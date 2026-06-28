@@ -2678,3 +2678,19 @@ without stamping broad `GpuDirty`. Runtime contract tests cover menu/model
 advertising, uniform and adaptive remesh, all three subdivision operators,
 undo/redo, dirty tags, wrong-domain and invalid-parameter fail-closed paths,
 and unavailable-kernel diagnostics.
+
+[`GEOM-039`](GEOM-039-accelerated-mesh-closest-face-query.md) — accelerated mesh
+closest-face query and consumer adoption retired to `tasks/done/` on 2026-06-28
+at `CPUContracted`. `Geometry.MeshClosestFaceIndex` now provides a packaged
+CPU exact nearest/k-nearest/radius face query over a `Geometry.BVH` of per-face
+AABBs, returning face, closest point, normal, fan-triangle primitive index,
+exact squared distance, status, and `Geometry.SpatialQueries` diagnostics.
+Polygon faces are fan-triangulated; empty/no-usable-triangle meshes,
+non-finite vertices, non-finite probes, and invalid parameters fail closed
+without NaNs or asserts. Adaptive remeshing reference projection, implicit
+plane-field closest-point evaluation, simplification Hausdorff redistribution,
+and `Geometry.HalfedgeMesh.Utils::NearestFace` now share the packaged query
+instead of private brute-force face scans. Focused geometry tests cover
+brute-force parity, pruning diagnostics, k-nearest and radius results, subset
+indices, boundary/on-surface queries, degenerate fail-closed behavior, and the
+three adopted consumers.

@@ -70,6 +70,17 @@ Reference projection is also available to uniform remeshing through
 `Geometry.Remeshing::RemeshingParams::ProjectToSurface` and related projection
 limits.
 
+`Geometry.MeshClosestFaceIndex` is the shared CPU exact nearest-face query for
+mesh consumers. It builds a `Geometry.BVH` over per-face AABBs and evaluates
+exact point-to-triangle distance for nearest, k-nearest, and radius queries;
+polygon faces are fan-triangulated while faces with no finite non-degenerate
+triangle are skipped. Results carry the `FaceHandle`, closest point, face normal,
+fan-triangle primitive index, exact squared distance, explicit status, and
+`Geometry.SpatialQueries` diagnostics. Adaptive remeshing reference projection,
+implicit plane-field closest-point evaluation, simplification Hausdorff
+redistribution, and `Geometry.HalfedgeMesh.Utils::NearestFace` all consume this
+packaged query instead of private brute-force face scans.
+
 `Geometry.Subdivision` implements Loop subdivision with optional feature-edge
 preservation from a caller-selected boolean edge property, defaulting to
 `e:feature`. Feature split edges remain tagged on output. `Geometry.SubdivisionSqrt3`

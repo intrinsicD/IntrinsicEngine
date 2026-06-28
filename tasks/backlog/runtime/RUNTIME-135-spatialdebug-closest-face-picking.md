@@ -23,22 +23,22 @@ maturity_target: CPUContracted
 - Status: backlog.
 - Owning subsystem/layer: `src/runtime/SpatialDebug/*` plus the runtime composition root that owns mesh `GeometrySources` entities. Runtime composes the geometry query; geometry owns the query. Runtime depends on geometry; geometry never depends on runtime.
 - SpatialDebug already exists under `src/runtime/SpatialDebug` as `Extrinsic.Runtime.SpatialDebugAdapters` (`src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` / `.cpp`). It already exposes adapter wrappers over `Geometry::BVH` / `Geometry::KDTree` / `Geometry::Octree`, a `SpatialDebugSnapshotBatch` data-only batch, `SpatialDebugAdapterOptions`/`SpatialDebugAdapterStats`, and a `SpatialDebugAdapterRegistry` keyed by an opaque `std::uint64_t`. This task adds an exact-nearest-face consumer alongside those adapters, not in place of them.
-- GEOM-039 exports the packaged nearest-face query in `src/geometry/Geometry.SpatialQueries.cppm` / `Geometry.BVH.cppm` returning a result type (e.g. `MeshClosestFaceResult`) carrying the closest `FaceHandle`, the closest `glm::vec3` point, the exact squared distance, and a found/valid flag, built over per-face AABBs. The mesh source is a `Geometry::HalfedgeMesh::Mesh` (`FaceHandle` declared in `src/geometry/Geometry.HalfedgeMesh.cppm`).
+- GEOM-039 exports the packaged nearest-face query in `src/geometry/Geometry.MeshClosestFace.cppm` / `.cpp` returning `MeshClosestFaceResult` with the closest `FaceHandle`, closest `glm::vec3` point, normal, primitive index, exact squared distance, status, and diagnostics, built over per-face AABBs. The mesh source is a `Geometry::HalfedgeMesh::Mesh` (`FaceHandle` declared in `src/geometry/Geometry.HalfedgeMesh.cppm`).
 - The active mesh entity is composed from ECS `GeometrySources` (`src/ecs/Components/ECS.Component.GeometrySources.cppm`); the runtime composition root resolves the active mesh, supplies its `HalfedgeMesh::Mesh` to the geometry query, and stamps overlay state.
-- Because GEOM-039 is a dependency, the runtime consumer must be feature-gated (compile-time/no-op) until the query lands, and must fail closed with deterministic diagnostics when no mesh entity is active, when the mesh is empty/non-triangle, or when the cursor point is non-finite.
+- GEOM-039 is retired and exports the query in `Geometry.MeshClosestFace`; the runtime consumer must fail closed with deterministic diagnostics when no mesh entity is active, when the mesh has no usable finite non-degenerate face triangles, or when the cursor point is non-finite.
 - Overlay rendering follows the existing SpatialDebug data-only batch convention: the consumer publishes overlay state (a highlighted `FaceHandle`, its closest point, and a distance) into a data-only structure; it must not call renderer/RHI/Vulkan upload APIs directly.
 
 ## Slice plan
-- [ ] Slice A (CPUContracted composition): add the runtime closest-face SpatialDebug consumer (index build/refresh over the active mesh entity, point-driven resolution via the GEOM-039 query, data-only overlay state) behind a GEOM-039 feature gate, with a runtime contract test proving parity with the direct geometry query and a valid overlay reference. This is the maturity stop-state.
+- [ ] Slice A (CPUContracted composition): add the runtime closest-face SpatialDebug consumer (index build/refresh over the active mesh entity, point-driven resolution via the GEOM-039 query, data-only overlay state), with a runtime contract test proving parity with the direct geometry query and a valid overlay reference. This is the maturity stop-state.
 - [ ] Slice B (Operational, deferred): live interactive cursor/ray-driven picking wired into the editor input loop with on-screen highlight rendering. Deferred to a later value-gated follow-up; not in scope here.
 
 ## Required changes
 - [ ] Add a runtime closest-face SpatialDebug consumer to `src/runtime/SpatialDebug/` (new `Runtime.SpatialDebugClosestFace.cppm` interface plus matching `Runtime.SpatialDebugClosestFace.cpp` implementation; non-trivial bodies in the `.cpp`). Export the consumer in the `Extrinsic::Runtime` namespace alongside the existing adapter surface.
-- [ ] Define a data-only overlay state struct (e.g. `SpatialDebugClosestFaceOverlay`) carrying a found/valid flag, the highlighted `Geometry::HalfedgeMesh::FaceHandle`, the closest `glm::vec3` point, the cursor/probe world point, and the resolved distance; plus a result/diagnostic enum reported on failure (no active mesh, empty/non-triangle mesh, non-finite probe, GEOM-039 unavailable).
+- [ ] Define a data-only overlay state struct (e.g. `SpatialDebugClosestFaceOverlay`) carrying a found/valid flag, the highlighted `Geometry::HalfedgeMesh::FaceHandle`, the closest `glm::vec3` point, the cursor/probe world point, and the resolved distance; plus a result/diagnostic enum reported on failure (no active mesh, empty mesh/no usable face triangles, non-finite probe).
 - [ ] Add an index lifecycle on the consumer: build/refresh the per-face nearest-face index for the active mesh entity by delegating to the GEOM-039 query/index build, and invalidate/rebuild it when the active mesh entity or its mesh content changes (track via a mesh revision/dirty signal already available on `GeometrySources`, rather than rebuilding every frame).
 - [ ] Add the resolve entry point: given the active mesh and a world-space probe point, call the GEOM-039 nearest-face query and populate the overlay state with the returned `{FaceHandle, closest point, exact distance}`; populate the failure diagnostic and clear the highlight on any fail-closed path.
 - [ ] Wire the consumer into the runtime composition that owns mesh `GeometrySources` (the SpatialDebug composition under `src/runtime/`), resolving the active mesh entity's `HalfedgeMesh::Mesh` and feeding it to the consumer; do not reach into geometry to access runtime/ECS state.
-- [ ] Feature-gate the GEOM-039 call site so the consumer compiles and returns a deterministic "query unavailable" diagnostic (no highlight) until GEOM-039 is present; remove the gate when the dependency lands.
+- [ ] Compose the geometry-owned GEOM-039 call site directly; do not reimplement closest-face traversal or keep a stale query-unavailable lane now that the dependency is retired.
 - [ ] Update module wiring (`intrinsic_add_module_library` / `target_sources(... FILE_SET CXX_MODULES ...)`) in the runtime SpatialDebug `CMakeLists.txt` for the new translation unit; do not introduce a new module library if the existing SpatialDebug module library can own the unit.
 
 ## Tests
@@ -46,8 +46,7 @@ maturity_target: CPUContracted
 - [ ] Assert that after a successful resolve, the overlay state references a valid (in-mesh, non-deleted) `FaceHandle`, a finite closest point, and a non-negative distance consistent with the direct query.
 - [ ] Assert index rebuild on mesh change: after mutating the active mesh entity's mesh content (or swapping the active mesh entity), a subsequent resolve reflects the new mesh and returns the new nearest face (stale-index result is not returned).
 - [ ] Assert no-active-mesh behavior: with no active mesh entity, resolve returns a fail-closed diagnostic, leaves the overlay highlight cleared, and does not crash or assert.
-- [ ] Assert degenerate fail-closed: empty mesh, non-triangle mesh, and a non-finite probe point each return an explicit diagnostic with no highlight and no NaNs.
-- [ ] Assert the GEOM-039-unavailable gate path returns the deterministic "query unavailable" diagnostic with no highlight.
+- [ ] Assert degenerate fail-closed: empty mesh, mesh with no usable finite non-degenerate face triangle, and a non-finite probe point each return an explicit diagnostic with no highlight and no NaNs.
 
 ## Docs
 - [ ] Update `src/runtime/README.md` (or the SpatialDebug section therein) describing the closest-face overlay consumer, the runtime-composes / geometry-owns split, the index invalidation contract, and the data-only overlay (no direct renderer/RHI calls).
@@ -58,7 +57,7 @@ maturity_target: CPUContracted
 - [ ] The SpatialDebug closest-face consumer resolves a world-space probe point to the same nearest `FaceHandle` and closest point as the direct GEOM-039 query on a fixed corpus.
 - [ ] On success the overlay state references a valid face, a finite closest point, and a reported distance; the consumer publishes only data-only overlay state and makes no renderer/RHI/Vulkan calls.
 - [ ] The index is built/refreshed for the active mesh entity and is invalidated/rebuilt on mesh or active-entity change; a stale-index result is never returned.
-- [ ] All fail-closed paths (no active mesh, empty/non-triangle mesh, non-finite probe, GEOM-039 unavailable) return deterministic diagnostics with no highlight, no NaNs, and no asserts.
+- [ ] All fail-closed paths (no active mesh, empty mesh/no usable face triangles, non-finite probe) return deterministic diagnostics with no highlight, no NaNs, and no asserts.
 - [ ] No geometry kernel for closest-face is implemented in runtime; the consumer only composes the GEOM-039 query.
 - [ ] Focused runtime contract tests and the structural/layering/doc checks below pass.
 

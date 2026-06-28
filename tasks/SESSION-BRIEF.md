@@ -33,7 +33,7 @@ the authoritative open/unblocked view.
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
-- blocked by `GEOM-039`: `RUNTIME-135` — SpatialDebug closest-face picking via accelerated mesh query (tasks/backlog/runtime/RUNTIME-135-spatialdebug-closest-face-picking.md)
+- unblocked: `RUNTIME-135` — SpatialDebug closest-face picking via accelerated mesh query (tasks/backlog/runtime/RUNTIME-135-spatialdebug-closest-face-picking.md)
 
 ## Theme H — Agentic workflow hardening
 
@@ -55,7 +55,6 @@ the authoritative open/unblocked view.
 - blocked by `GEOM-020`: `GEOM-024` — Sparse symmetric generalized eigensolver seam (tasks/backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
 - unblocked: `GEOM-037` — SO(3) rotation primitives (Lie machinery) (tasks/backlog/geometry/GEOM-037-so3-rotation-primitives.md)
 - blocked by `GEOM-037`: `GEOM-038` — Rotation averaging — SO(3) means and medians (tasks/backlog/geometry/GEOM-038-rotation-averaging-means-medians.md)
-- unblocked: `GEOM-039` — Accelerated mesh closest-face query and consumer adoption (tasks/backlog/geometry/GEOM-039-accelerated-mesh-closest-face-query.md)
 - unblocked: `GEOM-045` — First-class mesh geometric-quantity accessors (tasks/backlog/geometry/GEOM-045-first-class-mesh-quantity-accessors.md)
 - unblocked: `GEOM-048` — Statistics accumulators and robust estimation kernels (tasks/backlog/geometry/GEOM-048-statistics-robust-estimation-kernels.md)
 - unblocked: `GEOM-049` — Numeric / linear-algebra utilities: RPCA and Eigen map adapters (tasks/backlog/geometry/GEOM-049-numeric-linalg-utilities.md)

@@ -19,6 +19,7 @@ module Geometry.ImplicitPlaneField;
 
 import Geometry.Plane;
 import Geometry.Validation;
+import Geometry.MeshClosestFace;
 
 namespace Geometry::Implicit
 {
@@ -34,14 +35,6 @@ namespace Geometry::Implicit
 
         static constexpr float kEpsilon = 1.0e-6f;
 
-        struct TrianglePrimitive
-        {
-            glm::vec3 A;
-            glm::vec3 B;
-            glm::vec3 C;
-            std::uint32_t PrimitiveIndex{std::numeric_limits<std::uint32_t>::max()};
-        };
-
         struct ClosestPointSample
         {
             glm::vec3 QueryPoint{0.0f};
@@ -53,158 +46,39 @@ namespace Geometry::Implicit
             bool Valid{false};
         };
 
-        [[nodiscard]] bool NormalizeSafe(glm::vec3& v)
-        {
-            const float len2 = glm::dot(v, v);
-            if (!std::isfinite(len2) || len2 <= (kEpsilon * kEpsilon))
-                return false;
-            v *= 1.0f / std::sqrt(len2);
-            return true;
-        }
-
-        [[nodiscard]] glm::vec3 TriangleNormal(
-            const glm::vec3& a,
-            const glm::vec3& b,
-            const glm::vec3& c)
-        {
-            return glm::cross(b - a, c - a);
-        }
-
-        [[nodiscard]] glm::vec3 ClosestPointOnTriangle(
-            const glm::vec3& p,
-            const glm::vec3& a,
-            const glm::vec3& b,
-            const glm::vec3& c)
-        {
-            // Christer Ericson, Real-Time Collision Detection.
-            const glm::vec3 ab = b - a;
-            const glm::vec3 ac = c - a;
-            const glm::vec3 ap = p - a;
-
-            const float d1 = glm::dot(ab, ap);
-            const float d2 = glm::dot(ac, ap);
-            if (d1 <= 0.0f && d2 <= 0.0f) return a;
-
-            const glm::vec3 bp = p - b;
-            const float d3 = glm::dot(ab, bp);
-            const float d4 = glm::dot(ac, bp);
-            if (d3 >= 0.0f && d4 <= d3) return b;
-
-            const float vc = d1 * d4 - d3 * d2;
-            if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f)
-            {
-                const float v = d1 / (d1 - d3);
-                return a + v * ab;
-            }
-
-            const glm::vec3 cp = p - c;
-            const float d5 = glm::dot(ab, cp);
-            const float d6 = glm::dot(ac, cp);
-            if (d6 >= 0.0f && d5 <= d6) return c;
-
-            const float vb = d5 * d2 - d1 * d6;
-            if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f)
-            {
-                const float w = d2 / (d2 - d6);
-                return a + w * ac;
-            }
-
-            const float va = d3 * d6 - d5 * d4;
-            if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f)
-            {
-                const glm::vec3 bc = c - b;
-                const float w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
-                return b + w * bc;
-            }
-
-            const float denom = 1.0f / (va + vb + vc);
-            const float v = vb * denom;
-            const float w = vc * denom;
-            return a + ab * v + ac * w;
-        }
-
         struct MeshClosestPointOracle
         {
             explicit MeshClosestPointOracle(const HalfedgeMesh::Mesh& mesh)
             {
-                BuildTriangles(mesh);
+                (void)m_Index.Build(mesh);
             }
 
             [[nodiscard]] bool Empty() const noexcept
             {
-                return m_Triangles.empty();
+                return !m_Index.IsBuilt();
             }
 
             [[nodiscard]] ClosestPointSample Query(const glm::vec3& queryPoint) const
             {
                 ClosestPointSample out;
                 out.QueryPoint = queryPoint;
-                if (m_Triangles.empty())
+                const MeshClosestFaceResult nearest = m_Index.Query(queryPoint);
+                if (!nearest.Found)
                     return out;
 
-                float bestDist2 = std::numeric_limits<float>::max();
-                for (const TrianglePrimitive& tri : m_Triangles)
-                {
-                    const glm::vec3 cp = ClosestPointOnTriangle(queryPoint, tri.A, tri.B, tri.C);
-                    const glm::vec3 diff = queryPoint - cp;
-                    const float dist2 = glm::dot(diff, diff);
-                    if (dist2 >= bestDist2)
-                        continue;
-
-                    glm::vec3 n = TriangleNormal(tri.A, tri.B, tri.C);
-                    if (!NormalizeSafe(n))
-                        continue;
-
-                    bestDist2 = dist2;
-                    out.ClosestPoint = cp;
-                    out.Normal = n;
-                    out.UnsignedDistance = std::sqrt(std::max(0.0f, dist2));
-                    out.SignedDistance = glm::dot(queryPoint - cp, n);
-                    out.PrimitiveIndex = tri.PrimitiveIndex;
-                    out.Valid = true;
-                }
-
+                out.ClosestPoint = nearest.Point;
+                out.Normal = nearest.Normal;
+                out.UnsignedDistance =
+                    std::sqrt(std::max(0.0f, nearest.SquaredDistance));
+                out.SignedDistance =
+                    glm::dot(queryPoint - nearest.Point, nearest.Normal);
+                out.PrimitiveIndex = nearest.PrimitiveIndex;
+                out.Valid = true;
                 return out;
             }
 
         private:
-            void BuildTriangles(const HalfedgeMesh::Mesh& mesh)
-            {
-                for (std::size_t faceIndex = 0; faceIndex < mesh.FacesSize(); ++faceIndex)
-                {
-                    const FaceHandle f{static_cast<PropertyIndex>(faceIndex)};
-                    if (!mesh.IsValid(f) || mesh.IsDeleted(f))
-                        continue;
-
-                    std::vector<VertexHandle> faceVertices;
-                    for (const VertexHandle v : mesh.VerticesAroundFace(f))
-                    {
-                        if (mesh.IsValid(v) && !mesh.IsDeleted(v))
-                            faceVertices.push_back(v);
-                    }
-
-                    if (faceVertices.size() < 3u)
-                        continue;
-
-                    const glm::vec3 p0 = mesh.Position(faceVertices[0]);
-                    for (std::size_t i = 1; i + 1 < faceVertices.size(); ++i)
-                    {
-                        const glm::vec3 p1 = mesh.Position(faceVertices[i]);
-                        const glm::vec3 p2 = mesh.Position(faceVertices[i + 1u]);
-                        if (!Validation::IsFinite(p0) || !Validation::IsFinite(p1) || !Validation::IsFinite(p2))
-                            continue;
-
-                        m_Triangles.push_back(TrianglePrimitive{
-                            .A = p0,
-                            .B = p1,
-                            .C = p2,
-                            .PrimitiveIndex = static_cast<std::uint32_t>(m_Triangles.size())
-                        });
-                    }
-                }
-            }
-
-            std::vector<TrianglePrimitive> m_Triangles;
+            MeshClosestFaceIndex m_Index{};
         };
 
         [[nodiscard]] float DegreesToRadians(float degrees)

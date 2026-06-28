@@ -35,7 +35,6 @@ Grouped by cluster; each is `geometry -> core` only and targets `CPUContracted`.
   (foundation for `GEOM-038`).
 - [GEOM-038 — Rotation averaging: SO(3) means and medians](GEOM-038-rotation-averaging-means-medians.md)
   (depends on `GEOM-037`).
-- [GEOM-039 — Accelerated mesh closest-face query and consumer adoption](GEOM-039-accelerated-mesh-closest-face-query.md).
 - [GEOM-045 — First-class mesh geometric-quantity accessors](GEOM-045-first-class-mesh-quantity-accessors.md).
 - [GEOM-048 — Statistics accumulators and robust estimation kernels](GEOM-048-statistics-robust-estimation-kernels.md).
 - [GEOM-049 — Numeric/linear-algebra utilities (RPCA, Eigen map adapters)](GEOM-049-numeric-linalg-utilities.md).
@@ -44,7 +43,8 @@ Grouped by cluster; each is `geometry -> core` only and targets `CPUContracted`.
 
 The indexed decrease-key heap that backs Dijkstra is a `core` container filed
 under the runtime backlog as `CORE-004`; the paired editor/runtime integration
-tasks are retired `UI-024`/`UI-025`/`UI-026`, with `RUNTIME-135` remaining.
+tasks are retired `UI-024`/`UI-025`/`UI-026`, and retired `GEOM-039` unblocks
+the runtime SpatialDebug closest-face consumer in `RUNTIME-135`.
 
 ## Convergence
 
@@ -126,6 +126,7 @@ split; narratives live in the retirement log.
 - [GEOM-032 — Bool property access contract](../../done/GEOM-032-bool-property-access-contract.md) (done).
 - [GEOM-033 — Erased property metadata catalog](../../done/GEOM-033-erased-property-metadata-catalog.md) (done).
 - [GEOM-034 — Geometry property API documentation audit](../../done/GEOM-034-geometry-property-api-doc-audit.md) (done).
+- [GEOM-039 — Accelerated mesh closest-face query and consumer adoption](../../done/GEOM-039-accelerated-mesh-closest-face-query.md) (done).
 - [GEOM-040 — Mesh curvature tensor and principal directions](../../done/GEOM-040-curvature-tensor-principal-directions.md) (done).
 - [GEOM-041 — FEM Laplacian mass/stiffness variants and edge-weight modes](../../done/GEOM-041-fem-laplacian-mass-stiffness-variants.md) (done).
 - [GEOM-042 — Mesh normal-based bilateral denoiser](../../done/GEOM-042-mesh-normal-bilateral-denoiser.md) (done).
