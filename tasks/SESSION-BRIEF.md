@@ -33,7 +33,6 @@ the authoritative open/unblocked view.
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
-- unblocked: `RUNTIME-135` — SpatialDebug closest-face picking via accelerated mesh query (tasks/backlog/runtime/RUNTIME-135-spatialdebug-closest-face-picking.md)
 
 ## Theme H — Agentic workflow hardening
 

@@ -50,6 +50,7 @@ target_sources(${target_name}
         Runtime.VertexChannelBindings.cppm
         Runtime.VertexChannelStreams.cppm
         SpatialDebug/Runtime.SpatialDebugAdapters.cppm
+        SpatialDebug/Runtime.SpatialDebugClosestFace.cppm
         Visualization/Runtime.VisualizationAdapters.cppm
         PRIVATE
         Runtime.AssetGeometryIO.cpp
@@ -93,6 +94,7 @@ target_sources(${target_name}
         Runtime.VertexAttributeBinding.cpp
         Runtime.VertexChannelStreams.cpp
         SpatialDebug/Runtime.SpatialDebugAdapters.cpp
+        SpatialDebug/Runtime.SpatialDebugClosestFace.cpp
         Visualization/Runtime.VisualizationAdapters.cpp
 )
 

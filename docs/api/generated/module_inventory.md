@@ -21,7 +21,7 @@ Root scanned: `src`
 | `legacy` | 181 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 43 |
+| `runtime` | 44 |
 
 ## Modules
 
@@ -545,6 +545,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.VertexChannelBindings` | `src/runtime/Runtime.VertexChannelBindings.cppm` | `runtime` |
 | `Extrinsic.Runtime.VertexChannelStreams` | `src/runtime/Runtime.VertexChannelStreams.cppm` | `runtime` |
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
+| `Extrinsic.Runtime.SpatialDebugClosestFace` | `src/runtime/SpatialDebug/Runtime.SpatialDebugClosestFace.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **519**
+Total modules: **520**

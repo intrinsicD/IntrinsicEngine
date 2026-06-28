@@ -323,6 +323,7 @@ if(TARGET ExtrinsicRuntime)
         Test.SelectionSnapshotExtraction.cpp
         Test.SelectionStableLookupComposition.cpp
         Test.SpatialDebugAdapters.cpp
+        Test.SpatialDebugClosestFace.cpp
         Test.StableEntityLookup.cpp
         Test.VertexAttributeBinding.cpp
         Test.VertexChannelStreams.cpp

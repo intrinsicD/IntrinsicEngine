@@ -2694,3 +2694,16 @@ instead of private brute-force face scans. Focused geometry tests cover
 brute-force parity, pruning diagnostics, k-nearest and radius results, subset
 indices, boundary/on-surface queries, degenerate fail-closed behavior, and the
 three adopted consumers.
+
+[`RUNTIME-135`](RUNTIME-135-spatialdebug-closest-face-picking.md) —
+SpatialDebug closest-face picking via accelerated mesh query retired to
+`tasks/done/` on 2026-06-28 at `CPUContracted`. Runtime now exports
+`Extrinsic.Runtime.SpatialDebugClosestFace`, a data-only closest-face overlay
+consumer that accepts a caller-resolved active mesh descriptor, caches the
+GEOM-039 `Geometry.MeshClosestFaceIndex` by stable mesh key/revision, and emits
+the highlighted face, probe point, closest point, normal, exact distance,
+primitive index, mesh identity, query status, and diagnostics. No closest-face
+kernel is implemented in runtime; no renderer/RHI/Vulkan or editor widget path
+is touched. Runtime contract coverage proves parity with the direct geometry
+query, valid overlay output, rebuild on revision change, no-active/missing-mesh
+fail-closed behavior, and empty/degenerate/non-finite-probe diagnostics.

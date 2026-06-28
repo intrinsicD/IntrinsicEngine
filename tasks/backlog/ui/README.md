@@ -12,8 +12,8 @@ map.
 
 - [RORG-031F — UI integration backlog seed](RORG-031-ui-integration.md).
 
-The runtime SpatialDebug closest-face picking consumer for `GEOM-039` is filed
-under the runtime backlog as `RUNTIME-135`.
+The runtime SpatialDebug closest-face picking consumer for `GEOM-039` is
+retired under the runtime backlog as `RUNTIME-135`.
 
 ## Convergence
 
