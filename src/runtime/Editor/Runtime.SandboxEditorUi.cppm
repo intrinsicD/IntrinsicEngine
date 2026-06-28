@@ -284,6 +284,8 @@ export namespace Extrinsic::Runtime
         bool HasNormalsMethod{false};
         bool HasDenoiseMethod{false};
         bool HasCurvatureMethod{false};
+        bool HasRemeshMethod{false};
+        bool HasSubdivideMethod{false};
     };
 
     [[nodiscard]] std::vector<SandboxEditorGeometryProcessingMenuItem>
@@ -370,6 +372,34 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] const char* DebugNameForSandboxEditorMeshCurvatureOutput(
         SandboxEditorMeshCurvatureOutput output) noexcept;
 
+    enum class SandboxEditorMeshRemeshMode : std::uint8_t
+    {
+        Uniform,
+        Adaptive,
+    };
+
+    enum class SandboxEditorMeshRemeshSizingLaw : std::uint8_t
+    {
+        MeanCurvature,
+        ErrorBoundedTaubin,
+    };
+
+    enum class SandboxEditorMeshSubdivideOperator : std::uint8_t
+    {
+        Loop,
+        CatmullClark,
+        Sqrt3,
+    };
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorMeshRemeshMode(
+        SandboxEditorMeshRemeshMode mode) noexcept;
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorMeshRemeshSizingLaw(
+        SandboxEditorMeshRemeshSizingLaw sizingLaw) noexcept;
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorMeshSubdivideOperator(
+        SandboxEditorMeshSubdivideOperator op) noexcept;
+
     struct SandboxEditorMeshDenoiseCommand
     {
         std::uint32_t StableEntityId{0u};
@@ -438,6 +468,83 @@ export namespace Extrinsic::Runtime
         std::size_t DirectionWrittenCount{0u};
         std::size_t NonFiniteScalarCount{0u};
         std::size_t NonFiniteDirectionCount{0u};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SandboxEditorCommandStatus::Applied;
+        }
+    };
+
+    struct SandboxEditorMeshRemeshCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        SandboxEditorMeshRemeshMode Mode{
+            SandboxEditorMeshRemeshMode::Uniform};
+        SandboxEditorMeshRemeshSizingLaw SizingLaw{
+            SandboxEditorMeshRemeshSizingLaw::MeanCurvature};
+        std::uint32_t Iterations{1u};
+        double TargetEdgeLength{0.0};
+        double Lambda{0.5};
+        double CurvatureAdaptation{1.0};
+        double ApproximationError{0.01};
+        bool PreserveBoundary{true};
+        bool ProjectToSurface{false};
+        std::uint32_t ReferenceProjectionK{16u};
+        double MaxReferenceProjectionDistance{0.0};
+    };
+
+    struct SandboxEditorMeshRemeshResult
+    {
+        SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
+        SandboxEditorMeshRemeshMode Mode{
+            SandboxEditorMeshRemeshMode::Uniform};
+        SandboxEditorMeshRemeshSizingLaw SizingLaw{
+            SandboxEditorMeshRemeshSizingLaw::MeanCurvature};
+        std::uint32_t IterationsRequested{0u};
+        std::uint32_t IterationsPerformed{0u};
+        double TargetEdgeLength{0.0};
+        bool ProjectToSurface{false};
+        std::size_t InputVertexCount{0u};
+        std::size_t InputFaceCount{0u};
+        std::size_t OutputVertexCount{0u};
+        std::size_t OutputFaceCount{0u};
+        std::size_t SplitCount{0u};
+        std::size_t CollapseCount{0u};
+        std::size_t FlipCount{0u};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SandboxEditorCommandStatus::Applied;
+        }
+    };
+
+    struct SandboxEditorMeshSubdivideCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        SandboxEditorMeshSubdivideOperator Operator{
+            SandboxEditorMeshSubdivideOperator::Loop};
+        std::uint32_t Iterations{1u};
+        bool PreserveLoopFeatureEdges{false};
+        std::uint32_t MaxOutputFaces{0u};
+        std::string FeatureEdgePropertyName{"e:feature"};
+    };
+
+    struct SandboxEditorMeshSubdivideResult
+    {
+        SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
+        SandboxEditorMeshSubdivideOperator Operator{
+            SandboxEditorMeshSubdivideOperator::Loop};
+        std::uint32_t IterationsRequested{0u};
+        std::uint32_t IterationsPerformed{0u};
+        bool PreserveLoopFeatureEdges{false};
+        std::size_t InputVertexCount{0u};
+        std::size_t InputFaceCount{0u};
+        std::size_t OutputVertexCount{0u};
+        std::size_t OutputFaceCount{0u};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
 
@@ -1548,6 +1655,16 @@ export namespace Extrinsic::Runtime
         bool MeshDenoiseAvailable{false};
         bool MeshCurvatureAvailable{false};
         bool MeshCurvatureDirectionsAvailable{false};
+        bool MeshRemeshAvailable{false};
+        bool MeshRemeshUniformAvailable{false};
+        bool MeshRemeshAdaptiveAvailable{false};
+        bool MeshRemeshProjectToSurfaceAvailable{false};
+        bool MeshRemeshErrorBoundedSizingAvailable{false};
+        bool MeshSubdivideAvailable{false};
+        bool MeshSubdivideLoopAvailable{false};
+        bool MeshSubdivideCatmullClarkAvailable{false};
+        bool MeshSubdivideSqrt3Available{false};
+        bool MeshSubdivideLoopFeatureEdgesAvailable{false};
         bool MeshVertexNormalsAvailable{false};
         bool GraphVertexNormalsAvailable{false};
         bool PointCloudVertexNormalsAvailable{false};
@@ -1556,6 +1673,10 @@ export namespace Extrinsic::Runtime
             LastMeshDenoiseResult{};
         std::optional<SandboxEditorMeshCurvatureResult>
             LastMeshCurvatureResult{};
+        std::optional<SandboxEditorMeshRemeshResult>
+            LastMeshRemeshResult{};
+        std::optional<SandboxEditorMeshSubdivideResult>
+            LastMeshSubdivideResult{};
         std::optional<SandboxEditorMeshVertexNormalsResult>
             LastMeshVertexNormalsResult{};
         std::optional<SandboxEditorGraphVertexNormalsResult>
@@ -1636,6 +1757,10 @@ export namespace Extrinsic::Runtime
             LastMeshDenoiseResult{nullptr};
         const SandboxEditorMeshCurvatureResult*
             LastMeshCurvatureResult{nullptr};
+        const SandboxEditorMeshRemeshResult*
+            LastMeshRemeshResult{nullptr};
+        const SandboxEditorMeshSubdivideResult*
+            LastMeshSubdivideResult{nullptr};
         const SandboxEditorMeshVertexNormalsResult*
             LastMeshVertexNormalsResult{nullptr};
         const SandboxEditorGraphVertexNormalsResult*
@@ -1663,6 +1788,14 @@ export namespace Extrinsic::Runtime
         bool MeshDenoiseKernelAvailable{true};
         bool MeshCurvatureKernelAvailable{true};
         bool MeshCurvatureDirectionsAvailable{true};
+        bool MeshRemeshUniformKernelAvailable{true};
+        bool MeshRemeshAdaptiveKernelAvailable{true};
+        bool MeshRemeshProjectToSurfaceAvailable{true};
+        bool MeshRemeshErrorBoundedSizingAvailable{true};
+        bool MeshSubdivideLoopKernelAvailable{true};
+        bool MeshSubdivideCatmullClarkKernelAvailable{true};
+        bool MeshSubdivideSqrt3KernelAvailable{true};
+        bool MeshSubdivideLoopFeatureEdgesAvailable{true};
     };
 
     struct SandboxEditorTransformEditCommand
@@ -1975,6 +2108,14 @@ export namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorMeshCurvatureCommand& command);
 
+    SandboxEditorMeshRemeshResult ApplySandboxEditorMeshRemeshCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorMeshRemeshCommand& command);
+
+    SandboxEditorMeshSubdivideResult ApplySandboxEditorMeshSubdivideCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorMeshSubdivideCommand& command);
+
     SandboxEditorMeshVertexNormalsResult
     ApplySandboxEditorMeshVertexNormalsCommand(
         const SandboxEditorContext& context,
@@ -2039,6 +2180,10 @@ export namespace Extrinsic::Runtime
             m_LastMeshDenoiseResult{};
         std::optional<SandboxEditorMeshCurvatureResult>
             m_LastMeshCurvatureResult{};
+        std::optional<SandboxEditorMeshRemeshResult>
+            m_LastMeshRemeshResult{};
+        std::optional<SandboxEditorMeshSubdivideResult>
+            m_LastMeshSubdivideResult{};
         std::optional<SandboxEditorMeshVertexNormalsResult>
             m_LastMeshVertexNormalsResult{};
         std::optional<SandboxEditorGraphVertexNormalsResult>
@@ -2063,6 +2208,14 @@ export namespace Extrinsic::Runtime
         bool m_MeshDenoisePreserveBoundary{true};
         std::int32_t m_MeshCurvatureOutput{0};
         bool m_MeshCurvaturePublishDirections{true};
+        std::int32_t m_MeshRemeshMode{0};
+        std::int32_t m_MeshRemeshSizingLaw{0};
+        std::int32_t m_MeshRemeshIterations{1};
+        float m_MeshRemeshTargetEdgeLength{0.0f};
+        bool m_MeshRemeshProjectToSurface{false};
+        std::int32_t m_MeshSubdivideOperator{0};
+        std::int32_t m_MeshSubdivideIterations{1};
+        bool m_MeshSubdividePreserveLoopFeatures{false};
         std::int32_t m_MeshVertexNormalsWeighting{1};
         glm::vec3 m_MeshVertexNormalsFallback{0.0f, 1.0f, 0.0f};
         glm::vec3 m_GraphVertexNormalsFallback{0.0f, 0.0f, 1.0f};

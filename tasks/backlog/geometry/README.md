@@ -44,7 +44,7 @@ Grouped by cluster; each is `geometry -> core` only and targets `CPUContracted`.
 
 The indexed decrease-key heap that backs Dijkstra is a `core` container filed
 under the runtime backlog as `CORE-004`; the paired editor/runtime integration
-tasks are retired `UI-024`/`UI-026`, remaining `UI-025`, and `RUNTIME-135`.
+tasks are retired `UI-024`/`UI-025`/`UI-026`, with `RUNTIME-135` remaining.
 
 ## Convergence
 

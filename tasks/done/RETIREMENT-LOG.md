@@ -2660,3 +2660,21 @@ without stamping broad `GpuDirty`. Contract tests cover menu/capability
 advertising, successful denoise publication, undo/redo exact restoration,
 dirty-tag behavior, wrong-domain and invalid-parameter fail-closed paths, and
 the deterministic unavailable-kernel diagnostic lane.
+
+[`UI-025`](UI-025-editor-remesh-subdivide-windows.md) — Sandbox EditorUI
+remeshing and subdivision windows retired to `tasks/done/` on 2026-06-28 at
+`CPUContracted`. `Mesh > Processing > Remesh` now exposes uniform/adaptive
+remeshing controls for target edge length, iterations, project-to-surface, and
+mean-curvature versus error-bounded Taubin sizing, with runtime-owned
+feature-gated command/result DTOs that call `Geometry.Remeshing` and
+`Geometry.HalfedgeMesh.AdaptiveRemeshing`. `Mesh > Processing > Subdivide`
+exposes Loop, Catmull-Clark, and Sqrt(3) operators plus Loop feature-edge
+preservation, calling the GEOM-044 geometry modules through the same runtime
+command surface. Successful commands replace the selected mesh
+`GeometrySources` through undoable `EditorCommandHistory` snapshots, stamp
+`DirtyVertexPositions`, `DirtyVertexAttributes`, `DirtyEdgeTopology`, and
+`DirtyFaceTopology`, and leave renderer/RHI uploads to deferred extraction
+without stamping broad `GpuDirty`. Runtime contract tests cover menu/model
+advertising, uniform and adaptive remesh, all three subdivision operators,
+undo/redo, dirty tags, wrong-domain and invalid-parameter fail-closed paths,
+and unavailable-kernel diagnostics.

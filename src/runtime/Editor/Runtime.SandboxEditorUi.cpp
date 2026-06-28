@@ -68,15 +68,21 @@ import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Graph;
 import Geometry.Graph.Vertex.Normals;
 import Geometry.Curvature;
+import Geometry.CatmullClark;
 import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.AdaptiveRemeshing;
+import Geometry.HalfedgeMesh.SubdivisionSqrt3;
 import Geometry.HalfedgeMesh.Vertices.Normals;
 import Geometry.KMeans;
 import Geometry.Mesh.Conversion;
+import Geometry.MeshOperator;
 import Geometry.MeshSoup;
 import Geometry.PointCloud;
 import Geometry.PointCloud.Normals;
 import Geometry.Properties;
+import Geometry.Remeshing;
 import Geometry.Smoothing;
+import Geometry.Subdivision;
 import Geometry.UvAtlas;
 
 namespace Extrinsic::Runtime
@@ -95,6 +101,11 @@ namespace Extrinsic::Runtime
         namespace PointNormals = Geometry::PointCloud::Normals;
         namespace Smooth = Geometry::Smoothing;
         namespace Curv = Geometry::Curvature;
+        namespace Remesh = Geometry::Remeshing;
+        namespace AdaptiveRemesh = Geometry::AdaptiveRemeshing;
+        namespace LoopSubdivide = Geometry::Subdivision;
+        namespace CatmullClark = Geometry::CatmullClark;
+        namespace Sqrt3Subdivide = Geometry::SubdivisionSqrt3;
 
         inline constexpr std::array<A::AssetPayloadKind, 6> kImportPayloadKinds{{
             A::AssetPayloadKind::Unknown,
@@ -152,6 +163,25 @@ namespace Extrinsic::Runtime
                 SandboxEditorMeshCurvatureOutput::PrincipalDirections,
             }};
 
+        inline constexpr std::array<SandboxEditorMeshRemeshMode, 2>
+            kMeshRemeshModes{{
+                SandboxEditorMeshRemeshMode::Uniform,
+                SandboxEditorMeshRemeshMode::Adaptive,
+            }};
+
+        inline constexpr std::array<SandboxEditorMeshRemeshSizingLaw, 2>
+            kMeshRemeshSizingLaws{{
+                SandboxEditorMeshRemeshSizingLaw::MeanCurvature,
+                SandboxEditorMeshRemeshSizingLaw::ErrorBoundedTaubin,
+            }};
+
+        inline constexpr std::array<SandboxEditorMeshSubdivideOperator, 3>
+            kMeshSubdivideOperators{{
+                SandboxEditorMeshSubdivideOperator::Loop,
+                SandboxEditorMeshSubdivideOperator::CatmullClark,
+                SandboxEditorMeshSubdivideOperator::Sqrt3,
+            }};
+
         [[nodiscard]] const char* DebugNameForTextureBakeEncoder(
             const MeshAttributeTextureBakeEncoder encoder) noexcept
         {
@@ -195,6 +225,24 @@ namespace Extrinsic::Runtime
             std::optional<SandboxEditorMeshCurvatureResult>* LastResult{nullptr};
             std::int32_t* Output{nullptr};
             bool* PublishPrincipalDirections{nullptr};
+        };
+
+        struct MeshRemeshUiState
+        {
+            std::optional<SandboxEditorMeshRemeshResult>* LastResult{nullptr};
+            std::int32_t* Mode{nullptr};
+            std::int32_t* SizingLaw{nullptr};
+            std::int32_t* Iterations{nullptr};
+            float* TargetEdgeLength{nullptr};
+            bool* ProjectToSurface{nullptr};
+        };
+
+        struct MeshSubdivideUiState
+        {
+            std::optional<SandboxEditorMeshSubdivideResult>* LastResult{nullptr};
+            std::int32_t* Operator{nullptr};
+            std::int32_t* Iterations{nullptr};
+            bool* PreserveLoopFeatures{nullptr};
         };
 
         struct MeshVertexNormalsUiState
@@ -4511,6 +4559,36 @@ namespace Extrinsic::Runtime
             return kMeshCurvatureOutputs[static_cast<std::size_t>(clamped)];
         }
 
+        [[nodiscard]] SandboxEditorMeshRemeshMode
+        MeshRemeshModeFromIndex(const std::int32_t index) noexcept
+        {
+            const std::int32_t clamped = std::clamp(
+                index,
+                0,
+                static_cast<std::int32_t>(kMeshRemeshModes.size() - 1u));
+            return kMeshRemeshModes[static_cast<std::size_t>(clamped)];
+        }
+
+        [[nodiscard]] SandboxEditorMeshRemeshSizingLaw
+        MeshRemeshSizingLawFromIndex(const std::int32_t index) noexcept
+        {
+            const std::int32_t clamped = std::clamp(
+                index,
+                0,
+                static_cast<std::int32_t>(kMeshRemeshSizingLaws.size() - 1u));
+            return kMeshRemeshSizingLaws[static_cast<std::size_t>(clamped)];
+        }
+
+        [[nodiscard]] SandboxEditorMeshSubdivideOperator
+        MeshSubdivideOperatorFromIndex(const std::int32_t index) noexcept
+        {
+            const std::int32_t clamped = std::clamp(
+                index,
+                0,
+                static_cast<std::int32_t>(kMeshSubdivideOperators.size() - 1u));
+            return kMeshSubdivideOperators[static_cast<std::size_t>(clamped)];
+        }
+
         [[nodiscard]] Core::ErrorCode ErrorForDenoiseStatus(
             const Smooth::DenoiseStatus status) noexcept
         {
@@ -5083,6 +5161,215 @@ namespace Extrinsic::Runtime
             return message;
         }
 
+        [[nodiscard]] bool ValidMeshRemeshMode(
+            const SandboxEditorMeshRemeshMode mode) noexcept
+        {
+            return std::find(kMeshRemeshModes.begin(),
+                             kMeshRemeshModes.end(),
+                             mode) != kMeshRemeshModes.end();
+        }
+
+        [[nodiscard]] bool ValidMeshRemeshSizingLaw(
+            const SandboxEditorMeshRemeshSizingLaw sizingLaw) noexcept
+        {
+            return std::find(kMeshRemeshSizingLaws.begin(),
+                             kMeshRemeshSizingLaws.end(),
+                             sizingLaw) != kMeshRemeshSizingLaws.end();
+        }
+
+        [[nodiscard]] bool ValidMeshSubdivideOperator(
+            const SandboxEditorMeshSubdivideOperator op) noexcept
+        {
+            return std::find(kMeshSubdivideOperators.begin(),
+                             kMeshSubdivideOperators.end(),
+                             op) != kMeshSubdivideOperators.end();
+        }
+
+        struct MeshTopologySourceResult
+        {
+            Geometry::HalfedgeMesh::Mesh Mesh{};
+            SandboxEditorCommandStatus Status{
+                SandboxEditorCommandStatus::NoChange};
+            Core::ErrorCode Error{Core::ErrorCode::Success};
+            std::string Diagnostic{};
+
+            [[nodiscard]] bool Succeeded() const noexcept
+            {
+                return Status == SandboxEditorCommandStatus::Applied;
+            }
+        };
+
+        [[nodiscard]] MeshTopologySourceResult BuildHalfedgeMeshForTopologyEdit(
+            const GS::ConstSourceView& view,
+            std::string_view operationName)
+        {
+            MeshDenoiseSourceResult source = BuildHalfedgeMeshForDenoise(view);
+            MeshTopologySourceResult result{};
+            result.Status = source.Status;
+            result.Error = source.Error;
+            if (source.Succeeded())
+            {
+                result.Mesh = std::move(source.Mesh);
+                return result;
+            }
+
+            result.Diagnostic = std::string{operationName};
+            if (source.Status ==
+                SandboxEditorCommandStatus::UnsupportedGeometryDomain)
+            {
+                result.Diagnostic +=
+                    " requires selected mesh GeometrySources.";
+            }
+            else if (source.Status ==
+                     SandboxEditorCommandStatus::InvalidProcessingParameters)
+            {
+                result.Diagnostic +=
+                    " requires a non-empty finite mesh with valid topology.";
+            }
+            else
+            {
+                result.Diagnostic +=
+                    " could not build a halfedge mesh from GeometrySources.";
+            }
+            if (!source.Diagnostic.empty())
+            {
+                result.Diagnostic += " ";
+                result.Diagnostic += source.Diagnostic;
+            }
+            return result;
+        }
+
+        void MarkMeshTopologyReplacementDirty(
+            entt::registry& raw,
+            const ECS::EntityHandle entity)
+        {
+            Dirty::MarkVertexPositionsDirty(raw, entity);
+            Dirty::MarkVertexAttributesDirty(raw, entity);
+            Dirty::MarkEdgeTopologyDirty(raw, entity);
+            Dirty::MarkFaceTopologyDirty(raw, entity);
+        }
+
+        [[nodiscard]] EditorCommandHistoryStatus ApplyMeshTopologyState(
+            ECS::Scene::Registry* scene,
+            const std::uint32_t stableEntityId,
+            const Geometry::HalfedgeMesh::Mesh& mesh)
+        {
+            if (scene == nullptr)
+                return EditorCommandHistoryStatus::MissingScene;
+
+            entt::registry& raw = scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, stableEntityId);
+            if (!entity.has_value())
+                return EditorCommandHistoryStatus::StaleEntity;
+
+            Geometry::HalfedgeMesh::Mesh published = mesh;
+            if (published.HasGarbage())
+                published.GarbageCollection();
+            GS::PopulateFromMesh(raw, *entity, published);
+            MarkMeshTopologyReplacementDirty(raw, *entity);
+            return EditorCommandHistoryStatus::Applied;
+        }
+
+        [[nodiscard]] SandboxEditorCommandStatus CommitMeshTopologyReplacement(
+            const SandboxEditorContext& context,
+            const std::uint32_t stableEntityId,
+            const char* label,
+            Geometry::HalfedgeMesh::Mesh before,
+            Geometry::HalfedgeMesh::Mesh after)
+        {
+            if (context.CommandHistory != nullptr)
+            {
+                ECS::Scene::Registry* scene = context.Scene;
+                const EditorCommandHistoryResult history =
+                    context.CommandHistory->Execute(
+                        EditorCommandRecord{
+                            .Label = label,
+                            .Redo =
+                                [scene, stableEntityId, after]()
+                                {
+                                    return ApplyMeshTopologyState(
+                                        scene,
+                                        stableEntityId,
+                                        after);
+                                },
+                            .Undo =
+                                [scene, stableEntityId, before]()
+                                {
+                                    return ApplyMeshTopologyState(
+                                        scene,
+                                        stableEntityId,
+                                        before);
+                                },
+                            .Dirtying = true,
+                        });
+                return ToSandboxEditorCommandStatus(history.Status);
+            }
+
+            return ToSandboxEditorCommandStatus(
+                ApplyMeshTopologyState(
+                    context.Scene,
+                    stableEntityId,
+                    after));
+        }
+
+        [[nodiscard]] AdaptiveRemesh::SizingLaw ToAdaptiveSizingLaw(
+            const SandboxEditorMeshRemeshSizingLaw sizingLaw) noexcept
+        {
+            switch (sizingLaw)
+            {
+            case SandboxEditorMeshRemeshSizingLaw::MeanCurvature:
+                return AdaptiveRemesh::SizingLaw::MeanCurvature;
+            case SandboxEditorMeshRemeshSizingLaw::ErrorBoundedTaubin:
+                return AdaptiveRemesh::SizingLaw::ErrorBoundedTaubin;
+            }
+            return AdaptiveRemesh::SizingLaw::MeanCurvature;
+        }
+
+        void CopyRemeshCounters(
+            const Geometry::RemeshingOperationResult& source,
+            SandboxEditorMeshRemeshResult& target)
+        {
+            target.IterationsPerformed =
+                static_cast<std::uint32_t>(source.IterationsPerformed);
+            target.OutputVertexCount = source.FinalVertexCount;
+            target.OutputFaceCount = source.FinalFaceCount;
+            target.SplitCount = source.SplitCount;
+            target.CollapseCount = source.CollapseCount;
+            target.FlipCount = source.FlipCount;
+        }
+
+        [[nodiscard]] std::string BuildMeshRemeshSuccessMessage(
+            const SandboxEditorMeshRemeshResult& result)
+        {
+            std::string message = "Mesh remesh completed (mode=";
+            message += DebugNameForSandboxEditorMeshRemeshMode(result.Mode);
+            message += ", inputFaces=";
+            message += std::to_string(result.InputFaceCount);
+            message += ", outputFaces=";
+            message += std::to_string(result.OutputFaceCount);
+            message += ", iterations=";
+            message += std::to_string(result.IterationsPerformed);
+            message += ").";
+            return message;
+        }
+
+        [[nodiscard]] std::string BuildMeshSubdivideSuccessMessage(
+            const SandboxEditorMeshSubdivideResult& result)
+        {
+            std::string message = "Mesh subdivide completed (operator=";
+            message += DebugNameForSandboxEditorMeshSubdivideOperator(
+                result.Operator);
+            message += ", inputFaces=";
+            message += std::to_string(result.InputFaceCount);
+            message += ", outputFaces=";
+            message += std::to_string(result.OutputFaceCount);
+            message += ", iterations=";
+            message += std::to_string(result.IterationsPerformed);
+            message += ").";
+            return message;
+        }
+
         [[nodiscard]] SandboxEditorGeometryProcessingModel BuildGeometryProcessingModel(
             const SandboxEditorContext& context)
         {
@@ -5136,6 +5423,37 @@ namespace Extrinsic::Runtime
             model.MeshCurvatureDirectionsAvailable =
                 model.MeshCurvatureAvailable &&
                 context.MeshCurvatureDirectionsAvailable;
+            model.MeshRemeshUniformAvailable =
+                context.MeshRemeshUniformKernelAvailable &&
+                model.Capabilities.HasEditableSurfaceMesh;
+            model.MeshRemeshAdaptiveAvailable =
+                context.MeshRemeshAdaptiveKernelAvailable &&
+                model.Capabilities.HasEditableSurfaceMesh;
+            model.MeshRemeshAvailable =
+                model.MeshRemeshUniformAvailable ||
+                model.MeshRemeshAdaptiveAvailable;
+            model.MeshRemeshProjectToSurfaceAvailable =
+                model.MeshRemeshAvailable &&
+                context.MeshRemeshProjectToSurfaceAvailable;
+            model.MeshRemeshErrorBoundedSizingAvailable =
+                model.MeshRemeshAdaptiveAvailable &&
+                context.MeshRemeshErrorBoundedSizingAvailable;
+            model.MeshSubdivideLoopAvailable =
+                context.MeshSubdivideLoopKernelAvailable &&
+                model.Capabilities.HasEditableSurfaceMesh;
+            model.MeshSubdivideCatmullClarkAvailable =
+                context.MeshSubdivideCatmullClarkKernelAvailable &&
+                model.Capabilities.HasEditableSurfaceMesh;
+            model.MeshSubdivideSqrt3Available =
+                context.MeshSubdivideSqrt3KernelAvailable &&
+                model.Capabilities.HasEditableSurfaceMesh;
+            model.MeshSubdivideAvailable =
+                model.MeshSubdivideLoopAvailable ||
+                model.MeshSubdivideCatmullClarkAvailable ||
+                model.MeshSubdivideSqrt3Available;
+            model.MeshSubdivideLoopFeatureEdgesAvailable =
+                model.MeshSubdivideLoopAvailable &&
+                context.MeshSubdivideLoopFeatureEdgesAvailable;
             model.MeshVertexNormalsAvailable =
                 model.Capabilities.HasEditableSurfaceMesh &&
                 HasAnySandboxEditorGeometryProcessingDomain(
@@ -5188,6 +5506,34 @@ namespace Extrinsic::Runtime
                         context.LastMeshCurvatureResult->Message.empty()
                             ? "Last mesh curvature command failed."
                             : context.LastMeshCurvatureResult->Message);
+                }
+            }
+            if (context.LastMeshRemeshResult != nullptr)
+            {
+                model.LastMeshRemeshResult =
+                    *context.LastMeshRemeshResult;
+                if (!context.LastMeshRemeshResult->Succeeded())
+                {
+                    AddDiagnostic(
+                        model.Diagnostics,
+                        SandboxEditorDiagnosticCode::GeometryProcessingFailed,
+                        context.LastMeshRemeshResult->Message.empty()
+                            ? "Last mesh remesh command failed."
+                            : context.LastMeshRemeshResult->Message);
+                }
+            }
+            if (context.LastMeshSubdivideResult != nullptr)
+            {
+                model.LastMeshSubdivideResult =
+                    *context.LastMeshSubdivideResult;
+                if (!context.LastMeshSubdivideResult->Succeeded())
+                {
+                    AddDiagnostic(
+                        model.Diagnostics,
+                        SandboxEditorDiagnosticCode::GeometryProcessingFailed,
+                        context.LastMeshSubdivideResult->Message.empty()
+                            ? "Last mesh subdivide command failed."
+                            : context.LastMeshSubdivideResult->Message);
                 }
             }
             if (context.LastMeshVertexNormalsResult != nullptr)
@@ -6203,6 +6549,30 @@ namespace Extrinsic::Runtime
                                 return item.HasCurvatureMethod;
                             });
                     if (hasCurvatureLeaf && ImGui::MenuItem("Curvature"))
+                    {
+                        processingOpen = true;
+                    }
+                    const bool hasRemeshLeaf =
+                        std::any_of(
+                            menuItems.begin(),
+                            menuItems.end(),
+                            [](const SandboxEditorGeometryProcessingMenuItem& item)
+                            {
+                                return item.HasRemeshMethod;
+                            });
+                    if (hasRemeshLeaf && ImGui::MenuItem("Remesh"))
+                    {
+                        processingOpen = true;
+                    }
+                    const bool hasSubdivideLeaf =
+                        std::any_of(
+                            menuItems.begin(),
+                            menuItems.end(),
+                            [](const SandboxEditorGeometryProcessingMenuItem& item)
+                            {
+                                return item.HasSubdivideMethod;
+                            });
+                    if (hasSubdivideLeaf && ImGui::MenuItem("Subdivide"))
                     {
                         processingOpen = true;
                     }
@@ -7876,6 +8246,361 @@ namespace Extrinsic::Runtime
             DrawMeshCurvatureResultStatus(result);
         }
 
+        void DrawMeshRemeshResultStatus(
+            const std::optional<SandboxEditorMeshRemeshResult>& lastResult)
+        {
+            if (!lastResult.has_value())
+            {
+                ImGui::TextDisabled("Last remesh run: none");
+                return;
+            }
+
+            const SandboxEditorMeshRemeshResult& result = *lastResult;
+            ImGui::Text("Last remesh run: %s",
+                        DebugNameForSandboxEditorCommandStatus(result.Status));
+            ImGui::Text("Mode: %s  sizing: %s",
+                        DebugNameForSandboxEditorMeshRemeshMode(result.Mode),
+                        DebugNameForSandboxEditorMeshRemeshSizingLaw(result.SizingLaw));
+            if (result.Succeeded())
+            {
+                ImGui::Text("Vertices: %zu -> %zu  faces: %zu -> %zu",
+                            result.InputVertexCount,
+                            result.OutputVertexCount,
+                            result.InputFaceCount,
+                            result.OutputFaceCount);
+                ImGui::Text("Iterations: %u / %u  splits=%zu  collapses=%zu  flips=%zu",
+                            result.IterationsPerformed,
+                            result.IterationsRequested,
+                            result.SplitCount,
+                            result.CollapseCount,
+                            result.FlipCount);
+            }
+            if (!result.Message.empty())
+                ImGui::TextWrapped("%s", result.Message.c_str());
+        }
+
+        void DrawMeshRemeshControls(
+            const SandboxEditorDomainWindowModel& model,
+            const SandboxEditorContext& context,
+            const SandboxEditorGeometryProcessingModel& processing,
+            MeshRemeshUiState* remeshState)
+        {
+            ImGui::SeparatorText("Remesh");
+            if (!processing.MeshRemeshAvailable)
+            {
+                ImGui::TextDisabled("Mesh remesh is unavailable for this selection.");
+                return;
+            }
+            if (remeshState == nullptr ||
+                remeshState->LastResult == nullptr ||
+                remeshState->Mode == nullptr ||
+                remeshState->SizingLaw == nullptr ||
+                remeshState->Iterations == nullptr ||
+                remeshState->TargetEdgeLength == nullptr ||
+                remeshState->ProjectToSurface == nullptr)
+            {
+                ImGui::TextDisabled("Mesh remesh controls are not bound.");
+                return;
+            }
+
+            *remeshState->Mode = std::clamp(
+                *remeshState->Mode,
+                0,
+                static_cast<std::int32_t>(kMeshRemeshModes.size() - 1u));
+            *remeshState->SizingLaw = std::clamp(
+                *remeshState->SizingLaw,
+                0,
+                static_cast<std::int32_t>(kMeshRemeshSizingLaws.size() - 1u));
+            *remeshState->Iterations =
+                std::clamp(*remeshState->Iterations, 1, 64);
+            *remeshState->TargetEdgeLength =
+                std::clamp(*remeshState->TargetEdgeLength, 0.0f, 1.0e6f);
+
+            const SandboxEditorMeshRemeshMode mode =
+                MeshRemeshModeFromIndex(*remeshState->Mode);
+            if (ImGui::BeginCombo(
+                    "Mode",
+                    DebugNameForSandboxEditorMeshRemeshMode(mode)))
+            {
+                for (std::size_t i = 0u; i < kMeshRemeshModes.size(); ++i)
+                {
+                    const SandboxEditorMeshRemeshMode option =
+                        kMeshRemeshModes[i];
+                    const bool available =
+                        option == SandboxEditorMeshRemeshMode::Uniform
+                            ? processing.MeshRemeshUniformAvailable
+                            : processing.MeshRemeshAdaptiveAvailable;
+                    if (!available)
+                        ImGui::BeginDisabled();
+                    const bool selected =
+                        *remeshState->Mode == static_cast<std::int32_t>(i);
+                    if (ImGui::Selectable(
+                            DebugNameForSandboxEditorMeshRemeshMode(option),
+                            selected))
+                    {
+                        *remeshState->Mode = static_cast<std::int32_t>(i);
+                    }
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                    if (!available)
+                        ImGui::EndDisabled();
+                }
+                ImGui::EndCombo();
+            }
+
+            ImGui::DragInt("Iterations", remeshState->Iterations, 1.0f, 1, 64);
+            ImGui::DragFloat(
+                "Target edge length",
+                remeshState->TargetEdgeLength,
+                0.01f,
+                0.0f,
+                1.0e6f);
+
+            const bool adaptive =
+                mode == SandboxEditorMeshRemeshMode::Adaptive;
+            if (!adaptive)
+                ImGui::BeginDisabled();
+            const SandboxEditorMeshRemeshSizingLaw sizingLaw =
+                MeshRemeshSizingLawFromIndex(*remeshState->SizingLaw);
+            if (ImGui::BeginCombo(
+                    "Sizing law",
+                    DebugNameForSandboxEditorMeshRemeshSizingLaw(sizingLaw)))
+            {
+                for (std::size_t i = 0u; i < kMeshRemeshSizingLaws.size(); ++i)
+                {
+                    const SandboxEditorMeshRemeshSizingLaw option =
+                        kMeshRemeshSizingLaws[i];
+                    const bool available =
+                        option !=
+                            SandboxEditorMeshRemeshSizingLaw::ErrorBoundedTaubin ||
+                        processing.MeshRemeshErrorBoundedSizingAvailable;
+                    if (!available)
+                        ImGui::BeginDisabled();
+                    const bool selected =
+                        *remeshState->SizingLaw == static_cast<std::int32_t>(i);
+                    if (ImGui::Selectable(
+                            DebugNameForSandboxEditorMeshRemeshSizingLaw(option),
+                            selected))
+                    {
+                        *remeshState->SizingLaw =
+                            static_cast<std::int32_t>(i);
+                    }
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                    if (!available)
+                        ImGui::EndDisabled();
+                }
+                ImGui::EndCombo();
+            }
+            if (!adaptive)
+                ImGui::EndDisabled();
+
+            if (!processing.MeshRemeshProjectToSurfaceAvailable)
+                ImGui::BeginDisabled();
+            ImGui::Checkbox(
+                "Project to surface",
+                remeshState->ProjectToSurface);
+            if (!processing.MeshRemeshProjectToSurfaceAvailable)
+                ImGui::EndDisabled();
+
+            const bool modeAvailable =
+                mode == SandboxEditorMeshRemeshMode::Uniform
+                    ? processing.MeshRemeshUniformAvailable
+                    : processing.MeshRemeshAdaptiveAvailable;
+            const bool sizingAvailable =
+                sizingLaw != SandboxEditorMeshRemeshSizingLaw::ErrorBoundedTaubin ||
+                processing.MeshRemeshErrorBoundedSizingAvailable;
+            const bool projectionAvailable =
+                !*remeshState->ProjectToSurface ||
+                processing.MeshRemeshProjectToSurfaceAvailable;
+            const bool canRun =
+                modeAvailable && sizingAvailable && projectionAvailable;
+            if (!canRun)
+                ImGui::BeginDisabled();
+            if (ImGui::Button("Remesh"))
+            {
+                *remeshState->LastResult =
+                    ApplySandboxEditorMeshRemeshCommand(
+                        context,
+                        SandboxEditorMeshRemeshCommand{
+                            .StableEntityId = model.SelectedStableId,
+                            .Mode = mode,
+                            .SizingLaw = sizingLaw,
+                            .Iterations = static_cast<std::uint32_t>(
+                                *remeshState->Iterations),
+                            .TargetEdgeLength = static_cast<double>(
+                                *remeshState->TargetEdgeLength),
+                            .ProjectToSurface =
+                                *remeshState->ProjectToSurface,
+                        });
+            }
+            if (!canRun)
+                ImGui::EndDisabled();
+
+            const std::optional<SandboxEditorMeshRemeshResult>& result =
+                remeshState->LastResult->has_value()
+                    ? *remeshState->LastResult
+                    : processing.LastMeshRemeshResult;
+            DrawMeshRemeshResultStatus(result);
+        }
+
+        void DrawMeshSubdivideResultStatus(
+            const std::optional<SandboxEditorMeshSubdivideResult>& lastResult)
+        {
+            if (!lastResult.has_value())
+            {
+                ImGui::TextDisabled("Last subdivide run: none");
+                return;
+            }
+
+            const SandboxEditorMeshSubdivideResult& result = *lastResult;
+            ImGui::Text("Last subdivide run: %s",
+                        DebugNameForSandboxEditorCommandStatus(result.Status));
+            ImGui::Text("Operator: %s",
+                        DebugNameForSandboxEditorMeshSubdivideOperator(result.Operator));
+            if (result.Succeeded())
+            {
+                ImGui::Text("Vertices: %zu -> %zu  faces: %zu -> %zu",
+                            result.InputVertexCount,
+                            result.OutputVertexCount,
+                            result.InputFaceCount,
+                            result.OutputFaceCount);
+                ImGui::Text("Iterations: %u / %u  Loop features: %s",
+                            result.IterationsPerformed,
+                            result.IterationsRequested,
+                            result.PreserveLoopFeatureEdges ? "yes" : "no");
+            }
+            if (!result.Message.empty())
+                ImGui::TextWrapped("%s", result.Message.c_str());
+        }
+
+        void DrawMeshSubdivideControls(
+            const SandboxEditorDomainWindowModel& model,
+            const SandboxEditorContext& context,
+            const SandboxEditorGeometryProcessingModel& processing,
+            MeshSubdivideUiState* subdivideState)
+        {
+            ImGui::SeparatorText("Subdivide");
+            if (!processing.MeshSubdivideAvailable)
+            {
+                ImGui::TextDisabled("Mesh subdivision is unavailable for this selection.");
+                return;
+            }
+            if (subdivideState == nullptr ||
+                subdivideState->LastResult == nullptr ||
+                subdivideState->Operator == nullptr ||
+                subdivideState->Iterations == nullptr ||
+                subdivideState->PreserveLoopFeatures == nullptr)
+            {
+                ImGui::TextDisabled("Mesh subdivision controls are not bound.");
+                return;
+            }
+
+            *subdivideState->Operator = std::clamp(
+                *subdivideState->Operator,
+                0,
+                static_cast<std::int32_t>(kMeshSubdivideOperators.size() - 1u));
+            *subdivideState->Iterations =
+                std::clamp(*subdivideState->Iterations, 1, 10);
+
+            const SandboxEditorMeshSubdivideOperator op =
+                MeshSubdivideOperatorFromIndex(*subdivideState->Operator);
+            if (ImGui::BeginCombo(
+                    "Operator",
+                    DebugNameForSandboxEditorMeshSubdivideOperator(op)))
+            {
+                for (std::size_t i = 0u; i < kMeshSubdivideOperators.size(); ++i)
+                {
+                    const SandboxEditorMeshSubdivideOperator option =
+                        kMeshSubdivideOperators[i];
+                    const bool available =
+                        option == SandboxEditorMeshSubdivideOperator::Loop
+                            ? processing.MeshSubdivideLoopAvailable
+                            : option ==
+                                      SandboxEditorMeshSubdivideOperator::CatmullClark
+                                  ? processing.MeshSubdivideCatmullClarkAvailable
+                                  : processing.MeshSubdivideSqrt3Available;
+                    if (!available)
+                        ImGui::BeginDisabled();
+                    const bool selected =
+                        *subdivideState->Operator ==
+                        static_cast<std::int32_t>(i);
+                    if (ImGui::Selectable(
+                            DebugNameForSandboxEditorMeshSubdivideOperator(option),
+                            selected))
+                    {
+                        *subdivideState->Operator =
+                            static_cast<std::int32_t>(i);
+                    }
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                    if (!available)
+                        ImGui::EndDisabled();
+                }
+                ImGui::EndCombo();
+            }
+
+            ImGui::DragInt(
+                "Iterations",
+                subdivideState->Iterations,
+                1.0f,
+                1,
+                10);
+
+            const bool loop =
+                op == SandboxEditorMeshSubdivideOperator::Loop;
+            if (!loop)
+                *subdivideState->PreserveLoopFeatures = false;
+            if (!loop ||
+                !processing.MeshSubdivideLoopFeatureEdgesAvailable)
+            {
+                ImGui::BeginDisabled();
+            }
+            ImGui::Checkbox(
+                "Preserve Loop features",
+                subdivideState->PreserveLoopFeatures);
+            if (!loop ||
+                !processing.MeshSubdivideLoopFeatureEdgesAvailable)
+            {
+                ImGui::EndDisabled();
+            }
+
+            const bool operatorAvailable =
+                op == SandboxEditorMeshSubdivideOperator::Loop
+                    ? processing.MeshSubdivideLoopAvailable
+                    : op == SandboxEditorMeshSubdivideOperator::CatmullClark
+                          ? processing.MeshSubdivideCatmullClarkAvailable
+                          : processing.MeshSubdivideSqrt3Available;
+            const bool featureAvailable =
+                !*subdivideState->PreserveLoopFeatures ||
+                processing.MeshSubdivideLoopFeatureEdgesAvailable;
+            const bool canRun = operatorAvailable && featureAvailable;
+            if (!canRun)
+                ImGui::BeginDisabled();
+            if (ImGui::Button("Subdivide"))
+            {
+                *subdivideState->LastResult =
+                    ApplySandboxEditorMeshSubdivideCommand(
+                        context,
+                        SandboxEditorMeshSubdivideCommand{
+                            .StableEntityId = model.SelectedStableId,
+                            .Operator = op,
+                            .Iterations = static_cast<std::uint32_t>(
+                                *subdivideState->Iterations),
+                            .PreserveLoopFeatureEdges =
+                                *subdivideState->PreserveLoopFeatures,
+                        });
+            }
+            if (!canRun)
+                ImGui::EndDisabled();
+
+            const std::optional<SandboxEditorMeshSubdivideResult>& result =
+                subdivideState->LastResult->has_value()
+                    ? *subdivideState->LastResult
+                    : processing.LastMeshSubdivideResult;
+            DrawMeshSubdivideResultStatus(result);
+        }
+
         [[nodiscard]] GN::AveragingMode MeshVertexNormalWeightingFromIndex(
             const std::int32_t index) noexcept
         {
@@ -8278,6 +9003,8 @@ namespace Extrinsic::Runtime
             KMeansUiState* kmeansState,
             MeshDenoiseUiState* denoiseState,
             MeshCurvatureUiState* curvatureState,
+            MeshRemeshUiState* remeshState,
+            MeshSubdivideUiState* subdivideState,
             MeshVertexNormalsUiState* meshNormalsState,
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState)
@@ -8345,6 +9072,16 @@ namespace Extrinsic::Runtime
                     context,
                     processing,
                     curvatureState);
+                DrawMeshRemeshControls(
+                    model,
+                    context,
+                    processing,
+                    remeshState);
+                DrawMeshSubdivideControls(
+                    model,
+                    context,
+                    processing,
+                    subdivideState);
                 DrawMeshVertexNormalsControls(
                     model,
                     context,
@@ -8376,6 +9113,8 @@ namespace Extrinsic::Runtime
             KMeansUiState* kmeansState,
             MeshDenoiseUiState* denoiseState,
             MeshCurvatureUiState* curvatureState,
+            MeshRemeshUiState* remeshState,
+            MeshSubdivideUiState* subdivideState,
             MeshVertexNormalsUiState* normalsState,
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
@@ -8411,6 +9150,8 @@ namespace Extrinsic::Runtime
                         kmeansState,
                         denoiseState,
                         curvatureState,
+                        remeshState,
+                        subdivideState,
                         normalsState,
                         graphNormalsState,
                         pointCloudNormalsState);
@@ -8428,6 +9169,8 @@ namespace Extrinsic::Runtime
             KMeansUiState* kmeansState,
             MeshDenoiseUiState* denoiseState,
             MeshCurvatureUiState* curvatureState,
+            MeshRemeshUiState* remeshState,
+            MeshSubdivideUiState* subdivideState,
             MeshVertexNormalsUiState* normalsState,
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
@@ -8460,6 +9203,8 @@ namespace Extrinsic::Runtime
                     kmeansState,
                     denoiseState,
                     curvatureState,
+                    remeshState,
+                    subdivideState,
                     normalsState,
                     graphNormalsState,
                     pointCloudNormalsState,
@@ -8851,6 +9596,8 @@ namespace Extrinsic::Runtime
             KMeansUiState* kmeansState,
             MeshDenoiseUiState* denoiseState,
             MeshCurvatureUiState* curvatureState,
+            MeshRemeshUiState* remeshState,
+            MeshSubdivideUiState* subdivideState,
             MeshVertexNormalsUiState* normalsState,
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
@@ -8863,6 +9610,8 @@ namespace Extrinsic::Runtime
                 kmeansState,
                 denoiseState,
                 curvatureState,
+                remeshState,
+                subdivideState,
                 normalsState,
                 graphNormalsState,
                 pointCloudNormalsState,
@@ -10226,7 +10975,9 @@ namespace Extrinsic::Runtime
                  .Label = "Vertices",
                  .HasNormalsMethod = true,
                  .HasDenoiseMethod = true,
-                 .HasCurvatureMethod = true},
+                 .HasCurvatureMethod = true,
+                 .HasRemeshMethod = true,
+                 .HasSubdivideMethod = true},
                 {.Domain = Domain::MeshEdges, .Label = "Edges"},
                 {.Domain = Domain::MeshFaces, .Label = "Faces"},
             };
@@ -11106,6 +11857,47 @@ namespace Extrinsic::Runtime
             return "Gaussian";
         case SandboxEditorMeshCurvatureOutput::PrincipalDirections:
             return "Principal";
+        }
+        return "Unknown";
+    }
+
+    const char* DebugNameForSandboxEditorMeshRemeshMode(
+        const SandboxEditorMeshRemeshMode mode) noexcept
+    {
+        switch (mode)
+        {
+        case SandboxEditorMeshRemeshMode::Uniform:
+            return "Uniform";
+        case SandboxEditorMeshRemeshMode::Adaptive:
+            return "Adaptive";
+        }
+        return "Unknown";
+    }
+
+    const char* DebugNameForSandboxEditorMeshRemeshSizingLaw(
+        const SandboxEditorMeshRemeshSizingLaw sizingLaw) noexcept
+    {
+        switch (sizingLaw)
+        {
+        case SandboxEditorMeshRemeshSizingLaw::MeanCurvature:
+            return "Mean curvature";
+        case SandboxEditorMeshRemeshSizingLaw::ErrorBoundedTaubin:
+            return "Error-bounded Taubin";
+        }
+        return "Unknown";
+    }
+
+    const char* DebugNameForSandboxEditorMeshSubdivideOperator(
+        const SandboxEditorMeshSubdivideOperator op) noexcept
+    {
+        switch (op)
+        {
+        case SandboxEditorMeshSubdivideOperator::Loop:
+            return "Loop";
+        case SandboxEditorMeshSubdivideOperator::CatmullClark:
+            return "Catmull-Clark";
+        case SandboxEditorMeshSubdivideOperator::Sqrt3:
+            return "Sqrt(3)";
         }
         return "Unknown";
     }
@@ -13009,6 +13801,389 @@ namespace Extrinsic::Runtime
         return result;
     }
 
+    SandboxEditorMeshRemeshResult ApplySandboxEditorMeshRemeshCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorMeshRemeshCommand& command)
+    {
+        SandboxEditorMeshRemeshResult result{
+            .Status = SandboxEditorCommandStatus::NoChange,
+            .Mode = command.Mode,
+            .SizingLaw = command.SizingLaw,
+            .IterationsRequested = command.Iterations,
+            .TargetEdgeLength = command.TargetEdgeLength,
+            .ProjectToSurface = command.ProjectToSurface,
+            .Error = Core::ErrorCode::Success,
+        };
+
+        if (context.Scene == nullptr)
+        {
+            result.Status = SandboxEditorCommandStatus::MissingScene;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message = "Scene registry is unavailable for mesh remesh.";
+            return result;
+        }
+        if (!ValidMeshRemeshMode(command.Mode) ||
+            !ValidMeshRemeshSizingLaw(command.SizingLaw) ||
+            command.Iterations == 0u ||
+            !std::isfinite(command.TargetEdgeLength) ||
+            command.TargetEdgeLength < 0.0 ||
+            !IsPositiveFinite(command.Lambda) ||
+            !std::isfinite(command.CurvatureAdaptation) ||
+            command.CurvatureAdaptation < 0.0 ||
+            !std::isfinite(command.MaxReferenceProjectionDistance) ||
+            command.MaxReferenceProjectionDistance < 0.0 ||
+            (command.ProjectToSurface && command.ReferenceProjectionK == 0u) ||
+            (command.SizingLaw ==
+                 SandboxEditorMeshRemeshSizingLaw::ErrorBoundedTaubin &&
+             !IsPositiveFinite(command.ApproximationError)))
+        {
+            result.Status =
+                SandboxEditorCommandStatus::InvalidProcessingParameters;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Mesh remesh requires a valid mode, sizing law, positive iteration count, finite non-negative target length, positive lambda, and valid projection/sizing parameters.";
+            return result;
+        }
+        if (command.Mode == SandboxEditorMeshRemeshMode::Uniform &&
+            !context.MeshRemeshUniformKernelAvailable)
+        {
+            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message =
+                "Geometry.Remeshing uniform remesher is unavailable in this runtime configuration.";
+            return result;
+        }
+        if (command.Mode == SandboxEditorMeshRemeshMode::Adaptive &&
+            !context.MeshRemeshAdaptiveKernelAvailable)
+        {
+            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message =
+                "Geometry.HalfedgeMesh.AdaptiveRemeshing is unavailable in this runtime configuration.";
+            return result;
+        }
+        if (command.ProjectToSurface &&
+            !context.MeshRemeshProjectToSurfaceAvailable)
+        {
+            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message =
+                "Mesh remesh project-to-surface is unavailable in this runtime configuration.";
+            return result;
+        }
+        if (command.SizingLaw ==
+                SandboxEditorMeshRemeshSizingLaw::ErrorBoundedTaubin &&
+            !context.MeshRemeshErrorBoundedSizingAvailable)
+        {
+            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message =
+                "Mesh remesh error-bounded Taubin sizing is unavailable in this runtime configuration.";
+            return result;
+        }
+
+        entt::registry& raw = context.Scene->Raw();
+        const std::optional<ECS::EntityHandle> entity =
+            ResolveStableEntity(raw, command.StableEntityId);
+        if (!entity.has_value())
+        {
+            result.Status = SandboxEditorCommandStatus::StaleEntity;
+            result.Error = Core::ErrorCode::ResourceNotFound;
+            result.Message =
+                "Mesh remesh target entity is stale or no longer live.";
+            return result;
+        }
+
+        const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
+        MeshTopologySourceResult source =
+            BuildHalfedgeMeshForTopologyEdit(view, "Mesh remesh");
+        if (!source.Succeeded())
+        {
+            result.Status = source.Status;
+            result.Error = source.Error;
+            result.Message = source.Diagnostic;
+            return result;
+        }
+
+        result.InputVertexCount = source.Mesh.VertexCount();
+        result.InputFaceCount = source.Mesh.FaceCount();
+        Geometry::HalfedgeMesh::Mesh before = source.Mesh;
+
+        std::optional<Geometry::RemeshingOperationResult> remeshResult{};
+        if (command.Mode == SandboxEditorMeshRemeshMode::Uniform)
+        {
+            Remesh::RemeshingParams params{};
+            params.TargetLength = command.TargetEdgeLength;
+            params.Iterations = command.Iterations;
+            params.Lambda = command.Lambda;
+            params.PreserveBoundary = command.PreserveBoundary;
+            params.ProjectToSurface = command.ProjectToSurface;
+            params.ReferenceProjectionK = command.ReferenceProjectionK;
+            params.MaxReferenceProjectionDistance =
+                command.MaxReferenceProjectionDistance;
+            remeshResult = Remesh::Remesh(source.Mesh, params);
+        }
+        else
+        {
+            AdaptiveRemesh::AdaptiveRemeshingParams params{};
+            if (command.TargetEdgeLength > 0.0)
+            {
+                params.MinEdgeLength = command.TargetEdgeLength * 0.5;
+                params.MaxEdgeLength = command.TargetEdgeLength * 2.0;
+            }
+            params.CurvatureAdaptation = command.CurvatureAdaptation;
+            params.Sizing = ToAdaptiveSizingLaw(command.SizingLaw);
+            params.ApproximationError = command.ApproximationError;
+            params.Iterations = command.Iterations;
+            params.Lambda = command.Lambda;
+            params.PreserveBoundary = command.PreserveBoundary;
+            params.EnableReferenceProjection = command.ProjectToSurface;
+            params.ReferenceProjectionK = command.ReferenceProjectionK;
+            params.MaxReferenceProjectionDistance =
+                command.MaxReferenceProjectionDistance;
+            remeshResult = AdaptiveRemesh::AdaptiveRemesh(source.Mesh, params);
+        }
+
+        if (!remeshResult.has_value())
+        {
+            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Geometry remeshing failed for the selected mesh and parameters.";
+            return result;
+        }
+
+        if (source.Mesh.HasGarbage())
+            source.Mesh.GarbageCollection();
+        CopyRemeshCounters(*remeshResult, result);
+        result.OutputVertexCount = source.Mesh.VertexCount();
+        result.OutputFaceCount = source.Mesh.FaceCount();
+
+        const SandboxEditorCommandStatus commitStatus =
+            CommitMeshTopologyReplacement(
+                context,
+                command.StableEntityId,
+                "Remesh mesh",
+                std::move(before),
+                std::move(source.Mesh));
+        if (commitStatus != SandboxEditorCommandStatus::Applied)
+        {
+            result.Status = commitStatus;
+            result.Error = Core::ErrorCode::Unknown;
+            result.Message =
+                "Mesh remesh publication failed during editor history commit.";
+            return result;
+        }
+
+        result.Status = SandboxEditorCommandStatus::Applied;
+        result.Error = Core::ErrorCode::Success;
+        result.Message = BuildMeshRemeshSuccessMessage(result);
+        return result;
+    }
+
+    SandboxEditorMeshSubdivideResult ApplySandboxEditorMeshSubdivideCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorMeshSubdivideCommand& command)
+    {
+        SandboxEditorMeshSubdivideResult result{
+            .Status = SandboxEditorCommandStatus::NoChange,
+            .Operator = command.Operator,
+            .IterationsRequested = command.Iterations,
+            .PreserveLoopFeatureEdges = command.PreserveLoopFeatureEdges,
+            .Error = Core::ErrorCode::Success,
+        };
+
+        if (context.Scene == nullptr)
+        {
+            result.Status = SandboxEditorCommandStatus::MissingScene;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message = "Scene registry is unavailable for mesh subdivide.";
+            return result;
+        }
+        if (!ValidMeshSubdivideOperator(command.Operator) ||
+            command.Iterations == 0u ||
+            (command.PreserveLoopFeatureEdges &&
+             command.FeatureEdgePropertyName.empty()))
+        {
+            result.Status =
+                SandboxEditorCommandStatus::InvalidProcessingParameters;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Mesh subdivide requires a valid operator, positive iteration count, and a feature-edge property name when feature preservation is enabled.";
+            return result;
+        }
+        if (command.Operator == SandboxEditorMeshSubdivideOperator::Loop &&
+            !context.MeshSubdivideLoopKernelAvailable)
+        {
+            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message =
+                "Geometry.Subdivision Loop subdivision is unavailable in this runtime configuration.";
+            return result;
+        }
+        if (command.Operator ==
+                SandboxEditorMeshSubdivideOperator::CatmullClark &&
+            !context.MeshSubdivideCatmullClarkKernelAvailable)
+        {
+            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message =
+                "Geometry.CatmullClark subdivision is unavailable in this runtime configuration.";
+            return result;
+        }
+        if (command.Operator == SandboxEditorMeshSubdivideOperator::Sqrt3 &&
+            !context.MeshSubdivideSqrt3KernelAvailable)
+        {
+            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message =
+                "Geometry.HalfedgeMesh.SubdivisionSqrt3 is unavailable in this runtime configuration.";
+            return result;
+        }
+        if (command.PreserveLoopFeatureEdges &&
+            command.Operator != SandboxEditorMeshSubdivideOperator::Loop)
+        {
+            result.Status =
+                SandboxEditorCommandStatus::InvalidProcessingParameters;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Loop feature-edge preservation can only be used with the Loop subdivision operator.";
+            return result;
+        }
+        if (command.PreserveLoopFeatureEdges &&
+            !context.MeshSubdivideLoopFeatureEdgesAvailable)
+        {
+            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message =
+                "Loop subdivision feature-edge preservation is unavailable in this runtime configuration.";
+            return result;
+        }
+
+        entt::registry& raw = context.Scene->Raw();
+        const std::optional<ECS::EntityHandle> entity =
+            ResolveStableEntity(raw, command.StableEntityId);
+        if (!entity.has_value())
+        {
+            result.Status = SandboxEditorCommandStatus::StaleEntity;
+            result.Error = Core::ErrorCode::ResourceNotFound;
+            result.Message =
+                "Mesh subdivide target entity is stale or no longer live.";
+            return result;
+        }
+
+        const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
+        MeshTopologySourceResult source =
+            BuildHalfedgeMeshForTopologyEdit(view, "Mesh subdivide");
+        if (!source.Succeeded())
+        {
+            result.Status = source.Status;
+            result.Error = source.Error;
+            result.Message = source.Diagnostic;
+            return result;
+        }
+
+        result.InputVertexCount = source.Mesh.VertexCount();
+        result.InputFaceCount = source.Mesh.FaceCount();
+        Geometry::HalfedgeMesh::Mesh before = source.Mesh;
+        Geometry::HalfedgeMesh::Mesh output{};
+
+        if (command.Operator == SandboxEditorMeshSubdivideOperator::Loop)
+        {
+            LoopSubdivide::SubdivisionParams params{};
+            params.Iterations = command.Iterations;
+            params.MaxOutputFaces = command.MaxOutputFaces;
+            params.PreserveFeatureEdges = command.PreserveLoopFeatureEdges;
+            params.FeatureEdgePropertyName = command.FeatureEdgePropertyName;
+            const std::optional<LoopSubdivide::SubdivisionResult>
+                subdivision = LoopSubdivide::Subdivide(source.Mesh, output, params);
+            if (!subdivision.has_value())
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message =
+                    "Geometry.Subdivision Loop subdivision failed for the selected mesh and parameters.";
+                return result;
+            }
+            result.IterationsPerformed =
+                static_cast<std::uint32_t>(
+                    subdivision->IterationsPerformed);
+            result.OutputVertexCount = subdivision->FinalVertexCount;
+            result.OutputFaceCount = subdivision->FinalFaceCount;
+        }
+        else if (command.Operator ==
+                 SandboxEditorMeshSubdivideOperator::CatmullClark)
+        {
+            CatmullClark::SubdivisionParams params{};
+            params.Iterations = command.Iterations;
+            const std::optional<CatmullClark::SubdivisionResult>
+                subdivision = CatmullClark::Subdivide(source.Mesh, output, params);
+            if (!subdivision.has_value())
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message =
+                    "Geometry.CatmullClark subdivision failed for the selected mesh and parameters.";
+                return result;
+            }
+            result.IterationsPerformed =
+                static_cast<std::uint32_t>(
+                    subdivision->IterationsPerformed);
+            result.OutputVertexCount = subdivision->FinalVertexCount;
+            result.OutputFaceCount = subdivision->FinalFaceCount;
+        }
+        else
+        {
+            Sqrt3Subdivide::Sqrt3Params params{};
+            params.Iterations = command.Iterations;
+            params.MaxOutputFaces = command.MaxOutputFaces;
+            const std::optional<Sqrt3Subdivide::Sqrt3Result>
+                subdivision = Sqrt3Subdivide::Subdivide(source.Mesh, output, params);
+            if (!subdivision.has_value())
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message =
+                    "Geometry.HalfedgeMesh.SubdivisionSqrt3 failed for the selected mesh and parameters.";
+                return result;
+            }
+            result.IterationsPerformed =
+                static_cast<std::uint32_t>(
+                    subdivision->IterationsPerformed);
+            result.OutputVertexCount = subdivision->FinalVertexCount;
+            result.OutputFaceCount = subdivision->FinalFaceCount;
+        }
+
+        if (output.HasGarbage())
+            output.GarbageCollection();
+        result.OutputVertexCount = output.VertexCount();
+        result.OutputFaceCount = output.FaceCount();
+
+        const SandboxEditorCommandStatus commitStatus =
+            CommitMeshTopologyReplacement(
+                context,
+                command.StableEntityId,
+                "Subdivide mesh",
+                std::move(before),
+                std::move(output));
+        if (commitStatus != SandboxEditorCommandStatus::Applied)
+        {
+            result.Status = commitStatus;
+            result.Error = Core::ErrorCode::Unknown;
+            result.Message =
+                "Mesh subdivide publication failed during editor history commit.";
+            return result;
+        }
+
+        result.Status = SandboxEditorCommandStatus::Applied;
+        result.Error = Core::ErrorCode::Success;
+        result.Message = BuildMeshSubdivideSuccessMessage(result);
+        return result;
+    }
+
     SandboxEditorMeshVertexNormalsResult
     ApplySandboxEditorMeshVertexNormalsCommand(
         const SandboxEditorContext& context,
@@ -13365,6 +14540,8 @@ namespace Extrinsic::Runtime
                        nullptr,
                        nullptr,
                        nullptr,
+                       nullptr,
+                       nullptr,
                        nullptr);
     }
 
@@ -13410,6 +14587,12 @@ namespace Extrinsic::Runtime
                 if (m_LastMeshCurvatureResult.has_value())
                     context.LastMeshCurvatureResult =
                         &*m_LastMeshCurvatureResult;
+                if (m_LastMeshRemeshResult.has_value())
+                    context.LastMeshRemeshResult =
+                        &*m_LastMeshRemeshResult;
+                if (m_LastMeshSubdivideResult.has_value())
+                    context.LastMeshSubdivideResult =
+                        &*m_LastMeshSubdivideResult;
                 if (m_LastMeshVertexNormalsResult.has_value())
                     context.LastMeshVertexNormalsResult =
                         &*m_LastMeshVertexNormalsResult;
@@ -13467,6 +14650,21 @@ namespace Extrinsic::Runtime
                     .PublishPrincipalDirections =
                         &m_MeshCurvaturePublishDirections,
                 };
+                MeshRemeshUiState remeshState{
+                    .LastResult = &m_LastMeshRemeshResult,
+                    .Mode = &m_MeshRemeshMode,
+                    .SizingLaw = &m_MeshRemeshSizingLaw,
+                    .Iterations = &m_MeshRemeshIterations,
+                    .TargetEdgeLength = &m_MeshRemeshTargetEdgeLength,
+                    .ProjectToSurface = &m_MeshRemeshProjectToSurface,
+                };
+                MeshSubdivideUiState subdivideState{
+                    .LastResult = &m_LastMeshSubdivideResult,
+                    .Operator = &m_MeshSubdivideOperator,
+                    .Iterations = &m_MeshSubdivideIterations,
+                    .PreserveLoopFeatures =
+                        &m_MeshSubdividePreserveLoopFeatures,
+                };
                 MeshVertexNormalsUiState normalsState{
                     .LastResult = &m_LastMeshVertexNormalsResult,
                     .Weighting = &m_MeshVertexNormalsWeighting,
@@ -13515,6 +14713,8 @@ namespace Extrinsic::Runtime
                     &kmeansState,
                     &denoiseState,
                     &curvatureState,
+                    &remeshState,
+                    &subdivideState,
                     &normalsState,
                     &graphNormalsState,
                     &pointCloudNormalsState,

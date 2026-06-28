@@ -615,6 +615,40 @@ namespace
         registry.Raw().emplace_or_replace<G::RenderSurface>(entity);
     }
 
+    void AddIcosahedronMeshSource(ECS::Scene::Registry& registry,
+                                  const ECS::EntityHandle entity)
+    {
+        Geometry::HalfedgeMesh::Mesh mesh =
+            Geometry::HalfedgeMesh::MakeMeshIcosahedron();
+        GS::PopulateFromMesh(registry.Raw(), entity, mesh);
+        registry.Raw().emplace_or_replace<G::RenderSurface>(entity);
+    }
+
+    struct MeshCounts
+    {
+        std::size_t Vertices{0u};
+        std::size_t Faces{0u};
+    };
+
+    [[nodiscard]] MeshCounts SourceMeshCounts(
+        ECS::Scene::Registry& registry,
+        const ECS::EntityHandle entity)
+    {
+        const GS::ConstSourceView view =
+            GS::BuildConstView(registry.Raw(), entity);
+        return MeshCounts{
+            .Vertices = view.VerticesAlive(),
+            .Faces = view.FacesAlive(),
+        };
+    }
+
+    void ExpectMeshCountsEqual(const MeshCounts actual,
+                               const MeshCounts expected)
+    {
+        EXPECT_EQ(actual.Vertices, expected.Vertices);
+        EXPECT_EQ(actual.Faces, expected.Faces);
+    }
+
     [[nodiscard]] std::vector<glm::vec3> MeshVertexPositions(
         ECS::Scene::Registry& registry,
         const ECS::EntityHandle entity)
@@ -1865,16 +1899,22 @@ TEST(SandboxEditorUi, GeometryProcessingMenusExposeDomainElementSubmenus)
     EXPECT_TRUE(mesh[0].HasNormalsMethod);
     EXPECT_TRUE(mesh[0].HasDenoiseMethod);
     EXPECT_TRUE(mesh[0].HasCurvatureMethod);
+    EXPECT_TRUE(mesh[0].HasRemeshMethod);
+    EXPECT_TRUE(mesh[0].HasSubdivideMethod);
     EXPECT_EQ(mesh[1].Domain, Domain::MeshEdges);
     EXPECT_STREQ(mesh[1].Label, "Edges");
     EXPECT_FALSE(mesh[1].HasNormalsMethod);
     EXPECT_FALSE(mesh[1].HasDenoiseMethod);
     EXPECT_FALSE(mesh[1].HasCurvatureMethod);
+    EXPECT_FALSE(mesh[1].HasRemeshMethod);
+    EXPECT_FALSE(mesh[1].HasSubdivideMethod);
     EXPECT_EQ(mesh[2].Domain, Domain::MeshFaces);
     EXPECT_STREQ(mesh[2].Label, "Faces");
     EXPECT_FALSE(mesh[2].HasNormalsMethod);
     EXPECT_FALSE(mesh[2].HasDenoiseMethod);
     EXPECT_FALSE(mesh[2].HasCurvatureMethod);
+    EXPECT_FALSE(mesh[2].HasRemeshMethod);
+    EXPECT_FALSE(mesh[2].HasSubdivideMethod);
 
     const std::vector<Runtime::SandboxEditorGeometryProcessingMenuItem> graph =
         Runtime::GetSandboxEditorGeometryProcessingMenuItems(
@@ -1885,16 +1925,22 @@ TEST(SandboxEditorUi, GeometryProcessingMenusExposeDomainElementSubmenus)
     EXPECT_TRUE(graph[0].HasNormalsMethod);
     EXPECT_FALSE(graph[0].HasDenoiseMethod);
     EXPECT_FALSE(graph[0].HasCurvatureMethod);
+    EXPECT_FALSE(graph[0].HasRemeshMethod);
+    EXPECT_FALSE(graph[0].HasSubdivideMethod);
     EXPECT_EQ(graph[1].Domain, Domain::GraphEdges);
     EXPECT_STREQ(graph[1].Label, "Edges");
     EXPECT_FALSE(graph[1].HasNormalsMethod);
     EXPECT_FALSE(graph[1].HasDenoiseMethod);
     EXPECT_FALSE(graph[1].HasCurvatureMethod);
+    EXPECT_FALSE(graph[1].HasRemeshMethod);
+    EXPECT_FALSE(graph[1].HasSubdivideMethod);
     EXPECT_EQ(graph[2].Domain, Domain::GraphHalfedges);
     EXPECT_STREQ(graph[2].Label, "Halfedges");
     EXPECT_FALSE(graph[2].HasNormalsMethod);
     EXPECT_FALSE(graph[2].HasDenoiseMethod);
     EXPECT_FALSE(graph[2].HasCurvatureMethod);
+    EXPECT_FALSE(graph[2].HasRemeshMethod);
+    EXPECT_FALSE(graph[2].HasSubdivideMethod);
 
     const std::vector<Runtime::SandboxEditorGeometryProcessingMenuItem> cloud =
         Runtime::GetSandboxEditorGeometryProcessingMenuItems(
@@ -1905,6 +1951,8 @@ TEST(SandboxEditorUi, GeometryProcessingMenusExposeDomainElementSubmenus)
     EXPECT_TRUE(cloud[0].HasNormalsMethod);
     EXPECT_FALSE(cloud[0].HasDenoiseMethod);
     EXPECT_FALSE(cloud[0].HasCurvatureMethod);
+    EXPECT_FALSE(cloud[0].HasRemeshMethod);
+    EXPECT_FALSE(cloud[0].HasSubdivideMethod);
 }
 
 TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntries)
@@ -1965,6 +2013,16 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
     EXPECT_TRUE(meshModel.Processing.MeshDenoiseAvailable);
     EXPECT_TRUE(meshModel.Processing.MeshCurvatureAvailable);
     EXPECT_TRUE(meshModel.Processing.MeshCurvatureDirectionsAvailable);
+    EXPECT_TRUE(meshModel.Processing.MeshRemeshAvailable);
+    EXPECT_TRUE(meshModel.Processing.MeshRemeshUniformAvailable);
+    EXPECT_TRUE(meshModel.Processing.MeshRemeshAdaptiveAvailable);
+    EXPECT_TRUE(meshModel.Processing.MeshRemeshProjectToSurfaceAvailable);
+    EXPECT_TRUE(meshModel.Processing.MeshRemeshErrorBoundedSizingAvailable);
+    EXPECT_TRUE(meshModel.Processing.MeshSubdivideAvailable);
+    EXPECT_TRUE(meshModel.Processing.MeshSubdivideLoopAvailable);
+    EXPECT_TRUE(meshModel.Processing.MeshSubdivideCatmullClarkAvailable);
+    EXPECT_TRUE(meshModel.Processing.MeshSubdivideSqrt3Available);
+    EXPECT_TRUE(meshModel.Processing.MeshSubdivideLoopFeatureEdgesAvailable);
     EXPECT_TRUE(meshModel.Processing.MeshVertexNormalsAvailable);
     EXPECT_FALSE(meshModel.Processing.GraphVertexNormalsAvailable);
     EXPECT_FALSE(meshModel.Processing.PointCloudVertexNormalsAvailable);
@@ -2694,6 +2752,351 @@ TEST(SandboxEditorUi, MeshCurvatureCommandFailsClosedForInvalidTargetsAndConflic
     EXPECT_EQ(conflict.Error, Core::ErrorCode::TypeMismatch);
     EXPECT_FALSE(properties.Exists(PN::kGaussianCurvature));
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+}
+
+TEST(SandboxEditorUi, MeshRemeshCommandReplacesTopologyAndSupportsUndoRedo)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "UniformRemesh");
+    AddIcosahedronMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    const MeshCounts before = SourceMeshCounts(registry, mesh);
+    ASSERT_GT(before.Vertices, 0u);
+    ASSERT_GT(before.Faces, 0u);
+
+    const Runtime::SandboxEditorMeshRemeshResult uniform =
+        Runtime::ApplySandboxEditorMeshRemeshCommand(
+            context,
+            Runtime::SandboxEditorMeshRemeshCommand{
+                .StableEntityId = stableId,
+                .Mode = Runtime::SandboxEditorMeshRemeshMode::Uniform,
+                .SizingLaw =
+                    Runtime::SandboxEditorMeshRemeshSizingLaw::MeanCurvature,
+                .Iterations = 1u,
+                .TargetEdgeLength = 0.35,
+                .PreserveBoundary = false,
+                .ProjectToSurface = true,
+            });
+
+    ASSERT_TRUE(uniform.Succeeded()) << uniform.Message;
+    EXPECT_EQ(uniform.Mode, Runtime::SandboxEditorMeshRemeshMode::Uniform);
+    EXPECT_TRUE(uniform.ProjectToSurface);
+    EXPECT_EQ(uniform.IterationsRequested, 1u);
+    EXPECT_EQ(uniform.IterationsPerformed, 1u);
+    EXPECT_EQ(uniform.InputVertexCount, before.Vertices);
+    EXPECT_EQ(uniform.InputFaceCount, before.Faces);
+    EXPECT_GT(uniform.OutputVertexCount, before.Vertices);
+    EXPECT_GT(uniform.OutputFaceCount, before.Faces);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
+    EXPECT_TRUE(history.IsDirty());
+    EXPECT_TRUE(history.CanUndo());
+
+    const MeshCounts afterUniform = SourceMeshCounts(registry, mesh);
+    EXPECT_EQ(afterUniform.Vertices, uniform.OutputVertexCount);
+    EXPECT_EQ(afterUniform.Faces, uniform.OutputFaceCount);
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), afterUniform);
+
+    context.LastMeshRemeshResult = &uniform;
+    const Runtime::SandboxEditorDomainWindowModel model =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    EXPECT_TRUE(model.Processing.MeshRemeshAvailable);
+    ASSERT_TRUE(model.Processing.LastMeshRemeshResult.has_value());
+    EXPECT_TRUE(model.Processing.LastMeshRemeshResult->Succeeded());
+    EXPECT_EQ(model.Processing.LastMeshRemeshResult->OutputFaceCount,
+              uniform.OutputFaceCount);
+
+    const ECS::EntityHandle adaptiveMesh =
+        MakeSelectable(registry, "AdaptiveRemesh");
+    AddIcosahedronMeshSource(registry, adaptiveMesh);
+    const Runtime::SandboxEditorMeshRemeshResult adaptive =
+        Runtime::ApplySandboxEditorMeshRemeshCommand(
+            context,
+            Runtime::SandboxEditorMeshRemeshCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(adaptiveMesh),
+                .Mode = Runtime::SandboxEditorMeshRemeshMode::Adaptive,
+                .SizingLaw =
+                    Runtime::SandboxEditorMeshRemeshSizingLaw::ErrorBoundedTaubin,
+                .Iterations = 1u,
+                .TargetEdgeLength = 0.35,
+                .ApproximationError = 0.01,
+                .PreserveBoundary = false,
+                .ProjectToSurface = false,
+            });
+    ASSERT_TRUE(adaptive.Succeeded()) << adaptive.Message;
+    EXPECT_EQ(adaptive.Mode, Runtime::SandboxEditorMeshRemeshMode::Adaptive);
+    EXPECT_EQ(adaptive.SizingLaw,
+              Runtime::SandboxEditorMeshRemeshSizingLaw::ErrorBoundedTaubin);
+    EXPECT_EQ(adaptive.IterationsPerformed, 1u);
+    EXPECT_GT(adaptive.OutputVertexCount, 0u);
+    EXPECT_GT(adaptive.OutputFaceCount, 0u);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(adaptiveMesh));
+}
+
+TEST(SandboxEditorUi, MeshSubdivideCommandReplacesTopologyForAllOperatorsAndSupportsUndoRedo)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const ECS::EntityHandle loopMesh = MakeSelectable(registry, "LoopSubdivide");
+    AddDenoiseTetraMeshSource(registry, loopMesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, loopMesh));
+    const MeshCounts beforeLoop = SourceMeshCounts(registry, loopMesh);
+    const std::uint32_t loopStableId =
+        Runtime::SelectionController::ToStableEntityId(loopMesh);
+
+    const Runtime::SandboxEditorMeshSubdivideResult loop =
+        Runtime::ApplySandboxEditorMeshSubdivideCommand(
+            context,
+            Runtime::SandboxEditorMeshSubdivideCommand{
+                .StableEntityId = loopStableId,
+                .Operator = Runtime::SandboxEditorMeshSubdivideOperator::Loop,
+                .Iterations = 1u,
+                .PreserveLoopFeatureEdges = true,
+            });
+
+    ASSERT_TRUE(loop.Succeeded()) << loop.Message;
+    EXPECT_EQ(loop.Operator,
+              Runtime::SandboxEditorMeshSubdivideOperator::Loop);
+    EXPECT_TRUE(loop.PreserveLoopFeatureEdges);
+    EXPECT_EQ(loop.IterationsPerformed, 1u);
+    EXPECT_EQ(loop.InputVertexCount, beforeLoop.Vertices);
+    EXPECT_EQ(loop.InputFaceCount, beforeLoop.Faces);
+    EXPECT_GT(loop.OutputVertexCount, beforeLoop.Vertices);
+    EXPECT_GT(loop.OutputFaceCount, beforeLoop.Faces);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(loopMesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(loopMesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(loopMesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(loopMesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(loopMesh));
+    EXPECT_TRUE(history.IsDirty());
+
+    const MeshCounts afterLoop = SourceMeshCounts(registry, loopMesh);
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    ExpectMeshCountsEqual(SourceMeshCounts(registry, loopMesh), beforeLoop);
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    ExpectMeshCountsEqual(SourceMeshCounts(registry, loopMesh), afterLoop);
+
+    context.LastMeshSubdivideResult = &loop;
+    const Runtime::SandboxEditorDomainWindowModel model =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    EXPECT_TRUE(model.Processing.MeshSubdivideAvailable);
+    ASSERT_TRUE(model.Processing.LastMeshSubdivideResult.has_value());
+    EXPECT_TRUE(model.Processing.LastMeshSubdivideResult->Succeeded());
+    EXPECT_EQ(model.Processing.LastMeshSubdivideResult->OutputFaceCount,
+              loop.OutputFaceCount);
+
+    const ECS::EntityHandle catmullMesh =
+        MakeSelectable(registry, "CatmullClarkSubdivide");
+    AddDenoiseTetraMeshSource(registry, catmullMesh);
+    const Runtime::SandboxEditorMeshSubdivideResult catmull =
+        Runtime::ApplySandboxEditorMeshSubdivideCommand(
+            context,
+            Runtime::SandboxEditorMeshSubdivideCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(catmullMesh),
+                .Operator =
+                    Runtime::SandboxEditorMeshSubdivideOperator::CatmullClark,
+                .Iterations = 1u,
+            });
+    ASSERT_TRUE(catmull.Succeeded()) << catmull.Message;
+    EXPECT_EQ(catmull.Operator,
+              Runtime::SandboxEditorMeshSubdivideOperator::CatmullClark);
+    EXPECT_GT(catmull.OutputVertexCount, catmull.InputVertexCount);
+    EXPECT_GT(catmull.OutputFaceCount, catmull.InputFaceCount);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(catmullMesh));
+
+    const ECS::EntityHandle sqrt3Mesh =
+        MakeSelectable(registry, "Sqrt3Subdivide");
+    AddDenoiseTetraMeshSource(registry, sqrt3Mesh);
+    const Runtime::SandboxEditorMeshSubdivideResult sqrt3 =
+        Runtime::ApplySandboxEditorMeshSubdivideCommand(
+            context,
+            Runtime::SandboxEditorMeshSubdivideCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(sqrt3Mesh),
+                .Operator = Runtime::SandboxEditorMeshSubdivideOperator::Sqrt3,
+                .Iterations = 1u,
+            });
+    ASSERT_TRUE(sqrt3.Succeeded()) << sqrt3.Message;
+    EXPECT_EQ(sqrt3.Operator,
+              Runtime::SandboxEditorMeshSubdivideOperator::Sqrt3);
+    EXPECT_GT(sqrt3.OutputVertexCount, sqrt3.InputVertexCount);
+    EXPECT_GT(sqrt3.OutputFaceCount, sqrt3.InputFaceCount);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(sqrt3Mesh));
+}
+
+TEST(SandboxEditorUi, MeshTopologyProcessingCommandsFailClosedForInvalidTargetsAndUnavailableKernels)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    const Runtime::SandboxEditorMeshRemeshResult missingRemeshScene =
+        Runtime::ApplySandboxEditorMeshRemeshCommand(
+            Runtime::SandboxEditorContext{},
+            Runtime::SandboxEditorMeshRemeshCommand{
+                .StableEntityId = 1u,
+            });
+    EXPECT_EQ(missingRemeshScene.Status,
+              Runtime::SandboxEditorCommandStatus::MissingScene);
+    EXPECT_EQ(missingRemeshScene.Error, Core::ErrorCode::InvalidState);
+
+    const Runtime::SandboxEditorMeshSubdivideResult missingSubdivideScene =
+        Runtime::ApplySandboxEditorMeshSubdivideCommand(
+            Runtime::SandboxEditorContext{},
+            Runtime::SandboxEditorMeshSubdivideCommand{
+                .StableEntityId = 1u,
+            });
+    EXPECT_EQ(missingSubdivideScene.Status,
+              Runtime::SandboxEditorCommandStatus::MissingScene);
+    EXPECT_EQ(missingSubdivideScene.Error, Core::ErrorCode::InvalidState);
+
+    const ECS::EntityHandle cloud =
+        MakeSelectable(registry, "TopologyWrongDomain");
+    AddPointCloudSource(registry, cloud, 3u);
+    const std::uint32_t cloudStableId =
+        Runtime::SelectionController::ToStableEntityId(cloud);
+    const Runtime::SandboxEditorMeshRemeshResult wrongRemeshDomain =
+        Runtime::ApplySandboxEditorMeshRemeshCommand(
+            context,
+            Runtime::SandboxEditorMeshRemeshCommand{
+                .StableEntityId = cloudStableId,
+            });
+    EXPECT_EQ(wrongRemeshDomain.Status,
+              Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
+    const Runtime::SandboxEditorMeshSubdivideResult wrongSubdivideDomain =
+        Runtime::ApplySandboxEditorMeshSubdivideCommand(
+            context,
+            Runtime::SandboxEditorMeshSubdivideCommand{
+                .StableEntityId = cloudStableId,
+            });
+    EXPECT_EQ(wrongSubdivideDomain.Status,
+              Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(cloud));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(cloud));
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "TopologyFailMesh");
+    AddIcosahedronMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::uint32_t meshStableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    const MeshCounts before = SourceMeshCounts(registry, mesh);
+
+    const Runtime::SandboxEditorMeshRemeshResult invalidRemesh =
+        Runtime::ApplySandboxEditorMeshRemeshCommand(
+            context,
+            Runtime::SandboxEditorMeshRemeshCommand{
+                .StableEntityId = meshStableId,
+                .Iterations = 0u,
+            });
+    EXPECT_EQ(invalidRemesh.Status,
+              Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
+    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
+
+    const Runtime::SandboxEditorMeshSubdivideResult invalidSubdivide =
+        Runtime::ApplySandboxEditorMeshSubdivideCommand(
+            context,
+            Runtime::SandboxEditorMeshSubdivideCommand{
+                .StableEntityId = meshStableId,
+                .Iterations = 0u,
+            });
+    EXPECT_EQ(invalidSubdivide.Status,
+              Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
+    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
+
+    context.MeshRemeshAdaptiveKernelAvailable = false;
+    const Runtime::SandboxEditorMeshRemeshResult unavailableAdaptive =
+        Runtime::ApplySandboxEditorMeshRemeshCommand(
+            context,
+            Runtime::SandboxEditorMeshRemeshCommand{
+                .StableEntityId = meshStableId,
+                .Mode = Runtime::SandboxEditorMeshRemeshMode::Adaptive,
+                .Iterations = 1u,
+                .TargetEdgeLength = 0.35,
+            });
+    EXPECT_EQ(unavailableAdaptive.Status,
+              Runtime::SandboxEditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_EQ(unavailableAdaptive.Error, Core::ErrorCode::InvalidState);
+    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
+
+    context.MeshRemeshAdaptiveKernelAvailable = true;
+    context.MeshRemeshErrorBoundedSizingAvailable = false;
+    const Runtime::SandboxEditorMeshRemeshResult unavailableSizing =
+        Runtime::ApplySandboxEditorMeshRemeshCommand(
+            context,
+            Runtime::SandboxEditorMeshRemeshCommand{
+                .StableEntityId = meshStableId,
+                .Mode = Runtime::SandboxEditorMeshRemeshMode::Adaptive,
+                .SizingLaw =
+                    Runtime::SandboxEditorMeshRemeshSizingLaw::ErrorBoundedTaubin,
+                .Iterations = 1u,
+                .TargetEdgeLength = 0.35,
+                .ApproximationError = 0.01,
+            });
+    EXPECT_EQ(unavailableSizing.Status,
+              Runtime::SandboxEditorCommandStatus::GeometryProcessingFailed);
+    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
+
+    context.MeshRemeshErrorBoundedSizingAvailable = true;
+    context.MeshSubdivideSqrt3KernelAvailable = false;
+    const Runtime::SandboxEditorMeshSubdivideResult unavailableSqrt3 =
+        Runtime::ApplySandboxEditorMeshSubdivideCommand(
+            context,
+            Runtime::SandboxEditorMeshSubdivideCommand{
+                .StableEntityId = meshStableId,
+                .Operator = Runtime::SandboxEditorMeshSubdivideOperator::Sqrt3,
+                .Iterations = 1u,
+            });
+    EXPECT_EQ(unavailableSqrt3.Status,
+              Runtime::SandboxEditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_EQ(unavailableSqrt3.Error, Core::ErrorCode::InvalidState);
+    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
+
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
+
+    context.MeshRemeshUniformKernelAvailable = false;
+    context.MeshRemeshAdaptiveKernelAvailable = false;
+    context.MeshSubdivideLoopKernelAvailable = false;
+    context.MeshSubdivideCatmullClarkKernelAvailable = false;
+    const Runtime::SandboxEditorDomainWindowModel unavailableModel =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    EXPECT_FALSE(unavailableModel.Processing.MeshRemeshAvailable);
+    EXPECT_FALSE(unavailableModel.Processing.MeshRemeshUniformAvailable);
+    EXPECT_FALSE(unavailableModel.Processing.MeshRemeshAdaptiveAvailable);
+    EXPECT_FALSE(unavailableModel.Processing.MeshSubdivideAvailable);
+    EXPECT_FALSE(unavailableModel.Processing.MeshSubdivideLoopAvailable);
+    EXPECT_FALSE(unavailableModel.Processing.MeshSubdivideCatmullClarkAvailable);
+    EXPECT_FALSE(unavailableModel.Processing.MeshSubdivideSqrt3Available);
 }
 
 TEST(SandboxEditorUi, MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWeightings)

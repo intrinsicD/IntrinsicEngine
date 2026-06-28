@@ -11,9 +11,6 @@ map.
 ## Tasks
 
 - [RORG-031F — UI integration backlog seed](RORG-031-ui-integration.md).
-- [UI-025 — Sandbox EditorUI remeshing and subdivision windows](UI-025-editor-remesh-subdivide-windows.md)
-  (depends on `GEOM-043`, `GEOM-044`; `Mesh > Processing` remesh/subdivide
-  method windows).
 
 The runtime SpatialDebug closest-face picking consumer for `GEOM-039` is filed
 under the runtime backlog as `RUNTIME-135`.
@@ -106,6 +103,10 @@ under the runtime backlog as `RUNTIME-135`.
   renderer descriptors, optional recipe slots, binding overrides, view/output
   recipes, validation/preview status, artifact lifetime/status, and activation
   outcomes without UI owning renderer state.
+- UI-025 retired the remesh/subdivide method-window follow-up: mesh processing
+  now exposes `Remesh` and `Subdivide` windows that call the geometry-owned
+  GEOM-043/GEOM-044 kernels through runtime-owned undoable command seams and
+  defer renderer synchronization through geometry dirty tags.
 - UI work that depends on renderer overlays/handoff coordinates with the
   retired `GRAPHICS-024`
   parity matrix, the `RUNTIME-104` decision not to retain a persistent
@@ -179,6 +180,11 @@ split; narratives live in the retirement log.
   (done, 2026-06-28, `CPUContracted`): mesh denoise commands consume the
   geometry-owned bilateral denoiser, publish canonical `v:position`, and defer
   renderer synchronization through dirty tags.
+- [UI-025 — Sandbox EditorUI remeshing and subdivision windows](../../done/UI-025-editor-remesh-subdivide-windows.md)
+  (done, 2026-06-28, `CPUContracted`): remesh/subdivide commands consume
+  GEOM-043/GEOM-044 topology operators, replace selected mesh `GeometrySources`
+  through undoable runtime command history, and defer renderer synchronization
+  through dirty tags.
 - [UI-026 — Sandbox EditorUI curvature analysis window and principal-direction field](../../done/UI-026-editor-curvature-analysis-window.md)
   (done, 2026-06-28, `CPUContracted`): mesh curvature commands consume
   `Geometry.Curvature`, publish canonical scalar/direction properties, and

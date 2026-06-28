@@ -181,6 +181,36 @@ principal-direction vector-field packets from the canonical direction
 properties. Missing, wrong-typed, count-mismatched, or non-finite direction
 properties fall back to scalar-only output with deterministic adapter stats.
 
+### Sandbox Editor Mesh Remesh And Subdivide
+
+`UI-025` adds mesh topology replacement commands at
+`Mesh > Processing > Remesh` and `Mesh > Processing > Subdivide`. The Sandbox
+EditorUI surface exports `SandboxEditorMeshRemeshCommand`,
+`SandboxEditorMeshRemeshResult`, `ApplySandboxEditorMeshRemeshCommand(...)`,
+`SandboxEditorMeshSubdivideCommand`, `SandboxEditorMeshSubdivideResult`, and
+`ApplySandboxEditorMeshSubdivideCommand(...)`. Runtime validates a live selected
+mesh `GeometrySources` entity, builds a scratch halfedge mesh, calls the
+geometry-owned `GEOM-043`/`GEOM-044` kernels, and publishes the resulting
+topology back through `GeometrySourcesPopulate` only after the geometry result
+succeeds.
+
+The remesh window exposes uniform/adaptive mode, target edge length, iteration
+count, project-to-surface, and mean-curvature versus error-bounded Taubin sizing
+selection. Uniform mode calls `Geometry.Remeshing`; adaptive mode calls
+`Geometry.HalfedgeMesh.AdaptiveRemeshing`, mapping the editor target length to a
+bounded adaptive sizing range. The subdivide window exposes Loop, Catmull-Clark,
+and Sqrt(3) operators, iteration count, and Loop feature-edge preservation.
+Each backing kernel and option has an explicit `SandboxEditorContext` feature
+gate, so unavailable operators return deterministic diagnostics without
+mutating `GeometrySources`.
+
+Successful remesh and subdivide commits are undoable through
+`EditorCommandHistory::Execute`: undo restores the exact prior mesh snapshot and
+redo reapplies the generated mesh. Publication stamps `DirtyVertexPositions`,
+`DirtyVertexAttributes`, `DirtyEdgeTopology`, and `DirtyFaceTopology`, and does
+not call renderer/RHI upload APIs or stamp broad `GpuDirty`; mesh extraction
+repackages/reuploads on the next deferred extraction opportunity.
+
 ### Sandbox Editor Vertex Channel Bindings
 
 `RUNTIME-123` extends `Extrinsic.Runtime.SandboxEditorUi` with normal/color

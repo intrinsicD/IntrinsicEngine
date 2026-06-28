@@ -18,7 +18,7 @@ consumer lives here because `runtime` owns composition over `geometry`.
   (`core` container; adopted by `Geometry.Graph.ShortestPath`).
 - [RUNTIME-135 — SpatialDebug closest-face picking via accelerated mesh query](RUNTIME-135-spatialdebug-closest-face-picking.md)
   (depends on `GEOM-039`). Editor method windows for the ported algorithms are
-  retired `UI-024`/`UI-026` plus remaining `UI-025` under the UI backlog.
+  retired `UI-024`/`UI-025`/`UI-026` under the UI backlog.
 
 ### CPU→GPU vertex-attribute overhaul (Theme B)
 
