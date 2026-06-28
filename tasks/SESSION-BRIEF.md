@@ -35,7 +35,6 @@ the authoritative open/unblocked view.
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
 - blocked by `GEOM-039`: `RUNTIME-135` — SpatialDebug closest-face picking via accelerated mesh query (tasks/backlog/runtime/RUNTIME-135-spatialdebug-closest-face-picking.md)
 - unblocked: `UI-025` — Sandbox EditorUI remeshing and subdivision windows (tasks/backlog/ui/UI-025-editor-remesh-subdivide-windows.md)
-- unblocked: `UI-026` — Sandbox EditorUI curvature analysis window and principal-direction field (tasks/backlog/ui/UI-026-editor-curvature-analysis-window.md)
 
 ## Theme H — Agentic workflow hardening
 

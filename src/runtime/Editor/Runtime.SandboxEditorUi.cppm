@@ -236,6 +236,7 @@ export namespace Extrinsic::Runtime
     {
         KMeans,
         MeshDenoise,
+        Curvature,
         Remeshing,
         Simplification,
         Smoothing,
@@ -282,6 +283,7 @@ export namespace Extrinsic::Runtime
         const char* Label{""};
         bool HasNormalsMethod{false};
         bool HasDenoiseMethod{false};
+        bool HasCurvatureMethod{false};
     };
 
     [[nodiscard]] std::vector<SandboxEditorGeometryProcessingMenuItem>
@@ -357,6 +359,17 @@ export namespace Extrinsic::Runtime
         FullBilateral,
     };
 
+    enum class SandboxEditorMeshCurvatureOutput : std::uint8_t
+    {
+        All,
+        Mean,
+        Gaussian,
+        PrincipalDirections,
+    };
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorMeshCurvatureOutput(
+        SandboxEditorMeshCurvatureOutput output) noexcept;
+
     struct SandboxEditorMeshDenoiseCommand
     {
         std::uint32_t StableEntityId{0u};
@@ -393,6 +406,38 @@ export namespace Extrinsic::Runtime
         std::size_t PinnedBoundaryVertexCount{0u};
         double SigmaSpatialUsed{0.0};
         double SigmaRangeUsed{0.0};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SandboxEditorCommandStatus::Applied;
+        }
+    };
+
+    struct SandboxEditorMeshCurvatureCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        SandboxEditorMeshCurvatureOutput Output{
+            SandboxEditorMeshCurvatureOutput::All};
+        bool PublishPrincipalDirections{true};
+    };
+
+    struct SandboxEditorMeshCurvatureResult
+    {
+        SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
+        SandboxEditorMeshCurvatureOutput Output{
+            SandboxEditorMeshCurvatureOutput::All};
+        bool DirectionsRequested{true};
+        bool DirectionsAvailable{true};
+        bool DirectionsPublished{false};
+        std::size_t VertexSlotCount{0u};
+        std::size_t ScalarPropertyCount{0u};
+        std::size_t ScalarWrittenCount{0u};
+        std::size_t DirectionPropertyCount{0u};
+        std::size_t DirectionWrittenCount{0u};
+        std::size_t NonFiniteScalarCount{0u};
+        std::size_t NonFiniteDirectionCount{0u};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
 
@@ -1501,12 +1546,16 @@ export namespace Extrinsic::Runtime
         std::vector<SandboxEditorGeometryProcessingEntry> Entries{};
         std::vector<SandboxEditorGeometryProcessingDomain> KMeansDomains{};
         bool MeshDenoiseAvailable{false};
+        bool MeshCurvatureAvailable{false};
+        bool MeshCurvatureDirectionsAvailable{false};
         bool MeshVertexNormalsAvailable{false};
         bool GraphVertexNormalsAvailable{false};
         bool PointCloudVertexNormalsAvailable{false};
         std::optional<SandboxEditorKMeansResult> LastKMeansResult{};
         std::optional<SandboxEditorMeshDenoiseResult>
             LastMeshDenoiseResult{};
+        std::optional<SandboxEditorMeshCurvatureResult>
+            LastMeshCurvatureResult{};
         std::optional<SandboxEditorMeshVertexNormalsResult>
             LastMeshVertexNormalsResult{};
         std::optional<SandboxEditorGraphVertexNormalsResult>
@@ -1585,6 +1634,8 @@ export namespace Extrinsic::Runtime
         const SandboxEditorKMeansResult* LastKMeansResult{nullptr};
         const SandboxEditorMeshDenoiseResult*
             LastMeshDenoiseResult{nullptr};
+        const SandboxEditorMeshCurvatureResult*
+            LastMeshCurvatureResult{nullptr};
         const SandboxEditorMeshVertexNormalsResult*
             LastMeshVertexNormalsResult{nullptr};
         const SandboxEditorGraphVertexNormalsResult*
@@ -1610,6 +1661,8 @@ export namespace Extrinsic::Runtime
         bool VisualizationCommandsAvailable{false};
         bool RenderRecipeCommandsAvailable{false};
         bool MeshDenoiseKernelAvailable{true};
+        bool MeshCurvatureKernelAvailable{true};
+        bool MeshCurvatureDirectionsAvailable{true};
     };
 
     struct SandboxEditorTransformEditCommand
@@ -1918,6 +1971,10 @@ export namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorMeshDenoiseCommand& command);
 
+    SandboxEditorMeshCurvatureResult ApplySandboxEditorMeshCurvatureCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorMeshCurvatureCommand& command);
+
     SandboxEditorMeshVertexNormalsResult
     ApplySandboxEditorMeshVertexNormalsCommand(
         const SandboxEditorContext& context,
@@ -1980,6 +2037,8 @@ export namespace Extrinsic::Runtime
         std::optional<SandboxEditorKMeansResult> m_LastKMeansResult{};
         std::optional<SandboxEditorMeshDenoiseResult>
             m_LastMeshDenoiseResult{};
+        std::optional<SandboxEditorMeshCurvatureResult>
+            m_LastMeshCurvatureResult{};
         std::optional<SandboxEditorMeshVertexNormalsResult>
             m_LastMeshVertexNormalsResult{};
         std::optional<SandboxEditorGraphVertexNormalsResult>
@@ -2002,6 +2061,8 @@ export namespace Extrinsic::Runtime
         float m_MeshDenoiseSigmaSpatial{0.0f};
         float m_MeshDenoiseSigmaRange{0.0f};
         bool m_MeshDenoisePreserveBoundary{true};
+        std::int32_t m_MeshCurvatureOutput{0};
+        bool m_MeshCurvaturePublishDirections{true};
         std::int32_t m_MeshVertexNormalsWeighting{1};
         glm::vec3 m_MeshVertexNormalsFallback{0.0f, 1.0f, 0.0f};
         glm::vec3 m_GraphVertexNormalsFallback{0.0f, 0.0f, 1.0f};

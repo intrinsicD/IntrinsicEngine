@@ -9,6 +9,21 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`UI-026`](UI-026-editor-curvature-analysis-window.md) — Sandbox EditorUI
+curvature analysis window and principal-direction field — retired on
+2026-06-28 at maturity `CPUContracted`. `Mesh > Processing > Curvature` now
+routes through a runtime-owned command/result surface that builds a scratch
+halfedge mesh from selected mesh `GeometrySources`, calls the `GEOM-040`
+`Geometry::Curvature::ComputeCurvature` backend, and publishes canonical
+`v:mean_curvature` / `v:gaussian_curvature` scalar properties plus
+`v:principal_dir1` / `v:principal_dir2` direction fields when available.
+Successful commits are undoable through `EditorCommandHistory`, stamp
+`DirtyVertexAttributes`, and leave renderer/RHI uploads to deferred extraction.
+`CurvatureVisualizationAdapter` reuses scalar colormap packets and emits
+principal-direction vector-field packets when direction properties are present,
+falling back to scalar-only diagnostics for absent or invalid direction data.
+
+Backlog
 [`GEOM-034`](GEOM-034-geometry-property-api-doc-audit.md) — Geometry property
 API documentation audit — retired on 2026-06-28 at maturity `Scaffolded`
 (documentation synchronization endpoint). The audit made

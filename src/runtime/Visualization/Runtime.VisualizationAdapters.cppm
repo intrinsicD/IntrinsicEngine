@@ -64,6 +64,11 @@ export namespace Extrinsic::Runtime
         float VectorScale{1.0f};
         glm::vec4 VectorColor{1.0f};
         bool DepthTested{true};
+        bool EmitPrincipalDirections{false};
+        bool EmitPrincipalDirection1{true};
+        bool EmitPrincipalDirection2{true};
+        std::string PrincipalDirection1SourceName{};
+        std::string PrincipalDirection2SourceName{};
         bool EmitHtexPreview{false};
         bool EmitFragmentBake{false};
         std::string SourceAttributeName{};
@@ -141,6 +146,19 @@ export namespace Extrinsic::Runtime
     {
     public:
         explicit VectorFieldAdapter(Geometry::ConstPropertySet properties) noexcept;
+
+        void Append(VisualizationAdapterBatch& out,
+                    const VisualizationAdapterOptions& options,
+                    VisualizationAdapterStats& stats) const override;
+
+    private:
+        Geometry::ConstPropertySet m_Properties{};
+    };
+
+    class CurvatureVisualizationAdapter final : public IVisualizationAdapter
+    {
+    public:
+        explicit CurvatureVisualizationAdapter(Geometry::ConstPropertySet properties) noexcept;
 
         void Append(VisualizationAdapterBatch& out,
                     const VisualizationAdapterOptions& options,

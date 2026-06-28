@@ -151,6 +151,36 @@ denoised positions. The commit stamps `DirtyVertexPositions` and
 renderer/RHI upload APIs or stamp broad `GpuDirty`. Runtime owns the ECS
 composition and history seam; geometry owns the denoising algorithm.
 
+### Sandbox Editor Mesh Curvature
+
+`UI-026` adds a mesh-only curvature analysis editor command at
+`Mesh > Processing > Curvature`. The Sandbox EditorUI surface exports
+`SandboxEditorMeshCurvatureCommand`,
+`SandboxEditorMeshCurvatureResult`, and
+`ApplySandboxEditorMeshCurvatureCommand(...)`. Runtime validates the selected
+mesh `GeometrySources`, converts the current CPU data to a scratch halfedge
+mesh, calls the geometry-owned `Geometry::Curvature::ComputeCurvature` backend
+from `GEOM-040`, and publishes count-matched finite vertex properties only
+after the geometry result succeeds.
+
+Successful scalar publication writes canonical `v:mean_curvature` and
+`v:gaussian_curvature` `double` properties. When principal directions are
+requested and available, the command also writes `v:principal_dir1` and
+`v:principal_dir2` `glm::vec3` properties; when the directions lane is disabled
+or unavailable, the command succeeds with scalars only and reports a
+deterministic diagnostic. The UI exposes an output selector, a principal
+directions toggle that is inert when directions are unavailable, and a single
+`Compute` action. Successful commits are undoable through
+`EditorCommandHistory::Execute`, stamp `DirtyVertexAttributes`, and do not call
+renderer/RHI upload APIs or stamp broad `GpuDirty`.
+
+`Extrinsic.Runtime.VisualizationAdapters` exports
+`CurvatureVisualizationAdapter` for the published properties. It reuses the
+existing scalar-property adapter path for curvature colormaps and can append
+principal-direction vector-field packets from the canonical direction
+properties. Missing, wrong-typed, count-mismatched, or non-finite direction
+properties fall back to scalar-only output with deterministic adapter stats.
+
 ### Sandbox Editor Vertex Channel Bindings
 
 `RUNTIME-123` extends `Extrinsic.Runtime.SandboxEditorUi` with normal/color

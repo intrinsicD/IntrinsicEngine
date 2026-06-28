@@ -14,10 +14,9 @@ map.
 - [UI-025 — Sandbox EditorUI remeshing and subdivision windows](UI-025-editor-remesh-subdivide-windows.md)
   (depends on `GEOM-043`, `GEOM-044`; `Mesh > Processing` remesh/subdivide
   method windows).
-- [UI-026 — Sandbox EditorUI curvature analysis window and principal-direction field](UI-026-editor-curvature-analysis-window.md)
-  (depends on retired `GEOM-040`; publishes canonical curvature/direction properties for
-  visualization). The runtime SpatialDebug closest-face picking consumer for
-  `GEOM-039` is filed under the runtime backlog as `RUNTIME-135`.
+
+The runtime SpatialDebug closest-face picking consumer for `GEOM-039` is filed
+under the runtime backlog as `RUNTIME-135`.
 
 ## Convergence
 
@@ -176,3 +175,11 @@ split; narratives live in the retirement log.
   rows expose declared renderer slots, binding overrides, view/output recipes,
   validation/preview/activation state, and artifact publish/apply commands
   through runtime-owned seams without UI owning renderer state.
+- [UI-024 — Sandbox EditorUI mesh denoising window](../../done/UI-024-editor-mesh-denoise-window.md)
+  (done, 2026-06-28, `CPUContracted`): mesh denoise commands consume the
+  geometry-owned bilateral denoiser, publish canonical `v:position`, and defer
+  renderer synchronization through dirty tags.
+- [UI-026 — Sandbox EditorUI curvature analysis window and principal-direction field](../../done/UI-026-editor-curvature-analysis-window.md)
+  (done, 2026-06-28, `CPUContracted`): mesh curvature commands consume
+  `Geometry.Curvature`, publish canonical scalar/direction properties, and
+  feed scalar colormap plus principal-direction visualization adapters.

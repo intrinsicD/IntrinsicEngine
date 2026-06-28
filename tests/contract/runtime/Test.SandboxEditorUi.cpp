@@ -1797,6 +1797,22 @@ TEST(SandboxEditorUi, GeometryProcessingSupportedDomainsMatchPromotedEditorContr
         denoise,
         Domain::PointCloudPoints));
 
+    const Domain curvature =
+        Runtime::GetSandboxEditorSupportedGeometryProcessingDomains(
+            Algorithm::Curvature);
+    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        curvature,
+        Domain::MeshVertices));
+    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        curvature,
+        Domain::MeshEdges));
+    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        curvature,
+        Domain::GraphVertices));
+    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        curvature,
+        Domain::PointCloudPoints));
+
     const Domain smoothing =
         Runtime::GetSandboxEditorSupportedGeometryProcessingDomains(
             Algorithm::Smoothing);
@@ -1831,6 +1847,9 @@ TEST(SandboxEditorUi, GeometryProcessingSupportedDomainsMatchPromotedEditorContr
     EXPECT_STREQ(Runtime::DebugNameForSandboxEditorGeometryProcessingAlgorithm(
                      Algorithm::MeshDenoise),
                  "Mesh Denoise");
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorGeometryProcessingAlgorithm(
+                     Algorithm::Curvature),
+                 "Curvature");
 }
 
 TEST(SandboxEditorUi, GeometryProcessingMenusExposeDomainElementSubmenus)
@@ -1845,14 +1864,17 @@ TEST(SandboxEditorUi, GeometryProcessingMenusExposeDomainElementSubmenus)
     EXPECT_STREQ(mesh[0].Label, "Vertices");
     EXPECT_TRUE(mesh[0].HasNormalsMethod);
     EXPECT_TRUE(mesh[0].HasDenoiseMethod);
+    EXPECT_TRUE(mesh[0].HasCurvatureMethod);
     EXPECT_EQ(mesh[1].Domain, Domain::MeshEdges);
     EXPECT_STREQ(mesh[1].Label, "Edges");
     EXPECT_FALSE(mesh[1].HasNormalsMethod);
     EXPECT_FALSE(mesh[1].HasDenoiseMethod);
+    EXPECT_FALSE(mesh[1].HasCurvatureMethod);
     EXPECT_EQ(mesh[2].Domain, Domain::MeshFaces);
     EXPECT_STREQ(mesh[2].Label, "Faces");
     EXPECT_FALSE(mesh[2].HasNormalsMethod);
     EXPECT_FALSE(mesh[2].HasDenoiseMethod);
+    EXPECT_FALSE(mesh[2].HasCurvatureMethod);
 
     const std::vector<Runtime::SandboxEditorGeometryProcessingMenuItem> graph =
         Runtime::GetSandboxEditorGeometryProcessingMenuItems(
@@ -1862,14 +1884,17 @@ TEST(SandboxEditorUi, GeometryProcessingMenusExposeDomainElementSubmenus)
     EXPECT_STREQ(graph[0].Label, "Vertices");
     EXPECT_TRUE(graph[0].HasNormalsMethod);
     EXPECT_FALSE(graph[0].HasDenoiseMethod);
+    EXPECT_FALSE(graph[0].HasCurvatureMethod);
     EXPECT_EQ(graph[1].Domain, Domain::GraphEdges);
     EXPECT_STREQ(graph[1].Label, "Edges");
     EXPECT_FALSE(graph[1].HasNormalsMethod);
     EXPECT_FALSE(graph[1].HasDenoiseMethod);
+    EXPECT_FALSE(graph[1].HasCurvatureMethod);
     EXPECT_EQ(graph[2].Domain, Domain::GraphHalfedges);
     EXPECT_STREQ(graph[2].Label, "Halfedges");
     EXPECT_FALSE(graph[2].HasNormalsMethod);
     EXPECT_FALSE(graph[2].HasDenoiseMethod);
+    EXPECT_FALSE(graph[2].HasCurvatureMethod);
 
     const std::vector<Runtime::SandboxEditorGeometryProcessingMenuItem> cloud =
         Runtime::GetSandboxEditorGeometryProcessingMenuItems(
@@ -1879,6 +1904,7 @@ TEST(SandboxEditorUi, GeometryProcessingMenusExposeDomainElementSubmenus)
     EXPECT_STREQ(cloud[0].Label, "Vertices");
     EXPECT_TRUE(cloud[0].HasNormalsMethod);
     EXPECT_FALSE(cloud[0].HasDenoiseMethod);
+    EXPECT_FALSE(cloud[0].HasCurvatureMethod);
 }
 
 TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntries)
@@ -1913,17 +1939,18 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
 
     const std::vector<Runtime::SandboxEditorGeometryProcessingEntry> meshEntries =
         Runtime::ResolveSandboxEditorGeometryProcessingEntries(meshCaps);
-    ASSERT_EQ(meshEntries.size(), 13u);
+    ASSERT_EQ(meshEntries.size(), 14u);
     EXPECT_EQ(meshEntries[0].Algorithm, Algorithm::KMeans);
     EXPECT_EQ(meshEntries[1].Algorithm, Algorithm::NormalEstimation);
     EXPECT_EQ(meshEntries[2].Algorithm, Algorithm::MeshDenoise);
-    EXPECT_EQ(meshEntries[3].Algorithm, Algorithm::ShortestPath);
-    EXPECT_EQ(meshEntries[4].Algorithm, Algorithm::VectorHeat);
-    EXPECT_EQ(meshEntries[5].Algorithm, Algorithm::Parameterization);
-    EXPECT_EQ(meshEntries[6].Algorithm, Algorithm::ConvexHull);
-    EXPECT_EQ(meshEntries[7].Algorithm, Algorithm::BooleanCSG);
-    EXPECT_EQ(meshEntries[8].Algorithm, Algorithm::Remeshing);
-    EXPECT_EQ(meshEntries[12].Algorithm, Algorithm::Repair);
+    EXPECT_EQ(meshEntries[3].Algorithm, Algorithm::Curvature);
+    EXPECT_EQ(meshEntries[4].Algorithm, Algorithm::ShortestPath);
+    EXPECT_EQ(meshEntries[5].Algorithm, Algorithm::VectorHeat);
+    EXPECT_EQ(meshEntries[6].Algorithm, Algorithm::Parameterization);
+    EXPECT_EQ(meshEntries[7].Algorithm, Algorithm::ConvexHull);
+    EXPECT_EQ(meshEntries[8].Algorithm, Algorithm::BooleanCSG);
+    EXPECT_EQ(meshEntries[9].Algorithm, Algorithm::Remeshing);
+    EXPECT_EQ(meshEntries[13].Algorithm, Algorithm::Repair);
 
     const std::vector<Domain> meshKMeans =
         Runtime::GetAvailableSandboxEditorKMeansDomains(registry, mesh);
@@ -1936,6 +1963,8 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
             context,
             Runtime::SandboxEditorDomainWindowKind::Mesh);
     EXPECT_TRUE(meshModel.Processing.MeshDenoiseAvailable);
+    EXPECT_TRUE(meshModel.Processing.MeshCurvatureAvailable);
+    EXPECT_TRUE(meshModel.Processing.MeshCurvatureDirectionsAvailable);
     EXPECT_TRUE(meshModel.Processing.MeshVertexNormalsAvailable);
     EXPECT_FALSE(meshModel.Processing.GraphVertexNormalsAvailable);
     EXPECT_FALSE(meshModel.Processing.PointCloudVertexNormalsAvailable);
@@ -1973,6 +2002,8 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
             context,
             Runtime::SandboxEditorDomainWindowKind::Graph);
     EXPECT_FALSE(graphModel.Processing.MeshDenoiseAvailable);
+    EXPECT_FALSE(graphModel.Processing.MeshCurvatureAvailable);
+    EXPECT_FALSE(graphModel.Processing.MeshCurvatureDirectionsAvailable);
     EXPECT_FALSE(graphModel.Processing.MeshVertexNormalsAvailable);
     EXPECT_TRUE(graphModel.Processing.GraphVertexNormalsAvailable);
     EXPECT_FALSE(graphModel.Processing.PointCloudVertexNormalsAvailable);
@@ -2005,6 +2036,8 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
             context,
             Runtime::SandboxEditorDomainWindowKind::PointCloud);
     EXPECT_FALSE(cloudModel.Processing.MeshDenoiseAvailable);
+    EXPECT_FALSE(cloudModel.Processing.MeshCurvatureAvailable);
+    EXPECT_FALSE(cloudModel.Processing.MeshCurvatureDirectionsAvailable);
     EXPECT_FALSE(cloudModel.Processing.MeshVertexNormalsAvailable);
     EXPECT_FALSE(cloudModel.Processing.GraphVertexNormalsAvailable);
     EXPECT_TRUE(cloudModel.Processing.PointCloudVertexNormalsAvailable);
@@ -2454,6 +2487,213 @@ TEST(SandboxEditorUi, MeshDenoiseCommandFailsClosedForInvalidTargetsAndUnavailab
             context,
             Runtime::SandboxEditorDomainWindowKind::Mesh);
     EXPECT_FALSE(unavailableModel.Processing.MeshDenoiseAvailable);
+}
+
+TEST(SandboxEditorUi, MeshCurvatureCommandPublishesCanonicalPropertiesAndSupportsUndoRedo)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "CurvatureMesh");
+    AddDenoiseTetraMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
+    ASSERT_FALSE(properties.Exists(PN::kMeanCurvature));
+    ASSERT_FALSE(properties.Exists(PN::kGaussianCurvature));
+    ASSERT_FALSE(properties.Exists(PN::kPrincipalDir1));
+    ASSERT_FALSE(properties.Exists(PN::kPrincipalDir2));
+
+    const Runtime::SandboxEditorMeshCurvatureResult result =
+        Runtime::ApplySandboxEditorMeshCurvatureCommand(
+            context,
+            Runtime::SandboxEditorMeshCurvatureCommand{
+                .StableEntityId = stableId,
+                .Output = Runtime::SandboxEditorMeshCurvatureOutput::All,
+                .PublishPrincipalDirections = true,
+            });
+
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_EQ(result.VertexSlotCount, 4u);
+    EXPECT_EQ(result.ScalarPropertyCount, 2u);
+    EXPECT_EQ(result.ScalarWrittenCount, 8u);
+    EXPECT_EQ(result.DirectionPropertyCount, 2u);
+    EXPECT_EQ(result.DirectionWrittenCount, 8u);
+    EXPECT_EQ(result.NonFiniteScalarCount, 0u);
+    EXPECT_EQ(result.NonFiniteDirectionCount, 0u);
+    EXPECT_TRUE(result.DirectionsRequested);
+    EXPECT_TRUE(result.DirectionsAvailable);
+    EXPECT_TRUE(result.DirectionsPublished);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
+    EXPECT_TRUE(history.IsDirty());
+    EXPECT_TRUE(history.CanUndo());
+
+    const auto mean = properties.Get<double>(PN::kMeanCurvature);
+    const auto gaussian = properties.Get<double>(PN::kGaussianCurvature);
+    const auto dir1 = properties.Get<glm::vec3>(PN::kPrincipalDir1);
+    const auto dir2 = properties.Get<glm::vec3>(PN::kPrincipalDir2);
+    ASSERT_TRUE(mean.IsValid());
+    ASSERT_TRUE(gaussian.IsValid());
+    ASSERT_TRUE(dir1.IsValid());
+    ASSERT_TRUE(dir2.IsValid());
+    ASSERT_EQ(mean.Vector().size(), 4u);
+    ASSERT_EQ(gaussian.Vector().size(), 4u);
+    ASSERT_EQ(dir1.Vector().size(), 4u);
+    ASSERT_EQ(dir2.Vector().size(), 4u);
+    for (std::size_t i = 0u; i < 4u; ++i)
+    {
+        EXPECT_TRUE(std::isfinite(mean.Vector()[i]));
+        EXPECT_TRUE(std::isfinite(gaussian.Vector()[i]));
+        EXPECT_TRUE(std::isfinite(dir1.Vector()[i].x));
+        EXPECT_TRUE(std::isfinite(dir1.Vector()[i].y));
+        EXPECT_TRUE(std::isfinite(dir1.Vector()[i].z));
+        EXPECT_TRUE(std::isfinite(dir2.Vector()[i].x));
+        EXPECT_TRUE(std::isfinite(dir2.Vector()[i].y));
+        EXPECT_TRUE(std::isfinite(dir2.Vector()[i].z));
+    }
+
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_FALSE(properties.Exists(PN::kMeanCurvature));
+    EXPECT_FALSE(properties.Exists(PN::kGaussianCurvature));
+    EXPECT_FALSE(properties.Exists(PN::kPrincipalDir1));
+    EXPECT_FALSE(properties.Exists(PN::kPrincipalDir2));
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_TRUE(properties.Get<double>(PN::kMeanCurvature).IsValid());
+    EXPECT_TRUE(properties.Get<double>(PN::kGaussianCurvature).IsValid());
+    EXPECT_TRUE(properties.Get<glm::vec3>(PN::kPrincipalDir1).IsValid());
+    EXPECT_TRUE(properties.Get<glm::vec3>(PN::kPrincipalDir2).IsValid());
+
+    context.LastMeshCurvatureResult = &result;
+    const Runtime::SandboxEditorDomainWindowModel model =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    EXPECT_TRUE(model.Processing.MeshCurvatureAvailable);
+    EXPECT_TRUE(model.Processing.MeshCurvatureDirectionsAvailable);
+    ASSERT_TRUE(model.Processing.LastMeshCurvatureResult.has_value());
+    EXPECT_TRUE(model.Processing.LastMeshCurvatureResult->Succeeded());
+    EXPECT_EQ(model.Processing.LastMeshCurvatureResult->ScalarWrittenCount, 8u);
+}
+
+TEST(SandboxEditorUi, MeshCurvatureCommandFallsBackToScalarOnlyWhenDirectionsUnavailable)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.MeshCurvatureDirectionsAvailable = false;
+
+    const ECS::EntityHandle mesh =
+        MakeSelectable(registry, "CurvatureScalarOnlyMesh");
+    AddDenoiseTetraMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    const Runtime::SandboxEditorMeshCurvatureResult result =
+        Runtime::ApplySandboxEditorMeshCurvatureCommand(
+            context,
+            Runtime::SandboxEditorMeshCurvatureCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+                .Output = Runtime::SandboxEditorMeshCurvatureOutput::All,
+                .PublishPrincipalDirections = true,
+            });
+
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_TRUE(result.DirectionsRequested);
+    EXPECT_FALSE(result.DirectionsAvailable);
+    EXPECT_FALSE(result.DirectionsPublished);
+    EXPECT_EQ(result.ScalarPropertyCount, 2u);
+    EXPECT_EQ(result.ScalarWrittenCount, 8u);
+    EXPECT_EQ(result.DirectionWrittenCount, 0u);
+    EXPECT_NE(result.Message.find("not published"), std::string::npos);
+
+    auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
+    EXPECT_TRUE(properties.Get<double>(PN::kMeanCurvature).IsValid());
+    EXPECT_TRUE(properties.Get<double>(PN::kGaussianCurvature).IsValid());
+    EXPECT_FALSE(properties.Exists(PN::kPrincipalDir1));
+    EXPECT_FALSE(properties.Exists(PN::kPrincipalDir2));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
+
+    const Runtime::SandboxEditorDomainWindowModel model =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    EXPECT_TRUE(model.Processing.MeshCurvatureAvailable);
+    EXPECT_FALSE(model.Processing.MeshCurvatureDirectionsAvailable);
+}
+
+TEST(SandboxEditorUi, MeshCurvatureCommandFailsClosedForInvalidTargetsAndConflicts)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    const Runtime::SandboxEditorMeshCurvatureResult missingScene =
+        Runtime::ApplySandboxEditorMeshCurvatureCommand(
+            Runtime::SandboxEditorContext{},
+            Runtime::SandboxEditorMeshCurvatureCommand{
+                .StableEntityId = 1u,
+            });
+    EXPECT_EQ(missingScene.Status,
+              Runtime::SandboxEditorCommandStatus::MissingScene);
+    EXPECT_EQ(missingScene.Error, Core::ErrorCode::InvalidState);
+
+    const ECS::EntityHandle cloud =
+        MakeSelectable(registry, "CurvatureWrongDomain");
+    AddPointCloudSource(registry, cloud, 3u);
+    const Runtime::SandboxEditorMeshCurvatureResult wrongDomain =
+        Runtime::ApplySandboxEditorMeshCurvatureCommand(
+            context,
+            Runtime::SandboxEditorMeshCurvatureCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(cloud),
+            });
+    EXPECT_EQ(wrongDomain.Status,
+              Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(cloud));
+
+    const ECS::EntityHandle mesh =
+        MakeSelectable(registry, "CurvatureUnavailableMesh");
+    AddDenoiseTetraMeshSource(registry, mesh);
+    context.MeshCurvatureKernelAvailable = false;
+    const Runtime::SandboxEditorMeshCurvatureResult unavailable =
+        Runtime::ApplySandboxEditorMeshCurvatureCommand(
+            context,
+            Runtime::SandboxEditorMeshCurvatureCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+            });
+    EXPECT_EQ(unavailable.Status,
+              Runtime::SandboxEditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_EQ(unavailable.Error, Core::ErrorCode::InvalidState);
+    EXPECT_FALSE(registry.Raw().get<GS::Vertices>(mesh).Properties.Exists(
+        PN::kMeanCurvature));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+
+    context.MeshCurvatureKernelAvailable = true;
+    auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
+    (void)properties.Add<float>(std::string{PN::kMeanCurvature}, 0.0f);
+    const Runtime::SandboxEditorMeshCurvatureResult conflict =
+        Runtime::ApplySandboxEditorMeshCurvatureCommand(
+            context,
+            Runtime::SandboxEditorMeshCurvatureCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+            });
+    EXPECT_EQ(conflict.Status,
+              Runtime::SandboxEditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_EQ(conflict.Error, Core::ErrorCode::TypeMismatch);
+    EXPECT_FALSE(properties.Exists(PN::kGaussianCurvature));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
 }
 
 TEST(SandboxEditorUi, MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWeightings)
