@@ -294,6 +294,7 @@ if(TARGET ExtrinsicRuntime)
         Test.MeshPrimitiveViewPacker.cpp
         Test.MeshPrimitiveViewExtraction.cpp
         Test.ObjectSpaceNormalBakeQueue.cpp
+        Test.ObjectSpaceNormalBakeSubmission.cpp
         Test.ProgressivePresentationExtraction.cpp
         Test.ProgressiveRenderData.cpp
         Test.RenderArtifactPublication.cpp
