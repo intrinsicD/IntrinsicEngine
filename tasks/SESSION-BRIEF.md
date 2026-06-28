@@ -42,7 +42,6 @@ the authoritative open/unblocked view.
 
 ## Unthemed
 
-- unblocked: `CORE-004` — Indexed decrease-key min-heap container and Dijkstra adoption (tasks/backlog/runtime/CORE-004-indexed-decrease-key-heap.md)
 - unblocked: `GEOIO-003` — Mesh and point-cloud IO breadth — OFF writer and point-cloud readers (tasks/backlog/geometry/GEOIO-003-mesh-pointcloud-io-breadth.md)
 - unblocked: `GEOM-013` — Feature-preserving dual contouring (tasks/backlog/geometry/GEOM-013-feature-preserving-dual-contouring.md)
 - unblocked: `GEOM-014` — Feature-aware quadric error mesh simplification (tasks/backlog/geometry/GEOM-014-feature-aware-quadric-error-simplification.md)

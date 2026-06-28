@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <cstddef>
 #include <optional>
 #include <random>
 #include <utility>
@@ -23,6 +24,28 @@ namespace
             out.push_back(top.first);
         }
         return out;
+    }
+
+    template <typename H>
+    std::vector<std::pair<double, int>> DrainPairs(H heap)
+    {
+        std::vector<std::pair<double, int>> out;
+        std::pair<double, int> top;
+        while (heap.TryPop(top))
+        {
+            out.push_back(top);
+        }
+        return out;
+    }
+
+    std::vector<std::pair<double, int>> SortedReference(std::vector<std::pair<double, int>> reference)
+    {
+        std::sort(reference.begin(), reference.end(), [](const auto& lhs, const auto& rhs)
+        {
+            if (lhs.first != rhs.first) return lhs.first < rhs.first;
+            return lhs.second < rhs.second;
+        });
+        return reference;
     }
 }
 
@@ -78,6 +101,11 @@ TEST(CoreIndexedHeap, DecreaseKeySurfacesValue)
     ASSERT_TRUE(top.has_value());
     EXPECT_EQ(top->second, 2);
     EXPECT_DOUBLE_EQ(top->first, 5.0);
+
+    std::pair<double, int> peek;
+    ASSERT_TRUE(heap.TryTop(peek));
+    EXPECT_EQ(peek.second, 2);
+    EXPECT_DOUBLE_EQ(peek.first, 5.0);
 }
 
 TEST(CoreIndexedHeap, DecreaseKeyRejectsIncrease)
@@ -143,11 +171,80 @@ TEST(CoreIndexedHeap, RandomizedParityWithSortedReference)
         EXPECT_DOUBLE_EQ(drained[i], expected[i]);
 }
 
+TEST(CoreIndexedHeap, RandomizedOperationParityWithBruteForceReference)
+{
+    std::mt19937 rng(67890);
+    std::uniform_int_distribution<int> opDist(0, 3);
+    std::uniform_int_distribution<int> keyDist(-20, 20);
+    std::uniform_int_distribution<int> decrementDist(1, 8);
+    IndexedHeap<double, int> heap;
+    std::vector<std::pair<double, int>> reference;
+    int nextValue = 0;
+
+    for (int step = 0; step < 400; ++step)
+    {
+        const int op = opDist(rng);
+        if (op == 0 || reference.empty())
+        {
+            const int value = nextValue++;
+            const double key = static_cast<double>(keyDist(rng));
+            ASSERT_TRUE(heap.Push(key, value));
+            reference.push_back({key, value});
+        }
+        else if (op == 1)
+        {
+            const auto expected = SortedReference(reference);
+            std::pair<double, int> popped;
+            ASSERT_TRUE(heap.TryPop(popped));
+            EXPECT_EQ(popped, expected.front());
+            reference.erase(std::find_if(reference.begin(), reference.end(), [&](const auto& item)
+            {
+                return item.second == popped.second;
+            }));
+        }
+        else if (op == 2)
+        {
+            std::uniform_int_distribution<std::size_t> liveDist(0, reference.size() - 1);
+            const std::size_t index = liveDist(rng);
+            const double newKey = reference[index].first - static_cast<double>(decrementDist(rng));
+            ASSERT_TRUE(heap.DecreaseKey(reference[index].second, newKey));
+            reference[index].first = newKey;
+        }
+        else
+        {
+            std::uniform_int_distribution<std::size_t> liveDist(0, reference.size() - 1);
+            const std::size_t index = liveDist(rng);
+            const int value = reference[index].second;
+            ASSERT_TRUE(heap.Remove(value));
+            EXPECT_FALSE(heap.Contains(value));
+            reference.erase(reference.begin() + static_cast<std::ptrdiff_t>(index));
+        }
+
+        const auto expected = SortedReference(reference);
+        EXPECT_EQ(heap.Size(), expected.size());
+        EXPECT_EQ(DrainPairs(heap), expected);
+        std::pair<double, int> peek{-999.0, -999};
+        if (expected.empty())
+        {
+            EXPECT_FALSE(heap.TryTop(peek));
+            EXPECT_EQ(peek.second, -999);
+        }
+        else
+        {
+            ASSERT_TRUE(heap.TryTop(peek));
+            EXPECT_EQ(peek, expected.front());
+        }
+    }
+}
+
 TEST(CoreIndexedHeap, FailClosedOnEmpty)
 {
     IndexedHeap<double, int> heap;
     EXPECT_TRUE(heap.Empty());
     EXPECT_FALSE(heap.Top().has_value());
+    std::pair<double, int> top{-1.0, -1};
+    EXPECT_FALSE(heap.TryTop(top));
+    EXPECT_EQ(top.second, -1);
     EXPECT_FALSE(heap.Pop());
     std::pair<double, int> out{-1.0, -1};
     EXPECT_FALSE(heap.TryPop(out));

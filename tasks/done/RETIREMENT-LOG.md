@@ -2707,3 +2707,16 @@ kernel is implemented in runtime; no renderer/RHI/Vulkan or editor widget path
 is touched. Runtime contract coverage proves parity with the direct geometry
 query, valid overlay output, rebuild on revision change, no-active/missing-mesh
 fail-closed behavior, and empty/degenerate/non-finite-probe diagnostics.
+
+[`CORE-004`](CORE-004-indexed-decrease-key-heap.md) — indexed decrease-key
+min-heap container and Dijkstra adoption retired to `tasks/done/` on
+2026-06-28 at `CPUContracted`. Core now exports
+`Extrinsic.Core.IndexedHeap`, a generic deterministic indexed binary min-heap
+with fail-closed `Top`/`TryTop`/`Pop`/`TryPop`, duplicate-safe `Push`,
+O(log n) `DecreaseKey`, O(log n) `Remove`, and value-token tie-breaking.
+`Geometry.Graph.ShortestPath` now uses the core heap as its true decrease-key
+Dijkstra frontier instead of `std::priority_queue` lazy re-insertion, while
+preserving distance, predecessor, traversal-count, goal-stop, and
+budget-exhaustion diagnostics against the prior priority-queue reference.
+Focused core heap randomized operation parity and geometry shortest-path
+priority-queue parity tests cover the migration.

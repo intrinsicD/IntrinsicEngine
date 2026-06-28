@@ -11,6 +11,7 @@ engine subsystems.
 - `Extrinsic.Core.Config.Engine`
 - `Extrinsic.Core.Config.EngineLoad`
 - `Extrinsic.Core.BoundedHeap`
+- `Extrinsic.Core.IndexedHeap`
 - `Extrinsic.Core.CallbackRegistry`
 - `Extrinsic.Core.Dag.Scheduler`
 - `Extrinsic.Core.Dag.TaskGraph`
@@ -36,6 +37,12 @@ engine subsystems.
 
 Core owns reusable graph/scheduling primitives, not domain-specific GPU policy.
 
+- **`Extrinsic.Core.IndexedHeap`**: generic indexed binary min-heap with
+  O(log n) `DecreaseKey` and `Remove`, deterministic tie-breaks on the value
+  token when priorities compare equivalent, and fail-closed empty/absent-value
+  operations. Geometry's Dijkstra frontier uses it as a true decrease-key heap;
+  shortest-path outputs remain covered against the previous lazy
+  priority-queue reference.
 - **`Extrinsic.Core.Dag.Scheduler`**: shared graph compiler substrate (`TaskId`,
   `ResourceId`, hazard analysis, deterministic topological layering, schedule
   stats, cycle diagnostics).

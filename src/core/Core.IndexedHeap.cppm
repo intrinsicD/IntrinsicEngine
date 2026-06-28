@@ -64,6 +64,17 @@ namespace Extrinsic::Core
             return std::make_pair(nodes_.front().key, nodes_.front().value);
         }
 
+        // Copy the current minimum into out; false (out untouched) when empty.
+        bool TryTop(std::pair<Key, Value>& out) const
+        {
+            if (nodes_.empty())
+            {
+                return false;
+            }
+            out = std::make_pair(nodes_.front().key, nodes_.front().value);
+            return true;
+        }
+
         // Pop the minimum into out; false (out untouched) when empty.
         bool TryPop(std::pair<Key, Value>& out)
         {

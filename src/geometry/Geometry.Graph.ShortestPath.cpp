@@ -6,8 +6,8 @@ module;
 #include <cstdint>
 #include <limits>
 #include <optional>
-#include <queue>
 #include <span>
+#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -17,6 +17,7 @@ module Geometry.Graph.ShortestPath;
 
 import Geometry.HalfedgeMesh;
 import Geometry.Graph;
+import Extrinsic.Core.IndexedHeap;
 
 namespace Geometry::ShortestPath
 {
@@ -33,21 +34,6 @@ namespace Geometry::ShortestPath
             d.HalfedgesAroundVertex(v);
             { cd.ToVertex(h) } -> std::same_as<VertexHandle>;
             d.VertexProperties();
-        };
-
-        struct FrontNode
-        {
-            VertexHandle Vertex{};
-            double Distance{0.0};
-        };
-
-        struct FrontNodeGreater
-        {
-            [[nodiscard]] bool operator()(const FrontNode& a, const FrontNode& b) const noexcept
-            {
-                if (a.Distance != b.Distance) return a.Distance > b.Distance;
-                return a.Vertex.Index > b.Vertex.Index;
-            }
         };
 
         [[nodiscard]] glm::vec3 VertexPosition(const HalfedgeMesh::Mesh& mesh, VertexHandle v)
@@ -76,6 +62,33 @@ namespace Geometry::ShortestPath
         [[nodiscard]] bool IsUsableVertex(const Domain& domain, VertexHandle v)
         {
             return v.IsValid() && domain.IsValid(v) && !domain.IsDeleted(v) && !domain.IsIsolated(v);
+        }
+
+        struct FrontierPriority
+        {
+            double Distance{0.0};
+            PropertyIndex VertexIndex{0};
+        };
+
+        [[nodiscard]] bool FrontierPriorityBefore(FrontierPriority a, FrontierPriority b)
+        {
+            if (a.Distance != b.Distance) return a.Distance < b.Distance;
+            return a.VertexIndex < b.VertexIndex;
+        }
+
+        [[nodiscard]] bool LegacyLazyFrontierWouldHavePendingEntry(
+            std::span<const FrontierPriority> supersededEntries,
+            std::optional<FrontierPriority> lastSettledPriority)
+        {
+            if (!lastSettledPriority) return false;
+            for (const FrontierPriority entry : supersededEntries)
+            {
+                if (!FrontierPriorityBefore(entry, *lastSettledPriority))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         template <class Domain>
@@ -200,14 +213,28 @@ namespace Geometry::ShortestPath
                 ++validGoalCount;
             }
 
-            std::priority_queue<FrontNode, std::vector<FrontNode>, FrontNodeGreater> queue;
+            // True decrease-key frontier. QueuePushCount intentionally counts
+            // each successful historical frontier update (including
+            // DecreaseKey) to preserve the old lazy-priority-queue diagnostics.
+            Extrinsic::Core::IndexedHeap<double, PropertyIndex> queue;
+            std::vector<double> frontierDistances(vertexCount, kInfinity);
+            std::vector<FrontierPriority> supersededFrontierEntries;
             std::size_t validStartCount = 0;
             for (const VertexHandle source : seedVertices)
             {
                 if (!IsUsableVertex(graph, source)) continue;
                 if (result.Distances[source] > 0.0) result.Distances[source] = 0.0;
                 result.Predecessors[source] = VertexHandle{};
-                queue.push(FrontNode{source, 0.0});
+                if (queue.Contains(source.Index))
+                {
+                    supersededFrontierEntries.push_back(FrontierPriority{frontierDistances[source.Index], source.Index});
+                    (void)queue.DecreaseKey(source.Index, 0.0);
+                }
+                else
+                {
+                    (void)queue.Push(0.0, source.Index);
+                }
+                frontierDistances[source.Index] = 0.0;
                 ++result.QueuePushCount;
                 ++validStartCount;
             }
@@ -219,18 +246,22 @@ namespace Geometry::ShortestPath
             const std::size_t settleBudget = params.MaxSettledVertices > 0 ? params.MaxSettledVertices : vertexCount;
             const bool trackGoals = !goalVertices.empty();
             bool reachedGoal = goalVertices.empty();
+            std::optional<FrontierPriority> lastSettledPriority;
 
-            while (!queue.empty() && result.SettledVertexCount < settleBudget)
+            while (!queue.Empty() && result.SettledVertexCount < settleBudget)
             {
-                const FrontNode node = queue.top();
-                queue.pop();
+                std::pair<double, PropertyIndex> front;
+                if (!queue.TryPop(front)) break;
 
-                if (node.Distance > result.Distances[node.Vertex]) continue;
-                if (settled[node.Vertex.Index] != 0) continue;
-                settled[node.Vertex.Index] = 1;
+                const VertexHandle current{front.second};
+                const double currentDistance = front.first;
+                if (settled[current.Index] != 0) continue;
+                settled[current.Index] = 1;
+                frontierDistances[current.Index] = kInfinity;
+                lastSettledPriority = FrontierPriority{currentDistance, current.Index};
                 ++result.SettledVertexCount;
 
-                if (goalMask[node.Vertex.Index] != 0)
+                if (goalMask[current.Index] != 0)
                 {
                     ++result.ReachedGoalCount;
                     reachedGoal = true;
@@ -244,29 +275,41 @@ namespace Geometry::ShortestPath
 
                 std::size_t safety = 0;
                 const std::size_t safetyLimit = graph.HalfedgesSize();
-                for (const HalfedgeHandle h : graph.HalfedgesAroundVertex(node.Vertex))
+                for (const HalfedgeHandle h : graph.HalfedgesAroundVertex(current))
                 {
                     if (++safety > safetyLimit) break;
 
                     const VertexHandle next = graph.ToVertex(h);
                     if (!IsUsableVertex(graph, next)) continue;
 
-                    const double stepLength = EdgeLength(graph, node.Vertex, next);
+                    const double stepLength = EdgeLength(graph, current, next);
                     if (!std::isfinite(stepLength)) continue;
 
-                    const double newDistance = node.Distance + stepLength;
+                    const double newDistance = currentDistance + stepLength;
                     ++result.RelaxedEdgeCount;
                     if (newDistance < result.Distances[next])
                     {
                         result.Distances[next] = newDistance;
-                        result.Predecessors[next] = node.Vertex;
-                        queue.push(FrontNode{next, newDistance});
+                        result.Predecessors[next] = current;
+                        if (queue.Contains(next.Index))
+                        {
+                            supersededFrontierEntries.push_back(FrontierPriority{frontierDistances[next.Index], next.Index});
+                            (void)queue.DecreaseKey(next.Index, newDistance);
+                        }
+                        else
+                        {
+                            (void)queue.Push(newDistance, next.Index);
+                        }
+                        frontierDistances[next.Index] = newDistance;
                         ++result.QueuePushCount;
                     }
                 }
             }
 
-            if (result.SettledVertexCount >= settleBudget && !queue.empty())
+            const bool legacyLazyFrontierWouldHavePendingEntries =
+                LegacyLazyFrontierWouldHavePendingEntry(supersededFrontierEntries, lastSettledPriority);
+            if (result.SettledVertexCount >= settleBudget &&
+                (!queue.Empty() || legacyLazyFrontierWouldHavePendingEntries))
             {
                 result.Converged = false;
             }
