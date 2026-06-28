@@ -61,7 +61,6 @@ the authoritative open/unblocked view.
 - unblocked: `GEOM-020` — Sparse direct factorization solver seam (LDLT/LLT) (tasks/backlog/geometry/GEOM-020-sparse-direct-factorization-seam.md)
 - unblocked: `GEOM-023` — Sparse non-symmetric iterative solver seam (BiCGSTAB) (tasks/backlog/geometry/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md)
 - blocked by `GEOM-020`: `GEOM-024` — Sparse symmetric generalized eigensolver seam (tasks/backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
-- unblocked: `GEOM-036` — Blue-noise / sampling quality-metrics module (tasks/backlog/geometry/GEOM-036-sampling-quality-metrics.md)
 - unblocked: `GEOM-037` — SO(3) rotation primitives (Lie machinery) (tasks/backlog/geometry/GEOM-037-so3-rotation-primitives.md)
 - blocked by `GEOM-037`: `GEOM-038` — Rotation averaging — SO(3) means and medians (tasks/backlog/geometry/GEOM-038-rotation-averaging-means-medians.md)
 - unblocked: `GEOM-039` — Accelerated mesh closest-face query and consumer adoption (tasks/backlog/geometry/GEOM-039-accelerated-mesh-closest-face-query.md)
@@ -79,7 +78,7 @@ the authoritative open/unblocked view.
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
 - blocked by `GRAPHICS-108`: `METHOD-013` — Progressive Poisson-disk sampling: GPU (Vulkan compute) backend + parity (tasks/backlog/methods/METHOD-013-progressive-poisson-disk-gpu-backend.md)
 - unblocked: `METHODS-001` — Pin signed heat as methods-pipeline pathfinder (tasks/backlog/methods/METHODS-001-signed-heat-pathfinder.md)
-- blocked by `GEOM-036`: `RUNTIME-133` — Method result & figure data-export seam (CSV/JSON) (tasks/backlog/runtime/RUNTIME-133-method-figure-data-export.md)
+- unblocked: `RUNTIME-133` — Method result & figure data-export seam (CSV/JSON) (tasks/backlog/runtime/RUNTIME-133-method-figure-data-export.md)
 - blocked by `RUNTIME-131`: `RUNTIME-134` — Interactive progressive-Poisson sampling playground in the Sandbox (tasks/backlog/ui/RUNTIME-134-progressive-poisson-interactive-playground.md)
 
 ## Audits

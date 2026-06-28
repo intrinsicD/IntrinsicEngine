@@ -2542,3 +2542,13 @@ from interpolated source `v:normal` or geometric fallback normals. Focused
 geometry tests cover area proportions, determinism, normal handling, and
 invalid-input diagnostics; the benchmark smoke runner includes a CPU-only
 surface-sampling workload and manifest with no performance claim.
+
+[`GEOM-036`](GEOM-036-sampling-quality-metrics.md) — blue-noise and sampling
+quality metrics retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
+`Geometry.PointCloud.QualityMetrics` now exposes deterministic CPU functions
+for nearest-neighbor distances, NN histograms, coefficient of variation,
+minimum pair distance, Poisson-disk ratio, coverage, RDF with rectangular-domain
+edge correction, 2D periodograms, and radially averaged power spectra. Focused
+geometry tests cover grid, jittered-grid, white-noise, regular-lattice, cloud
+adapter, and fail-closed edge cases; the benchmark smoke runner includes a
+CPU-only quality-metrics workload and manifest with no performance claim.

@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 12 |
 | `core` | 41 |
 | `ecs` | 28 |
-| `geometry` | 97 |
+| `geometry` | 98 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 68 |
@@ -178,6 +178,7 @@ Root scanned: `src`
 | `Geometry.PointCloud.Fwd` | `src/geometry/Geometry.PointCloud.Fwd.cppm` | `geometry` |
 | `Geometry.PointCloud.IO` | `src/geometry/Geometry.PointCloud.IO.cppm` | `geometry` |
 | `Geometry.PointCloud.Normals` | `src/geometry/Geometry.PointCloud.Normals.cppm` | `geometry` |
+| `Geometry.PointCloud.QualityMetrics` | `src/geometry/Geometry.PointCloud.QualityMetrics.cppm` | `geometry` |
 | `Geometry.PointCloud.SurfaceSampling` | `src/geometry/Geometry.PointCloud.SurfaceSampling.cppm` | `geometry` |
 | `Geometry.PointCloud.Utils` | `src/geometry/Geometry.PointCloud.Utils.cppm` | `geometry` |
 | `Geometry.PointCloud` | `src/geometry/Geometry.PointCloud.cppm` | `geometry` |
@@ -545,4 +546,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **517**
+Total modules: **518**

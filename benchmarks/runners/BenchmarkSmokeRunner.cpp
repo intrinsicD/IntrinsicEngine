@@ -15,6 +15,7 @@
 
 #include "../geometry/Bench.GeometrySmoke.hpp"
 #include "../geometry/Bench.ProgressivePoissonReferenceSmoke.hpp"
+#include "../geometry/Bench.QualityMetricsSmoke.hpp"
 #include "../geometry/Bench.SurfaceSamplingSmoke.hpp"
 #include "../physics/Bench.ParticleSpringReferenceSmoke.hpp"
 #include "../physics/Bench.RigidBodyReferenceSmoke.hpp"
@@ -208,6 +209,43 @@ namespace
         return EmittedBenchmark{kSurfaceSamplingSmokeBenchmarkId, out.str(), metrics.Succeeded};
     }
 
+    auto EmitQualityMetricsSmoke(const std::string& commit) -> EmittedBenchmark
+    {
+        using namespace Intrinsic::Bench::Geometry;
+
+        const auto metrics = RunQualityMetricsSmoke();
+
+        std::ostringstream out;
+        out.setf(std::ios::fixed);
+        out.precision(6);
+        out << "{\n"
+            << "  \"benchmark_id\": \"" << EscapeJson(kQualityMetricsSmokeBenchmarkId) << "\",\n"
+            << "  \"method\": \""       << EscapeJson(kQualityMetricsSmokeMethod)      << "\",\n"
+            << "  \"backend\": \"cpu_reference\",\n"
+            << "  \"dataset\": \""      << EscapeJson(kQualityMetricsSmokeDataset)     << "\",\n"
+            << "  \"commit\": \""       << EscapeJson(commit)                          << "\",\n"
+            << "  \"metrics\": {\n"
+            << "    \"runtime_ms\": "       << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
+            << "  },\n"
+            << "  \"diagnostics\": {\n"
+            << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 8,\n"
+            << "    \"point_count\": " << metrics.PointCount << ",\n"
+            << "    \"nearest_neighbor_cv\": " << metrics.NearestNeighborCv << ",\n"
+            << "    \"poisson_ratio\": " << metrics.PoissonRatio << ",\n"
+            << "    \"rdf_mean_away_from_zero\": " << metrics.RdfMeanAwayFromZero << ",\n"
+            << "    \"raps_cv\": " << metrics.RapsCv << ",\n"
+            << "    \"coverage_fraction\": " << metrics.CoverageFraction << "\n"
+            << "  },\n"
+            << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed") << "\"\n"
+            << "}\n";
+
+        return EmittedBenchmark{kQualityMetricsSmokeBenchmarkId, out.str(), metrics.Succeeded};
+    }
+
     auto EmitRigidBodyReferenceSmoke(const std::string& commit) -> EmittedBenchmark
     {
         using namespace Intrinsic::Bench::Physics;
@@ -379,6 +417,7 @@ auto main(int argc, char** argv) -> int
     emitted.push_back(EmitParameterizationDiagnosticsSmoke(commit));
     emitted.push_back(EmitProgressivePoissonReferenceSmoke(commit));
     emitted.push_back(EmitSurfaceSamplingSmoke(commit));
+    emitted.push_back(EmitQualityMetricsSmoke(commit));
     emitted.push_back(EmitRigidBodyReferenceSmoke(commit));
     emitted.push_back(EmitParticleSpringReferenceSmoke(commit));
     emitted.push_back(EmitXpbdClothReferenceSmoke(commit));

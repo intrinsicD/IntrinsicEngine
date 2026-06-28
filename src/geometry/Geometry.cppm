@@ -80,6 +80,7 @@ export import Geometry.KMeans;
 export import Geometry.PointCloud;
 export import Geometry.PointCloud.Conversion;
 export import Geometry.PointCloud.Normals;
+export import Geometry.PointCloud.QualityMetrics;
 export import Geometry.PointCloud.SurfaceSampling;
 export import Geometry.PointCloud.Utils;
 export import Geometry.PointCloud.IO;

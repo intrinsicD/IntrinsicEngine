@@ -469,6 +469,7 @@ set(_geometry_test_files
     Test_ShortestPath.cpp
     Test_Subdivision.cpp
     Test_Smoothing.cpp
+    Test.QualityMetrics.cpp
     Test.SurfaceSampling.cpp
     Test.PointCloudNormals.cpp
     Test_Registration.cpp

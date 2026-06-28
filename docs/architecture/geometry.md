@@ -119,6 +119,30 @@ whether normals came from interpolated source `v:normal` data or geometric face
 fallbacks. Output clouds publish sampled positions as `v:point` and point
 normals as the point-cloud built-in `p:normal`.
 
+`Geometry.PointCloud.QualityMetrics` is the CPU numeric-analysis companion for
+sampling papers and figure export. It accepts either `std::span<const glm::vec3>`
+or a `PointCloud::Cloud` adapter and returns owned numeric arrays with explicit
+status values; it performs no plotting, rasterization, file IO, GPU work, or
+runtime/editor integration. The module reports nearest-neighbor distances,
+nearest-neighbor histograms, mean/stddev/CV, measured minimum pairwise distance,
+Poisson-disk ratio `min_pair_distance / target_radius`, and coverage as the
+fraction of a reference point set whose nearest sample lies within a caller
+radius. Invalid empty/one-point inputs, non-finite coordinates, non-positive
+radii, invalid bin ranges, invalid domains, and out-of-domain points fail closed.
+
+For radial distribution functions, `g(r)` is binned over a caller-provided or
+inferred axis-aligned 2D/3D domain. Pair counts are accumulated as ordered
+neighbors per shell and normalized by density times shell area/volume. Boundary
+correction is deterministic: each point estimates the accessible shell fraction
+with a fixed set of circular/spherical directions at the bin center, so figure
+captions can cite a rectangular-domain shell-fraction correction rather than an
+uncorrected raw pair histogram. Spectral metrics are intentionally 2D-only over
+the `xy` domain. Periodograms evaluate the squared DFT magnitude on an integer
+frequency grid after normalizing points into the domain; the DC bin is zeroed by
+default. RAPS is the radially averaged profile of that 2D periodogram binned by
+frequency radius. Inputs with non-planar `z` values are rejected as
+`Requires2DInput`.
+
 ### Curvature tensor and principal directions
 
 `Geometry.Curvature` estimates per-vertex discrete curvature on triangle meshes.
