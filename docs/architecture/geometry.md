@@ -78,6 +78,26 @@ requests, and currently falls back to the CPU reference because no KMeans GPU
 kernel has landed. A real GPU backend must arrive as a separate parity-gated
 task.
 
+### Geometry IO coverage
+
+`Geometry.HalfedgeMesh.IO` owns mesh OBJ/OFF/STL/PLY import and mesh
+OBJ/OFF/STL/PLY export. The OFF path is symmetric at the geometry module level:
+`WriteOFF` emits deterministic ASCII OFF records for finite meshes, rejects
+empty or invalid topology, and round-trips through the hardened `LoadOFF`
+reader.
+
+`Geometry.PointCloud.IO` owns point-cloud XYZ/PTS/PWN/CSV/3D/TXT/PLY/PCD
+import plus XYZ/PLY/PCD export. The PWN reader consumes a count header followed
+by point rows and normal rows; CSV and 3D inputs may carry normals through their
+six-column layouts; PTS and TXT validate their count/intensity/color/reflectance
+columns and store supported color channels. The additional ASCII readers share
+one strict scanner and fail closed on empty, malformed, wrong-column, or
+non-finite inputs.
+
+This is module-level geometry coverage. Asset/runtime routing remains a
+separate layer concern and should not be inferred from the existence of a
+geometry reader or writer.
+
 ### Remeshing, subdivision, and mesh topology utilities
 
 `Geometry.HalfedgeMesh.AdaptiveRemeshing` exposes `ReferenceProjector`, a

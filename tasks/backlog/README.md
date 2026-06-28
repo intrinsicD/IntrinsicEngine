@@ -111,8 +111,9 @@ keeping `ecs -> core` and explicit geometry handles only. All members
 
 Finish geometry-owned IO parity so legacy graphics importers/exporters can
 retire and asset ingest can route through promoted decoders. `GEOIO-002` and
-its children are retired — see [`geometry/README.md`](geometry/README.md) and
-the retirement log.
+its children are retired, and the follow-on geometry-module breadth task
+`GEOIO-003` is also retired — see [`geometry/README.md`](geometry/README.md)
+and the retirement log.
 
 ### Theme F — Architecture/runtime/UI foundation seeds
 

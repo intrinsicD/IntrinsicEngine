@@ -39,7 +39,6 @@ Grouped by cluster; each is `geometry -> core` only and targets `CPUContracted`.
 - [GEOM-048 — Statistics accumulators and robust estimation kernels](GEOM-048-statistics-robust-estimation-kernels.md).
 - [GEOM-049 — Numeric/linear-algebra utilities (RPCA, Eigen map adapters)](GEOM-049-numeric-linalg-utilities.md).
 - [GEOM-050 — Primitive and curve utilities (Bezier, triangle metrics, sphere fit, AABB)](GEOM-050-primitive-curve-utilities.md).
-- [GEOIO-003 — Mesh and point-cloud IO breadth (OFF writer, point-cloud readers)](GEOIO-003-mesh-pointcloud-io-breadth.md).
 
 The indexed decrease-key heap that backs Dijkstra is a `core` container filed
 under the runtime backlog as `CORE-004`; the paired editor/runtime integration
@@ -137,6 +136,7 @@ split; narratives live in the retirement log.
 - [GEOM-047 — Graph and point-cloud query/noise utilities](../../done/GEOM-047-graph-pointcloud-query-noise-utilities.md) (done).
 - [GEOM-051 — Property system enhancements](../../done/GEOM-051-property-system-enhancements.md) (done).
 - [GEOM-052 — Shared CPU/GPU backend seam + fix the KMeans phantom GPU exemplar](../../done/GEOM-052-shared-cpu-gpu-backend-seam-kmeans-exemplar.md) (done).
+- [GEOIO-003 — Mesh and point-cloud IO breadth (OFF writer, point-cloud readers)](../../done/GEOIO-003-mesh-pointcloud-io-breadth.md) (done).
 - GEOIO-002 is retired in [`tasks/done`](../../done/GEOIO-002-geometry-io-parity-hardening.md)
   and contributed to **Theme E — Geometry IO completion** as the upstream gate
   for retired [`ASSETIO-001`](../../done/ASSETIO-001-asset-model-texture-ingest-ownership.md)

@@ -508,6 +508,9 @@ intrinsic_test_object_lib(GeometryTestObjs
         ${_geometry_test_sources}
     DEPS IntrinsicCore IntrinsicGeometry
 )
+target_compile_definitions(GeometryTestObjs PRIVATE
+    INTRINSIC_TEST_SUPPORT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/support"
+)
 
 # --- Geometry method reference tests (CPU-only; methods/ package, no runtime/ECS) ---
 # METHOD-012 geometry.progressive_poisson CPU reference. The method package is

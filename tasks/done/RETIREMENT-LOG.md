@@ -9,6 +9,17 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`GEOIO-003`](GEOIO-003-mesh-pointcloud-io-breadth.md) — Mesh and point-cloud
+IO breadth — retired on 2026-06-28 at maturity `CPUContracted`.
+`Geometry::MeshIO::WriteOFF` now provides deterministic ASCII OFF export with
+round-trip, determinism, invalid-topology, bad-path, and non-finite fail-closed
+coverage. `Geometry::PointCloudIO` now exports strict ASCII readers for PTS,
+PWN, CSV, 3D, and TXT with committed fixtures, deterministic reads, explicit
+malformed/empty/non-finite diagnostics, and normal/color population for the
+supported layouts. This is module-level geometry coverage; runtime/assets route
+widening was intentionally left out of scope.
+
+Backlog
 [`UI-026`](UI-026-editor-curvature-analysis-window.md) — Sandbox EditorUI
 curvature analysis window and principal-direction field — retired on
 2026-06-28 at maturity `CPUContracted`. `Mesh > Processing > Curvature` now
