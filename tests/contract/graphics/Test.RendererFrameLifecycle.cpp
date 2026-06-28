@@ -7,10 +7,12 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <optional>
 #include <span>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -171,6 +173,16 @@ namespace
         return nullptr;
     }
 
+    [[nodiscard]] Extrinsic::Graphics::FrameRecipeOverride MakeRecipeOverride(
+        std::vector<std::string> disabledSlots)
+    {
+        return Extrinsic::Graphics::FrameRecipeOverride{
+            .Recipe = Extrinsic::Graphics::MakeCurrentRendererRecipeDescriptor(),
+            .DisabledExtensionSlots = std::move(disabledSlots),
+            .SourceId = "unit-test",
+        };
+    }
+
     [[nodiscard]] std::uint32_t ExpectedCullDispatchGroups() noexcept
     {
         return (Extrinsic::RHI::kMaxIndirectDrawCount + Extrinsic::RHI::kGpuCullDispatchGroupSize - 1u) /
@@ -271,6 +283,51 @@ TEST(RendererFrameLifecycle, ActiveGpuSceneVertexShadersUseSceneTableCameraViewP
     }
 }
 
+TEST(RendererFrameLifecycle, FrameRecipeOverrideProjectionDisablesPostProcess)
+{
+    Extrinsic::Graphics::FrameRecipeFeatures defaults{};
+    defaults.EnablePostProcess = true;
+    defaults.EnableAntiAliasing = true;
+    defaults.EnableDebugView = true;
+    defaults.EnablePicking = true;
+    defaults.LightingPath = Extrinsic::Graphics::FrameRecipeLightingPath::Deferred;
+
+    const Extrinsic::Graphics::FrameRecipeOverrideProjection projection =
+        Extrinsic::Graphics::ProjectFrameRecipeOverride(
+            defaults,
+            MakeRecipeOverride({"postprocess"}));
+
+    EXPECT_TRUE(projection.Diagnostics.empty());
+    EXPECT_TRUE(projection.Applied);
+    EXPECT_EQ(projection.DisabledSlotCount, 1u);
+    EXPECT_FALSE(projection.Features.EnablePostProcess);
+    EXPECT_FALSE(projection.Features.EnableAntiAliasing);
+    EXPECT_TRUE(projection.Features.EnableDebugView);
+    EXPECT_TRUE(projection.Features.EnablePicking);
+    EXPECT_EQ(projection.Features.LightingPath,
+              Extrinsic::Graphics::FrameRecipeLightingPath::Deferred);
+}
+
+TEST(RendererFrameLifecycle, FrameRecipeOverrideProjectionFailsClosedForUnknownSlot)
+{
+    Extrinsic::Graphics::FrameRecipeFeatures defaults{};
+    defaults.EnablePostProcess = true;
+    defaults.EnableAntiAliasing = true;
+
+    const Extrinsic::Graphics::FrameRecipeOverrideProjection projection =
+        Extrinsic::Graphics::ProjectFrameRecipeOverride(
+            defaults,
+            MakeRecipeOverride({"ray-traced-gi"}));
+
+    ASSERT_EQ(projection.Diagnostics.size(), 1u);
+    EXPECT_EQ(projection.Diagnostics.front().Code,
+              Extrinsic::Graphics::FrameRecipeOverrideDiagnosticCode::UnknownSlot);
+    EXPECT_FALSE(projection.Applied);
+    EXPECT_EQ(projection.DisabledSlotCount, 0u);
+    EXPECT_TRUE(projection.Features.EnablePostProcess);
+    EXPECT_TRUE(projection.Features.EnableAntiAliasing);
+}
+
 TEST(RendererFrameLifecycle, PrepareFramePublishesCameraIntoGpuSceneTable)
 {
     Extrinsic::Tests::MockDevice device;
@@ -326,6 +383,83 @@ TEST(RendererFrameLifecycle, PrepareFramePublishesCameraIntoGpuSceneTable)
     EXPECT_EQ(sceneTable->CameraFrameIndex, 37u);
     EXPECT_EQ(sceneTable->CameraCullingFlags,
               Extrinsic::RHI::CameraCulling_ExplicitTransition);
+
+    renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle, ActiveFrameRecipeOverrideOmitsPostProcessPasses)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.NextFrame = Extrinsic::RHI::FrameHandle{.FrameIndex = 17u, .SwapchainImageIndex = 0u};
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{177u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer =
+        Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+    renderer->SetActiveFrameRecipeOverride(
+        std::make_optional(MakeRecipeOverride({"postprocess"})));
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats =
+        renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.FrameRecipeOverrideActive);
+    EXPECT_TRUE(stats.FrameRecipeOverrideApplied);
+    EXPECT_EQ(stats.FrameRecipeOverrideDisabledSlotCount, 1u);
+    EXPECT_EQ(stats.FrameRecipeOverrideDiagnosticCount, 0u);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessHistogramPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAEdgePass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAABlendPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAResolvePass"), nullptr);
+    ASSERT_NE(FindCommandPass(stats, "Present"), nullptr);
+
+    renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle, ActiveFrameRecipeOverrideDiagnosticsLeaveDefaultsUntouched)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.NextFrame = Extrinsic::RHI::FrameHandle{.FrameIndex = 18u, .SwapchainImageIndex = 0u};
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{178u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer =
+        Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+    renderer->SetActiveFrameRecipeOverride(
+        std::make_optional(MakeRecipeOverride({"ray-traced-gi"})));
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats =
+        renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.FrameRecipeOverrideActive);
+    EXPECT_FALSE(stats.FrameRecipeOverrideApplied);
+    EXPECT_EQ(stats.FrameRecipeOverrideDisabledSlotCount, 0u);
+    ASSERT_EQ(stats.FrameRecipeOverrideDiagnosticCount, 1u);
+    ASSERT_EQ(stats.FrameRecipeOverrideDiagnostics.size(), 1u);
+    EXPECT_EQ(stats.FrameRecipeOverrideDiagnostics.front().Code,
+              Extrinsic::Graphics::FrameRecipeOverrideDiagnosticCode::UnknownSlot);
+    ASSERT_NE(FindCommandPass(stats, "PostProcessPass"), nullptr);
+    ASSERT_NE(FindCommandPass(stats, "PostProcessHistogramPass"), nullptr);
 
     renderer->Shutdown();
 }

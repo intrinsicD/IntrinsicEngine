@@ -14,11 +14,10 @@ the authoritative open/unblocked view.
 
 - unblocked: `DOCS-004` — Promote frame-graph.md from stub and document the recipe-config lane (tasks/backlog/rendering/DOCS-004-frame-graph-doc-recipe-config-lane.md)
 - blocked by `GRAPHICS-104`: `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/backlog/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
-- unblocked: `GRAPHICS-106` — Fail-closed IRenderer frame-recipe override seam (tasks/backlog/rendering/GRAPHICS-106-frame-recipe-override-seam.md)
-- blocked by `GRAPHICS-106`: `GRAPHICS-107` — Reconcile the FrameRecipe vs RenderRecipe vocabularies (tasks/backlog/rendering/GRAPHICS-107-reconcile-framerecipe-renderrecipe-vocabulary.md)
+- unblocked: `GRAPHICS-107` — Reconcile the FrameRecipe vs RenderRecipe vocabularies (tasks/backlog/rendering/GRAPHICS-107-reconcile-framerecipe-renderrecipe-vocabulary.md)
 - unblocked: `RUNTIME-125` — Optional AoS fast lane for static geometry (profile-gated) (tasks/backlog/runtime/RUNTIME-125-aos-static-fast-lane.md)
 - blocked by `GRAPHICS-104`: `RUNTIME-129` — Schedule GPU object-space normal bake jobs after import (tasks/backlog/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
-- blocked by `GRAPHICS-106`: `RUNTIME-130` — Route recipe activation through runtime + load default recipe at init (tasks/backlog/rendering/RUNTIME-130-route-recipe-activation-and-load-default-recipe.md)
+- unblocked: `RUNTIME-130` — Route recipe activation through runtime + load default recipe at init (tasks/backlog/rendering/RUNTIME-130-route-recipe-activation-and-load-default-recipe.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
@@ -35,7 +34,7 @@ the authoritative open/unblocked view.
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
-- blocked by `GRAPHICS-106`: `RUNTIME-131` — Agent/CLI config-control facade on the Engine (tasks/backlog/runtime/RUNTIME-131-agent-cli-config-control-facade.md)
+- unblocked: `RUNTIME-131` — Agent/CLI config-control facade on the Engine (tasks/backlog/runtime/RUNTIME-131-agent-cli-config-control-facade.md)
 - blocked by `GEOM-039`: `RUNTIME-135` — SpatialDebug closest-face picking via accelerated mesh query (tasks/backlog/runtime/RUNTIME-135-spatialdebug-closest-face-picking.md)
 - unblocked: `UI-022` — Sandbox EditorUI vertex-normal recompute windows (tasks/backlog/ui/UI-022-sandbox-editor-vertex-normal-recompute.md)
 - unblocked: `UI-024` — Sandbox EditorUI mesh denoising window (tasks/backlog/ui/UI-024-editor-mesh-denoise-window.md)

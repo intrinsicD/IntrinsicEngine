@@ -3,6 +3,7 @@ id: GRAPHICS-106
 theme: B
 depends_on: []
 maturity_target: CPUContracted
+completed_on: 2026-06-28
 ---
 # GRAPHICS-106 — Fail-closed IRenderer frame-recipe override seam
 
@@ -21,6 +22,11 @@ maturity_target: CPUContracted
 - The engine-level `EngineConfig` file lane (owned by `CORE-003`).
 
 ## Context
+- Status: done.
+- Owner/agent: Codex.
+- Completed: 2026-06-28.
+- Commit: this commit (`Add renderer frame recipe override seam`).
+- Maturity: `CPUContracted`.
 - `src/graphics/renderer/Graphics.Renderer.cpp` derives features via
   `DeriveDefaultFrameRecipeFeatures(renderWorld)` (~line 2120) then calls
   `BuildDefaultFrameRecipe(...)` (~line 2153) unconditionally. `IRenderer`
@@ -35,48 +41,58 @@ maturity_target: CPUContracted
   no ECS, runtime, or live asset-service knowledge.
 
 ## Required changes
-- [ ] Add an `IRenderer` seam (`SetActiveFrameRecipeOverride(std::optional<...>)`
+- [x] Add an `IRenderer` seam (`SetActiveFrameRecipeOverride(std::optional<...>)`
       / `ClearActiveFrameRecipeOverride()` + a getter) that stores the override
       beside the existing recipe/lighting state on the concrete renderer.
-- [ ] Add a pure, side-effect-free projection from a validated
+- [x] Add a pure, side-effect-free projection from a validated
       `RenderRecipeConfigPreview` / `RenderRecipeDescriptor` to
       `FrameRecipeFeatures` enable flags, restricted to optional declared slots
       (e.g. `LightingPath`, `EnablePostProcess`, AA mode).
-- [ ] Apply the override at the `BuildDefaultFrameRecipe` call site **after**
+- [x] Apply the override at the `BuildDefaultFrameRecipe` call site **after**
       `DeriveDefaultFrameRecipeFeatures`, keeping the existing availability gates
       (`EnableAntiAliasing` / `EnableHZBBuild` / cluster flags) failing closed so
       an override can only **disable** an optional pass, never enable one whose
       real resources are unavailable.
-- [ ] Record a diagnostic when an override references an unknown/unavailable
+- [x] Record a diagnostic when an override references an unknown/unavailable
       slot and leave the derived defaults unchanged in that case.
 
 ## Tests
-- [ ] CPU/null contract test: activate an override that disables PostProcess;
+- [x] CPU/null contract test: activate an override that disables PostProcess;
       assert `PostProcessPass` is absent from `FrameRecipeIntrospection` /
       `RenderGraphFrameStats`.
-- [ ] CPU/null contract test: an invalid / unknown-slot override leaves the
+- [x] CPU/null contract test: an invalid / unknown-slot override leaves the
       derived defaults untouched and records a diagnostic (fail-closed).
-- [ ] Unit test the projection function in isolation (no device).
-- [ ] Default CPU gate stays green.
+- [x] Unit test the projection function in isolation (no device).
+- [x] Default CPU gate stays green.
 
 ## Docs
-- [ ] Note the override seam and its fixed-core/optional-slot constraints in
+- [x] Note the override seam and its fixed-core/optional-slot constraints in
       `src/graphics/renderer/README.md`.
-- [ ] Cross-link `docs/architecture/frame-graph.md` once `DOCS-004` lands.
+
+`docs/architecture/frame-graph.md` cross-linking is deferred to `DOCS-004`,
+which owns promoting that stub into the canonical frame-graph document.
 
 ## Acceptance criteria
-- [ ] `IRenderer` exposes the override seam and the projection is unit-tested in
+- [x] `IRenderer` exposes the override seam and the projection is unit-tested in
       isolation.
-- [ ] An activated override changes the introspected pass set on a null device;
+- [x] An activated override changes the introspected pass set on a null device;
       an invalid override is a fail-closed no-op with a diagnostic.
-- [ ] Fixed core is never mutated; no `RenderRecipeDescriptor` vocabulary widened.
-- [ ] No GPU dependency; the default CPU gate is green.
+- [x] Fixed core is never mutated; no `RenderRecipeDescriptor` vocabulary widened.
+- [x] No GPU dependency; the default CPU gate is green.
 
 ## Verification
 ```bash
-cmake --preset ci
+cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure -R 'RendererFrameLifecycle' --timeout 120
 cmake --build --preset ci --target IntrinsicTests
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main
+git diff --check
 ```
 
 ## Forbidden changes

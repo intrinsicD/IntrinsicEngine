@@ -2,6 +2,7 @@ module;
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -146,6 +147,39 @@ namespace Extrinsic::Graphics
         std::vector<std::string> Diagnostics{};
     };
 
+    export enum class FrameRecipeOverrideDiagnosticCode : std::uint8_t
+    {
+        None = 0,
+        EmptyRecipeId,
+        FixedCoreMutation,
+        UnknownSlot,
+        FixedCoreSlotDisabled,
+        UnsupportedSlotDisable,
+        UnsupportedCapability,
+    };
+
+    export struct FrameRecipeOverrideDiagnostic
+    {
+        FrameRecipeOverrideDiagnosticCode Code{FrameRecipeOverrideDiagnosticCode::None};
+        std::string Subject{};
+        std::string Message{};
+    };
+
+    export struct FrameRecipeOverride
+    {
+        RenderRecipeDescriptor Recipe{};
+        std::vector<std::string> DisabledExtensionSlots{};
+        std::string SourceId{};
+    };
+
+    export struct FrameRecipeOverrideProjection
+    {
+        FrameRecipeFeatures Features{};
+        bool Applied{false};
+        std::uint32_t DisabledSlotCount{0u};
+        std::vector<FrameRecipeOverrideDiagnostic> Diagnostics{};
+    };
+
     export struct RenderGraphFrameStats
     {
         RenderGraphCompileStats Compile{};
@@ -155,6 +189,11 @@ namespace Extrinsic::Graphics
         std::string DebugDump{};
         std::string Diagnostic{};
         std::string LifecycleDiagnostic{};
+        bool FrameRecipeOverrideActive{false};
+        bool FrameRecipeOverrideApplied{false};
+        std::uint32_t FrameRecipeOverrideDisabledSlotCount{0u};
+        std::uint32_t FrameRecipeOverrideDiagnosticCount{0u};
+        std::vector<FrameRecipeOverrideDiagnostic> FrameRecipeOverrideDiagnostics{};
         // GRAPHICS-037D Slice D — count of frames in which the default
         // recipe produced an accepted multi-queue submit plan containing an
         // `AsyncCompute` batch. Stays at zero when the backend has no async
@@ -724,6 +763,17 @@ namespace Extrinsic::Graphics
         virtual void SetLightingPath(FrameRecipeLightingPath path) noexcept = 0;
         [[nodiscard]] virtual FrameRecipeLightingPath GetLightingPath() const noexcept = 0;
 
+        // GRAPHICS-106 — fail-closed recipe override seam. The renderer keeps
+        // `FrameRecipe*` as the live frame driver; this wrapper carries a
+        // validated `RenderRecipeDescriptor` plus explicit optional-slot
+        // disables from config/UI/agent lanes. Applying an override can only
+        // turn off optional feature gates at the default-recipe build site.
+        virtual void SetActiveFrameRecipeOverride(
+            std::optional<FrameRecipeOverride> recipeOverride) = 0;
+        virtual void ClearActiveFrameRecipeOverride() noexcept = 0;
+        [[nodiscard]] virtual const std::optional<FrameRecipeOverride>&
+        GetActiveFrameRecipeOverride() const noexcept = 0;
+
         // GRAPHICS-076E — opt-in backbuffer-to-host readback wiring for the
         // canonical default recipe's visible-triangle parity harness. The
         // caller owns the buffer lifetime and passes a raw HostVisible +
@@ -775,4 +825,8 @@ namespace Extrinsic::Graphics
     };
 
     export std::unique_ptr<IRenderer> CreateRenderer();
+
+    export [[nodiscard]] FrameRecipeOverrideProjection ProjectFrameRecipeOverride(
+        const FrameRecipeFeatures& derivedDefaults,
+        const FrameRecipeOverride& recipeOverride);
 }

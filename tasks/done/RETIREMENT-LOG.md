@@ -2575,3 +2575,15 @@ render-input, render-contract, maintenance, pick-readback, and frame-retire
 sequence instead of carrying adapter bodies inline. Text-based runtime layering
 contracts were updated to follow the extracted helper body without requiring
 the old inline fixed-step implementation.
+
+[`GRAPHICS-106`](GRAPHICS-106-frame-recipe-override-seam.md) — fail-closed
+IRenderer frame-recipe override seam retired to `tasks/done/` on 2026-06-28 at
+`CPUContracted`. `IRenderer` now exposes an active frame-recipe override lane
+with side-effect-free projection diagnostics, optional-slot disable semantics,
+and live null-renderer application immediately before `BuildDefaultFrameRecipe`.
+Invalid overrides leave derived defaults untouched and publish diagnostics in
+`RenderGraphFrameStats`; valid overrides can disable mapped optional slots such
+as postprocess, debug view, picking, and lighting without widening
+`RenderRecipeDescriptor` vocabulary or mutating the fixed core. Focused
+graphics contract tests cover projection, live pass omission, and fail-closed
+unknown-slot behavior; the default CPU-supported gate is green.

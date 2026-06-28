@@ -156,6 +156,16 @@ the supplied context is never mutated. Diagnostics use
 fallback-applied states remain usable only when the underlying rendering
 contract validation reports no errors.
 
+`IRenderer::SetActiveFrameRecipeOverride(...)` is the renderer-side activation
+seam for a validated recipe overlay. The live frame driver remains
+`FrameRecipeFeatures` plus `BuildDefaultFrameRecipe(...)`; the override wrapper
+can only disable mapped optional extension slots (`postprocess`, `debug-view`,
+`picking`, and the lighting-path fallback). It never adds pass-graph nodes,
+never replaces the fixed core, and never enables a feature whose derived
+availability gate was false. Unknown, fixed-core, or unsupported slot requests
+leave the derived defaults unchanged and are reported on
+`RenderGraphFrameStats::FrameRecipeOverrideDiagnostics`.
+
 `Extrinsic.Graphics.SharedRenderRecipeExecution` is the `GRAPHICS-102`
 CPU-tested, renderer-neutral execution layer for shared visibility/grouping and
 lighting/environment recipe products. It consumes immutable `RenderWorld` data

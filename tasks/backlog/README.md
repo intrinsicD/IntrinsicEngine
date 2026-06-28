@@ -73,9 +73,10 @@ derived-job graph.
 
 The research-control-surface recipe/config seam (see Theme H `PROC-010` for the
 proposed framing) opens new Theme B leaves that close the gap where an activated
-`RenderRecipeConfig` preview cannot yet reach the live frame:
-[`rendering/GRAPHICS-106-frame-recipe-override-seam.md`](rendering/GRAPHICS-106-frame-recipe-override-seam.md)
-(fail-closed renderer override seam),
+`RenderRecipeConfig` preview cannot yet reach the live frame. The fail-closed
+renderer override seam is retired in
+[`GRAPHICS-106`](../done/GRAPHICS-106-frame-recipe-override-seam.md); remaining
+live leaves are:
 [`rendering/RUNTIME-130-route-recipe-activation-and-load-default-recipe.md`](rendering/RUNTIME-130-route-recipe-activation-and-load-default-recipe.md)
 (route activation + load a default recipe at init),
 [`rendering/GRAPHICS-107-reconcile-framerecipe-renderrecipe-vocabulary.md`](rendering/GRAPHICS-107-reconcile-framerecipe-renderrecipe-vocabulary.md)
@@ -144,7 +145,7 @@ Open members:
 - [`platform/PLATFORM-004-alternative-platform-backend-onboarding.md`](platform/PLATFORM-004-alternative-platform-backend-onboarding.md) (planning-only seed).
 - [`runtime/RUNTIME-131-agent-cli-config-control-facade.md`](runtime/RUNTIME-131-agent-cli-config-control-facade.md) —
   agent/CLI config-control facade on the `Engine`, equal to the UI (consumes
-  retired `CORE-003`; still depends on `GRAPHICS-106`).
+  retired `CORE-003` and is now unblocked by retired `GRAPHICS-106`).
 - [`geometry/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md`](geometry/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md) —
   reconcile `algorithm-variant-dispatch.md` with live code and define the shared
   CPU/GPU backend-seam template.
