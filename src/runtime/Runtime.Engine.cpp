@@ -121,6 +121,559 @@ namespace Extrinsic::Runtime
             std::uint32_t PooledFrontSlot{RenderWorldPool::kInvalidSlot};
         };
 
+        void SubmitViewportSelectionClickForFrame(SelectionController& selection,
+                                                  const Platform::Input::Context& input,
+                                                  Core::Extent2D windowExtent,
+                                                  Core::Extent2D viewport,
+                                                  bool imguiCapturesMouse,
+                                                  bool gizmoCapturesMouse) noexcept;
+        void RebuildSelectedGizmoEntities(
+            const SelectionController& selection,
+            ECS::Scene::Registry& scene,
+            std::vector<ECS::EntityHandle>& outSelected);
+        void DriveGizmoInteractionForFrame(
+            GizmoInteraction& gizmo,
+            GizmoUndoStack& undo,
+            ECS::Scene::Registry& scene,
+            const Platform::Input::Context& input,
+            const Graphics::CameraViewInput& cameraInput,
+            Core::Extent2D windowExtent,
+            Core::Extent2D viewport,
+            bool imguiCapturesInput,
+            std::span<const ECS::EntityHandle> selected);
+
+        struct PlatformFrameHooks final : Core::IPlatformFrameHooks
+        {
+            Platform::IWindow& Window;
+
+            explicit PlatformFrameHooks(Platform::IWindow& window)
+                : Window(window)
+            {
+            }
+
+            void PollEvents() override { Window.PollEvents(); }
+            [[nodiscard]] bool ShouldClose() const override
+            {
+                return Window.ShouldClose();
+            }
+            [[nodiscard]] bool IsMinimized() const override
+            {
+                return Window.IsMinimized();
+            }
+            void WaitForEventsTimeout(double seconds) override
+            {
+                Window.WaitForEventsTimeout(seconds);
+            }
+        };
+
+        struct OperationalTransitionHooks final : Core::IOperationalTransitionHooks
+        {
+            RHI::IDevice& Device;
+            Graphics::IRenderer& Renderer;
+            bool& RendererOperational;
+
+            OperationalTransitionHooks(RHI::IDevice& device,
+                                       Graphics::IRenderer& renderer,
+                                       bool& rendererOperational)
+                : Device(device)
+                , Renderer(renderer)
+                , RendererOperational(rendererOperational)
+            {
+            }
+
+            [[nodiscard]] bool IsDeviceOperational() const override { return Device.IsOperational(); }
+            [[nodiscard]] bool IsRendererOperational() const override { return RendererOperational; }
+            void WaitDeviceIdle() override { Device.WaitIdle(); }
+            [[nodiscard]] bool RebuildRendererOperationalResources() override
+            {
+                return Renderer.RebuildOperationalResources(Device);
+            }
+            void MarkRendererOperational() override { RendererOperational = true; }
+        };
+
+        struct RuntimeRenderFrameHooks final : Core::IRenderFrameHooks
+        {
+            Graphics::IRenderer& Renderer;
+            ECS::Scene::Registry& Scene;
+            RenderExtractionCache& Extraction;
+            Graphics::GpuAssetCache* GpuAssetCache;
+            const SelectionController& Selection;
+            RenderWorldPool& Pool;
+            bool SynchronousExtraction;
+            RuntimeRenderExtractionStats& Stats;
+            std::uint64_t FrameIndex;
+            std::uint32_t& OutFrontSlot;
+            RHI::FrameHandle& Frame;
+            const Graphics::RenderFrameInput& Input;
+            std::span<const Graphics::TransformGizmoRenderPacket> TransformGizmos;
+            Graphics::RenderWorld& World;
+
+            RuntimeRenderFrameHooks(Graphics::IRenderer& renderer,
+                                    ECS::Scene::Registry& scene,
+                                    RenderExtractionCache& extraction,
+                                    Graphics::GpuAssetCache* gpuAssetCache,
+                                    const SelectionController& selection,
+                                    RenderWorldPool& pool,
+                                    const bool synchronousExtraction,
+                                    RuntimeRenderExtractionStats& stats,
+                                    std::uint64_t frameIndex,
+                                    std::uint32_t& outFrontSlot,
+                                    RHI::FrameHandle& frame,
+                                    const Graphics::RenderFrameInput& input,
+                                    std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos,
+                                    Graphics::RenderWorld& world)
+                : Renderer(renderer)
+                , Scene(scene)
+                , Extraction(extraction)
+                , GpuAssetCache(gpuAssetCache)
+                , Selection(selection)
+                , Pool(pool)
+                , SynchronousExtraction(synchronousExtraction)
+                , Stats(stats)
+                , FrameIndex(frameIndex)
+                , OutFrontSlot(outFrontSlot)
+                , Frame(frame)
+                , Input(input)
+                , TransformGizmos(transformGizmos)
+                , World(world)
+            {
+            }
+
+            bool BeginFrame() override
+            {
+                return Renderer.BeginFrame(Frame);
+            }
+            void ExtractRenderWorld() override
+            {
+                // GRAPHICS-036C — producer half: acquire a back slot, write the
+                // snapshot into it via ExtractAndSubmit, then publish it as the
+                // front. AcquireBack only fails closed (kInvalidSlot) when the
+                // pool is exhausted; in that case the previous front stays current
+                // and we skip the publish so no in-flight slot is overwritten.
+                const std::uint32_t backSlot = Pool.AcquireBack(FrameIndex);
+
+                // RUNTIME-089 Slice B — mirror the runtime selection snapshot
+                // into RenderWorld::Selection via the extraction batch. In
+                // pipelined mode the renderer writes into the acquired back
+                // slot while the consumer below reads the previous front slot.
+                const std::uint32_t submitSlot =
+                    backSlot != RenderWorldPool::kInvalidSlot ? backSlot : 0u;
+                if (backSlot != RenderWorldPool::kInvalidSlot)
+                {
+                    Stats = Extraction.ExtractAndSubmit(Scene,
+                                                         Renderer,
+                                                         GpuAssetCache,
+                                                         &Selection,
+                                                         submitSlot,
+                                                         TransformGizmos);
+                    Pool.PublishFront(backSlot);
+                }
+                else
+                {
+                    Stats = Extraction.GetLastStats();
+                }
+
+                // Consumer half: synchronous mode preserves the existing
+                // same-frame consume. Pipelined mode intentionally consumes the
+                // previously published front (render-N-1) after extraction has
+                // published N.
+                OutFrontSlot = SynchronousExtraction
+                    ? Pool.AcquireFront(FrameIndex)
+                    : Pool.AcquirePreviousFront(FrameIndex);
+
+                const std::uint32_t extractSlot =
+                    OutFrontSlot != RenderWorldPool::kInvalidSlot ? OutFrontSlot : submitSlot;
+                World = Renderer.ExtractRenderWorld(Input, extractSlot);
+
+                // GRAPHICS-036B — surface the pool's three counters on the
+                // extraction stats for editor overlays / tests.
+                MirrorRenderWorldPoolDiagnostics(Pool, Stats);
+            }
+            void PrepareFrame() override { Renderer.PrepareFrame(World); }
+            void ExecuteFrame() override { Renderer.ExecuteFrame(Frame, World); }
+            std::uint64_t EndFrame() override { return Renderer.EndFrame(Frame); }
+        };
+
+        struct TransferHooks final : Core::ITransferFrameHooks
+        {
+            RHI::IDevice& Device;
+
+            explicit TransferHooks(RHI::IDevice& device)
+                : Device(device)
+            {
+            }
+
+            void CollectCompletedTransfers() override
+            {
+                // GPU-side resource retirement, staging GC, readback processing.
+                Device.GetTransferQueue().CollectCompleted();
+            }
+        };
+
+        struct StreamingHooks final : Core::IStreamingFrameHooks
+        {
+            StreamingExecutor& Executor;
+
+            explicit StreamingHooks(StreamingExecutor& executor)
+                : Executor(executor)
+            {
+            }
+
+            void DrainCompletions() override { Executor.DrainCompletions(); }
+            void ApplyMainThreadResults() override { Executor.ApplyMainThreadResults(); }
+            void SubmitFrameWork() override {}
+            void PumpBackground(std::uint32_t maxLaunches) override { Executor.PumpBackground(maxLaunches); }
+        };
+
+        struct AssetHooks final : Core::IAssetFrameHooks
+        {
+            Assets::AssetService&     AssetService;
+            Graphics::GpuAssetCache*  GpuAssetCache;
+            AssetModelSceneHandoff*   ModelSceneHandoff;
+            RHI::IDevice&             Device;
+            RenderExtractionCache&    Extraction;
+            Graphics::IRenderer&      Renderer;
+
+            AssetHooks(Assets::AssetService& assetService,
+                       Graphics::GpuAssetCache* gpuAssetCache,
+                       AssetModelSceneHandoff* modelSceneHandoff,
+                       RHI::IDevice& device,
+                       RenderExtractionCache& extraction,
+                       Graphics::IRenderer& renderer)
+                : AssetService(assetService)
+                , GpuAssetCache(gpuAssetCache)
+                , ModelSceneHandoff(modelSceneHandoff)
+                , Device(device)
+                , Extraction(extraction)
+                , Renderer(renderer)
+            {
+            }
+
+            void TickAssets() override
+            {
+                // Asset service main-thread tick: advances state machines, fires
+                // AssetEventBus::Ready / Reloaded / Destroyed callbacks. The
+                // cache subscribed in Engine::Initialize observes those events
+                // synchronously during this Tick.
+                AssetService.Tick();
+                const std::uint64_t currentFrame = Device.GetGlobalFrameNumber();
+                const std::uint32_t framesInFlight = Device.GetFramesInFlight();
+                if (GpuAssetCache)
+                {
+                    GpuAssetCache->Tick(currentFrame, framesInFlight);
+                }
+                if (ModelSceneHandoff)
+                {
+                    static_cast<void>(
+                        ModelSceneHandoff->ResolvePendingMaterialTextureBindings());
+                }
+                // GRAPHICS-030C: drive the procedural geometry cache's
+                // deferred-retire window with the same CPU frame counter and
+                // framesInFlight the asset cache uses. Final FreeGeometry calls
+                // fall through to GpuWorld here.
+                Extraction.TickProceduralGeometry(currentFrame, framesInFlight, Renderer);
+                // RUNTIME-085 Slice C — mirror the same window for the
+                // runtime-owned mesh-residency retire queue.
+                Extraction.TickMeshGeometry(currentFrame, framesInFlight, Renderer);
+                // RUNTIME-086 Slice B — and for the graph-residency queue.
+                Extraction.TickGraphGeometry(currentFrame, framesInFlight, Renderer);
+                // RUNTIME-087 — and for the point-cloud-residency queue.
+                Extraction.TickPointCloudGeometry(currentFrame, framesInFlight, Renderer);
+                // RUNTIME-088 Slice B — and for the mesh edge/vertex primitive
+                // view residency queue (one queue for both view lanes).
+                Extraction.TickMeshPrimitiveViewGeometry(currentFrame, framesInFlight, Renderer);
+            }
+        };
+
+        [[nodiscard]] std::optional<PickReadbackContext> BuildPickReadbackContextForFrame(
+            const Graphics::RenderFrameInput& renderInput,
+            const Platform::Extent2D& viewport)
+        {
+            const Graphics::CameraViewSnapshot pickCamera =
+                Graphics::BuildCameraViewSnapshot(renderInput.Camera,
+                                                  viewport,
+                                                  renderInput.Pick);
+            if (!pickCamera.Valid)
+                return std::nullopt;
+
+            const std::uint32_t viewportWidth =
+                viewport.Width > 0 ? static_cast<std::uint32_t>(viewport.Width) : 0u;
+            const std::uint32_t viewportHeight =
+                viewport.Height > 0 ? static_cast<std::uint32_t>(viewport.Height) : 0u;
+            PickReadbackContext context{};
+            context.InverseViewProjection = pickCamera.InverseViewProjection;
+            context.ViewportWidth         = viewportWidth;
+            context.ViewportHeight        = viewportHeight;
+            context.HasWorldRay           = pickCamera.HasPickRay;
+            context.WorldRayOrigin        = pickCamera.PickRayOrigin;
+            context.WorldRayDirection     = pickCamera.PickRayDirection;
+            // `2 / (|P[1][1]| * H)`: for perspective ([1][1] =
+            // ±1/tan(fovY/2)) this is the world-units-per-pixel at view depth
+            // 1; for orthographic ([1][1] = ±2/orthoHeight, e.g. the promoted
+            // TopDownCameraController) the same expression is the
+            // depth-invariant orthoHeight/H, and the flag tells refinement not
+            // to scale it by the hit distance. The sign carries the Vulkan Y
+            // flip in both cases.
+            const float projectionScaleY =
+                std::abs(renderInput.Camera.Projection[1][1]);
+            if (projectionScaleY > 0.000001f && viewportHeight > 0u)
+            {
+                context.WorldUnitsPerPixelAtUnitDepth =
+                    2.0f / (projectionScaleY *
+                            static_cast<float>(viewportHeight));
+            }
+            context.OrthographicProjection =
+                IsOrthographicProjection(renderInput.Camera.Projection);
+            return context;
+        }
+
+        void RememberPickReadbackContextForFrame(
+            auto& inFlightPickContexts,
+            const std::uint64_t sequence,
+            const PickReadbackContext& context)
+        {
+            constexpr std::size_t kMaxInFlightPickContexts = 32u;
+            if (inFlightPickContexts.size() >= kMaxInFlightPickContexts)
+                inFlightPickContexts.erase(inFlightPickContexts.begin());
+
+            inFlightPickContexts.emplace_back();
+            inFlightPickContexts.back().Sequence = sequence;
+            inFlightPickContexts.back().Context = context;
+        }
+
+        void DrainPendingSelectionPickForFrame(
+            SelectionController& selection,
+            Graphics::SelectionSystem& selectionSystem,
+            auto& inFlightPickContexts,
+            const Platform::Extent2D& viewport,
+            Graphics::RenderFrameInput& renderInput)
+        {
+            const std::optional<PendingSelectionPick> pick =
+                selection.ConsumePendingPick();
+            if (!pick.has_value())
+                return;
+
+            renderInput.HasPendingPick = true;
+            renderInput.Pick = Graphics::PickPixelRequest{
+                .X        = pick->PixelX,
+                .Y        = pick->PixelY,
+                .Pending  = true,
+                .Sequence = pick->Sequence,
+            };
+            selectionSystem.RequestPick(Graphics::PickRequest{
+                .PixelX = pick->PixelX,
+                .PixelY = pick->PixelY,
+            });
+
+            if (const std::optional<PickReadbackContext> context =
+                    BuildPickReadbackContextForFrame(renderInput, viewport))
+            {
+                RememberPickReadbackContextForFrame(
+                    inFlightPickContexts,
+                    pick->Sequence,
+                    *context);
+            }
+        }
+
+        void ApplySelectionReadbackToController(
+            SelectionController& selection,
+            ECS::Scene::Registry& scene,
+            const Graphics::PickReadbackResult& result)
+        {
+            if (result.Sequence != 0u)
+            {
+                if (result.Hit)
+                    selection.ConsumeHit(scene, result.StableEntityId, result.Sequence);
+                else
+                    selection.ConsumeNoHit(scene, result.Sequence);
+                return;
+            }
+
+            if (result.Hit)
+                selection.ConsumeHit(scene, result.StableEntityId);
+            else
+                selection.ConsumeNoHit(scene);
+        }
+
+        void RefineSelectionReadbackForFrame(
+            ECS::Scene::Registry& scene,
+            const Graphics::PickReadbackResult& result,
+            auto& inFlightPickContexts,
+            std::optional<PrimitiveSelectionResult>& lastRefinedPrimitive)
+        {
+            const PickReadbackContext* pickContext = nullptr;
+            auto contextIt = inFlightPickContexts.end();
+            if (result.Sequence != 0u)
+            {
+                contextIt = std::find_if(
+                    inFlightPickContexts.begin(),
+                    inFlightPickContexts.end(),
+                    [seq = result.Sequence](const auto& entry)
+                    { return entry.Sequence == seq; });
+                if (contextIt != inFlightPickContexts.end())
+                    pickContext = &contextIt->Context;
+            }
+
+            lastRefinedPrimitive =
+                RefinePickReadbackResult(scene, result, pickContext);
+            if (contextIt != inFlightPickContexts.end())
+                inFlightPickContexts.erase(contextIt);
+        }
+
+        void DrainCompletedSelectionReadbacksForFrame(
+            Graphics::SelectionSystem& selectionSystem,
+            SelectionController& selection,
+            ECS::Scene::Registry& scene,
+            auto& inFlightPickContexts,
+            std::optional<PrimitiveSelectionResult>& lastRefinedPrimitive)
+        {
+            while (const std::optional<Graphics::PickReadbackResult> result =
+                       selectionSystem.PopPickResult())
+            {
+                ApplySelectionReadbackToController(selection, scene, *result);
+                RefineSelectionReadbackForFrame(scene,
+                                                *result,
+                                                inFlightPickContexts,
+                                                lastRefinedPrimitive);
+            }
+        }
+
+        void RunFixedStepSimulationTicks(Engine& engine,
+                                         IApplication& application,
+                                         Core::FrameGraph& frameGraph,
+                                         ECS::Scene::Registry& scene,
+                                         double& accumulator,
+                                         const double fixedDt,
+                                         const int maxSubSteps)
+        {
+            int substeps = 0;
+            while (accumulator >= fixedDt && substeps < maxSubSteps)
+            {
+                application.OnSimTick(engine, fixedDt);
+
+                // RUNTIME-091: register the promoted baseline ECS systems after
+                // the app has had a chance to add its own fixed-step passes.
+                (void)RegisterPromotedEcsSystemBundle(frameGraph, scene);
+
+                if (frameGraph.PassCount() > 0)
+                {
+                    if (auto r = frameGraph.Compile(); r.has_value())
+                    {
+                        if (auto exec = frameGraph.Execute(); !exec.has_value())
+                        {
+                            Core::Log::Error("[Runtime] FrameGraph Execute() failed: error={}",
+                                             static_cast<int>(exec.error()));
+                        }
+                    }
+                    else
+                    {
+                        Core::Log::Error("[Runtime] FrameGraph Compile() failed: error={}",
+                                         static_cast<int>(r.error()));
+                    }
+                    frameGraph.Reset();
+                }
+
+                accumulator -= fixedDt;
+                ++substeps;
+            }
+        }
+
+        void PopulateMainCameraForFrame(
+            const Core::Config::EngineConfig& config,
+            CameraControllerRegistry& cameras,
+            const std::optional<Graphics::CameraViewInput>& referenceCamera,
+            const Platform::IWindow& window,
+            const Platform::Extent2D& viewport,
+            const double frameDt,
+            const bool imguiCapturesInput,
+            Graphics::RenderFrameInput& renderInput)
+        {
+            if (!config.Camera.Enabled)
+                return;
+
+            ICameraController* controller = cameras.ResolveOrNull(CameraControllerSlot::Main);
+            if (controller == nullptr)
+            {
+                const Graphics::CameraViewInput seed = referenceCamera.has_value()
+                    ? BuildReferenceCameraViewInput(*referenceCamera, viewport.Width, viewport.Height)
+                    : Graphics::CameraViewInput{};
+                cameras.Register(
+                    CameraControllerSlot::Main,
+                    CreateCameraController(config.Camera.Controller, seed));
+                controller = cameras.ResolveOrNull(CameraControllerSlot::Main);
+            }
+
+            if (controller == nullptr)
+                return;
+
+            if (!imguiCapturesInput)
+                controller->Update(window.GetInput(), frameDt);
+
+            renderInput.Camera = controller->GetView(viewport);
+            renderInput.Camera.ExplicitCameraTransition =
+                cameras.ConsumeCameraTransition(CameraControllerSlot::Main);
+        }
+
+        void DriveGizmoAndSelectionInputForFrame(
+            GizmoInteraction& gizmoInteraction,
+            GizmoUndoStack& gizmoUndoStack,
+            ECS::Scene::Registry& scene,
+            SelectionController& selection,
+            const Platform::IWindow& window,
+            const Platform::Extent2D& viewport,
+            const bool imguiCapturesInput,
+            const bool imguiCapturesMouse,
+            std::vector<ECS::EntityHandle>& gizmoSelectedEntities,
+            const Graphics::CameraViewInput& camera)
+        {
+            RebuildSelectedGizmoEntities(selection, scene, gizmoSelectedEntities);
+            const Platform::Extent2D windowExtent = window.GetWindowExtent();
+            DriveGizmoInteractionForFrame(gizmoInteraction,
+                                          gizmoUndoStack,
+                                          scene,
+                                          window.GetInput(),
+                                          camera,
+                                          windowExtent,
+                                          viewport,
+                                          imguiCapturesInput,
+                                          gizmoSelectedEntities);
+            SubmitViewportSelectionClickForFrame(selection,
+                                                 window.GetInput(),
+                                                 windowExtent,
+                                                 viewport,
+                                                 imguiCapturesMouse,
+                                                 gizmoInteraction.IsDragging());
+        }
+
+        void FocusMainCameraOnSelectionForFrame(
+            const Core::Config::EngineConfig& config,
+            CameraControllerRegistry& cameras,
+            SelectionController& selection,
+            ECS::Scene::Registry& scene,
+            const Platform::IWindow& window,
+            const Platform::Extent2D& viewport,
+            const bool imguiCapturesKeyboard,
+            Graphics::RenderFrameInput& renderInput)
+        {
+            if (!config.Camera.Enabled || imguiCapturesKeyboard ||
+                !window.GetInput().IsKeyJustPressed(Platform::Input::Key::F) ||
+                !FocusCameraOnSelection(cameras,
+                                        selection,
+                                        scene,
+                                        CameraControllerSlot::Main))
+            {
+                return;
+            }
+
+            if (ICameraController* focused =
+                    cameras.ResolveOrNull(CameraControllerSlot::Main))
+            {
+                renderInput.Camera = focused->GetView(viewport);
+                renderInput.Camera.ExplicitCameraTransition =
+                    cameras.ConsumeCameraTransition(CameraControllerSlot::Main);
+            }
+        }
+
         [[nodiscard]] Graphics::Components::RenderPoints::RenderType ToRenderPointType(
             const MeshVertexViewRenderMode mode) noexcept
         {
@@ -2093,30 +2646,6 @@ namespace Extrinsic::Runtime
         RuntimeFrameContext frameContext{};
 
         // ── Phase 1: Platform ─────────────────────────────────────────────
-        struct PlatformFrameHooks final : Core::IPlatformFrameHooks
-        {
-            Platform::IWindow& Window;
-
-            explicit PlatformFrameHooks(Platform::IWindow& window)
-                : Window(window)
-            {
-            }
-
-            void PollEvents() override { Window.PollEvents(); }
-            [[nodiscard]] bool ShouldClose() const override
-            {
-                return Window.ShouldClose();
-            }
-            [[nodiscard]] bool IsMinimized() const override
-            {
-                return Window.IsMinimized();
-            }
-            void WaitForEventsTimeout(double seconds) override
-            {
-                Window.WaitForEventsTimeout(seconds);
-            }
-        };
-
         PlatformFrameHooks platformHooks{*m_Window};
         const Core::PlatformFrameResult platformResult =
             Core::ExecutePlatformBeginFrameContract(platformHooks,
@@ -2150,31 +2679,6 @@ namespace Extrinsic::Runtime
             m_Window->AcknowledgeResize();
         }
 
-        struct OperationalTransitionHooks final : Core::IOperationalTransitionHooks
-        {
-            RHI::IDevice& Device;
-            Graphics::IRenderer& Renderer;
-            bool& RendererOperational;
-
-            OperationalTransitionHooks(RHI::IDevice& device,
-                                       Graphics::IRenderer& renderer,
-                                       bool& rendererOperational)
-                : Device(device)
-                , Renderer(renderer)
-                , RendererOperational(rendererOperational)
-            {
-            }
-
-            [[nodiscard]] bool IsDeviceOperational() const override { return Device.IsOperational(); }
-            [[nodiscard]] bool IsRendererOperational() const override { return RendererOperational; }
-            void WaitDeviceIdle() override { Device.WaitIdle(); }
-            [[nodiscard]] bool RebuildRendererOperationalResources() override
-            {
-                return Renderer.RebuildOperationalResources(Device);
-            }
-            void MarkRendererOperational() override { RendererOperational = true; }
-        };
-
         OperationalTransitionHooks operationalHooks(*m_Device, *m_Renderer, m_RendererOperational);
         (void)Core::ExecuteOperationalTransitionContract(operationalHooks);
 
@@ -2186,45 +2690,13 @@ namespace Extrinsic::Runtime
         frameContext.FrameDeltaSeconds = frameDt;
         m_Accumulator += frameDt;
 
-        int substeps = 0;
-        while (m_Accumulator >= m_FixedDt && substeps < m_MaxSubSteps)
-        {
-            // App registers system passes via engine.GetFrameGraph().AddPass(...)
-            m_Application->OnSimTick(*this, m_FixedDt);
-
-            // RUNTIME-091: register the promoted baseline ECS systems
-            // (TransformHierarchy, BoundsPropagation) after the app has
-            // had a chance to add its own fixed-step passes. The FrameGraph
-            // resolves the actual execution order through TypeToken reads/
-            // writes and the named TransformUpdate / WorldBoundsUpdate
-            // signals, so app passes that mutate transforms run before
-            // TransformHierarchy and app passes that WaitFor either signal
-            // run after the propagation seam.
-            (void)RegisterPromotedEcsSystemBundle(*m_FrameGraph, *m_Scene);
-
-            // CPU task graph: compile dependency order, execute in topo-layer
-            // sequence (currently sequential execution), then reset.
-            if (m_FrameGraph->PassCount() > 0)
-            {
-                if (auto r = m_FrameGraph->Compile(); r.has_value())
-                {
-                    if (auto exec = m_FrameGraph->Execute(); !exec.has_value())
-                    {
-                        Core::Log::Error("[Runtime] FrameGraph Execute() failed: error={}",
-                                   static_cast<int>(exec.error()));
-                    }
-                }
-                else
-                {
-                    Core::Log::Error("[Runtime] FrameGraph Compile() failed: error={}",
-                               static_cast<int>(r.error()));
-                }
-                m_FrameGraph->Reset();
-            }
-
-            m_Accumulator -= m_FixedDt;
-            ++substeps;
-        }
+        RunFixedStepSimulationTicks(*this,
+                                    *m_Application,
+                                    *m_FrameGraph,
+                                    *m_Scene,
+                                    m_Accumulator,
+                                    m_FixedDt,
+                                    m_MaxSubSteps);
 
         const double alpha = m_Accumulator / m_FixedDt;
         frameContext.FixedStepAlpha = alpha;
@@ -2267,50 +2739,25 @@ namespace Extrinsic::Runtime
         };
         Graphics::RenderFrameInput& renderInput = frameContext.RenderInput;
 
-        if (m_Config.Camera.Enabled)
-        {
-            ICameraController* controller = m_CameraControllers.ResolveOrNull(CameraControllerSlot::Main);
-            if (controller == nullptr)
-            {
-                const Graphics::CameraViewInput seed = m_ReferenceCamera.has_value()
-                    ? BuildReferenceCameraViewInput(*m_ReferenceCamera, viewport.Width, viewport.Height)
-                    : Graphics::CameraViewInput{};
-                m_CameraControllers.Register(
-                    CameraControllerSlot::Main,
-                    CreateCameraController(m_Config.Camera.Controller, seed));
-                controller = m_CameraControllers.ResolveOrNull(CameraControllerSlot::Main);
-            }
-
-            if (controller != nullptr)
-            {
-                const Platform::IWindow& window = *m_Window;
-                if (!imguiCapturesInput)
-                    controller->Update(window.GetInput(), frameDt);
-
-                renderInput.Camera = controller->GetView(viewport);
-                renderInput.Camera.ExplicitCameraTransition =
-                    m_CameraControllers.ConsumeCameraTransition(CameraControllerSlot::Main);
-            }
-        }
-
-        RebuildSelectedGizmoEntities(m_SelectionController, *m_Scene, m_GizmoSelectedEntities);
         const Platform::IWindow& inputWindow = *m_Window;
-        const Platform::Extent2D windowExtent = inputWindow.GetWindowExtent();
-        DriveGizmoInteractionForFrame(m_GizmoInteraction,
-                                      m_GizmoUndoStack,
-                                      *m_Scene,
-                                      inputWindow.GetInput(),
-                                      renderInput.Camera,
-                                      windowExtent,
-                                      viewport,
-                                      imguiCapturesInput,
-                                      m_GizmoSelectedEntities);
-        SubmitViewportSelectionClickForFrame(m_SelectionController,
-                                             inputWindow.GetInput(),
-                                             windowExtent,
-                                             viewport,
-                                             imguiCapturesMouse,
-                                             m_GizmoInteraction.IsDragging());
+        PopulateMainCameraForFrame(m_Config,
+                                   m_CameraControllers,
+                                   m_ReferenceCamera,
+                                   inputWindow,
+                                   viewport,
+                                   frameDt,
+                                   imguiCapturesInput,
+                                   renderInput);
+        DriveGizmoAndSelectionInputForFrame(m_GizmoInteraction,
+                                            m_GizmoUndoStack,
+                                            *m_Scene,
+                                            m_SelectionController,
+                                            inputWindow,
+                                            viewport,
+                                            imguiCapturesInput,
+                                            imguiCapturesMouse,
+                                            m_GizmoSelectedEntities,
+                                            renderInput.Camera);
 
         // ── BUG-024: pre-render transform flush ───────────────────────────
         // Local-transform mutations made after the fixed-step ECS bundle —
@@ -2335,21 +2782,14 @@ namespace Extrinsic::Runtime
         // the keyboard (e.g. typing in a field). On a successful reframe the
         // camera view is rebuilt so the snapped camera reaches the transform-
         // gizmo packets and render extraction this same frame.
-        if (m_Config.Camera.Enabled && !imguiCapturesKeyboard &&
-            inputWindow.GetInput().IsKeyJustPressed(Platform::Input::Key::F) &&
-            FocusCameraOnSelection(m_CameraControllers,
-                                   m_SelectionController,
-                                   *m_Scene,
-                                   CameraControllerSlot::Main))
-        {
-            if (ICameraController* focused =
-                    m_CameraControllers.ResolveOrNull(CameraControllerSlot::Main))
-            {
-                renderInput.Camera = focused->GetView(viewport);
-                renderInput.Camera.ExplicitCameraTransition =
-                    m_CameraControllers.ConsumeCameraTransition(CameraControllerSlot::Main);
-            }
-        }
+        FocusMainCameraOnSelectionForFrame(m_Config,
+                                           m_CameraControllers,
+                                           m_SelectionController,
+                                           *m_Scene,
+                                           inputWindow,
+                                           viewport,
+                                           imguiCapturesKeyboard,
+                                           renderInput);
 
         const std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos =
             m_GizmoPacketBuilder.Build(*m_Scene,
@@ -2358,82 +2798,12 @@ namespace Extrinsic::Runtime
                                        m_GizmoInteraction.Orientation(),
                                        m_GizmoInteraction.Config().AxisLength);
 
-        // ── RUNTIME-089 Slice B: drain the coalesced selection pick ───────
-        // Input ports / editor tools submit hover/click picks onto the
-        // controller (GetSelectionController()); here we drain the single
-        // coalesced survivor into the frame input and the renderer's
-        // SelectionSystem so graphics issues the pick this frame. The
-        // controller tracks the drained pick as in-flight; the matching
-        // readback is consumed in the maintenance phase below. Graphics stays
-        // reporting-only — it never reads live ECS or runtime selection state.
-        if (const std::optional<PendingSelectionPick> pick =
-                m_SelectionController.ConsumePendingPick())
-        {
-            renderInput.HasPendingPick = true;
-            renderInput.Pick = Graphics::PickPixelRequest{
-                .X        = pick->PixelX,
-                .Y        = pick->PixelY,
-                .Pending  = true,
-                // Carry the controller's correlation token so the readback
-                // resolves this exact request, not whichever pick is oldest.
-                .Sequence = pick->Sequence,
-            };
-            m_Renderer->GetSelectionSystem().RequestPick(Graphics::PickRequest{
-                .PixelX = pick->PixelX,
-                .PixelY = pick->PixelY,
-            });
-
-            // BUG-026 — capture the issuing frame's camera context, keyed by
-            // the pick's correlation Sequence. The readback completes frames
-            // later (the camera may have moved), so the depth-to-world cursor
-            // reconstruction and the CPU ray fallback must replay *this*
-            // frame's inverse view-projection / pick ray, not the consume
-            // frame's. Bounded mirror of the controller's in-flight FIFO.
-            const Graphics::CameraViewSnapshot pickCamera =
-                Graphics::BuildCameraViewSnapshot(renderInput.Camera,
-                                                  viewport,
-                                                  renderInput.Pick);
-            if (pickCamera.Valid)
-            {
-                const std::uint32_t viewportWidth =
-                    viewport.Width > 0 ? static_cast<std::uint32_t>(viewport.Width) : 0u;
-                const std::uint32_t viewportHeight =
-                    viewport.Height > 0 ? static_cast<std::uint32_t>(viewport.Height) : 0u;
-                PickReadbackContext context{};
-                context.InverseViewProjection = pickCamera.InverseViewProjection;
-                context.ViewportWidth         = viewportWidth;
-                context.ViewportHeight        = viewportHeight;
-                context.HasWorldRay           = pickCamera.HasPickRay;
-                context.WorldRayOrigin        = pickCamera.PickRayOrigin;
-                context.WorldRayDirection     = pickCamera.PickRayDirection;
-                // `2 / (|P[1][1]| * H)`: for perspective ([1][1] =
-                // ±1/tan(fovY/2)) this is the world-units-per-pixel at view
-                // depth 1; for orthographic ([1][1] = ±2/orthoHeight, e.g.
-                // the promoted TopDownCameraController) the same expression
-                // is the depth-invariant orthoHeight/H, and the flag tells
-                // refinement not to scale it by the hit distance. The sign
-                // carries the Vulkan Y flip in both cases.
-                const float projectionScaleY =
-                    std::abs(renderInput.Camera.Projection[1][1]);
-                if (projectionScaleY > 0.000001f && viewportHeight > 0u)
-                {
-                    context.WorldUnitsPerPixelAtUnitDepth =
-                        2.0f / (projectionScaleY *
-                                static_cast<float>(viewportHeight));
-                }
-                context.OrthographicProjection =
-                    IsOrthographicProjection(renderInput.Camera.Projection);
-                constexpr std::size_t kMaxInFlightPickContexts = 32u;
-                if (m_InFlightPickContexts.size() >= kMaxInFlightPickContexts)
-                {
-                    m_InFlightPickContexts.erase(m_InFlightPickContexts.begin());
-                }
-                m_InFlightPickContexts.push_back(InFlightPickContext{
-                    .Sequence = pick->Sequence,
-                    .Context  = context,
-                });
-            }
-        }
+        // ── RUNTIME-089 / BUG-026: drain coalesced selection pick ─────────
+        DrainPendingSelectionPickForFrame(m_SelectionController,
+                                          m_Renderer->GetSelectionSystem(),
+                                          m_InFlightPickContexts,
+                                          viewport,
+                                          renderInput);
 
         // ── Phases 5–9: promoted render-frame contract ───────────────────
         RHI::FrameHandle frame{};
@@ -2446,123 +2816,20 @@ namespace Extrinsic::Runtime
         // consumer's frame-age diagnostic reads 0 in the synchronous baseline.
         frameContext.FrameIndex = m_FrameIndex++;
 
-        struct RenderFrameHooks final : Core::IRenderFrameHooks
-        {
-            Graphics::IRenderer& Renderer;
-            ECS::Scene::Registry& Scene;
-            RenderExtractionCache& Extraction;
-            Graphics::GpuAssetCache* GpuAssetCache;
-            const SelectionController& Selection;
-            RenderWorldPool& Pool;
-            bool SynchronousExtraction;
-            RuntimeRenderExtractionStats& Stats;
-            std::uint64_t FrameIndex;
-            std::uint32_t& OutFrontSlot;
-            RHI::FrameHandle& Frame;
-            const Graphics::RenderFrameInput& Input;
-            std::span<const Graphics::TransformGizmoRenderPacket> TransformGizmos;
-            Graphics::RenderWorld& World;
-
-            RenderFrameHooks(Graphics::IRenderer& renderer,
-                             ECS::Scene::Registry& scene,
-                             RenderExtractionCache& extraction,
-                             Graphics::GpuAssetCache* gpuAssetCache,
-                             const SelectionController& selection,
-                             RenderWorldPool& pool,
-                             const bool synchronousExtraction,
-                             RuntimeRenderExtractionStats& stats,
-                             std::uint64_t frameIndex,
-                             std::uint32_t& outFrontSlot,
-                             RHI::FrameHandle& frame,
-                             const Graphics::RenderFrameInput& input,
-                             std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos,
-                             Graphics::RenderWorld& world)
-                : Renderer(renderer)
-                , Scene(scene)
-                , Extraction(extraction)
-                , GpuAssetCache(gpuAssetCache)
-                , Selection(selection)
-                , Pool(pool)
-                , SynchronousExtraction(synchronousExtraction)
-                , Stats(stats)
-                , FrameIndex(frameIndex)
-                , OutFrontSlot(outFrontSlot)
-                , Frame(frame)
-                , Input(input)
-                , TransformGizmos(transformGizmos)
-                , World(world)
-            {
-            }
-
-            bool BeginFrame() override
-            {
-                return Renderer.BeginFrame(Frame);
-            }
-            void ExtractRenderWorld() override
-            {
-                // GRAPHICS-036C — producer half: acquire a back slot, write the
-                // snapshot into it via ExtractAndSubmit, then publish it as the
-                // front. AcquireBack only fails closed (kInvalidSlot) when the
-                // pool is exhausted; in that case the previous front stays current
-                // and we skip the publish so no in-flight slot is overwritten.
-                const std::uint32_t backSlot = Pool.AcquireBack(FrameIndex);
-
-                // RUNTIME-089 Slice B — mirror the runtime selection snapshot
-                // into RenderWorld::Selection via the extraction batch. In
-                // pipelined mode the renderer writes into the acquired back
-                // slot while the consumer below reads the previous front slot.
-                const std::uint32_t submitSlot =
-                    backSlot != RenderWorldPool::kInvalidSlot ? backSlot : 0u;
-                if (backSlot != RenderWorldPool::kInvalidSlot)
-                {
-                    Stats = Extraction.ExtractAndSubmit(Scene,
-                                                         Renderer,
-                                                         GpuAssetCache,
-                                                         &Selection,
-                                                         submitSlot,
-                                                         TransformGizmos);
-                    Pool.PublishFront(backSlot);
-                }
-                else
-                {
-                    Stats = Extraction.GetLastStats();
-                }
-
-                // Consumer half: synchronous mode preserves the existing
-                // same-frame consume. Pipelined mode intentionally consumes the
-                // previously published front (render-N-1) after extraction has
-                // published N.
-                OutFrontSlot = SynchronousExtraction
-                    ? Pool.AcquireFront(FrameIndex)
-                    : Pool.AcquirePreviousFront(FrameIndex);
-
-                const std::uint32_t extractSlot =
-                    OutFrontSlot != RenderWorldPool::kInvalidSlot ? OutFrontSlot : submitSlot;
-                World = Renderer.ExtractRenderWorld(Input, extractSlot);
-
-                // GRAPHICS-036B — surface the pool's three counters on the
-                // extraction stats for editor overlays / tests.
-                MirrorRenderWorldPoolDiagnostics(Pool, Stats);
-            }
-            void PrepareFrame() override { Renderer.PrepareFrame(World); }
-            void ExecuteFrame() override { Renderer.ExecuteFrame(Frame, World); }
-            std::uint64_t EndFrame() override { return Renderer.EndFrame(Frame); }
-        };
-
-        RenderFrameHooks renderHooks(*m_Renderer,
-                                     *m_Scene,
-                                     m_RenderExtraction,
-                                     m_GpuAssetCache.get(),
-                                     m_SelectionController,
-                                     *m_RenderWorldPool,
-                                     m_Config.Render.SynchronousExtraction,
-                                     frameContext.ExtractionStats,
-                                     frameContext.FrameIndex,
-                                     frameContext.PooledFrontSlot,
-                                     frame,
-                                     renderInput,
-                                     transformGizmos,
-                                     renderWorld);
+        RuntimeRenderFrameHooks renderHooks(*m_Renderer,
+                                            *m_Scene,
+                                            m_RenderExtraction,
+                                            m_GpuAssetCache.get(),
+                                            m_SelectionController,
+                                            *m_RenderWorldPool,
+                                            m_Config.Render.SynchronousExtraction,
+                                            frameContext.ExtractionStats,
+                                            frameContext.FrameIndex,
+                                            frameContext.PooledFrontSlot,
+                                            frame,
+                                            renderInput,
+                                            transformGizmos,
+                                            renderWorld);
 
         const Core::RenderFrameResult renderResult = Core::ExecuteRenderFrameContract(renderHooks);
         m_LastExtractionStats = frameContext.ExtractionStats;
@@ -2578,97 +2845,6 @@ namespace Extrinsic::Runtime
         m_Device->Present(frame);
 
         // ── Phase 10: Maintenance ─────────────────────────────────────────
-        struct TransferHooks final : Core::ITransferFrameHooks
-        {
-            RHI::IDevice& Device;
-
-            explicit TransferHooks(RHI::IDevice& device)
-                : Device(device)
-            {
-            }
-
-            void CollectCompletedTransfers() override
-            {
-                // GPU-side resource retirement, staging GC, readback processing.
-                Device.GetTransferQueue().CollectCompleted();
-            }
-        };
-
-        struct StreamingHooks final : Core::IStreamingFrameHooks
-        {
-            StreamingExecutor& Executor;
-
-            explicit StreamingHooks(StreamingExecutor& executor)
-                : Executor(executor)
-            {
-            }
-
-            void DrainCompletions() override { Executor.DrainCompletions(); }
-            void ApplyMainThreadResults() override { Executor.ApplyMainThreadResults(); }
-            void SubmitFrameWork() override {}
-            void PumpBackground(std::uint32_t maxLaunches) override { Executor.PumpBackground(maxLaunches); }
-        };
-
-        struct AssetHooks final : Core::IAssetFrameHooks
-        {
-            Assets::AssetService&     AssetService;
-            Graphics::GpuAssetCache*  GpuAssetCache;
-            AssetModelSceneHandoff*   ModelSceneHandoff;
-            RHI::IDevice&             Device;
-            RenderExtractionCache&    Extraction;
-            Graphics::IRenderer&      Renderer;
-
-            AssetHooks(Assets::AssetService& assetService,
-                       Graphics::GpuAssetCache* gpuAssetCache,
-                       AssetModelSceneHandoff* modelSceneHandoff,
-                       RHI::IDevice& device,
-                       RenderExtractionCache& extraction,
-                       Graphics::IRenderer& renderer)
-                : AssetService(assetService)
-                , GpuAssetCache(gpuAssetCache)
-                , ModelSceneHandoff(modelSceneHandoff)
-                , Device(device)
-                , Extraction(extraction)
-                , Renderer(renderer)
-            {
-            }
-
-            void TickAssets() override
-            {
-                // Asset service main-thread tick: advances state machines, fires
-                // AssetEventBus::Ready / Reloaded / Destroyed callbacks.  The
-                // cache subscribed in Engine::Initialize observes those events
-                // synchronously during this Tick.
-                AssetService.Tick();
-                const std::uint64_t currentFrame = Device.GetGlobalFrameNumber();
-                const std::uint32_t framesInFlight = Device.GetFramesInFlight();
-                if (GpuAssetCache)
-                {
-                    GpuAssetCache->Tick(currentFrame, framesInFlight);
-                }
-                if (ModelSceneHandoff)
-                {
-                    static_cast<void>(
-                        ModelSceneHandoff->ResolvePendingMaterialTextureBindings());
-                }
-                // GRAPHICS-030C: drive the procedural geometry cache's
-                // deferred-retire window with the same CPU frame counter and
-                // framesInFlight the asset cache uses.  Final FreeGeometry
-                // calls fall through to GpuWorld here.
-                Extraction.TickProceduralGeometry(currentFrame, framesInFlight, Renderer);
-                // RUNTIME-085 Slice C — mirror the same window for the
-                // runtime-owned mesh-residency retire queue.
-                Extraction.TickMeshGeometry(currentFrame, framesInFlight, Renderer);
-                // RUNTIME-086 Slice B — and for the graph-residency queue.
-                Extraction.TickGraphGeometry(currentFrame, framesInFlight, Renderer);
-                // RUNTIME-087 — and for the point-cloud-residency queue.
-                Extraction.TickPointCloudGeometry(currentFrame, framesInFlight, Renderer);
-                // RUNTIME-088 Slice B — and for the mesh edge/vertex primitive
-                // view residency queue (one queue for both view lanes).
-                Extraction.TickMeshPrimitiveViewGeometry(currentFrame, framesInFlight, Renderer);
-            }
-        };
-
         TransferHooks transferHooks(*m_Device);
         StreamingHooks streamingHooks(*m_StreamingExecutor);
         AssetHooks assetHooks(*m_AssetService,
@@ -2690,67 +2866,12 @@ namespace Extrinsic::Runtime
         // the other consumers and is the single per-frame maintenance point.
         m_StableEntityLookup.Rebuild(*m_Scene);
 
-        // ── RUNTIME-089 Slice B: consume the completed pick readbacks ──────
-        // DrainCompletedPickingSlots can publish several completed picking
-        // slots into the SelectionSystem during the render/transfer phases, so
-        // drain the whole FIFO — not just the newest — and resolve each result
-        // by its correlation Sequence. ConsumeHit/ConsumeNoHit(reg, seq) replay
-        // the exact in-flight request's kind/mode (hover vs click, Replace/Add/
-        // Toggle) even when picks complete out of issue order or a slot is
-        // recycled. A result with no Sequence (uncorrelated; e.g. a pick issued
-        // outside the controller bridge) falls back to the oldest in-flight
-        // pick. The controller resolves the stable id, rejects stale/
-        // non-selectable hits, and mutates ECS Selected/Hovered tags.
-        {
-            Graphics::SelectionSystem& selectionSystem = m_Renderer->GetSelectionSystem();
-            while (const std::optional<Graphics::PickReadbackResult> result =
-                       selectionSystem.PopPickResult())
-            {
-                if (result->Sequence != 0u)
-                {
-                    if (result->Hit)
-                        m_SelectionController.ConsumeHit(*m_Scene, result->StableEntityId, result->Sequence);
-                    else
-                        m_SelectionController.ConsumeNoHit(*m_Scene, result->Sequence);
-                }
-                else
-                {
-                    if (result->Hit)
-                        m_SelectionController.ConsumeHit(*m_Scene, result->StableEntityId);
-                    else
-                        m_SelectionController.ConsumeNoHit(*m_Scene);
-                }
-
-                // ── RUNTIME-093 Slice B2: refine the pick into a sub-primitive ──
-                // Bridge each readback's encoded primitive hint to the authoritative
-                // CPU GeometrySources of the hit entity and cache the result for the
-                // editor. The whole loop runs oldest→newest, so the last readback's
-                // refinement wins, matching the controller's latest-pick-wins
-                // coalescing; a background (no-hit) readback clears the cache. The
-                // bridge mutates nothing and only ever reads the live registry.
-                //
-                // BUG-026 — replay the issuing frame's camera context (matched by
-                // the correlation Sequence) so the readback's depth sample
-                // reconstructs the world/local cursor position and anchors the
-                // closest-vertex/edge/face refinement.
-                const PickReadbackContext* pickContext = nullptr;
-                auto contextIt = m_InFlightPickContexts.end();
-                if (result->Sequence != 0u)
-                {
-                    contextIt = std::find_if(
-                        m_InFlightPickContexts.begin(),
-                        m_InFlightPickContexts.end(),
-                        [seq = result->Sequence](const InFlightPickContext& entry)
-                        { return entry.Sequence == seq; });
-                    if (contextIt != m_InFlightPickContexts.end())
-                        pickContext = &contextIt->Context;
-                }
-                m_LastRefinedPrimitive =
-                    RefinePickReadbackResult(*m_Scene, *result, pickContext);
-                if (contextIt != m_InFlightPickContexts.end())
-                    m_InFlightPickContexts.erase(contextIt);
-            }
-        }
+        // ── RUNTIME-089 / RUNTIME-093 / BUG-026: completed pick readbacks ──
+        DrainCompletedSelectionReadbacksForFrame(m_Renderer->GetSelectionSystem(),
+                                                 m_SelectionController,
+                                                 *m_Scene,
+                                                 m_InFlightPickContexts,
+                                                 m_LastRefinedPrimitive);
 
         // completedGpuValue is the renderer's per-frame timeline value.  The
         // GpuAssetCache currently retires on the CPU frame counter (which is

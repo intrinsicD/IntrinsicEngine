@@ -278,6 +278,10 @@ alpha, monotonic render frame index, `RenderFrameInput`, extraction stats, and
 the acquired `RenderWorldPool` front slot. This keeps the stage data explicit
 without exporting a runtime API or reviving legacy `Runtime.FrameLoop`,
 `Runtime.RenderOrchestrator`, or `Runtime.ResourceMaintenance` modules.
+Single-use frame-hook adapters, fixed-step/camera/input helpers, pick-context
+capture, and pick-readback refinement live as private `Runtime.Engine.cpp`
+helpers so `RunFrame` stays an ordered phase list while preserving the same
+runtime-owned composition points.
 
 ## Derived overlay producer decision
 

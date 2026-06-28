@@ -98,6 +98,11 @@ these as runtime work when scheduling and review:
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [RUNTIME-132 — Lift single-use RunFrame hook adapters out of the RunFrame body](../../done/RUNTIME-132-lift-runframe-hook-adapters.md)
+  (done, 2026-06-28): `Engine::RunFrame` now delegates single-use frame-hook
+  adapters, fixed-step substeps, camera/gizmo/selection input, BUG-026
+  pick-context capture, and completed pick-readback refinement to private
+  implementation helpers while preserving the documented frame order.
 - [RUNTIME-128 — Default lit material for material-less imported primitives](../../done/RUNTIME-128-default-lit-material-for-materialless-imports.md)
   (done, 2026-06-28, `CPUContracted`): model-scene imports now give
   material-less primitives a neutral lit StandardPBR default while preserving

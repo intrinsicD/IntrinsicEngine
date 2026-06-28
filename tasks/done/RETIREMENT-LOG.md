@@ -2563,3 +2563,15 @@ same-directory temporary file, and fail closed with explicit diagnostics.
 Focused runtime unit tests cover metric round-trip parsing, byte-identical
 manifest ordering, point-set CSV/PLY output, invalid arrays, duplicate keys,
 and unwritable target paths.
+
+[`RUNTIME-132`](RUNTIME-132-lift-runframe-hook-adapters.md) — RunFrame hook
+adapter readability lift retired to `tasks/done/` on 2026-06-28. The six
+single-use `Core.FrameLoop` hook adapters, fixed-step simulation loop, camera /
+gizmo / selection input helpers, BUG-026 pick-context construction, and
+completed pick-readback refinement now live as private `Runtime.Engine.cpp`
+helpers. `Engine::RunFrame` remains the runtime composition point and preserves
+the documented phase order, but now reads as the platform, simulation, UI,
+render-input, render-contract, maintenance, pick-readback, and frame-retire
+sequence instead of carrying adapter bodies inline. Text-based runtime layering
+contracts were updated to follow the extracted helper body without requiring
+the old inline fixed-step implementation.

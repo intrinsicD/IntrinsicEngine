@@ -2,6 +2,7 @@
 id: RUNTIME-132
 theme: F
 depends_on: []
+completed_on: 2026-06-28
 ---
 # RUNTIME-132 — Lift single-use RunFrame hook adapters out of the RunFrame body
 
@@ -25,35 +26,48 @@ depends_on: []
   header comment); the body just buries it under inline adapter definitions.
 - Owner/layer: `runtime` (composition root). The frame contract free functions
   (`Core.FrameLoop` `Execute*Contract`) already exist and are not changed.
+- Status: retired on 2026-06-28 as a behavior-preserving runtime readability
+  slice. `RunFrame` now delegates hook adapters, fixed-step substeps, camera /
+  gizmo / selection input, pick-context capture, and readback refinement to
+  named implementation helpers while preserving the documented frame order.
+- Commit reference: this retirement commit.
 
 ## Required changes
-- [ ] Move the six inline adapter structs (e.g. `PlatformFrameHooks`,
+- [x] Move the six inline adapter structs (e.g. `PlatformFrameHooks`,
       `OperationalTransitionHooks`, `RenderFrameHooks`, `TransferHooks`,
       `StreamingHooks`, `AssetHooks`) into named free helpers / small adapter
       units under `src/runtime`.
-- [ ] Move the `BUG-026` pick-context capture into a named free helper.
-- [ ] Leave `RunFrame` as a short ordered list of phase setup + `Execute*Contract`
+- [x] Move the `BUG-026` pick-context capture into a named free helper.
+- [x] Leave `RunFrame` as a short ordered list of phase setup + `Execute*Contract`
       calls.
 
 ## Tests
-- [ ] `Test.RuntimeFrameLoopContract` and `Test_HeadlessEngine` (and the runtime
+- [x] `Test.RuntimeFrameLoopContract` and `Test_HeadlessEngine` (and the runtime
       frame tests) stay green with zero behavioral change.
-- [ ] Default CPU gate stays green.
+- [x] Default CPU gate stays green.
 
 ## Docs
-- [ ] No doc change required beyond a one-line note in `src/runtime/README.md` if
+- [x] No doc change required beyond a one-line note in `src/runtime/README.md` if
       it indexes `RunFrame` structure.
 
 ## Acceptance criteria
-- [ ] `RunFrame` shrinks to a short, ordered, readable phase list (~150 lines).
-- [ ] Zero behavioral change; existing runtime/headless tests unchanged and green.
-- [ ] No hook registry / stage framework introduced.
+- [x] `RunFrame` shrinks to a short, ordered, readable phase list (~150 lines).
+      It is 146 non-comment lines after extraction; the remaining physical
+      length is phase comments documenting order and existing historical gates.
+- [x] Zero behavioral change; existing runtime/headless tests unchanged and green.
+- [x] No hook registry / stage framework introduced.
 
 ## Verification
 ```bash
-cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeIntegrationTests IntrinsicRuntimeGraphicsCpuTests IntrinsicRuntimeTests
+ctest --test-dir build/ci --output-on-failure -R 'RuntimeFrameLoopContract|HeadlessEngineTest|IntrinsicRuntimeTests.HeadlessEngineGrouped|RuntimeEngineLayering' --timeout 120
+ctest --test-dir build/ci --output-on-failure -R 'RuntimeFrameLoopContract|HeadlessEngine|RuntimeSandboxAcceptance|RuntimeRenderExtraction|RenderWorldPoolPipelined|RuntimeDeviceSelection' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/agents/check_task_policy.py --root . --strict
 ```
 
 ## Forbidden changes

@@ -145,8 +145,6 @@ Open members:
 - [`runtime/RUNTIME-131-agent-cli-config-control-facade.md`](runtime/RUNTIME-131-agent-cli-config-control-facade.md) —
   agent/CLI config-control facade on the `Engine`, equal to the UI (consumes
   retired `CORE-003`; still depends on `GRAPHICS-106`).
-- [`runtime/RUNTIME-132-lift-runframe-hook-adapters.md`](runtime/RUNTIME-132-lift-runframe-hook-adapters.md) —
-  behavior-preserving readability lift of the inline `RunFrame` hook adapters.
 - [`geometry/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md`](geometry/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md) —
   reconcile `algorithm-variant-dispatch.md` with live code and define the shared
   CPU/GPU backend-seam template.
