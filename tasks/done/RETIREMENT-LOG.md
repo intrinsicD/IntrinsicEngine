@@ -9,6 +9,48 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`GEOM-042`](GEOM-042-mesh-normal-bilateral-denoiser.md) — Mesh normal-based
+bilateral denoiser — retired on 2026-06-28 at maturity `CPUContracted`.
+`Geometry::Smoothing` now exports the two-stage bilateral mesh denoiser with
+face-normal filtering, normal-projection vertex updates, deterministic
+diagnostics, and fail-closed handling for empty, non-manifold, degenerate,
+non-finite, and invalid-parameter inputs. The default CPU gate passed after the
+landed implementation, unblocking `UI-024`.
+
+Backlog
+[`GEOM-041`](GEOM-041-fem-laplacian-mass-stiffness-variants.md) — FEM
+Laplacian mass/stiffness variants and edge-weight modes — retired on
+2026-06-28 at maturity `CPUContracted`. DEC assembly now has Graph, Fujiwara,
+and ModifiedNormal stiffness modes plus Sum, Barycentric, Voronoi, and
+Galerkin mass modes, with `ClampedHalfedgeCotan` in mesh utilities and
+row-sum/symmetry/SPD/fail-closed tests.
+
+Backlog
+[`GEOM-040`](GEOM-040-curvature-tensor-principal-directions.md) — Mesh
+curvature tensor and principal directions — retired on 2026-06-28 at maturity
+`CPUContracted`. `Geometry.Curvature` publishes `v:principal_dir1` and
+`v:principal_dir2`, exposes `ComputeCurvatureTensor`, and reuses exported
+`Geometry::PCA::SymmetricEigen3`; analytic curvature tensor tests and the
+default CPU gate passed. This unblocks `UI-026`.
+
+Active
+[`RUNTIME-128`](RUNTIME-128-default-lit-material-for-materialless-imports.md)
+— Default lit material for material-less imported primitives — retired on
+2026-06-28 at maturity `CPUContracted`. Runtime model-scene materialization now
+binds material-less primitives to a lazily created neutral lit StandardPBR
+material while preserving slot 0 as the unlit missing/invalid material
+indicator. The regression is covered by the runtime handoff contract test and
+the default CPU gate.
+
+Active
+[`METHOD-012`](METHOD-012-progressive-poisson-disk-cpu-reference.md) —
+Progressive Poisson-disk sampling: paper intake + CPU reference backend —
+retired on 2026-06-28 at maturity `CPUContracted`. The method package now has
+a deterministic CPU reference backend, manifest, docs, correctness tests, and a
+smoke benchmark with quality metrics. Method and benchmark manifests validate,
+and the default CPU gate passed, unblocking `METHOD-013` and `RUNTIME-134`.
+
+Backlog
 [`PROC-012`](PROC-012-resolve-duplicate-geom-027-id.md) — Resolve duplicate
 `GEOM-027` task ID — retired on 2026-06-27 at maturity `Retired`. Two files
 declared `id: GEOM-027`: the canonical property-name-lifetime contract (depended

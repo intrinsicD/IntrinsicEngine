@@ -46,7 +46,7 @@ This index is the canonical entry point for method/paper implementation document
   in R^d (d in {2,3}) it computes a progressive ordering of an accepted subset
   such that every prefix `[0,k)` is a Poisson-disk sampling at its hierarchy
   level. It is delivered by
-  [`METHOD-012`](../../tasks/active/METHOD-012-progressive-poisson-disk-cpu-reference.md)
+  [`METHOD-012`](../../tasks/done/METHOD-012-progressive-poisson-disk-cpu-reference.md)
   at `CPUContracted`; correctness lives in
   [`Test.ProgressivePoissonReference.cpp`](../../tests/unit/geometry/Test.ProgressivePoissonReference.cpp)
   and the smoke benchmark in

@@ -16,6 +16,11 @@ maturity_target: CPUContracted
 - glTF/material authoring, PBR parameter inference, or per-primitive material variety.
 
 ## Context
+- Status: done.
+- Owner/agent: Claude + Codex verification/retirement.
+- Completed: 2026-06-28.
+- Commit: this commit (`Retire verified geometry, method, and runtime tasks`).
+- Maturity: `CPUContracted`.
 - Owner/layer: `runtime` (`Extrinsic.Runtime.AssetModelSceneHandoff`); material instances created through the `graphics`-owned `MaterialSystem`.
 - Symptom: many imported meshes render as a flat single color that never shades.
 - Root cause: a primitive whose `MaterialIndex` is out of range of the created material records binds to `Graphics::kDefaultMaterialSlotIndex` (slot 0) in `MaterializeModelSceneAsset` (`src/runtime/Runtime.AssetModelSceneHandoff.cpp:1477-1485`). Slot 0 is `Material.DefaultDebugSurface`, populated `Unlit` at `MaterialSystem::Initialize()` (GRAPHICS-031A). The forward/deferred shaders short-circuit to flat `baseColor` for `Unlit`/`DefaultDebugSurface` (`assets/shaders/forward/default_debug_surface.frag:137-138`), so the mesh never shades regardless of its vertex normals.
@@ -29,16 +34,16 @@ maturity_target: CPUContracted
 
 ## Tests
 - [x] Add a CPU/null contract test in `tests/contract/runtime/Test.AssetModelSceneHandoff.cpp`: materialize a model whose primitive references no material and assert the primitive binds a valid non-default slot, the default lit material is recorded, the diagnostics counter increments, and the default material params are the neutral lit defaults (not `Unlit`). (`MaterialLessPrimitiveBindsNeutralLitDefaultMaterial`)
-- [ ] **Execute** the CPU build/test gate. NOT run in the authoring environment: the session egress policy blocks the repository-local vcpkg bootstrap (`tools/setup/bootstrap_vcpkg.sh` → GitHub clone returns 403), so `cmake --preset ci` cannot configure. Must be run on a host with vcpkg access before this task closes `CPUContracted`.
+- [x] Execute the CPU build/test gate in the local `ci` preset build.
 
 ## Docs
 - [x] Update `src/runtime/README.md` to document material-less import default-lit binding and the preserved slot-0 error semantics.
 
 ## Acceptance criteria
-- [ ] Material-less imported primitives bind a lit material (`HasMaterialSlot == true`, slot `!= kDefaultMaterialSlotIndex`).
-- [ ] Authored-material imports are unchanged (existing handoff tests still pass).
-- [ ] Slot 0 / `DefaultDebugSurface` remains unlit and reserved for missing/invalid bindings.
-- [ ] Fix introduces no layering violations and adds a regression test on the CPU gate.
+- [x] Material-less imported primitives bind a lit material (`HasMaterialSlot == true`, slot `!= kDefaultMaterialSlotIndex`).
+- [x] Authored-material imports are unchanged (existing handoff tests still pass).
+- [x] Slot 0 / `DefaultDebugSurface` remains unlit and reserved for missing/invalid bindings.
+- [x] Fix introduces no layering violations and adds a regression test on the CPU gate.
 
 ## Verification
 ```bash

@@ -19,7 +19,9 @@ maturity_target: CPUContracted
 - No additional method leaves under edges, halfedges, faces, graph, or point-cloud domains in this slice.
 
 ## Context
-- Status: backlog. Blocked on `GEOM-042` (mesh denoiser kernel). The window is feature-gated/disabled until `GEOM-042` lands; the menu leaf and command surface must compile and present deterministic "denoiser unavailable" diagnostics while the dependency is unresolved.
+- Status: backlog. Unblocked by retired `GEOM-042` (mesh denoiser kernel).
+  The window still keeps deterministic "denoiser unavailable" diagnostics for
+  build/config seams where the kernel entry point cannot be reached.
 - Owning subsystem/layer: `src/runtime/Editor/Runtime.SandboxEditorUi.cppm` and `src/runtime/Editor/Runtime.SandboxEditorUi.cpp`. Runtime composes ECS `GeometrySources` + the geometry denoiser + editor command/history; geometry owns the algorithm and never depends on runtime.
 - Mirrors `UI-022` (vertex-normal recompute windows): the domain menu exposes a `Processing` submenu, a method window owns the action button label (`Denoise`), the command discovers the selected mesh entity, calls a geometry-owned kernel, publishes to a single canonical property, stamps the deferred dirty tag, and records an undoable entry in `EditorCommandHistory`.
 - Selection and discovery reuse `SandboxEditorContext` and the existing eligible-mesh discovery seam advertised by `SandboxEditorGeometryProcessingAlgorithm`; this task adds a denoise method advertisement for mesh vertex discovery rather than a new UI-owned discovery path.

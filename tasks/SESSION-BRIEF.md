@@ -10,8 +10,6 @@ the authoritative open/unblocked view.
 
 - `GEOM-035` — Triangle-mesh surface point sampling (tasks/active/GEOM-035-mesh-surface-point-sampling.md)
 - `GRAPHICS-104` — GPU Object-Space Normal Texture Bake (tasks/active/GRAPHICS-104-gpu-object-space-normal-texture-bake.md)
-- `METHOD-012` — Progressive Poisson-disk sampling: paper intake + CPU reference backend (tasks/active/METHOD-012-progressive-poisson-disk-cpu-reference.md)
-- `RUNTIME-128` — Default lit material for material-less imported primitives (tasks/active/RUNTIME-128-default-lit-material-for-materialless-imports.md)
 
 ## Theme B — Rendering modernization
 
@@ -43,9 +41,9 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-132` — Lift single-use RunFrame hook adapters out of the RunFrame body (tasks/backlog/runtime/RUNTIME-132-lift-runframe-hook-adapters.md)
 - blocked by `GEOM-039`: `RUNTIME-135` — SpatialDebug closest-face picking via accelerated mesh query (tasks/backlog/runtime/RUNTIME-135-spatialdebug-closest-face-picking.md)
 - unblocked: `UI-022` — Sandbox EditorUI vertex-normal recompute windows (tasks/backlog/ui/UI-022-sandbox-editor-vertex-normal-recompute.md)
-- blocked by `GEOM-042`: `UI-024` — Sandbox EditorUI mesh denoising window (tasks/backlog/ui/UI-024-editor-mesh-denoise-window.md)
+- unblocked: `UI-024` — Sandbox EditorUI mesh denoising window (tasks/backlog/ui/UI-024-editor-mesh-denoise-window.md)
 - unblocked: `UI-025` — Sandbox EditorUI remeshing and subdivision windows (tasks/backlog/ui/UI-025-editor-remesh-subdivide-windows.md)
-- blocked by `GEOM-040`: `UI-026` — Sandbox EditorUI curvature analysis window and principal-direction field (tasks/backlog/ui/UI-026-editor-curvature-analysis-window.md)
+- unblocked: `UI-026` — Sandbox EditorUI curvature analysis window and principal-direction field (tasks/backlog/ui/UI-026-editor-curvature-analysis-window.md)
 
 ## Theme H — Agentic workflow hardening
 
@@ -70,9 +68,6 @@ the authoritative open/unblocked view.
 - unblocked: `GEOM-037` — SO(3) rotation primitives (Lie machinery) (tasks/backlog/geometry/GEOM-037-so3-rotation-primitives.md)
 - blocked by `GEOM-037`: `GEOM-038` — Rotation averaging — SO(3) means and medians (tasks/backlog/geometry/GEOM-038-rotation-averaging-means-medians.md)
 - unblocked: `GEOM-039` — Accelerated mesh closest-face query and consumer adoption (tasks/backlog/geometry/GEOM-039-accelerated-mesh-closest-face-query.md)
-- unblocked: `GEOM-040` — Mesh curvature tensor and principal directions (tasks/backlog/geometry/GEOM-040-curvature-tensor-principal-directions.md)
-- unblocked: `GEOM-041` — FEM Laplacian mass/stiffness variants and edge-weight modes (tasks/backlog/geometry/GEOM-041-fem-laplacian-mass-stiffness-variants.md)
-- unblocked: `GEOM-042` — Mesh normal-based bilateral denoiser (tasks/backlog/geometry/GEOM-042-mesh-normal-bilateral-denoiser.md)
 - unblocked: `GEOM-045` — First-class mesh geometric-quantity accessors (tasks/backlog/geometry/GEOM-045-first-class-mesh-quantity-accessors.md)
 - unblocked: `GEOM-048` — Statistics accumulators and robust estimation kernels (tasks/backlog/geometry/GEOM-048-statistics-robust-estimation-kernels.md)
 - unblocked: `GEOM-049` — Numeric / linear-algebra utilities: RPCA and Eigen map adapters (tasks/backlog/geometry/GEOM-049-numeric-linalg-utilities.md)
@@ -85,10 +80,10 @@ the authoritative open/unblocked view.
 - unblocked: `METHOD-005` — Robust mesh boolean reference backend (tasks/backlog/methods/METHOD-005-robust-mesh-boolean-reference-backend.md)
 - blocked by `GEOM-024`: `METHOD-006` — Cross-field / frame-field design reference backend (tasks/backlog/methods/METHOD-006-cross-field-design-reference-backend.md)
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
-- blocked by `METHOD-012`: `METHOD-013` — Progressive Poisson-disk sampling: GPU (Vulkan compute) backend + parity (tasks/backlog/methods/METHOD-013-progressive-poisson-disk-gpu-backend.md)
+- blocked by `GRAPHICS-108`: `METHOD-013` — Progressive Poisson-disk sampling: GPU (Vulkan compute) backend + parity (tasks/backlog/methods/METHOD-013-progressive-poisson-disk-gpu-backend.md)
 - unblocked: `METHODS-001` — Pin signed heat as methods-pipeline pathfinder (tasks/backlog/methods/METHODS-001-signed-heat-pathfinder.md)
 - blocked by `GEOM-036`: `RUNTIME-133` — Method result & figure data-export seam (CSV/JSON) (tasks/backlog/runtime/RUNTIME-133-method-figure-data-export.md)
-- blocked by `METHOD-012`: `RUNTIME-134` — Interactive progressive-Poisson sampling playground in the Sandbox (tasks/backlog/ui/RUNTIME-134-progressive-poisson-interactive-playground.md)
+- blocked by `CORE-003`: `RUNTIME-134` — Interactive progressive-Poisson sampling playground in the Sandbox (tasks/backlog/ui/RUNTIME-134-progressive-poisson-interactive-playground.md)
 
 ## Audits
 

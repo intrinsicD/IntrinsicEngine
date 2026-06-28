@@ -98,6 +98,10 @@ these as runtime work when scheduling and review:
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [RUNTIME-128 — Default lit material for material-less imported primitives](../../done/RUNTIME-128-default-lit-material-for-materialless-imports.md)
+  (done, 2026-06-28, `CPUContracted`): model-scene imports now give
+  material-less primitives a neutral lit StandardPBR default while preserving
+  slot 0 as the unlit missing/invalid material indicator.
 - [RUNTIME-127 — Render artifact publication and apply semantics](../../done/RUNTIME-127-render-artifact-publication.md)
   (done, 2026-06-24, `CPUContracted`): runtime now has a render artifact
   registry, lifecycle states, UI-facing status vocabulary, and explicit

@@ -9,16 +9,16 @@ maturity_target: CPUContracted
 
 ## Goal
 
-- [ ] Add a feature-preserving mesh denoiser to the geometry layer: a two-stage
+- [x] Add a feature-preserving mesh denoiser to the geometry layer: a two-stage
       algorithm that (1) bilaterally filters per-face normals, then (2) updates
       vertex positions by integrating ("projecting" toward) the filtered face
       normals.
-- [ ] Expose the denoiser as a new entry point on the existing
+- [x] Expose the denoiser as a new entry point on the existing
       `Geometry::Smoothing` namespace (module `Geometry.Smoothing`, interface
       `src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm`), filling a gap: the
       engine currently has bilateral filtering only for point clouds, not for
       triangle meshes.
-- [ ] Stay entirely within the geometry layer, deterministic and fail-closed,
+- [x] Stay entirely within the geometry layer, deterministic and fail-closed,
       with no renderer/runtime/UI coupling.
 
 ## Non-goals
@@ -36,12 +36,16 @@ maturity_target: CPUContracted
 
 ## Context
 
+- Status: done.
+- Owner/agent: Claude + Codex verification/retirement.
+- Completed: 2026-06-28.
+- Commit: this commit (`Retire verified geometry, method, and runtime tasks`).
+- Maturity: `CPUContracted`.
 - `Geometry::Smoothing` (interface
   `src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm`, implementation
-  `src/geometry/Geometry.HalfedgeMesh.Smoothing.cpp`) currently offers only
-  Uniform Laplacian, Cotan Laplacian, Taubin, and Implicit (backward-Euler)
-  Laplacian. All operate directly on vertex positions and none preserve sharp
-  features under noise.
+  `src/geometry/Geometry.HalfedgeMesh.Smoothing.cpp`) offers Uniform
+  Laplacian, Cotan Laplacian, Taubin, Implicit Laplacian, and the bilateral
+  mesh denoiser.
 - Face normals and per-vertex normals are computed by
   `Geometry::HalfedgeMesh::VertexNormals` (module
   `Geometry.HalfedgeMesh.Vertices.Normals`), which already establishes the
@@ -101,10 +105,10 @@ maturity_target: CPUContracted
 
 ## Required changes
 
-- [ ] In `src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm`, extend namespace
+- [x] In `src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm`, extend namespace
       `Geometry::Smoothing` with the denoiser API (declarations + small structs
       only; non-trivial bodies go in the `.cpp`):
-  - [ ] `struct BilateralDenoiseParams` with: `std::size_t NormalIterations{}`
+  - [x] `struct BilateralDenoiseParams` with: `std::size_t NormalIterations{}`
         (Stage 1 face-normal smoothing iterations), `std::size_t
         VertexIterations{}` (Stage 2 position-update iterations), `double
         SigmaSpatial{}` (centroid-distance Gaussian; `<= 0` means
@@ -112,20 +116,20 @@ maturity_target: CPUContracted
         `double SigmaRange{}` (normal-difference Gaussian; `<= 0` means
         auto-select), `bool PreserveBoundary{true}`, and a small finite-input
         epsilon field consistent with `VertexNormals::Params`.
-  - [ ] `enum class DenoiseStatus : std::uint8_t { Success, EmptyMesh,
+  - [x] `enum class DenoiseStatus : std::uint8_t { Success, EmptyMesh,
         NonManifoldInput, DegenerateGeometry, NonFiniteInput, InvalidParams }`
         for fail-closed reporting.
-  - [ ] `struct BilateralDenoiseResult` carrying `DenoiseStatus Status`,
+  - [x] `struct BilateralDenoiseResult` carrying `DenoiseStatus Status`,
         `std::size_t NormalIterationsPerformed`, `std::size_t
         VertexIterationsPerformed`, `std::size_t VertexCount`, and degenerate /
         non-finite / skipped-face counts mirroring `VertexNormals::Result`.
-  - [ ] `[[nodiscard]] BilateralDenoiseResult DenoiseBilateral(
+  - [x] `[[nodiscard]] BilateralDenoiseResult DenoiseBilateral(
         HalfedgeMesh::Mesh& mesh, const BilateralDenoiseParams& params);` — the
         two-stage orchestrator that runs Stage 1 then Stage 2 in place.
-  - [ ] Doc comments stating the references (Fleishman et al. 2003; Sun et al.
+  - [x] Doc comments stating the references (Fleishman et al. 2003; Sun et al.
         2007 / Ohtake normal-projection update) and the fail-closed contract.
-- [ ] In `src/geometry/Geometry.HalfedgeMesh.Smoothing.cpp`, implement:
-  - [ ] Stage 1 — face-normal bilateral filtering: for each non-deleted face,
+- [x] In `src/geometry/Geometry.HalfedgeMesh.Smoothing.cpp`, implement:
+  - [x] Stage 1 — face-normal bilateral filtering: for each non-deleted face,
         compute the centroid and area-aware face normal, then iteratively
         replace each face normal with the normalized weighted sum over
         adjacent faces (edge-adjacent 1-ring) using weight `w =
@@ -133,21 +137,21 @@ maturity_target: CPUContracted
         exp(-||n_i - n_j||^2 / (2 SigmaRange^2)) * area_j`. Filtering reads from
         the previous iteration's normals into a scratch buffer (double-buffered)
         so iterations are order-independent and deterministic.
-  - [ ] Stage 2 — vertex position update (Sun et al. 2007): for `VertexIterations`,
+  - [x] Stage 2 — vertex position update (Sun et al. 2007): for `VertexIterations`,
         move each vertex `x_i ← x_i + (1/|F(i)|) Σ_{f ∈ F(i)} n_f (n_f · (c_f - x_i))`,
         where `n_f` are the filtered face normals and `c_f` the incident face
         centroids; pin boundary vertices when `PreserveBoundary` is set.
-  - [ ] Reuse the existing face-normal/centroid computation conventions from
+  - [x] Reuse the existing face-normal/centroid computation conventions from
         `Geometry.HalfedgeMesh.Vertices.Normals` (import that module rather than
         re-deriving averaging policy) to keep degenerate handling consistent.
-  - [ ] Fail-closed guards: empty mesh → `EmptyMesh`; any non-finite input
+  - [x] Fail-closed guards: empty mesh → `EmptyMesh`; any non-finite input
         position → `NonFiniteInput`; zero-area / degenerate faces counted and
         excluded from weighting (and if no usable faces remain →
         `DegenerateGeometry`); non-manifold edges (an edge with >2 incident
         faces) → `NonManifoldInput`; invalid params (negative iterations not
         possible with unsigned, but non-finite sigma) → `InvalidParams`. On any
         non-`Success` status the mesh is left unmodified.
-- [ ] Register the denoiser source in the geometry module library build entry
+- [x] Register the denoiser source in the geometry module library build entry
       that already lists `Geometry.HalfedgeMesh.Smoothing.cpp` / `.cppm`
       (via `intrinsic_add_module_library` + the `FILE_SET CXX_MODULES`
       `target_sources` for the geometry target); no new module is created — the
@@ -155,24 +159,24 @@ maturity_target: CPUContracted
 
 ## Tests
 
-- [ ] In `tests/unit/geometry/Test_Smoothing.cpp`, add cases under the existing
+- [x] In `tests/unit/geometry/Test_Smoothing.cpp`, add cases under the existing
       `unit;geometry` label (do not introduce a new CTest label):
-  - [ ] Near-identity on a clean mesh: denoising an already-smooth/flat mesh
+  - [x] Near-identity on a clean mesh: denoising an already-smooth/flat mesh
         moves every vertex by less than a tight tolerance (max displacement
         below a small epsilon relative to mean edge length).
-  - [ ] Noise reduction: inject deterministic (fixed-seed) Gaussian noise into
+  - [x] Noise reduction: inject deterministic (fixed-seed) Gaussian noise into
         vertex positions of a known surface, run `DenoiseBilateral`, and assert
         the RMS distance to the clean surface is strictly reduced versus the
         noisy input.
-  - [ ] Feature preservation vs. uniform Laplacian: on a mesh with a sharp
+  - [x] Feature preservation vs. uniform Laplacian: on a mesh with a sharp
         feature edge (e.g. two planes meeting at a crease) plus injected noise,
         assert the bilateral denoiser preserves the dihedral angle / crease
         sharpness better (smaller error along the feature) than
         `UniformLaplacian` run to comparable smoothness.
-  - [ ] Determinism: two runs with identical mesh and params produce
+  - [x] Determinism: two runs with identical mesh and params produce
         bit-identical vertex positions and identical `BilateralDenoiseResult`
         counters.
-  - [ ] Fail-closed: empty mesh → `EmptyMesh`; a mesh with a non-manifold edge
+  - [x] Fail-closed: empty mesh → `EmptyMesh`; a mesh with a non-manifold edge
         → `NonManifoldInput`; a mesh containing a zero-area face →
         `DegenerateGeometry` (or excluded-and-counted per contract); non-finite
         injected position → `NonFiniteInput`; non-finite sigma → `InvalidParams`.
@@ -180,34 +184,34 @@ maturity_target: CPUContracted
 
 ## Docs
 
-- [ ] Update the module doc comment block in
+- [x] Update the module doc comment block in
       `src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm` to describe the new
       denoiser, its two stages, parameters, and references.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` via
+- [x] Regenerate `docs/api/generated/module_inventory.md` via
       `tools/repo/generate_module_inventory.py` so the new exported symbols on
       `Geometry.Smoothing` are reflected.
-- [ ] If `tests/unit/geometry/README.md` enumerates covered behaviors, add the
+- [x] If `tests/unit/geometry/README.md` enumerates covered behaviors, add the
       denoiser cases there (no new label introduced).
 
 ## Acceptance criteria
 
-- [ ] `Geometry::Smoothing::DenoiseBilateral` exists, is exported from module
+- [x] `Geometry::Smoothing::DenoiseBilateral` exists, is exported from module
       `Geometry.Smoothing`, and runs the two stages in place, returning a
       `BilateralDenoiseResult` with a `DenoiseStatus`.
-- [ ] On a clean mesh, max per-vertex displacement after denoising is below the
+- [x] On a clean mesh, max per-vertex displacement after denoising is below the
       documented near-identity tolerance.
-- [ ] On a fixed-seed noisy mesh, RMS error to the clean surface is strictly
+- [x] On a fixed-seed noisy mesh, RMS error to the clean surface is strictly
       smaller after denoising than before.
-- [ ] On the crease-plus-noise mesh, the bilateral denoiser's feature error is
+- [x] On the crease-plus-noise mesh, the bilateral denoiser's feature error is
       strictly smaller than `UniformLaplacian`'s at comparable overall
       smoothness.
-- [ ] Repeated runs are bit-identical (positions and result counters).
-- [ ] Every degenerate/empty/non-manifold/non-finite/invalid-params case returns
+- [x] Repeated runs are bit-identical (positions and result counters).
+- [x] Every degenerate/empty/non-manifold/non-finite/invalid-params case returns
       the specified non-`Success` status, emits no NaN/Inf, triggers no assert,
       and leaves the mesh unmodified.
-- [ ] `src/geometry/*` still imports only `core`-level dependencies; no
+- [x] `src/geometry/*` still imports only `core`-level dependencies; no
       assets/runtime/graphics/rhi/ecs/app imports are added.
-- [ ] All listed verification commands pass.
+- [x] All listed verification commands pass.
 
 ## Verification
 

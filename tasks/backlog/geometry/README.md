@@ -39,9 +39,6 @@ Grouped by cluster; each is `geometry -> core` only and targets `CPUContracted`.
 - [GEOM-038 — Rotation averaging: SO(3) means and medians](GEOM-038-rotation-averaging-means-medians.md)
   (depends on `GEOM-037`).
 - [GEOM-039 — Accelerated mesh closest-face query and consumer adoption](GEOM-039-accelerated-mesh-closest-face-query.md).
-- [GEOM-040 — Mesh curvature tensor and principal directions](GEOM-040-curvature-tensor-principal-directions.md).
-- [GEOM-041 — FEM Laplacian mass/stiffness variants and edge-weight modes](GEOM-041-fem-laplacian-mass-stiffness-variants.md).
-- [GEOM-042 — Mesh normal-based bilateral denoiser](GEOM-042-mesh-normal-bilateral-denoiser.md).
 - [GEOM-045 — First-class mesh geometric-quantity accessors](GEOM-045-first-class-mesh-quantity-accessors.md).
 - [GEOM-048 — Statistics accumulators and robust estimation kernels](GEOM-048-statistics-robust-estimation-kernels.md).
 - [GEOM-049 — Numeric/linear-algebra utilities (RPCA, Eigen map adapters)](GEOM-049-numeric-linalg-utilities.md).
@@ -131,6 +128,9 @@ split; narratives live in the retirement log.
 - [GEOM-031 — Property set naming normalization](../../done/GEOM-031-property-set-naming-normalization.md) (done).
 - [GEOM-032 — Bool property access contract](../../done/GEOM-032-bool-property-access-contract.md) (done).
 - [GEOM-033 — Erased property metadata catalog](../../done/GEOM-033-erased-property-metadata-catalog.md) (done).
+- [GEOM-040 — Mesh curvature tensor and principal directions](../../done/GEOM-040-curvature-tensor-principal-directions.md) (done).
+- [GEOM-041 — FEM Laplacian mass/stiffness variants and edge-weight modes](../../done/GEOM-041-fem-laplacian-mass-stiffness-variants.md) (done).
+- [GEOM-042 — Mesh normal-based bilateral denoiser](../../done/GEOM-042-mesh-normal-bilateral-denoiser.md) (done).
 - [GEOM-043 — Remeshing surface reprojection and error-bounded adaptive sizing](../../done/GEOM-043-remeshing-reprojection-error-bounded-sizing.md) (done).
 - [GEOM-044 — Sqrt-3 subdivision and Loop feature/crease masks](../../done/GEOM-044-subdivision-sqrt3-loop-feature-masks.md) (done).
 - [GEOM-046 — Mesh topology utilities](../../done/GEOM-046-mesh-topology-utilities.md) (done).

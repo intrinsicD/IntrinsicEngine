@@ -16,13 +16,13 @@ map.
   `Mesh > Processing > Vertices`, with graph/point-cloud normal windows
   consuming the geometry-owned recompute modules).
 - [UI-024 — Sandbox EditorUI mesh denoising window](UI-024-editor-mesh-denoise-window.md)
-  (depends on `GEOM-042`; `Mesh > Processing > Denoise` method window following
+  (depends on retired `GEOM-042`; `Mesh > Processing > Denoise` method window following
   the UI-022 pattern).
 - [UI-025 — Sandbox EditorUI remeshing and subdivision windows](UI-025-editor-remesh-subdivide-windows.md)
   (depends on `GEOM-043`, `GEOM-044`; `Mesh > Processing` remesh/subdivide
   method windows).
 - [UI-026 — Sandbox EditorUI curvature analysis window and principal-direction field](UI-026-editor-curvature-analysis-window.md)
-  (depends on `GEOM-040`; publishes canonical curvature/direction properties for
+  (depends on retired `GEOM-040`; publishes canonical curvature/direction properties for
   visualization). The runtime SpatialDebug closest-face picking consumer for
   `GEOM-039` is filed under the runtime backlog as `RUNTIME-135`.
 

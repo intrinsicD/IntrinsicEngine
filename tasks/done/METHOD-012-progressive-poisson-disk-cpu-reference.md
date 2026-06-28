@@ -15,8 +15,14 @@ depends_on: []
 - No new engine-layer geometry features; the method is a hermetic package consuming public geometry types only.
 
 ## Context
-- Status: active (in-progress). Owner: unassigned. Branch: `claude/gpu-accelerated-pointcloud-mesh-test-57hjjk`. Next verification step: implement the CPU reference under `methods/geometry/progressive_poisson/` (scaffold already present) and run `ctest --test-dir build/ci -R 'ProgressivePoisson'` + `validate_method_manifests.py --strict`.
-- Verification status (2026-06-26): CPU reference + smoke benchmark compiled and run standalone with clang++-20 `-std=c++23` — Poisson guarantee holds at every level boundary in 2D and 3D (checked vs independent brute-force min-distance), determinism and all edge cases pass, and the smoke workload reports quality_error_l2=0 (Poisson ratio 1.00008). CMake wiring (`IntrinsicGeometryMethodTests`, `IntrinsicBenchmarkSmoke`) is in place but the full `cmake --preset ci` + `ctest` gate was not run in this environment (no vcpkg/clang-20 build tree); it must go green in CI before retirement.
+- Status: done.
+- Owner/agent: Claude + Codex verification/retirement.
+- Completed: 2026-06-28.
+- Commit: this commit (`Retire verified geometry, method, and runtime tasks`).
+- Maturity: `CPUContracted`.
+- Verification status: CPU reference + smoke benchmark compile through the
+  repository CMake wiring, manifest validation, and the default CPU gate are now
+  green in the local `ci` preset build.
 - Owning subsystem/layer: `methods` (hermetic package; method packages import only public method APIs + declared geometry types, no ECS/runtime/graphics/platform/app — see `AGENTS.md` §2/§6 and the `methods/_template` + `methods/physics/particle_spring_reference` exemplar).
 - Reference source: the sibling repo `GPU-Accelerated-Progressive-Poisson-Disk-Sampling-via-Phase-Parallel-Spatial-Hashing` (`code/progressive_poisson.h` defines the contract: `SamplerConfig{dimension, grid_width, max_levels, hash_load_factor, radius_alpha, randomize_grid_origin, grid_origin_seed, shuffle_within_levels, shuffle_seed}` → `ProgressivePoissonResult{order, level_offsets, splat_radii, base_radius}`). The CUDA `.cu` is the optimized parallel form; the CPU reference must reproduce the same accept/order semantics serially. Honor the splat-radius semantics caveat recorded in that repo's `OPEN_DECISIONS.md` (OD1: introduction-level radii).
 - Must follow the method workflow: intake → CPU reference → correctness tests → benchmark harness (this task), with optimized/GPU backends in follow-ups.
@@ -41,7 +47,7 @@ depends_on: []
 ## Acceptance criteria
 - [x] A hermetic CPU reference method package exists, builds via its tests/benchmarks, and produces a progressive ordering whose every level-boundary prefix satisfies the Poisson-disk guarantee.
 - [x] Output is deterministic for fixed inputs/seeds; diagnostics report per-level counts and measured spacing.
-- [ ] Correctness, determinism, and edge-case tests pass on the default CPU gate; a CPU smoke benchmark exists without perf claims.
+- [x] Correctness, determinism, and edge-case tests pass on the default CPU gate; a CPU smoke benchmark exists without perf claims.
 - [x] `method.yaml` validates strict; the method imports no ECS/runtime/graphics/platform/app code.
 
 ## Verification

@@ -27,7 +27,10 @@ maturity_target: CPUContracted
 
 ## Slice plan
 - [ ] Slice 1 (CPU scalar curvature): `Mesh > Processing > Curvature` window with curvature-type selection and a `Compute` action that publishes `v:mean_curvature` and `v:gaussian_curvature`, plus the scalar colormap visualization toggle. This slice can land on the scalar-only surface of `GEOM-040`.
-- [ ] Slice 2 (principal directions): publish `v:principal_dir1`/`v:principal_dir2` and the principal-direction line-glyph overlay; gate this slice on `GEOM-040` principal-direction availability so the window and adapters degrade deterministically (scalars only) when directions are absent.
+- [ ] Slice 2 (principal directions): publish `v:principal_dir1`/`v:principal_dir2`
+      and the principal-direction line-glyph overlay. `GEOM-040` is retired, but
+      the window and adapters still degrade deterministically (scalars only) if
+      a build/config seam cannot publish directions.
 
 ## Required changes
 - [ ] Add the canonical curvature property names beside `Extrinsic::ECS::Components::GeometrySources::PropertyNames` in `src/ecs/Components/ECS.Component.GeometrySources.cppm`: `kMeanCurvature` (`v:mean_curvature`), `kGaussianCurvature` (`v:gaussian_curvature`), `kPrincipalDir1` (`v:principal_dir1`), `kPrincipalDir2` (`v:principal_dir2`).

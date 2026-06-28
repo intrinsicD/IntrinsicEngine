@@ -54,6 +54,11 @@ map.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [METHOD-012 — Progressive Poisson-disk sampling: paper intake + CPU reference backend](../../done/METHOD-012-progressive-poisson-disk-cpu-reference.md)
+  (done, 2026-06-28, `CPUContracted`): deterministic CPU reference, manifest,
+  docs, correctness tests, and smoke benchmark for progressive Poisson-disk
+  subsampling. GPU parity remains owned by
+  [`METHOD-013`](METHOD-013-progressive-poisson-disk-gpu-backend.md).
 - [METHOD-001 — Rigid-body dynamics reference backend](../../done/METHOD-001-rigid-body-dynamics-reference-backend.md)
   (done 2026-06-05 at `CPUContracted`; ownership gate accepted by
   [`ARCH-001`](../../done/ARCH-001-physics-layer-ownership-and-ecs-integration.md)
