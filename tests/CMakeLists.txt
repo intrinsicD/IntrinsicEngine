@@ -307,6 +307,7 @@ if(TARGET ExtrinsicRuntime)
         Test.ProceduralGeometryCache.cpp
         Test.ProceduralGeometryExtraction.cpp
         Test.RuntimeCameraControllers.cpp
+        Test.RuntimeConfigControlFacade.cpp
         Test.RuntimeEngineConfigBoot.cpp
         Test.RuntimeRenderRecipeActivation.cpp
         Test.RuntimeCameraFocusCommand.cpp

@@ -33,7 +33,6 @@ the authoritative open/unblocked view.
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
-- unblocked: `RUNTIME-131` — Agent/CLI config-control facade on the Engine (tasks/backlog/runtime/RUNTIME-131-agent-cli-config-control-facade.md)
 - blocked by `GEOM-039`: `RUNTIME-135` — SpatialDebug closest-face picking via accelerated mesh query (tasks/backlog/runtime/RUNTIME-135-spatialdebug-closest-face-picking.md)
 - unblocked: `UI-022` — Sandbox EditorUI vertex-normal recompute windows (tasks/backlog/ui/UI-022-sandbox-editor-vertex-normal-recompute.md)
 - unblocked: `UI-024` — Sandbox EditorUI mesh denoising window (tasks/backlog/ui/UI-024-editor-mesh-denoise-window.md)
@@ -75,7 +74,7 @@ the authoritative open/unblocked view.
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
 - blocked by `GRAPHICS-108`: `METHOD-013` — Progressive Poisson-disk sampling: GPU (Vulkan compute) backend + parity (tasks/backlog/methods/METHOD-013-progressive-poisson-disk-gpu-backend.md)
 - unblocked: `METHODS-001` — Pin signed heat as methods-pipeline pathfinder (tasks/backlog/methods/METHODS-001-signed-heat-pathfinder.md)
-- blocked by `RUNTIME-131`: `RUNTIME-134` — Interactive progressive-Poisson sampling playground in the Sandbox (tasks/backlog/ui/RUNTIME-134-progressive-poisson-interactive-playground.md)
+- unblocked: `RUNTIME-134` — Interactive progressive-Poisson sampling playground in the Sandbox (tasks/backlog/ui/RUNTIME-134-progressive-poisson-interactive-playground.md)
 
 ## Audits
 

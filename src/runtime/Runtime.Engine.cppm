@@ -6,6 +6,7 @@ module;
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 export module Extrinsic.Runtime.Engine;
@@ -146,6 +147,15 @@ namespace Extrinsic::Runtime
     {
         None = 0,
         StartupConfigFile,
+        AgentCli,
+        Editor,
+        Programmatic,
+    };
+
+    export enum class RuntimeConfigControlSource : std::uint8_t
+    {
+        None = 0,
+        AgentCli,
         Editor,
         Programmatic,
     };
@@ -179,6 +189,39 @@ namespace Extrinsic::Runtime
         RuntimeRenderRecipeActivationSource ActiveSource{
             RuntimeRenderRecipeActivationSource::None};
         RuntimeRenderRecipeApplyResult LastApply{};
+        bool HasLastApply{false};
+    };
+
+    export enum class RuntimeEngineConfigApplyStatus : std::uint8_t
+    {
+        None = 0,
+        Applied,
+        NoChange,
+        Rejected,
+    };
+
+    export struct RuntimeEngineConfigApplyResult
+    {
+        RuntimeEngineConfigApplyStatus Status{
+            RuntimeEngineConfigApplyStatus::None};
+        RuntimeConfigControlSource Source{RuntimeConfigControlSource::None};
+        Core::Config::EngineConfigLoadResult LoadResult{};
+        RuntimeRenderRecipeApplyResult RecipeApply{};
+        bool EngineConfigApplied{false};
+        bool DefaultRecipeConfigPathChanged{false};
+        std::vector<std::string> RejectedBootOnlyFields{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == RuntimeEngineConfigApplyStatus::Applied ||
+                   Status == RuntimeEngineConfigApplyStatus::NoChange;
+        }
+    };
+
+    export struct RuntimeEngineConfigControlState
+    {
+        Core::Config::EngineConfig ActiveConfig{};
+        RuntimeEngineConfigApplyResult LastApply{};
         bool HasLastApply{false};
     };
 
@@ -294,8 +337,22 @@ namespace Extrinsic::Runtime
         [[nodiscard]] Platform::IWindow&      GetWindow()        noexcept;
         [[nodiscard]] RHI::IDevice&           GetDevice()        noexcept;
         [[nodiscard]] Graphics::IRenderer&    GetRenderer()      noexcept;
+        [[nodiscard]] const Core::Config::EngineConfig&
+            GetEngineConfig() const noexcept;
         [[nodiscard]] Graphics::RenderRecipeConfigContext
             CreateRenderRecipeConfigContext() const;
+        [[nodiscard]] Graphics::RenderRecipeConfigLoadResult
+            PreviewRenderRecipeConfigDocument(
+                std::string_view document,
+                std::string sourceId = "<memory>") const;
+        [[nodiscard]] Graphics::RenderRecipeConfigLoadResult
+            LoadRenderRecipeConfigPreviewFile(std::string path) const;
+        [[nodiscard]] RuntimeRenderRecipeApplyResult
+            ActivateRenderRecipeConfigDocument(
+                std::string_view document,
+                std::string sourceId = "<memory>",
+                RuntimeRenderRecipeActivationSource source =
+                    RuntimeRenderRecipeActivationSource::Programmatic);
         [[nodiscard]] RuntimeRenderRecipeApplyResult ApplyRenderRecipeConfigPreview(
             const Graphics::RenderRecipeConfigLoadResult& loadResult,
             RuntimeRenderRecipeActivationSource source =
@@ -307,6 +364,23 @@ namespace Extrinsic::Runtime
         void ClearActiveRenderRecipeOverride() noexcept;
         [[nodiscard]] const RuntimeRenderRecipeState&
             GetRenderRecipeState() const noexcept;
+        [[nodiscard]] Core::Config::EngineConfigLoadResult
+            PreviewEngineConfigControlDocument(
+                std::string_view document,
+                std::string sourceId = "<memory>") const;
+        [[nodiscard]] Core::Config::EngineConfigLoadResult
+            LoadEngineConfigControlFile(std::string path) const;
+        [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEngineConfigHotSubset(
+            const Core::Config::EngineConfigLoadResult& loadResult,
+            RuntimeConfigControlSource source =
+                RuntimeConfigControlSource::Programmatic);
+        [[nodiscard]] RuntimeEngineConfigApplyResult
+            LoadAndApplyEngineConfigHotSubsetFile(
+                std::string path,
+                RuntimeConfigControlSource source =
+                    RuntimeConfigControlSource::Programmatic);
+        [[nodiscard]] const RuntimeEngineConfigControlState&
+            GetEngineConfigControlState() const noexcept;
         [[nodiscard]] Assets::AssetService&   GetAssetService()  noexcept;
         [[nodiscard]] Graphics::GpuAssetCache& GetGpuAssetCache() noexcept;
         [[nodiscard]] ECS::Scene::Registry&   GetScene()         noexcept;
@@ -460,6 +534,7 @@ namespace Extrinsic::Runtime
         std::unique_ptr<RHI::IDevice>        m_Device;
         std::unique_ptr<Graphics::IRenderer> m_Renderer;
         RuntimeRenderRecipeState             m_RenderRecipeState{};
+        RuntimeEngineConfigControlState      m_ConfigControlState{};
         // RUNTIME-090 Slice B — runtime-side Dear ImGui adapter + the graphics
         // overlay system it produces into. The overlay system instance is
         // runtime-owned composition (the allowed runtime -> graphics edge) so

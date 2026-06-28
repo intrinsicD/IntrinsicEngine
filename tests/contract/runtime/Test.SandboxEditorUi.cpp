@@ -220,6 +220,17 @@ namespace
         return Runtime::SandboxEditorContext{
             .RenderRecipeContext = &recipeContext,
             .RenderRecipeEditorState = &editorState,
+            .PreviewRenderRecipeDocument =
+                [&recipeContext](const std::string& document,
+                                 const std::string& sourceId)
+                {
+                    return Graphics::PreviewRenderRecipeConfig(
+                        document,
+                        recipeContext,
+                        Graphics::RenderRecipeConfigParseOptions{
+                            .SourceId = sourceId,
+                        });
+                },
             .RenderArtifacts = artifacts,
             .ImGuiAdapterAvailable = true,
             .RenderRecipeCommandsAvailable = commandsAvailable,

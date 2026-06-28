@@ -4945,6 +4945,14 @@ namespace Extrinsic::Runtime
                 .AssetImportQueue = engine.GetAssetImportQueueSnapshot(),
                 .RenderGraphStats = &engine.GetRenderer().GetLastRenderGraphStats(),
                 .RenderRecipeRuntimeState = &engine.GetRenderRecipeState(),
+                .PreviewRenderRecipeDocument =
+                    [&engine](const std::string& document,
+                              const std::string& sourceId)
+                    {
+                        return engine.PreviewRenderRecipeConfigDocument(
+                            document,
+                            sourceId);
+                    },
                 .ApplyRenderRecipePreview =
                     [&engine](const Graphics::RenderRecipeConfigLoadResult& loadResult)
                     {
@@ -9205,7 +9213,7 @@ namespace Extrinsic::Runtime
         case Kind::ValidateDraft:
         case Kind::PreviewDraft:
         {
-            if (context.RenderRecipeContext == nullptr)
+            if (!context.PreviewRenderRecipeDocument)
             {
                 return MakeRenderRecipeCommandResult(
                     SandboxEditorRenderRecipeCommandStatus::MissingRecipeContext,
@@ -9219,12 +9227,9 @@ namespace Extrinsic::Runtime
             if (!command.SourceId.empty())
                 state->DraftSourceId = command.SourceId;
 
-            state->LastPreview = Graphics::PreviewRenderRecipeConfig(
+            state->LastPreview = context.PreviewRenderRecipeDocument(
                 state->DraftDocument,
-                *context.RenderRecipeContext,
-                Graphics::RenderRecipeConfigParseOptions{
-                    .SourceId = state->DraftSourceId,
-                });
+                state->DraftSourceId);
             state->HasLastPreview = true;
             const bool usable = Graphics::IsConfigUsable(state->LastPreview);
             if (usable)

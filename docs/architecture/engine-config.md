@@ -62,7 +62,7 @@ fail-closed.
 | `render` | `enable_validation` | Boolean |
 | `render` | `enable_vsync` | Boolean |
 | `render` | `frames_in_flight` | Integer in `[1, 8]` |
-| `render` | `default_recipe_config_path` | String path; empty disables startup recipe loading |
+| `render` | `default_recipe_config_path` | String path; empty disables startup/live recipe loading |
 | `render` | `synchronous_extraction` | Boolean |
 | `simulation` | `worker_thread_count` | Integer in `[0, 1024]`; `0` keeps scheduler auto-detect |
 | `reference_scene` | `enabled` | Boolean |
@@ -72,20 +72,25 @@ fail-closed.
 
 ## Mutability
 
-The current schema is a boot config. Runtime reads it before constructing
-`Engine`, and all fields are treated as boot-only for `CORE-003`:
+The schema is primarily a boot config. Runtime reads it before constructing
+`Engine`, and most fields remain boot-only:
 
 - graphics backend selection and promoted-Vulkan opt-in;
 - frames-in-flight and synchronous extraction mode;
-- startup render-recipe config path;
 - validation and VSync toggles;
 - scheduler worker-thread count;
 - window title, size, resizable flag, and platform backend override;
 - reference-scene and initial camera-controller selection.
 
-There is no hot-apply subset yet. `RUNTIME-131` owns the later agent/CLI control
-facade; it may preview the same schema but must not mutate boot-only fields in a
-live engine unless a follow-up task defines a specific apply contract.
+The current live hot-apply subset is deliberately narrow:
+`render.default_recipe_config_path`. `Runtime::Engine::ApplyEngineConfigHotSubset`
+previews a candidate document against the live config, rejects any difference in
+the boot-only fields above, and then applies only the render-recipe path change.
+A non-empty path is loaded and activated through the same validated
+`RenderRecipeConfig` path used by startup and the editor; invalid recipe files
+reject the hot apply without disturbing the currently active recipe override. An
+empty path clears the active override and returns to the derived default frame
+recipe. See [runtime config control](runtime-config-control.md).
 
 ## Diagnostics
 

@@ -17,6 +17,7 @@ IntrinsicEngine uses a layered architecture optimized for modularity, testabilit
 ## Contract references
 
 - Dependency and ownership rules: [layering.md](layering.md).
+- Runtime live config-control facade: [runtime-config-control.md](runtime-config-control.md).
 - Physics layer ownership: [physics.md](physics.md).
 - Module/import constraints: [module-rules.md](module-rules.md).
 - Execution graph ownership: [task-graphs.md](task-graphs.md) and [frame-graph.md](frame-graph.md).

@@ -3,6 +3,7 @@ id: RUNTIME-131
 theme: F
 depends_on: [CORE-003, GRAPHICS-106]
 maturity_target: CPUContracted
+completed_on: 2026-06-28
 ---
 # RUNTIME-131 — Agent/CLI config-control facade on the Engine
 
@@ -19,6 +20,11 @@ maturity_target: CPUContracted
 - The renderer override seam (`GRAPHICS-106`) or its runtime routing (`RUNTIME-130`).
 
 ## Context
+- Status: done.
+- Owner/agent: Codex.
+- Completed: 2026-06-28.
+- Commit: this commit (`Add runtime config-control facade`).
+- Maturity: `CPUContracted`.
 - The render-recipe draft/preview/activate lifecycle lives inside
   `ApplySandboxEditorRenderRecipeCommand` (`Runtime.SandboxEditorUi.cpp`,
   ~line 9143) and is reachable only through ImGui. P3 requires config files,
@@ -30,38 +36,46 @@ maturity_target: CPUContracted
 - Owner/layer: `runtime`. Plain structs + free functions; no new abstraction layer.
 
 ## Required changes
-- [ ] Add a runtime-owned facade on `Engine` that drives the recipe
+- [x] Add a runtime-owned facade on `Engine` that drives the recipe
       draft/preview/activate lifecycle and an apply-`EngineConfig` (hot-subset)
       path, backed by `Graphics::PreviewRenderRecipeConfig` /
       `LoadRenderRecipeConfigFile` and the `CORE-003` engine-config loader.
-- [ ] Make `SandboxEditorUi` call the same facade; the UI keeps only widget /
+- [x] Make `SandboxEditorUi` call the same facade; the UI keeps only widget /
       draft-buffer state (no private subsystem poking).
-- [ ] Keep the facade ImGui-independent so an agent/CLI caller can build the
+- [x] Keep the facade ImGui-independent so an agent/CLI caller can build the
       context once and drive activation with zero ImGui frames.
 
 ## Tests
-- [ ] Contract test: a non-ImGui caller drives recipe activation + an
+- [x] Contract test: a non-ImGui caller drives recipe activation + an
       `EngineConfig` hot-subset change through the facade with zero ImGui frames,
       sharing one validated path with the UI.
-- [ ] Contract test: the editor command path and the agent path produce identical
+- [x] Contract test: the editor command path and the agent path produce identical
       validated results for the same input.
-- [ ] Default CPU gate stays green.
+- [x] Default CPU gate stays green.
 
 ## Docs
-- [ ] Document the agent/CLI control facade (entry points, validated apply path)
+- [x] Document the agent/CLI control facade (entry points, validated apply path)
       under `docs/architecture/` and link it from the runtime docs.
 
 ## Acceptance criteria
-- [ ] An agent/CLI caller controls recipe activation and an engine-config hot
+- [x] An agent/CLI caller controls recipe activation and an engine-config hot
       subset without the UI, through the same validated path the UI uses.
-- [ ] No command-bus abstraction introduced; facade is plain structs + functions.
-- [ ] No GPU dependency; CPU gate green.
+- [x] No command-bus abstraction introduced; facade is plain structs + functions.
+- [x] No GPU dependency; CPU gate green.
 
 ## Verification
 ```bash
-cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+ctest --test-dir build/ci --output-on-failure -R 'RuntimeConfigControlFacade|RuntimeRenderRecipeActivation|SandboxEditorUi\.RenderRecipeEditor' --timeout 120
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main
+git diff --check
 ```
 
 ## Forbidden changes
@@ -74,3 +88,5 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 - Depends on `CORE-003` (engine-config loader) and `GRAPHICS-106` (override seam);
   `RUNTIME-130` provides the recipe routing this facade reuses.
 - `CPUContracted` is the intended endpoint; no `Operational` follow-up is owed.
+  `RUNTIME-134` consumes the facade for a concrete UI/method playground rather
+  than being a maturity follow-up for this facade.

@@ -1435,6 +1435,10 @@ export namespace Extrinsic::Runtime
         const Graphics::RenderRecipeConfigContext* RenderRecipeContext{nullptr};
         SandboxEditorRenderRecipeEditorState* RenderRecipeEditorState{nullptr};
         const RuntimeRenderRecipeState* RenderRecipeRuntimeState{nullptr};
+        std::function<Graphics::RenderRecipeConfigLoadResult(
+            const std::string&,
+            const std::string&)>
+            PreviewRenderRecipeDocument{};
         std::function<RuntimeRenderRecipeApplyResult(
             const Graphics::RenderRecipeConfigLoadResult&)>
             ApplyRenderRecipePreview{};

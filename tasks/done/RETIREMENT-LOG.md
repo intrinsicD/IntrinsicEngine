@@ -2602,3 +2602,19 @@ runtime apply path instead of keeping activation editor-local. Focused runtime
 contract tests cover startup pass omission, missing and invalid fallback
 diagnostics, and editor activation reaching the live frame; the default
 CPU-supported gate is green.
+
+[`RUNTIME-131`](RUNTIME-131-agent-cli-config-control-facade.md) — agent/CLI
+config-control facade on `Engine` retired to `tasks/done/` on 2026-06-28 at
+`CPUContracted`. `Engine` now exposes typed, ImGui-independent methods for
+render-recipe preview, file preview, document activation, and validated preview
+apply, plus engine-config preview/load and a deliberately narrow hot-apply
+subset for `render.default_recipe_config_path`. Non-empty hot paths validate the
+referenced `RenderRecipeConfig` before mutating live config or renderer state;
+invalid hot recipe files reject without clearing an active override, and all
+other engine-config differences are reported as boot-only rejections. The
+Sandbox Editor recipe commands now call the same facade callbacks for preview
+and activation while keeping widget/draft-buffer state local. Focused runtime
+contract tests cover agent/CLI control without UI frames, boot-only rejection,
+invalid-hot-file preservation, and editor/agent preview parity; the default
+CPU-supported gate is green. This satisfies the `RUNTIME-131` dependency for
+`RUNTIME-134`.

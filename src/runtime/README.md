@@ -91,16 +91,17 @@ binding overrides are the only rows marked editable.
 
 Draft updates, validation, preview, activation, cancellation, artifact publish,
 and artifact apply use `ApplySandboxEditorRenderRecipeCommand(...)`. Validation
-and preview call the graphics-owned loadable recipe validator without mutating
-graphics state. Activation calls the engine-owned
-`ApplyRenderRecipeConfigPreview(...)` path, which stores the active config on
-runtime and installs a `Graphics::FrameRecipeOverride` on the renderer; the
-editor keeps only a presentation cache for its panel model. Artifact publish/apply
-routes through `RenderArtifactRegistry`; the registry authorizes project mutation
-for accepted candidate outputs but performs no ECS, renderer, RHI, file IO, or
-scene persistence mutation itself. Draft states are explicit across inactive,
-debounced, validated, rejected, previewed, activated, and canceled outcomes, so
-stale or invalid recipes fail closed in the UI model.
+and preview call the engine-owned config-control facade callback
+(`Engine::PreviewRenderRecipeConfigDocument`) without mutating graphics state.
+Activation calls `Engine::ApplyRenderRecipeConfigPreview(...)`, the same facade
+path available to agent/CLI callers, which stores the active config on runtime
+and installs a `Graphics::FrameRecipeOverride` on the renderer; the editor keeps
+only widget/draft-buffer state plus a presentation cache for its panel model.
+Artifact publish/apply routes through `RenderArtifactRegistry`; the registry
+authorizes project mutation for accepted candidate outputs but performs no ECS,
+renderer, RHI, file IO, or scene persistence mutation itself. Draft states are
+explicit across inactive, debounced, validated, rejected, previewed, activated,
+and canceled outcomes, so stale or invalid recipes fail closed in the UI model.
 
 ### Sandbox Editor Mesh Vertex Normals
 
@@ -270,6 +271,19 @@ default-constructed `EngineConfig{}` keeps
 `Engine::Initialize()` against the Null device do not regress and do not emit
 the breadcrumb.
 
+`Engine` also exposes the live agent/CLI config-control facade documented in
+[`docs/architecture/runtime-config-control.md`](../../docs/architecture/runtime-config-control.md).
+Recipe preview/activation uses
+`PreviewRenderRecipeConfigDocument(...)`,
+`LoadRenderRecipeConfigPreviewFile(...)`,
+`ActivateRenderRecipeConfigDocument(...)`, and
+`ApplyRenderRecipeConfigPreview(...)`. Engine-config preview uses
+`PreviewEngineConfigControlDocument(...)` /
+`LoadEngineConfigControlFile(...)`; hot apply is intentionally limited to
+`render.default_recipe_config_path` through `ApplyEngineConfigHotSubset(...)`.
+All other engine-config differences are reported as boot-only rejections and do
+not mutate the live engine.
+
 Runtime consumes `Extrinsic.Core.FrameLoop` for reusable platform/render/
 maintenance/shutdown phase contracts. The contract lives in `core` because it has
 no higher-layer imports; `Runtime.Engine` supplies runtime-specific hook
@@ -380,10 +394,13 @@ freshly-constructed subsystems):
    render recipe file from
    `Core::Config::RenderConfig::DefaultRecipeConfigPath` when that path is
    non-empty. Usable `RenderRecipeConfig` previews flow through the same
-   `ApplyRenderRecipeConfigPreview(...)` path used by the editor and future
-   agent/CLI facade; missing or invalid files clear the active override and
-   leave the derived default frame recipe in place with diagnostics recorded on
-   `Engine::GetRenderRecipeState().LastApply`.
+   `ApplyRenderRecipeConfigPreview(...)` path used by the editor and agent/CLI
+   facade; missing or invalid startup files clear the active override and leave
+   the derived default frame recipe in place with diagnostics recorded on
+   `Engine::GetRenderRecipeState().LastApply`. Later live engine-config hot
+   applies validate the referenced recipe before mutating
+   `DefaultRecipeConfigPath`, so an invalid hot file preserves the current
+   active recipe override.
 3. CPU `FrameGraph` and `StreamingExecutor`.
 4. `Assets::AssetService`.
 5. `Graphics::GpuAssetCache` construction with the renderer's

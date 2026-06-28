@@ -132,6 +132,13 @@ extraction, progressive helpers, GPU availability inspection, and the sandbox
 editor now share the promoted source/provenance and render-lane availability
 contracts.
 
+`RUNTIME-131` is retired to `tasks/done`: `Engine` now exposes the
+agent/CLI config-control facade for render-recipe preview/activation and the
+current engine-config hot subset (`render.default_recipe_config_path`), with the
+Sandbox Editor routed through the same facade. This satisfies the config-control
+dependency for `RUNTIME-134`; remaining gating for that playground stays on its
+own method/UI scope.
+
 Open members:
 - [`architecture/LEGACY-012-migrate-legacy-consumer-tests.md`](architecture/LEGACY-012-migrate-legacy-consumer-tests.md) —
   follow-up for tests and non-legacy consumers that still import bare legacy
@@ -143,9 +150,6 @@ Open members:
   unblocked by retired `GEOM-026`; adds the first method window under each
   vertex processing submenu.
 - [`platform/PLATFORM-004-alternative-platform-backend-onboarding.md`](platform/PLATFORM-004-alternative-platform-backend-onboarding.md) (planning-only seed).
-- [`runtime/RUNTIME-131-agent-cli-config-control-facade.md`](runtime/RUNTIME-131-agent-cli-config-control-facade.md) —
-  agent/CLI config-control facade on the `Engine`, equal to the UI (consumes
-  retired `CORE-003` and is now unblocked by retired `GRAPHICS-106`).
 - [`geometry/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md`](geometry/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md) —
   reconcile `algorithm-variant-dispatch.md` with live code and define the shared
   CPU/GPU backend-seam template.

@@ -2157,6 +2157,99 @@ namespace Extrinsic::Runtime
         return !isDeviceOperational;
     }
 
+    [[nodiscard]] RuntimeRenderRecipeActivationSource ToRecipeActivationSource(
+        const RuntimeConfigControlSource source) noexcept
+    {
+        switch (source)
+        {
+        case RuntimeConfigControlSource::AgentCli:
+            return RuntimeRenderRecipeActivationSource::AgentCli;
+        case RuntimeConfigControlSource::Editor:
+            return RuntimeRenderRecipeActivationSource::Editor;
+        case RuntimeConfigControlSource::Programmatic:
+            return RuntimeRenderRecipeActivationSource::Programmatic;
+        case RuntimeConfigControlSource::None:
+            return RuntimeRenderRecipeActivationSource::None;
+        }
+        return RuntimeRenderRecipeActivationSource::None;
+    }
+
+    void RecordBootOnlyDifference(std::vector<std::string>& fields,
+                                  const bool differs,
+                                  std::string field)
+    {
+        if (differs)
+        {
+            fields.push_back(std::move(field));
+        }
+    }
+
+    [[nodiscard]] std::vector<std::string> FindBootOnlyEngineConfigDifferences(
+        const Core::Config::EngineConfig& current,
+        const Core::Config::EngineConfig& candidate)
+    {
+        std::vector<std::string> fields{};
+        RecordBootOnlyDifference(fields,
+                                  current.Window.Title != candidate.Window.Title,
+                                  "window.title");
+        RecordBootOnlyDifference(fields,
+                                  current.Window.Width != candidate.Window.Width,
+                                  "window.width");
+        RecordBootOnlyDifference(fields,
+                                  current.Window.Height != candidate.Window.Height,
+                                  "window.height");
+        RecordBootOnlyDifference(fields,
+                                  current.Window.Resizable != candidate.Window.Resizable,
+                                  "window.resizable");
+        RecordBootOnlyDifference(fields,
+                                  current.Window.Backend != candidate.Window.Backend,
+                                  "window.backend");
+        RecordBootOnlyDifference(fields,
+                                  current.Render.Backend != candidate.Render.Backend,
+                                  "render.backend");
+        RecordBootOnlyDifference(
+            fields,
+            current.Render.EnablePromotedVulkanDevice !=
+                candidate.Render.EnablePromotedVulkanDevice,
+            "render.enable_promoted_vulkan_device");
+        RecordBootOnlyDifference(fields,
+                                  current.Render.EnableValidation !=
+                                      candidate.Render.EnableValidation,
+                                  "render.enable_validation");
+        RecordBootOnlyDifference(fields,
+                                  current.Render.EnableVSync !=
+                                      candidate.Render.EnableVSync,
+                                  "render.enable_vsync");
+        RecordBootOnlyDifference(fields,
+                                  current.Render.FramesInFlight !=
+                                      candidate.Render.FramesInFlight,
+                                  "render.frames_in_flight");
+        RecordBootOnlyDifference(fields,
+                                  current.Render.SynchronousExtraction !=
+                                      candidate.Render.SynchronousExtraction,
+                                  "render.synchronous_extraction");
+        RecordBootOnlyDifference(fields,
+                                  current.Simulation.WorkerThreadCount !=
+                                      candidate.Simulation.WorkerThreadCount,
+                                  "simulation.worker_thread_count");
+        RecordBootOnlyDifference(fields,
+                                  current.ReferenceScene.Enabled !=
+                                      candidate.ReferenceScene.Enabled,
+                                  "reference_scene.enabled");
+        RecordBootOnlyDifference(fields,
+                                  current.ReferenceScene.Selector !=
+                                      candidate.ReferenceScene.Selector,
+                                  "reference_scene.selector");
+        RecordBootOnlyDifference(fields,
+                                  current.Camera.Enabled != candidate.Camera.Enabled,
+                                  "camera.enabled");
+        RecordBootOnlyDifference(fields,
+                                  current.Camera.Controller !=
+                                      candidate.Camera.Controller,
+                                  "camera.controller");
+        return fields;
+    }
+
     Core::Config::EngineConfig CreateReferenceEngineConfig()
     {
         Core::Config::EngineConfig config{};
@@ -2229,6 +2322,7 @@ namespace Extrinsic::Runtime
     {
         if (!m_Application)
             std::terminate();
+        m_ConfigControlState.ActiveConfig = m_Config;
     }
 
     Engine::~Engine()
@@ -2907,6 +3001,10 @@ namespace Extrinsic::Runtime
     Platform::IWindow&    Engine::GetWindow()        noexcept { return *m_Window;        }
     RHI::IDevice&         Engine::GetDevice()        noexcept { return *m_Device;        }
     Graphics::IRenderer&  Engine::GetRenderer()      noexcept { return *m_Renderer;      }
+    const Core::Config::EngineConfig& Engine::GetEngineConfig() const noexcept
+    {
+        return m_Config;
+    }
 
     Graphics::RenderRecipeConfigContext Engine::CreateRenderRecipeConfigContext() const
     {
@@ -2934,6 +3032,40 @@ namespace Extrinsic::Runtime
                 Graphics::MakeCurrentRendererViewOutputRecipe(recipeInput),
             .BaseBindings = Graphics::MakeCurrentRendererBindingSet(),
         };
+    }
+
+    Graphics::RenderRecipeConfigLoadResult Engine::PreviewRenderRecipeConfigDocument(
+        const std::string_view document,
+        std::string sourceId) const
+    {
+        return Graphics::PreviewRenderRecipeConfig(
+            document,
+            CreateRenderRecipeConfigContext(),
+            Graphics::RenderRecipeConfigParseOptions{
+                .SourceId = std::move(sourceId),
+            });
+    }
+
+    Graphics::RenderRecipeConfigLoadResult Engine::LoadRenderRecipeConfigPreviewFile(
+        std::string path) const
+    {
+        const std::string sourceId = path;
+        return Graphics::LoadRenderRecipeConfigFile(
+            path,
+            CreateRenderRecipeConfigContext(),
+            Graphics::RenderRecipeConfigParseOptions{
+                .SourceId = sourceId,
+            });
+    }
+
+    RuntimeRenderRecipeApplyResult Engine::ActivateRenderRecipeConfigDocument(
+        const std::string_view document,
+        std::string sourceId,
+        const RuntimeRenderRecipeActivationSource source)
+    {
+        const Graphics::RenderRecipeConfigLoadResult loadResult =
+            PreviewRenderRecipeConfigDocument(document, std::move(sourceId));
+        return ApplyRenderRecipeConfigPreview(loadResult, source);
     }
 
     RuntimeRenderRecipeApplyResult Engine::ApplyRenderRecipeConfigPreview(
@@ -3014,6 +3146,135 @@ namespace Extrinsic::Runtime
     const RuntimeRenderRecipeState& Engine::GetRenderRecipeState() const noexcept
     {
         return m_RenderRecipeState;
+    }
+
+    Core::Config::EngineConfigLoadResult Engine::PreviewEngineConfigControlDocument(
+        const std::string_view document,
+        std::string sourceId) const
+    {
+        return Core::Config::PreviewEngineConfig(
+            document,
+            m_Config,
+            Core::Config::EngineConfigParseOptions{
+                .SourceId = std::move(sourceId),
+            });
+    }
+
+    Core::Config::EngineConfigLoadResult Engine::LoadEngineConfigControlFile(
+        std::string path) const
+    {
+        const std::string sourceId = path;
+        return Core::Config::LoadEngineConfigFile(
+            path,
+            m_Config,
+            Core::Config::EngineConfigParseOptions{
+                .SourceId = sourceId,
+            });
+    }
+
+    RuntimeEngineConfigApplyResult Engine::ApplyEngineConfigHotSubset(
+        const Core::Config::EngineConfigLoadResult& loadResult,
+        const RuntimeConfigControlSource source)
+    {
+        RuntimeEngineConfigApplyResult result{
+            .Source = source,
+            .LoadResult = loadResult,
+        };
+
+        if (!Core::Config::IsConfigUsable(loadResult))
+        {
+            result.Status = RuntimeEngineConfigApplyStatus::Rejected;
+            m_ConfigControlState.LastApply = result;
+            m_ConfigControlState.HasLastApply = true;
+            return result;
+        }
+
+        const Core::Config::EngineConfig& candidate = loadResult.Preview.Config;
+        result.RejectedBootOnlyFields =
+            FindBootOnlyEngineConfigDifferences(m_Config, candidate);
+        if (!result.RejectedBootOnlyFields.empty())
+        {
+            result.Status = RuntimeEngineConfigApplyStatus::Rejected;
+            m_ConfigControlState.LastApply = result;
+            m_ConfigControlState.HasLastApply = true;
+            return result;
+        }
+
+        const bool recipePathChanged =
+            m_Config.Render.DefaultRecipeConfigPath !=
+            candidate.Render.DefaultRecipeConfigPath;
+        result.DefaultRecipeConfigPathChanged = recipePathChanged;
+        if (!recipePathChanged)
+        {
+            result.Status = RuntimeEngineConfigApplyStatus::NoChange;
+            m_ConfigControlState.ActiveConfig = m_Config;
+            m_ConfigControlState.LastApply = result;
+            m_ConfigControlState.HasLastApply = true;
+            return result;
+        }
+
+        if (candidate.Render.DefaultRecipeConfigPath.empty())
+        {
+            m_Config.Render.DefaultRecipeConfigPath.clear();
+            m_ConfigControlState.ActiveConfig = m_Config;
+            ClearActiveRenderRecipeOverride();
+            result.Status = RuntimeEngineConfigApplyStatus::Applied;
+            result.EngineConfigApplied = true;
+            m_ConfigControlState.LastApply = result;
+            m_ConfigControlState.HasLastApply = true;
+            return result;
+        }
+
+        const Graphics::RenderRecipeConfigLoadResult recipeLoadResult =
+            LoadRenderRecipeConfigPreviewFile(candidate.Render.DefaultRecipeConfigPath);
+        result.RecipeApply = RuntimeRenderRecipeApplyResult{
+            .Source = ToRecipeActivationSource(source),
+            .LoadResult = recipeLoadResult,
+        };
+        if (!Graphics::IsConfigUsable(recipeLoadResult))
+        {
+            result.RecipeApply.Status =
+                RuntimeRenderRecipeApplyStatus::Rejected;
+            result.Status = RuntimeEngineConfigApplyStatus::Rejected;
+            m_ConfigControlState.LastApply = result;
+            m_ConfigControlState.HasLastApply = true;
+            return result;
+        }
+
+        result.RecipeApply = ApplyRenderRecipeConfigPreview(
+            recipeLoadResult,
+            ToRecipeActivationSource(source));
+        if (!result.RecipeApply.Succeeded())
+        {
+            result.Status = RuntimeEngineConfigApplyStatus::Rejected;
+            m_ConfigControlState.LastApply = result;
+            m_ConfigControlState.HasLastApply = true;
+            return result;
+        }
+
+        m_Config.Render.DefaultRecipeConfigPath =
+            candidate.Render.DefaultRecipeConfigPath;
+        m_ConfigControlState.ActiveConfig = m_Config;
+        result.Status = RuntimeEngineConfigApplyStatus::Applied;
+        result.EngineConfigApplied = true;
+        m_ConfigControlState.LastApply = result;
+        m_ConfigControlState.HasLastApply = true;
+        return result;
+    }
+
+    RuntimeEngineConfigApplyResult Engine::LoadAndApplyEngineConfigHotSubsetFile(
+        std::string path,
+        const RuntimeConfigControlSource source)
+    {
+        const Core::Config::EngineConfigLoadResult loadResult =
+            LoadEngineConfigControlFile(std::move(path));
+        return ApplyEngineConfigHotSubset(loadResult, source);
+    }
+
+    const RuntimeEngineConfigControlState& Engine::GetEngineConfigControlState()
+        const noexcept
+    {
+        return m_ConfigControlState;
     }
 
     Assets::AssetService& Engine::GetAssetService()  noexcept { return *m_AssetService;  }

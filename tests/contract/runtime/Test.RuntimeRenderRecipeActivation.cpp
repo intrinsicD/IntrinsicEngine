@@ -203,6 +203,11 @@ TEST(RuntimeRenderRecipeActivation, EditorActivationCommandRoutesThroughRuntimeA
     context.RenderRecipeContext = &recipeContext;
     context.RenderRecipeEditorState = &editorState;
     context.RenderRecipeRuntimeState = &engine.GetRenderRecipeState();
+    context.PreviewRenderRecipeDocument =
+        [&engine](const std::string& document, const std::string& sourceId)
+        {
+            return engine.PreviewRenderRecipeConfigDocument(document, sourceId);
+        };
     context.ApplyRenderRecipePreview =
         [&engine](const Graphics::RenderRecipeConfigLoadResult& loadResult)
         {
