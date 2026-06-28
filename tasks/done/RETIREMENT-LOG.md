@@ -9,6 +9,16 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`GEOM-034`](GEOM-034-geometry-property-api-doc-audit.md) — Geometry property
+API documentation audit — retired on 2026-06-28 at maturity `Scaffolded`
+(documentation synchronization endpoint). The audit made
+`docs/architecture/geometry-api-style.md` the coherent source for property
+name lifetime, domain-prefix naming, validity, const lookup, bool/proxy access,
+and descriptors, and replaced stale higher-layer shared-ownership `MeshView`
+wording in `rendering-target-architecture.md` with links to the current
+geometry-owned property/domain-view contracts.
+
+Backlog
 [`GEOM-042`](GEOM-042-mesh-normal-bilateral-denoiser.md) — Mesh normal-based
 bilateral denoiser — retired on 2026-06-28 at maturity `CPUContracted`.
 `Geometry::Smoothing` now exports the two-stage bilateral mesh denoiser with

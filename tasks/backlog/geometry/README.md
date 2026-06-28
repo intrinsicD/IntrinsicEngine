@@ -23,9 +23,6 @@ map.
 - [GEOM-024 — Sparse symmetric generalized eigensolver seam](GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
   (gates `methods/METHOD-006` variant B; depends on `GEOM-020`; promote when
   METHOD-006 is the next-priority method).
-- [GEOM-034 — Geometry property API documentation audit](GEOM-034-geometry-property-api-doc-audit.md)
-  (depends on the property-system refactor sequence `GEOM-027` through
-  `GEOM-033`).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ### bcg_code_base geometry-processing port gaps (seeded 2026-06-26)
@@ -128,6 +125,7 @@ split; narratives live in the retirement log.
 - [GEOM-031 — Property set naming normalization](../../done/GEOM-031-property-set-naming-normalization.md) (done).
 - [GEOM-032 — Bool property access contract](../../done/GEOM-032-bool-property-access-contract.md) (done).
 - [GEOM-033 — Erased property metadata catalog](../../done/GEOM-033-erased-property-metadata-catalog.md) (done).
+- [GEOM-034 — Geometry property API documentation audit](../../done/GEOM-034-geometry-property-api-doc-audit.md) (done).
 - [GEOM-040 — Mesh curvature tensor and principal directions](../../done/GEOM-040-curvature-tensor-principal-directions.md) (done).
 - [GEOM-041 — FEM Laplacian mass/stiffness variants and edge-weight modes](../../done/GEOM-041-fem-laplacian-mass-stiffness-variants.md) (done).
 - [GEOM-042 — Mesh normal-based bilateral denoiser](../../done/GEOM-042-mesh-normal-bilateral-denoiser.md) (done).

@@ -16,51 +16,57 @@ depends_on: [GEOM-027, GEOM-028, GEOM-029, GEOM-030, GEOM-031, GEOM-032, GEOM-03
 - No historical rewrite of retired task narratives unless a link is broken.
 
 ## Context
+- Status: done.
+- Owner/agent: Codex.
+- Completed: 2026-06-28.
+- Commit: this commit (`Audit geometry property API docs`).
+- Maturity: `Scaffolded` documentation synchronization; this audit is the
+  intended endpoint and no `Operational` follow-up is owed.
 - Owning subsystem/layer: documentation for `geometry` public APIs.
 - The code refactor tasks `GEOM-027` through `GEOM-033` each own local docs for
   their behavior change; this task owns the final cross-document audit once
   those changes are current state.
 - The canonical API-style policy is
-  [`docs/architecture/geometry-api-style.md`](../../../docs/architecture/geometry-api-style.md).
+  [`docs/architecture/geometry-api-style.md`](../../docs/architecture/geometry-api-style.md).
 - Broader architecture docs may contain stale property/view ownership wording,
   especially where rendering or runtime plans describe geometry property access.
 
 ## Required changes
-- [ ] Update
-      [`docs/architecture/geometry-api-style.md`](../../../docs/architecture/geometry-api-style.md)
+- [x] Update
+      [`docs/architecture/geometry-api-style.md`](../../docs/architecture/geometry-api-style.md)
       with one coherent property API section covering names, validity, const
       access, naming style, bool/proxy storage, and descriptors.
-- [ ] Update
-      [`docs/architecture/geometry.md`](../../../docs/architecture/geometry.md)
+- [x] Update
+      [`docs/architecture/geometry.md`](../../docs/architecture/geometry.md)
       so domain views and property sharing refer to the final property contract.
-- [ ] Audit
-      [`docs/architecture/rendering-target-architecture.md`](../../../docs/architecture/rendering-target-architecture.md)
+- [x] Audit
+      [`docs/architecture/rendering-target-architecture.md`](../../docs/architecture/rendering-target-architecture.md)
       and any nearby runtime/graphics docs for stale `PropertySet`, `MeshView`,
       or mutable borrowed-view claims; replace stale details with links to the
       geometry docs where appropriate.
-- [ ] Confirm
-      [`docs/api/generated/module_inventory.md`](../../../docs/api/generated/module_inventory.md)
+- [x] Confirm
+      [`docs/api/generated/module_inventory.md`](../../docs/api/generated/module_inventory.md)
       is current after the code tasks; regenerate and commit only if stale.
-- [ ] Leave historical review documents intact unless the audit finds broken
+- [x] Leave historical review documents intact unless the audit finds broken
       links or text that is explicitly maintained as current-state guidance.
 
 ## Tests
-- [ ] Run documentation link checks.
-- [ ] Run task-policy validation to prove the dependency chain remains valid.
-- [ ] Run module inventory generation in check mode by comparing the generated
+- [x] Run documentation link checks.
+- [x] Run task-policy validation to prove the dependency chain remains valid.
+- [x] Run module inventory generation in check mode by comparing the generated
       output to the committed file after prior code tasks.
 
 ## Docs
-- [ ] This task is docs-only; all required documentation work is listed in
+- [x] This task is docs-only; all required documentation work is listed in
       Required changes.
 
 ## Acceptance criteria
-- [ ] Property API docs describe current behavior only, not planned behavior.
-- [ ] Geometry API style and geometry architecture docs agree on names,
+- [x] Property API docs describe current behavior only, not planned behavior.
+- [x] Geometry API style and geometry architecture docs agree on names,
       mutability, invalid/default behavior, bool storage, and descriptors.
-- [ ] Higher-layer docs do not duplicate or contradict the geometry-owned
+- [x] Higher-layer docs do not duplicate or contradict the geometry-owned
       property contract.
-- [ ] Module inventory and task/session docs are fresh.
+- [x] Module inventory and task/session docs are fresh.
 
 ## Verification
 ```bash

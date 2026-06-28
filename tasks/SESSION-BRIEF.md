@@ -63,7 +63,6 @@ the authoritative open/unblocked view.
 - unblocked: `GEOM-020` — Sparse direct factorization solver seam (LDLT/LLT) (tasks/backlog/geometry/GEOM-020-sparse-direct-factorization-seam.md)
 - unblocked: `GEOM-023` — Sparse non-symmetric iterative solver seam (BiCGSTAB) (tasks/backlog/geometry/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md)
 - blocked by `GEOM-020`: `GEOM-024` — Sparse symmetric generalized eigensolver seam (tasks/backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
-- unblocked: `GEOM-034` — Geometry property API documentation audit (tasks/backlog/geometry/GEOM-034-geometry-property-api-doc-audit.md)
 - unblocked: `GEOM-036` — Blue-noise / sampling quality-metrics module (tasks/backlog/geometry/GEOM-036-sampling-quality-metrics.md)
 - unblocked: `GEOM-037` — SO(3) rotation primitives (Lie machinery) (tasks/backlog/geometry/GEOM-037-so3-rotation-primitives.md)
 - blocked by `GEOM-037`: `GEOM-038` — Rotation averaging — SO(3) means and medians (tasks/backlog/geometry/GEOM-038-rotation-averaging-means-medians.md)

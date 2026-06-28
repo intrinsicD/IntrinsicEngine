@@ -58,6 +58,12 @@ record should name the deviation and include a removal or normalization follow-u
 Geometry properties expose names as `std::string_view` borrowed from the owning
 property storage. Property handles may copy the view cheaply, but callers must
 not retain it past the lifetime of the owning `PropertySet`/domain object.
+Use the canonical domain prefixes in property names: `v:` for vertex/node/point
+attributes, `e:` for edges, `h:` for halfedges, `f:` for faces, and `c:` for
+corners when a corner domain is explicitly present. Prefer the established
+semantic names (`v:point`, `v:normal`, `e:length`, `f:area`, etc.) over local
+aliases; compatibility aliases belong in explicit conversion code, not in
+borrowed views.
 
 Mutable property lookup returns `Property<T>`; const lookup returns
 `ConstProperty<T>` and never grants mutable access through a const domain view.
@@ -70,7 +76,8 @@ when their storage is valid. `bool` properties intentionally do not expose a
 typed span because `std::vector<bool>` uses proxy references; use indexed
 `Get()`/`Set()` for boolean channels such as feature masks. Erased property
 inspection goes through descriptors that report the stable name, value kind,
-type metadata, and element count without exposing writable erased storage.
+type metadata, element count, and mutability without exposing writable erased
+storage.
 
 ## Naming and count terminology
 

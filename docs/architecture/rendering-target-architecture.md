@@ -1082,9 +1082,17 @@ Before the clean design, here are the places where the ideas as stated **can't w
 
 #### ✅ Issue A — PropertySet Duality & ::Data Component Elimination (resolved)
 
-**Resolution — Shared-Ownership Mesh Interface:** Each `GeometrySources` domain component holds its PropertySet via `std::shared_ptr<PropertySet>`. The `HalfedgeMesh::MeshView` interface, when created for an entity, takes shared ownership of these PropertySets — it holds `shared_ptr` copies, not raw references. `meshView.VertexProperties()` IS `GeometrySources::Vertices.Properties` — the same heap object, co-owned.
-
-Concretely: `GeometrySources::Vertices`, `::Edges`, `::Halfedges`, `::Faces` each store `std::shared_ptr<PropertySet> Properties`. When an algorithm creates a `MeshView`, it copies these `shared_ptr`s. This guarantees lifetime safety: even if entt reallocates its component pools (e.g., emplacing a component on another entity), the PropertySet data remains valid because the `MeshView` holds a shared reference. All reads and writes through the mesh interface operate directly on the ECS-owned PropertySet data. No sync, no copy of the data itself, no duality.
+**Current-state note:** this target-design issue is historically resolved, but
+the old shared-ownership `MeshView` sketch is not the promoted implementation.
+`GeometrySources` owns per-domain `Geometry::PropertySet` values directly and
+runtime callers access them through `GeometrySources::ConstSourceView` /
+`GeometrySources::MutableSourceView`. Geometry-owned no-copy adaptation is
+spelled out in [Geometry Architecture → Mesh, graph, and point-cloud domain
+views](geometry.md#mesh-graph-and-point-cloud-domain-views), and the property
+handle/name/const/bool/descriptor contract is canonical in
+[Geometry API Style → Property API contract](geometry-api-style.md#property-api-contract).
+Higher-layer docs should link to those geometry-owned contracts instead of
+duplicating storage-lifetime rules.
 
 **Algorithm-specific scratch data:** When an algorithm needs temporary working data that should NOT appear as a persistent entity property (e.g., intermediate quadric matrices during simplification), it creates a local `MeshScratchProperties` struct that it owns. This data is never written to `GeometrySources` and is discarded when the algorithm completes.
 
@@ -1110,7 +1118,9 @@ Concretely: `GeometrySources::Vertices`, `::Edges`, `::Halfedges`, `::Faces` eac
 
 **Lifecycle systems** read `DataAuthority` tags + `GeometrySources` to determine what to create. They set appearance defaults on render components at creation time. There is no intermediate `::Data` component to bridge.
 
-**Migration note:** `GeometrySources` domain components change from owning `PropertySet` directly to owning `std::shared_ptr<PropertySet>`. The halfedge mesh constructor (`MeshView`) accepts `shared_ptr<PropertySet>` parameters. All construction sites that currently build a mesh from a file or scratch must pass the entity's `GeometrySources` components' shared pointers. The existing `GeometrySourcesPopulate` logic (which already syncs mesh ↔ ECS) is replaced by this shared-ownership construction. All lifecycle systems that currently read from `::Data` components switch to reading from `GeometrySources` + render components.
+**Migration note:** promoted runtime code reads and mutates `GeometrySources`
+through `BuildConstView(...)` / `BuildMutableView(...)` and does not store an
+ECS component that co-owns a geometry `MeshView`.
 
 #### ✅ Issue B — "Runtime Modules" = Compile-Time Registered Units
 
@@ -1150,7 +1160,7 @@ Entity
  ├── ECS::DataAuthority::MeshTag         ← IDENTITY (zero-size, one per entity)
  │
  ├── ECS::Components::GeometrySources::Vertices    ← AUTHORITATIVE for all vertex data
- │    └── Properties: shared_ptr<PropertySet>     (co-owned by MeshView when active)
+ │    └── Properties: Geometry::PropertySet       (owned by GeometrySources)
  │         "v:position"   vec3[]    — positions (canonical)
  │         "v:normal"     vec3[]    — normals (written by geometry normal recompute modules or loader)
  │         "v:color"      vec3[]    — vertex colors (written by colorizing algorithms)
@@ -1159,18 +1169,18 @@ Entity
  │         ... any algorithm result with "v:" prefix
  │
  ├── ECS::Components::GeometrySources::Edges        ← AUTHORITATIVE for all edge data
- │    └── Properties: shared_ptr<PropertySet>     (co-owned by MeshView when active)
+ │    └── Properties: Geometry::PropertySet       (owned by GeometrySources)
  │         "e:v0", "e:v1"           — endpoint indices (topology, canonical)
  │         "e:length"   float[]     — edge lengths (written by MeshQuality)
  │         "e:color"    vec3[]      — per-edge colors
  │         ... any algorithm result with "e:" prefix
  │
  ├── ECS::Components::GeometrySources::Halfedges    ← AUTHORITATIVE for halfedge topology
- │    └── Properties: shared_ptr<PropertySet>     (co-owned by MeshView when active)
+ │    └── Properties: Geometry::PropertySet       (owned by GeometrySources)
  │         "h:to_vertex", "h:next", "h:face"        — topology (canonical)
  │
  ├── ECS::Components::GeometrySources::Faces        ← AUTHORITATIVE for all face data
- │    └── Properties: shared_ptr<PropertySet>     (co-owned by MeshView when active)
+ │    └── Properties: Geometry::PropertySet       (owned by GeometrySources)
  │         "f:halfedge"             — topology (canonical)
  │         "f:normal"   vec3[]      — face normals (written by MeshAnalysis or shader)
  │         "f:area"     float[]     — face areas
@@ -1193,25 +1203,17 @@ Entity
 
 **No `Mesh::Data`, `Graph::Data`, or `PointCloud::Data` components exist.** Entity type is determined solely by `DataAuthority::*Tag`. All persistent data lives in `GeometrySources`. All render state lives on render components. All algorithm state lives on algorithm-specific components.
 
-**HalfedgeMesh::Mesh as on-demand computation interface:**
+**GeometrySources as the promoted runtime computation interface:**
 
-When an algorithm needs topology traversal (neighbor iteration, valence queries, boundary detection), it creates a `HalfedgeMesh::MeshView` that **shares ownership of the entity's GeometrySources PropertySets** via `shared_ptr`:
-
-```cpp
-// Algorithm code — NOT stored on any ECS component
-auto meshView = HalfedgeMesh::MeshView(
-    reg.get<GeometrySources::Vertices>(entity).Properties,    // shared_ptr<PropertySet>
-    reg.get<GeometrySources::Edges>(entity).Properties,       // shared_ptr<PropertySet>
-    reg.get<GeometrySources::Halfedges>(entity).Properties,   // shared_ptr<PropertySet>
-    reg.get<GeometrySources::Faces>(entity).Properties        // shared_ptr<PropertySet>
-);
-// meshView.VertexProperties() IS GeometrySources::Vertices.Properties — same heap object
-// MeshView holds shared_ptr copies → safe even if entt reallocates component pools
-// Reads and writes go directly to ECS data, zero copy of the data itself
-auto result = Geometry::Smoothing::Smooth(meshView, params);
-```
-
-The `MeshView` is a stack-local object. It is **never stored on an ECS component**. It holds `shared_ptr` copies to the PropertySets, so it is safe against entt component pool reallocation (e.g., emplacing a component on another entity between view creation and use). All mutations through the view are live in the ECS. When the algorithm returns, the view is discarded and releases its shared ownership. The algorithm's results are already in `GeometrySources` because the view wrote them there directly.
+Runtime-owned commands and extraction paths build a
+`GeometrySources::ConstSourceView` or `GeometrySources::MutableSourceView` from
+the ECS registry, then compose geometry kernels against those domain property
+sets or against explicit hard-copy conversions. Geometry-owned borrowed views
+(`Geometry.DomainViews`) are for geometry-domain algorithms with clear source
+lifetime and mutation semantics; they are not stored on ECS components.
+Algorithms that mutate `GeometrySources` do so through runtime-owned command
+helpers and then stamp the appropriate dirty tags so extraction/upload observes
+the CPU-side property change.
 
 **When an algorithm needs its own scratch data:** It creates a local `MeshScratchProperties` struct that it owns. This data is never written to `GeometrySources` and is discarded when the algorithm completes.
 
@@ -1521,7 +1523,7 @@ Any overlay entity (child parented via `Hierarchy::Component`) can be **baked** 
 
 **Bake procedure (CPU first, then GPU):**
 1. Create a new entity. Emplace `ECS::DataAuthority::*Tag`, `NameTag`, `Transform::Component` (world-space transform resolved from overlay + parent chain).
-2. Copy all relevant `GeometrySources` properties from the overlay or its parent into new `GeometrySources` components on the new entity. Each domain gets a fresh `shared_ptr<PropertySet>` with deep-copied data.
+2. Copy all relevant `GeometrySources` properties from the overlay or its parent into new `GeometrySources` components on the new entity. Each domain gets a fresh owned `Geometry::PropertySet` with deep-copied data.
 3. Remove `Hierarchy::Component` from the new entity (detach from parent).
 4. The new entity is now a standalone CPU entity with complete `GeometrySources` data.
 5. Normal lifecycle systems detect the new entity (has `DataAuthority::*Tag` + `GeometrySources` but no GPU representation) and handle GPU upload on the next frame — allocating a managed buffer region, uploading geometry, creating `GpuInstanceData`/`GpuEntityConfig` slots, and emplacing render components.
@@ -1635,7 +1637,7 @@ This section is a checklist of breaking changes implied by §15. Nothing in §15
 | M11 | Geometry buffer ownership | Per-entity `GeometryPool` handles | `GpuWorld::GlobalGeometryStore` via `BufferManager` | `GeometryPool`, all lifecycle systems, `GeometryGpuData::CreateAsync` |
 | M12 | GPUScene scope | `Graphics::GPUScene` (instances + AABBs only) | `GpuWorld` (all GPU scene data) | `RenderOrchestrator`, `RenderDriver`, `Graphics.GPUScene` module |
 | M13 | Normal map composition | Priority chain (normal map overrides vertex normals) | Two-stage composition (base normal + normal map perturbation in TBN) | `gbuffer.frag` shader, §4.2 |
-| M14 | On-demand mesh interface | `Mesh::Data::MeshRef` (persistent shared_ptr) | `HalfedgeMesh::MeshView` created on stack by algorithm code | All algorithm callsites that use `MeshRef` for topology traversal |
+| M14 | On-demand mesh interface | `Mesh::Data::MeshRef` (persistent shared_ptr) | `GeometrySources::ConstSourceView` / `MutableSourceView`, or an explicit geometry hard-copy / `Geometry.DomainViews` borrow when an algorithm needs a geometry-domain container | All algorithm callsites that use `MeshRef` for topology traversal |
 
 **Recommended order:**
 1. **M1** (property authority redirect) — foundational, all algorithms depend on this.
