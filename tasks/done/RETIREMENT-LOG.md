@@ -2834,3 +2834,19 @@ residuals, and `NumericDiagnostics`, and fails closed on empty, zero, non-finite
 invalid-option, or hard SVD-failure inputs. Unit coverage proves strided-map and
 property-map aliasing, the bool fallback, synthetic low-rank-plus-sparse
 recovery, bitwise determinism, and degenerate-input diagnostics.
+
+[`GEOM-050`](GEOM-050-primitive-curve-utilities.md) — primitive and curve
+utilities retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
+`Geometry.Curve` keeps its existing span-based Bezier evaluators and now also
+exports `BezierCurve`, `GetDegree`, `EvaluateBernstein`, and
+`EvaluateDeCasteljau`. `Geometry.Triangle` now exposes opposite-edge lengths,
+perimeter, per-vertex angles, stable-Heron area, and `SafeAcos`, with
+non-finite or degenerate triangles returning finite zero metrics. `Geometry.Sphere`
+adds `FittingMethod::IterativeGeometric` plus convergence controls on the
+existing `ToSphere` path; the branch rejects fewer than four, non-finite, or
+coincident samples and keeps the best point-to-surface residual reached from
+the algebraic seed/refinement. `Geometry.AABB` now supports `MakeCubic`,
+`OctantCenter`, and `ChildOctant` with invalid-box sentinels. Unit coverage
+exercises Bezier endpoint/linear/Bernstein-vs-de Casteljau behavior, triangle
+analytic metrics and degenerate guards, iterative sphere residual comparison
+against least squares, and AABB cubification/octant tiling.

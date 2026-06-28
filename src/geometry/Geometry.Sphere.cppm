@@ -34,12 +34,15 @@ export namespace Geometry
             LeastSquares,
             Bounding,
             Hybrid,
+            IterativeGeometric,
         };
 
         FittingMethod Method{FittingMethod::Hybrid};
         float MinimumRadius{0.0f};
         float ContainmentSlack{1.0e-5f};
         float SingularThreshold{1.0e-10f};
+        std::uint32_t MaxIterations{64u};
+        float ConvergenceTolerance{1.0e-5f};
         bool EnforceContainment{false};
     };
 

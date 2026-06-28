@@ -13,6 +13,25 @@
 - Allowed: `core`, GLM, and Eigen3 for geometry-owned CPU numerical kernels.
 - Disallowed: runtime/app-specific ownership and rendering backend internals.
 
+## Primitive and curve modules
+
+- `Geometry.Curve` owns the engine's Bezier curve primitive. It exposes
+  `BezierCurve` control-point storage, degree reporting, and deterministic
+  Bernstein-basis and de Casteljau evaluators. Empty curves, non-finite
+  parameters, out-of-range parameters, and non-finite control points fail closed
+  with `std::nullopt`.
+- `Geometry.Triangle` exposes closest-point/distance utilities plus
+  edge-length, perimeter, angle, and stable-Heron area metrics. New metric
+  helpers return finite zero values for non-finite, zero-area, or otherwise
+  degenerate triangles.
+- `Geometry.Sphere::ToSphere` supports algebraic least squares, bounding,
+  hybrid fallback, and iterative geometric fitting. The iterative geometric
+  method is a CPU fixed-point center refinement over point-to-surface residuals
+  and requires at least four finite, non-coincident samples.
+- `Geometry.AABB` exposes cubification around the original center and bitwise
+  child-octant navigation. Invalid boxes fail closed with default invalid boxes
+  or finite center sentinels.
+
 ## Linear algebra policy
 
 - GLM remains the public storage vocabulary for geometry containers, primitive

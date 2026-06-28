@@ -424,6 +424,8 @@ endif()
 set(_geometry_test_files
     Test_Statistics.cpp
     Test_RobustKernels.cpp
+    Test_AABBCubify.cpp
+    Test_BezierCurve.cpp
     Test_Curve.cpp
     Test_Rotation.cpp
     Test_RotationAveraging.cpp
@@ -456,6 +458,7 @@ set(_geometry_test_files
     Test_ConvexHull.cpp
     Test_PointCloud.cpp
     Test_SphereFitting.cpp
+    Test_TriangleMetrics.cpp
     Test_Boolean.cpp
     Test_MeshBoundary.cpp
     Test_GeometryAttributePropagation.cpp
