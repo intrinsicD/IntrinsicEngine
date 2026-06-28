@@ -9,7 +9,6 @@ the authoritative open/unblocked view.
 ## Active tasks
 
 - `GRAPHICS-104` — GPU Object-Space Normal Texture Bake (tasks/active/GRAPHICS-104-gpu-object-space-normal-texture-bake.md)
-- `GRAPHICS-107` — Reconcile the FrameRecipe vs RenderRecipe vocabularies (tasks/active/GRAPHICS-107-reconcile-framerecipe-renderrecipe-vocabulary.md)
 
 ## Theme B — Rendering modernization
 

@@ -15,9 +15,6 @@ Each active task should include:
   — in progress; next verification step is focused object-space normal bake
   contract coverage plus the default CPU-supported gate after runtime
   orchestration lands.
-- [`GRAPHICS-107` — Reconcile the FrameRecipe vs RenderRecipe vocabularies](GRAPHICS-107-reconcile-framerecipe-renderrecipe-vocabulary.md)
-  — in progress; Slice A docs/locality landed, next verification step is the
-  Slice B projection-function contract test plus the default CPU-supported gate.
 
 ## History
 

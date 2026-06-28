@@ -8,6 +8,18 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+Active
+[`GRAPHICS-107`](GRAPHICS-107-reconcile-framerecipe-renderrecipe-vocabulary.md) —
+Reconcile the FrameRecipe vs RenderRecipe vocabularies — retired on 2026-06-28
+at maturity `CPUContracted`. Renderer docs and the canonical frame-graph
+architecture doc now identify `FrameRecipe*` as the live per-frame driver,
+`RenderRecipe*` as the contract/config overlay, and
+`FrameRecipeOverride` / `ProjectFrameRecipeOverride(...)` as the constrained
+bridge between them. Focused renderer contract tests cover mapped optional-slot
+feature disables, valid-but-unmapped extension-slot rejection, unknown slot
+rejection, and fixed-core mutation/disable rollback without adding new contract
+vocabulary or arbitrary pass-graph injection.
+
 Backlog
 [`DOCS-004`](DOCS-004-frame-graph-doc-recipe-config-lane.md) — Promote
 frame-graph.md from stub and document the recipe-config lane — retired on

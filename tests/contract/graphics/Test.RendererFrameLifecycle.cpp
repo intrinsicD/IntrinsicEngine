@@ -183,6 +183,19 @@ namespace
         };
     }
 
+    [[nodiscard]] bool HasProjectionDiagnostic(
+        const Extrinsic::Graphics::FrameRecipeOverrideProjection& projection,
+        const Extrinsic::Graphics::FrameRecipeOverrideDiagnosticCode code,
+        const std::string_view subject)
+    {
+        return std::any_of(projection.Diagnostics.begin(),
+                           projection.Diagnostics.end(),
+                           [code, subject](const Extrinsic::Graphics::FrameRecipeOverrideDiagnostic& diagnostic) {
+                               return diagnostic.Code == code &&
+                                      diagnostic.Subject == subject;
+                           });
+    }
+
     [[nodiscard]] std::uint32_t ExpectedCullDispatchGroups() noexcept
     {
         return (Extrinsic::RHI::kMaxIndirectDrawCount + Extrinsic::RHI::kGpuCullDispatchGroupSize - 1u) /
@@ -308,6 +321,31 @@ TEST(RendererFrameLifecycle, FrameRecipeOverrideProjectionDisablesPostProcess)
               Extrinsic::Graphics::FrameRecipeLightingPath::Deferred);
 }
 
+TEST(RendererFrameLifecycle, FrameRecipeOverrideProjectionDisablesMappedFeatureSlots)
+{
+    Extrinsic::Graphics::FrameRecipeFeatures defaults{};
+    defaults.EnablePostProcess = true;
+    defaults.EnableAntiAliasing = true;
+    defaults.EnableDebugView = true;
+    defaults.EnablePicking = true;
+    defaults.LightingPath = Extrinsic::Graphics::FrameRecipeLightingPath::Deferred;
+
+    const Extrinsic::Graphics::FrameRecipeOverrideProjection projection =
+        Extrinsic::Graphics::ProjectFrameRecipeOverride(
+            defaults,
+            MakeRecipeOverride({"debug-view", "picking", "lighting", "postprocess"}));
+
+    EXPECT_TRUE(projection.Diagnostics.empty());
+    EXPECT_TRUE(projection.Applied);
+    EXPECT_EQ(projection.DisabledSlotCount, 4u);
+    EXPECT_FALSE(projection.Features.EnablePostProcess);
+    EXPECT_FALSE(projection.Features.EnableAntiAliasing);
+    EXPECT_FALSE(projection.Features.EnableDebugView);
+    EXPECT_FALSE(projection.Features.EnablePicking);
+    EXPECT_EQ(projection.Features.LightingPath,
+              Extrinsic::Graphics::FrameRecipeLightingPath::Forward);
+}
+
 TEST(RendererFrameLifecycle, FrameRecipeOverrideProjectionFailsClosedForUnknownSlot)
 {
     Extrinsic::Graphics::FrameRecipeFeatures defaults{};
@@ -326,6 +364,68 @@ TEST(RendererFrameLifecycle, FrameRecipeOverrideProjectionFailsClosedForUnknownS
     EXPECT_EQ(projection.DisabledSlotCount, 0u);
     EXPECT_TRUE(projection.Features.EnablePostProcess);
     EXPECT_TRUE(projection.Features.EnableAntiAliasing);
+}
+
+TEST(RendererFrameLifecycle, FrameRecipeOverrideProjectionRejectsUnmappedExtensionDisable)
+{
+    Extrinsic::Graphics::FrameRecipeFeatures defaults{};
+    defaults.EnableDebugView = true;
+
+    const Extrinsic::Graphics::FrameRecipeOverrideProjection projection =
+        Extrinsic::Graphics::ProjectFrameRecipeOverride(
+            defaults,
+            MakeRecipeOverride({"visibility"}));
+
+    ASSERT_EQ(projection.Diagnostics.size(), 1u);
+    EXPECT_TRUE(HasProjectionDiagnostic(
+        projection,
+        Extrinsic::Graphics::FrameRecipeOverrideDiagnosticCode::UnsupportedSlotDisable,
+        "visibility"));
+    EXPECT_FALSE(projection.Applied);
+    EXPECT_EQ(projection.DisabledSlotCount, 0u);
+    EXPECT_TRUE(projection.Features.EnableDebugView);
+}
+
+TEST(RendererFrameLifecycle, FrameRecipeOverrideProjectionFailsClosedForFixedCoreChanges)
+{
+    Extrinsic::Graphics::FrameRecipeFeatures defaults{};
+    defaults.EnableDebugView = true;
+    defaults.EnablePicking = true;
+    defaults.LightingPath = Extrinsic::Graphics::FrameRecipeLightingPath::Deferred;
+
+    Extrinsic::Graphics::FrameRecipeOverride override =
+        MakeRecipeOverride({"debug-view", "default-frame-core"});
+    override.Recipe.FixedCoreName = "Extrinsic.Graphics.FrameRecipe.Experimental";
+    for (Extrinsic::Graphics::RecipeExtensionSlotDescriptor& slot : override.Recipe.Slots)
+    {
+        if (slot.StableName == "default-frame-core")
+        {
+            slot.SchemaId = "intrinsic.graphics.experimental-frame-core/v1";
+            break;
+        }
+    }
+
+    const Extrinsic::Graphics::FrameRecipeOverrideProjection projection =
+        Extrinsic::Graphics::ProjectFrameRecipeOverride(defaults, override);
+
+    EXPECT_TRUE(HasProjectionDiagnostic(
+        projection,
+        Extrinsic::Graphics::FrameRecipeOverrideDiagnosticCode::FixedCoreMutation,
+        "Extrinsic.Graphics.FrameRecipe.Experimental"));
+    EXPECT_TRUE(HasProjectionDiagnostic(
+        projection,
+        Extrinsic::Graphics::FrameRecipeOverrideDiagnosticCode::FixedCoreMutation,
+        "default-frame-core"));
+    EXPECT_TRUE(HasProjectionDiagnostic(
+        projection,
+        Extrinsic::Graphics::FrameRecipeOverrideDiagnosticCode::FixedCoreSlotDisabled,
+        "default-frame-core"));
+    EXPECT_FALSE(projection.Applied);
+    EXPECT_EQ(projection.DisabledSlotCount, 0u);
+    EXPECT_TRUE(projection.Features.EnableDebugView);
+    EXPECT_TRUE(projection.Features.EnablePicking);
+    EXPECT_EQ(projection.Features.LightingPath,
+              Extrinsic::Graphics::FrameRecipeLightingPath::Deferred);
 }
 
 TEST(RendererFrameLifecycle, PrepareFramePublishesCameraIntoGpuSceneTable)

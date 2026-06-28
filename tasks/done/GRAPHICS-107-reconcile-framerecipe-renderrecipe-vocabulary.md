@@ -3,6 +3,7 @@ id: GRAPHICS-107
 theme: B
 depends_on: [GRAPHICS-106]
 maturity_target: CPUContracted
+completed_on: 2026-06-28
 ---
 # GRAPHICS-107 — Reconcile the FrameRecipe vs RenderRecipe vocabularies
 
@@ -27,12 +28,16 @@ maturity_target: CPUContracted
 - This is the enabling-refactor framing of the same root cause as `GRAPHICS-106`;
   kept separate and medium so the seam ships first and this reuses its pure
   projection.
-- Current state: Slice A is implemented. `src/graphics/renderer/README.md` and
+- Status: retired 2026-06-28 at maturity `CPUContracted`.
+  `src/graphics/renderer/README.md` and
   `docs/architecture/frame-graph.md` now name `FrameRecipe*` as the live
   per-frame driver, `RenderRecipe*` as the contract/config overlay, and
   `FrameRecipeOverride` / `ProjectFrameRecipeOverride(...)` as the
-  `GRAPHICS-106` seam between them. Slice B remains open for projection
-  behavior/tests.
+  `GRAPHICS-106` seam between them. `ProjectFrameRecipeOverride(...)` is now
+  unit-tested for mapped optional-slot feature disables, valid-but-unmapped
+  extension rejection, unknown slot rejection, and fixed-core mutation/disable
+  rollback.
+- Commit: this commit (`Document frame recipe projection contract`).
 - Owner/layer: `graphics` (renderer).
 
 ## Required changes
@@ -40,14 +45,14 @@ maturity_target: CPUContracted
       cross-references so a reader can tell `FrameRecipe*` is the live frame
       driver and `RenderRecipe*` is the config/contract overlay; mark the seam
       where the overlay applies (the `GRAPHICS-106` projection).
-- [ ] Slice B: reuse the pure projection from `GRAPHICS-106`; constrain mapping to
+- [x] Slice B: reuse the pure projection from `GRAPHICS-106`; constrain mapping to
       optional-slot/feature flags only — no arbitrary pass-graph injection, no new
       contract vocabulary.
 
 ## Tests
-- [ ] Unit test the projection function in isolation (shared with `GRAPHICS-106`).
+- [x] Unit test the projection function in isolation (shared with `GRAPHICS-106`).
 - [x] Slice A is behavior-preserving: docs/comment-only; docs/task checks pass.
-- [ ] Default CPU gate stays green.
+- [x] Default CPU gate stays green.
 
 ## Docs
 - [x] Update `src/graphics/renderer/README.md` (and `docs/architecture/frame-graph.md`
@@ -56,7 +61,7 @@ maturity_target: CPUContracted
 ## Acceptance criteria
 - [x] A renderer reader can identify the single authoritative frame-composition
       path and where the config overlay applies.
-- [ ] The projection function is unit-tested in isolation.
+- [x] The projection function is unit-tested in isolation.
 - [x] Slice A introduces no behavior change.
 
 ## Verification
@@ -75,5 +80,5 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 - Target: `CPUContracted`. Slice A is doc/locality only; Slice B's projection is
   contract-tested. No `Operational` follow-up is owed beyond `RUNTIME-130`'s
   live-frame wiring.
-- Slice A landed as docs/locality only; task remains active until Slice B closes
-  the projection-test gate.
+- Slice B closes the projection-test gate without adding contract vocabulary or
+  pass-graph injection.
