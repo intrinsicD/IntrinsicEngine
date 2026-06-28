@@ -22,9 +22,11 @@ services, and platform state do not enter the graphics frame graph directly.
   scheduling. It receives declarations from the recipe; it is not the authority
   for deciding which gameplay or editor features are enabled.
 
-`FrameRecipe*` is therefore the authoritative live composition path. Any config
-or UI recipe lane must project onto this path before it can affect a rendered
-frame.
+`FrameRecipe*` is therefore the authoritative live composition path. In this
+vocabulary, `FrameRecipe*` means the per-frame pass/resource graph driver, while
+`RenderRecipe*` means the renderer-independent contract/config overlay. Any
+config or UI recipe lane must project onto `FrameRecipeFeatures` before it can
+affect a rendered frame.
 
 ## Recipe Config Lane
 

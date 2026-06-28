@@ -9,11 +9,11 @@ the authoritative open/unblocked view.
 ## Active tasks
 
 - `GRAPHICS-104` — GPU Object-Space Normal Texture Bake (tasks/active/GRAPHICS-104-gpu-object-space-normal-texture-bake.md)
+- `GRAPHICS-107` — Reconcile the FrameRecipe vs RenderRecipe vocabularies (tasks/active/GRAPHICS-107-reconcile-framerecipe-renderrecipe-vocabulary.md)
 
 ## Theme B — Rendering modernization
 
 - blocked by `GRAPHICS-104`: `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/backlog/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
-- unblocked: `GRAPHICS-107` — Reconcile the FrameRecipe vs RenderRecipe vocabularies (tasks/backlog/rendering/GRAPHICS-107-reconcile-framerecipe-renderrecipe-vocabulary.md)
 - unblocked: `RUNTIME-125` — Optional AoS fast lane for static geometry (profile-gated) (tasks/backlog/runtime/RUNTIME-125-aos-static-fast-lane.md)
 - blocked by `GRAPHICS-104`: `RUNTIME-129` — Schedule GPU object-space normal bake jobs after import (tasks/backlog/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
 

@@ -41,6 +41,24 @@ generated during compilation, and `GetLastCompileValidationResult()` exposes
 structured hard-error findings when `Compile()` fails. Callers needing a
 human-readable summary should read `Findings.front().Message`.
 
+### FrameRecipe vs RenderRecipe Vocabulary
+
+`FrameRecipe*` names the live frame-composition path. The current renderer
+derives `FrameRecipeFeatures` from `RenderWorld`, optionally projects a
+validated `FrameRecipeOverride` onto those feature gates, and then calls
+`BuildDefaultFrameRecipe(...)` to declare the render-graph pass/resource DAG for
+that frame. `DescribeDefaultFrameRecipe(...)` is the matching introspection
+surface for tests, debug views, UI, and config validation.
+
+`RenderRecipe*` names the renderer-independent contract/config vocabulary.
+`RenderRecipeDescriptor`, `RenderRecipeConfig`, view/output recipes, and binding
+sets describe what a config, UI draft, or agent request would like to change.
+They do not drive command recording directly and they do not inject arbitrary
+pass-graph nodes. The seam between the vocabularies is the `GRAPHICS-106`
+projection: runtime installs a validated `FrameRecipeOverride`, and the
+renderer maps supported optional-slot disables onto `FrameRecipeFeatures` before
+the normal `BuildDefaultFrameRecipe(...)` call.
+
 Per `GRAPHICS-033E`, `Graphics.Renderer.cpp::ExecuteFrame()` publishes the
 recipe-aware validation outcome to the device via
 `RHI::IDevice::NoteRecipeGraphValidation(bool)` exactly once per recipe compile

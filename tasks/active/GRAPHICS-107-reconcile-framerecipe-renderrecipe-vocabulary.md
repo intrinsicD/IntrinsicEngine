@@ -27,10 +27,16 @@ maturity_target: CPUContracted
 - This is the enabling-refactor framing of the same root cause as `GRAPHICS-106`;
   kept separate and medium so the seam ships first and this reuses its pure
   projection.
+- Current state: Slice A is implemented. `src/graphics/renderer/README.md` and
+  `docs/architecture/frame-graph.md` now name `FrameRecipe*` as the live
+  per-frame driver, `RenderRecipe*` as the contract/config overlay, and
+  `FrameRecipeOverride` / `ProjectFrameRecipeOverride(...)` as the
+  `GRAPHICS-106` seam between them. Slice B remains open for projection
+  behavior/tests.
 - Owner/layer: `graphics` (renderer).
 
 ## Required changes
-- [ ] Slice A (readability, no behavior change): add header/doc notes and
+- [x] Slice A (readability, no behavior change): add header/doc notes and
       cross-references so a reader can tell `FrameRecipe*` is the live frame
       driver and `RenderRecipe*` is the config/contract overlay; mark the seam
       where the overlay applies (the `GRAPHICS-106` projection).
@@ -40,18 +46,18 @@ maturity_target: CPUContracted
 
 ## Tests
 - [ ] Unit test the projection function in isolation (shared with `GRAPHICS-106`).
-- [ ] Slice A is behavior-preserving: existing renderer contract tests stay green.
+- [x] Slice A is behavior-preserving: docs/comment-only; docs/task checks pass.
 - [ ] Default CPU gate stays green.
 
 ## Docs
-- [ ] Update `src/graphics/renderer/README.md` (and `docs/architecture/frame-graph.md`
+- [x] Update `src/graphics/renderer/README.md` (and `docs/architecture/frame-graph.md`
       after `DOCS-004`) to name the single authoritative frame-composition path.
 
 ## Acceptance criteria
-- [ ] A renderer reader can identify the single authoritative frame-composition
+- [x] A renderer reader can identify the single authoritative frame-composition
       path and where the config overlay applies.
 - [ ] The projection function is unit-tested in isolation.
-- [ ] Slice A introduces no behavior change.
+- [x] Slice A introduces no behavior change.
 
 ## Verification
 ```bash
@@ -69,3 +75,5 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 - Target: `CPUContracted`. Slice A is doc/locality only; Slice B's projection is
   contract-tested. No `Operational` follow-up is owed beyond `RUNTIME-130`'s
   live-frame wiring.
+- Slice A landed as docs/locality only; task remains active until Slice B closes
+  the projection-test gate.
