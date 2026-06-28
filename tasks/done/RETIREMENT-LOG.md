@@ -2772,3 +2772,18 @@ eigensolver copy. Unit coverage exercises round trips, distances, deterministic
 random rotations, SO(3) projection, optimal-rotation recovery, reflection
 correction, non-finite input, and under-determined fail-closed behavior; existing
 registration tests pass unchanged.
+
+[`GEOM-038`](GEOM-038-rotation-averaging-means-medians.md) — SO(3) rotation
+averaging retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
+`Geometry.RotationAveraging` now exposes result/status-returning chordal,
+Karcher, and quaternion L2 means plus geodesic and quaternion Weiszfeld L1
+medians. The chordal mean builds the Markley 4x4 quaternion moment matrix and
+solves it through `Geometry.Linalg::ComputeSymmetricEigen`, with deterministic
+sample canonicalization/sorting and a polar projection fallback for solver
+failure. Shared options carry optional weights, convergence controls, and an
+outlier-rejection threshold; shared results report validity, convergence,
+iterations, residual radians, and explicit fail-closed status. Unit coverage
+proves repeated-rotation identity, clustered chordal/Karcher agreement, weighted
+Karcher/slerp parity, median robustness against gross outliers, deterministic
+permutation behavior, and explicit empty/single/antipodal/weight/non-finite
+status handling.

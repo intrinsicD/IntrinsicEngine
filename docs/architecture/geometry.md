@@ -35,6 +35,21 @@
   `Geometry.Linalg::ComputePolarDecomposition(...).Orthogonal` and applies a
   determinant correction to stay in SO(3). `Geometry.Registration` consumes this
   module for point-to-point alignment instead of keeping a private Kabsch copy.
+- `Geometry.RotationAveraging` builds on `Geometry.Rotation` and
+  `Geometry.Linalg` for deterministic CPU SO(3) averaging. Its chordal L2 mean
+  uses the Markley 4x4 quaternion-moment matrix and
+  `Geometry.Linalg::ComputeSymmetricEigen`; Karcher means iterate with
+  `Log(meanᵀR_i)` / `Exp(delta)` in the tangent space; quaternion means use
+  hemisphere-aligned linear quaternion accumulation; geodesic and quaternion L1
+  medians use Weiszfeld inverse-distance reweighting. All five routines accept
+  `RotationAverageOptions` (`Weights`, `MaxIterations`, `Tolerance`, optional
+  `OutlierRejectionRadians`) and return `RotationAverageResult` with status,
+  validity, convergence, iteration count, and residual radians. Empty input,
+  weight-size mismatches, invalid weights, non-finite matrices, cut-locus
+  two-sample degeneracy, invalid options, and non-convergence report explicit
+  `RotationAverageStatus` values and return finite identity or last-iterate
+  sentinels without asserts or NaNs. Single finite samples return unchanged with
+  `SingleSample`. Registration weighting remains a GEOM-048 follow-up.
 - `Geometry.Sparse` owns reusable CSR storage, COO-to-CSR building, matrix
   diagnostics, and conjugate-gradient diagnostics. `Geometry.DEC` aliases these
   sparse records so existing DEC/geodesic/parameterization callers keep their

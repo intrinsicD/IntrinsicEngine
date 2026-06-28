@@ -31,8 +31,6 @@ Confirmed feature gaps from the `bcg_code_base` → IntrinsicEngine port-gap
 review (features already present or better in IntrinsicEngine were excluded).
 Grouped by cluster; each is `geometry -> core` only and targets `CPUContracted`.
 
-- [GEOM-038 — Rotation averaging: SO(3) means and medians](GEOM-038-rotation-averaging-means-medians.md)
-  (builds on retired `GEOM-037`).
 - [GEOM-045 — First-class mesh geometric-quantity accessors](GEOM-045-first-class-mesh-quantity-accessors.md).
 - [GEOM-048 — Statistics accumulators and robust estimation kernels](GEOM-048-statistics-robust-estimation-kernels.md).
 - [GEOM-049 — Numeric/linear-algebra utilities (RPCA, Eigen map adapters)](GEOM-049-numeric-linalg-utilities.md).
@@ -125,6 +123,7 @@ split; narratives live in the retirement log.
 - [GEOM-033 — Erased property metadata catalog](../../done/GEOM-033-erased-property-metadata-catalog.md) (done).
 - [GEOM-034 — Geometry property API documentation audit](../../done/GEOM-034-geometry-property-api-doc-audit.md) (done).
 - [GEOM-037 — SO(3) rotation primitives (Lie machinery)](../../done/GEOM-037-so3-rotation-primitives.md) (done).
+- [GEOM-038 — Rotation averaging: SO(3) means and medians](../../done/GEOM-038-rotation-averaging-means-medians.md) (done).
 - [GEOM-039 — Accelerated mesh closest-face query and consumer adoption](../../done/GEOM-039-accelerated-mesh-closest-face-query.md) (done).
 - [GEOM-040 — Mesh curvature tensor and principal directions](../../done/GEOM-040-curvature-tensor-principal-directions.md) (done).
 - [GEOM-041 — FEM Laplacian mass/stiffness variants and edge-weight modes](../../done/GEOM-041-fem-laplacian-mass-stiffness-variants.md) (done).
