@@ -32,6 +32,7 @@ fail-closed.
     "enable_validation": true,
     "enable_vsync": true,
     "frames_in_flight": 2,
+    "default_recipe_config_path": "config/render-recipe.json",
     "synchronous_extraction": true
   },
   "simulation": {
@@ -61,6 +62,7 @@ fail-closed.
 | `render` | `enable_validation` | Boolean |
 | `render` | `enable_vsync` | Boolean |
 | `render` | `frames_in_flight` | Integer in `[1, 8]` |
+| `render` | `default_recipe_config_path` | String path; empty disables startup recipe loading |
 | `render` | `synchronous_extraction` | Boolean |
 | `simulation` | `worker_thread_count` | Integer in `[0, 1024]`; `0` keeps scheduler auto-detect |
 | `reference_scene` | `enabled` | Boolean |
@@ -75,6 +77,7 @@ The current schema is a boot config. Runtime reads it before constructing
 
 - graphics backend selection and promoted-Vulkan opt-in;
 - frames-in-flight and synchronous extraction mode;
+- startup render-recipe config path;
 - validation and VSync toggles;
 - scheduler worker-thread count;
 - window title, size, resizable flag, and platform backend override;

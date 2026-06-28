@@ -17,7 +17,6 @@ the authoritative open/unblocked view.
 - unblocked: `GRAPHICS-107` — Reconcile the FrameRecipe vs RenderRecipe vocabularies (tasks/backlog/rendering/GRAPHICS-107-reconcile-framerecipe-renderrecipe-vocabulary.md)
 - unblocked: `RUNTIME-125` — Optional AoS fast lane for static geometry (profile-gated) (tasks/backlog/runtime/RUNTIME-125-aos-static-fast-lane.md)
 - blocked by `GRAPHICS-104`: `RUNTIME-129` — Schedule GPU object-space normal bake jobs after import (tasks/backlog/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
-- unblocked: `RUNTIME-130` — Route recipe activation through runtime + load default recipe at init (tasks/backlog/rendering/RUNTIME-130-route-recipe-activation-and-load-default-recipe.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 

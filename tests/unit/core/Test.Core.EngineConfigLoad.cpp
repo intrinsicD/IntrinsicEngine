@@ -39,6 +39,7 @@ TEST(CoreEngineConfigLoad, SerializesAndLoadsEveryBootField)
     config.Render.EnableValidation = false;
     config.Render.EnableVSync = false;
     config.Render.FramesInFlight = 3;
+    config.Render.DefaultRecipeConfigPath = "config/runtime-test-recipe.json";
     config.Render.SynchronousExtraction = false;
     config.Simulation.WorkerThreadCount = 4;
     config.ReferenceScene.Enabled = true;
@@ -52,7 +53,7 @@ TEST(CoreEngineConfigLoad, SerializesAndLoadsEveryBootField)
     ASSERT_EQ(preview.State, EngineConfigState::Valid);
     EXPECT_FALSE(HasErrors(preview));
     EXPECT_TRUE(preview.Preview.SideEffectFree);
-    EXPECT_EQ(preview.Preview.ParsedFieldCount, 16u);
+    EXPECT_EQ(preview.Preview.ParsedFieldCount, 17u);
     EXPECT_EQ(preview.Preview.Config.Window.Title, "Engine Config Test");
     EXPECT_EQ(preview.Preview.Config.Window.Width, 1280);
     EXPECT_EQ(preview.Preview.Config.Window.Height, 720);
@@ -63,6 +64,8 @@ TEST(CoreEngineConfigLoad, SerializesAndLoadsEveryBootField)
     EXPECT_FALSE(preview.Preview.Config.Render.EnableValidation);
     EXPECT_FALSE(preview.Preview.Config.Render.EnableVSync);
     EXPECT_EQ(preview.Preview.Config.Render.FramesInFlight, 3u);
+    EXPECT_EQ(preview.Preview.Config.Render.DefaultRecipeConfigPath,
+              "config/runtime-test-recipe.json");
     EXPECT_FALSE(preview.Preview.Config.Render.SynchronousExtraction);
     EXPECT_EQ(preview.Preview.Config.Simulation.WorkerThreadCount, 4u);
     EXPECT_TRUE(preview.Preview.Config.ReferenceScene.Enabled);
@@ -79,6 +82,8 @@ TEST(CoreEngineConfigLoad, SerializesAndLoadsEveryBootField)
     EXPECT_EQ(loaded.SchemaVersion, kEngineConfigSchemaVersion);
     EXPECT_EQ(loaded.Preview.Config.Window.Width, 1280);
     EXPECT_EQ(loaded.Preview.Config.Render.FramesInFlight, 3u);
+    EXPECT_EQ(loaded.Preview.Config.Render.DefaultRecipeConfigPath,
+              "config/runtime-test-recipe.json");
     EXPECT_EQ(loaded.Preview.Config.Camera.Controller, CameraControllerKind::TopDown);
 }
 
@@ -93,6 +98,7 @@ TEST(CoreEngineConfigLoad, InvalidFieldsFallBackWithDiagnostics)
     defaults.Render.EnableValidation = true;
     defaults.Render.EnableVSync = true;
     defaults.Render.FramesInFlight = 2;
+    defaults.Render.DefaultRecipeConfigPath = "config/reference-recipe.json";
     defaults.Render.SynchronousExtraction = true;
     defaults.Simulation.WorkerThreadCount = 6;
     defaults.ReferenceScene.Enabled = true;
@@ -117,6 +123,7 @@ TEST(CoreEngineConfigLoad, InvalidFieldsFallBackWithDiagnostics)
     "enable_validation": "true",
     "enable_vsync": false,
     "frames_in_flight": 0,
+    "default_recipe_config_path": 42,
     "synchronous_extraction": false
   },
   "simulation": {
@@ -151,6 +158,8 @@ TEST(CoreEngineConfigLoad, InvalidFieldsFallBackWithDiagnostics)
     EXPECT_TRUE(result.Preview.Config.Render.EnableValidation);
     EXPECT_FALSE(result.Preview.Config.Render.EnableVSync);
     EXPECT_EQ(result.Preview.Config.Render.FramesInFlight, 2u);
+    EXPECT_EQ(result.Preview.Config.Render.DefaultRecipeConfigPath,
+              "config/reference-recipe.json");
     EXPECT_FALSE(result.Preview.Config.Render.SynchronousExtraction);
     EXPECT_EQ(result.Preview.Config.Simulation.WorkerThreadCount, 6u);
     EXPECT_FALSE(result.Preview.Config.ReferenceScene.Enabled);

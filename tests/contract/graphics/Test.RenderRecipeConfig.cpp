@@ -144,6 +144,48 @@ TEST(RenderRecipeConfig, ValidRecipeConfigLoadsIntoContractValues)
     EXPECT_EQ(lights->SourceIdentity, "RenderWorld.Lights.UserPreview");
 }
 
+TEST(RenderRecipeConfig, DisabledExtensionSlotsLoadIntoPreview)
+{
+    const RenderRecipeConfigContext context = MakeContext();
+    const std::string document = std::string{R"json({
+  "schema": ")json"} + std::string{kRenderRecipeConfigSchemaId} + R"json(",
+  "version": 1,
+  "rendererId": ")json" + std::string{kCurrentRendererContractId} + R"json(",
+  "recipe": {
+    "recipeId": "current-renderer.disable-post",
+    "disabledExtensionSlots": ["postprocess", "debug-view"]
+  }
+})json";
+
+    const RenderRecipeConfigLoadResult result =
+        PreviewRenderRecipeConfig(document, context);
+
+    ASSERT_TRUE(IsConfigUsable(result));
+    ASSERT_EQ(result.Preview.DisabledExtensionSlots.size(), 2u);
+    EXPECT_EQ(result.Preview.DisabledExtensionSlots[0], "postprocess");
+    EXPECT_EQ(result.Preview.DisabledExtensionSlots[1], "debug-view");
+}
+
+TEST(RenderRecipeConfig, DisabledUnknownSlotsFailClosed)
+{
+    const RenderRecipeConfigContext context = MakeContext();
+    const std::string document = std::string{R"json({
+  "schema": ")json"} + std::string{kRenderRecipeConfigSchemaId} + R"json(",
+  "version": 1,
+  "rendererId": ")json" + std::string{kCurrentRendererContractId} + R"json(",
+  "recipe": {
+    "disabledExtensionSlots": ["ray-traced-gi"]
+  }
+})json";
+
+    const RenderRecipeConfigLoadResult result =
+        PreviewRenderRecipeConfig(document, context);
+
+    EXPECT_FALSE(IsConfigUsable(result));
+    EXPECT_EQ(result.State, RenderRecipeConfigState::Unsupported);
+    EXPECT_TRUE(HasDiagnostic(result, RenderRecipeConfigDiagnosticCode::UnknownRecipeSlot));
+}
+
 TEST(RenderRecipeConfig, FileLoaderUsesSameDryRunValidation)
 {
     const RenderRecipeConfigContext context = MakeContext();

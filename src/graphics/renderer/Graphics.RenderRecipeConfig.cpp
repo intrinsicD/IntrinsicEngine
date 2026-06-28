@@ -367,6 +367,44 @@ namespace Extrinsic::Graphics
             return capabilities;
         }
 
+        void ParseDisabledExtensionSlots(
+            RenderRecipeConfigLoadResult& result,
+            const RendererDescriptor& renderer,
+            const RenderRecipeDescriptor& baseRecipe,
+            const json& value,
+            std::vector<std::string>& disabledExtensionSlots)
+        {
+            for (const std::string& slotName :
+                 ParseStringArray(result, value, "recipe.disabledExtensionSlots"))
+            {
+                const RecipeExtensionSlotDescriptor* baseSlot =
+                    FindRecipeSlot(baseRecipe, slotName);
+                if (baseSlot == nullptr ||
+                    !ContainsString(renderer.DeclaredRecipeSlots, slotName))
+                {
+                    AddError(result,
+                             RenderRecipeConfigState::Unsupported,
+                             RenderRecipeConfigDiagnosticCode::UnknownRecipeSlot,
+                             slotName,
+                             "disabled recipe slot is not declared by the renderer");
+                    continue;
+                }
+                if (baseSlot->Kind == RecipeSlotKind::FixedCore)
+                {
+                    AddError(result,
+                             RenderRecipeConfigState::Invalid,
+                             RenderRecipeConfigDiagnosticCode::FixedCoreMutation,
+                             slotName,
+                             "recipe configs cannot disable the fixed renderer core");
+                    continue;
+                }
+                if (!ContainsString(disabledExtensionSlots, slotName))
+                {
+                    disabledExtensionSlots.push_back(slotName);
+                }
+            }
+        }
+
         template <typename Parser>
         [[nodiscard]] auto ParseStringEnum(RenderRecipeConfigLoadResult& result,
                                            const json& object,
@@ -638,9 +676,14 @@ namespace Extrinsic::Graphics
                          const RendererDescriptor& renderer,
                          const RenderRecipeDescriptor& baseRecipe,
                          RenderRecipeDescriptor& recipe,
+                         std::vector<std::string>& disabledExtensionSlots,
                          const json& recipeJson)
         {
-            if (!IsObjectWithOnly(recipeJson, {"recipeId", "fixedCoreName", "slots"}))
+            if (!IsObjectWithOnly(recipeJson,
+                                  {"recipeId",
+                                   "fixedCoreName",
+                                   "slots",
+                                   "disabledExtensionSlots"}))
             {
                 AddError(result,
                          RenderRecipeConfigState::Invalid,
@@ -694,6 +737,15 @@ namespace Extrinsic::Graphics
                 {
                     ParseRecipeSlot(result, renderer, baseRecipe, recipe, slotJson);
                 }
+            }
+            if (const json* disabledSlots = FindMember(recipeJson, "disabledExtensionSlots");
+                disabledSlots != nullptr)
+            {
+                ParseDisabledExtensionSlots(result,
+                                            renderer,
+                                            baseRecipe,
+                                            *disabledSlots,
+                                            disabledExtensionSlots);
             }
         }
 
@@ -1574,7 +1626,12 @@ namespace Extrinsic::Graphics
         if (const json* recipe = FindMember(root, "recipe");
             recipe != nullptr)
         {
-            ParseRecipe(result, context.Renderer, context.BaseRecipe, result.Preview.Recipe, *recipe);
+            ParseRecipe(result,
+                        context.Renderer,
+                        context.BaseRecipe,
+                        result.Preview.Recipe,
+                        result.Preview.DisabledExtensionSlots,
+                        *recipe);
         }
         if (const json* viewOutput = FindMember(root, "viewOutput");
             viewOutput != nullptr)

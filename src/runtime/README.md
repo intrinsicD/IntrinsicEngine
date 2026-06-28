@@ -92,12 +92,15 @@ binding overrides are the only rows marked editable.
 Draft updates, validation, preview, activation, cancellation, artifact publish,
 and artifact apply use `ApplySandboxEditorRenderRecipeCommand(...)`. Validation
 and preview call the graphics-owned loadable recipe validator without mutating
-graphics state. Activation stores a runtime/editor active override, and artifact
-publish/apply routes through `RenderArtifactRegistry`; the registry authorizes
-project mutation for accepted candidate outputs but performs no ECS, renderer,
-RHI, file IO, or scene persistence mutation itself. Draft states are explicit
-across inactive, debounced, validated, rejected, previewed, activated, and
-canceled outcomes, so stale or invalid recipes fail closed in the UI model.
+graphics state. Activation calls the engine-owned
+`ApplyRenderRecipeConfigPreview(...)` path, which stores the active config on
+runtime and installs a `Graphics::FrameRecipeOverride` on the renderer; the
+editor keeps only a presentation cache for its panel model. Artifact publish/apply
+routes through `RenderArtifactRegistry`; the registry authorizes project mutation
+for accepted candidate outputs but performs no ECS, renderer, RHI, file IO, or
+scene persistence mutation itself. Draft states are explicit across inactive,
+debounced, validated, rejected, previewed, activated, and canceled outcomes, so
+stale or invalid recipes fail closed in the UI model.
 
 ### Sandbox Editor Mesh Vertex Normals
 
@@ -373,6 +376,14 @@ freshly-constructed subsystems):
    surface does not exist in that build). Runtime never aborts solely
    because requested Vulkan falls back to Null — see the truth table in
    `src/graphics/vulkan/README.md`.
+   Immediately after renderer initialization, runtime attempts the boot-only
+   render recipe file from
+   `Core::Config::RenderConfig::DefaultRecipeConfigPath` when that path is
+   non-empty. Usable `RenderRecipeConfig` previews flow through the same
+   `ApplyRenderRecipeConfigPreview(...)` path used by the editor and future
+   agent/CLI facade; missing or invalid files clear the active override and
+   leave the derived default frame recipe in place with diagnostics recorded on
+   `Engine::GetRenderRecipeState().LastApply`.
 3. CPU `FrameGraph` and `StreamingExecutor`.
 4. `Assets::AssetService`.
 5. `Graphics::GpuAssetCache` construction with the renderer's

@@ -23,6 +23,7 @@ import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Graphics.Material;
+import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.AssetIngestStateMachine;
@@ -141,6 +142,46 @@ namespace Extrinsic::Runtime
         std::span<const std::string_view> args,
         const EngineConfigBootOptions& options = {});
 
+    export enum class RuntimeRenderRecipeActivationSource : std::uint8_t
+    {
+        None = 0,
+        StartupConfigFile,
+        Editor,
+        Programmatic,
+    };
+
+    export enum class RuntimeRenderRecipeApplyStatus : std::uint8_t
+    {
+        None = 0,
+        Applied,
+        Rejected,
+        MissingRenderer,
+    };
+
+    export struct RuntimeRenderRecipeApplyResult
+    {
+        RuntimeRenderRecipeApplyStatus Status{RuntimeRenderRecipeApplyStatus::None};
+        RuntimeRenderRecipeActivationSource Source{RuntimeRenderRecipeActivationSource::None};
+        Graphics::RenderRecipeConfigLoadResult LoadResult{};
+        bool RendererOverrideInstalled{false};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == RuntimeRenderRecipeApplyStatus::Applied;
+        }
+    };
+
+    export struct RuntimeRenderRecipeState
+    {
+        std::optional<Graphics::FrameRecipeOverride> ActiveOverride{};
+        Graphics::RenderRecipeConfigLoadResult ActiveConfig{};
+        bool HasActiveConfig{false};
+        RuntimeRenderRecipeActivationSource ActiveSource{
+            RuntimeRenderRecipeActivationSource::None};
+        RuntimeRenderRecipeApplyResult LastApply{};
+        bool HasLastApply{false};
+    };
+
     // ============================================================
     // IApplication — the user-facing hook interface.
     //
@@ -253,6 +294,19 @@ namespace Extrinsic::Runtime
         [[nodiscard]] Platform::IWindow&      GetWindow()        noexcept;
         [[nodiscard]] RHI::IDevice&           GetDevice()        noexcept;
         [[nodiscard]] Graphics::IRenderer&    GetRenderer()      noexcept;
+        [[nodiscard]] Graphics::RenderRecipeConfigContext
+            CreateRenderRecipeConfigContext() const;
+        [[nodiscard]] RuntimeRenderRecipeApplyResult ApplyRenderRecipeConfigPreview(
+            const Graphics::RenderRecipeConfigLoadResult& loadResult,
+            RuntimeRenderRecipeActivationSource source =
+                RuntimeRenderRecipeActivationSource::Programmatic);
+        [[nodiscard]] RuntimeRenderRecipeApplyResult LoadAndApplyRenderRecipeConfigFile(
+            std::string path,
+            RuntimeRenderRecipeActivationSource source =
+                RuntimeRenderRecipeActivationSource::Programmatic);
+        void ClearActiveRenderRecipeOverride() noexcept;
+        [[nodiscard]] const RuntimeRenderRecipeState&
+            GetRenderRecipeState() const noexcept;
         [[nodiscard]] Assets::AssetService&   GetAssetService()  noexcept;
         [[nodiscard]] Graphics::GpuAssetCache& GetGpuAssetCache() noexcept;
         [[nodiscard]] ECS::Scene::Registry&   GetScene()         noexcept;
@@ -405,6 +459,7 @@ namespace Extrinsic::Runtime
         std::unique_ptr<Platform::IWindow>   m_Window;
         std::unique_ptr<RHI::IDevice>        m_Device;
         std::unique_ptr<Graphics::IRenderer> m_Renderer;
+        RuntimeRenderRecipeState             m_RenderRecipeState{};
         // RUNTIME-090 Slice B — runtime-side Dear ImGui adapter + the graphics
         // overlay system it produces into. The overlay system instance is
         // runtime-owned composition (the allowed runtime -> graphics edge) so

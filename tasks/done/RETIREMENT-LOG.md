@@ -2587,3 +2587,18 @@ as postprocess, debug view, picking, and lighting without widening
 `RenderRecipeDescriptor` vocabulary or mutating the fixed core. Focused
 graphics contract tests cover projection, live pass omission, and fail-closed
 unknown-slot behavior; the default CPU-supported gate is green.
+
+[`RUNTIME-130`](RUNTIME-130-route-recipe-activation-and-load-default-recipe.md)
+— runtime render-recipe activation and startup default loading retired to
+`tasks/done/` on 2026-06-28 at `Operational`. `Engine` now owns the active
+render-recipe config state, builds recipe-config validation context from the
+current renderer contract, applies validated previews through a single runtime
+path, and translates accepted configs into the `GRAPHICS-106`
+`FrameRecipeOverride` seam. `RenderConfig` carries a boot-time
+`DefaultRecipeConfigPath` with empty-string opt-out, startup loads missing or
+invalid config files fail closed to the derived default recipe while preserving
+typed diagnostics, and the sandbox editor activation command now calls the
+runtime apply path instead of keeping activation editor-local. Focused runtime
+contract tests cover startup pass omission, missing and invalid fallback
+diagnostics, and editor activation reaching the live frame; the default
+CPU-supported gate is green.

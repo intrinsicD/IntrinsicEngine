@@ -1056,6 +1056,7 @@ export namespace Extrinsic::Runtime
         Canceled,
         Published,
         Applied,
+        ActivationFailed,
         MissingRecipeContext,
         MissingEditorState,
         MissingArtifactRegistry,
@@ -1433,6 +1434,10 @@ export namespace Extrinsic::Runtime
         const Graphics::RenderGraphFrameStats* RenderGraphStats{nullptr};
         const Graphics::RenderRecipeConfigContext* RenderRecipeContext{nullptr};
         SandboxEditorRenderRecipeEditorState* RenderRecipeEditorState{nullptr};
+        const RuntimeRenderRecipeState* RenderRecipeRuntimeState{nullptr};
+        std::function<RuntimeRenderRecipeApplyResult(
+            const Graphics::RenderRecipeConfigLoadResult&)>
+            ApplyRenderRecipePreview{};
         RenderArtifactRegistry* RenderArtifacts{nullptr};
         bool ImGuiAdapterAvailable{false};
         bool AssetImportCommandsAvailable{false};

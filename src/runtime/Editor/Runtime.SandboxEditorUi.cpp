@@ -4944,6 +4944,14 @@ namespace Extrinsic::Runtime
                 },
                 .AssetImportQueue = engine.GetAssetImportQueueSnapshot(),
                 .RenderGraphStats = &engine.GetRenderer().GetLastRenderGraphStats(),
+                .RenderRecipeRuntimeState = &engine.GetRenderRecipeState(),
+                .ApplyRenderRecipePreview =
+                    [&engine](const Graphics::RenderRecipeConfigLoadResult& loadResult)
+                    {
+                        return engine.ApplyRenderRecipeConfigPreview(
+                            loadResult,
+                            RuntimeRenderRecipeActivationSource::Editor);
+                    },
                 .ImGuiAdapterAvailable = engine.GetImGuiAdapter().IsInitialized(),
                 .AssetImportCommandsAvailable = true,
                 .SceneFileCommandsAvailable = true,
@@ -8253,6 +8261,8 @@ namespace Extrinsic::Runtime
             return "Published";
         case Status::Applied:
             return "Applied";
+        case Status::ActivationFailed:
+            return "ActivationFailed";
         case Status::MissingRecipeContext:
             return "MissingRecipeContext";
         case Status::MissingEditorState:
@@ -9015,14 +9025,26 @@ namespace Extrinsic::Runtime
         const SandboxEditorRenderRecipeEditorState* state =
             context.RenderRecipeEditorState;
 
-        const bool useActiveOverride =
-            state != nullptr && state->HasActiveOverride;
+        const RuntimeRenderRecipeState* runtimeState =
+            context.RenderRecipeRuntimeState;
+        const bool useRuntimeActiveOverride =
+            runtimeState != nullptr && runtimeState->HasActiveConfig;
+        const bool useEditorActiveOverride =
+            !useRuntimeActiveOverride &&
+            state != nullptr &&
+            state->HasActiveOverride;
         const Graphics::RenderRecipeDescriptor& recipe =
-            useActiveOverride ? state->ActiveRecipe : recipeContext.BaseRecipe;
+            useRuntimeActiveOverride
+                ? runtimeState->ActiveConfig.Preview.Recipe
+                : (useEditorActiveOverride ? state->ActiveRecipe : recipeContext.BaseRecipe);
         const Graphics::ViewOutputRecipeDescriptor& viewOutput =
-            useActiveOverride ? state->ActiveViewOutput : recipeContext.BaseViewOutput;
+            useRuntimeActiveOverride
+                ? runtimeState->ActiveConfig.Preview.ViewOutput
+                : (useEditorActiveOverride ? state->ActiveViewOutput : recipeContext.BaseViewOutput);
         const Graphics::BindingSet& bindings =
-            useActiveOverride ? state->ActiveBindings : recipeContext.BaseBindings;
+            useRuntimeActiveOverride
+                ? runtimeState->ActiveConfig.Preview.Bindings
+                : (useEditorActiveOverride ? state->ActiveBindings : recipeContext.BaseBindings);
 
         model.RendererId = recipeContext.Renderer.Id;
         model.ActiveRecipeId = recipe.RecipeId;
@@ -9232,6 +9254,17 @@ namespace Extrinsic::Runtime
                 return MakeRenderRecipeCommandResult(
                     SandboxEditorRenderRecipeCommandStatus::PreviewFailed,
                     state);
+            }
+            if (context.ApplyRenderRecipePreview)
+            {
+                const RuntimeRenderRecipeApplyResult applyResult =
+                    context.ApplyRenderRecipePreview(state->LastPreview);
+                if (!applyResult.Succeeded())
+                {
+                    return MakeRenderRecipeCommandResult(
+                        SandboxEditorRenderRecipeCommandStatus::ActivationFailed,
+                        state);
+                }
             }
             state->ActiveRecipe = state->LastPreview.Preview.Recipe;
             state->ActiveViewOutput = state->LastPreview.Preview.ViewOutput;

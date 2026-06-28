@@ -48,6 +48,8 @@ import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Graphics.Material;
+import Extrinsic.Graphics.CurrentRendererContractAdapter;
+import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
@@ -2291,6 +2293,12 @@ namespace Extrinsic::Runtime
         m_Renderer = Graphics::CreateRenderer();
         m_Renderer->Initialize(*m_Device);
         m_RendererOperational = m_Device->IsOperational();
+        if (!m_Config.Render.DefaultRecipeConfigPath.empty())
+        {
+            (void)LoadAndApplyRenderRecipeConfigFile(
+                m_Config.Render.DefaultRecipeConfigPath,
+                RuntimeRenderRecipeActivationSource::StartupConfigFile);
+        }
 
         // ── 2c. Runtime-side Dear ImGui adapter (RUNTIME-090 / GRAPHICS-079) ─
         // Constructed after the Window and Renderer exist. The adapter owns the
@@ -2899,6 +2907,115 @@ namespace Extrinsic::Runtime
     Platform::IWindow&    Engine::GetWindow()        noexcept { return *m_Window;        }
     RHI::IDevice&         Engine::GetDevice()        noexcept { return *m_Device;        }
     Graphics::IRenderer&  Engine::GetRenderer()      noexcept { return *m_Renderer;      }
+
+    Graphics::RenderRecipeConfigContext Engine::CreateRenderRecipeConfigContext() const
+    {
+        Core::Extent2D viewport{
+            .Width = std::max(m_Config.Window.Width, 1),
+            .Height = std::max(m_Config.Window.Height, 1),
+        };
+        if (m_Window)
+        {
+            const Platform::Extent2D extent = m_Window->GetFramebufferExtent();
+            if (extent.Width > 0 && extent.Height > 0)
+            {
+                viewport = Core::Extent2D{.Width = extent.Width, .Height = extent.Height};
+            }
+        }
+
+        const Graphics::RenderFrameInput recipeInput{
+            .Viewport = viewport,
+            .Camera = Graphics::CameraViewInput{.Valid = true},
+        };
+        return Graphics::RenderRecipeConfigContext{
+            .Renderer = Graphics::MakeCurrentRendererDescriptor(),
+            .BaseRecipe = Graphics::MakeCurrentRendererRecipeDescriptor(),
+            .BaseViewOutput =
+                Graphics::MakeCurrentRendererViewOutputRecipe(recipeInput),
+            .BaseBindings = Graphics::MakeCurrentRendererBindingSet(),
+        };
+    }
+
+    RuntimeRenderRecipeApplyResult Engine::ApplyRenderRecipeConfigPreview(
+        const Graphics::RenderRecipeConfigLoadResult& loadResult,
+        const RuntimeRenderRecipeActivationSource source)
+    {
+        RuntimeRenderRecipeApplyResult result{
+            .Source = source,
+            .LoadResult = loadResult,
+        };
+
+        if (!m_Renderer)
+        {
+            result.Status = RuntimeRenderRecipeApplyStatus::MissingRenderer;
+            m_RenderRecipeState.LastApply = result;
+            m_RenderRecipeState.HasLastApply = true;
+            return result;
+        }
+
+        if (!Graphics::IsConfigUsable(loadResult))
+        {
+            m_Renderer->ClearActiveFrameRecipeOverride();
+            m_RenderRecipeState.ActiveOverride.reset();
+            m_RenderRecipeState.ActiveConfig = Graphics::RenderRecipeConfigLoadResult{};
+            m_RenderRecipeState.HasActiveConfig = false;
+            m_RenderRecipeState.ActiveSource =
+                RuntimeRenderRecipeActivationSource::None;
+            result.Status = RuntimeRenderRecipeApplyStatus::Rejected;
+            m_RenderRecipeState.LastApply = result;
+            m_RenderRecipeState.HasLastApply = true;
+            return result;
+        }
+
+        Graphics::FrameRecipeOverride recipeOverride{
+            .Recipe = loadResult.Preview.Recipe,
+            .DisabledExtensionSlots = loadResult.Preview.DisabledExtensionSlots,
+            .SourceId = loadResult.SourceId,
+        };
+        m_Renderer->SetActiveFrameRecipeOverride(std::make_optional(recipeOverride));
+        m_RenderRecipeState.ActiveOverride = recipeOverride;
+        m_RenderRecipeState.ActiveConfig = loadResult;
+        m_RenderRecipeState.HasActiveConfig = true;
+        m_RenderRecipeState.ActiveSource = source;
+        result.Status = RuntimeRenderRecipeApplyStatus::Applied;
+        result.RendererOverrideInstalled = true;
+        m_RenderRecipeState.LastApply = result;
+        m_RenderRecipeState.HasLastApply = true;
+        return result;
+    }
+
+    RuntimeRenderRecipeApplyResult Engine::LoadAndApplyRenderRecipeConfigFile(
+        std::string path,
+        const RuntimeRenderRecipeActivationSource source)
+    {
+        const std::string sourceId = path;
+        const Graphics::RenderRecipeConfigLoadResult loadResult =
+            Graphics::LoadRenderRecipeConfigFile(
+                path,
+                CreateRenderRecipeConfigContext(),
+                Graphics::RenderRecipeConfigParseOptions{
+                    .SourceId = sourceId,
+                });
+        return ApplyRenderRecipeConfigPreview(loadResult, source);
+    }
+
+    void Engine::ClearActiveRenderRecipeOverride() noexcept
+    {
+        if (m_Renderer)
+        {
+            m_Renderer->ClearActiveFrameRecipeOverride();
+        }
+        m_RenderRecipeState.ActiveOverride.reset();
+        m_RenderRecipeState.ActiveConfig = Graphics::RenderRecipeConfigLoadResult{};
+        m_RenderRecipeState.HasActiveConfig = false;
+        m_RenderRecipeState.ActiveSource = RuntimeRenderRecipeActivationSource::None;
+    }
+
+    const RuntimeRenderRecipeState& Engine::GetRenderRecipeState() const noexcept
+    {
+        return m_RenderRecipeState;
+    }
+
     Assets::AssetService& Engine::GetAssetService()  noexcept { return *m_AssetService;  }
     Graphics::GpuAssetCache& Engine::GetGpuAssetCache() noexcept { return *m_GpuAssetCache; }
     ECS::Scene::Registry& Engine::GetScene()         noexcept { return *m_Scene;         }

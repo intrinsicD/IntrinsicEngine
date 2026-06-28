@@ -156,6 +156,11 @@ the supplied context is never mutated. Diagnostics use
 fallback-applied states remain usable only when the underlying rendering
 contract validation reports no errors.
 
+Recipe configs may also list `recipe.disabledExtensionSlots` to request a
+smaller optional pass set. The loader validates each name against the renderer's
+declared non-fixed extension slots and leaves the live frame untouched; runtime
+activation translates the usable preview into the `FrameRecipeOverride` wrapper.
+
 `IRenderer::SetActiveFrameRecipeOverride(...)` is the renderer-side activation
 seam for a validated recipe overlay. The live frame driver remains
 `FrameRecipeFeatures` plus `BuildDefaultFrameRecipe(...)`; the override wrapper

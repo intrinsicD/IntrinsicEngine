@@ -385,6 +385,7 @@ namespace Extrinsic::Core::Config
                                         "enable_validation",
                                         "enable_vsync",
                                         "frames_in_flight",
+                                        "default_recipe_config_path",
                                         "synchronous_extraction"});
 
             RenderConfig& config = result.Preview.Config.Render;
@@ -418,6 +419,13 @@ namespace Extrinsic::Core::Config
                 frames.has_value())
             {
                 config.FramesInFlight = static_cast<std::uint32_t>(*frames);
+                ++result.Preview.ParsedFieldCount;
+            }
+            if (const std::optional<std::string> defaultRecipe =
+                    ReadString(result, *object, "default_recipe_config_path", "render", true);
+                defaultRecipe.has_value())
+            {
+                config.DefaultRecipeConfigPath = *defaultRecipe;
                 ++result.Preview.ParsedFieldCount;
             }
             if (const std::optional<bool> synchronous =
@@ -809,6 +817,7 @@ namespace Extrinsic::Core::Config
             {"enable_validation", config.Render.EnableValidation},
             {"enable_vsync", config.Render.EnableVSync},
             {"frames_in_flight", config.Render.FramesInFlight},
+            {"default_recipe_config_path", config.Render.DefaultRecipeConfigPath},
             {"synchronous_extraction", config.Render.SynchronousExtraction},
         });
         root["simulation"] = json::object({
