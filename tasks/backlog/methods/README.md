@@ -10,12 +10,14 @@ map.
 
 ## Program tasks
 
-- [METHODS-001 — Pin signed heat as methods-pipeline pathfinder](METHODS-001-signed-heat-pathfinder.md).
+- No open program tasks. Retired
+  [`METHODS-001`](../../done/METHODS-001-signed-heat-pathfinder.md) pins
+  METHOD-002 as the methods-pipeline pathfinder.
 
 ## Tasks
 
 - [METHOD-002 — Signed Heat Method reference backend](METHOD-002-signed-heat-method-reference-backend.md)
-  **(pathfinder method per [METHODS-001](METHODS-001-signed-heat-pathfinder.md))**;
+  **(pathfinder method per [METHODS-001](../../done/METHODS-001-signed-heat-pathfinder.md))**;
   unblocked by retired `geometry/GEOM-020` (LDLT seam) and expected to use
   `Geometry.Sparse::SparseLDLT` for its default diffusion solve.
 - [METHOD-003 — Closest Point Method PDE solver reference backend](METHOD-003-closest-point-method-pde-reference-backend.md)
@@ -56,6 +58,11 @@ map.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [METHODS-001 — Pin signed heat as methods-pipeline pathfinder](../../done/METHODS-001-signed-heat-pathfinder.md)
+  (done, 2026-06-28, `Retired`): records METHOD-002 as the first method to
+  drive the full paper-intake → CPU-reference → tests → benchmark → docs
+  pipeline and names retired GEOM-020 as the LDLT gate that makes promotion
+  deterministic.
 - [METHOD-012 — Progressive Poisson-disk sampling: paper intake + CPU reference backend](../../done/METHOD-012-progressive-poisson-disk-cpu-reference.md)
   (done, 2026-06-28, `CPUContracted`): deterministic CPU reference, manifest,
   docs, correctness tests, and smoke benchmark for progressive Poisson-disk

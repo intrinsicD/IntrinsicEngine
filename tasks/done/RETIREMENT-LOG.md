@@ -2884,3 +2884,13 @@ input rejection, multi-RHS parity, preconditioner agreement, and bit-stable
 repeated solves. METHOD-003 can now promote against
 `Geometry.Sparse::SparseBiCGSTAB` for its non-symmetric closest-point-extension
 operator.
+
+[`METHODS-001`](METHODS-001-signed-heat-pathfinder.md) — signed-heat
+pathfinder planning task retired to `tasks/done/` on 2026-06-28 at `Retired`.
+The task pins METHOD-002 as the first concrete method to drive the full
+methods pipeline from paper intake through CPU reference, correctness tests,
+benchmark harness, and docs. It records retired GEOM-020 as the LDLT seam that
+satisfies METHOD-002's direct-solver gate, preserves Variant A (surface signed
+heat) as the public-facing default, and points future method work at the
+resulting `methods/geometry/signed_heat/` package as the canonical package
+pattern.

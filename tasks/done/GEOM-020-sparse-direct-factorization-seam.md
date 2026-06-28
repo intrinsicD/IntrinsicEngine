@@ -91,7 +91,7 @@ completed_on: 2026-06-28
 - [x] Regenerate `docs/api/generated/module_inventory.md` if the
       module surface changes (it should not — the additions live
       inside the existing `Geometry.Sparse` module).
-- [x] Update [`tasks/backlog/methods/METHODS-001`](../backlog/methods/METHODS-001-signed-heat-pathfinder.md)
+- [x] Update retired [`tasks/done/METHODS-001`](METHODS-001-signed-heat-pathfinder.md)
       and [`tasks/backlog/methods/README.md`](../backlog/methods/README.md)
       ordering notes only if the gate language drifts; the
       pre-promotion edits made together with the GEOM-008 retirement
