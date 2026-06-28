@@ -47,14 +47,17 @@ maturity_target: Operational
 - [x] Add material metadata for object-space normal textures, including an API enum reserving tangent-space support and a shader-visible flag such as `HasObjectSpaceNormalMap`.
 - [x] Update forward and deferred/G-buffer shaders to sample object-space normal maps only when the material flag is set and `NormalID` is valid, decode RGB to object-space normal, transform through the model normal matrix, normalize, and otherwise preserve vertex-normal behavior.
 - [x] Mark current generated-normal material bindings as `ObjectSpaceNormal` in direct import, model-scene handoff, and progressive presentation extraction; full GPU job scheduling remains owned by the runtime orchestration item below.
-- [ ] Add runtime orchestration that schedules explicit GPU object-space normal bake jobs, records stale keys for entity, geometry/UV/normal generation, resolution, padding, and normal-map type, and discards stale completions.
+- [x] Add a runtime queue contract that schedules explicit GPU object-space normal bake requests, records stale keys for entity, geometry/UV/normal generation, resolution, padding, and normal-map type, no-ops on non-operational graphics backends without CPU fallback, and rejects stale completions before material mutation.
+- [ ] Wire runtime orchestration into import/render-thread scheduling so queued GPU object-space normal bake jobs are submitted and completed against real cache readiness.
 - [ ] Route import/enrichment generated-normal use cases through the new GPU job API once the end-to-end GPU path is implemented, retaining the CPU path only as legacy compatibility until replacement is complete.
-- [ ] Keep completed bakes reusable by resolved geometry/UV/normal content key where available, with entity-scoped generated `AssetId` fallback when no stable geometry key exists.
+- [x] Select generated texture `AssetId`s through the runtime queue by resolved geometry/UV/normal content key where available, with entity-scoped generated `AssetId` fallback when no stable geometry key exists.
+- [ ] Keep completed bakes reusable end-to-end after cache readiness, including material binding updates for content-key hits.
 - [ ] Fail closed with deterministic diagnostics for missing/non-finite UVs, missing/non-finite normals, non-atlas UVs, degenerate UV triangles, zero coverage, non-triangle meshes, non-operational graphics backends, and stale completion.
 
 ## Tests
 - [x] Add CPU/null contract tests for object-space bake request validation, resolution/default/clamp policy, fail-closed sampling, and material flag/binding behavior.
-- [ ] Add CPU/null contract tests for generated asset key selection, runtime stale completion discard, and end-to-end material binding transition once runtime GPU orchestration lands.
+- [x] Add CPU/null contract tests for generated asset key selection, non-operational no-op, and runtime stale completion discard in the runtime queue contract.
+- [ ] Add CPU/null contract tests for end-to-end material binding transition once runtime GPU orchestration lands.
 - [x] Add `GpuAssetCache` tests for GPU-produced pending texture registration, readiness promotion, fallback/default view behavior before readiness, and retirement/reload interactions.
 - [x] Add command-recording contract coverage for the GPU bake pass shape, target extent, clear coverage, push constants, and indexed draw.
 - [x] Add shader-source contract checks for modified surface/G-buffer shaders.
@@ -68,7 +71,7 @@ maturity_target: Operational
 ## Docs
 - [x] Update `src/graphics/assets/README.md` for GPU-produced generated texture residency, cache ownership, readiness, and material binding semantics.
 - [x] Update `src/graphics/renderer/README.md` for the object-space normal bake pass, shader consumption flag, forward/deferred behavior, dilation/mip policy, and non-operational backend behavior.
-- [x] Update `src/runtime/README.md` for current object-space generated-normal binding metadata and the deferred replacement of the direct CPU generated-normal post-process path.
+- [x] Update `src/runtime/README.md` for current object-space generated-normal binding metadata, runtime queue scheduling/stale-key semantics, non-operational no-op behavior, and the deferred replacement of the direct CPU generated-normal post-process path.
 - [x] Update architecture docs if the final API adds or changes a public module surface or dependency boundary.
 - [x] Regenerate `docs/api/generated/module_inventory.md` if any `.cppm` module surfaces are added or changed.
 
@@ -113,7 +116,7 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' --time
 - **Slice A (implemented).** Add request/status DTOs, validation helpers, shader-equivalent point sampling, and `GpuAssetCache` pending GPU-produced texture contracts. Close at `CPUContracted`.
 - **Slice B (implemented).** Add graphics-owned raster bake command recorder and shaders, plus command-recording contract coverage. Close at `CPUContracted`.
 - **Slice C (implemented).** Add object-space normal-map material metadata and forward/deferred shader consumption. Close at `CPUContracted`.
-- **Slice D (partial).** Generated-normal bindings now carry `ObjectSpaceNormal` provenance for direct import, model-scene handoff, and progressive presentation extraction. Runtime GPU job scheduling, stale-key lifecycle, and import/enrichment replacement remain open. Close target remains `CPUContracted`.
+- **Slice D (partial).** Generated-normal bindings now carry `ObjectSpaceNormal` provenance for direct import, model-scene handoff, and progressive presentation extraction. The runtime queue contract now selects generated texture assets by content key, records stale keys, no-ops without CPU fallback on non-operational graphics backends, and discards stale completions before material mutation. Engine import scheduling, render-thread submission, cache-ready material binding, and import/enrichment replacement remain open. Close target remains `CPUContracted`.
 - **Slice E (partial).** Add Vulkan operational smoke with selected-texel readback. Still requires cache-ready promotion proof from a submitted bake and switching generated object-space normal import/enrichment to the GPU path before closing `Operational`.
 
 ## Maturity

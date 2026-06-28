@@ -17,6 +17,7 @@ target_sources(${target_name}
         Runtime.DerivedJobGraph.cppm
         Runtime.MeshAttributeTextureBake.cppm
         Runtime.MethodFigureExport.cppm
+        Runtime.ObjectSpaceNormalBakeQueue.cppm
         Runtime.ProgressivePresentationExtraction.cppm
         Runtime.ProgressiveRenderData.cppm
         Runtime.RenderArtifactPublication.cppm
@@ -63,6 +64,7 @@ target_sources(${target_name}
         Runtime.DerivedJobGraph.cpp
         Runtime.MeshAttributeTextureBake.cpp
         Runtime.MethodFigureExport.cpp
+        Runtime.ObjectSpaceNormalBakeQueue.cpp
         Runtime.ProgressivePresentationExtraction.cpp
         Runtime.ProgressiveRenderData.cpp
         Runtime.RenderArtifactPublication.cpp

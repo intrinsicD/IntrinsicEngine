@@ -19,7 +19,7 @@ maturity_target: Operational
 
 ## Context
 - Owner/layer: `runtime` for job orchestration, generated `AssetId` selection, stale-generation keys, render-thread submission timing, and material-binding swap; `graphics` owns the bake command recorder (`Extrinsic.Graphics.ObjectSpaceNormalTextureBake`, `RecordObjectSpaceNormalTextureBake(...)` at `src/graphics/renderer/Graphics.ObjectSpaceNormalTextureBake.cppm:168`) and the cache residency path (`GpuAssetCache::BeginGpuProducedTexture(...)` / `SetGpuProducedTextureReadyFrame(...)`).
-- Current state: all bake requests are hardcoded to CPU — `Runtime.SelectedMeshTextureBake.cpp:1028` and the import/normal path in `Runtime.AssetModelSceneHandoff.cpp` set `RequestedJobDomain = ProgressiveJobDomain::Cpu`. The derived-job graph fail-closes any non-CPU domain: `IsUnsupportedJobDomain(domain) { return domain != ProgressiveJobDomain::Cpu; }` (`Runtime.DerivedJobGraph.cpp:36-47`, rejection at `:348-355`). `ProgressiveJobDomain` already reserves `GpuCompute`/`GpuGraphics`/`Auto` (`Runtime.ProgressiveRenderData.cppm:122`).
+- Current state: `Extrinsic.Runtime.ObjectSpaceNormalBakeQueue` owns the CPU-contract scheduling metadata for generated texture `AssetId` selection, content-key reuse, stale-key matching, and non-operational no-op behavior. It is not yet wired into Engine import scheduling, render-thread submission, cache readiness, or material binding mutation. Existing import/enrichment bake requests are still hardcoded to CPU — `Runtime.SelectedMeshTextureBake.cpp:1028` and the import/normal path in `Runtime.AssetModelSceneHandoff.cpp` set `RequestedJobDomain = ProgressiveJobDomain::Cpu`. The derived-job graph fail-closes any non-CPU domain: `IsUnsupportedJobDomain(domain) { return domain != ProgressiveJobDomain::Cpu; }` (`Runtime.DerivedJobGraph.cpp:36-47`, rejection at `:348-355`). `ProgressiveJobDomain` already reserves `GpuCompute`/`GpuGraphics`/`Auto` (`Runtime.ProgressiveRenderData.cppm:122`).
 - The shader fallback already exists: forward/deferred sample the object-space normal texture only when the material flag is set and `NormalID` is valid, otherwise use the vertex-normal attribute (`ResolveSurfaceNormal`). So "use texture when ready, else attribute" needs no shader work — only the runtime swap of the `Normal` binding once the cache entry is `Ready`.
 - Architectural crux (open design decision — see questions below): a GPU graphics bake cannot run on the existing background streaming `Execute` callback (that lane is CPU). It must record commands and submit on the render thread, and promote via the GPU-completion fence already wired into `GpuAssetCache`.
 - Requires an operational Vulkan device for `Operational`; `IDevice::IsOperational()` is false under the default Null backend, so on non-operational hosts this path must no-op deterministically and leave vertex-normal shading in place.
@@ -37,13 +37,16 @@ maturity_target: Operational
 - [ ] Retain the CPU generated-normal path only as legacy compatibility behind the operational check until the GPU path is proven, then route import/enrichment through the GPU path.
 
 ## Tests
-- [ ] CPU/null contract: scheduling a GPU bake on a non-operational backend no-ops deterministically, emits a diagnostic, and leaves the vertex-normal binding (and no `ObjectSpaceNormalMap` flag) in place.
-- [ ] CPU/null contract: stale-key lifecycle — a completion whose recorded generation/resolution keys no longer match is discarded and does not mutate the material binding.
-- [ ] CPU/null contract: generated `AssetId` selection and content-key reuse return the same id for identical resolved geometry/UV/normal inputs.
+- [x] CPU/null contract: queue-level scheduling on a non-operational backend no-ops deterministically and emits a no-CPU-fallback diagnostic.
+- [x] CPU/null contract: queue-level stale-key lifecycle rejects a completion whose recorded entity/source generation, resolution, padding, or normal-map type no longer matches.
+- [x] CPU/null contract: generated `AssetId` selection and content-key reuse return the same id for identical resolved geometry/UV/normal inputs.
+- [ ] CPU/null contract: engine-level non-operational import scheduling leaves the vertex-normal binding and no `ObjectSpaceNormalMap` flag in place.
+- [ ] CPU/null contract: engine-level stale completion does not mutate the material binding.
 - [ ] Opt-in `gpu;vulkan` smoke on a Vulkan-capable host: an imported mesh schedules a bake, the cache entry promotes to `Ready`, the material `Normal` binding swaps to the generated texture, and selected texels match expected encoded object-space normals.
 
 ## Docs
-- [ ] Update `src/runtime/README.md` for GPU bake scheduling, the render-thread submission step, stale-key lifecycle, and the non-operational no-op contract.
+- [x] Update `src/runtime/README.md` for queue-level GPU bake scheduling metadata, stale-key lifecycle, and the non-operational no-op contract.
+- [ ] Update `src/runtime/README.md` for Engine render-thread submission and material-binding swap once wired.
 - [ ] Update `src/graphics/renderer/README.md` / `src/graphics/assets/README.md` only if the consumed graphics bake API surface changes.
 - [ ] Regenerate `docs/api/generated/module_inventory.md` if any `.cppm` module surfaces are added or changed.
 
@@ -79,11 +82,13 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' --time
 
 ## Maturity
 - Target: `Operational` on Vulkan-capable hosts; `CPUContracted` for the scheduling/stale-key/fail-closed orchestration contract on CPU/null.
-- Slice A (CPUContracted): scheduling decision, generated-`AssetId`/content-key selection, stale-key lifecycle, non-operational no-op — all CPU/null testable with bake submission stubbed behind the operational check.
+- Slice A.1 (CPUContracted, landed in `GRAPHICS-104`): queue-level scheduling decision, generated-`AssetId`/content-key selection, stale-key lifecycle, and non-operational no-op — all CPU/null tested with bake submission deferred behind the operational check.
+- Slice A.2 (CPUContracted): wire import-generated-normal producers to enqueue GPU bake requests instead of the CPU-domain hardcode, while still deferring render-thread submission to Slice B.
 - Slice B (CPUContracted): render-thread GPU submission step + cache registration wired behind `IsOperational()`, plus the material-binding swap-on-`Ready` logic; CPU contract proves the swap given a faked `Ready` promotion.
 - Slice C (Operational): real Vulkan submission + `gpu;vulkan` smoke proving an actual baked texture promotes and binds; route import/enrichment off the CPU legacy path.
 
 ## Slice plan
-- **Slice A (this owns the scheduling contract).** Replace the CPU-domain hardcode with a GPU bake request + stale-key record for generated-normal primitives; add generated-`AssetId`/content-key selection and the non-operational no-op. Preserves CPU gate. Defers all render-thread submission to Slice B.
+- **Slice A.1 (landed).** Add `Runtime.ObjectSpaceNormalBakeQueue` for generated-`AssetId`/content-key selection, stale-key records, stale-completion discard, and non-operational no-op diagnostics. Preserves CPU gate and does not mutate materials.
+- **Slice A.2.** Replace the CPU-domain hardcode with a GPU bake request for generated-normal primitives. Preserves CPU gate. Defers all render-thread submission to Slice B.
 - **Slice B.** Add the runtime render-thread GPU bake drain calling the graphics bake API + `GpuAssetCache` registration, and the material `Normal`-binding swap on `Ready` with stale-completion discard. CPU contract fakes the `Ready` promotion.
 - **Slice C.** Operational Vulkan submission + opt-in `gpu;vulkan` smoke; switch import/enrichment generated-normal use cases off the CPU legacy path. Cites an actually-run Vulkan smoke.
