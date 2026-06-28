@@ -2758,3 +2758,17 @@ requests, and fall back to the geometry CPU reference because no KMeans GPU
 kernel is implemented in this slice. Focused geometry and runtime contract tests
 cover CPU telemetry, non-operational GPU requests, operational-but-unimplemented
 GPU requests, and unchanged editor KMeans publication behavior.
+
+[`GEOM-037`](GEOM-037-so3-rotation-primitives.md) — SO(3) rotation primitives
+retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
+`Geometry.Rotation` now owns hat/vee, exp/log, geodesic and chordal distances,
+deterministic seeded random rotations, `ProjectOnSO3`, and optimal-rotation
+helpers for both `glm::vec3` and `glm::dvec3` correspondences. `ProjectOnSO3`
+delegates orthogonal projection to
+`Geometry.Linalg::ComputePolarDecomposition(...).Orthogonal` and determinant
+corrects into SO(3). `Geometry.Registration` imports the module for
+point-to-point ICP alignment, removing the private Kabsch/Umeyama
+eigensolver copy. Unit coverage exercises round trips, distances, deterministic
+random rotations, SO(3) projection, optimal-rotation recovery, reflection
+correction, non-finite input, and under-determined fail-closed behavior; existing
+registration tests pass unchanged.

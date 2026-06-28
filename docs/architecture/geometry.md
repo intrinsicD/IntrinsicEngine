@@ -27,6 +27,14 @@
   exposes GLM round-trip adapters, explicit row-major `Eigen::Map` helpers for
   contiguous scalar buffers, and dense decomposition wrappers that return
   geometry-owned diagnostics rather than raw Eigen solver state.
+- `Geometry.Rotation` owns the shared SO(3) primitive surface: hat/vee, exp/log,
+  geodesic and chordal distances, deterministic seeded random rotations,
+  `ProjectOnSO3`, and optimal-rotation/Kabsch helpers for corresponded point
+  sets. Rotation-valued routines fail closed to finite SO(3) sentinels rather
+  than returning NaNs. `ProjectOnSO3` delegates the orthogonal projection to
+  `Geometry.Linalg::ComputePolarDecomposition(...).Orthogonal` and applies a
+  determinant correction to stay in SO(3). `Geometry.Registration` consumes this
+  module for point-to-point alignment instead of keeping a private Kabsch copy.
 - `Geometry.Sparse` owns reusable CSR storage, COO-to-CSR building, matrix
   diagnostics, and conjugate-gradient diagnostics. `Geometry.DEC` aliases these
   sparse records so existing DEC/geodesic/parameterization callers keep their

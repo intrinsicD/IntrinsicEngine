@@ -17,8 +17,9 @@ export module Geometry.Rotation;
 // direction = rotation axis and magnitude = rotation angle (radians).
 //
 // Numeric/fail-closed contract (GEOM-005/GEOM-007): every routine returns a
-// finite, valid rotation (orthonormal, det +1) for finite input; degenerate or
-// mismatched input falls back to identity rather than producing NaN/Inf.
+// finite sentinel for invalid input. Rotation-valued routines return a valid
+// SO(3) matrix (orthonormal, det +1); vector-valued Log returns zero for
+// non-finite input.
 export namespace Geometry::Rotation
 {
     // Skew-symmetric "hat" operator: Hat(w) * v == cross(w, v). Vee is its inverse
@@ -41,14 +42,22 @@ export namespace Geometry::Rotation
     // Deterministic uniform-random rotation (Shoemake) for a given seed.
     [[nodiscard]] glm::mat3 RandomRotation(std::uint64_t seed);
 
-    // Nearest rotation (det +1) to an arbitrary 3x3 matrix (SVD projection).
+    // Nearest rotation (det +1) to an arbitrary 3x3 matrix. The projection is
+    // delegated to Geometry.Linalg's polar decomposition and then determinant
+    // corrected to stay in SO(3).
     [[nodiscard]] glm::mat3 ProjectOnSO3(const glm::mat3& m);
 
     // Optimal rotation aligning `from` onto `to` about the origin (Kabsch/
-    // Umeyama, det-corrected). Sizes must match and be non-empty, else identity.
+    // Umeyama, det-corrected). Sizes must match with at least three finite
+    // correspondences, else identity.
     [[nodiscard]] glm::mat3 OptimalRotation(std::span<const glm::vec3> from,
                                             std::span<const glm::vec3> to);
     [[nodiscard]] glm::mat3 OptimalRotation(std::span<const glm::vec3> from,
                                             std::span<const glm::vec3> to,
                                             std::span<const float> weights);
+    [[nodiscard]] glm::dmat3 OptimalRotation(std::span<const glm::dvec3> from,
+                                             std::span<const glm::dvec3> to);
+    [[nodiscard]] glm::dmat3 OptimalRotation(std::span<const glm::dvec3> from,
+                                             std::span<const glm::dvec3> to,
+                                             std::span<const double> weights);
 }
