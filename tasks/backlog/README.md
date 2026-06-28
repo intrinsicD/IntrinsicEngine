@@ -139,10 +139,15 @@ Sandbox Editor routed through the same facade. This satisfies the config-control
 dependency for `RUNTIME-134`; remaining gating for that playground stays on its
 own method/UI scope.
 
-`DOCS-003` is retired to `tasks/done`: `algorithm-variant-dispatch.md` is now an
+`DOCS-003` is retired to `tasks/done`: `algorithm-variant-dispatch.md` became an
 explicit target Strategy x Backend template using `RHI::IDevice`, method-policy
-backend tokens, and honest requested-vs-actual fallback telemetry. This satisfies
-the documentation gate for `GEOM-052` and `PROC-011`.
+backend tokens, and honest requested-vs-actual fallback telemetry.
+
+`GEOM-052` is retired to `tasks/done`: `Geometry.KMeans` is now the canonical
+backend-seam exemplar with `{CPU, GPU}` backend tokens and requested-vs-actual
+fallback telemetry, while `Extrinsic.Runtime.KMeansBackend` owns the
+`RHI::IDevice`-visible fallback hook. This satisfies the backend-seam dependency
+for `PROC-011`.
 
 Open members:
 - [`architecture/LEGACY-012-migrate-legacy-consumer-tests.md`](architecture/LEGACY-012-migrate-legacy-consumer-tests.md) —
@@ -152,9 +157,6 @@ Open members:
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`ui/RORG-031-ui-integration.md`](ui/RORG-031-ui-integration.md).
 - [`platform/PLATFORM-004-alternative-platform-backend-onboarding.md`](platform/PLATFORM-004-alternative-platform-backend-onboarding.md) (planning-only seed).
-- [`geometry/GEOM-052-shared-cpu-gpu-backend-seam-kmeans-exemplar.md`](geometry/GEOM-052-shared-cpu-gpu-backend-seam-kmeans-exemplar.md) —
-  establish the shared backend seam and fix the `Geometry.KMeans` phantom GPU as
-  the worked exemplar (`DOCS-003` satisfied).
 
 ### Theme G — Active bugs
 

@@ -687,7 +687,7 @@ namespace Runtime::PointCloudKMeans
                 return false;
             }
 
-            MarkPending(target, Geometry::KMeans::Backend::CUDA, job.ClusterCount, job.Iterations);
+            MarkPending(target, Geometry::KMeans::Backend::GPU, job.ClusterCount, job.Iterations);
             auto* pendingJobs = GetPendingCudaJobRegistry().TryAccess("PointCloudKMeans::ScheduleCudaJob");
             if (!pendingJobs)
             {
@@ -1101,7 +1101,7 @@ namespace Runtime::PointCloudKMeans
             return false;
 
 #ifdef INTRINSIC_HAS_CUDA
-        if (params.Compute == Geometry::KMeans::Backend::CUDA)
+        if (params.Compute == Geometry::KMeans::Backend::GPU)
         {
             if (target.Domain == Domain::PointCloudPoints)
             {
@@ -1246,7 +1246,8 @@ namespace Runtime::PointCloudKMeans
             result.Centroids = std::move(centroids);
             result.Iterations = job.Iterations;
             result.Converged = false;
-            result.ActualBackend = Geometry::KMeans::Backend::CUDA;
+            result.RequestedBackend = Geometry::KMeans::Backend::GPU;
+            result.ActualBackend = Geometry::KMeans::Backend::GPU;
 
             float inertia = 0.0f;
             float maxDistance = -1.0f;
@@ -1316,7 +1317,8 @@ namespace Runtime::PointCloudKMeans
             result.Centroids = std::move(centroids);
             result.Iterations = pcData.KMeansLastIterations;
             result.Converged = false;
-            result.ActualBackend = Geometry::KMeans::Backend::CUDA;
+            result.RequestedBackend = Geometry::KMeans::Backend::GPU;
+            result.ActualBackend = Geometry::KMeans::Backend::GPU;
 
             float inertia = 0.0f;
             float maxDistance = -1.0f;

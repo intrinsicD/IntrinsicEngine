@@ -136,6 +136,7 @@ split; narratives live in the retirement log.
 - [GEOM-046 — Mesh topology utilities](../../done/GEOM-046-mesh-topology-utilities.md) (done).
 - [GEOM-047 — Graph and point-cloud query/noise utilities](../../done/GEOM-047-graph-pointcloud-query-noise-utilities.md) (done).
 - [GEOM-051 — Property system enhancements](../../done/GEOM-051-property-system-enhancements.md) (done).
+- [GEOM-052 — Shared CPU/GPU backend seam + fix the KMeans phantom GPU exemplar](../../done/GEOM-052-shared-cpu-gpu-backend-seam-kmeans-exemplar.md) (done).
 - GEOIO-002 is retired in [`tasks/done`](../../done/GEOIO-002-geometry-io-parity-hardening.md)
   and contributed to **Theme E — Geometry IO completion** as the upstream gate
   for retired [`ASSETIO-001`](../../done/ASSETIO-001-asset-model-texture-ingest-ownership.md)

@@ -287,6 +287,7 @@ if(TARGET ExtrinsicRuntime)
         Test.EditorCommandHistory.cpp
         Test.ImGuiAdapter.cpp
         Test.ImGuiAdapterEngineWiring.cpp
+        Test.KMeansBackend.cpp
         Test.MeshGeometryExtraction.cpp
         Test.MeshAttributeTextureBake.cpp
         Test.MeshGeometryPacker.cpp

@@ -1,12 +1,13 @@
 # Algorithm Variant Dispatch Pattern
 
-Status: target template, pending `GEOM-052`.
+Status: canonical template. `Geometry.KMeans` is the first implemented exemplar
+for the CPU-reference plus RHI-visible fallback seam.
 
-This document describes the target Strategy x Backend seam for geometry and
-method algorithms that may later gain GPU execution. It is not a claim that
-every example below is implemented today. As of `DOCS-003`, the live
-`Geometry.KMeans` path is CPU-only; `GEOM-052` owns converting it into the
-worked exemplar and removing the old phantom GPU token.
+This document describes the Strategy x Backend seam for geometry and method
+algorithms that may later gain GPU execution. The first exemplar is
+`Geometry.KMeans`: its CPU reference path is implemented in `src/geometry`, and
+`Extrinsic.Runtime.KMeansBackend` provides the `RHI::IDevice`-visible overload
+that falls back honestly until a real GPU kernel lands.
 
 The seam keeps the CPU reference path testable without RHI while giving runtime
 or method-integration code a clear place to request a GPU backend and fall back
@@ -98,7 +99,7 @@ export namespace Geometry::KMeans
     {
         std::uint32_t ClusterCount = 8;
         Strategy Algorithm = Lloyd{};
-        Backend RequestedBackend = Backend::CPU;
+        Backend Compute = Backend::CPU;
     };
 
     struct Result
@@ -107,8 +108,9 @@ export namespace Geometry::KMeans
         std::vector<glm::vec3> Centroids{};
         std::uint32_t Iterations = 0;
         bool Converged = false;
+        Backend RequestedBackend = Backend::CPU;
         Backend ActualBackend = Backend::CPU;
-        bool FellBack = false;
+        bool FellBackToCPU = false;
     };
 
     [[nodiscard]] std::optional<Result> Cluster(
@@ -166,17 +168,19 @@ namespace Geometry::KMeans
 
         if (result)
         {
+            result->RequestedBackend = params.Compute;
             result->ActualBackend = Backend::CPU;
-            result->FellBack = params.RequestedBackend != Backend::CPU;
+            result->FellBackToCPU = params.Compute != Backend::CPU;
         }
         return result;
     }
 }
 ```
 
-The CPU entry point may accept `RequestedBackend` in its params so callers can
-use one config struct everywhere. The CPU-only function still executes the CPU
-reference path and reports that fact through `ActualBackend`.
+The CPU entry point may accept a backend request in its params so callers can use
+one config struct everywhere. `Geometry.KMeans` uses the existing
+`KMeansParams::Compute` field for that request. The CPU-only function still
+executes the CPU reference path and reports that fact through `ActualBackend`.
 
 ## GPU-Capable Overload
 
@@ -189,33 +193,30 @@ reference otherwise.
 import Extrinsic.RHI.Device;
 import Geometry.KMeans;
 
-namespace Runtime::KMeansBackend
+namespace Extrinsic::Runtime
 {
-    [[nodiscard]] std::optional<Geometry::KMeans::Result> Cluster(
+    [[nodiscard]] std::optional<Geometry::KMeans::KMeansResult> ClusterKMeans(
         std::span<const glm::vec3> points,
-        const Geometry::KMeans::Params& params,
+        const Geometry::KMeans::KMeansParams& params,
         Extrinsic::RHI::IDevice& device)
     {
         namespace KMeans = Geometry::KMeans;
 
-        if (params.RequestedBackend == KMeans::Backend::GPU &&
+        if (params.Compute == KMeans::Backend::GPU &&
             device.IsOperational())
         {
-            if (auto gpuResult = TryClusterGpu(points, params, device))
-            {
-                gpuResult->ActualBackend = KMeans::Backend::GPU;
-                gpuResult->FellBack = false;
-                return gpuResult;
-            }
+            // Future parity-gated GPU kernel hook. GEOM-052 intentionally
+            // installs only the seam, so the current exemplar falls through.
         }
 
         auto cpuParams = params;
-        cpuParams.RequestedBackend = KMeans::Backend::CPU;
+        cpuParams.Compute = KMeans::Backend::CPU;
         auto cpuResult = KMeans::Cluster(points, cpuParams);
         if (cpuResult)
         {
             cpuResult->ActualBackend = KMeans::Backend::CPU;
-            cpuResult->FellBack = params.RequestedBackend == KMeans::Backend::GPU;
+            cpuResult->RequestedBackend = params.Compute;
+            cpuResult->FellBackToCPU = params.Compute == KMeans::Backend::GPU;
         }
         return cpuResult;
     }
@@ -253,8 +254,8 @@ Use this checklist when adding a new dispatchable family:
   tokens in docs or diagnostics.
 - Put shared config, strategy selection, and requested backend in the params
   struct.
-- Put output payload, convergence/diagnostics, `ActualBackend`, and fallback
-  telemetry in the result struct.
+- Put output payload, convergence/diagnostics, requested backend,
+  `ActualBackend`, and fallback telemetry in the result struct.
 - Export a CPU-only free function from the owning layer with no RHI dependency.
 - Add a GPU-capable overload only in a layer that may import RHI, using
   `Extrinsic::RHI::IDevice&`.
@@ -265,9 +266,13 @@ Use this checklist when adding a new dispatchable family:
 
 ## Current Exemplar Status
 
-`Geometry.KMeans` is the intended first exemplar, but before `GEOM-052` it is not
-yet compliant with this template. The current live code is CPU-only and contains
-a legacy backend enum value that does not represent an implemented GPU path.
+`Geometry.KMeans` is the first exemplar. Its promoted geometry API exposes
+`Backend::CPU` and `Backend::GPU`, accepts a backend request through
+`KMeansParams::Compute`, and reports `RequestedBackend`, `ActualBackend`, and
+`FellBackToCPU` in `KMeansResult`.
 
-`GEOM-052` must make the exemplar match this document before this document can
-be reclassified as canonical architecture guidance.
+The CPU entry point always runs the CPU reference implementation. The runtime
+adapter `Extrinsic.Runtime.KMeansBackend::ClusterKMeans(...)` accepts
+`Extrinsic::RHI::IDevice&`, evaluates `IDevice::IsOperational()` for GPU
+requests, and falls back to the CPU reference with honest telemetry because no
+KMeans GPU kernel exists yet.

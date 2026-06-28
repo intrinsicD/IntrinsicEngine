@@ -168,7 +168,9 @@ namespace Geometry::KMeans
             return std::nullopt;
 
         KMeansResult result{};
+        result.RequestedBackend = params.Compute;
         result.ActualBackend = Backend::CPU;
+        result.FellBackToCPU = params.Compute != Backend::CPU;
         result.Labels.assign(points.size(), 0u);
         result.SquaredDistances.assign(points.size(), 0.0f);
         result.Centroids = BuildInitialCentroids(points, initialCentroids, params, k);

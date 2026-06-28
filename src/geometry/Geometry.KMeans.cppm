@@ -18,7 +18,7 @@ export namespace Geometry::KMeans
     enum class Backend : uint8_t
     {
         CPU = 0,
-        CUDA = 1,
+        GPU = 1,
     };
 
     enum class Initialization : uint8_t
@@ -46,7 +46,9 @@ export namespace Geometry::KMeans
         bool Converged = false;
         float Inertia = 0.0f;
         uint32_t MaxDistanceIndex = 0;
+        Backend RequestedBackend = Backend::CPU;
         Backend ActualBackend = Backend::CPU;
+        bool FellBackToCPU = false;
     };
 
     struct CpuScratch

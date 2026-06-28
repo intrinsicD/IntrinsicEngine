@@ -61,6 +61,23 @@ enumerate geometry attributes without RTTI. `LiveElementRange` is the shared
 handle iteration helper behind mesh, graph, point-cloud, and const domain-view
 live-element accessors.
 
+### Algorithm backend seams
+
+`Geometry.KMeans` is the canonical geometry exemplar for the
+[Algorithm Variant Dispatch Pattern](algorithm-variant-dispatch.md). The geometry
+module owns the deterministic CPU reference path and does not import RHI. Its
+`KMeansParams::Compute` field is the requested backend (`Backend::CPU` or
+`Backend::GPU`), while `KMeansResult` reports `RequestedBackend`,
+`ActualBackend`, and `FellBackToCPU` so a GPU request that runs on CPU is never
+silent.
+
+The RHI-visible integration hook lives in runtime:
+`Extrinsic.Runtime.KMeansBackend::ClusterKMeans(...)` accepts
+`Extrinsic::RHI::IDevice&`, evaluates `IDevice::IsOperational()` for GPU
+requests, and currently falls back to the CPU reference because no KMeans GPU
+kernel has landed. A real GPU backend must arrive as a separate parity-gated
+task.
+
 ### Remeshing, subdivision, and mesh topology utilities
 
 `Geometry.HalfedgeMesh.AdaptiveRemeshing` exposes `ReferenceProjector`, a

@@ -3,11 +3,12 @@ id: GEOM-052
 theme: F
 depends_on: [DOCS-003]
 maturity_target: CPUContracted
+completed_on: 2026-06-28
 ---
 # GEOM-052 — Shared CPU/GPU backend seam + fix the KMeans phantom GPU exemplar
 
 ## Goal
-- Establish the reusable Strategy×Backend seam so a new data-parallel algorithm
+- [x] Establish the reusable Strategy×Backend seam so a new data-parallel algorithm
   gets CPU + GPU *hooks* for free, and fix `Geometry.KMeans` to that seam as the
   worked exemplar — reporting `ActualBackend` honestly, with no fabricated GPU
   path (P4; honors AGENTS.md §6 CPU-reference-first).
@@ -19,7 +20,8 @@ maturity_target: CPUContracted
 - Converting other geometry algorithms (each is its own later task).
 
 ## Context
-- The only extant `Backend` axis in `src/geometry` is `Geometry.KMeans`, and it
+- Before this task, the only extant `Backend` axis in `src/geometry` was
+  `Geometry.KMeans`, and it
   is a phantom: `enum class Backend { CPU, CUDA }`, `Params.Compute` defaults to
   `Backend::CPU`, and `Geometry.KMeans.cpp` always sets
   `result.ActualBackend = Backend::CPU`. The UI hardcodes `Backend::CPU`. There
@@ -31,35 +33,45 @@ maturity_target: CPUContracted
   where RHI is available, per the dispatch doc's link-boundary design).
 - Slice per `docs/architecture/backend_integration_slicing_policy.md` so seam,
   exemplar, and UI/config wiring are separately bisectable.
+- Status: completed 2026-06-28 by Codex. Commit: this commit (`Implement KMeans backend seam telemetry`).
+- `Geometry.KMeans::Backend` now exposes `{CPU, GPU}`; `KMeansResult` reports
+  `RequestedBackend`, `ActualBackend`, and `FellBackToCPU`; and the CPU entry
+  point reports CPU fallback honestly when `params.Compute == Backend::GPU`.
+- `Extrinsic.Runtime.KMeansBackend` is the RHI-visible integration seam. Its
+  `ClusterKMeans(...)` overloads accept `Extrinsic::RHI::IDevice&`, evaluate
+  `IDevice::IsOperational()` for GPU requests, and fall back to the geometry CPU
+  reference because no real KMeans GPU kernel exists in this slice.
 
 ## Required changes
-- [ ] Introduce the shared seam shape (CPU-only free function + optional
+- [x] Introduce the shared seam shape (CPU-only free function + optional
       GPU-capable `RHI::IDevice&` overload + `ActualBackend` diagnostic; enum
       `{ CPU, GPU }` using backend-policy tokens, not `CUDA`).
-- [ ] Rework `Geometry.KMeans` to that shape: resolve to the CPU reference today
+- [x] Rework `Geometry.KMeans` to that shape: resolve to the CPU reference today
       and report `ActualBackend` honestly (no fabricated GPU path).
-- [ ] Surface a typed `Backend` field on the command/config struct, defaulting to
+- [x] Surface a typed `Backend` field on the command/config struct, defaulting to
       the operational reference backend, failing closed to the reference when a
       requested backend is non-operational (`IsOperational` policy).
 
 ## Tests
-- [ ] CPU test: KMeans exposes the seam and reports `ActualBackend`
+- [x] CPU test: KMeans exposes the seam and reports `ActualBackend`
       deterministically; requesting GPU on a non-operational host resolves to
       CPU with honest telemetry (no fabricated GPU claim).
-- [ ] CPU test: the seam's requested-vs-resolved backend telemetry is asserted.
-- [ ] Default CPU gate stays green.
+- [x] CPU test: the seam's requested-vs-resolved backend telemetry is asserted.
+- [x] Default CPU gate stays green.
 
 ## Docs
-- [ ] Cross-link the implemented seam from
+- [x] Cross-link the implemented seam from
       `docs/architecture/algorithm-variant-dispatch.md` (reconciled by `DOCS-003`).
-- [ ] Note KMeans as the canonical backend-seam exemplar in `src/geometry/README.md`.
+- [x] Note KMeans as the canonical backend-seam exemplar in
+      `docs/architecture/geometry.md` (there is no `src/geometry/README.md` in
+      this tree) and document the runtime adapter in `src/runtime/README.md`.
 
 ## Acceptance criteria
-- [ ] A new data-parallel algorithm can adopt the seam to get CPU+GPU hooks.
-- [ ] `Geometry.KMeans` reports `ActualBackend` honestly; no fabricated GPU path.
-- [ ] Backend selection is read from the command/config struct and fails closed
+- [x] A new data-parallel algorithm can adopt the seam to get CPU+GPU hooks.
+- [x] `Geometry.KMeans` reports `ActualBackend` honestly; no fabricated GPU path.
+- [x] Backend selection is read from the command/config struct and fails closed
       to the reference backend.
-- [ ] No GPU dependency in the CPU gate; gate green.
+- [x] No GPU dependency in the CPU gate; gate green.
 
 ## Verification
 ```bash

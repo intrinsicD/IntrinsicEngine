@@ -2732,3 +2732,18 @@ requires honest requested-vs-actual fallback telemetry instead of a silent
 phantom GPU path. The architecture index now records the doc as target guidance
 pending `GEOM-052` before canonical promotion, satisfying the documentation
 gate for `GEOM-052` and `PROC-011`.
+
+[`GEOM-052`](GEOM-052-shared-cpu-gpu-backend-seam-kmeans-exemplar.md) —
+shared CPU/GPU backend seam and KMeans exemplar retired to `tasks/done/` on
+2026-06-28 at `CPUContracted`. `Geometry.KMeans::Backend` now exposes
+`CPU`/`GPU` rather than the old phantom GPU token, `KMeansParams::Compute`
+remains the backend request field, and `KMeansResult` reports
+`RequestedBackend`, `ActualBackend`, and `FellBackToCPU` so CPU fallback is
+observable. The CPU geometry entry point remains RHI-free and reports CPU as
+the actual backend even when GPU was requested. Runtime now exports
+`Extrinsic.Runtime.KMeansBackend`, whose `ClusterKMeans(...)` overloads accept
+`Extrinsic::RHI::IDevice&`, evaluate `IDevice::IsOperational()` for GPU
+requests, and fall back to the geometry CPU reference because no KMeans GPU
+kernel is implemented in this slice. Focused geometry and runtime contract tests
+cover CPU telemetry, non-operational GPU requests, operational-but-unimplemented
+GPU requests, and unchanged editor KMeans publication behavior.

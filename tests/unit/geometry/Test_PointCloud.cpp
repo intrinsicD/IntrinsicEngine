@@ -586,7 +586,9 @@ TEST(PointCloud_KMeans, TwoSeparatedBlobsProduceTwoCentroids)
     ASSERT_EQ(result->Centroids.size(), 2u);
     EXPECT_EQ(result->Labels.size(), points.size());
     EXPECT_EQ(result->SquaredDistances.size(), points.size());
+    EXPECT_EQ(result->RequestedBackend, Geometry::KMeans::Backend::CPU);
     EXPECT_EQ(result->ActualBackend, Geometry::KMeans::Backend::CPU);
+    EXPECT_FALSE(result->FellBackToCPU);
     EXPECT_GT(result->Iterations, 0u);
 
     std::sort(result->Centroids.begin(), result->Centroids.end(),
@@ -595,6 +597,29 @@ TEST(PointCloud_KMeans, TwoSeparatedBlobsProduceTwoCentroids)
     EXPECT_NEAR(result->Centroids[0].x, -9.845f, 0.25f);
     EXPECT_NEAR(result->Centroids[1].x, 10.155f, 0.25f);
     EXPECT_LT(result->Inertia, 1.0f);
+}
+
+TEST(PointCloud_KMeans, CpuEntryReportsGpuRequestAsCpuFallback)
+{
+    const std::vector<glm::vec3> points{
+        {-1.0f, 0.0f, 0.0f},
+        {-0.8f, 0.0f, 0.0f},
+        {1.0f, 0.0f, 0.0f},
+        {1.2f, 0.0f, 0.0f},
+    };
+
+    Geometry::KMeans::KMeansParams params{};
+    params.ClusterCount = 2u;
+    params.MaxIterations = 8u;
+    params.Compute = Geometry::KMeans::Backend::GPU;
+
+    const auto result = Geometry::KMeans::Cluster(points, params);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->RequestedBackend, Geometry::KMeans::Backend::GPU);
+    EXPECT_EQ(result->ActualBackend, Geometry::KMeans::Backend::CPU);
+    EXPECT_TRUE(result->FellBackToCPU);
+    EXPECT_EQ(result->Labels.size(), points.size());
+    EXPECT_EQ(result->Centroids.size(), 2u);
 }
 
 TEST(PointCloud_KMeans, ClusterCountIsClampedToPointCount)
