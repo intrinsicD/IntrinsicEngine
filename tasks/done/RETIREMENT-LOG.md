@@ -2532,3 +2532,13 @@ default-path config files before sandbox `Engine` construction. Focused core
 tests cover every boot field, file round-trip, invalid-key/value fallback, and
 diagnostics; runtime contract tests cover CLI selection and missing explicit
 path fallback; the sandbox target builds with the new entry-point wiring.
+
+[`GEOM-035`](GEOM-035-mesh-surface-point-sampling.md) — triangle-mesh surface
+point sampling retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
+`Geometry.PointCloud.SurfaceSampling` now samples triangle meshes into
+point-clouds with area-weighted face selection, sqrt-corrected barycentric
+samples, deterministic seeds, explicit diagnostics, and `p:normal` publication
+from interpolated source `v:normal` or geometric fallback normals. Focused
+geometry tests cover area proportions, determinism, normal handling, and
+invalid-input diagnostics; the benchmark smoke runner includes a CPU-only
+surface-sampling workload and manifest with no performance claim.

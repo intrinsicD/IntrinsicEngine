@@ -1,0 +1,25 @@
+# GEOM-035 — surface sampling smoke manifest.
+#
+# Stable benchmark contract for the workload defined by
+# benchmarks/geometry/Bench_SurfaceSamplingSmoke.cpp and emitted by the
+# IntrinsicBenchmarkSmoke runner. The benchmark_id below must match
+# kSurfaceSamplingSmokeBenchmarkId.
+#
+# Quality, not speed, is the gate: quality_error_l2 is the absolute area-fraction
+# error for a deterministic two-triangle fixture with a 1:4 area ratio.
+
+benchmark_id: geometry.surface_sampling.smoke
+method: geometry.pointcloud.surface_sampling
+dataset: builtin.two_triangle_area_ratio
+params:
+  intent: smoke
+  sample_count: 2048
+  seed: 217141
+  warmup_iterations: 1
+  measured_iterations: 8
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 100
+  quality_error_l2_max: 0.08

@@ -108,6 +108,17 @@ fraction is an identity operation, while empty input, non-finite positions,
 negative/non-finite fractions, and non-zero requests with degenerate scale report
 explicit status values.
 
+`Geometry.PointCloud.SurfaceSampling` converts a triangle `HalfedgeMesh::Mesh`
+into a deterministic dense `PointCloud::Cloud` by area-weighted face selection
+and sqrt-corrected barycentric sampling. The API returns a result record rather
+than throwing: invalid sample counts, empty meshes, and meshes with no valid
+triangles fail closed with explicit status and diagnostics. Diagnostics count
+requested/written samples, total/accepted faces, rejected non-triangle,
+degenerate, and non-finite triangles, total accepted surface area, seed, and
+whether normals came from interpolated source `v:normal` data or geometric face
+fallbacks. Output clouds publish sampled positions as `v:point` and point
+normals as the point-cloud built-in `p:normal`.
+
 ### Curvature tensor and principal directions
 
 `Geometry.Curvature` estimates per-vertex discrete curvature on triangle meshes.
