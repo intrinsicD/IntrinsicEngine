@@ -16,6 +16,7 @@ target_sources(${target_name}
         Runtime.AssetModelTextureIO.cppm
         Runtime.DerivedJobGraph.cppm
         Runtime.MeshAttributeTextureBake.cppm
+        Runtime.MethodFigureExport.cppm
         Runtime.ProgressivePresentationExtraction.cppm
         Runtime.ProgressiveRenderData.cppm
         Runtime.RenderArtifactPublication.cppm
@@ -59,6 +60,7 @@ target_sources(${target_name}
         Runtime.AssetModelTextureIO.cpp
         Runtime.DerivedJobGraph.cpp
         Runtime.MeshAttributeTextureBake.cpp
+        Runtime.MethodFigureExport.cpp
         Runtime.ProgressivePresentationExtraction.cpp
         Runtime.ProgressiveRenderData.cpp
         Runtime.RenderArtifactPublication.cpp

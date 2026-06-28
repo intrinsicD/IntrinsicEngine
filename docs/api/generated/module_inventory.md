@@ -21,7 +21,7 @@ Root scanned: `src`
 | `legacy` | 181 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 42 |
+| `runtime` | 43 |
 
 ## Modules
 
@@ -524,6 +524,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.MeshAttributeTextureBake` | `src/runtime/Runtime.MeshAttributeTextureBake.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshGeometryPacker` | `src/runtime/Runtime.MeshGeometryPacker.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshPrimitiveViewPacker` | `src/runtime/Runtime.MeshPrimitiveViewPacker.cppm` | `runtime` |
+| `Extrinsic.Runtime.MethodFigureExport` | `src/runtime/Runtime.MethodFigureExport.cppm` | `runtime` |
 | `Extrinsic.Runtime.PhysicsBridge` | `src/runtime/Runtime.PhysicsBridge.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointCloudGeometryPacker` | `src/runtime/Runtime.PointCloudGeometryPacker.cppm` | `runtime` |
 | `Extrinsic.Runtime.PrimitiveSelectionRefinement` | `src/runtime/Runtime.PrimitiveSelectionRefinement.cppm` | `runtime` |
@@ -546,4 +547,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **518**
+Total modules: **519**

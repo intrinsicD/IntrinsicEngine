@@ -260,6 +260,19 @@ intrinsic_test_object_lib(EcsContractTestObjs
 # so they live in a dedicated CPU-only contract executable rather than the
 # headless-gated IntrinsicRuntimeTests umbrella.
 if(TARGET ExtrinsicRuntime)
+    set(_runtime_unit_test_files
+        Test.MethodFigureExport.cpp
+    )
+    intrinsic_resolve_test_sources(_runtime_unit_test_sources
+        SEARCH_DIRS unit/runtime
+        FILES ${_runtime_unit_test_files}
+    )
+    intrinsic_test_object_lib(RuntimeUnitTestObjs
+        SOURCES
+            ${_runtime_unit_test_sources}
+        DEPS ExtrinsicRuntime nlohmann_json::nlohmann_json glm::glm
+    )
+
     set(_runtime_contract_test_files
         Test.GpuAssetCacheFallbackBootstrap.cpp
         Test.GpuReadbackJob.cpp
@@ -1044,6 +1057,14 @@ intrinsic_test_executable(IntrinsicEcsContractTests
 )
 
 # --- Runtime contract tests (CPU-only procedural geometry contracts) ---
+if(TARGET RuntimeUnitTestObjs)
+    intrinsic_test_executable(IntrinsicRuntimeUnitTests
+        OBJECTS RuntimeUnitTestObjs
+        LINK_LIBS ExtrinsicRuntime
+        LABELS unit runtime
+    )
+endif()
+
 if(TARGET RuntimeContractTestObjs)
     intrinsic_test_executable(IntrinsicRuntimeContractTests
         OBJECTS RuntimeContractTestObjs

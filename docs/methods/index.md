@@ -12,6 +12,7 @@ This index is the canonical entry point for method/paper implementation document
 - [Backend policy](backend-policy.md)
 - [Numerical robustness policy](numerical-robustness-policy.md)
 - [Dataset policy](dataset-policy.md)
+- [Method figure data export](figure-data-export.md)
 - [Report template](report-template.md)
 
 ## Related docs

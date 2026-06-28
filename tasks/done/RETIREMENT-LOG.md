@@ -2552,3 +2552,14 @@ edge correction, 2D periodograms, and radially averaged power spectra. Focused
 geometry tests cover grid, jittered-grid, white-noise, regular-lattice, cloud
 adapter, and fail-closed edge cases; the benchmark smoke runner includes a
 CPU-only quality-metrics workload and manifest with no performance claim.
+
+[`RUNTIME-133`](RUNTIME-133-method-figure-data-export.md) — method figure
+data-export seam retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
+`Extrinsic.Runtime.MethodFigureExport` now serializes copied metric series,
+scalar summaries, run manifests, and point sets to deterministic CSV, JSON,
+and ASCII PLY with stable column/property ordering and 17-digit scientific
+float formatting. Writers validate inputs before opening output, commit via a
+same-directory temporary file, and fail closed with explicit diagnostics.
+Focused runtime unit tests cover metric round-trip parsing, byte-identical
+manifest ordering, point-set CSV/PLY output, invalid arrays, duplicate keys,
+and unwritable target paths.
