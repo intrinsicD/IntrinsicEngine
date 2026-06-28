@@ -6,6 +6,7 @@ module;
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include <type_traits>
 
 export module Geometry.Statistics;
 
@@ -78,4 +79,52 @@ export namespace Geometry::Statistics
     // finite samples. q is clamped-checked: q outside [0, 1] (or no finite
     // samples) returns nullopt.
     [[nodiscard]] std::optional<double> Quantile(std::span<const double> values, double q);
+
+    template <typename T>
+        requires(std::is_arithmetic_v<T>)
+    [[nodiscard]] std::optional<double> Median(std::span<const T> values)
+    {
+        std::vector<double> finite;
+        finite.reserve(values.size());
+        for (const T value : values)
+        {
+            const double scalar = static_cast<double>(value);
+            if (std::isfinite(scalar))
+            {
+                finite.push_back(scalar);
+            }
+        }
+        return Median(std::span<const double>(finite));
+    }
+
+    template <typename T>
+        requires(std::is_arithmetic_v<T>)
+    [[nodiscard]] std::optional<double> Median(const std::vector<T>& values)
+    {
+        return Median(std::span<const T>(values));
+    }
+
+    template <typename T>
+        requires(std::is_arithmetic_v<T>)
+    [[nodiscard]] std::optional<double> Quantile(std::span<const T> values, double q)
+    {
+        std::vector<double> finite;
+        finite.reserve(values.size());
+        for (const T value : values)
+        {
+            const double scalar = static_cast<double>(value);
+            if (std::isfinite(scalar))
+            {
+                finite.push_back(scalar);
+            }
+        }
+        return Quantile(std::span<const double>(finite), q);
+    }
+
+    template <typename T>
+        requires(std::is_arithmetic_v<T>)
+    [[nodiscard]] std::optional<double> Quantile(const std::vector<T>& values, double q)
+    {
+        return Quantile(std::span<const T>(values), q);
+    }
 }

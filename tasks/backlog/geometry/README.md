@@ -31,7 +31,6 @@ Confirmed feature gaps from the `bcg_code_base` → IntrinsicEngine port-gap
 review (features already present or better in IntrinsicEngine were excluded).
 Grouped by cluster; each is `geometry -> core` only and targets `CPUContracted`.
 
-- [GEOM-048 — Statistics accumulators and robust estimation kernels](GEOM-048-statistics-robust-estimation-kernels.md).
 - [GEOM-049 — Numeric/linear-algebra utilities (RPCA, Eigen map adapters)](GEOM-049-numeric-linalg-utilities.md).
 - [GEOM-050 — Primitive and curve utilities (Bezier, triangle metrics, sphere fit, AABB)](GEOM-050-primitive-curve-utilities.md).
 
@@ -132,6 +131,7 @@ split; narratives live in the retirement log.
 - [GEOM-045 — First-class mesh geometric-quantity accessors](../../done/GEOM-045-first-class-mesh-quantity-accessors.md) (done).
 - [GEOM-046 — Mesh topology utilities](../../done/GEOM-046-mesh-topology-utilities.md) (done).
 - [GEOM-047 — Graph and point-cloud query/noise utilities](../../done/GEOM-047-graph-pointcloud-query-noise-utilities.md) (done).
+- [GEOM-048 — Statistics accumulators and robust estimation kernels](../../done/GEOM-048-statistics-robust-estimation-kernels.md) (done).
 - [GEOM-051 — Property system enhancements](../../done/GEOM-051-property-system-enhancements.md) (done).
 - [GEOM-052 — Shared CPU/GPU backend seam + fix the KMeans phantom GPU exemplar](../../done/GEOM-052-shared-cpu-gpu-backend-seam-kmeans-exemplar.md) (done).
 - [GEOIO-003 — Mesh and point-cloud IO breadth (OFF writer, point-cloud readers)](../../done/GEOIO-003-mesh-pointcloud-io-breadth.md) (done).

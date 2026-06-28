@@ -70,14 +70,17 @@ TEST(GeometryStatistics, MergeEqualsConcatenation)
 {
     const std::vector<double> a{1.0, 2.0, 3.0, 10.0, -4.0};
     const std::vector<double> b{7.0, 7.5, -2.0, 0.0, 100.0, 42.0};
+    const std::vector<double> c{-9.0, 6.25, 8.75};
 
-    StreamingMoments accA, accB, accAll;
+    StreamingMoments accA, accB, accC, accAll;
     for (double x : a) accA.Add(x);
     for (double x : b) accB.Add(x);
+    for (double x : c) accC.Add(x);
     for (double x : a) accAll.Add(x);
     for (double x : b) accAll.Add(x);
+    for (double x : c) accAll.Add(x);
 
-    const StreamingMoments merged = accA + accB;
+    const StreamingMoments merged = (accA + accB) + accC;
     EXPECT_EQ(merged.Count(), accAll.Count());
     EXPECT_NEAR(*merged.Mean(), *accAll.Mean(), 1e-7);
     EXPECT_NEAR(*merged.PopulationVariance(), *accAll.PopulationVariance(), 1e-6);
@@ -85,9 +88,16 @@ TEST(GeometryStatistics, MergeEqualsConcatenation)
     EXPECT_NEAR(*merged.Kurtosis(), *accAll.Kurtosis(), 1e-6);
 
     // Commutativity of merge.
-    const StreamingMoments mergedBA = accB + accA;
-    EXPECT_NEAR(*mergedBA.Mean(), *merged.Mean(), 1e-7);
-    EXPECT_NEAR(*mergedBA.Kurtosis(), *merged.Kurtosis(), 1e-6);
+    const StreamingMoments mergedCBA = (accC + accB) + accA;
+    EXPECT_NEAR(*mergedCBA.Mean(), *merged.Mean(), 1e-7);
+    EXPECT_NEAR(*mergedCBA.Kurtosis(), *merged.Kurtosis(), 1e-6);
+
+    // Associativity within floating-point tolerance.
+    const StreamingMoments leftAssoc = (accA + accB) + accC;
+    const StreamingMoments rightAssoc = accA + (accB + accC);
+    EXPECT_NEAR(*leftAssoc.Mean(), *rightAssoc.Mean(), 1e-7);
+    EXPECT_NEAR(*leftAssoc.PopulationVariance(), *rightAssoc.PopulationVariance(), 1e-6);
+    EXPECT_NEAR(*leftAssoc.Skewness(), *rightAssoc.Skewness(), 1e-6);
 }
 
 TEST(GeometryStatistics, MedianOddAndEven)
@@ -115,6 +125,21 @@ TEST(GeometryStatistics, QuantileLinearInterpolation)
     EXPECT_NEAR(*Quantile(s, 1.0), 5.0, kTol);
     // Interpolated point: h = 0.1*(5-1)=0.4 → 1 + 0.4*(2-1) = 1.4
     EXPECT_NEAR(*Quantile(s, 0.1), 1.4, kTol);
+}
+
+TEST(GeometryStatistics, GenericMedianAndQuantileSupportNonDoubleVectors)
+{
+    const std::vector<int> ints{9, 1, 5, 3};
+    ASSERT_TRUE(Median(ints).has_value());
+    EXPECT_NEAR(*Median(ints), 4.0, kTol);
+    ASSERT_TRUE(Quantile(ints, 0.25).has_value());
+    EXPECT_NEAR(*Quantile(ints, 0.25), 2.5, kTol);
+
+    const std::vector<float> floats{4.0f, 2.0f, std::numeric_limits<float>::infinity(), 6.0f};
+    ASSERT_TRUE(Median(floats).has_value());
+    EXPECT_NEAR(*Median(floats), 4.0, kTol);
+    ASSERT_TRUE(Quantile(std::span<const float>(floats), 1.0).has_value());
+    EXPECT_NEAR(*Quantile(std::span<const float>(floats), 1.0), 6.0, kTol);
 }
 
 TEST(GeometryStatistics, RunningMedianTracksMedian)

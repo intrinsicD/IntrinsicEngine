@@ -48,7 +48,6 @@ the authoritative open/unblocked view.
 - unblocked: `GEOM-020` — Sparse direct factorization solver seam (LDLT/LLT) (tasks/backlog/geometry/GEOM-020-sparse-direct-factorization-seam.md)
 - unblocked: `GEOM-023` — Sparse non-symmetric iterative solver seam (BiCGSTAB) (tasks/backlog/geometry/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md)
 - blocked by `GEOM-020`: `GEOM-024` — Sparse symmetric generalized eigensolver seam (tasks/backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
-- unblocked: `GEOM-048` — Statistics accumulators and robust estimation kernels (tasks/backlog/geometry/GEOM-048-statistics-robust-estimation-kernels.md)
 - unblocked: `GEOM-049` — Numeric / linear-algebra utilities: RPCA and Eigen map adapters (tasks/backlog/geometry/GEOM-049-numeric-linalg-utilities.md)
 - unblocked: `GEOM-050` — Primitive and curve utilities — Bezier, triangle metrics, sphere fit, AABB cubify (tasks/backlog/geometry/GEOM-050-primitive-curve-utilities.md)
 - unblocked: `GRAPHICS-108` — Reusable Vulkan compute parallel primitives (scan + compaction) (tasks/backlog/rendering/GRAPHICS-108-vulkan-compute-parallel-primitives.md)

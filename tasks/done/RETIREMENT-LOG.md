@@ -2803,3 +2803,19 @@ coverage pins analytic area, closed-mesh area-vector conservation, property
 publication, linear-field face gradients, origin-safe unit-sphere projection,
 area-times-angle normals, 1-ring PCA normal alignment, and fail-closed invalid
 inputs; focused geodesic tests pass through the promoted gradient path.
+
+[`GEOM-048`](GEOM-048-statistics-robust-estimation-kernels.md) — statistics
+accumulators and robust estimation kernels retired to `tasks/done/` on
+2026-06-28 at `CPUContracted`. `Geometry.Statistics` now owns mergeable scalar
+streaming moments, a two-heap running median, generic finite-sample
+`Median`/`Quantile` helpers, and fail-closed `SafeAcos`/`SafeAsin` domain
+clamps. `Geometry.Robust` now owns L2, L1, Huber, Tukey, Welsch, Lorentzian,
+and Cauchy M-estimator kernels with `Rho`/`Psi`/`Weight` entry points.
+`Geometry.Registration` exposes default-off robust ICP weighting through
+`RegistrationParams::RobustKernelKind` and `RobustScale`; when selected, the
+existing percentile trim remains in place and the surviving correspondences
+feed weighted point-to-point Kabsch or point-to-plane normal equations. Unit
+coverage proves streaming-vs-batch moments, merge associativity, order
+statistics over double and non-double scalar vectors, robust-kernel analytic
+forms/fail-closed inputs, invalid robust ICP params, and Tukey improvement over
+percentile trimming alone on a gross-outlier registration case.

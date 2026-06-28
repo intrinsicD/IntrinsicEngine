@@ -17,6 +17,7 @@ module;
 module Geometry.Registration;
 
 import Geometry.KDTree;
+import Geometry.Robust;
 import Geometry.Rotation;
 
 namespace Geometry::Registration
@@ -32,6 +33,7 @@ namespace Geometry::Registration
             std::size_t SourceIndex;
             std::size_t TargetIndex;
             double DistanceSq;
+            double Weight{1.0};
         };
 
         // Apply a 4x4 rigid transform to a vec3 point.
@@ -83,7 +85,7 @@ namespace Geometry::Registration
                 const double distSq = glm::dot(diff, diff);
 
                 if (distSq <= maxDistSq)
-                    outPairs.push_back({i, targetIdx, distSq});
+                    outPairs.push_back({i, targetIdx, distSq, 1.0});
             }
         }
 
@@ -108,17 +110,51 @@ namespace Geometry::Registration
             pairs.resize(keepCount);
         }
 
-        // Compute RMSE from correspondence pairs.
-        [[nodiscard]] double ComputeRMSE(const std::vector<CorrespondencePair>& pairs)
+        // Apply IRLS-style robust weights to the surviving correspondences.
+        void ApplyRobustWeights(std::vector<CorrespondencePair>& pairs,
+                                Geometry::Robust::RobustKernel kernel,
+                                double scale)
+        {
+            for (auto& pair : pairs)
+            {
+                const double residual = std::sqrt(std::max(0.0, pair.DistanceSq));
+                const std::optional<double> weight = Geometry::Robust::Weight(kernel, residual, scale);
+                pair.Weight = (weight && std::isfinite(*weight) && *weight > 0.0) ? *weight : 0.0;
+            }
+
+            std::erase_if(pairs,
+                          [](const CorrespondencePair& pair)
+                          {
+                              return !std::isfinite(pair.Weight) || !(pair.Weight > 0.0);
+                          });
+        }
+
+        // Compute RMSE from correspondence pairs. Robust ICP reports the
+        // weighted objective so convergence follows the IRLS energy; the default
+        // path keeps the historical unweighted RMSE.
+        [[nodiscard]] double ComputeRMSE(const std::vector<CorrespondencePair>& pairs, bool weighted)
         {
             if (pairs.empty())
                 return 0.0;
 
             double sumSq = 0.0;
+            double sumWeight = 0.0;
             for (const auto& p : pairs)
-                sumSq += p.DistanceSq;
+            {
+                const double w = weighted ? p.Weight : 1.0;
+                if (!std::isfinite(w) || !(w > 0.0))
+                {
+                    continue;
+                }
+                sumSq += w * p.DistanceSq;
+                sumWeight += w;
+            }
 
-            return std::sqrt(sumSq / static_cast<double>(pairs.size()));
+            if (!(sumWeight > 0.0))
+            {
+                return 0.0;
+            }
+            return std::sqrt(sumSq / sumWeight);
         }
 
         // =====================================================================
@@ -142,30 +178,46 @@ namespace Geometry::Registration
             if (pairs.size() < 3)
                 return glm::dmat4(1.0);
 
-            const double invN = 1.0 / static_cast<double>(pairs.size());
-
-            // Compute centroids
             glm::dvec3 centroidS(0.0);
             glm::dvec3 centroidT(0.0);
+            double totalWeight = 0.0;
+            std::size_t validCount = 0;
             for (const auto& pair : pairs)
             {
-                centroidS += transformedSource[pair.SourceIndex];
-                centroidT += glm::dvec3(targetPoints[pair.TargetIndex]);
+                if (!std::isfinite(pair.Weight) || !(pair.Weight > 0.0))
+                {
+                    continue;
+                }
+                centroidS += pair.Weight * transformedSource[pair.SourceIndex];
+                centroidT += pair.Weight * glm::dvec3(targetPoints[pair.TargetIndex]);
+                totalWeight += pair.Weight;
+                ++validCount;
             }
-            centroidS *= invN;
-            centroidT *= invN;
+            if (validCount < 3 || !(totalWeight > 0.0))
+            {
+                return glm::dmat4(1.0);
+            }
+            centroidS /= totalWeight;
+            centroidT /= totalWeight;
 
             std::vector<glm::dvec3> sourceCentered;
             std::vector<glm::dvec3> targetCentered;
+            std::vector<double> weights;
             sourceCentered.reserve(pairs.size());
             targetCentered.reserve(pairs.size());
+            weights.reserve(pairs.size());
             for (const auto& pair : pairs)
             {
+                if (!std::isfinite(pair.Weight) || !(pair.Weight > 0.0))
+                {
+                    continue;
+                }
                 sourceCentered.push_back(transformedSource[pair.SourceIndex] - centroidS);
                 targetCentered.push_back(glm::dvec3(targetPoints[pair.TargetIndex]) - centroidT);
+                weights.push_back(pair.Weight);
             }
 
-            const glm::dmat3 R = Geometry::Rotation::OptimalRotation(sourceCentered, targetCentered);
+            const glm::dmat3 R = Geometry::Rotation::OptimalRotation(sourceCentered, targetCentered, weights);
 
             // Translation
             const glm::dvec3 t = centroidT - R * centroidS;
@@ -208,9 +260,14 @@ namespace Geometry::Registration
             // Build normal equations: A^T A x = A^T b  (6x6 symmetric system)
             double ATA[6][6] = {};
             double ATb[6] = {};
+            std::size_t validRows = 0;
 
             for (const auto& pair : pairs)
             {
+                if (!std::isfinite(pair.Weight) || !(pair.Weight > 0.0))
+                {
+                    continue;
+                }
                 const glm::dvec3 s = transformedSource[pair.SourceIndex];
                 const glm::dvec3 c = glm::dvec3(targetPoints[pair.TargetIndex]);
                 const glm::dvec3 n = glm::dvec3(targetNormals[pair.TargetIndex]);
@@ -231,9 +288,15 @@ namespace Geometry::Registration
                 for (int i = 0; i < 6; ++i)
                 {
                     for (int j = i; j < 6; ++j)
-                        ATA[i][j] += a[i] * a[j];
-                    ATb[i] += a[i] * b;
+                        ATA[i][j] += pair.Weight * a[i] * a[j];
+                    ATb[i] += pair.Weight * a[i] * b;
                 }
+                ++validRows;
+            }
+
+            if (validRows < 6)
+            {
+                return glm::dmat4(1.0);
             }
 
             // Fill lower triangle
@@ -347,6 +410,13 @@ namespace Geometry::Registration
         if (params.InlierRatio <= 0.0 || params.InlierRatio > 1.0)
             return std::nullopt;
 
+        const bool robustWeightingEnabled = params.RobustKernelKind.has_value();
+        if (robustWeightingEnabled &&
+            (!std::isfinite(params.RobustScale) || !(params.RobustScale > 0.0)))
+        {
+            return std::nullopt;
+        }
+
         // Determine effective variant: fall back to PointToPoint if normals unavailable
         ICPVariant effectiveVariant = params.Variant;
         if (effectiveVariant == ICPVariant::PointToPlane &&
@@ -389,11 +459,16 @@ namespace Geometry::Registration
             // 2. Reject outliers
             RejectOutliers(pairs, params.InlierRatio);
 
+            if (robustWeightingEnabled)
+            {
+                ApplyRobustWeights(pairs, *params.RobustKernelKind, params.RobustScale);
+            }
+
             if (pairs.size() < 3)
                 break;
 
             // 3. Compute RMSE before solving
-            const double rmse = ComputeRMSE(pairs);
+            const double rmse = ComputeRMSE(pairs, robustWeightingEnabled);
             result.RMSEHistory.push_back(rmse);
 
             // 4. Solve for incremental transform

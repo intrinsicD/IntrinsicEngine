@@ -49,7 +49,29 @@
   two-sample degeneracy, invalid options, and non-convergence report explicit
   `RotationAverageStatus` values and return finite identity or last-iterate
   sentinels without asserts or NaNs. Single finite samples return unchanged with
-  `SingleSample`. Registration weighting remains a GEOM-048 follow-up.
+  `SingleSample`.
+- `Geometry.Statistics` owns scalar CPU statistics utilities that are
+  deterministic and fail closed: `StreamingMoments` accumulates count, mean,
+  population/sample variance, skewness, and excess kurtosis with mergeable
+  Pébay/Terriberry M2/M3/M4 state; `RunningMedian` tracks a streaming median
+  with two heaps; `Median` and `Quantile` provide finite-sample order
+  statistics over double spans and arithmetic vectors; and `SafeAcos` /
+  `SafeAsin` centralize inverse-trig domain clamping. Empty, non-finite, or
+  out-of-domain order-statistic queries return `std::nullopt`; non-finite
+  accumulator samples are ignored rather than poisoning state.
+- `Geometry.Robust` owns robust M-estimator kernels for CPU fitting and IRLS
+  seams. The `RobustKernel` family covers L2, L1, Huber, Tukey biweight,
+  Welsch, Lorentzian, and Cauchy; each exposes `Rho`, `Psi`, and `Weight`, where
+  `Weight` is the finite `Psi(u)/u` IRLS weight on scaled residual
+  `u = residual / scale`. Non-finite residuals and non-positive or non-finite
+  scales fail closed with `std::nullopt`.
+- `Geometry.Registration` keeps percentile trimming (`InlierRatio`) as the
+  default ICP outlier policy. Optional robust weighting is explicit through
+  `RegistrationParams::RobustKernelKind` plus `RobustScale`; when selected, ICP
+  computes per-correspondence robust weights after the existing trim and folds
+  them into point-to-point weighted Kabsch and point-to-plane normal-equation
+  assembly. With no robust kernel selected, the no-kernel path ignores
+  `RobustScale` and preserves the existing trimming behavior.
 - `Geometry.Sparse` owns reusable CSR storage, COO-to-CSR building, matrix
   diagnostics, and conjugate-gradient diagnostics. `Geometry.DEC` aliases these
   sparse records so existing DEC/geodesic/parameterization callers keep their
