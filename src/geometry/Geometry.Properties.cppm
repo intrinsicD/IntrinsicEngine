@@ -16,9 +16,11 @@ module;
 #include <vector>
 #include <limits>
 
-#include <glm/fwd.hpp>
+#include <glm/glm.hpp>
 
 export module Geometry.Properties;
+
+import Geometry.Linalg;
 
 export namespace Geometry
 {
@@ -461,6 +463,102 @@ export namespace Geometry
         const Internal::PropertyStorage<T>* m_Storage{nullptr};
         PropertyId m_Id{static_cast<PropertyId>(-1)};
     };
+
+    struct BoolPropertyMap
+    {
+        Geometry::Linalg::DenseMatrix Values{};
+        Geometry::Linalg::NumericDiagnostics Diagnostics{};
+
+        [[nodiscard]] bool Succeeded() const noexcept { return Diagnostics.Succeeded(); }
+    };
+
+    namespace Internal
+    {
+        template <class T>
+        concept EigenMappablePropertyScalar = std::is_arithmetic_v<T> && !std::is_same_v<T, bool>;
+
+        template <class T>
+        concept EigenMappablePropertyVector = Geometry::Linalg::FixedSizeVector<T>;
+
+        [[nodiscard]] inline BoolPropertyMap MakeBoolPropertyMap(const std::vector<bool>& values)
+        {
+            BoolPropertyMap result;
+            result.Values = Geometry::Linalg::DenseMatrix(values.size(), 1u);
+            for (std::size_t row = 0; row < values.size(); ++row)
+            {
+                result.Values(row, 0u) = values[row] ? 1.0 : 0.0;
+            }
+            result.Diagnostics.Status = Geometry::Linalg::NumericStatus::Success;
+            result.Diagnostics.Rank = values.empty() ? 0u : 1u;
+            return result;
+        }
+    } // namespace Internal
+
+    template <class T>
+        requires (Internal::EigenMappablePropertyScalar<T>)
+    [[nodiscard]] auto MapProperty(PropertyBuffer<T>& property)
+    {
+        if (!property)
+        {
+            return Geometry::Linalg::MapAsMatrix(std::span<T>{}, 0u, 0u, 0);
+        }
+        return Geometry::Linalg::MapAsMatrix(property.Span(), property.Vector().size(), 1u, 1);
+    }
+
+    template <class T>
+        requires (Internal::EigenMappablePropertyScalar<T>)
+    [[nodiscard]] auto MapProperty(const ConstPropertyBuffer<T>& property)
+    {
+        if (!property)
+        {
+            return Geometry::Linalg::MapAsMatrix(std::span<const T>{}, 0u, 0u, 0);
+        }
+        return Geometry::Linalg::MapAsMatrix(property.Span(), property.Vector().size(), 1u, 1);
+    }
+
+    template <class T>
+        requires (Internal::EigenMappablePropertyVector<T>)
+    [[nodiscard]] auto MapProperty(PropertyBuffer<T>& property)
+    {
+        if (!property)
+        {
+            return Geometry::Linalg::MapVectorAsMatrix(std::span<T>{});
+        }
+        return Geometry::Linalg::MapVectorAsMatrix(property.Span());
+    }
+
+    template <class T>
+        requires (Internal::EigenMappablePropertyVector<T>)
+    [[nodiscard]] auto MapProperty(const ConstPropertyBuffer<T>& property)
+    {
+        if (!property)
+        {
+            return Geometry::Linalg::MapVectorAsMatrix(std::span<const T>{});
+        }
+        return Geometry::Linalg::MapVectorAsMatrix(property.Span());
+    }
+
+    [[nodiscard]] inline BoolPropertyMap MapProperty(PropertyBuffer<bool>& property)
+    {
+        if (!property)
+        {
+            BoolPropertyMap result;
+            result.Diagnostics.Status = Geometry::Linalg::NumericStatus::InvalidInput;
+            return result;
+        }
+        return Internal::MakeBoolPropertyMap(property.Vector());
+    }
+
+    [[nodiscard]] inline BoolPropertyMap MapProperty(const ConstPropertyBuffer<bool>& property)
+    {
+        if (!property)
+        {
+            BoolPropertyMap result;
+            result.Diagnostics.Status = Geometry::Linalg::NumericStatus::InvalidInput;
+            return result;
+        }
+        return Internal::MakeBoolPropertyMap(property.Vector());
+    }
 
     template <class T>
     Internal::PropertyStorage<T>* PropertyRegistry::Storage(PropertyId id) noexcept

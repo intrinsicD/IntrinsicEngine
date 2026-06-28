@@ -10,6 +10,7 @@
 #include <glm/glm.hpp>
 
 import Geometry;
+import Geometry.Linalg;
 
 namespace
 {
@@ -145,6 +146,67 @@ TEST(GeometryPropertiesContract, BoolPropertySupportsScalarProxyAccessOnly)
     EXPECT_FALSE(static_cast<bool>(selected[2]));
     EXPECT_TRUE(static_cast<bool>(selected[3]));
     EXPECT_EQ(selected.Vector().size(), 4u);
+}
+
+TEST(GeometryPropertiesContract, MapPropertyAliasesScalarAndVectorColumns)
+{
+    Geometry::PropertySet properties;
+    properties.Resize(3u);
+
+    auto weights = properties.GetOrAdd<double>("v:weight", 0.0);
+    auto directions = properties.GetOrAdd<glm::vec3>("v:direction", glm::vec3{0.0f});
+    ASSERT_TRUE(weights.IsValid());
+    ASSERT_TRUE(directions.IsValid());
+
+    weights[0] = 1.0;
+    weights[1] = 2.0;
+    weights[2] = 3.0;
+    directions[0] = glm::vec3{1.0f, 2.0f, 3.0f};
+    directions[1] = glm::vec3{4.0f, 5.0f, 6.0f};
+    directions[2] = glm::vec3{7.0f, 8.0f, 9.0f};
+
+    auto weightMap = Geometry::MapProperty(weights.Handle());
+    ASSERT_EQ(weightMap.rows(), 3);
+    ASSERT_EQ(weightMap.cols(), 1);
+    EXPECT_DOUBLE_EQ(weightMap(2, 0), 3.0);
+    weightMap(1, 0) = 12.0;
+    EXPECT_DOUBLE_EQ(weights[1], 12.0);
+
+    auto directionMap = Geometry::MapProperty(directions.Handle());
+    ASSERT_EQ(directionMap.rows(), 3);
+    ASSERT_EQ(directionMap.cols(), 3);
+    EXPECT_FLOAT_EQ(directionMap(2, 1), 8.0f);
+    directionMap(0, 2) = -5.0f;
+    EXPECT_FLOAT_EQ(directions[0].z, -5.0f);
+
+    const Geometry::ConstPropertySet constProperties{properties};
+    const auto constWeights = constProperties.Get<double>("v:weight");
+    ASSERT_TRUE(constWeights.IsValid());
+    const auto constWeightMap = Geometry::MapProperty(constWeights.Handle());
+    EXPECT_DOUBLE_EQ(constWeightMap(1, 0), 12.0);
+}
+
+TEST(GeometryPropertiesContract, MapPropertyBoolReturnsCopiedNumericColumn)
+{
+    Geometry::PropertySet properties;
+    properties.Resize(4u);
+
+    auto selected = properties.GetOrAdd<bool>("v:selected", false);
+    ASSERT_TRUE(selected.IsValid());
+    selected[1] = true;
+    selected[3] = true;
+
+    auto mapped = Geometry::MapProperty(selected.Handle());
+    ASSERT_TRUE(mapped.Succeeded());
+    ASSERT_EQ(mapped.Values.Rows, 4u);
+    ASSERT_EQ(mapped.Values.Cols, 1u);
+    EXPECT_DOUBLE_EQ(mapped.Values(0, 0), 0.0);
+    EXPECT_DOUBLE_EQ(mapped.Values(1, 0), 1.0);
+    EXPECT_DOUBLE_EQ(mapped.Values(2, 0), 0.0);
+    EXPECT_DOUBLE_EQ(mapped.Values(3, 0), 1.0);
+
+    mapped.Values(0, 0) = 1.0;
+    EXPECT_FALSE(static_cast<bool>(selected[0]));
 }
 
 TEST(GeometryPropertiesContract, DescriptorCatalogReportsTypeAndAccessMetadata)

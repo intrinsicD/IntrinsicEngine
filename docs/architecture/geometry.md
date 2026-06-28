@@ -24,9 +24,16 @@
   GLM/Eigen adapters or dense decompositions must import `Geometry.Linalg`
   explicitly.
 - `Geometry.Linalg` is the narrow advanced numerical surface for CPU kernels. It
-  exposes GLM round-trip adapters, explicit row-major `Eigen::Map` helpers for
-  contiguous scalar buffers, and dense decomposition wrappers that return
-  geometry-owned diagnostics rather than raw Eigen solver state.
+  exposes GLM round-trip adapters, explicit row-major and strided `Eigen::Map`
+  helpers for contiguous scalar buffers and fixed-size GLM vector arrays, and
+  dense decomposition wrappers that return geometry-owned diagnostics rather
+  than raw Eigen solver state. `RobustPCA` implements deterministic Principal
+  Component Pursuit / ADMM on top of `ComputeSVD`: lambda defaults to
+  `1 / sqrt(max(rows, cols))`, convergence is the relative Frobenius residual
+  `||M - L - S||_F / ||M||_F`, and empty, zero, non-finite, invalid-option, or
+  hard SVD-failure inputs return non-success `NumericStatus` diagnostics
+  without NaNs or asserts. Rank-deficient SVDs are accepted inside RPCA because
+  low rank is the expected solution shape.
 - `Geometry.Rotation` owns the shared SO(3) primitive surface: hat/vee, exp/log,
   geodesic and chordal distances, deterministic seeded random rotations,
   `ProjectOnSO3`, and optimal-rotation/Kabsch helpers for corresponded point
@@ -102,7 +109,12 @@ the property remains alive. Const property-set lookups return read-only property
 handles and default-constructed `ConstPropertySet` values behave as safe empty
 views. `PropertySet::Descriptors()` reports erased property metadata including
 name, value kind, element count, and mutability so runtime/editor inspection can
-enumerate geometry attributes without RTTI. `LiveElementRange` is the shared
+enumerate geometry attributes without RTTI. `MapProperty(...)` is the
+geometry-owned bridge from typed property columns to `Geometry.Linalg` Eigen
+views: arithmetic columns map as aliasing `N x 1` strided views, fixed-size GLM
+vector columns map as aliasing `N x dim` strided views, and `bool` columns
+return an explicit copied numeric column because `std::vector<bool>` cannot be
+reinterpreted as contiguous scalar storage. `LiveElementRange` is the shared
 handle iteration helper behind mesh, graph, point-cloud, and const domain-view
 live-element accessors.
 

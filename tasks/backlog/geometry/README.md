@@ -31,7 +31,6 @@ Confirmed feature gaps from the `bcg_code_base` → IntrinsicEngine port-gap
 review (features already present or better in IntrinsicEngine were excluded).
 Grouped by cluster; each is `geometry -> core` only and targets `CPUContracted`.
 
-- [GEOM-049 — Numeric/linear-algebra utilities (RPCA, Eigen map adapters)](GEOM-049-numeric-linalg-utilities.md).
 - [GEOM-050 — Primitive and curve utilities (Bezier, triangle metrics, sphere fit, AABB)](GEOM-050-primitive-curve-utilities.md).
 
 The indexed decrease-key heap that backs Dijkstra is a `core` container filed
@@ -98,6 +97,7 @@ Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
 - [DOCS-003 — Reconcile algorithm-variant-dispatch.md with reality and define the backend-seam template](../../done/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md) (done).
+- [GEOM-049 — Numeric/linear-algebra utilities (RPCA, Eigen map adapters)](../../done/GEOM-049-numeric-linalg-utilities.md) (done).
 - [GEOIO-002 — Geometry IO parity hardening and exporters](../../done/GEOIO-002-geometry-io-parity-hardening.md) (done).
 - [GEOM-006 — Indexed mesh/soup container and conversion contracts](../../done/GEOM-006-indexed-mesh-soup-conversion-contracts.md) (done).
 - [GEOM-007 — Robust predicates and intersection classification foundation](../../done/GEOM-007-robust-predicates-intersection-classification.md) (done).

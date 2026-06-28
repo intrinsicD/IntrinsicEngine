@@ -2819,3 +2819,18 @@ coverage proves streaming-vs-batch moments, merge associativity, order
 statistics over double and non-double scalar vectors, robust-kernel analytic
 forms/fail-closed inputs, invalid robust ICP params, and Tukey improvement over
 percentile trimming alone on a gross-outlier registration case.
+
+[`GEOM-049`](GEOM-049-numeric-linalg-utilities.md) — numeric / linear-algebra
+utilities retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
+`Geometry.Linalg` now exports strided Eigen map aliases plus `MapAsMatrix` and
+`MapVectorAsMatrix` adapters for aliasing scalar buffers and fixed-size GLM
+vector arrays as `N x dim` matrices. `Geometry.Properties` now owns the
+one-way adapter into `Geometry.Linalg`: arithmetic property columns map as
+aliasing `N x 1` views, GLM vector columns map as aliasing `N x dim` views, and
+`bool` property columns return copied numeric columns instead of reinterpreting
+`std::vector<bool>`. `RobustPCA` implements deterministic Principal Component
+Pursuit / ADMM on top of `ComputeSVD`, reports recovered rank, iteration count,
+residuals, and `NumericDiagnostics`, and fails closed on empty, zero, non-finite,
+invalid-option, or hard SVD-failure inputs. Unit coverage proves strided-map and
+property-map aliasing, the bool fallback, synthetic low-rank-plus-sparse
+recovery, bitwise determinism, and degenerate-input diagnostics.
