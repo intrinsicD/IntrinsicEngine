@@ -95,7 +95,7 @@ Notable substantive commits used as evidence anchors:
   exist). This is intentional infrastructure-ahead-of-consumers: GEOM-008's
   `Why` explicitly delivers the CPU numerical-infrastructure gap and defers the
   consuming algorithm rewrites; the consumers are tracked
-  ([`GEOM-020`](../../tasks/backlog/geometry/GEOM-020-sparse-direct-factorization-seam.md),
+  ([`GEOM-020`](../../tasks/done/GEOM-020-sparse-direct-factorization-seam.md),
   METHOD-002/003 gated on GEOM-016). Flagged here so the next audit does not
   re-open it as drift, and so the next reviewer re-checks that at least one of
   those consumers has begun wiring `Geometry.Linalg` before the gap ages

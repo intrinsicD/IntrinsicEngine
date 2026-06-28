@@ -30,12 +30,12 @@
 - Follow-ups owning capability NOT delivered by this slice (named per
   the `CPUContracted` closure rule so reviewers can see which method
   seams remain gated):
-  - [`GEOM-020`](../backlog/geometry/GEOM-020-sparse-direct-factorization-seam.md)
+  - [`GEOM-020`](GEOM-020-sparse-direct-factorization-seam.md)
     owns the direct sparse SPD factorization seam (`SimplicialLDLT` /
     `SimplicialLLT`) that `tasks/backlog/methods/METHOD-002` (step 2)
     and `METHOD-003` (step 5) name as "the LDLT path from `GEOM-008`".
-    Until GEOM-016 lands, those method packages must not be promoted
-    on the assumption that the LDLT seam is available from this task.
+    GEOM-020 retired separately; those method packages must not infer
+    the direct factorization seam from GEOM-008 alone.
   - The sparse symmetric (generalized) eigensolver seam referenced by
     `tasks/backlog/methods/METHOD-006` step 4 (LOBPCG / shift-invert)
     is **not** owned by this task and is **not** owned by GEOM-016.
@@ -127,4 +127,3 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 - Do not add optional heavyweight solver backends in the first Eigen infrastructure patch.
 - Do not replace GLM in renderer/runtime-facing storage.
 - Do not claim numerical or performance superiority without tests and benchmarks.
-

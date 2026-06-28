@@ -20,9 +20,9 @@ depends_on: [GEOM-020]
 - Method package: `methods/geometry/signed_heat/`.
 - Paper(s): see Variants below.
 - Seeded by [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md) Tier 1 #1, against gaps in [`docs/reviews/2026-05-12-src-geometry-gap-analysis.md`](../../../docs/reviews/2026-05-12-src-geometry-gap-analysis.md) (geodesics + intrinsic geometry pack; tolerant input for noisy / broken boundary data).
-- Reuses the cotan Laplacian / mass matrix already assembled by `Geometry.HalfedgeMesh.DEC`, the CSR builder / CG iterative solver from retired [`GEOM-008`](../../done/GEOM-008-linear-algebra-solver-infrastructure.md), and the direct sparse SPD factorization (LDLT/LLT) seam owed by follow-up [`GEOM-020`](../geometry/GEOM-020-sparse-direct-factorization-seam.md). Until `GEOM-020` lands, this task's Step 2 LDLT path has no concrete implementation to call.
+- Reuses the cotan Laplacian / mass matrix already assembled by `Geometry.HalfedgeMesh.DEC`, the CSR builder / CG iterative solver from retired [`GEOM-008`](../../done/GEOM-008-linear-algebra-solver-infrastructure.md), and the direct sparse SPD factorization (LDLT/LLT) seam from retired [`GEOM-020`](../../done/GEOM-020-sparse-direct-factorization-seam.md). Step 2 should call `Geometry.Sparse::SparseLDLT` by default.
 - Reference C++ implementation exists in geometry-central's `signed_heat_method` module and may be used as the parity oracle, not as a dependency.
-- Pathfinder method per [`METHODS-001`](METHODS-001-signed-heat-pathfinder.md): the first method to be driven end-to-end through the `methods/` pipeline. Promotion gate is the LDLT follow-up [`GEOM-020`](../geometry/GEOM-020-sparse-direct-factorization-seam.md) — retired GEOM-008 alone is not sufficient because it only ships the CG iterative path; Step 2 below names LDLT. When `GEOM-020` retires, promote this task to `tasks/active/` and start with the method-package scaffolding slice + Variant A reference implementation against the analytic disk test.
+- Pathfinder method per [`METHODS-001`](METHODS-001-signed-heat-pathfinder.md): the first method to be driven end-to-end through the `methods/` pipeline. The LDLT follow-up [`GEOM-020`](../../done/GEOM-020-sparse-direct-factorization-seam.md) is retired; promote this task to `tasks/active/` when the method track is selected next and start with the method-package scaffolding slice + Variant A reference implementation against the analytic disk test.
 
 ## Variants and default selection
 
@@ -66,7 +66,7 @@ Default recommendation: **A** (smallest reuse of existing engine code; B/C as fo
 
 ### Implementation
 - [ ] Step 1: assemble cotan-Laplace `L`, lumped mass `M` via existing `Geometry.HalfedgeMesh.DEC` exports.
-- [ ] Step 2: diffuse boundary normals for time `t = h^2` where `h = mean edge length`, using `(M + tL) X = X_0` solved by the LDLT path from [`GEOM-020`](../geometry/GEOM-020-sparse-direct-factorization-seam.md) (`Geometry.Sparse::SparseLDLT`). The CG path from retired GEOM-008 is acceptable as a temporary fallback only if a later slice plan records re-baselining the parity tolerances; the default is LDLT.
+- [ ] Step 2: diffuse boundary normals for time `t = h^2` where `h = mean edge length`, using `(M + tL) X = X_0` solved by the LDLT path from retired [`GEOM-020`](../../done/GEOM-020-sparse-direct-factorization-seam.md) (`Geometry.Sparse::SparseLDLT`). The CG path from retired GEOM-008 is acceptable as a temporary fallback only if a later slice plan records re-baselining the parity tolerances; the default is LDLT.
 - [ ] Step 3: normalize diffused vector field per vertex.
 - [ ] Step 4: solve Poisson `L φ = div(X̂)` for the signed scalar, fixing one boundary vertex for the constant null space.
 - [ ] All matrix assembly behind the geometry-owned Eigen adapter (no Eigen types in the public API).

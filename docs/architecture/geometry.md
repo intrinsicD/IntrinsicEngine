@@ -99,9 +99,17 @@
   assembly. With no robust kernel selected, the no-kernel path ignores
   `RobustScale` and preserves the existing trimming behavior.
 - `Geometry.Sparse` owns reusable CSR storage, COO-to-CSR building, matrix
-  diagnostics, and conjugate-gradient diagnostics. `Geometry.DEC` aliases these
-  sparse records so existing DEC/geodesic/parameterization callers keep their
-  names while sharing the common implementation.
+  diagnostics, and solver seams. `SolveCG` / `SolveCGShifted` are the
+  iterative CPU path for large sparse SPD systems and shifted mass-plus-stiffness
+  operators. `SparseLDLT` and `SparseLLT` are the direct CPU reference path for
+  deterministic SPD factor-once / solve-many workloads; factorization returns
+  structured pivot diagnostics and solve calls fail closed on dimension or
+  non-finite RHS mismatches. Single-RHS calls use span-based engine storage;
+  multi-RHS direct solves expose `EigenDenseBlockRef` aliases as a narrow
+  solver bridge for dense RHS blocks, not as a geometry container storage
+  convention. `Geometry.DEC` aliases these sparse records so existing
+  DEC/geodesic/parameterization callers keep their names while sharing the common
+  implementation.
 - Optional Spectra or SuiteSparse/CHOLMOD seams are deferred until CPU reference
   parity and benchmark manifests justify a second backend.
 - `Geometry.PCA` exports the closed-form symmetric 3×3 eigensolver

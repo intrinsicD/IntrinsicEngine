@@ -2850,3 +2850,19 @@ the algebraic seed/refinement. `Geometry.AABB` now supports `MakeCubic`,
 exercises Bezier endpoint/linear/Bernstein-vs-de Casteljau behavior, triangle
 analytic metrics and degenerate guards, iterative sphere residual comparison
 against least squares, and AABB cubification/octant tiling.
+
+[`GEOM-020`](GEOM-020-sparse-direct-factorization-seam.md) — sparse direct
+factorization solver seam retired to `tasks/done/` on 2026-06-28 at
+`CPUContracted`. `Geometry.Sparse` now exposes `SparseLDLT` and `SparseLLT`
+solver objects over the existing CSR matrix type, with `factor`, span-based
+single-RHS solves, `Eigen::Ref` multi-RHS solves, and solve-in-place overloads.
+Factorization returns `SparseFactorizationDiagnostics` carrying status, pivot
+count, smallest absolute pivot, and a reserved condition-estimate field. LDLT
+classifies negative pivots as `NonSPD` and near-zero pivots as `ZeroPivot`; LLT
+uses Eigen status plus an LDLT probe for failure classification. DEC/geodesic
+callers keep the existing CG path, while future method packages now have the
+factor-once / solve-many SPD reference seam they were gated on. Unit coverage
+proves SPD Poisson solves, a mass-plus-Laplacian method-shaped solve,
+indefinite/singular diagnostics, multi-RHS solve parity, solve-in-place storage
+reuse, invalid-input rejection, and bit-stable repeated solves from one
+factorization.

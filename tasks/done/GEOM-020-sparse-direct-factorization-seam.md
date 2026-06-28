@@ -2,6 +2,7 @@
 id: GEOM-020
 theme: none
 depends_on: []
+completed_on: 2026-06-28
 ---
 # GEOM-020 — Sparse direct factorization solver seam (LDLT/LLT)
 
@@ -10,17 +11,17 @@ depends_on: []
 
 ## Non-goals
 - No optional SuiteSparse / CHOLMOD / Pardiso / Accelerate / MKL backends in this task; document the seam shape so a later task can add them.
-- No non-symmetric sparse LU; the non-symmetric **iterative** seam (BiCGSTAB) is owned by follow-up [`GEOM-023`](GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md), and a direct non-symmetric LU stays unowned until a consumer needs it.
-- No sparse symmetric (generalized) eigensolver; that is METHOD-006's gap and is owned by follow-up [`GEOM-024`](GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md) (see Context).
+- No non-symmetric sparse LU; the non-symmetric **iterative** seam (BiCGSTAB) is owned by follow-up [`GEOM-023`](../backlog/geometry/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md), and a direct non-symmetric LU stays unowned until a consumer needs it.
+- No sparse symmetric (generalized) eigensolver; that is METHOD-006's gap and is owned by follow-up [`GEOM-024`](../backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md) (see Context).
 - No changes to public method-package APIs; this task only adds to the geometry solver seam consumed by future method backends.
 - No performance claims without benchmark baselines.
 
 ## Context
-- Status: backlog (not yet promoted).
-- Owner/agent: unassigned.
+- Status: retired at `CPUContracted`.
+- Owner/agent: Codex.
 - Owning subsystem/layer: `geometry` (`geometry -> core`; reuses the already-declared Eigen3 dependency from GEOM-008).
 - Promoted from the GEOM-008 follow-up gap noted in
-  [`tasks/done/GEOM-008-linear-algebra-solver-infrastructure.md`](../../done/GEOM-008-linear-algebra-solver-infrastructure.md).
+  [`tasks/done/GEOM-008-linear-algebra-solver-infrastructure.md`](GEOM-008-linear-algebra-solver-infrastructure.md).
   GEOM-008 closed at `CPUContracted` shipping `Geometry.Linalg`
   (dense decompositions) and `Geometry.Sparse` (CSR builders + CG +
   shifted CG). It did **not** ship a direct sparse factorization, but
@@ -35,32 +36,38 @@ depends_on: []
   symmetric generalized eigensolver (LOBPCG / shift-invert) from
   GEOM-008. That requires Spectra (an Eigen-companion library) and a
   different API surface; that follow-up is filed as
-  [`GEOM-024`](GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md),
+  [`GEOM-024`](../backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md),
   which depends on this task for its shift-invert inner solve.
 
+## Status
+- Completed at `CPUContracted`. Commit: this commit (`Complete sparse direct factorization seam`).
+- `Geometry.Sparse` now exposes `SparseLDLT` and `SparseLLT` over the existing CSR type, with `factor`, span-based single-RHS solves, `Eigen::Ref` multi-RHS solves, and solve-in-place overloads.
+- Factorization reports `SparseFactorizationDiagnostics` with status, pivot count, smallest absolute pivot, and a reserved condition-estimate field. LDLT classifies negative pivots as `NonSPD` and near-zero pivots as `ZeroPivot`; LLT uses Eigen status plus an LDLT probe for failure classification.
+- The default DEC/geodesic CG path remains unchanged; the direct seam is available for future method packages that need factor-once / solve-many SPD solves.
+
 ## Required changes
-- [ ] Extend `src/geometry/Geometry.Sparse.cppm` with `SparseLDLT` and
+- [x] Extend `src/geometry/Geometry.Sparse.cppm` with `SparseLDLT` and
       `SparseLLT` wrappers around `Eigen::SimplicialLDLT` /
       `Eigen::SimplicialLLT` over the existing `SparseMatrix` CSR type.
       Provide `factor(matrix)` / `solve(rhs)` / `solveInPlace(x)` plus
       a multi-RHS overload taking an `Eigen::Ref` of a dense block.
-- [ ] Add a `SparseFactorizationStatus` enum (`Success`,
+- [x] Add a `SparseFactorizationStatus` enum (`Success`,
       `NotFactored`, `NumericalIssue`, `NonSPD`, `ZeroPivot`,
       `DimensionMismatch`, `InvalidInput`) and a
       `SparseFactorizationDiagnostics` struct (status, pivot count,
       smallest absolute pivot, condition-estimate placeholder for a
       later slice) returned by the factor step.
-- [ ] Implement the wrappers in `src/geometry/Geometry.Sparse.cpp`
+- [x] Implement the wrappers in `src/geometry/Geometry.Sparse.cpp`
       with explicit input validation (square matrix, finite entries,
       symmetric in debug builds) and translate Eigen's
       `ComputationInfo` to the new status enum.
-- [ ] Keep `Geometry.Sparse` re-exported through `Geometry.cppm` as it
+- [x] Keep `Geometry.Sparse` re-exported through `Geometry.cppm` as it
       already is; do not widen `Geometry.Linalg` re-export rules.
-- [ ] Update `src/geometry/CMakeLists.txt` only if a new translation
+- [x] Update `src/geometry/CMakeLists.txt` only if a new translation
       unit is added; no new module-interface file should be required.
 
 ## Tests
-- [ ] Add `tests/unit/geometry/Test.SparseFactorization.cpp` (labels:
+- [x] Add `tests/unit/geometry/Test.SparseFactorization.cpp` (labels:
       `unit;geometry`) with deterministic small-system cases: a 1-D
       Poisson stiffness matrix (SPD); the cotan-Laplacian-plus-mass
       operator `M + tL` on a small triangle fan (the matrix shape
@@ -68,37 +75,37 @@ depends_on: []
       assert `NonSPD` / `NumericalIssue` reporting; a singular matrix
       to assert `ZeroPivot`; multi-RHS round-trip; and a non-square /
       non-finite input rejection battery.
-- [ ] Add a regression test that re-solves the same factorization
+- [x] Add a regression test that re-solves the same factorization
       against several RHS vectors and asserts bit-stable output (the
       factor-once / solve-many contract method packages depend on).
-- [ ] Default CPU gate must remain green:
+- [x] Default CPU gate must remain green:
       `ctest --test-dir build/ci -LE 'gpu|vulkan|slow|flaky-quarantine'`.
 
 ## Docs
-- [ ] Extend `docs/architecture/geometry.md` "Linear algebra policy"
+- [x] Extend `docs/architecture/geometry.md` "Linear algebra policy"
       section to document the direct vs iterative solver split:
       `Geometry.Sparse::SolveCG` / `SolveCGShifted` for matrix-free /
       large iterative solves; `Geometry.Sparse::SparseLDLT` /
       `SparseLLT` for SPD factor-once / solve-many. Keep the existing
       Spectra / SuiteSparse "later optional backend" paragraph as-is.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` if the
+- [x] Regenerate `docs/api/generated/module_inventory.md` if the
       module surface changes (it should not — the additions live
       inside the existing `Geometry.Sparse` module).
-- [ ] Update [`tasks/backlog/methods/METHODS-001`](../methods/METHODS-001-signed-heat-pathfinder.md)
-      and [`tasks/backlog/methods/README.md`](../methods/README.md)
+- [x] Update [`tasks/backlog/methods/METHODS-001`](../backlog/methods/METHODS-001-signed-heat-pathfinder.md)
+      and [`tasks/backlog/methods/README.md`](../backlog/methods/README.md)
       ordering notes only if the gate language drifts; the
       pre-promotion edits made together with the GEOM-008 retirement
       already point METHOD-002 at this task for the LDLT path.
 
 ## Acceptance criteria
-- [ ] `Geometry.Sparse` exposes `SparseLDLT` and `SparseLLT` types
+- [x] `Geometry.Sparse` exposes `SparseLDLT` and `SparseLLT` types
       with `factor` / `solve` / `solveInPlace` APIs and a structured
       diagnostics return on `factor`.
-- [ ] All new unit tests pass under the default CPU gate; no
+- [x] All new unit tests pass under the default CPU gate; no
       `flaky-quarantine` label is introduced.
-- [ ] No new third-party dependency is added; the existing Eigen3
+- [x] No new third-party dependency is added; the existing Eigen3
       cache continues to satisfy the build offline.
-- [ ] Layering / test-layout / docs-link / task-policy validators
+- [x] Layering / test-layout / docs-link / task-policy validators
       remain green.
 
 ## Verification

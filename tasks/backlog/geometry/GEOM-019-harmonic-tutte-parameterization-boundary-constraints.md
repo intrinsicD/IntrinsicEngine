@@ -21,7 +21,7 @@ depends_on: [GEOM-018, GEOM-020]
 - Spawned by [`GEOM-011`](../../done/GEOM-011-parameterization-mapping-roadmap.md) and the [parameterization/mapping roadmap](../../../docs/architecture/parameterization-mapping-roadmap.md).
 - Existing `Geometry.Parameterization` provides LSCM for disk-topology triangle meshes. This task adds the smallest new solver family after diagnostics: harmonic/Tutte embedding with explicit boundary policies.
 - Depends on GEOM-018 for shared distortion/map-quality diagnostics. If GEOM-018 is not retired when this task starts, record any diagnostic subset used here as an explicit in-task assumption.
-- Depends on GEOM-020 for the sparse direct SPD solver seam (`Geometry.Sparse` LDLT/LLT): the fixed-boundary Tutte/harmonic interior system is SPD and should use the direct path. If sequencing demands starting before GEOM-020 retires, the existing `Geometry.Sparse` CG path from GEOM-008 is an acceptable documented fallback — record the solver choice and tolerance in this task before implementation.
+- Depends on retired GEOM-020 for the sparse direct SPD solver seam (`Geometry.Sparse` LDLT/LLT): the fixed-boundary Tutte/harmonic interior system is SPD and should use `Geometry.Sparse::SparseLDLT` by default. The existing `Geometry.Sparse` CG path from GEOM-008 remains an acceptable documented fallback only if a later slice plan records the solver choice and tolerance before implementation.
 
 ## Required changes
 - [ ] Define public boundary-condition records for circle, square, arc-length, fixed/pinned vertices, and caller-provided boundary UVs.
@@ -74,4 +74,3 @@ python3 tools/agents/check_task_policy.py --root . --strict
 ## Maturity
 - Target: `CPUContracted` (deterministic CPU solver verified by the default gate).
 - No `Operational` follow-up is owed; this task has no backend seam.
-

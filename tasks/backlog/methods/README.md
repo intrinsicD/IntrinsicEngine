@@ -16,7 +16,8 @@ map.
 
 - [METHOD-002 — Signed Heat Method reference backend](METHOD-002-signed-heat-method-reference-backend.md)
   **(pathfinder method per [METHODS-001](METHODS-001-signed-heat-pathfinder.md))**;
-  gated on `geometry/GEOM-020` (LDLT seam) via `depends_on`.
+  unblocked by retired `geometry/GEOM-020` (LDLT seam) and expected to use
+  `Geometry.Sparse::SparseLDLT` for its default diffusion solve.
 - [METHOD-003 — Closest Point Method PDE solver reference backend](METHOD-003-closest-point-method-pde-reference-backend.md)
   (variant A default; gated on `geometry/GEOM-023` non-symmetric solver seam).
 - [METHOD-004 — Walk on Spheres / Walk on Stars PDE solver reference backend](METHOD-004-walk-on-spheres-reference-backend.md)
@@ -88,9 +89,9 @@ split; narratives live in the retirement log.
 - Ordering: [`geometry/GEOM-008`](../../done/GEOM-008-linear-algebra-solver-infrastructure.md)
   retired 2026-05-27 at `CPUContracted` shipping the CSR builder + CG /
   shifted-CG iterative solver. The direct sparse SPD factorization
-  (LDLT/LLT) path that METHOD-002 (step 2) names is owed by the follow-up
-  [`geometry/GEOM-020`](../geometry/GEOM-020-sparse-direct-factorization-seam.md);
-  METHOD-002 must wait on `GEOM-020`, not on retired `GEOM-008`.
+  (LDLT/LLT) path that METHOD-002 (step 2) names is available from retired
+  [`geometry/GEOM-020`](../../done/GEOM-020-sparse-direct-factorization-seam.md);
+  METHOD-002 is no longer blocked on the solver seam.
   METHOD-003's variant-A non-symmetric operator waits on
   [`geometry/GEOM-023`](../geometry/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md).
   METHOD-004 needs no solver gate and may proceed against retired

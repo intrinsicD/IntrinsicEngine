@@ -2,10 +2,23 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <vector>
 
+#ifndef EIGEN_MPL2_ONLY
+#define EIGEN_MPL2_ONLY
+#endif
+
+#include <Eigen/Dense>
+
 export module Geometry.Sparse;
+
+namespace Geometry::Sparse::Detail
+{
+    struct SparseLDLTImpl;
+    struct SparseLLTImpl;
+}
 
 export namespace Geometry::Sparse
 {
@@ -17,6 +30,17 @@ export namespace Geometry::Sparse
         InvalidInput,
         Breakdown,
         NonFinite
+    };
+
+    enum class SparseFactorizationStatus : std::uint8_t
+    {
+        Success = 0,
+        NotFactored,
+        NumericalIssue,
+        NonSPD,
+        ZeroPivot,
+        DimensionMismatch,
+        InvalidInput
     };
 
     struct SparseMatrix
@@ -97,6 +121,19 @@ export namespace Geometry::Sparse
         }
     };
 
+    struct SparseFactorizationDiagnostics
+    {
+        SparseFactorizationStatus Status{SparseFactorizationStatus::NotFactored};
+        std::size_t PivotCount{0};
+        double SmallestAbsolutePivot{0.0};
+        double ConditionEstimate{0.0};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SparseFactorizationStatus::Success;
+        }
+    };
+
     struct CGParams
     {
         std::size_t MaxIterations{1000};
@@ -111,6 +148,68 @@ export namespace Geometry::Sparse
         double RelativeResidual{0.0};
         bool Converged{false};
         CGConvergenceReason Reason{CGConvergenceReason::NotRun};
+    };
+
+    using EigenDenseMatrixXd = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>;
+    using EigenDenseBlockRef = Eigen::Ref<EigenDenseMatrixXd>;
+    using ConstEigenDenseBlockRef = Eigen::Ref<const EigenDenseMatrixXd>;
+
+    class SparseLDLT
+    {
+    public:
+        SparseLDLT();
+        ~SparseLDLT();
+
+        SparseLDLT(SparseLDLT&&) noexcept;
+        SparseLDLT& operator=(SparseLDLT&&) noexcept;
+
+        SparseLDLT(const SparseLDLT&) = delete;
+        SparseLDLT& operator=(const SparseLDLT&) = delete;
+
+        [[nodiscard]] SparseFactorizationDiagnostics factor(const SparseMatrix& matrix);
+        [[nodiscard]] SparseFactorizationDiagnostics solve(
+            std::span<const double> rhs,
+            std::span<double> x) const;
+        [[nodiscard]] SparseFactorizationDiagnostics solveInPlace(std::span<double> x) const;
+        [[nodiscard]] SparseFactorizationDiagnostics solve(
+            ConstEigenDenseBlockRef rhs,
+            EigenDenseBlockRef x) const;
+        [[nodiscard]] SparseFactorizationDiagnostics solveInPlace(EigenDenseBlockRef x) const;
+        [[nodiscard]] const SparseFactorizationDiagnostics& diagnostics() const noexcept;
+
+    private:
+        std::unique_ptr<Detail::SparseLDLTImpl> Impl_;
+        SparseFactorizationDiagnostics Diagnostics_{};
+        std::size_t Dimension_{0};
+    };
+
+    class SparseLLT
+    {
+    public:
+        SparseLLT();
+        ~SparseLLT();
+
+        SparseLLT(SparseLLT&&) noexcept;
+        SparseLLT& operator=(SparseLLT&&) noexcept;
+
+        SparseLLT(const SparseLLT&) = delete;
+        SparseLLT& operator=(const SparseLLT&) = delete;
+
+        [[nodiscard]] SparseFactorizationDiagnostics factor(const SparseMatrix& matrix);
+        [[nodiscard]] SparseFactorizationDiagnostics solve(
+            std::span<const double> rhs,
+            std::span<double> x) const;
+        [[nodiscard]] SparseFactorizationDiagnostics solveInPlace(std::span<double> x) const;
+        [[nodiscard]] SparseFactorizationDiagnostics solve(
+            ConstEigenDenseBlockRef rhs,
+            EigenDenseBlockRef x) const;
+        [[nodiscard]] SparseFactorizationDiagnostics solveInPlace(EigenDenseBlockRef x) const;
+        [[nodiscard]] const SparseFactorizationDiagnostics& diagnostics() const noexcept;
+
+    private:
+        std::unique_ptr<Detail::SparseLLTImpl> Impl_;
+        SparseFactorizationDiagnostics Diagnostics_{};
+        std::size_t Dimension_{0};
     };
 
     [[nodiscard]] SparseDiagnostics AnalyzeSparseMatrix(
@@ -130,4 +229,3 @@ export namespace Geometry::Sparse
         std::span<double> x,
         const CGParams& params = {});
 }
-
