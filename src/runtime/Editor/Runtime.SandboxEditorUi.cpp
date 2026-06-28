@@ -75,6 +75,7 @@ import Geometry.MeshSoup;
 import Geometry.PointCloud;
 import Geometry.PointCloud.Normals;
 import Geometry.Properties;
+import Geometry.Smoothing;
 import Geometry.UvAtlas;
 
 namespace Extrinsic::Runtime
@@ -91,6 +92,7 @@ namespace Extrinsic::Runtime
         namespace GN = Geometry::HalfedgeMesh::VertexNormals;
         namespace GraphNormals = Geometry::Graph::VertexNormals;
         namespace PointNormals = Geometry::PointCloud::Normals;
+        namespace Smooth = Geometry::Smoothing;
 
         inline constexpr std::array<A::AssetPayloadKind, 6> kImportPayloadKinds{{
             A::AssetPayloadKind::Unknown,
@@ -135,6 +137,11 @@ namespace Extrinsic::Runtime
                 PointNormals::OrientationMode::MinimumSpanningTree,
             }};
 
+        inline constexpr std::array<SandboxEditorMeshDenoiseStage, 1>
+            kMeshDenoiseStages{{
+                SandboxEditorMeshDenoiseStage::FullBilateral,
+            }};
+
         [[nodiscard]] const char* DebugNameForTextureBakeEncoder(
             const MeshAttributeTextureBakeEncoder encoder) noexcept
         {
@@ -160,6 +167,17 @@ namespace Extrinsic::Runtime
             std::int32_t* MaxIterations{nullptr};
             std::int32_t* Seed{nullptr};
             bool* UseHierarchicalInitialization{nullptr};
+        };
+
+        struct MeshDenoiseUiState
+        {
+            std::optional<SandboxEditorMeshDenoiseResult>* LastResult{nullptr};
+            std::int32_t* Stage{nullptr};
+            std::int32_t* NormalIterations{nullptr};
+            std::int32_t* VertexIterations{nullptr};
+            float* SigmaSpatial{nullptr};
+            float* SigmaRange{nullptr};
+            bool* PreserveBoundary{nullptr};
         };
 
         struct MeshVertexNormalsUiState
@@ -2601,6 +2619,7 @@ namespace Extrinsic::Runtime
         {
             switch (algorithm)
             {
+            case SandboxEditorGeometryProcessingAlgorithm::MeshDenoise:
             case SandboxEditorGeometryProcessingAlgorithm::Remeshing:
             case SandboxEditorGeometryProcessingAlgorithm::Simplification:
             case SandboxEditorGeometryProcessingAlgorithm::Smoothing:
@@ -4453,6 +4472,290 @@ namespace Extrinsic::Runtime
             return message;
         }
 
+        [[nodiscard]] const char* DebugNameForSandboxEditorMeshDenoiseStage(
+            const SandboxEditorMeshDenoiseStage stage) noexcept
+        {
+            switch (stage)
+            {
+            case SandboxEditorMeshDenoiseStage::FullBilateral:
+                return "Full bilateral";
+            }
+            return "Unknown";
+        }
+
+        [[nodiscard]] Core::ErrorCode ErrorForDenoiseStatus(
+            const Smooth::DenoiseStatus status) noexcept
+        {
+            switch (status)
+            {
+            case Smooth::DenoiseStatus::Success:
+                return Core::ErrorCode::Success;
+            case Smooth::DenoiseStatus::EmptyMesh:
+                return Core::ErrorCode::ResourceNotFound;
+            case Smooth::DenoiseStatus::NonManifoldInput:
+            case Smooth::DenoiseStatus::DegenerateGeometry:
+            case Smooth::DenoiseStatus::NonFiniteInput:
+            case Smooth::DenoiseStatus::InvalidParams:
+                return Core::ErrorCode::InvalidArgument;
+            }
+            return Core::ErrorCode::Unknown;
+        }
+
+        [[nodiscard]] bool IsFiniteVec3(const glm::vec3 value) noexcept
+        {
+            return std::isfinite(value.x) &&
+                   std::isfinite(value.y) &&
+                   std::isfinite(value.z);
+        }
+
+        [[nodiscard]] bool AllFiniteVec3(
+            const std::span<const glm::vec3> values) noexcept
+        {
+            for (const glm::vec3 value : values)
+            {
+                if (!IsFiniteVec3(value))
+                    return false;
+            }
+            return true;
+        }
+
+        struct MeshDenoiseSourceResult
+        {
+            Geometry::HalfedgeMesh::Mesh Mesh{};
+            std::vector<glm::vec3> BeforePositions{};
+            std::vector<bool> DeletedVertices{};
+            SandboxEditorCommandStatus Status{
+                SandboxEditorCommandStatus::NoChange};
+            Core::ErrorCode Error{Core::ErrorCode::Success};
+            std::string Diagnostic{};
+
+            [[nodiscard]] bool Succeeded() const noexcept
+            {
+                return Status == SandboxEditorCommandStatus::Applied;
+            }
+        };
+
+        [[nodiscard]] MeshDenoiseSourceResult BuildHalfedgeMeshForDenoise(
+            const GS::ConstSourceView& view)
+        {
+            MeshDenoiseSourceResult result{};
+            const GS::SourceAvailability availability =
+                GS::BuildSourceAvailability(view);
+            if (availability.ProvenanceDomain != GS::Domain::Mesh ||
+                view.VertexSource == nullptr ||
+                view.HalfedgeSource == nullptr ||
+                view.FaceSource == nullptr)
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Diagnostic =
+                    "Mesh denoise requires selected mesh GeometrySources.";
+                return result;
+            }
+
+            const auto positions =
+                view.VertexSource->Properties.Get<glm::vec3>(
+                    GS::PropertyNames::kPosition);
+            if (!positions || positions.Vector().empty())
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::InvalidProcessingParameters;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Diagnostic =
+                    "Mesh denoise requires a non-empty v:position property.";
+                return result;
+            }
+
+            result.BeforePositions = positions.Vector();
+            result.DeletedVertices.assign(result.BeforePositions.size(), false);
+            if (const auto deleted =
+                    view.VertexSource->Properties.Get<bool>("v:deleted"))
+            {
+                if (deleted.Vector().size() != result.BeforePositions.size())
+                {
+                    result.Status =
+                        SandboxEditorCommandStatus::InvalidProcessingParameters;
+                    result.Error = Core::ErrorCode::InvalidArgument;
+                    result.Diagnostic =
+                        "Mesh denoise requires v:deleted to match v:position when present.";
+                    return result;
+                }
+                for (std::size_t i = 0u; i < deleted.Vector().size(); ++i)
+                    result.DeletedVertices[i] = deleted.Vector()[i];
+            }
+
+            MeshSoupFromGeometrySourcesResult soup =
+                BuildMeshSoupFromGeometrySources(view);
+            if (!soup.Succeeded())
+            {
+                result.Status = soup.Status;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Diagnostic = soup.Diagnostic.empty()
+                    ? "Mesh denoise could not build a triangle soup from GeometrySources."
+                    : soup.Diagnostic;
+                return result;
+            }
+
+            auto converted =
+                Geometry::Mesh::Conversion::ToHalfedgeMesh(soup.Mesh);
+            if (!converted.Succeeded())
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Diagnostic =
+                    "Mesh denoise could not convert selected GeometrySources to halfedge topology.";
+                return result;
+            }
+            if (converted.Mesh.VerticesSize() != result.BeforePositions.size())
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Diagnostic =
+                    "Mesh denoise conversion changed the vertex slot count.";
+                return result;
+            }
+
+            result.Mesh = std::move(converted.Mesh);
+            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Error = Core::ErrorCode::Success;
+            return result;
+        }
+
+        [[nodiscard]] std::vector<glm::vec3> ExtractMeshPositions(
+            const Geometry::HalfedgeMesh::Mesh& mesh)
+        {
+            std::vector<glm::vec3> positions(mesh.VerticesSize());
+            for (std::size_t i = 0u; i < positions.size(); ++i)
+            {
+                positions[i] = mesh.Position(
+                    Geometry::VertexHandle{
+                        static_cast<Geometry::PropertyIndex>(i)});
+            }
+            return positions;
+        }
+
+        [[nodiscard]] EditorCommandHistoryStatus ApplyMeshDenoisePositionState(
+            ECS::Scene::Registry* scene,
+            const std::uint32_t stableEntityId,
+            const std::vector<glm::vec3>& positions)
+        {
+            if (scene == nullptr)
+                return EditorCommandHistoryStatus::MissingScene;
+
+            entt::registry& raw = scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, stableEntityId);
+            if (!entity.has_value())
+                return EditorCommandHistoryStatus::StaleEntity;
+
+            GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
+            const GS::SourceAvailability availability =
+                GS::BuildSourceAvailability(view);
+            if (availability.ProvenanceDomain != GS::Domain::Mesh ||
+                view.VertexSource == nullptr)
+            {
+                return EditorCommandHistoryStatus::UnsupportedOperation;
+            }
+
+            auto currentPositions =
+                view.VertexSource->Properties.Get<glm::vec3>(
+                    GS::PropertyNames::kPosition);
+            if (!currentPositions ||
+                currentPositions.Vector().size() != positions.size() ||
+                !AllFiniteVec3(std::span<const glm::vec3>{
+                    positions.data(),
+                    positions.size()}))
+            {
+                return EditorCommandHistoryStatus::CommandFailed;
+            }
+
+            currentPositions.Vector() = positions;
+            Dirty::MarkVertexPositionsDirty(raw, *entity);
+            Dirty::MarkVertexAttributesDirty(raw, *entity);
+            return EditorCommandHistoryStatus::Applied;
+        }
+
+        [[nodiscard]] SandboxEditorCommandStatus CommitMeshDenoisePositions(
+            const SandboxEditorContext& context,
+            const std::uint32_t stableEntityId,
+            std::vector<glm::vec3> before,
+            std::vector<glm::vec3> after)
+        {
+            if (context.CommandHistory != nullptr)
+            {
+                ECS::Scene::Registry* scene = context.Scene;
+                const EditorCommandHistoryResult history =
+                    context.CommandHistory->Execute(
+                        EditorCommandRecord{
+                            .Label = "Denoise mesh vertices",
+                            .Redo =
+                                [scene, stableEntityId, after]()
+                                {
+                                    return ApplyMeshDenoisePositionState(
+                                        scene,
+                                        stableEntityId,
+                                        after);
+                                },
+                            .Undo =
+                                [scene, stableEntityId, before]()
+                                {
+                                    return ApplyMeshDenoisePositionState(
+                                        scene,
+                                        stableEntityId,
+                                        before);
+                                },
+                            .Dirtying = true,
+                        });
+                return ToSandboxEditorCommandStatus(history.Status);
+            }
+
+            return ToSandboxEditorCommandStatus(
+                ApplyMeshDenoisePositionState(
+                    context.Scene,
+                    stableEntityId,
+                    after));
+        }
+
+        void CopyMeshDenoiseCounters(
+            const Smooth::BilateralDenoiseResult& source,
+            SandboxEditorMeshDenoiseResult& target)
+        {
+            target.NormalIterations =
+                static_cast<std::uint32_t>(
+                    source.NormalIterationsPerformed);
+            target.VertexIterations =
+                static_cast<std::uint32_t>(
+                    source.VertexIterationsPerformed);
+            target.VertexSlotCount = source.VertexCount;
+            target.MovedVertexCount = source.MovedVertexCount;
+            target.ProcessedFaceCount = source.ProcessedFaceCount;
+            target.DegenerateFaceCount = source.DegenerateFaceCount;
+            target.NonFiniteFaceCount = source.NonFiniteFaceCount;
+            target.SkippedDeletedFaceCount = source.SkippedDeletedFaceCount;
+            target.PinnedBoundaryVertexCount =
+                source.PinnedBoundaryVertexCount;
+            target.SigmaSpatialUsed = source.SigmaSpatialUsed;
+            target.SigmaRangeUsed = source.SigmaRangeUsed;
+        }
+
+        [[nodiscard]] std::string BuildMeshDenoiseSuccessMessage(
+            const SandboxEditorMeshDenoiseResult& result)
+        {
+            std::string message = "Mesh denoise completed (written=";
+            message += std::to_string(result.WrittenCount);
+            message += ", moved=";
+            message += std::to_string(result.MovedVertexCount);
+            message += ", sigmaSpatial=";
+            message += std::to_string(result.SigmaSpatialUsed);
+            message += ", sigmaRange=";
+            message += std::to_string(result.SigmaRangeUsed);
+            message += ").";
+            return message;
+        }
+
         [[nodiscard]] SandboxEditorGeometryProcessingModel BuildGeometryProcessingModel(
             const SandboxEditorContext& context)
         {
@@ -4491,6 +4794,12 @@ namespace Extrinsic::Runtime
                 ResolveSandboxEditorGeometryProcessingEntries(model.Capabilities);
             model.KMeansDomains =
                 GetAvailableSandboxEditorKMeansDomains(*context.Scene, *selected);
+            model.MeshDenoiseAvailable =
+                context.MeshDenoiseKernelAvailable &&
+                model.Capabilities.HasEditableSurfaceMesh &&
+                HasAnySandboxEditorGeometryProcessingDomain(
+                    model.Capabilities.Domains,
+                    SandboxEditorGeometryProcessingDomain::MeshVertices);
             model.MeshVertexNormalsAvailable =
                 model.Capabilities.HasEditableSurfaceMesh &&
                 HasAnySandboxEditorGeometryProcessingDomain(
@@ -4515,6 +4824,20 @@ namespace Extrinsic::Runtime
                         context.LastKMeansResult->Message.empty()
                             ? "Last K-Means command failed."
                             : context.LastKMeansResult->Message);
+                }
+            }
+            if (context.LastMeshDenoiseResult != nullptr)
+            {
+                model.LastMeshDenoiseResult =
+                    *context.LastMeshDenoiseResult;
+                if (!context.LastMeshDenoiseResult->Succeeded())
+                {
+                    AddDiagnostic(
+                        model.Diagnostics,
+                        SandboxEditorDiagnosticCode::GeometryProcessingFailed,
+                        context.LastMeshDenoiseResult->Message.empty()
+                            ? "Last mesh denoise command failed."
+                            : context.LastMeshDenoiseResult->Message);
                 }
             }
             if (context.LastMeshVertexNormalsResult != nullptr)
@@ -5509,6 +5832,18 @@ namespace Extrinsic::Runtime
                     const std::vector<SandboxEditorGeometryProcessingMenuItem>
                         menuItems =
                             GetSandboxEditorGeometryProcessingMenuItems(kind);
+                    const bool hasDenoiseLeaf =
+                        std::any_of(
+                            menuItems.begin(),
+                            menuItems.end(),
+                            [](const SandboxEditorGeometryProcessingMenuItem& item)
+                            {
+                                return item.HasDenoiseMethod;
+                            });
+                    if (hasDenoiseLeaf && ImGui::MenuItem("Denoise"))
+                    {
+                        processingOpen = true;
+                    }
                     for (const SandboxEditorGeometryProcessingMenuItem& item :
                          menuItems)
                     {
@@ -5516,8 +5851,11 @@ namespace Extrinsic::Runtime
                         {
                             if (ImGui::BeginMenu(item.Label))
                             {
-                                if (ImGui::MenuItem("Normals"))
+                                if (item.HasNormalsMethod &&
+                                    ImGui::MenuItem("Normals"))
+                                {
                                     processingOpen = true;
+                                }
                                 ImGui::EndMenu();
                             }
                         }
@@ -6900,6 +7238,174 @@ namespace Extrinsic::Runtime
             DrawKMeansResultStatus(result);
         }
 
+        [[nodiscard]] SandboxEditorMeshDenoiseStage MeshDenoiseStageFromIndex(
+            const std::int32_t index) noexcept
+        {
+            const std::int32_t clamped = std::clamp(
+                index,
+                0,
+                static_cast<std::int32_t>(kMeshDenoiseStages.size() - 1u));
+            return kMeshDenoiseStages[static_cast<std::size_t>(clamped)];
+        }
+
+        void DrawMeshDenoiseResultStatus(
+            const std::optional<SandboxEditorMeshDenoiseResult>& lastResult)
+        {
+            if (!lastResult.has_value())
+            {
+                ImGui::TextDisabled("Last denoise run: none");
+                return;
+            }
+
+            const SandboxEditorMeshDenoiseResult& result = *lastResult;
+            ImGui::Text("Last denoise run: %s",
+                        DebugNameForSandboxEditorCommandStatus(result.Status));
+            ImGui::Text("Geometry status: %s",
+                        std::string(Smooth::DebugName(result.DenoiseStatus)).c_str());
+            ImGui::Text("Stage: %s",
+                        DebugNameForSandboxEditorMeshDenoiseStage(result.Stage));
+            if (result.Succeeded())
+            {
+                ImGui::Text("Written: %zu / %zu  moved: %zu  deleted: %zu",
+                            result.WrittenCount,
+                            result.VertexSlotCount,
+                            result.MovedVertexCount,
+                            result.SkippedDeletedVertexCount);
+                ImGui::Text("Iterations: normals=%u  vertices=%u",
+                            result.NormalIterations,
+                            result.VertexIterations);
+                ImGui::Text("Faces: processed=%zu  degenerate=%zu  nonfinite=%zu  deleted=%zu",
+                            result.ProcessedFaceCount,
+                            result.DegenerateFaceCount,
+                            result.NonFiniteFaceCount,
+                            result.SkippedDeletedFaceCount);
+                ImGui::Text("Pinned boundary vertices: %zu",
+                            result.PinnedBoundaryVertexCount);
+                ImGui::Text("Sigma used: spatial=%.6f  range=%.6f",
+                            result.SigmaSpatialUsed,
+                            result.SigmaRangeUsed);
+            }
+            if (!result.Message.empty())
+                ImGui::TextWrapped("%s", result.Message.c_str());
+        }
+
+        void DrawMeshDenoiseControls(
+            const SandboxEditorDomainWindowModel& model,
+            const SandboxEditorContext& context,
+            const SandboxEditorGeometryProcessingModel& processing,
+            MeshDenoiseUiState* denoiseState)
+        {
+            ImGui::SeparatorText("Denoise");
+            if (!processing.MeshDenoiseAvailable)
+            {
+                ImGui::TextDisabled("Mesh denoise is unavailable for this selection.");
+                return;
+            }
+            if (denoiseState == nullptr ||
+                denoiseState->LastResult == nullptr ||
+                denoiseState->Stage == nullptr ||
+                denoiseState->NormalIterations == nullptr ||
+                denoiseState->VertexIterations == nullptr ||
+                denoiseState->SigmaSpatial == nullptr ||
+                denoiseState->SigmaRange == nullptr ||
+                denoiseState->PreserveBoundary == nullptr)
+            {
+                ImGui::TextDisabled("Mesh denoise controls are not bound.");
+                return;
+            }
+
+            *denoiseState->Stage = std::clamp(
+                *denoiseState->Stage,
+                0,
+                static_cast<std::int32_t>(kMeshDenoiseStages.size() - 1u));
+            const SandboxEditorMeshDenoiseStage stage =
+                MeshDenoiseStageFromIndex(*denoiseState->Stage);
+            if (ImGui::BeginCombo(
+                    "Stage",
+                    DebugNameForSandboxEditorMeshDenoiseStage(stage)))
+            {
+                for (std::size_t i = 0u; i < kMeshDenoiseStages.size(); ++i)
+                {
+                    const bool selected =
+                        *denoiseState->Stage == static_cast<std::int32_t>(i);
+                    if (ImGui::Selectable(
+                            DebugNameForSandboxEditorMeshDenoiseStage(
+                                kMeshDenoiseStages[i]),
+                            selected))
+                    {
+                        *denoiseState->Stage = static_cast<std::int32_t>(i);
+                    }
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+
+            *denoiseState->NormalIterations =
+                std::clamp(*denoiseState->NormalIterations, 1, 4096);
+            *denoiseState->VertexIterations =
+                std::clamp(*denoiseState->VertexIterations, 1, 4096);
+            *denoiseState->SigmaSpatial =
+                std::clamp(*denoiseState->SigmaSpatial, 0.0f, 1.0e6f);
+            *denoiseState->SigmaRange =
+                std::clamp(*denoiseState->SigmaRange, 0.0f, 1.0e6f);
+            ImGui::DragInt(
+                "Normal iterations",
+                denoiseState->NormalIterations,
+                1.0f,
+                1,
+                4096);
+            ImGui::DragInt(
+                "Vertex iterations",
+                denoiseState->VertexIterations,
+                1.0f,
+                1,
+                4096);
+            ImGui::DragFloat(
+                "Sigma spatial",
+                denoiseState->SigmaSpatial,
+                0.01f,
+                0.0f,
+                1.0e6f);
+            ImGui::DragFloat(
+                "Sigma range",
+                denoiseState->SigmaRange,
+                0.01f,
+                0.0f,
+                1.0e6f);
+            ImGui::Checkbox(
+                "Preserve boundary",
+                denoiseState->PreserveBoundary);
+
+            if (ImGui::Button("Denoise"))
+            {
+                *denoiseState->LastResult =
+                    ApplySandboxEditorMeshDenoiseCommand(
+                        context,
+                        SandboxEditorMeshDenoiseCommand{
+                            .StableEntityId = model.SelectedStableId,
+                            .Stage = MeshDenoiseStageFromIndex(
+                                *denoiseState->Stage),
+                            .NormalIterations = static_cast<std::uint32_t>(
+                                *denoiseState->NormalIterations),
+                            .VertexIterations = static_cast<std::uint32_t>(
+                                *denoiseState->VertexIterations),
+                            .SigmaSpatial = static_cast<double>(
+                                *denoiseState->SigmaSpatial),
+                            .SigmaRange = static_cast<double>(
+                                *denoiseState->SigmaRange),
+                            .PreserveBoundary =
+                                *denoiseState->PreserveBoundary,
+                        });
+            }
+
+            const std::optional<SandboxEditorMeshDenoiseResult>& result =
+                denoiseState->LastResult->has_value()
+                    ? *denoiseState->LastResult
+                    : processing.LastMeshDenoiseResult;
+            DrawMeshDenoiseResultStatus(result);
+        }
+
         [[nodiscard]] GN::AveragingMode MeshVertexNormalWeightingFromIndex(
             const std::int32_t index) noexcept
         {
@@ -7300,6 +7806,7 @@ namespace Extrinsic::Runtime
             const SandboxEditorDomainWindowModel& model,
             const SandboxEditorContext& context,
             KMeansUiState* kmeansState,
+            MeshDenoiseUiState* denoiseState,
             MeshVertexNormalsUiState* meshNormalsState,
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState)
@@ -7357,6 +7864,11 @@ namespace Extrinsic::Runtime
             switch (model.Kind)
             {
             case SandboxEditorDomainWindowKind::Mesh:
+                DrawMeshDenoiseControls(
+                    model,
+                    context,
+                    processing,
+                    denoiseState);
                 DrawMeshVertexNormalsControls(
                     model,
                     context,
@@ -7386,6 +7898,7 @@ namespace Extrinsic::Runtime
             const DomainWindowSection section,
             std::array<bool, 15>& domainWindowOpen,
             KMeansUiState* kmeansState,
+            MeshDenoiseUiState* denoiseState,
             MeshVertexNormalsUiState* normalsState,
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
@@ -7419,6 +7932,7 @@ namespace Extrinsic::Runtime
                         model,
                         context,
                         kmeansState,
+                        denoiseState,
                         normalsState,
                         graphNormalsState,
                         pointCloudNormalsState);
@@ -7434,6 +7948,7 @@ namespace Extrinsic::Runtime
             const SandboxEditorContext* context,
             std::array<bool, 15>* domainWindowOpen,
             KMeansUiState* kmeansState,
+            MeshDenoiseUiState* denoiseState,
             MeshVertexNormalsUiState* normalsState,
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
@@ -7464,6 +7979,7 @@ namespace Extrinsic::Runtime
                         section,
                     *domainWindowOpen,
                     kmeansState,
+                    denoiseState,
                     normalsState,
                     graphNormalsState,
                     pointCloudNormalsState,
@@ -7853,6 +8369,7 @@ namespace Extrinsic::Runtime
                 panelWindowOpen,
             std::array<bool, 15>* domainWindowOpen,
             KMeansUiState* kmeansState,
+            MeshDenoiseUiState* denoiseState,
             MeshVertexNormalsUiState* normalsState,
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
@@ -7863,6 +8380,7 @@ namespace Extrinsic::Runtime
                 context,
                 domainWindowOpen,
                 kmeansState,
+                denoiseState,
                 normalsState,
                 graphNormalsState,
                 pointCloudNormalsState,
@@ -9224,7 +9742,8 @@ namespace Extrinsic::Runtime
             return {
                 {.Domain = Domain::MeshVertices,
                  .Label = "Vertices",
-                 .HasNormalsMethod = true},
+                 .HasNormalsMethod = true,
+                 .HasDenoiseMethod = true},
                 {.Domain = Domain::MeshEdges, .Label = "Edges"},
                 {.Domain = Domain::MeshFaces, .Label = "Faces"},
             };
@@ -9257,6 +9776,8 @@ namespace Extrinsic::Runtime
             return Domain::MeshVertices |
                    Domain::GraphVertices |
                    Domain::PointCloudPoints;
+        case SandboxEditorGeometryProcessingAlgorithm::MeshDenoise:
+            return Domain::MeshVertices;
         case SandboxEditorGeometryProcessingAlgorithm::Remeshing:
         case SandboxEditorGeometryProcessingAlgorithm::Simplification:
         case SandboxEditorGeometryProcessingAlgorithm::Smoothing:
@@ -9329,10 +9850,11 @@ namespace Extrinsic::Runtime
     ResolveSandboxEditorGeometryProcessingEntries(
         const SandboxEditorGeometryProcessingCapabilities capabilities)
     {
-        static constexpr std::array<SandboxEditorGeometryProcessingAlgorithm, 17>
+        static constexpr std::array<SandboxEditorGeometryProcessingAlgorithm, 18>
             kAlgorithmOrder{
                 SandboxEditorGeometryProcessingAlgorithm::KMeans,
                 SandboxEditorGeometryProcessingAlgorithm::NormalEstimation,
+                SandboxEditorGeometryProcessingAlgorithm::MeshDenoise,
                 SandboxEditorGeometryProcessingAlgorithm::Registration,
                 SandboxEditorGeometryProcessingAlgorithm::BilateralFilter,
                 SandboxEditorGeometryProcessingAlgorithm::OutlierEstimation,
@@ -10046,6 +10568,8 @@ namespace Extrinsic::Runtime
         {
         case SandboxEditorGeometryProcessingAlgorithm::KMeans:
             return "K-Means";
+        case SandboxEditorGeometryProcessingAlgorithm::MeshDenoise:
+            return "Mesh Denoise";
         case SandboxEditorGeometryProcessingAlgorithm::Remeshing:
             return "Remeshing";
         case SandboxEditorGeometryProcessingAlgorithm::Simplification:
@@ -11611,6 +12135,175 @@ namespace Extrinsic::Runtime
         return result;
     }
 
+    SandboxEditorMeshDenoiseResult ApplySandboxEditorMeshDenoiseCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorMeshDenoiseCommand& command)
+    {
+        SandboxEditorMeshDenoiseResult result{
+            .Status = SandboxEditorCommandStatus::NoChange,
+            .DenoiseStatus = Smooth::DenoiseStatus::Success,
+            .Stage = command.Stage,
+            .NormalIterations = command.NormalIterations,
+            .VertexIterations = command.VertexIterations,
+            .SigmaSpatial = command.SigmaSpatial,
+            .SigmaRange = command.SigmaRange,
+            .PreserveBoundary = command.PreserveBoundary,
+            .Error = Core::ErrorCode::Success,
+        };
+
+        if (context.Scene == nullptr)
+        {
+            result.Status = SandboxEditorCommandStatus::MissingScene;
+            result.DenoiseStatus = Smooth::DenoiseStatus::EmptyMesh;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message = "Scene registry is unavailable for mesh denoise.";
+            return result;
+        }
+        if (!context.MeshDenoiseKernelAvailable)
+        {
+            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.DenoiseStatus = Smooth::DenoiseStatus::InvalidParams;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message =
+                "Geometry.Smoothing mesh denoiser is unavailable in this runtime configuration.";
+            return result;
+        }
+
+        const bool validStage =
+            std::find(kMeshDenoiseStages.begin(),
+                      kMeshDenoiseStages.end(),
+                      command.Stage) != kMeshDenoiseStages.end();
+        if (!validStage ||
+            command.NormalIterations == 0u ||
+            command.VertexIterations == 0u ||
+            !std::isfinite(command.SigmaSpatial) ||
+            !std::isfinite(command.SigmaRange) ||
+            command.SigmaSpatial < 0.0 ||
+            command.SigmaRange < 0.0 ||
+            !IsPositiveFinite(command.DegenerateNormalLengthEpsilon))
+        {
+            result.Status =
+                SandboxEditorCommandStatus::InvalidProcessingParameters;
+            result.DenoiseStatus = Smooth::DenoiseStatus::InvalidParams;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Mesh denoise requires a valid stage, positive iteration counts, non-negative finite sigma values, and a positive finite degeneracy epsilon.";
+            return result;
+        }
+
+        entt::registry& raw = context.Scene->Raw();
+        const std::optional<ECS::EntityHandle> entity =
+            ResolveStableEntity(raw, command.StableEntityId);
+        if (!entity.has_value())
+        {
+            result.Status = SandboxEditorCommandStatus::StaleEntity;
+            result.DenoiseStatus = Smooth::DenoiseStatus::EmptyMesh;
+            result.Error = Core::ErrorCode::ResourceNotFound;
+            result.Message =
+                "Mesh denoise target entity is stale or no longer live.";
+            return result;
+        }
+
+        const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
+        MeshDenoiseSourceResult source =
+            BuildHalfedgeMeshForDenoise(view);
+        result.VertexSlotCount = source.BeforePositions.size();
+        result.SkippedDeletedVertexCount =
+            static_cast<std::size_t>(
+                std::count(source.DeletedVertices.begin(),
+                           source.DeletedVertices.end(),
+                           true));
+        result.WrittenCount =
+            result.VertexSlotCount - result.SkippedDeletedVertexCount;
+        if (!source.Succeeded())
+        {
+            result.Status = source.Status;
+            result.DenoiseStatus =
+                source.Status ==
+                        SandboxEditorCommandStatus::UnsupportedGeometryDomain
+                    ? Smooth::DenoiseStatus::EmptyMesh
+                    : Smooth::DenoiseStatus::InvalidParams;
+            result.Error = source.Error;
+            result.Message = source.Diagnostic;
+            return result;
+        }
+
+        Smooth::BilateralDenoiseParams params{};
+        params.NormalIterations = command.NormalIterations;
+        params.VertexIterations = command.VertexIterations;
+        params.SigmaSpatial = command.SigmaSpatial;
+        params.SigmaRange = command.SigmaRange;
+        params.PreserveBoundary = command.PreserveBoundary;
+        params.DegenerateNormalLengthEpsilon =
+            command.DegenerateNormalLengthEpsilon;
+
+        const Smooth::BilateralDenoiseResult denoise =
+            Smooth::DenoiseBilateral(source.Mesh, params);
+        result.DenoiseStatus = denoise.Status;
+        result.Error = ErrorForDenoiseStatus(denoise.Status);
+        CopyMeshDenoiseCounters(denoise, result);
+        result.VertexSlotCount = source.BeforePositions.size();
+        result.WrittenCount =
+            result.VertexSlotCount - result.SkippedDeletedVertexCount;
+
+        if (denoise.Status != Smooth::DenoiseStatus::Success)
+        {
+            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Message = "Geometry.Smoothing denoise failed with ";
+            result.Message += std::string(Smooth::DebugName(denoise.Status));
+            result.Message += ".";
+            return result;
+        }
+
+        std::vector<glm::vec3> afterPositions =
+            ExtractMeshPositions(source.Mesh);
+        if (afterPositions.size() != source.BeforePositions.size() ||
+            !AllFiniteVec3(std::span<const glm::vec3>{
+                afterPositions.data(),
+                afterPositions.size()}))
+        {
+            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.DenoiseStatus = Smooth::DenoiseStatus::NonFiniteInput;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Geometry.Smoothing denoise produced invalid or count-mismatched positions.";
+            return result;
+        }
+
+        std::size_t movedPublishedVertices = 0u;
+        for (std::size_t i = 0u; i < afterPositions.size(); ++i)
+        {
+            if (i < source.DeletedVertices.size() && source.DeletedVertices[i])
+            {
+                afterPositions[i] = source.BeforePositions[i];
+                continue;
+            }
+            if (afterPositions[i] != source.BeforePositions[i])
+                ++movedPublishedVertices;
+        }
+        result.MovedVertexCount = movedPublishedVertices;
+
+        const SandboxEditorCommandStatus commitStatus =
+            CommitMeshDenoisePositions(
+                context,
+                command.StableEntityId,
+                std::move(source.BeforePositions),
+                std::move(afterPositions));
+        if (commitStatus != SandboxEditorCommandStatus::Applied)
+        {
+            result.Status = commitStatus;
+            result.Error = Core::ErrorCode::Unknown;
+            result.Message =
+                "Mesh denoise position publication failed during editor history commit.";
+            return result;
+        }
+
+        result.Status = SandboxEditorCommandStatus::Applied;
+        result.Error = Core::ErrorCode::Success;
+        result.Message = BuildMeshDenoiseSuccessMessage(result);
+        return result;
+    }
+
     SandboxEditorMeshVertexNormalsResult
     ApplySandboxEditorMeshVertexNormalsCommand(
         const SandboxEditorContext& context,
@@ -11965,6 +12658,7 @@ namespace Extrinsic::Runtime
                        nullptr,
                        nullptr,
                        nullptr,
+                       nullptr,
                        nullptr);
     }
 
@@ -12004,6 +12698,9 @@ namespace Extrinsic::Runtime
                     context.LastAssetImportResult = &*m_LastImportResult;
                 if (m_LastKMeansResult.has_value())
                     context.LastKMeansResult = &*m_LastKMeansResult;
+                if (m_LastMeshDenoiseResult.has_value())
+                    context.LastMeshDenoiseResult =
+                        &*m_LastMeshDenoiseResult;
                 if (m_LastMeshVertexNormalsResult.has_value())
                     context.LastMeshVertexNormalsResult =
                         &*m_LastMeshVertexNormalsResult;
@@ -12042,6 +12739,18 @@ namespace Extrinsic::Runtime
                     .Seed = &m_KMeansSeed,
                     .UseHierarchicalInitialization =
                         &m_KMeansUseHierarchicalInitialization,
+                };
+                MeshDenoiseUiState denoiseState{
+                    .LastResult = &m_LastMeshDenoiseResult,
+                    .Stage = &m_MeshDenoiseStage,
+                    .NormalIterations =
+                        &m_MeshDenoiseNormalIterations,
+                    .VertexIterations =
+                        &m_MeshDenoiseVertexIterations,
+                    .SigmaSpatial = &m_MeshDenoiseSigmaSpatial,
+                    .SigmaRange = &m_MeshDenoiseSigmaRange,
+                    .PreserveBoundary =
+                        &m_MeshDenoisePreserveBoundary,
                 };
                 MeshVertexNormalsUiState normalsState{
                     .LastResult = &m_LastMeshVertexNormalsResult,
@@ -12089,6 +12798,7 @@ namespace Extrinsic::Runtime
                     &m_PanelWindowOpen,
                     &m_DomainWindowOpen,
                     &kmeansState,
+                    &denoiseState,
                     &normalsState,
                     &graphNormalsState,
                     &pointCloudNormalsState,

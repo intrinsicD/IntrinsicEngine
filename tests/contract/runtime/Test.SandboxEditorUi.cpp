@@ -45,6 +45,7 @@ import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Hierarchy.Mutation;
 import Extrinsic.ECS.Scene.Handle;
@@ -79,9 +80,12 @@ import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Graph.Vertex.Normals;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
 import Geometry.HalfedgeMesh.Vertices.Normals;
 import Geometry.PointCloud.Normals;
 import Geometry.Properties;
+import Geometry.Smoothing;
 import Geometry.UvAtlas;
 
 namespace Runtime = Extrinsic::Runtime;
@@ -99,6 +103,7 @@ namespace PN = Extrinsic::ECS::Components::GeometrySources::PropertyNames;
 namespace GN = Geometry::HalfedgeMesh::VertexNormals;
 namespace GVN = Geometry::Graph::VertexNormals;
 namespace PCN = Geometry::PointCloud::Normals;
+namespace Smooth = Geometry::Smoothing;
 
 namespace
 {
@@ -597,6 +602,60 @@ namespace
                      {0u, 0u, 0u, kInvalidIndex, kInvalidIndex, kInvalidIndex});
         auto& faces = raw.emplace<GS::Faces>(entity);
         SetFaces(faces, {0u});
+    }
+
+    void AddDenoiseTetraMeshSource(ECS::Scene::Registry& registry,
+                                   const ECS::EntityHandle entity)
+    {
+        Geometry::HalfedgeMesh::Mesh mesh =
+            Geometry::HalfedgeMesh::MakeMeshTetrahedron();
+        mesh.Position(Geometry::VertexHandle{0u}) +=
+            glm::vec3{0.35f, -0.15f, 0.20f};
+        GS::PopulateFromMesh(registry.Raw(), entity, mesh);
+        registry.Raw().emplace_or_replace<G::RenderSurface>(entity);
+    }
+
+    [[nodiscard]] std::vector<glm::vec3> MeshVertexPositions(
+        ECS::Scene::Registry& registry,
+        const ECS::EntityHandle entity)
+    {
+        auto positions = registry.Raw()
+                             .get<GS::Vertices>(entity)
+                             .Properties.Get<glm::vec3>(PN::kPosition);
+        if (!positions)
+            return {};
+        return positions.Vector();
+    }
+
+    void ExpectPositionsExactlyEqual(
+        const std::vector<glm::vec3>& lhs,
+        const std::vector<glm::vec3>& rhs)
+    {
+        ASSERT_EQ(lhs.size(), rhs.size());
+        for (std::size_t i = 0u; i < lhs.size(); ++i)
+        {
+            EXPECT_FLOAT_EQ(lhs[i].x, rhs[i].x);
+            EXPECT_FLOAT_EQ(lhs[i].y, rhs[i].y);
+            EXPECT_FLOAT_EQ(lhs[i].z, rhs[i].z);
+        }
+    }
+
+    [[nodiscard]] bool AnyPositionDiffers(
+        const std::vector<glm::vec3>& lhs,
+        const std::vector<glm::vec3>& rhs)
+    {
+        if (lhs.size() != rhs.size())
+            return true;
+        for (std::size_t i = 0u; i < lhs.size(); ++i)
+        {
+            if (lhs[i].x != rhs[i].x ||
+                lhs[i].y != rhs[i].y ||
+                lhs[i].z != rhs[i].z)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     [[nodiscard]] Runtime::ProgressivePresentationBindings
@@ -1722,6 +1781,22 @@ TEST(SandboxEditorUi, GeometryProcessingSupportedDomainsMatchPromotedEditorContr
         normals,
         Domain::MeshEdges));
 
+    const Domain denoise =
+        Runtime::GetSandboxEditorSupportedGeometryProcessingDomains(
+            Algorithm::MeshDenoise);
+    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        denoise,
+        Domain::MeshVertices));
+    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        denoise,
+        Domain::MeshEdges));
+    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        denoise,
+        Domain::GraphVertices));
+    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        denoise,
+        Domain::PointCloudPoints));
+
     const Domain smoothing =
         Runtime::GetSandboxEditorSupportedGeometryProcessingDomains(
             Algorithm::Smoothing);
@@ -1753,6 +1828,9 @@ TEST(SandboxEditorUi, GeometryProcessingSupportedDomainsMatchPromotedEditorContr
     EXPECT_STREQ(Runtime::DebugNameForSandboxEditorGeometryProcessingAlgorithm(
                      Algorithm::VectorHeat),
                  "Vector Heat Method");
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorGeometryProcessingAlgorithm(
+                     Algorithm::MeshDenoise),
+                 "Mesh Denoise");
 }
 
 TEST(SandboxEditorUi, GeometryProcessingMenusExposeDomainElementSubmenus)
@@ -1766,12 +1844,15 @@ TEST(SandboxEditorUi, GeometryProcessingMenusExposeDomainElementSubmenus)
     EXPECT_EQ(mesh[0].Domain, Domain::MeshVertices);
     EXPECT_STREQ(mesh[0].Label, "Vertices");
     EXPECT_TRUE(mesh[0].HasNormalsMethod);
+    EXPECT_TRUE(mesh[0].HasDenoiseMethod);
     EXPECT_EQ(mesh[1].Domain, Domain::MeshEdges);
     EXPECT_STREQ(mesh[1].Label, "Edges");
     EXPECT_FALSE(mesh[1].HasNormalsMethod);
+    EXPECT_FALSE(mesh[1].HasDenoiseMethod);
     EXPECT_EQ(mesh[2].Domain, Domain::MeshFaces);
     EXPECT_STREQ(mesh[2].Label, "Faces");
     EXPECT_FALSE(mesh[2].HasNormalsMethod);
+    EXPECT_FALSE(mesh[2].HasDenoiseMethod);
 
     const std::vector<Runtime::SandboxEditorGeometryProcessingMenuItem> graph =
         Runtime::GetSandboxEditorGeometryProcessingMenuItems(
@@ -1780,12 +1861,15 @@ TEST(SandboxEditorUi, GeometryProcessingMenusExposeDomainElementSubmenus)
     EXPECT_EQ(graph[0].Domain, Domain::GraphVertices);
     EXPECT_STREQ(graph[0].Label, "Vertices");
     EXPECT_TRUE(graph[0].HasNormalsMethod);
+    EXPECT_FALSE(graph[0].HasDenoiseMethod);
     EXPECT_EQ(graph[1].Domain, Domain::GraphEdges);
     EXPECT_STREQ(graph[1].Label, "Edges");
     EXPECT_FALSE(graph[1].HasNormalsMethod);
+    EXPECT_FALSE(graph[1].HasDenoiseMethod);
     EXPECT_EQ(graph[2].Domain, Domain::GraphHalfedges);
     EXPECT_STREQ(graph[2].Label, "Halfedges");
     EXPECT_FALSE(graph[2].HasNormalsMethod);
+    EXPECT_FALSE(graph[2].HasDenoiseMethod);
 
     const std::vector<Runtime::SandboxEditorGeometryProcessingMenuItem> cloud =
         Runtime::GetSandboxEditorGeometryProcessingMenuItems(
@@ -1794,6 +1878,7 @@ TEST(SandboxEditorUi, GeometryProcessingMenusExposeDomainElementSubmenus)
     EXPECT_EQ(cloud[0].Domain, Domain::PointCloudPoints);
     EXPECT_STREQ(cloud[0].Label, "Vertices");
     EXPECT_TRUE(cloud[0].HasNormalsMethod);
+    EXPECT_FALSE(cloud[0].HasDenoiseMethod);
 }
 
 TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntries)
@@ -1828,16 +1913,17 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
 
     const std::vector<Runtime::SandboxEditorGeometryProcessingEntry> meshEntries =
         Runtime::ResolveSandboxEditorGeometryProcessingEntries(meshCaps);
-    ASSERT_EQ(meshEntries.size(), 12u);
+    ASSERT_EQ(meshEntries.size(), 13u);
     EXPECT_EQ(meshEntries[0].Algorithm, Algorithm::KMeans);
     EXPECT_EQ(meshEntries[1].Algorithm, Algorithm::NormalEstimation);
-    EXPECT_EQ(meshEntries[2].Algorithm, Algorithm::ShortestPath);
-    EXPECT_EQ(meshEntries[3].Algorithm, Algorithm::VectorHeat);
-    EXPECT_EQ(meshEntries[4].Algorithm, Algorithm::Parameterization);
-    EXPECT_EQ(meshEntries[5].Algorithm, Algorithm::ConvexHull);
-    EXPECT_EQ(meshEntries[6].Algorithm, Algorithm::BooleanCSG);
-    EXPECT_EQ(meshEntries[7].Algorithm, Algorithm::Remeshing);
-    EXPECT_EQ(meshEntries[11].Algorithm, Algorithm::Repair);
+    EXPECT_EQ(meshEntries[2].Algorithm, Algorithm::MeshDenoise);
+    EXPECT_EQ(meshEntries[3].Algorithm, Algorithm::ShortestPath);
+    EXPECT_EQ(meshEntries[4].Algorithm, Algorithm::VectorHeat);
+    EXPECT_EQ(meshEntries[5].Algorithm, Algorithm::Parameterization);
+    EXPECT_EQ(meshEntries[6].Algorithm, Algorithm::ConvexHull);
+    EXPECT_EQ(meshEntries[7].Algorithm, Algorithm::BooleanCSG);
+    EXPECT_EQ(meshEntries[8].Algorithm, Algorithm::Remeshing);
+    EXPECT_EQ(meshEntries[12].Algorithm, Algorithm::Repair);
 
     const std::vector<Domain> meshKMeans =
         Runtime::GetAvailableSandboxEditorKMeansDomains(registry, mesh);
@@ -1849,6 +1935,7 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
         Runtime::BuildSandboxEditorDomainWindowModel(
             context,
             Runtime::SandboxEditorDomainWindowKind::Mesh);
+    EXPECT_TRUE(meshModel.Processing.MeshDenoiseAvailable);
     EXPECT_TRUE(meshModel.Processing.MeshVertexNormalsAvailable);
     EXPECT_FALSE(meshModel.Processing.GraphVertexNormalsAvailable);
     EXPECT_FALSE(meshModel.Processing.PointCloudVertexNormalsAvailable);
@@ -1885,6 +1972,7 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
         Runtime::BuildSandboxEditorDomainWindowModel(
             context,
             Runtime::SandboxEditorDomainWindowKind::Graph);
+    EXPECT_FALSE(graphModel.Processing.MeshDenoiseAvailable);
     EXPECT_FALSE(graphModel.Processing.MeshVertexNormalsAvailable);
     EXPECT_TRUE(graphModel.Processing.GraphVertexNormalsAvailable);
     EXPECT_FALSE(graphModel.Processing.PointCloudVertexNormalsAvailable);
@@ -1916,6 +2004,7 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
         Runtime::BuildSandboxEditorDomainWindowModel(
             context,
             Runtime::SandboxEditorDomainWindowKind::PointCloud);
+    EXPECT_FALSE(cloudModel.Processing.MeshDenoiseAvailable);
     EXPECT_FALSE(cloudModel.Processing.MeshVertexNormalsAvailable);
     EXPECT_FALSE(cloudModel.Processing.GraphVertexNormalsAvailable);
     EXPECT_TRUE(cloudModel.Processing.PointCloudVertexNormalsAvailable);
@@ -2216,6 +2305,155 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandBindsColorAndDisablesCleanly)
     EXPECT_FALSE(registry.Raw().all_of<Runtime::VertexChannelBindingSet>(mesh));
     EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexColors>(mesh));
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+}
+
+TEST(SandboxEditorUi, MeshDenoiseCommandPublishesPositionsAndSupportsUndoRedo)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "DenoiseMesh");
+    AddDenoiseTetraMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    const std::vector<glm::vec3> original =
+        MeshVertexPositions(registry, mesh);
+    ASSERT_EQ(original.size(), 4u);
+
+    const Runtime::SandboxEditorMeshDenoiseResult result =
+        Runtime::ApplySandboxEditorMeshDenoiseCommand(
+            context,
+            Runtime::SandboxEditorMeshDenoiseCommand{
+                .StableEntityId = stableId,
+                .NormalIterations = 2u,
+                .VertexIterations = 3u,
+                .SigmaSpatial = 0.0,
+                .SigmaRange = 0.0,
+                .PreserveBoundary = true,
+            });
+
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_EQ(result.DenoiseStatus, Smooth::DenoiseStatus::Success);
+    EXPECT_EQ(result.VertexSlotCount, original.size());
+    EXPECT_EQ(result.WrittenCount, original.size());
+    EXPECT_EQ(result.SkippedDeletedVertexCount, 0u);
+    EXPECT_EQ(result.NormalIterations, 2u);
+    EXPECT_EQ(result.VertexIterations, 3u);
+    EXPECT_GT(result.ProcessedFaceCount, 0u);
+    EXPECT_GT(result.MovedVertexCount, 0u);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
+    EXPECT_TRUE(history.IsDirty());
+
+    const std::vector<glm::vec3> denoised =
+        MeshVertexPositions(registry, mesh);
+    ASSERT_TRUE(AnyPositionDiffers(original, denoised));
+    for (const glm::vec3 position : denoised)
+    {
+        EXPECT_TRUE(std::isfinite(position.x));
+        EXPECT_TRUE(std::isfinite(position.y));
+        EXPECT_TRUE(std::isfinite(position.z));
+    }
+
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    ExpectPositionsExactlyEqual(MeshVertexPositions(registry, mesh), original);
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    ExpectPositionsExactlyEqual(MeshVertexPositions(registry, mesh), denoised);
+
+    context.LastMeshDenoiseResult = &result;
+    const Runtime::SandboxEditorDomainWindowModel model =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    EXPECT_TRUE(model.Processing.MeshDenoiseAvailable);
+    ASSERT_TRUE(model.Processing.LastMeshDenoiseResult.has_value());
+    EXPECT_TRUE(model.Processing.LastMeshDenoiseResult->Succeeded());
+    EXPECT_EQ(model.Processing.LastMeshDenoiseResult->WrittenCount, 4u);
+}
+
+TEST(SandboxEditorUi, MeshDenoiseCommandFailsClosedForInvalidTargetsAndUnavailableKernel)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    const Runtime::SandboxEditorMeshDenoiseResult missingScene =
+        Runtime::ApplySandboxEditorMeshDenoiseCommand(
+            Runtime::SandboxEditorContext{},
+            Runtime::SandboxEditorMeshDenoiseCommand{
+                .StableEntityId = 1u,
+            });
+    EXPECT_EQ(missingScene.Status,
+              Runtime::SandboxEditorCommandStatus::MissingScene);
+    EXPECT_EQ(missingScene.Error, Core::ErrorCode::InvalidState);
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "CloudWrongDomain");
+    AddPointCloudSource(registry, cloud, 3u);
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
+                 {
+                     {0.0f, 0.0f, 0.0f},
+                     {1.0f, 0.0f, 0.0f},
+                     {0.0f, 1.0f, 0.0f},
+                 });
+    const Runtime::SandboxEditorMeshDenoiseResult wrongDomain =
+        Runtime::ApplySandboxEditorMeshDenoiseCommand(
+            context,
+            Runtime::SandboxEditorMeshDenoiseCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(cloud),
+            });
+    EXPECT_EQ(wrongDomain.Status,
+              Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(cloud));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(cloud));
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "DenoiseFailMesh");
+    AddDenoiseTetraMeshSource(registry, mesh);
+    const std::vector<glm::vec3> before =
+        MeshVertexPositions(registry, mesh);
+    const Runtime::SandboxEditorMeshDenoiseResult invalidParams =
+        Runtime::ApplySandboxEditorMeshDenoiseCommand(
+            context,
+            Runtime::SandboxEditorMeshDenoiseCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+                .NormalIterations = 0u,
+            });
+    EXPECT_EQ(invalidParams.Status,
+              Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
+    ExpectPositionsExactlyEqual(MeshVertexPositions(registry, mesh), before);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+
+    context.MeshDenoiseKernelAvailable = false;
+    const Runtime::SandboxEditorMeshDenoiseResult unavailable =
+        Runtime::ApplySandboxEditorMeshDenoiseCommand(
+            context,
+            Runtime::SandboxEditorMeshDenoiseCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+            });
+    EXPECT_EQ(unavailable.Status,
+              Runtime::SandboxEditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_EQ(unavailable.Error, Core::ErrorCode::InvalidState);
+    ExpectPositionsExactlyEqual(MeshVertexPositions(registry, mesh), before);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const Runtime::SandboxEditorDomainWindowModel unavailableModel =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    EXPECT_FALSE(unavailableModel.Processing.MeshDenoiseAvailable);
 }
 
 TEST(SandboxEditorUi, MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWeightings)

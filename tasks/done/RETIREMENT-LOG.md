@@ -2631,3 +2631,17 @@ targets, invalid settings, and typed `v:normal` conflicts fail closed without
 touching unrelated properties or renderer/RHI state. Focused geometry,
 runtime-editor, and dirty-tag extraction tests passed, and K-Means processing
 capability coverage remains green.
+
+[`UI-024`](UI-024-editor-mesh-denoise-window.md) — Sandbox EditorUI mesh
+denoising window retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
+`Mesh > Processing > Denoise` now exposes a runtime-owned command/result
+surface that builds a scratch halfedge mesh from selected mesh
+`GeometrySources`, calls the `GEOM-042` `Geometry.Smoothing::DenoiseBilateral`
+kernel, and publishes finite count-matched `v:position` values only after the
+geometry result succeeds. Successful commits are undoable through
+`EditorCommandHistory`, stamp `DirtyVertexPositions` and
+`DirtyVertexAttributes`, and leave renderer/RHI uploads to deferred extraction
+without stamping broad `GpuDirty`. Contract tests cover menu/capability
+advertising, successful denoise publication, undo/redo exact restoration,
+dirty-tag behavior, wrong-domain and invalid-parameter fail-closed paths, and
+the deterministic unavailable-kernel diagnostic lane.

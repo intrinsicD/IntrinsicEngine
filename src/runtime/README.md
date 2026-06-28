@@ -127,6 +127,30 @@ import's deferred materialization applies after an edit, runtime preserves
 count-matched current `v:normal` values so editor-authored normals remain the
 CPU authority.
 
+### Sandbox Editor Mesh Denoise
+
+`UI-024` adds a mesh-only denoise editor command at
+`Mesh > Processing > Denoise`. The Sandbox EditorUI surface exports
+`SandboxEditorMeshDenoiseCommand`,
+`SandboxEditorMeshDenoiseResult`, and
+`ApplySandboxEditorMeshDenoiseCommand(...)`. Runtime validates the selected
+mesh `GeometrySources`, converts the current CPU data to a scratch halfedge
+mesh, calls the geometry-owned `Geometry.Smoothing::DenoiseBilateral` kernel
+from `GEOM-042`, and publishes count-matched finite positions back to canonical
+`v:position` only after the geometry result succeeds. The UI exposes the
+full-bilateral stage, normal/vertex iteration counts, auto-or-explicit spatial
+and range sigma values, and boundary preservation, with a single `Denoise`
+action. `SandboxEditorContext::MeshDenoiseKernelAvailable` provides the
+deterministic unavailable-kernel diagnostic lane used by headless/editor
+contract tests.
+
+Successful publication is undoable through `EditorCommandHistory::Execute`:
+undo restores the exact prior `v:position` array and redo reapplies the
+denoised positions. The commit stamps `DirtyVertexPositions` and
+`DirtyVertexAttributes` for deferred mesh extraction/reupload and does not call
+renderer/RHI upload APIs or stamp broad `GpuDirty`. Runtime owns the ECS
+composition and history seam; geometry owns the denoising algorithm.
+
 ### Sandbox Editor Vertex Channel Bindings
 
 `RUNTIME-123` extends `Extrinsic.Runtime.SandboxEditorUi` with normal/color

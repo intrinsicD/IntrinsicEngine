@@ -11,9 +11,6 @@ map.
 ## Tasks
 
 - [RORG-031F — UI integration backlog seed](RORG-031-ui-integration.md).
-- [UI-024 — Sandbox EditorUI mesh denoising window](UI-024-editor-mesh-denoise-window.md)
-  (depends on retired `GEOM-042`; `Mesh > Processing > Denoise` method window following
-  the UI-022 pattern).
 - [UI-025 — Sandbox EditorUI remeshing and subdivision windows](UI-025-editor-remesh-subdivide-windows.md)
   (depends on `GEOM-043`, `GEOM-044`; `Mesh > Processing` remesh/subdivide
   method windows).

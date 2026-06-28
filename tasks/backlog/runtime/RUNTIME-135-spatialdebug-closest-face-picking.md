@@ -13,7 +13,7 @@ maturity_target: CPUContracted
 ## Non-goals
 - No geometry kernel implementation; GEOM-039 owns the accelerated nearest-face query, the per-face AABB index build, and the exact branch-and-bound traversal.
 - No GPU picking, GPU readback, render-target ID buffers, or shader work; this is a CPU-resolved overlay path.
-- No editor-window UI; this is the SpatialDebug overlay path and is distinct from the UI-024/025/026 geometry-method editor windows.
+- No editor-window UI; this is the SpatialDebug overlay path and is distinct from the retired UI-024 denoise window and the remaining UI-025/UI-026 geometry-method editor windows.
 - No new persistent or generated asset, and no new serialized scene state.
 - No async/streaming index build unless a later value-gated runtime task accepts it.
 - No `Runtime.Engine.cppm` public API expansion unless the existing SpatialDebug composition seams cannot express the workflow.
@@ -78,7 +78,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Implementing the closest-face geometry kernel, the per-face AABB index, or the branch-and-bound traversal in runtime/UI instead of consuming GEOM-039; this task only composes the geometry-owned query.
 - Introducing any geometry -> runtime/ECS/assets/graphics/rhi/app dependency, or otherwise reaching from `src/geometry/*` into runtime to satisfy this workflow.
 - Adding GPU picking, renderer/RHI/Vulkan upload calls, or shader work to the SpatialDebug overlay path.
-- Adding an editor-window UI here (the UI-024/025/026 method-window path) instead of the SpatialDebug overlay path.
+- Adding an editor-window UI here (the UI-025/UI-026 method-window path, plus retired UI-024's denoise path) instead of the SpatialDebug overlay path.
 - Mixing mechanical file moves with semantic refactors.
 - Introducing unrelated feature work.
 - Claiming performance improvements without a baseline comparison.

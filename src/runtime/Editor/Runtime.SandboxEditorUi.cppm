@@ -49,6 +49,7 @@ import Extrinsic.Runtime.VertexChannelBindings;
     import Geometry.Graph.Vertex.Normals;
     import Geometry.HalfedgeMesh.Vertices.Normals;
     import Geometry.PointCloud.Normals;
+    import Geometry.Smoothing;
     import Geometry.UvAtlas;
 
 namespace Extrinsic::Runtime::Detail
@@ -234,6 +235,7 @@ export namespace Extrinsic::Runtime
     enum class SandboxEditorGeometryProcessingAlgorithm : std::uint8_t
     {
         KMeans,
+        MeshDenoise,
         Remeshing,
         Simplification,
         Smoothing,
@@ -279,6 +281,7 @@ export namespace Extrinsic::Runtime
             SandboxEditorGeometryProcessingDomain::None};
         const char* Label{""};
         bool HasNormalsMethod{false};
+        bool HasDenoiseMethod{false};
     };
 
     [[nodiscard]] std::vector<SandboxEditorGeometryProcessingMenuItem>
@@ -340,6 +343,56 @@ export namespace Extrinsic::Runtime
         bool Converged{false};
         float Inertia{0.0f};
         std::uint32_t MaxDistanceIndex{0u};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SandboxEditorCommandStatus::Applied;
+        }
+    };
+
+    enum class SandboxEditorMeshDenoiseStage : std::uint8_t
+    {
+        FullBilateral,
+    };
+
+    struct SandboxEditorMeshDenoiseCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        SandboxEditorMeshDenoiseStage Stage{
+            SandboxEditorMeshDenoiseStage::FullBilateral};
+        std::uint32_t NormalIterations{5u};
+        std::uint32_t VertexIterations{10u};
+        double SigmaSpatial{0.0};
+        double SigmaRange{0.0};
+        bool PreserveBoundary{true};
+        double DegenerateNormalLengthEpsilon{1.0e-12};
+    };
+
+    struct SandboxEditorMeshDenoiseResult
+    {
+        SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
+        Geometry::Smoothing::DenoiseStatus DenoiseStatus{
+            Geometry::Smoothing::DenoiseStatus::Success};
+        SandboxEditorMeshDenoiseStage Stage{
+            SandboxEditorMeshDenoiseStage::FullBilateral};
+        std::uint32_t NormalIterations{0u};
+        std::uint32_t VertexIterations{0u};
+        double SigmaSpatial{0.0};
+        double SigmaRange{0.0};
+        bool PreserveBoundary{true};
+        std::size_t VertexSlotCount{0u};
+        std::size_t WrittenCount{0u};
+        std::size_t SkippedDeletedVertexCount{0u};
+        std::size_t MovedVertexCount{0u};
+        std::size_t ProcessedFaceCount{0u};
+        std::size_t DegenerateFaceCount{0u};
+        std::size_t NonFiniteFaceCount{0u};
+        std::size_t SkippedDeletedFaceCount{0u};
+        std::size_t PinnedBoundaryVertexCount{0u};
+        double SigmaSpatialUsed{0.0};
+        double SigmaRangeUsed{0.0};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
 
@@ -1447,10 +1500,13 @@ export namespace Extrinsic::Runtime
         SandboxEditorGeometryProcessingCapabilities Capabilities{};
         std::vector<SandboxEditorGeometryProcessingEntry> Entries{};
         std::vector<SandboxEditorGeometryProcessingDomain> KMeansDomains{};
+        bool MeshDenoiseAvailable{false};
         bool MeshVertexNormalsAvailable{false};
         bool GraphVertexNormalsAvailable{false};
         bool PointCloudVertexNormalsAvailable{false};
         std::optional<SandboxEditorKMeansResult> LastKMeansResult{};
+        std::optional<SandboxEditorMeshDenoiseResult>
+            LastMeshDenoiseResult{};
         std::optional<SandboxEditorMeshVertexNormalsResult>
             LastMeshVertexNormalsResult{};
         std::optional<SandboxEditorGraphVertexNormalsResult>
@@ -1527,6 +1583,8 @@ export namespace Extrinsic::Runtime
         const SandboxEditorFileImportResult* LastAssetImportResult{nullptr};
         const SandboxEditorSceneFileResult* LastSceneFileResult{nullptr};
         const SandboxEditorKMeansResult* LastKMeansResult{nullptr};
+        const SandboxEditorMeshDenoiseResult*
+            LastMeshDenoiseResult{nullptr};
         const SandboxEditorMeshVertexNormalsResult*
             LastMeshVertexNormalsResult{nullptr};
         const SandboxEditorGraphVertexNormalsResult*
@@ -1551,6 +1609,7 @@ export namespace Extrinsic::Runtime
         bool CameraRenderCommandsAvailable{false};
         bool VisualizationCommandsAvailable{false};
         bool RenderRecipeCommandsAvailable{false};
+        bool MeshDenoiseKernelAvailable{true};
     };
 
     struct SandboxEditorTransformEditCommand
@@ -1855,6 +1914,10 @@ export namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorKMeansCommand& command);
 
+    SandboxEditorMeshDenoiseResult ApplySandboxEditorMeshDenoiseCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorMeshDenoiseCommand& command);
+
     SandboxEditorMeshVertexNormalsResult
     ApplySandboxEditorMeshVertexNormalsCommand(
         const SandboxEditorContext& context,
@@ -1915,6 +1978,8 @@ export namespace Extrinsic::Runtime
         std::optional<SandboxEditorFileImportResult> m_LastImportResult{};
         std::optional<SandboxEditorSceneFileResult> m_LastSceneFileResult{};
         std::optional<SandboxEditorKMeansResult> m_LastKMeansResult{};
+        std::optional<SandboxEditorMeshDenoiseResult>
+            m_LastMeshDenoiseResult{};
         std::optional<SandboxEditorMeshVertexNormalsResult>
             m_LastMeshVertexNormalsResult{};
         std::optional<SandboxEditorGraphVertexNormalsResult>
@@ -1931,6 +1996,12 @@ export namespace Extrinsic::Runtime
         std::int32_t m_KMeansMaxIterations{32};
         std::int32_t m_KMeansSeed{42};
         bool m_KMeansUseHierarchicalInitialization{true};
+        std::int32_t m_MeshDenoiseStage{0};
+        std::int32_t m_MeshDenoiseNormalIterations{5};
+        std::int32_t m_MeshDenoiseVertexIterations{10};
+        float m_MeshDenoiseSigmaSpatial{0.0f};
+        float m_MeshDenoiseSigmaRange{0.0f};
+        bool m_MeshDenoisePreserveBoundary{true};
         std::int32_t m_MeshVertexNormalsWeighting{1};
         glm::vec3 m_MeshVertexNormalsFallback{0.0f, 1.0f, 0.0f};
         glm::vec3 m_GraphVertexNormalsFallback{0.0f, 0.0f, 1.0f};
