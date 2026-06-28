@@ -32,7 +32,7 @@
   seams remain gated):
   - [`GEOM-020`](GEOM-020-sparse-direct-factorization-seam.md)
     owns the direct sparse SPD factorization seam (`SimplicialLDLT` /
-    `SimplicialLLT`) that `tasks/backlog/methods/METHOD-002` (step 2)
+    `SimplicialLLT`) that retired `METHOD-002` (step 2)
     and `METHOD-003` (step 5) name as "the LDLT path from `GEOM-008`".
     GEOM-020 retired separately; those method packages must not infer
     the direct factorization seam from GEOM-008 alone.

@@ -1,0 +1,33 @@
+id: geometry.signed_heat
+name: Signed Heat Method for Generalized Signed Distance
+domain: geometry
+status: reference
+paper:
+  title: "A Heat Method for Generalized Signed Distance"
+  authors: "Nicole Feng and Keenan Crane"
+  year: 2024
+  doi: "10.1145/3658220"
+  url: "https://nzfeng.github.io/research/SignedHeatMethod/"
+inputs:
+  - "Halfedge triangle mesh domain with finite vertex positions"
+  - "Oriented halfedge curve samples describing the signed-distance zero set on the mesh"
+  - "SignedHeatParams: optional diffusion time and Poisson regularization"
+outputs:
+  - "Per-vertex signed distance property v:signed_heat_distance"
+  - "Per-vertex source marker property v:is_signed_heat_source"
+  - "SignedHeatDiagnostics with backend status, boundary degeneracy counts, factorization diagnostics, and output quality summaries"
+backends:
+  - cpu_reference
+metrics:
+  - "quality_error_l2"
+  - "runtime_ms"
+correctness_tests:
+  - "../../../tests/unit/geometry/Test.SignedHeatMethod.cpp"
+benchmarks:
+  - "../../../benchmarks/geometry/manifests/signed_heat_reference_smoke.yaml"
+known_limitations:
+  - "Surface Variant A only: point-cloud and volumetric variants are deferred follow-ups."
+  - "The repo-native CPU reference uses DEC vertex mass/cotan operators and extrinsic component diffusion as a deterministic approximation of the paper's edge-based Crouzeix-Raviart connection discretization."
+  - "Current correctness and smoke thresholds are calibrated on a deterministic flat-grid square-boundary case with quality_error_l2 < 0.40."
+  - "Input curves are oriented halfedge chains. Open or duplicate curves produce finite output when possible but set the degenerate-boundary diagnostic status."
+  - "The Poisson null space is removed with a small mass regularization, then shifted so the weighted mean value on the source curve is zero."

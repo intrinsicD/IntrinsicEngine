@@ -115,6 +115,15 @@
   convention. `Geometry.DEC` aliases these sparse records so existing
   DEC/geodesic/parameterization callers keep their names while sharing the
   common implementation.
+- `Geometry.SignedHeatMethod` is the CPU reference surface backend for Feng &
+  Crane's Signed Heat Method. It consumes an oriented halfedge curve on a
+  triangle mesh, assembles `Geometry.DEC` vertex mass/cotan operators, diffuses
+  boundary-normal impulses with `Geometry.Sparse::SparseLDLT`, solves a
+  regularized Poisson recovery, and writes `v:signed_heat_distance` plus
+  `v:is_signed_heat_source`. The current backend is a deterministic
+  vertex-based approximation of the paper's edge-based Crouzeix-Raviart
+  connection discretization and reports explicit invalid-input,
+  degenerate-boundary, factorization/solve, and non-finite-result statuses.
 - Optional Spectra or SuiteSparse/CHOLMOD seams are deferred until CPU reference
   parity and benchmark manifests justify a second backend.
 - `Geometry.PCA` exports the closed-form symmetric 3×3 eigensolver

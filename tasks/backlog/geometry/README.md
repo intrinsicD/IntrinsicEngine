@@ -43,7 +43,7 @@ the runtime SpatialDebug closest-face consumer in `RUNTIME-135`.
   future geometry method packages plug into.
 - Retired GEOM-020 is the named follow-up to retired GEOM-008 for the direct
   sparse SPD factorization (LDLT/LLT) seam that GEOM-008 deferred but
-  that methods/METHOD-002 (step 2) and METHOD-003 (step 5) already
+  that retired METHOD-002 (step 2) and METHOD-003 (step 5) already
   reference as "the LDLT path from GEOM-008". Method tasks gated on the
   LDLT path can now promote against `Geometry.Sparse::SparseLDLT` /
   `SparseLLT`; remaining method gates are encoded in the method tasks'

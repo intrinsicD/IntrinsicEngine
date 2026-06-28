@@ -2894,3 +2894,20 @@ satisfies METHOD-002's direct-solver gate, preserves Variant A (surface signed
 heat) as the public-facing default, and points future method work at the
 resulting `methods/geometry/signed_heat/` package as the canonical package
 pattern.
+
+[`METHOD-002`](METHOD-002-signed-heat-method-reference-backend.md) — Signed Heat
+Method reference backend retired to `tasks/done/` on 2026-06-28 at
+`CPUContracted`. `Geometry.SignedHeatMethod` now exposes a CPU reference surface
+backend that computes per-vertex signed distance from an oriented halfedge curve
+on a triangle mesh. The implementation reuses `Geometry.DEC` vertex mass/cotan
+operators and `Geometry.Sparse::SparseLDLT` for the heat and regularized
+Poisson solves, writes `v:signed_heat_distance` and
+`v:is_signed_heat_source`, and reports explicit invalid-input,
+degenerate-boundary, factorization/solve, and non-finite-result diagnostics.
+The method package `methods/geometry/signed_heat/` records the paper intake,
+backend status, and known limitation that this is a vertex-based approximation
+of the paper's edge-based Crouzeix-Raviart connection discretization. Unit
+coverage proves flat-grid signed-distance sign/quality, orientation sign flip,
+open-boundary finite diagnostics, invalid-input failure, and bitwise
+determinism. The smoke benchmark emits schema-valid runtime and
+`quality_error_l2` metrics without making a performance claim.

@@ -16,10 +16,6 @@ map.
 
 ## Tasks
 
-- [METHOD-002 — Signed Heat Method reference backend](METHOD-002-signed-heat-method-reference-backend.md)
-  **(pathfinder method per [METHODS-001](../../done/METHODS-001-signed-heat-pathfinder.md))**;
-  unblocked by retired `geometry/GEOM-020` (LDLT seam) and expected to use
-  `Geometry.Sparse::SparseLDLT` for its default diffusion solve.
 - [METHOD-003 — Closest Point Method PDE solver reference backend](METHOD-003-closest-point-method-pde-reference-backend.md)
   (variant A default; unblocked by retired `geometry/GEOM-023` and expected
   to use `Geometry.Sparse::SparseBiCGSTAB` for its non-symmetric solve).
@@ -58,6 +54,11 @@ map.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [METHOD-002 — Signed Heat Method reference backend](../../done/METHOD-002-signed-heat-method-reference-backend.md)
+  (done, 2026-06-28, `CPUContracted`): pathfinder method package for
+  `geometry.signed_heat`, with surface Variant A CPU reference, correctness
+  tests, smoke benchmark, method docs, and `Geometry.Sparse::SparseLDLT` as the
+  default heat/Poisson solver.
 - [METHODS-001 — Pin signed heat as methods-pipeline pathfinder](../../done/METHODS-001-signed-heat-pathfinder.md)
   (done, 2026-06-28, `Retired`): records METHOD-002 as the first method to
   drive the full paper-intake → CPU-reference → tests → benchmark → docs
@@ -97,9 +98,9 @@ split; narratives live in the retirement log.
 - Ordering: [`geometry/GEOM-008`](../../done/GEOM-008-linear-algebra-solver-infrastructure.md)
   retired 2026-05-27 at `CPUContracted` shipping the CSR builder + CG /
   shifted-CG iterative solver. The direct sparse SPD factorization
-  (LDLT/LLT) path that METHOD-002 (step 2) names is available from retired
+  (LDLT/LLT) path that METHOD-002 used is available from retired
   [`geometry/GEOM-020`](../../done/GEOM-020-sparse-direct-factorization-seam.md);
-  METHOD-002 is no longer blocked on the solver seam.
+  METHOD-002 is retired at `CPUContracted`.
   METHOD-003's variant-A non-symmetric operator is available from retired
   [`geometry/GEOM-023`](../../done/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md);
   METHOD-003 is no longer blocked on the solver seam.

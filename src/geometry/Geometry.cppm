@@ -54,6 +54,7 @@ export import Geometry.DEC;
 export import Geometry.Curvature;
 export import Geometry.Smoothing;
 export import Geometry.Simplification;
+export import Geometry.SignedHeatMethod;
 export import Geometry.Subdivision;
 export import Geometry.HalfedgeMesh.SubdivisionSqrt3;
 export import Geometry.Remeshing;

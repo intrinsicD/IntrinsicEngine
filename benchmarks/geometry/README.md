@@ -38,8 +38,10 @@ such as `Intrinsic::Bench::Geometry::kHalfedgeSmokeBenchmarkId` and
 [`Bench.SurfaceSamplingSmoke.hpp`](Bench.SurfaceSamplingSmoke.hpp); manifests
 copy the same strings. `kQualityMetricsSmokeBenchmarkId` from
 [`Bench.QualityMetricsSmoke.hpp`](Bench.QualityMetricsSmoke.hpp) binds the
-point-cloud quality metrics smoke workload. Keeping the constants in the
-headers is the binding mechanism.
+point-cloud quality metrics smoke workload. `kSignedHeatReferenceSmokeBenchmarkId`
+from [`Bench.SignedHeatReferenceSmoke.hpp`](Bench.SignedHeatReferenceSmoke.hpp)
+binds the signed heat reference workload. Keeping the constants in the headers
+is the binding mechanism.
 
 ## Fixture policy
 

@@ -1,0 +1,23 @@
+# METHOD-002 — signed heat CPU reference smoke manifest.
+#
+# Stable benchmark contract for the workload defined by
+# benchmarks/geometry/Bench_SignedHeatReferenceSmoke.cpp and emitted by the
+# IntrinsicBenchmarkSmoke runner.
+
+benchmark_id: geometry.signed_heat.smoke
+method: geometry.signed_heat
+dataset: builtin.flat_grid.square_boundary.8
+params:
+  intent: smoke
+  grid_columns: 8
+  boundary_halfedges: 16
+  time_step: auto_mean_edge_length_squared
+  poisson_regularization: 1.0e-8
+  warmup_iterations: 1
+  measured_iterations: 8
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 250
+  quality_error_l2_max: 0.40

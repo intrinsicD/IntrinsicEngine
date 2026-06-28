@@ -40,6 +40,7 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.Remeshing.cppm
         Geometry.HalfedgeMesh.Repair.cppm
         Geometry.HalfedgeMesh.Simplification.cppm
+        Geometry.HalfedgeMesh.SignedHeatMethod.cppm
         Geometry.HalfedgeMesh.Smoothing.cppm
         Geometry.HalfedgeMesh.Subdivision.cppm
         Geometry.HalfedgeMesh.SubdivisionSqrt3.cppm
@@ -135,6 +136,7 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.Remeshing.cpp
         Geometry.HalfedgeMesh.Repair.cpp
         Geometry.HalfedgeMesh.Simplification.cpp
+        Geometry.HalfedgeMesh.SignedHeatMethod.cpp
         Geometry.HalfedgeMesh.Smoothing.cpp
         Geometry.HalfedgeMesh.Subdivision.cpp
         Geometry.HalfedgeMesh.SubdivisionSqrt3.cpp

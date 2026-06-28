@@ -25,7 +25,7 @@ completed_on: 2026-06-28
   GEOM-008 closed at `CPUContracted` shipping `Geometry.Linalg`
   (dense decompositions) and `Geometry.Sparse` (CSR builders + CG +
   shifted CG). It did **not** ship a direct sparse factorization, but
-  `tasks/backlog/methods/METHOD-002` (step 2) and `METHOD-003` (step 5)
+  `METHOD-002` (retired) and `tasks/backlog/methods/METHOD-003` (step 5)
   both name the "LDLT path from `GEOM-008`" as the solver they intend
   to call. This task owns that gap so those method packages have a
   concrete seam name before promotion.
