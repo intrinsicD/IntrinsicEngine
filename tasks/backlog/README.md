@@ -139,6 +139,11 @@ Sandbox Editor routed through the same facade. This satisfies the config-control
 dependency for `RUNTIME-134`; remaining gating for that playground stays on its
 own method/UI scope.
 
+`DOCS-003` is retired to `tasks/done`: `algorithm-variant-dispatch.md` is now an
+explicit target Strategy x Backend template using `RHI::IDevice`, method-policy
+backend tokens, and honest requested-vs-actual fallback telemetry. This satisfies
+the documentation gate for `GEOM-052` and `PROC-011`.
+
 Open members:
 - [`architecture/LEGACY-012-migrate-legacy-consumer-tests.md`](architecture/LEGACY-012-migrate-legacy-consumer-tests.md) —
   follow-up for tests and non-legacy consumers that still import bare legacy
@@ -147,12 +152,9 @@ Open members:
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`ui/RORG-031-ui-integration.md`](ui/RORG-031-ui-integration.md).
 - [`platform/PLATFORM-004-alternative-platform-backend-onboarding.md`](platform/PLATFORM-004-alternative-platform-backend-onboarding.md) (planning-only seed).
-- [`geometry/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md`](geometry/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md) —
-  reconcile `algorithm-variant-dispatch.md` with live code and define the shared
-  CPU/GPU backend-seam template.
 - [`geometry/GEOM-052-shared-cpu-gpu-backend-seam-kmeans-exemplar.md`](geometry/GEOM-052-shared-cpu-gpu-backend-seam-kmeans-exemplar.md) —
   establish the shared backend seam and fix the `Geometry.KMeans` phantom GPU as
-  the worked exemplar (depends on `DOCS-003`).
+  the worked exemplar (`DOCS-003` satisfied).
 
 ### Theme G — Active bugs
 
@@ -193,7 +195,7 @@ invariants rather than descriptive prose:
   "Theme I — Research control surface" convergence theme).
 - [`process/PROC-011-route-contract-to-architecture-index-and-author-checks.md`](process/PROC-011-route-contract-to-architecture-index-and-author-checks.md) —
   route the contract to the canonical architecture index and add backend-axis +
-  config-lane authoring checks (depends on `DOCS-003`).
+  config-lane authoring checks (`DOCS-003` satisfied).
 - [`process/DOCS-005-feature-module-playbook-minimal-floor.md`](process/DOCS-005-feature-module-playbook-minimal-floor.md) —
   add a minimal-feature floor + config/command artifact to the feature-module
   playbook so trivial research probes are not forced through full ceremony.

@@ -58,7 +58,7 @@ Status labels:
 
 | Document | Status | Notes |
 |---|---|---|
-| `algorithm-variant-dispatch.md` | legacy-background | Historical implementation options. |
+| `algorithm-variant-dispatch.md` | legacy-background | Target Strategy x Backend template pending `GEOM-052` before canonical promotion. |
 | `backend_integration_slicing_policy.md` | legacy-background | Useful guidance, not canonical policy. |
 | `feature-module-playbook.md` | legacy-background | Candidate content for future module handbook consolidation. |
 | `frame-loop-rollback-strategy.md` | legacy-background | Runtime policy background; may be merged into runtime docs later. |

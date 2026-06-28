@@ -104,6 +104,7 @@ the runtime SpatialDebug closest-face consumer in `RUNTIME-135`.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [DOCS-003 — Reconcile algorithm-variant-dispatch.md with reality and define the backend-seam template](../../done/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md) (done).
 - [GEOIO-002 — Geometry IO parity hardening and exporters](../../done/GEOIO-002-geometry-io-parity-hardening.md) (done).
 - [GEOM-006 — Indexed mesh/soup container and conversion contracts](../../done/GEOM-006-indexed-mesh-soup-conversion-contracts.md) (done).
 - [GEOM-007 — Robust predicates and intersection classification foundation](../../done/GEOM-007-robust-predicates-intersection-classification.md) (done).

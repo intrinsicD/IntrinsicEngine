@@ -2720,3 +2720,15 @@ preserving distance, predecessor, traversal-count, goal-stop, and
 budget-exhaustion diagnostics against the prior priority-queue reference.
 Focused core heap randomized operation parity and geometry shortest-path
 priority-queue parity tests cover the migration.
+
+[`DOCS-003`](DOCS-003-reconcile-algorithm-variant-dispatch-doc.md) —
+algorithm variant dispatch documentation reconciliation retired to
+`tasks/done/` on 2026-06-28. `docs/architecture/algorithm-variant-dispatch.md`
+now identifies itself as a target Strategy x Backend template pending
+`GEOM-052`, describes the CPU-only owning-layer function plus the
+`Extrinsic::RHI::IDevice&` GPU-capable integration overload, maps
+`Backend::CPU` / `Backend::GPU` to the method backend-policy tokens, and
+requires honest requested-vs-actual fallback telemetry instead of a silent
+phantom GPU path. The architecture index now records the doc as target guidance
+pending `GEOM-052` before canonical promotion, satisfying the documentation
+gate for `GEOM-052` and `PROC-011`.

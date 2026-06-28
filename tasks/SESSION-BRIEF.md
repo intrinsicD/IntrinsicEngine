@@ -20,8 +20,7 @@ the authoritative open/unblocked view.
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
-- unblocked: `DOCS-003` — Reconcile algorithm-variant-dispatch.md with reality and define the backend-seam template (tasks/backlog/geometry/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md)
-- blocked by `DOCS-003`: `GEOM-052` — Shared CPU/GPU backend seam + fix the KMeans phantom GPU exemplar (tasks/backlog/geometry/GEOM-052-shared-cpu-gpu-backend-seam-kmeans-exemplar.md)
+- unblocked: `GEOM-052` — Shared CPU/GPU backend seam + fix the KMeans phantom GPU exemplar (tasks/backlog/geometry/GEOM-052-shared-cpu-gpu-backend-seam-kmeans-exemplar.md)
 - unblocked: `LEGACY-001` — Delete `src/legacy/Interface/` (tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)
 - unblocked: `LEGACY-004` — Delete `src/legacy/Asset/` (tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md)
 - unblocked: `LEGACY-005` — Delete `src/legacy/Core/` (tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)
@@ -38,7 +37,7 @@ the authoritative open/unblocked view.
 
 - unblocked: `DOCS-005` — Add a minimal-feature floor + config-entry artifact to the feature-module playbook (tasks/backlog/process/DOCS-005-feature-module-playbook-minimal-floor.md)
 - unblocked: `PROC-010` — Encode P1/P3/P5 research-engine invariants in AGENTS.md + review checklist (tasks/backlog/process/PROC-010-encode-research-engine-invariants-in-contract.md)
-- blocked by `DOCS-003`: `PROC-011` — Route the contract to the architecture index + add backend/config authoring checks (tasks/backlog/process/PROC-011-route-contract-to-architecture-index-and-author-checks.md)
+- unblocked: `PROC-011` — Route the contract to the architecture index + add backend/config authoring checks (tasks/backlog/process/PROC-011-route-contract-to-architecture-index-and-author-checks.md)
 
 ## Unthemed
 
