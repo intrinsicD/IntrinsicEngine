@@ -39,7 +39,7 @@ maturity_target: Operational
 ## Required changes
 - [x] Refine and keep current the slice checklist as implementation discoveries land, including any deliberate deferrals with follow-up ownership.
 - [x] Add a graphics-owned object-space normal bake RHI command recorder that consumes resolved texcoord/normal BDA buffers, index buffer, target extent, output texture, and pipeline handle without importing ECS, runtime, or live `AssetService`.
-- [ ] Add a graphics-owned object-space normal bake API/subsystem that accepts resolved triangle mesh buffer/geometry-record data, bake extent, padding, generated asset id/key, and stale-generation metadata without importing ECS, runtime, or live `AssetService`.
+- [x] Add a graphics-owned object-space normal bake API/subsystem that accepts resolved triangle mesh buffer/geometry-record data, bake extent, padding, generated asset id/key, and stale-generation metadata without importing ECS, runtime, or live `AssetService`.
 - [x] Extend `GpuAssetCache` with a GPU-produced pending texture path keyed by `AssetId`, allocating cache-owned textures with `Sampled | ColorTarget` and reserving `Storage` usage for the future dilation path.
 - [x] Track GPU completion for produced textures and promote cache entries to `Ready` only after the submitted graphics work has completed.
 - [x] Add bake shaders that rasterize atlas UV triangles into an `RGBA8_UNORM` target, interpolate and normalize object-space normals, write alpha coverage, and use a shader-sampling-equivalent orientation.
@@ -59,6 +59,7 @@ maturity_target: Operational
 - [x] Add command-recording contract coverage for the GPU bake pass shape, target extent, clear coverage, push constants, and indexed draw.
 - [x] Add shader-source contract checks for modified surface/G-buffer shaders.
 - [x] Add shader/material contract tests that verify object-space normal maps are gated by explicit material metadata and not inferred solely from `NormalID`.
+- [x] Add graphics API contract tests for generated texture `AssetId` packaging, stale completion keys, `GpuProducedTextureRequest` output descriptors, and command-record template instantiation.
 - [x] Add a focused asymmetric UV/orientation test at the plan or shader-contract level so the baked texture samples the same surface point the mesh UV refers to.
 - [x] Add a deterministic point-sample bake correctness test with known object-space normals at selected UV/sample points; prefer GPU texture readback when available, otherwise test the shared bake math/plan used by the GPU path.
 - [x] Add an opt-in `gpu;vulkan` smoke that submits a small triangle bake on a Vulkan-capable host and verifies selected output texels.

@@ -1697,17 +1697,22 @@ Concretely:
   object-space normal bake contract introduced by `GRAPHICS-104`. The
   backend-neutral helpers validate finite atlas UVs, count-matched finite
   normals, triangle indices, the `ObjectSpaceNormal` mode, and resolution clamp
-  policy; `TangentSpaceNormal` is reserved and rejected. The GPU recorder binds
-  a caller-provided pipeline, index buffer, texcoord/normal BDAs, and output
-  texture; it sets viewport and scissor to the exact target texture extent,
-  clears to encoded `+Z` with alpha `0`, rasterizes UV triangles by mapping UV
-  to clip space, writes normalized object-space normals with alpha `1`, and
-  transitions to the requested final texture layout. The bake shader uses the
-  same vertical orientation as the CPU texel-center sampling contract so a
-  point addressed by mesh UV samples the same baked texel on Vulkan. Runtime
-  job scheduling, stale-key rejection, generated-normal import replacement,
-  and GPU dilation padding remain open parts of `GRAPHICS-104`; this graphics
-  surface does not import ECS, runtime, live `AssetService`, or Vulkan handles.
+  policy; `TangentSpaceNormal` is reserved and rejected. The graphics-owned plan
+  API packages resolved index-buffer/texcoord-BDA/normal-BDA geometry, generated
+  `AssetId`, resolved extent/padding, sampler policy, frame-readiness metadata,
+  and a stale-completion key into a `GpuProducedTextureRequest` plus command
+  record template. The GPU recorder then binds a caller-provided pipeline,
+  index buffer, texcoord/normal BDAs, and output texture; it sets viewport and
+  scissor to the exact target texture extent, clears to encoded `+Z` with alpha
+  `0`, rasterizes UV triangles by mapping UV to clip space, writes normalized
+  object-space normals with alpha `1`, and transitions to the requested final
+  texture layout. The bake shader uses the same vertical orientation as the CPU
+  texel-center sampling contract so a point addressed by mesh UV samples the
+  same baked texel on Vulkan. Runtime job scheduling, stale-key rejection at the
+  runtime completion boundary, generated-normal import replacement, and GPU
+  dilation padding remain open parts of `GRAPHICS-104`; requested padding is
+  reported by the plan but no CPU dilation is implied. This graphics surface
+  does not import ECS, runtime, live `AssetService`, or Vulkan handles.
 - Per `GRAPHICS-018Q`, the four remaining Vulkan integration follow-ups
   to the `GRAPHICS-018` guarded backend bring-up resolve as follows.
   Texture upload policy keeps the guarded synchronous staging-buffer
