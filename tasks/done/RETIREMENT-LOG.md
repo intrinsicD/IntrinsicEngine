@@ -2866,3 +2866,21 @@ proves SPD Poisson solves, a mass-plus-Laplacian method-shaped solve,
 indefinite/singular diagnostics, multi-RHS solve parity, solve-in-place storage
 reuse, invalid-input rejection, and bit-stable repeated solves from one
 factorization.
+
+[`GEOM-023`](GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md) — sparse
+non-symmetric iterative solver seam retired to `tasks/done/` on 2026-06-28 at
+`CPUContracted`. `Geometry.Sparse` now exposes `SparseBiCGSTAB` over the
+existing CSR matrix type, with span-based single-RHS solves and `Eigen::Ref`
+multi-RHS solves. Solver params report max iterations, relative tolerance, and
+preconditioner choice (`None`, `Diagonal`, or `IncompleteLUT`), while
+diagnostics report status, iterations, final relative residual, and the
+preconditioner used. Invalid CSR/matrix shape, non-finite RHS, invalid
+tolerances, unsupported preconditioner enum values, non-convergence, and
+numerical failures return structured statuses and do not mutate caller output on
+failed solves. The module pins Eigen's single-threaded path with
+`EIGEN_DONT_PARALLELIZE`, and unit coverage proves a genuinely non-symmetric
+advection-diffusion solve, SPD parity with CG, singular-system diagnostics,
+input rejection, multi-RHS parity, preconditioner agreement, and bit-stable
+repeated solves. METHOD-003 can now promote against
+`Geometry.Sparse::SparseBiCGSTAB` for its non-symmetric closest-point-extension
+operator.

@@ -10,6 +10,10 @@ module;
 #define EIGEN_MPL2_ONLY
 #endif
 
+#ifndef EIGEN_DONT_PARALLELIZE
+#define EIGEN_DONT_PARALLELIZE
+#endif
+
 #include <Eigen/Dense>
 
 export module Geometry.Sparse;
@@ -41,6 +45,22 @@ export namespace Geometry::Sparse
         ZeroPivot,
         DimensionMismatch,
         InvalidInput
+    };
+
+    enum class SparseIterativeStatus : std::uint8_t
+    {
+        Success = 0,
+        NotConverged,
+        NumericalIssue,
+        DimensionMismatch,
+        InvalidInput
+    };
+
+    enum class SparsePreconditioner : std::uint8_t
+    {
+        None = 0,
+        Diagonal,
+        IncompleteLUT
     };
 
     struct SparseMatrix
@@ -134,10 +154,30 @@ export namespace Geometry::Sparse
         }
     };
 
+    struct SparseIterativeDiagnostics
+    {
+        SparseIterativeStatus Status{SparseIterativeStatus::InvalidInput};
+        std::size_t Iterations{0};
+        double FinalRelativeResidual{0.0};
+        SparsePreconditioner Preconditioner{SparsePreconditioner::Diagonal};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SparseIterativeStatus::Success;
+        }
+    };
+
     struct CGParams
     {
         std::size_t MaxIterations{1000};
         double Tolerance{1e-8};
+    };
+
+    struct SparseBiCGSTABParams
+    {
+        std::size_t MaxIterations{1000};
+        double RelativeTolerance{1e-8};
+        SparsePreconditioner Preconditioner{SparsePreconditioner::Diagonal};
     };
 
     struct CGResult
@@ -210,6 +250,21 @@ export namespace Geometry::Sparse
         std::unique_ptr<Detail::SparseLLTImpl> Impl_;
         SparseFactorizationDiagnostics Diagnostics_{};
         std::size_t Dimension_{0};
+    };
+
+    class SparseBiCGSTAB
+    {
+    public:
+        [[nodiscard]] SparseIterativeDiagnostics solve(
+            const SparseMatrix& matrix,
+            std::span<const double> rhs,
+            std::span<double> x,
+            const SparseBiCGSTABParams& params = {}) const;
+        [[nodiscard]] SparseIterativeDiagnostics solve(
+            const SparseMatrix& matrix,
+            ConstEigenDenseBlockRef rhs,
+            EigenDenseBlockRef x,
+            const SparseBiCGSTABParams& params = {}) const;
     };
 
     [[nodiscard]] SparseDiagnostics AnalyzeSparseMatrix(

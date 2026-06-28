@@ -500,6 +500,7 @@ set(_geometry_test_files
     Test.LinearAlgebra.cpp
     Test.Sparse.cpp
     Test.SparseFactorization.cpp
+    Test.SparseNonsymmetric.cpp
     Test_SubmeshView.cpp
     Test.SubmeshViewDomainBorrows.cpp
 )

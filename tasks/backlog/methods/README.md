@@ -19,7 +19,8 @@ map.
   unblocked by retired `geometry/GEOM-020` (LDLT seam) and expected to use
   `Geometry.Sparse::SparseLDLT` for its default diffusion solve.
 - [METHOD-003 — Closest Point Method PDE solver reference backend](METHOD-003-closest-point-method-pde-reference-backend.md)
-  (variant A default; gated on `geometry/GEOM-023` non-symmetric solver seam).
+  (variant A default; unblocked by retired `geometry/GEOM-023` and expected
+  to use `Geometry.Sparse::SparseBiCGSTAB` for its non-symmetric solve).
 - [METHOD-004 — Walk on Spheres / Walk on Stars PDE solver reference backend](METHOD-004-walk-on-spheres-reference-backend.md)
   (variant A default; no solver gate — promotable now).
 - [METHOD-005 — Robust mesh boolean reference backend](METHOD-005-robust-mesh-boolean-reference-backend.md)
@@ -92,8 +93,9 @@ split; narratives live in the retirement log.
   (LDLT/LLT) path that METHOD-002 (step 2) names is available from retired
   [`geometry/GEOM-020`](../../done/GEOM-020-sparse-direct-factorization-seam.md);
   METHOD-002 is no longer blocked on the solver seam.
-  METHOD-003's variant-A non-symmetric operator waits on
-  [`geometry/GEOM-023`](../geometry/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md).
+  METHOD-003's variant-A non-symmetric operator is available from retired
+  [`geometry/GEOM-023`](../../done/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md);
+  METHOD-003 is no longer blocked on the solver seam.
   METHOD-004 needs no solver gate and may proceed against retired
   `GEOM-008` directly. METHOD-005 and METHOD-007 waited on
   [`geometry/GEOM-007`](../../done/GEOM-007-robust-predicates-intersection-classification.md),

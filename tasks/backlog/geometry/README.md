@@ -14,9 +14,6 @@ map.
 - [GEOM-016 — Point-cloud filtering and density diagnostics contracts](GEOM-016-point-cloud-filtering-density-contracts.md).
 - [GEOM-017 — Point-cloud descriptors and registration seams](GEOM-017-point-cloud-descriptors-registration-seams.md).
 - [GEOM-019 — Harmonic/Tutte parameterization and boundary constraints](GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md).
-- [GEOM-023 — Sparse non-symmetric iterative solver seam (BiCGSTAB)](GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md)
-  (gates `methods/METHOD-003` variant A; promote when METHOD-003 is the
-  next-priority method).
 - [GEOM-024 — Sparse symmetric generalized eigensolver seam](GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
   (gates `methods/METHOD-006` variant B; depends on `GEOM-020`; promote when
   METHOD-006 is the next-priority method).
@@ -51,11 +48,14 @@ the runtime SpatialDebug closest-face consumer in `RUNTIME-135`.
   LDLT path can now promote against `Geometry.Sparse::SparseLDLT` /
   `SparseLLT`; remaining method gates are encoded in the method tasks'
   `depends_on` front-matter.
-- GEOM-023 (non-symmetric BiCGSTAB) and GEOM-024 (generalized symmetric
-  eigensolver, Spectra-backed, gated on GEOM-020) complete the solver-seam
-  family: they own the gaps GEOM-020 explicitly deferred and gate
-  METHOD-003 variant A and METHOD-006 variant B respectively. Promote each
-  only when its consuming method is the next-priority method.
+- Retired GEOM-023 is the named follow-up to retired GEOM-020 for the
+  non-symmetric BiCGSTAB seam that METHOD-003 variant A needs for its
+  closest-point-extension operator. METHOD-003 can now promote against
+  `Geometry.Sparse::SparseBiCGSTAB`.
+- GEOM-024 (generalized symmetric eigensolver, Spectra-backed, gated on
+  GEOM-020) is the remaining solver-seam gap in this family and gates
+  METHOD-006 variant B. Promote it only when METHOD-006 is the
+  next-priority method.
 - GEOM-021 is a module-hygiene follow-up for retired GEOM-006: it keeps the
   `Geometry.MeshSoup` public module interface declarative by moving
   non-trivial validation/container bodies into a matching implementation unit
@@ -97,6 +97,7 @@ split; narratives live in the retirement log.
 
 - [DOCS-003 — Reconcile algorithm-variant-dispatch.md with reality and define the backend-seam template](../../done/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md) (done).
 - [GEOM-020 — Sparse direct factorization solver seam (LDLT/LLT)](../../done/GEOM-020-sparse-direct-factorization-seam.md) (done).
+- [GEOM-023 — Sparse non-symmetric iterative solver seam (BiCGSTAB)](../../done/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md) (done).
 - [GEOM-049 — Numeric/linear-algebra utilities (RPCA, Eigen map adapters)](../../done/GEOM-049-numeric-linalg-utilities.md) (done).
 - [GEOM-050 — Primitive and curve utilities (Bezier, triangle metrics, sphere fit, AABB)](../../done/GEOM-050-primitive-curve-utilities.md) (done).
 - [GEOIO-002 — Geometry IO parity hardening and exporters](../../done/GEOIO-002-geometry-io-parity-hardening.md) (done).

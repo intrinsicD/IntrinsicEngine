@@ -24,13 +24,11 @@ depends_on: []
 - Open children (all under `tasks/backlog/geometry/`): `GEOM-013` (dual
   contouring), `GEOM-014` (FA-QEM simplification), `GEOM-016` (point-cloud
   filtering/density), `GEOM-017` (descriptors/registration seams), `GEOM-019`
-  (harmonic/Tutte, gated on GEOM-020), `GEOM-020` (sparse LDLT/LLT seam),
-  `GEOM-023` (non-symmetric BiCGSTAB seam), `GEOM-024` (generalized
-  eigensolver seam, gated on GEOM-020), and `GEOM-027` through `GEOM-034`
-  (property-system API cleanup and docs synchronization).
-- Retired children/foundations: `GEOM-005..012`, `GEOM-015`, `GEOM-021`,
-  `GEOM-022`, `GEOM-025`, `GEOM-026`, `GEOIO-002` (narratives in the retirement log; index in the
-  category README).
+  (harmonic/Tutte, unblocked by retired GEOM-020), and `GEOM-024`
+  (generalized eigensolver seam, gated on GEOM-020).
+- Retired children/foundations: `GEOM-005..012`, `GEOM-015`, `GEOM-020..023`,
+  `GEOM-025..034`, `GEOM-037..052`, `GEOIO-002`, and `GEOIO-003`
+  (narratives in the retirement log; index in the category README).
 - Method-readiness edges this seed watches: `GEOM-020 → METHOD-002`,
   `GEOM-023 → METHOD-003`, `GEOM-024 → METHOD-006` (encoded in those tasks'
   `depends_on`), and `GEOM-017 →` future robust/global registration method
@@ -61,7 +59,7 @@ depends_on: []
 
 ## Verification
 ```bash
-for t in GEOM-013 GEOM-014 GEOM-016 GEOM-017 GEOM-019 GEOM-020 GEOM-023 GEOM-024 GEOM-027 GEOM-028 GEOM-029 GEOM-030 GEOM-031 GEOM-032 GEOM-033 GEOM-034; do
+for t in GEOM-013 GEOM-014 GEOM-016 GEOM-017 GEOM-019 GEOM-024; do
   ls tasks/backlog/geometry/${t}-*.md >/dev/null || { echo "missing ${t}"; exit 1; }
 done
 python3 tools/agents/validate_tasks.py --root tasks --strict

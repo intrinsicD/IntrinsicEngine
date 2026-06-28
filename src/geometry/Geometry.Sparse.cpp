@@ -14,6 +14,11 @@ module;
 #define EIGEN_MPL2_ONLY
 #endif
 
+#ifndef EIGEN_DONT_PARALLELIZE
+#define EIGEN_DONT_PARALLELIZE
+#endif
+
+#include <Eigen/IterativeLinearSolvers>
 #include <Eigen/SparseCholesky>
 #include <Eigen/SparseCore>
 
@@ -24,8 +29,12 @@ namespace Geometry::Sparse
     namespace
     {
         using EigenSparseMatrix = Eigen::SparseMatrix<double, Eigen::ColMajor, int>;
+        using EigenIterativeSparseMatrix = Eigen::SparseMatrix<double, Eigen::RowMajor, int>;
         using EigenLDLT = Eigen::SimplicialLDLT<EigenSparseMatrix>;
         using EigenLLT = Eigen::SimplicialLLT<EigenSparseMatrix>;
+        using EigenBiCGSTABIdentity = Eigen::BiCGSTAB<EigenIterativeSparseMatrix, Eigen::IdentityPreconditioner>;
+        using EigenBiCGSTABDiagonal = Eigen::BiCGSTAB<EigenIterativeSparseMatrix, Eigen::DiagonalPreconditioner<double>>;
+        using EigenBiCGSTABILUT = Eigen::BiCGSTAB<EigenIterativeSparseMatrix, Eigen::IncompleteLUT<double, int>>;
 
         constexpr double kSymmetryTolerance = 1.0e-10;
         constexpr double kPivotTolerance = 1.0e-12;
@@ -119,6 +128,32 @@ namespace Geometry::Sparse
             return diagnostics;
         }
 
+        [[nodiscard]] SparseIterativeDiagnostics MakeIterativeDiagnostics(
+            SparseIterativeStatus status,
+            SparsePreconditioner preconditioner,
+            std::size_t iterations = 0,
+            double finalRelativeResidual = 0.0)
+        {
+            SparseIterativeDiagnostics diagnostics;
+            diagnostics.Status = status;
+            diagnostics.Iterations = iterations;
+            diagnostics.FinalRelativeResidual = finalRelativeResidual;
+            diagnostics.Preconditioner = preconditioner;
+            return diagnostics;
+        }
+
+        [[nodiscard]] bool IsSupportedPreconditioner(SparsePreconditioner preconditioner)
+        {
+            switch (preconditioner)
+            {
+            case SparsePreconditioner::None:
+            case SparsePreconditioner::Diagonal:
+            case SparsePreconditioner::IncompleteLUT:
+                return true;
+            }
+            return false;
+        }
+
         [[nodiscard]] bool IsSymmetric(const SparseMatrix& matrix, double tolerance)
         {
             if (matrix.Rows != matrix.Cols)
@@ -178,6 +213,27 @@ namespace Geometry::Sparse
             }
 
             EigenSparseMatrix result(static_cast<int>(matrix.Rows), static_cast<int>(matrix.Cols));
+            result.setFromTriplets(triplets.begin(), triplets.end());
+            result.makeCompressed();
+            return result;
+        }
+
+        [[nodiscard]] EigenIterativeSparseMatrix ToEigenIterativeSparseMatrix(const SparseMatrix& matrix)
+        {
+            std::vector<Eigen::Triplet<double, int>> triplets;
+            triplets.reserve(matrix.Values.size());
+            for (std::size_t row = 0; row < matrix.Rows; ++row)
+            {
+                for (std::size_t k = matrix.RowOffsets[row]; k < matrix.RowOffsets[row + 1]; ++k)
+                {
+                    triplets.emplace_back(
+                        static_cast<int>(row),
+                        static_cast<int>(matrix.ColIndices[k]),
+                        matrix.Values[k]);
+                }
+            }
+
+            EigenIterativeSparseMatrix result(static_cast<int>(matrix.Rows), static_cast<int>(matrix.Cols));
             result.setFromTriplets(triplets.begin(), triplets.end());
             result.makeCompressed();
             return result;
@@ -336,6 +392,269 @@ namespace Geometry::Sparse
                     factorDiagnostics.SmallestAbsolutePivot);
             }
             return factorDiagnostics;
+        }
+
+        [[nodiscard]] SparseIterativeDiagnostics ValidateBiCGSTABMatrixInput(
+            const SparseMatrix& matrix,
+            const SparseBiCGSTABParams& params)
+        {
+            if (matrix.Rows != matrix.Cols)
+            {
+                return MakeIterativeDiagnostics(
+                    SparseIterativeStatus::DimensionMismatch,
+                    params.Preconditioner);
+            }
+            if (matrix.Rows > static_cast<std::size_t>(std::numeric_limits<int>::max()))
+            {
+                return MakeIterativeDiagnostics(SparseIterativeStatus::InvalidInput, params.Preconditioner);
+            }
+            if (!IsSupportedPreconditioner(params.Preconditioner))
+            {
+                return MakeIterativeDiagnostics(SparseIterativeStatus::InvalidInput, params.Preconditioner);
+            }
+            if (params.MaxIterations > static_cast<std::size_t>(std::numeric_limits<Eigen::Index>::max()))
+            {
+                return MakeIterativeDiagnostics(SparseIterativeStatus::InvalidInput, params.Preconditioner);
+            }
+            if (!ValidateCsr(matrix))
+            {
+                return MakeIterativeDiagnostics(SparseIterativeStatus::InvalidInput, params.Preconditioner);
+            }
+            if (params.MaxIterations == 0
+                || !std::isfinite(params.RelativeTolerance)
+                || params.RelativeTolerance <= 0.0)
+            {
+                return MakeIterativeDiagnostics(SparseIterativeStatus::InvalidInput, params.Preconditioner);
+            }
+            return MakeIterativeDiagnostics(SparseIterativeStatus::Success, params.Preconditioner);
+        }
+
+        [[nodiscard]] SparseIterativeDiagnostics ValidateBiCGSTABVectorInput(
+            const SparseMatrix& matrix,
+            std::span<const double> rhs,
+            std::span<double> x,
+            const SparseBiCGSTABParams& params)
+        {
+            SparseIterativeDiagnostics diagnostics = ValidateBiCGSTABMatrixInput(matrix, params);
+            if (!diagnostics.Succeeded())
+            {
+                return diagnostics;
+            }
+            if (rhs.size() < matrix.Rows || x.size() < matrix.Rows)
+            {
+                return MakeIterativeDiagnostics(
+                    SparseIterativeStatus::DimensionMismatch,
+                    params.Preconditioner);
+            }
+            if (!IsFiniteSpan(rhs.first(matrix.Rows)))
+            {
+                return MakeIterativeDiagnostics(SparseIterativeStatus::InvalidInput, params.Preconditioner);
+            }
+            return diagnostics;
+        }
+
+        [[nodiscard]] SparseIterativeDiagnostics ValidateBiCGSTABDenseInput(
+            const SparseMatrix& matrix,
+            ConstEigenDenseBlockRef rhs,
+            EigenDenseBlockRef x,
+            const SparseBiCGSTABParams& params)
+        {
+            SparseIterativeDiagnostics diagnostics = ValidateBiCGSTABMatrixInput(matrix, params);
+            if (!diagnostics.Succeeded())
+            {
+                return diagnostics;
+            }
+            if (rhs.rows() != static_cast<Eigen::Index>(matrix.Rows)
+                || x.rows() != static_cast<Eigen::Index>(matrix.Rows)
+                || rhs.cols() != x.cols())
+            {
+                return MakeIterativeDiagnostics(
+                    SparseIterativeStatus::DimensionMismatch,
+                    params.Preconditioner);
+            }
+            if (!rhs.allFinite())
+            {
+                return MakeIterativeDiagnostics(SparseIterativeStatus::InvalidInput, params.Preconditioner);
+            }
+            return diagnostics;
+        }
+
+        [[nodiscard]] SparseIterativeStatus StatusFromEigenInfo(Eigen::ComputationInfo info, bool outputFinite)
+        {
+            if (!outputFinite)
+            {
+                return SparseIterativeStatus::NumericalIssue;
+            }
+            if (info == Eigen::Success)
+            {
+                return SparseIterativeStatus::Success;
+            }
+            if (info == Eigen::NoConvergence)
+            {
+                return SparseIterativeStatus::NotConverged;
+            }
+            if (info == Eigen::InvalidInput)
+            {
+                return SparseIterativeStatus::InvalidInput;
+            }
+            return SparseIterativeStatus::NumericalIssue;
+        }
+
+        [[nodiscard]] SparseIterativeStatus MergeIterativeStatus(
+            SparseIterativeStatus current,
+            SparseIterativeStatus next)
+        {
+            if (current == SparseIterativeStatus::NumericalIssue || next == SparseIterativeStatus::NumericalIssue)
+            {
+                return SparseIterativeStatus::NumericalIssue;
+            }
+            if (current == SparseIterativeStatus::InvalidInput || next == SparseIterativeStatus::InvalidInput)
+            {
+                return SparseIterativeStatus::InvalidInput;
+            }
+            if (current == SparseIterativeStatus::DimensionMismatch || next == SparseIterativeStatus::DimensionMismatch)
+            {
+                return SparseIterativeStatus::DimensionMismatch;
+            }
+            if (current == SparseIterativeStatus::NotConverged || next == SparseIterativeStatus::NotConverged)
+            {
+                return SparseIterativeStatus::NotConverged;
+            }
+            return SparseIterativeStatus::Success;
+        }
+
+        template <typename Solver>
+        [[nodiscard]] SparseIterativeDiagnostics ConfigureAndComputeBiCGSTAB(
+            Solver& solver,
+            const EigenIterativeSparseMatrix& matrix,
+            const SparseBiCGSTABParams& params)
+        {
+            solver.setMaxIterations(static_cast<Eigen::Index>(params.MaxIterations));
+            solver.setTolerance(params.RelativeTolerance);
+            solver.compute(matrix);
+            if (solver.info() == Eigen::Success)
+            {
+                return MakeIterativeDiagnostics(SparseIterativeStatus::Success, params.Preconditioner);
+            }
+            return MakeIterativeDiagnostics(
+                StatusFromEigenInfo(solver.info(), true),
+                params.Preconditioner);
+        }
+
+        [[nodiscard]] SparseIterativeDiagnostics ConfigureAndComputeBiCGSTAB(
+            EigenBiCGSTABILUT& solver,
+            const EigenIterativeSparseMatrix& matrix,
+            const SparseBiCGSTABParams& params)
+        {
+            solver.preconditioner().setDroptol(1.0e-4);
+            solver.preconditioner().setFillfactor(10);
+            solver.setMaxIterations(static_cast<Eigen::Index>(params.MaxIterations));
+            solver.setTolerance(params.RelativeTolerance);
+            solver.compute(matrix);
+            if (solver.info() == Eigen::Success)
+            {
+                return MakeIterativeDiagnostics(SparseIterativeStatus::Success, params.Preconditioner);
+            }
+            return MakeIterativeDiagnostics(
+                StatusFromEigenInfo(solver.info(), true),
+                params.Preconditioner);
+        }
+
+        template <typename Solver>
+        [[nodiscard]] SparseIterativeDiagnostics SolveBiCGSTABWithSolver(
+            Solver& solver,
+            const EigenIterativeSparseMatrix& matrix,
+            ConstEigenDenseBlockRef rhs,
+            EigenDenseBlockRef x,
+            const SparseBiCGSTABParams& params)
+        {
+            SparseIterativeDiagnostics diagnostics = ConfigureAndComputeBiCGSTAB(solver, matrix, params);
+            if (!diagnostics.Succeeded())
+            {
+                return diagnostics;
+            }
+
+            if (rhs.rows() == 0)
+            {
+                return diagnostics;
+            }
+
+            EigenDenseMatrixXd solved(rhs.rows(), rhs.cols());
+            SparseIterativeStatus status = SparseIterativeStatus::Success;
+            std::size_t maxIterations = 0;
+            double maxRelativeResidual = 0.0;
+            for (Eigen::Index col = 0; col < rhs.cols(); ++col)
+            {
+                Eigen::VectorXd solution = solver.solve(rhs.col(col));
+                const SparseIterativeStatus columnStatus = StatusFromEigenInfo(
+                    solver.info(),
+                    solution.allFinite());
+                status = MergeIterativeStatus(status, columnStatus);
+                maxIterations = std::max(maxIterations, static_cast<std::size_t>(solver.iterations()));
+                const double relativeResidual = static_cast<double>(solver.error());
+                if (std::isfinite(relativeResidual))
+                {
+                    maxRelativeResidual = std::max(maxRelativeResidual, relativeResidual);
+                }
+                else
+                {
+                    status = MergeIterativeStatus(status, SparseIterativeStatus::NumericalIssue);
+                }
+                solved.col(col) = solution;
+            }
+
+            diagnostics = MakeIterativeDiagnostics(
+                status,
+                params.Preconditioner,
+                maxIterations,
+                maxRelativeResidual);
+            if (!diagnostics.Succeeded())
+            {
+                return diagnostics;
+            }
+
+            x = solved;
+            return diagnostics;
+        }
+
+        [[nodiscard]] SparseIterativeDiagnostics SolveBiCGSTABDense(
+            const SparseMatrix& matrix,
+            ConstEigenDenseBlockRef rhs,
+            EigenDenseBlockRef x,
+            const SparseBiCGSTABParams& params)
+        {
+            SparseIterativeDiagnostics diagnostics = ValidateBiCGSTABDenseInput(matrix, rhs, x, params);
+            if (!diagnostics.Succeeded())
+            {
+                return diagnostics;
+            }
+
+            if (matrix.Rows == 0)
+            {
+                return diagnostics;
+            }
+
+            const EigenIterativeSparseMatrix eigenMatrix = ToEigenIterativeSparseMatrix(matrix);
+            switch (params.Preconditioner)
+            {
+            case SparsePreconditioner::None:
+            {
+                EigenBiCGSTABIdentity solver;
+                return SolveBiCGSTABWithSolver(solver, eigenMatrix, rhs, x, params);
+            }
+            case SparsePreconditioner::Diagonal:
+            {
+                EigenBiCGSTABDiagonal solver;
+                return SolveBiCGSTABWithSolver(solver, eigenMatrix, rhs, x, params);
+            }
+            case SparsePreconditioner::IncompleteLUT:
+            {
+                EigenBiCGSTABILUT solver;
+                return SolveBiCGSTABWithSolver(solver, eigenMatrix, rhs, x, params);
+            }
+            }
+
+            return MakeIterativeDiagnostics(SparseIterativeStatus::InvalidInput, params.Preconditioner);
         }
     }
 
@@ -766,6 +1085,50 @@ namespace Geometry::Sparse
     const SparseFactorizationDiagnostics& SparseLLT::diagnostics() const noexcept
     {
         return Diagnostics_;
+    }
+
+    SparseIterativeDiagnostics SparseBiCGSTAB::solve(
+        const SparseMatrix& matrix,
+        std::span<const double> rhs,
+        std::span<double> x,
+        const SparseBiCGSTABParams& params) const
+    {
+        SparseIterativeDiagnostics diagnostics = ValidateBiCGSTABVectorInput(matrix, rhs, x, params);
+        if (!diagnostics.Succeeded())
+        {
+            return diagnostics;
+        }
+
+        if (matrix.Rows == 0)
+        {
+            return diagnostics;
+        }
+
+        Eigen::Map<const EigenDenseMatrixXd> rhsVector(
+            rhs.data(),
+            static_cast<Eigen::Index>(matrix.Rows),
+            1);
+        EigenDenseMatrixXd solved = EigenDenseMatrixXd::Zero(static_cast<Eigen::Index>(matrix.Rows), 1);
+        diagnostics = SolveBiCGSTABDense(matrix, rhsVector, solved, params);
+        if (!diagnostics.Succeeded())
+        {
+            return diagnostics;
+        }
+
+        for (std::size_t i = 0; i < matrix.Rows; ++i)
+        {
+            x[i] = solved(static_cast<Eigen::Index>(i), 0);
+        }
+        return diagnostics;
+    }
+
+    SparseIterativeDiagnostics SparseBiCGSTAB::solve(
+        const SparseMatrix& matrix,
+        ConstEigenDenseBlockRef rhs,
+        EigenDenseBlockRef x,
+        const SparseBiCGSTABParams& params) const
+    {
+        return SolveBiCGSTABDense(matrix, rhs, x, params);
     }
 
     CGResult SolveCG(const SparseMatrix& A, std::span<const double> b, std::span<double> x, const CGParams& params)

@@ -20,14 +20,14 @@ depends_on: [GEOM-023]
 - Method package: `methods/geometry/closest_point_pde/`.
 - Paper: see Variants below.
 - Seeded by [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md) Tier 1 #2.
-- Reuses `Geometry.Grid`, `Geometry.SDF`, `Geometry.KDTree` / `Geometry.BVH` (closest-point oracle), the CSR builder / CG iterative solver from retired [`GEOM-008`](../../done/GEOM-008-linear-algebra-solver-infrastructure.md), and the direct sparse SPD factorization (LDLT/LLT) seam from retired [`GEOM-020`](../../done/GEOM-020-sparse-direct-factorization-seam.md). The `L_band` operator assembled in Step 5 is non-symmetric for the closest-point-extension formulation, so the practical solver path is BiCGSTAB / GMRES — that seam is owned by [`GEOM-023`](../geometry/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md), which gates this task now that variant A is the marked default.
+- Reuses `Geometry.Grid`, `Geometry.SDF`, `Geometry.KDTree` / `Geometry.BVH` (closest-point oracle), the CSR builder / CG iterative solver from retired [`GEOM-008`](../../done/GEOM-008-linear-algebra-solver-infrastructure.md), the direct sparse SPD factorization (LDLT/LLT) seam from retired [`GEOM-020`](../../done/GEOM-020-sparse-direct-factorization-seam.md), and the non-symmetric BiCGSTAB seam from retired [`GEOM-023`](../../done/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md). The `L_band` operator assembled in Step 5 is non-symmetric for the closest-point-extension formulation, so the practical solver path is `Geometry.Sparse::SparseBiCGSTAB`. GMRES remains a possible follow-up only if a concrete CPM slice proves BiCGSTAB insufficient.
 - Symmetric-domain-views work in [`GEOM-012`](../../done/GEOM-012-symmetric-domain-views-property-sharing.md) is a soft prerequisite: this method must accept a `ClosestPoint` interface backed by any of: halfedge mesh, point cloud, or implicit SDF.
 
 ## Variants and default selection
 
 Mark `[x]` next to the variant that should be the **public-facing default backend**. Unmarked variants become optional capability flags or follow-up tasks.
 
-- [x] **A — CPM with interior boundary conditions (King, Berger-Vergiat, Macdonald, Wong; TOG 2024, arXiv:2305.04711).** Most general; handles Dirichlet on interior curves on the surface (diffusion curves, harmonic maps, tangent-vector field design, reaction-diffusion textures). **Selected as the default; its non-symmetric solver need is owned by `GEOM-023`, which gates this task.**
+- [x] **A — CPM with interior boundary conditions (King, Berger-Vergiat, Macdonald, Wong; TOG 2024, arXiv:2305.04711).** Most general; handles Dirichlet on interior curves on the surface (diffusion curves, harmonic maps, tangent-vector field design, reaction-diffusion textures). **Selected as the default; its non-symmetric solver need is satisfied by retired `GEOM-023`.**
 - [ ] **B — Classic CPM (Ruuth & Merriman 2008, Macdonald & Ruuth 2009).** Simpler, no interior BC support; smaller code surface. Pick if interior BC are not needed in year-1 scope.
 - [ ] **C — Generalized MLS for vector-valued PDEs on unknown manifolds (Liang et al., arXiv:2406.12210).** Pure point-cloud solver, no embedding grid. Pick only if point-cloud-only operation is the primary use case.
 
@@ -72,7 +72,7 @@ Default recommendation: **A**.
 - [ ] Step 2: assemble Laplacian on the grid using standard 7-point stencil (3D) restricted to the band.
 - [ ] Step 3: implement the closest-point extension operator (barycentric / Lagrange interpolation at closest points).
 - [ ] Step 4: variant A — partition stencils across interior BC curves following §3 of arXiv:2305.04711.
-- [ ] Step 5: solve `L_band X = b`. The variant-A closest-point-extension operator is non-symmetric: use the BiCGSTAB/GMRES path from [`GEOM-023`](../geometry/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md) (`Geometry.Sparse` non-symmetric seam). Where a sub-step produces an SPD system, the LDLT path from retired [`GEOM-020`](../../done/GEOM-020-sparse-direct-factorization-seam.md) or the CG path from retired [`GEOM-008`](../../done/GEOM-008-linear-algebra-solver-infrastructure.md) remains preferable; record the per-step solver choice in the slice plan.
+- [ ] Step 5: solve `L_band X = b`. The variant-A closest-point-extension operator is non-symmetric: use `Geometry.Sparse::SparseBiCGSTAB` from retired [`GEOM-023`](../../done/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md). Where a sub-step produces an SPD system, the LDLT path from retired [`GEOM-020`](../../done/GEOM-020-sparse-direct-factorization-seam.md) or the CG path from retired [`GEOM-008`](../../done/GEOM-008-linear-algebra-solver-infrastructure.md) remains preferable; record the per-step solver choice in the slice plan.
 
 ### Closest-point oracle adapters
 - [ ] Add adapter `Geometry::ClosestPointPDE::OracleFromHalfedgeMesh` using existing `Geometry.BVH`.

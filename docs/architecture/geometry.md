@@ -104,12 +104,17 @@
   operators. `SparseLDLT` and `SparseLLT` are the direct CPU reference path for
   deterministic SPD factor-once / solve-many workloads; factorization returns
   structured pivot diagnostics and solve calls fail closed on dimension or
-  non-finite RHS mismatches. Single-RHS calls use span-based engine storage;
-  multi-RHS direct solves expose `EigenDenseBlockRef` aliases as a narrow
+  non-finite RHS mismatches. `SparseBiCGSTAB` is the iterative CPU reference
+  path for non-symmetric sparse systems, with explicit `None`, `Diagonal`, and
+  `IncompleteLUT` preconditioner choices plus structured convergence
+  diagnostics. The sparse module defines `EIGEN_DONT_PARALLELIZE` before
+  including Eigen so fixed inputs and solver params use Eigen's single-threaded
+  deterministic path. Single-RHS calls use span-based engine storage; multi-RHS
+  direct and BiCGSTAB solves expose `EigenDenseBlockRef` aliases as a narrow
   solver bridge for dense RHS blocks, not as a geometry container storage
   convention. `Geometry.DEC` aliases these sparse records so existing
-  DEC/geodesic/parameterization callers keep their names while sharing the common
-  implementation.
+  DEC/geodesic/parameterization callers keep their names while sharing the
+  common implementation.
 - Optional Spectra or SuiteSparse/CHOLMOD seams are deferred until CPU reference
   parity and benchmark manifests justify a second backend.
 - `Geometry.PCA` exports the closed-form symmetric 3×3 eigensolver
