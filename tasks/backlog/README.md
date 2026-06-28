@@ -80,9 +80,8 @@ runtime activation/default-load lane is retired in
 [`RUNTIME-130`](../done/RUNTIME-130-route-recipe-activation-and-load-default-recipe.md);
 remaining live leaves are:
 [`rendering/GRAPHICS-107-reconcile-framerecipe-renderrecipe-vocabulary.md`](rendering/GRAPHICS-107-reconcile-framerecipe-renderrecipe-vocabulary.md)
-(reconcile the `FrameRecipe`/`RenderRecipe` vocabularies), and
-[`rendering/DOCS-004-frame-graph-doc-recipe-config-lane.md`](rendering/DOCS-004-frame-graph-doc-recipe-config-lane.md)
-(promote `frame-graph.md` + document the recipe-config lane).
+(reconcile the `FrameRecipe`/`RenderRecipe` vocabularies). `DOCS-004` is
+retired: canonical `frame-graph.md` now documents the recipe-config lane.
 
 ### Theme C — Physics readiness (P1)
 

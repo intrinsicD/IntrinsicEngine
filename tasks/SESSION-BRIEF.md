@@ -12,7 +12,6 @@ the authoritative open/unblocked view.
 
 ## Theme B — Rendering modernization
 
-- unblocked: `DOCS-004` — Promote frame-graph.md from stub and document the recipe-config lane (tasks/backlog/rendering/DOCS-004-frame-graph-doc-recipe-config-lane.md)
 - blocked by `GRAPHICS-104`: `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/backlog/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
 - unblocked: `GRAPHICS-107` — Reconcile the FrameRecipe vs RenderRecipe vocabularies (tasks/backlog/rendering/GRAPHICS-107-reconcile-framerecipe-renderrecipe-vocabulary.md)
 - unblocked: `RUNTIME-125` — Optional AoS fast lane for static geometry (profile-gated) (tasks/backlog/runtime/RUNTIME-125-aos-static-fast-lane.md)

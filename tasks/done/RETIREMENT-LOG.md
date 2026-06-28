@@ -9,6 +9,17 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`DOCS-004`](DOCS-004-frame-graph-doc-recipe-config-lane.md) — Promote
+frame-graph.md from stub and document the recipe-config lane — retired on
+2026-06-28 as a docs-only synchronization task. `docs/architecture/frame-graph.md`
+now documents `FrameRecipe*` as the live per-frame composition driver,
+`RenderRecipeConfig` as the side-effect-free config overlay, runtime/editor/
+agent edit lanes, boot and hot `render.default_recipe_config_path` activation,
+and the fixed-core guard that limits overrides to supported optional slots and
+binding/output changes. The legacy-background `rendering-three-pass.md` remains
+context only.
+
+Backlog
 [`GEOIO-003`](GEOIO-003-mesh-pointcloud-io-breadth.md) — Mesh and point-cloud
 IO breadth — retired on 2026-06-28 at maturity `CPUContracted`.
 `Geometry::MeshIO::WriteOFF` now provides deterministic ASCII OFF export with
