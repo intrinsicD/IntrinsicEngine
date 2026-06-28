@@ -20,6 +20,7 @@ export namespace Geometry::HalfedgeMesh::VertexNormals
         UniformFace,
         AreaWeighted,
         AngleWeighted,
+        AreaAngleWeighted,
         MaxWeighted,
     };
 

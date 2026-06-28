@@ -5,6 +5,7 @@
 #include <numeric>
 #include <vector>
 #include <glm/glm.hpp>
+#include <glm/geometric.hpp>
 
 import Geometry;
 
@@ -12,6 +13,7 @@ namespace
 {
     using Geometry::FaceHandle;
     using Geometry::PropertyIndex;
+    using Geometry::VertexHandle;
     namespace MU = Geometry::MeshUtils;
 
     Geometry::HalfedgeMesh::Mesh MakeSingleTriangle()
@@ -31,6 +33,13 @@ namespace
         auto mesh = MU::BuildHalfedgeMeshFromIndexedTriangles(pos, idx);
         EXPECT_TRUE(mesh.has_value());
         return std::move(*mesh);
+    }
+
+    void ExpectVecNear(const glm::dvec3 actual, const glm::dvec3 expected, const double epsilon = 1.0e-9)
+    {
+        EXPECT_NEAR(actual.x, expected.x, epsilon);
+        EXPECT_NEAR(actual.y, expected.y, epsilon);
+        EXPECT_NEAR(actual.z, expected.z, epsilon);
     }
 }
 
@@ -73,6 +82,61 @@ TEST(GeometryMeshQuantities, BarycentricAreasSumToSurfaceArea)
     EXPECT_EQ(bary.size(), mesh.VerticesSize());
 }
 
+TEST(GeometryMeshQuantities, EquilateralTriangleAreaIsAnalytic)
+{
+    const float height = static_cast<float>(std::sqrt(3.0) * 0.5);
+    const std::vector<glm::vec3> pos{
+        {0.0f, 0.0f, 0.0f},
+        {1.0f, 0.0f, 0.0f},
+        {0.5f, height, 0.0f},
+    };
+    const std::vector<std::uint32_t> idx{0, 1, 2};
+    const auto mesh = MU::BuildHalfedgeMeshFromIndexedTriangles(pos, idx);
+    ASSERT_TRUE(mesh.has_value());
+
+    EXPECT_NEAR(MU::FaceArea(*mesh, FaceHandle{0}), std::sqrt(3.0) * 0.25, 1.0e-8);
+}
+
+TEST(GeometryMeshQuantities, ClosedMeshAreaVectorsSumToZero)
+{
+    const auto mesh = Geometry::HalfedgeMesh::MakeMeshTetrahedron();
+
+    glm::dvec3 sum{0.0};
+    for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+    {
+        sum += MU::FaceAreaVector(mesh, FaceHandle{static_cast<PropertyIndex>(fi)});
+    }
+
+    ExpectVecNear(sum, glm::dvec3{0.0}, 1.0e-9);
+}
+
+TEST(GeometryMeshQuantities, PublishCanonicalQuantityProperties)
+{
+    auto mesh = MakeUnitSquare();
+
+    const auto areas = MU::PublishFaceAreas(mesh);
+    const auto areaVectors = MU::PublishFaceAreaVectors(mesh);
+    const auto centroids = MU::PublishFaceCentroids(mesh);
+    const auto barycentricAreas = MU::PublishBarycentricVertexAreas(mesh);
+
+    ASSERT_TRUE(areas.IsValid());
+    ASSERT_TRUE(areaVectors.IsValid());
+    ASSERT_TRUE(centroids.IsValid());
+    ASSERT_TRUE(barycentricAreas.IsValid());
+    EXPECT_TRUE(mesh.FaceProperties().Exists(MU::kFaceAreaPropertyName));
+    EXPECT_TRUE(mesh.FaceProperties().Exists(MU::kFaceAreaVectorPropertyName));
+    EXPECT_TRUE(mesh.FaceProperties().Exists(MU::kFaceCentroidPropertyName));
+    EXPECT_TRUE(mesh.VertexProperties().Exists(MU::kBarycentricVertexAreaPropertyName));
+
+    EXPECT_NEAR(areas[FaceHandle{0}], MU::FaceArea(mesh, FaceHandle{0}), 1.0e-9);
+    ExpectVecNear(areaVectors[FaceHandle{0}], MU::FaceAreaVector(mesh, FaceHandle{0}));
+    ExpectVecNear(centroids[FaceHandle{0}], MU::FaceCentroid(mesh, FaceHandle{0}));
+
+    const double barySum = std::accumulate(
+        barycentricAreas.Vector().begin(), barycentricAreas.Vector().end(), 0.0);
+    EXPECT_NEAR(barySum, 1.0, 1.0e-9);
+}
+
 TEST(GeometryMeshQuantities, FaceCentroidIsCornerAverageNotOneRing)
 {
     const auto mesh = MakeUnitSquare();
@@ -89,6 +153,83 @@ TEST(GeometryMeshQuantities, FailClosedOnInvalidFace)
     EXPECT_EQ(MU::FaceArea(mesh, bogus), 0.0);
     EXPECT_EQ(glm::length(MU::FaceAreaVector(mesh, bogus)), 0.0);
     EXPECT_EQ(glm::length(MU::FaceCentroid(mesh, bogus)), 0.0);
+}
+
+TEST(GeometryMeshQuantities, FaceScalarGradientMatchesLinearField)
+{
+    const auto mesh = MakeSingleTriangle();
+    const std::vector<double> u{
+        5.0,
+        7.0,
+        8.0,
+    };
+
+    const glm::dvec3 gradient = MU::FaceScalarGradient(mesh, FaceHandle{0}, u);
+    ExpectVecNear(gradient, glm::dvec3{2.0, 3.0, 0.0}, 1.0e-7);
+
+    const auto gradients = MU::ComputeFaceScalarGradients(mesh, u);
+    ASSERT_EQ(gradients.size(), mesh.FacesSize());
+    ExpectVecNear(gradients[0], gradient, 1.0e-12);
+
+    auto mutableMesh = mesh;
+    const auto published = MU::PublishFaceScalarGradients(mutableMesh, u);
+    ASSERT_TRUE(published.IsValid());
+    ExpectVecNear(published[FaceHandle{0}], gradient, 1.0e-12);
+}
+
+TEST(GeometryMeshQuantities, FaceScalarGradientFailsClosed)
+{
+    const auto mesh = MakeSingleTriangle();
+    const std::vector<double> tooShort{1.0, 2.0};
+    const std::vector<double> nonFinite{0.0, std::numeric_limits<double>::infinity(), 1.0};
+    const std::vector<double> valid{0.0, 1.0, 2.0};
+
+    ExpectVecNear(MU::FaceScalarGradient(mesh, FaceHandle{0}, tooShort), glm::dvec3{0.0});
+    ExpectVecNear(MU::FaceScalarGradient(mesh, FaceHandle{0}, nonFinite), glm::dvec3{0.0});
+    ExpectVecNear(MU::FaceScalarGradient(mesh, FaceHandle{9999}, valid), glm::dvec3{0.0});
+}
+
+TEST(GeometryMeshQuantities, ProjectToUnitSphereLeavesOriginAndNormalizesFiniteVertices)
+{
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const VertexHandle origin = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    const VertexHandle x = mesh.AddVertex({2.0f, 0.0f, 0.0f});
+    const VertexHandle diagonal = mesh.AddVertex({1.0f, 2.0f, 2.0f});
+
+    Geometry::HalfedgeMesh::ProjectToUnitSphere(mesh);
+
+    EXPECT_EQ(mesh.Position(origin), (glm::vec3{0.0f, 0.0f, 0.0f}));
+    EXPECT_NEAR(glm::length(mesh.Position(x)), 1.0f, 1.0e-6f);
+    EXPECT_NEAR(glm::length(mesh.Position(diagonal)), 1.0f, 1.0e-6f);
+    EXPECT_TRUE(std::isfinite(mesh.Position(origin).x));
+    EXPECT_TRUE(std::isfinite(mesh.Position(diagonal).z));
+}
+
+TEST(GeometryMeshQuantities, VertexOneRingPcaAlignsWithSphereNormal)
+{
+    auto mesh = Geometry::HalfedgeMesh::MakeMeshIcosahedron();
+    Geometry::HalfedgeMesh::ProjectToUnitSphere(mesh);
+
+    const VertexHandle vertex{0u};
+    const Geometry::PCAResult pca = MU::VertexOneRingPCA(mesh, vertex);
+    ASSERT_TRUE(pca.Valid);
+    const glm::vec3 radial = glm::normalize(mesh.Position(vertex));
+    const glm::vec3 smallestEigenvector = glm::normalize(pca.Eigenvectors[2]);
+    EXPECT_GT(std::abs(glm::dot(radial, smallestEigenvector)), 0.95f);
+
+    const auto pcaProperty = MU::PublishVertexOneRingPCA(mesh);
+    ASSERT_TRUE(pcaProperty.IsValid());
+    EXPECT_TRUE(mesh.VertexProperties().Exists(MU::kVertexPcaPropertyName));
+    EXPECT_TRUE(pcaProperty[vertex].Valid);
+}
+
+TEST(GeometryMeshQuantities, VertexOneRingPcaFailsClosedWhenUnderdetermined)
+{
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const VertexHandle v = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+
+    const Geometry::PCAResult pca = MU::VertexOneRingPCA(mesh, v);
+    EXPECT_FALSE(pca.Valid);
 }
 
 TEST(GeometryMeshQuantities, NonPlanarQuadAreaUsesTriangleFan)

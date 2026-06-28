@@ -3,6 +3,7 @@ module;
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <string_view>
 #include <vector>
 #include <glm/fwd.hpp>
 
@@ -11,12 +12,19 @@ export module Geometry.HalfedgeMesh.Utils;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.MeshClosestFace;
+import Geometry.PCA;
 
 export namespace Geometry::MeshUtils
 {
     // Canonical property name for per-vertex texture coordinates across all
     // geometry modules (subdivision, remeshing, mesh conversion, etc.).
     inline constexpr const char* kVertexTexcoordPropertyName = "v:texcoord";
+    inline constexpr const char* kFaceAreaPropertyName = "f:area";
+    inline constexpr const char* kFaceAreaVectorPropertyName = "f:area_vector";
+    inline constexpr const char* kFaceCentroidPropertyName = "f:centroid";
+    inline constexpr const char* kBarycentricVertexAreaPropertyName = "v:barycentric_area";
+    inline constexpr const char* kFaceScalarGradientPropertyName = "f:scalar_gradient";
+    inline constexpr const char* kVertexPcaPropertyName = "v:pca";
 
     struct TriangleFaceView
     {
@@ -105,6 +113,9 @@ export namespace Geometry::MeshUtils
     /// face or one with a non-finite corner position.
     glm::dvec3 FaceAreaVector(const HalfedgeMesh::Mesh& mesh, FaceHandle f);
 
+    /// Populate the canonical `f:area_vector` property from FaceAreaVector().
+    [[nodiscard]] FaceProperty<glm::dvec3> PublishFaceAreaVectors(HalfedgeMesh::Mesh& mesh);
+
     /// Scalar surface area of a (possibly polygonal) face. Planar faces —
     /// including concave polygons — use the exact Newell/shoelace area
     /// (= |FaceAreaVector|). Genuinely non-planar (folded) faces, whose oriented
@@ -113,16 +124,56 @@ export namespace Geometry::MeshUtils
     /// face or one with a non-finite corner position.
     double FaceArea(const HalfedgeMesh::Mesh& mesh, FaceHandle f);
 
+    /// Populate the canonical `f:area` property from FaceArea().
+    [[nodiscard]] FaceProperty<double> PublishFaceAreas(HalfedgeMesh::Mesh& mesh);
+
     /// Centroid of a face's own corner positions (average of the face vertices).
     /// Distinct from ComputeOneRingCentroid, which averages 1-ring neighbours.
     /// Returns (0,0,0) for a deleted/invalid/empty face.
     glm::dvec3 FaceCentroid(const HalfedgeMesh::Mesh& mesh, FaceHandle f);
+
+    /// Populate the canonical `f:centroid` property from FaceCentroid().
+    [[nodiscard]] FaceProperty<glm::dvec3> PublishFaceCentroids(HalfedgeMesh::Mesh& mesh);
 
     /// Lumped ("barycentric") vertex areas: each vertex receives FaceArea/degree
     /// from every incident face (= Σ incident FaceArea / 3 for a triangle mesh).
     /// Cheaper alternative to the mixed-Voronoi area. Indexed by vertex storage
     /// index; deleted vertices receive 0.
     std::vector<double> ComputeBarycentricVertexAreas(const HalfedgeMesh::Mesh& mesh);
+
+    /// Populate the canonical `v:barycentric_area` property from
+    /// ComputeBarycentricVertexAreas().
+    [[nodiscard]] VertexProperty<double> PublishBarycentricVertexAreas(HalfedgeMesh::Mesh& mesh);
+
+    /// Unnormalized gradient of a vertex scalar field over one triangular face:
+    ///   grad = (1 / 2A) Σ_i u_i (N x e_i).
+    /// Returns zero for invalid, non-triangular, degenerate, mismatched, or
+    /// non-finite inputs. Heat-method callers normalize/negate this result.
+    glm::dvec3 FaceScalarGradient(
+        const HalfedgeMesh::Mesh& mesh,
+        FaceHandle f,
+        std::span<const double> vertexValues);
+
+    /// Batch FaceScalarGradient() over all face storage slots.
+    [[nodiscard]] std::vector<glm::dvec3> ComputeFaceScalarGradients(
+        const HalfedgeMesh::Mesh& mesh,
+        std::span<const double> vertexValues);
+
+    /// Populate a face vector property with unnormalized scalar gradients.
+    [[nodiscard]] FaceProperty<glm::dvec3> PublishFaceScalarGradients(
+        HalfedgeMesh::Mesh& mesh,
+        std::span<const double> vertexValues,
+        std::string_view outputPropertyName = kFaceScalarGradientPropertyName);
+
+    /// PCA over a vertex's finite 1-ring neighbour positions. Returns an
+    /// invalid PCAResult for deleted, isolated, non-finite, or underdetermined
+    /// (<3 finite neighbours) neighborhoods.
+    [[nodiscard]] PCAResult VertexOneRingPCA(const HalfedgeMesh::Mesh& mesh, VertexHandle v);
+
+    /// Populate the canonical `v:pca` property from VertexOneRingPCA().
+    [[nodiscard]] VertexProperty<PCAResult> PublishVertexOneRingPCA(
+        HalfedgeMesh::Mesh& mesh,
+        std::string_view outputPropertyName = kVertexPcaPropertyName);
 
     /// Area-weighted vertex normal with safety iteration limit.
     /// Falls back to (0, 1, 0) for degenerate configurations.

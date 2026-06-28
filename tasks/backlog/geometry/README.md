@@ -31,7 +31,6 @@ Confirmed feature gaps from the `bcg_code_base` → IntrinsicEngine port-gap
 review (features already present or better in IntrinsicEngine were excluded).
 Grouped by cluster; each is `geometry -> core` only and targets `CPUContracted`.
 
-- [GEOM-045 — First-class mesh geometric-quantity accessors](GEOM-045-first-class-mesh-quantity-accessors.md).
 - [GEOM-048 — Statistics accumulators and robust estimation kernels](GEOM-048-statistics-robust-estimation-kernels.md).
 - [GEOM-049 — Numeric/linear-algebra utilities (RPCA, Eigen map adapters)](GEOM-049-numeric-linalg-utilities.md).
 - [GEOM-050 — Primitive and curve utilities (Bezier, triangle metrics, sphere fit, AABB)](GEOM-050-primitive-curve-utilities.md).
@@ -130,6 +129,7 @@ split; narratives live in the retirement log.
 - [GEOM-042 — Mesh normal-based bilateral denoiser](../../done/GEOM-042-mesh-normal-bilateral-denoiser.md) (done).
 - [GEOM-043 — Remeshing surface reprojection and error-bounded adaptive sizing](../../done/GEOM-043-remeshing-reprojection-error-bounded-sizing.md) (done).
 - [GEOM-044 — Sqrt-3 subdivision and Loop feature/crease masks](../../done/GEOM-044-subdivision-sqrt3-loop-feature-masks.md) (done).
+- [GEOM-045 — First-class mesh geometric-quantity accessors](../../done/GEOM-045-first-class-mesh-quantity-accessors.md) (done).
 - [GEOM-046 — Mesh topology utilities](../../done/GEOM-046-mesh-topology-utilities.md) (done).
 - [GEOM-047 — Graph and point-cloud query/noise utilities](../../done/GEOM-047-graph-pointcloud-query-noise-utilities.md) (done).
 - [GEOM-051 — Property system enhancements](../../done/GEOM-051-property-system-enhancements.md) (done).

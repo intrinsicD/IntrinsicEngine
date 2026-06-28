@@ -274,6 +274,36 @@ All lumped modes partition the surface area; degenerate / non-finite faces fail
 closed (are skipped). `BuildConsistentMass` and the mass-mode `BuildHodgeStar0`
 are deterministic.
 
+### Halfedge mesh quantity accessors
+
+`Geometry.HalfedgeMesh.Utils` owns the first-class mesh geometric-quantity
+accessors shared by curvature, parameterization, geodesics, subdivision, and
+mesh builders. Direct accessors are pure reads, while `Publish*` variants write
+canonical property names:
+
+- `FaceArea` / `PublishFaceAreas` write `f:area`; polygon faces use Newell
+  area for planar loops, including concave loops, and fall back to triangle-fan
+  surface area for genuinely folded non-planar loops.
+- `FaceAreaVector` / `PublishFaceAreaVectors` write `f:area_vector`, the
+  oriented Newell vector area.
+- `FaceCentroid` / `PublishFaceCentroids` write `f:centroid`, the average of a
+  face's own corner positions. This is distinct from `ComputeOneRingCentroid`,
+  which averages a vertex neighborhood.
+- `ComputeBarycentricVertexAreas` / `PublishBarycentricVertexAreas` write
+  `v:barycentric_area`, the lumped incident face-area partition.
+- `FaceScalarGradient`, `ComputeFaceScalarGradients`, and
+  `PublishFaceScalarGradients` expose the unnormalized triangle-face gradient
+  of a vertex scalar field and default to `f:scalar_gradient`. The heat method
+  continues to normalize and negate the returned gradient locally.
+- `VertexOneRingPCA` / `PublishVertexOneRingPCA` write `v:pca` with
+  `Geometry::PCAResult`, using finite 1-ring neighbor positions and failing
+  closed for deleted, isolated, non-finite, or underdetermined neighborhoods.
+
+`Geometry.HalfedgeMesh.Builder::ProjectToUnitSphere` is also public: it
+normalizes finite non-origin vertex positions in-place and leaves near-origin
+vertices unchanged so no NaN/Inf values are introduced. `MakeMesh(Sphere)` and
+subdivision-based sphere construction route through this public helper.
+
 ### Parameterization diagnostics
 
 `Geometry.Parameterization.Diagnostics` is the shared CPU diagnostics surface for
@@ -298,10 +328,10 @@ for publishing count-matched `glm::vec3` vertex normals back to a
 `HalfedgeMesh::Mesh` vertex property, defaulting to `v:normal`. The contract
 returns the written `VertexProperty<glm::vec3>` plus deterministic status and
 diagnostic counts. The selectable averaging modes are uniform face normals,
-area-weighted face normals, angle-weighted face normals, and Max-style
-sine/reciprocal-edge weighting. Degenerate faces, invalid topology, non-finite
-face input, deleted slots, fallback writes, and repaired fallback normals are
-reported through the result record.
+area-weighted face normals, angle-weighted face normals, `AreaAngleWeighted`
+face normals, and Max-style sine/reciprocal-edge weighting. Degenerate faces,
+invalid topology, non-finite face input, deleted slots, fallback writes, and
+repaired fallback normals are reported through the result record.
 
 ### Graph Vertex Normal Recompute
 

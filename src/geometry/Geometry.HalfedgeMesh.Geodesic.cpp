@@ -55,30 +55,7 @@ namespace Geometry::Geodesic
             if (!MeshUtils::TryGetTriangleFaceView(mesh, fh, tri))
                 continue;
 
-            double ua_val = u[tri.V0.Index];
-            double ub_val = u[tri.V1.Index];
-            double uc_val = u[tri.V2.Index];
-
-            // Face normal (unnormalized, length = 2*area)
-            glm::vec3 N = glm::cross(tri.P1 - tri.P0, tri.P2 - tri.P0);
-            float areaTimesTwo = glm::length(N);
-            if (areaTimesTwo < 1e-10f)
-                continue;
-
-            N /= areaTimesTwo; // Unit normal
-
-            // Edges opposite to each vertex
-            glm::vec3 ea = tri.P2 - tri.P1; // opposite to a
-            glm::vec3 eb = tri.P0 - tri.P2; // opposite to b
-            glm::vec3 ec = tri.P1 - tri.P0; // opposite to c
-
-            // Gradient: (1/2A) * Σ u_i * (N × e_i)
-            float invTwoA = 1.0f / areaTimesTwo;
-            glm::vec3 grad = invTwoA * (
-                static_cast<float>(ua_val) * glm::cross(N, ea) +
-                static_cast<float>(ub_val) * glm::cross(N, eb) +
-                static_cast<float>(uc_val) * glm::cross(N, ec)
-            );
+            const glm::vec3 grad = glm::vec3(MeshUtils::FaceScalarGradient(mesh, fh, u));
 
             float gradLen = glm::length(grad);
             if (gradLen < 1e-10f)

@@ -44,16 +44,6 @@ namespace Geometry::UvAtlas
             return std::all_of(uvs.begin(), uvs.end(), [](const glm::vec2 uv) { return IsFinite(uv); });
         }
 
-        [[nodiscard]] double TriangleArea(
-            const std::span<const glm::vec3> positions,
-            const MeshSoup::PolygonFace& face) noexcept
-        {
-            const glm::vec3 p0 = positions[face.Indices[0]];
-            const glm::vec3 p1 = positions[face.Indices[1]];
-            const glm::vec3 p2 = positions[face.Indices[2]];
-            return 0.5 * static_cast<double>(glm::length(glm::cross(p1 - p0, p2 - p0)));
-        }
-
         [[nodiscard]] UvAtlasDiagnostics MakeDiagnostics(const UvAtlasInput& input)
         {
             UvAtlasDiagnostics diagnostics{};
@@ -580,7 +570,10 @@ namespace Geometry::UvAtlas
             {
                 continue;
             }
-            if (TriangleArea(input.Positions, face) <= kDegenerateAreaEpsilon)
+            if (MeshUtils::TriangleArea(
+                    input.Positions[face.Indices[0]],
+                    input.Positions[face.Indices[1]],
+                    input.Positions[face.Indices[2]]) <= kDegenerateAreaEpsilon)
             {
                 ++diagnostics.DegenerateFaceCount;
             }

@@ -2787,3 +2787,19 @@ proves repeated-rotation identity, clustered chordal/Karcher agreement, weighted
 Karcher/slerp parity, median robustness against gross outliers, deterministic
 permutation behavior, and explicit empty/single/antipodal/weight/non-finite
 status handling.
+
+[`GEOM-045`](GEOM-045-first-class-mesh-quantity-accessors.md) — first-class mesh
+geometric-quantity accessors retired to `tasks/done/` on 2026-06-28 at
+`CPUContracted`. `Geometry.HalfedgeMesh.Utils` now exposes property-backed
+`FaceArea`, `FaceAreaVector`, `FaceCentroid`,
+`ComputeBarycentricVertexAreas`, `FaceScalarGradient`, and
+`VertexOneRingPCA` contracts with canonical `f:` / `v:` property names.
+The heat-method geodesic implementation consumes the public unnormalized
+gradient and keeps the local normalize/negate step, `Geometry.UvAtlas` routes
+its degenerate triangle check through the canonical triangle-area helper,
+`Geometry.HalfedgeMesh.Builder` exports `ProjectToUnitSphere`, and
+`Geometry.HalfedgeMesh.Vertices.Normals` adds `AreaAngleWeighted`. Unit
+coverage pins analytic area, closed-mesh area-vector conservation, property
+publication, linear-field face gradients, origin-safe unit-sphere projection,
+area-times-angle normals, 1-ring PCA normal alignment, and fail-closed invalid
+inputs; focused geodesic tests pass through the promoted gradient path.
