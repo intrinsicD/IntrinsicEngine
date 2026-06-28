@@ -242,7 +242,14 @@ restore true normal-aligned surfel ellipses without reusing texture coordinates.
 applications can request the standard runtime configuration without importing
 lower-layer `core` config modules directly. Applications may pass the returned
 config to `Engine`; runtime remains responsible for interpreting subsystem
-configuration and composition. `CreateReferenceEngineConfig()` flips
+configuration and composition. `ResolveEngineConfigForBoot(...)` is the sandbox
+boot helper layered on top of that reference value: it checks
+`--engine-config`, `INTRINSIC_ENGINE_CONFIG`, and an existing
+`config/engine.json` path, then uses the core-owned
+`Extrinsic.Core.Config.EngineLoad` diagnostics lane to preview the file before
+constructing `Engine`. Invalid or unreadable explicit files keep the reference
+config and preserve diagnostics in `EngineConfigBootResult`; runtime does not
+mutate a live engine from this path. `CreateReferenceEngineConfig()` flips
 `EngineConfig::ReferenceScene::Enabled = true` and
 `Selector = ReferenceSceneSelector::Triangle`; the default-constructed
 `EngineConfig{}` keeps `Enabled = false` so existing CPU/null tests do not

@@ -142,12 +142,9 @@ Open members:
   unblocked by retired `GEOM-026`; adds the first method window under each
   vertex processing submenu.
 - [`platform/PLATFORM-004-alternative-platform-backend-onboarding.md`](platform/PLATFORM-004-alternative-platform-backend-onboarding.md) (planning-only seed).
-- [`runtime/CORE-003-engine-config-file-lane.md`](runtime/CORE-003-engine-config-file-lane.md) —
-  give `EngineConfig` the file/preview/diagnostics lane `RenderRecipeConfig`
-  already proves (config lane first-class; foundation for the agent/CLI lane).
 - [`runtime/RUNTIME-131-agent-cli-config-control-facade.md`](runtime/RUNTIME-131-agent-cli-config-control-facade.md) —
-  agent/CLI config-control facade on the `Engine`, equal to the UI (depends on
-  `CORE-003`, `GRAPHICS-106`).
+  agent/CLI config-control facade on the `Engine`, equal to the UI (consumes
+  retired `CORE-003`; still depends on `GRAPHICS-106`).
 - [`runtime/RUNTIME-132-lift-runframe-hook-adapters.md`](runtime/RUNTIME-132-lift-runframe-hook-adapters.md) —
   behavior-preserving readability lift of the inline `RunFrame` hook adapters.
 - [`geometry/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md`](geometry/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md) —

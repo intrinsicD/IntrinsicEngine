@@ -10,6 +10,7 @@ target_sources(${target_name}
         Core.Config.Render.cppm
         Core.Config.Simulation.cppm
         Core.Config.Engine.cppm
+        Core.Config.EngineLoad.cppm
         Core.Dag.Scheduler.cppm
         Core.Dag.Scheduler.Types.cppm
         Core.Dag.Scheduler.Hazards.cppm
@@ -52,6 +53,7 @@ target_sources(${target_name}
         Core.Memory.ScopeStack.cpp
         Core.Memory.Polymorphic.cpp
         PRIVATE
+        Core.Config.EngineLoad.cpp
         Core.Dag.Scheduler.Hazards.cpp
         Core.Dag.Scheduler.cpp
         Core.Dag.TaskGraph.cpp
@@ -77,4 +79,9 @@ target_include_directories(${target_name} PUBLIC .)
 target_compile_definitions(${target_name}
         PUBLIC
         ENGINE_ROOT_DIR="${CMAKE_SOURCE_DIR}"
+)
+
+target_link_libraries(${target_name}
+        PRIVATE
+        nlohmann_json::nlohmann_json
 )

@@ -23,7 +23,6 @@ the authoritative open/unblocked view.
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
-- unblocked: `CORE-003` — Give EngineConfig the file/preview/diagnostics config lane (tasks/backlog/runtime/CORE-003-engine-config-file-lane.md)
 - unblocked: `DOCS-003` — Reconcile algorithm-variant-dispatch.md with reality and define the backend-seam template (tasks/backlog/geometry/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md)
 - blocked by `DOCS-003`: `GEOM-052` — Shared CPU/GPU backend seam + fix the KMeans phantom GPU exemplar (tasks/backlog/geometry/GEOM-052-shared-cpu-gpu-backend-seam-kmeans-exemplar.md)
 - unblocked: `LEGACY-001` — Delete `src/legacy/Interface/` (tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)
@@ -37,7 +36,7 @@ the authoritative open/unblocked view.
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
-- blocked by `CORE-003`: `RUNTIME-131` — Agent/CLI config-control facade on the Engine (tasks/backlog/runtime/RUNTIME-131-agent-cli-config-control-facade.md)
+- blocked by `GRAPHICS-106`: `RUNTIME-131` — Agent/CLI config-control facade on the Engine (tasks/backlog/runtime/RUNTIME-131-agent-cli-config-control-facade.md)
 - unblocked: `RUNTIME-132` — Lift single-use RunFrame hook adapters out of the RunFrame body (tasks/backlog/runtime/RUNTIME-132-lift-runframe-hook-adapters.md)
 - blocked by `GEOM-039`: `RUNTIME-135` — SpatialDebug closest-face picking via accelerated mesh query (tasks/backlog/runtime/RUNTIME-135-spatialdebug-closest-face-picking.md)
 - unblocked: `UI-022` — Sandbox EditorUI vertex-normal recompute windows (tasks/backlog/ui/UI-022-sandbox-editor-vertex-normal-recompute.md)
@@ -82,7 +81,7 @@ the authoritative open/unblocked view.
 - blocked by `GRAPHICS-108`: `METHOD-013` — Progressive Poisson-disk sampling: GPU (Vulkan compute) backend + parity (tasks/backlog/methods/METHOD-013-progressive-poisson-disk-gpu-backend.md)
 - unblocked: `METHODS-001` — Pin signed heat as methods-pipeline pathfinder (tasks/backlog/methods/METHODS-001-signed-heat-pathfinder.md)
 - blocked by `GEOM-036`: `RUNTIME-133` — Method result & figure data-export seam (CSV/JSON) (tasks/backlog/runtime/RUNTIME-133-method-figure-data-export.md)
-- blocked by `CORE-003`: `RUNTIME-134` — Interactive progressive-Poisson sampling playground in the Sandbox (tasks/backlog/ui/RUNTIME-134-progressive-poisson-interactive-playground.md)
+- blocked by `RUNTIME-131`: `RUNTIME-134` — Interactive progressive-Poisson sampling playground in the Sandbox (tasks/backlog/ui/RUNTIME-134-progressive-poisson-interactive-playground.md)
 
 ## Audits
 

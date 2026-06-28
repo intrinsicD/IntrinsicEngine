@@ -3,6 +3,7 @@ id: CORE-003
 theme: F
 depends_on: []
 maturity_target: CPUContracted
+completed_on: 2026-06-28
 ---
 # CORE-003 — Give EngineConfig the file/preview/diagnostics config lane
 
@@ -22,6 +23,11 @@ maturity_target: CPUContracted
   a follow-up).
 
 ## Context
+- Status: done.
+- Owner/agent: Codex.
+- Completed: 2026-06-28.
+- Commit: this commit (`Give EngineConfig a file load lane`).
+- Maturity: `CPUContracted`.
 - `EngineConfig` is hand-built in C++ via `Runtime::CreateReferenceEngineConfig()`
   (`src/runtime/Runtime.Engine.cpp`, ~line 1542), passed once to the `Engine`
   ctor, and stored read-only as `m_Config`. `src/app/Sandbox/main.cpp` boots from
@@ -35,43 +41,54 @@ maturity_target: CPUContracted
   `Core.Filesystem`/`Core.IOBackend`.
 
 ## Required changes
-- [ ] Add a CPU-only, deterministic, side-effect-free loader module (e.g.
+- [x] Add a CPU-only, deterministic, side-effect-free loader module (e.g.
       `Extrinsic.Core.Config.EngineLoad`, companion to
       `Extrinsic.Core.Config.Engine`) exposing `kEngineConfigSchemaId` +
       `kEngineConfigSchemaVersion`, an `EngineConfigState` enum, an
       `EngineConfigDiagnostic` vector, `LoadEngineConfigFile(path) -> result`,
       and `PreviewEngineConfig` (dry-run) producing a fully-defaulted
       `EngineConfig`.
-- [ ] Keep `EngineConfig` and its sub-configs (`SimulationConfig`, `RenderConfig`,
+- [x] Keep `EngineConfig` and its sub-configs (`SimulationConfig`, `RenderConfig`,
       `WindowConfig`) plain structs; add only the thin parse/serialize layer.
-- [ ] Partition mutability explicitly in the schema/docs: boot-only fields
+- [x] Partition mutability explicitly in the schema/docs: boot-only fields
       (graphics backend, frames-in-flight, worker-thread count, validation toggle,
       window size) vs any hot subset (deferred here).
-- [ ] Wire `main.cpp`/`Engine` to attempt a default config path plus an env/CLI
+- [x] Wire `main.cpp`/`Engine` to attempt a default config path plus an env/CLI
       override before falling back to `CreateReferenceEngineConfig()`.
 
 ## Tests
-- [ ] Round-trip test: a config file sets every boot field and loads to the
+- [x] Round-trip test: a config file sets every boot field and loads to the
       expected `EngineConfig`.
-- [ ] Fail-closed test: invalid keys/values fall back to reference defaults with
+- [x] Fail-closed test: invalid keys/values fall back to reference defaults with
       precise diagnostics; the loader is deterministic and side-effect-free.
-- [ ] Default CPU gate stays green.
+- [x] Default CPU gate stays green.
 
 ## Docs
-- [ ] Document the engine config file schema (fields, boot-only vs hot, defaults,
+- [x] Document the engine config file schema (fields, boot-only vs hot, defaults,
       diagnostics) under `docs/architecture/` and link it from the runtime docs.
-- [ ] Update `src/core/README.md` for the new config module.
+- [x] Update `src/core/README.md` for the new config module.
 
 ## Acceptance criteria
-- [ ] `EngineConfig` can be loaded from a file with a versioned schema and
+- [x] `EngineConfig` can be loaded from a file with a versioned schema and
       fail-closed diagnostics; the loader is deterministic and side-effect-free.
-- [ ] The value-type `EngineConfig` carries no IO imports.
-- [ ] `main.cpp` boots from a file/env/CLI path with a reference-default fallback.
-- [ ] No GPU dependency; CPU gate green.
+- [x] The value-type `EngineConfig` carries no IO imports.
+- [x] `main.cpp` boots from a file/env/CLI path with a reference-default fallback.
+- [x] No GPU dependency; CPU gate green.
 
 ## Verification
 ```bash
 cmake --preset ci
+cmake --build --preset ci --target IntrinsicCoreTests IntrinsicRuntimeContractTests
+cmake --build --preset ci --target IntrinsicCoreWrapperUnitTests
+cmake --build --preset ci --target ExtrinsicSandbox
+ctest --test-dir build/ci --output-on-failure -R 'CoreEngineConfigLoad|RuntimeEngineConfigBoot' --timeout 60
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
+python3 tools/agents/generate_session_brief.py
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```

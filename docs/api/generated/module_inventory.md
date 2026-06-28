@@ -10,7 +10,7 @@ Root scanned: `src`
 |---|---:|
 | `app` | 1 |
 | `assets` | 12 |
-| `core` | 40 |
+| `core` | 41 |
 | `ecs` | 28 |
 | `geometry` | 96 |
 | `graphics/assets` | 1 |
@@ -43,6 +43,7 @@ Root scanned: `src`
 | `Extrinsic.Core.BoundedHeap` | `src/core/Core.BoundedHeap.cppm` | `core` |
 | `Extrinsic.Core.CallbackRegistry` | `src/core/Core.CallbackRegistry.cppm` | `core` |
 | `Extrinsic.Core.Config.Engine` | `src/core/Core.Config.Engine.cppm` | `core` |
+| `Extrinsic.Core.Config.EngineLoad` | `src/core/Core.Config.EngineLoad.cppm` | `core` |
 | `Extrinsic.Core.Config.Render` | `src/core/Core.Config.Render.cppm` | `core` |
 | `Extrinsic.Core.Config.Simulation` | `src/core/Core.Config.Simulation.cppm` | `core` |
 | `Extrinsic.Core.Config.Window` | `src/core/Core.Config.Window.cppm` | `core` |
@@ -543,4 +544,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **515**
+Total modules: **516**

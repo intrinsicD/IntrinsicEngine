@@ -294,6 +294,7 @@ if(TARGET ExtrinsicRuntime)
         Test.ProceduralGeometryCache.cpp
         Test.ProceduralGeometryExtraction.cpp
         Test.RuntimeCameraControllers.cpp
+        Test.RuntimeEngineConfigBoot.cpp
         Test.RuntimeCameraFocusCommand.cpp
         Test.RuntimeEcsSystemBundle.cpp
         Test.RuntimeReferenceScene.cpp
@@ -536,6 +537,7 @@ set(_core_wrapper_unit_test_files
     Test.Core.BoundedHeap.cpp
     Test.Core.CallbackRegistry.cpp
     Test.Core.Config.cpp
+    Test.Core.EngineConfigLoad.cpp
     Test.Core.DagScheduler.cpp
     Test.Core.ErrorLegacy.cpp
     Test.Core.FrameClock.cpp

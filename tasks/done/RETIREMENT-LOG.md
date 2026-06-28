@@ -2519,3 +2519,16 @@ utilities now apply seeded Gaussian noise scaled by average spacing and
 fail-close on degenerate nonzero-noise requests. Focused CPU tests cover cache
 publication, query ordering against brute force, one-ring search, deterministic
 noise, identity cases, and degenerate diagnostics.
+
+[`CORE-003`](CORE-003-engine-config-file-lane.md) — engine config file lane
+retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
+`Extrinsic.Core.Config.EngineLoad` now provides a versioned
+`intrinsic.core.engine-config` JSON schema, side-effect-free preview,
+file-load, serialization, typed diagnostics, and fallback-applied usability
+state while keeping the value-type `EngineConfig` module free of IO imports.
+Runtime exposes `ResolveEngineConfigForBoot(...)`, which starts from
+`CreateReferenceEngineConfig()` and then applies CLI, environment, or existing
+default-path config files before sandbox `Engine` construction. Focused core
+tests cover every boot field, file round-trip, invalid-key/value fallback, and
+diagnostics; runtime contract tests cover CLI selection and missing explicit
+path fallback; the sandbox target builds with the new entry-point wiring.

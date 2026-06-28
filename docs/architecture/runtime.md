@@ -18,6 +18,15 @@
 
 ## Lifecycle Composition
 
+Sandbox startup resolves engine configuration before `Engine` construction.
+`Runtime::ResolveEngineConfigForBoot(...)` starts from
+`CreateReferenceEngineConfig()`, then checks `--engine-config`, the
+`INTRINSIC_ENGINE_CONFIG` environment variable, and an existing
+`config/engine.json` default path. File parsing and diagnostics remain in the
+core-owned [`engine config file`](engine-config.md) lane; runtime only chooses
+the boot source and passes the resulting value-type `EngineConfig` into
+`Engine`.
+
 `Engine::RunFrame()` is the promoted runtime lifecycle pipeline. Runtime owns the
 cross-layer composition, while reusable phase contracts live in
 `Extrinsic.Core.FrameLoop` so `core` stays dependency-free.
