@@ -2977,3 +2977,19 @@ legacy-background docs. The architecture review checklist now asks for a
 declared backend axis and round-trippable config/command reachability, while
 the task template and task-format guide carry optional `## Control surfaces`
 and `## Backends` prompts.
+
+[`GEOM-016`](GEOM-016-point-cloud-filtering-density-contracts.md) —
+point-cloud filtering and density diagnostics contracts retired to
+`tasks/done/` on 2026-06-29 at `CPUContracted`. `Geometry.PointCloud.Utils`
+gained explicit `RemoveStatisticalOutliers` and `RemoveRadiusOutliers`
+operators returning a shared `OutlierRemovalResult` (owned filtered cloud,
+ascending kept/rejected index partitions, an `OutlierRemovalStatus` fail-closed
+taxonomy, and statistical mean/std-dev/threshold diagnostics), hardening the
+pre-existing voxel/random downsampling, bilateral, outlier-score, KDE, and
+radius-estimation surfaces rather than replacing the module. Unit coverage
+(`Test.PointCloudOutlierRemoval.cpp`) proves known two-cluster + isolated-outlier
+rejection, deterministic ascending partitions, non-finite rejection, and
+invalid/insufficient/overflow input handling; the
+`geometry_pointcloud_filtering_smoke` benchmark emits schema-valid metrics
+without a performance claim. CPU-only contract with no backend seam; the editor
+wire-up of these operators is owned by `UI-027`.

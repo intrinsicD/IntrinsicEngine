@@ -29,7 +29,7 @@ the authoritative open/unblocked view.
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
-- blocked by `GEOM-016`: `UI-027` — Sandbox EditorUI point-cloud outlier-removal window (tasks/backlog/ui/UI-027-editor-pointcloud-outlier-removal-window.md)
+- unblocked: `UI-027` — Sandbox EditorUI point-cloud outlier-removal window (tasks/backlog/ui/UI-027-editor-pointcloud-outlier-removal-window.md)
 
 ## Theme H — Agentic workflow hardening
 
@@ -39,7 +39,6 @@ the authoritative open/unblocked view.
 
 - unblocked: `GEOM-013` — Feature-preserving dual contouring (tasks/backlog/geometry/GEOM-013-feature-preserving-dual-contouring.md)
 - unblocked: `GEOM-014` — Feature-aware quadric error mesh simplification (tasks/backlog/geometry/GEOM-014-feature-aware-quadric-error-simplification.md)
-- unblocked: `GEOM-016` — Point-cloud filtering and density diagnostics contracts (tasks/backlog/geometry/GEOM-016-point-cloud-filtering-density-contracts.md)
 - unblocked: `GEOM-017` — Point-cloud descriptors and registration seams (tasks/backlog/geometry/GEOM-017-point-cloud-descriptors-registration-seams.md)
 - unblocked: `GEOM-019` — Harmonic/Tutte parameterization and boundary constraints (tasks/backlog/geometry/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md)
 - unblocked: `GEOM-024` — Sparse symmetric generalized eigensolver seam (tasks/backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
