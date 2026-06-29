@@ -12,6 +12,7 @@ EXPECTED_TOP_LEVEL = {
     ".codex",
     ".github",
     ".gitignore",
+    ".mcp.json",
     "AGENTS.md",
     "CLAUDE.md",
     "README.md",

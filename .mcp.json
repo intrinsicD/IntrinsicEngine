@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "knowledge-graph": {
+      "command": "graphify-mcp",
+      "args": ["--graph", "build/knowledge-graph/graphify-out/graph.json"]
+    }
+  }
+}
