@@ -662,7 +662,10 @@ namespace Geometry::PointCloud
             return result;
         }
         const std::size_t k = params.KNeighbors;
-        if (n < k + 1)
+        // Need at least k neighbors plus the point itself. Compare without
+        // computing k + 1, which would wrap to 0 for a very large KNeighbors
+        // (e.g. unchecked config/UI input) and silently bypass this guard.
+        if (k >= n)
         {
             result.Status = OutlierRemovalStatus::InsufficientPoints;
             return result;

@@ -171,6 +171,14 @@ TEST(PointCloudOutlierRemoval, StatisticalInvalidInputs)
     bigK.KNeighbors = 16;
     EXPECT_EQ(PC::RemoveStatisticalOutliers(tiny, bigK).Status,
               PC::OutlierRemovalStatus::InsufficientPoints);
+
+    // A KNeighbors near SIZE_MAX must still fail closed, not wrap k + 1 to 0
+    // and keep every point with Success.
+    PC::StatisticalOutlierRemovalParams overflowK{};
+    overflowK.KNeighbors = std::numeric_limits<std::size_t>::max();
+    const PC::OutlierRemovalResult overflowResult = PC::RemoveStatisticalOutliers(cloud, overflowK);
+    EXPECT_EQ(overflowResult.Status, PC::OutlierRemovalStatus::InsufficientPoints);
+    EXPECT_EQ(overflowResult.KeptCount, std::size_t{0});
 }
 
 // =============================================================================
