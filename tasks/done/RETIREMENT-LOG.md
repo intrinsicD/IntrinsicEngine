@@ -2967,3 +2967,13 @@ softens the full vertical-slice contract so it is required once a second
 caller, backend split, scheduled work, persisted config, command routing, UI
 control, or telemetry-backed diagnostics appears; and adds a serializable
 config/command entry to the discoverability artifacts for UI-backed features.
+
+[`PROC-011`](PROC-011-route-contract-to-architecture-index-and-author-checks.md)
+— contract routing and backend/config authoring checks retired to `tasks/done/`
+on 2026-06-29 at `Retired`. `AGENTS.md` now routes subsystem architecture,
+backend-split, config/command, and recipe/frame-composition design questions to
+the canonical `docs/architecture/index.md` instead of linking directly to
+legacy-background docs. The architecture review checklist now asks for a
+declared backend axis and round-trippable config/command reachability, while
+the task template and task-format guide carry optional `## Control surfaces`
+and `## Backends` prompts.

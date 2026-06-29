@@ -184,7 +184,7 @@ code. `PROC-001` (mirror sync gate), `PROC-002` (ID uniqueness), `PROC-005`
 and `PROC-006` (audit cadence visibility) are retired — see
 [`process/README.md`](process/README.md) and the retirement log.
 
-`PROC-001..009` are all retired. The current open Theme H members encode the
+`PROC-001..009` are all retired. The current open Theme H member encodes the
 research-engine design principles into the contract so they become enforceable
 invariants rather than descriptive prose:
 
@@ -194,12 +194,12 @@ invariants rather than descriptive prose:
   loop) into always-on `AGENTS.md` §5 invariants + per-PR checklist rows. Carries
   the proposed contract wording **for owner review** (and the optional
   "Theme I — Research control surface" convergence theme).
-- [`process/PROC-011-route-contract-to-architecture-index-and-author-checks.md`](process/PROC-011-route-contract-to-architecture-index-and-author-checks.md) —
-  route the contract to the canonical architecture index and add backend-axis +
-  config-lane authoring checks (`DOCS-003` satisfied).
 
 `DOCS-005` is retired; the feature-module playbook now has the minimal-feature
 floor and config/command artifact.
+`PROC-011` is retired; the contract now routes architecture questions to the
+canonical architecture index, and task authoring prompts record backend/config
+control-surface intent.
 
 ## Cross-domain dependency anchors
 

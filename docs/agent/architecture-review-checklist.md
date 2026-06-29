@@ -14,6 +14,14 @@ Use this checklist for architecture-impacting changes (code, build, docs, CI, an
       the strict run and either pass or carry a tracked allowlist entry
       with `task`/`expires` metadata.
 
+## Backend and control surfaces
+
+- [ ] New parallelizable engine algorithms declare their backend axis: a
+      CPU/GPU hook is present, or GPU execution is explicitly deferred to a
+      task ID.
+- [ ] Config/UI mutation routes through the config/command lane and is
+      expressible in a round-trippable config file, not UI-only.
+
 ## Lifetime and resource ownership
 
 - [ ] Ownership model is explicit (value, handle, unique owner, borrowed view).

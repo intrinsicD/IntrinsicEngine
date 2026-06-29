@@ -14,6 +14,19 @@ depends_on: []
 ## Context
 - 
 
+<!--
+Optional. Add when the task changes feature control surfaces or backend
+selection policy.
+
+## Control surfaces
+- Config:
+- UI:
+- Agent/CLI:
+
+## Backends
+- Backend axis: present, not applicable, or deferred to <TASK-ID>.
+-->
+
 ## Required changes
 - [ ] <required change>
 

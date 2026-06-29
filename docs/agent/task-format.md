@@ -69,6 +69,34 @@ retired tasks under `tasks/done/` are exempt. After opening, retiring, or
 re-gating a task, regenerate the session brief with
 `python3 tools/agents/generate_session_brief.py`.
 
+## Optional `## Control surfaces` and `## Backends` fields
+
+For feature work that introduces or changes user/agent control, add a
+`## Control surfaces` section before `## Required changes` and name which
+surfaces can drive the behavior:
+
+```md
+## Control surfaces
+- Config: `EngineConfig.render.default_recipe_config_path`
+- UI: Sandbox editor recipe panel
+- Agent/CLI: `Engine::LoadAndApplyRenderRecipeConfigFile(...)`
+```
+
+Use `N/A` only when the task cannot be externally controlled by design, for
+example a purely internal mechanical migration.
+
+For parallelizable engine algorithms or backend-facing features, add a short
+`## Backends` section:
+
+```md
+## Backends
+- Backend axis: CPU reference now; GPU deferred to `GRAPHICS-108`.
+```
+
+This field is non-enforcing, like `## Maturity`; it is an authoring prompt so
+reviewers can see whether a CPU/GPU backend hook is present or intentionally
+deferred to a named task.
+
 ## Retiring a task
 
 When a task completes:

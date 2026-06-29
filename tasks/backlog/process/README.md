@@ -74,3 +74,7 @@ split; narratives live in the retirement log.
   (done, 2026-06-29): added the one-caller minimal-feature floor, softened the
   full vertical-slice trigger language, and added a serializable config/command
   artifact for UI-backed feature discoverability.
+- [PROC-011 - Route contract to architecture index and authoring checks](../../done/PROC-011-route-contract-to-architecture-index-and-author-checks.md)
+  (done, 2026-06-29): routed `AGENTS.md` to the canonical architecture index,
+  added backend-axis and config/command lane rows to the architecture checklist,
+  and documented optional `## Control surfaces` and `## Backends` task sections.
