@@ -2470,6 +2470,173 @@ TEST(SandboxEditorUi, MeshDenoiseCommandPublishesPositionsAndSupportsUndoRedo)
     EXPECT_EQ(model.Processing.LastMeshDenoiseResult->WrittenCount, 4u);
 }
 
+namespace
+{
+    // Two dense 3x3 grid clusters plus two far isolated outliers (appended
+    // last) — a deterministic UI-027 outlier-removal fixture mirroring the
+    // GEOM-016 unit fixture.
+    [[nodiscard]] std::vector<glm::vec3> MakeOutlierClusterPositions()
+    {
+        std::vector<glm::vec3> positions;
+        const auto appendGrid = [&positions](const glm::vec3 origin) {
+            for (int y = 0; y < 3; ++y)
+                for (int x = 0; x < 3; ++x)
+                    positions.push_back(
+                        origin + glm::vec3(static_cast<float>(x) * 0.05f,
+                                           static_cast<float>(y) * 0.05f,
+                                           0.0f));
+        };
+        appendGrid(glm::vec3{0.0f});
+        appendGrid(glm::vec3{2.0f, 0.0f, 0.0f});
+        positions.push_back(glm::vec3{10.0f, 10.0f, 10.0f});
+        positions.push_back(glm::vec3{-8.0f, 5.0f, -3.0f});
+        return positions;
+    }
+
+    [[nodiscard]] std::size_t PointCloudPositionCount(
+        ECS::Scene::Registry& registry,
+        const ECS::EntityHandle entity)
+    {
+        auto pos = registry.Raw()
+                       .get<GS::Vertices>(entity)
+                       .Properties.Get<glm::vec3>(PN::kPosition);
+        return pos ? pos.Vector().size() : 0u;
+    }
+}
+
+TEST(SandboxEditorUi, PointCloudOutlierRemovalStatisticalPublishesKeptPointsWithUndoRedo)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const std::vector<glm::vec3> positions = MakeOutlierClusterPositions();
+    const std::size_t originalCount = positions.size();
+    ASSERT_EQ(originalCount, 20u);
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "OutlierCloud");
+    AddPointCloudSource(registry, cloud, originalCount);
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(cloud);
+    ASSERT_EQ(PointCloudPositionCount(registry, cloud), originalCount);
+
+    const Runtime::SandboxEditorPointCloudOutlierRemovalResult result =
+        Runtime::ApplySandboxEditorPointCloudOutlierRemovalCommand(
+            context,
+            Runtime::SandboxEditorPointCloudOutlierRemovalCommand{
+                .StableEntityId = stableId,
+                .Method =
+                    Runtime::SandboxEditorPointCloudOutlierMethod::Statistical,
+                .KNeighbors = 8u,
+                .StdDevMultiplier = 1.0f,
+            });
+
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_EQ(result.OriginalCount, originalCount);
+    EXPECT_GE(result.RejectedCount, 2u);
+    EXPECT_EQ(result.KeptCount + result.RejectedCount, originalCount);
+    EXPECT_LT(result.KeptCount, originalCount);
+    // The published point GeometrySources reflect exactly the kept points.
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud), result.KeptCount);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::GpuDirty>(cloud));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(cloud));
+    EXPECT_TRUE(history.IsDirty());
+
+    // Undo restores the original point set; redo re-applies the removal.
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud), originalCount);
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud), result.KeptCount);
+
+    context.LastPointCloudOutlierRemovalResult = &result;
+    const Runtime::SandboxEditorDomainWindowModel model =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::PointCloud);
+    EXPECT_TRUE(model.Processing.PointCloudOutlierRemovalAvailable);
+    ASSERT_TRUE(
+        model.Processing.LastPointCloudOutlierRemovalResult.has_value());
+    EXPECT_TRUE(
+        model.Processing.LastPointCloudOutlierRemovalResult->Succeeded());
+}
+
+TEST(SandboxEditorUi, PointCloudOutlierRemovalRadiusPublishesAndFailsClosed)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const std::vector<glm::vec3> positions = MakeOutlierClusterPositions();
+    const std::size_t originalCount = positions.size();
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "RadiusCloud");
+    AddPointCloudSource(registry, cloud, originalCount);
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(cloud);
+
+    const Runtime::SandboxEditorPointCloudOutlierRemovalResult radius =
+        Runtime::ApplySandboxEditorPointCloudOutlierRemovalCommand(
+            context,
+            Runtime::SandboxEditorPointCloudOutlierRemovalCommand{
+                .StableEntityId = stableId,
+                .Method =
+                    Runtime::SandboxEditorPointCloudOutlierMethod::Radius,
+                .SearchRadius = 0.15f,
+                .MinNeighbors = 3u,
+            });
+    ASSERT_TRUE(radius.Succeeded()) << radius.Message;
+    EXPECT_GE(radius.RejectedCount, 2u);
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud), radius.KeptCount);
+
+    // Fail-closed: non-positive radius is rejected before any mutation.
+    const Runtime::SandboxEditorPointCloudOutlierRemovalResult badRadius =
+        Runtime::ApplySandboxEditorPointCloudOutlierRemovalCommand(
+            context,
+            Runtime::SandboxEditorPointCloudOutlierRemovalCommand{
+                .StableEntityId = stableId,
+                .Method =
+                    Runtime::SandboxEditorPointCloudOutlierMethod::Radius,
+                .SearchRadius = 0.0f,
+                .MinNeighbors = 3u,
+            });
+    EXPECT_EQ(badRadius.Status,
+              Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
+
+    // Missing scene fails closed.
+    const Runtime::SandboxEditorPointCloudOutlierRemovalResult missingScene =
+        Runtime::ApplySandboxEditorPointCloudOutlierRemovalCommand(
+            Runtime::SandboxEditorContext{},
+            Runtime::SandboxEditorPointCloudOutlierRemovalCommand{
+                .StableEntityId = stableId,
+                .KNeighbors = 8u,
+            });
+    EXPECT_EQ(missingScene.Status,
+              Runtime::SandboxEditorCommandStatus::MissingScene);
+
+    // A mesh entity is the wrong domain for point-cloud outlier removal.
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "WrongDomainMesh");
+    AddDenoiseTetraMeshSource(registry, mesh);
+    const Runtime::SandboxEditorPointCloudOutlierRemovalResult wrongDomain =
+        Runtime::ApplySandboxEditorPointCloudOutlierRemovalCommand(
+            context,
+            Runtime::SandboxEditorPointCloudOutlierRemovalCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+                .KNeighbors = 8u,
+            });
+    EXPECT_EQ(wrongDomain.Status,
+              Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
+}
+
 TEST(SandboxEditorUi, MeshDenoiseCommandFailsClosedForInvalidTargetsAndUnavailableKernel)
 {
     ECS::Scene::Registry registry;

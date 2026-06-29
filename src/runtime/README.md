@@ -156,6 +156,38 @@ denoised positions. The commit stamps `DirtyVertexPositions` and
 renderer/RHI upload APIs or stamp broad `GpuDirty`. Runtime owns the ECS
 composition and history seam; geometry owns the denoising algorithm.
 
+### Sandbox Editor Point-Cloud Outlier Removal
+
+`UI-027` adds a point-cloud-only outlier-removal editor command at
+`PointCloud > Processing > Remove Outliers`. The Sandbox EditorUI surface
+exports `SandboxEditorPointCloudOutlierMethod` (statistical or radius),
+`SandboxEditorPointCloudOutlierRemovalCommand`,
+`SandboxEditorPointCloudOutlierRemovalResult`, and
+`ApplySandboxEditorPointCloudOutlierRemovalCommand(...)`. Runtime validates the
+selected point-cloud `GeometrySources`, borrows the live points into a scratch
+`Geometry.PointCloud.Cloud`, and calls the geometry-owned `GEOM-016` operators
+`Geometry.PointCloud::RemoveStatisticalOutliers` /
+`RemoveRadiusOutliers`. The window exposes a method toggle plus the per-method
+parameters: statistical removal takes `KNeighbors` (1–512) and a
+`StdDevMultiplier` (0–100, higher keeps more points); radius removal takes a
+positive `SearchRadius` and a `MinNeighbors` (0–512) threshold. It surfaces the
+`OutlierRemovalResult` diagnostics (kept/rejected/non-finite counts plus the
+statistical mean/std-dev/threshold) and fails closed with
+`InvalidProcessingParameters` / `UnsupportedGeometryDomain` / `MissingScene`
+when the inputs or selection are invalid.
+
+Unlike the vertex-normal and denoise commands, outlier removal changes the
+point count, so it rebuilds the entity's point `GeometrySources` from the kept
+points via `GeometrySources::PopulateFromCloud` (preserving normals and other
+surviving point attributes) rather than rewriting a count-matched property. The
+publication is undoable through `EditorCommandHistory::Execute`: undo republishes
+the original cloud and redo reapplies the kept cloud. Because the count changed,
+the commit stamps coarse `GpuDirty` plus `DirtyVertexPositions` /
+`DirtyVertexAttributes` / `DirtyVertexNormals` so point-cloud extraction performs
+a full deferred repack/reupload on the next extraction opportunity; the command
+does not call renderer/RHI upload APIs. Runtime owns the ECS composition and
+history seam; `GEOM-016` owns the removal algorithm and its diagnostics.
+
 ### Sandbox Editor Mesh Curvature
 
 `UI-026` adds a mesh-only curvature analysis editor command at
