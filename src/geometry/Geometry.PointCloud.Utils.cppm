@@ -264,6 +264,89 @@ export namespace Geometry::PointCloud
         const OutlierEstimationParams& params = {});
 
     // -------------------------------------------------------------------------
+    // Outlier Removal (explicit kept/rejected partitions)
+    // -------------------------------------------------------------------------
+    //
+    // Whereas EstimateOutlierProbability only publishes a per-point score and
+    // leaves interpretation to the caller, the removal APIs return an explicit
+    // partition into kept/rejected points, an owned filtered cloud carrying the
+    // kept points (with their normals/colors/radii), and normalized diagnostics
+    // with an explicit status. The input cloud is never mutated.
+    //
+    // Both APIs produce deterministic output: kept and rejected index lists are
+    // sorted ascending by original point index, and the filtered cloud is built
+    // in that same ascending order, so identical inputs always yield identical
+    // outputs regardless of spatial-acceleration traversal order.
+    //
+    // References:
+    //   - Rusu et al., "Towards 3D Point Cloud Based Object Maps for Household
+    //     Environments" (Robotics and Autonomous Systems, 2008) — statistical
+    //     outlier removal.
+    //   - Rusu & Cousins, "3D is here: Point Cloud Library (PCL)" (ICRA 2011) —
+    //     radius outlier removal.
+
+    enum class OutlierRemovalStatus : std::uint8_t
+    {
+        Success,             // Partition computed (RejectedCount may be 0).
+        EmptyInput,          // Cloud has no points.
+        InsufficientPoints,  // Too few points to evaluate the neighborhood.
+        InvalidParameters,   // KNeighbors == 0, SearchRadius <= 0, etc.
+        BuildFailed          // Spatial acceleration structure could not be built.
+    };
+
+    // Shared result for both removal operators. The distance-distribution fields
+    // are populated by RemoveStatisticalOutliers and left at 0 by
+    // RemoveRadiusOutliers (whose decision is neighbor-count based).
+    struct OutlierRemovalResult
+    {
+        OutlierRemovalStatus     Status{OutlierRemovalStatus::Success};
+        Cloud                    Filtered{};          // Kept points (owned copy).
+        std::vector<std::size_t> KeptIndices{};       // Original indices, ascending.
+        std::vector<std::size_t> RejectedIndices{};   // Original indices, ascending.
+        std::size_t              OriginalCount{0};
+        std::size_t              KeptCount{0};
+        std::size_t              RejectedCount{0};
+        std::size_t              NonFiniteCount{0};    // Always rejected, included above.
+
+        // Statistical-removal diagnostics (0 for radius removal).
+        float MeanDistance{0.0f};       // Global mean of per-point mean-kNN distance.
+        float StdDevDistance{0.0f};     // Global std-dev of that distribution.
+        float DistanceThreshold{0.0f};  // MeanDistance + StdDevMultiplier*StdDevDistance.
+    };
+
+    // Statistical outlier removal: for each point, compute the mean distance to
+    // its K nearest neighbors, then reject points whose mean distance exceeds
+    // MeanDistance + StdDevMultiplier * StdDevDistance. Points with non-finite
+    // positions are always rejected. Returns InsufficientPoints when fewer than
+    // KNeighbors + 1 points are available.
+    struct StatisticalOutlierRemovalParams
+    {
+        std::size_t KNeighbors{16};        // Neighbors used per point (excludes self).
+        float       StdDevMultiplier{1.0f}; // Higher keeps more points.
+        std::size_t OctreeMaxPerNode{32};
+        std::size_t OctreeMaxDepth{10};
+    };
+
+    [[nodiscard]] OutlierRemovalResult RemoveStatisticalOutliers(
+        const Cloud& cloud,
+        const StatisticalOutlierRemovalParams& params = {});
+
+    // Radius outlier removal: reject points that have fewer than MinNeighbors
+    // other points within SearchRadius. Points with non-finite positions are
+    // always rejected. Returns InvalidParameters when SearchRadius <= 0.
+    struct RadiusOutlierRemovalParams
+    {
+        float       SearchRadius{0.0f};   // World-space radius; must be > 0.
+        std::size_t MinNeighbors{4};      // Minimum neighbors (excludes self) to keep.
+        std::size_t OctreeMaxPerNode{32};
+        std::size_t OctreeMaxDepth{10};
+    };
+
+    [[nodiscard]] OutlierRemovalResult RemoveRadiusOutliers(
+        const Cloud& cloud,
+        const RadiusOutlierRemovalParams& params = {});
+
+    // -------------------------------------------------------------------------
     // Kernel Density Estimation (KDE)
     // -------------------------------------------------------------------------
     //
