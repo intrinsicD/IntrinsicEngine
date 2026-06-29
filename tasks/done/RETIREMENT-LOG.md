@@ -2958,3 +2958,12 @@ coverage proves flat-grid signed-distance sign/quality, orientation sign flip,
 open-boundary finite diagnostics, invalid-input failure, and bitwise
 determinism. The smoke benchmark emits schema-valid runtime and
 `quality_error_l2` metrics without making a performance claim.
+
+[`DOCS-005`](DOCS-005-feature-module-playbook-minimal-floor.md) —
+feature-module playbook minimal floor and config command artifact retired to
+`tasks/done/` on 2026-06-29 at `Retired`. The playbook now opens with a
+minimal-feature floor for one-caller, synchronous, data-driven research probes;
+softens the full vertical-slice contract so it is required once a second
+caller, backend split, scheduled work, persisted config, command routing, UI
+control, or telemetry-backed diagnostics appears; and adds a serializable
+config/command entry to the discoverability artifacts for UI-backed features.

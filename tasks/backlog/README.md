@@ -197,9 +197,9 @@ invariants rather than descriptive prose:
 - [`process/PROC-011-route-contract-to-architecture-index-and-author-checks.md`](process/PROC-011-route-contract-to-architecture-index-and-author-checks.md) —
   route the contract to the canonical architecture index and add backend-axis +
   config-lane authoring checks (`DOCS-003` satisfied).
-- [`process/DOCS-005-feature-module-playbook-minimal-floor.md`](process/DOCS-005-feature-module-playbook-minimal-floor.md) —
-  add a minimal-feature floor + config/command artifact to the feature-module
-  playbook so trivial research probes are not forced through full ceremony.
+
+`DOCS-005` is retired; the feature-module playbook now has the minimal-feature
+floor and config/command artifact.
 
 ## Cross-domain dependency anchors
 

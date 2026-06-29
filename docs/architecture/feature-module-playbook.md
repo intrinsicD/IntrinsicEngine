@@ -6,16 +6,37 @@ Use it when introducing anything like `Runtime.SomethingModule.cppm`, geometry t
 
 ---
 
+## 0) Minimal-feature floor
+
+Not every research probe needs a full vertical slice on day one. A one-caller,
+data-driven feature with no backend split, no async/off-main-thread execution,
+and no durable runtime state may start as a plain parameter struct plus a free
+function in the owning lower layer.
+
+Grow it into the full feature contract when any of these appears:
+
+- A second caller needs the behavior.
+- The feature gains a CPU/GPU/backend variant split.
+- Work moves off the main thread or into a scheduled runtime lane.
+- The feature needs persisted config, command routing, UI control, or
+  telemetry-backed diagnostics.
+
+The floor is an escape hatch for tiny probes, not a reason to hide shared
+behavior inside ad-hoc runtime or ImGui code.
+
+---
+
 ## 1) Core rule: a feature is a vertical slice with explicit seams
 
-A feature module is not just one file; it is a small contract-driven slice:
+When a feature grows past the floor, it is a small contract-driven slice:
 
 1. **Runtime facade** (orchestrates frame phase integration).
 2. **Domain/service layer** (pure logic, testable without GPU/UI).
 3. **Data contract** (typed IDs/handles, immutable inputs, explicit outputs).
 4. **Adapters** (ECS, GPU, IO, UI hooks).
 
-If any part is missing, the feature will drift into "works now" code instead of reusable architecture.
+If a grown feature is missing one of these seams, it will drift into "works
+now" code instead of reusable architecture.
 
 ---
 
@@ -56,9 +77,10 @@ A runtime feature module may import lower layers, but lower layers must never im
 
 ---
 
-## 4) Mandatory feature contract
+## 4) Full feature contract
 
-Every new feature module should export the same minimum shape:
+Once the floor no longer fits, the feature module should export the same
+minimum shape:
 
 - `Config` (validated user tuning / policy)
 - `InputSnapshot` (immutable per-dispatch data)
@@ -66,7 +88,10 @@ Every new feature module should export the same minimum shape:
 - `Execute(...) -> std::expected<Result, Error>`
 - `EnqueueAsync(...)` for streaming/off-main-thread heavy work (if applicable)
 
-This makes features discoverable and consistent for call sites.
+This surface is not required for a one-caller, synchronous probe that still fits
+the floor. Add it when a second caller, a backend split, scheduled work,
+persisted config, command routing, UI control, or telemetry-backed diagnostics
+appears.
 
 ---
 
@@ -221,12 +246,15 @@ void MyFeatureController::DrawPanel() {
 
 ## 12) Discoverability for UI-backed features
 
-For each new feature, register all three artifacts:
+For each UI-backed feature that has grown past the floor, register all four
+artifacts:
 
 1. **Runtime facade module** (`Extrinsic.Runtime.<Feature>`)
 2. **Editor UI controller/panel** (`Extrinsic.Runtime.<Feature>Editor` or a
    `SandboxEditorUi` command/window extension)
 3. **Architecture note** in `docs/architecture/` with command/result contract
+4. **Serializable config/command entry** that can be driven by an agent,
+   command surface, or config file without going through ImGui
 
 If one is missing, feature discoverability degrades quickly.
 
@@ -234,12 +262,16 @@ If one is missing, feature discoverability degrades quickly.
 
 ## 13) Decision checklist (copy into PR description)
 
+- [ ] Is the full slice actually needed now, or would a parameter struct plus
+      free function satisfy a one-caller probe?
 - [ ] Does this module orchestrate, rather than own domain kernels?
 - [ ] Is the dependency direction acyclic and layer-correct?
 - [ ] Is there a stable `Config/Input/Result` contract?
 - [ ] Is the work assigned to CPU graph vs GPU frame graph vs async graph intentionally?
 - [ ] Are degenerate inputs and error surfaces explicit?
 - [ ] Are telemetry and tests in place?
-- [ ] Is the architecture doc + README link updated?
+- [ ] Is the agent/config-drivable command entry present when UI control exists?
+- [ ] Is the architecture doc + README link updated when the feature grows past
+      the floor?
 
 If all boxes are checked, the feature is likely maintainable, performant, and reusable.

@@ -70,3 +70,7 @@ split; narratives live in the retirement log.
   (done, 2026-06-22): imported `teach`, `grilling`, and `grill-me` from
   `mattpocock/skills`, preserved the MIT license/provenance, and documented
   their non-generated maintenance model.
+- [DOCS-005 - Feature-module playbook minimal floor and config command artifact](../../done/DOCS-005-feature-module-playbook-minimal-floor.md)
+  (done, 2026-06-29): added the one-caller minimal-feature floor, softened the
+  full vertical-slice trigger language, and added a serializable config/command
+  artifact for UI-backed feature discoverability.
