@@ -120,6 +120,12 @@ the full version.
   imports (`import Extrinsic.<Layer>.*;`) and CMake `target_link_libraries(...)`
   edges; new dependencies are visible to the strict run and either pass or
   carry a tracked allowlist entry with `task`/`expires` metadata.
+- **Use the `knowledge-graph` MCP aid to scope the review.** When the server is
+  available (see `intrinsicengine-core`), query it first to map the changed
+  modules' neighbors and the change's downstream blast radius, and to eyeball
+  `violation`-tagged edges — then **confirm every layering finding with the
+  strict `check_layering.py` run above**, which remains the sole gate. The graph
+  speeds discovery; it never substitutes for the gate.
 
 ### Lifetime and resource ownership
 

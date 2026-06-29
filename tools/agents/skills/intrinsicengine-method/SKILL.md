@@ -76,6 +76,13 @@ Apply this checklist when reviewing any method/paper-implementation task. Read
 - Paper claim is captured correctly: objective, assumptions, expected output.
 - Mathematical formulation is explicit (objective / constraints / diagnostics).
 - Input/output contract and units are explicit.
+- **Use the `knowledge-graph` MCP aid to trace claim → code.** When the server is
+  available (see `intrinsicengine-core`), query the paper→method→code chain to
+  confirm which paper claim each method implements and which engine modules
+  realize it, rather than grepping by hand. The graph is built from
+  `method.yaml` + `paper.md` headings + import edges; the **authoritative record
+  of paper claims stays the method contract** (`method.yaml` + `docs/methods/*`),
+  so confirm against it before acting.
 
 ### Robustness and correctness
 
