@@ -19,16 +19,18 @@ maturity_target: Operational
 
 ## Context
 - Status: in-progress; owner/agent: Codex; branch: `main` local iteration.
-- Current slice: Slice B planning contract only. This slice consumes the
-  PR-fast CPU/reference benchmark signal to add data-only storage-lane
+- Current slice: Slice B planning contract is complete. The next implementation
+  slice is Slice C: AoS storage/shader variants plus parity proof. Slice B
+  consumed the PR-fast CPU/reference benchmark signal to add data-only storage-lane
   classification and static-to-dynamic promotion planning, but still records no
   AoS adoption claim and does not add GPU storage or shader variants.
 - Local Slice A smoke run (2026-06-29, `cpu_reference`, local-dev): uniform SoA
   `runtime_ms=13.358873`, interleaved probe `runtime_ms=10.116964`,
   `interleaved_to_soa_runtime_ratio=0.757322`, `quality_error_l2=0.0`,
   `adoption_claim=false`.
-- Next verification step: build/run `IntrinsicBenchmarkSmoke`, validate
-  benchmark manifests/results, then run task/docs structural checks.
+- Next verification step: for Slice C, add focused graphics contract coverage
+  for the AoS storage/shader path, then run the opt-in `gpu;vulkan` parity smoke
+  and re-run the vertex-fetch benchmark validators before any adoption claim.
 - Owning subsystem/layer: `src/graphics/renderer` (`GpuWorld`, geometry record)
   and the GpuScene vertex shaders; `src/runtime` extraction for the
   static→dynamic promotion trigger.
@@ -98,7 +100,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Slice A (done) closes the benchmark gate at `Scaffolded`: the harness
   exists and emits comparable SoA/probe metrics, but no storage or shader work
   is justified yet.
-- Slice B (this slice) closes `Scaffolded -> CPUContracted` for the
+- Slice B (done) closes `Scaffolded -> CPUContracted` for the
   promotion-plan contract only; `Operational` is owned by later `RUNTIME-125`
   slices via the cited `gpu;vulkan` smoke and benchmark baseline.
 
@@ -106,8 +108,8 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - **Slice A (done).** Add the PR-fast benchmark manifest/runner wiring for
   current uniform-SoA vertex fetch plus an interleaved AoS probe. Preserve the
   default renderer storage model and make no performance/adoption claim.
-- **Slice B (this slice).** Use the profile signal to add the CPU contract for
+- **Slice B (done).** Use the profile signal to add the CPU contract for
   storage-class classification and static-to-dynamic promotion planning. This
   slice is planning-only: it must not allocate AoS GPU buffers, mutate geometry
   records, or add shader variants.
-- **Slice C.** Add AoS storage/shader variants and `gpu;vulkan` parity smoke.
+- **Slice C (next).** Add AoS storage/shader variants and `gpu;vulkan` parity smoke.
