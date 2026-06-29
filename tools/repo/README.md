@@ -18,6 +18,34 @@ Repository structure and policy scripts.
 - `check_layering_allowlist_quality.py`: validates layering allowlist entry hygiene (required metadata, duplicate keys, broad legacy wildcard bans, and open task-owner references).
 - `check_test_layout.py`: enforces taxonomy-owned test source layout and forbids legacy wrapper test directories.
 - `generate_module_inventory.py`: module inventory generator for `src/`; defaults to `docs/api/generated/module_inventory.md`.
+- `export_module_graph.py`: emits a [graphify](https://github.com/safishamsi/graphify)-schema `graph.json` for the C++23 module dependency graph, reusing this directory's own module/layering parsers (graphify's tree-sitter C++ extractor cannot parse module syntax). Edges are tagged `same-layer`/`allowed`/`violation`; the authoritative gate remains `check_layering.py`.
+- `export_method_graph.py`: emits a graphify-schema `graph.json` for the paper → method → code chain from `methods/` (`method.yaml`, `paper.md` headings, method sources). Engine-module import edges reuse `export_module_graph`'s ids so the two graphs merge.
+- `build_knowledge_graph.py`: orchestrator — runs both adapters and merges them (in pure Python, no graphify/API key needed) into `build/knowledge-graph/graphify-out/graph.json`.
+
+## Knowledge graph (optional agent discovery aid)
+
+A deterministic, queryable map of the engine for navigation/review — **not** an
+authority (layering is gated by `check_layering.py`; paper claims live in method
+contracts). Generated output is a `build/` artifact and is not committed.
+
+```bash
+# 1. Build the merged code + method/paper graph (deterministic, no API key).
+python3 tools/repo/build_knowledge_graph.py
+
+# 2a. Visualize / query from the CLI (requires: uv tool install graphifyy).
+cd build/knowledge-graph/graphify-out && graphify cluster-only . --no-label
+graphify explain "Extrinsic.Core.Logging" --graph build/knowledge-graph/graphify-out/graph.json
+
+# 2b. Query live in-session over MCP. The repo `.mcp.json` registers a
+#     `knowledge-graph` server (query_graph / get_neighbors / shortest_path /
+#     god_nodes / graph_stats). Requires the MCP extra:
+uv tool install graphifyy --with mcp
+```
+
+Optional probabilistic layer (not wired): `graphify add <paper.pdf>` with an LLM
+backend key builds a fuzzy concept graph from a real PDF that can be merged in
+with `graphify merge-graphs`. `paper.md` is the no-key deterministic alternative
+the method adapter already consumes.
 
 ## Config files
 

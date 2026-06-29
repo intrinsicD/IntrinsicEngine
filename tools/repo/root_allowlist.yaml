@@ -3,6 +3,7 @@ allowed_root_entries:
   - .codex/
   - .github/
   - .gitignore
+  - .mcp.json
   - AGENTS.md
   - CLAUDE.md
   - README.md
