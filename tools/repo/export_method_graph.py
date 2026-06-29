@@ -209,14 +209,14 @@ def build_graph(methods_root: Path, exclude_template: bool) -> dict:
                     tok = im.group(1).strip()
                     if tok.startswith(":") or tok.startswith("<") or tok.endswith(">"):
                         continue
-                    primary = _primary(tok)
                     # Only link tokens that name an engine module/layer; reuse the
-                    # code graph's id so a merge connects to the real module node.
-                    if detect_target_layer(primary) is None:
+                    # code graph's id (partition-preserving) so a merge connects to
+                    # the real module node, partition or whole-module alike.
+                    if detect_target_layer(_primary(tok)) is None:
                         continue
                     add_link(
                         file_id,
-                        _slug(primary),
+                        _slug(tok),
                         "imports",
                         context="import",
                         source_file=code.as_posix(),

@@ -79,13 +79,16 @@ def collect_source_files(root: Path, exclude: list[str]) -> list[Path]:
 def build_graph(root: Path, exclude: list[str], include_external: bool) -> dict:
     files = collect_source_files(root, exclude)
 
-    # Pass 1: map every primary module -> its interface file + layer, and map
-    # every owning-module declaration (incl. partitions) -> primary module so
-    # implementation units attribute their imports to the right node.
+    # Pass 1: register every exported module declaration -- including real
+    # partitions (``X:Part``) -- as its own node, keyed by the *full* module
+    # name so partitions never collapse into the primary interface unit. Each
+    # file's full owning-module name is recorded so imports attribute to the
+    # exact unit, and its primary is kept to resolve ``import :Part;`` shorthand.
     module_file: dict[str, str] = {}
     module_line: dict[str, int] = {}
     module_layer: dict[str, str] = {}
-    file_owner: dict[Path, str] = {}
+    file_owner: dict[Path, str] = {}    # full owning module name (incl. :Part)
+    file_primary: dict[Path, str] = {}  # primary module of that file
 
     for path in files:
         try:
@@ -95,16 +98,17 @@ def build_graph(root: Path, exclude: list[str], include_external: bool) -> dict:
 
         owner_match = OWNING_MODULE_RE.search(text)
         if owner_match:
-            file_owner[path] = _primary(owner_match.group(1))
+            owner_full = owner_match.group(1).strip()
+            file_owner[path] = owner_full
+            file_primary[path] = _primary(owner_full)
 
         for m in EXPORT_MODULE_RE.finditer(text):
-            primary = _primary(m.group(1))
+            full = m.group(1).strip()
             line = text[: m.start()].count("\n") + 1
-            # Prefer the partition-free interface unit as the canonical file.
-            if primary not in module_file or ":" not in m.group(1):
-                module_file[primary] = path.as_posix()
-                module_line[primary] = line
-                module_layer[primary] = detect_owner_layer(path) or "unknown"
+            if full not in module_file:
+                module_file[full] = path.as_posix()
+                module_line[full] = line
+                module_layer[full] = detect_owner_layer(path) or "unknown"
 
     # Pass 2: resolve import edges and aggregate at module granularity.
     edge_weight: dict[tuple[str, str], int] = defaultdict(int)
@@ -125,6 +129,15 @@ def build_graph(root: Path, exclude: list[str], include_external: bool) -> dict:
                 pass
             continue
 
+        owner_primary = file_primary.get(path, _primary(owner))
+        # Attribute edges to an existing node: the owning unit when it is an
+        # exported module/partition, otherwise its primary interface. A non-
+        # exported impl unit (e.g. ``module X:Part_impl;``) folds into the
+        # primary instead of producing a dangling edge source.
+        owner_node = owner if owner in module_file else owner_primary
+        if owner_node not in module_file:
+            skipped_no_owner += 1
+            continue
         try:
             lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
         except OSError:
@@ -135,31 +148,32 @@ def build_graph(root: Path, exclude: list[str], include_external: bool) -> dict:
             if not im:
                 continue
             tok = im.group(1).strip()
-            if tok.startswith(":"):
-                continue  # partition import: intra-module, not an architecture edge
             if tok.startswith("<") or tok.endswith(">"):
                 target = ("external", tok)
+            elif tok.startswith(":"):
+                # ``import :Part;`` -> the partition of this file's own primary.
+                full = f"{owner_primary}{tok}"
+                target = ("module", full) if full in module_file else ("external", tok)
+            elif tok in module_file:
+                # Whole module or fully-qualified partition ``X:Part``.
+                target = ("module", tok)
+            elif _primary(tok) == "std" or _primary(tok).startswith("std."):
+                target = ("external", tok)
             else:
-                primary = _primary(tok)
-                if primary in module_file:
-                    target = ("module", primary)
-                elif primary == "std" or primary.startswith("std."):
-                    target = ("external", tok)
-                else:
-                    target = ("external", tok)
-                    unresolved += 1
+                target = ("external", tok)
+                unresolved += 1
 
             kind, name = target
             if kind == "module":
-                if name == owner:
+                if name == owner_node:
                     continue  # self
-                key = (owner, name)
+                key = (owner_node, name)
                 edge_weight[key] += 1
                 edge_lines.setdefault(key, (path.as_posix(), line_no))
             elif include_external:
                 slug = "ext__" + re.sub(r"[^a-z0-9]+", "_", name.lower())
                 external_targets[slug] = name
-                external_edges[(_slug(owner), slug)] += 1
+                external_edges[(_slug(owner_node), slug)] += 1
 
     # Assemble graphify-schema nodes + links.
     nodes: list[dict] = []
