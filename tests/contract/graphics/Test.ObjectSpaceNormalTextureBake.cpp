@@ -268,7 +268,7 @@ namespace
             .Options = Graphics::ObjectSpaceNormalTextureBakeOptions{
                 .Width = 32u,
                 .Height = 64u,
-                .PaddingTexels = 4u,
+                .PaddingTexels = 0u,
             },
             .SourceKey = Graphics::ObjectSpaceNormalTextureBakeSourceKey{
                 .EntityKey = 0xabcdu,
@@ -464,7 +464,7 @@ TEST(ObjectSpaceNormalTextureBake, BuildsGpuProducedTexturePlanWithCompletionKey
                                 RHI::TextureUsage::TransferSrc));
     EXPECT_FALSE(HasTextureUsage(plan.TextureRequest.Desc.Usage,
                                  RHI::TextureUsage::Storage))
-        << "Dilation is reported as unavailable until the compute pass lands.";
+        << "The zero-padding path does not require the future dilation compute pass.";
     EXPECT_EQ(plan.TextureRequest.Desc.InitialLayout,
               RHI::TextureLayout::Undefined);
     EXPECT_STREQ(plan.TextureRequest.Desc.DebugName,
@@ -480,10 +480,10 @@ TEST(ObjectSpaceNormalTextureBake, BuildsGpuProducedTexturePlanWithCompletionKey
     EXPECT_EQ(plan.CompletionKey.Source.NormalGeneration, 13u);
     EXPECT_EQ(plan.CompletionKey.Width, 32u);
     EXPECT_EQ(plan.CompletionKey.Height, 64u);
-    EXPECT_EQ(plan.CompletionKey.PaddingTexels, 4u);
+    EXPECT_EQ(plan.CompletionKey.PaddingTexels, 0u);
     EXPECT_EQ(plan.CompletionKey.Space,
               Graphics::NormalTextureSpace::ObjectSpaceNormal);
-    EXPECT_TRUE(plan.DilationRequested);
+    EXPECT_FALSE(plan.DilationRequested);
     EXPECT_FALSE(plan.DilationAvailable);
 
     const RHI::TextureHandle outputTexture{9u, 2u};
@@ -500,6 +500,23 @@ TEST(ObjectSpaceNormalTextureBake, BuildsGpuProducedTexturePlanWithCompletionKey
     EXPECT_EQ(record.Height, 64u);
     EXPECT_EQ(record.InitialLayout, RHI::TextureLayout::Undefined);
     EXPECT_EQ(record.FinalLayout, RHI::TextureLayout::TransferSrc);
+}
+
+TEST(ObjectSpaceNormalTextureBake, PaddedGpuProducedTexturePlanFailsClosed)
+{
+    auto request = MakeValidPlanRequest();
+    request.Options.PaddingTexels = 4u;
+
+    const auto plan = Graphics::BuildObjectSpaceNormalTextureBakePlan(request);
+
+    EXPECT_FALSE(plan.Succeeded());
+    EXPECT_EQ(plan.Status,
+              Graphics::ObjectSpaceNormalTextureBakeStatus::DilationUnavailable);
+    EXPECT_TRUE(plan.DilationRequested);
+    EXPECT_FALSE(plan.DilationAvailable);
+    EXPECT_EQ(plan.Diagnostics.Options.PaddingTexels, 4u);
+    EXPECT_FALSE(plan.TextureRequest.Id.IsValid());
+    EXPECT_FALSE(plan.RecordTemplate.Pipeline.IsValid());
 }
 
 TEST(ObjectSpaceNormalTextureBake, CompletionKeyDetectsStaleBakeResults)

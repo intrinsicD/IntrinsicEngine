@@ -43,7 +43,11 @@ maturity_target: Operational
 - [x] Extend `GpuAssetCache` with a GPU-produced pending texture path keyed by `AssetId`, allocating cache-owned textures with `Sampled | ColorTarget` and reserving `Storage` usage for the future dilation path.
 - [x] Track GPU completion for produced textures and promote cache entries to `Ready` only after the submitted graphics work has completed.
 - [x] Add bake shaders that rasterize atlas UV triangles into an `RGBA8_UNORM` target, interpolate and normalize object-space normals, write alpha coverage, and use a shader-sampling-equivalent orientation.
-- [ ] Add GPU dilation as an image-space compute post-pass with request padding defaulting to 4 texels and clamped diagnostics; if descriptor plumbing prevents dilation in the first implementation, fail closed or report padding unavailable rather than CPU-dilating.
+- [x] Fail closed for requested dilation padding while the GPU compute post-pass is
+      unavailable, reporting `DilationUnavailable` and rejecting runtime GPU
+      submission before cache allocation rather than CPU-dilating.
+- [ ] Add GPU dilation as an image-space compute post-pass with request padding
+      defaulting to 4 texels and clamped diagnostics.
 - [x] Add material metadata for object-space normal textures, including an API enum reserving tangent-space support and a shader-visible flag such as `HasObjectSpaceNormalMap`.
 - [x] Update forward and deferred/G-buffer shaders to sample object-space normal maps only when the material flag is set and `NormalID` is valid, decode RGB to object-space normal, transform through the model normal matrix, normalize, and otherwise preserve vertex-normal behavior.
 - [x] Mark current generated-normal material bindings as `ObjectSpaceNormal` in direct import, model-scene handoff, and progressive presentation extraction; full GPU job scheduling remains owned by the runtime orchestration item below.
@@ -61,6 +65,9 @@ maturity_target: Operational
 - [x] Add CPU/null contract tests for generated asset key selection, non-operational no-op, and runtime stale completion discard in the runtime queue contract.
 - [x] Add CPU/null contract tests for cache-ready object-space normal bake binding, pending-cache no-op behavior, content-key reuse binding, and stale-completion rejection before material mutation.
 - [x] Add CPU/null contract tests for GPU submission preparation, stale-plan rejection before cache allocation, ready-frame promotion, and binding handoff after cache readiness.
+- [x] Add CPU/null contract tests for padded GPU bake plan fail-closed behavior
+      and runtime submission rejection before cache allocation while dilation is
+      unavailable.
 - [ ] Add CPU/null contract tests for end-to-end material binding transition once runtime GPU orchestration lands.
 - [x] Add `GpuAssetCache` tests for GPU-produced pending texture registration, readiness promotion, fallback/default view behavior before readiness, and retirement/reload interactions.
 - [x] Add command-recording contract coverage for the GPU bake pass shape, target extent, clear coverage, push constants, and indexed draw.
@@ -124,6 +131,11 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' --time
 - **Slice C (implemented).** Add object-space normal-map material metadata and forward/deferred shader consumption. Close at `CPUContracted`.
 - **Slice D (partial).** Generated-normal bindings now carry `ObjectSpaceNormal` provenance for direct import, model-scene handoff, and progressive presentation extraction. The runtime queue contract now selects generated texture assets by content key, records stale keys, no-ops without CPU fallback on non-operational graphics backends, and discards stale completions before material mutation. `Runtime.ObjectSpaceNormalBakeBinding` now bridges cache-ready completions into data-only `RenderExtractionCache` material bindings without consuming pending cache entries or applying stale completions. `Runtime.ObjectSpaceNormalBakeSubmission` now validates queued stale keys against graphics bake plans, registers cache-owned GPU-produced textures, returns record descriptors for render-thread command recording, and marks ready frames without completing the queue early. Engine import scheduling, render-thread command submission, GPU command completion feed integration, and import/enrichment replacement remain open. Close target remains `CPUContracted`.
 - **Slice E (partial).** Add Vulkan operational smoke with selected-texel readback. Still requires cache-ready promotion proof from a submitted bake and switching generated object-space normal import/enrichment to the GPU path before closing `Operational`.
+- **Slice F (this slice).** Tighten requested-padding behavior while GPU
+  dilation is unavailable: padded graphics bake plans report
+  `DilationUnavailable`, runtime submission rejects them before cache allocation,
+  and the zero-padding path remains the only submittable GPU-produced texture
+  plan. Close at `CPUContracted`; actual GPU dilation remains open.
 
 ## Maturity
 - Target: `Operational` on Vulkan-capable hosts; `CPUContracted` for CPU/null validation.

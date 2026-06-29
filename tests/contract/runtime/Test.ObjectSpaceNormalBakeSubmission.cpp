@@ -53,7 +53,8 @@ namespace
     [[nodiscard]] Runtime::RuntimeObjectSpaceNormalBakeRequest MakeRequest(
         const std::uint64_t entityKey,
         const std::uint64_t entityGeneration,
-        const Assets::AssetId generated)
+        const Assets::AssetId generated,
+        const std::uint32_t paddingTexels = 0u)
     {
         return Runtime::RuntimeObjectSpaceNormalBakeRequest{
             .EntityScopedGeneratedTextureAsset = generated,
@@ -67,7 +68,7 @@ namespace
             .Options = Graphics::ObjectSpaceNormalTextureBakeOptions{
                 .Width = 64u,
                 .Height = 32u,
-                .PaddingTexels = 4u,
+                .PaddingTexels = paddingTexels,
                 .Space = Graphics::NormalTextureSpace::ObjectSpaceNormal,
             },
             .ContentKey = Runtime::RuntimeObjectSpaceNormalBakeContentKey{
@@ -82,7 +83,8 @@ namespace
     }
 
     [[nodiscard]] Graphics::ObjectSpaceNormalTextureBakePlan MakePlan(
-        const Runtime::RuntimeObjectSpaceNormalBakeSubmission& submission)
+        const Runtime::RuntimeObjectSpaceNormalBakeSubmission& submission,
+        const std::uint32_t paddingTexels = 0u)
     {
         return Graphics::BuildObjectSpaceNormalTextureBakePlan(
             Graphics::ObjectSpaceNormalTextureBakePlanRequest{
@@ -97,7 +99,7 @@ namespace
                 .Options = Graphics::ObjectSpaceNormalTextureBakeOptions{
                     .Width = 64u,
                     .Height = 32u,
-                    .PaddingTexels = 4u,
+                    .PaddingTexels = paddingTexels,
                     .Space = Graphics::NormalTextureSpace::ObjectSpaceNormal,
                 },
                 .SourceKey = submission.StaleKey.Bake.Source,
@@ -108,10 +110,11 @@ namespace
 
     [[nodiscard]] Runtime::RuntimeObjectSpaceNormalBakeResult ScheduleBake(
         SubmissionFixture& fx,
-        const Assets::AssetId generated)
+        const Assets::AssetId generated,
+        const std::uint32_t paddingTexels = 0u)
     {
         return fx.Queue.Schedule(
-            MakeRequest(17u, 1u, generated),
+            MakeRequest(17u, 1u, generated, paddingTexels),
             /*graphicsBackendOperational=*/true);
     }
 }
@@ -233,10 +236,35 @@ TEST(RuntimeObjectSpaceNormalBakeSubmission,
 }
 
 TEST(RuntimeObjectSpaceNormalBakeSubmission,
+     RejectsPaddedPlanBeforeCacheAllocationUntilDilationLands)
+{
+    SubmissionFixture fx;
+    const Assets::AssetId generated{85u, 1u};
+    const auto scheduled = ScheduleBake(fx, generated, /*paddingTexels=*/4u);
+    ASSERT_TRUE(scheduled.Succeeded());
+    const auto plan = MakePlan(scheduled.Submission, /*paddingTexels=*/4u);
+    ASSERT_FALSE(plan.Succeeded());
+    EXPECT_EQ(plan.Status,
+              Graphics::ObjectSpaceNormalTextureBakeStatus::DilationUnavailable);
+
+    const auto rejected = Runtime::BeginObjectSpaceNormalBakeGpuSubmission(
+        fx.GpuAssets,
+        /*stableEntityId=*/17u,
+        scheduled.Submission,
+        plan);
+
+    EXPECT_FALSE(rejected.Succeeded());
+    EXPECT_EQ(rejected.Status,
+              Runtime::RuntimeObjectSpaceNormalBakeGpuSubmitStatus::InvalidPlan);
+    EXPECT_EQ(fx.GpuAssets.GetState(generated), Graphics::GpuAssetState::NotRequested);
+    EXPECT_EQ(fx.Queue.PendingCount(), 1u);
+}
+
+TEST(RuntimeObjectSpaceNormalBakeSubmission,
      RejectsCacheBusyWithoutConsumingQueue)
 {
     SubmissionFixture fx;
-    const Assets::AssetId generated{84u, 1u};
+    const Assets::AssetId generated{86u, 1u};
     const auto scheduled = ScheduleBake(fx, generated);
     ASSERT_TRUE(scheduled.Succeeded());
     const auto plan = MakePlan(scheduled.Submission);

@@ -121,6 +121,8 @@ namespace Extrinsic::Graphics
             return "InvalidGpuResource";
         case ObjectSpaceNormalTextureBakeStatus::InvalidIndexCount:
             return "InvalidIndexCount";
+        case ObjectSpaceNormalTextureBakeStatus::DilationUnavailable:
+            return "DilationUnavailable";
         }
         return "Unknown";
     }
@@ -398,6 +400,11 @@ namespace Extrinsic::Graphics
             request.Geometry.NormalBDA == 0u)
         {
             return fail(ObjectSpaceNormalTextureBakeStatus::InvalidGpuResource);
+        }
+
+        if (plan.DilationRequested && !plan.DilationAvailable)
+        {
+            return fail(ObjectSpaceNormalTextureBakeStatus::DilationUnavailable);
         }
 
         const RHI::TextureUsage usage =

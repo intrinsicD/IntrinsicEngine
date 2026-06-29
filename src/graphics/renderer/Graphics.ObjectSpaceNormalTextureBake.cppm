@@ -43,6 +43,7 @@ export namespace Extrinsic::Graphics
         InvalidGeneratedTextureAsset,
         InvalidGpuResource,
         InvalidIndexCount,
+        DilationUnavailable,
     };
 
     struct ObjectSpaceNormalTextureBakeOptions

@@ -1735,10 +1735,12 @@ Concretely:
   texture layout. The bake shader uses the same vertical orientation as the CPU
   texel-center sampling contract so a point addressed by mesh UV samples the
   same baked texel on Vulkan. Runtime job scheduling, stale-key rejection at the
-  runtime completion boundary, generated-normal import replacement, and GPU
-  dilation padding remain open parts of `GRAPHICS-104`; requested padding is
-  reported by the plan but no CPU dilation is implied. This graphics surface
-  does not import ECS, runtime, live `AssetService`, or Vulkan handles.
+  runtime completion boundary and generated-normal import replacement remain
+  open parts of `GRAPHICS-104`. Requested dilation padding currently fails
+  closed with `DilationUnavailable`; the zero-padding path is the only
+  submittable GPU-produced texture plan until the GPU compute dilation pass
+  lands, and no CPU dilation is implied. This graphics surface does not import
+  ECS, runtime, live `AssetService`, or Vulkan handles.
 - Per `GRAPHICS-018Q`, the four remaining Vulkan integration follow-ups
   to the `GRAPHICS-018` guarded backend bring-up resolve as follows.
   Texture upload policy keeps the guarded synchronous staging-buffer
