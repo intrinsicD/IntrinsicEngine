@@ -161,14 +161,15 @@ Load the specialist skill for the touched scope rather than reading every guide:
 
 A `knowledge-graph` MCP server (registered in `.mcp.json`, provisioned by session
 setup) serves a merged graph of the whole-repo C++23 module DAG **and** the
-paper→method→code chain. **When it is available, query it first** instead of
-hand-walking `import`/`#include` lines — it is faster and deterministic. Reach
-for it in these cases:
+paper→method→code chain. Its dependency edges come **only from C++23 module
+`import` statements** — the adapters do not parse `#include`, so header include
+dependencies are absent from the graph. Reach for it in these cases:
 
-- **Before touching a `.cppm` interface** — `get_neighbors` to see what the
-  module imports and who imports it.
-- **Scoping a change's blast radius** (review, docs-sync) — `shortest_path` and
-  reverse-dependency walks to find downstream consumers.
+- **Before touching a `.cppm` interface** — `get_neighbors` to see which modules
+  it imports and who imports it.
+- **Scoping a change's module-level blast radius** (review, docs-sync) —
+  `shortest_path` and reverse-dependency walks over module `import` edges to
+  find downstream consumers.
 - **Suspected layering problem** — edges are pre-tagged
   `same-layer`/`allowed`/`violation`; spot it on the graph, then **confirm with
   `tools/repo/check_layering.py --root src --strict`**, which stays the sole gate.
@@ -176,11 +177,15 @@ for it in these cases:
 - **Paper-claim ↔ code traceability** — trace which paper claim a method
   implements and which modules realize it (see `intrinsicengine-method`).
 
-It is a navigation aid, never an authority: every finding is confirmed against
-the real gate (`check_layering.py`) or the method contract (`method.yaml` +
-`docs/methods/*`) before you act. If the server is absent, proceed normally — no
-task depends on it. Full use-case detail: `references/contract.md` §"Knowledge-graph
-discovery aid".
+**For `#include`-based dependencies the graph is incomplete** — any unit still
+using C/C++ headers will have include edges the graph does not show. For those
+units, fall back to source search (Grep/Glob) and to
+`tools/repo/check_layering.py`, which is the authority that covers **both**
+`import` and `#include` edges. The graph is a module-import navigation aid, never
+an authority: confirm every finding against the gate (`check_layering.py`) or the
+method contract (`method.yaml` + `docs/methods/*`) before you act. If the server
+is absent, proceed normally — no task depends on it. Full use-case detail:
+`references/contract.md` §"Knowledge-graph discovery aid".
 
 References bundled with this skill (read on demand):
 

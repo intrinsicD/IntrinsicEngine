@@ -69,13 +69,19 @@ When the `knowledge-graph` MCP server from `.mcp.json` is available, agents *may
 query the merged code + paper/method graph (`query_graph`, `get_neighbors`,
 `shortest_path`, `god_nodes`, `graph_stats`) to navigate faster. It is a
 discovery aid only: it never gates anything, and any finding must be confirmed
-against the real authority before acting on it. Fitting use cases:
+against the real authority before acting on it. Its dependency edges are derived
+**only from C++23 module `import` statements** — the adapters do not parse
+`#include`, so header include dependencies are absent from the graph; for units
+that still use C/C++ headers, fall back to source search and to
+`check_layering.py` (which covers both `import` and `#include` edges). Fitting
+use cases:
 
-- **Navigation before edits** — `get_neighbors` on a module to see what it
-  imports and who imports it before touching a `.cppm` interface.
-- **Impact / blast-radius analysis** — `shortest_path` and reverse-dependency
-  walks to find downstream consumers of a change (useful for review and
-  docs-sync scoping).
+- **Navigation before edits** — `get_neighbors` on a module to see which modules
+  it imports and who imports it before touching a `.cppm` interface.
+- **Impact / blast-radius analysis (module imports)** — `shortest_path` and
+  reverse-dependency walks to find downstream consumers reachable through module
+  `import` edges (useful for review and docs-sync scoping); pair with source
+  search for `#include` dependencies, which the graph does not capture.
 - **Layering review aid** — edges are pre-tagged `same-layer`/`allowed`/
   `violation`, so a suspected boundary problem can be spotted quickly, then
   **confirmed with `check_layering.py`**, which remains the sole layering gate.
