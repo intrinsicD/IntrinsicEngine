@@ -10,7 +10,6 @@ module;
 #include <numeric>
 #include <optional>
 #include <queue>
-#include <random>
 #include <utility>
 #include <span>
 #include <vector>
@@ -24,6 +23,8 @@ import Geometry.BVH;
 import Geometry.Octree;
 import Geometry.Properties;
 import Geometry.Queries;
+import Geometry.RobustPredicates;
+import Geometry.Sampling;
 import Geometry.Sphere;
 import Geometry.Validation;
 
@@ -123,14 +124,12 @@ namespace Geometry::Graph
             }
         }
 
-        // 2D orientation test (cross product of AB and AC).
+        // 2D orientation test through the shared robust-predicate module.
         // Returns > 0 for CCW, < 0 for CW, 0 for collinear.
         // Used by edge-crossing detection for graph layout quality diagnostics.
-        [[nodiscard]] float Orientation2D(const glm::vec2& a, const glm::vec2& b, const glm::vec2& c)
+        [[nodiscard]] double Orientation2D(const glm::vec2& a, const glm::vec2& b, const glm::vec2& c)
         {
-            const glm::vec2 ab = b - a;
-            const glm::vec2 ac = c - a;
-            return ab.x * ac.y - ab.y * ac.x;
+            return Geometry::RobustPredicates::Orientation2D(a, b, c).Value;
         }
 
         // Check whether two 1D intervals [a0,a1] and [b0,b1] overlap within epsilon.
@@ -156,6 +155,7 @@ namespace Geometry::Graph
             const EdgeCrossingParams& params)
         {
             const float epsilon = std::max(params.IntersectionEpsilon, 0.0F);
+            const double orientationEpsilon = static_cast<double>(epsilon);
 
             if (!RangesOverlap(a0.x, a1.x, b0.x, b1.x, epsilon)
                 || !RangesOverlap(a0.y, a1.y, b0.y, b1.y, epsilon))
@@ -163,15 +163,15 @@ namespace Geometry::Graph
                 return false;
             }
 
-            const float o0 = Orientation2D(a0, a1, b0);
-            const float o1 = Orientation2D(a0, a1, b1);
-            const float o2 = Orientation2D(b0, b1, a0);
-            const float o3 = Orientation2D(b0, b1, a1);
+            const double o0 = Orientation2D(a0, a1, b0);
+            const double o1 = Orientation2D(a0, a1, b1);
+            const double o2 = Orientation2D(b0, b1, a0);
+            const double o3 = Orientation2D(b0, b1, a1);
 
-            const auto sign = [epsilon](float value)
+            const auto sign = [orientationEpsilon](double value)
             {
-                if (value > epsilon) return 1;
-                if (value < -epsilon) return -1;
+                if (value > orientationEpsilon) return 1;
+                if (value < -orientationEpsilon) return -1;
                 return 0;
             };
 
@@ -346,23 +346,6 @@ namespace Geometry::Graph
                 }), result.Edges.end());
 
             return result;
-        }
-
-        [[nodiscard]] std::uint64_t MixSeed(std::uint64_t value)
-        {
-            value ^= value >> 30U;
-            value *= 0xbf58476d1ce4e5b9ULL;
-            value ^= value >> 27U;
-            value *= 0x94d049bb133111ebULL;
-            value ^= value >> 31U;
-            return value;
-        }
-
-        [[nodiscard]] glm::vec3 GaussianDisplacement(std::uint64_t seed, std::uint32_t elementIndex, float scale)
-        {
-            std::mt19937_64 rng(MixSeed(seed ^ (static_cast<std::uint64_t>(elementIndex) + 0x9e3779b97f4a7c15ULL)));
-            std::normal_distribution<float> normal(0.0F, scale);
-            return glm::vec3(normal(rng), normal(rng), normal(rng));
         }
 
         [[nodiscard]] AABB LiveVertexAabb(const Graph& graph)
@@ -1513,7 +1496,10 @@ namespace Geometry::Graph
 
         for (const VertexHandle vertex : graph.LiveVertices())
         {
-            const glm::vec3 displacement = GaussianDisplacement(params.Seed, vertex.Index, result.Scale);
+            const glm::vec3 displacement = Geometry::Sampling::GaussianDisplacement(
+                params.Seed,
+                vertex.Index,
+                result.Scale);
             graph.SetVertexPosition(vertex, graph.VertexPosition(vertex) + displacement);
             displacementSum += displacement;
             result.MaxDisplacement = std::max(result.MaxDisplacement, glm::length(displacement));

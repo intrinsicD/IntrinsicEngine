@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 12 |
 | `core` | 41 |
 | `ecs` | 28 |
-| `geometry` | 99 |
+| `geometry` | 100 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 68 |
@@ -196,6 +196,7 @@ Root scanned: `src`
 | `Geometry.RotationAveraging` | `src/geometry/Geometry.RotationAveraging.cppm` | `geometry` |
 | `Geometry.SDF` | `src/geometry/Geometry.SDF.cppm` | `geometry` |
 | `Geometry.SDFContact` | `src/geometry/Geometry.SDFContact.cppm` | `geometry` |
+| `Geometry.Sampling` | `src/geometry/Geometry.Sampling.cppm` | `geometry` |
 | `Geometry.Segment` | `src/geometry/Geometry.Segment.cppm` | `geometry` |
 | `Geometry.Sparse` | `src/geometry/Geometry.Sparse.cppm` | `geometry` |
 | `Geometry.SpatialQueries` | `src/geometry/Geometry.SpatialQueries.cppm` | `geometry` |
@@ -553,4 +554,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugClosestFace` | `src/runtime/SpatialDebug/Runtime.SpatialDebugClosestFace.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **525**
+Total modules: **526**

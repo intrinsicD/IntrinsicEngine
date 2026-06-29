@@ -8,6 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
+- `GEOM-053` — Geometry reuse and deterministic sampling cleanup (tasks/active/GEOM-053-geometry-reuse-deterministic-sampling.md)
 - `GRAPHICS-104` — GPU Object-Space Normal Texture Bake (tasks/active/GRAPHICS-104-gpu-object-space-normal-texture-bake.md)
 
 ## Theme B — Rendering modernization

@@ -1,13 +1,19 @@
 module;
 
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <numbers>
+#include <random>
 #include <span>
 #include <vector>
 
 #include <glm/glm.hpp>
-#include <random>
 
 module Geometry.Sphere.Sampling;
 
+import Geometry.Sampling;
 import Geometry.Sphere;
 
 namespace Geometry::Sampling
@@ -29,30 +35,29 @@ namespace Geometry::Sampling
             return point * sphere.Radius + sphere.Center;
         }
 
-        inline double SquaredNorm(const glm::vec3& v)
+        [[nodiscard]] std::mt19937_64 MakeDeterministicGenerator(std::uint64_t seed)
         {
-            return glm::dot(v, v);
+            return std::mt19937_64(MixSeed(seed));
         }
     }
 
-    std::vector<glm::vec3> SampleSurfaceRandom(const Sphere& sphere, size_t num_samples)
+    std::vector<glm::vec3> SampleSurfaceRandom(const Sphere& sphere, std::uint32_t num_samples)
+    {
+        return SampleSurfaceRandom(sphere, num_samples, kDefaultSphereSamplingSeed);
+    }
+
+    std::vector<glm::vec3> SampleSurfaceRandom(const Sphere& sphere, std::uint32_t num_samples, std::uint64_t seed)
     {
         std::vector<glm::vec3> points(num_samples);
-        std::random_device rd;
-        std::mt19937 gen(rd());
-        std::uniform_real_distribution<double> dist(-1.0, 1.0);
+        std::mt19937_64 rng = helper::MakeDeterministicGenerator(seed);
+        std::uniform_real_distribution<double> unit(0.0, 1.0);
 
-        // Generate random points inside the unit sphere and then scale them to the sphere's radius
-        // Ensure the points are uniformly distributed over the sphere's surface
         for (size_t i = 0; i < num_samples; ++i)
         {
-            glm::vec3 point;
-            do
-            {
-                point = {dist(gen), dist(gen), dist(gen)};
-            }
-            while (helper::SquaredNorm(point) > 1.0); // Ensure the point is inside the unit sphere
-            points[i] = glm::normalize(point) * sphere.Radius + sphere.Center;
+            const double zSample = unit(rng);
+            const double azimuthSample = unit(rng);
+            const glm::vec3 direction = UniformUnitVectorFromUnitSamples(zSample, azimuthSample);
+            points[i] = direction * sphere.Radius + sphere.Center;
         }
         return points;
     }
@@ -61,7 +66,7 @@ namespace Geometry::Sampling
     std::vector<glm::vec3> SampleSurfaceUniform(const Sphere& sphere, size_t num_samples)
     {
         std::vector<glm::vec3> points(num_samples);
-        double phi = M_PI * (3.0 - std::sqrt(5.0)); // Golden angle in radians
+        double phi = std::numbers::pi_v<double> * (3.0 - std::sqrt(5.0)); // Golden angle in radians
         double radius = sphere.Radius;
 
         for (size_t i = 0; i < num_samples; ++i)
@@ -83,14 +88,14 @@ namespace Geometry::Sampling
     //Thou et. al. - 2024 - https://arxiv.org/pdf/2410.12007v1
     //Alvaro Gonzalez - 2009 - https://arxiv.org/pdf/0912.4540
 
-    std::vector<glm::vec3> SampleSurfaceFibonacciLattice(const Sphere& sphere, size_t num_samples,
+    std::vector<glm::vec3> SampleSurfaceFibonacciLattice(const Sphere& sphere, std::uint32_t num_samples,
                                                          FibonacciLattice type = FLTHIRD)
     {
         //http://extremelearning.com.au/evenly-distributing-points-on-a-sphere/
         std::vector<glm::vec3> points(num_samples);
 
         double golden_ratio = (1.0 + std::sqrt(5.0)) / 2.0;
-        double TWOPI = 2 * M_PI;
+        double TWOPI = 2 * std::numbers::pi_v<double>;
         double epsilon = 0.36;
         size_t start_index = 0;
         size_t end_index = num_samples;
@@ -153,36 +158,25 @@ namespace Geometry::Sampling
     //Aaron R. Voelker, Jan Gosmann, Terrence C. Stewart. “Efficiently sampling vectors and coordinates from the n‐sphere and n‐ball,” Centre for Theoretical Neuroscience, University of Waterloo (2017).
     //“Uniformly at random within the n‐ball,” Wikipedia (accessed May 2025).
 
-    std::vector<glm::vec3> SampleVolumeRandom(const Sphere& sphere, size_t num_samples)
+    std::vector<glm::vec3> SampleVolumeRandom(const Sphere& sphere, std::uint32_t num_samples)
+    {
+        return SampleVolumeRandom(sphere, num_samples, kDefaultSphereSamplingSeed);
+    }
+
+    std::vector<glm::vec3> SampleVolumeRandom(const Sphere& sphere, std::uint32_t num_samples, std::uint64_t seed)
     {
         std::vector<glm::vec3> points(num_samples);
+        std::mt19937_64 rng = helper::MakeDeterministicGenerator(seed);
+        std::uniform_real_distribution<double> unit(0.0, 1.0);
 
-        // 1) random_device + mt19937 for high‐quality randomness
-        std::random_device rd;
-        std::mt19937 gen(rd());
-
-        // 2) Generate uniform real in [-1,1] (to be scaled by sphere.Radius)
-        std::uniform_real_distribution<double> dist(-1.0, 1.0);
-
-        // 3) Rejection sampling in the cube [−R,R]^3:
-        //    - Draw (x,y,z) in [−1,1]^3, scale by R
-        //    - Reject if x^2+y^2+z^2 > R^2
-        //    This yields a uniform distribution over the sphere’s volume :contentReference[oaicite:0]{index=0}
         for (size_t i = 0; i < num_samples; ++i)
         {
-            glm::vec3 point;
-            do
-            {
-                // a) random sample in unit cube
-                point = {dist(gen), dist(gen), dist(gen)};
-                // b) scale to actual sphere radius
-                point *= sphere.Radius;
-                // c) check if inside sphere: squaredNorm() <= R^2
-            }
-            while (helper::SquaredNorm(point) > (sphere.Radius * sphere.Radius));
-
-            // 4) Translate to sphere center
-            points[i] = point + sphere.Center;
+            const double radiusSample = unit(rng);
+            const double zSample = unit(rng);
+            const double azimuthSample = unit(rng);
+            points[i] = UniformUnitBallPointFromUnitSamples(radiusSample, zSample, azimuthSample)
+                * sphere.Radius
+                + sphere.Center;
         }
 
         return points;
@@ -192,51 +186,27 @@ namespace Geometry::Sampling
     //“Uniformly at random within the n‐ball,” Wikipedia (accessed May 2025).
     //“Walk-on-spheres method,” Wikipedia (accessed May 2025).
 
-    std::vector<glm::vec3> SampleVolumeUniform(const Sphere& sphere, size_t num_samples)
+    std::vector<glm::vec3> SampleVolumeUniform(const Sphere& sphere, std::uint32_t num_samples)
+    {
+        return SampleVolumeUniform(sphere, num_samples, kDefaultSphereSamplingSeed);
+    }
+
+    std::vector<glm::vec3> SampleVolumeUniform(const Sphere& sphere, std::uint32_t num_samples, std::uint64_t seed)
     {
         std::vector<glm::vec3> points;
         points.reserve(num_samples);
-
-        // 1) Use std::random_device + mt19937 for high‐quality randomness
-        std::random_device rd;
-        std::mt19937 gen(rd());
-
-        // 2) We'll need three independent Uniform[0,1] draws (u, u', u''):
-        std::uniform_real_distribution<double> dist01(0.0, 1.0);
+        std::mt19937_64 rng = helper::MakeDeterministicGenerator(seed);
+        std::uniform_real_distribution<double> unit(0.0, 1.0);
 
         for (size_t i = 0; i < num_samples; ++i)
         {
-            // a) Draw u ∼ Uniform[0,1] for radial coordinate:
-            //    r = sphere.Radius * ∛u ensures uniformity in volume (Jacobian ∝ r^2).
-            //    :contentReference[oaicite:0]{index=0}
-            double u = dist01(gen);
-            double r = sphere.Radius * std::cbrt(u);
-
-            // b) Draw u' ∼ Uniform[0,1] to get cosθ ∈ [−1,1]:
-            //    cosθ = 1 − 2u' ⇒ θ has pdf ∝ sinθ, giving uniform distribution on the sphere’s surface :contentReference[oaicite:1]{index=1}
-            double u_prime = dist01(gen);
-            double cos_theta = 1.0 - 2.0 * u_prime;
-            double sin_theta = std::sqrt(std::max<double>(0, 1.0 - cos_theta * cos_theta));
-            // guard against tiny negatives
-
-            // c) Draw u'' ∼ Uniform[0,1] to get φ ∈ [0,2π):
-            //    φ = 2π·u''  gives uniform azimuthal angle. :contentReference[oaicite:2]{index=2}
-            double u_doubleprime = dist01(gen);
-            double phi = 2.0 * M_PI * u_doubleprime;
-
-            // d) Convert (r, θ, φ) → Cartesian unit‐vector * r:
-            //
-            //    x = r · sinθ · cosφ
-            //    y = r · sinθ · sinφ
-            //    z = r · cosθ
-            glm::vec3 dir = {
-                sin_theta * std::cos(phi),
-                sin_theta * std::sin(phi),
-                cos_theta
-            };
-
-            // e) Scale by r and translate by sphere.Center:
-            points.push_back(float(r) * dir + sphere.Center);
+            const double radiusSample = unit(rng);
+            const double zSample = unit(rng);
+            const double azimuthSample = unit(rng);
+            const glm::vec3 point = UniformUnitBallPointFromUnitSamples(radiusSample, zSample, azimuthSample)
+                * sphere.Radius
+                + sphere.Center;
+            points.push_back(point);
         }
 
         return points;

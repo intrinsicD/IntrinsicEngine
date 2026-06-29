@@ -19,28 +19,12 @@ module Geometry.PointCloud.Utils;
 
 import Geometry.AABB;
 import Geometry.Octree;
+import Geometry.Sampling;
 
 namespace Geometry::PointCloud
 {
     namespace
     {
-        [[nodiscard]] std::uint64_t MixSeed(std::uint64_t value)
-        {
-            value ^= value >> 30U;
-            value *= 0xbf58476d1ce4e5b9ULL;
-            value ^= value >> 27U;
-            value *= 0x94d049bb133111ebULL;
-            value ^= value >> 31U;
-            return value;
-        }
-
-        [[nodiscard]] glm::vec3 GaussianDisplacement(std::uint64_t seed, std::uint32_t elementIndex, float scale)
-        {
-            std::mt19937_64 rng(MixSeed(seed ^ (static_cast<std::uint64_t>(elementIndex) + 0x9e3779b97f4a7c15ULL)));
-            std::normal_distribution<float> normal(0.0F, scale);
-            return glm::vec3(normal(rng), normal(rng), normal(rng));
-        }
-
         [[nodiscard]] bool IsFinite(const glm::vec3& value)
         {
             return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
@@ -771,7 +755,10 @@ namespace Geometry::PointCloud
 
         for (const VertexHandle point : cloud.LivePoints())
         {
-            const glm::vec3 displacement = GaussianDisplacement(params.Seed, point.Index, result.Scale);
+            const glm::vec3 displacement = Geometry::Sampling::GaussianDisplacement(
+                params.Seed,
+                point.Index,
+                result.Scale);
             cloud.Position(point) += displacement;
             displacementSum += displacement;
             result.MaxDisplacement = std::max(result.MaxDisplacement, glm::length(displacement));
