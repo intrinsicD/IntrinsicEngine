@@ -3,6 +3,7 @@ id: GEOM-053
 theme: none
 depends_on: []
 maturity_target: CPUContracted
+completed_on: 2026-06-29
 ---
 # GEOM-053 — Geometry reuse and deterministic sampling cleanup
 
@@ -17,6 +18,11 @@ maturity_target: CPUContracted
 
 ## Context
 - Owner/layer: `src/geometry`; the layer contract remains `geometry -> core` only.
+- Status: done; retired on 2026-06-29 by Codex. Implementation landed in commit
+  `a96e5bd4` (`Add deterministic geometry sampling reuse`); retirement
+  bookkeeping is this commit.
+- PR/commit: this retirement commit (`Retire completed active task records`);
+  implementation commit `a96e5bd4`.
 - The knowledge-graph MCP list/graph calls timed out during this slice, so the concrete changes below are grounded in a source audit of the same geometry reuse target classes: `Geometry.Properties`, `Geometry.DomainViews`, `Geometry.Mesh.Conversion`, `Geometry.PointCloud.Conversion`, `Geometry.RobustPredicates`, `Geometry.Linalg`, `Geometry.Sparse`, and deterministic sampling helpers.
 - The first reviewable slice should address high-confidence duplication without mixing in compatibility migration work.
 - `docs/architecture/geometry-api-style.md` requires deterministic random algorithms, explicit diagnostics, narrow imports, and least-structured domain reuse.

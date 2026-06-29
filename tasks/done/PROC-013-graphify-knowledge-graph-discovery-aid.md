@@ -2,6 +2,8 @@
 id: PROC-013
 theme: H
 depends_on: []
+maturity_target: Scaffolded
+completed_on: 2026-06-29
 ---
 # PROC-013 — Knowledge-graph discovery aid (graphify adapters + shared setup)
 
@@ -41,6 +43,20 @@ depends_on: []
 - Owner/layer: `tools/repo`, `tools/setup`, and agent workflow. Satisfies the
   `tools/**` docs-sync rule via `tools/repo/README.md`, `AGENTS.md`,
   `docs/agent/contract.md`, and this task.
+- Status: done; retired on 2026-06-29 by Codex. Implementation landed across
+  commits `f9b8ff98`, `1ff0ee8a`, `904fafe0`, `b92953e0`, and `6833c1cd`;
+  retirement bookkeeping is this commit.
+- PR/commit: this retirement commit (`Retire completed active task records`);
+  implementation commits `f9b8ff98`, `1ff0ee8a`, `904fafe0`, `b92953e0`, and
+  `6833c1cd`.
+- Deferred follow-ups are not owed by this scaffold endpoint:
+  - Light up `method -> engine-module` edges once a reference method gains an
+    optimized/GPU backend that imports engine modules.
+  - Add an optional CI smoke that builds the graph and asserts node/edge floors
+    only if the aid graduates from optional convenience tooling to a relied-upon
+    check.
+  - Add fixture-based adapter regression coverage only if the graph becomes
+    load-bearing.
 
 ## Required changes
 - [x] `tools/repo/export_module_graph.py` — module DAG → graphify JSON.
@@ -58,10 +74,6 @@ depends_on: []
       that need the toolchain before running CMake gates.
 - [x] `.claude/setup.sh` and `.claude/wait-for-toolchain.sh` — reduce to thin
       adapters around the shared scripts.
-- [ ] (follow-up) Light up `method → engine-module` edges once a reference
-      method gains an optimized/GPU backend that imports engine modules.
-- [ ] (follow-up) Optional CI smoke that builds the graph and asserts node/edge
-      floors, only if the aid graduates from optional to relied-upon.
 
 ## Tests
 - [x] `python3 tools/repo/build_knowledge_graph.py` builds the merged graph.
@@ -70,8 +82,6 @@ depends_on: []
 - [x] Shell-parse the shared setup scripts and Claude wrappers with `bash -n`.
 - [x] Run the shared knowledge-graph provisioning script through graph build at
       least once in this workspace.
-- [ ] (follow-up) Fixture-based regression test for the adapters (mirroring
-      `tests/regression/tooling/Test.CheckLayering.py`) if this becomes load-bearing.
 
 ## Docs
 - [x] `tools/repo/README.md` knowledge-graph section (workflow + MCP + PDF note).

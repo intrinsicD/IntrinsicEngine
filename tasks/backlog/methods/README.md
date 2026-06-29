@@ -10,9 +10,8 @@ map.
 
 ## Program tasks
 
-- No open program tasks. Retired
-  [`METHODS-001`](../../done/METHODS-001-signed-heat-pathfinder.md) pins
-  METHOD-002 as the methods-pipeline pathfinder.
+- No open program tasks. Retired `METHODS-001` pins METHOD-002 as the
+  methods-pipeline pathfinder.
 
 ## Tasks
 

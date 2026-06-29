@@ -9,6 +9,30 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`PROC-013`](PROC-013-graphify-knowledge-graph-discovery-aid.md) —
+Knowledge-graph discovery aid (graphify adapters + shared setup) — retired on
+2026-06-29 at maturity `Scaffolded`. The optional graphify discovery path now
+builds a deterministic module DAG plus paper/method/code graph from repository
+parsers, registers the opt-in `knowledge-graph` MCP server, and shares setup
+entrypoints under `tools/setup/` so provisioning is not Claude-only. The graph
+remains a non-authoritative navigation aid; layering, method manifests, and
+paper contracts remain the gates. Optional engine-module method edges, CI
+smoke, and fixture adapter tests remain deferred until the graph becomes
+load-bearing.
+
+Active
+[`GEOM-053`](GEOM-053-geometry-reuse-deterministic-sampling.md) — Geometry
+reuse and deterministic sampling cleanup — retired on 2026-06-29 at maturity
+`CPUContracted`. `Geometry.Random` now owns the shared deterministic seed-mixing
+and Gaussian displacement helper used by graph and point-cloud utilities,
+`Geometry.Sphere.Sampling` exposes seed-bearing random-sampling overloads while
+preserving deterministic defaults, and graph edge-crossing orientation uses the
+promoted robust predicate where it preserves layout semantics. Focused geometry
+coverage pins deterministic sphere sampling and Gaussian noise reuse; broader
+mesh conversion, normal-estimation, and domain-view adoption remain deferred to
+dedicated compatibility or algorithm slices.
+
+Active
 [`GRAPHICS-107`](GRAPHICS-107-reconcile-framerecipe-renderrecipe-vocabulary.md) —
 Reconcile the FrameRecipe vs RenderRecipe vocabularies — retired on 2026-06-28
 at maturity `CPUContracted`. Renderer docs and the canonical frame-graph
