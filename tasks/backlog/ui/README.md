@@ -11,6 +11,10 @@ map.
 ## Tasks
 
 - [RORG-031F — UI integration backlog seed](RORG-031-ui-integration.md).
+- [UI-027 — Sandbox EditorUI point-cloud outlier-removal window](UI-027-editor-pointcloud-outlier-removal-window.md)
+  (blocked by `GEOM-016`; pairs the editor command/UI with the GEOM-016
+  `RemoveStatisticalOutliers`/`RemoveRadiusOutliers` operators, mirroring the
+  retired `UI-024`/`UI-025`/`UI-026` processing windows).
 
 The runtime SpatialDebug closest-face picking consumer for `GEOM-039` is
 retired under the runtime backlog as `RUNTIME-135`.
@@ -19,6 +23,9 @@ retired under the runtime backlog as `RUNTIME-135`.
 
 - RORG-031F is part of
   **Theme F — Architecture/runtime/UI foundation seeds**.
+- UI-027 is part of **Theme F**: it is the paired editor command/UI for the
+  `GEOM-016` point-cloud outlier-removal operators, continuing the
+  `bcg_code_base` geometry-processing port into interactive Sandbox workflows.
 - UI-001 is retired as part of **Theme A — Working sandbox app path** and depends on
   `RUNTIME-090` + `GRAPHICS-079` for ImGui frame production/presentation plus
   runtime selection/geometry-residency tasks for live content. RUNTIME-095 closes
