@@ -33,7 +33,10 @@ namespace Geometry::Subdivision
 
     // Perform a single level of Loop subdivision.
     // Takes input mesh, produces output mesh.
-    static bool SubdivideOnce(const HalfedgeMesh::Mesh& input, HalfedgeMesh::Mesh& output)
+    static bool SubdivideOnce(
+        const HalfedgeMesh::Mesh& input,
+        HalfedgeMesh::Mesh& output,
+        const SubdivisionParams& params)
     {
         const std::size_t nV = input.VerticesSize();
         const std::size_t nE = input.EdgesSize();
@@ -44,6 +47,13 @@ namespace Geometry::Subdivision
 
         const auto inputTexcoord = input.VertexProperties().Get<glm::vec2>(MeshUtils::kVertexTexcoordPropertyName);
         const bool hasTexcoord = static_cast<bool>(inputTexcoord);
+        ConstEdgeProperty<bool> inputFeatureEdges{};
+        if (params.PreserveFeatureEdges)
+        {
+            inputFeatureEdges = ConstEdgeProperty<bool>(
+                input.EdgeProperties().Get<bool>(params.FeatureEdgePropertyName));
+        }
+        const bool hasFeatureEdges = static_cast<bool>(inputFeatureEdges);
 
         // Verify all faces are triangles
         for (std::size_t fi = 0; fi < nF; ++fi)
@@ -76,7 +86,43 @@ namespace Geometry::Subdivision
             const glm::vec2 uv = hasTexcoord ? inputTexcoord[vi] : glm::vec2(0.0f);
             std::size_t valence = input.Valence(vh);
 
-            if (input.IsBoundary(vh))
+            std::vector<VertexHandle> featureNeighbors;
+            if (hasFeatureEdges)
+            {
+                featureNeighbors.reserve(2);
+                for (const HalfedgeHandle h : input.HalfedgesAroundVertex(vh))
+                {
+                    const EdgeHandle e = input.Edge(h);
+                    if (input.IsValid(e) && !input.IsDeleted(e) && inputFeatureEdges[e])
+                    {
+                        featureNeighbors.push_back(input.ToVertex(h));
+                    }
+                }
+            }
+
+            if (hasFeatureEdges && !featureNeighbors.empty())
+            {
+                if (featureNeighbors.size() == 2)
+                {
+                    evenPositions[vi] = 0.75f * p
+                        + 0.125f * (input.Position(featureNeighbors[0]) + input.Position(featureNeighbors[1]));
+                    if (hasTexcoord)
+                    {
+                        evenTexcoords[vi] = 0.75f * uv
+                            + 0.125f * (inputTexcoord[featureNeighbors[0].Index]
+                                + inputTexcoord[featureNeighbors[1].Index]);
+                    }
+                }
+                else
+                {
+                    evenPositions[vi] = p;
+                    if (hasTexcoord)
+                    {
+                        evenTexcoords[vi] = uv;
+                    }
+                }
+            }
+            else if (input.IsBoundary(vh))
             {
                 // Boundary vertex rule: 1/8 * prev + 3/4 * v + 1/8 * next
                 // Find the two boundary neighbors
@@ -165,9 +211,9 @@ namespace Geometry::Subdivision
             const glm::vec2 uv0 = hasTexcoord ? inputTexcoord[v0.Index] : glm::vec2(0.0f);
             const glm::vec2 uv1 = hasTexcoord ? inputTexcoord[v1.Index] : glm::vec2(0.0f);
 
-            if (input.IsBoundary(eh))
+            if ((hasFeatureEdges && inputFeatureEdges[eh]) || input.IsBoundary(eh))
             {
-                // Boundary edge: simple midpoint
+                // Boundary and tagged feature edges use the crease midpoint.
                 oddPositions[ei] = 0.5f * (p0 + p1);
                 if (hasTexcoord)
                 {
@@ -198,6 +244,12 @@ namespace Geometry::Subdivision
         {
             outputTexcoord = VertexProperty<glm::vec2>(
                 output.VertexProperties().GetOrAdd<glm::vec2>(MeshUtils::kVertexTexcoordPropertyName, glm::vec2(0.0f)));
+        }
+        EdgeProperty<bool> outputFeatureEdges;
+        if (hasFeatureEdges)
+        {
+            outputFeatureEdges = EdgeProperty<bool>(
+                output.EdgeProperties().GetOrAdd<bool>(params.FeatureEdgePropertyName, false));
         }
 
         // Add even vertices (one per original vertex)
@@ -270,6 +322,34 @@ namespace Geometry::Subdivision
             (void)output.AddTriangle(m_ca, m_ab, m_bc);  // center
         }
 
+        if (hasFeatureEdges)
+        {
+            for (std::size_t ei = 0; ei < nE; ++ei)
+            {
+                EdgeHandle eh{static_cast<PropertyIndex>(ei)};
+                if (input.IsDeleted(eh) || !inputFeatureEdges[eh])
+                {
+                    continue;
+                }
+
+                const HalfedgeHandle h{static_cast<PropertyIndex>(2u * ei)};
+                const VertexHandle v0 = input.FromVertex(h);
+                const VertexHandle v1 = input.ToVertex(h);
+                const VertexHandle mid = oddVerts[ei];
+                const VertexHandle out0 = evenVerts[v0.Index];
+                const VertexHandle out1 = evenVerts[v1.Index];
+
+                if (const auto e0 = output.FindEdge(out0, mid))
+                {
+                    outputFeatureEdges[*e0] = true;
+                }
+                if (const auto e1 = output.FindEdge(out1, mid))
+                {
+                    outputFeatureEdges[*e1] = true;
+                }
+            }
+        }
+
         return true;
     }
 
@@ -307,7 +387,7 @@ namespace Geometry::Subdivision
         SubdivisionResult result;
 
         // First iteration: input → output
-        if (!SubdivideOnce(input, output))
+        if (!SubdivideOnce(input, output, params))
             return std::nullopt;
 
         result.IterationsPerformed = 1;
@@ -317,7 +397,7 @@ namespace Geometry::Subdivision
         for (std::size_t i = 1; i < iterationsToRun; ++i)
         {
             temp.Clear();
-            if (!SubdivideOnce(output, temp))
+            if (!SubdivideOnce(output, temp, params))
                 break;
 
             output = std::move(temp);

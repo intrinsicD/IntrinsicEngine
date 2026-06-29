@@ -24,6 +24,19 @@ namespace Geometry
         return out;
     }
 
+    std::vector<PropertyDescriptor> PropertyRegistry::Descriptors(bool isMutable) const
+    {
+        std::vector<PropertyDescriptor> out;
+        out.reserve(m_Storages.size());
+        for (std::size_t i = 0; i < m_Storages.size(); ++i)
+        {
+            const auto& storage = m_Storages[i];
+            if (!storage) continue;
+            out.push_back(storage->Describe(i, isMutable));
+        }
+        return out;
+    }
+
     void PropertyRegistry::Clear()
     {
         m_Size = 0;
@@ -74,13 +87,26 @@ namespace Geometry
         return std::nullopt;
     }
 
+    bool PropertyRegistry::IsValidId(PropertyId id) const noexcept
+    {
+        return id < m_Storages.size() && static_cast<bool>(m_Storages[id]);
+    }
+
     Internal::PropertyStorageBase* PropertyRegistry::Storage(PropertyId id) noexcept
     {
+        if (!IsValidId(id))
+        {
+            return nullptr;
+        }
         return m_Storages[id].get();
     }
 
     const Internal::PropertyStorageBase* PropertyRegistry::Storage(PropertyId id) const noexcept
     {
+        if (!IsValidId(id))
+        {
+            return nullptr;
+        }
         return m_Storages[id].get();
     }
 

@@ -7,6 +7,7 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <numbers>
 #include <span>
 #include <vector>
@@ -94,6 +95,33 @@ namespace
     {
         return glm::translate(glm::mat4(1.0f), offset);
     }
+
+    std::vector<glm::vec3> MakeAsymmetricCloud()
+    {
+        std::vector<glm::vec3> points;
+        points.reserve(60);
+        for (int z = 0; z < 3; ++z)
+        {
+            for (int y = 0; y < 4; ++y)
+            {
+                for (int x = 0; x < 5; ++x)
+                {
+                    points.emplace_back(
+                        0.13f * static_cast<float>(x) + 0.01f * static_cast<float>(y),
+                        0.17f * static_cast<float>(y) - 0.02f * static_cast<float>(z),
+                        0.11f * static_cast<float>(z) + 0.005f * static_cast<float>(x * y));
+                }
+            }
+        }
+        return points;
+    }
+
+    double TranslationError(const Geometry::Registration::RegistrationResult& result,
+                            const glm::dvec3& expected)
+    {
+        const glm::dvec3 actual(result.Transform[3][0], result.Transform[3][1], result.Transform[3][2]);
+        return glm::length(actual - expected);
+    }
 }
 
 // =============================================================================
@@ -151,6 +179,29 @@ TEST(Registration_ICP, ReturnsNulloptForInvalidInlierRatio)
     EXPECT_FALSE(result.has_value());
 
     params.InlierRatio = 1.5;
+    result = Geometry::Registration::AlignICP(source, target, {}, params);
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST(Registration_ICP, ReturnsNulloptForInvalidRobustScaleOnlyWhenEnabled)
+{
+    auto target = MakeFlatGrid();
+    auto source = TransformPoints(target, MakeTranslation(glm::vec3(0.02f, 0.0f, 0.0f)));
+
+    Geometry::Registration::RegistrationParams params;
+    params.Variant = Geometry::Registration::ICPVariant::PointToPoint;
+    params.RobustScale = -1.0;
+
+    // RobustScale is ignored when no robust kernel is selected; this preserves
+    // the default no-kernel path.
+    auto result = Geometry::Registration::AlignICP(source, target, {}, params);
+    EXPECT_TRUE(result.has_value());
+
+    params.RobustKernelKind = Geometry::Robust::RobustKernel::Huber;
+    result = Geometry::Registration::AlignICP(source, target, {}, params);
+    EXPECT_FALSE(result.has_value());
+
+    params.RobustScale = std::numeric_limits<double>::infinity();
     result = Geometry::Registration::AlignICP(source, target, {}, params);
     EXPECT_FALSE(result.has_value());
 }
@@ -402,6 +453,44 @@ TEST(Registration_ICP, OutlierRejectionImproveAlignment)
     ASSERT_TRUE(result.has_value());
     // Should still achieve reasonable alignment despite outliers
     EXPECT_LT(result->FinalRMSE, 0.1);
+}
+
+TEST(Registration_ICP, RobustKernelDownweightsGrossOutliers)
+{
+    auto target = MakeAsymmetricCloud();
+    const glm::vec3 offset(0.03f, -0.02f, 0.025f);
+    auto source = TransformPoints(target, MakeTranslation(offset));
+
+    for (int i = 0; i < 30; ++i)
+    {
+        source.emplace_back(2.5f + 0.03f * static_cast<float>(i),
+                            -1.25f + 0.015f * static_cast<float>(i),
+                            1.75f);
+    }
+
+    Geometry::Registration::RegistrationParams trimmed;
+    trimmed.Variant = Geometry::Registration::ICPVariant::PointToPoint;
+    trimmed.MaxIterations = 50;
+    trimmed.InlierRatio = 0.8;
+    trimmed.MaxCorrespondenceDistance = 10.0;
+
+    auto trimmedResult = Geometry::Registration::AlignICP(source, target, {}, trimmed);
+    ASSERT_TRUE(trimmedResult.has_value());
+
+    Geometry::Registration::RegistrationParams robust = trimmed;
+    robust.RobustKernelKind = Geometry::Robust::RobustKernel::Tukey;
+    robust.RobustScale = 0.15;
+
+    auto robustResult = Geometry::Registration::AlignICP(source, target, {}, robust);
+    ASSERT_TRUE(robustResult.has_value());
+
+    const glm::dvec3 expectedInverse(-offset.x, -offset.y, -offset.z);
+    const double trimmedTranslationError = TranslationError(*trimmedResult, expectedInverse);
+    const double robustTranslationError = TranslationError(*robustResult, expectedInverse);
+
+    EXPECT_LT(robustTranslationError, 0.02);
+    EXPECT_LT(robustTranslationError, trimmedTranslationError * 0.6);
+    EXPECT_LT(robustResult->FinalRMSE, trimmedResult->FinalRMSE);
 }
 
 TEST(Registration_ICP, MaxCorrespondenceDistanceRejectsDistantPairs)

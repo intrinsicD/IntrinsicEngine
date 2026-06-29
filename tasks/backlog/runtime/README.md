@@ -14,11 +14,11 @@ Core/runtime work paired with the `bcg_code_base` geometry port gaps tracked in
 lives here because `geometry` may not own a `core` container; the SpatialDebug
 consumer lives here because `runtime` owns composition over `geometry`.
 
-- [CORE-004 — Indexed decrease-key min-heap container and Dijkstra adoption](CORE-004-indexed-decrease-key-heap.md)
-  (`core` container; adopted by `Geometry.Graph.ShortestPath`).
-- [RUNTIME-135 — SpatialDebug closest-face picking via accelerated mesh query](RUNTIME-135-spatialdebug-closest-face-picking.md)
-  (depends on `GEOM-039`). Editor method windows for the ported algorithms are
-  `UI-024`/`UI-025`/`UI-026` under the UI backlog.
+`CORE-004` is retired; `Extrinsic.Core.IndexedHeap` now backs
+`Geometry.Graph.ShortestPath` Dijkstra with a true decrease-key frontier.
+`RUNTIME-135` is retired; the SpatialDebug closest-face consumer now lives in
+`Extrinsic.Runtime.SpatialDebugClosestFace`. Editor method windows for the
+ported algorithms are retired `UI-024`/`UI-025`/`UI-026` under the UI backlog.
 
 ### CPU→GPU vertex-attribute overhaul (Theme B)
 
@@ -98,6 +98,27 @@ these as runtime work when scheduling and review:
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [RUNTIME-135 — SpatialDebug closest-face picking via accelerated mesh query](../../done/RUNTIME-135-spatialdebug-closest-face-picking.md)
+  (done, 2026-06-28, `CPUContracted`): runtime now has a data-only closest-face
+  SpatialDebug overlay consumer that caches the GEOM-039 mesh closest-face
+  index by active mesh key/revision and emits deterministic fail-closed overlay
+  diagnostics without renderer/RHI/Vulkan or editor/UI ownership.
+- [CORE-004 — Indexed decrease-key min-heap container and Dijkstra adoption](../../done/CORE-004-indexed-decrease-key-heap.md)
+  (done, 2026-06-28, `CPUContracted`): core now exports
+  `Extrinsic.Core.IndexedHeap`, a deterministic fail-closed indexed binary
+  min-heap with `TryTop`, `TryPop`, O(log n) `DecreaseKey`, and O(log n)
+  `Remove`; geometry Dijkstra now uses it as the live frontier while preserving
+  shortest-path and diagnostic parity against the prior lazy priority-queue
+  implementation.
+- [RUNTIME-132 — Lift single-use RunFrame hook adapters out of the RunFrame body](../../done/RUNTIME-132-lift-runframe-hook-adapters.md)
+  (done, 2026-06-28): `Engine::RunFrame` now delegates single-use frame-hook
+  adapters, fixed-step substeps, camera/gizmo/selection input, BUG-026
+  pick-context capture, and completed pick-readback refinement to private
+  implementation helpers while preserving the documented frame order.
+- [RUNTIME-128 — Default lit material for material-less imported primitives](../../done/RUNTIME-128-default-lit-material-for-materialless-imports.md)
+  (done, 2026-06-28, `CPUContracted`): model-scene imports now give
+  material-less primitives a neutral lit StandardPBR default while preserving
+  slot 0 as the unlit missing/invalid material indicator.
 - [RUNTIME-127 — Render artifact publication and apply semantics](../../done/RUNTIME-127-render-artifact-publication.md)
   (done, 2026-06-24, `CPUContracted`): runtime now has a render artifact
   registry, lifecycle states, UI-facing status vocabulary, and explicit

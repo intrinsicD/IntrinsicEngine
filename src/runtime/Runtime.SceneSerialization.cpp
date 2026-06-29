@@ -336,7 +336,7 @@ namespace Extrinsic::Runtime
             const Geometry::PropertySet& properties,
             const std::string_view name)
         {
-            const Geometry::Property<glm::vec2> property =
+            const Geometry::ConstProperty<glm::vec2> property =
                 properties.Get<glm::vec2>(name);
             return property.IsValid() ? &property.Vector() : nullptr;
         }
@@ -345,7 +345,7 @@ namespace Extrinsic::Runtime
             const Geometry::PropertySet& properties,
             const std::string_view name)
         {
-            const Geometry::Property<glm::vec3> property =
+            const Geometry::ConstProperty<glm::vec3> property =
                 properties.Get<glm::vec3>(name);
             return property.IsValid() ? &property.Vector() : nullptr;
         }
@@ -354,7 +354,7 @@ namespace Extrinsic::Runtime
             const Geometry::PropertySet& properties,
             const std::string_view name)
         {
-            const Geometry::Property<std::uint32_t> property =
+            const Geometry::ConstProperty<std::uint32_t> property =
                 properties.Get<std::uint32_t>(name);
             return property.IsValid() ? &property.Vector() : nullptr;
         }

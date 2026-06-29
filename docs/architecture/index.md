@@ -17,6 +17,8 @@ Status labels:
 - [Overview](overview.md) (`canonical`)
 - [Layering rules](layering.md) (`canonical`)
 - [Runtime](runtime.md) (`canonical`)
+- [Runtime config control](runtime-config-control.md) (`canonical`)
+- [Engine config file](engine-config.md) (`canonical`)
 - [Graphics](graphics.md) (`canonical`) — reduced to the contract layer per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md); embedded decision records relocated to ADRs `0004..0018` (see Pointers section).
 - [Geometry](geometry.md) (`canonical`)
 - [Geometry API style and numeric policy](geometry-api-style.md) (`canonical`)
@@ -28,6 +30,7 @@ Status labels:
 - [Module rules](module-rules.md) (`canonical`)
 - [Test strategy](test-strategy.md) (`canonical`)
 - [Method API contract](method-api-contract.md) (`canonical`)
+- [Algorithm variant dispatch pattern](algorithm-variant-dispatch.md) (`canonical`)
 
 ## ADRs
 
@@ -56,7 +59,6 @@ Status labels:
 
 | Document | Status | Notes |
 |---|---|---|
-| `algorithm-variant-dispatch.md` | legacy-background | Historical implementation options. |
 | `backend_integration_slicing_policy.md` | legacy-background | Useful guidance, not canonical policy. |
 | `feature-module-playbook.md` | legacy-background | Candidate content for future module handbook consolidation. |
 | `frame-loop-rollback-strategy.md` | legacy-background | Runtime policy background; may be merged into runtime docs later. |

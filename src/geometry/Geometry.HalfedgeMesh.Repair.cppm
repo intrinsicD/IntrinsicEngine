@@ -1,6 +1,7 @@
 module;
 
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <vector>
 
@@ -157,7 +158,29 @@ export namespace Geometry::MeshRepair
         HalfedgeMesh::Mesh& mesh);
 
     // =====================================================================
-    // 5. Combined Repair
+    // 5. Connected components
+    // =====================================================================
+
+    struct ConnectedComponentsResult
+    {
+        std::size_t ComponentCount{0};
+        std::vector<std::uint32_t> VertexComponents{};
+        std::vector<std::uint32_t> FaceComponents{};
+    };
+
+    // Deterministically flood-fill face adjacency. Publishes v:component and
+    // f:component properties on success.
+    [[nodiscard]] std::optional<ConnectedComponentsResult> ComputeConnectedComponents(
+        HalfedgeMesh::Mesh& mesh);
+
+    [[nodiscard]] std::optional<std::vector<HalfedgeMesh::Mesh>> SplitIntoComponents(
+        const HalfedgeMesh::Mesh& mesh);
+
+    [[nodiscard]] std::optional<ConnectedComponentsResult> KeepLargestComponent(
+        HalfedgeMesh::Mesh& mesh);
+
+    // =====================================================================
+    // 6. Combined Repair
     // =====================================================================
 
     struct RepairParams

@@ -72,6 +72,7 @@ namespace Extrinsic::Graphics
         RenderRecipeDescriptor Recipe{};
         ViewOutputRecipeDescriptor ViewOutput{};
         BindingSet Bindings{};
+        std::vector<std::string> DisabledExtensionSlots{};
         bool SideEffectFree = true;
         std::uint32_t ParsedSlotCount = 0u;
         std::uint32_t ParsedBindingOverrideCount = 0u;

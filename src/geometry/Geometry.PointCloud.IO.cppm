@@ -19,6 +19,11 @@ export namespace Geometry::PointCloudIO
     };
 
     Extrinsic::Core::Expected<PointCloudIOResult> LoadXYZ(std::string_view absolute_path);
+    Extrinsic::Core::Expected<PointCloudIOResult> LoadPTS(std::string_view absolute_path);
+    Extrinsic::Core::Expected<PointCloudIOResult> LoadPWN(std::string_view absolute_path);
+    Extrinsic::Core::Expected<PointCloudIOResult> LoadCSV(std::string_view absolute_path);
+    Extrinsic::Core::Expected<PointCloudIOResult> Load3D(std::string_view absolute_path);
+    Extrinsic::Core::Expected<PointCloudIOResult> LoadTXT(std::string_view absolute_path);
     Extrinsic::Core::Expected<PointCloudIOResult> LoadPCD(std::string_view absolute_path);
     Extrinsic::Core::Expected<PointCloudIOResult> LoadPLY(std::string_view absolute_path);
 
@@ -36,4 +41,3 @@ export namespace Geometry::PointCloudIO
     PointCloudIOWriteStatus WritePCD(std::string_view absolute_path, const PointCloudIOResult& cloud);
     PointCloudIOWriteStatus WritePCDBinary(std::string_view absolute_path, const PointCloudIOResult& cloud);
 }
-

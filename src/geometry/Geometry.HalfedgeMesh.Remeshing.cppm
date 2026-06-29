@@ -48,6 +48,17 @@ export namespace Geometry::Remeshing
         // If true, boundary vertices are not moved and boundary edges
         // are not collapsed or flipped.
         bool PreserveBoundary{true};
+
+        // If true, build a frozen copy of the input surface and project
+        // remeshed vertices back to the closest reference face after each
+        // iteration. Disabled by default to preserve existing behavior.
+        bool ProjectToSurface{false};
+
+        // K for candidate shortlisting when the backing projector supports it.
+        std::size_t ReferenceProjectionK{16};
+
+        // Maximum allowed projection distance; <= 0 disables distance clamping.
+        double MaxReferenceProjectionDistance{0.0};
     };
 
     // RemeshingResult and AdaptiveRemeshing::AdaptiveRemeshingResult are identical.

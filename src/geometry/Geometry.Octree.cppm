@@ -65,9 +65,9 @@ export namespace Geometry
         }
 
         template <class T>
-        [[nodiscard]] NodeProperty<T> GetNodeProperty(const std::string& name) const
+        [[nodiscard]] ConstNodeProperty<T> GetNodeProperty(const std::string& name) const
         {
-            return NodeProperty<T>(NodeProperties.Get<T>(name));
+            return ConstNodeProperty<T>(NodeProperties.Get<T>(name));
         }
 
         template <class T>

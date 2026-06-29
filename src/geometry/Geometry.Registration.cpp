@@ -1,11 +1,9 @@
 module;
 
 #include <algorithm>
-#include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <limits>
-#include <numeric>
 #include <optional>
 #include <span>
 #include <vector>
@@ -19,6 +17,8 @@ module;
 module Geometry.Registration;
 
 import Geometry.KDTree;
+import Geometry.Robust;
+import Geometry.Rotation;
 
 namespace Geometry::Registration
 {
@@ -33,105 +33,8 @@ namespace Geometry::Registration
             std::size_t SourceIndex;
             std::size_t TargetIndex;
             double DistanceSq;
+            double Weight{1.0};
         };
-
-        // 3x3 symmetric eigendecomposition (Cardano's method).
-        // Eigenvalues sorted descending, eigenvectors orthonormalized.
-        // Same algorithm used throughout the geometry kernel (PCA, PointCloud.Normals).
-        struct SymEigen3Result
-        {
-            double Values[3]{};        // sorted descending
-            glm::dvec3 Vectors[3]{};   // corresponding eigenvectors
-        };
-
-        [[nodiscard]] SymEigen3Result SymEigen3(
-            double a00, double a01, double a02,
-            double a11, double a12, double a22)
-        {
-            SymEigen3Result result{};
-
-            const double mean = (a00 + a11 + a22) / 3.0;
-            const double b00 = a00 - mean;
-            const double b11 = a11 - mean;
-            const double b22 = a22 - mean;
-            const double p2 = (b00 * b00 + b11 * b11 + b22 * b22
-                              + 2.0 * (a01 * a01 + a02 * a02 + a12 * a12)) / 6.0;
-            const double scale = std::max({std::abs(a00), std::abs(a11), std::abs(a22),
-                                            std::abs(a01), std::abs(a02), std::abs(a12), 1.0});
-            if (!(p2 > std::numeric_limits<double>::epsilon() * scale * scale))
-            {
-                result.Values[0] = result.Values[1] = result.Values[2] = mean;
-                result.Vectors[0] = {1.0, 0.0, 0.0};
-                result.Vectors[1] = {0.0, 1.0, 0.0};
-                result.Vectors[2] = {0.0, 0.0, 1.0};
-                return result;
-            }
-
-            const double p = std::sqrt(p2);
-            const double invP = 1.0 / p;
-            const double c00 = b00 * invP, c01 = a01 * invP, c02 = a02 * invP;
-            const double c11 = b11 * invP, c12 = a12 * invP, c22 = b22 * invP;
-            const double detC = c00 * c11 * c22 + 2.0 * c01 * c02 * c12
-                              - c00 * c12 * c12 - c11 * c02 * c02 - c22 * c01 * c01;
-            const double phi = std::acos(std::clamp(detC * 0.5, -1.0, 1.0)) / 3.0;
-
-            double lambda0 = mean + 2.0 * p * std::cos(phi);
-            double lambda2 = mean + 2.0 * p * std::cos(phi + 2.0 * std::acos(-1.0) / 3.0);
-            double lambda1 = 3.0 * mean - lambda0 - lambda2;
-
-            // Sort descending
-            if (lambda0 < lambda1) std::swap(lambda0, lambda1);
-            if (lambda0 < lambda2) std::swap(lambda0, lambda2);
-            if (lambda1 < lambda2) std::swap(lambda1, lambda2);
-
-            result.Values[0] = lambda0;
-            result.Values[1] = lambda1;
-            result.Values[2] = lambda2;
-
-            auto computeEigenvector = [&](double lambda) -> glm::dvec3
-            {
-                const glm::dvec3 row0{a00 - lambda, a01, a02};
-                const glm::dvec3 row1{a01, a11 - lambda, a12};
-                const glm::dvec3 row2{a02, a12, a22 - lambda};
-
-                const glm::dvec3 cross01 = glm::cross(row0, row1);
-                const glm::dvec3 cross02 = glm::cross(row0, row2);
-                const glm::dvec3 cross12 = glm::cross(row1, row2);
-
-                const double lenSq01 = glm::dot(cross01, cross01);
-                const double lenSq02 = glm::dot(cross02, cross02);
-                const double lenSq12 = glm::dot(cross12, cross12);
-
-                glm::dvec3 best{1.0, 0.0, 0.0};
-                double bestLenSq = 0.0;
-                if (lenSq01 >= lenSq02 && lenSq01 >= lenSq12)
-                { best = cross01; bestLenSq = lenSq01; }
-                else if (lenSq02 >= lenSq12)
-                { best = cross02; bestLenSq = lenSq02; }
-                else
-                { best = cross12; bestLenSq = lenSq12; }
-
-                if (bestLenSq > 1e-30)
-                    return best / std::sqrt(bestLenSq);
-                return {1.0, 0.0, 0.0};
-            };
-
-            result.Vectors[0] = computeEigenvector(lambda0);
-            result.Vectors[1] = computeEigenvector(lambda1);
-            result.Vectors[2] = computeEigenvector(lambda2);
-
-            // Gram-Schmidt orthogonalization
-            const double dot01 = glm::dot(result.Vectors[0], result.Vectors[1]);
-            result.Vectors[1] -= dot01 * result.Vectors[0];
-            const double len1 = glm::length(result.Vectors[1]);
-            if (len1 > 1e-15) result.Vectors[1] /= len1;
-
-            result.Vectors[2] = glm::cross(result.Vectors[0], result.Vectors[1]);
-            const double len2 = glm::length(result.Vectors[2]);
-            if (len2 > 1e-15) result.Vectors[2] /= len2;
-
-            return result;
-        }
 
         // Apply a 4x4 rigid transform to a vec3 point.
         [[nodiscard]] glm::dvec3 TransformPoint(const glm::dmat4& T, const glm::vec3& p)
@@ -182,7 +85,7 @@ namespace Geometry::Registration
                 const double distSq = glm::dot(diff, diff);
 
                 if (distSq <= maxDistSq)
-                    outPairs.push_back({i, targetIdx, distSq});
+                    outPairs.push_back({i, targetIdx, distSq, 1.0});
             }
         }
 
@@ -207,21 +110,55 @@ namespace Geometry::Registration
             pairs.resize(keepCount);
         }
 
-        // Compute RMSE from correspondence pairs.
-        [[nodiscard]] double ComputeRMSE(const std::vector<CorrespondencePair>& pairs)
+        // Apply IRLS-style robust weights to the surviving correspondences.
+        void ApplyRobustWeights(std::vector<CorrespondencePair>& pairs,
+                                Geometry::Robust::RobustKernel kernel,
+                                double scale)
+        {
+            for (auto& pair : pairs)
+            {
+                const double residual = std::sqrt(std::max(0.0, pair.DistanceSq));
+                const std::optional<double> weight = Geometry::Robust::Weight(kernel, residual, scale);
+                pair.Weight = (weight && std::isfinite(*weight) && *weight > 0.0) ? *weight : 0.0;
+            }
+
+            std::erase_if(pairs,
+                          [](const CorrespondencePair& pair)
+                          {
+                              return !std::isfinite(pair.Weight) || !(pair.Weight > 0.0);
+                          });
+        }
+
+        // Compute RMSE from correspondence pairs. Robust ICP reports the
+        // weighted objective so convergence follows the IRLS energy; the default
+        // path keeps the historical unweighted RMSE.
+        [[nodiscard]] double ComputeRMSE(const std::vector<CorrespondencePair>& pairs, bool weighted)
         {
             if (pairs.empty())
                 return 0.0;
 
             double sumSq = 0.0;
+            double sumWeight = 0.0;
             for (const auto& p : pairs)
-                sumSq += p.DistanceSq;
+            {
+                const double w = weighted ? p.Weight : 1.0;
+                if (!std::isfinite(w) || !(w > 0.0))
+                {
+                    continue;
+                }
+                sumSq += w * p.DistanceSq;
+                sumWeight += w;
+            }
 
-            return std::sqrt(sumSq / static_cast<double>(pairs.size()));
+            if (!(sumWeight > 0.0))
+            {
+                return 0.0;
+            }
+            return std::sqrt(sumSq / sumWeight);
         }
 
         // =====================================================================
-        // Point-to-Point: SVD-based rigid alignment (Arun et al. 1987)
+        // Point-to-Point: rigid alignment (Arun et al. 1987)
         // =====================================================================
         //
         // Given corresponding point pairs (s_i, t_i), find R, t minimizing:
@@ -230,10 +167,8 @@ namespace Geometry::Registration
         // Solution:
         //   1. Compute centroids of both sets.
         //   2. Center the points: s'_i = s_i - centroid_s, t'_i = t_i - centroid_t
-        //   3. Compute cross-covariance H = sum_i s'_i * t'_i^T
-        //   4. SVD of H = U * S * V^T
-        //   5. R = V * U^T (with det correction for reflections)
-        //   6. t = centroid_t - R * centroid_s
+        //   3. Solve the Kabsch/Umeyama optimal rotation through Geometry.Rotation.
+        //   4. t = centroid_t - R * centroid_s
 
         [[nodiscard]] glm::dmat4 SolvePointToPoint(
             const std::vector<CorrespondencePair>& pairs,
@@ -243,114 +178,46 @@ namespace Geometry::Registration
             if (pairs.size() < 3)
                 return glm::dmat4(1.0);
 
-            const double invN = 1.0 / static_cast<double>(pairs.size());
-
-            // Compute centroids
             glm::dvec3 centroidS(0.0);
             glm::dvec3 centroidT(0.0);
+            double totalWeight = 0.0;
+            std::size_t validCount = 0;
             for (const auto& pair : pairs)
             {
-                centroidS += transformedSource[pair.SourceIndex];
-                centroidT += glm::dvec3(targetPoints[pair.TargetIndex]);
+                if (!std::isfinite(pair.Weight) || !(pair.Weight > 0.0))
+                {
+                    continue;
+                }
+                centroidS += pair.Weight * transformedSource[pair.SourceIndex];
+                centroidT += pair.Weight * glm::dvec3(targetPoints[pair.TargetIndex]);
+                totalWeight += pair.Weight;
+                ++validCount;
             }
-            centroidS *= invN;
-            centroidT *= invN;
+            if (validCount < 3 || !(totalWeight > 0.0))
+            {
+                return glm::dmat4(1.0);
+            }
+            centroidS /= totalWeight;
+            centroidT /= totalWeight;
 
-            // Build 3x3 cross-covariance matrix H = sum (s'_i)(t'_i)^T
-            // H[row][col] = sum s'[row] * t'[col]
-            double h00 = 0, h01 = 0, h02 = 0;
-            double h10 = 0, h11 = 0, h12 = 0;
-            double h20 = 0, h21 = 0, h22 = 0;
-
+            std::vector<glm::dvec3> sourceCentered;
+            std::vector<glm::dvec3> targetCentered;
+            std::vector<double> weights;
+            sourceCentered.reserve(pairs.size());
+            targetCentered.reserve(pairs.size());
+            weights.reserve(pairs.size());
             for (const auto& pair : pairs)
             {
-                const glm::dvec3 s = transformedSource[pair.SourceIndex] - centroidS;
-                const glm::dvec3 t = glm::dvec3(targetPoints[pair.TargetIndex]) - centroidT;
-
-                h00 += s.x * t.x; h01 += s.x * t.y; h02 += s.x * t.z;
-                h10 += s.y * t.x; h11 += s.y * t.y; h12 += s.y * t.z;
-                h20 += s.z * t.x; h21 += s.z * t.y; h22 += s.z * t.z;
-            }
-
-            // SVD of H via eigendecomposition of H^T * H (3x3 symmetric).
-            // H = U * S * V^T  =>  H^T * H = V * S^2 * V^T
-
-            // Compute H^T * H
-            const double g00 = h00*h00 + h10*h10 + h20*h20;
-            const double g01 = h00*h01 + h10*h11 + h20*h21;
-            const double g02 = h00*h02 + h10*h12 + h20*h22;
-            const double g11 = h01*h01 + h11*h11 + h21*h21;
-            const double g12 = h01*h02 + h11*h12 + h21*h22;
-            const double g22 = h02*h02 + h12*h12 + h22*h22;
-
-            // Inline 3x3 symmetric eigendecomposition (Cardano's method)
-            auto eigenResult = SymEigen3(g00, g01, g02, g11, g12, g22);
-
-            // Compute singular values (sqrt of eigenvalues of H^T * H)
-            double sigma[3];
-            for (int i = 0; i < 3; ++i)
-                sigma[i] = std::sqrt(std::max(0.0, eigenResult.Values[i]));
-
-            // V = eigenvectors of H^T * H (sorted descending)
-            glm::dvec3 V[3], U[3];
-            for (int i = 0; i < 3; ++i)
-                V[i] = eigenResult.Vectors[i];
-
-            // Compute U columns: U_i = H * V_i / sigma_i
-            // For degenerate singular values, complete orthogonally.
-            for (int i = 0; i < 3; ++i)
-            {
-                if (sigma[i] > 1e-15)
+                if (!std::isfinite(pair.Weight) || !(pair.Weight > 0.0))
                 {
-                    const glm::dvec3& v = V[i];
-                    U[i] = glm::dvec3(
-                        h00 * v.x + h01 * v.y + h02 * v.z,
-                        h10 * v.x + h11 * v.y + h12 * v.z,
-                        h20 * v.x + h21 * v.y + h22 * v.z) / sigma[i];
+                    continue;
                 }
-                else
-                {
-                    // Degenerate: orthogonal completion via cross products
-                    if (i == 0)
-                    {
-                        U[i] = glm::dvec3(1.0, 0.0, 0.0);
-                    }
-                    else if (i == 1)
-                    {
-                        // Find a vector orthogonal to U[0]
-                        const glm::dvec3 candidate = (std::abs(U[0].x) < 0.9)
-                            ? glm::dvec3(1, 0, 0) : glm::dvec3(0, 1, 0);
-                        U[i] = glm::normalize(glm::cross(U[0], candidate));
-                    }
-                    else
-                    {
-                        U[i] = glm::cross(U[0], U[1]);
-                    }
-                }
+                sourceCentered.push_back(transformedSource[pair.SourceIndex] - centroidS);
+                targetCentered.push_back(glm::dvec3(targetPoints[pair.TargetIndex]) - centroidT);
+                weights.push_back(pair.Weight);
             }
 
-            // Rotation: R = V * D * U^T where D = diag(1, 1, det(V)*det(U))
-            // corrects for reflections when det(H) < 0 (Umeyama 1991).
-
-            // Reflection correction
-            auto det3 = [](const glm::dvec3& c0, const glm::dvec3& c1, const glm::dvec3& c2) -> double
-            {
-                return glm::dot(c0, glm::cross(c1, c2));
-            };
-
-            const double detU = det3(U[0], U[1], U[2]);
-            const double detV = det3(V[0], V[1], V[2]);
-            const double d = (detU * detV < 0.0) ? -1.0 : 1.0;
-
-            // R = V * D * U^T = sum_i d_i * outer(V[i], U[i])
-            glm::dmat3 R(0.0);
-            for (int i = 0; i < 3; ++i)
-            {
-                const double sign = (i == 2) ? d : 1.0;
-                for (int row = 0; row < 3; ++row)
-                    for (int col = 0; col < 3; ++col)
-                        R[col][row] += sign * V[i][row] * U[i][col];
-            }
+            const glm::dmat3 R = Geometry::Rotation::OptimalRotation(sourceCentered, targetCentered, weights);
 
             // Translation
             const glm::dvec3 t = centroidT - R * centroidS;
@@ -393,9 +260,14 @@ namespace Geometry::Registration
             // Build normal equations: A^T A x = A^T b  (6x6 symmetric system)
             double ATA[6][6] = {};
             double ATb[6] = {};
+            std::size_t validRows = 0;
 
             for (const auto& pair : pairs)
             {
+                if (!std::isfinite(pair.Weight) || !(pair.Weight > 0.0))
+                {
+                    continue;
+                }
                 const glm::dvec3 s = transformedSource[pair.SourceIndex];
                 const glm::dvec3 c = glm::dvec3(targetPoints[pair.TargetIndex]);
                 const glm::dvec3 n = glm::dvec3(targetNormals[pair.TargetIndex]);
@@ -416,9 +288,15 @@ namespace Geometry::Registration
                 for (int i = 0; i < 6; ++i)
                 {
                     for (int j = i; j < 6; ++j)
-                        ATA[i][j] += a[i] * a[j];
-                    ATb[i] += a[i] * b;
+                        ATA[i][j] += pair.Weight * a[i] * a[j];
+                    ATb[i] += pair.Weight * a[i] * b;
                 }
+                ++validRows;
+            }
+
+            if (validRows < 6)
+            {
+                return glm::dmat4(1.0);
             }
 
             // Fill lower triangle
@@ -532,6 +410,13 @@ namespace Geometry::Registration
         if (params.InlierRatio <= 0.0 || params.InlierRatio > 1.0)
             return std::nullopt;
 
+        const bool robustWeightingEnabled = params.RobustKernelKind.has_value();
+        if (robustWeightingEnabled &&
+            (!std::isfinite(params.RobustScale) || !(params.RobustScale > 0.0)))
+        {
+            return std::nullopt;
+        }
+
         // Determine effective variant: fall back to PointToPoint if normals unavailable
         ICPVariant effectiveVariant = params.Variant;
         if (effectiveVariant == ICPVariant::PointToPlane &&
@@ -574,11 +459,16 @@ namespace Geometry::Registration
             // 2. Reject outliers
             RejectOutliers(pairs, params.InlierRatio);
 
+            if (robustWeightingEnabled)
+            {
+                ApplyRobustWeights(pairs, *params.RobustKernelKind, params.RobustScale);
+            }
+
             if (pairs.size() < 3)
                 break;
 
             // 3. Compute RMSE before solving
-            const double rmse = ComputeRMSE(pairs);
+            const double rmse = ComputeRMSE(pairs, robustWeightingEnabled);
             result.RMSEHistory.push_back(rmse);
 
             // 4. Solve for incremental transform

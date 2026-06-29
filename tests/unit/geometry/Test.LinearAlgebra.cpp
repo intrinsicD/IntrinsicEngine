@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <span>
 #include <vector>
 
@@ -24,6 +26,90 @@ namespace
             }
         }
         return std::sqrt(error);
+    }
+
+    [[nodiscard]] double FrobeniusNorm(const Geometry::Linalg::DenseMatrix& matrix)
+    {
+        double norm = 0.0;
+        for (const double value : matrix.Values)
+        {
+            norm += value * value;
+        }
+        return std::sqrt(norm);
+    }
+
+    [[nodiscard]] double RelativeFrobeniusError(const Geometry::Linalg::DenseMatrix& a,
+                                                const Geometry::Linalg::DenseMatrix& b)
+    {
+        return FrobeniusError(a, b) / std::max(FrobeniusNorm(b), 1.0);
+    }
+
+    [[nodiscard]] bool HasNoNaNs(const Geometry::Linalg::DenseMatrix& matrix)
+    {
+        for (const double value : matrix.Values)
+        {
+            if (std::isnan(value))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    struct RobustPCASynthetic
+    {
+        Geometry::Linalg::DenseMatrix LowRank;
+        Geometry::Linalg::DenseMatrix Sparse;
+        Geometry::Linalg::DenseMatrix Input;
+    };
+
+    [[nodiscard]] RobustPCASynthetic MakeRobustPCASynthetic()
+    {
+        constexpr std::size_t rows = 6;
+        constexpr std::size_t cols = 5;
+        const std::array<double, rows> u{1.0, 2.0, 3.0, 4.0, 5.0, 6.0};
+        const std::array<double, cols> v{1.0, -0.5, 0.25, 2.0, -1.5};
+
+        RobustPCASynthetic synthetic{
+            .LowRank = Geometry::Linalg::DenseMatrix(rows, cols),
+            .Sparse = Geometry::Linalg::DenseMatrix(rows, cols),
+            .Input = Geometry::Linalg::DenseMatrix(rows, cols)};
+
+        for (std::size_t row = 0; row < rows; ++row)
+        {
+            for (std::size_t col = 0; col < cols; ++col)
+            {
+                synthetic.LowRank(row, col) = u[row] * v[col];
+            }
+        }
+
+        synthetic.Sparse(0, 4) = 20.0;
+        synthetic.Sparse(2, 1) = -18.0;
+        synthetic.Sparse(4, 0) = -14.0;
+        synthetic.Sparse(5, 3) = 16.0;
+
+        for (std::size_t i = 0; i < synthetic.Input.Values.size(); ++i)
+        {
+            synthetic.Input.Values[i] = synthetic.LowRank.Values[i] + synthetic.Sparse.Values[i];
+        }
+        return synthetic;
+    }
+
+    [[nodiscard]] double SparseSupportAgreement(const Geometry::Linalg::DenseMatrix& recovered,
+                                                const Geometry::Linalg::DenseMatrix& expected,
+                                                double threshold)
+    {
+        std::size_t matches = 0;
+        for (std::size_t i = 0; i < recovered.Values.size(); ++i)
+        {
+            const bool recoveredNonZero = std::abs(recovered.Values[i]) > threshold;
+            const bool expectedNonZero = std::abs(expected.Values[i]) > threshold;
+            if (recoveredNonZero == expectedNonZero)
+            {
+                ++matches;
+            }
+        }
+        return static_cast<double>(matches) / static_cast<double>(recovered.Values.size());
     }
 
     [[nodiscard]] Geometry::Linalg::DenseMatrix Multiply(const Geometry::Linalg::DenseMatrix& a,
@@ -180,3 +266,74 @@ TEST(LinearAlgebra, LeastSquaresPolarAndCovarianceReturnDiagnostics)
     EXPECT_NEAR(covarianceResult.Covariance[0][0], 4.0, 1.0e-12);
 }
 
+TEST(LinearAlgebra, RobustPCARecoversLowRankPlusSparseMatrix)
+{
+    const RobustPCASynthetic synthetic = MakeRobustPCASynthetic();
+    Geometry::Linalg::RobustPCAOptions options;
+    options.Lambda = 0.5;
+    options.MaxIterations = 1000;
+    options.Tolerance = 1.0e-6;
+
+    const Geometry::Linalg::RobustPCAResult result = Geometry::Linalg::RobustPCA(synthetic.Input, options);
+    ASSERT_TRUE(result.Diagnostics.Succeeded());
+    EXPECT_EQ(result.Rank, 1u);
+    EXPECT_LE(result.Iterations, options.MaxIterations);
+    EXPECT_LT(result.RelativeResidual, options.Tolerance);
+    EXPECT_LT(RelativeFrobeniusError(result.LowRank, synthetic.LowRank), 1.0e-4);
+    EXPECT_LT(RelativeFrobeniusError(result.Sparse, synthetic.Sparse), 1.0e-4);
+    EXPECT_GE(SparseSupportAgreement(result.Sparse, synthetic.Sparse, 1.0e-3), 1.0);
+}
+
+TEST(LinearAlgebra, RobustPCAIsDeterministicForIdenticalInput)
+{
+    const RobustPCASynthetic synthetic = MakeRobustPCASynthetic();
+    Geometry::Linalg::RobustPCAOptions options;
+    options.Lambda = 0.5;
+    options.MaxIterations = 1000;
+    options.Tolerance = 1.0e-6;
+
+    const Geometry::Linalg::RobustPCAResult a = Geometry::Linalg::RobustPCA(synthetic.Input, options);
+    const Geometry::Linalg::RobustPCAResult b = Geometry::Linalg::RobustPCA(synthetic.Input, options);
+
+    ASSERT_TRUE(a.Diagnostics.Succeeded());
+    ASSERT_TRUE(b.Diagnostics.Succeeded());
+    EXPECT_EQ(a.LowRank.Values, b.LowRank.Values);
+    EXPECT_EQ(a.Sparse.Values, b.Sparse.Values);
+    EXPECT_EQ(a.Rank, b.Rank);
+    EXPECT_EQ(a.Iterations, b.Iterations);
+    EXPECT_DOUBLE_EQ(a.RelativeResidual, b.RelativeResidual);
+}
+
+TEST(LinearAlgebra, RobustPCAFailsClosedForDegenerateInput)
+{
+    const Geometry::Linalg::RobustPCAResult empty = Geometry::Linalg::RobustPCA(Geometry::Linalg::DenseMatrix{});
+    EXPECT_FALSE(empty.Diagnostics.Succeeded());
+    EXPECT_TRUE(HasNoNaNs(empty.LowRank));
+    EXPECT_TRUE(HasNoNaNs(empty.Sparse));
+
+    Geometry::Linalg::DenseMatrix zero(2, 2);
+    const Geometry::Linalg::RobustPCAResult zeroResult = Geometry::Linalg::RobustPCA(zero);
+    EXPECT_FALSE(zeroResult.Diagnostics.Succeeded());
+    EXPECT_TRUE(HasNoNaNs(zeroResult.LowRank));
+    EXPECT_TRUE(HasNoNaNs(zeroResult.Sparse));
+
+    Geometry::Linalg::DenseMatrix nonFinite(2, 2);
+    nonFinite(0, 0) = 1.0;
+    nonFinite(0, 1) = std::numeric_limits<double>::quiet_NaN();
+    nonFinite(1, 0) = 2.0;
+    nonFinite(1, 1) = 3.0;
+    const Geometry::Linalg::RobustPCAResult nonFiniteResult = Geometry::Linalg::RobustPCA(nonFinite);
+    EXPECT_FALSE(nonFiniteResult.Diagnostics.Succeeded());
+    EXPECT_EQ(nonFiniteResult.Diagnostics.Status, Geometry::Linalg::NumericStatus::NonFinite);
+    EXPECT_TRUE(HasNoNaNs(nonFiniteResult.LowRank));
+    EXPECT_TRUE(HasNoNaNs(nonFiniteResult.Sparse));
+
+    Geometry::Linalg::RobustPCAOptions invalidOptions;
+    invalidOptions.Tolerance = 0.0;
+    const Geometry::Linalg::RobustPCAResult invalidOptionResult =
+        Geometry::Linalg::RobustPCA(MakeRobustPCASynthetic().Input, invalidOptions);
+    EXPECT_FALSE(invalidOptionResult.Diagnostics.Succeeded());
+    EXPECT_EQ(invalidOptionResult.Diagnostics.Status, Geometry::Linalg::NumericStatus::InvalidInput);
+    EXPECT_TRUE(HasNoNaNs(invalidOptionResult.LowRank));
+    EXPECT_TRUE(HasNoNaNs(invalidOptionResult.Sparse));
+}

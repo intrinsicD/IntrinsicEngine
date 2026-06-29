@@ -9,6 +9,7 @@
 #include <span>
 #include <vector>
 
+import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Error;
 import Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
 import Extrinsic.RHI.CommandContext;
@@ -244,6 +245,52 @@ namespace
         EXPECT_NEAR(actual.z, expected.z, kEpsilon);
         EXPECT_NEAR(actual.w, expected.w, kEpsilon);
     }
+
+    [[nodiscard]] bool HasTextureUsage(const RHI::TextureUsage flags,
+                                       const RHI::TextureUsage bit) noexcept
+    {
+        return (static_cast<std::uint32_t>(flags) &
+                static_cast<std::uint32_t>(bit)) != 0u;
+    }
+
+    [[nodiscard]] Graphics::ObjectSpaceNormalTextureBakePlanRequest
+    MakeValidPlanRequest()
+    {
+        return Graphics::ObjectSpaceNormalTextureBakePlanRequest{
+            .GeneratedTextureAsset = Assets::AssetId{42u, 7u},
+            .Geometry = Graphics::ObjectSpaceNormalTextureBakeGeometryBuffers{
+                .IndexBuffer = RHI::BufferHandle{3u, 1u},
+                .TexcoordBDA = 0x1000u,
+                .NormalBDA = 0x2000u,
+                .VertexCount = 3u,
+                .IndexCount = 3u,
+            },
+            .Options = Graphics::ObjectSpaceNormalTextureBakeOptions{
+                .Width = 32u,
+                .Height = 64u,
+                .PaddingTexels = 4u,
+            },
+            .SourceKey = Graphics::ObjectSpaceNormalTextureBakeSourceKey{
+                .EntityKey = 0xabcdu,
+                .GeometryGeneration = 11u,
+                .TexcoordGeneration = 12u,
+                .NormalGeneration = 13u,
+            },
+            .Pipeline = RHI::PipelineHandle{5u, 1u},
+            .SamplerDesc = RHI::SamplerDesc{
+                .AddressU = RHI::AddressMode::ClampToEdge,
+                .AddressV = RHI::AddressMode::ClampToEdge,
+                .AddressW = RHI::AddressMode::ClampToEdge,
+                .DebugName = "ObjectSpaceNormalBake.ContractSampler",
+            },
+            .AdditionalTextureUsage = RHI::TextureUsage::TransferSrc,
+            .InitialLayout = RHI::TextureLayout::Undefined,
+            .FinalLayout = RHI::TextureLayout::TransferSrc,
+            .DebugName = "ObjectSpaceNormalBake.ContractOutput",
+            .ReadyFrame = 17u,
+            .HasReadyFrame = true,
+        };
+    }
 }
 
 TEST(ObjectSpaceNormalTextureBake, ResolvesDefaultExtentAndClampPolicy)
@@ -395,6 +442,113 @@ TEST(ObjectSpaceNormalTextureBake, BuildsGpuPipelineDescForRgbaBakeTarget)
     EXPECT_EQ(desc.ColorTargetFormats[0], RHI::Format::RGBA8_UNORM);
     EXPECT_EQ(desc.PushConstantSize,
               sizeof(Graphics::ObjectSpaceNormalTextureBakeGpuPushConstants));
+}
+
+TEST(ObjectSpaceNormalTextureBake, BuildsGpuProducedTexturePlanWithCompletionKey)
+{
+    const auto request = MakeValidPlanRequest();
+
+    const auto plan = Graphics::BuildObjectSpaceNormalTextureBakePlan(request);
+    ASSERT_TRUE(plan.Succeeded())
+        << Graphics::DebugNameForObjectSpaceNormalTextureBakeStatus(plan.Status);
+
+    EXPECT_EQ(plan.TextureRequest.Id, request.GeneratedTextureAsset);
+    EXPECT_EQ(plan.TextureRequest.Desc.Width, 32u);
+    EXPECT_EQ(plan.TextureRequest.Desc.Height, 64u);
+    EXPECT_EQ(plan.TextureRequest.Desc.Fmt, RHI::Format::RGBA8_UNORM);
+    EXPECT_TRUE(HasTextureUsage(plan.TextureRequest.Desc.Usage,
+                                RHI::TextureUsage::Sampled));
+    EXPECT_TRUE(HasTextureUsage(plan.TextureRequest.Desc.Usage,
+                                RHI::TextureUsage::ColorTarget));
+    EXPECT_TRUE(HasTextureUsage(plan.TextureRequest.Desc.Usage,
+                                RHI::TextureUsage::TransferSrc));
+    EXPECT_FALSE(HasTextureUsage(plan.TextureRequest.Desc.Usage,
+                                 RHI::TextureUsage::Storage))
+        << "Dilation is reported as unavailable until the compute pass lands.";
+    EXPECT_EQ(plan.TextureRequest.Desc.InitialLayout,
+              RHI::TextureLayout::Undefined);
+    EXPECT_STREQ(plan.TextureRequest.Desc.DebugName,
+                 "ObjectSpaceNormalBake.ContractOutput");
+    EXPECT_EQ(plan.TextureRequest.ReadyFrame, 17u);
+    EXPECT_TRUE(plan.TextureRequest.HasReadyFrame);
+
+    EXPECT_EQ(plan.CompletionKey.GeneratedTextureAsset,
+              request.GeneratedTextureAsset);
+    EXPECT_EQ(plan.CompletionKey.Source.EntityKey, 0xabcdu);
+    EXPECT_EQ(plan.CompletionKey.Source.GeometryGeneration, 11u);
+    EXPECT_EQ(plan.CompletionKey.Source.TexcoordGeneration, 12u);
+    EXPECT_EQ(plan.CompletionKey.Source.NormalGeneration, 13u);
+    EXPECT_EQ(plan.CompletionKey.Width, 32u);
+    EXPECT_EQ(plan.CompletionKey.Height, 64u);
+    EXPECT_EQ(plan.CompletionKey.PaddingTexels, 4u);
+    EXPECT_EQ(plan.CompletionKey.Space,
+              Graphics::NormalTextureSpace::ObjectSpaceNormal);
+    EXPECT_TRUE(plan.DilationRequested);
+    EXPECT_FALSE(plan.DilationAvailable);
+
+    const RHI::TextureHandle outputTexture{9u, 2u};
+    const auto record =
+        Graphics::MakeObjectSpaceNormalTextureBakeGpuRecordDesc(plan,
+                                                                outputTexture);
+    EXPECT_EQ(record.Pipeline, request.Pipeline);
+    EXPECT_EQ(record.OutputTexture, outputTexture);
+    EXPECT_EQ(record.IndexBuffer, request.Geometry.IndexBuffer);
+    EXPECT_EQ(record.TexcoordBDA, request.Geometry.TexcoordBDA);
+    EXPECT_EQ(record.NormalBDA, request.Geometry.NormalBDA);
+    EXPECT_EQ(record.IndexCount, request.Geometry.IndexCount);
+    EXPECT_EQ(record.Width, 32u);
+    EXPECT_EQ(record.Height, 64u);
+    EXPECT_EQ(record.InitialLayout, RHI::TextureLayout::Undefined);
+    EXPECT_EQ(record.FinalLayout, RHI::TextureLayout::TransferSrc);
+}
+
+TEST(ObjectSpaceNormalTextureBake, CompletionKeyDetectsStaleBakeResults)
+{
+    const auto plan = Graphics::BuildObjectSpaceNormalTextureBakePlan(
+        MakeValidPlanRequest());
+    ASSERT_TRUE(plan.Succeeded());
+
+    auto current = plan.CompletionKey;
+    EXPECT_TRUE(Graphics::ObjectSpaceNormalTextureBakeCompletionKeyMatches(
+        plan.CompletionKey,
+        current));
+
+    current.Source.NormalGeneration += 1u;
+    EXPECT_FALSE(Graphics::ObjectSpaceNormalTextureBakeCompletionKeyMatches(
+        plan.CompletionKey,
+        current));
+
+    current = plan.CompletionKey;
+    current.PaddingTexels += 1u;
+    EXPECT_FALSE(Graphics::ObjectSpaceNormalTextureBakeCompletionKeyMatches(
+        plan.CompletionKey,
+        current));
+}
+
+TEST(ObjectSpaceNormalTextureBake, BuildGpuProducedTexturePlanFailsClosed)
+{
+    auto request = MakeValidPlanRequest();
+    request.GeneratedTextureAsset = Assets::AssetId{};
+    auto plan = Graphics::BuildObjectSpaceNormalTextureBakePlan(request);
+    EXPECT_FALSE(plan.Succeeded());
+    EXPECT_EQ(plan.Status,
+              Graphics::ObjectSpaceNormalTextureBakeStatus::
+                  InvalidGeneratedTextureAsset);
+
+    request = MakeValidPlanRequest();
+    request.Geometry.IndexCount = 4u;
+    plan = Graphics::BuildObjectSpaceNormalTextureBakePlan(request);
+    EXPECT_FALSE(plan.Succeeded());
+    EXPECT_EQ(plan.Status,
+              Graphics::ObjectSpaceNormalTextureBakeStatus::InvalidIndexCount);
+    EXPECT_EQ(plan.Diagnostics.FirstFailureIndex, 4u);
+
+    request = MakeValidPlanRequest();
+    request.Geometry.TexcoordBDA = 0u;
+    plan = Graphics::BuildObjectSpaceNormalTextureBakePlan(request);
+    EXPECT_FALSE(plan.Succeeded());
+    EXPECT_EQ(plan.Status,
+              Graphics::ObjectSpaceNormalTextureBakeStatus::InvalidGpuResource);
 }
 
 TEST(ObjectSpaceNormalTextureBake, RecordGpuBakeCommandsPinsRasterExtentAndDraw)

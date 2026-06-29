@@ -4,6 +4,8 @@ module;
 #include <cassert>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
+#include <limits>
 #include <optional>
 #include <queue>
 #include <vector>
@@ -376,6 +378,176 @@ namespace Geometry::MeshRepair
 
         result.WasConsistent = (result.FacesFlipped == 0);
         return result;
+    }
+
+    namespace
+    {
+        [[nodiscard]] bool HasFiniteLivePositions(const HalfedgeMesh::Mesh& mesh)
+        {
+            for (std::size_t vi = 0; vi < mesh.VerticesSize(); ++vi)
+            {
+                const VertexHandle v{static_cast<PropertyIndex>(vi)};
+                if (mesh.IsDeleted(v)) continue;
+                const glm::vec3 p = mesh.Position(v);
+                if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        [[nodiscard]] std::optional<ConnectedComponentsResult> LabelComponents(
+            const HalfedgeMesh::Mesh& mesh)
+        {
+            if (mesh.IsEmpty() || mesh.FaceCount() == 0 || !HasFiniteLivePositions(mesh))
+            {
+                return std::nullopt;
+            }
+
+            constexpr std::uint32_t kUnassigned = std::numeric_limits<std::uint32_t>::max();
+            ConnectedComponentsResult result{};
+            result.VertexComponents.assign(mesh.VerticesSize(), kUnassigned);
+            result.FaceComponents.assign(mesh.FacesSize(), kUnassigned);
+
+            std::queue<FaceHandle> queue;
+            for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+            {
+                const FaceHandle seed{static_cast<PropertyIndex>(fi)};
+                if (mesh.IsDeleted(seed) || result.FaceComponents[fi] != kUnassigned)
+                {
+                    continue;
+                }
+
+                const std::uint32_t component = static_cast<std::uint32_t>(result.ComponentCount++);
+                result.FaceComponents[fi] = component;
+                queue.push(seed);
+
+                while (!queue.empty())
+                {
+                    const FaceHandle face = queue.front();
+                    queue.pop();
+
+                    for (const VertexHandle v : mesh.VerticesAroundFace(face))
+                    {
+                        result.VertexComponents[v.Index] = component;
+                    }
+
+                    for (const HalfedgeHandle h : mesh.HalfedgesAroundFace(face))
+                    {
+                        const FaceHandle adjacent = mesh.Face(mesh.OppositeHalfedge(h));
+                        if (!adjacent.IsValid() || mesh.IsDeleted(adjacent))
+                        {
+                            continue;
+                        }
+                        if (result.FaceComponents[adjacent.Index] != kUnassigned)
+                        {
+                            continue;
+                        }
+                        result.FaceComponents[adjacent.Index] = component;
+                        queue.push(adjacent);
+                    }
+                }
+            }
+
+            return result.ComponentCount > 0 ? std::optional{std::move(result)} : std::nullopt;
+        }
+
+        [[nodiscard]] HalfedgeMesh::Mesh BuildComponentMesh(
+            const HalfedgeMesh::Mesh& mesh,
+            const ConnectedComponentsResult& labels,
+            const std::uint32_t component)
+        {
+            HalfedgeMesh::Mesh out;
+            std::vector<VertexHandle> remap(mesh.VerticesSize(), VertexHandle{});
+
+            for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+            {
+                const FaceHandle f{static_cast<PropertyIndex>(fi)};
+                if (mesh.IsDeleted(f) || labels.FaceComponents[fi] != component)
+                {
+                    continue;
+                }
+
+                std::vector<VertexHandle> faceVertices;
+                for (const VertexHandle oldVertex : mesh.VerticesAroundFace(f))
+                {
+                    VertexHandle& mapped = remap[oldVertex.Index];
+                    if (!mapped.IsValid())
+                    {
+                        mapped = out.AddVertex(mesh.Position(oldVertex));
+                    }
+                    faceVertices.push_back(mapped);
+                }
+                (void)out.AddFace(faceVertices);
+            }
+
+            return out;
+        }
+    }
+
+    std::optional<ConnectedComponentsResult> ComputeConnectedComponents(HalfedgeMesh::Mesh& mesh)
+    {
+        auto labels = LabelComponents(mesh);
+        if (!labels) return std::nullopt;
+
+        VertexProperty<std::uint32_t> vertexComponents(
+            mesh.VertexProperties().GetOrAdd<std::uint32_t>("v:component", 0u));
+        FaceProperty<std::uint32_t> faceComponents(
+            mesh.FaceProperties().GetOrAdd<std::uint32_t>("f:component", 0u));
+        for (std::size_t vi = 0; vi < labels->VertexComponents.size(); ++vi)
+        {
+            vertexComponents[VertexHandle{static_cast<PropertyIndex>(vi)}] = labels->VertexComponents[vi];
+        }
+        for (std::size_t fi = 0; fi < labels->FaceComponents.size(); ++fi)
+        {
+            faceComponents[FaceHandle{static_cast<PropertyIndex>(fi)}] = labels->FaceComponents[fi];
+        }
+
+        return labels;
+    }
+
+    std::optional<std::vector<HalfedgeMesh::Mesh>> SplitIntoComponents(const HalfedgeMesh::Mesh& mesh)
+    {
+        auto labels = LabelComponents(mesh);
+        if (!labels) return std::nullopt;
+
+        std::vector<HalfedgeMesh::Mesh> components;
+        components.reserve(labels->ComponentCount);
+        for (std::uint32_t component = 0; component < labels->ComponentCount; ++component)
+        {
+            components.push_back(BuildComponentMesh(mesh, *labels, component));
+        }
+        return components;
+    }
+
+    std::optional<ConnectedComponentsResult> KeepLargestComponent(HalfedgeMesh::Mesh& mesh)
+    {
+        auto labels = LabelComponents(mesh);
+        if (!labels) return std::nullopt;
+
+        std::vector<std::size_t> faceCounts(labels->ComponentCount, 0u);
+        std::vector<std::size_t> firstFace(labels->ComponentCount, std::numeric_limits<std::size_t>::max());
+        for (std::size_t fi = 0; fi < labels->FaceComponents.size(); ++fi)
+        {
+            const std::uint32_t component = labels->FaceComponents[fi];
+            if (component == std::numeric_limits<std::uint32_t>::max()) continue;
+            ++faceCounts[component];
+            firstFace[component] = std::min(firstFace[component], fi);
+        }
+
+        std::uint32_t keep = 0;
+        for (std::uint32_t component = 1; component < labels->ComponentCount; ++component)
+        {
+            if (faceCounts[component] > faceCounts[keep]
+                || (faceCounts[component] == faceCounts[keep] && firstFace[component] < firstFace[keep]))
+            {
+                keep = component;
+            }
+        }
+
+        mesh = BuildComponentMesh(mesh, *labels, keep);
+        return ComputeConnectedComponents(mesh);
     }
 
     // =========================================================================

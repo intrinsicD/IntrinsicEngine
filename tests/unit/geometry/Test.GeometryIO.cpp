@@ -22,6 +22,10 @@
 import Extrinsic.Core.Error;
 import Geometry;
 
+#ifndef INTRINSIC_TEST_SUPPORT_DIR
+#define INTRINSIC_TEST_SUPPORT_DIR "tests/support"
+#endif
+
 namespace
 {
     [[nodiscard]] std::string WriteTempFile(const std::string& extension, const std::string& contents)
@@ -84,6 +88,32 @@ namespace
         EXPECT_EQ(faceVertices[0][1], 1u);
         EXPECT_EQ(faceVertices[0][2], 2u);
     }
+
+    [[nodiscard]] std::string GeometryIOFixturePath(const std::string& filename)
+    {
+        return std::string(INTRINSIC_TEST_SUPPORT_DIR) + "/geometry/geometry_io/" + filename;
+    }
+
+    void ExpectPointCloudPositionsEqual(const Geometry::PointCloud::Cloud& lhs,
+                                        const Geometry::PointCloud::Cloud& rhs)
+    {
+        ASSERT_EQ(lhs.VerticesSize(), rhs.VerticesSize());
+        ASSERT_EQ(lhs.HasNormals(), rhs.HasNormals());
+        ASSERT_EQ(lhs.HasColors(), rhs.HasColors());
+        for (std::size_t i = 0; i < lhs.VerticesSize(); ++i)
+        {
+            const Geometry::VertexHandle point{static_cast<Geometry::PropertyIndex>(i)};
+            EXPECT_EQ(lhs.Position(point), rhs.Position(point));
+            if (lhs.HasNormals())
+            {
+                EXPECT_EQ(lhs.Normal(point), rhs.Normal(point));
+            }
+            if (lhs.HasColors())
+            {
+                EXPECT_EQ(lhs.Color(point), rhs.Color(point));
+            }
+        }
+    }
 }
 
 TEST(GeometryIO_Metadata, ReportsSupportedImportAndExportDomains)
@@ -99,7 +129,7 @@ TEST(GeometryIO_Metadata, ReportsSupportedImportAndExportDomains)
     using Geometry::IO::SupportsExportDomain;
     using Geometry::IO::SupportsImportDomain;
 
-    EXPECT_EQ(SupportedGeometryIOFormats().size(), 10u);
+    EXPECT_EQ(SupportedGeometryIOFormats().size(), 14u);
 
     const auto* ply = FindGeometryIOFormat(".PLY");
     ASSERT_NE(ply, nullptr);
@@ -125,11 +155,19 @@ TEST(GeometryIO_Metadata, ReportsSupportedImportAndExportDomains)
     EXPECT_FALSE(HasAmbiguousExportDomains("obj"));
 
     EXPECT_TRUE(SupportsImportDomain("off", GeometryIODomain::Mesh));
-    EXPECT_FALSE(SupportsExportDomain("off", GeometryIODomain::Mesh));
+    EXPECT_TRUE(SupportsExportDomain("off", GeometryIODomain::Mesh));
 
     EXPECT_TRUE(SupportsImportDomain("pts", GeometryIODomain::PointCloud));
+    EXPECT_TRUE(SupportsImportDomain("pwn", GeometryIODomain::PointCloud));
+    EXPECT_TRUE(SupportsImportDomain("csv", GeometryIODomain::PointCloud));
+    EXPECT_TRUE(SupportsImportDomain("3d", GeometryIODomain::PointCloud));
+    EXPECT_TRUE(SupportsImportDomain("txt", GeometryIODomain::PointCloud));
     EXPECT_TRUE(SupportsImportDomain("xyzrgb", GeometryIODomain::PointCloud));
     EXPECT_FALSE(SupportsExportDomain("pts", GeometryIODomain::PointCloud));
+    EXPECT_FALSE(SupportsExportDomain("pwn", GeometryIODomain::PointCloud));
+    EXPECT_FALSE(SupportsExportDomain("csv", GeometryIODomain::PointCloud));
+    EXPECT_FALSE(SupportsExportDomain("3d", GeometryIODomain::PointCloud));
+    EXPECT_FALSE(SupportsExportDomain("txt", GeometryIODomain::PointCloud));
     EXPECT_FALSE(SupportsExportDomain("xyzrgb", GeometryIODomain::PointCloud));
     EXPECT_TRUE(SupportsExportDomain("pcd", GeometryIODomain::PointCloud));
 
@@ -167,13 +205,17 @@ TEST(GeometryIO_Metadata, ReportsAssetRoutingReadinessForAllPromotedFormats)
         bool AmbiguousExport = false;
     };
 
-    const std::array<ExpectedFormat, 10> expected{{
+    const std::array<ExpectedFormat, 14> expected{{
         {"obj", GeometryIOFormatKind::OBJ, true, false, false, true, false, false, false, false, false, false},
-        {"off", GeometryIOFormatKind::OFF, true, false, false, false, false, false, false, false, false, false},
+        {"off", GeometryIOFormatKind::OFF, true, false, false, true, false, false, false, false, false, false},
         {"stl", GeometryIOFormatKind::STL, true, false, false, true, false, false, true, true, false, false},
         {"ply", GeometryIOFormatKind::PLY, true, true, false, true, true, false, true, true, true, true},
         {"xyz", GeometryIOFormatKind::XYZ, false, true, false, false, true, false, false, false, false, false},
         {"pts", GeometryIOFormatKind::PTS, false, true, false, false, false, false, false, false, false, false},
+        {"pwn", GeometryIOFormatKind::PWN, false, true, false, false, false, false, false, false, false, false},
+        {"csv", GeometryIOFormatKind::CSV, false, true, false, false, false, false, false, false, false, false},
+        {"3d", GeometryIOFormatKind::ThreeD, false, true, false, false, false, false, false, false, false, false},
+        {"txt", GeometryIOFormatKind::TXT, false, true, false, false, false, false, false, false, false, false},
         {"xyzrgb", GeometryIOFormatKind::XYZRGB, false, true, false, false, false, false, false, false, false, false},
         {"pcd", GeometryIOFormatKind::PCD, false, true, false, false, true, false, true, true, false, false},
         {"tgf", GeometryIOFormatKind::TGF, false, false, true, false, false, true, false, false, false, false},
@@ -1275,6 +1317,128 @@ TEST(GeometryIO_PointCloudIO, LoadXYZRejectsAllMalformedInput)
     EXPECT_EQ(result.error(), Extrinsic::Core::ErrorCode::InvalidFormat);
 }
 
+TEST(GeometryIO_PointCloudIO, LoadsPTSFixture)
+{
+    const auto result = Geometry::PointCloudIO::LoadPTS(GeometryIOFixturePath("valid.pts"));
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Cloud.VerticesSize(), 2u);
+    EXPECT_TRUE(result->Cloud.HasColors());
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(0.0f, 0.0f, 0.0f));
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{1}), glm::vec3(1.0f, 2.0f, 3.0f));
+    EXPECT_EQ(result->Cloud.Color(Geometry::VertexHandle{0}), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{1}).g, 128.0f / 255.0f, 1.0e-6f);
+}
+
+TEST(GeometryIO_PointCloudIO, LoadsPWNFixtureWithNormals)
+{
+    const auto result = Geometry::PointCloudIO::LoadPWN(GeometryIOFixturePath("valid.pwn"));
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Cloud.VerticesSize(), 2u);
+    EXPECT_TRUE(result->Cloud.HasNormals());
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{1}), glm::vec3(1.0f, 0.0f, 0.0f));
+    EXPECT_EQ(result->Cloud.Normal(Geometry::VertexHandle{0}), glm::vec3(0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(result->Cloud.Normal(Geometry::VertexHandle{1}), glm::vec3(0.0f, 1.0f, 0.0f));
+}
+
+TEST(GeometryIO_PointCloudIO, LoadsCSVFixtureWithNormals)
+{
+    const auto result = Geometry::PointCloudIO::LoadCSV(GeometryIOFixturePath("valid.csv"));
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Cloud.VerticesSize(), 2u);
+    EXPECT_TRUE(result->Cloud.HasNormals());
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(0.0f, 0.0f, 0.0f));
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{1}), glm::vec3(1.0f, 2.0f, 3.0f));
+    EXPECT_EQ(result->Cloud.Normal(Geometry::VertexHandle{0}), glm::vec3(0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(result->Cloud.Normal(Geometry::VertexHandle{1}), glm::vec3(0.0f, 1.0f, 0.0f));
+}
+
+TEST(GeometryIO_PointCloudIO, Loads3DFixture)
+{
+    const auto result = Geometry::PointCloudIO::Load3D(GeometryIOFixturePath("valid.3d"));
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Cloud.VerticesSize(), 2u);
+    EXPECT_FALSE(result->Cloud.HasNormals());
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(-1.0f, 0.0f, 2.0f));
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{1}), glm::vec3(3.0f, 4.0f, 5.0f));
+}
+
+TEST(GeometryIO_PointCloudIO, LoadsTXTFixtureWithColor)
+{
+    const auto result = Geometry::PointCloudIO::LoadTXT(GeometryIOFixturePath("valid.txt"));
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Cloud.VerticesSize(), 2u);
+    EXPECT_TRUE(result->Cloud.HasColors());
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(0.0f, 0.0f, 0.0f));
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{1}), glm::vec3(2.0f, 3.0f, 4.0f));
+    EXPECT_EQ(result->Cloud.Color(Geometry::VertexHandle{0}), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{1}).g, 1.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{1}).b, 128.0f / 255.0f, 1.0e-6f);
+}
+
+TEST(GeometryIO_PointCloudIO, StrictAsciiReadersRejectMalformedInput)
+{
+    using Result = Extrinsic::Core::Expected<Geometry::PointCloudIO::PointCloudIOResult>;
+    using Loader = Result (*)(std::string_view);
+    struct ReaderCase
+    {
+        const char* Extension = "";
+        Loader Load = nullptr;
+        const char* WrongColumnCount = "";
+        const char* NonNumeric = "";
+        const char* NonFinite = "";
+    };
+
+    const std::array<ReaderCase, 5> cases{{
+        {".pts", Geometry::PointCloudIO::LoadPTS, "1\n0 0\n", "1\n0 nope 0\n", "1\n0 inf 0\n"},
+        {".pwn", Geometry::PointCloudIO::LoadPWN, "2\n0 0 0\n", "1\n0 nope 0\n0 0 1\n", "1\n0 0 0\n0 nan 1\n"},
+        {".csv", Geometry::PointCloudIO::LoadCSV, "0.0,0.0\n", "0.0,nope,0.0\n", "0.0,nan,0.0\n"},
+        {".3d", Geometry::PointCloudIO::Load3D, "0 0\n", "0 nope 0 1\n", "0 0 inf 1\n"},
+        {".txt", Geometry::PointCloudIO::LoadTXT, "1\n0 0\n", "1\n0 nope 0 255 0 0 1\n", "1\n0 0 0 nan 0 0 1\n"},
+    }};
+
+    for (const auto& item : cases)
+    {
+        SCOPED_TRACE(item.Extension);
+
+        TempFile empty(item.Extension, "");
+        const auto emptyResult = item.Load(empty.Path);
+        ASSERT_FALSE(emptyResult.has_value());
+        EXPECT_EQ(emptyResult.error(), Extrinsic::Core::ErrorCode::InvalidFormat);
+
+        TempFile wrongColumns(item.Extension, item.WrongColumnCount);
+        const auto wrongColumnsResult = item.Load(wrongColumns.Path);
+        ASSERT_FALSE(wrongColumnsResult.has_value());
+        EXPECT_EQ(wrongColumnsResult.error(), Extrinsic::Core::ErrorCode::InvalidFormat);
+
+        TempFile nonNumeric(item.Extension, item.NonNumeric);
+        const auto nonNumericResult = item.Load(nonNumeric.Path);
+        ASSERT_FALSE(nonNumericResult.has_value());
+        EXPECT_EQ(nonNumericResult.error(), Extrinsic::Core::ErrorCode::InvalidFormat);
+
+        TempFile nonFinite(item.Extension, item.NonFinite);
+        const auto nonFiniteResult = item.Load(nonFinite.Path);
+        ASSERT_FALSE(nonFiniteResult.has_value());
+        EXPECT_EQ(nonFiniteResult.error(), Extrinsic::Core::ErrorCode::InvalidFormat);
+    }
+
+    const auto committedEmpty = Geometry::PointCloudIO::LoadTXT(GeometryIOFixturePath("empty.txt"));
+    ASSERT_FALSE(committedEmpty.has_value());
+    EXPECT_EQ(committedEmpty.error(), Extrinsic::Core::ErrorCode::InvalidFormat);
+
+    const auto committedMalformed = Geometry::PointCloudIO::LoadCSV(GeometryIOFixturePath("malformed.csv"));
+    ASSERT_FALSE(committedMalformed.has_value());
+    EXPECT_EQ(committedMalformed.error(), Extrinsic::Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_PointCloudIO, StrictAsciiReaderLoadsAreDeterministic)
+{
+    const auto first = Geometry::PointCloudIO::LoadPWN(GeometryIOFixturePath("valid.pwn"));
+    const auto second = Geometry::PointCloudIO::LoadPWN(GeometryIOFixturePath("valid.pwn"));
+    ASSERT_TRUE(first.has_value());
+    ASSERT_TRUE(second.has_value());
+    ExpectPointCloudPositionsEqual(first->Cloud, second->Cloud);
+}
+
 TEST(GeometryIO_PointCloudIO, PointCloudImportersRejectNonFinitePositions)
 {
     TempFile xyz(".xyz", "0 0 0\nnan 1 2\n");
@@ -2003,6 +2167,103 @@ namespace
         buffer << in.rdbuf();
         return buffer.str();
     }
+}
+
+TEST(GeometryIO_MeshIO, WritesOFFQuadRoundTripsFaceArity)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 4> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 1.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u, 3u}}};
+    PopulateTriangleMesh(mesh, positions, faces);
+
+    TempFile file(".off", "");
+    const auto status = Geometry::MeshIO::WriteOFF(file.Path, mesh);
+    EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
+
+    const std::string contents = ReadFileContents(file.Path);
+    EXPECT_NE(contents.find("OFF\n4 1 0\n"), std::string::npos);
+    EXPECT_NE(contents.find("4 0 1 2 3\n"), std::string::npos);
+
+    const auto loaded = Geometry::MeshIO::LoadOFF(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    EXPECT_EQ(loaded->Vertices.Size(), 4u);
+    EXPECT_EQ(loaded->Faces.Size(), 1u);
+
+    auto loadedPositions = loaded->Vertices.Get<glm::vec3>("v:point");
+    ASSERT_TRUE(loadedPositions.IsValid());
+    ASSERT_EQ(loadedPositions.Vector().size(), 4u);
+    for (std::size_t i = 0; i < positions.size(); ++i)
+    {
+        EXPECT_EQ(loadedPositions[i], positions[i]);
+    }
+
+    auto loadedFaces = loaded->Faces.Get<std::vector<std::uint32_t>>("f:vertices");
+    ASSERT_TRUE(loadedFaces.IsValid());
+    ASSERT_EQ(loadedFaces.Vector().size(), 1u);
+    EXPECT_EQ(loadedFaces[0], faces[0]);
+}
+
+TEST(GeometryIO_MeshIO, WriteOFFIsByteDeterministic)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.125f, -2.5f, 3.0f},
+        glm::vec3{1.0f, 0.5f, 0.25f},
+        glm::vec3{0.0f, 1.0f, -0.75f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces);
+
+    TempFile first(".off", "");
+    TempFile second(".off", "");
+    EXPECT_EQ(Geometry::MeshIO::WriteOFF(first.Path, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::Success);
+    EXPECT_EQ(Geometry::MeshIO::WriteOFF(second.Path, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::Success);
+    EXPECT_EQ(ReadFileContents(first.Path), ReadFileContents(second.Path));
+}
+
+TEST(GeometryIO_MeshIO, WriteOFFFailsClosed)
+{
+    Geometry::MeshIO::MeshIOResult empty;
+    TempFile emptyFile(".off", "");
+    EXPECT_EQ(Geometry::MeshIO::WriteOFF(emptyFile.Path, empty),
+              Geometry::MeshIO::MeshIOWriteStatus::EmptyMesh);
+
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces);
+
+    EXPECT_EQ(Geometry::MeshIO::WriteOFF({}, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::InvalidPath);
+
+    const std::string badPath = "/tmp/intrinsic_geometry_io_missing_dir/out.off";
+    EXPECT_EQ(Geometry::MeshIO::WriteOFF(badPath, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::InvalidPath);
+
+    Geometry::MeshIO::MeshIOResult nonFiniteMesh;
+    const std::array<glm::vec3, 3> nonFinitePositions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{std::numeric_limits<float>::infinity(), 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    PopulateTriangleMesh(nonFiniteMesh, nonFinitePositions, faces);
+    TempFile nonFiniteFile(".off", "");
+    EXPECT_EQ(Geometry::MeshIO::WriteOFF(nonFiniteFile.Path, nonFiniteMesh),
+              Geometry::MeshIO::MeshIOWriteStatus::FileWriteError);
+    const std::string contents = ReadFileContents(nonFiniteFile.Path);
+    EXPECT_EQ(contents.find("inf"), std::string::npos);
+    EXPECT_EQ(contents.find("nan"), std::string::npos);
 }
 
 TEST(GeometryIO_MeshIO, WritesOBJTriangle)

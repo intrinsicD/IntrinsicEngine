@@ -2,6 +2,7 @@ module;
 
 #include <cstddef>
 #include <optional>
+#include <string>
 
 export module Geometry.Subdivision;
 
@@ -47,6 +48,15 @@ export namespace Geometry::Subdivision
         // budget clamping. When non-zero, Subdivide() automatically clamps
         // Iterations so the produced mesh does not exceed this count.
         std::size_t MaxOutputFaces{0};
+
+        // Optional Loop crease preservation. When enabled, edge bool property
+        // FeatureEdgePropertyName marks feature/crease edges. Feature edge
+        // midpoint vertices use the 1/2-1/2 crease rule and split feature
+        // edges remain tagged on output. Feature vertices with exactly two
+        // incident feature edges use the crease even-vertex stencil; other
+        // incident-feature vertices remain fixed.
+        bool PreserveFeatureEdges{false};
+        std::string FeatureEdgePropertyName{"e:feature"};
     };
 
     struct SubdivisionResult

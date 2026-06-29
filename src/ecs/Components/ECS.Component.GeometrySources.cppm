@@ -18,8 +18,12 @@ export namespace Extrinsic::ECS::Components::GeometrySources
     // well-known keys, regardless of the originating geometry type.
     //
     // Domain: Vertices (mesh vertex OR point-cloud point)
-    //   "v:position"  – glm::vec3  mandatory canonical position
-    //   "v:normal"    – glm::vec3  optional surface / point-cloud normal
+    //   "v:position"           – glm::vec3  mandatory canonical position
+    //   "v:normal"             – glm::vec3  optional surface / point-cloud normal
+    //   "v:mean_curvature"     – double     optional mean curvature scalar
+    //   "v:gaussian_curvature" – double     optional Gaussian curvature scalar
+    //   "v:principal_dir1"     – glm::vec3  optional max-principal tangent direction
+    //   "v:principal_dir2"     – glm::vec3  optional min-principal tangent direction
     //
     // Domain: Nodes (graph node)
     //   "v:position"  – glm::vec3  same canonical key as above (node pos)
@@ -39,17 +43,21 @@ export namespace Extrinsic::ECS::Components::GeometrySources
     // -----------------------------------------------------------------------
     namespace PropertyNames
     {
-        constexpr std::string_view kPosition        = "v:position";
-        constexpr std::string_view kNormal          = "v:normal";
+        constexpr std::string_view kPosition          = "v:position";
+        constexpr std::string_view kNormal            = "v:normal";
+        constexpr std::string_view kMeanCurvature     = "v:mean_curvature";
+        constexpr std::string_view kGaussianCurvature = "v:gaussian_curvature";
+        constexpr std::string_view kPrincipalDir1     = "v:principal_dir1";
+        constexpr std::string_view kPrincipalDir2     = "v:principal_dir2";
 
-        constexpr std::string_view kEdgeV0          = "e:v0";
-        constexpr std::string_view kEdgeV1          = "e:v1";
+        constexpr std::string_view kEdgeV0            = "e:v0";
+        constexpr std::string_view kEdgeV1            = "e:v1";
 
-        constexpr std::string_view kHalfedgeToVertex = "h:to_vertex";
-        constexpr std::string_view kHalfedgeNext     = "h:next";
-        constexpr std::string_view kHalfedgeFace     = "h:face";
+        constexpr std::string_view kHalfedgeToVertex  = "h:to_vertex";
+        constexpr std::string_view kHalfedgeNext      = "h:next";
+        constexpr std::string_view kHalfedgeFace      = "h:face";
 
-        constexpr std::string_view kFaceHalfedge    = "f:halfedge";
+        constexpr std::string_view kFaceHalfedge      = "f:halfedge";
     }
 
     // Owned per-domain PropertySet components. After a `PopulateFrom*` call

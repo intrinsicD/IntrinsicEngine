@@ -2,6 +2,8 @@ module;
 
 #include <optional>
 #include <span>
+#include <cstdint>
+#include <vector>
 #include <glm/glm.hpp>
 
 export module Geometry.Curve;
@@ -17,6 +19,16 @@ export module Geometry.Curve;
 // non-finite t, or t outside [0, 1] returns std::nullopt; no NaN/Inf.
 export namespace Geometry
 {
+    struct BezierCurve
+    {
+        std::vector<glm::vec3> ControlPoints;
+
+        [[nodiscard]] std::optional<std::uint32_t> GetDegree() const;
+    };
+
+    [[nodiscard]] std::optional<glm::vec3> EvaluateBernstein(const BezierCurve& curve, float t);
+    [[nodiscard]] std::optional<glm::vec3> EvaluateDeCasteljau(const BezierCurve& curve, float t);
+
     [[nodiscard]] std::optional<glm::vec3> EvaluateBezier(std::span<const glm::vec3> controlPoints, float t);
 
     [[nodiscard]] std::optional<glm::vec3> EvaluateBezierBernstein(std::span<const glm::vec3> controlPoints, float t);

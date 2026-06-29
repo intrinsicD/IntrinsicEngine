@@ -13,6 +13,25 @@
 - Allowed: `core`, GLM, and Eigen3 for geometry-owned CPU numerical kernels.
 - Disallowed: runtime/app-specific ownership and rendering backend internals.
 
+## Primitive and curve modules
+
+- `Geometry.Curve` owns the engine's Bezier curve primitive. It exposes
+  `BezierCurve` control-point storage, degree reporting, and deterministic
+  Bernstein-basis and de Casteljau evaluators. Empty curves, non-finite
+  parameters, out-of-range parameters, and non-finite control points fail closed
+  with `std::nullopt`.
+- `Geometry.Triangle` exposes closest-point/distance utilities plus
+  edge-length, perimeter, angle, and stable-Heron area metrics. New metric
+  helpers return finite zero values for non-finite, zero-area, or otherwise
+  degenerate triangles.
+- `Geometry.Sphere::ToSphere` supports algebraic least squares, bounding,
+  hybrid fallback, and iterative geometric fitting. The iterative geometric
+  method is a CPU fixed-point center refinement over point-to-surface residuals
+  and requires at least four finite, non-coincident samples.
+- `Geometry.AABB` exposes cubification around the original center and bitwise
+  child-octant navigation. Invalid boxes fail closed with default invalid boxes
+  or finite center sentinels.
+
 ## Linear algebra policy
 
 - GLM remains the public storage vocabulary for geometry containers, primitive
@@ -24,13 +43,87 @@
   GLM/Eigen adapters or dense decompositions must import `Geometry.Linalg`
   explicitly.
 - `Geometry.Linalg` is the narrow advanced numerical surface for CPU kernels. It
-  exposes GLM round-trip adapters, explicit row-major `Eigen::Map` helpers for
-  contiguous scalar buffers, and dense decomposition wrappers that return
-  geometry-owned diagnostics rather than raw Eigen solver state.
+  exposes GLM round-trip adapters, explicit row-major and strided `Eigen::Map`
+  helpers for contiguous scalar buffers and fixed-size GLM vector arrays, and
+  dense decomposition wrappers that return geometry-owned diagnostics rather
+  than raw Eigen solver state. `RobustPCA` implements deterministic Principal
+  Component Pursuit / ADMM on top of `ComputeSVD`: lambda defaults to
+  `1 / sqrt(max(rows, cols))`, convergence is the relative Frobenius residual
+  `||M - L - S||_F / ||M||_F`, and empty, zero, non-finite, invalid-option, or
+  hard SVD-failure inputs return non-success `NumericStatus` diagnostics
+  without NaNs or asserts. Rank-deficient SVDs are accepted inside RPCA because
+  low rank is the expected solution shape.
+- `Geometry.Rotation` owns the shared SO(3) primitive surface: hat/vee, exp/log,
+  geodesic and chordal distances, deterministic seeded random rotations,
+  `ProjectOnSO3`, and optimal-rotation/Kabsch helpers for corresponded point
+  sets. Rotation-valued routines fail closed to finite SO(3) sentinels rather
+  than returning NaNs. `ProjectOnSO3` delegates the orthogonal projection to
+  `Geometry.Linalg::ComputePolarDecomposition(...).Orthogonal` and applies a
+  determinant correction to stay in SO(3). `Geometry.Registration` consumes this
+  module for point-to-point alignment instead of keeping a private Kabsch copy.
+- `Geometry.RotationAveraging` builds on `Geometry.Rotation` and
+  `Geometry.Linalg` for deterministic CPU SO(3) averaging. Its chordal L2 mean
+  uses the Markley 4x4 quaternion-moment matrix and
+  `Geometry.Linalg::ComputeSymmetricEigen`; Karcher means iterate with
+  `Log(meanᵀR_i)` / `Exp(delta)` in the tangent space; quaternion means use
+  hemisphere-aligned linear quaternion accumulation; geodesic and quaternion L1
+  medians use Weiszfeld inverse-distance reweighting. All five routines accept
+  `RotationAverageOptions` (`Weights`, `MaxIterations`, `Tolerance`, optional
+  `OutlierRejectionRadians`) and return `RotationAverageResult` with status,
+  validity, convergence, iteration count, and residual radians. Empty input,
+  weight-size mismatches, invalid weights, non-finite matrices, cut-locus
+  two-sample degeneracy, invalid options, and non-convergence report explicit
+  `RotationAverageStatus` values and return finite identity or last-iterate
+  sentinels without asserts or NaNs. Single finite samples return unchanged with
+  `SingleSample`.
+- `Geometry.Statistics` owns scalar CPU statistics utilities that are
+  deterministic and fail closed: `StreamingMoments` accumulates count, mean,
+  population/sample variance, skewness, and excess kurtosis with mergeable
+  Pébay/Terriberry M2/M3/M4 state; `RunningMedian` tracks a streaming median
+  with two heaps; `Median` and `Quantile` provide finite-sample order
+  statistics over double spans and arithmetic vectors; and `SafeAcos` /
+  `SafeAsin` centralize inverse-trig domain clamping. Empty, non-finite, or
+  out-of-domain order-statistic queries return `std::nullopt`; non-finite
+  accumulator samples are ignored rather than poisoning state.
+- `Geometry.Robust` owns robust M-estimator kernels for CPU fitting and IRLS
+  seams. The `RobustKernel` family covers L2, L1, Huber, Tukey biweight,
+  Welsch, Lorentzian, and Cauchy; each exposes `Rho`, `Psi`, and `Weight`, where
+  `Weight` is the finite `Psi(u)/u` IRLS weight on scaled residual
+  `u = residual / scale`. Non-finite residuals and non-positive or non-finite
+  scales fail closed with `std::nullopt`.
+- `Geometry.Registration` keeps percentile trimming (`InlierRatio`) as the
+  default ICP outlier policy. Optional robust weighting is explicit through
+  `RegistrationParams::RobustKernelKind` plus `RobustScale`; when selected, ICP
+  computes per-correspondence robust weights after the existing trim and folds
+  them into point-to-point weighted Kabsch and point-to-plane normal-equation
+  assembly. With no robust kernel selected, the no-kernel path ignores
+  `RobustScale` and preserves the existing trimming behavior.
 - `Geometry.Sparse` owns reusable CSR storage, COO-to-CSR building, matrix
-  diagnostics, and conjugate-gradient diagnostics. `Geometry.DEC` aliases these
-  sparse records so existing DEC/geodesic/parameterization callers keep their
-  names while sharing the common implementation.
+  diagnostics, and solver seams. `SolveCG` / `SolveCGShifted` are the
+  iterative CPU path for large sparse SPD systems and shifted mass-plus-stiffness
+  operators. `SparseLDLT` and `SparseLLT` are the direct CPU reference path for
+  deterministic SPD factor-once / solve-many workloads; factorization returns
+  structured pivot diagnostics and solve calls fail closed on dimension or
+  non-finite RHS mismatches. `SparseBiCGSTAB` is the iterative CPU reference
+  path for non-symmetric sparse systems, with explicit `None`, `Diagonal`, and
+  `IncompleteLUT` preconditioner choices plus structured convergence
+  diagnostics. The sparse module defines `EIGEN_DONT_PARALLELIZE` before
+  including Eigen so fixed inputs and solver params use Eigen's single-threaded
+  deterministic path. Single-RHS calls use span-based engine storage; multi-RHS
+  direct and BiCGSTAB solves expose `EigenDenseBlockRef` aliases as a narrow
+  solver bridge for dense RHS blocks, not as a geometry container storage
+  convention. `Geometry.DEC` aliases these sparse records so existing
+  DEC/geodesic/parameterization callers keep their names while sharing the
+  common implementation.
+- `Geometry.SignedHeatMethod` is the CPU reference surface backend for Feng &
+  Crane's Signed Heat Method. It consumes an oriented halfedge curve on a
+  triangle mesh, assembles `Geometry.DEC` vertex mass/cotan operators, diffuses
+  boundary-normal impulses with `Geometry.Sparse::SparseLDLT`, solves a
+  regularized Poisson recovery, and writes `v:signed_heat_distance` plus
+  `v:is_signed_heat_source`. The current backend is a deterministic
+  vertex-based approximation of the paper's edge-based Crouzeix-Raviart
+  connection discretization and reports explicit invalid-input,
+  degenerate-boundary, factorization/solve, and non-finite-result statuses.
 - Optional Spectra or SuiteSparse/CHOLMOD seams are deferred until CPU reference
   parity and benchmark manifests justify a second backend.
 - `Geometry.PCA` exports the closed-form symmetric 3×3 eigensolver
@@ -48,6 +141,153 @@ New or materially changed geometry APIs must follow the
 module/file/namespace alignment, public state and mutability, count terminology,
 failure reporting, deterministic diagnostics, numeric tolerances, and the current
 `Geometry.LinearSolver` narrow-module decision.
+
+### Property-system contracts
+
+`Geometry.Properties` exposes property names as `std::string_view` borrows tied to
+the owning property registry, so callers can inspect names without copying while
+the property remains alive. Const property-set lookups return read-only property
+handles and default-constructed `ConstPropertySet` values behave as safe empty
+views. `PropertySet::Descriptors()` reports erased property metadata including
+name, value kind, element count, and mutability so runtime/editor inspection can
+enumerate geometry attributes without RTTI. `MapProperty(...)` is the
+geometry-owned bridge from typed property columns to `Geometry.Linalg` Eigen
+views: arithmetic columns map as aliasing `N x 1` strided views, fixed-size GLM
+vector columns map as aliasing `N x dim` strided views, and `bool` columns
+return an explicit copied numeric column because `std::vector<bool>` cannot be
+reinterpreted as contiguous scalar storage. `LiveElementRange` is the shared
+handle iteration helper behind mesh, graph, point-cloud, and const domain-view
+live-element accessors.
+
+### Algorithm backend seams
+
+`Geometry.KMeans` is the canonical geometry exemplar for the
+[Algorithm Variant Dispatch Pattern](algorithm-variant-dispatch.md). The geometry
+module owns the deterministic CPU reference path and does not import RHI. Its
+`KMeansParams::Compute` field is the requested backend (`Backend::CPU` or
+`Backend::GPU`), while `KMeansResult` reports `RequestedBackend`,
+`ActualBackend`, and `FellBackToCPU` so a GPU request that runs on CPU is never
+silent.
+
+The RHI-visible integration hook lives in runtime:
+`Extrinsic.Runtime.KMeansBackend::ClusterKMeans(...)` accepts
+`Extrinsic::RHI::IDevice&`, evaluates `IDevice::IsOperational()` for GPU
+requests, and currently falls back to the CPU reference because no KMeans GPU
+kernel has landed. A real GPU backend must arrive as a separate parity-gated
+task.
+
+### Geometry IO coverage
+
+`Geometry.HalfedgeMesh.IO` owns mesh OBJ/OFF/STL/PLY import and mesh
+OBJ/OFF/STL/PLY export. The OFF path is symmetric at the geometry module level:
+`WriteOFF` emits deterministic ASCII OFF records for finite meshes, rejects
+empty or invalid topology, and round-trips through the hardened `LoadOFF`
+reader.
+
+`Geometry.PointCloud.IO` owns point-cloud XYZ/PTS/PWN/CSV/3D/TXT/PLY/PCD
+import plus XYZ/PLY/PCD export. The PWN reader consumes a count header followed
+by point rows and normal rows; CSV and 3D inputs may carry normals through their
+six-column layouts; PTS and TXT validate their count/intensity/color/reflectance
+columns and store supported color channels. The additional ASCII readers share
+one strict scanner and fail closed on empty, malformed, wrong-column, or
+non-finite inputs.
+
+This is module-level geometry coverage. Asset/runtime routing remains a
+separate layer concern and should not be inferred from the existence of a
+geometry reader or writer.
+
+### Remeshing, subdivision, and mesh topology utilities
+
+`Geometry.HalfedgeMesh.AdaptiveRemeshing` exposes `ReferenceProjector`, a
+frozen-surface nearest-face projector backed by `Geometry.MeshClosestFace`, and
+supports both mean-curvature sizing and `SizingLaw::ErrorBoundedTaubin`.
+Reference projection is also available to uniform remeshing through
+`Geometry.Remeshing::RemeshingParams::ProjectToSurface` and related projection
+limits.
+
+`Geometry.MeshClosestFaceIndex` is the shared CPU exact nearest-face query for
+mesh consumers. It builds a `Geometry.BVH` over per-face AABBs and evaluates
+exact point-to-triangle distance for nearest, k-nearest, and radius queries;
+polygon faces are fan-triangulated while faces with no finite non-degenerate
+triangle are skipped. Results carry the `FaceHandle`, closest point, face normal,
+fan-triangle primitive index, exact squared distance, explicit status, and
+`Geometry.SpatialQueries` diagnostics. Adaptive remeshing reference projection,
+implicit plane-field closest-point evaluation, simplification Hausdorff
+redistribution, and `Geometry.HalfedgeMesh.Utils::NearestFace` all consume this
+packaged query instead of private brute-force face scans.
+
+`Geometry.Subdivision` implements Loop subdivision with optional feature-edge
+preservation from a caller-selected boolean edge property, defaulting to
+`e:feature`. Feature split edges remain tagged on output. `Geometry.SubdivisionSqrt3`
+adds Kobbelt sqrt(3) subdivision for triangle meshes, including centroid split,
+old-vertex relaxation, original interior-edge flips, and boundary handling.
+
+`Geometry.HalfedgeMesh::Mesh` publishes core topology helpers for polygon
+`Triangulate`, conservative `IsRemovalOk`, intrinsic `IsDelaunay`, conditional
+`DelaunayFlip`, direct `EdgeLength`, and `UpdateEdgeLengths`. `UpdateEdgeLengths`
+recomputes the canonical `e:length` `double` edge property; the cache is not
+automatically invalidated, so callers that mutate topology or positions must
+refresh it before consuming the property. `Geometry.MeshRepair` provides
+deterministic connected-component labels (`v:component`, `f:component`),
+component splitting, and keep-largest-component cleanup. `Geometry.HalfedgeMesh.Utils`
+provides dual construction, triangle-adjacency index buffers with boundary edges
+encoded by the triangle's own opposite vertex, and `NearestFace`, which delegates
+to the accelerated `Geometry.MeshClosestFace` query.
+
+### Graph and point-cloud query/noise utilities
+
+`Geometry.Graph.Utils` publishes the graph-side `e:length` `float` cache through
+`EnsureEdgeLengths` and the non-caching `FillEdgeLengths`. Both fail closed on
+empty graphs, invalid edges, non-finite endpoints, zero-length edges, or
+undersized caller buffers. Edge spatial queries (`ClosestEdge`, `KClosestEdges`,
+`EdgesWithinRadius`, and `ClosestEdgeWithinOneRing`) use
+`Geometry.Queries::ClosestPointSegment` for exact segment distance and a
+`Geometry.BVH` over edge segment AABBs for candidate enumeration; returned sets
+are ordered by squared distance with ascending edge handle tie-breaks.
+
+Graph and point-cloud Gaussian augmentation is deterministic and true-Gaussian:
+each element seeds its own RNG from `(Seed, element index)` and draws independent
+per-component normal samples. Graph displacement standard deviation is
+`StdDevFraction * vertex-AABB diagonal`; point-cloud displacement standard
+deviation is `StdDevFraction * ComputeStatistics(...).AverageSpacing`. A zero
+fraction is an identity operation, while empty input, non-finite positions,
+negative/non-finite fractions, and non-zero requests with degenerate scale report
+explicit status values.
+
+`Geometry.PointCloud.SurfaceSampling` converts a triangle `HalfedgeMesh::Mesh`
+into a deterministic dense `PointCloud::Cloud` by area-weighted face selection
+and sqrt-corrected barycentric sampling. The API returns a result record rather
+than throwing: invalid sample counts, empty meshes, and meshes with no valid
+triangles fail closed with explicit status and diagnostics. Diagnostics count
+requested/written samples, total/accepted faces, rejected non-triangle,
+degenerate, and non-finite triangles, total accepted surface area, seed, and
+whether normals came from interpolated source `v:normal` data or geometric face
+fallbacks. Output clouds publish sampled positions as `v:point` and point
+normals as the point-cloud built-in `p:normal`.
+
+`Geometry.PointCloud.QualityMetrics` is the CPU numeric-analysis companion for
+sampling papers and figure export. It accepts either `std::span<const glm::vec3>`
+or a `PointCloud::Cloud` adapter and returns owned numeric arrays with explicit
+status values; it performs no plotting, rasterization, file IO, GPU work, or
+runtime/editor integration. The module reports nearest-neighbor distances,
+nearest-neighbor histograms, mean/stddev/CV, measured minimum pairwise distance,
+Poisson-disk ratio `min_pair_distance / target_radius`, and coverage as the
+fraction of a reference point set whose nearest sample lies within a caller
+radius. Invalid empty/one-point inputs, non-finite coordinates, non-positive
+radii, invalid bin ranges, invalid domains, and out-of-domain points fail closed.
+
+For radial distribution functions, `g(r)` is binned over a caller-provided or
+inferred axis-aligned 2D/3D domain. Pair counts are accumulated as ordered
+neighbors per shell and normalized by density times shell area/volume. Boundary
+correction is deterministic: each point estimates the accessible shell fraction
+with a fixed set of circular/spherical directions at the bin center, so figure
+captions can cite a rectangular-domain shell-fraction correction rather than an
+uncorrected raw pair histogram. Spectral metrics are intentionally 2D-only over
+the `xy` domain. Periodograms evaluate the squared DFT magnitude on an integer
+frequency grid after normalizing points into the domain; the DC bin is zeroed by
+default. RAPS is the radially averaged profile of that 2D periodogram binned by
+frequency radius. Inputs with non-planar `z` values are rejected as
+`Requires2DInput`.
 
 ### Curvature tensor and principal directions
 
@@ -109,6 +349,36 @@ All lumped modes partition the surface area; degenerate / non-finite faces fail
 closed (are skipped). `BuildConsistentMass` and the mass-mode `BuildHodgeStar0`
 are deterministic.
 
+### Halfedge mesh quantity accessors
+
+`Geometry.HalfedgeMesh.Utils` owns the first-class mesh geometric-quantity
+accessors shared by curvature, parameterization, geodesics, subdivision, and
+mesh builders. Direct accessors are pure reads, while `Publish*` variants write
+canonical property names:
+
+- `FaceArea` / `PublishFaceAreas` write `f:area`; polygon faces use Newell
+  area for planar loops, including concave loops, and fall back to triangle-fan
+  surface area for genuinely folded non-planar loops.
+- `FaceAreaVector` / `PublishFaceAreaVectors` write `f:area_vector`, the
+  oriented Newell vector area.
+- `FaceCentroid` / `PublishFaceCentroids` write `f:centroid`, the average of a
+  face's own corner positions. This is distinct from `ComputeOneRingCentroid`,
+  which averages a vertex neighborhood.
+- `ComputeBarycentricVertexAreas` / `PublishBarycentricVertexAreas` write
+  `v:barycentric_area`, the lumped incident face-area partition.
+- `FaceScalarGradient`, `ComputeFaceScalarGradients`, and
+  `PublishFaceScalarGradients` expose the unnormalized triangle-face gradient
+  of a vertex scalar field and default to `f:scalar_gradient`. The heat method
+  continues to normalize and negate the returned gradient locally.
+- `VertexOneRingPCA` / `PublishVertexOneRingPCA` write `v:pca` with
+  `Geometry::PCAResult`, using finite 1-ring neighbor positions and failing
+  closed for deleted, isolated, non-finite, or underdetermined neighborhoods.
+
+`Geometry.HalfedgeMesh.Builder::ProjectToUnitSphere` is also public: it
+normalizes finite non-origin vertex positions in-place and leaves near-origin
+vertices unchanged so no NaN/Inf values are introduced. `MakeMesh(Sphere)` and
+subdivision-based sphere construction route through this public helper.
+
 ### Parameterization diagnostics
 
 `Geometry.Parameterization.Diagnostics` is the shared CPU diagnostics surface for
@@ -133,10 +403,10 @@ for publishing count-matched `glm::vec3` vertex normals back to a
 `HalfedgeMesh::Mesh` vertex property, defaulting to `v:normal`. The contract
 returns the written `VertexProperty<glm::vec3>` plus deterministic status and
 diagnostic counts. The selectable averaging modes are uniform face normals,
-area-weighted face normals, angle-weighted face normals, and Max-style
-sine/reciprocal-edge weighting. Degenerate faces, invalid topology, non-finite
-face input, deleted slots, fallback writes, and repaired fallback normals are
-reported through the result record.
+area-weighted face normals, angle-weighted face normals, `AreaAngleWeighted`
+face normals, and Max-style sine/reciprocal-edge weighting. Degenerate faces,
+invalid topology, non-finite face input, deleted slots, fallback writes, and
+repaired fallback normals are reported through the result record.
 
 ### Graph Vertex Normal Recompute
 

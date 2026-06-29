@@ -248,6 +248,8 @@ namespace Geometry::HalfedgeMesh::VertexNormals
                 return areaVector;
             case AveragingMode::AngleWeighted:
                 return faceUnitNormal * CornerAngle(corners, index, epsilon, result);
+            case AveragingMode::AreaAngleWeighted:
+                return areaVector * CornerAngle(corners, index, epsilon, result);
             case AveragingMode::MaxWeighted:
                 return faceUnitNormal * MaxCornerWeight(corners, index, epsilon, result);
             }
@@ -266,6 +268,8 @@ namespace Geometry::HalfedgeMesh::VertexNormals
             return "AreaWeighted";
         case AveragingMode::AngleWeighted:
             return "AngleWeighted";
+        case AveragingMode::AreaAngleWeighted:
+            return "AreaAngleWeighted";
         case AveragingMode::MaxWeighted:
             return "MaxWeighted";
         }

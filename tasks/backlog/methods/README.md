@@ -10,15 +10,15 @@ map.
 
 ## Program tasks
 
-- [METHODS-001 — Pin signed heat as methods-pipeline pathfinder](METHODS-001-signed-heat-pathfinder.md).
+- No open program tasks. Retired
+  [`METHODS-001`](../../done/METHODS-001-signed-heat-pathfinder.md) pins
+  METHOD-002 as the methods-pipeline pathfinder.
 
 ## Tasks
 
-- [METHOD-002 — Signed Heat Method reference backend](METHOD-002-signed-heat-method-reference-backend.md)
-  **(pathfinder method per [METHODS-001](METHODS-001-signed-heat-pathfinder.md))**;
-  gated on `geometry/GEOM-020` (LDLT seam) via `depends_on`.
 - [METHOD-003 — Closest Point Method PDE solver reference backend](METHOD-003-closest-point-method-pde-reference-backend.md)
-  (variant A default; gated on `geometry/GEOM-023` non-symmetric solver seam).
+  (variant A default; unblocked by retired `geometry/GEOM-023` and expected
+  to use `Geometry.Sparse::SparseBiCGSTAB` for its non-symmetric solve).
 - [METHOD-004 — Walk on Spheres / Walk on Stars PDE solver reference backend](METHOD-004-walk-on-spheres-reference-backend.md)
   (variant A default; no solver gate — promotable now).
 - [METHOD-005 — Robust mesh boolean reference backend](METHOD-005-robust-mesh-boolean-reference-backend.md)
@@ -54,6 +54,21 @@ map.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [METHOD-002 — Signed Heat Method reference backend](../../done/METHOD-002-signed-heat-method-reference-backend.md)
+  (done, 2026-06-28, `CPUContracted`): pathfinder method package for
+  `geometry.signed_heat`, with surface Variant A CPU reference, correctness
+  tests, smoke benchmark, method docs, and `Geometry.Sparse::SparseLDLT` as the
+  default heat/Poisson solver.
+- [METHODS-001 — Pin signed heat as methods-pipeline pathfinder](../../done/METHODS-001-signed-heat-pathfinder.md)
+  (done, 2026-06-28, `Retired`): records METHOD-002 as the first method to
+  drive the full paper-intake → CPU-reference → tests → benchmark → docs
+  pipeline and names retired GEOM-020 as the LDLT gate that makes promotion
+  deterministic.
+- [METHOD-012 — Progressive Poisson-disk sampling: paper intake + CPU reference backend](../../done/METHOD-012-progressive-poisson-disk-cpu-reference.md)
+  (done, 2026-06-28, `CPUContracted`): deterministic CPU reference, manifest,
+  docs, correctness tests, and smoke benchmark for progressive Poisson-disk
+  subsampling. GPU parity remains owned by
+  [`METHOD-013`](METHOD-013-progressive-poisson-disk-gpu-backend.md).
 - [METHOD-001 — Rigid-body dynamics reference backend](../../done/METHOD-001-rigid-body-dynamics-reference-backend.md)
   (done 2026-06-05 at `CPUContracted`; ownership gate accepted by
   [`ARCH-001`](../../done/ARCH-001-physics-layer-ownership-and-ecs-integration.md)
@@ -83,11 +98,12 @@ split; narratives live in the retirement log.
 - Ordering: [`geometry/GEOM-008`](../../done/GEOM-008-linear-algebra-solver-infrastructure.md)
   retired 2026-05-27 at `CPUContracted` shipping the CSR builder + CG /
   shifted-CG iterative solver. The direct sparse SPD factorization
-  (LDLT/LLT) path that METHOD-002 (step 2) names is owed by the follow-up
-  [`geometry/GEOM-020`](../geometry/GEOM-020-sparse-direct-factorization-seam.md);
-  METHOD-002 must wait on `GEOM-020`, not on retired `GEOM-008`.
-  METHOD-003's variant-A non-symmetric operator waits on
-  [`geometry/GEOM-023`](../geometry/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md).
+  (LDLT/LLT) path that METHOD-002 used is available from retired
+  [`geometry/GEOM-020`](../../done/GEOM-020-sparse-direct-factorization-seam.md);
+  METHOD-002 is retired at `CPUContracted`.
+  METHOD-003's variant-A non-symmetric operator is available from retired
+  [`geometry/GEOM-023`](../../done/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md);
+  METHOD-003 is no longer blocked on the solver seam.
   METHOD-004 needs no solver gate and may proceed against retired
   `GEOM-008` directly. METHOD-005 and METHOD-007 waited on
   [`geometry/GEOM-007`](../../done/GEOM-007-robust-predicates-intersection-classification.md),

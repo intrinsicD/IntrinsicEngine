@@ -1,13 +1,17 @@
 module;
 
 #include <cstddef>
+#include <cstdint>
 #include <optional>
+
+#include <glm/glm.hpp>
 
 export module Geometry.HalfedgeMesh.AdaptiveRemeshing;
 
 import Geometry.MeshOperator;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
+import Geometry.MeshClosestFace;
 
 export namespace Geometry::AdaptiveRemeshing
 {
@@ -38,6 +42,59 @@ export namespace Geometry::AdaptiveRemeshing
     //   4. Equalize valence via edge flips toward target (6 interior, 4 boundary)
     //   5. Tangential Laplacian smoothing projected onto normal plane
 
+    struct ReferenceProjectionParams
+    {
+        // K for KD-tree/BVH candidate shortlist when the backing index supports
+        // it. The current GEOM-039 MeshClosestFace index resolves exact nearest
+        // faces internally, so this remains API-compatible with legacy callers.
+        std::size_t ReferenceProjectionK{16};
+
+        // Maximum allowed projection distance; <= 0 disables distance clamping.
+        double MaxReferenceProjectionDistance{0.0};
+    };
+
+    struct ReferenceProjectionResult
+    {
+        bool Found{false};
+        glm::vec3 Point{0.0f};
+        FaceHandle Face{};
+        float Distance{0.0f};
+    };
+
+    // Reusable frozen-surface projector shared by adaptive and uniform
+    // remeshing. It delegates nearest-face lookup to Geometry.MeshClosestFace
+    // (GEOM-039) and fails closed by returning Found=false for unbuilt indices,
+    // non-finite probes, or distance-clamp misses.
+    class ReferenceProjector
+    {
+    public:
+        bool Enabled{false};
+        bool ProjectSplitVertices{true};
+        bool ProjectAfterSmoothing{true};
+
+        ReferenceProjector() = default;
+        ReferenceProjector(const ReferenceProjector&) = delete;
+        ReferenceProjector& operator=(const ReferenceProjector&) = delete;
+        ReferenceProjector(ReferenceProjector&&) noexcept = default;
+        ReferenceProjector& operator=(ReferenceProjector&&) noexcept = default;
+        ~ReferenceProjector() = default;
+
+        [[nodiscard]] bool Build(const HalfedgeMesh::Mesh& mesh,
+                                 const ReferenceProjectionParams& params = {});
+        [[nodiscard]] ReferenceProjectionResult Project(glm::vec3 point) const;
+        [[nodiscard]] glm::vec3 ProjectPoint(glm::vec3 point) const;
+
+    private:
+        MeshClosestFaceIndex m_Index{};
+        float m_MaxDistanceSq{0.0f};
+    };
+
+    enum class SizingLaw : std::uint8_t
+    {
+        MeanCurvature = 0,
+        ErrorBoundedTaubin = 1,
+    };
+
     struct AdaptiveRemeshingParams
     {
         // Minimum edge length. 0 = auto (0.1 × mean edge length).
@@ -50,6 +107,17 @@ export namespace Geometry::AdaptiveRemeshing
         // 0 = isotropic (uniform target length = mean edge length).
         // Higher values = more refinement in high-curvature regions.
         double CurvatureAdaptation{1.0};
+
+        // MeanCurvature preserves the existing sizing law:
+        //   L(v) = L_base / (1 + alpha * |H(v)|).
+        // ErrorBoundedTaubin uses h = sqrt(6*e*r - 3*e^2), where r is the
+        // reciprocal Taubin principal-curvature magnitude and e is
+        // ApproximationError. Non-positive/non-finite e falls back to
+        // MeanCurvature fail-closed behavior.
+        SizingLaw Sizing{SizingLaw::MeanCurvature};
+
+        // Approximation error bound e for ErrorBoundedTaubin.
+        double ApproximationError{0.0};
 
         // Number of remeshing iterations. Each iteration recomputes the sizing field.
         std::size_t Iterations{5};

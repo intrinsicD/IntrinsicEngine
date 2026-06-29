@@ -109,9 +109,9 @@ namespace Geometry::Graph
 
     void Graph::FreeMemory()
     {
-        m_Vertices.Shrink_to_fit();
-        m_Halfedges.Shrink_to_fit();
-        m_Edges.Shrink_to_fit();
+        m_Vertices.ShrinkToFit();
+        m_Halfedges.ShrinkToFit();
+        m_Edges.ShrinkToFit();
     }
 
     void Graph::Reserve(std::size_t nVertices, std::size_t nEdges)
@@ -453,11 +453,11 @@ namespace Geometry::Graph
         m_Halfedges.Remove(hmap);
 
         m_Vertices.Resize(nv);
-        m_Vertices.Shrink_to_fit();
+        m_Vertices.ShrinkToFit();
         m_Halfedges.Resize(nh);
-        m_Halfedges.Shrink_to_fit();
+        m_Halfedges.ShrinkToFit();
         m_Edges.Resize(ne);
-        m_Edges.Shrink_to_fit();
+        m_Edges.ShrinkToFit();
 
         m_DeletedVertices = 0;
         m_DeletedEdges = 0;

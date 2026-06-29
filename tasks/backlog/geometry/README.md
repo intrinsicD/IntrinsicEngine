@@ -14,27 +14,9 @@ map.
 - [GEOM-016 — Point-cloud filtering and density diagnostics contracts](GEOM-016-point-cloud-filtering-density-contracts.md).
 - [GEOM-017 — Point-cloud descriptors and registration seams](GEOM-017-point-cloud-descriptors-registration-seams.md).
 - [GEOM-019 — Harmonic/Tutte parameterization and boundary constraints](GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md).
-- [GEOM-020 — Sparse direct factorization solver seam (LDLT/LLT)](GEOM-020-sparse-direct-factorization-seam.md)
-  (follow-up to retired `GEOM-008`; gates `methods/METHOD-002` and the
-  shift-invert inner solve of `GEOM-024`).
-- [GEOM-023 — Sparse non-symmetric iterative solver seam (BiCGSTAB)](GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md)
-  (gates `methods/METHOD-003` variant A; promote when METHOD-003 is the
-  next-priority method).
 - [GEOM-024 — Sparse symmetric generalized eigensolver seam](GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
   (gates `methods/METHOD-006` variant B; depends on `GEOM-020`; promote when
   METHOD-006 is the next-priority method).
-- [GEOM-027 — Property name lifetime contract](GEOM-027-property-name-lifetime-contract.md).
-- [GEOM-028 — Property registry handle safety](GEOM-028-property-registry-handle-safety.md).
-- [GEOM-029 — Const property set validity contract](GEOM-029-const-property-set-validity-contract.md).
-- [GEOM-030 — Property set const lookup migration](GEOM-030-property-set-const-lookup-migration.md)
-  (depends on `GEOM-029`).
-- [GEOM-031 — Property set naming normalization](GEOM-031-property-set-naming-normalization.md).
-- [GEOM-032 — Bool property access contract](GEOM-032-bool-property-access-contract.md).
-- [GEOM-033 — Erased property metadata catalog](GEOM-033-erased-property-metadata-catalog.md)
-  (depends on `GEOM-027`, `GEOM-030`, and `GEOM-032`).
-- [GEOM-034 — Geometry property API documentation audit](GEOM-034-geometry-property-api-doc-audit.md)
-  (depends on the property-system refactor sequence `GEOM-027` through
-  `GEOM-033`).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ### bcg_code_base geometry-processing port gaps (seeded 2026-06-26)
@@ -43,30 +25,13 @@ Confirmed feature gaps from the `bcg_code_base` → IntrinsicEngine port-gap
 review (features already present or better in IntrinsicEngine were excluded).
 Grouped by cluster; each is `geometry -> core` only and targets `CPUContracted`.
 
-- [GEOM-037 — SO(3) rotation primitives (Lie machinery)](GEOM-037-so3-rotation-primitives.md)
-  (foundation for `GEOM-038`).
-- [GEOM-038 — Rotation averaging: SO(3) means and medians](GEOM-038-rotation-averaging-means-medians.md)
-  (depends on `GEOM-037`).
-- [GEOM-039 — Accelerated mesh closest-face query and consumer adoption](GEOM-039-accelerated-mesh-closest-face-query.md).
-- [GEOM-040 — Mesh curvature tensor and principal directions](GEOM-040-curvature-tensor-principal-directions.md).
-- [GEOM-041 — FEM Laplacian mass/stiffness variants and edge-weight modes](GEOM-041-fem-laplacian-mass-stiffness-variants.md).
-- [GEOM-042 — Mesh normal-based bilateral denoiser](GEOM-042-mesh-normal-bilateral-denoiser.md).
-- [GEOM-043 — Remeshing surface reprojection and error-bounded adaptive sizing](GEOM-043-remeshing-reprojection-error-bounded-sizing.md)
-  (depends on `GEOM-039`, `GEOM-040`).
-- [GEOM-044 — Sqrt-3 (Kobbelt) subdivision and Loop feature/crease masks](GEOM-044-subdivision-sqrt3-loop-feature-masks.md).
-- [GEOM-045 — First-class mesh geometric-quantity accessors](GEOM-045-first-class-mesh-quantity-accessors.md).
-- [GEOM-046 — Mesh topology utilities (components, dual, triangulate, adjacency)](GEOM-046-mesh-topology-utilities.md).
-- [GEOM-047 — Graph and point-cloud query / sampling utilities](GEOM-047-graph-pointcloud-query-noise-utilities.md).
-- [GEOM-048 — Statistics accumulators and robust estimation kernels](GEOM-048-statistics-robust-estimation-kernels.md).
-- [GEOM-049 — Numeric/linear-algebra utilities (RPCA, Eigen map adapters)](GEOM-049-numeric-linalg-utilities.md).
-- [GEOM-050 — Primitive and curve utilities (Bezier, triangle metrics, sphere fit, AABB)](GEOM-050-primitive-curve-utilities.md).
-- [GEOM-051 — Property system enhancements (live iterator, upload metadata)](GEOM-051-property-system-enhancements.md)
-  (depends on `GEOM-033`).
-- [GEOIO-003 — Mesh and point-cloud IO breadth (OFF writer, point-cloud readers)](GEOIO-003-mesh-pointcloud-io-breadth.md).
+All seeded primitive, statistics, and linear-algebra gaps in this cluster are
+retired; see the retired entries below.
 
 The indexed decrease-key heap that backs Dijkstra is a `core` container filed
 under the runtime backlog as `CORE-004`; the paired editor/runtime integration
-tasks are `UI-024`/`UI-025`/`UI-026` and `RUNTIME-135`.
+tasks are retired `UI-024`/`UI-025`/`UI-026`, and retired `GEOM-039` unblocks
+the runtime SpatialDebug closest-face consumer in `RUNTIME-135`.
 
 ## Convergence
 
@@ -76,17 +41,21 @@ tasks are `UI-024`/`UI-025`/`UI-026` and `RUNTIME-135`.
   algebra (GEOM-008) — are all retired. GEOM-009 (benchmark manifests) is
   retired in `tasks/done/` and provides the manifest-driven smoke harness
   future geometry method packages plug into.
-- GEOM-020 is the named follow-up to retired GEOM-008 for the direct
+- Retired GEOM-020 is the named follow-up to retired GEOM-008 for the direct
   sparse SPD factorization (LDLT/LLT) seam that GEOM-008 deferred but
-  that methods/METHOD-002 (step 2) and METHOD-003 (step 5) already
+  that retired METHOD-002 (step 2) and METHOD-003 (step 5) already
   reference as "the LDLT path from GEOM-008". Method tasks gated on the
-  LDLT path must wait on GEOM-020, not on retired GEOM-008; the gates are
-  encoded in the method tasks' `depends_on` front-matter.
-- GEOM-023 (non-symmetric BiCGSTAB) and GEOM-024 (generalized symmetric
-  eigensolver, Spectra-backed, gated on GEOM-020) complete the solver-seam
-  family: they own the gaps GEOM-020 explicitly deferred and gate
-  METHOD-003 variant A and METHOD-006 variant B respectively. Promote each
-  only when its consuming method is the next-priority method.
+  LDLT path can now promote against `Geometry.Sparse::SparseLDLT` /
+  `SparseLLT`; remaining method gates are encoded in the method tasks'
+  `depends_on` front-matter.
+- Retired GEOM-023 is the named follow-up to retired GEOM-020 for the
+  non-symmetric BiCGSTAB seam that METHOD-003 variant A needs for its
+  closest-point-extension operator. METHOD-003 can now promote against
+  `Geometry.Sparse::SparseBiCGSTAB`.
+- GEOM-024 (generalized symmetric eigensolver, Spectra-backed, gated on
+  GEOM-020) is the remaining solver-seam gap in this family and gates
+  METHOD-006 variant B. Promote it only when METHOD-006 is the
+  next-priority method.
 - GEOM-021 is a module-hygiene follow-up for retired GEOM-006: it keeps the
   `Geometry.MeshSoup` public module interface declarative by moving
   non-trivial validation/container bodies into a matching implementation unit
@@ -103,12 +72,12 @@ tasks are `UI-024`/`UI-025`/`UI-026` and `RUNTIME-135`.
   `Geometry.PointCloud.Normals` replaces the old `Geometry.NormalEstimation`
   point-cloud module with KDTree/default and supplied-index normal-generation
   overloads that return the written normal property.
-- GEOM-027 through GEOM-034 isolate the `Geometry.Properties` cleanup found by
-  the property-system review: name lifetimes, registry handle safety,
-  `ConstPropertySet` validity, const-correct lookup, naming normalization,
-  `bool` proxy-storage behavior, erased metadata descriptors, and the final
-  architecture-doc audit. Keep these as separate slices so public API changes,
-  behavior changes, and docs synchronization stay reviewable.
+- Retired GEOM-027 through GEOM-033 and GEOM-051 completed the
+  `Geometry.Properties` cleanup found by the property-system review: name
+  lifetimes, registry handle safety, `ConstPropertySet` validity,
+  const-correct lookup, naming normalization, `bool` proxy-storage behavior,
+  erased metadata descriptors, and live iterator/upload metadata seams. GEOM-034
+  remains the separate architecture-documentation audit follow-up.
 - GEOM-013 and GEOM-014 are seeded by the geometry paper survey
   [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md).
   Each lists explicit algorithm variants with a marked default (Manifold DC
@@ -126,6 +95,11 @@ tasks are `UI-024`/`UI-025`/`UI-026` and `RUNTIME-135`.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [DOCS-003 — Reconcile algorithm-variant-dispatch.md with reality and define the backend-seam template](../../done/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md) (done).
+- [GEOM-020 — Sparse direct factorization solver seam (LDLT/LLT)](../../done/GEOM-020-sparse-direct-factorization-seam.md) (done).
+- [GEOM-023 — Sparse non-symmetric iterative solver seam (BiCGSTAB)](../../done/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md) (done).
+- [GEOM-049 — Numeric/linear-algebra utilities (RPCA, Eigen map adapters)](../../done/GEOM-049-numeric-linalg-utilities.md) (done).
+- [GEOM-050 — Primitive and curve utilities (Bezier, triangle metrics, sphere fit, AABB)](../../done/GEOM-050-primitive-curve-utilities.md) (done).
 - [GEOIO-002 — Geometry IO parity hardening and exporters](../../done/GEOIO-002-geometry-io-parity-hardening.md) (done).
 - [GEOM-006 — Indexed mesh/soup container and conversion contracts](../../done/GEOM-006-indexed-mesh-soup-conversion-contracts.md) (done).
 - [GEOM-007 — Robust predicates and intersection classification foundation](../../done/GEOM-007-robust-predicates-intersection-classification.md) (done).
@@ -140,6 +114,29 @@ split; narratives live in the retirement log.
 - [GEOM-022 — Remaining geometry module implementation splits](../../done/GEOM-022-remaining-geometry-module-implementation-splits.md).
 - [GEOM-025 — UV atlas backend contract and xatlas default](../../done/GEOM-025-uv-atlas-backend-xatlas.md) (done).
 - [GEOM-026 — Cross-domain vertex normal recomputation contracts](../../done/GEOM-026-cross-domain-vertex-normal-recompute.md) (done).
+- [GEOM-027 — Property name lifetime contract](../../done/GEOM-027-property-name-lifetime-contract.md) (done).
+- [GEOM-028 — Property registry handle safety](../../done/GEOM-028-property-registry-handle-safety.md) (done).
+- [GEOM-029 — Const property set validity contract](../../done/GEOM-029-const-property-set-validity-contract.md) (done).
+- [GEOM-030 — Property set const lookup migration](../../done/GEOM-030-property-set-const-lookup-migration.md) (done).
+- [GEOM-031 — Property set naming normalization](../../done/GEOM-031-property-set-naming-normalization.md) (done).
+- [GEOM-032 — Bool property access contract](../../done/GEOM-032-bool-property-access-contract.md) (done).
+- [GEOM-033 — Erased property metadata catalog](../../done/GEOM-033-erased-property-metadata-catalog.md) (done).
+- [GEOM-034 — Geometry property API documentation audit](../../done/GEOM-034-geometry-property-api-doc-audit.md) (done).
+- [GEOM-037 — SO(3) rotation primitives (Lie machinery)](../../done/GEOM-037-so3-rotation-primitives.md) (done).
+- [GEOM-038 — Rotation averaging: SO(3) means and medians](../../done/GEOM-038-rotation-averaging-means-medians.md) (done).
+- [GEOM-039 — Accelerated mesh closest-face query and consumer adoption](../../done/GEOM-039-accelerated-mesh-closest-face-query.md) (done).
+- [GEOM-040 — Mesh curvature tensor and principal directions](../../done/GEOM-040-curvature-tensor-principal-directions.md) (done).
+- [GEOM-041 — FEM Laplacian mass/stiffness variants and edge-weight modes](../../done/GEOM-041-fem-laplacian-mass-stiffness-variants.md) (done).
+- [GEOM-042 — Mesh normal-based bilateral denoiser](../../done/GEOM-042-mesh-normal-bilateral-denoiser.md) (done).
+- [GEOM-043 — Remeshing surface reprojection and error-bounded adaptive sizing](../../done/GEOM-043-remeshing-reprojection-error-bounded-sizing.md) (done).
+- [GEOM-044 — Sqrt-3 subdivision and Loop feature/crease masks](../../done/GEOM-044-subdivision-sqrt3-loop-feature-masks.md) (done).
+- [GEOM-045 — First-class mesh geometric-quantity accessors](../../done/GEOM-045-first-class-mesh-quantity-accessors.md) (done).
+- [GEOM-046 — Mesh topology utilities](../../done/GEOM-046-mesh-topology-utilities.md) (done).
+- [GEOM-047 — Graph and point-cloud query/noise utilities](../../done/GEOM-047-graph-pointcloud-query-noise-utilities.md) (done).
+- [GEOM-048 — Statistics accumulators and robust estimation kernels](../../done/GEOM-048-statistics-robust-estimation-kernels.md) (done).
+- [GEOM-051 — Property system enhancements](../../done/GEOM-051-property-system-enhancements.md) (done).
+- [GEOM-052 — Shared CPU/GPU backend seam + fix the KMeans phantom GPU exemplar](../../done/GEOM-052-shared-cpu-gpu-backend-seam-kmeans-exemplar.md) (done).
+- [GEOIO-003 — Mesh and point-cloud IO breadth (OFF writer, point-cloud readers)](../../done/GEOIO-003-mesh-pointcloud-io-breadth.md) (done).
 - GEOIO-002 is retired in [`tasks/done`](../../done/GEOIO-002-geometry-io-parity-hardening.md)
   and contributed to **Theme E — Geometry IO completion** as the upstream gate
   for retired [`ASSETIO-001`](../../done/ASSETIO-001-asset-model-texture-ingest-ownership.md)

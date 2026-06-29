@@ -272,6 +272,324 @@ namespace Geometry::PointCloudIO
             result.BasePath = pathInfo.BasePath;
         }
 
+        enum class StrictAsciiPointCloudFormat
+        {
+            PTS,
+            CSV,
+            ThreeD,
+            TXT,
+        };
+
+        [[nodiscard]] std::optional<std::vector<std::string_view>> SplitCsvStrict(std::string_view line)
+        {
+            std::vector<std::string_view> tokens;
+            std::size_t start = 0;
+            while (start <= line.size())
+            {
+                const std::size_t end = line.find(',', start);
+                std::string_view token = end == std::string_view::npos
+                                             ? line.substr(start)
+                                             : line.substr(start, end - start);
+                token = Trim(token);
+                if (token.empty())
+                {
+                    return std::nullopt;
+                }
+                tokens.push_back(token);
+                if (end == std::string_view::npos)
+                {
+                    break;
+                }
+                start = end + 1;
+            }
+            return tokens;
+        }
+
+        [[nodiscard]] std::vector<std::string_view> SplitAsciiPointCloudTokens(
+            std::string_view line,
+            const StrictAsciiPointCloudFormat format,
+            std::string& scratch)
+        {
+            if (format == StrictAsciiPointCloudFormat::CSV)
+            {
+                const auto csvTokens = SplitCsvStrict(line);
+                return csvTokens.value_or(std::vector<std::string_view>{});
+            }
+
+            if (line.find(';') != std::string_view::npos || line.find(',') != std::string_view::npos)
+            {
+                scratch.assign(line.begin(), line.end());
+                for (char& c : scratch)
+                {
+                    if (c == ';' || c == ',')
+                    {
+                        c = ' ';
+                    }
+                }
+                line = Trim(std::string_view(scratch));
+            }
+            return SplitWhitespace(line);
+        }
+
+        [[nodiscard]] std::optional<std::vector<float>> ParseFiniteFloatTokens(
+            std::span<const std::string_view> tokens)
+        {
+            std::vector<float> values;
+            values.reserve(tokens.size());
+            for (const std::string_view token : tokens)
+            {
+                const auto value = ParseNumber<float>(token);
+                if (!value || !IsFinite(*value))
+                {
+                    return std::nullopt;
+                }
+                values.push_back(*value);
+            }
+            return values;
+        }
+
+        [[nodiscard]] bool ValidStrictAsciiColumnCount(
+            const StrictAsciiPointCloudFormat format,
+            const std::size_t count)
+        {
+            switch (format)
+            {
+            case StrictAsciiPointCloudFormat::PTS:
+                return count == 3 || count == 4 || count == 7;
+            case StrictAsciiPointCloudFormat::CSV:
+                return count == 3 || count == 5 || count == 6;
+            case StrictAsciiPointCloudFormat::ThreeD:
+                return count == 3 || count == 4 || count == 6;
+            case StrictAsciiPointCloudFormat::TXT:
+                return count == 3 || count == 6 || count == 7;
+            }
+            return false;
+        }
+
+        [[nodiscard]] bool StrictAsciiRowHasNormal(
+            const StrictAsciiPointCloudFormat format,
+            const std::size_t count)
+        {
+            return count == 6 &&
+                   (format == StrictAsciiPointCloudFormat::CSV ||
+                    format == StrictAsciiPointCloudFormat::ThreeD ||
+                    format == StrictAsciiPointCloudFormat::TXT);
+        }
+
+        [[nodiscard]] bool StrictAsciiRowHasColor(
+            const StrictAsciiPointCloudFormat format,
+            const std::size_t count)
+        {
+            return count == 7 &&
+                   (format == StrictAsciiPointCloudFormat::PTS ||
+                    format == StrictAsciiPointCloudFormat::TXT);
+        }
+
+        [[nodiscard]] Extrinsic::Core::Expected<PointCloudIOResult> ParseStrictAsciiPointCloud(
+            std::string_view text,
+            std::string_view absolutePath,
+            const StrictAsciiPointCloudFormat format)
+        {
+            PointCloudIOResult result;
+            ApplyPathInfo(result, absolutePath);
+
+            std::size_t cursor = 0;
+            std::string_view line;
+            bool firstPayloadLine = true;
+            std::size_t expectedCount = 0;
+            std::string normalizedLine;
+
+            while (NextLine(text, cursor, line))
+            {
+                const auto comment = line.find('#');
+                if (comment != std::string_view::npos)
+                {
+                    line = Trim(line.substr(0, comment));
+                }
+                if (line.empty())
+                {
+                    continue;
+                }
+
+                const auto tokens = SplitAsciiPointCloudTokens(line, format, normalizedLine);
+                if (tokens.empty())
+                {
+                    return InvalidPointCloudFormat();
+                }
+
+                if (firstPayloadLine &&
+                    (format == StrictAsciiPointCloudFormat::PTS || format == StrictAsciiPointCloudFormat::TXT) &&
+                    tokens.size() == 1)
+                {
+                    const auto count = ParseNumber<std::size_t>(tokens[0]);
+                    if (!count || *count == 0)
+                    {
+                        return InvalidPointCloudFormat();
+                    }
+                    expectedCount = *count;
+                    firstPayloadLine = false;
+                    continue;
+                }
+                firstPayloadLine = false;
+
+                if (expectedCount > 0 && result.Cloud.VerticesSize() >= expectedCount)
+                {
+                    return InvalidPointCloudFormat();
+                }
+
+                if (!ValidStrictAsciiColumnCount(format, tokens.size()))
+                {
+                    return InvalidPointCloudFormat();
+                }
+
+                const auto values = ParseFiniteFloatTokens(tokens);
+                if (!values)
+                {
+                    return InvalidPointCloudFormat();
+                }
+
+                const glm::vec3 position((*values)[0], (*values)[1], (*values)[2]);
+                if (!IsFinite(position))
+                {
+                    return InvalidPointCloudFormat();
+                }
+
+                const bool hasNormal = StrictAsciiRowHasNormal(format, values->size());
+                const bool hasColor = StrictAsciiRowHasColor(format, values->size());
+                if (hasNormal && !result.Cloud.HasNormals())
+                {
+                    result.Cloud.EnableNormals();
+                }
+                if (hasColor && !result.Cloud.HasColors())
+                {
+                    result.Cloud.EnableColors(glm::vec4(1.0f));
+                }
+
+                const auto point = result.Cloud.AddPoint(position);
+                if (hasNormal)
+                {
+                    const glm::vec3 normal((*values)[3], (*values)[4], (*values)[5]);
+                    if (!IsFinite(normal))
+                    {
+                        return InvalidPointCloudFormat();
+                    }
+                    result.Cloud.Normal(point) = normal;
+                }
+                if (hasColor)
+                {
+                    const std::size_t colorOffset =
+                        format == StrictAsciiPointCloudFormat::PTS ? 4u : 3u;
+                    result.Cloud.Color(point) = glm::vec4(
+                        NormalizeColorChannel((*values)[colorOffset]),
+                        NormalizeColorChannel((*values)[colorOffset + 1]),
+                        NormalizeColorChannel((*values)[colorOffset + 2]),
+                        1.0f);
+                }
+            }
+
+            if (result.Cloud.IsEmpty())
+            {
+                return InvalidPointCloudFormat();
+            }
+            if (expectedCount > 0 && result.Cloud.VerticesSize() != expectedCount)
+            {
+                return InvalidPointCloudFormat();
+            }
+            return result;
+        }
+
+        [[nodiscard]] std::optional<glm::vec3> ParseStrictVec3(
+            std::span<const std::string_view> tokens)
+        {
+            if (tokens.size() != 3)
+            {
+                return std::nullopt;
+            }
+            const auto values = ParseFiniteFloatTokens(tokens);
+            if (!values || values->size() != 3)
+            {
+                return std::nullopt;
+            }
+            return glm::vec3((*values)[0], (*values)[1], (*values)[2]);
+        }
+
+        [[nodiscard]] Extrinsic::Core::Expected<PointCloudIOResult> ParsePWNPointCloud(
+            std::string_view text,
+            std::string_view absolutePath)
+        {
+            std::size_t cursor = 0;
+            std::string_view line;
+            bool countSeen = false;
+            std::size_t expectedCount = 0;
+            std::vector<glm::vec3> positions;
+            std::vector<glm::vec3> normals;
+
+            while (NextLine(text, cursor, line))
+            {
+                const auto comment = line.find('#');
+                if (comment != std::string_view::npos)
+                {
+                    line = Trim(line.substr(0, comment));
+                }
+                if (line.empty())
+                {
+                    continue;
+                }
+
+                const auto tokens = SplitWhitespace(line);
+                if (!countSeen)
+                {
+                    if (tokens.size() != 1)
+                    {
+                        return InvalidPointCloudFormat();
+                    }
+                    const auto count = ParseNumber<std::size_t>(tokens[0]);
+                    if (!count || *count == 0)
+                    {
+                        return InvalidPointCloudFormat();
+                    }
+                    expectedCount = *count;
+                    countSeen = true;
+                    continue;
+                }
+
+                const auto value = ParseStrictVec3(tokens);
+                if (!value || !IsFinite(*value))
+                {
+                    return InvalidPointCloudFormat();
+                }
+
+                if (positions.size() < expectedCount)
+                {
+                    positions.push_back(*value);
+                }
+                else if (normals.size() < expectedCount)
+                {
+                    normals.push_back(*value);
+                }
+                else
+                {
+                    return InvalidPointCloudFormat();
+                }
+            }
+
+            if (!countSeen || positions.size() != expectedCount || normals.size() != expectedCount)
+            {
+                return InvalidPointCloudFormat();
+            }
+
+            PointCloudIOResult result;
+            ApplyPathInfo(result, absolutePath);
+            result.Cloud.Reserve(expectedCount);
+            result.Cloud.EnableNormals();
+            for (std::size_t i = 0; i < expectedCount; ++i)
+            {
+                const auto point = result.Cloud.AddPoint(positions[i]);
+                result.Cloud.Normal(point) = normals[i];
+            }
+            return result;
+        }
+
         enum class PlyFormat
         {
             Ascii,
@@ -1220,6 +1538,56 @@ namespace Geometry::PointCloudIO
             return InvalidPointCloudFormat();
         }
         return result;
+    }
+
+    Extrinsic::Core::Expected<PointCloudIOResult> LoadPTS(std::string_view absolute_path)
+    {
+        auto text = ReadTextFile(absolute_path);
+        if (!text)
+        {
+            return Extrinsic::Core::Err<PointCloudIOResult>(text.error());
+        }
+        return ParseStrictAsciiPointCloud(*text, absolute_path, StrictAsciiPointCloudFormat::PTS);
+    }
+
+    Extrinsic::Core::Expected<PointCloudIOResult> LoadPWN(std::string_view absolute_path)
+    {
+        auto text = ReadTextFile(absolute_path);
+        if (!text)
+        {
+            return Extrinsic::Core::Err<PointCloudIOResult>(text.error());
+        }
+        return ParsePWNPointCloud(*text, absolute_path);
+    }
+
+    Extrinsic::Core::Expected<PointCloudIOResult> LoadCSV(std::string_view absolute_path)
+    {
+        auto text = ReadTextFile(absolute_path);
+        if (!text)
+        {
+            return Extrinsic::Core::Err<PointCloudIOResult>(text.error());
+        }
+        return ParseStrictAsciiPointCloud(*text, absolute_path, StrictAsciiPointCloudFormat::CSV);
+    }
+
+    Extrinsic::Core::Expected<PointCloudIOResult> Load3D(std::string_view absolute_path)
+    {
+        auto text = ReadTextFile(absolute_path);
+        if (!text)
+        {
+            return Extrinsic::Core::Err<PointCloudIOResult>(text.error());
+        }
+        return ParseStrictAsciiPointCloud(*text, absolute_path, StrictAsciiPointCloudFormat::ThreeD);
+    }
+
+    Extrinsic::Core::Expected<PointCloudIOResult> LoadTXT(std::string_view absolute_path)
+    {
+        auto text = ReadTextFile(absolute_path);
+        if (!text)
+        {
+            return Extrinsic::Core::Err<PointCloudIOResult>(text.error());
+        }
+        return ParseStrictAsciiPointCloud(*text, absolute_path, StrictAsciiPointCloudFormat::TXT);
     }
 
     Extrinsic::Core::Expected<PointCloudIOResult> LoadPCD(std::string_view absolute_path)
@@ -2288,5 +2656,3 @@ namespace Geometry::PointCloudIO
         return PointCloudIOWriteStatus::Success;
     }
 }
-
-

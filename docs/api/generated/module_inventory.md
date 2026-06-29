@@ -10,9 +10,9 @@ Root scanned: `src`
 |---|---:|
 | `app` | 1 |
 | `assets` | 12 |
-| `core` | 40 |
+| `core` | 41 |
 | `ecs` | 28 |
-| `geometry` | 95 |
+| `geometry` | 99 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 68 |
@@ -21,7 +21,7 @@ Root scanned: `src`
 | `legacy` | 181 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 42 |
+| `runtime` | 48 |
 
 ## Modules
 
@@ -43,6 +43,7 @@ Root scanned: `src`
 | `Extrinsic.Core.BoundedHeap` | `src/core/Core.BoundedHeap.cppm` | `core` |
 | `Extrinsic.Core.CallbackRegistry` | `src/core/Core.CallbackRegistry.cppm` | `core` |
 | `Extrinsic.Core.Config.Engine` | `src/core/Core.Config.Engine.cppm` | `core` |
+| `Extrinsic.Core.Config.EngineLoad` | `src/core/Core.Config.EngineLoad.cppm` | `core` |
 | `Extrinsic.Core.Config.Render` | `src/core/Core.Config.Render.cppm` | `core` |
 | `Extrinsic.Core.Config.Simulation` | `src/core/Core.Config.Simulation.cppm` | `core` |
 | `Extrinsic.Core.Config.Window` | `src/core/Core.Config.Window.cppm` | `core` |
@@ -145,9 +146,11 @@ Root scanned: `src`
 | `Geometry.HalfedgeMesh.Quality` | `src/geometry/Geometry.HalfedgeMesh.Quality.cppm` | `geometry` |
 | `Geometry.Remeshing` | `src/geometry/Geometry.HalfedgeMesh.Remeshing.cppm` | `geometry` |
 | `Geometry.HalfedgeMesh.Repair` | `src/geometry/Geometry.HalfedgeMesh.Repair.cppm` | `geometry` |
+| `Geometry.SignedHeatMethod` | `src/geometry/Geometry.HalfedgeMesh.SignedHeatMethod.cppm` | `geometry` |
 | `Geometry.Simplification` | `src/geometry/Geometry.HalfedgeMesh.Simplification.cppm` | `geometry` |
 | `Geometry.Smoothing` | `src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm` | `geometry` |
 | `Geometry.Subdivision` | `src/geometry/Geometry.HalfedgeMesh.Subdivision.cppm` | `geometry` |
+| `Geometry.HalfedgeMesh.SubdivisionSqrt3` | `src/geometry/Geometry.HalfedgeMesh.SubdivisionSqrt3.cppm` | `geometry` |
 | `Geometry.HalfedgeMesh.Utils` | `src/geometry/Geometry.HalfedgeMesh.Utils.cppm` | `geometry` |
 | `Geometry.VectorHeatMethod` | `src/geometry/Geometry.HalfedgeMesh.VectorHeatMethod.cppm` | `geometry` |
 | `Geometry.HalfedgeMesh.Vertices.Normals` | `src/geometry/Geometry.HalfedgeMesh.Vertices.Normals.cppm` | `geometry` |
@@ -176,6 +179,8 @@ Root scanned: `src`
 | `Geometry.PointCloud.Fwd` | `src/geometry/Geometry.PointCloud.Fwd.cppm` | `geometry` |
 | `Geometry.PointCloud.IO` | `src/geometry/Geometry.PointCloud.IO.cppm` | `geometry` |
 | `Geometry.PointCloud.Normals` | `src/geometry/Geometry.PointCloud.Normals.cppm` | `geometry` |
+| `Geometry.PointCloud.QualityMetrics` | `src/geometry/Geometry.PointCloud.QualityMetrics.cppm` | `geometry` |
+| `Geometry.PointCloud.SurfaceSampling` | `src/geometry/Geometry.PointCloud.SurfaceSampling.cppm` | `geometry` |
 | `Geometry.PointCloud.Utils` | `src/geometry/Geometry.PointCloud.Utils.cppm` | `geometry` |
 | `Geometry.PointCloud` | `src/geometry/Geometry.PointCloud.cppm` | `geometry` |
 | `Geometry.Primitives` | `src/geometry/Geometry.Primitives.cppm` | `geometry` |
@@ -517,9 +522,14 @@ Root scanned: `src`
 | `Extrinsic.Runtime.GeometryAvailability` | `src/runtime/Runtime.GeometryAvailability.cppm` | `runtime` |
 | `Extrinsic.Runtime.GpuReadbackJob` | `src/runtime/Runtime.GpuReadbackJob.cppm` | `runtime` |
 | `Extrinsic.Runtime.GraphGeometryPacker` | `src/runtime/Runtime.GraphGeometryPacker.cppm` | `runtime` |
+| `Extrinsic.Runtime.KMeansBackend` | `src/runtime/Runtime.KMeansBackend.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshAttributeTextureBake` | `src/runtime/Runtime.MeshAttributeTextureBake.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshGeometryPacker` | `src/runtime/Runtime.MeshGeometryPacker.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshPrimitiveViewPacker` | `src/runtime/Runtime.MeshPrimitiveViewPacker.cppm` | `runtime` |
+| `Extrinsic.Runtime.MethodFigureExport` | `src/runtime/Runtime.MethodFigureExport.cppm` | `runtime` |
+| `Extrinsic.Runtime.ObjectSpaceNormalBakeBinding` | `src/runtime/Runtime.ObjectSpaceNormalBakeBinding.cppm` | `runtime` |
+| `Extrinsic.Runtime.ObjectSpaceNormalBakeQueue` | `src/runtime/Runtime.ObjectSpaceNormalBakeQueue.cppm` | `runtime` |
+| `Extrinsic.Runtime.ObjectSpaceNormalBakeSubmission` | `src/runtime/Runtime.ObjectSpaceNormalBakeSubmission.cppm` | `runtime` |
 | `Extrinsic.Runtime.PhysicsBridge` | `src/runtime/Runtime.PhysicsBridge.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointCloudGeometryPacker` | `src/runtime/Runtime.PointCloudGeometryPacker.cppm` | `runtime` |
 | `Extrinsic.Runtime.PrimitiveSelectionRefinement` | `src/runtime/Runtime.PrimitiveSelectionRefinement.cppm` | `runtime` |
@@ -540,6 +550,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.VertexChannelBindings` | `src/runtime/Runtime.VertexChannelBindings.cppm` | `runtime` |
 | `Extrinsic.Runtime.VertexChannelStreams` | `src/runtime/Runtime.VertexChannelStreams.cppm` | `runtime` |
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
+| `Extrinsic.Runtime.SpatialDebugClosestFace` | `src/runtime/SpatialDebug/Runtime.SpatialDebugClosestFace.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **514**
+Total modules: **525**

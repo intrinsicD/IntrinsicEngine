@@ -169,7 +169,7 @@ namespace Geometry::PointCloud
         m_Vertices.Remove(vmap);
 
         m_Vertices.Resize(nv);
-        m_Vertices.Shrink_to_fit();
+        m_Vertices.ShrinkToFit();
 
         m_DeletedVertices = 0;
         EnsureProperties();

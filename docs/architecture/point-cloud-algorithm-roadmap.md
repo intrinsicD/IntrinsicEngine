@@ -16,7 +16,10 @@ This document splits point-cloud algorithm work into reviewable packs for `src/g
 The current promoted geometry layer already provides useful point-cloud foundations:
 
 - `Geometry.PointCloud` owns the `Geometry::PointCloud::Cloud` container with canonical `v:point` positions and optional normal/color/radius attributes.
-- `Geometry.PointCloud.Utils` includes statistics, voxel downsampling, random subsampling, radius estimation, bilateral filtering, outlier-score estimation, and kernel-density estimation.
+- `Geometry.PointCloud.Utils` includes statistics, voxel downsampling, random
+  subsampling, deterministic seeded Gaussian noise scaled to mean spacing, radius
+  estimation, bilateral filtering, outlier-score estimation, and kernel-density
+  estimation.
 - `Geometry.PointCloud.Normals` provides KDTree-backed PCA normal estimation,
   MST orientation, supplied-index overloads, and property-writing `v:normal`
   recompute contracts.

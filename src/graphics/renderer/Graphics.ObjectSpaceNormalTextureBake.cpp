@@ -115,6 +115,12 @@ namespace Extrinsic::Graphics
             return "DegenerateUvTriangle";
         case ObjectSpaceNormalTextureBakeStatus::NoContainingTriangle:
             return "NoContainingTriangle";
+        case ObjectSpaceNormalTextureBakeStatus::InvalidGeneratedTextureAsset:
+            return "InvalidGeneratedTextureAsset";
+        case ObjectSpaceNormalTextureBakeStatus::InvalidGpuResource:
+            return "InvalidGpuResource";
+        case ObjectSpaceNormalTextureBakeStatus::InvalidIndexCount:
+            return "InvalidIndexCount";
         }
         return "Unknown";
     }
@@ -345,6 +351,138 @@ namespace Extrinsic::Graphics
                 sizeof(ObjectSpaceNormalTextureBakeGpuPushConstants));
         desc.DebugName = "ObjectSpaceNormalTextureBake";
         return desc;
+    }
+
+    ObjectSpaceNormalTextureBakePlan BuildObjectSpaceNormalTextureBakePlan(
+        const ObjectSpaceNormalTextureBakePlanRequest& request) noexcept
+    {
+        ObjectSpaceNormalTextureBakePlan plan{};
+        plan.Diagnostics.Options =
+            ResolveObjectSpaceNormalTextureBakeOptions(request.Options);
+        plan.Diagnostics.VertexCount = request.Geometry.VertexCount;
+        plan.Diagnostics.TriangleCount = request.Geometry.IndexCount / 3u;
+        plan.DilationRequested = plan.Diagnostics.Options.PaddingTexels > 0u;
+
+        const auto fail = [&plan](const ObjectSpaceNormalTextureBakeStatus status) noexcept
+        {
+            plan.Status = status;
+            return plan;
+        };
+
+        if (plan.Diagnostics.Options.Space != NormalTextureSpace::ObjectSpaceNormal)
+        {
+            return fail(
+                ObjectSpaceNormalTextureBakeStatus::UnsupportedNormalTextureSpace);
+        }
+
+        if (!request.GeneratedTextureAsset.IsValid())
+        {
+            return fail(
+                ObjectSpaceNormalTextureBakeStatus::InvalidGeneratedTextureAsset);
+        }
+
+        if (request.Geometry.VertexCount == 0u || request.Geometry.IndexCount == 0u)
+        {
+            return fail(ObjectSpaceNormalTextureBakeStatus::EmptyInput);
+        }
+
+        if ((request.Geometry.IndexCount % 3u) != 0u)
+        {
+            plan.Diagnostics.FirstFailureIndex = request.Geometry.IndexCount;
+            return fail(ObjectSpaceNormalTextureBakeStatus::InvalidIndexCount);
+        }
+
+        if (!request.Pipeline.IsValid() ||
+            !request.Geometry.IndexBuffer.IsValid() ||
+            request.Geometry.TexcoordBDA == 0u ||
+            request.Geometry.NormalBDA == 0u)
+        {
+            return fail(ObjectSpaceNormalTextureBakeStatus::InvalidGpuResource);
+        }
+
+        const RHI::TextureUsage usage =
+            (RHI::TextureUsage::Sampled | RHI::TextureUsage::ColorTarget) |
+            request.AdditionalTextureUsage;
+        const char* debugName = request.DebugName != nullptr
+            ? request.DebugName
+            : "ObjectSpaceNormalTextureBake.Output";
+
+        plan.CompletionKey = ObjectSpaceNormalTextureBakeCompletionKey{
+            .GeneratedTextureAsset = request.GeneratedTextureAsset,
+            .Source = request.SourceKey,
+            .Width = plan.Diagnostics.Options.Width,
+            .Height = plan.Diagnostics.Options.Height,
+            .PaddingTexels = plan.Diagnostics.Options.PaddingTexels,
+            .Space = plan.Diagnostics.Options.Space,
+        };
+
+        plan.TextureRequest = GpuProducedTextureRequest{
+            .Id = request.GeneratedTextureAsset,
+            .Desc = RHI::TextureDesc{
+                .Width = plan.Diagnostics.Options.Width,
+                .Height = plan.Diagnostics.Options.Height,
+                .MipLevels = 1u,
+                .Fmt = RHI::Format::RGBA8_UNORM,
+                .Usage = usage,
+                .InitialLayout = request.InitialLayout,
+                .DebugName = debugName,
+            },
+            .SamplerDesc = request.SamplerDesc,
+            .Sampler = request.Sampler,
+            .ReadyFrame = request.ReadyFrame,
+            .HasReadyFrame = request.HasReadyFrame,
+        };
+
+        plan.RecordTemplate = ObjectSpaceNormalTextureBakeGpuRecordTemplate{
+            .Pipeline = request.Pipeline,
+            .IndexBuffer = request.Geometry.IndexBuffer,
+            .TexcoordBDA = request.Geometry.TexcoordBDA,
+            .NormalBDA = request.Geometry.NormalBDA,
+            .IndexCount = request.Geometry.IndexCount,
+            .Width = plan.Diagnostics.Options.Width,
+            .Height = plan.Diagnostics.Options.Height,
+            .InitialLayout = request.InitialLayout,
+            .FinalLayout = request.FinalLayout,
+        };
+
+        plan.Status = ObjectSpaceNormalTextureBakeStatus::Success;
+        return plan;
+    }
+
+    bool ObjectSpaceNormalTextureBakeCompletionKeyMatches(
+        const ObjectSpaceNormalTextureBakeCompletionKey& expected,
+        const ObjectSpaceNormalTextureBakeCompletionKey& actual) noexcept
+    {
+        return expected.GeneratedTextureAsset == actual.GeneratedTextureAsset &&
+               expected.Source.EntityKey == actual.Source.EntityKey &&
+               expected.Source.GeometryGeneration ==
+                   actual.Source.GeometryGeneration &&
+               expected.Source.TexcoordGeneration ==
+                   actual.Source.TexcoordGeneration &&
+               expected.Source.NormalGeneration == actual.Source.NormalGeneration &&
+               expected.Width == actual.Width &&
+               expected.Height == actual.Height &&
+               expected.PaddingTexels == actual.PaddingTexels &&
+               expected.Space == actual.Space;
+    }
+
+    ObjectSpaceNormalTextureBakeGpuRecordDesc
+    MakeObjectSpaceNormalTextureBakeGpuRecordDesc(
+        const ObjectSpaceNormalTextureBakePlan& plan,
+        const RHI::TextureHandle outputTexture) noexcept
+    {
+        return ObjectSpaceNormalTextureBakeGpuRecordDesc{
+            .Pipeline = plan.RecordTemplate.Pipeline,
+            .OutputTexture = outputTexture,
+            .IndexBuffer = plan.RecordTemplate.IndexBuffer,
+            .TexcoordBDA = plan.RecordTemplate.TexcoordBDA,
+            .NormalBDA = plan.RecordTemplate.NormalBDA,
+            .IndexCount = plan.RecordTemplate.IndexCount,
+            .Width = plan.RecordTemplate.Width,
+            .Height = plan.RecordTemplate.Height,
+            .InitialLayout = plan.RecordTemplate.InitialLayout,
+            .FinalLayout = plan.RecordTemplate.FinalLayout,
+        };
     }
 
     Core::Result RecordObjectSpaceNormalTextureBake(

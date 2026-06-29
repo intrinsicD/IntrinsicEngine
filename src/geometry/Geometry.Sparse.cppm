@@ -2,10 +2,27 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <vector>
 
+#ifndef EIGEN_MPL2_ONLY
+#define EIGEN_MPL2_ONLY
+#endif
+
+#ifndef EIGEN_DONT_PARALLELIZE
+#define EIGEN_DONT_PARALLELIZE
+#endif
+
+#include <Eigen/Dense>
+
 export module Geometry.Sparse;
+
+namespace Geometry::Sparse::Detail
+{
+    struct SparseLDLTImpl;
+    struct SparseLLTImpl;
+}
 
 export namespace Geometry::Sparse
 {
@@ -17,6 +34,33 @@ export namespace Geometry::Sparse
         InvalidInput,
         Breakdown,
         NonFinite
+    };
+
+    enum class SparseFactorizationStatus : std::uint8_t
+    {
+        Success = 0,
+        NotFactored,
+        NumericalIssue,
+        NonSPD,
+        ZeroPivot,
+        DimensionMismatch,
+        InvalidInput
+    };
+
+    enum class SparseIterativeStatus : std::uint8_t
+    {
+        Success = 0,
+        NotConverged,
+        NumericalIssue,
+        DimensionMismatch,
+        InvalidInput
+    };
+
+    enum class SparsePreconditioner : std::uint8_t
+    {
+        None = 0,
+        Diagonal,
+        IncompleteLUT
     };
 
     struct SparseMatrix
@@ -97,10 +141,43 @@ export namespace Geometry::Sparse
         }
     };
 
+    struct SparseFactorizationDiagnostics
+    {
+        SparseFactorizationStatus Status{SparseFactorizationStatus::NotFactored};
+        std::size_t PivotCount{0};
+        double SmallestAbsolutePivot{0.0};
+        double ConditionEstimate{0.0};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SparseFactorizationStatus::Success;
+        }
+    };
+
+    struct SparseIterativeDiagnostics
+    {
+        SparseIterativeStatus Status{SparseIterativeStatus::InvalidInput};
+        std::size_t Iterations{0};
+        double FinalRelativeResidual{0.0};
+        SparsePreconditioner Preconditioner{SparsePreconditioner::Diagonal};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SparseIterativeStatus::Success;
+        }
+    };
+
     struct CGParams
     {
         std::size_t MaxIterations{1000};
         double Tolerance{1e-8};
+    };
+
+    struct SparseBiCGSTABParams
+    {
+        std::size_t MaxIterations{1000};
+        double RelativeTolerance{1e-8};
+        SparsePreconditioner Preconditioner{SparsePreconditioner::Diagonal};
     };
 
     struct CGResult
@@ -111,6 +188,83 @@ export namespace Geometry::Sparse
         double RelativeResidual{0.0};
         bool Converged{false};
         CGConvergenceReason Reason{CGConvergenceReason::NotRun};
+    };
+
+    using EigenDenseMatrixXd = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>;
+    using EigenDenseBlockRef = Eigen::Ref<EigenDenseMatrixXd>;
+    using ConstEigenDenseBlockRef = Eigen::Ref<const EigenDenseMatrixXd>;
+
+    class SparseLDLT
+    {
+    public:
+        SparseLDLT();
+        ~SparseLDLT();
+
+        SparseLDLT(SparseLDLT&&) noexcept;
+        SparseLDLT& operator=(SparseLDLT&&) noexcept;
+
+        SparseLDLT(const SparseLDLT&) = delete;
+        SparseLDLT& operator=(const SparseLDLT&) = delete;
+
+        [[nodiscard]] SparseFactorizationDiagnostics factor(const SparseMatrix& matrix);
+        [[nodiscard]] SparseFactorizationDiagnostics solve(
+            std::span<const double> rhs,
+            std::span<double> x) const;
+        [[nodiscard]] SparseFactorizationDiagnostics solveInPlace(std::span<double> x) const;
+        [[nodiscard]] SparseFactorizationDiagnostics solve(
+            ConstEigenDenseBlockRef rhs,
+            EigenDenseBlockRef x) const;
+        [[nodiscard]] SparseFactorizationDiagnostics solveInPlace(EigenDenseBlockRef x) const;
+        [[nodiscard]] const SparseFactorizationDiagnostics& diagnostics() const noexcept;
+
+    private:
+        std::unique_ptr<Detail::SparseLDLTImpl> Impl_;
+        SparseFactorizationDiagnostics Diagnostics_{};
+        std::size_t Dimension_{0};
+    };
+
+    class SparseLLT
+    {
+    public:
+        SparseLLT();
+        ~SparseLLT();
+
+        SparseLLT(SparseLLT&&) noexcept;
+        SparseLLT& operator=(SparseLLT&&) noexcept;
+
+        SparseLLT(const SparseLLT&) = delete;
+        SparseLLT& operator=(const SparseLLT&) = delete;
+
+        [[nodiscard]] SparseFactorizationDiagnostics factor(const SparseMatrix& matrix);
+        [[nodiscard]] SparseFactorizationDiagnostics solve(
+            std::span<const double> rhs,
+            std::span<double> x) const;
+        [[nodiscard]] SparseFactorizationDiagnostics solveInPlace(std::span<double> x) const;
+        [[nodiscard]] SparseFactorizationDiagnostics solve(
+            ConstEigenDenseBlockRef rhs,
+            EigenDenseBlockRef x) const;
+        [[nodiscard]] SparseFactorizationDiagnostics solveInPlace(EigenDenseBlockRef x) const;
+        [[nodiscard]] const SparseFactorizationDiagnostics& diagnostics() const noexcept;
+
+    private:
+        std::unique_ptr<Detail::SparseLLTImpl> Impl_;
+        SparseFactorizationDiagnostics Diagnostics_{};
+        std::size_t Dimension_{0};
+    };
+
+    class SparseBiCGSTAB
+    {
+    public:
+        [[nodiscard]] SparseIterativeDiagnostics solve(
+            const SparseMatrix& matrix,
+            std::span<const double> rhs,
+            std::span<double> x,
+            const SparseBiCGSTABParams& params = {}) const;
+        [[nodiscard]] SparseIterativeDiagnostics solve(
+            const SparseMatrix& matrix,
+            ConstEigenDenseBlockRef rhs,
+            EigenDenseBlockRef x,
+            const SparseBiCGSTABParams& params = {}) const;
     };
 
     [[nodiscard]] SparseDiagnostics AnalyzeSparseMatrix(
@@ -130,4 +284,3 @@ export namespace Geometry::Sparse
         std::span<double> x,
         const CGParams& params = {});
 }
-

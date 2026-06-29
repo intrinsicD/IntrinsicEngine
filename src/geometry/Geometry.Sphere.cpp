@@ -250,17 +250,156 @@ namespace SphereFitDetail
 
             return FinalizeSphere(centerD, radius, points, params);
         }
+
+        [[nodiscard]] glm::dvec3 Centroid(std::span<const glm::dvec3> points)
+        {
+            glm::dvec3 center{0.0};
+            for (const glm::dvec3& p : points)
+            {
+                center += p;
+            }
+            return center / static_cast<double>(points.size());
+        }
+
+        [[nodiscard]] bool IsFinite(const glm::dvec3& v)
+        {
+            return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+        }
+
+        [[nodiscard]] double MeanDistance(std::span<const glm::dvec3> points, const glm::dvec3& center)
+        {
+            double radius = 0.0;
+            for (const glm::dvec3& p : points)
+            {
+                radius += glm::distance(p, center);
+            }
+            return radius / static_cast<double>(points.size());
+        }
+
+        [[nodiscard]] double GeometricResidual(
+            std::span<const glm::dvec3> points,
+            const glm::dvec3& center,
+            double radius)
+        {
+            double residual = 0.0;
+            for (const glm::dvec3& p : points)
+            {
+                const double distanceResidual = glm::distance(p, center) - radius;
+                residual += distanceResidual * distanceResidual;
+            }
+            return residual / static_cast<double>(points.size());
+        }
+
+        [[nodiscard]] bool HasNonCoincidentExtent(
+            std::span<const glm::dvec3> points,
+            const glm::dvec3& center,
+            const FittingParams& params)
+        {
+            double maxDistance = 0.0;
+            for (const glm::dvec3& p : points)
+            {
+                maxDistance = std::max(maxDistance, glm::distance(p, center));
+            }
+
+            const double singularThreshold = std::max(1.0e-12, static_cast<double>(params.SingularThreshold));
+            return maxDistance > singularThreshold;
+        }
+
+        [[nodiscard]] std::optional<Sphere> FitIterativeGeometric(
+            std::span<const glm::dvec3> points,
+            const FittingParams& params)
+        {
+            if (points.size() < 4u ||
+                params.MaxIterations == 0u ||
+                !std::isfinite(params.ConvergenceTolerance) ||
+                !(params.ConvergenceTolerance > 0.0f))
+            {
+                return std::nullopt;
+            }
+
+            const glm::dvec3 centroid = Centroid(points);
+            if (!IsFinite(centroid) || !HasNonCoincidentExtent(points, centroid, params))
+            {
+                return std::nullopt;
+            }
+
+            glm::dvec3 center = centroid;
+            if (const auto algebraicSeed = FitLeastSquares(points, params); algebraicSeed.has_value())
+            {
+                center = glm::dvec3{algebraicSeed->Center};
+            }
+
+            double radius = MeanDistance(points, center);
+            if (!std::isfinite(radius) || !(radius > 0.0))
+            {
+                return std::nullopt;
+            }
+
+            glm::dvec3 bestCenter = center;
+            double bestRadius = radius;
+            double bestResidual = GeometricResidual(points, center, radius);
+
+            const double directionEpsilon = std::max(1.0e-14, static_cast<double>(params.SingularThreshold));
+            const double tolerance = static_cast<double>(params.ConvergenceTolerance);
+
+            for (std::uint32_t iteration = 0u; iteration < params.MaxIterations; ++iteration)
+            {
+                glm::dvec3 meanUnitDirection{0.0};
+                for (const glm::dvec3& p : points)
+                {
+                    const glm::dvec3 fromPointToCenter = center - p;
+                    const double distance = glm::length(fromPointToCenter);
+                    if (distance > directionEpsilon)
+                    {
+                        meanUnitDirection += fromPointToCenter / distance;
+                    }
+                }
+                meanUnitDirection /= static_cast<double>(points.size());
+
+                const glm::dvec3 nextCenter = centroid + radius * meanUnitDirection;
+                if (!IsFinite(nextCenter))
+                {
+                    return std::nullopt;
+                }
+
+                const double nextRadius = MeanDistance(points, nextCenter);
+                if (!std::isfinite(nextRadius) || !(nextRadius > 0.0))
+                {
+                    return std::nullopt;
+                }
+
+                const double nextResidual = GeometricResidual(points, nextCenter, nextRadius);
+                if (std::isfinite(nextResidual) && nextResidual <= bestResidual)
+                {
+                    bestCenter = nextCenter;
+                    bestRadius = nextRadius;
+                    bestResidual = nextResidual;
+                }
+
+                const double step = glm::distance(nextCenter, center);
+                center = nextCenter;
+                radius = nextRadius;
+                if (step <= tolerance * std::max(1.0, radius))
+                {
+                    break;
+                }
+            }
+
+            return FinalizeSphere(bestCenter, bestRadius, points, params);
+        }
     }
 
     [[nodiscard]] std::optional<Sphere> ToSphere(std::span<const glm::vec3> points, const FittingParams& params)
     {
         std::vector<glm::dvec3> samples;
         samples.reserve(points.size());
+        bool hasNonFiniteSample = false;
 
         for (const glm::vec3& p : points)
         {
             if (!SphereFitDetail::IsFinite(p))
             {
+                hasNonFiniteSample = true;
                 continue;
             }
 
@@ -275,6 +414,15 @@ namespace SphereFitDetail
         if (params.Method == FittingParams::FittingMethod::Bounding)
         {
             return SphereFitDetail::MakeBoundingSphere(samples, params);
+        }
+
+        if (params.Method == FittingParams::FittingMethod::IterativeGeometric)
+        {
+            if (hasNonFiniteSample)
+            {
+                return std::nullopt;
+            }
+            return SphereFitDetail::FitIterativeGeometric(samples, params);
         }
 
         auto fit = SphereFitDetail::FitLeastSquares(samples, params);

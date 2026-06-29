@@ -7,7 +7,9 @@ module;
 
 export module Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
 
+import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Error;
+import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
@@ -38,6 +40,9 @@ export namespace Extrinsic::Graphics
         DegenerateNormal,
         DegenerateUvTriangle,
         NoContainingTriangle,
+        InvalidGeneratedTextureAsset,
+        InvalidGpuResource,
+        InvalidIndexCount,
     };
 
     struct ObjectSpaceNormalTextureBakeOptions
@@ -132,6 +137,80 @@ export namespace Extrinsic::Graphics
         RHI::TextureLayout FinalLayout = RHI::TextureLayout::ShaderReadOnly;
     };
 
+    struct ObjectSpaceNormalTextureBakeGeometryBuffers
+    {
+        RHI::BufferHandle IndexBuffer{};
+        std::uint64_t TexcoordBDA = 0u;
+        std::uint64_t NormalBDA = 0u;
+        std::uint32_t VertexCount = 0u;
+        std::uint32_t IndexCount = 0u;
+    };
+
+    struct ObjectSpaceNormalTextureBakeSourceKey
+    {
+        std::uint64_t EntityKey = 0u;
+        std::uint64_t GeometryGeneration = 0u;
+        std::uint64_t TexcoordGeneration = 0u;
+        std::uint64_t NormalGeneration = 0u;
+    };
+
+    struct ObjectSpaceNormalTextureBakeCompletionKey
+    {
+        Assets::AssetId GeneratedTextureAsset{};
+        ObjectSpaceNormalTextureBakeSourceKey Source{};
+        std::uint32_t Width = 0u;
+        std::uint32_t Height = 0u;
+        std::uint32_t PaddingTexels = 0u;
+        NormalTextureSpace Space = NormalTextureSpace::ObjectSpaceNormal;
+    };
+
+    struct ObjectSpaceNormalTextureBakeGpuRecordTemplate
+    {
+        RHI::PipelineHandle Pipeline{};
+        RHI::BufferHandle IndexBuffer{};
+        std::uint64_t TexcoordBDA = 0u;
+        std::uint64_t NormalBDA = 0u;
+        std::uint32_t IndexCount = 0u;
+        std::uint32_t Width = 0u;
+        std::uint32_t Height = 0u;
+        RHI::TextureLayout InitialLayout = RHI::TextureLayout::Undefined;
+        RHI::TextureLayout FinalLayout = RHI::TextureLayout::ShaderReadOnly;
+    };
+
+    struct ObjectSpaceNormalTextureBakePlanRequest
+    {
+        Assets::AssetId GeneratedTextureAsset{};
+        ObjectSpaceNormalTextureBakeGeometryBuffers Geometry{};
+        ObjectSpaceNormalTextureBakeOptions Options{};
+        ObjectSpaceNormalTextureBakeSourceKey SourceKey{};
+        RHI::PipelineHandle Pipeline{};
+        RHI::SamplerDesc SamplerDesc{};
+        RHI::SamplerHandle Sampler{};
+        RHI::TextureUsage AdditionalTextureUsage = RHI::TextureUsage::None;
+        RHI::TextureLayout InitialLayout = RHI::TextureLayout::Undefined;
+        RHI::TextureLayout FinalLayout = RHI::TextureLayout::ShaderReadOnly;
+        const char* DebugName = "ObjectSpaceNormalTextureBake.Output";
+        std::uint64_t ReadyFrame = 0u;
+        bool HasReadyFrame = false;
+    };
+
+    struct ObjectSpaceNormalTextureBakePlan
+    {
+        ObjectSpaceNormalTextureBakeStatus Status{
+            ObjectSpaceNormalTextureBakeStatus::Success};
+        ObjectSpaceNormalTextureBakeDiagnostics Diagnostics{};
+        ObjectSpaceNormalTextureBakeCompletionKey CompletionKey{};
+        GpuProducedTextureRequest TextureRequest{};
+        ObjectSpaceNormalTextureBakeGpuRecordTemplate RecordTemplate{};
+        bool DilationRequested = false;
+        bool DilationAvailable = false;
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == ObjectSpaceNormalTextureBakeStatus::Success;
+        }
+    };
+
     [[nodiscard]] const char* DebugNameForObjectSpaceNormalTextureBakeStatus(
         ObjectSpaceNormalTextureBakeStatus status) noexcept;
 
@@ -164,6 +243,19 @@ export namespace Extrinsic::Graphics
         std::string vertexShaderPath,
         std::string fragmentShaderPath,
         RHI::Format colorFormat = RHI::Format::RGBA8_UNORM);
+
+    [[nodiscard]] ObjectSpaceNormalTextureBakePlan
+        BuildObjectSpaceNormalTextureBakePlan(
+            const ObjectSpaceNormalTextureBakePlanRequest& request) noexcept;
+
+    [[nodiscard]] bool ObjectSpaceNormalTextureBakeCompletionKeyMatches(
+        const ObjectSpaceNormalTextureBakeCompletionKey& expected,
+        const ObjectSpaceNormalTextureBakeCompletionKey& actual) noexcept;
+
+    [[nodiscard]] ObjectSpaceNormalTextureBakeGpuRecordDesc
+        MakeObjectSpaceNormalTextureBakeGpuRecordDesc(
+            const ObjectSpaceNormalTextureBakePlan& plan,
+            RHI::TextureHandle outputTexture) noexcept;
 
     [[nodiscard]] Core::Result RecordObjectSpaceNormalTextureBake(
         RHI::ICommandContext& cmd,

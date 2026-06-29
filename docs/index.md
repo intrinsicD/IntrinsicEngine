@@ -5,6 +5,7 @@ This page is the canonical entry point for repository documentation.
 ## Architecture
 
 - [Architecture documents](architecture/) — subsystem design notes, runtime boundaries, rendering plans, and migration-era architecture records.
+- [Engine config file schema](architecture/engine-config.md)
 - [Rendering three-pass architecture](architecture/rendering-three-pass.md)
 - [Runtime subsystem boundaries](architecture/runtime-subsystem-boundaries.md)
 - [Task graph architecture](architecture/task-graph-domains.md)

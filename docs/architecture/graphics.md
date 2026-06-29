@@ -146,7 +146,7 @@ See [ADR-0016 — Texture residency, fallback, and asset cache policy](../adr/00
 
 ## Object-space normal texture baking
 
-- `Extrinsic.Graphics.ObjectSpaceNormalTextureBake` is the graphics-owned raster bake surface for generated object-space normal maps. It accepts resolved triangle mesh UVs/normals as graphics-facing buffers, validates the CPU/null contract with finite atlas UVs and finite object-space normals, maps UVs into clip space, pins viewport/scissor to the requested texture extent, clears uncovered texels to encoded `+Z` alpha `0`, and writes covered texels as normalized object-space normal RGB alpha `1`. The module records through RHI only; runtime owns entity/job scheduling, stale-key rejection, generated `AssetId` selection, and any future switch away from the CPU compatibility bake path.
+- `Extrinsic.Graphics.ObjectSpaceNormalTextureBake` is the graphics-owned raster bake surface for generated object-space normal maps. It accepts resolved triangle mesh UVs/normals as graphics-facing buffers, validates the CPU/null contract with finite atlas UVs and finite object-space normals, packages generated `AssetId`, `GpuProducedTextureRequest`, command-record templates, and stale-completion keys without importing runtime/ECS, maps UVs into clip space, pins viewport/scissor to the requested texture extent, clears uncovered texels to encoded `+Z` alpha `0`, and writes covered texels as normalized object-space normal RGB alpha `1`. Runtime owns entity/job scheduling, generated `AssetId` policy, runtime-side stale completion rejection, and any future switch away from the CPU compatibility bake path.
 
 ## Pointers
 

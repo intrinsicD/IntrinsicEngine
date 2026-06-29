@@ -3,6 +3,8 @@ module;
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <span>
@@ -14,7 +16,11 @@ module;
 #include <vector>
 #include <limits>
 
+#include <glm/glm.hpp>
+
 export module Geometry.Properties;
+
+import Geometry.Linalg;
 
 export namespace Geometry
 {
@@ -39,6 +45,50 @@ export namespace Geometry
                 return reinterpret_cast<std::uintptr_t>(&s_ID);
             }
         };
+    } // namespace Internal
+
+    enum class PropertyValueKind : std::uint8_t
+    {
+        Unknown,
+        Bool,
+        Int32,
+        UInt32,
+        UInt64,
+        Float,
+        Double,
+        Vec2,
+        Vec3,
+        Vec4
+    };
+
+    struct PropertyDescriptor
+    {
+        PropertyId Id{static_cast<PropertyId>(-1)};
+        std::string Name{};
+        Internal::TypeID Type{0};
+        PropertyValueKind ValueKind{PropertyValueKind::Unknown};
+        std::size_t ElementCount{0};
+        bool Mutable{false};
+        bool SupportsContiguousSpan{false};
+        bool SupportsRawData{false};
+    };
+
+    namespace Internal
+    {
+        template <class T>
+        [[nodiscard]] constexpr PropertyValueKind ValueKindOf() noexcept
+        {
+            if constexpr (std::is_same_v<T, bool>) return PropertyValueKind::Bool;
+            else if constexpr (std::is_same_v<T, std::int32_t>) return PropertyValueKind::Int32;
+            else if constexpr (std::is_same_v<T, std::uint32_t>) return PropertyValueKind::UInt32;
+            else if constexpr (std::is_same_v<T, std::uint64_t>) return PropertyValueKind::UInt64;
+            else if constexpr (std::is_same_v<T, float>) return PropertyValueKind::Float;
+            else if constexpr (std::is_same_v<T, double>) return PropertyValueKind::Double;
+            else if constexpr (std::is_same_v<T, glm::vec2>) return PropertyValueKind::Vec2;
+            else if constexpr (std::is_same_v<T, glm::vec3>) return PropertyValueKind::Vec3;
+            else if constexpr (std::is_same_v<T, glm::vec4>) return PropertyValueKind::Vec4;
+            else return PropertyValueKind::Unknown;
+        }
 
         /// Erased storage interface for property arrays.
         class PropertyStorageBase
@@ -68,6 +118,8 @@ export namespace Geometry
 
             /// Returns the erased runtime type id for this storage.
             [[nodiscard]] virtual TypeID Type() const noexcept = 0;
+            /// Returns descriptor metadata that does not expose typed storage.
+            [[nodiscard]] virtual PropertyDescriptor Describe(PropertyId id, bool isMutable) const = 0;
         };
 
         template <class T>
@@ -118,6 +170,19 @@ export namespace Geometry
                 return TypeInfo<T>::ID();
             }
 
+            [[nodiscard]] PropertyDescriptor Describe(PropertyId id, bool isMutable) const override
+            {
+                return PropertyDescriptor{
+                    .Id = id,
+                    .Name = m_Name,
+                    .Type = TypeInfo<T>::ID(),
+                    .ValueKind = ValueKindOf<T>(),
+                    .ElementCount = m_Data.size(),
+                    .Mutable = isMutable,
+                    .SupportsContiguousSpan = !std::is_same_v<T, bool>,
+                    .SupportsRawData = !std::is_same_v<T, bool>};
+            }
+
             [[nodiscard]] std::vector<T>& Data() noexcept { return m_Data; }
             [[nodiscard]] const std::vector<T>& Data() const noexcept { return m_Data; }
             [[nodiscard]] const T& DefaultValue() const noexcept { return m_Default; }
@@ -154,6 +219,8 @@ export namespace Geometry
 
         /// Returns the names of all properties in insertion order.
         [[nodiscard]] std::vector<std::string> PropertyNames() const;
+        /// Returns erased descriptors for all live properties in insertion order.
+        [[nodiscard]] std::vector<PropertyDescriptor> Descriptors(bool isMutable) const;
 
         /// Clears all properties and their data.
         void Clear();
@@ -210,6 +277,8 @@ export namespace Geometry
         bool Remove(PropertyId id);
 
     private:
+        [[nodiscard]] bool IsValidId(PropertyId id) const noexcept;
+
         [[nodiscard]] Internal::PropertyStorageBase* Storage(PropertyId id) noexcept;
 
         [[nodiscard]] const Internal::PropertyStorageBase* Storage(PropertyId id) const noexcept;
@@ -250,7 +319,7 @@ export namespace Geometry
         [[nodiscard]] PropertyId Id() const noexcept { return m_Id; }
 
         /// Returns the property name; asserts if invalid.
-        [[nodiscard]] const std::string& Name() const noexcept
+        [[nodiscard]] std::string_view Name() const noexcept
         {
             assert(m_Storage != nullptr);
             return m_Storage->Name();
@@ -309,6 +378,13 @@ export namespace Geometry
             return static_cast<const Internal::PropertyStorage<T>*>(m_Storage)->Data().data();
         }
 
+        /// Returns raw data pointer (unsupported for vector<bool>).
+        [[nodiscard]] T* Data() noexcept requires (!std::is_same_v<T, bool>)
+        {
+            assert(m_Storage != nullptr);
+            return m_Storage->Data().data();
+        }
+
         /// Clears the handle so it no longer refers to storage.
         void Reset() noexcept
         {
@@ -338,7 +414,7 @@ export namespace Geometry
         [[nodiscard]] PropertyId Id() const noexcept { return m_Id; }
 
         /// Returns the property name; asserts if invalid.
-        [[nodiscard]] const std::string& Name() const noexcept
+        [[nodiscard]] std::string_view Name() const noexcept
         {
             assert(m_Storage != nullptr);
             return m_Storage->Name();
@@ -387,6 +463,102 @@ export namespace Geometry
         const Internal::PropertyStorage<T>* m_Storage{nullptr};
         PropertyId m_Id{static_cast<PropertyId>(-1)};
     };
+
+    struct BoolPropertyMap
+    {
+        Geometry::Linalg::DenseMatrix Values{};
+        Geometry::Linalg::NumericDiagnostics Diagnostics{};
+
+        [[nodiscard]] bool Succeeded() const noexcept { return Diagnostics.Succeeded(); }
+    };
+
+    namespace Internal
+    {
+        template <class T>
+        concept EigenMappablePropertyScalar = std::is_arithmetic_v<T> && !std::is_same_v<T, bool>;
+
+        template <class T>
+        concept EigenMappablePropertyVector = Geometry::Linalg::FixedSizeVector<T>;
+
+        [[nodiscard]] inline BoolPropertyMap MakeBoolPropertyMap(const std::vector<bool>& values)
+        {
+            BoolPropertyMap result;
+            result.Values = Geometry::Linalg::DenseMatrix(values.size(), 1u);
+            for (std::size_t row = 0; row < values.size(); ++row)
+            {
+                result.Values(row, 0u) = values[row] ? 1.0 : 0.0;
+            }
+            result.Diagnostics.Status = Geometry::Linalg::NumericStatus::Success;
+            result.Diagnostics.Rank = values.empty() ? 0u : 1u;
+            return result;
+        }
+    } // namespace Internal
+
+    template <class T>
+        requires (Internal::EigenMappablePropertyScalar<T>)
+    [[nodiscard]] auto MapProperty(PropertyBuffer<T>& property)
+    {
+        if (!property)
+        {
+            return Geometry::Linalg::MapAsMatrix(std::span<T>{}, 0u, 0u, 0);
+        }
+        return Geometry::Linalg::MapAsMatrix(property.Span(), property.Vector().size(), 1u, 1);
+    }
+
+    template <class T>
+        requires (Internal::EigenMappablePropertyScalar<T>)
+    [[nodiscard]] auto MapProperty(const ConstPropertyBuffer<T>& property)
+    {
+        if (!property)
+        {
+            return Geometry::Linalg::MapAsMatrix(std::span<const T>{}, 0u, 0u, 0);
+        }
+        return Geometry::Linalg::MapAsMatrix(property.Span(), property.Vector().size(), 1u, 1);
+    }
+
+    template <class T>
+        requires (Internal::EigenMappablePropertyVector<T>)
+    [[nodiscard]] auto MapProperty(PropertyBuffer<T>& property)
+    {
+        if (!property)
+        {
+            return Geometry::Linalg::MapVectorAsMatrix(std::span<T>{});
+        }
+        return Geometry::Linalg::MapVectorAsMatrix(property.Span());
+    }
+
+    template <class T>
+        requires (Internal::EigenMappablePropertyVector<T>)
+    [[nodiscard]] auto MapProperty(const ConstPropertyBuffer<T>& property)
+    {
+        if (!property)
+        {
+            return Geometry::Linalg::MapVectorAsMatrix(std::span<const T>{});
+        }
+        return Geometry::Linalg::MapVectorAsMatrix(property.Span());
+    }
+
+    [[nodiscard]] inline BoolPropertyMap MapProperty(PropertyBuffer<bool>& property)
+    {
+        if (!property)
+        {
+            BoolPropertyMap result;
+            result.Diagnostics.Status = Geometry::Linalg::NumericStatus::InvalidInput;
+            return result;
+        }
+        return Internal::MakeBoolPropertyMap(property.Vector());
+    }
+
+    [[nodiscard]] inline BoolPropertyMap MapProperty(const ConstPropertyBuffer<bool>& property)
+    {
+        if (!property)
+        {
+            BoolPropertyMap result;
+            result.Diagnostics.Status = Geometry::Linalg::NumericStatus::InvalidInput;
+            return result;
+        }
+        return Internal::MakeBoolPropertyMap(property.Vector());
+    }
 
     template <class T>
     Internal::PropertyStorage<T>* PropertyRegistry::Storage(PropertyId id) noexcept
@@ -507,7 +679,7 @@ export namespace Geometry
         explicit operator bool() const noexcept { return static_cast<bool>(m_Buffer); }
 
         /// Property name (asserts if invalid).
-        [[nodiscard]] const std::string& Name() const { return m_Buffer.Name(); }
+        [[nodiscard]] std::string_view Name() const { return m_Buffer.Name(); }
 
         /// Element access (asserts on invalid/out-of-range).
         [[nodiscard]] decltype(auto) operator[](size_t index) const { return m_Buffer[index]; }
@@ -522,8 +694,12 @@ export namespace Geometry
         [[nodiscard]] const std::vector<T>& Array() const { return m_Buffer.Vector(); }
 
         /// Span view (unsupported for vector<bool>).
-        [[nodiscard]] std::span<T> Span() { return m_Buffer.Span(); }
-        [[nodiscard]] std::span<const T> Span() const { return m_Buffer.Span(); }
+        [[nodiscard]] std::span<T> Span() requires (!std::is_same_v<T, bool>) { return m_Buffer.Span(); }
+        [[nodiscard]] std::span<const T> Span() const requires (!std::is_same_v<T, bool>) { return m_Buffer.Span(); }
+
+        /// Raw data view (unsupported for vector<bool>).
+        [[nodiscard]] T* Data() requires (!std::is_same_v<T, bool>) { return m_Buffer.Data(); }
+        [[nodiscard]] const T* Data() const requires (!std::is_same_v<T, bool>) { return m_Buffer.Data(); }
 
         /// Access to the underlying handle.
         [[nodiscard]] PropertyBuffer<T>& Handle() noexcept { return m_Buffer; }
@@ -550,13 +726,14 @@ export namespace Geometry
         [[nodiscard]] bool IsValid() const noexcept { return static_cast<bool>(m_Buffer); }
         explicit operator bool() const noexcept { return static_cast<bool>(m_Buffer); }
 
-        [[nodiscard]] const std::string& Name() const { return m_Buffer.Name(); }
+        [[nodiscard]] std::string_view Name() const { return m_Buffer.Name(); }
 
         [[nodiscard]] decltype(auto) operator[](size_t index) const { return m_Buffer[index]; }
 
         [[nodiscard]] const std::vector<T>& Vector() const { return m_Buffer.Vector(); }
         [[nodiscard]] const std::vector<T>& Array() const { return m_Buffer.Vector(); }
-        [[nodiscard]] std::span<const T> Span() const { return m_Buffer.Span(); }
+        [[nodiscard]] std::span<const T> Span() const requires (!std::is_same_v<T, bool>) { return m_Buffer.Span(); }
+        [[nodiscard]] const T* Data() const requires (!std::is_same_v<T, bool>) { return m_Buffer.Data(); }
 
         [[nodiscard]] const ConstPropertyBuffer<T>& Handle() const noexcept { return m_Buffer; }
 
@@ -612,10 +789,13 @@ export namespace Geometry
         inline void Resize(size_t n) { m_Registry.Resize(n); }
         inline void PushBack() { m_Registry.PushBack(); }
         inline void Swap(size_t i0, size_t i1) { m_Registry.Swap(i0, i1); }
-        inline void Shrink_to_fit() { m_Registry.ShrinkToFit(); }
+        inline void ShrinkToFit() { m_Registry.ShrinkToFit(); }
+        // GEOM-031 compatibility wrapper; new code should use ShrinkToFit().
+        inline void Shrink_to_fit() { ShrinkToFit(); }
         [[nodiscard]] inline bool Empty() const { return m_Registry.Size() == 0; }
         [[nodiscard]] inline bool Exists(std::string_view name) const { return m_Registry.Contains(name); }
         [[nodiscard]] inline std::vector<std::string> Properties() const { return m_Registry.PropertyNames(); }
+        [[nodiscard]] inline std::vector<PropertyDescriptor> Descriptors() const { return m_Registry.Descriptors(true); }
 
         /// Adds a property; returns invalid Property on name collision.
         template <class T>
@@ -625,9 +805,9 @@ export namespace Geometry
         template <class T>
         [[nodiscard]] Property<T> Get(std::string_view name);
 
-        /// Const overload; forwards to mutable lookup.
+        /// Const overload; returns a read-only property view.
         template <class T>
-        [[nodiscard]] Property<T> Get(std::string_view name) const;
+        [[nodiscard]] ConstProperty<T> Get(std::string_view name) const;
 
         /// Gets or creates a property by name.
         template <class T>
@@ -650,14 +830,25 @@ export namespace Geometry
         ConstPropertySet() = default;
         explicit ConstPropertySet(const PropertySet& set) : m_Set(&set) {}
 
-        [[nodiscard]] size_t Size() const noexcept { return m_Set->Size(); }
-        [[nodiscard]] bool Empty() const { return m_Set->Empty(); }
-        [[nodiscard]] bool Exists(std::string_view name) const { return m_Set->Exists(name); }
-        [[nodiscard]] std::vector<std::string> Properties() const { return m_Set->Properties(); }
+        [[nodiscard]] bool IsValid() const noexcept { return m_Set != nullptr; }
+        [[nodiscard]] explicit operator bool() const noexcept { return IsValid(); }
+
+        [[nodiscard]] size_t Size() const noexcept { return m_Set ? m_Set->Size() : 0u; }
+        [[nodiscard]] bool Empty() const { return m_Set == nullptr || m_Set->Empty(); }
+        [[nodiscard]] bool Exists(std::string_view name) const { return m_Set != nullptr && m_Set->Exists(name); }
+        [[nodiscard]] std::vector<std::string> Properties() const { return m_Set ? m_Set->Properties() : std::vector<std::string>{}; }
+        [[nodiscard]] std::vector<PropertyDescriptor> Descriptors() const
+        {
+            return m_Set ? m_Set->Registry().Descriptors(false) : std::vector<PropertyDescriptor>{};
+        }
 
         template <class T>
         [[nodiscard]] ConstProperty<T> Get(std::string_view name) const
         {
+            if (m_Set == nullptr)
+            {
+                return ConstProperty<T>();
+            }
             if (auto handle = m_Set->Registry().Get<T>(name))
             {
                 return ConstProperty<T>(*handle);
@@ -690,9 +881,13 @@ export namespace Geometry
     }
 
     template <class T>
-    Property<T> PropertySet::Get(std::string_view name) const
+    ConstProperty<T> PropertySet::Get(std::string_view name) const
     {
-        return const_cast<PropertySet*>(this)->Get<T>(name);
+        if (auto handle = m_Registry.Get<T>(name))
+        {
+            return ConstProperty<T>(*handle);
+        }
+        return ConstProperty<T>();
     }
 
     template <class T>
@@ -763,6 +958,141 @@ export namespace Geometry
 
     using NodeHandle = Handle<NodeTag>;
 
+    template <class HandleT>
+    class LiveElementRange;
+
+    template <class HandleT>
+    class LiveElementIterator
+    {
+    public:
+        using iterator_category = std::input_iterator_tag;
+        using value_type = HandleT;
+        using difference_type = std::ptrdiff_t;
+        using pointer = const HandleT*;
+        using reference = HandleT;
+
+        LiveElementIterator() = default;
+
+        [[nodiscard]] HandleT operator*() const noexcept
+        {
+            return HandleT{static_cast<PropertyIndex>(m_Index)};
+        }
+
+        LiveElementIterator& operator++()
+        {
+            ++m_Index;
+            SkipDeleted();
+            return *this;
+        }
+
+        void operator++(int)
+        {
+            ++(*this);
+        }
+
+        [[nodiscard]] friend bool operator==(const LiveElementIterator& it, std::default_sentinel_t) noexcept
+        {
+            return it.m_Range == nullptr || it.m_Index >= it.m_End;
+        }
+
+        [[nodiscard]] friend bool operator!=(const LiveElementIterator& it, std::default_sentinel_t sentinel) noexcept
+        {
+            return !(it == sentinel);
+        }
+
+    private:
+        friend class LiveElementRange<HandleT>;
+
+        LiveElementIterator(const LiveElementRange<HandleT>* range, std::size_t begin, std::size_t end)
+            : m_Range(range), m_Index(begin), m_End(end)
+        {
+            SkipDeleted();
+        }
+
+        void SkipDeleted()
+        {
+            if (m_Range == nullptr || !m_Range->HasPredicate())
+            {
+                m_Index = m_End;
+                return;
+            }
+
+            while (m_Index < m_End)
+            {
+                const HandleT handle{static_cast<PropertyIndex>(m_Index)};
+                if (!m_Range->IsDeleted(handle))
+                {
+                    break;
+                }
+                ++m_Index;
+            }
+        }
+
+        const LiveElementRange<HandleT>* m_Range{nullptr};
+        std::size_t m_Index{0};
+        std::size_t m_End{0};
+    };
+
+    template <class HandleT>
+    class LiveElementRange
+    {
+    public:
+        using DeletePredicate = std::function<bool(HandleT)>;
+        using iterator = LiveElementIterator<HandleT>;
+
+        LiveElementRange() = default;
+
+        LiveElementRange(std::size_t count, DeletePredicate isDeleted)
+            : LiveElementRange(0u, count, std::move(isDeleted))
+        {
+        }
+
+        LiveElementRange(std::size_t offset, std::size_t count, DeletePredicate isDeleted)
+            : m_Offset(offset), m_Count(count), m_IsDeleted(std::move(isDeleted))
+        {
+        }
+
+        [[nodiscard]] iterator begin() const
+        {
+            if (!HasPredicate())
+            {
+                return iterator(this, EndIndex(), EndIndex());
+            }
+            return iterator(this, m_Offset, EndIndex());
+        }
+
+        [[nodiscard]] std::default_sentinel_t end() const noexcept
+        {
+            return {};
+        }
+
+        [[nodiscard]] std::size_t Offset() const noexcept { return m_Offset; }
+        [[nodiscard]] std::size_t Count() const noexcept { return m_Count; }
+        [[nodiscard]] bool Empty() const noexcept { return m_Count == 0u || !HasPredicate(); }
+
+    private:
+        friend class LiveElementIterator<HandleT>;
+
+        [[nodiscard]] bool HasPredicate() const noexcept
+        {
+            return static_cast<bool>(m_IsDeleted);
+        }
+
+        [[nodiscard]] bool IsDeleted(HandleT handle) const
+        {
+            return !HasPredicate() || m_IsDeleted(handle);
+        }
+
+        [[nodiscard]] std::size_t EndIndex() const noexcept
+        {
+            return m_Offset + m_Count;
+        }
+
+        std::size_t m_Offset{0};
+        std::size_t m_Count{0};
+        DeletePredicate m_IsDeleted{};
+    };
+
     // Stream operators are defined in Geometry.Properties.cpp (implementation unit)
     std::ostream& operator<<(std::ostream& os, VertexHandle v);
     std::ostream& operator<<(std::ostream& os, HalfedgeHandle h);
@@ -816,4 +1146,4 @@ export namespace Geometry
     using Edges = PropertySet;
     using Faces = PropertySet;
     using Nodes = PropertySet;
-} // namespace engine::geometry
+} // namespace Geometry

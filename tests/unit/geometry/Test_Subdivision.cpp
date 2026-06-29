@@ -379,3 +379,49 @@ TEST(CatmullClark, VertexCountFormula)
     EXPECT_EQ(result->FinalVertexCount, Vold + Eold + Fold)
         << "V=" << Vold << " E=" << Eold << " F=" << Fold;
 }
+
+TEST(SubdivisionSqrt3, SingleTriangleSplitsIntoThreeTriangles)
+{
+    auto input = MakeSingleTriangle();
+    Geometry::HalfedgeMesh::Mesh output;
+
+    const auto result = Geometry::SubdivisionSqrt3::Subdivide(input, output);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->IterationsPerformed, 1u);
+    EXPECT_EQ(result->FinalVertexCount, 4u);
+    EXPECT_EQ(result->FinalFaceCount, 3u);
+    EXPECT_EQ(output.FaceCount(), 3u);
+
+    for (const Geometry::FaceHandle face : output.LiveFaces())
+    {
+        EXPECT_EQ(output.Valence(face), 3u);
+    }
+}
+
+TEST(Subdivision, FeatureEdgeMaskPropagatesToSplitEdges)
+{
+    auto input = MakeSingleTriangle();
+    const auto sourceEdge = input.FindEdge(Geometry::VertexHandle{0u}, Geometry::VertexHandle{1u});
+    ASSERT_TRUE(sourceEdge.has_value());
+
+    Geometry::EdgeProperty<bool> featureIn(input.EdgeProperties().GetOrAdd<bool>("e:feature", false));
+    featureIn[*sourceEdge] = true;
+
+    Geometry::HalfedgeMesh::Mesh output;
+    Geometry::Subdivision::SubdivisionParams params{};
+    params.PreserveFeatureEdges = true;
+    params.FeatureEdgePropertyName = "e:feature";
+
+    const auto result = Geometry::Subdivision::Subdivide(input, output, params);
+    ASSERT_TRUE(result.has_value());
+
+    const auto featureOut = output.EdgeProperties().Get<bool>("e:feature");
+    ASSERT_TRUE(featureOut.IsValid());
+
+    std::size_t taggedEdges = 0;
+    for (const Geometry::EdgeHandle edge : output.LiveEdges())
+    {
+        if (featureOut[edge.Index]) ++taggedEdges;
+    }
+    EXPECT_GE(taggedEdges, 2u);
+}

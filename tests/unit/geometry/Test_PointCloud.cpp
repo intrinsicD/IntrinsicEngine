@@ -586,7 +586,9 @@ TEST(PointCloud_KMeans, TwoSeparatedBlobsProduceTwoCentroids)
     ASSERT_EQ(result->Centroids.size(), 2u);
     EXPECT_EQ(result->Labels.size(), points.size());
     EXPECT_EQ(result->SquaredDistances.size(), points.size());
+    EXPECT_EQ(result->RequestedBackend, Geometry::KMeans::Backend::CPU);
     EXPECT_EQ(result->ActualBackend, Geometry::KMeans::Backend::CPU);
+    EXPECT_FALSE(result->FellBackToCPU);
     EXPECT_GT(result->Iterations, 0u);
 
     std::sort(result->Centroids.begin(), result->Centroids.end(),
@@ -595,6 +597,29 @@ TEST(PointCloud_KMeans, TwoSeparatedBlobsProduceTwoCentroids)
     EXPECT_NEAR(result->Centroids[0].x, -9.845f, 0.25f);
     EXPECT_NEAR(result->Centroids[1].x, 10.155f, 0.25f);
     EXPECT_LT(result->Inertia, 1.0f);
+}
+
+TEST(PointCloud_KMeans, CpuEntryReportsGpuRequestAsCpuFallback)
+{
+    const std::vector<glm::vec3> points{
+        {-1.0f, 0.0f, 0.0f},
+        {-0.8f, 0.0f, 0.0f},
+        {1.0f, 0.0f, 0.0f},
+        {1.2f, 0.0f, 0.0f},
+    };
+
+    Geometry::KMeans::KMeansParams params{};
+    params.ClusterCount = 2u;
+    params.MaxIterations = 8u;
+    params.Compute = Geometry::KMeans::Backend::GPU;
+
+    const auto result = Geometry::KMeans::Cluster(points, params);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->RequestedBackend, Geometry::KMeans::Backend::GPU);
+    EXPECT_EQ(result->ActualBackend, Geometry::KMeans::Backend::CPU);
+    EXPECT_TRUE(result->FellBackToCPU);
+    EXPECT_EQ(result->Labels.size(), points.size());
+    EXPECT_EQ(result->Centroids.size(), 2u);
 }
 
 TEST(PointCloud_KMeans, ClusterCountIsClampedToPointCount)
@@ -699,4 +724,53 @@ TEST(PointCloud_KMeans, ClassifyPointToCentroidUsesCentroidVoronoiCells)
     const auto right = Geometry::KMeans::ClassifyPointToCentroid(glm::vec3{9.0f, 0.0f, 0.0f}, centroids);
     ASSERT_TRUE(right.has_value());
     EXPECT_EQ(*right, 1u);
+}
+
+TEST(PointCloud_GaussianNoise, ZeroScaleIsIdentity)
+{
+    auto cloud = MakeSphereCloud(64, 1.0F, false, false);
+    const std::vector<glm::vec3> before(cloud.Positions().begin(), cloud.Positions().end());
+
+    const auto result = Geometry::PointCloud::ApplyGaussianNoise(cloud, {.StdDevFraction = 0.0F, .Seed = 99});
+    ASSERT_EQ(result.Status, Geometry::PointCloud::GaussianNoiseStatus::Success);
+    EXPECT_EQ(result.DisplacedCount, 0u);
+
+    for (std::size_t i = 0; i < before.size(); ++i)
+    {
+        EXPECT_EQ(cloud.Positions()[i], before[i]);
+    }
+}
+
+TEST(PointCloud_GaussianNoise, SameSeedIsDeterministic)
+{
+    auto a = MakeSphereCloud(128, 1.0F, false, false);
+    auto b = MakeSphereCloud(128, 1.0F, false, false);
+    auto c = MakeSphereCloud(128, 1.0F, false, false);
+
+    const auto resultA = Geometry::PointCloud::ApplyGaussianNoise(a, {.StdDevFraction = 0.05F, .Seed = 42});
+    const auto resultB = Geometry::PointCloud::ApplyGaussianNoise(b, {.StdDevFraction = 0.05F, .Seed = 42});
+    const auto resultC = Geometry::PointCloud::ApplyGaussianNoise(c, {.StdDevFraction = 0.05F, .Seed = 43});
+    ASSERT_EQ(resultA.Status, Geometry::PointCloud::GaussianNoiseStatus::Success);
+    ASSERT_EQ(resultB.Status, Geometry::PointCloud::GaussianNoiseStatus::Success);
+    ASSERT_EQ(resultC.Status, Geometry::PointCloud::GaussianNoiseStatus::Success);
+    EXPECT_GT(resultA.Scale, 0.0F);
+    EXPECT_FLOAT_EQ(resultA.Scale, resultB.Scale);
+
+    bool differentSeedMovedDifferently = false;
+    for (std::size_t i = 0; i < a.VerticesSize(); ++i)
+    {
+        EXPECT_EQ(a.Positions()[i], b.Positions()[i]);
+        if (a.Positions()[i] != c.Positions()[i]) differentSeedMovedDifferently = true;
+    }
+    EXPECT_TRUE(differentSeedMovedDifferently);
+}
+
+TEST(PointCloud_GaussianNoise, SinglePointNonZeroScaleFailsClosed)
+{
+    Geometry::PointCloud::Cloud cloud;
+    cloud.AddPoint({0.0F, 0.0F, 0.0F});
+
+    const auto result = Geometry::PointCloud::ApplyGaussianNoise(cloud, {.StdDevFraction = 0.1F, .Seed = 1});
+    EXPECT_EQ(result.Status, Geometry::PointCloud::GaussianNoiseStatus::DegenerateScale);
+    EXPECT_EQ(result.DisplacedCount, 0u);
 }

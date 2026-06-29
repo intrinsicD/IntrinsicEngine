@@ -22,6 +22,31 @@ import Geometry.Octree;
 
 namespace Geometry::PointCloud
 {
+    namespace
+    {
+        [[nodiscard]] std::uint64_t MixSeed(std::uint64_t value)
+        {
+            value ^= value >> 30U;
+            value *= 0xbf58476d1ce4e5b9ULL;
+            value ^= value >> 27U;
+            value *= 0x94d049bb133111ebULL;
+            value ^= value >> 31U;
+            return value;
+        }
+
+        [[nodiscard]] glm::vec3 GaussianDisplacement(std::uint64_t seed, std::uint32_t elementIndex, float scale)
+        {
+            std::mt19937_64 rng(MixSeed(seed ^ (static_cast<std::uint64_t>(elementIndex) + 0x9e3779b97f4a7c15ULL)));
+            std::normal_distribution<float> normal(0.0F, scale);
+            return glm::vec3(normal(rng), normal(rng), normal(rng));
+        }
+
+        [[nodiscard]] bool IsFinite(const glm::vec3& value)
+        {
+            return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
+        }
+    }
+
     // =========================================================================
     // Cloud — construction
     // =========================================================================
@@ -699,6 +724,65 @@ namespace Geometry::PointCloud
         for (std::size_t i = 0; i < n; ++i)
             prop[Cloud::Handle(i)] = result.Densities[i];
 
+        return result;
+    }
+
+    GaussianNoiseResult ApplyGaussianNoise(
+        Cloud& cloud, const PointCloudGaussianNoiseParams& params)
+    {
+        GaussianNoiseResult result{};
+        result.ElementCount = cloud.VertexCount();
+
+        if (cloud.VertexCount() == 0)
+        {
+            result.Status = GaussianNoiseStatus::EmptyInput;
+            return result;
+        }
+        if (!std::isfinite(params.StdDevFraction) || params.StdDevFraction < 0.0F)
+        {
+            result.Status = GaussianNoiseStatus::InvalidParameters;
+            return result;
+        }
+
+        for (const VertexHandle point : cloud.LivePoints())
+        {
+            if (!IsFinite(cloud.Position(point)))
+            {
+                result.Status = GaussianNoiseStatus::NonFinitePosition;
+                return result;
+            }
+        }
+
+        if (params.StdDevFraction == 0.0F)
+        {
+            result.Status = GaussianNoiseStatus::Success;
+            return result;
+        }
+
+        const std::optional<CloudStatistics> stats = ComputeStatistics(cloud);
+        if (!stats.has_value() || !std::isfinite(stats->AverageSpacing) || stats->AverageSpacing <= 0.0F)
+        {
+            result.Status = GaussianNoiseStatus::DegenerateScale;
+            return result;
+        }
+
+        result.Scale = params.StdDevFraction * stats->AverageSpacing;
+        glm::vec3 displacementSum{0.0F};
+
+        for (const VertexHandle point : cloud.LivePoints())
+        {
+            const glm::vec3 displacement = GaussianDisplacement(params.Seed, point.Index, result.Scale);
+            cloud.Position(point) += displacement;
+            displacementSum += displacement;
+            result.MaxDisplacement = std::max(result.MaxDisplacement, glm::length(displacement));
+            ++result.DisplacedCount;
+        }
+
+        if (result.DisplacedCount > 0)
+        {
+            result.MeanDisplacement = displacementSum / static_cast<float>(result.DisplacedCount);
+        }
+        result.Status = GaussianNoiseStatus::Success;
         return result;
     }
 

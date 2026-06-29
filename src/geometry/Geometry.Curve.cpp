@@ -1,6 +1,8 @@
 module;
 
 #include <cmath>
+#include <cstdint>
+#include <limits>
 #include <optional>
 #include <span>
 #include <vector>
@@ -29,6 +31,25 @@ namespace Geometry
             }
             return true;
         }
+    }
+
+    std::optional<std::uint32_t> BezierCurve::GetDegree() const
+    {
+        if (ControlPoints.empty() || ControlPoints.size() - 1u > static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()))
+        {
+            return std::nullopt;
+        }
+        return static_cast<std::uint32_t>(ControlPoints.size() - 1u);
+    }
+
+    std::optional<glm::vec3> EvaluateBernstein(const BezierCurve& curve, float t)
+    {
+        return EvaluateBezierBernstein(curve.ControlPoints, t);
+    }
+
+    std::optional<glm::vec3> EvaluateDeCasteljau(const BezierCurve& curve, float t)
+    {
+        return EvaluateBezier(curve.ControlPoints, t);
     }
 
     std::optional<glm::vec3> EvaluateBezier(std::span<const glm::vec3> controlPoints, float t)

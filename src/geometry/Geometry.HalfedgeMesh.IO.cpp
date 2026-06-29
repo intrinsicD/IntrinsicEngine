@@ -2114,6 +2114,108 @@ namespace Geometry::MeshIO
         return MeshIOWriteStatus::Success;
     }
 
+    MeshIOWriteStatus WriteOFF(std::string_view absolute_path, const MeshIOResult& mesh)
+    {
+        if (absolute_path.empty())
+        {
+            return MeshIOWriteStatus::InvalidPath;
+        }
+
+        const auto positionsView = mesh.Vertices.Get<glm::vec3>("v:point");
+        if (!positionsView.IsValid() || positionsView.Vector().empty())
+        {
+            return MeshIOWriteStatus::EmptyMesh;
+        }
+        const auto& positions = positionsView.Vector();
+
+        if (!AllFinite(positions))
+        {
+            return MeshIOWriteStatus::FileWriteError;
+        }
+
+        const auto facesView = mesh.Faces.Get<std::vector<std::uint32_t>>("f:vertices");
+        if (!facesView.IsValid() || facesView.Vector().empty())
+        {
+            return MeshIOWriteStatus::EmptyMesh;
+        }
+        const auto& faces = facesView.Vector();
+
+        for (const auto& face : faces)
+        {
+            if (face.size() < 3)
+            {
+                return MeshIOWriteStatus::InvalidFace;
+            }
+            for (const auto index : face)
+            {
+                if (static_cast<std::size_t>(index) >= positions.size())
+                {
+                    return MeshIOWriteStatus::InvalidFace;
+                }
+            }
+        }
+
+        std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
+        if (!stream)
+        {
+            return MeshIOWriteStatus::InvalidPath;
+        }
+
+        char buffer[192];
+        stream << "OFF\n";
+
+        int written = std::snprintf(buffer, sizeof(buffer), "%zu %zu 0\n",
+                                    positions.size(),
+                                    faces.size());
+        if (written <= 0 || static_cast<std::size_t>(written) >= sizeof(buffer))
+        {
+            return MeshIOWriteStatus::FileWriteError;
+        }
+        stream.write(buffer, written);
+
+        for (const auto& p : positions)
+        {
+            written = std::snprintf(buffer, sizeof(buffer),
+                                    "%.6f %.6f %.6f\n",
+                                    static_cast<double>(p.x),
+                                    static_cast<double>(p.y),
+                                    static_cast<double>(p.z));
+            if (written <= 0 || static_cast<std::size_t>(written) >= sizeof(buffer))
+            {
+                return MeshIOWriteStatus::FileWriteError;
+            }
+            stream.write(buffer, written);
+        }
+
+        for (const auto& face : faces)
+        {
+            written = std::snprintf(buffer, sizeof(buffer), "%zu", face.size());
+            if (written <= 0 || static_cast<std::size_t>(written) >= sizeof(buffer))
+            {
+                return MeshIOWriteStatus::FileWriteError;
+            }
+            stream.write(buffer, written);
+            for (const auto index : face)
+            {
+                written = std::snprintf(buffer, sizeof(buffer), " %llu",
+                                        static_cast<unsigned long long>(index));
+                if (written <= 0 || static_cast<std::size_t>(written) >= sizeof(buffer))
+                {
+                    return MeshIOWriteStatus::FileWriteError;
+                }
+                stream.write(buffer, written);
+            }
+            stream.put('\n');
+        }
+
+        stream.flush();
+        if (!stream.good())
+        {
+            return MeshIOWriteStatus::FileWriteError;
+        }
+        return MeshIOWriteStatus::Success;
+    }
+
     MeshIOWriteStatus WritePLY(std::string_view absolute_path, const MeshIOResult& mesh)
     {
         if (absolute_path.empty())

@@ -260,6 +260,19 @@ intrinsic_test_object_lib(EcsContractTestObjs
 # so they live in a dedicated CPU-only contract executable rather than the
 # headless-gated IntrinsicRuntimeTests umbrella.
 if(TARGET ExtrinsicRuntime)
+    set(_runtime_unit_test_files
+        Test.MethodFigureExport.cpp
+    )
+    intrinsic_resolve_test_sources(_runtime_unit_test_sources
+        SEARCH_DIRS unit/runtime
+        FILES ${_runtime_unit_test_files}
+    )
+    intrinsic_test_object_lib(RuntimeUnitTestObjs
+        SOURCES
+            ${_runtime_unit_test_sources}
+        DEPS ExtrinsicRuntime nlohmann_json::nlohmann_json glm::glm
+    )
+
     set(_runtime_contract_test_files
         Test.GpuAssetCacheFallbackBootstrap.cpp
         Test.GpuReadbackJob.cpp
@@ -274,11 +287,14 @@ if(TARGET ExtrinsicRuntime)
         Test.EditorCommandHistory.cpp
         Test.ImGuiAdapter.cpp
         Test.ImGuiAdapterEngineWiring.cpp
+        Test.KMeansBackend.cpp
         Test.MeshGeometryExtraction.cpp
         Test.MeshAttributeTextureBake.cpp
         Test.MeshGeometryPacker.cpp
         Test.MeshPrimitiveViewPacker.cpp
         Test.MeshPrimitiveViewExtraction.cpp
+        Test.ObjectSpaceNormalBakeQueue.cpp
+        Test.ObjectSpaceNormalBakeSubmission.cpp
         Test.ProgressivePresentationExtraction.cpp
         Test.ProgressiveRenderData.cpp
         Test.RenderArtifactPublication.cpp
@@ -294,6 +310,9 @@ if(TARGET ExtrinsicRuntime)
         Test.ProceduralGeometryCache.cpp
         Test.ProceduralGeometryExtraction.cpp
         Test.RuntimeCameraControllers.cpp
+        Test.RuntimeConfigControlFacade.cpp
+        Test.RuntimeEngineConfigBoot.cpp
+        Test.RuntimeRenderRecipeActivation.cpp
         Test.RuntimeCameraFocusCommand.cpp
         Test.RuntimeEcsSystemBundle.cpp
         Test.RuntimeReferenceScene.cpp
@@ -307,6 +326,7 @@ if(TARGET ExtrinsicRuntime)
         Test.SelectionSnapshotExtraction.cpp
         Test.SelectionStableLookupComposition.cpp
         Test.SpatialDebugAdapters.cpp
+        Test.SpatialDebugClosestFace.cpp
         Test.StableEntityLookup.cpp
         Test.VertexAttributeBinding.cpp
         Test.VertexChannelStreams.cpp
@@ -406,6 +426,8 @@ endif()
 set(_geometry_test_files
     Test_Statistics.cpp
     Test_RobustKernels.cpp
+    Test_AABBCubify.cpp
+    Test_BezierCurve.cpp
     Test_Curve.cpp
     Test_Rotation.cpp
     Test_RotationAveraging.cpp
@@ -416,6 +438,8 @@ set(_geometry_test_files
     Test.GeometryIO.cpp
     Test_RuntimeGraph.cpp
     Test_RuntimeGraphKNN.cpp
+    Test.GraphQueries.cpp
+    Test.GeometryProperties.cpp
     Test_KDTree.cpp
     Test_Octree.cpp
     Test_BVH.cpp
@@ -436,6 +460,7 @@ set(_geometry_test_files
     Test_ConvexHull.cpp
     Test_PointCloud.cpp
     Test_SphereFitting.cpp
+    Test_TriangleMetrics.cpp
     Test_Boolean.cpp
     Test_MeshBoundary.cpp
     Test_GeometryAttributePropagation.cpp
@@ -443,6 +468,7 @@ set(_geometry_test_files
     Test.HalfedgeMeshVertexNormals.cpp
     Test_HalfedgeMeshPropertyAccess.cpp
     Test_HalfedgeMeshTopology.cpp
+    Test.MeshTopologyUtilities.cpp
     Test_HtexPatch.cpp
     Test_Validation.cpp
     Test_Curvature.cpp
@@ -465,6 +491,8 @@ set(_geometry_test_files
     Test_ShortestPath.cpp
     Test_Subdivision.cpp
     Test_Smoothing.cpp
+    Test.QualityMetrics.cpp
+    Test.SurfaceSampling.cpp
     Test.PointCloudNormals.cpp
     Test_Registration.cpp
     Test_PointCloudRobustness.cpp
@@ -473,6 +501,9 @@ set(_geometry_test_files
     Test.RobustPredicates.cpp
     Test.LinearAlgebra.cpp
     Test.Sparse.cpp
+    Test.SparseFactorization.cpp
+    Test.SparseNonsymmetric.cpp
+    Test.SignedHeatMethod.cpp
     Test_SubmeshView.cpp
     Test.SubmeshViewDomainBorrows.cpp
 )
@@ -484,6 +515,9 @@ intrinsic_test_object_lib(GeometryTestObjs
     SOURCES
         ${_geometry_test_sources}
     DEPS IntrinsicCore IntrinsicGeometry
+)
+target_compile_definitions(GeometryTestObjs PRIVATE
+    INTRINSIC_TEST_SUPPORT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/support"
 )
 
 # --- Geometry method reference tests (CPU-only; methods/ package, no runtime/ECS) ---
@@ -533,6 +567,7 @@ set(_core_wrapper_unit_test_files
     Test.Core.BoundedHeap.cpp
     Test.Core.CallbackRegistry.cpp
     Test.Core.Config.cpp
+    Test.Core.EngineConfigLoad.cpp
     Test.Core.DagScheduler.cpp
     Test.Core.ErrorLegacy.cpp
     Test.Core.FrameClock.cpp
@@ -1037,6 +1072,14 @@ intrinsic_test_executable(IntrinsicEcsContractTests
 )
 
 # --- Runtime contract tests (CPU-only procedural geometry contracts) ---
+if(TARGET RuntimeUnitTestObjs)
+    intrinsic_test_executable(IntrinsicRuntimeUnitTests
+        OBJECTS RuntimeUnitTestObjs
+        LINK_LIBS ExtrinsicRuntime
+        LABELS unit runtime
+    )
+endif()
+
 if(TARGET RuntimeContractTestObjs)
     intrinsic_test_executable(IntrinsicRuntimeContractTests
         OBJECTS RuntimeContractTestObjs

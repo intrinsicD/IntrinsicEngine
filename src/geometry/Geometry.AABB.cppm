@@ -2,6 +2,7 @@ module;
 
 #include <array>
 #include <cfloat>
+#include <cstdint>
 #include <span>
 #include <vector>
 
@@ -50,6 +51,9 @@ export namespace Geometry
 
         [[nodiscard]] float GetLongestAxisLength() const;
         [[nodiscard]] std::array<glm::vec3, 8> GetCorners() const;
+        [[nodiscard]] AABB MakeCubic() const;
+        [[nodiscard]] glm::vec3 OctantCenter(std::uint32_t octant) const;
+        [[nodiscard]] AABB ChildOctant(std::uint32_t octant) const;
     };
 
     [[nodiscard]] AABB TransformAABB(const AABB& box, const glm::mat4& m);

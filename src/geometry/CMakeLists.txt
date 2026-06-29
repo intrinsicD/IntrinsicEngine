@@ -40,8 +40,10 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.Remeshing.cppm
         Geometry.HalfedgeMesh.Repair.cppm
         Geometry.HalfedgeMesh.Simplification.cppm
+        Geometry.HalfedgeMesh.SignedHeatMethod.cppm
         Geometry.HalfedgeMesh.Smoothing.cppm
         Geometry.HalfedgeMesh.Subdivision.cppm
+        Geometry.HalfedgeMesh.SubdivisionSqrt3.cppm
         Geometry.HalfedgeMesh.Utils.cppm
         Geometry.HalfedgeMesh.Vertices.Normals.cppm
         Geometry.HalfedgeMesh.VectorHeatMethod.cppm
@@ -69,6 +71,8 @@ target_sources(${target_name}
         Geometry.PointCloud.Conversion.cppm
         Geometry.PointCloud.IO.cppm
         Geometry.PointCloud.Normals.cppm
+        Geometry.PointCloud.QualityMetrics.cppm
+        Geometry.PointCloud.SurfaceSampling.cppm
         Geometry.PointCloud.Utils.cppm
         Geometry.PointCloud.cppm
         Geometry.Primitives.cppm
@@ -132,8 +136,10 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.Remeshing.cpp
         Geometry.HalfedgeMesh.Repair.cpp
         Geometry.HalfedgeMesh.Simplification.cpp
+        Geometry.HalfedgeMesh.SignedHeatMethod.cpp
         Geometry.HalfedgeMesh.Smoothing.cpp
         Geometry.HalfedgeMesh.Subdivision.cpp
+        Geometry.HalfedgeMesh.SubdivisionSqrt3.cpp
         Geometry.HalfedgeMesh.Utils.cpp
         Geometry.HalfedgeMesh.Vertices.Normals.cpp
         Geometry.HalfedgeMesh.VectorHeatMethod.cpp
@@ -156,6 +162,8 @@ target_sources(${target_name}
         Geometry.PointCloud.Conversion.cpp
         Geometry.PointCloud.IO.cpp
         Geometry.PointCloud.Normals.cpp
+        Geometry.PointCloud.QualityMetrics.cpp
+        Geometry.PointCloud.SurfaceSampling.cpp
         Geometry.PointCloud.Utils.cpp
         Geometry.PointCloud.cpp
         Geometry.Properties.cpp

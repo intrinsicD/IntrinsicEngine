@@ -6,7 +6,10 @@ module;
 #include <cstdint>
 #include <limits>
 #include <numbers>
+#include <optional>
 #include <span>
+#include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -18,6 +21,8 @@ module;
 module Geometry.HalfedgeMesh.Utils;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
+import Geometry.MeshClosestFace;
+import Geometry.PCA;
 import Extrinsic.Core.Logging;
 
 namespace Geometry::MeshUtils
@@ -477,6 +482,23 @@ namespace Geometry::MeshUtils
         return accum * 0.5;
     }
 
+    FaceProperty<glm::dvec3> PublishFaceAreaVectors(HalfedgeMesh::Mesh& mesh)
+    {
+        FaceProperty<glm::dvec3> property(
+            mesh.FaceProperties().GetOrAdd<glm::dvec3>(kFaceAreaVectorPropertyName, glm::dvec3(0.0)));
+        if (!property.IsValid())
+        {
+            return property;
+        }
+
+        for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+        {
+            const FaceHandle f{static_cast<PropertyIndex>(fi)};
+            property[f] = FaceAreaVector(mesh, f);
+        }
+        return property;
+    }
+
     double FaceArea(const HalfedgeMesh::Mesh& mesh, FaceHandle f)
     {
         if (!mesh.IsValid(f) || mesh.IsDeleted(f))
@@ -547,6 +569,23 @@ namespace Geometry::MeshUtils
         return fanAbs; // non-planar -> fan surface-area approximation
     }
 
+    FaceProperty<double> PublishFaceAreas(HalfedgeMesh::Mesh& mesh)
+    {
+        FaceProperty<double> property(
+            mesh.FaceProperties().GetOrAdd<double>(kFaceAreaPropertyName, 0.0));
+        if (!property.IsValid())
+        {
+            return property;
+        }
+
+        for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+        {
+            const FaceHandle f{static_cast<PropertyIndex>(fi)};
+            property[f] = FaceArea(mesh, f);
+        }
+        return property;
+    }
+
     glm::dvec3 FaceCentroid(const HalfedgeMesh::Mesh& mesh, FaceHandle f)
     {
         if (!mesh.IsValid(f) || mesh.IsDeleted(f))
@@ -570,6 +609,23 @@ namespace Geometry::MeshUtils
             return glm::dvec3(0.0);
         }
         return sum / static_cast<double>(count);
+    }
+
+    FaceProperty<glm::dvec3> PublishFaceCentroids(HalfedgeMesh::Mesh& mesh)
+    {
+        FaceProperty<glm::dvec3> property(
+            mesh.FaceProperties().GetOrAdd<glm::dvec3>(kFaceCentroidPropertyName, glm::dvec3(0.0)));
+        if (!property.IsValid())
+        {
+            return property;
+        }
+
+        for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+        {
+            const FaceHandle f{static_cast<PropertyIndex>(fi)};
+            property[f] = FaceCentroid(mesh, f);
+        }
+        return property;
     }
 
     std::vector<double> ComputeBarycentricVertexAreas(const HalfedgeMesh::Mesh& mesh)
@@ -603,6 +659,230 @@ namespace Geometry::MeshUtils
             }
         }
         return areas;
+    }
+
+    VertexProperty<double> PublishBarycentricVertexAreas(HalfedgeMesh::Mesh& mesh)
+    {
+        VertexProperty<double> property(
+            mesh.VertexProperties().GetOrAdd<double>(kBarycentricVertexAreaPropertyName, 0.0));
+        if (!property.IsValid())
+        {
+            return property;
+        }
+
+        const std::vector<double> areas = ComputeBarycentricVertexAreas(mesh);
+        const std::size_t count = std::min(areas.size(), property.Vector().size());
+        for (std::size_t vi = 0; vi < count; ++vi)
+        {
+            property[VertexHandle{static_cast<PropertyIndex>(vi)}] = areas[vi];
+        }
+        return property;
+    }
+
+    glm::dvec3 FaceScalarGradient(
+        const HalfedgeMesh::Mesh& mesh,
+        FaceHandle f,
+        std::span<const double> vertexValues)
+    {
+        if (!mesh.IsValid(f) || mesh.IsDeleted(f))
+        {
+            return glm::dvec3(0.0);
+        }
+
+        TriangleFaceView tri{};
+        if (!TryGetTriangleFaceView(mesh, f, tri))
+        {
+            return glm::dvec3(0.0);
+        }
+
+        if (tri.V0.Index >= vertexValues.size()
+            || tri.V1.Index >= vertexValues.size()
+            || tri.V2.Index >= vertexValues.size())
+        {
+            return glm::dvec3(0.0);
+        }
+
+        const double ua = vertexValues[tri.V0.Index];
+        const double ub = vertexValues[tri.V1.Index];
+        const double uc = vertexValues[tri.V2.Index];
+        if (!std::isfinite(ua) || !std::isfinite(ub) || !std::isfinite(uc)
+            || !IsFinite(glm::dvec3(tri.P0))
+            || !IsFinite(glm::dvec3(tri.P1))
+            || !IsFinite(glm::dvec3(tri.P2)))
+        {
+            return glm::dvec3(0.0);
+        }
+
+        glm::vec3 normal = glm::cross(tri.P1 - tri.P0, tri.P2 - tri.P0);
+        const float areaTimesTwo = glm::length(normal);
+        if (!(std::isfinite(areaTimesTwo)) || areaTimesTwo < 1.0e-10f)
+        {
+            return glm::dvec3(0.0);
+        }
+
+        normal /= areaTimesTwo;
+        const glm::vec3 ea = tri.P2 - tri.P1;
+        const glm::vec3 eb = tri.P0 - tri.P2;
+        const glm::vec3 ec = tri.P1 - tri.P0;
+        const float invTwoA = 1.0f / areaTimesTwo;
+        const glm::vec3 gradient = invTwoA * (
+            static_cast<float>(ua) * glm::cross(normal, ea) +
+            static_cast<float>(ub) * glm::cross(normal, eb) +
+            static_cast<float>(uc) * glm::cross(normal, ec));
+        if (!IsFinite(glm::dvec3(gradient)))
+        {
+            return glm::dvec3(0.0);
+        }
+        return glm::dvec3(gradient);
+    }
+
+    std::vector<glm::dvec3> ComputeFaceScalarGradients(
+        const HalfedgeMesh::Mesh& mesh,
+        std::span<const double> vertexValues)
+    {
+        std::vector<glm::dvec3> gradients(mesh.FacesSize(), glm::dvec3(0.0));
+        for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+        {
+            gradients[fi] = FaceScalarGradient(mesh, FaceHandle{static_cast<PropertyIndex>(fi)}, vertexValues);
+        }
+        return gradients;
+    }
+
+    FaceProperty<glm::dvec3> PublishFaceScalarGradients(
+        HalfedgeMesh::Mesh& mesh,
+        std::span<const double> vertexValues,
+        std::string_view outputPropertyName)
+    {
+        if (outputPropertyName.empty())
+        {
+            return FaceProperty<glm::dvec3>{};
+        }
+
+        FaceProperty<glm::dvec3> property(
+            mesh.FaceProperties().GetOrAdd<glm::dvec3>(std::string(outputPropertyName), glm::dvec3(0.0)));
+        if (!property.IsValid())
+        {
+            return property;
+        }
+
+        for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+        {
+            const FaceHandle f{static_cast<PropertyIndex>(fi)};
+            property[f] = FaceScalarGradient(mesh, f, vertexValues);
+        }
+        return property;
+    }
+
+    PCAResult VertexOneRingPCA(const HalfedgeMesh::Mesh& mesh, VertexHandle v)
+    {
+        PCAResult invalid{};
+        if (!mesh.IsValid(v) || mesh.IsDeleted(v) || mesh.IsIsolated(v))
+        {
+            return invalid;
+        }
+
+        std::vector<glm::vec3> neighbours;
+        neighbours.reserve(mesh.Valence(v));
+        for (const HalfedgeHandle h : mesh.HalfedgesAroundVertex(v))
+        {
+            if (!h.IsValid() || !mesh.IsValid(h) || mesh.IsDeleted(h))
+            {
+                continue;
+            }
+
+            const VertexHandle to = mesh.ToVertex(h);
+            if (!to.IsValid() || !mesh.IsValid(to) || mesh.IsDeleted(to))
+            {
+                continue;
+            }
+
+            const glm::vec3 position = mesh.Position(to);
+            if (IsFinite(glm::dvec3(position)))
+            {
+                neighbours.push_back(position);
+            }
+        }
+
+        if (neighbours.size() < 3u)
+        {
+            return invalid;
+        }
+
+        PCAResult result = ToPCA(neighbours);
+        if (!result.Valid)
+        {
+            return invalid;
+        }
+
+        auto hasFiniteBasisVector = [](const glm::vec3 vector) noexcept
+        {
+            const glm::dvec3 v(vector);
+            const double lenSq = glm::dot(v, v);
+            return IsFinite(v) && std::isfinite(lenSq) && lenSq > 1.0e-20;
+        };
+
+        if (hasFiniteBasisVector(result.Eigenvectors[0])
+            && hasFiniteBasisVector(result.Eigenvectors[1])
+            && hasFiniteBasisVector(result.Eigenvectors[2]))
+        {
+            return result;
+        }
+
+        glm::dvec3 normal{0.0};
+        for (const FaceHandle face : mesh.FacesAroundVertex(v))
+        {
+            normal += FaceAreaVector(mesh, face);
+        }
+
+        const double normalLength = glm::length(normal);
+        if (!IsFinite(normal) || !std::isfinite(normalLength) || normalLength <= 1.0e-12)
+        {
+            return invalid;
+        }
+        normal /= normalLength;
+
+        const glm::dvec3 seed = std::abs(normal.z) < 0.9
+            ? glm::dvec3{0.0, 0.0, 1.0}
+            : glm::dvec3{0.0, 1.0, 0.0};
+        glm::dvec3 tangent = glm::cross(seed, normal);
+        const double tangentLength = glm::length(tangent);
+        if (!std::isfinite(tangentLength) || tangentLength <= 1.0e-12)
+        {
+            return invalid;
+        }
+        tangent /= tangentLength;
+        const glm::dvec3 bitangent = glm::cross(normal, tangent);
+
+        result.Eigenvectors = glm::mat3{
+            glm::vec3(tangent),
+            glm::vec3(bitangent),
+            glm::vec3(normal),
+        };
+        return result;
+    }
+
+    VertexProperty<PCAResult> PublishVertexOneRingPCA(
+        HalfedgeMesh::Mesh& mesh,
+        std::string_view outputPropertyName)
+    {
+        if (outputPropertyName.empty())
+        {
+            return VertexProperty<PCAResult>{};
+        }
+
+        VertexProperty<PCAResult> property(
+            mesh.VertexProperties().GetOrAdd<PCAResult>(std::string(outputPropertyName), PCAResult{}));
+        if (!property.IsValid())
+        {
+            return property;
+        }
+
+        for (std::size_t vi = 0; vi < mesh.VerticesSize(); ++vi)
+        {
+            const VertexHandle v{static_cast<PropertyIndex>(vi)};
+            property[v] = VertexOneRingPCA(mesh, v);
+        }
+        return property;
     }
 
     glm::vec3 VertexNormal(const HalfedgeMesh::Mesh& mesh, VertexHandle v)
@@ -1214,6 +1494,119 @@ namespace Geometry::MeshUtils
 
         // Tie-break: prefer the lower rotation count for absolute determinism
         return (dotHigh > dotLow) ? candidateHigh : candidateLow;
+    }
+
+    std::optional<HalfedgeMesh::Mesh> Dual(const HalfedgeMesh::Mesh& mesh)
+    {
+        if (mesh.IsEmpty() || mesh.FaceCount() == 0) return std::nullopt;
+        for (std::size_t ei = 0; ei < mesh.EdgesSize(); ++ei)
+        {
+            const EdgeHandle e{static_cast<PropertyIndex>(ei)};
+            if (!mesh.IsDeleted(e) && mesh.IsBoundary(e)) return std::nullopt;
+        }
+
+        HalfedgeMesh::Mesh dual;
+        std::vector<VertexHandle> faceVertices(mesh.FacesSize(), VertexHandle{});
+        for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+        {
+            const FaceHandle f{static_cast<PropertyIndex>(fi)};
+            if (mesh.IsDeleted(f)) continue;
+            const glm::vec3 centroid = glm::vec3(FaceCentroid(mesh, f));
+            if (!std::isfinite(centroid.x) || !std::isfinite(centroid.y) || !std::isfinite(centroid.z))
+            {
+                return std::nullopt;
+            }
+            faceVertices[fi] = dual.AddVertex(centroid);
+        }
+
+        for (std::size_t vi = 0; vi < mesh.VerticesSize(); ++vi)
+        {
+            const VertexHandle v{static_cast<PropertyIndex>(vi)};
+            if (mesh.IsDeleted(v) || mesh.IsIsolated(v)) continue;
+            if (mesh.IsBoundary(v)) return std::nullopt;
+
+            std::vector<VertexHandle> dualFace;
+            for (const FaceHandle f : mesh.FacesAroundVertex(v))
+            {
+                if (!f.IsValid() || mesh.IsDeleted(f)) continue;
+                dualFace.push_back(faceVertices[f.Index]);
+            }
+            if (dualFace.size() < 3) return std::nullopt;
+
+            if (!dual.AddFace(dualFace).has_value())
+            {
+                std::reverse(dualFace.begin(), dualFace.end());
+                if (!dual.AddFace(dualFace).has_value()) return std::nullopt;
+            }
+        }
+
+        return dual;
+    }
+
+    namespace
+    {
+        [[nodiscard]] std::uint32_t AdjacentOppositeVertexIndex(
+            const HalfedgeMesh::Mesh& mesh,
+            const HalfedgeHandle edgeHalfedge,
+            const VertexHandle edgeA,
+            const VertexHandle edgeB,
+            const VertexHandle boundaryFallback)
+        {
+            const HalfedgeHandle opposite = mesh.OppositeHalfedge(edgeHalfedge);
+            const FaceHandle adjacent = mesh.Face(opposite);
+            if (!adjacent.IsValid() || mesh.IsDeleted(adjacent) || mesh.Valence(adjacent) != 3)
+            {
+                return boundaryFallback.Index;
+            }
+
+            for (const VertexHandle candidate : mesh.VerticesAroundFace(adjacent))
+            {
+                if (candidate != edgeA && candidate != edgeB)
+                {
+                    return candidate.Index;
+                }
+            }
+            return boundaryFallback.Index;
+        }
+    }
+
+    std::optional<std::vector<std::uint32_t>> BuildTriangleAdjacencyIndices(
+        const HalfedgeMesh::Mesh& mesh)
+    {
+        if (mesh.IsEmpty() || mesh.FaceCount() == 0) return std::nullopt;
+
+        std::vector<std::uint32_t> indices;
+        indices.reserve(mesh.FaceCount() * 6u);
+        for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+        {
+            const FaceHandle f{static_cast<PropertyIndex>(fi)};
+            if (mesh.IsDeleted(f)) continue;
+
+            const HalfedgeHandle h0 = mesh.Halfedge(f);
+            const HalfedgeHandle h1 = mesh.NextHalfedge(h0);
+            const HalfedgeHandle h2 = mesh.NextHalfedge(h1);
+            if (mesh.NextHalfedge(h2) != h0) return std::nullopt;
+
+            const VertexHandle va = mesh.ToVertex(h0);
+            const VertexHandle vb = mesh.ToVertex(h1);
+            const VertexHandle vc = mesh.ToVertex(h2);
+
+            indices.push_back(va.Index);
+            indices.push_back(AdjacentOppositeVertexIndex(mesh, h1, va, vb, vc));
+            indices.push_back(vb.Index);
+            indices.push_back(AdjacentOppositeVertexIndex(mesh, h2, vb, vc, va));
+            indices.push_back(vc.Index);
+            indices.push_back(AdjacentOppositeVertexIndex(mesh, h0, vc, va, vb));
+        }
+
+        return indices.empty() ? std::nullopt : std::optional{std::move(indices)};
+    }
+
+    MeshClosestFaceResult NearestFace(const HalfedgeMesh::Mesh& mesh, const glm::vec3 point)
+    {
+        MeshClosestFaceIndex index;
+        if (!index.Build(mesh)) return {};
+        return index.Query(point);
     }
 
     // --- Edge Loop: vertex-walking algorithm ---

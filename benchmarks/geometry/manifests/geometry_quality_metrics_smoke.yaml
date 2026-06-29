@@ -1,0 +1,26 @@
+# GEOM-036 — point-cloud quality metrics smoke manifest.
+#
+# Stable benchmark contract for the workload defined by
+# benchmarks/geometry/Bench_QualityMetricsSmoke.cpp and emitted by the
+# IntrinsicBenchmarkSmoke runner. This is quality/smoke evidence only; no
+# performance-win claim is made.
+
+benchmark_id: geometry.pointcloud_quality_metrics.smoke
+method: geometry.pointcloud.quality_metrics
+dataset: builtin.jittered_grid_white_noise_2d
+params:
+  intent: smoke
+  jittered_grid_side: 16
+  white_noise_count: 384
+  rdf_bin_width: 0.05
+  rdf_max_radius: 0.35
+  periodogram_resolution: 16
+  raps_frequency_bin_width: 2.0
+  warmup_iterations: 1
+  measured_iterations: 8
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 250
+  quality_error_l2_max: 1.0e-6

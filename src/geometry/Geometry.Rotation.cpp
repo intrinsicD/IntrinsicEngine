@@ -4,6 +4,7 @@ module;
 #include <cmath>
 #include <cstdint>
 #include <span>
+#include <utility>
 #include <glm/glm.hpp>
 
 module Geometry.Rotation;
@@ -40,6 +41,11 @@ namespace Geometry::Rotation
                 for (int r = 0; r < 3; ++r)
                     if (!std::isfinite(m[c][r])) return false;
             return true;
+        }
+
+        [[nodiscard]] bool Finite(const glm::dvec3& v)
+        {
+            return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
         }
 
         [[nodiscard]] glm::dmat3 ExpD(const glm::dvec3& w)
@@ -121,25 +127,42 @@ namespace Geometry::Rotation
             return d;
         }
 
-        // Nearest rotation to M via SVD with reflection correction.
-        [[nodiscard]] glm::dmat3 NearestRotationD(const glm::dmat3& m)
+        [[nodiscard]] bool IsUsablePolarStatus(Geometry::Linalg::NumericStatus status)
+        {
+            return status == Geometry::Linalg::NumericStatus::Success ||
+                   status == Geometry::Linalg::NumericStatus::RankDeficient;
+        }
+
+        [[nodiscard]] glm::dmat3 ProjectOnSOD(const glm::dmat3& m)
         {
             if (!Finite(m))
             {
                 return glm::dmat3(1.0);
             }
-            const Geometry::Linalg::SVDResult svd = Geometry::Linalg::ComputeSVD(ToDense3(m));
-            if (!svd.Diagnostics.Succeeded() || svd.U.Rows != 3 || svd.Vt.Rows != 3)
+            const Geometry::Linalg::PolarDecompositionResult polar =
+                Geometry::Linalg::ComputePolarDecomposition(ToDense3(m));
+            if (!IsUsablePolarStatus(polar.Diagnostics.Status) ||
+                polar.Orthogonal.Rows != 3 || polar.Orthogonal.Cols != 3)
             {
                 return glm::dmat3(1.0);
             }
-            const glm::dmat3 u = ToGlm3(svd.U);
-            const glm::dmat3 vt = ToGlm3(svd.Vt);
-            double d = glm::determinant(u * vt);
-            d = (d < 0.0) ? -1.0 : 1.0;
-            glm::dmat3 dDiag(1.0);
-            dDiag[2][2] = d;
-            return u * dDiag * vt;
+
+            glm::dmat3 q = ToGlm3(polar.Orthogonal);
+            if (!Finite(q))
+            {
+                return glm::dmat3(1.0);
+            }
+
+            const double det = glm::determinant(q);
+            if (!std::isfinite(det))
+            {
+                return glm::dmat3(1.0);
+            }
+            if (det < 0.0)
+            {
+                q[2] *= -1.0;
+            }
+            return q;
         }
 
         [[nodiscard]] glm::mat3 ToFloat(const glm::dmat3& g)
@@ -165,6 +188,40 @@ namespace Geometry::Rotation
         {
             // 53-bit mantissa uniform in [0, 1).
             return static_cast<double>(SplitMix64(state) >> 11) * (1.0 / 9007199254740992.0);
+        }
+
+        template <typename VecGetter, typename WeightGetter>
+        [[nodiscard]] glm::dmat3 OptimalRotationD(std::size_t count,
+                                                  VecGetter&& getPair,
+                                                  WeightGetter&& getWeight)
+        {
+            if (count < 3)
+            {
+                return glm::dmat3(1.0);
+            }
+
+            glm::dmat3 h(0.0);
+            std::size_t validCount = 0;
+            double totalWeight = 0.0;
+            for (std::size_t i = 0; i < count; ++i)
+            {
+                const auto [f, t] = getPair(i);
+                const double w = getWeight(i);
+                if (!Finite(f) || !Finite(t) || !std::isfinite(w) || !(w > 0.0))
+                {
+                    continue;
+                }
+                ++validCount;
+                totalWeight += w;
+                for (int row = 0; row < 3; ++row)
+                    for (int col = 0; col < 3; ++col)
+                        h[col][row] += w * t[row] * f[col];
+            }
+            if (validCount < 3 || !(totalWeight > 0.0))
+            {
+                return glm::dmat3(1.0);
+            }
+            return ProjectOnSOD(h);
         }
     }
 
@@ -249,7 +306,7 @@ namespace Geometry::Rotation
 
     glm::mat3 ProjectOnSO3(const glm::mat3& m)
     {
-        return ToFloat(NearestRotationD(glm::dmat3(m)));
+        return ToFloat(ProjectOnSOD(glm::dmat3(m)));
     }
 
     glm::mat3 OptimalRotation(std::span<const glm::vec3> from, std::span<const glm::vec3> to)
@@ -261,27 +318,44 @@ namespace Geometry::Rotation
                               std::span<const glm::vec3> to,
                               std::span<const float> weights)
     {
-        if (from.empty() || from.size() != to.size())
+        if (from.size() != to.size())
         {
             return glm::mat3(1.0f);
         }
         const bool useWeights = (weights.size() == from.size());
+        return ToFloat(OptimalRotationD(from.size(),
+                                        [&](std::size_t i)
+                                        {
+                                            return std::pair{glm::dvec3(from[i]), glm::dvec3(to[i])};
+                                        },
+                                        [&](std::size_t i)
+                                        {
+                                            return useWeights ? static_cast<double>(weights[i]) : 1.0;
+                                        }));
+    }
 
-        // Cross-covariance H = sum w_i * to_i * from_i^T.
-        glm::dmat3 h(0.0);
-        for (std::size_t i = 0; i < from.size(); ++i)
+    glm::dmat3 OptimalRotation(std::span<const glm::dvec3> from, std::span<const glm::dvec3> to)
+    {
+        return OptimalRotation(from, to, std::span<const double>{});
+    }
+
+    glm::dmat3 OptimalRotation(std::span<const glm::dvec3> from,
+                               std::span<const glm::dvec3> to,
+                               std::span<const double> weights)
+    {
+        if (from.size() != to.size())
         {
-            const glm::dvec3 f(from[i]);
-            const glm::dvec3 t(to[i]);
-            const double w = useWeights ? static_cast<double>(weights[i]) : 1.0;
-            if (!std::isfinite(f.x) || !std::isfinite(t.x) || !std::isfinite(w))
-            {
-                continue;
-            }
-            for (int row = 0; row < 3; ++row)
-                for (int col = 0; col < 3; ++col)
-                    h[col][row] += w * t[row] * f[col];
+            return glm::dmat3(1.0);
         }
-        return ToFloat(NearestRotationD(h));
+        const bool useWeights = (weights.size() == from.size());
+        return OptimalRotationD(from.size(),
+                                [&](std::size_t i)
+                                {
+                                    return std::pair{from[i], to[i]};
+                                },
+                                [&](std::size_t i)
+                                {
+                                    return useWeights ? weights[i] : 1.0;
+                                });
     }
 }

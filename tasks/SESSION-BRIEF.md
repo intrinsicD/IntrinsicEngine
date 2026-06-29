@@ -8,26 +8,16 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `GEOM-035` — Triangle-mesh surface point sampling (tasks/active/GEOM-035-mesh-surface-point-sampling.md)
 - `GRAPHICS-104` — GPU Object-Space Normal Texture Bake (tasks/active/GRAPHICS-104-gpu-object-space-normal-texture-bake.md)
-- `METHOD-012` — Progressive Poisson-disk sampling: paper intake + CPU reference backend (tasks/active/METHOD-012-progressive-poisson-disk-cpu-reference.md)
-- `RUNTIME-128` — Default lit material for material-less imported primitives (tasks/active/RUNTIME-128-default-lit-material-for-materialless-imports.md)
 
 ## Theme B — Rendering modernization
 
-- unblocked: `DOCS-004` — Promote frame-graph.md from stub and document the recipe-config lane (tasks/backlog/rendering/DOCS-004-frame-graph-doc-recipe-config-lane.md)
 - blocked by `GRAPHICS-104`: `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/backlog/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
-- unblocked: `GRAPHICS-106` — Fail-closed IRenderer frame-recipe override seam (tasks/backlog/rendering/GRAPHICS-106-frame-recipe-override-seam.md)
-- blocked by `GRAPHICS-106`: `GRAPHICS-107` — Reconcile the FrameRecipe vs RenderRecipe vocabularies (tasks/backlog/rendering/GRAPHICS-107-reconcile-framerecipe-renderrecipe-vocabulary.md)
 - unblocked: `RUNTIME-125` — Optional AoS fast lane for static geometry (profile-gated) (tasks/backlog/runtime/RUNTIME-125-aos-static-fast-lane.md)
 - blocked by `GRAPHICS-104`: `RUNTIME-129` — Schedule GPU object-space normal bake jobs after import (tasks/backlog/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
-- blocked by `GRAPHICS-106`: `RUNTIME-130` — Route recipe activation through runtime + load default recipe at init (tasks/backlog/rendering/RUNTIME-130-route-recipe-activation-and-load-default-recipe.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
-- unblocked: `CORE-003` — Give EngineConfig the file/preview/diagnostics config lane (tasks/backlog/runtime/CORE-003-engine-config-file-lane.md)
-- unblocked: `DOCS-003` — Reconcile algorithm-variant-dispatch.md with reality and define the backend-seam template (tasks/backlog/geometry/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md)
-- blocked by `DOCS-003`: `GEOM-052` — Shared CPU/GPU backend seam + fix the KMeans phantom GPU exemplar (tasks/backlog/geometry/GEOM-052-shared-cpu-gpu-backend-seam-kmeans-exemplar.md)
 - unblocked: `LEGACY-001` — Delete `src/legacy/Interface/` (tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)
 - unblocked: `LEGACY-004` — Delete `src/legacy/Asset/` (tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md)
 - unblocked: `LEGACY-005` — Delete `src/legacy/Core/` (tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)
@@ -39,69 +29,31 @@ the authoritative open/unblocked view.
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
-- blocked by `CORE-003`: `RUNTIME-131` — Agent/CLI config-control facade on the Engine (tasks/backlog/runtime/RUNTIME-131-agent-cli-config-control-facade.md)
-- unblocked: `RUNTIME-132` — Lift single-use RunFrame hook adapters out of the RunFrame body (tasks/backlog/runtime/RUNTIME-132-lift-runframe-hook-adapters.md)
-- blocked by `GEOM-039`: `RUNTIME-135` — SpatialDebug closest-face picking via accelerated mesh query (tasks/backlog/runtime/RUNTIME-135-spatialdebug-closest-face-picking.md)
-- unblocked: `UI-022` — Sandbox EditorUI vertex-normal recompute windows (tasks/backlog/ui/UI-022-sandbox-editor-vertex-normal-recompute.md)
-- blocked by `GEOM-042`: `UI-024` — Sandbox EditorUI mesh denoising window (tasks/backlog/ui/UI-024-editor-mesh-denoise-window.md)
-- blocked by `GEOM-043`: `UI-025` — Sandbox EditorUI remeshing and subdivision windows (tasks/backlog/ui/UI-025-editor-remesh-subdivide-windows.md)
-- blocked by `GEOM-040`: `UI-026` — Sandbox EditorUI curvature analysis window and principal-direction field (tasks/backlog/ui/UI-026-editor-curvature-analysis-window.md)
 
 ## Theme H — Agentic workflow hardening
 
 - unblocked: `DOCS-005` — Add a minimal-feature floor + config-entry artifact to the feature-module playbook (tasks/backlog/process/DOCS-005-feature-module-playbook-minimal-floor.md)
 - unblocked: `PROC-010` — Encode P1/P3/P5 research-engine invariants in AGENTS.md + review checklist (tasks/backlog/process/PROC-010-encode-research-engine-invariants-in-contract.md)
-- blocked by `DOCS-003`: `PROC-011` — Route the contract to the architecture index + add backend/config authoring checks (tasks/backlog/process/PROC-011-route-contract-to-architecture-index-and-author-checks.md)
+- unblocked: `PROC-011` — Route the contract to the architecture index + add backend/config authoring checks (tasks/backlog/process/PROC-011-route-contract-to-architecture-index-and-author-checks.md)
 - unblocked: `PROC-013` — Knowledge-graph discovery aid (graphify adapters + MCP) (tasks/backlog/process/PROC-013-graphify-knowledge-graph-discovery-aid.md)
 
 ## Unthemed
 
-- unblocked: `CORE-004` — Indexed decrease-key min-heap container and Dijkstra adoption (tasks/backlog/runtime/CORE-004-indexed-decrease-key-heap.md)
-- unblocked: `GEOIO-003` — Mesh and point-cloud IO breadth — OFF writer and point-cloud readers (tasks/backlog/geometry/GEOIO-003-mesh-pointcloud-io-breadth.md)
 - unblocked: `GEOM-013` — Feature-preserving dual contouring (tasks/backlog/geometry/GEOM-013-feature-preserving-dual-contouring.md)
 - unblocked: `GEOM-014` — Feature-aware quadric error mesh simplification (tasks/backlog/geometry/GEOM-014-feature-aware-quadric-error-simplification.md)
 - unblocked: `GEOM-016` — Point-cloud filtering and density diagnostics contracts (tasks/backlog/geometry/GEOM-016-point-cloud-filtering-density-contracts.md)
 - unblocked: `GEOM-017` — Point-cloud descriptors and registration seams (tasks/backlog/geometry/GEOM-017-point-cloud-descriptors-registration-seams.md)
-- blocked by `GEOM-020`: `GEOM-019` — Harmonic/Tutte parameterization and boundary constraints (tasks/backlog/geometry/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md)
-- unblocked: `GEOM-020` — Sparse direct factorization solver seam (LDLT/LLT) (tasks/backlog/geometry/GEOM-020-sparse-direct-factorization-seam.md)
-- unblocked: `GEOM-023` — Sparse non-symmetric iterative solver seam (BiCGSTAB) (tasks/backlog/geometry/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md)
-- blocked by `GEOM-020`: `GEOM-024` — Sparse symmetric generalized eigensolver seam (tasks/backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
-- unblocked: `GEOM-027` — Property name lifetime contract (tasks/backlog/geometry/GEOM-027-property-name-lifetime-contract.md)
-- unblocked: `GEOM-028` — Property registry handle safety (tasks/backlog/geometry/GEOM-028-property-registry-handle-safety.md)
-- unblocked: `GEOM-029` — Const property set validity contract (tasks/backlog/geometry/GEOM-029-const-property-set-validity-contract.md)
-- blocked by `GEOM-029`: `GEOM-030` — Property set const lookup migration (tasks/backlog/geometry/GEOM-030-property-set-const-lookup-migration.md)
-- unblocked: `GEOM-031` — Property set naming normalization (tasks/backlog/geometry/GEOM-031-property-set-naming-normalization.md)
-- unblocked: `GEOM-032` — Bool property access contract (tasks/backlog/geometry/GEOM-032-bool-property-access-contract.md)
-- blocked by `GEOM-027`: `GEOM-033` — Erased property metadata catalog (tasks/backlog/geometry/GEOM-033-erased-property-metadata-catalog.md)
-- blocked by `GEOM-027`: `GEOM-034` — Geometry property API documentation audit (tasks/backlog/geometry/GEOM-034-geometry-property-api-doc-audit.md)
-- unblocked: `GEOM-036` — Blue-noise / sampling quality-metrics module (tasks/backlog/geometry/GEOM-036-sampling-quality-metrics.md)
-- unblocked: `GEOM-037` — SO(3) rotation primitives (Lie machinery) (tasks/backlog/geometry/GEOM-037-so3-rotation-primitives.md)
-- blocked by `GEOM-037`: `GEOM-038` — Rotation averaging — SO(3) means and medians (tasks/backlog/geometry/GEOM-038-rotation-averaging-means-medians.md)
-- unblocked: `GEOM-039` — Accelerated mesh closest-face query and consumer adoption (tasks/backlog/geometry/GEOM-039-accelerated-mesh-closest-face-query.md)
-- unblocked: `GEOM-040` — Mesh curvature tensor and principal directions (tasks/backlog/geometry/GEOM-040-curvature-tensor-principal-directions.md)
-- unblocked: `GEOM-041` — FEM Laplacian mass/stiffness variants and edge-weight modes (tasks/backlog/geometry/GEOM-041-fem-laplacian-mass-stiffness-variants.md)
-- unblocked: `GEOM-042` — Mesh normal-based bilateral denoiser (tasks/backlog/geometry/GEOM-042-mesh-normal-bilateral-denoiser.md)
-- blocked by `GEOM-039`: `GEOM-043` — Remeshing surface reprojection and error-bounded adaptive sizing (tasks/backlog/geometry/GEOM-043-remeshing-reprojection-error-bounded-sizing.md)
-- unblocked: `GEOM-044` — Sqrt-3 (Kobbelt) subdivision and Loop feature/crease masks (tasks/backlog/geometry/GEOM-044-subdivision-sqrt3-loop-feature-masks.md)
-- unblocked: `GEOM-045` — First-class mesh geometric-quantity accessors (tasks/backlog/geometry/GEOM-045-first-class-mesh-quantity-accessors.md)
-- unblocked: `GEOM-046` — Mesh topology utilities — components, dual, triangulate, adjacency (tasks/backlog/geometry/GEOM-046-mesh-topology-utilities.md)
-- unblocked: `GEOM-047` — Graph and point-cloud query / sampling utilities (tasks/backlog/geometry/GEOM-047-graph-pointcloud-query-noise-utilities.md)
-- unblocked: `GEOM-048` — Statistics accumulators and robust estimation kernels (tasks/backlog/geometry/GEOM-048-statistics-robust-estimation-kernels.md)
-- unblocked: `GEOM-049` — Numeric / linear-algebra utilities: RPCA and Eigen map adapters (tasks/backlog/geometry/GEOM-049-numeric-linalg-utilities.md)
-- unblocked: `GEOM-050` — Primitive and curve utilities — Bezier, triangle metrics, sphere fit, AABB cubify (tasks/backlog/geometry/GEOM-050-primitive-curve-utilities.md)
-- blocked by `GEOM-033`: `GEOM-051` — Property system enhancements — live-element iterator and upload metadata (tasks/backlog/geometry/GEOM-051-property-system-enhancements.md)
+- unblocked: `GEOM-019` — Harmonic/Tutte parameterization and boundary constraints (tasks/backlog/geometry/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md)
+- unblocked: `GEOM-024` — Sparse symmetric generalized eigensolver seam (tasks/backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
 - unblocked: `GRAPHICS-108` — Reusable Vulkan compute parallel primitives (scan + compaction) (tasks/backlog/rendering/GRAPHICS-108-vulkan-compute-parallel-primitives.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
-- blocked by `GEOM-020`: `METHOD-002` — Signed Heat Method reference backend (tasks/backlog/methods/METHOD-002-signed-heat-method-reference-backend.md)
-- blocked by `GEOM-023`: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
+- unblocked: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
 - unblocked: `METHOD-004` — Walk on Spheres / Walk on Stars PDE solver reference backend (tasks/backlog/methods/METHOD-004-walk-on-spheres-reference-backend.md)
 - unblocked: `METHOD-005` — Robust mesh boolean reference backend (tasks/backlog/methods/METHOD-005-robust-mesh-boolean-reference-backend.md)
 - blocked by `GEOM-024`: `METHOD-006` — Cross-field / frame-field design reference backend (tasks/backlog/methods/METHOD-006-cross-field-design-reference-backend.md)
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
-- blocked by `METHOD-012`: `METHOD-013` — Progressive Poisson-disk sampling: GPU (Vulkan compute) backend + parity (tasks/backlog/methods/METHOD-013-progressive-poisson-disk-gpu-backend.md)
-- unblocked: `METHODS-001` — Pin signed heat as methods-pipeline pathfinder (tasks/backlog/methods/METHODS-001-signed-heat-pathfinder.md)
-- blocked by `GEOM-036`: `RUNTIME-133` — Method result & figure data-export seam (CSV/JSON) (tasks/backlog/runtime/RUNTIME-133-method-figure-data-export.md)
-- blocked by `METHOD-012`: `RUNTIME-134` — Interactive progressive-Poisson sampling playground in the Sandbox (tasks/backlog/ui/RUNTIME-134-progressive-poisson-interactive-playground.md)
+- blocked by `GRAPHICS-108`: `METHOD-013` — Progressive Poisson-disk sampling: GPU (Vulkan compute) backend + parity (tasks/backlog/methods/METHOD-013-progressive-poisson-disk-gpu-backend.md)
+- unblocked: `RUNTIME-134` — Interactive progressive-Poisson sampling playground in the Sandbox (tasks/backlog/ui/RUNTIME-134-progressive-poisson-interactive-playground.md)
 
 ## Audits
 

@@ -174,9 +174,15 @@ implemented in the matching `.cpp`):
 
 Canonical key constants live in
 `Extrinsic.ECS.Components.GeometrySources::PropertyNames`
-(`kPosition`, `kNormal`, `kEdgeV0`, `kEdgeV1`, `kHalfedgeToVertex`,
-`kHalfedgeNext`, `kHalfedgeFace`, `kFaceHalfedge`); read sites must
-prefer these constants over inline string literals.
+(`kPosition`, `kNormal`, `kMeanCurvature`, `kGaussianCurvature`,
+`kPrincipalDir1`, `kPrincipalDir2`, `kEdgeV0`, `kEdgeV1`,
+`kHalfedgeToVertex`, `kHalfedgeNext`, `kHalfedgeFace`, `kFaceHalfedge`);
+read sites must prefer these constants over inline string literals.
+The curvature keys are mesh-vertex properties published by the runtime/editor
+curvature command: `v:mean_curvature` and `v:gaussian_curvature` store
+count-matched `double` scalars, while `v:principal_dir1` and
+`v:principal_dir2` store count-matched `glm::vec3` tangent directions when the
+geometry curvature backend publishes directions.
 
 `BuildConstView` / `BuildMutableView` keep the exact-domain classifier in
 `ActiveDomain`: a full mesh, graph, or point cloud resolves to one mutually

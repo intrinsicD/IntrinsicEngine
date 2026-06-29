@@ -35,8 +35,8 @@ depends_on: []
 - Optionally proposes a new convergence theme so the backlog map reflects the
   research-control-surface direction (see the wording section); the substantive
   tasks (`GRAPHICS-106`, `RUNTIME-130`, `CORE-003`, `RUNTIME-131`, `GEOM-052`,
-  `GRAPHICS-107`, `RUNTIME-132`, `DOCS-003`, `DOCS-004`) are currently filed under
-  existing themes B/F and can be re-homed under it on approval.
+  `GRAPHICS-107`, `RUNTIME-132`, `DOCS-003`, `DOCS-004`) are filed or retired
+  under existing themes B/F and can be re-homed or cited under it on approval.
 
 ## Proposed wording (for review)
 

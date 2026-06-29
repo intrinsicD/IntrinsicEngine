@@ -8,6 +8,107 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+Active
+[`GRAPHICS-107`](GRAPHICS-107-reconcile-framerecipe-renderrecipe-vocabulary.md) —
+Reconcile the FrameRecipe vs RenderRecipe vocabularies — retired on 2026-06-28
+at maturity `CPUContracted`. Renderer docs and the canonical frame-graph
+architecture doc now identify `FrameRecipe*` as the live per-frame driver,
+`RenderRecipe*` as the contract/config overlay, and
+`FrameRecipeOverride` / `ProjectFrameRecipeOverride(...)` as the constrained
+bridge between them. Focused renderer contract tests cover mapped optional-slot
+feature disables, valid-but-unmapped extension-slot rejection, unknown slot
+rejection, and fixed-core mutation/disable rollback without adding new contract
+vocabulary or arbitrary pass-graph injection.
+
+Backlog
+[`DOCS-004`](DOCS-004-frame-graph-doc-recipe-config-lane.md) — Promote
+frame-graph.md from stub and document the recipe-config lane — retired on
+2026-06-28 as a docs-only synchronization task. `docs/architecture/frame-graph.md`
+now documents `FrameRecipe*` as the live per-frame composition driver,
+`RenderRecipeConfig` as the side-effect-free config overlay, runtime/editor/
+agent edit lanes, boot and hot `render.default_recipe_config_path` activation,
+and the fixed-core guard that limits overrides to supported optional slots and
+binding/output changes. The legacy-background `rendering-three-pass.md` remains
+context only.
+
+Backlog
+[`GEOIO-003`](GEOIO-003-mesh-pointcloud-io-breadth.md) — Mesh and point-cloud
+IO breadth — retired on 2026-06-28 at maturity `CPUContracted`.
+`Geometry::MeshIO::WriteOFF` now provides deterministic ASCII OFF export with
+round-trip, determinism, invalid-topology, bad-path, and non-finite fail-closed
+coverage. `Geometry::PointCloudIO` now exports strict ASCII readers for PTS,
+PWN, CSV, 3D, and TXT with committed fixtures, deterministic reads, explicit
+malformed/empty/non-finite diagnostics, and normal/color population for the
+supported layouts. This is module-level geometry coverage; runtime/assets route
+widening was intentionally left out of scope.
+
+Backlog
+[`UI-026`](UI-026-editor-curvature-analysis-window.md) — Sandbox EditorUI
+curvature analysis window and principal-direction field — retired on
+2026-06-28 at maturity `CPUContracted`. `Mesh > Processing > Curvature` now
+routes through a runtime-owned command/result surface that builds a scratch
+halfedge mesh from selected mesh `GeometrySources`, calls the `GEOM-040`
+`Geometry::Curvature::ComputeCurvature` backend, and publishes canonical
+`v:mean_curvature` / `v:gaussian_curvature` scalar properties plus
+`v:principal_dir1` / `v:principal_dir2` direction fields when available.
+Successful commits are undoable through `EditorCommandHistory`, stamp
+`DirtyVertexAttributes`, and leave renderer/RHI uploads to deferred extraction.
+`CurvatureVisualizationAdapter` reuses scalar colormap packets and emits
+principal-direction vector-field packets when direction properties are present,
+falling back to scalar-only diagnostics for absent or invalid direction data.
+
+Backlog
+[`GEOM-034`](GEOM-034-geometry-property-api-doc-audit.md) — Geometry property
+API documentation audit — retired on 2026-06-28 at maturity `Scaffolded`
+(documentation synchronization endpoint). The audit made
+`docs/architecture/geometry-api-style.md` the coherent source for property
+name lifetime, domain-prefix naming, validity, const lookup, bool/proxy access,
+and descriptors, and replaced stale higher-layer shared-ownership `MeshView`
+wording in `rendering-target-architecture.md` with links to the current
+geometry-owned property/domain-view contracts.
+
+Backlog
+[`GEOM-042`](GEOM-042-mesh-normal-bilateral-denoiser.md) — Mesh normal-based
+bilateral denoiser — retired on 2026-06-28 at maturity `CPUContracted`.
+`Geometry::Smoothing` now exports the two-stage bilateral mesh denoiser with
+face-normal filtering, normal-projection vertex updates, deterministic
+diagnostics, and fail-closed handling for empty, non-manifold, degenerate,
+non-finite, and invalid-parameter inputs. The default CPU gate passed after the
+landed implementation, unblocking `UI-024`.
+
+Backlog
+[`GEOM-041`](GEOM-041-fem-laplacian-mass-stiffness-variants.md) — FEM
+Laplacian mass/stiffness variants and edge-weight modes — retired on
+2026-06-28 at maturity `CPUContracted`. DEC assembly now has Graph, Fujiwara,
+and ModifiedNormal stiffness modes plus Sum, Barycentric, Voronoi, and
+Galerkin mass modes, with `ClampedHalfedgeCotan` in mesh utilities and
+row-sum/symmetry/SPD/fail-closed tests.
+
+Backlog
+[`GEOM-040`](GEOM-040-curvature-tensor-principal-directions.md) — Mesh
+curvature tensor and principal directions — retired on 2026-06-28 at maturity
+`CPUContracted`. `Geometry.Curvature` publishes `v:principal_dir1` and
+`v:principal_dir2`, exposes `ComputeCurvatureTensor`, and reuses exported
+`Geometry::PCA::SymmetricEigen3`; analytic curvature tensor tests and the
+default CPU gate passed. This unblocks `UI-026`.
+
+Active
+[`RUNTIME-128`](RUNTIME-128-default-lit-material-for-materialless-imports.md)
+— Default lit material for material-less imported primitives — retired on
+2026-06-28 at maturity `CPUContracted`. Runtime model-scene materialization now
+binds material-less primitives to a lazily created neutral lit StandardPBR
+material while preserving slot 0 as the unlit missing/invalid material
+indicator. The regression is covered by the runtime handoff contract test and
+the default CPU gate.
+
+Active
+[`METHOD-012`](METHOD-012-progressive-poisson-disk-cpu-reference.md) —
+Progressive Poisson-disk sampling: paper intake + CPU reference backend —
+retired on 2026-06-28 at maturity `CPUContracted`. The method package now has
+a deterministic CPU reference backend, manifest, docs, correctness tests, and a
+smoke benchmark with quality metrics. Method and benchmark manifests validate,
+and the default CPU gate passed, unblocking `METHOD-013` and `RUNTIME-134`.
+
 Backlog
 [`PROC-012`](PROC-012-resolve-duplicate-geom-027-id.md) — Resolve duplicate
 `GEOM-027` task ID — retired on 2026-06-27 at maturity `Retired`. Two files
@@ -2414,3 +2515,422 @@ readback job has resumed and applied, preserving existing `SubmitFollowUp` /
 `DependsOn` ordering. Focused CPU readback/derived-job/binding tests, explicit
 readback streaming integration tests, the full CPU-supported CTest gate, and an
 opt-in `gpu;vulkan` readback round-trip smoke passed.
+
+[`GEOM-027`](GEOM-027-property-name-lifetime-contract.md),
+[`GEOM-028`](GEOM-028-property-registry-handle-safety.md),
+[`GEOM-029`](GEOM-029-const-property-set-validity-contract.md),
+[`GEOM-030`](GEOM-030-property-set-const-lookup-migration.md),
+[`GEOM-031`](GEOM-031-property-set-naming-normalization.md),
+[`GEOM-032`](GEOM-032-bool-property-access-contract.md),
+[`GEOM-033`](GEOM-033-erased-property-metadata-catalog.md), and
+[`GEOM-051`](GEOM-051-property-system-enhancements.md) — geometry property
+system migration blockers retired to `tasks/done/` on 2026-06-28 at
+`CPUContracted`. `Geometry.Properties` now uses a single borrowed
+`std::string_view` name contract, fail-closed handle validity, const-correct
+property lookup, canonical `ShrinkToFit`, non-bool contiguous span/data access,
+bool proxy-safe indexed access, erased property descriptors, and reusable live
+element ranges across mesh, graph, point-cloud, and const domain views. Focused
+property tests cover names, copied handles, invalid handles, const lookup,
+descriptor metadata, bool access, and live ranges.
+
+[`GEOM-043`](GEOM-043-remeshing-reprojection-error-bounded-sizing.md) —
+remeshing reprojection and error-bounded sizing retired to `tasks/done/` on
+2026-06-28 at `CPUContracted`. Adaptive remeshing now exposes a reference
+projector backed by closest-face queries, error-bounded Taubin-style sizing,
+and uniform-remeshing projection options for split/move operations. Focused CPU
+tests prove projection to a frozen reference surface and the error-bounded
+sizing path on representative meshes.
+
+[`GEOM-044`](GEOM-044-subdivision-sqrt3-loop-feature-masks.md) — subdivision
+utility migration retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
+Loop subdivision now preserves optional feature-edge masks through crease
+stencils and tag propagation, and the new
+`Geometry.HalfedgeMesh.SubdivisionSqrt3` module adds triangle-centered Sqrt(3)
+subdivision. Focused CPU tests cover the single-triangle Sqrt(3) split and Loop
+feature-mask propagation.
+
+[`GEOM-046`](GEOM-046-mesh-topology-utilities.md) — mesh topology utilities
+retired to `tasks/done/` on 2026-06-28 at `CPUContracted`. `HalfedgeMesh` now
+has polygon-face triangulation, removal safety, Delaunay predicates/flips,
+explicit edge-length cache publication, connected-component labeling and split
+helpers, largest-component retention, dual/triangle-adjacency construction, and
+deterministic nearest-face queries. Focused CPU tests cover triangulation,
+component labels/splits, adjacency, nearest-face ordering, and the canonical
+`e:length` cache.
+
+[`GEOM-047`](GEOM-047-graph-pointcloud-query-noise-utilities.md) — graph and
+point-cloud query/noise utilities retired to `tasks/done/` on 2026-06-28 at
+`CPUContracted`. Graph utilities now publish and validate canonical `e:length`
+edge caches, run closest/K/radius edge queries through deterministic BVH-backed
+candidate search, support one-ring constrained closest-edge lookup, and apply
+seeded Gaussian graph noise scaled by bounding-box diagonal. Point-cloud
+utilities now apply seeded Gaussian noise scaled by average spacing and
+fail-close on degenerate nonzero-noise requests. Focused CPU tests cover cache
+publication, query ordering against brute force, one-ring search, deterministic
+noise, identity cases, and degenerate diagnostics.
+
+[`CORE-003`](CORE-003-engine-config-file-lane.md) — engine config file lane
+retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
+`Extrinsic.Core.Config.EngineLoad` now provides a versioned
+`intrinsic.core.engine-config` JSON schema, side-effect-free preview,
+file-load, serialization, typed diagnostics, and fallback-applied usability
+state while keeping the value-type `EngineConfig` module free of IO imports.
+Runtime exposes `ResolveEngineConfigForBoot(...)`, which starts from
+`CreateReferenceEngineConfig()` and then applies CLI, environment, or existing
+default-path config files before sandbox `Engine` construction. Focused core
+tests cover every boot field, file round-trip, invalid-key/value fallback, and
+diagnostics; runtime contract tests cover CLI selection and missing explicit
+path fallback; the sandbox target builds with the new entry-point wiring.
+
+[`GEOM-035`](GEOM-035-mesh-surface-point-sampling.md) — triangle-mesh surface
+point sampling retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
+`Geometry.PointCloud.SurfaceSampling` now samples triangle meshes into
+point-clouds with area-weighted face selection, sqrt-corrected barycentric
+samples, deterministic seeds, explicit diagnostics, and `p:normal` publication
+from interpolated source `v:normal` or geometric fallback normals. Focused
+geometry tests cover area proportions, determinism, normal handling, and
+invalid-input diagnostics; the benchmark smoke runner includes a CPU-only
+surface-sampling workload and manifest with no performance claim.
+
+[`GEOM-036`](GEOM-036-sampling-quality-metrics.md) — blue-noise and sampling
+quality metrics retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
+`Geometry.PointCloud.QualityMetrics` now exposes deterministic CPU functions
+for nearest-neighbor distances, NN histograms, coefficient of variation,
+minimum pair distance, Poisson-disk ratio, coverage, RDF with rectangular-domain
+edge correction, 2D periodograms, and radially averaged power spectra. Focused
+geometry tests cover grid, jittered-grid, white-noise, regular-lattice, cloud
+adapter, and fail-closed edge cases; the benchmark smoke runner includes a
+CPU-only quality-metrics workload and manifest with no performance claim.
+
+[`RUNTIME-133`](RUNTIME-133-method-figure-data-export.md) — method figure
+data-export seam retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
+`Extrinsic.Runtime.MethodFigureExport` now serializes copied metric series,
+scalar summaries, run manifests, and point sets to deterministic CSV, JSON,
+and ASCII PLY with stable column/property ordering and 17-digit scientific
+float formatting. Writers validate inputs before opening output, commit via a
+same-directory temporary file, and fail closed with explicit diagnostics.
+Focused runtime unit tests cover metric round-trip parsing, byte-identical
+manifest ordering, point-set CSV/PLY output, invalid arrays, duplicate keys,
+and unwritable target paths.
+
+[`RUNTIME-132`](RUNTIME-132-lift-runframe-hook-adapters.md) — RunFrame hook
+adapter readability lift retired to `tasks/done/` on 2026-06-28. The six
+single-use `Core.FrameLoop` hook adapters, fixed-step simulation loop, camera /
+gizmo / selection input helpers, BUG-026 pick-context construction, and
+completed pick-readback refinement now live as private `Runtime.Engine.cpp`
+helpers. `Engine::RunFrame` remains the runtime composition point and preserves
+the documented phase order, but now reads as the platform, simulation, UI,
+render-input, render-contract, maintenance, pick-readback, and frame-retire
+sequence instead of carrying adapter bodies inline. Text-based runtime layering
+contracts were updated to follow the extracted helper body without requiring
+the old inline fixed-step implementation.
+
+[`GRAPHICS-106`](GRAPHICS-106-frame-recipe-override-seam.md) — fail-closed
+IRenderer frame-recipe override seam retired to `tasks/done/` on 2026-06-28 at
+`CPUContracted`. `IRenderer` now exposes an active frame-recipe override lane
+with side-effect-free projection diagnostics, optional-slot disable semantics,
+and live null-renderer application immediately before `BuildDefaultFrameRecipe`.
+Invalid overrides leave derived defaults untouched and publish diagnostics in
+`RenderGraphFrameStats`; valid overrides can disable mapped optional slots such
+as postprocess, debug view, picking, and lighting without widening
+`RenderRecipeDescriptor` vocabulary or mutating the fixed core. Focused
+graphics contract tests cover projection, live pass omission, and fail-closed
+unknown-slot behavior; the default CPU-supported gate is green.
+
+[`RUNTIME-130`](RUNTIME-130-route-recipe-activation-and-load-default-recipe.md)
+— runtime render-recipe activation and startup default loading retired to
+`tasks/done/` on 2026-06-28 at `Operational`. `Engine` now owns the active
+render-recipe config state, builds recipe-config validation context from the
+current renderer contract, applies validated previews through a single runtime
+path, and translates accepted configs into the `GRAPHICS-106`
+`FrameRecipeOverride` seam. `RenderConfig` carries a boot-time
+`DefaultRecipeConfigPath` with empty-string opt-out, startup loads missing or
+invalid config files fail closed to the derived default recipe while preserving
+typed diagnostics, and the sandbox editor activation command now calls the
+runtime apply path instead of keeping activation editor-local. Focused runtime
+contract tests cover startup pass omission, missing and invalid fallback
+diagnostics, and editor activation reaching the live frame; the default
+CPU-supported gate is green.
+
+[`RUNTIME-131`](RUNTIME-131-agent-cli-config-control-facade.md) — agent/CLI
+config-control facade on `Engine` retired to `tasks/done/` on 2026-06-28 at
+`CPUContracted`. `Engine` now exposes typed, ImGui-independent methods for
+render-recipe preview, file preview, document activation, and validated preview
+apply, plus engine-config preview/load and a deliberately narrow hot-apply
+subset for `render.default_recipe_config_path`. Non-empty hot paths validate the
+referenced `RenderRecipeConfig` before mutating live config or renderer state;
+invalid hot recipe files reject without clearing an active override, and all
+other engine-config differences are reported as boot-only rejections. The
+Sandbox Editor recipe commands now call the same facade callbacks for preview
+and activation while keeping widget/draft-buffer state local. Focused runtime
+contract tests cover agent/CLI control without UI frames, boot-only rejection,
+invalid-hot-file preservation, and editor/agent preview parity; the default
+CPU-supported gate is green. This satisfies the `RUNTIME-131` dependency for
+`RUNTIME-134`.
+
+[`UI-022`](UI-022-sandbox-editor-vertex-normal-recompute.md) — Sandbox
+EditorUI vertex-normal recompute windows retired to `tasks/done/` on
+2026-06-28 at `CPUContracted`. Mesh, graph, and point-cloud
+`Processing > Vertices > Normals` windows now route through runtime-owned
+command/result DTOs that call `Geometry.HalfedgeMesh.Vertices.Normals`,
+`Geometry.Graph.Vertex.Normals`, and `Geometry.PointCloud.Normals` rather than
+UI-owned algorithms. Successful commands publish count-matched canonical
+`v:normal`, stamp `DirtyVertexNormals`, and mark editor history dirty; invalid
+targets, invalid settings, and typed `v:normal` conflicts fail closed without
+touching unrelated properties or renderer/RHI state. Focused geometry,
+runtime-editor, and dirty-tag extraction tests passed, and K-Means processing
+capability coverage remains green.
+
+[`UI-024`](UI-024-editor-mesh-denoise-window.md) — Sandbox EditorUI mesh
+denoising window retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
+`Mesh > Processing > Denoise` now exposes a runtime-owned command/result
+surface that builds a scratch halfedge mesh from selected mesh
+`GeometrySources`, calls the `GEOM-042` `Geometry.Smoothing::DenoiseBilateral`
+kernel, and publishes finite count-matched `v:position` values only after the
+geometry result succeeds. Successful commits are undoable through
+`EditorCommandHistory`, stamp `DirtyVertexPositions` and
+`DirtyVertexAttributes`, and leave renderer/RHI uploads to deferred extraction
+without stamping broad `GpuDirty`. Contract tests cover menu/capability
+advertising, successful denoise publication, undo/redo exact restoration,
+dirty-tag behavior, wrong-domain and invalid-parameter fail-closed paths, and
+the deterministic unavailable-kernel diagnostic lane.
+
+[`UI-025`](UI-025-editor-remesh-subdivide-windows.md) — Sandbox EditorUI
+remeshing and subdivision windows retired to `tasks/done/` on 2026-06-28 at
+`CPUContracted`. `Mesh > Processing > Remesh` now exposes uniform/adaptive
+remeshing controls for target edge length, iterations, project-to-surface, and
+mean-curvature versus error-bounded Taubin sizing, with runtime-owned
+feature-gated command/result DTOs that call `Geometry.Remeshing` and
+`Geometry.HalfedgeMesh.AdaptiveRemeshing`. `Mesh > Processing > Subdivide`
+exposes Loop, Catmull-Clark, and Sqrt(3) operators plus Loop feature-edge
+preservation, calling the GEOM-044 geometry modules through the same runtime
+command surface. Successful commands replace the selected mesh
+`GeometrySources` through undoable `EditorCommandHistory` snapshots, stamp
+`DirtyVertexPositions`, `DirtyVertexAttributes`, `DirtyEdgeTopology`, and
+`DirtyFaceTopology`, and leave renderer/RHI uploads to deferred extraction
+without stamping broad `GpuDirty`. Runtime contract tests cover menu/model
+advertising, uniform and adaptive remesh, all three subdivision operators,
+undo/redo, dirty tags, wrong-domain and invalid-parameter fail-closed paths,
+and unavailable-kernel diagnostics.
+
+[`GEOM-039`](GEOM-039-accelerated-mesh-closest-face-query.md) — accelerated mesh
+closest-face query and consumer adoption retired to `tasks/done/` on 2026-06-28
+at `CPUContracted`. `Geometry.MeshClosestFaceIndex` now provides a packaged
+CPU exact nearest/k-nearest/radius face query over a `Geometry.BVH` of per-face
+AABBs, returning face, closest point, normal, fan-triangle primitive index,
+exact squared distance, status, and `Geometry.SpatialQueries` diagnostics.
+Polygon faces are fan-triangulated; empty/no-usable-triangle meshes,
+non-finite vertices, non-finite probes, and invalid parameters fail closed
+without NaNs or asserts. Adaptive remeshing reference projection, implicit
+plane-field closest-point evaluation, simplification Hausdorff redistribution,
+and `Geometry.HalfedgeMesh.Utils::NearestFace` now share the packaged query
+instead of private brute-force face scans. Focused geometry tests cover
+brute-force parity, pruning diagnostics, k-nearest and radius results, subset
+indices, boundary/on-surface queries, degenerate fail-closed behavior, and the
+three adopted consumers.
+
+[`RUNTIME-135`](RUNTIME-135-spatialdebug-closest-face-picking.md) —
+SpatialDebug closest-face picking via accelerated mesh query retired to
+`tasks/done/` on 2026-06-28 at `CPUContracted`. Runtime now exports
+`Extrinsic.Runtime.SpatialDebugClosestFace`, a data-only closest-face overlay
+consumer that accepts a caller-resolved active mesh descriptor, caches the
+GEOM-039 `Geometry.MeshClosestFaceIndex` by stable mesh key/revision, and emits
+the highlighted face, probe point, closest point, normal, exact distance,
+primitive index, mesh identity, query status, and diagnostics. No closest-face
+kernel is implemented in runtime; no renderer/RHI/Vulkan or editor widget path
+is touched. Runtime contract coverage proves parity with the direct geometry
+query, valid overlay output, rebuild on revision change, no-active/missing-mesh
+fail-closed behavior, and empty/degenerate/non-finite-probe diagnostics.
+
+[`CORE-004`](CORE-004-indexed-decrease-key-heap.md) — indexed decrease-key
+min-heap container and Dijkstra adoption retired to `tasks/done/` on
+2026-06-28 at `CPUContracted`. Core now exports
+`Extrinsic.Core.IndexedHeap`, a generic deterministic indexed binary min-heap
+with fail-closed `Top`/`TryTop`/`Pop`/`TryPop`, duplicate-safe `Push`,
+O(log n) `DecreaseKey`, O(log n) `Remove`, and value-token tie-breaking.
+`Geometry.Graph.ShortestPath` now uses the core heap as its true decrease-key
+Dijkstra frontier instead of `std::priority_queue` lazy re-insertion, while
+preserving distance, predecessor, traversal-count, goal-stop, and
+budget-exhaustion diagnostics against the prior priority-queue reference.
+Focused core heap randomized operation parity and geometry shortest-path
+priority-queue parity tests cover the migration.
+
+[`DOCS-003`](DOCS-003-reconcile-algorithm-variant-dispatch-doc.md) —
+algorithm variant dispatch documentation reconciliation retired to
+`tasks/done/` on 2026-06-28. `docs/architecture/algorithm-variant-dispatch.md`
+now identifies itself as a target Strategy x Backend template pending
+`GEOM-052`, describes the CPU-only owning-layer function plus the
+`Extrinsic::RHI::IDevice&` GPU-capable integration overload, maps
+`Backend::CPU` / `Backend::GPU` to the method backend-policy tokens, and
+requires honest requested-vs-actual fallback telemetry instead of a silent
+phantom GPU path. The architecture index now records the doc as target guidance
+pending `GEOM-052` before canonical promotion, satisfying the documentation
+gate for `GEOM-052` and `PROC-011`.
+
+[`GEOM-052`](GEOM-052-shared-cpu-gpu-backend-seam-kmeans-exemplar.md) —
+shared CPU/GPU backend seam and KMeans exemplar retired to `tasks/done/` on
+2026-06-28 at `CPUContracted`. `Geometry.KMeans::Backend` now exposes
+`CPU`/`GPU` rather than the old phantom GPU token, `KMeansParams::Compute`
+remains the backend request field, and `KMeansResult` reports
+`RequestedBackend`, `ActualBackend`, and `FellBackToCPU` so CPU fallback is
+observable. The CPU geometry entry point remains RHI-free and reports CPU as
+the actual backend even when GPU was requested. Runtime now exports
+`Extrinsic.Runtime.KMeansBackend`, whose `ClusterKMeans(...)` overloads accept
+`Extrinsic::RHI::IDevice&`, evaluate `IDevice::IsOperational()` for GPU
+requests, and fall back to the geometry CPU reference because no KMeans GPU
+kernel is implemented in this slice. Focused geometry and runtime contract tests
+cover CPU telemetry, non-operational GPU requests, operational-but-unimplemented
+GPU requests, and unchanged editor KMeans publication behavior.
+
+[`GEOM-037`](GEOM-037-so3-rotation-primitives.md) — SO(3) rotation primitives
+retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
+`Geometry.Rotation` now owns hat/vee, exp/log, geodesic and chordal distances,
+deterministic seeded random rotations, `ProjectOnSO3`, and optimal-rotation
+helpers for both `glm::vec3` and `glm::dvec3` correspondences. `ProjectOnSO3`
+delegates orthogonal projection to
+`Geometry.Linalg::ComputePolarDecomposition(...).Orthogonal` and determinant
+corrects into SO(3). `Geometry.Registration` imports the module for
+point-to-point ICP alignment, removing the private Kabsch/Umeyama
+eigensolver copy. Unit coverage exercises round trips, distances, deterministic
+random rotations, SO(3) projection, optimal-rotation recovery, reflection
+correction, non-finite input, and under-determined fail-closed behavior; existing
+registration tests pass unchanged.
+
+[`GEOM-038`](GEOM-038-rotation-averaging-means-medians.md) — SO(3) rotation
+averaging retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
+`Geometry.RotationAveraging` now exposes result/status-returning chordal,
+Karcher, and quaternion L2 means plus geodesic and quaternion Weiszfeld L1
+medians. The chordal mean builds the Markley 4x4 quaternion moment matrix and
+solves it through `Geometry.Linalg::ComputeSymmetricEigen`, with deterministic
+sample canonicalization/sorting and a polar projection fallback for solver
+failure. Shared options carry optional weights, convergence controls, and an
+outlier-rejection threshold; shared results report validity, convergence,
+iterations, residual radians, and explicit fail-closed status. Unit coverage
+proves repeated-rotation identity, clustered chordal/Karcher agreement, weighted
+Karcher/slerp parity, median robustness against gross outliers, deterministic
+permutation behavior, and explicit empty/single/antipodal/weight/non-finite
+status handling.
+
+[`GEOM-045`](GEOM-045-first-class-mesh-quantity-accessors.md) — first-class mesh
+geometric-quantity accessors retired to `tasks/done/` on 2026-06-28 at
+`CPUContracted`. `Geometry.HalfedgeMesh.Utils` now exposes property-backed
+`FaceArea`, `FaceAreaVector`, `FaceCentroid`,
+`ComputeBarycentricVertexAreas`, `FaceScalarGradient`, and
+`VertexOneRingPCA` contracts with canonical `f:` / `v:` property names.
+The heat-method geodesic implementation consumes the public unnormalized
+gradient and keeps the local normalize/negate step, `Geometry.UvAtlas` routes
+its degenerate triangle check through the canonical triangle-area helper,
+`Geometry.HalfedgeMesh.Builder` exports `ProjectToUnitSphere`, and
+`Geometry.HalfedgeMesh.Vertices.Normals` adds `AreaAngleWeighted`. Unit
+coverage pins analytic area, closed-mesh area-vector conservation, property
+publication, linear-field face gradients, origin-safe unit-sphere projection,
+area-times-angle normals, 1-ring PCA normal alignment, and fail-closed invalid
+inputs; focused geodesic tests pass through the promoted gradient path.
+
+[`GEOM-048`](GEOM-048-statistics-robust-estimation-kernels.md) — statistics
+accumulators and robust estimation kernels retired to `tasks/done/` on
+2026-06-28 at `CPUContracted`. `Geometry.Statistics` now owns mergeable scalar
+streaming moments, a two-heap running median, generic finite-sample
+`Median`/`Quantile` helpers, and fail-closed `SafeAcos`/`SafeAsin` domain
+clamps. `Geometry.Robust` now owns L2, L1, Huber, Tukey, Welsch, Lorentzian,
+and Cauchy M-estimator kernels with `Rho`/`Psi`/`Weight` entry points.
+`Geometry.Registration` exposes default-off robust ICP weighting through
+`RegistrationParams::RobustKernelKind` and `RobustScale`; when selected, the
+existing percentile trim remains in place and the surviving correspondences
+feed weighted point-to-point Kabsch or point-to-plane normal equations. Unit
+coverage proves streaming-vs-batch moments, merge associativity, order
+statistics over double and non-double scalar vectors, robust-kernel analytic
+forms/fail-closed inputs, invalid robust ICP params, and Tukey improvement over
+percentile trimming alone on a gross-outlier registration case.
+
+[`GEOM-049`](GEOM-049-numeric-linalg-utilities.md) — numeric / linear-algebra
+utilities retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
+`Geometry.Linalg` now exports strided Eigen map aliases plus `MapAsMatrix` and
+`MapVectorAsMatrix` adapters for aliasing scalar buffers and fixed-size GLM
+vector arrays as `N x dim` matrices. `Geometry.Properties` now owns the
+one-way adapter into `Geometry.Linalg`: arithmetic property columns map as
+aliasing `N x 1` views, GLM vector columns map as aliasing `N x dim` views, and
+`bool` property columns return copied numeric columns instead of reinterpreting
+`std::vector<bool>`. `RobustPCA` implements deterministic Principal Component
+Pursuit / ADMM on top of `ComputeSVD`, reports recovered rank, iteration count,
+residuals, and `NumericDiagnostics`, and fails closed on empty, zero, non-finite,
+invalid-option, or hard SVD-failure inputs. Unit coverage proves strided-map and
+property-map aliasing, the bool fallback, synthetic low-rank-plus-sparse
+recovery, bitwise determinism, and degenerate-input diagnostics.
+
+[`GEOM-050`](GEOM-050-primitive-curve-utilities.md) — primitive and curve
+utilities retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
+`Geometry.Curve` keeps its existing span-based Bezier evaluators and now also
+exports `BezierCurve`, `GetDegree`, `EvaluateBernstein`, and
+`EvaluateDeCasteljau`. `Geometry.Triangle` now exposes opposite-edge lengths,
+perimeter, per-vertex angles, stable-Heron area, and `SafeAcos`, with
+non-finite or degenerate triangles returning finite zero metrics. `Geometry.Sphere`
+adds `FittingMethod::IterativeGeometric` plus convergence controls on the
+existing `ToSphere` path; the branch rejects fewer than four, non-finite, or
+coincident samples and keeps the best point-to-surface residual reached from
+the algebraic seed/refinement. `Geometry.AABB` now supports `MakeCubic`,
+`OctantCenter`, and `ChildOctant` with invalid-box sentinels. Unit coverage
+exercises Bezier endpoint/linear/Bernstein-vs-de Casteljau behavior, triangle
+analytic metrics and degenerate guards, iterative sphere residual comparison
+against least squares, and AABB cubification/octant tiling.
+
+[`GEOM-020`](GEOM-020-sparse-direct-factorization-seam.md) — sparse direct
+factorization solver seam retired to `tasks/done/` on 2026-06-28 at
+`CPUContracted`. `Geometry.Sparse` now exposes `SparseLDLT` and `SparseLLT`
+solver objects over the existing CSR matrix type, with `factor`, span-based
+single-RHS solves, `Eigen::Ref` multi-RHS solves, and solve-in-place overloads.
+Factorization returns `SparseFactorizationDiagnostics` carrying status, pivot
+count, smallest absolute pivot, and a reserved condition-estimate field. LDLT
+classifies negative pivots as `NonSPD` and near-zero pivots as `ZeroPivot`; LLT
+uses Eigen status plus an LDLT probe for failure classification. DEC/geodesic
+callers keep the existing CG path, while future method packages now have the
+factor-once / solve-many SPD reference seam they were gated on. Unit coverage
+proves SPD Poisson solves, a mass-plus-Laplacian method-shaped solve,
+indefinite/singular diagnostics, multi-RHS solve parity, solve-in-place storage
+reuse, invalid-input rejection, and bit-stable repeated solves from one
+factorization.
+
+[`GEOM-023`](GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md) — sparse
+non-symmetric iterative solver seam retired to `tasks/done/` on 2026-06-28 at
+`CPUContracted`. `Geometry.Sparse` now exposes `SparseBiCGSTAB` over the
+existing CSR matrix type, with span-based single-RHS solves and `Eigen::Ref`
+multi-RHS solves. Solver params report max iterations, relative tolerance, and
+preconditioner choice (`None`, `Diagonal`, or `IncompleteLUT`), while
+diagnostics report status, iterations, final relative residual, and the
+preconditioner used. Invalid CSR/matrix shape, non-finite RHS, invalid
+tolerances, unsupported preconditioner enum values, non-convergence, and
+numerical failures return structured statuses and do not mutate caller output on
+failed solves. The module pins Eigen's single-threaded path with
+`EIGEN_DONT_PARALLELIZE`, and unit coverage proves a genuinely non-symmetric
+advection-diffusion solve, SPD parity with CG, singular-system diagnostics,
+input rejection, multi-RHS parity, preconditioner agreement, and bit-stable
+repeated solves. METHOD-003 can now promote against
+`Geometry.Sparse::SparseBiCGSTAB` for its non-symmetric closest-point-extension
+operator.
+
+[`METHODS-001`](METHODS-001-signed-heat-pathfinder.md) — signed-heat
+pathfinder planning task retired to `tasks/done/` on 2026-06-28 at `Retired`.
+The task pins METHOD-002 as the first concrete method to drive the full
+methods pipeline from paper intake through CPU reference, correctness tests,
+benchmark harness, and docs. It records retired GEOM-020 as the LDLT seam that
+satisfies METHOD-002's direct-solver gate, preserves Variant A (surface signed
+heat) as the public-facing default, and points future method work at the
+resulting `methods/geometry/signed_heat/` package as the canonical package
+pattern.
+
+[`METHOD-002`](METHOD-002-signed-heat-method-reference-backend.md) — Signed Heat
+Method reference backend retired to `tasks/done/` on 2026-06-28 at
+`CPUContracted`. `Geometry.SignedHeatMethod` now exposes a CPU reference surface
+backend that computes per-vertex signed distance from an oriented halfedge curve
+on a triangle mesh. The implementation reuses `Geometry.DEC` vertex mass/cotan
+operators and `Geometry.Sparse::SparseLDLT` for the heat and regularized
+Poisson solves, writes `v:signed_heat_distance` and
+`v:is_signed_heat_source`, and reports explicit invalid-input,
+degenerate-boundary, factorization/solve, and non-finite-result diagnostics.
+The method package `methods/geometry/signed_heat/` records the paper intake,
+backend status, and known limitation that this is a vertex-based approximation
+of the paper's edge-based Crouzeix-Raviart connection discretization. Unit
+coverage proves flat-grid signed-distance sign/quality, orientation sign flip,
+open-boundary finite diagnostics, invalid-input failure, and bitwise
+determinism. The smoke benchmark emits schema-valid runtime and
+`quality_error_l2` metrics without making a performance claim.

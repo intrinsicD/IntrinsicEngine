@@ -11,7 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-None.
+- [`GRAPHICS-104` — GPU Object-Space Normal Texture Bake](GRAPHICS-104-gpu-object-space-normal-texture-bake.md)
+  — in progress; next verification step is focused object-space normal bake
+  contract coverage plus the default CPU-supported gate after runtime
+  orchestration lands.
 
 ## History
 

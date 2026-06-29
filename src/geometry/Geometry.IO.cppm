@@ -23,6 +23,10 @@ export namespace Geometry::IO
         PLY,
         XYZ,
         PTS,
+        PWN,
+        CSV,
+        ThreeD,
+        TXT,
         XYZRGB,
         PCD,
         TGF,
@@ -60,18 +64,26 @@ namespace Geometry::IO
         inline constexpr std::array<std::string_view, 1> PlyAliases{"ply"};
         inline constexpr std::array<std::string_view, 1> XyzAliases{"xyz"};
         inline constexpr std::array<std::string_view, 1> PtsAliases{"pts"};
+        inline constexpr std::array<std::string_view, 1> PwnAliases{"pwn"};
+        inline constexpr std::array<std::string_view, 1> CsvAliases{"csv"};
+        inline constexpr std::array<std::string_view, 1> ThreeDAliases{"3d"};
+        inline constexpr std::array<std::string_view, 1> TxtAliases{"txt"};
         inline constexpr std::array<std::string_view, 1> XyzRgbAliases{"xyzrgb"};
         inline constexpr std::array<std::string_view, 1> PcdAliases{"pcd"};
         inline constexpr std::array<std::string_view, 1> TgfAliases{"tgf"};
         inline constexpr std::array<std::string_view, 1> EdgeAliases{"edges"};
 
-        inline constexpr std::array<GeometryIOFormatInfo, 10> Formats{{
+        inline constexpr std::array<GeometryIOFormatInfo, 14> Formats{{
             {Kind::OBJ, "obj", ObjAliases, MeshOnly, MeshOnly, false, false},
-            {Kind::OFF, "off", OffAliases, MeshOnly, NoDomains, false, false},
+            {Kind::OFF, "off", OffAliases, MeshOnly, MeshOnly, false, false},
             {Kind::STL, "stl", StlAliases, MeshOnly, MeshOnly, true, true},
             {Kind::PLY, "ply", PlyAliases, MeshAndPointCloud, MeshAndPointCloud, true, true},
             {Kind::XYZ, "xyz", XyzAliases, PointCloudOnly, PointCloudOnly, false, false},
             {Kind::PTS, "pts", PtsAliases, PointCloudOnly, NoDomains, false, false},
+            {Kind::PWN, "pwn", PwnAliases, PointCloudOnly, NoDomains, false, false},
+            {Kind::CSV, "csv", CsvAliases, PointCloudOnly, NoDomains, false, false},
+            {Kind::ThreeD, "3d", ThreeDAliases, PointCloudOnly, NoDomains, false, false},
+            {Kind::TXT, "txt", TxtAliases, PointCloudOnly, NoDomains, false, false},
             {Kind::XYZRGB, "xyzrgb", XyzRgbAliases, PointCloudOnly, NoDomains, false, false},
             {Kind::PCD, "pcd", PcdAliases, PointCloudOnly, PointCloudOnly, true, true},
             {Kind::TGF, "tgf", TgfAliases, GraphOnly, GraphOnly, false, false},
@@ -189,4 +201,3 @@ export namespace Geometry::IO
         return HasDomain(ExportDomainsForExtension(extension), domain);
     }
 }
-

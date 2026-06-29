@@ -114,6 +114,12 @@ TEST(GeometryRotation, ProjectOnSO3)
     m[0] *= 1.3f;
     m[1] += glm::vec3(0.05f, -0.02f, 0.01f);
     EXPECT_TRUE(IsRotation(ProjectOnSO3(m)));
+    // Reflections are determinant-corrected into SO(3), not returned as O(3).
+    glm::mat3 reflected = r;
+    reflected[2] *= -1.0f;
+    const glm::mat3 projectedReflection = ProjectOnSO3(reflected);
+    EXPECT_TRUE(IsRotation(projectedReflection));
+    EXPECT_NEAR(glm::determinant(projectedReflection), 1.0f, 1e-3f);
 }
 
 TEST(GeometryRotation, OptimalRotationRecoversKnown)
@@ -146,4 +152,14 @@ TEST(GeometryRotation, FailClosed)
     std::vector<glm::vec3> two{{1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
     EXPECT_LT(ChordalDistance(OptimalRotation(empty, empty), glm::mat3(1.0f)), 1e-5f);
     EXPECT_LT(ChordalDistance(OptimalRotation(a, two), glm::mat3(1.0f)), 1e-5f);
+    EXPECT_LT(ChordalDistance(OptimalRotation(two, two), glm::mat3(1.0f)), 1e-5f);
+    std::vector<glm::vec3> nonFiniteTarget{
+        {1.0f, 0.0f, 0.0f},
+        {0.0f, nan, 0.0f},
+        {0.0f, 0.0f, 1.0f}};
+    std::vector<glm::vec3> finiteSource{
+        {1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+        {0.0f, 0.0f, 1.0f}};
+    EXPECT_LT(ChordalDistance(OptimalRotation(finiteSource, nonFiniteTarget), glm::mat3(1.0f)), 1e-5f);
 }

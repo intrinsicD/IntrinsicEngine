@@ -9,7 +9,9 @@ engine subsystems.
 - `Extrinsic.Core.Config.Render`
 - `Extrinsic.Core.Config.Simulation`
 - `Extrinsic.Core.Config.Engine`
+- `Extrinsic.Core.Config.EngineLoad`
 - `Extrinsic.Core.BoundedHeap`
+- `Extrinsic.Core.IndexedHeap`
 - `Extrinsic.Core.CallbackRegistry`
 - `Extrinsic.Core.Dag.Scheduler`
 - `Extrinsic.Core.Dag.TaskGraph`
@@ -35,6 +37,12 @@ engine subsystems.
 
 Core owns reusable graph/scheduling primitives, not domain-specific GPU policy.
 
+- **`Extrinsic.Core.IndexedHeap`**: generic indexed binary min-heap with
+  O(log n) `DecreaseKey` and `Remove`, deterministic tie-breaks on the value
+  token when priorities compare equivalent, and fail-closed empty/absent-value
+  operations. Geometry's Dijkstra frontier uses it as a true decrease-key heap;
+  shortest-path outputs remain covered against the previous lazy
+  priority-queue reference.
 - **`Extrinsic.Core.Dag.Scheduler`**: shared graph compiler substrate (`TaskId`,
   `ResourceId`, hazard analysis, deterministic topological layering, schedule
   stats, cycle diagnostics).
@@ -112,6 +120,16 @@ consumes at composition time. Per-field ownership is:
   lives in `runtime`; `core` only carries the value-type enum
   `ReferenceSceneSelector` so this header stays free of runtime/graphics
   imports.
+
+`Extrinsic.Core.Config.EngineLoad` is the adjacent parse/serialize lane for
+that value type. It exports the versioned JSON schema id
+`intrinsic.core.engine-config`, side-effect-free `PreviewEngineConfig(...)`,
+`LoadEngineConfigFile(...)`, `SerializeEngineConfig(...)`, and typed
+diagnostics. The loader starts from caller-provided defaults, ignores invalid or
+unknown fields with `FallbackApplied` diagnostics, and keeps the value-type
+`EngineConfig` module free of IO imports. The schema and boot-only field
+partition are documented in
+[`docs/architecture/engine-config.md`](../../docs/architecture/engine-config.md).
 
 ## Notes
 

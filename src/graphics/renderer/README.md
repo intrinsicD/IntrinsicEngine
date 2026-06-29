@@ -41,6 +41,24 @@ generated during compilation, and `GetLastCompileValidationResult()` exposes
 structured hard-error findings when `Compile()` fails. Callers needing a
 human-readable summary should read `Findings.front().Message`.
 
+### FrameRecipe vs RenderRecipe Vocabulary
+
+`FrameRecipe*` names the live frame-composition path. The current renderer
+derives `FrameRecipeFeatures` from `RenderWorld`, optionally projects a
+validated `FrameRecipeOverride` onto those feature gates, and then calls
+`BuildDefaultFrameRecipe(...)` to declare the render-graph pass/resource DAG for
+that frame. `DescribeDefaultFrameRecipe(...)` is the matching introspection
+surface for tests, debug views, UI, and config validation.
+
+`RenderRecipe*` names the renderer-independent contract/config vocabulary.
+`RenderRecipeDescriptor`, `RenderRecipeConfig`, view/output recipes, and binding
+sets describe what a config, UI draft, or agent request would like to change.
+They do not drive command recording directly and they do not inject arbitrary
+pass-graph nodes. The seam between the vocabularies is the `GRAPHICS-106`
+projection: runtime installs a validated `FrameRecipeOverride`, and the
+renderer maps supported optional-slot disables onto `FrameRecipeFeatures` before
+the normal `BuildDefaultFrameRecipe(...)` call.
+
 Per `GRAPHICS-033E`, `Graphics.Renderer.cpp::ExecuteFrame()` publishes the
 recipe-aware validation outcome to the device via
 `RHI::IDevice::NoteRecipeGraphValidation(bool)` exactly once per recipe compile
@@ -155,6 +173,21 @@ the supplied context is never mutated. Diagnostics use
 `Degraded`, and `FallbackApplied` states. Errors fail closed; degraded and
 fallback-applied states remain usable only when the underlying rendering
 contract validation reports no errors.
+
+Recipe configs may also list `recipe.disabledExtensionSlots` to request a
+smaller optional pass set. The loader validates each name against the renderer's
+declared non-fixed extension slots and leaves the live frame untouched; runtime
+activation translates the usable preview into the `FrameRecipeOverride` wrapper.
+
+`IRenderer::SetActiveFrameRecipeOverride(...)` is the renderer-side activation
+seam for a validated recipe overlay. The live frame driver remains
+`FrameRecipeFeatures` plus `BuildDefaultFrameRecipe(...)`; the override wrapper
+can only disable mapped optional extension slots (`postprocess`, `debug-view`,
+`picking`, and the lighting-path fallback). It never adds pass-graph nodes,
+never replaces the fixed core, and never enables a feature whose derived
+availability gate was false. Unknown, fixed-core, or unsupported slot requests
+leave the derived defaults unchanged and are reported on
+`RenderGraphFrameStats::FrameRecipeOverrideDiagnostics`.
 
 `Extrinsic.Graphics.SharedRenderRecipeExecution` is the `GRAPHICS-102`
 CPU-tested, renderer-neutral execution layer for shared visibility/grouping and
@@ -1682,17 +1715,22 @@ Concretely:
   object-space normal bake contract introduced by `GRAPHICS-104`. The
   backend-neutral helpers validate finite atlas UVs, count-matched finite
   normals, triangle indices, the `ObjectSpaceNormal` mode, and resolution clamp
-  policy; `TangentSpaceNormal` is reserved and rejected. The GPU recorder binds
-  a caller-provided pipeline, index buffer, texcoord/normal BDAs, and output
-  texture; it sets viewport and scissor to the exact target texture extent,
-  clears to encoded `+Z` with alpha `0`, rasterizes UV triangles by mapping UV
-  to clip space, writes normalized object-space normals with alpha `1`, and
-  transitions to the requested final texture layout. The bake shader uses the
-  same vertical orientation as the CPU texel-center sampling contract so a
-  point addressed by mesh UV samples the same baked texel on Vulkan. Runtime
-  job scheduling, stale-key rejection, generated-normal import replacement,
-  and GPU dilation padding remain open parts of `GRAPHICS-104`; this graphics
-  surface does not import ECS, runtime, live `AssetService`, or Vulkan handles.
+  policy; `TangentSpaceNormal` is reserved and rejected. The graphics-owned plan
+  API packages resolved index-buffer/texcoord-BDA/normal-BDA geometry, generated
+  `AssetId`, resolved extent/padding, sampler policy, frame-readiness metadata,
+  and a stale-completion key into a `GpuProducedTextureRequest` plus command
+  record template. The GPU recorder then binds a caller-provided pipeline,
+  index buffer, texcoord/normal BDAs, and output texture; it sets viewport and
+  scissor to the exact target texture extent, clears to encoded `+Z` with alpha
+  `0`, rasterizes UV triangles by mapping UV to clip space, writes normalized
+  object-space normals with alpha `1`, and transitions to the requested final
+  texture layout. The bake shader uses the same vertical orientation as the CPU
+  texel-center sampling contract so a point addressed by mesh UV samples the
+  same baked texel on Vulkan. Runtime job scheduling, stale-key rejection at the
+  runtime completion boundary, generated-normal import replacement, and GPU
+  dilation padding remain open parts of `GRAPHICS-104`; requested padding is
+  reported by the plan but no CPU dilation is implied. This graphics surface
+  does not import ECS, runtime, live `AssetService`, or Vulkan handles.
 - Per `GRAPHICS-018Q`, the four remaining Vulkan integration follow-ups
   to the `GRAPHICS-018` guarded backend bring-up resolve as follows.
   Texture upload policy keeps the guarded synchronous staging-buffer

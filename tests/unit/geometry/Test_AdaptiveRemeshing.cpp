@@ -290,3 +290,44 @@ TEST(AdaptiveRemesh, ReferenceProjectionPathProducesValidMesh)
     EXPECT_GT(result->FinalVertexCount, 0u);
     EXPECT_GT(result->FinalFaceCount, 0u);
 }
+
+TEST(AdaptiveRemesh, ReferenceProjectorProjectsToFrozenSurface)
+{
+    const auto mesh = MakeTwoTriangleSquare();
+
+    Geometry::AdaptiveRemeshing::ReferenceProjector projector;
+    Geometry::AdaptiveRemeshing::ReferenceProjectionParams params;
+    params.MaxReferenceProjectionDistance = 2.0;
+    ASSERT_TRUE(projector.Build(mesh, params));
+
+    const auto projected = projector.Project({0.25F, 0.25F, 1.0F});
+    ASSERT_TRUE(projected.Found);
+    EXPECT_TRUE(projected.Face.IsValid());
+    EXPECT_NEAR(projected.Point.x, 0.25F, 1.0e-5F);
+    EXPECT_NEAR(projected.Point.y, 0.25F, 1.0e-5F);
+    EXPECT_NEAR(projected.Point.z, 0.0F, 1.0e-5F);
+    EXPECT_NEAR(projected.Distance, 1.0F, 1.0e-5F);
+
+    params.MaxReferenceProjectionDistance = 0.25;
+    Geometry::AdaptiveRemeshing::ReferenceProjector clamped;
+    ASSERT_TRUE(clamped.Build(mesh, params));
+    EXPECT_FALSE(clamped.Project({0.25F, 0.25F, 1.0F}).Found);
+}
+
+TEST(AdaptiveRemesh, ErrorBoundedSizingPathProducesValidMesh)
+{
+    auto mesh = MakeIcosahedron();
+
+    Geometry::AdaptiveRemeshing::AdaptiveRemeshingParams params;
+    params.Iterations = 1;
+    params.MinEdgeLength = 0.15;
+    params.MaxEdgeLength = 0.9;
+    params.Sizing = Geometry::AdaptiveRemeshing::SizingLaw::ErrorBoundedTaubin;
+    params.ApproximationError = 0.01;
+
+    const auto result = Geometry::AdaptiveRemeshing::AdaptiveRemesh(mesh, params);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->IterationsPerformed, 1u);
+    EXPECT_GT(result->FinalVertexCount, 0u);
+    EXPECT_GT(result->FinalFaceCount, 0u);
+}

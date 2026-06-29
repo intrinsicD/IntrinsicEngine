@@ -1,6 +1,7 @@
 module;
 
 #include <cstdint>
+#include <string>
 
 export module Extrinsic.Core.Config.Render;
 
@@ -18,6 +19,7 @@ namespace Extrinsic::Core::Config
         bool EnableValidation{true};
         bool EnableVSync{true};
         std::uint32_t FramesInFlight{2};
+        std::string DefaultRecipeConfigPath{"config/render-recipe.json"};
         // GRAPHICS-036 decision 6 — when true (the default) the runtime drives a
         // single-buffer `RenderWorldPool` so extraction and rendering stay serial
         // and behavior matches the pre-pool path. When false the pool is sized for

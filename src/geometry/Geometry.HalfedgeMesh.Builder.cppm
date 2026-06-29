@@ -10,6 +10,8 @@ import Geometry.Primitives;
 
 export namespace Geometry::HalfedgeMesh
 {
+    void ProjectToUnitSphere(Mesh& mesh) noexcept;
+
     [[nodiscard]] std::optional<Mesh> MakeMesh(const AABB& aabb) noexcept;
     [[nodiscard]] std::optional<Mesh> MakeMesh(const OBB& obb) noexcept;
     [[nodiscard]] std::optional<Mesh> MakeMesh(const Sphere& sphere, uint8_t subdiv_level = 3) noexcept;

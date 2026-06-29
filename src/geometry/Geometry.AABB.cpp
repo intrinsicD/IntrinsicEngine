@@ -1,6 +1,8 @@
 module;
 
 #include <array>
+#include <cmath>
+#include <cstdint>
 #include <span>
 #include <vector>
 
@@ -12,6 +14,25 @@ module Geometry.AABB;
 
 namespace Geometry
 {
+    namespace
+    {
+        [[nodiscard]] bool IsFinite(const glm::vec3& value)
+        {
+            return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
+        }
+
+        [[nodiscard]] bool IsUsable(const AABB& box)
+        {
+            return box.IsValid() && IsFinite(box.Min) && IsFinite(box.Max);
+        }
+
+        [[nodiscard]] glm::vec3 SafeCenter(const AABB& box)
+        {
+            const glm::vec3 center = box.GetCenter();
+            return IsFinite(center) ? center : glm::vec3{0.0f};
+        }
+    }
+
     float AABB::GetLongestAxisLength() const
     {
         const glm::vec3 size = GetSize();
@@ -25,6 +46,68 @@ namespace Geometry
             glm::vec3{Max.x, Max.y, Min.z}, glm::vec3{Min.x, Max.y, Min.z},
             glm::vec3{Min.x, Min.y, Max.z}, glm::vec3{Max.x, Min.y, Max.z},
             glm::vec3{Max.x, Max.y, Max.z}, glm::vec3{Min.x, Max.y, Max.z}
+        };
+    }
+
+    AABB AABB::MakeCubic() const
+    {
+        if (!IsUsable(*this))
+        {
+            return {};
+        }
+
+        const glm::vec3 center = GetCenter();
+        const glm::vec3 extents = GetExtents();
+        const float halfExtent = glm::compMax(extents);
+        if (!std::isfinite(halfExtent) || halfExtent < 0.0f)
+        {
+            return {};
+        }
+
+        const glm::vec3 cubeExtent{halfExtent};
+        return AABB{center - cubeExtent, center + cubeExtent};
+    }
+
+    glm::vec3 AABB::OctantCenter(std::uint32_t octant) const
+    {
+        const glm::vec3 center = SafeCenter(*this);
+        if (!IsUsable(*this) || octant >= 8u)
+        {
+            return center;
+        }
+
+        const glm::vec3 childMin{
+            (octant & 0x1u) ? center.x : Min.x,
+            (octant & 0x2u) ? center.y : Min.y,
+            (octant & 0x4u) ? center.z : Min.z,
+        };
+        const glm::vec3 childMax{
+            (octant & 0x1u) ? Max.x : center.x,
+            (octant & 0x2u) ? Max.y : center.y,
+            (octant & 0x4u) ? Max.z : center.z,
+        };
+        return (childMin + childMax) * 0.5f;
+    }
+
+    AABB AABB::ChildOctant(std::uint32_t octant) const
+    {
+        if (!IsUsable(*this) || octant >= 8u)
+        {
+            return {};
+        }
+
+        const glm::vec3 center = GetCenter();
+        return AABB{
+            glm::vec3{
+                (octant & 0x1u) ? center.x : Min.x,
+                (octant & 0x2u) ? center.y : Min.y,
+                (octant & 0x4u) ? center.z : Min.z,
+            },
+            glm::vec3{
+                (octant & 0x1u) ? Max.x : center.x,
+                (octant & 0x2u) ? Max.y : center.y,
+                (octant & 0x4u) ? Max.z : center.z,
+            },
         };
     }
 

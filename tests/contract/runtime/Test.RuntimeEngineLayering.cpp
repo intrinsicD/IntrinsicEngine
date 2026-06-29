@@ -71,7 +71,7 @@ TEST(RuntimeEngineLayering, RunFrameDelegatesToPromotedContractsInDocumentedBroa
 
     const auto frameContext = runFrame.find("RuntimeFrameContext frameContext{};");
     const auto platformContract = runFrame.find("Core::ExecutePlatformBeginFrameContract(platformHooks");
-    const auto simTick = runFrame.find("m_Application->OnSimTick(*this, m_FixedDt);");
+    const auto fixedStep = runFrame.find("RunFixedStepSimulationTicks(*this");
     const auto variableTick = runFrame.find("m_Application->OnVariableTick(*this, alpha, frameDt);");
     const auto renderContract = runFrame.find("Core::ExecuteRenderFrameContract(renderHooks)");
     const auto present = runFrame.find("m_Device->Present(frame);");
@@ -80,7 +80,7 @@ TEST(RuntimeEngineLayering, RunFrameDelegatesToPromotedContractsInDocumentedBroa
 
     ASSERT_NE(frameContext, std::string::npos);
     ASSERT_NE(platformContract, std::string::npos);
-    ASSERT_NE(simTick, std::string::npos);
+    ASSERT_NE(fixedStep, std::string::npos);
     ASSERT_NE(variableTick, std::string::npos);
     ASSERT_NE(renderContract, std::string::npos);
     ASSERT_NE(present, std::string::npos);
@@ -88,8 +88,8 @@ TEST(RuntimeEngineLayering, RunFrameDelegatesToPromotedContractsInDocumentedBroa
     ASSERT_NE(clockEnd, std::string::npos);
 
     EXPECT_LT(frameContext, platformContract);
-    EXPECT_LT(platformContract, simTick);
-    EXPECT_LT(simTick, variableTick);
+    EXPECT_LT(platformContract, fixedStep);
+    EXPECT_LT(fixedStep, variableTick);
     EXPECT_LT(variableTick, renderContract);
     EXPECT_LT(renderContract, present);
     EXPECT_LT(present, maintenance);
@@ -185,10 +185,10 @@ TEST(RuntimeEngineLayering, RunFrameRegistersPromotedEcsSystemBundleBetweenSimTi
 {
     const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
 
-    const auto simTick = content.find("m_Application->OnSimTick(*this, m_FixedDt);");
+    const auto simTick = content.find("application.OnSimTick(engine, fixedDt);");
     const auto bundleRegistration = content.find(
-        "RegisterPromotedEcsSystemBundle(*m_FrameGraph, *m_Scene)");
-    const auto compile = content.find("m_FrameGraph->Compile()");
+        "RegisterPromotedEcsSystemBundle(frameGraph, scene)");
+    const auto compile = content.find("frameGraph.Compile()");
     const auto bundleImport = content.find("import Extrinsic.Runtime.EcsSystemBundle");
 
     ASSERT_NE(simTick, std::string::npos);

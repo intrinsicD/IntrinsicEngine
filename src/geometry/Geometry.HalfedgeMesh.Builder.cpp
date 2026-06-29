@@ -106,24 +106,10 @@ namespace Geometry::HalfedgeMesh
             return mesh;
         }
 
-        void ProjectVerticesToUnitSphere(Mesh& mesh) noexcept
-        {
-            for (glm::vec3& position : mesh.Positions())
-            {
-                const float lenSq = glm::dot(position, position);
-                if (lenSq <= kEpsilon)
-                {
-                    position = glm::vec3{1.0f, 0.0f, 0.0f};
-                    continue;
-                }
-                position *= glm::inversesqrt(lenSq);
-            }
-        }
-
         [[nodiscard]] std::optional<Mesh> MakeUnitSphereMesh(const uint8_t subdivLevel) noexcept
         {
             Mesh current = MakeMeshIcosahedron();
-            ProjectVerticesToUnitSphere(current);
+            ProjectToUnitSphere(current);
 
             for (uint8_t iteration = 0; iteration < subdivLevel; ++iteration)
             {
@@ -135,7 +121,7 @@ namespace Geometry::HalfedgeMesh
                     return std::nullopt;
                 }
                 current = std::move(refined);
-                ProjectVerticesToUnitSphere(current);
+                ProjectToUnitSphere(current);
             }
 
             return current;
@@ -236,6 +222,19 @@ namespace Geometry::HalfedgeMesh
                 normal.z += (current.x - next.x) * (current.y + next.y);
             }
             return normal;
+        }
+    }
+
+    void ProjectToUnitSphere(Mesh& mesh) noexcept
+    {
+        for (glm::vec3& position : mesh.Positions())
+        {
+            const float lenSq = glm::dot(position, position);
+            if (lenSq <= kEpsilon || !IsFiniteFloat(lenSq))
+            {
+                continue;
+            }
+            position *= glm::inversesqrt(lenSq);
         }
     }
 
@@ -631,5 +630,4 @@ namespace Geometry::HalfedgeMesh
         return mesh;
     }
 }
-
 

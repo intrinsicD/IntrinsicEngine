@@ -11,20 +11,9 @@ map.
 ## Tasks
 
 - [RORG-031F — UI integration backlog seed](RORG-031-ui-integration.md).
-- [UI-022 — Sandbox EditorUI vertex-normal recompute windows](UI-022-sandbox-editor-vertex-normal-recompute.md)
-  (depends on retired `GEOM-026`; adds the first method window under
-  `Mesh > Processing > Vertices`, with graph/point-cloud normal windows
-  consuming the geometry-owned recompute modules).
-- [UI-024 — Sandbox EditorUI mesh denoising window](UI-024-editor-mesh-denoise-window.md)
-  (depends on `GEOM-042`; `Mesh > Processing > Denoise` method window following
-  the UI-022 pattern).
-- [UI-025 — Sandbox EditorUI remeshing and subdivision windows](UI-025-editor-remesh-subdivide-windows.md)
-  (depends on `GEOM-043`, `GEOM-044`; `Mesh > Processing` remesh/subdivide
-  method windows).
-- [UI-026 — Sandbox EditorUI curvature analysis window and principal-direction field](UI-026-editor-curvature-analysis-window.md)
-  (depends on `GEOM-040`; publishes canonical curvature/direction properties for
-  visualization). The runtime SpatialDebug closest-face picking consumer for
-  `GEOM-039` is filed under the runtime backlog as `RUNTIME-135`.
+
+The runtime SpatialDebug closest-face picking consumer for `GEOM-039` is
+retired under the runtime backlog as `RUNTIME-135`.
 
 ## Convergence
 
@@ -107,14 +96,17 @@ map.
   visualization controls, property catalogs, and processing affordances now
   consume the runtime resolver from `RUNTIME-117`, while preserving provenance
   labels for mesh/graph/point-cloud origins.
-- UI-022 is the opened follow-up from the vertex-processing menu request: the
-  mesh `Processing > Vertices` submenu gains a `Normals` method window backed
-  by `Geometry.HalfedgeMesh.Vertices.Normals`; graph and point-cloud windows
-  now consume retired `GEOM-026` recomputation contracts for those domains.
+- UI-022 retired the vertex-processing menu request: mesh, graph, and
+  point-cloud `Processing > Vertices` submenus now expose `Normals` method
+  windows backed by the retired `GEOM-026` geometry modules.
 - UI-023 retired the render recipe editing follow-up: sandbox UI now inspects
   renderer descriptors, optional recipe slots, binding overrides, view/output
   recipes, validation/preview status, artifact lifetime/status, and activation
   outcomes without UI owning renderer state.
+- UI-025 retired the remesh/subdivide method-window follow-up: mesh processing
+  now exposes `Remesh` and `Subdivide` windows that call the geometry-owned
+  GEOM-043/GEOM-044 kernels through runtime-owned undoable command seams and
+  defer renderer synchronization through geometry dirty tags.
 - UI work that depends on renderer overlays/handoff coordinates with the
   retired `GRAPHICS-024`
   parity matrix, the `RUNTIME-104` decision not to retain a persistent
@@ -175,8 +167,25 @@ split; narratives live in the retirement log.
   (done, 2026-06-19, `CPUContracted`): domain windows, visualization targets,
   property catalogs, primitive-view commands, render hints, K-Means affordances,
   and mesh UV/bake diagnostics now consume the runtime availability resolver.
+- [UI-022 — Sandbox EditorUI vertex-normal recompute windows](../../done/UI-022-sandbox-editor-vertex-normal-recompute.md)
+  (done, 2026-06-28, `CPUContracted`): mesh, graph, and point-cloud normal
+  recompute windows consume domain-owned geometry modules, publish canonical
+  `v:normal`, and defer renderer synchronization through `DirtyVertexNormals`.
 - [UI-023 — Sandbox render recipe editing UI](../../done/UI-023-render-recipe-ui-editing.md)
   (done, 2026-06-24, `CPUContracted`): render recipe editor models and ImGui
   rows expose declared renderer slots, binding overrides, view/output recipes,
   validation/preview/activation state, and artifact publish/apply commands
   through runtime-owned seams without UI owning renderer state.
+- [UI-024 — Sandbox EditorUI mesh denoising window](../../done/UI-024-editor-mesh-denoise-window.md)
+  (done, 2026-06-28, `CPUContracted`): mesh denoise commands consume the
+  geometry-owned bilateral denoiser, publish canonical `v:position`, and defer
+  renderer synchronization through dirty tags.
+- [UI-025 — Sandbox EditorUI remeshing and subdivision windows](../../done/UI-025-editor-remesh-subdivide-windows.md)
+  (done, 2026-06-28, `CPUContracted`): remesh/subdivide commands consume
+  GEOM-043/GEOM-044 topology operators, replace selected mesh `GeometrySources`
+  through undoable runtime command history, and defer renderer synchronization
+  through dirty tags.
+- [UI-026 — Sandbox EditorUI curvature analysis window and principal-direction field](../../done/UI-026-editor-curvature-analysis-window.md)
+  (done, 2026-06-28, `CPUContracted`): mesh curvature commands consume
+  `Geometry.Curvature`, publish canonical scalar/direction properties, and
+  feed scalar colormap plus principal-direction visualization adapters.

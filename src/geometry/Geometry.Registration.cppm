@@ -1,6 +1,7 @@
 module;
 
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <span>
 #include <vector>
@@ -9,6 +10,8 @@ module;
 #include <glm/mat4x4.hpp>
 
 export module Geometry.Registration;
+
+export import Geometry.Robust;
 
 export namespace Geometry::Registration
 {
@@ -36,6 +39,7 @@ export namespace Geometry::Registration
     // Both variants support:
     //   - Maximum correspondence distance (reject pairs farther than threshold)
     //   - Outlier rejection by percentile (keep only the closest N% of pairs)
+    //   - Optional robust IRLS-style per-residual weights (default off)
     //   - Convergence detection (RMSE change below threshold)
     //
     // Algorithm (per iteration):
@@ -85,6 +89,14 @@ export namespace Geometry::Registration
         // 1.0 = keep all, 0.9 = reject worst 10%. Range: (0, 1].
         double InlierRatio{0.9};
 
+        // Optional robust weighting for correspondences after percentile
+        // trimming. Disengaged by default to preserve the legacy ICP path.
+        std::optional<Geometry::Robust::RobustKernel> RobustKernelKind{};
+
+        // Robust residual scale in world-space units. Used only when
+        // RobustKernelKind is engaged; must be finite and > 0.
+        double RobustScale{1.0};
+
         // KDTree build parameters for the target cloud.
         std::size_t KDTreeLeafSize{16};
     };
@@ -128,6 +140,7 @@ export namespace Geometry::Registration
     // Returns nullopt if:
     //   - Either point set has fewer than 3 points
     //   - InlierRatio is not in (0, 1]
+    //   - RobustKernelKind is set and RobustScale is not finite or <= 0
     //   - MaxIterations is 0
     [[nodiscard]] std::optional<RegistrationResult> AlignICP(
         std::span<const glm::vec3> sourcePoints,

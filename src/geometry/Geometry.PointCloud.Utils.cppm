@@ -299,4 +299,40 @@ export namespace Geometry::PointCloud
         Cloud& cloud,
         const KDEParams& params = {});
 
+    // -------------------------------------------------------------------------
+    // Gaussian Noise
+    // -------------------------------------------------------------------------
+    //
+    // Deterministic true Gaussian per-component displacement. The standard
+    // deviation is `StdDevFraction * AverageSpacing`, where AverageSpacing comes
+    // from ComputeStatistics.
+
+    struct PointCloudGaussianNoiseParams
+    {
+        float StdDevFraction{0.0F};
+        std::uint64_t Seed{0};
+    };
+
+    enum class GaussianNoiseStatus : std::uint8_t
+    {
+        Success,
+        EmptyInput,
+        InvalidParameters,
+        NonFinitePosition,
+        DegenerateScale
+    };
+
+    struct GaussianNoiseResult
+    {
+        GaussianNoiseStatus Status{GaussianNoiseStatus::Success};
+        std::size_t ElementCount{0};
+        std::size_t DisplacedCount{0};
+        float Scale{0.0F};
+        glm::vec3 MeanDisplacement{0.0F};
+        float MaxDisplacement{0.0F};
+    };
+
+    [[nodiscard]] GaussianNoiseResult ApplyGaussianNoise(
+        Cloud& cloud, const PointCloudGaussianNoiseParams& params = {});
+
 } // namespace Geometry::PointCloud

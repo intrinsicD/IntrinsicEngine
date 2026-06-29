@@ -19,6 +19,7 @@ import Geometry.Quadric;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Utils;
+import Geometry.MeshClosestFace;
 import Geometry.Validation;
 
 namespace Geometry::Simplification
@@ -1222,24 +1223,27 @@ namespace Geometry::Simplification
             // Redistribute Hausdorff points
             if (params.HausdorffError > 0.0 && !hausdorffPoints.empty())
             {
+                std::vector<FaceHandle> closestFaceCandidates;
+                ForEachFace(mesh, *surviving, [&](FaceHandle f)
+                {
+                    closestFaceCandidates.push_back(f);
+                });
+
+                MeshClosestFaceIndex closestFaceIndex;
+                const bool closestFaceIndexBuilt =
+                    closestFaceIndex.Build(mesh, closestFaceCandidates);
+
                 for (const auto& pt : hausdorffPoints)
                 {
-                    double minDist = std::numeric_limits<double>::max();
-                    FaceHandle closestFace;
-
-                    ForEachFace(mesh, *surviving, [&](FaceHandle f)
+                    const MeshClosestFaceResult closest =
+                        closestFaceIndexBuilt
+                            ? closestFaceIndex.Query(pt)
+                            : MeshClosestFaceResult{};
+                    if (closest.Found &&
+                        closest.Face.IsValid() &&
+                        closest.Face.Index < facePoints.size())
                     {
-                        const double d = FacePointDistance(mesh, f, pt);
-                        if (d < minDist)
-                        {
-                            minDist = d;
-                            closestFace = f;
-                        }
-                    });
-
-                    if (closestFace.IsValid() && closestFace.Index < facePoints.size())
-                    {
-                        facePoints[closestFace.Index].push_back(pt);
+                        facePoints[closest.Face.Index].push_back(pt);
                     }
                 }
             }

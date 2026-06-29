@@ -16,6 +16,10 @@ target_sources(${target_name}
         Runtime.AssetModelTextureIO.cppm
         Runtime.DerivedJobGraph.cppm
         Runtime.MeshAttributeTextureBake.cppm
+        Runtime.MethodFigureExport.cppm
+        Runtime.ObjectSpaceNormalBakeBinding.cppm
+        Runtime.ObjectSpaceNormalBakeQueue.cppm
+        Runtime.ObjectSpaceNormalBakeSubmission.cppm
         Runtime.ProgressivePresentationExtraction.cppm
         Runtime.ProgressiveRenderData.cppm
         Runtime.RenderArtifactPublication.cppm
@@ -25,6 +29,7 @@ target_sources(${target_name}
         Runtime.Engine.cppm
         Runtime.GeometryAvailability.cppm
         Runtime.GpuReadbackJob.cppm
+        Runtime.KMeansBackend.cppm
         Runtime.PhysicsBridge.cppm
         Runtime.SceneSerialization.cppm
         Cameras/Runtime.CameraControllers.cppm
@@ -49,6 +54,7 @@ target_sources(${target_name}
         Runtime.VertexChannelBindings.cppm
         Runtime.VertexChannelStreams.cppm
         SpatialDebug/Runtime.SpatialDebugAdapters.cppm
+        SpatialDebug/Runtime.SpatialDebugClosestFace.cppm
         Visualization/Runtime.VisualizationAdapters.cppm
         PRIVATE
         Runtime.AssetGeometryIO.cpp
@@ -59,6 +65,10 @@ target_sources(${target_name}
         Runtime.AssetModelTextureIO.cpp
         Runtime.DerivedJobGraph.cpp
         Runtime.MeshAttributeTextureBake.cpp
+        Runtime.MethodFigureExport.cpp
+        Runtime.ObjectSpaceNormalBakeBinding.cpp
+        Runtime.ObjectSpaceNormalBakeQueue.cpp
+        Runtime.ObjectSpaceNormalBakeSubmission.cpp
         Runtime.ProgressivePresentationExtraction.cpp
         Runtime.ProgressiveRenderData.cpp
         Runtime.RenderArtifactPublication.cpp
@@ -68,6 +78,7 @@ target_sources(${target_name}
         Runtime.Engine.cpp
         Runtime.GeometryAvailability.cpp
         Runtime.GpuReadbackJob.cpp
+        Runtime.KMeansBackend.cpp
         Runtime.PhysicsBridge.cpp
         Runtime.SceneSerialization.cpp
         Cameras/Runtime.CameraControllers.cpp
@@ -91,6 +102,7 @@ target_sources(${target_name}
         Runtime.VertexAttributeBinding.cpp
         Runtime.VertexChannelStreams.cpp
         SpatialDebug/Runtime.SpatialDebugAdapters.cpp
+        SpatialDebug/Runtime.SpatialDebugClosestFace.cpp
         Visualization/Runtime.VisualizationAdapters.cpp
 )
 

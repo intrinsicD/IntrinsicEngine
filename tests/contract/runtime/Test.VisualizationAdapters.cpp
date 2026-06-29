@@ -1,11 +1,13 @@
 #include <cstdint>
 #include <limits>
+#include <string>
 
 #include <gtest/gtest.h>
 #include <glm/glm.hpp>
 
 import Geometry.Properties;
 import Extrinsic.Asset.Registry;
+import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.Runtime.VisualizationAdapters;
@@ -14,6 +16,7 @@ import Extrinsic.Runtime.StreamingExecutor;
 namespace Assets = Extrinsic::Assets;
 namespace G = Extrinsic::Graphics;
 namespace R = Extrinsic::Runtime;
+namespace PN = Extrinsic::ECS::Components::GeometrySources::PropertyNames;
 
 namespace
 {
@@ -48,6 +51,43 @@ namespace
         velocity[1] = glm::vec3{0.0f, 1.0f, 0.0f};
         velocity[2] = glm::vec3{0.0f, 0.0f, 1.0f};
         velocity[3] = glm::vec3{-1.0f, 0.0f, 0.0f};
+
+        auto positions =
+            properties.Add<glm::vec3>(std::string{PN::kPosition}, glm::vec3{0.0f});
+        positions[0] = glm::vec3{0.0f, 0.0f, 0.0f};
+        positions[1] = glm::vec3{1.0f, 0.0f, 0.0f};
+        positions[2] = glm::vec3{0.0f, 1.0f, 0.0f};
+        positions[3] = glm::vec3{0.0f, 0.0f, 1.0f};
+
+        auto mean = properties.Add<double>(
+            std::string{PN::kMeanCurvature},
+            0.0);
+        mean[0] = 0.5;
+        mean[1] = 0.25;
+        mean[2] = 0.75;
+        mean[3] = 1.0;
+
+        auto gaussian = properties.Add<double>(
+            std::string{PN::kGaussianCurvature},
+            0.0);
+        gaussian[0] = 0.1;
+        gaussian[1] = 0.2;
+        gaussian[2] = 0.3;
+        gaussian[3] = 0.4;
+
+        auto principalDir1 = properties.Add<glm::vec3>(
+            std::string{PN::kPrincipalDir1},
+            glm::vec3{1.0f, 0.0f, 0.0f});
+        principalDir1[1] = glm::vec3{0.0f, 1.0f, 0.0f};
+        principalDir1[2] = glm::vec3{0.0f, 0.0f, 1.0f};
+        principalDir1[3] = glm::vec3{-1.0f, 0.0f, 0.0f};
+
+        auto principalDir2 = properties.Add<glm::vec3>(
+            std::string{PN::kPrincipalDir2},
+            glm::vec3{0.0f, 1.0f, 0.0f});
+        principalDir2[1] = glm::vec3{1.0f, 0.0f, 0.0f};
+        principalDir2[2] = glm::vec3{0.0f, -1.0f, 0.0f};
+        principalDir2[3] = glm::vec3{0.0f, 0.0f, 1.0f};
 
         return properties;
     }
@@ -410,6 +450,133 @@ TEST(VisualizationAdapters, VectorFieldAdapterAppendsVectorFieldPacket)
     EXPECT_EQ(diagnostics.InputPacketCount, 1u);
     EXPECT_EQ(diagnostics.AcceptedPacketCount, 1u);
     EXPECT_FALSE(diagnostics.HasErrors);
+}
+
+TEST(VisualizationAdapters, CurvatureVisualizationAdapterAppendsScalarAndPrincipalDirections)
+{
+    Geometry::PropertySet properties = MakeScalarProperties();
+    const R::CurvatureVisualizationAdapter adapter{
+        Geometry::ConstPropertySet{properties}};
+
+    R::VisualizationAdapterBatch batch{};
+    R::VisualizationAdapterStats stats{};
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = std::string{PN::kMeanCurvature},
+                       .OutputName = "curvature.mean",
+                       .Domain = G::VisualizationAttributeDomain::Vertex,
+                       .PositionBufferSourceKey = std::string{PN::kPosition},
+                       .DirtyStamp = 17u,
+                       .Colormap = G::Colormap::Type::Plasma,
+                       .VectorScale = 0.25f,
+                       .VectorColor = glm::vec4{1.0f, 0.9f, 0.2f, 1.0f},
+                       .DepthTested = false,
+                       .EmitPrincipalDirections = true,
+                   },
+                   stats);
+
+    ASSERT_EQ(batch.Scalars.size(), 1u);
+    EXPECT_EQ(batch.Scalars.front().Name, "curvature.mean");
+    EXPECT_EQ(batch.Scalars.front().SourceBufferKey, "curvature.mean");
+    EXPECT_EQ(batch.Scalars.front().ElementCount, 4u);
+    EXPECT_EQ(batch.Scalars.front().Colormap, G::Colormap::Type::Plasma);
+
+    ASSERT_EQ(batch.VectorFields.size(), 2u);
+    EXPECT_EQ(batch.VectorFields[0].Name, "curvature.mean.principal_dir1");
+    EXPECT_EQ(batch.VectorFields[0].PositionBufferSourceKey,
+              std::string{PN::kPosition});
+    EXPECT_EQ(batch.VectorFields[0].VectorBufferSourceKey,
+              "curvature.mean.principal_dir1");
+    EXPECT_EQ(batch.VectorFields[0].ElementCount, 4u);
+    EXPECT_FLOAT_EQ(batch.VectorFields[0].Scale, 0.25f);
+    EXPECT_FALSE(batch.VectorFields[0].DepthTested);
+    EXPECT_EQ(batch.VectorFields[1].Name, "curvature.mean.principal_dir2");
+    EXPECT_EQ(batch.VectorFields[1].VectorBufferSourceKey,
+              "curvature.mean.principal_dir2");
+
+    ASSERT_EQ(batch.PropertyBuffers.size(), 3u);
+    EXPECT_EQ(batch.PropertyBuffers[0].SourceKey, "curvature.mean");
+    EXPECT_EQ(batch.PropertyBuffers[0].ValueType,
+              G::VisualizationValueType::ScalarFloat);
+    EXPECT_EQ(batch.PropertyBuffers[1].SourceKey,
+              "curvature.mean.principal_dir1");
+    EXPECT_EQ(batch.PropertyBuffers[1].ValueType,
+              G::VisualizationValueType::VectorFloat3);
+    EXPECT_EQ(batch.PropertyBuffers[2].SourceKey,
+              "curvature.mean.principal_dir2");
+    EXPECT_EQ(batch.PropertyBuffers[2].ValueType,
+              G::VisualizationValueType::VectorFloat3);
+
+    EXPECT_EQ(stats.AdapterInvocationCount, 1u);
+    EXPECT_EQ(stats.PacketAppendCount, 3u);
+    EXPECT_EQ(stats.MissingSourceCount, 0u);
+    EXPECT_EQ(stats.InvalidResourceCount, 0u);
+
+    const G::VisualizationPropertyBufferDiagnostics bufferDiagnostics =
+        G::ValidateVisualizationPropertyBufferUploads(batch.PropertyBuffers);
+    EXPECT_EQ(bufferDiagnostics.InputBufferCount, 3u);
+    EXPECT_EQ(bufferDiagnostics.AcceptedBufferCount, 3u);
+    EXPECT_FALSE(bufferDiagnostics.HasErrors);
+}
+
+TEST(VisualizationAdapters, CurvatureVisualizationAdapterFallsBackToScalarOnlyForInvalidDirections)
+{
+    Geometry::PropertySet missingDirections;
+    missingDirections.Resize(4u);
+    auto mean = missingDirections.Add<double>(
+        std::string{PN::kMeanCurvature},
+        0.0);
+    mean[0] = 0.0;
+    mean[1] = 0.5;
+    mean[2] = 1.0;
+    mean[3] = 1.5;
+    auto positions = missingDirections.Add<glm::vec3>(
+        std::string{PN::kPosition},
+        glm::vec3{0.0f});
+    positions[1] = glm::vec3{1.0f, 0.0f, 0.0f};
+
+    const R::CurvatureVisualizationAdapter missingAdapter{
+        Geometry::ConstPropertySet{missingDirections}};
+    R::VisualizationAdapterBatch missingBatch{};
+    R::VisualizationAdapterStats missingStats{};
+    missingAdapter.Append(missingBatch,
+                          R::VisualizationAdapterOptions{
+                              .SourceName = std::string{PN::kMeanCurvature},
+                              .PositionBufferSourceKey =
+                                  std::string{PN::kPosition},
+                              .EmitPrincipalDirections = true,
+                          },
+                          missingStats);
+    ASSERT_EQ(missingBatch.Scalars.size(), 1u);
+    EXPECT_TRUE(missingBatch.VectorFields.empty());
+    EXPECT_EQ(missingBatch.PropertyBuffers.size(), 1u);
+    EXPECT_EQ(missingStats.PacketAppendCount, 1u);
+    EXPECT_EQ(missingStats.MissingSourceCount, 2u);
+    EXPECT_EQ(missingStats.InvalidResourceCount, 0u);
+
+    Geometry::PropertySet mismatchedDirections = MakeScalarProperties();
+    auto dir1 = mismatchedDirections.Get<glm::vec3>(PN::kPrincipalDir1);
+    ASSERT_TRUE(dir1.IsValid());
+    dir1.Vector().pop_back();
+    const R::CurvatureVisualizationAdapter mismatchedAdapter{
+        Geometry::ConstPropertySet{mismatchedDirections}};
+    R::VisualizationAdapterBatch mismatchedBatch{};
+    R::VisualizationAdapterStats mismatchedStats{};
+    mismatchedAdapter.Append(mismatchedBatch,
+                             R::VisualizationAdapterOptions{
+                                 .SourceName =
+                                     std::string{PN::kMeanCurvature},
+                                 .PositionBufferSourceKey =
+                                     std::string{PN::kPosition},
+                                 .EmitPrincipalDirections = true,
+                             },
+                             mismatchedStats);
+    ASSERT_EQ(mismatchedBatch.Scalars.size(), 1u);
+    EXPECT_TRUE(mismatchedBatch.VectorFields.empty());
+    EXPECT_EQ(mismatchedBatch.PropertyBuffers.size(), 1u);
+    EXPECT_EQ(mismatchedStats.PacketAppendCount, 1u);
+    EXPECT_EQ(mismatchedStats.MissingSourceCount, 0u);
+    EXPECT_EQ(mismatchedStats.InvalidResourceCount, 1u);
 }
 
 TEST(VisualizationAdapters, VectorFieldAdapterRejectsInvalidSources)

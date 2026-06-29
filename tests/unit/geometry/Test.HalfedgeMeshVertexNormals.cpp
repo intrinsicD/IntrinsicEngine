@@ -57,6 +57,7 @@ TEST(HalfedgeMeshVertexNormals, DebugNamesAreStable)
     EXPECT_EQ(VertexNormals::DebugName(VertexNormals::AveragingMode::UniformFace), "UniformFace");
     EXPECT_EQ(VertexNormals::DebugName(VertexNormals::AveragingMode::AreaWeighted), "AreaWeighted");
     EXPECT_EQ(VertexNormals::DebugName(VertexNormals::AveragingMode::AngleWeighted), "AngleWeighted");
+    EXPECT_EQ(VertexNormals::DebugName(VertexNormals::AveragingMode::AreaAngleWeighted), "AreaAngleWeighted");
     EXPECT_EQ(VertexNormals::DebugName(VertexNormals::AveragingMode::MaxWeighted), "MaxWeighted");
     EXPECT_EQ(VertexNormals::DebugName(VertexNormals::RecomputeStatus::Success), "Success");
 }
@@ -89,6 +90,11 @@ TEST(HalfedgeMeshVertexNormals, WeightingModesProduceExpectedCornerNormal)
     const float xAngle = static_cast<float>(std::acos(1.0 / std::sqrt(17.0)));
     const float zAngle = static_cast<float>(std::numbers::pi / 2.0);
     ExpectVecNear(angle.Normals[center], Normalize(glm::vec3{xAngle, 0.0f, zAngle}));
+
+    params.Weighting = VertexNormals::AveragingMode::AreaAngleWeighted;
+    const auto areaAngle = VertexNormals::Recompute(mesh, params);
+    ASSERT_EQ(areaAngle.Status, VertexNormals::RecomputeStatus::Success);
+    ExpectVecNear(areaAngle.Normals[center], Normalize(glm::vec3{4.0f * xAngle, 0.0f, zAngle}));
 
     params.Weighting = VertexNormals::AveragingMode::MaxWeighted;
     const auto maxWeighted = VertexNormals::Recompute(mesh, params);

@@ -6,6 +6,7 @@ module;
 #include <cstring>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -16,6 +17,7 @@ module;
 
 module Extrinsic.Runtime.VisualizationAdapters;
 
+import Extrinsic.ECS.Components.GeometrySources;
 import Geometry.Properties;
 import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.Runtime.StreamingExecutor;
@@ -462,6 +464,26 @@ namespace Extrinsic::Runtime
             return options.OutputName.empty() ? options.SourceName : options.OutputName;
         }
 
+        [[nodiscard]] std::string CurvatureDirectionName(
+            const std::string& configured,
+            const std::string_view fallback)
+        {
+            return configured.empty() ? std::string{fallback} : configured;
+        }
+
+        [[nodiscard]] std::string CurvatureDirectionPacketName(
+            const VisualizationAdapterOptions& options,
+            const std::string_view suffix)
+        {
+            const std::string base = PacketName(options);
+            if (base.empty())
+                return std::string{suffix};
+            std::string name = base;
+            name += ".";
+            name += suffix;
+            return name;
+        }
+
         [[nodiscard]] std::string FragmentSourceAttributeName(
             const VisualizationAdapterOptions& options)
         {
@@ -652,6 +674,137 @@ namespace Extrinsic::Runtime
         else
         {
             ++stats.MissingSourceCount;
+        }
+    }
+
+    CurvatureVisualizationAdapter::CurvatureVisualizationAdapter(
+        Geometry::ConstPropertySet properties) noexcept
+        : m_Properties(std::move(properties))
+    {
+    }
+
+    void CurvatureVisualizationAdapter::Append(
+        VisualizationAdapterBatch& out,
+        const VisualizationAdapterOptions& options,
+        VisualizationAdapterStats& stats) const
+    {
+        namespace GS = Extrinsic::ECS::Components::GeometrySources;
+
+        ++stats.AdapterInvocationCount;
+
+        if (options.SourceName.empty())
+        {
+            ++stats.MissingSourceCount;
+            return;
+        }
+
+        std::optional<std::size_t> scalarCount{};
+        bool scalarAppended = false;
+        if (const auto floatProperty = m_Properties.Get<float>(options.SourceName);
+            floatProperty.IsValid())
+        {
+            scalarCount = floatProperty.Span().size();
+            scalarAppended = AppendScalarPacket(floatProperty, out, options, stats);
+        }
+        else if (const auto doubleProperty =
+                     m_Properties.Get<double>(options.SourceName);
+                 doubleProperty.IsValid())
+        {
+            scalarCount = doubleProperty.Span().size();
+            scalarAppended = AppendScalarPacket(doubleProperty, out, options, stats);
+        }
+        else
+        {
+            if (m_Properties.Exists(options.SourceName))
+                ++stats.UnsupportedSourceTypeCount;
+            else
+                ++stats.MissingSourceCount;
+            return;
+        }
+
+        if (!scalarAppended || !options.EmitPrincipalDirections)
+            return;
+
+        struct DirectionRequest
+        {
+            std::string SourceName{};
+            std::string Suffix{};
+            Geometry::ConstProperty<glm::vec3> Property{};
+        };
+
+        std::vector<DirectionRequest> directions{};
+        directions.reserve(2u);
+        const auto prepareDirection =
+            [&](std::string sourceName,
+                std::string suffix) -> bool
+            {
+                if (sourceName.empty())
+                {
+                    ++stats.MissingSourceCount;
+                    return false;
+                }
+
+                const auto vectors = m_Properties.Get<glm::vec3>(sourceName);
+                if (!vectors.IsValid())
+                {
+                    if (m_Properties.Exists(sourceName))
+                        ++stats.UnsupportedSourceTypeCount;
+                    else
+                        ++stats.MissingSourceCount;
+                    return false;
+                }
+                if (scalarCount.has_value() &&
+                    vectors.Span().size() != *scalarCount)
+                {
+                    ++stats.InvalidResourceCount;
+                    return false;
+                }
+
+                directions.push_back(DirectionRequest{
+                    .SourceName = std::move(sourceName),
+                    .Suffix = std::move(suffix),
+                    .Property = vectors,
+                });
+                return true;
+            };
+
+        bool directionsValid = true;
+        if (options.EmitPrincipalDirection1)
+        {
+            directionsValid = prepareDirection(
+                CurvatureDirectionName(
+                    options.PrincipalDirection1SourceName,
+                    GS::PropertyNames::kPrincipalDir1),
+                "principal_dir1") &&
+                directionsValid;
+        }
+        if (options.EmitPrincipalDirection2)
+        {
+            directionsValid = prepareDirection(
+                CurvatureDirectionName(
+                    options.PrincipalDirection2SourceName,
+                    GS::PropertyNames::kPrincipalDir2),
+                "principal_dir2") &&
+                directionsValid;
+        }
+        if (!directionsValid)
+            return;
+
+        for (const DirectionRequest& direction : directions)
+        {
+                VisualizationAdapterOptions directionOptions = options;
+                directionOptions.SourceName = direction.SourceName;
+                directionOptions.OutputName =
+                    CurvatureDirectionPacketName(options, direction.Suffix);
+                directionOptions.PropertyBufferSourceKey.clear();
+                directionOptions.VectorBufferSourceKey =
+                    directionOptions.OutputName;
+                directionOptions.VectorBufferBDA = 0u;
+                (void)AppendVectorFieldPacket(
+                    direction.Property,
+                    out,
+                    directionOptions,
+                    stats);
         }
     }
 
