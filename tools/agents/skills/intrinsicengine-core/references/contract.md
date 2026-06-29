@@ -63,6 +63,32 @@ Agent-specific hooks should be thin adapters over these scripts. Knowledge
 Graph provisioning is an optional, non-authoritative discovery aid and must not
 block normal build/test work.
 
+### Knowledge-graph discovery aid (optional)
+
+When the `knowledge-graph` MCP server from `.mcp.json` is available, agents *may*
+query the merged code + paper/method graph (`query_graph`, `get_neighbors`,
+`shortest_path`, `god_nodes`, `graph_stats`) to navigate faster. It is a
+discovery aid only: it never gates anything, and any finding must be confirmed
+against the real authority before acting on it. Fitting use cases:
+
+- **Navigation before edits** — `get_neighbors` on a module to see what it
+  imports and who imports it before touching a `.cppm` interface.
+- **Impact / blast-radius analysis** — `shortest_path` and reverse-dependency
+  walks to find downstream consumers of a change (useful for review and
+  docs-sync scoping).
+- **Layering review aid** — edges are pre-tagged `same-layer`/`allowed`/
+  `violation`, so a suspected boundary problem can be spotted quickly, then
+  **confirmed with `check_layering.py`**, which remains the sole layering gate.
+- **Architecture hot-spots** — `god_nodes`/`graph_stats` to surface
+  over-connected modules worth refactoring.
+- **Paper-claim ↔ code traceability** — trace which paper claim a method
+  implements and which modules realize it, from `method.yaml` + `paper.md`
+  headings + import edges. The authoritative record of paper claims stays the
+  method contract (`method.yaml` + `docs/methods/*`), not the graph.
+
+If the server is absent (graph not built, or `--skip-knowledge-graph`), proceed
+normally — no task depends on it.
+
 ## Method implementation protocol
 
 1. Intake paper and define method contract.
