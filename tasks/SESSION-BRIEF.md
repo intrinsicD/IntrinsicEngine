@@ -10,6 +10,7 @@ the authoritative open/unblocked view.
 
 - `GEOM-053` — Geometry reuse and deterministic sampling cleanup (tasks/active/GEOM-053-geometry-reuse-deterministic-sampling.md)
 - `GRAPHICS-104` — GPU Object-Space Normal Texture Bake (tasks/active/GRAPHICS-104-gpu-object-space-normal-texture-bake.md)
+- `PROC-013` — Knowledge-graph discovery aid (graphify adapters + shared setup) (tasks/active/PROC-013-graphify-knowledge-graph-discovery-aid.md)
 
 ## Theme B — Rendering modernization
 
@@ -36,7 +37,6 @@ the authoritative open/unblocked view.
 - unblocked: `DOCS-005` — Add a minimal-feature floor + config-entry artifact to the feature-module playbook (tasks/backlog/process/DOCS-005-feature-module-playbook-minimal-floor.md)
 - unblocked: `PROC-010` — Encode P1/P3/P5 research-engine invariants in AGENTS.md + review checklist (tasks/backlog/process/PROC-010-encode-research-engine-invariants-in-contract.md)
 - unblocked: `PROC-011` — Route the contract to the architecture index + add backend/config authoring checks (tasks/backlog/process/PROC-011-route-contract-to-architecture-index-and-author-checks.md)
-- unblocked: `PROC-013` — Knowledge-graph discovery aid (graphify adapters + MCP) (tasks/backlog/process/PROC-013-graphify-knowledge-graph-discovery-aid.md)
 
 ## Unthemed
 

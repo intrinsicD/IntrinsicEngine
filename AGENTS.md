@@ -28,6 +28,29 @@ files under `tools/agents/skills/` as required reading mirroring
 `docs/agent/*` — the SKILL.md bodies summarize, and `references/` files
 contain the authoritative source.
 
+## Shared optional session setup
+
+All agents may use the shared setup entrypoints under `tools/setup/`:
+
+- `tools/setup/agent_session_setup.sh` provisions the Clang 20+ module toolchain
+  and windowing/Vulkan development headers used by repository builds, then
+  optionally pre-builds core library targets. On Debian/Ubuntu hosts this may
+  install system packages with `sudo`; invoke it intentionally, and remember it
+  is a convenience setup helper, not a replacement for preset-based
+  verification.
+- `tools/setup/wait_for_agent_setup.sh` blocks until the session setup marker is
+  written or a complete Clang 20+ toolchain is visible. Use it before CMake
+  gates if setup is running in the background.
+- `tools/setup/provision_knowledge_graph.sh` installs graphify's MCP extra when
+  possible and rebuilds `build/knowledge-graph/graphify-out/graph.json`, the
+  artifact served by `.mcp.json`. This is optional, non-authoritative discovery
+  tooling; failures must not block normal build/test work.
+
+Agent-specific hooks should wrap these shared scripts instead of duplicating
+their implementation. For example, `.claude/setup.sh` is only a Claude
+`SessionStart` adapter that calls `tools/setup/agent_session_setup.sh
+--async-json`.
+
 ## 1. Mission
 
 Build and maintain IntrinsicEngine as a modular, high-performance, scientifically rigorous engine for graphics, geometry

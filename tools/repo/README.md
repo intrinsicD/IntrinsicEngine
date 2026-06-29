@@ -32,6 +32,9 @@ contracts). Generated output is a `build/` artifact and is not committed.
 # 1. Build the merged code + method/paper graph (deterministic, no API key).
 python3 tools/repo/build_knowledge_graph.py
 
+# 1b. Optional all-agent setup wrapper. Use --no-install to skip graphify.
+tools/setup/provision_knowledge_graph.sh --no-install
+
 # 2a. Visualize / query from the CLI (requires: uv tool install graphifyy).
 cd build/knowledge-graph/graphify-out && graphify cluster-only . --no-label
 graphify explain "Extrinsic.Core.Logging" --graph build/knowledge-graph/graphify-out/graph.json
@@ -41,6 +44,10 @@ graphify explain "Extrinsic.Core.Logging" --graph build/knowledge-graph/graphify
 #     god_nodes / graph_stats). Requires the MCP extra:
 uv tool install graphifyy --with mcp
 ```
+
+Shared session setup lives under `tools/setup/`. Agent-specific hooks should
+wrap those scripts rather than duplicating provisioning logic; for example,
+`.claude/setup.sh` delegates to `tools/setup/agent_session_setup.sh --async-json`.
 
 Optional probabilistic layer (not wired): `graphify add <paper.pdf>` with an LLM
 backend key builds a fuzzy concept graph from a real PDF that can be merged in

@@ -44,6 +44,25 @@ Required dependency boundaries:
   traversal, backend calls, diagnostics assembly, file/IO handling, or imports
   other modules only needed by the implementation rather than the public API.
 
+## Shared optional session setup
+
+Agents and humans may use shared setup entrypoints under `tools/setup/`:
+
+- `tools/setup/agent_session_setup.sh` provisions the Clang 20+ module toolchain
+  plus windowing/Vulkan development headers, then optionally pre-builds core
+  library targets. On Debian/Ubuntu hosts it may install system packages with
+  `sudo`; use it intentionally. It is a setup convenience, not a substitute for
+  preset-based verification.
+- `tools/setup/wait_for_agent_setup.sh` waits for the session setup marker or a
+  visible complete Clang 20+ toolchain before build/test gates.
+- `tools/setup/provision_knowledge_graph.sh` optionally installs graphify's MCP
+  extra and rebuilds the `.mcp.json` graph artifact at
+  `build/knowledge-graph/graphify-out/graph.json`.
+
+Agent-specific hooks should be thin adapters over these scripts. Knowledge
+Graph provisioning is an optional, non-authoritative discovery aid and must not
+block normal build/test work.
+
 ## Method implementation protocol
 
 1. Intake paper and define method contract.
