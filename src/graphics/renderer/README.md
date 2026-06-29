@@ -1631,6 +1631,14 @@ Concretely:
   Pending channel writes are tracked by channel internally, then emitted as the
   managed vertex-buffer upload-to-shader-read barrier during
   `SubmitPendingUploadBarriers(...)`.
+- `GpuWorld::PlanGeometryStorage(...)` and
+  `GpuWorld::PlanGeometryStoragePromotion(...)` are RUNTIME-125's planning-only
+  contract for the optional static AoS fast lane. The current live storage path
+  remains uniform SoA: static surface geometry with complete position/UV/normal
+  data can be classified as `StaticInterleavedAoS`, but no AoS buffer is
+  allocated and no shader variant is selected in this slice. The first
+  streaming channel edit from that planned lane produces a full SoA promotion
+  and rebind plan.
 - `Graphics.FrameRecipe` imports explicit cull bucket resources for surface,
   line, and point lanes. `LinePass` consumes
   `Cull.LineQuads.NonIndexedArgs` / `Cull.LineQuads.Count`; the indexed
