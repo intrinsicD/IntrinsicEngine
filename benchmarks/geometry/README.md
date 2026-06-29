@@ -38,7 +38,11 @@ such as `Intrinsic::Bench::Geometry::kHalfedgeSmokeBenchmarkId` and
 [`Bench.SurfaceSamplingSmoke.hpp`](Bench.SurfaceSamplingSmoke.hpp); manifests
 copy the same strings. `kQualityMetricsSmokeBenchmarkId` from
 [`Bench.QualityMetricsSmoke.hpp`](Bench.QualityMetricsSmoke.hpp) binds the
-point-cloud quality metrics smoke workload. `kSignedHeatReferenceSmokeBenchmarkId`
+point-cloud quality metrics smoke workload. `kPointCloudFilteringSmokeBenchmarkId`
+from [`Bench.PointCloudFilteringSmoke.hpp`](Bench.PointCloudFilteringSmoke.hpp)
+binds the GEOM-016 filtering/outlier-removal workload (voxel downsample plus
+statistical and radius outlier removal on a two-cluster + injected-outlier
+fixture). `kSignedHeatReferenceSmokeBenchmarkId`
 from [`Bench.SignedHeatReferenceSmoke.hpp`](Bench.SignedHeatReferenceSmoke.hpp)
 binds the signed heat reference workload. Keeping the constants in the headers
 is the binding mechanism.

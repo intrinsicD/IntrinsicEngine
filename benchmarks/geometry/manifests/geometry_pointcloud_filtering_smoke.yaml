@@ -1,0 +1,28 @@
+# GEOM-016 — point-cloud filtering/outlier-removal smoke manifest.
+#
+# Stable benchmark contract for the workload defined by
+# benchmarks/geometry/Bench_PointCloudFilteringSmoke.cpp and emitted by the
+# IntrinsicBenchmarkSmoke runner. This is quality/smoke evidence only; no
+# performance-win claim is made.
+
+benchmark_id: geometry.pointcloud_filtering.smoke
+method: geometry.pointcloud.filtering
+dataset: builtin.two_cluster_grid_with_outliers
+params:
+  intent: smoke
+  cluster_side: 6
+  cluster_spacing: 0.05
+  injected_outliers: 4
+  voxel_size: 0.04
+  statistical_k_neighbors: 8
+  statistical_stddev_multiplier: 1.0
+  radius_search_radius: 0.12
+  radius_min_neighbors: 3
+  warmup_iterations: 1
+  measured_iterations: 8
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 250
+  quality_error_l2_max: 1.0e-6

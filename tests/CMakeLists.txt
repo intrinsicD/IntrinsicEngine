@@ -497,6 +497,7 @@ set(_geometry_test_files
     Test.PointCloudNormals.cpp
     Test_Registration.cpp
     Test_PointCloudRobustness.cpp
+    Test.PointCloudOutlierRemoval.cpp
     Test.IntersectionClassification.cpp
     Test.RaycastClassify.cpp
     Test.RobustPredicates.cpp

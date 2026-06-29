@@ -20,6 +20,7 @@ module Geometry.PointCloud.Utils;
 import Geometry.AABB;
 import Geometry.Octree;
 import Geometry.Sampling;
+import Geometry.Sphere;
 
 namespace Geometry::PointCloud
 {
@@ -28,6 +29,55 @@ namespace Geometry::PointCloud
         [[nodiscard]] bool IsFinite(const glm::vec3& value)
         {
             return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
+        }
+
+        // Builds an owned cloud from the given (already ascending) original
+        // indices, copying optional normals/colors/radii when present. Shared by
+        // the outlier-removal operators so kept-point construction stays
+        // deterministic and consistent with RandomSubsample / VoxelDownsample.
+        [[nodiscard]] Cloud BuildSubsetCloud(
+            const Cloud& cloud, const std::vector<std::size_t>& keptIndices)
+        {
+            Cloud out;
+            out.Reserve(keptIndices.size());
+            if (cloud.HasNormals()) out.EnableNormals();
+            if (cloud.HasColors())  out.EnableColors();
+            if (cloud.HasRadii())   out.EnableRadii();
+
+            auto positions = cloud.Positions();
+            auto normals   = cloud.HasNormals() ? cloud.Normals() : std::span<const glm::vec3>{};
+            auto colors    = cloud.HasColors()  ? cloud.Colors()  : std::span<const glm::vec4>{};
+            auto radii     = cloud.HasRadii()   ? cloud.Radii()   : std::span<const float>{};
+
+            for (std::size_t idx : keptIndices)
+            {
+                const VertexHandle ph = out.AddPoint(positions[idx]);
+                if (cloud.HasNormals()) out.Normal(ph) = normals[idx];
+                if (cloud.HasColors())  out.Color(ph)  = colors[idx];
+                if (cloud.HasRadii())   out.Radius(ph) = radii[idx];
+            }
+            return out;
+        }
+
+        // Partitions [0, n) by a keep predicate into ascending kept/rejected
+        // lists and materializes the filtered cloud + counts onto the result.
+        template <typename KeepFn>
+        void FinalizeRemoval(
+            const Cloud& cloud, std::size_t n, OutlierRemovalResult& result, KeepFn keep)
+        {
+            result.OriginalCount = n;
+            result.KeptIndices.reserve(n);
+            for (std::size_t i = 0; i < n; ++i)
+            {
+                if (keep(i))
+                    result.KeptIndices.push_back(i);
+                else
+                    result.RejectedIndices.push_back(i);
+            }
+            result.KeptCount     = result.KeptIndices.size();
+            result.RejectedCount = result.RejectedIndices.size();
+            result.Filtered      = BuildSubsetCloud(cloud, result.KeptIndices);
+            result.Status        = OutlierRemovalStatus::Success;
         }
     }
 
@@ -587,6 +637,167 @@ namespace Geometry::PointCloud
         for (std::size_t i = 0; i < n; ++i)
             prop[Cloud::Handle(i)] = result.Scores[i];
 
+        return result;
+    }
+
+    // =========================================================================
+    // RemoveStatisticalOutliers
+    // =========================================================================
+
+    OutlierRemovalResult RemoveStatisticalOutliers(
+        const Cloud& cloud,
+        const StatisticalOutlierRemovalParams& params)
+    {
+        OutlierRemovalResult result{};
+
+        const std::size_t n = cloud.VerticesSize();
+        if (n == 0)
+        {
+            result.Status = OutlierRemovalStatus::EmptyInput;
+            return result;
+        }
+        if (params.KNeighbors == 0)
+        {
+            result.Status = OutlierRemovalStatus::InvalidParameters;
+            return result;
+        }
+        const std::size_t k = params.KNeighbors;
+        // Need at least k neighbors plus the point itself. Compare without
+        // computing k + 1, which would wrap to 0 for a very large KNeighbors
+        // (e.g. unchecked config/UI input) and silently bypass this guard.
+        if (k >= n)
+        {
+            result.Status = OutlierRemovalStatus::InsufficientPoints;
+            return result;
+        }
+
+        auto positions = cloud.Positions();
+
+        Octree octree;
+        Octree::SplitPolicy policy{};
+        policy.SplitPoint = Octree::SplitPoint::Center;
+        policy.TightChildren = true;
+        if (!octree.BuildFromPoints(positions, policy, params.OctreeMaxPerNode, params.OctreeMaxDepth))
+        {
+            result.Status = OutlierRemovalStatus::BuildFailed;
+            return result;
+        }
+
+        // Per-point mean distance to its k nearest neighbors. Non-finite points
+        // get a sentinel NaN so they always fall on the reject side and never
+        // pollute the global mean/std-dev estimate.
+        const std::size_t kQuery = k + 1; // +1 for self.
+        std::vector<float> meanDist(n, 0.0f);
+        std::vector<std::size_t> knn;
+
+        double sum = 0.0;
+        double sumSq = 0.0;
+        std::size_t finiteCount = 0;
+
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            if (!IsFinite(positions[i]))
+            {
+                meanDist[i] = std::numeric_limits<float>::quiet_NaN();
+                ++result.NonFiniteCount;
+                continue;
+            }
+
+            knn.clear();
+            octree.QueryKNN(positions[i], kQuery, knn);
+
+            float distSum = 0.0f;
+            std::size_t count = 0;
+            for (std::size_t ni : knn)
+            {
+                if (ni == i || !IsFinite(positions[ni]))
+                    continue;
+                distSum += glm::length(positions[ni] - positions[i]);
+                ++count;
+            }
+
+            const float m = (count > 0) ? distSum / static_cast<float>(count) : 0.0f;
+            meanDist[i] = m;
+            sum += m;
+            sumSq += static_cast<double>(m) * static_cast<double>(m);
+            ++finiteCount;
+        }
+
+        const double meanD = (finiteCount > 0) ? sum / static_cast<double>(finiteCount) : 0.0;
+        const double variance =
+            (finiteCount > 0) ? std::max(0.0, sumSq / static_cast<double>(finiteCount) - meanD * meanD) : 0.0;
+        const double stdD = std::sqrt(variance);
+        const double threshold = meanD + static_cast<double>(params.StdDevMultiplier) * stdD;
+
+        result.MeanDistance      = static_cast<float>(meanD);
+        result.StdDevDistance    = static_cast<float>(stdD);
+        result.DistanceThreshold = static_cast<float>(threshold);
+
+        FinalizeRemoval(cloud, n, result, [&](std::size_t i) {
+            const float m = meanDist[i];
+            return std::isfinite(m) && static_cast<double>(m) <= threshold;
+        });
+        return result;
+    }
+
+    // =========================================================================
+    // RemoveRadiusOutliers
+    // =========================================================================
+
+    OutlierRemovalResult RemoveRadiusOutliers(
+        const Cloud& cloud,
+        const RadiusOutlierRemovalParams& params)
+    {
+        OutlierRemovalResult result{};
+
+        const std::size_t n = cloud.VerticesSize();
+        if (n == 0)
+        {
+            result.Status = OutlierRemovalStatus::EmptyInput;
+            return result;
+        }
+        if (!(params.SearchRadius > 0.0f) || !std::isfinite(params.SearchRadius))
+        {
+            result.Status = OutlierRemovalStatus::InvalidParameters;
+            return result;
+        }
+
+        auto positions = cloud.Positions();
+
+        Octree octree;
+        Octree::SplitPolicy policy{};
+        policy.SplitPoint = Octree::SplitPoint::Center;
+        policy.TightChildren = true;
+        if (!octree.BuildFromPoints(positions, policy, params.OctreeMaxPerNode, params.OctreeMaxDepth))
+        {
+            result.Status = OutlierRemovalStatus::BuildFailed;
+            return result;
+        }
+
+        const float radius = params.SearchRadius;
+        std::vector<std::size_t> hits;
+
+        FinalizeRemoval(cloud, n, result, [&](std::size_t i) {
+            if (!IsFinite(positions[i]))
+            {
+                ++result.NonFiniteCount;
+                return false;
+            }
+            hits.clear();
+            octree.QuerySphere(Sphere{positions[i], radius}, hits);
+
+            std::size_t neighbors = 0;
+            for (std::size_t ni : hits)
+            {
+                if (ni == i || !IsFinite(positions[ni]))
+                    continue;
+                // QuerySphere may return broad-phase candidates; confirm by exact
+                // distance so the kept/rejected partition is radius-exact.
+                if (glm::length(positions[ni] - positions[i]) <= radius)
+                    ++neighbors;
+            }
+            return neighbors >= params.MinNeighbors;
+        });
         return result;
     }
 

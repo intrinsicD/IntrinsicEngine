@@ -254,6 +254,35 @@ fraction is an identity operation, while empty input, non-finite positions,
 negative/non-finite fractions, and non-zero requests with degenerate scale report
 explicit status values.
 
+### Point-cloud filtering and outlier-removal contracts
+
+`Geometry.PointCloud.Utils` owns the deterministic point-cloud filtering pack:
+voxel downsampling, random subsampling, bilateral filtering, radius estimation,
+kernel-density and outlier-probability scoring. On top of the score-only
+`EstimateOutlierProbability` (which publishes `p:outlier_score` and leaves the
+keep/reject decision to the caller), GEOM-016 adds two explicit removal
+operators that return an owned partition instead of a raw score:
+
+- `RemoveStatisticalOutliers` rejects points whose mean distance to their `K`
+  nearest neighbors exceeds `MeanDistance + StdDevMultiplier * StdDevDistance`
+  over the cloud-wide distribution.
+- `RemoveRadiusOutliers` rejects points with fewer than `MinNeighbors` other
+  points inside `SearchRadius`.
+
+Both share `OutlierRemovalResult`: an explicit `OutlierRemovalStatus`, an owned
+`Filtered` cloud carrying the kept points (with their normals/colors/radii),
+ascending `KeptIndices`/`RejectedIndices` lists, original/kept/rejected counts,
+and a `NonFiniteCount`. The input cloud is never mutated. Output is fully
+deterministic — kept and rejected lists are sorted by original point index and
+the filtered cloud is built in that order, independent of octree traversal —
+and points with non-finite positions are always rejected. Invalid requests fail
+closed with `EmptyInput`, `InsufficientPoints` (fewer than `K + 1` points),
+`InvalidParameters` (`K == 0`, `SearchRadius <= 0`), or `BuildFailed`. The
+statistical-only distance-distribution diagnostics (`MeanDistance`,
+`StdDevDistance`, `DistanceThreshold`) are left at zero by the radius operator,
+whose decision is neighbor-count based. The filtering/outlier pack is exercised
+by the `geometry.pointcloud_filtering.smoke` benchmark.
+
 `Geometry.PointCloud.SurfaceSampling` converts a triangle `HalfedgeMesh::Mesh`
 into a deterministic dense `PointCloud::Cloud` by area-weighted face selection
 and sqrt-corrected barycentric sampling. The API returns a result record rather

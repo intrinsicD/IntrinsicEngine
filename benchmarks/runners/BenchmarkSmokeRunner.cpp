@@ -14,6 +14,7 @@
 // with the previous scaffold's CMake/CI wiring.
 
 #include "../geometry/Bench.GeometrySmoke.hpp"
+#include "../geometry/Bench.PointCloudFilteringSmoke.hpp"
 #include "../geometry/Bench.ProgressivePoissonReferenceSmoke.hpp"
 #include "../geometry/Bench.QualityMetricsSmoke.hpp"
 #include "../geometry/Bench.SignedHeatReferenceSmoke.hpp"
@@ -283,6 +284,44 @@ namespace
         return EmittedBenchmark{kQualityMetricsSmokeBenchmarkId, out.str(), metrics.Succeeded};
     }
 
+    auto EmitPointCloudFilteringSmoke(const std::string& commit) -> EmittedBenchmark
+    {
+        using namespace Intrinsic::Bench::Geometry;
+
+        const auto metrics = RunPointCloudFilteringSmoke();
+
+        std::ostringstream out;
+        out.setf(std::ios::fixed);
+        out.precision(6);
+        out << "{\n"
+            << "  \"benchmark_id\": \"" << EscapeJson(kPointCloudFilteringSmokeBenchmarkId) << "\",\n"
+            << "  \"method\": \""       << EscapeJson(kPointCloudFilteringSmokeMethod)      << "\",\n"
+            << "  \"backend\": \"cpu_reference\",\n"
+            << "  \"dataset\": \""      << EscapeJson(kPointCloudFilteringSmokeDataset)     << "\",\n"
+            << "  \"commit\": \""       << EscapeJson(commit)                              << "\",\n"
+            << "  \"metrics\": {\n"
+            << "    \"runtime_ms\": "       << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
+            << "  },\n"
+            << "  \"diagnostics\": {\n"
+            << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 8,\n"
+            << "    \"input_count\": " << metrics.InputCount << ",\n"
+            << "    \"injected_outliers\": " << metrics.InjectedOutliers << ",\n"
+            << "    \"voxel_reduced_count\": " << metrics.VoxelReducedCount << ",\n"
+            << "    \"statistical_kept\": " << metrics.StatisticalKept << ",\n"
+            << "    \"statistical_rejected\": " << metrics.StatisticalRejected << ",\n"
+            << "    \"radius_kept\": " << metrics.RadiusKept << ",\n"
+            << "    \"radius_rejected\": " << metrics.RadiusRejected << "\n"
+            << "  },\n"
+            << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed") << "\"\n"
+            << "}\n";
+
+        return EmittedBenchmark{kPointCloudFilteringSmokeBenchmarkId, out.str(), metrics.Succeeded};
+    }
+
     auto EmitRigidBodyReferenceSmoke(const std::string& commit) -> EmittedBenchmark
     {
         using namespace Intrinsic::Bench::Physics;
@@ -497,6 +536,7 @@ auto main(int argc, char** argv) -> int
     emitted.push_back(EmitSignedHeatReferenceSmoke(commit));
     emitted.push_back(EmitSurfaceSamplingSmoke(commit));
     emitted.push_back(EmitQualityMetricsSmoke(commit));
+    emitted.push_back(EmitPointCloudFilteringSmoke(commit));
     emitted.push_back(EmitRigidBodyReferenceSmoke(commit));
     emitted.push_back(EmitParticleSpringReferenceSmoke(commit));
     emitted.push_back(EmitXpbdClothReferenceSmoke(commit));
