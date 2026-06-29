@@ -15,6 +15,9 @@ Each active task should include:
   — in progress; next verification step is focused object-space normal bake
   contract coverage plus the default CPU-supported gate after runtime
   orchestration lands.
+- [`RUNTIME-125` — Optional AoS fast lane for static geometry](RUNTIME-125-aos-static-fast-lane.md)
+  — in progress; next verification step is the rendering vertex-fetch layout
+  smoke benchmark plus benchmark/task validators.
 
 ## History
 

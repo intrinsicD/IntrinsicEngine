@@ -1,0 +1,27 @@
+# RUNTIME-125 - vertex-fetch layout baseline/probe.
+#
+# This smoke benchmark is a deterministic PR-fast measurement harness for the
+# current uniform-SoA vertex fetch shape and an interleaved probe over the same
+# static mesh. It does not claim the AoS fast lane is justified; adoption still
+# requires a comparable GPU/profile baseline that proves vertex fetch is the
+# bottleneck.
+
+benchmark_id: rendering.vertex_fetch_layout.smoke
+method: rendering.vertex_fetch_layout
+dataset: builtin.static_grid_mesh.65536
+params:
+  intent: smoke
+  vertex_count: 65536
+  triangle_count: 131072
+  index_count: 393216
+  warmup_iterations: 1
+  measured_iterations: 6
+  baseline_layout: uniform_soa
+  probe_layout: interleaved_aos
+metrics:
+  - runtime_ms
+  - throughput_items_per_sec
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 250
+  quality_error_l2_max: 1.0e-9

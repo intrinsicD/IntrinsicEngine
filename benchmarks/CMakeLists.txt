@@ -17,6 +17,7 @@ add_executable(IntrinsicBenchmarkSmoke
     physics/Bench_ParticleSpringReferenceSmoke.cpp
     physics/Bench_XpbdClothReferenceSmoke.cpp
     physics/Bench_SphFluidReferenceSmoke.cpp
+    rendering/Bench_VertexFetchLayoutSmoke.cpp
     ${CMAKE_SOURCE_DIR}/methods/physics/rigid_body_reference/src/RigidBodyReference.cpp
     ${CMAKE_SOURCE_DIR}/methods/physics/particle_spring_reference/src/ParticleSpringReference.cpp
     ${CMAKE_SOURCE_DIR}/methods/physics/xpbd_cloth_reference/src/XpbdClothReference.cpp
@@ -68,7 +69,7 @@ if(BUILD_TESTING)
         COMMAND $<TARGET_FILE:IntrinsicBenchmarkSmoke> "${_intrinsic_bench_smoke_test_dir}"
     )
     set_tests_properties(IntrinsicBenchmarkSmoke.Run PROPERTIES
-        LABELS "benchmark;geometry;physics"
+        LABELS "benchmark;geometry;graphics;physics"
         TIMEOUT 30
         FIXTURES_SETUP IntrinsicBenchmarkSmoke
     )
@@ -83,7 +84,7 @@ if(BUILD_TESTING)
                 --strict
         )
         set_tests_properties(IntrinsicBenchmarkSmoke.Validate PROPERTIES
-            LABELS "benchmark;geometry;physics"
+            LABELS "benchmark;geometry;graphics;physics"
             TIMEOUT 30
             FIXTURES_REQUIRED IntrinsicBenchmarkSmoke
         )

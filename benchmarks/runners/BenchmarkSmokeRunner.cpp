@@ -22,6 +22,7 @@
 #include "../physics/Bench.RigidBodyReferenceSmoke.hpp"
 #include "../physics/Bench.SphFluidReferenceSmoke.hpp"
 #include "../physics/Bench.XpbdClothReferenceSmoke.hpp"
+#include "../rendering/Bench.VertexFetchLayoutSmoke.hpp"
 
 #include <cstdlib>
 #include <filesystem>
@@ -422,6 +423,47 @@ namespace
         return EmittedBenchmark{kSphFluidReferenceSmokeBenchmarkId, out.str(), metrics.Succeeded};
     }
 
+    auto EmitVertexFetchLayoutSmoke(const std::string& commit) -> EmittedBenchmark
+    {
+        using namespace Intrinsic::Bench::Rendering;
+
+        const auto metrics = RunVertexFetchLayoutSmoke();
+
+        std::ostringstream out;
+        out.setf(std::ios::fixed);
+        out.precision(6);
+        out << "{\n"
+            << "  \"benchmark_id\": \"" << EscapeJson(kVertexFetchLayoutSmokeBenchmarkId) << "\",\n"
+            << "  \"method\": \""       << EscapeJson(kVertexFetchLayoutSmokeMethod)      << "\",\n"
+            << "  \"backend\": \"cpu_reference\",\n"
+            << "  \"dataset\": \""      << EscapeJson(kVertexFetchLayoutSmokeDataset)     << "\",\n"
+            << "  \"commit\": \""       << EscapeJson(commit)                             << "\",\n"
+            << "  \"metrics\": {\n"
+            << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"throughput_items_per_sec\": " << metrics.ThroughputItemsPerSecond << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
+            << "  },\n"
+            << "  \"diagnostics\": {\n"
+            << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 6,\n"
+            << "    \"baseline_layout\": \"uniform_soa\",\n"
+            << "    \"probe_layout\": \"interleaved_aos\",\n"
+            << "    \"adoption_claim\": false,\n"
+            << "    \"soa_runtime_ms\": " << metrics.SoaRuntimeMilliseconds << ",\n"
+            << "    \"interleaved_runtime_ms\": " << metrics.InterleavedRuntimeMilliseconds << ",\n"
+            << "    \"interleaved_to_soa_runtime_ratio\": "
+            << metrics.InterleavedToSoaRuntimeRatio << ",\n"
+            << "    \"vertex_count\": " << metrics.VertexCount << ",\n"
+            << "    \"index_count\": " << metrics.IndexCount << "\n"
+            << "  },\n"
+            << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed") << "\"\n"
+            << "}\n";
+
+        return EmittedBenchmark{kVertexFetchLayoutSmokeBenchmarkId, out.str(), metrics.Succeeded};
+    }
+
     auto WriteFile(const std::filesystem::path& path, std::string_view payload) -> bool
     {
         std::error_code ec;
@@ -459,6 +501,7 @@ auto main(int argc, char** argv) -> int
     emitted.push_back(EmitParticleSpringReferenceSmoke(commit));
     emitted.push_back(EmitXpbdClothReferenceSmoke(commit));
     emitted.push_back(EmitSphFluidReferenceSmoke(commit));
+    emitted.push_back(EmitVertexFetchLayoutSmoke(commit));
 
     // Output target: an existing directory or a path with no extension (or no
     // filename component) is treated as a directory and gets one JSON per

@@ -27,7 +27,8 @@ geometry kind has its own packer with inlined property names and a fixed AoS
 vertex struct, no vertex color channel, and no way to bind an arbitrary property
 as normals/colors. This series fixes that incrementally.
 
-- `RUNTIME-125` — Optional AoS fast lane for static geometry (profile-gated).
+`RUNTIME-125` is active and remains profile-gated: shader/storage work is
+blocked until its benchmark baseline justifies the optional AoS lane.
 
 Storage model is fixed by
 [`ADR-0022`](../../../docs/adr/0022-vertex-storage-soa-per-channel-streaming.md):
