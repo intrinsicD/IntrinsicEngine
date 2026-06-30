@@ -11,6 +11,9 @@ map.
 ## Tasks
 
 - [RORG-031F — UI integration backlog seed](RORG-031-ui-integration.md).
+- [UI-028 — Sandbox EditorUI mesh simplification window](UI-028-editor-mesh-simplification-window.md)
+  (depends on `GEOM-014`; the editor executor for feature-aware QEM
+  simplification, continuing the `bcg_code_base` processing-window port).
 
 The runtime SpatialDebug closest-face picking consumer for `GEOM-039` is
 retired under the runtime backlog as `RUNTIME-135`.

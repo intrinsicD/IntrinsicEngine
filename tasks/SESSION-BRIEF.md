@@ -30,6 +30,7 @@ the authoritative open/unblocked view.
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
+- blocked by `GEOM-014`: `UI-028` — Sandbox EditorUI mesh simplification window (tasks/backlog/ui/UI-028-editor-mesh-simplification-window.md)
 
 ## Theme H — Agentic workflow hardening
 
