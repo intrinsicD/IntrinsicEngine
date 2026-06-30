@@ -230,7 +230,9 @@ Reusable GPU building blocks should stay in graphics-owned modules rather than
 inside individual method adapters. For scan/compaction-style compute workloads,
 `Extrinsic.Graphics.ComputeParallelPrimitives` is the shared GRAPHICS-108 seam:
 Slice A provides the deterministic CPU reference and fail-closed GPU request
-contract, while later Vulkan slices own shader dispatch and `gpu;vulkan` parity.
+contract, Slice B pins the shader assets plus backend-neutral dispatch/scratch
+planning contract, and later Vulkan slices own command recording and
+`gpu;vulkan` parity.
 Method adapters such as METHOD-013 should consume that seam instead of declaring
 private CUB-equivalent primitives.
 

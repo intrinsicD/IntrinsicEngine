@@ -27,6 +27,7 @@ Status labels:
 - [Physics](physics.md) (`canonical`)
 - [Task graphs](task-graphs.md) (`canonical`)
 - [Frame graph](frame-graph.md) (`canonical`)
+- [Compute parallel primitives](compute-parallel-primitives.md) (`canonical`)
 - [Module rules](module-rules.md) (`canonical`)
 - [Test strategy](test-strategy.md) (`canonical`)
 - [Method API contract](method-api-contract.md) (`canonical`)

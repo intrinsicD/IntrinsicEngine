@@ -1746,13 +1746,18 @@ Concretely:
   scan/compaction primitive contract introduced by `GRAPHICS-108`. Slice A
   exports deterministic CPU reference helpers for `uint32` exclusive/inclusive
   prefix scan and stable stream compaction by flags, plus status/diagnostic DTOs
-  that later Vulkan parity tests compare against. The GPU record facade is
-  fail-closed in the default gate: Null or non-operational devices report
-  `DeviceUnavailable` with `CpuFallbackRecommended`, operational devices report
-  `UnsupportedInCurrentSlice` until the Vulkan shader/dispatch slices land, and
-  invalid buffer handles fail as `InvalidGpuResource`. The module imports RHI
-  device and handle types but exposes no Vulkan handles, ECS, runtime, platform,
-  or asset-service ownership.
+  that later Vulkan parity tests compare against. Slice B adds
+  backend-neutral dispatch planning for the `parallel_prefix_scan.comp`,
+  `parallel_scan_add_offsets.comp`, and `parallel_compact_by_flags.comp` shader
+  assets, including recursive scratch-level sizing and `ShaderWrite` publication
+  barriers. The GPU record facade is fail-closed in the default gate: Null or
+  non-operational devices report `DeviceUnavailable` with
+  `CpuFallbackRecommended`, operational devices report `UnsupportedInCurrentSlice`
+  until the Vulkan command-recording slice lands, and invalid buffer handles fail
+  as `InvalidGpuResource`. The module imports RHI device/handle/barrier/descriptor
+  types but exposes no Vulkan handles, ECS, runtime, platform, or asset-service
+  ownership. See
+  [`docs/architecture/compute-parallel-primitives.md`](../../../docs/architecture/compute-parallel-primitives.md).
 - Per `GRAPHICS-018Q`, the four remaining Vulkan integration follow-ups
   to the `GRAPHICS-018` guarded backend bring-up resolve as follows.
   Texture upload policy keeps the guarded synchronous staging-buffer

@@ -1,0 +1,94 @@
+#version 460
+
+// GRAPHICS-108 Slice B — one workgroup-local uint32 prefix-scan pass.
+//
+// The host planner composes this into a device-wide scan by recursively scanning
+// per-block sums, then dispatching `parallel_scan_add_offsets.comp`.
+//
+// BDA convention: the promoted global pipeline layout exposes storage buffers
+// through Buffer Device Addresses carried in push constants, matching the
+// clustered-light and culling compute shaders.
+
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+const uint PrefixScanMode_Exclusive = 0u;
+const uint PrefixScanMode_Inclusive = 1u;
+
+layout(buffer_reference, scalar) readonly buffer PrefixScanInputRef
+{
+    uint Values[];
+};
+
+layout(buffer_reference, scalar) buffer PrefixScanOutputRef
+{
+    uint Values[];
+};
+
+layout(buffer_reference, scalar) buffer PrefixScanBlockSumsRef
+{
+    uint Values[];
+};
+
+layout(push_constant, scalar) uniform PrefixScanPush
+{
+    uint64_t InputBDA;
+    uint64_t OutputBDA;
+    uint64_t BlockSumsBDA;
+    uint ElementCount;
+    uint Mode;
+    uint LevelIndex;
+    uint Reserved0;
+} pc;
+
+shared uint sharedValues[256];
+
+void main()
+{
+    const uint localIndex = gl_LocalInvocationIndex;
+    const uint globalIndex = gl_GlobalInvocationID.x;
+    const uint blockStart = gl_WorkGroupID.x * gl_WorkGroupSize.x;
+    const uint remaining = pc.ElementCount > blockStart
+        ? pc.ElementCount - blockStart
+        : 0u;
+    const uint activeInBlock = min(uint(gl_WorkGroupSize.x), remaining);
+    const bool inBounds = globalIndex < pc.ElementCount;
+
+    uint value = 0u;
+    if (inBounds && pc.InputBDA != uint64_t(0) && pc.OutputBDA != uint64_t(0))
+    {
+        PrefixScanInputRef inputRef = PrefixScanInputRef(pc.InputBDA);
+        value = inputRef.Values[globalIndex];
+    }
+
+    sharedValues[localIndex] = value;
+    barrier();
+
+    for (uint offset = 1u; offset < gl_WorkGroupSize.x; offset <<= 1u)
+    {
+        const uint addend = localIndex >= offset ? sharedValues[localIndex - offset] : 0u;
+        barrier();
+        sharedValues[localIndex] += addend;
+        barrier();
+    }
+
+    if (inBounds && pc.OutputBDA != uint64_t(0))
+    {
+        PrefixScanOutputRef outputRef = PrefixScanOutputRef(pc.OutputBDA);
+        const uint inclusive = sharedValues[localIndex];
+        outputRef.Values[globalIndex] = pc.Mode == PrefixScanMode_Inclusive
+            ? inclusive
+            : inclusive - value;
+    }
+
+    if (pc.BlockSumsBDA != uint64_t(0) &&
+        activeInBlock > 0u &&
+        localIndex + 1u == activeInBlock)
+    {
+        PrefixScanBlockSumsRef blockSumsRef = PrefixScanBlockSumsRef(pc.BlockSumsBDA);
+        blockSumsRef.Values[gl_WorkGroupID.x] = sharedValues[localIndex];
+    }
+}
