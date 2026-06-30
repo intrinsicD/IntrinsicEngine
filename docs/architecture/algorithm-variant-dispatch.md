@@ -226,6 +226,14 @@ namespace Extrinsic::Runtime
 Fallback is not silent. Tests must assert requested-vs-actual backend telemetry,
 especially when `Backend::GPU` is requested on a null or non-operational device.
 
+Reusable GPU building blocks should stay in graphics-owned modules rather than
+inside individual method adapters. For scan/compaction-style compute workloads,
+`Extrinsic.Graphics.ComputeParallelPrimitives` is the shared GRAPHICS-108 seam:
+Slice A provides the deterministic CPU reference and fail-closed GPU request
+contract, while later Vulkan slices own shader dispatch and `gpu;vulkan` parity.
+Method adapters such as METHOD-013 should consume that seam instead of declaring
+private CUB-equivalent primitives.
+
 ## Config And Agent Lane
 
 The backend field on the algorithm params is the supported override surface for

@@ -232,6 +232,7 @@ into graphics public contracts.
 
 - `Extrinsic.Graphics.RenderFrameInput`
 - `Extrinsic.Graphics.RenderWorld`
+- `Extrinsic.Graphics.ComputeParallelPrimitives`
 - `Extrinsic.Graphics.GpuTransfer`
 - `Extrinsic.Graphics.RuntimeRenderSnapshotBatch` (declared by `Extrinsic.Graphics.Renderer`)
 - `Extrinsic.Graphics.GpuWorld`
@@ -1741,6 +1742,17 @@ Concretely:
   submittable GPU-produced texture plan until the GPU compute dilation pass
   lands, and no CPU dilation is implied. This graphics surface does not import
   ECS, runtime, live `AssetService`, or Vulkan handles.
+- `Extrinsic.Graphics.ComputeParallelPrimitives` owns the generic
+  scan/compaction primitive contract introduced by `GRAPHICS-108`. Slice A
+  exports deterministic CPU reference helpers for `uint32` exclusive/inclusive
+  prefix scan and stable stream compaction by flags, plus status/diagnostic DTOs
+  that later Vulkan parity tests compare against. The GPU record facade is
+  fail-closed in the default gate: Null or non-operational devices report
+  `DeviceUnavailable` with `CpuFallbackRecommended`, operational devices report
+  `UnsupportedInCurrentSlice` until the Vulkan shader/dispatch slices land, and
+  invalid buffer handles fail as `InvalidGpuResource`. The module imports RHI
+  device and handle types but exposes no Vulkan handles, ECS, runtime, platform,
+  or asset-service ownership.
 - Per `GRAPHICS-018Q`, the four remaining Vulkan integration follow-ups
   to the `GRAPHICS-018` guarded backend bring-up resolve as follows.
   Texture upload policy keeps the guarded synchronous staging-buffer

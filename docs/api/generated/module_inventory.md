@@ -15,7 +15,7 @@ Root scanned: `src`
 | `geometry` | 100 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 68 |
+| `graphics/renderer` | 69 |
 | `graphics/rhi` | 20 |
 | `graphics/vulkan` | 13 |
 | `legacy` | 181 |
@@ -225,6 +225,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.CameraSnapshots` | `src/graphics/renderer/Graphics.CameraSnapshots.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Colormap` | `src/graphics/renderer/Graphics.Colormap.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.ColormapSystem` | `src/graphics/renderer/Graphics.ColormapSystem.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.ComputeParallelPrimitives` | `src/graphics/renderer/Graphics.ComputeParallelPrimitives.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.CullingSystem` | `src/graphics/renderer/Graphics.CullingSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.CurrentRendererContractAdapter` | `src/graphics/renderer/Graphics.CurrentRendererContractAdapter.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.DebugViewSystem` | `src/graphics/renderer/Graphics.DebugViewSystem.cppm` | `graphics/renderer` |
@@ -554,4 +555,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugClosestFace` | `src/runtime/SpatialDebug/Runtime.SpatialDebugClosestFace.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **526**
+Total modules: **527**

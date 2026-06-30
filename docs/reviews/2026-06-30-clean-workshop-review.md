@@ -25,3 +25,33 @@
 ## Findings -> follow-ups
 
 - None.
+
+---
+
+# Clean-workshop review — GRAPHICS-108 Slice A
+
+## Change under review
+
+- Change: Add `Extrinsic.Graphics.ComputeParallelPrimitives` with CPU reference
+  prefix-scan/stream-compaction helpers, fail-closed GPU request validation, and
+  default-gate graphics contract tests.
+- Trigger(s): new graphics renderer module/API seam for reusable compute
+  primitives.
+- Reviewer: Codex.
+
+## Scorecard
+
+| # | Check | Outcome | Notes |
+| --- | --- | --- | --- |
+| 1 | Promoted layer imports match `/AGENTS.md` §2 | pass | `tools/ci/run_clean_workshop_review.sh . --strict` ran `check_layering.py --root src --strict`; no violations. |
+| 2 | CMake target links match layer policy | pass | The change adds sources to the existing `ExtrinsicGraphics` target and introduces no new `target_link_libraries` edge. |
+| 3 | No new public API exposes a higher-layer type to a lower layer | pass | `Graphics.ComputeParallelPrimitives.cppm` exports graphics/RHI handles, statuses, and DTOs only; no ECS/runtime/platform/app or method types leak into the graphics API. |
+| 4 | Renderer member/subsystem growth is justified by an owning seam | pass | The API is a standalone graphics module owned by `GRAPHICS-108`; no renderer god-object member, subsystem singleton, or pass body is added in Slice A. |
+| 5 | New passes use typed IDs, not string routing | n/a | No frame-graph pass or command route is added. |
+| 6 | New frame-recipe dependencies are resource-driven or explicitly justified | n/a | No frame-recipe dependency is added. |
+| 7 | Scaffold/parity tasks have a follow-up maturity gate | pass | `GRAPHICS-108` remains active with Slice B/C/D recorded toward the `Operational` Vulkan parity endpoint. |
+| 8 | Legacy/temporary exceptions have a task ID and expiry | pass | No allowlist row, shim, or temporary exception is added. |
+
+## Findings -> follow-ups
+
+- None.

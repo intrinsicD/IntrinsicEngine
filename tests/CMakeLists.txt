@@ -793,6 +793,7 @@ set(_graphics_contract_cpu_test_files
     Test.CurrentRendererContractAdapter.cpp
     Test.CullingPassContracts.cpp
     Test.DefaultRecipeBackbufferReadback.cpp
+    Test.ComputeParallelPrimitives.cpp
     Test.DebugViewContract.cpp
     Test.DebugViewPass.cpp
     Test.FrameRecipeContract.cpp
