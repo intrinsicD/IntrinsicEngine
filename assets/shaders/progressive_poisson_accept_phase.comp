@@ -1,10 +1,12 @@
 #version 460
 
-// METHOD-013 Slice B — planned progressive Poisson phase accept mask.
+// METHOD-013 Slice C — conservative progressive Poisson phase accept mask.
 //
-// The shader pins the executable interface for the future conflict-check pass.
-// Runtime dispatch remains disabled in Slice B, so this body is a conservative
-// phase-mask producer rather than the final neighbor/claim resolver.
+// This pass consumes the per-level cell table built by
+// progressive_poisson_build_cells.comp and writes two stream-compaction masks:
+// accepted candidates for the current phase and carried candidates for later
+// phases/levels. The runtime Slice C recorder still falls back to the CPU
+// reference until upload/readback/parity evidence lands.
 
 #extension GL_EXT_scalar_block_layout : require
 #extension GL_EXT_buffer_reference2 : require
@@ -22,6 +24,16 @@ layout(buffer_reference, scalar) buffer UIntArrayRef
     uint Values[];
 };
 
+layout(buffer_reference, scalar) readonly buffer UInt64ArrayReadRef
+{
+    uint64_t Values[];
+};
+
+layout(buffer_reference, scalar) readonly buffer FloatArrayRef
+{
+    float Values[];
+};
+
 layout(buffer_reference, scalar) readonly buffer ProgressivePoissonGpuStateRef
 {
     uint64_t PositionXBDA;
@@ -33,13 +45,13 @@ layout(buffer_reference, scalar) readonly buffer ProgressivePoissonGpuStateRef
     uint64_t CellKeysBDA;
     uint64_t CellPhasesBDA;
     uint64_t AcceptFlagsBDA;
+    uint64_t CarryFlagsBDA;
     uint64_t HashKeysBDA;
     uint64_t HashValuesBDA;
     uint64_t LevelOffsetsBDA;
     uint64_t SplatRadiiBDA;
     uint64_t OutputCountBDA;
     uint64_t CompactionScratchBDA;
-    uint64_t Reserved0;
 };
 
 layout(push_constant, scalar) uniform ProgressivePoissonPush
@@ -61,6 +73,60 @@ layout(push_constant, scalar) uniform ProgressivePoissonPush
     float Reserved0;
 } pc;
 
+const uint64_t EmptyHashKey = uint64_t(0xfffffffffffffffful);
+const uint InvalidIndex = 0xffffffffu;
+
+uint64_t packCell2D(int ix, int iy)
+{
+    const uint ux = uint(ix) ^ 0x80000000u;
+    const uint uy = uint(iy) ^ 0x80000000u;
+    return (uint64_t(ux) << 32) | uint64_t(uy);
+}
+
+uint64_t packCell3D(int ix, int iy, int iz)
+{
+    const uint64_t ux = uint64_t((ix + (1 << 20)) & 0x1fffff);
+    const uint64_t uy = uint64_t((iy + (1 << 20)) & 0x1fffff);
+    const uint64_t uz = uint64_t((iz + (1 << 20)) & 0x1fffff);
+    return (ux << 42) | (uy << 21) | uz;
+}
+
+uint lookupCell(ProgressivePoissonGpuStateRef state, uint64_t key)
+{
+    if (pc.HashTableCapacity == 0u ||
+        state.HashKeysBDA == uint64_t(0) ||
+        state.HashValuesBDA == uint64_t(0))
+    {
+        return InvalidIndex;
+    }
+
+    const uint slot = uint(key % uint64_t(pc.HashTableCapacity));
+    UInt64ArrayReadRef hashKeys = UInt64ArrayReadRef(state.HashKeysBDA);
+    if (hashKeys.Values[slot] == EmptyHashKey ||
+        hashKeys.Values[slot] != key)
+    {
+        return InvalidIndex;
+    }
+
+    UIntArrayReadRef hashValues = UIntArrayReadRef(state.HashValuesBDA);
+    return hashValues.Values[slot];
+}
+
+float pointDistanceSq(ProgressivePoissonGpuStateRef state, uint a, uint b)
+{
+    FloatArrayRef px = FloatArrayRef(state.PositionXBDA);
+    FloatArrayRef py = FloatArrayRef(state.PositionYBDA);
+    const float dx = px.Values[a] - px.Values[b];
+    const float dy = py.Values[a] - py.Values[b];
+    float dz = 0.0;
+    if (pc.Dimension == 3u && state.PositionZBDA != uint64_t(0))
+    {
+        FloatArrayRef pz = FloatArrayRef(state.PositionZBDA);
+        dz = pz.Values[a] - pz.Values[b];
+    }
+    return dx * dx + dy * dy + dz * dz;
+}
+
 void main()
 {
     const uint globalIndex = gl_GlobalInvocationID.x;
@@ -72,13 +138,88 @@ void main()
     ProgressivePoissonGpuStateRef state =
         ProgressivePoissonGpuStateRef(pc.StateBDA);
     if (state.CellPhasesBDA == uint64_t(0) ||
-        state.AcceptFlagsBDA == uint64_t(0))
+        state.AcceptFlagsBDA == uint64_t(0) ||
+        state.CarryFlagsBDA == uint64_t(0) ||
+        state.RemainingKeysBDA == uint64_t(0) ||
+        state.CellKeysBDA == uint64_t(0) ||
+        state.PositionXBDA == uint64_t(0) ||
+        state.PositionYBDA == uint64_t(0))
     {
         return;
     }
 
     UIntArrayReadRef cellPhases = UIntArrayReadRef(state.CellPhasesBDA);
     UIntArrayRef acceptFlags = UIntArrayRef(state.AcceptFlagsBDA);
-    acceptFlags.Values[globalIndex] =
-        cellPhases.Values[globalIndex] == pc.PhaseIndex ? 1u : 0u;
+    UIntArrayRef carryFlags = UIntArrayRef(state.CarryFlagsBDA);
+
+    acceptFlags.Values[globalIndex] = 0u;
+    carryFlags.Values[globalIndex] = 1u;
+
+    if (cellPhases.Values[globalIndex] != pc.PhaseIndex)
+    {
+        return;
+    }
+
+    UIntArrayReadRef remaining = UIntArrayReadRef(state.RemainingKeysBDA);
+    const uint pointIndex = remaining.Values[globalIndex];
+    if (pointIndex >= pc.InputCount)
+    {
+        return;
+    }
+
+    UInt64ArrayReadRef cellKeys = UInt64ArrayReadRef(state.CellKeysBDA);
+    const uint64_t ownKey = cellKeys.Values[globalIndex];
+    if (lookupCell(state, ownKey) != pointIndex)
+    {
+        return;
+    }
+
+    FloatArrayRef px = FloatArrayRef(state.PositionXBDA);
+    FloatArrayRef py = FloatArrayRef(state.PositionYBDA);
+    const float pzValue = (pc.Dimension == 3u && state.PositionZBDA != uint64_t(0))
+        ? FloatArrayRef(state.PositionZBDA).Values[pointIndex]
+        : 0.0;
+    const int ix = int(floor((px.Values[pointIndex] + pc.OriginX) * pc.InvCellSize));
+    const int iy = int(floor((py.Values[pointIndex] + pc.OriginY) * pc.InvCellSize));
+    const int iz = pc.Dimension == 3u
+        ? int(floor((pzValue + pc.OriginZ) * pc.InvCellSize))
+        : 0;
+
+    bool rejected = false;
+    for (int dz = -1; dz <= 1 && !rejected; ++dz)
+    {
+        if (pc.Dimension != 3u && dz != 0)
+        {
+            continue;
+        }
+        for (int dy = -1; dy <= 1 && !rejected; ++dy)
+        {
+            for (int dx = -1; dx <= 1; ++dx)
+            {
+                const uint64_t neighborKey = pc.Dimension == 3u
+                    ? packCell3D(ix + dx, iy + dy, iz + dz)
+                    : packCell2D(ix + dx, iy + dy);
+                const uint neighbor = lookupCell(state, neighborKey);
+                if (neighbor == InvalidIndex ||
+                    neighbor == pointIndex ||
+                    neighbor >= pc.InputCount)
+                {
+                    continue;
+                }
+                if (pointDistanceSq(state, pointIndex, neighbor) <
+                    pc.RadiusSquared &&
+                    neighbor < pointIndex)
+                {
+                    rejected = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!rejected)
+    {
+        acceptFlags.Values[globalIndex] = 1u;
+        carryFlags.Values[globalIndex] = 0u;
+    }
 }

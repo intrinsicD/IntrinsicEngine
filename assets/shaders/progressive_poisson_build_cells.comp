@@ -1,10 +1,11 @@
 #version 460
 
-// METHOD-013 Slice B — planned progressive Poisson per-level cell classification.
+// METHOD-013 Slice C.1 — progressive Poisson per-level cell classification.
 //
-// This shader pins the BDA state table and push layout for the future Vulkan
-// backend. Runtime execution remains disabled until later METHOD-013 slices add
-// conflict-checked accept/compact dispatches and CPU/GPU parity tests.
+// The runtime recorder can dispatch this kernel to build per-level cell keys,
+// phase masks, and a conservative hash table. Public method execution still
+// falls back to the CPU reference until upload/readback and parity evidence
+// land in later METHOD-013 slices.
 
 #extension GL_EXT_scalar_block_layout : require
 #extension GL_EXT_buffer_reference2 : require
@@ -46,13 +47,13 @@ layout(buffer_reference, scalar) readonly buffer ProgressivePoissonGpuStateRef
     uint64_t CellKeysBDA;
     uint64_t CellPhasesBDA;
     uint64_t AcceptFlagsBDA;
+    uint64_t CarryFlagsBDA;
     uint64_t HashKeysBDA;
     uint64_t HashValuesBDA;
     uint64_t LevelOffsetsBDA;
     uint64_t SplatRadiiBDA;
     uint64_t OutputCountBDA;
     uint64_t CompactionScratchBDA;
-    uint64_t Reserved0;
 };
 
 layout(push_constant, scalar) uniform ProgressivePoissonPush

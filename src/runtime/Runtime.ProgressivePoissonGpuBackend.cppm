@@ -8,8 +8,10 @@ export module Extrinsic.Runtime.ProgressivePoissonGpuBackend;
 
 import Extrinsic.Graphics.ComputeParallelPrimitives;
 import Extrinsic.RHI.BufferManager;
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
+import Extrinsic.RHI.Handles;
 
 export namespace Extrinsic::Runtime
 {
@@ -23,6 +25,7 @@ export namespace Extrinsic::Runtime
         DeviceUnavailable,
         PlanningOnly,
         SizeOverflow,
+        InvalidGpuResource,
     };
 
     enum class ProgressivePoissonGpuPassKind : std::uint8_t
@@ -46,6 +49,7 @@ export namespace Extrinsic::Runtime
         CellKeys,
         CellPhases,
         AcceptFlags,
+        CarryFlags,
         HashKeys,
         HashValues,
         LevelOffsets,
@@ -147,13 +151,13 @@ export namespace Extrinsic::Runtime
         std::uint64_t CellKeysBDA{0u};
         std::uint64_t CellPhasesBDA{0u};
         std::uint64_t AcceptFlagsBDA{0u};
+        std::uint64_t CarryFlagsBDA{0u};
         std::uint64_t HashKeysBDA{0u};
         std::uint64_t HashValuesBDA{0u};
         std::uint64_t LevelOffsetsBDA{0u};
         std::uint64_t SplatRadiiBDA{0u};
         std::uint64_t OutputCountBDA{0u};
         std::uint64_t CompactionScratchBDA{0u};
-        std::uint64_t Reserved0{0u};
     };
     static_assert(sizeof(ProgressivePoissonGpuStateBufferRecord) == 128u);
 
@@ -198,6 +202,63 @@ export namespace Extrinsic::Runtime
         }
     };
 
+    struct ProgressivePoissonGpuPipelineSet
+    {
+        RHI::PipelineHandle BuildCells{};
+        RHI::PipelineHandle AcceptPhase{};
+        Extrinsic::Graphics::ParallelPrimitivePipelineSet Compaction{};
+    };
+
+    struct ProgressivePoissonGpuResourceSet
+    {
+        RHI::BufferHandle State{};
+        RHI::BufferHandle PositionX{};
+        RHI::BufferHandle PositionY{};
+        RHI::BufferHandle PositionZ{};
+        RHI::BufferHandle RemainingKeys{};
+        RHI::BufferHandle NextRemainingKeys{};
+        RHI::BufferHandle AcceptedKeys{};
+        RHI::BufferHandle CellKeys{};
+        RHI::BufferHandle CellPhases{};
+        RHI::BufferHandle AcceptFlags{};
+        RHI::BufferHandle CarryFlags{};
+        RHI::BufferHandle HashKeys{};
+        RHI::BufferHandle HashValues{};
+        RHI::BufferHandle LevelOffsets{};
+        RHI::BufferHandle SplatRadii{};
+        RHI::BufferHandle OutputCount{};
+        RHI::BufferHandle CompactionScratch{};
+    };
+
+    struct ProgressivePoissonGpuRecordDesc
+    {
+        RHI::IDevice* Device{nullptr};
+        RHI::ICommandContext* CommandContext{nullptr};
+        RHI::BufferManager* Buffers{nullptr};
+        ProgressivePoissonGpuPipelineSet Pipelines{};
+        ProgressivePoissonGpuResourceSet Resources{};
+        ProgressivePoissonGpuPlanDesc Plan{};
+    };
+
+    struct ProgressivePoissonGpuRecordResult
+    {
+        ProgressivePoissonGpuStatus Status{ProgressivePoissonGpuStatus::Success};
+        bool Recorded{false};
+        bool CpuFallbackRecommended{false};
+        bool StateRecordUploaded{false};
+        std::uint32_t MethodDispatchCount{0u};
+        std::uint32_t AcceptedCompactionCount{0u};
+        std::uint32_t RemainingCompactionCount{0u};
+        Extrinsic::Graphics::ParallelPrimitiveStatus FirstCompactionFailure{
+            Extrinsic::Graphics::ParallelPrimitiveStatus::Success};
+        ProgressivePoissonGpuDispatchPlan Plan{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == ProgressivePoissonGpuStatus::Success;
+        }
+    };
+
     [[nodiscard]] const char* DebugNameForProgressivePoissonGpuStatus(
         ProgressivePoissonGpuStatus status) noexcept;
 
@@ -229,4 +290,13 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] ProgressivePoissonGpuResolveResult
     ResolveProgressivePoissonGpuRequest(
         const ProgressivePoissonGpuResolveDesc& desc);
+
+    [[nodiscard]] ProgressivePoissonGpuStateBufferRecord
+    BuildProgressivePoissonGpuStateRecord(
+        RHI::IDevice& device,
+        const ProgressivePoissonGpuResourceSet& resources) noexcept;
+
+    [[nodiscard]] ProgressivePoissonGpuRecordResult
+    RecordProgressivePoissonGpuPasses(
+        const ProgressivePoissonGpuRecordDesc& desc);
 }

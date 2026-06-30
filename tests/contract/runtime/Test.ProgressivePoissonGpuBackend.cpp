@@ -1,10 +1,14 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
+#include <cstring>
+#include <vector>
 
 #include <gtest/gtest.h>
 
 import Extrinsic.Runtime.ProgressivePoissonGpuBackend;
 import Extrinsic.Graphics.ComputeParallelPrimitives;
+import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Descriptors;
 
 #include "MockRHI.hpp"
@@ -15,6 +19,74 @@ namespace
     namespace Graphics = Extrinsic::Graphics;
     namespace RHI = Extrinsic::RHI;
     namespace Tests = Extrinsic::Tests;
+
+    [[nodiscard]] RHI::BufferHandle ValidBuffer(
+        const std::uint32_t index) noexcept
+    {
+        return RHI::BufferHandle{index, 1u};
+    }
+
+    [[nodiscard]] RHI::PipelineHandle ValidPipeline(
+        const std::uint32_t index) noexcept
+    {
+        return RHI::PipelineHandle{index, 1u};
+    }
+
+    [[nodiscard]] Graphics::ParallelPrimitivePipelineSet
+    ValidCompactionPipelines() noexcept
+    {
+        return Graphics::ParallelPrimitivePipelineSet{
+            .PrefixScan = ValidPipeline(60u),
+            .AddBlockOffsets = ValidPipeline(61u),
+            .CompactByFlags = ValidPipeline(62u),
+        };
+    }
+
+    [[nodiscard]] Runtime::ProgressivePoissonGpuPipelineSet
+    ValidProgressivePoissonPipelines() noexcept
+    {
+        return Runtime::ProgressivePoissonGpuPipelineSet{
+            .BuildCells = ValidPipeline(50u),
+            .AcceptPhase = ValidPipeline(51u),
+            .Compaction = ValidCompactionPipelines(),
+        };
+    }
+
+    [[nodiscard]] Runtime::ProgressivePoissonGpuResourceSet
+    ValidProgressivePoissonResources() noexcept
+    {
+        return Runtime::ProgressivePoissonGpuResourceSet{
+            .State = ValidBuffer(1u),
+            .PositionX = ValidBuffer(2u),
+            .PositionY = ValidBuffer(3u),
+            .PositionZ = ValidBuffer(4u),
+            .RemainingKeys = ValidBuffer(5u),
+            .NextRemainingKeys = ValidBuffer(6u),
+            .AcceptedKeys = ValidBuffer(7u),
+            .CellKeys = ValidBuffer(8u),
+            .CellPhases = ValidBuffer(9u),
+            .AcceptFlags = ValidBuffer(10u),
+            .CarryFlags = ValidBuffer(11u),
+            .HashKeys = ValidBuffer(12u),
+            .HashValues = ValidBuffer(13u),
+            .LevelOffsets = ValidBuffer(14u),
+            .SplatRadii = ValidBuffer(15u),
+            .OutputCount = ValidBuffer(16u),
+            .CompactionScratch = ValidBuffer(17u),
+        };
+    }
+
+    template <typename T>
+    [[nodiscard]] T ReadPayload(const std::vector<std::byte>& payload)
+    {
+        T value{};
+        EXPECT_EQ(payload.size(), sizeof(T));
+        if (payload.size() == sizeof(T))
+        {
+            std::memcpy(&value, payload.data(), sizeof(T));
+        }
+        return value;
+    }
 
     [[nodiscard]] const Runtime::ProgressivePoissonGpuBufferSpan* FindSpan(
         const Runtime::ProgressivePoissonGpuBufferLayout& layout,
@@ -79,6 +151,13 @@ TEST(ProgressivePoissonGpuBackend, PlansPerLevelBuildAcceptAndCompaction)
     ASSERT_NE(FindSpan(plan.Layout,
                        Runtime::ProgressivePoissonGpuBufferRole::HashKeys),
               nullptr);
+    ASSERT_NE(FindSpan(plan.Layout,
+                       Runtime::ProgressivePoissonGpuBufferRole::CarryFlags),
+              nullptr);
+    EXPECT_EQ(FindSpan(plan.Layout,
+                       Runtime::ProgressivePoissonGpuBufferRole::CarryFlags)
+                  ->SizeBytes,
+              100u * sizeof(std::uint32_t));
     EXPECT_EQ(FindSpan(plan.Layout,
                        Runtime::ProgressivePoissonGpuBufferRole::HashKeys)
                   ->SizeBytes,
@@ -166,6 +245,197 @@ TEST(ProgressivePoissonGpuBackend, BuildsBufferAndPipelineDescriptors)
         "shaders/progressive_poisson_accept_phase.comp.spv"));
     EXPECT_EQ(accept.PushConstantSize,
               sizeof(Runtime::ProgressivePoissonGpuPassPushConstants));
+}
+
+TEST(ProgressivePoissonGpuBackend,
+     BuildsStateRecordFromRoleBuffers)
+{
+    Tests::MockDevice device{};
+    const Runtime::ProgressivePoissonGpuResourceSet resources =
+        ValidProgressivePoissonResources();
+
+    const Runtime::ProgressivePoissonGpuStateBufferRecord record =
+        Runtime::BuildProgressivePoissonGpuStateRecord(device, resources);
+
+    EXPECT_EQ(record.PositionXBDA,
+              device.GetBufferDeviceAddress(resources.PositionX));
+    EXPECT_EQ(record.PositionYBDA,
+              device.GetBufferDeviceAddress(resources.PositionY));
+    EXPECT_EQ(record.PositionZBDA,
+              device.GetBufferDeviceAddress(resources.PositionZ));
+    EXPECT_EQ(record.AcceptFlagsBDA,
+              device.GetBufferDeviceAddress(resources.AcceptFlags));
+    EXPECT_EQ(record.CarryFlagsBDA,
+              device.GetBufferDeviceAddress(resources.CarryFlags));
+    EXPECT_EQ(record.CompactionScratchBDA,
+              device.GetBufferDeviceAddress(resources.CompactionScratch));
+}
+
+TEST(ProgressivePoissonGpuBackend,
+     RecordsMethodDispatchesAndDelegatesCompaction)
+{
+    Tests::MockDevice device{};
+    RHI::BufferManager buffers{device};
+
+    Runtime::ProgressivePoissonGpuPlanDesc planDesc{};
+    planDesc.InputCount = 128u;
+    planDesc.Config.Dimension = 2u;
+    planDesc.Config.GridWidth = 8u;
+    planDesc.Config.MaxLevels = 1u;
+    planDesc.Config.HashLoadFactor = 0.5f;
+    planDesc.Config.RadiusAlpha = 0.5f;
+    planDesc.Config.RandomizeGridOrigin = false;
+
+    const Runtime::ProgressivePoissonGpuResourceSet resources =
+        ValidProgressivePoissonResources();
+    const Runtime::ProgressivePoissonGpuRecordResult result =
+        Runtime::RecordProgressivePoissonGpuPasses(
+            Runtime::ProgressivePoissonGpuRecordDesc{
+                .Device = &device,
+                .CommandContext = &device.CommandContext,
+                .Buffers = &buffers,
+                .Pipelines = ValidProgressivePoissonPipelines(),
+                .Resources = resources,
+                .Plan = planDesc,
+            });
+
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_TRUE(result.Recorded);
+    EXPECT_FALSE(result.CpuFallbackRecommended);
+    EXPECT_TRUE(result.StateRecordUploaded);
+    EXPECT_EQ(result.MethodDispatchCount, 5u);
+    EXPECT_EQ(result.AcceptedCompactionCount, 1u);
+    EXPECT_EQ(result.RemainingCompactionCount, 1u);
+    EXPECT_EQ(device.CreateBufferCount, 0);
+    ASSERT_EQ(device.BufferWrites.size(), 1u);
+    EXPECT_EQ(device.BufferWrites[0].Handle, resources.State);
+    EXPECT_EQ(device.BufferWrites[0].Offset, 0u);
+    EXPECT_EQ(device.BufferWrites[0].Data.size(),
+              sizeof(Runtime::ProgressivePoissonGpuStateBufferRecord));
+
+    ASSERT_EQ(device.CommandContext.BoundPipelines.size(), 9u);
+    EXPECT_EQ(device.CommandContext.BoundPipelines[0], ValidPipeline(50u));
+    EXPECT_EQ(device.CommandContext.BoundPipelines[1], ValidPipeline(51u));
+    EXPECT_EQ(device.CommandContext.BoundPipelines[4], ValidPipeline(51u));
+    EXPECT_EQ(device.CommandContext.BoundPipelines[5], ValidPipeline(60u));
+    EXPECT_EQ(device.CommandContext.BoundPipelines[6], ValidPipeline(62u));
+    EXPECT_EQ(device.CommandContext.BoundPipelines[7], ValidPipeline(60u));
+    EXPECT_EQ(device.CommandContext.BoundPipelines[8], ValidPipeline(62u));
+    ASSERT_EQ(device.CommandContext.DispatchRecords.size(), 9u);
+    EXPECT_EQ(device.CommandContext.DispatchRecords[0].X, 1u);
+    EXPECT_EQ(device.CommandContext.DispatchRecords[1].X, 1u);
+
+    ASSERT_EQ(device.CommandContext.PushConstantPayloads.size(), 9u);
+    const auto buildPc =
+        ReadPayload<Runtime::ProgressivePoissonGpuPassPushConstants>(
+            device.CommandContext.PushConstantPayloads[0]);
+    EXPECT_EQ(buildPc.StateBDA,
+              device.GetBufferDeviceAddress(resources.State));
+    EXPECT_EQ(buildPc.InputCount, 128u);
+    EXPECT_EQ(buildPc.RemainingCount, 128u);
+    EXPECT_EQ(buildPc.HashTableCapacity, 256u);
+    EXPECT_EQ(buildPc.Dimension, 2u);
+    EXPECT_EQ(buildPc.GridWidth, 8u);
+    EXPECT_EQ(buildPc.PhaseCount, 4u);
+    EXPECT_FLOAT_EQ(buildPc.InvCellSize, 8.0f);
+    EXPECT_FLOAT_EQ(buildPc.RadiusSquared, 0.00390625f);
+
+    const auto lastAcceptPc =
+        ReadPayload<Runtime::ProgressivePoissonGpuPassPushConstants>(
+            device.CommandContext.PushConstantPayloads[4]);
+    EXPECT_EQ(lastAcceptPc.PhaseIndex, 3u);
+
+    const auto acceptedScatter =
+        ReadPayload<Graphics::ParallelCompactByFlagsPushConstants>(
+            device.CommandContext.PushConstantPayloads[6]);
+    EXPECT_EQ(acceptedScatter.KeysBDA,
+              device.GetBufferDeviceAddress(resources.RemainingKeys));
+    EXPECT_EQ(acceptedScatter.FlagsBDA,
+              device.GetBufferDeviceAddress(resources.AcceptFlags));
+    EXPECT_EQ(acceptedScatter.OutputKeysBDA,
+              device.GetBufferDeviceAddress(resources.AcceptedKeys));
+    EXPECT_EQ(acceptedScatter.OutputCountBDA,
+              device.GetBufferDeviceAddress(resources.OutputCount));
+
+    const auto remainingScatter =
+        ReadPayload<Graphics::ParallelCompactByFlagsPushConstants>(
+            device.CommandContext.PushConstantPayloads[8]);
+    EXPECT_EQ(remainingScatter.KeysBDA,
+              device.GetBufferDeviceAddress(resources.RemainingKeys));
+    EXPECT_EQ(remainingScatter.FlagsBDA,
+              device.GetBufferDeviceAddress(resources.CarryFlags));
+    EXPECT_EQ(remainingScatter.OutputKeysBDA,
+              device.GetBufferDeviceAddress(resources.NextRemainingKeys));
+    EXPECT_EQ(remainingScatter.OutputCountBDA,
+              device.GetBufferDeviceAddress(resources.OutputCount));
+
+    ASSERT_GE(device.CommandContext.BufferBarrierCalls.size(), 12u);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[0].Buffer,
+              resources.CellKeys);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[4].Buffer,
+              resources.AcceptFlags);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[5].Buffer,
+              resources.CarryFlags);
+}
+
+TEST(ProgressivePoissonGpuBackend,
+     RecordFailsClosedForInvalidResourcesAndUnavailableDevice)
+{
+    Runtime::ProgressivePoissonGpuPlanDesc planDesc{};
+    planDesc.InputCount = 16u;
+
+    Tests::MockDevice unavailable{};
+    unavailable.Operational = false;
+    const Runtime::ProgressivePoissonGpuRecordResult unavailableResult =
+        Runtime::RecordProgressivePoissonGpuPasses(
+            Runtime::ProgressivePoissonGpuRecordDesc{
+                .Device = &unavailable,
+                .CommandContext = &unavailable.CommandContext,
+                .Pipelines = ValidProgressivePoissonPipelines(),
+                .Resources = ValidProgressivePoissonResources(),
+                .Plan = planDesc,
+            });
+    EXPECT_EQ(unavailableResult.Status,
+              Runtime::ProgressivePoissonGpuStatus::DeviceUnavailable);
+    EXPECT_FALSE(unavailableResult.Recorded);
+    EXPECT_TRUE(unavailableResult.CpuFallbackRecommended);
+    EXPECT_EQ(unavailable.CommandContext.DispatchCalls, 0);
+
+    Tests::MockDevice device{};
+    Runtime::ProgressivePoissonGpuResourceSet missingCarry =
+        ValidProgressivePoissonResources();
+    missingCarry.CarryFlags = {};
+    const Runtime::ProgressivePoissonGpuRecordResult invalidResource =
+        Runtime::RecordProgressivePoissonGpuPasses(
+            Runtime::ProgressivePoissonGpuRecordDesc{
+                .Device = &device,
+                .CommandContext = &device.CommandContext,
+                .Pipelines = ValidProgressivePoissonPipelines(),
+                .Resources = missingCarry,
+                .Plan = planDesc,
+            });
+    EXPECT_EQ(invalidResource.Status,
+              Runtime::ProgressivePoissonGpuStatus::InvalidGpuResource);
+    EXPECT_FALSE(invalidResource.Recorded);
+    EXPECT_TRUE(invalidResource.CpuFallbackRecommended);
+    EXPECT_EQ(device.CommandContext.DispatchCalls, 0);
+
+    Runtime::ProgressivePoissonGpuPipelineSet missingCompaction =
+        ValidProgressivePoissonPipelines();
+    missingCompaction.Compaction.CompactByFlags = {};
+    const Runtime::ProgressivePoissonGpuRecordResult invalidPipeline =
+        Runtime::RecordProgressivePoissonGpuPasses(
+            Runtime::ProgressivePoissonGpuRecordDesc{
+                .Device = &device,
+                .CommandContext = &device.CommandContext,
+                .Pipelines = missingCompaction,
+                .Resources = ValidProgressivePoissonResources(),
+                .Plan = planDesc,
+            });
+    EXPECT_EQ(invalidPipeline.Status,
+              Runtime::ProgressivePoissonGpuStatus::InvalidGpuResource);
+    EXPECT_FALSE(invalidPipeline.Recorded);
+    EXPECT_TRUE(invalidPipeline.CpuFallbackRecommended);
 }
 
 TEST(ProgressivePoissonGpuBackend, ResolveReportsCpuFallbackUntilExecutionLands)

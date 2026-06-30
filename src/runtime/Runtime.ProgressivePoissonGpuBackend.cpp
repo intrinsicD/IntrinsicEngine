@@ -11,8 +11,10 @@ module Extrinsic.Runtime.ProgressivePoissonGpuBackend;
 
 import Extrinsic.Graphics.ComputeParallelPrimitives;
 import Extrinsic.RHI.BufferManager;
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
+import Extrinsic.RHI.Handles;
 
 namespace Extrinsic::Runtime
 {
@@ -73,6 +75,32 @@ namespace Extrinsic::Runtime
             const std::uint32_t dimension) noexcept
         {
             return dimension == 3u ? 8u : 4u;
+        }
+
+        [[nodiscard]] std::uint32_t MixU32(std::uint32_t x) noexcept
+        {
+            x ^= x >> 16u;
+            x *= 0x7feb352dU;
+            x ^= x >> 15u;
+            x *= 0x846ca68bU;
+            x ^= x >> 16u;
+            return x;
+        }
+
+        [[nodiscard]] float U32ToUnif01(const std::uint32_t x) noexcept
+        {
+            const std::uint32_t hi = x >> 8u;
+            return static_cast<float>(hi) * (1.0f / 16777216.0f);
+        }
+
+        [[nodiscard]] float EffectiveRadiusAlpha(
+            const ProgressivePoissonGpuConfig& config) noexcept
+        {
+            if (config.RadiusAlpha > 0.0f && config.RadiusAlpha < 1.0f)
+            {
+                return config.RadiusAlpha;
+            }
+            return config.Dimension == 3u ? 0.86602540378f : 0.70710678118f;
         }
 
         [[nodiscard]] std::uint32_t HashCapacityFor(
@@ -145,6 +173,7 @@ namespace Extrinsic::Runtime
             add(ProgressivePoissonGpuBufferRole::CellKeys, Uint64Bytes(inputCount));
             add(ProgressivePoissonGpuBufferRole::CellPhases, Uint32Bytes(inputCount));
             add(ProgressivePoissonGpuBufferRole::AcceptFlags, Uint32Bytes(inputCount));
+            add(ProgressivePoissonGpuBufferRole::CarryFlags, Uint32Bytes(inputCount));
             add(ProgressivePoissonGpuBufferRole::HashKeys, Uint64Bytes(hashCapacity));
             add(ProgressivePoissonGpuBufferRole::HashValues,
                 Uint32Bytes(hashCapacity));
@@ -191,6 +220,129 @@ namespace Extrinsic::Runtime
                 .Diagnostic = std::move(diagnostic),
             };
         }
+
+        [[nodiscard]] ProgressivePoissonGpuRecordResult RecordStatus(
+            const ProgressivePoissonGpuStatus status,
+            const ProgressivePoissonGpuPlanDesc& desc,
+            const bool cpuFallbackRecommended = true)
+        {
+            return ProgressivePoissonGpuRecordResult{
+                .Status = status,
+                .Recorded = false,
+                .CpuFallbackRecommended = cpuFallbackRecommended,
+                .Plan = ComputeProgressivePoissonGpuDispatchPlan(desc),
+            };
+        }
+
+        [[nodiscard]] bool PipelinesAreRecordable(
+            const ProgressivePoissonGpuPipelineSet& pipelines) noexcept
+        {
+            return pipelines.BuildCells.IsValid() &&
+                   pipelines.AcceptPhase.IsValid() &&
+                   pipelines.Compaction.PrefixScan.IsValid() &&
+                   pipelines.Compaction.AddBlockOffsets.IsValid() &&
+                   pipelines.Compaction.CompactByFlags.IsValid();
+        }
+
+        [[nodiscard]] bool ResourcesAreRecordable(
+            const ProgressivePoissonGpuResourceSet& resources,
+            const std::uint32_t dimension) noexcept
+        {
+            return resources.State.IsValid() &&
+                   resources.PositionX.IsValid() &&
+                   resources.PositionY.IsValid() &&
+                   (dimension != 3u || resources.PositionZ.IsValid()) &&
+                   resources.RemainingKeys.IsValid() &&
+                   resources.NextRemainingKeys.IsValid() &&
+                   resources.AcceptedKeys.IsValid() &&
+                   resources.CellKeys.IsValid() &&
+                   resources.CellPhases.IsValid() &&
+                   resources.AcceptFlags.IsValid() &&
+                   resources.CarryFlags.IsValid() &&
+                   resources.HashKeys.IsValid() &&
+                   resources.HashValues.IsValid() &&
+                   resources.LevelOffsets.IsValid() &&
+                   resources.SplatRadii.IsValid() &&
+                   resources.OutputCount.IsValid() &&
+                   resources.CompactionScratch.IsValid();
+        }
+
+        [[nodiscard]] ProgressivePoissonGpuPassPushConstants MakePushConstants(
+            RHI::IDevice& device,
+            const ProgressivePoissonGpuPlanDesc& desc,
+            const ProgressivePoissonGpuDispatchDesc& dispatch,
+            const ProgressivePoissonGpuResourceSet& resources) noexcept
+        {
+            const std::uint32_t scale =
+                dispatch.LevelIndex >= 31u ? (1u << 31u)
+                                           : (1u << dispatch.LevelIndex);
+            const float invCellSize =
+                static_cast<float>(desc.Config.GridWidth) *
+                static_cast<float>(scale);
+            const float cellSize = invCellSize > 0.0f
+                ? 1.0f / invCellSize
+                : 1.0f;
+            const float radius =
+                cellSize * EffectiveRadiusAlpha(desc.Config);
+
+            float originX = 0.0f;
+            float originY = 0.0f;
+            float originZ = 0.0f;
+            if (desc.Config.RandomizeGridOrigin)
+            {
+                const std::uint32_t seed = desc.Config.GridOriginSeed;
+                originX = U32ToUnif01(MixU32(
+                              seed + 0x9e3779b9u *
+                                         (3u * dispatch.LevelIndex + 1u))) *
+                          cellSize;
+                originY = U32ToUnif01(MixU32(
+                              seed + 0x9e3779b9u *
+                                         (3u * dispatch.LevelIndex + 2u))) *
+                          cellSize;
+                if (desc.Config.Dimension == 3u)
+                {
+                    originZ = U32ToUnif01(MixU32(
+                                  seed + 0x9e3779b9u *
+                                             (3u * dispatch.LevelIndex + 3u))) *
+                              cellSize;
+                }
+            }
+
+            return ProgressivePoissonGpuPassPushConstants{
+                .StateBDA = device.GetBufferDeviceAddress(resources.State),
+                .InputCount = desc.InputCount,
+                .RemainingCount = desc.InputCount,
+                .HashTableCapacity = dispatch.HashTableCapacity,
+                .Dimension = desc.Config.Dimension,
+                .GridWidth = desc.Config.GridWidth,
+                .LevelIndex = dispatch.LevelIndex,
+                .PhaseIndex = dispatch.PhaseIndex,
+                .PhaseCount = PhaseCountForDimension(desc.Config.Dimension),
+                .InvCellSize = invCellSize,
+                .RadiusSquared = radius * radius,
+                .OriginX = originX,
+                .OriginY = originY,
+                .OriginZ = originZ,
+                .Reserved0 = 0.0f,
+            };
+        }
+
+        void RecordMethodDispatch(
+            RHI::ICommandContext& cmd,
+            RHI::IDevice& device,
+            const ProgressivePoissonGpuPlanDesc& desc,
+            const ProgressivePoissonGpuDispatchDesc& dispatch,
+            const ProgressivePoissonGpuResourceSet& resources,
+            const RHI::PipelineHandle pipeline)
+        {
+            const ProgressivePoissonGpuPassPushConstants pc =
+                MakePushConstants(device, desc, dispatch, resources);
+            cmd.BindPipeline(pipeline);
+            cmd.PushConstants(&pc, static_cast<std::uint32_t>(sizeof(pc)), 0u);
+            cmd.Dispatch(dispatch.GroupCountX,
+                         dispatch.GroupCountY,
+                         dispatch.GroupCountZ);
+        }
     }
 
     const char* DebugNameForProgressivePoissonGpuStatus(
@@ -210,6 +362,8 @@ namespace Extrinsic::Runtime
             return "PlanningOnly";
         case ProgressivePoissonGpuStatus::SizeOverflow:
             return "SizeOverflow";
+        case ProgressivePoissonGpuStatus::InvalidGpuResource:
+            return "InvalidGpuResource";
         }
         return "Unknown";
     }
@@ -258,6 +412,8 @@ namespace Extrinsic::Runtime
             return "CellPhases";
         case ProgressivePoissonGpuBufferRole::AcceptFlags:
             return "AcceptFlags";
+        case ProgressivePoissonGpuBufferRole::CarryFlags:
+            return "CarryFlags";
         case ProgressivePoissonGpuBufferRole::HashKeys:
             return "HashKeys";
         case ProgressivePoissonGpuBufferRole::HashValues:
@@ -467,5 +623,189 @@ namespace Extrinsic::Runtime
                 "has not enabled executable GPU sampling yet.",
             .Plan = std::move(plan),
         };
+    }
+
+    ProgressivePoissonGpuStateBufferRecord BuildProgressivePoissonGpuStateRecord(
+        RHI::IDevice& device,
+        const ProgressivePoissonGpuResourceSet& resources) noexcept
+    {
+        return ProgressivePoissonGpuStateBufferRecord{
+            .PositionXBDA = device.GetBufferDeviceAddress(resources.PositionX),
+            .PositionYBDA = device.GetBufferDeviceAddress(resources.PositionY),
+            .PositionZBDA = device.GetBufferDeviceAddress(resources.PositionZ),
+            .RemainingKeysBDA = device.GetBufferDeviceAddress(resources.RemainingKeys),
+            .NextRemainingKeysBDA =
+                device.GetBufferDeviceAddress(resources.NextRemainingKeys),
+            .AcceptedKeysBDA = device.GetBufferDeviceAddress(resources.AcceptedKeys),
+            .CellKeysBDA = device.GetBufferDeviceAddress(resources.CellKeys),
+            .CellPhasesBDA = device.GetBufferDeviceAddress(resources.CellPhases),
+            .AcceptFlagsBDA = device.GetBufferDeviceAddress(resources.AcceptFlags),
+            .CarryFlagsBDA = device.GetBufferDeviceAddress(resources.CarryFlags),
+            .HashKeysBDA = device.GetBufferDeviceAddress(resources.HashKeys),
+            .HashValuesBDA = device.GetBufferDeviceAddress(resources.HashValues),
+            .LevelOffsetsBDA = device.GetBufferDeviceAddress(resources.LevelOffsets),
+            .SplatRadiiBDA = device.GetBufferDeviceAddress(resources.SplatRadii),
+            .OutputCountBDA = device.GetBufferDeviceAddress(resources.OutputCount),
+            .CompactionScratchBDA =
+                device.GetBufferDeviceAddress(resources.CompactionScratch),
+        };
+    }
+
+    ProgressivePoissonGpuRecordResult RecordProgressivePoissonGpuPasses(
+        const ProgressivePoissonGpuRecordDesc& desc)
+    {
+        if (desc.Device == nullptr)
+        {
+            return RecordStatus(ProgressivePoissonGpuStatus::MissingDevice,
+                                desc.Plan);
+        }
+
+        if (!desc.Device->IsOperational())
+        {
+            return RecordStatus(ProgressivePoissonGpuStatus::DeviceUnavailable,
+                                desc.Plan);
+        }
+
+        ProgressivePoissonGpuDispatchPlan plan =
+            ComputeProgressivePoissonGpuDispatchPlan(desc.Plan);
+        if (!plan.IsValid())
+        {
+            return ProgressivePoissonGpuRecordResult{
+                .Status = plan.Status,
+                .Recorded = false,
+                .CpuFallbackRecommended = true,
+                .Plan = std::move(plan),
+            };
+        }
+
+        if (desc.CommandContext == nullptr)
+        {
+            return ProgressivePoissonGpuRecordResult{
+                .Status = ProgressivePoissonGpuStatus::InvalidInput,
+                .Recorded = false,
+                .CpuFallbackRecommended = true,
+                .Plan = std::move(plan),
+            };
+        }
+
+        if (!PipelinesAreRecordable(desc.Pipelines) ||
+            !ResourcesAreRecordable(desc.Resources, desc.Plan.Config.Dimension))
+        {
+            return ProgressivePoissonGpuRecordResult{
+                .Status = ProgressivePoissonGpuStatus::InvalidGpuResource,
+                .Recorded = false,
+                .CpuFallbackRecommended = true,
+                .Plan = std::move(plan),
+            };
+        }
+
+        ProgressivePoissonGpuRecordResult result{};
+        result.Status = ProgressivePoissonGpuStatus::Success;
+        result.CpuFallbackRecommended = false;
+        result.Plan = plan;
+
+        const ProgressivePoissonGpuStateBufferRecord state =
+            BuildProgressivePoissonGpuStateRecord(*desc.Device, desc.Resources);
+        desc.Device->WriteBuffer(desc.Resources.State,
+                                 &state,
+                                 sizeof(state),
+                                 0u);
+        result.StateRecordUploaded = true;
+
+        if (plan.Levels.empty())
+        {
+            return result;
+        }
+
+        RHI::ICommandContext& cmd = *desc.CommandContext;
+        for (const ProgressivePoissonGpuLevelPlan& level : plan.Levels)
+        {
+            RecordMethodDispatch(cmd,
+                                 *desc.Device,
+                                 desc.Plan,
+                                 level.BuildCells,
+                                 desc.Resources,
+                                 desc.Pipelines.BuildCells);
+            ++result.MethodDispatchCount;
+            cmd.BufferBarrier(desc.Resources.CellKeys,
+                              RHI::MemoryAccess::ShaderWrite,
+                              RHI::MemoryAccess::ShaderRead);
+            cmd.BufferBarrier(desc.Resources.CellPhases,
+                              RHI::MemoryAccess::ShaderWrite,
+                              RHI::MemoryAccess::ShaderRead);
+            cmd.BufferBarrier(desc.Resources.HashKeys,
+                              RHI::MemoryAccess::ShaderWrite,
+                              RHI::MemoryAccess::ShaderRead);
+            cmd.BufferBarrier(desc.Resources.HashValues,
+                              RHI::MemoryAccess::ShaderWrite,
+                              RHI::MemoryAccess::ShaderRead);
+
+            for (const ProgressivePoissonGpuDispatchDesc& accept :
+                 level.AcceptPhases)
+            {
+                RecordMethodDispatch(cmd,
+                                     *desc.Device,
+                                     desc.Plan,
+                                     accept,
+                                     desc.Resources,
+                                     desc.Pipelines.AcceptPhase);
+                ++result.MethodDispatchCount;
+            }
+            cmd.BufferBarrier(desc.Resources.AcceptFlags,
+                              RHI::MemoryAccess::ShaderWrite,
+                              RHI::MemoryAccess::ShaderRead);
+            cmd.BufferBarrier(desc.Resources.CarryFlags,
+                              RHI::MemoryAccess::ShaderWrite,
+                              RHI::MemoryAccess::ShaderRead);
+
+            const Graphics::GpuParallelPrimitiveRecordResult accepted =
+                Graphics::RecordGpuStreamCompaction(
+                    Graphics::GpuStreamCompactionRecordDesc{
+                        .Device = desc.Device,
+                        .CommandContext = desc.CommandContext,
+                        .Buffers = desc.Buffers,
+                        .Pipelines = desc.Pipelines.Compaction,
+                        .Keys = desc.Resources.RemainingKeys,
+                        .Flags = desc.Resources.AcceptFlags,
+                        .OutputKeys = desc.Resources.AcceptedKeys,
+                        .OutputCount = desc.Resources.OutputCount,
+                        .Scratch = desc.Resources.CompactionScratch,
+                        .ElementCount = desc.Plan.InputCount,
+                    });
+            if (!accepted.Succeeded())
+            {
+                result.Status = ProgressivePoissonGpuStatus::InvalidGpuResource;
+                result.CpuFallbackRecommended = true;
+                result.FirstCompactionFailure = accepted.Status;
+                return result;
+            }
+            ++result.AcceptedCompactionCount;
+
+            const Graphics::GpuParallelPrimitiveRecordResult remaining =
+                Graphics::RecordGpuStreamCompaction(
+                    Graphics::GpuStreamCompactionRecordDesc{
+                        .Device = desc.Device,
+                        .CommandContext = desc.CommandContext,
+                        .Buffers = desc.Buffers,
+                        .Pipelines = desc.Pipelines.Compaction,
+                        .Keys = desc.Resources.RemainingKeys,
+                        .Flags = desc.Resources.CarryFlags,
+                        .OutputKeys = desc.Resources.NextRemainingKeys,
+                        .OutputCount = desc.Resources.OutputCount,
+                        .Scratch = desc.Resources.CompactionScratch,
+                        .ElementCount = desc.Plan.InputCount,
+                    });
+            if (!remaining.Succeeded())
+            {
+                result.Status = ProgressivePoissonGpuStatus::InvalidGpuResource;
+                result.CpuFallbackRecommended = true;
+                result.FirstCompactionFailure = remaining.Status;
+                return result;
+            }
+            ++result.RemainingCompactionCount;
+        }
+
+        result.Recorded = true;
+        return result;
     }
 }
