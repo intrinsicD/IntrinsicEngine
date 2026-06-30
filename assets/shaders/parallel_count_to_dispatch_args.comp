@@ -1,0 +1,50 @@
+#version 460
+
+// GRAPHICS-108 Slice D — converts a compacted uint32 count into Vulkan
+// dispatch-indirect arguments: {ceil(count / GroupSize), 1, 1}.
+
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+layout(buffer_reference, scalar) readonly buffer CountRef
+{
+    uint Value[];
+};
+
+layout(buffer_reference, scalar) buffer DispatchArgsRef
+{
+    uint GroupCountX;
+    uint GroupCountY;
+    uint GroupCountZ;
+};
+
+layout(push_constant, scalar) uniform CountToDispatchArgsPush
+{
+    uint64_t CountBDA;
+    uint64_t DispatchArgsBDA;
+    uint GroupSize;
+    uint Reserved0;
+    uint Reserved1;
+    uint Reserved2;
+} pc;
+
+void main()
+{
+    if (pc.CountBDA == uint64_t(0) ||
+        pc.DispatchArgsBDA == uint64_t(0) ||
+        pc.GroupSize == 0u)
+    {
+        return;
+    }
+
+    CountRef countRef = CountRef(pc.CountBDA);
+    const uint count = countRef.Value[0];
+
+    DispatchArgsRef argsRef = DispatchArgsRef(pc.DispatchArgsBDA);
+    argsRef.GroupCountX = count == 0u ? 0u : 1u + ((count - 1u) / pc.GroupSize);
+    argsRef.GroupCountY = 1u;
+    argsRef.GroupCountZ = 1u;
+}

@@ -14,7 +14,7 @@ depends_on: [METHOD-012, GRAPHICS-108]
 - No CUDA path; the GPU backend is Vulkan compute only.
 
 ## Context
-- Status: backlog. Gated on METHOD-012 (reference + parity contract) and GRAPHICS-108 (GPU scan/compaction primitives).
+- Status: backlog and unblocked for promotion. METHOD-012 provides the CPU reference + parity contract, and GRAPHICS-108 now provides the reusable GPU scan/compaction primitives.
 - Owning subsystem/layer: the GPU dispatch seam lives in `runtime` (it needs `RHI::IDevice`), following the `algorithm-variant-dispatch` / GEOM-052 shared CPU/GPU backend pattern: a CPU-only entry in the method/geometry layer plus a GPU-capable overload that takes `RHI::IDevice&`, returns a `Backend ActualBackend` diagnostic, and falls back to CPU on failure. Gate on `RHI::IDevice::IsOperational()`.
 - The CUDA reference (`progressive_poisson.cu`) uses CUB stream compaction and per-level phase-parallel grid hashing with a load factor; the Vulkan port builds the per-level hash grid in a storage buffer, marks accepted points per phase, and compacts via GRAPHICS-108. Respect the hash `hash_load_factor` and `randomize_grid_origin` knobs from `SamplerConfig`.
 

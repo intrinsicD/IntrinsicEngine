@@ -257,6 +257,16 @@ namespace Extrinsic::Graphics
                                 true);
         }
 
+        [[nodiscard]] GpuCompactionCountPublicationResult CountPublicationStatusResult(
+            const ParallelPrimitiveStatus status,
+            const bool cpuFallbackRecommended = false) noexcept
+        {
+            return GpuCompactionCountPublicationResult{
+                .Status = status,
+                .CpuFallbackRecommended = cpuFallbackRecommended,
+            };
+        }
+
         struct RoleBindings
         {
             RHI::BufferHandle Input{};
@@ -798,6 +808,32 @@ namespace Extrinsic::Graphics
         };
     }
 
+    RHI::BufferDesc BuildParallelCompactionCountReadbackBufferDesc(
+        const char* debugName) noexcept
+    {
+        return RHI::BufferDesc{
+            .SizeBytes = sizeof(std::uint32_t),
+            .Usage = RHI::BufferUsage::TransferDst |
+                     RHI::BufferUsage::TransferSrc,
+            .HostVisible = true,
+            .DebugName = debugName,
+        };
+    }
+
+    RHI::BufferDesc BuildParallelDispatchIndirectArgsBufferDesc(
+        const char* debugName) noexcept
+    {
+        return RHI::BufferDesc{
+            .SizeBytes = sizeof(ParallelDispatchIndirectArgs),
+            .Usage = RHI::BufferUsage::Storage |
+                     RHI::BufferUsage::Indirect |
+                     RHI::BufferUsage::TransferSrc |
+                     RHI::BufferUsage::TransferDst,
+            .HostVisible = false,
+            .DebugName = debugName,
+        };
+    }
+
     RHI::PipelineDesc BuildParallelPrefixScanPipelineDesc(const char* shaderPath)
     {
         RHI::PipelineDesc desc{};
@@ -825,6 +861,17 @@ namespace Extrinsic::Graphics
         desc.PushConstantSize = static_cast<std::uint32_t>(
             sizeof(ParallelCompactByFlagsPushConstants));
         desc.DebugName = "ParallelPrimitive.CompactByFlags";
+        return desc;
+    }
+
+    RHI::PipelineDesc BuildParallelCountToDispatchArgsPipelineDesc(
+        const char* shaderPath)
+    {
+        RHI::PipelineDesc desc{};
+        desc.ComputeShaderPath = shaderPath == nullptr ? "" : shaderPath;
+        desc.PushConstantSize = static_cast<std::uint32_t>(
+            sizeof(ParallelCountToDispatchArgsPushConstants));
+        desc.DebugName = "ParallelPrimitive.CountToDispatchArgs";
         return desc;
     }
 
@@ -1083,6 +1130,103 @@ namespace Extrinsic::Graphics
         result.Recorded = true;
         result.Scratch = scratch;
         result.Plan = std::move(plan);
+        return result;
+    }
+
+    GpuCompactionCountPublicationResult RecordCompactionCountPublication(
+        const GpuCompactionCountPublicationDesc& desc)
+    {
+        if (desc.Device == nullptr)
+        {
+            return CountPublicationStatusResult(ParallelPrimitiveStatus::InvalidInput);
+        }
+
+        if (!desc.Device->IsOperational())
+        {
+            return CountPublicationStatusResult(ParallelPrimitiveStatus::DeviceUnavailable,
+                                                true);
+        }
+
+        if (desc.CommandContext == nullptr ||
+            !desc.OutputCount.IsValid() ||
+            (!desc.ReadbackCount.IsValid() && !desc.DispatchArgs.IsValid()))
+        {
+            return CountPublicationStatusResult(ParallelPrimitiveStatus::InvalidInput);
+        }
+
+        GpuCompactionCountPublicationResult result{};
+        std::uint64_t countBDA = 0u;
+        std::uint64_t dispatchArgsBDA = 0u;
+
+        if (desc.DispatchArgs.IsValid())
+        {
+            if (!desc.CountToDispatchArgsPipeline.IsValid() ||
+                desc.DispatchGroupSize == 0u)
+            {
+                return CountPublicationStatusResult(
+                    ParallelPrimitiveStatus::InvalidInput);
+            }
+
+            countBDA = desc.Device->GetBufferDeviceAddress(desc.OutputCount);
+            dispatchArgsBDA = desc.Device->GetBufferDeviceAddress(desc.DispatchArgs);
+            if (countBDA == 0u || dispatchArgsBDA == 0u)
+            {
+                return CountPublicationStatusResult(
+                    ParallelPrimitiveStatus::InvalidGpuResource);
+            }
+        }
+
+        if (desc.ReadbackCount.IsValid())
+        {
+            desc.CommandContext->BufferBarrier(desc.OutputCount,
+                                               RHI::MemoryAccess::ShaderRead,
+                                               RHI::MemoryAccess::TransferRead);
+            desc.CommandContext->CopyBuffer(desc.OutputCount,
+                                            desc.ReadbackCount,
+                                            desc.OutputCountOffsetBytes,
+                                            desc.ReadbackCountOffsetBytes,
+                                            sizeof(std::uint32_t));
+            desc.CommandContext->BufferBarrier(desc.ReadbackCount,
+                                               RHI::MemoryAccess::TransferWrite,
+                                               RHI::MemoryAccess::HostRead);
+            result.RecordedReadbackCopy = true;
+            if (!desc.DispatchArgs.IsValid())
+            {
+                desc.CommandContext->BufferBarrier(desc.OutputCount,
+                                                   RHI::MemoryAccess::TransferRead,
+                                                   RHI::MemoryAccess::ShaderRead);
+            }
+        }
+
+        if (desc.DispatchArgs.IsValid())
+        {
+            if (desc.ReadbackCount.IsValid())
+            {
+                desc.CommandContext->BufferBarrier(desc.OutputCount,
+                                                   RHI::MemoryAccess::TransferRead,
+                                                   RHI::MemoryAccess::ShaderRead);
+            }
+
+            const ParallelCountToDispatchArgsPushConstants pc{
+                .CountBDA = countBDA + desc.OutputCountOffsetBytes,
+                .DispatchArgsBDA = dispatchArgsBDA + desc.DispatchArgsOffsetBytes,
+                .GroupSize = desc.DispatchGroupSize,
+                .Reserved0 = 0u,
+                .Reserved1 = 0u,
+                .Reserved2 = 0u,
+            };
+            desc.CommandContext->BindPipeline(desc.CountToDispatchArgsPipeline);
+            desc.CommandContext->PushConstants(
+                &pc,
+                static_cast<std::uint32_t>(sizeof(pc)),
+                0u);
+            desc.CommandContext->Dispatch(1u, 1u, 1u);
+            desc.CommandContext->BufferBarrier(desc.DispatchArgs,
+                                               RHI::MemoryAccess::ShaderWrite,
+                                               RHI::MemoryAccess::IndirectRead);
+            result.RecordedDispatchArgs = true;
+        }
+
         return result;
     }
 }

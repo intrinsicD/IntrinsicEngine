@@ -1743,19 +1743,21 @@ Concretely:
   lands, and no CPU dilation is implied. This graphics surface does not import
   ECS, runtime, live `AssetService`, or Vulkan handles.
 - `Extrinsic.Graphics.ComputeParallelPrimitives` owns the generic
-  scan/compaction primitive contract introduced by `GRAPHICS-108`. Slice A
-  exports deterministic CPU reference helpers for `uint32` exclusive/inclusive
+  scan/compaction primitive contract introduced by `GRAPHICS-108`. It exports
+  deterministic CPU reference helpers for `uint32` exclusive/inclusive
   prefix scan and stable stream compaction by flags, plus status/diagnostic DTOs
-  that later Vulkan parity tests compare against. Slice B adds
-  backend-neutral dispatch planning for the `parallel_prefix_scan.comp`,
-  `parallel_scan_add_offsets.comp`, and `parallel_compact_by_flags.comp` shader
+  that Vulkan parity tests compare against; backend-neutral dispatch planning
+  for the `parallel_prefix_scan.comp`, `parallel_scan_add_offsets.comp`,
+  `parallel_compact_by_flags.comp`, and `parallel_count_to_dispatch_args.comp` shader
   assets, including recursive scratch-level sizing and `ShaderWrite` publication
-  barriers. Slice C adds RHI command recording: callers provide the command
-  context and compute pipeline handles, scratch is allocated through
+  barriers; and RHI command recording where callers provide the command context
+  and compute pipeline handles. Scratch is allocated through
   `RHI::BufferManager` when needed and returned as a lease, and stream
   compaction normalizes nonzero flags before the scan so GPU parity matches the
-  CPU reference. The GPU record API is fail-closed in the default gate: Null or
-  non-operational devices report `DeviceUnavailable` with
+  CPU reference. Compacted counts can be published as caller-owned host readback
+  buffers and/or `ParallelDispatchIndirectArgs` buffers for downstream
+  `DispatchIndirect` consumers. The GPU record API is fail-closed in the default
+  gate: Null or non-operational devices report `DeviceUnavailable` with
   `CpuFallbackRecommended`, missing recorder dependencies report `InvalidInput`,
   and invalid buffer/pipeline/BDA resources fail as `InvalidGpuResource`. The
   module imports RHI device/handle/barrier/descriptor/buffer-manager types but

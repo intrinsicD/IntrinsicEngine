@@ -13,8 +13,8 @@ The default CPU-supported gate owns two contracts:
 
 - deterministic CPU reference helpers for exclusive/inclusive prefix scan and
   stable compaction by flags;
-- backend-neutral GPU dispatch planning and RHI command recording for Vulkan
-  compute execution.
+- backend-neutral GPU dispatch planning, RHI command recording, and compacted
+  count publication for Vulkan compute execution.
 
 The GPU record API remains fail-closed on unsupported devices: non-operational
 devices report `DeviceUnavailable`, missing caller-owned recorder dependencies
@@ -23,9 +23,16 @@ scratch buffers report `InvalidGpuResource`. Operational Vulkan paths record
 commands through `RHI::ICommandContext`; no Vulkan-native type leaks through the
 graphics API.
 
+Compaction count publication is an explicit follow-up recording step. Callers
+can copy `OutputCount` into a host-visible readback buffer, build a
+`ParallelDispatchIndirectArgs` buffer with `ceil(OutputCount / GroupSize)`, or
+do both in one command stream. The dispatch-args buffer is published as
+`IndirectRead` so downstream GPU consumers can call `DispatchIndirect` without a
+CPU round trip.
+
 ## Shader Assets
 
-Slice B pins three shader assets under `assets/shaders/`:
+GRAPHICS-108 pins four shader assets under `assets/shaders/`:
 
 - `parallel_prefix_scan.comp` performs one 256-lane workgroup-local scan and
   optionally writes one block sum per workgroup. For stream compaction, the
@@ -35,8 +42,10 @@ Slice B pins three shader assets under `assets/shaders/`:
   into an existing scan output.
 - `parallel_compact_by_flags.comp` scatters kept keys using exclusive prefix
   offsets and writes the compacted count.
+- `parallel_count_to_dispatch_args.comp` converts a compacted `uint32` count
+  into the Vulkan dispatch-indirect argument schema `{groupCountX, 1, 1}`.
 
-All three use the promoted Buffer Device Address convention: storage buffers are
+All four use the promoted Buffer Device Address convention: storage buffers are
 passed through scalar push constants, matching the clustered-light and culling
 compute shaders. They do not introduce descriptor-set storage-buffer bindings.
 
@@ -83,7 +92,20 @@ Published outputs use:
 ShaderWrite -> ShaderRead
 ```
 
-The plan records these barriers as `RHI::MemoryAccess` values. Slice C owns
-the Vulkan parity smoke for scan and compaction. Slice D owns higher-level
-readback and/or indirect-args integration for the compacted count before task
-retirement.
+Count readback publication uses:
+
+```text
+OutputCount: ShaderRead -> TransferRead -> ShaderRead
+ReadbackCount: TransferWrite -> HostRead
+```
+
+Dispatch-args publication uses:
+
+```text
+DispatchArgs: ShaderWrite -> IndirectRead
+```
+
+The plan and publication helpers record these barriers as `RHI::MemoryAccess`
+values. The opt-in Vulkan smoke compares scan and compaction results with the
+CPU reference, verifies readback count and dispatch-args publication, and repeats
+the same compaction input to pin deterministic output/count behavior.

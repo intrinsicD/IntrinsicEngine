@@ -15,10 +15,6 @@ Each active task should include:
   — in progress; next verification step is focused object-space normal bake
   contract coverage plus the default CPU-supported gate after runtime
   orchestration lands.
-- [`GRAPHICS-108` — Reusable Vulkan compute parallel primitives](GRAPHICS-108-vulkan-compute-parallel-primitives.md)
-  — in progress; next verification step is Slice A CPU/reference contract
-  coverage for scan/compaction plus structural checks before any Vulkan dispatch
-  work.
 - [`RUNTIME-125` — Optional AoS fast lane for static geometry](RUNTIME-125-aos-static-fast-lane.md)
   — in progress; next verification step is Slice C focused graphics contract
   coverage plus opt-in `gpu;vulkan` parity smoke for the AoS storage/shader path.

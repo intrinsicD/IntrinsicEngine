@@ -292,12 +292,28 @@ namespace
         return true;
     }
 
+    struct CompactionSmokeResult
+    {
+        std::vector<std::uint32_t> KeptKeys{};
+        std::uint32_t OutputCount = 0u;
+        std::uint32_t ReadbackCount = 0u;
+        Graphics::ParallelDispatchIndirectArgs DispatchArgs{};
+    };
+
+    [[nodiscard]] std::uint32_t CeilDiv(const std::uint32_t value,
+                                        const std::uint32_t divisor) noexcept
+    {
+        return value == 0u ? 0u : 1u + ((value - 1u) / divisor);
+    }
+
     [[nodiscard]] bool RunCompactionCase(RHI::IDevice& device,
                                          RHI::BufferManager& buffers,
                                          const Graphics::ParallelPrimitivePipelineSet pipelines,
+                                         const RHI::PipelineHandle countToDispatchPipeline,
                                          const std::vector<std::uint32_t>& keys,
                                          const std::vector<std::uint32_t>& flags,
-                                         const std::string_view caseName)
+                                         const std::string_view caseName,
+                                         CompactionSmokeResult* outResult = nullptr)
     {
         std::vector<std::uint32_t> expected(keys.size(), 0u);
         const Graphics::ParallelPrimitiveCpuResult cpu =
@@ -319,12 +335,24 @@ namespace
                                    "ComputePrimitiveSmoke.OutputKeys");
         RHI::BufferHandle outputCountBuffer =
             CreateU32StorageBuffer(device, 1u, "ComputePrimitiveSmoke.OutputCount");
+        RHI::BufferHandle readbackCountBuffer =
+            device.CreateBuffer(
+                Graphics::BuildParallelCompactionCountReadbackBufferDesc(
+                    "ComputePrimitiveSmoke.OutputCount.Readback"));
+        RHI::BufferHandle dispatchArgsBuffer =
+            device.CreateBuffer(
+                Graphics::BuildParallelDispatchIndirectArgsBufferDesc(
+                    "ComputePrimitiveSmoke.DispatchArgs"));
         if (!keysBuffer.IsValid() ||
             !flagsBuffer.IsValid() ||
             !outputKeysBuffer.IsValid() ||
-            !outputCountBuffer.IsValid())
+            !outputCountBuffer.IsValid() ||
+            !readbackCountBuffer.IsValid() ||
+            !dispatchArgsBuffer.IsValid())
         {
             ADD_FAILURE() << caseName << ": buffer allocation failed";
+            DestroyBufferIfValid(device, dispatchArgsBuffer);
+            DestroyBufferIfValid(device, readbackCountBuffer);
             DestroyBufferIfValid(device, outputCountBuffer);
             DestroyBufferIfValid(device, outputKeysBuffer);
             DestroyBufferIfValid(device, flagsBuffer);
@@ -335,6 +363,12 @@ namespace
         std::vector<std::uint32_t> outputKeys(std::max<std::size_t>(keys.size(), 1u),
                                               0xdeadbeefu);
         std::uint32_t outputCount = 0xdeadbeefu;
+        std::uint32_t readbackCount = 0xdeadbeefu;
+        Graphics::ParallelDispatchIndirectArgs dispatchArgs{
+            .GroupCountX = 0xdeadbeefu,
+            .GroupCountY = 0xdeadbeefu,
+            .GroupCountZ = 0xdeadbeefu,
+        };
         if (!keys.empty())
         {
             device.WriteBuffer(keysBuffer,
@@ -354,15 +388,36 @@ namespace
                            &outputCount,
                            sizeof(outputCount),
                            0u);
+        device.WriteBuffer(readbackCountBuffer,
+                           &readbackCount,
+                           sizeof(readbackCount),
+                           0u);
+        device.WriteBuffer(dispatchArgsBuffer,
+                           &dispatchArgs,
+                           sizeof(dispatchArgs),
+                           0u);
+
+        auto destroyAll = [&device,
+                           &dispatchArgsBuffer,
+                           &readbackCountBuffer,
+                           &outputCountBuffer,
+                           &outputKeysBuffer,
+                           &flagsBuffer,
+                           &keysBuffer]() noexcept
+        {
+            DestroyBufferIfValid(device, dispatchArgsBuffer);
+            DestroyBufferIfValid(device, readbackCountBuffer);
+            DestroyBufferIfValid(device, outputCountBuffer);
+            DestroyBufferIfValid(device, outputKeysBuffer);
+            DestroyBufferIfValid(device, flagsBuffer);
+            DestroyBufferIfValid(device, keysBuffer);
+        };
 
         RHI::FrameHandle frame{};
         RHI::ICommandContext* cmd = nullptr;
         if (!BeginComputeFrame(device, frame, cmd, caseName))
         {
-            DestroyBufferIfValid(device, outputCountBuffer);
-            DestroyBufferIfValid(device, outputKeysBuffer);
-            DestroyBufferIfValid(device, flagsBuffer);
-            DestroyBufferIfValid(device, keysBuffer);
+            destroyAll();
             return false;
         }
 
@@ -401,6 +456,22 @@ namespace
                 .ElementCount = static_cast<std::uint32_t>(keys.size()),
             });
 
+        Graphics::GpuCompactionCountPublicationResult publication{};
+        if (gpu.Succeeded())
+        {
+            publication =
+                Graphics::RecordCompactionCountPublication(
+                    Graphics::GpuCompactionCountPublicationDesc{
+                        .Device = &device,
+                        .CommandContext = cmd,
+                        .CountToDispatchArgsPipeline = countToDispatchPipeline,
+                        .OutputCount = outputCountBuffer,
+                        .ReadbackCount = readbackCountBuffer,
+                        .DispatchArgs = dispatchArgsBuffer,
+                        .DispatchGroupSize = 64u,
+                    });
+        }
+
         if (gpu.Succeeded())
         {
             if (!keys.empty())
@@ -409,8 +480,11 @@ namespace
                                    RHI::MemoryAccess::ShaderRead,
                                    RHI::MemoryAccess::HostRead);
             }
-            cmd->BufferBarrier(outputCountBuffer,
-                               RHI::MemoryAccess::ShaderRead,
+        }
+        if (gpu.Succeeded() && publication.Succeeded())
+        {
+            cmd->BufferBarrier(dispatchArgsBuffer,
+                               RHI::MemoryAccess::IndirectRead,
                                RHI::MemoryAccess::HostRead);
         }
 
@@ -420,34 +494,59 @@ namespace
         {
             ADD_FAILURE() << caseName << ": GPU compaction record failed with status "
                           << Graphics::DebugNameForParallelPrimitiveStatus(gpu.Status);
-            DestroyBufferIfValid(device, outputCountBuffer);
-            DestroyBufferIfValid(device, outputKeysBuffer);
-            DestroyBufferIfValid(device, flagsBuffer);
-            DestroyBufferIfValid(device, keysBuffer);
+            destroyAll();
             return false;
         }
+        if (!publication.Succeeded())
+        {
+            ADD_FAILURE() << caseName
+                          << ": count publication failed with status "
+                          << Graphics::DebugNameForParallelPrimitiveStatus(
+                                 publication.Status);
+            destroyAll();
+            return false;
+        }
+        EXPECT_TRUE(publication.RecordedReadbackCopy) << caseName;
+        EXPECT_TRUE(publication.RecordedDispatchArgs) << caseName;
 
         std::vector<std::uint32_t> actualKeys(outputKeys.size(), 0u);
-        std::uint32_t actualCount = 0u;
+        std::uint32_t actualReadbackCount = 0u;
+        Graphics::ParallelDispatchIndirectArgs actualDispatchArgs{};
         device.ReadBuffer(outputKeysBuffer,
                           actualKeys.data(),
                           actualKeys.size() * sizeof(std::uint32_t),
                           0u);
-        device.ReadBuffer(outputCountBuffer,
-                          &actualCount,
-                          sizeof(actualCount),
+        device.ReadBuffer(readbackCountBuffer,
+                          &actualReadbackCount,
+                          sizeof(actualReadbackCount),
                           0u);
+        device.ReadBuffer(dispatchArgsBuffer,
+                          &actualDispatchArgs,
+                          sizeof(actualDispatchArgs),
+                          0u);
+        const std::uint32_t actualCount = actualReadbackCount;
 
         EXPECT_EQ(actualCount, cpu.Diagnostics.OutputCount) << caseName;
+        EXPECT_EQ(actualReadbackCount, cpu.Diagnostics.OutputCount) << caseName;
+        EXPECT_EQ(actualDispatchArgs.GroupCountX,
+                  CeilDiv(cpu.Diagnostics.OutputCount, 64u)) << caseName;
+        EXPECT_EQ(actualDispatchArgs.GroupCountY, 1u) << caseName;
+        EXPECT_EQ(actualDispatchArgs.GroupCountZ, 1u) << caseName;
         for (std::uint32_t i = 0u; i < cpu.Diagnostics.OutputCount; ++i)
         {
             EXPECT_EQ(actualKeys[i], expected[i]) << caseName << " kept index " << i;
         }
 
-        DestroyBufferIfValid(device, outputCountBuffer);
-        DestroyBufferIfValid(device, outputKeysBuffer);
-        DestroyBufferIfValid(device, flagsBuffer);
-        DestroyBufferIfValid(device, keysBuffer);
+        if (outResult != nullptr)
+        {
+            actualKeys.resize(cpu.Diagnostics.OutputCount);
+            outResult->KeptKeys = std::move(actualKeys);
+            outResult->OutputCount = actualCount;
+            outResult->ReadbackCount = actualReadbackCount;
+            outResult->DispatchArgs = actualDispatchArgs;
+        }
+
+        destroyAll();
         return true;
     }
 } // namespace
@@ -483,6 +582,9 @@ TEST(ComputeParallelPrimitivesGpuSmoke, VulkanScanAndCompactionMatchCpuReference
     const std::string compactShader =
         Extrinsic::Core::Filesystem::GetShaderPath(
             "shaders/parallel_compact_by_flags.comp.spv");
+    const std::string countToDispatchShader =
+        Extrinsic::Core::Filesystem::GetShaderPath(
+            "shaders/parallel_count_to_dispatch_args.comp.spv");
 
     RHI::PipelineHandle prefixPipeline =
         device.CreatePipeline(Graphics::BuildParallelPrefixScanPipelineDesc(
@@ -493,9 +595,16 @@ TEST(ComputeParallelPrimitivesGpuSmoke, VulkanScanAndCompactionMatchCpuReference
     RHI::PipelineHandle compactPipeline =
         device.CreatePipeline(Graphics::BuildParallelCompactByFlagsPipelineDesc(
             compactShader.c_str()));
+    RHI::PipelineHandle countToDispatchPipeline =
+        device.CreatePipeline(Graphics::BuildParallelCountToDispatchArgsPipelineDesc(
+            countToDispatchShader.c_str()));
 
-    if (!prefixPipeline.IsValid() || !addPipeline.IsValid() || !compactPipeline.IsValid())
+    if (!prefixPipeline.IsValid() ||
+        !addPipeline.IsValid() ||
+        !compactPipeline.IsValid() ||
+        !countToDispatchPipeline.IsValid())
     {
+        DestroyPipelineIfValid(device, countToDispatchPipeline);
         DestroyPipelineIfValid(device, compactPipeline);
         DestroyPipelineIfValid(device, addPipeline);
         DestroyPipelineIfValid(device, prefixPipeline);
@@ -544,24 +653,28 @@ TEST(ComputeParallelPrimitivesGpuSmoke, VulkanScanAndCompactionMatchCpuReference
         ASSERT_TRUE(RunCompactionCase(device,
                                       buffers,
                                       pipelines,
+                                      countToDispatchPipeline,
                                       {},
                                       {},
                                       "compact empty"));
         ASSERT_TRUE(RunCompactionCase(device,
                                       buffers,
                                       pipelines,
+                                      countToDispatchPipeline,
                                       {10u, 11u, 12u, 13u, 14u, 15u},
                                       {0u, 1u, 2u, 0u, 1u, 0u},
                                       "compact mixed"));
         ASSERT_TRUE(RunCompactionCase(device,
                                       buffers,
                                       pipelines,
+                                      countToDispatchPipeline,
                                       {4u, 5u, 6u},
                                       {1u, 1u, 1u},
                                       "compact all-kept"));
         ASSERT_TRUE(RunCompactionCase(device,
                                       buffers,
                                       pipelines,
+                                      countToDispatchPipeline,
                                       {4u, 5u, 6u},
                                       {0u, 0u, 0u},
                                       "compact all-dropped"));
@@ -578,11 +691,41 @@ TEST(ComputeParallelPrimitivesGpuSmoke, VulkanScanAndCompactionMatchCpuReference
         ASSERT_TRUE(RunCompactionCase(device,
                                       buffers,
                                       pipelines,
+                                      countToDispatchPipeline,
                                       compactKeys,
                                       compactFlags,
                                       "compact multiblock pseudorandom"));
+
+        CompactionSmokeResult firstDeterministic{};
+        CompactionSmokeResult secondDeterministic{};
+        ASSERT_TRUE(RunCompactionCase(device,
+                                      buffers,
+                                      pipelines,
+                                      countToDispatchPipeline,
+                                      compactKeys,
+                                      compactFlags,
+                                      "compact deterministic first",
+                                      &firstDeterministic));
+        ASSERT_TRUE(RunCompactionCase(device,
+                                      buffers,
+                                      pipelines,
+                                      countToDispatchPipeline,
+                                      compactKeys,
+                                      compactFlags,
+                                      "compact deterministic second",
+                                      &secondDeterministic));
+        EXPECT_EQ(firstDeterministic.OutputCount, secondDeterministic.OutputCount);
+        EXPECT_EQ(firstDeterministic.ReadbackCount, secondDeterministic.ReadbackCount);
+        EXPECT_EQ(firstDeterministic.KeptKeys, secondDeterministic.KeptKeys);
+        EXPECT_EQ(firstDeterministic.DispatchArgs.GroupCountX,
+                  secondDeterministic.DispatchArgs.GroupCountX);
+        EXPECT_EQ(firstDeterministic.DispatchArgs.GroupCountY,
+                  secondDeterministic.DispatchArgs.GroupCountY);
+        EXPECT_EQ(firstDeterministic.DispatchArgs.GroupCountZ,
+                  secondDeterministic.DispatchArgs.GroupCountZ);
     }
 
+    DestroyPipelineIfValid(device, countToDispatchPipeline);
     DestroyPipelineIfValid(device, compactPipeline);
     DestroyPipelineIfValid(device, addPipeline);
     DestroyPipelineIfValid(device, prefixPipeline);

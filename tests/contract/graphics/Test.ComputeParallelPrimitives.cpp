@@ -355,6 +355,33 @@ TEST(ComputeParallelPrimitives, BuildsComputePipelineDescriptors)
     EXPECT_EQ(compact.PushConstantSize,
               static_cast<std::uint32_t>(
                   sizeof(Graphics::ParallelCompactByFlagsPushConstants)));
+
+    const RHI::PipelineDesc countToDispatch =
+        Graphics::BuildParallelCountToDispatchArgsPipelineDesc();
+    EXPECT_TRUE(countToDispatch.ComputeShaderPath.ends_with(
+        "shaders/parallel_count_to_dispatch_args.comp.spv"));
+    EXPECT_EQ(countToDispatch.PushConstantSize,
+              static_cast<std::uint32_t>(
+                  sizeof(Graphics::ParallelCountToDispatchArgsPushConstants)));
+}
+
+TEST(ComputeParallelPrimitives, BuildsCountPublicationBufferDescriptors)
+{
+    const RHI::BufferDesc readback =
+        Graphics::BuildParallelCompactionCountReadbackBufferDesc();
+    EXPECT_EQ(readback.SizeBytes, sizeof(std::uint32_t));
+    EXPECT_TRUE(readback.HostVisible);
+    EXPECT_TRUE(RHI::HasUsage(readback.Usage, RHI::BufferUsage::TransferDst));
+    EXPECT_TRUE(RHI::HasUsage(readback.Usage, RHI::BufferUsage::TransferSrc));
+
+    const RHI::BufferDesc dispatchArgs =
+        Graphics::BuildParallelDispatchIndirectArgsBufferDesc();
+    EXPECT_EQ(dispatchArgs.SizeBytes, sizeof(Graphics::ParallelDispatchIndirectArgs));
+    EXPECT_FALSE(dispatchArgs.HostVisible);
+    EXPECT_TRUE(RHI::HasUsage(dispatchArgs.Usage, RHI::BufferUsage::Storage));
+    EXPECT_TRUE(RHI::HasUsage(dispatchArgs.Usage, RHI::BufferUsage::Indirect));
+    EXPECT_TRUE(RHI::HasUsage(dispatchArgs.Usage, RHI::BufferUsage::TransferSrc));
+    EXPECT_TRUE(RHI::HasUsage(dispatchArgs.Usage, RHI::BufferUsage::TransferDst));
 }
 
 TEST(ComputeParallelPrimitives, RecordsSingleBlockPrefixScanCommands)
@@ -502,6 +529,79 @@ TEST(ComputeParallelPrimitives, RecordsStreamCompactionWithScanAndScatter)
     EXPECT_EQ(device.CommandContext.BufferBarrierCalls[4].Buffer, outputCount);
 }
 
+TEST(ComputeParallelPrimitives, PublishesCompactionCountForReadbackAndIndirectDispatch)
+{
+    Tests::MockDevice device{};
+    const RHI::BufferHandle outputCount = ValidBuffer(4u);
+    const RHI::BufferHandle readbackCount = ValidBuffer(5u);
+    const RHI::BufferHandle dispatchArgs = ValidBuffer(6u);
+    const RHI::PipelineHandle countPipeline = ValidPipeline(13u);
+
+    const auto result =
+        Graphics::RecordCompactionCountPublication(
+            Graphics::GpuCompactionCountPublicationDesc{
+                .Device = &device,
+                .CommandContext = &device.CommandContext,
+                .CountToDispatchArgsPipeline = countPipeline,
+                .OutputCount = outputCount,
+                .ReadbackCount = readbackCount,
+                .DispatchArgs = dispatchArgs,
+                .OutputCountOffsetBytes = 16u,
+                .ReadbackCountOffsetBytes = 4u,
+                .DispatchArgsOffsetBytes = 12u,
+                .DispatchGroupSize = 64u,
+            });
+
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_TRUE(result.RecordedReadbackCopy);
+    EXPECT_TRUE(result.RecordedDispatchArgs);
+    EXPECT_FALSE(result.CpuFallbackRecommended);
+
+    ASSERT_EQ(device.CommandContext.CopyBufferRecords.size(), 1u);
+    EXPECT_EQ(device.CommandContext.CopyBufferRecords[0].Src, outputCount);
+    EXPECT_EQ(device.CommandContext.CopyBufferRecords[0].Dst, readbackCount);
+    EXPECT_EQ(device.CommandContext.CopyBufferRecords[0].SrcOffset, 16u);
+    EXPECT_EQ(device.CommandContext.CopyBufferRecords[0].DstOffset, 4u);
+    EXPECT_EQ(device.CommandContext.CopyBufferRecords[0].Size, sizeof(std::uint32_t));
+
+    ASSERT_EQ(device.CommandContext.BoundPipelines.size(), 1u);
+    EXPECT_EQ(device.CommandContext.BoundPipelines[0], countPipeline);
+    ASSERT_EQ(device.CommandContext.DispatchRecords.size(), 1u);
+    EXPECT_EQ(device.CommandContext.DispatchRecords[0].X, 1u);
+    EXPECT_EQ(device.CommandContext.DispatchRecords[0].Y, 1u);
+    EXPECT_EQ(device.CommandContext.DispatchRecords[0].Z, 1u);
+
+    ASSERT_EQ(device.CommandContext.PushConstantPayloads.size(), 1u);
+    const auto pc =
+        ReadPushPayload<Graphics::ParallelCountToDispatchArgsPushConstants>(
+            device.CommandContext.PushConstantPayloads[0]);
+    EXPECT_EQ(pc.CountBDA, device.GetBufferDeviceAddress(outputCount) + 16u);
+    EXPECT_EQ(pc.DispatchArgsBDA, device.GetBufferDeviceAddress(dispatchArgs) + 12u);
+    EXPECT_EQ(pc.GroupSize, 64u);
+
+    ASSERT_EQ(device.CommandContext.BufferBarrierCalls.size(), 4u);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[0].Buffer, outputCount);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[0].Before,
+              RHI::MemoryAccess::ShaderRead);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[0].After,
+              RHI::MemoryAccess::TransferRead);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[1].Buffer, readbackCount);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[1].Before,
+              RHI::MemoryAccess::TransferWrite);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[1].After,
+              RHI::MemoryAccess::HostRead);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[2].Buffer, outputCount);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[2].Before,
+              RHI::MemoryAccess::TransferRead);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[2].After,
+              RHI::MemoryAccess::ShaderRead);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[3].Buffer, dispatchArgs);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[3].Before,
+              RHI::MemoryAccess::ShaderWrite);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[3].After,
+              RHI::MemoryAccess::IndirectRead);
+}
+
 TEST(ComputeParallelPrimitives, GpuRecordReportsDeviceUnavailableForNullDevice)
 {
     Tests::MockDevice device{};
@@ -529,6 +629,18 @@ TEST(ComputeParallelPrimitives, GpuRecordReportsDeviceUnavailableForNullDevice)
     EXPECT_EQ(compact.Status, Graphics::ParallelPrimitiveStatus::DeviceUnavailable);
     EXPECT_FALSE(compact.Recorded);
     EXPECT_TRUE(compact.CpuFallbackRecommended);
+
+    const auto countPublication =
+        Graphics::RecordCompactionCountPublication(
+            Graphics::GpuCompactionCountPublicationDesc{
+                .Device = &device,
+                .CommandContext = &device.CommandContext,
+                .OutputCount = ValidBuffer(4u),
+                .ReadbackCount = ValidBuffer(5u),
+            });
+    EXPECT_EQ(countPublication.Status,
+              Graphics::ParallelPrimitiveStatus::DeviceUnavailable);
+    EXPECT_TRUE(countPublication.CpuFallbackRecommended);
 }
 
 TEST(ComputeParallelPrimitives, GpuRecordValidatesRecorderInputsAndResources)
@@ -594,6 +706,44 @@ TEST(ComputeParallelPrimitives, GpuRecordValidatesRecorderInputsAndResources)
               Graphics::ParallelPrimitiveStatus::InvalidGpuResource);
     EXPECT_FALSE(missingPipeline.Recorded);
     EXPECT_FALSE(missingPipeline.CpuFallbackRecommended);
+
+    const auto missingCountTarget =
+        Graphics::RecordCompactionCountPublication(
+            Graphics::GpuCompactionCountPublicationDesc{
+                .Device = &device,
+                .CommandContext = &device.CommandContext,
+                .OutputCount = ValidBuffer(4u),
+            });
+    EXPECT_EQ(missingCountTarget.Status,
+              Graphics::ParallelPrimitiveStatus::InvalidInput);
+
+    const auto missingCountPipeline =
+        Graphics::RecordCompactionCountPublication(
+            Graphics::GpuCompactionCountPublicationDesc{
+                .Device = &device,
+                .CommandContext = &device.CommandContext,
+                .OutputCount = ValidBuffer(4u),
+                .ReadbackCount = ValidBuffer(5u),
+                .DispatchArgs = ValidBuffer(6u),
+                .DispatchGroupSize = 64u,
+            });
+    EXPECT_EQ(missingCountPipeline.Status,
+              Graphics::ParallelPrimitiveStatus::InvalidInput);
+    EXPECT_FALSE(missingCountPipeline.RecordedReadbackCopy)
+        << "Validation must reject bad indirect publication before recording copy commands.";
+
+    const auto zeroDispatchGroupSize =
+        Graphics::RecordCompactionCountPublication(
+            Graphics::GpuCompactionCountPublicationDesc{
+                .Device = &device,
+                .CommandContext = &device.CommandContext,
+                .CountToDispatchArgsPipeline = ValidPipeline(13u),
+                .OutputCount = ValidBuffer(4u),
+                .DispatchArgs = ValidBuffer(6u),
+                .DispatchGroupSize = 0u,
+            });
+    EXPECT_EQ(zeroDispatchGroupSize.Status,
+              Graphics::ParallelPrimitiveStatus::InvalidInput);
 }
 
 TEST(ComputeParallelPrimitives, StatusDebugNamesAreStable)

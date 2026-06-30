@@ -3031,3 +3031,22 @@ the C++/CTest gate could not run in the authoring sandbox (vcpkg bootstrap needs
 a github clone the egress proxy denies, so the `ci` preset cannot configure
 there); the runnable structural checks pass and CI owns the compile + contract
 tests.
+
+[`GRAPHICS-108`](GRAPHICS-108-vulkan-compute-parallel-primitives.md) —
+reusable Vulkan compute parallel primitives retired to `tasks/done/` on
+2026-06-30 at `Operational`. `Extrinsic.Graphics.ComputeParallelPrimitives`
+now owns deterministic CPU references, backend-neutral dispatch/scratch plans,
+RHI command recording, and promoted Vulkan smoke parity for `uint32`
+exclusive/inclusive prefix scan and stable stream compaction by nonzero flags.
+The GPU path uses four BDA-based compute shaders:
+`parallel_prefix_scan.comp`, `parallel_scan_add_offsets.comp`,
+`parallel_compact_by_flags.comp`, and `parallel_count_to_dispatch_args.comp`.
+Compaction publishes `OutputCount` to caller-owned readback buffers and/or
+`ParallelDispatchIndirectArgs` buffers, enabling downstream GPU consumers
+without a CPU count round trip. Default-gate contract tests cover CPU parity,
+planning, command recording, fail-closed statuses, count publication, and
+descriptor builders; the opt-in `gpu;vulkan` smoke validates Vulkan scan,
+compaction, count readback, dispatch-args publication, and repeated-input
+determinism. The seam remains graphics/RHI-only with no Vulkan handle leakage,
+ECS/runtime/app/platform imports, CUDA path, or method-specific kernels.
+`METHOD-013` is now unblocked for the progressive Poisson Vulkan backend.

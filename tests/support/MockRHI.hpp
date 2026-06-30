@@ -173,12 +173,14 @@ namespace Extrinsic::Tests
             BindPipeline,
             PushConstants,
             Dispatch,
+            DispatchIndirect,
             BindIndexBuffer,
             Draw,
             DrawIndexed,
             DrawIndexedIndirectCount,
             DrawIndirectCount,
             TextureBarrier,
+            CopyBuffer,
         };
 
         struct DrawRecord
@@ -225,6 +227,21 @@ namespace Extrinsic::Tests
             std::uint32_t X = 0;
             std::uint32_t Y = 0;
             std::uint32_t Z = 0;
+        };
+
+        struct DispatchIndirectRecord
+        {
+            RHI::BufferHandle Args{};
+            std::uint64_t Offset = 0;
+        };
+
+        struct CopyBufferRecord
+        {
+            RHI::BufferHandle Src{};
+            RHI::BufferHandle Dst{};
+            std::uint64_t SrcOffset = 0;
+            std::uint64_t DstOffset = 0;
+            std::uint64_t Size = 0;
         };
 
         void Begin() override { ++BeginCalls; Events.push_back(EventKind::Begin); }
@@ -320,7 +337,16 @@ namespace Extrinsic::Tests
             DispatchRecords.push_back(LastDispatch);
             Events.push_back(EventKind::Dispatch);
         }
-        void DispatchIndirect(RHI::BufferHandle, std::uint64_t) override {}
+        void DispatchIndirect(RHI::BufferHandle argBuffer, std::uint64_t offset) override
+        {
+            ++DispatchIndirectCalls;
+            LastDispatchIndirect = DispatchIndirectRecord{
+                .Args = argBuffer,
+                .Offset = offset,
+            };
+            DispatchIndirectRecords.push_back(LastDispatchIndirect);
+            Events.push_back(EventKind::DispatchIndirect);
+        }
         void TextureBarrier(RHI::TextureHandle texture, RHI::TextureLayout before, RHI::TextureLayout after) override
         {
             TextureBarrierCalls.push_back({texture, before, after});
@@ -364,8 +390,21 @@ namespace Extrinsic::Tests
             ++FillBufferCalls;
             Events.push_back(EventKind::FillBuffer);
         }
-        void CopyBuffer(RHI::BufferHandle, RHI::BufferHandle,
-                        std::uint64_t, std::uint64_t, std::uint64_t) override {}
+        void CopyBuffer(RHI::BufferHandle src, RHI::BufferHandle dst,
+                        std::uint64_t srcOffset, std::uint64_t dstOffset,
+                        std::uint64_t size) override
+        {
+            ++CopyBufferCalls;
+            LastCopyBuffer = CopyBufferRecord{
+                .Src = src,
+                .Dst = dst,
+                .SrcOffset = srcOffset,
+                .DstOffset = dstOffset,
+                .Size = size,
+            };
+            CopyBufferRecords.push_back(LastCopyBuffer);
+            Events.push_back(EventKind::CopyBuffer);
+        }
         void CopyBufferToTexture(RHI::BufferHandle, std::uint64_t,
                                  RHI::TextureHandle, std::uint32_t, std::uint32_t) override {}
 
@@ -373,6 +412,8 @@ namespace Extrinsic::Tests
         std::vector<SampledTextureBindingRecord> SampledTextureBindings{};
         std::vector<BufferBarrierRecord>  BufferBarrierCalls{};
         std::vector<DispatchRecord> DispatchRecords{};
+        std::vector<DispatchIndirectRecord> DispatchIndirectRecords{};
+        std::vector<CopyBufferRecord> CopyBufferRecords{};
         std::vector<EventKind> Events{};
         std::vector<std::uint32_t> PushConstantSizes{};
         std::vector<RHI::PipelineHandle> BoundPipelines{};
@@ -387,6 +428,8 @@ namespace Extrinsic::Tests
         int BindIndexBufferCalls = 0;
         int PushConstantsCalls = 0;
         int DispatchCalls = 0;
+        int DispatchIndirectCalls = 0;
+        int CopyBufferCalls = 0;
         int DrawCalls = 0;
         int DrawIndexedCalls = 0;
         int DrawIndexedIndirectCountCalls = 0;
@@ -396,6 +439,8 @@ namespace Extrinsic::Tests
         std::uint32_t LastPushConstantSize = 0;
         std::uint32_t LastPushConstantOffset = 0;
         DispatchRecord LastDispatch{};
+        DispatchIndirectRecord LastDispatchIndirect{};
+        CopyBufferRecord LastCopyBuffer{};
         RHI::PipelineHandle LastBoundPipeline{};
         RHI::BufferHandle LastIndexBuffer{};
         std::uint64_t LastIndexBufferOffset = 0;

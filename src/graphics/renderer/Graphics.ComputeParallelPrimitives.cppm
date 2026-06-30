@@ -181,6 +181,26 @@ export namespace Extrinsic::Graphics
     };
     static_assert(sizeof(ParallelCompactByFlagsPushConstants) == 56u);
 
+    // Matches `assets/shaders/parallel_count_to_dispatch_args.comp` scalar push layout.
+    struct ParallelCountToDispatchArgsPushConstants
+    {
+        std::uint64_t CountBDA = 0u;
+        std::uint64_t DispatchArgsBDA = 0u;
+        std::uint32_t GroupSize = kParallelPrimitiveGroupSize;
+        std::uint32_t Reserved0 = 0u;
+        std::uint32_t Reserved1 = 0u;
+        std::uint32_t Reserved2 = 0u;
+    };
+    static_assert(sizeof(ParallelCountToDispatchArgsPushConstants) == 32u);
+
+    struct ParallelDispatchIndirectArgs
+    {
+        std::uint32_t GroupCountX = 0u;
+        std::uint32_t GroupCountY = 1u;
+        std::uint32_t GroupCountZ = 1u;
+    };
+    static_assert(sizeof(ParallelDispatchIndirectArgs) == 12u);
+
     struct ParallelPrimitivePipelineSet
     {
         RHI::PipelineHandle PrefixScan{};
@@ -232,6 +252,33 @@ export namespace Extrinsic::Graphics
         }
     };
 
+    struct GpuCompactionCountPublicationDesc
+    {
+        RHI::IDevice* Device = nullptr;
+        RHI::ICommandContext* CommandContext = nullptr;
+        RHI::PipelineHandle CountToDispatchArgsPipeline{};
+        RHI::BufferHandle OutputCount{};
+        RHI::BufferHandle ReadbackCount{};
+        RHI::BufferHandle DispatchArgs{};
+        std::uint64_t OutputCountOffsetBytes = 0u;
+        std::uint64_t ReadbackCountOffsetBytes = 0u;
+        std::uint64_t DispatchArgsOffsetBytes = 0u;
+        std::uint32_t DispatchGroupSize = kParallelPrimitiveGroupSize;
+    };
+
+    struct GpuCompactionCountPublicationResult
+    {
+        ParallelPrimitiveStatus Status = ParallelPrimitiveStatus::Success;
+        bool RecordedReadbackCopy = false;
+        bool RecordedDispatchArgs = false;
+        bool CpuFallbackRecommended = false;
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == ParallelPrimitiveStatus::Success;
+        }
+    };
+
     [[nodiscard]] const char* DebugNameForParallelPrimitiveStatus(
         ParallelPrimitiveStatus status) noexcept;
 
@@ -264,6 +311,12 @@ export namespace Extrinsic::Graphics
         const ParallelPrimitiveDispatchPlan& plan,
         const char* debugName = "ParallelPrimitives.Scratch") noexcept;
 
+    [[nodiscard]] RHI::BufferDesc BuildParallelCompactionCountReadbackBufferDesc(
+        const char* debugName = "ParallelPrimitives.CompactionCount.Readback") noexcept;
+
+    [[nodiscard]] RHI::BufferDesc BuildParallelDispatchIndirectArgsBufferDesc(
+        const char* debugName = "ParallelPrimitives.DispatchArgs") noexcept;
+
     [[nodiscard]] RHI::PipelineDesc BuildParallelPrefixScanPipelineDesc(
         const char* shaderPath = "shaders/parallel_prefix_scan.comp.spv");
 
@@ -273,9 +326,15 @@ export namespace Extrinsic::Graphics
     [[nodiscard]] RHI::PipelineDesc BuildParallelCompactByFlagsPipelineDesc(
         const char* shaderPath = "shaders/parallel_compact_by_flags.comp.spv");
 
+    [[nodiscard]] RHI::PipelineDesc BuildParallelCountToDispatchArgsPipelineDesc(
+        const char* shaderPath = "shaders/parallel_count_to_dispatch_args.comp.spv");
+
     [[nodiscard]] GpuParallelPrimitiveRecordResult RecordGpuPrefixScan(
         const GpuPrefixScanRecordDesc& desc);
 
     [[nodiscard]] GpuParallelPrimitiveRecordResult RecordGpuStreamCompaction(
         const GpuStreamCompactionRecordDesc& desc);
+
+    [[nodiscard]] GpuCompactionCountPublicationResult RecordCompactionCountPublication(
+        const GpuCompactionCountPublicationDesc& desc);
 }
