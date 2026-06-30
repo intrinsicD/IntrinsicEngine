@@ -50,6 +50,25 @@ maturity_target: Operational
   heavy/nightly benchmark metric extension needed for `Operational` and
   `ParityProven`.
 
+## Continuation note
+
+- Paused on 2026-06-30 after committing Slice B (`a91c85a8`). No Slice C code
+  changes were staged or left in the worktree.
+- Resume with Slice C by adding a runtime recordable execution seam in
+  `Extrinsic.Runtime.ProgressivePoissonGpuBackend`: resource handles, a pipeline
+  set, a state-record builder, and a recorder result that binds the two
+  progressive-Poisson kernels through `RHI::ICommandContext` and delegates
+  accepted/remaining stream compaction to GRAPHICS-108
+  `RecordGpuStreamCompaction`.
+- Upgrade `assets/shaders/progressive_poisson_accept_phase.comp` from the Slice B
+  phase mask to conservative conflict-checked accept logic over the per-level
+  hash table and accepted set. Keep public Sandbox behavior CPU-fallback-only
+  until upload/readback/parity evidence lands.
+- Add default-gate coverage in
+  `tests/contract/runtime/Test.ProgressivePoissonGpuBackend.cpp` using
+  `Tests::MockDevice` to prove record order, push constants, compaction
+  delegation, invalid-resource fallback, and non-operational CPU fallback.
+
 ## Required changes
 - [x] Slice A: expose backend selection in config/command DTOs and return
       requested/actual backend diagnostics while preserving CPU reference output.
