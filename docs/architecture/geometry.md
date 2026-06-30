@@ -465,6 +465,26 @@ get the output property and return the written normal handle with diagnostics
 for non-finite input, too-few neighbors, collinear or duplicate neighborhoods,
 fallback writes, orientation flips, and spatial-query work.
 
+### Point-cloud feature descriptors and coarse registration
+
+`Geometry.PointCloud.Features` owns the generic, paper-neutral seams that
+initialize robust point-cloud registration and feed later `methods/geometry`
+packages: keypoints → descriptors → correspondences → coarse alignment → ICP.
+The selected first families are ISS saliency keypoints (eigenvalue-ratio gated
+with deterministic non-maximum suppression) and FPFH descriptors (33-D, Darboux
+histograms), both deterministic and `geometry -> core` only. Descriptor
+computation requires `Cloud::HasNormals()` (generate via
+`Geometry.PointCloud.Normals`) and fails closed otherwise. Matching is brute
+force with mutual-best and optional Lowe-ratio filtering and lower-index
+tie-breaks. `EstimateCoarseAlignment` runs a deterministic RANSAC over feature
+correspondences (seeded SplitMix sampler, edge-length consistency, internal
+Kabsch/SVD with reflection correction) and returns a rigid transform plus
+inlier/RMSE/iteration diagnostics and a status enum. No Eigen types cross the
+public interface. The seam initializes, and does not replace, the existing
+`Geometry.Registration` ICP refinement path. Paper-specific robust/global
+registration backends (TEASER/FGR/CPD-class) remain deferred to
+`methods/geometry` follow-ups.
+
 ### UV atlas backend contract
 
 `Geometry.UvAtlas` owns the backend-neutral UV atlas contract for generated

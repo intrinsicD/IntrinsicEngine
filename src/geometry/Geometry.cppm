@@ -80,6 +80,7 @@ export import Geometry.ConvexHullBuilder;
 export import Geometry.KMeans;
 export import Geometry.PointCloud;
 export import Geometry.PointCloud.Conversion;
+export import Geometry.PointCloud.Features;
 export import Geometry.PointCloud.Normals;
 export import Geometry.PointCloud.QualityMetrics;
 export import Geometry.PointCloud.SurfaceSampling;
