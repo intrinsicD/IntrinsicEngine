@@ -77,6 +77,12 @@ usable sandbox that can show authored mesh, graph, and point-cloud data with
 selection and UI. They are ordered after the visible-triangle foundation and
 compose with the rendering tasks listed in `tasks/backlog/rendering/README.md`.
 
+`RUNTIME-134` is retired at `CPUContracted`; the Sandbox now exposes the
+progressive-Poisson CPU reference playground for selected point-cloud and mesh
+inputs. The future CPU/GPU backend selector is blocked on METHOD-013 and tracked
+by
+[`RUNTIME-136`](RUNTIME-136-progressive-poisson-gpu-backend-toggle.md).
+
 
 ## Cross-linked rendering tasks (runtime-owned)
 

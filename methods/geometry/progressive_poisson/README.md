@@ -28,6 +28,7 @@ backend and parity reporting.
 - **RUNTIME-133** — figure/data export (CSV/JSON) for reproducible plots.
 - **GRAPHICS-109** — offscreen frame capture to PNG for rendered figures.
 - **RUNTIME-134** — interactive Sandbox playground binding every `SamplerConfig` knob.
+- **RUNTIME-136** — future Sandbox CPU/GPU backend toggle after METHOD-013.
 
 ## Interactive usage
 
@@ -66,8 +67,8 @@ Widget edits preview and hot-apply a serialized `EngineConfig` through
 `Engine::ApplyEngineConfigHotSubset`; when `auto_run_on_edit` is enabled, the
 Sandbox schedules a debounced rerun. The explicit Run action uses the same
 config path before invoking the CPU reference command.
-The backend toggle is deferred to METHOD-013, which owns the Vulkan-compute
-backend and CPU/GPU parity.
+The backend toggle is deferred to RUNTIME-136 after METHOD-013 lands; METHOD-013
+owns the Vulkan-compute backend and CPU/GPU parity.
 
 ## Known limitations
 

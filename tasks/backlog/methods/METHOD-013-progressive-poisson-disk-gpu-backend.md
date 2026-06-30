@@ -10,7 +10,7 @@ depends_on: [METHOD-012, GRAPHICS-108]
 
 ## Non-goals
 - No change to the CPU reference semantics (METHOD-012 is canonical truth).
-- No interactive UI wiring (RUNTIME-134) and no figure export (RUNTIME-133).
+- No interactive UI wiring (RUNTIME-136) and no figure export (RUNTIME-133).
 - No CUDA path; the GPU backend is Vulkan compute only.
 
 ## Context

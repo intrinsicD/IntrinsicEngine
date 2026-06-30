@@ -245,7 +245,8 @@ debounced rerun when `auto_run_on_edit` is enabled. The explicit Run button uses
 the same config path before invoking the sampler command. The command only
 composes runtime-owned ECS state and the public method/surface-sampling APIs; it
 does not add sampler logic to UI code or call renderer/RHI upload APIs directly.
-The future backend toggle remains blocked on METHOD-013.
+The future backend toggle is tracked by RUNTIME-136 and remains blocked on
+METHOD-013.
 
 ### Sandbox Editor Mesh Curvature
 

@@ -9,6 +9,20 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`RUNTIME-134`](RUNTIME-134-progressive-poisson-interactive-playground.md) —
+Interactive progressive-Poisson sampling playground in the Sandbox — retired on
+2026-06-30 at maturity `CPUContracted`. The Sandbox now exposes METHOD-012 over
+selected point-cloud and mesh inputs, including GEOM-035 mesh surface sampling,
+validated `sandbox.progressive_poisson` config-control routing, debounced
+reruns, point visualization via `p:poisson_level`, `p:poisson_phase`,
+`p:poisson_splat_radius`, and `p:poisson_prefix_visible`, plus CPU backend id
+and per-level accepted-count readouts. Headless runtime tests cover direct
+command/direct-method equivalence, config-path equivalence, mesh sampling, and
+deterministic property publication; the default CPU-supported gate passed.
+GPU backend/parity remains blocked by `GRAPHICS-108` and is owned by
+`METHOD-013`; future Sandbox backend-toggle UI is tracked by `RUNTIME-136`.
+
+Active
 [`PROC-013`](PROC-013-graphify-knowledge-graph-discovery-aid.md) —
 Knowledge-graph discovery aid (graphify adapters + shared setup) — retired on
 2026-06-29 at maturity `Scaffolded`. The optional graphify discovery path now
