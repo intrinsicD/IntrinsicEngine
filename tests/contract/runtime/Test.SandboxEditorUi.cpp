@@ -24,6 +24,7 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 
+#include "ProgressivePoissonReference.hpp"
 #include "TestImGuiFrameScope.hpp"
 
 import Extrinsic.Asset.ImportRouter;
@@ -104,6 +105,7 @@ namespace GN = Geometry::HalfedgeMesh::VertexNormals;
 namespace GVN = Geometry::Graph::VertexNormals;
 namespace PCN = Geometry::PointCloud::Normals;
 namespace Smooth = Geometry::Smoothing;
+namespace PPR = Intrinsic::Methods::Geometry::ProgressivePoissonReference;
 
 namespace
 {
@@ -2079,11 +2081,12 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
         Domain::MeshVertices));
     const std::vector<Runtime::SandboxEditorGeometryProcessingEntry> cloudEntries =
         Runtime::ResolveSandboxEditorGeometryProcessingEntries(registry, cloud);
-    ASSERT_EQ(cloudEntries.size(), 8u);
+    ASSERT_EQ(cloudEntries.size(), 11u);
     EXPECT_EQ(cloudEntries[0].Algorithm, Algorithm::KMeans);
     EXPECT_EQ(cloudEntries[1].Algorithm, Algorithm::NormalEstimation);
     EXPECT_EQ(cloudEntries[2].Algorithm, Algorithm::Registration);
-    EXPECT_EQ(cloudEntries[7].Algorithm, Algorithm::SurfaceReconstruction);
+    EXPECT_EQ(cloudEntries[6].Algorithm, Algorithm::ProgressivePoissonSampling);
+    EXPECT_EQ(cloudEntries[10].Algorithm, Algorithm::SurfaceReconstruction);
     const std::vector<Domain> cloudKMeans =
         Runtime::GetAvailableSandboxEditorKMeansDomains(registry, cloud);
     ASSERT_EQ(cloudKMeans.size(), 1u);
@@ -2099,6 +2102,7 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
     EXPECT_FALSE(cloudModel.Processing.MeshVertexNormalsAvailable);
     EXPECT_FALSE(cloudModel.Processing.GraphVertexNormalsAvailable);
     EXPECT_TRUE(cloudModel.Processing.PointCloudVertexNormalsAvailable);
+    EXPECT_TRUE(cloudModel.Processing.PointCloudProgressivePoissonAvailable);
 
     const ECS::EntityHandle empty = MakeSelectable(registry, "Empty");
     const Runtime::SandboxEditorGeometryProcessingCapabilities emptyCaps =
@@ -2203,6 +2207,195 @@ TEST(SandboxEditorUi, KMeansCommandPublishesMeshGraphAndPointCloudProperties)
     ASSERT_TRUE(model.Processing.LastKMeansResult.has_value());
     EXPECT_TRUE(model.Processing.LastKMeansResult->Succeeded());
     EXPECT_EQ(model.Processing.LastKMeansResult->LabelCount, 4u);
+}
+
+TEST(SandboxEditorUi, ProgressivePoissonCommandPublishesPointPropertiesAndVisualization)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "PoissonCloud");
+    AddPointCloudSource(registry, cloud, 8u);
+    const std::vector<glm::vec3> positions{
+        {0.0f, 0.0f, 0.0f},
+        {1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+        {1.0f, 1.0f, 0.0f},
+        {0.0f, 0.0f, 1.0f},
+        {1.0f, 0.0f, 1.0f},
+        {0.0f, 1.0f, 1.0f},
+        {1.0f, 1.0f, 1.0f},
+    };
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
+
+    const Runtime::SandboxEditorProgressivePoissonConfig config{
+        .Dimension = 3u,
+        .GridWidth = 2u,
+        .MaxLevels = 4u,
+        .HashLoadFactor = 0.5f,
+        .RadiusAlpha = -1.0f,
+        .RandomizeGridOrigin = false,
+        .GridOriginSeed = 17u,
+        .ShuffleWithinLevels = true,
+        .ShuffleSeed = 23u,
+        .PrefixCount = 3u,
+        .Channel = Runtime::SandboxEditorProgressivePoissonChannel::Phase,
+    };
+
+    const Runtime::SandboxEditorProgressivePoissonResult result =
+        Runtime::ApplySandboxEditorProgressivePoissonCommand(
+            context,
+            Runtime::SandboxEditorProgressivePoissonCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(cloud),
+                .Config = config,
+            });
+
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_EQ(result.InputCount, positions.size());
+    EXPECT_GT(result.AcceptedCount, 0u);
+    EXPECT_EQ(result.PrefixCount, std::min(3u, result.AcceptedCount));
+    EXPECT_EQ(result.Channel,
+              Runtime::SandboxEditorProgressivePoissonChannel::Phase);
+    EXPECT_STREQ(
+        Runtime::DebugNameForSandboxEditorProgressivePoissonChannel(
+            result.Channel),
+        "Phase");
+
+    Geometry::PropertySet& properties =
+        registry.Raw().get<GS::Vertices>(cloud).Properties;
+    const auto levels = properties.Get<float>("p:poisson_level");
+    const auto phases = properties.Get<float>("p:poisson_phase");
+    const auto splats = properties.Get<float>("p:poisson_splat_radius");
+    const auto visible = properties.Get<float>("p:poisson_prefix_visible");
+    ASSERT_TRUE(levels);
+    ASSERT_TRUE(phases);
+    ASSERT_TRUE(splats);
+    ASSERT_TRUE(visible);
+    ASSERT_EQ(levels.Vector().size(), positions.size());
+    ASSERT_EQ(phases.Vector().size(), positions.size());
+    ASSERT_EQ(splats.Vector().size(), positions.size());
+    ASSERT_EQ(visible.Vector().size(), positions.size());
+
+    std::size_t acceptedFromProperties = 0u;
+    std::size_t visibleFromProperties = 0u;
+    for (std::size_t i = 0u; i < positions.size(); ++i)
+    {
+        if (levels.Vector()[i] >= 0.0f)
+        {
+            ++acceptedFromProperties;
+            EXPECT_GE(phases.Vector()[i], 0.0f);
+            EXPECT_LT(phases.Vector()[i], 8.0f);
+            EXPECT_GT(splats.Vector()[i], 0.0f);
+        }
+        if (visible.Vector()[i] > 0.5f)
+            ++visibleFromProperties;
+    }
+    EXPECT_EQ(acceptedFromProperties, result.AcceptedCount);
+    EXPECT_EQ(visibleFromProperties, result.PrefixCount);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(cloud));
+    EXPECT_TRUE(registry.Raw().all_of<G::RenderPoints>(cloud));
+
+    ASSERT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(cloud));
+    const G::VisualizationConfig& vis =
+        registry.Raw().get<G::VisualizationConfig>(cloud);
+    EXPECT_EQ(vis.Source, G::VisualizationConfig::ColorSource::ScalarField);
+    EXPECT_EQ(vis.ScalarDomain, G::VisualizationConfig::Domain::Vertex);
+    EXPECT_EQ(vis.ScalarFieldName, "p:poisson_phase");
+
+    context.LastProgressivePoissonResult = &result;
+    const Runtime::SandboxEditorDomainWindowModel model =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::PointCloud);
+    EXPECT_TRUE(model.Processing.PointCloudProgressivePoissonAvailable);
+    ASSERT_TRUE(model.Processing.LastProgressivePoissonResult.has_value());
+    EXPECT_TRUE(model.Processing.LastProgressivePoissonResult->Succeeded());
+    EXPECT_EQ(model.Processing.LastProgressivePoissonResult->AcceptedCount,
+              result.AcceptedCount);
+}
+
+TEST(SandboxEditorUi, ProgressivePoissonCommandMatchesDirectMethodConfig)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "PoissonCloud");
+    AddPointCloudSource(registry, cloud, 6u);
+    const std::vector<glm::vec3> positions{
+        {0.0f, 0.0f, 0.0f},
+        {0.25f, 0.0f, 0.0f},
+        {0.5f, 0.5f, 0.0f},
+        {1.0f, 0.0f, 0.0f},
+        {1.0f, 1.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+    };
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
+
+    const Runtime::SandboxEditorProgressivePoissonConfig config{
+        .Dimension = 2u,
+        .GridWidth = 3u,
+        .MaxLevels = 5u,
+        .HashLoadFactor = 0.75f,
+        .RadiusAlpha = 0.4f,
+        .RandomizeGridOrigin = true,
+        .GridOriginSeed = 19u,
+        .ShuffleWithinLevels = false,
+        .ShuffleSeed = 29u,
+        .PrefixCount = 0u,
+        .Channel = Runtime::SandboxEditorProgressivePoissonChannel::Level,
+    };
+
+    const Runtime::SandboxEditorProgressivePoissonResult result =
+        Runtime::ApplySandboxEditorProgressivePoissonCommand(
+            context,
+            Runtime::SandboxEditorProgressivePoissonCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(cloud),
+                .Config = config,
+            });
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+
+    PPR::Config directConfig{};
+    directConfig.Dimension = config.Dimension;
+    directConfig.GridWidth = config.GridWidth;
+    directConfig.MaxLevels = config.MaxLevels;
+    directConfig.HashLoadFactor = config.HashLoadFactor;
+    directConfig.RadiusAlpha = config.RadiusAlpha;
+    directConfig.RandomizeGridOrigin = config.RandomizeGridOrigin;
+    directConfig.GridOriginSeed = config.GridOriginSeed;
+    directConfig.ShuffleWithinLevels = config.ShuffleWithinLevels;
+    directConfig.ShuffleSeed = config.ShuffleSeed;
+    const PPR::Result direct = PPR::Compute(positions, directConfig);
+    ASSERT_EQ(direct.Diag.Code, PPR::ValidationCode::Valid);
+
+    EXPECT_EQ(result.InputCount, direct.Diag.InputCount);
+    EXPECT_EQ(result.AcceptedCount, direct.Diag.AcceptedCount);
+    EXPECT_EQ(result.PrefixCount, direct.Diag.AcceptedCount);
+    EXPECT_EQ(result.LevelCount, direct.Diag.LevelCounts.size());
+    EXPECT_FLOAT_EQ(result.BaseRadius, direct.BaseRadius);
+    EXPECT_FLOAT_EQ(result.UsedAlpha, direct.Diag.UsedAlpha);
+
+    Geometry::PropertySet& properties =
+        registry.Raw().get<GS::Vertices>(cloud).Properties;
+    const auto levels = properties.Get<float>("p:poisson_level");
+    ASSERT_TRUE(levels);
+    ASSERT_EQ(levels.Vector().size(), positions.size());
+
+    std::vector<float> expectedLevels(positions.size(), -1.0f);
+    for (std::size_t level = 0u; level + 1u < direct.LevelOffsets.size(); ++level)
+    {
+        for (std::uint32_t rank = direct.LevelOffsets[level];
+             rank < direct.LevelOffsets[level + 1u];
+             ++rank)
+        {
+            expectedLevels[direct.Order[rank]] = static_cast<float>(level);
+        }
+    }
+    EXPECT_EQ(levels.Vector(), expectedLevels);
 }
 
 TEST(SandboxEditorUi, VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPointCloud)
@@ -2472,15 +2665,16 @@ TEST(SandboxEditorUi, MeshDenoiseCommandPublishesPositionsAndSupportsUndoRedo)
 
 namespace
 {
-    // Two dense 3x3 grid clusters plus two far isolated outliers (appended
+    // Two dense 5x5 grid clusters plus three far isolated outliers (appended
     // last) — a deterministic UI-027 outlier-removal fixture mirroring the
     // GEOM-016 unit fixture.
     [[nodiscard]] std::vector<glm::vec3> MakeOutlierClusterPositions()
     {
         std::vector<glm::vec3> positions;
-        const auto appendGrid = [&positions](const glm::vec3 origin) {
-            for (int y = 0; y < 3; ++y)
-                for (int x = 0; x < 3; ++x)
+        const auto appendGrid = [&positions](const glm::vec3 origin)
+        {
+            for (int y = 0; y < 5; ++y)
+                for (int x = 0; x < 5; ++x)
                     positions.push_back(
                         origin + glm::vec3(static_cast<float>(x) * 0.05f,
                                            static_cast<float>(y) * 0.05f,
@@ -2490,6 +2684,7 @@ namespace
         appendGrid(glm::vec3{2.0f, 0.0f, 0.0f});
         positions.push_back(glm::vec3{10.0f, 10.0f, 10.0f});
         positions.push_back(glm::vec3{-8.0f, 5.0f, -3.0f});
+        positions.push_back(glm::vec3{12.0f, -7.0f, 4.0f});
         return positions;
     }
 
@@ -2514,7 +2709,7 @@ TEST(SandboxEditorUi, PointCloudOutlierRemovalStatisticalPublishesKeptPointsWith
 
     const std::vector<glm::vec3> positions = MakeOutlierClusterPositions();
     const std::size_t originalCount = positions.size();
-    ASSERT_EQ(originalCount, 20u);
+    ASSERT_EQ(originalCount, 53u);
 
     const ECS::EntityHandle cloud = MakeSelectable(registry, "OutlierCloud");
     AddPointCloudSource(registry, cloud, originalCount);
@@ -2646,7 +2841,7 @@ TEST(SandboxEditorUi, PointCloudOutlierRemovalPreservesSurvivingPointProperties)
     context.CommandHistory = &history;
 
     const std::vector<glm::vec3> positions = MakeOutlierClusterPositions();
-    const std::size_t originalCount = positions.size();  // 20: 18 inliers + 2 outliers
+    const std::size_t originalCount = positions.size();  // 53: 50 inliers + 3 outliers
     const ECS::EntityHandle cloud = MakeSelectable(registry, "LabeledCloud");
     AddPointCloudSource(registry, cloud, originalCount);
     SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
@@ -2660,7 +2855,7 @@ TEST(SandboxEditorUi, PointCloudOutlierRemovalPreservesSurvivingPointProperties)
                           .Properties.GetOrAdd<float>("v:label", 0.0f);
         ASSERT_EQ(labels.Vector().size(), originalCount);
         for (std::size_t i = 0; i < originalCount; ++i)
-            labels.Vector()[i] = (i + 2u >= originalCount) ? 99.0f : 7.0f;
+            labels.Vector()[i] = (i + 3u >= originalCount) ? 99.0f : 7.0f;
     }
     ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
 
@@ -2697,12 +2892,12 @@ TEST(SandboxEditorUi, PointCloudOutlierRemovalRespectsDeletedSlots)
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
     context.CommandHistory = &history;
 
-    // 20 live points plus one trailing slot marked deleted (a far position that
+    // 53 live points plus one trailing slot marked deleted (a far position that
     // would look like an outlier if it were wrongly treated as live).
     std::vector<glm::vec3> positions = MakeOutlierClusterPositions();
-    const std::size_t liveCount = positions.size();  // 20
+    const std::size_t liveCount = positions.size();  // 53
     positions.push_back(glm::vec3{50.0f, 50.0f, 50.0f});
-    const std::size_t slotCount = positions.size();  // 21
+    const std::size_t slotCount = positions.size();  // 54
 
     const ECS::EntityHandle cloud = MakeSelectable(registry, "DeletedSlotCloud");
     AddPointCloudSource(registry, cloud, slotCount);

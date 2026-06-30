@@ -21,6 +21,8 @@ module;
 #include <glm/gtc/quaternion.hpp>
 #include <imgui.h>
 
+#include "ProgressivePoissonReference.hpp"
+
 module Extrinsic.Runtime.SandboxEditorUi;
 
 import Extrinsic.Asset.ImportRouter;
@@ -107,6 +109,7 @@ namespace Extrinsic::Runtime
         namespace LoopSubdivide = Geometry::Subdivision;
         namespace CatmullClark = Geometry::CatmullClark;
         namespace Sqrt3Subdivide = Geometry::SubdivisionSqrt3;
+        namespace PPR = Intrinsic::Methods::Geometry::ProgressivePoissonReference;
 
         inline constexpr std::array<A::AssetPayloadKind, 6> kImportPayloadKinds{{
             A::AssetPayloadKind::Unknown,
@@ -149,6 +152,14 @@ namespace Extrinsic::Runtime
             kPointCloudNormalOrientations{{
                 PointNormals::OrientationMode::None,
                 PointNormals::OrientationMode::MinimumSpanningTree,
+            }};
+
+        inline constexpr std::array<SandboxEditorProgressivePoissonChannel, 4>
+            kProgressivePoissonChannels{{
+                SandboxEditorProgressivePoissonChannel::Level,
+                SandboxEditorProgressivePoissonChannel::Phase,
+                SandboxEditorProgressivePoissonChannel::SplatRadius,
+                SandboxEditorProgressivePoissonChannel::PrefixVisible,
             }};
 
         inline constexpr std::array<SandboxEditorMeshDenoiseStage, 1>
@@ -280,6 +291,23 @@ namespace Extrinsic::Runtime
             float*        StdDevMultiplier{nullptr};
             float*        SearchRadius{nullptr};
             std::int32_t* MinNeighbors{nullptr};
+        };
+
+        struct ProgressivePoissonUiState
+        {
+            std::optional<SandboxEditorProgressivePoissonResult>*
+                LastResult{nullptr};
+            std::int32_t* Dimension{nullptr};
+            std::int32_t* GridWidth{nullptr};
+            std::int32_t* MaxLevels{nullptr};
+            float* HashLoadFactor{nullptr};
+            float* RadiusAlpha{nullptr};
+            bool* RandomizeGridOrigin{nullptr};
+            std::int32_t* GridOriginSeed{nullptr};
+            bool* ShuffleWithinLevels{nullptr};
+            std::int32_t* ShuffleSeed{nullptr};
+            std::int32_t* PrefixCount{nullptr};
+            std::int32_t* Channel{nullptr};
         };
 
         struct TextureBakeUiState
@@ -2718,6 +2746,7 @@ namespace Extrinsic::Runtime
             case SandboxEditorGeometryProcessingAlgorithm::KernelDensity:
             case SandboxEditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval:
             case SandboxEditorGeometryProcessingAlgorithm::RadiusOutlierRemoval:
+            case SandboxEditorGeometryProcessingAlgorithm::ProgressivePoissonSampling:
                 return false;
             }
             return false;
@@ -4058,6 +4087,168 @@ namespace Extrinsic::Runtime
             return message;
         }
 
+        inline constexpr const char* kProgressivePoissonLevelProperty =
+            "p:poisson_level";
+        inline constexpr const char* kProgressivePoissonPhaseProperty =
+            "p:poisson_phase";
+        inline constexpr const char* kProgressivePoissonSplatRadiusProperty =
+            "p:poisson_splat_radius";
+        inline constexpr const char* kProgressivePoissonPrefixVisibleProperty =
+            "p:poisson_prefix_visible";
+
+        [[nodiscard]] const char* ProgressivePoissonChannelPropertyName(
+            const SandboxEditorProgressivePoissonChannel channel) noexcept
+        {
+            switch (channel)
+            {
+            case SandboxEditorProgressivePoissonChannel::Level:
+                return kProgressivePoissonLevelProperty;
+            case SandboxEditorProgressivePoissonChannel::Phase:
+                return kProgressivePoissonPhaseProperty;
+            case SandboxEditorProgressivePoissonChannel::SplatRadius:
+                return kProgressivePoissonSplatRadiusProperty;
+            case SandboxEditorProgressivePoissonChannel::PrefixVisible:
+                return kProgressivePoissonPrefixVisibleProperty;
+            }
+            return kProgressivePoissonLevelProperty;
+        }
+
+        [[nodiscard]] SandboxEditorProgressivePoissonResult
+        MakeProgressivePoissonResult(
+            const SandboxEditorCommandStatus status,
+            const SandboxEditorProgressivePoissonChannel channel,
+            const Core::ErrorCode error,
+            std::string message)
+        {
+            return SandboxEditorProgressivePoissonResult{
+                .Status = status,
+                .Channel = channel,
+                .Error = error,
+                .Message = std::move(message),
+            };
+        }
+
+        [[nodiscard]] bool IsValidProgressivePoissonConfig(
+            const SandboxEditorProgressivePoissonConfig& config) noexcept
+        {
+            return (config.Dimension == 2u || config.Dimension == 3u) &&
+                   config.GridWidth > 0u &&
+                   config.MaxLevels > 0u &&
+                   std::isfinite(config.HashLoadFactor) &&
+                   config.HashLoadFactor > 0.0f &&
+                   std::isfinite(config.RadiusAlpha);
+        }
+
+        [[nodiscard]] PPR::Config ToProgressivePoissonReferenceConfig(
+            const SandboxEditorProgressivePoissonConfig& config) noexcept
+        {
+            PPR::Config out{};
+            out.Dimension = config.Dimension;
+            out.GridWidth = config.GridWidth;
+            out.MaxLevels = config.MaxLevels;
+            out.HashLoadFactor = config.HashLoadFactor;
+            out.RadiusAlpha = config.RadiusAlpha;
+            out.RandomizeGridOrigin = config.RandomizeGridOrigin;
+            out.GridOriginSeed = config.GridOriginSeed;
+            out.ShuffleWithinLevels = config.ShuffleWithinLevels;
+            out.ShuffleSeed = config.ShuffleSeed;
+            return out;
+        }
+
+        [[nodiscard]] std::uint32_t ClampProgressivePoissonPrefix(
+            const std::uint32_t requested,
+            const std::uint32_t accepted) noexcept
+        {
+            if (requested == 0u)
+                return accepted;
+            return std::min(requested, accepted);
+        }
+
+        [[nodiscard]] bool PublishProgressivePoissonProperties(
+            Geometry::PropertySet& properties,
+            const PPR::Result& method,
+            const SandboxEditorProgressivePoissonConfig& config,
+            const std::uint32_t prefixCount)
+        {
+            const std::size_t pointCount = properties.Size();
+            std::vector<float> levels(pointCount, -1.0f);
+            std::vector<float> phases(pointCount, -1.0f);
+            std::vector<float> splatRadii(pointCount, 0.0f);
+            std::vector<float> prefixVisible(pointCount, 0.0f);
+
+            const std::uint32_t phaseCount = config.Dimension == 3u ? 8u : 4u;
+            for (std::size_t level = 0u;
+                 level + 1u < method.LevelOffsets.size();
+                 ++level)
+            {
+                const std::uint32_t begin = method.LevelOffsets[level];
+                const std::uint32_t end = method.LevelOffsets[level + 1u];
+                for (std::uint32_t rank = begin; rank < end; ++rank)
+                {
+                    if (rank >= method.Order.size())
+                        return false;
+                    const std::uint32_t pointIndex = method.Order[rank];
+                    if (pointIndex >= pointCount)
+                        return false;
+
+                    levels[pointIndex] = static_cast<float>(level);
+                    phases[pointIndex] = static_cast<float>(
+                        (rank - begin) % phaseCount);
+                    if (rank < method.SplatRadii.size())
+                        splatRadii[pointIndex] = method.SplatRadii[rank];
+                    prefixVisible[pointIndex] = rank < prefixCount ? 1.0f : 0.0f;
+                }
+            }
+
+            auto levelProp = properties.GetOrAdd<float>(
+                kProgressivePoissonLevelProperty,
+                -1.0f);
+            auto phaseProp = properties.GetOrAdd<float>(
+                kProgressivePoissonPhaseProperty,
+                -1.0f);
+            auto splatProp = properties.GetOrAdd<float>(
+                kProgressivePoissonSplatRadiusProperty,
+                0.0f);
+            auto prefixProp = properties.GetOrAdd<float>(
+                kProgressivePoissonPrefixVisibleProperty,
+                0.0f);
+            if (!levelProp || !phaseProp || !splatProp || !prefixProp)
+                return false;
+
+            levelProp.Vector() = std::move(levels);
+            phaseProp.Vector() = std::move(phases);
+            splatProp.Vector() = std::move(splatRadii);
+            prefixProp.Vector() = std::move(prefixVisible);
+            return true;
+        }
+
+        void ApplyProgressivePoissonVisualization(
+            entt::registry& raw,
+            const ECS::EntityHandle entity,
+            const SandboxEditorProgressivePoissonChannel channel)
+        {
+            G::RenderPoints points = raw.all_of<G::RenderPoints>(entity)
+                ? raw.get<G::RenderPoints>(entity)
+                : G::RenderPoints{};
+            if (!std::holds_alternative<float>(points.SizeSource) &&
+                !std::holds_alternative<std::string>(points.SizeSource))
+            {
+                points.SizeSource = 4.0f;
+            }
+            raw.emplace_or_replace<G::RenderPoints>(entity, points);
+
+            G::VisualizationConfig config = raw.all_of<G::VisualizationConfig>(entity)
+                ? raw.get<G::VisualizationConfig>(entity)
+                : G::VisualizationConfig{};
+            config.Source = G::VisualizationConfig::ColorSource::ScalarField;
+            config.ScalarDomain = G::VisualizationConfig::Domain::Vertex;
+            config.ScalarFieldName = ProgressivePoissonChannelPropertyName(channel);
+            config.Scalar.AutoRange = true;
+            config.Scalar.BinCount = 0u;
+            config.Scalar.Isolines.Num = 0u;
+            raw.emplace_or_replace<G::VisualizationConfig>(entity, config);
+        }
+
         struct MeshForVertexNormalsResult
         {
             Geometry::HalfedgeMesh::Mesh Mesh{};
@@ -5364,6 +5555,26 @@ namespace Extrinsic::Runtime
             return EditorCommandHistoryStatus::Applied;
         }
 
+        [[nodiscard]] bool MirrorGeometrySourcePositionsToPointCloudStorage(
+            Geometry::PropertySet& properties)
+        {
+            const auto positions =
+                properties.Get<glm::vec3>(GS::PropertyNames::kPosition);
+            if (!positions || positions.Vector().size() != properties.Size())
+                return false;
+
+            // GeometrySources uses `v:position`; Geometry.PointCloud::Cloud
+            // uses `v:point`. Seed the cloud slot before borrowing the property
+            // set so point-cloud algorithms see the promoted source positions.
+            auto points = properties.GetOrAdd<glm::vec3>(
+                "v:point",
+                glm::vec3{0.0f});
+            if (!points)
+                return false;
+            points.Vector() = positions.Vector();
+            return true;
+        }
+
         [[nodiscard]] SandboxEditorCommandStatus CommitPointCloudReplacement(
             const SandboxEditorContext& context,
             const std::uint32_t stableEntityId,
@@ -5584,6 +5795,10 @@ namespace Extrinsic::Runtime
                 HasAnySandboxEditorGeometryProcessingDomain(
                     model.Capabilities.Domains,
                     SandboxEditorGeometryProcessingDomain::PointCloudPoints);
+            model.PointCloudProgressivePoissonAvailable =
+                HasAnySandboxEditorGeometryProcessingDomain(
+                    model.Capabilities.Domains,
+                    SandboxEditorGeometryProcessingDomain::PointCloudPoints);
             if (context.LastKMeansResult != nullptr)
             {
                 model.LastKMeansResult = *context.LastKMeansResult;
@@ -5707,6 +5922,20 @@ namespace Extrinsic::Runtime
                         context.LastPointCloudOutlierRemovalResult->Message.empty()
                             ? "Last point-cloud outlier-removal command failed."
                             : context.LastPointCloudOutlierRemovalResult->Message);
+                }
+            }
+            if (context.LastProgressivePoissonResult != nullptr)
+            {
+                model.LastProgressivePoissonResult =
+                    *context.LastProgressivePoissonResult;
+                if (!context.LastProgressivePoissonResult->Succeeded())
+                {
+                    AddDiagnostic(
+                        model.Diagnostics,
+                        SandboxEditorDiagnosticCode::GeometryProcessingFailed,
+                        context.LastProgressivePoissonResult->Message.empty()
+                            ? "Last progressive-Poisson command failed."
+                            : context.LastProgressivePoissonResult->Message);
                 }
             }
             if (!model.Capabilities.HasAny())
@@ -9277,6 +9506,222 @@ namespace Extrinsic::Runtime
             DrawPointCloudOutlierRemovalResultStatus(result);
         }
 
+        [[nodiscard]] SandboxEditorProgressivePoissonChannel
+        ProgressivePoissonChannelFromIndex(const std::int32_t index) noexcept
+        {
+            const std::int32_t clamped = std::clamp(
+                index,
+                0,
+                static_cast<std::int32_t>(
+                    kProgressivePoissonChannels.size() - 1u));
+            return kProgressivePoissonChannels[
+                static_cast<std::size_t>(clamped)];
+        }
+
+        void DrawProgressivePoissonResultStatus(
+            const std::optional<SandboxEditorProgressivePoissonResult>&
+                lastResult)
+        {
+            if (!lastResult.has_value())
+            {
+                ImGui::TextDisabled("Last progressive Poisson run: none");
+                return;
+            }
+
+            const SandboxEditorProgressivePoissonResult& result =
+                *lastResult;
+            ImGui::Text(
+                "Last progressive Poisson run: %s",
+                DebugNameForSandboxEditorCommandStatus(result.Status));
+            ImGui::Text(
+                "Channel: %s",
+                DebugNameForSandboxEditorProgressivePoissonChannel(
+                    result.Channel));
+            if (result.Succeeded())
+            {
+                ImGui::Text("Accepted %u / %u  prefix %u  levels %u",
+                            result.AcceptedCount,
+                            result.InputCount,
+                            result.PrefixCount,
+                            result.LevelCount);
+                ImGui::Text("Base radius %.6f  alpha %.6f",
+                            static_cast<double>(result.BaseRadius),
+                            static_cast<double>(result.UsedAlpha));
+                if (result.AlphaDefaulted ||
+                    result.ClampedGridWidth ||
+                    result.ClampedMaxLevels)
+                {
+                    ImGui::Text("Defaults: alpha=%s grid=%s levels=%s",
+                                result.AlphaDefaulted ? "yes" : "no",
+                                result.ClampedGridWidth ? "yes" : "no",
+                                result.ClampedMaxLevels ? "yes" : "no");
+                }
+            }
+            if (!result.Message.empty())
+                ImGui::TextWrapped("%s", result.Message.c_str());
+        }
+
+        void DrawProgressivePoissonControls(
+            const SandboxEditorDomainWindowModel& model,
+            const SandboxEditorContext& context,
+            const SandboxEditorGeometryProcessingModel& processing,
+            ProgressivePoissonUiState* poissonState)
+        {
+            ImGui::SeparatorText("Progressive Poisson");
+            if (!processing.PointCloudProgressivePoissonAvailable)
+            {
+                ImGui::TextDisabled("Progressive Poisson is unavailable for this selection.");
+                return;
+            }
+            if (poissonState == nullptr ||
+                poissonState->LastResult == nullptr ||
+                poissonState->Dimension == nullptr ||
+                poissonState->GridWidth == nullptr ||
+                poissonState->MaxLevels == nullptr ||
+                poissonState->HashLoadFactor == nullptr ||
+                poissonState->RadiusAlpha == nullptr ||
+                poissonState->RandomizeGridOrigin == nullptr ||
+                poissonState->GridOriginSeed == nullptr ||
+                poissonState->ShuffleWithinLevels == nullptr ||
+                poissonState->ShuffleSeed == nullptr ||
+                poissonState->PrefixCount == nullptr ||
+                poissonState->Channel == nullptr)
+            {
+                ImGui::TextDisabled("Progressive Poisson controls are not bound.");
+                return;
+            }
+
+            *poissonState->Dimension =
+                *poissonState->Dimension <= 2 ? 2 : 3;
+            if (ImGui::BeginCombo(
+                    "Dimension",
+                    *poissonState->Dimension == 2 ? "2D" : "3D"))
+            {
+                if (ImGui::Selectable("2D", *poissonState->Dimension == 2))
+                    *poissonState->Dimension = 2;
+                if (*poissonState->Dimension == 2)
+                    ImGui::SetItemDefaultFocus();
+                if (ImGui::Selectable("3D", *poissonState->Dimension == 3))
+                    *poissonState->Dimension = 3;
+                if (*poissonState->Dimension == 3)
+                    ImGui::SetItemDefaultFocus();
+                ImGui::EndCombo();
+            }
+
+            *poissonState->GridWidth =
+                std::clamp(*poissonState->GridWidth, 1, 4096);
+            *poissonState->MaxLevels =
+                std::clamp(*poissonState->MaxLevels, 1, 32);
+            *poissonState->HashLoadFactor =
+                std::clamp(*poissonState->HashLoadFactor, 0.01f, 16.0f);
+            if (!std::isfinite(*poissonState->RadiusAlpha))
+                *poissonState->RadiusAlpha = -1.0f;
+            *poissonState->GridOriginSeed =
+                std::clamp(*poissonState->GridOriginSeed, 0, 1'000'000'000);
+            *poissonState->ShuffleSeed =
+                std::clamp(*poissonState->ShuffleSeed, 0, 1'000'000'000);
+            *poissonState->PrefixCount =
+                std::clamp(*poissonState->PrefixCount, 0, 10'000'000);
+            *poissonState->Channel = std::clamp(
+                *poissonState->Channel,
+                0,
+                static_cast<std::int32_t>(
+                    kProgressivePoissonChannels.size() - 1u));
+
+            ImGui::DragInt("Grid width", poissonState->GridWidth, 1.0f, 1, 4096);
+            ImGui::DragInt("Max levels", poissonState->MaxLevels, 1.0f, 1, 32);
+            ImGui::DragFloat("Hash load", poissonState->HashLoadFactor, 0.01f, 0.01f, 16.0f);
+            ImGui::DragFloat("Radius alpha", poissonState->RadiusAlpha, 0.01f, -1.0f, 0.999f);
+            ImGui::Checkbox("Randomize grid origin",
+                            poissonState->RandomizeGridOrigin);
+            ImGui::DragInt(
+                "Grid seed",
+                poissonState->GridOriginSeed,
+                1.0f,
+                0,
+                1'000'000'000);
+            ImGui::Checkbox("Shuffle within levels",
+                            poissonState->ShuffleWithinLevels);
+            ImGui::DragInt(
+                "Shuffle seed",
+                poissonState->ShuffleSeed,
+                1.0f,
+                0,
+                1'000'000'000);
+            ImGui::DragInt(
+                "Prefix count",
+                poissonState->PrefixCount,
+                1.0f,
+                0,
+                10'000'000);
+
+            const SandboxEditorProgressivePoissonChannel channel =
+                ProgressivePoissonChannelFromIndex(*poissonState->Channel);
+            if (ImGui::BeginCombo(
+                    "Color channel",
+                    DebugNameForSandboxEditorProgressivePoissonChannel(channel)))
+            {
+                for (std::size_t i = 0u;
+                     i < kProgressivePoissonChannels.size();
+                     ++i)
+                {
+                    const bool selected =
+                        *poissonState->Channel ==
+                        static_cast<std::int32_t>(i);
+                    if (ImGui::Selectable(
+                            DebugNameForSandboxEditorProgressivePoissonChannel(
+                                kProgressivePoissonChannels[i]),
+                            selected))
+                    {
+                        *poissonState->Channel =
+                            static_cast<std::int32_t>(i);
+                    }
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+
+            if (ImGui::Button("Run Progressive Poisson"))
+            {
+                *poissonState->LastResult =
+                    ApplySandboxEditorProgressivePoissonCommand(
+                        context,
+                        SandboxEditorProgressivePoissonCommand{
+                            .StableEntityId = model.SelectedStableId,
+                            .Config = SandboxEditorProgressivePoissonConfig{
+                                .Dimension = static_cast<std::uint32_t>(
+                                    *poissonState->Dimension),
+                                .GridWidth = static_cast<std::uint32_t>(
+                                    *poissonState->GridWidth),
+                                .MaxLevels = static_cast<std::uint32_t>(
+                                    *poissonState->MaxLevels),
+                                .HashLoadFactor =
+                                    *poissonState->HashLoadFactor,
+                                .RadiusAlpha = *poissonState->RadiusAlpha,
+                                .RandomizeGridOrigin =
+                                    *poissonState->RandomizeGridOrigin,
+                                .GridOriginSeed = static_cast<std::uint32_t>(
+                                    *poissonState->GridOriginSeed),
+                                .ShuffleWithinLevels =
+                                    *poissonState->ShuffleWithinLevels,
+                                .ShuffleSeed = static_cast<std::uint32_t>(
+                                    *poissonState->ShuffleSeed),
+                                .PrefixCount = static_cast<std::uint32_t>(
+                                    *poissonState->PrefixCount),
+                                .Channel = ProgressivePoissonChannelFromIndex(
+                                    *poissonState->Channel),
+                            },
+                        });
+            }
+
+            const std::optional<SandboxEditorProgressivePoissonResult>& result =
+                poissonState->LastResult->has_value()
+                    ? *poissonState->LastResult
+                    : processing.LastProgressivePoissonResult;
+            DrawProgressivePoissonResultStatus(result);
+        }
+
         void DrawDomainProcessingWindow(
             const SandboxEditorDomainWindowModel& model,
             const SandboxEditorContext& context,
@@ -9288,7 +9733,8 @@ namespace Extrinsic::Runtime
             MeshVertexNormalsUiState* meshNormalsState,
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
-            PointCloudOutlierRemovalUiState* pointCloudOutlierState)
+            PointCloudOutlierRemovalUiState* pointCloudOutlierState,
+            ProgressivePoissonUiState* progressivePoissonState)
         {
             DrawDomainWindowHeader(model);
             ImGui::SeparatorText("Processing capabilities");
@@ -9387,6 +9833,11 @@ namespace Extrinsic::Runtime
                     context,
                     processing,
                     pointCloudOutlierState);
+                DrawProgressivePoissonControls(
+                    model,
+                    context,
+                    processing,
+                    progressivePoissonState);
                 break;
             }
         }
@@ -9405,6 +9856,7 @@ namespace Extrinsic::Runtime
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
             PointCloudOutlierRemovalUiState* pointCloudOutlierState,
+            ProgressivePoissonUiState* progressivePoissonState,
             TextureBakeUiState* textureBakeState)
         {
             const std::size_t slot = DomainWindowSlotIndex(kind, section);
@@ -9442,7 +9894,8 @@ namespace Extrinsic::Runtime
                         normalsState,
                         graphNormalsState,
                         pointCloudNormalsState,
-                        pointCloudOutlierState);
+                        pointCloudOutlierState,
+                        progressivePoissonState);
                     break;
                 case DomainWindowSection::Count:
                     break;
@@ -9463,6 +9916,7 @@ namespace Extrinsic::Runtime
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
             PointCloudOutlierRemovalUiState* pointCloudOutlierState,
+            ProgressivePoissonUiState* progressivePoissonState,
             TextureBakeUiState* textureBakeState)
         {
             if (context == nullptr || domainWindowOpen == nullptr)
@@ -9498,6 +9952,7 @@ namespace Extrinsic::Runtime
                     graphNormalsState,
                     pointCloudNormalsState,
                     pointCloudOutlierState,
+                    progressivePoissonState,
                     textureBakeState);
             }
             }
@@ -9892,6 +10347,7 @@ namespace Extrinsic::Runtime
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
             PointCloudOutlierRemovalUiState* pointCloudOutlierState,
+            ProgressivePoissonUiState* progressivePoissonState,
             TextureBakeUiState* textureBakeState)
         {
             DrawMainMenuBar(panelWindowOpen, domainWindowOpen);
@@ -9907,6 +10363,7 @@ namespace Extrinsic::Runtime
                 graphNormalsState,
                 pointCloudNormalsState,
                 pointCloudOutlierState,
+                progressivePoissonState,
                 textureBakeState);
 
             if (BeginPanelWindow(panelWindowOpen,
@@ -11333,6 +11790,7 @@ namespace Extrinsic::Runtime
         case SandboxEditorGeometryProcessingAlgorithm::KernelDensity:
         case SandboxEditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval:
         case SandboxEditorGeometryProcessingAlgorithm::RadiusOutlierRemoval:
+        case SandboxEditorGeometryProcessingAlgorithm::ProgressivePoissonSampling:
             return Domain::PointCloudPoints;
         }
         return Domain::None;
@@ -11379,7 +11837,7 @@ namespace Extrinsic::Runtime
     ResolveSandboxEditorGeometryProcessingEntries(
         const SandboxEditorGeometryProcessingCapabilities capabilities)
     {
-        static constexpr std::array<SandboxEditorGeometryProcessingAlgorithm, 21>
+        static constexpr std::array<SandboxEditorGeometryProcessingAlgorithm, 22>
             kAlgorithmOrder{
                 SandboxEditorGeometryProcessingAlgorithm::KMeans,
                 SandboxEditorGeometryProcessingAlgorithm::NormalEstimation,
@@ -11389,6 +11847,7 @@ namespace Extrinsic::Runtime
                 SandboxEditorGeometryProcessingAlgorithm::BilateralFilter,
                 SandboxEditorGeometryProcessingAlgorithm::OutlierEstimation,
                 SandboxEditorGeometryProcessingAlgorithm::KernelDensity,
+                SandboxEditorGeometryProcessingAlgorithm::ProgressivePoissonSampling,
                 SandboxEditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval,
                 SandboxEditorGeometryProcessingAlgorithm::RadiusOutlierRemoval,
                 SandboxEditorGeometryProcessingAlgorithm::ShortestPath,
@@ -12140,6 +12599,25 @@ namespace Extrinsic::Runtime
             return "Statistical Outlier Removal";
         case SandboxEditorGeometryProcessingAlgorithm::RadiusOutlierRemoval:
             return "Radius Outlier Removal";
+        case SandboxEditorGeometryProcessingAlgorithm::ProgressivePoissonSampling:
+            return "Progressive Poisson Sampling";
+        }
+        return "Unknown";
+    }
+
+    const char* DebugNameForSandboxEditorProgressivePoissonChannel(
+        const SandboxEditorProgressivePoissonChannel channel) noexcept
+    {
+        switch (channel)
+        {
+        case SandboxEditorProgressivePoissonChannel::Level:
+            return "Level";
+        case SandboxEditorProgressivePoissonChannel::Phase:
+            return "Phase";
+        case SandboxEditorProgressivePoissonChannel::SplatRadius:
+            return "Splat radius";
+        case SandboxEditorProgressivePoissonChannel::PrefixVisible:
+            return "Prefix visible";
         }
         return "Unknown";
     }
@@ -13731,6 +14209,132 @@ namespace Extrinsic::Runtime
         return result;
     }
 
+    SandboxEditorProgressivePoissonResult
+    ApplySandboxEditorProgressivePoissonCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorProgressivePoissonCommand& command)
+    {
+        if (context.Scene == nullptr)
+        {
+            return MakeProgressivePoissonResult(
+                SandboxEditorCommandStatus::MissingScene,
+                command.Config.Channel,
+                Core::ErrorCode::InvalidState,
+                "Progressive Poisson sampling requires an attached scene.");
+        }
+        if (!IsValidProgressivePoissonConfig(command.Config))
+        {
+            return MakeProgressivePoissonResult(
+                SandboxEditorCommandStatus::InvalidProcessingParameters,
+                command.Config.Channel,
+                Core::ErrorCode::InvalidArgument,
+                "Progressive Poisson sampling requires dimension 2 or 3, positive grid/max-level/hash settings, and finite radius alpha.");
+        }
+
+        entt::registry& raw = context.Scene->Raw();
+        const std::optional<ECS::EntityHandle> entity =
+            ResolveStableEntity(raw, command.StableEntityId);
+        if (!entity.has_value())
+        {
+            return MakeProgressivePoissonResult(
+                SandboxEditorCommandStatus::StaleEntity,
+                command.Config.Channel,
+                Core::ErrorCode::ResourceNotFound,
+                "Progressive Poisson target entity is stale or no longer live.");
+        }
+
+        GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
+        const GS::SourceAvailability availability =
+            GS::BuildSourceAvailability(view);
+        if (availability.ProvenanceDomain != GS::Domain::PointCloud ||
+            view.VertexSource == nullptr)
+        {
+            return MakeProgressivePoissonResult(
+                SandboxEditorCommandStatus::UnsupportedGeometryDomain,
+                command.Config.Channel,
+                Core::ErrorCode::InvalidArgument,
+                "Progressive Poisson sampling requires selected point-cloud GeometrySources.");
+        }
+
+        std::optional<std::vector<glm::vec3>> positions =
+            CollectKMeansPositions(view.VertexSource->Properties);
+        if (!positions.has_value())
+        {
+            return MakeProgressivePoissonResult(
+                SandboxEditorCommandStatus::InvalidProcessingParameters,
+                command.Config.Channel,
+                Core::ErrorCode::InvalidArgument,
+                "Progressive Poisson sampling requires a non-empty finite v:position property.");
+        }
+
+        const PPR::Config methodConfig =
+            ToProgressivePoissonReferenceConfig(command.Config);
+        const PPR::Result method = PPR::Compute(*positions, methodConfig);
+        SandboxEditorProgressivePoissonResult result{};
+        result.Channel = command.Config.Channel;
+        result.InputCount = method.Diag.InputCount;
+        result.AcceptedCount = method.Diag.AcceptedCount;
+        result.LevelCount = static_cast<std::uint32_t>(
+            method.Diag.LevelCounts.size());
+        result.BaseRadius = method.BaseRadius;
+        result.UsedAlpha = method.Diag.UsedAlpha;
+        result.AlphaDefaulted = method.Diag.AlphaDefaulted;
+        result.ClampedGridWidth = method.Diag.ClampedGridWidth;
+        result.ClampedMaxLevels = method.Diag.ClampedMaxLevels;
+
+        if (method.Diag.Code != PPR::ValidationCode::Valid)
+        {
+            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Error = method.Diag.Code == PPR::ValidationCode::InvalidDimension
+                ? Core::ErrorCode::InvalidArgument
+                : Core::ErrorCode::InvalidState;
+            result.Message =
+                "Progressive Poisson CPU reference rejected the input/config.";
+            return result;
+        }
+
+        result.PrefixCount = ClampProgressivePoissonPrefix(
+            command.Config.PrefixCount,
+            result.AcceptedCount);
+        if (!PublishProgressivePoissonProperties(
+                view.VertexSource->Properties,
+                method,
+                command.Config,
+                result.PrefixCount))
+        {
+            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message =
+                "Progressive Poisson property publication failed.";
+            return result;
+        }
+
+        ApplyProgressivePoissonVisualization(
+            raw,
+            *entity,
+            command.Config.Channel);
+        Dirty::MarkVertexAttributesDirty(raw, *entity);
+        if (context.CommandHistory != nullptr)
+            (void)context.CommandHistory->MarkDirty(
+                "Run progressive Poisson sampling");
+
+        result.Status = SandboxEditorCommandStatus::Applied;
+        result.Error = Core::ErrorCode::Success;
+        result.Message =
+            "Progressive Poisson accepted " +
+            std::to_string(result.AcceptedCount) +
+            " of " +
+            std::to_string(result.InputCount) +
+            " points across " +
+            std::to_string(result.LevelCount) +
+            " levels; prefix=" +
+            std::to_string(result.PrefixCount) +
+            ", channel=" +
+            DebugNameForSandboxEditorProgressivePoissonChannel(result.Channel) +
+            ".";
+        return result;
+    }
+
     SandboxEditorMeshDenoiseResult ApplySandboxEditorMeshDenoiseCommand(
         const SandboxEditorContext& context,
         const SandboxEditorMeshDenoiseCommand& command)
@@ -14900,6 +15504,17 @@ namespace Extrinsic::Runtime
         // and the live deletion counter) so undo restores the entity exactly.
         Geometry::Vertices originalPoints = view.VertexSource->Properties;
         std::size_t originalNumDeleted = view.VertexSource->NumDeleted;
+        if (!MirrorGeometrySourcePositionsToPointCloudStorage(originalPoints))
+        {
+            result.Status =
+                SandboxEditorCommandStatus::InvalidProcessingParameters;
+            result.GeometryStatus =
+                Geometry::PointCloud::OutlierRemovalStatus::InvalidParameters;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Point-cloud outlier removal requires a count-matched v:position property.";
+            return result;
+        }
         Geometry::PointCloud::Cloud beforeCloud{
             originalPoints,
             originalNumDeleted};
@@ -14911,6 +15526,17 @@ namespace Extrinsic::Runtime
         // slots. The full property set is carried so user attributes survive.
         Geometry::Vertices workPoints = view.VertexSource->Properties;
         std::size_t workNumDeleted = view.VertexSource->NumDeleted;
+        if (!MirrorGeometrySourcePositionsToPointCloudStorage(workPoints))
+        {
+            result.Status =
+                SandboxEditorCommandStatus::InvalidProcessingParameters;
+            result.GeometryStatus =
+                Geometry::PointCloud::OutlierRemovalStatus::InvalidParameters;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Point-cloud outlier removal requires a count-matched v:position property.";
+            return result;
+        }
         Geometry::PointCloud::Cloud workCloud{workPoints, workNumDeleted};
         if (workCloud.HasGarbage())
             workCloud.GarbageCollection();
@@ -15023,6 +15649,7 @@ namespace Extrinsic::Runtime
                        nullptr,
                        nullptr,
                        nullptr,
+                       nullptr,
                        nullptr);
     }
 
@@ -15086,6 +15713,9 @@ namespace Extrinsic::Runtime
                 if (m_LastPointCloudOutlierRemovalResult.has_value())
                     context.LastPointCloudOutlierRemovalResult =
                         &*m_LastPointCloudOutlierRemovalResult;
+                if (m_LastProgressivePoissonResult.has_value())
+                    context.LastProgressivePoissonResult =
+                        &*m_LastProgressivePoissonResult;
                 const Core::Extent2D viewport =
                     context.CameraViewport.Width != 0u &&
                             context.CameraViewport.Height != 0u
@@ -15179,6 +15809,22 @@ namespace Extrinsic::Runtime
                     .SearchRadius = &m_PointCloudOutlierSearchRadius,
                     .MinNeighbors = &m_PointCloudOutlierMinNeighbors,
                 };
+                ProgressivePoissonUiState progressivePoissonState{
+                    .LastResult = &m_LastProgressivePoissonResult,
+                    .Dimension = &m_ProgressivePoissonDimension,
+                    .GridWidth = &m_ProgressivePoissonGridWidth,
+                    .MaxLevels = &m_ProgressivePoissonMaxLevels,
+                    .HashLoadFactor = &m_ProgressivePoissonHashLoadFactor,
+                    .RadiusAlpha = &m_ProgressivePoissonRadiusAlpha,
+                    .RandomizeGridOrigin =
+                        &m_ProgressivePoissonRandomizeGridOrigin,
+                    .GridOriginSeed = &m_ProgressivePoissonGridOriginSeed,
+                    .ShuffleWithinLevels =
+                        &m_ProgressivePoissonShuffleWithinLevels,
+                    .ShuffleSeed = &m_ProgressivePoissonShuffleSeed,
+                    .PrefixCount = &m_ProgressivePoissonPrefixCount,
+                    .Channel = &m_ProgressivePoissonChannel,
+                };
                 TextureBakeUiState textureBakeState{
                     .SourceIndex = &m_TextureBakeSourceIndex,
                     .TargetSemanticIndex = &m_TextureBakeTargetSemanticIndex,
@@ -15211,6 +15857,7 @@ namespace Extrinsic::Runtime
                     &graphNormalsState,
                     &pointCloudNormalsState,
                     &pointCloudOutlierState,
+                    &progressivePoissonState,
                     &textureBakeState);
             });
     }

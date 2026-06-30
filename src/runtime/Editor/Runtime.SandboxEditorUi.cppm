@@ -256,6 +256,7 @@ export namespace Extrinsic::Runtime
         KernelDensity,
         StatisticalOutlierRemoval,
         RadiusOutlierRemoval,
+        ProgressivePoissonSampling,
     };
 
     struct SandboxEditorGeometryProcessingCapabilities
@@ -350,6 +351,62 @@ export namespace Extrinsic::Runtime
         bool Converged{false};
         float Inertia{0.0f};
         std::uint32_t MaxDistanceIndex{0u};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SandboxEditorCommandStatus::Applied;
+        }
+    };
+
+    enum class SandboxEditorProgressivePoissonChannel : std::uint8_t
+    {
+        Level,
+        Phase,
+        SplatRadius,
+        PrefixVisible,
+    };
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorProgressivePoissonChannel(
+        SandboxEditorProgressivePoissonChannel channel) noexcept;
+
+    struct SandboxEditorProgressivePoissonConfig
+    {
+        std::uint32_t Dimension{3u};
+        std::uint32_t GridWidth{4u};
+        std::uint32_t MaxLevels{16u};
+        float HashLoadFactor{0.25f};
+        float RadiusAlpha{-1.0f};
+        bool RandomizeGridOrigin{true};
+        std::uint32_t GridOriginSeed{1337u};
+        bool ShuffleWithinLevels{true};
+        std::uint32_t ShuffleSeed{0x51ed270bu};
+        std::uint32_t PrefixCount{0u}; // 0 means all accepted points.
+        SandboxEditorProgressivePoissonChannel Channel{
+            SandboxEditorProgressivePoissonChannel::Level};
+    };
+
+    struct SandboxEditorProgressivePoissonCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        SandboxEditorProgressivePoissonConfig Config{};
+    };
+
+    struct SandboxEditorProgressivePoissonResult
+    {
+        SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
+        SandboxEditorProgressivePoissonChannel Channel{
+            SandboxEditorProgressivePoissonChannel::Level};
+        std::uint32_t InputCount{0u};
+        std::uint32_t AcceptedCount{0u};
+        std::uint32_t PrefixCount{0u};
+        std::uint32_t LevelCount{0u};
+        float BaseRadius{0.0f};
+        float UsedAlpha{0.0f};
+        bool AlphaDefaulted{false};
+        bool ClampedGridWidth{false};
+        bool ClampedMaxLevels{false};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
 
@@ -1715,6 +1772,7 @@ export namespace Extrinsic::Runtime
         bool GraphVertexNormalsAvailable{false};
         bool PointCloudVertexNormalsAvailable{false};
         bool PointCloudOutlierRemovalAvailable{false};
+        bool PointCloudProgressivePoissonAvailable{false};
         std::optional<SandboxEditorKMeansResult> LastKMeansResult{};
         std::optional<SandboxEditorMeshDenoiseResult>
             LastMeshDenoiseResult{};
@@ -1732,6 +1790,8 @@ export namespace Extrinsic::Runtime
             LastPointCloudVertexNormalsResult{};
         std::optional<SandboxEditorPointCloudOutlierRemovalResult>
             LastPointCloudOutlierRemovalResult{};
+        std::optional<SandboxEditorProgressivePoissonResult>
+            LastProgressivePoissonResult{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
@@ -1818,6 +1878,8 @@ export namespace Extrinsic::Runtime
             LastPointCloudVertexNormalsResult{nullptr};
         const SandboxEditorPointCloudOutlierRemovalResult*
             LastPointCloudOutlierRemovalResult{nullptr};
+        const SandboxEditorProgressivePoissonResult*
+            LastProgressivePoissonResult{nullptr};
         const Graphics::RenderGraphFrameStats* RenderGraphStats{nullptr};
         const Graphics::RenderRecipeConfigContext* RenderRecipeContext{nullptr};
         SandboxEditorRenderRecipeEditorState* RenderRecipeEditorState{nullptr};
@@ -2187,6 +2249,11 @@ export namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorPointCloudOutlierRemovalCommand& command);
 
+    SandboxEditorProgressivePoissonResult
+    ApplySandboxEditorProgressivePoissonCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorProgressivePoissonCommand& command);
+
     [[nodiscard]] SandboxEditorRenderRecipeEditorModel
     BuildSandboxEditorRenderRecipeEditorModel(
         const SandboxEditorContext& context);
@@ -2248,6 +2315,8 @@ export namespace Extrinsic::Runtime
             m_LastPointCloudVertexNormalsResult{};
         std::optional<SandboxEditorPointCloudOutlierRemovalResult>
             m_LastPointCloudOutlierRemovalResult{};
+        std::optional<SandboxEditorProgressivePoissonResult>
+            m_LastProgressivePoissonResult{};
         Graphics::RenderRecipeConfigContext m_RenderRecipeContext{};
         SandboxEditorRenderRecipeEditorState m_RenderRecipeState{};
         RenderArtifactRegistry m_RenderArtifactRegistry{};
@@ -2289,6 +2358,17 @@ export namespace Extrinsic::Runtime
         float m_PointCloudOutlierStdDevMultiplier{1.0f};
         float m_PointCloudOutlierSearchRadius{0.0f};
         std::int32_t m_PointCloudOutlierMinNeighbors{4};
+        std::int32_t m_ProgressivePoissonDimension{3};
+        std::int32_t m_ProgressivePoissonGridWidth{4};
+        std::int32_t m_ProgressivePoissonMaxLevels{16};
+        float m_ProgressivePoissonHashLoadFactor{0.25f};
+        float m_ProgressivePoissonRadiusAlpha{-1.0f};
+        bool m_ProgressivePoissonRandomizeGridOrigin{true};
+        std::int32_t m_ProgressivePoissonGridOriginSeed{1337};
+        bool m_ProgressivePoissonShuffleWithinLevels{true};
+        std::int32_t m_ProgressivePoissonShuffleSeed{0x51ed270b};
+        std::int32_t m_ProgressivePoissonPrefixCount{0};
+        std::int32_t m_ProgressivePoissonChannel{0};
         std::int32_t m_TextureBakeSourceIndex{0};
         std::int32_t m_TextureBakeTargetSemanticIndex{0};
         std::int32_t m_TextureBakeEncoderIndex{0};

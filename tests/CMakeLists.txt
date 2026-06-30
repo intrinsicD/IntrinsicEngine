@@ -343,7 +343,7 @@ if(TARGET ExtrinsicRuntime)
     intrinsic_test_object_lib(RuntimeContractTestObjs
         SOURCES
             ${_runtime_contract_test_sources}
-        DEPS ExtrinsicRuntime imgui_core_lib nlohmann_json::nlohmann_json
+        DEPS ExtrinsicRuntime IntrinsicProgressivePoissonReference imgui_core_lib nlohmann_json::nlohmann_json
     )
 endif()
 
@@ -536,11 +536,7 @@ intrinsic_resolve_test_sources(_geometry_method_test_sources
 intrinsic_test_object_lib(GeometryMethodTestObjs
     SOURCES
         ${_geometry_method_test_sources}
-        ${CMAKE_SOURCE_DIR}/methods/geometry/progressive_poisson/src/ProgressivePoissonReference.cpp
-    DEPS IntrinsicCore
-)
-target_include_directories(GeometryMethodTestObjs PRIVATE
-    ${CMAKE_SOURCE_DIR}/methods/geometry/progressive_poisson/include
+    DEPS IntrinsicCore IntrinsicProgressivePoissonReference
 )
 
 # --- Relocated HARDEN-041 wrapper sources: assets/core/ecs/graphics/runtime taxonomy ---
@@ -1086,7 +1082,7 @@ endif()
 if(TARGET RuntimeContractTestObjs)
     intrinsic_test_executable(IntrinsicRuntimeContractTests
         OBJECTS RuntimeContractTestObjs
-        LINK_LIBS ExtrinsicRuntime
+        LINK_LIBS ExtrinsicRuntime IntrinsicProgressivePoissonReference
         LABELS contract runtime
     )
 endif()
@@ -1108,7 +1104,7 @@ intrinsic_test_executable(IntrinsicPhysicsMethodTests
 # --- Geometry method reference tests (CPU-only) ---
 intrinsic_test_executable(IntrinsicGeometryMethodTests
     OBJECTS GeometryMethodTestObjs
-    LINK_LIBS IntrinsicCore
+    LINK_LIBS IntrinsicCore IntrinsicProgressivePoissonReference
     LABELS unit geometry
 )
 

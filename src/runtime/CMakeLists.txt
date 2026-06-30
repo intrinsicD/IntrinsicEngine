@@ -126,7 +126,10 @@ target_link_libraries(${target_name}
 # ImGui core PRIVATE so `imgui.h` (and its transitive deps) stay out of the
 # runtime's public module surface. `imgui_core_lib` is always available, so the
 # adapter builds in headless-no-glfw configs too.
-target_link_libraries(${target_name} PRIVATE imgui_core_lib)
+target_link_libraries(${target_name} PRIVATE
+        IntrinsicProgressivePoissonReference
+        imgui_core_lib
+)
 
 # ASSETIO-001 Slice C.2b keeps concrete model/texture decoder dependencies
 # runtime-private. The exported registration seam only mentions promoted asset

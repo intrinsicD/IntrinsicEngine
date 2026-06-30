@@ -2,6 +2,7 @@
 id: RUNTIME-134
 theme: none
 depends_on: [METHOD-012, CORE-003, RUNTIME-131]
+maturity_target: CPUContracted
 ---
 # RUNTIME-134 — Interactive progressive-Poisson sampling playground in the Sandbox
 
@@ -14,9 +15,18 @@ depends_on: [METHOD-012, CORE-003, RUNTIME-131]
 - No figure/file export here (that is RUNTIME-133 / GRAPHICS-109), though the playground may invoke those seams once available.
 
 ## Context
-- Status: backlog. Depends on METHOD-012 (the sampler to drive), CORE-003 (engine-config file/preview lane) and RUNTIME-131 (agent/CLI config-control facade) so knob state is driven through the same validated config path the UI uses.
+- Status: active. Depends on METHOD-012 (the sampler to drive), CORE-003 (engine-config file/preview lane) and RUNTIME-131 (agent/CLI config-control facade) so knob state is driven through the same validated config path the UI uses.
 - Owning subsystem/layer: `runtime`/`ui` composition — imports runtime only (app → runtime). The pieces exist: point rendering with per-point colormap (`Pass.Forward.Point`, `Graphics.ColormapSystem`), `Graphics::Components::VisualizationConfig` (ScalarField + colormap sliders), the ImGui editor shell (`Runtime.SandboxEditorUi` with PointCloud/Mesh windows), camera controllers, and mesh/point packers. What is **missing** is a panel that binds the sampler's knobs and re-runs it, plus mapping the result's `level`/`phase`/`splat_radius` onto a per-point scalar property for coloring. No method is currently wired into the interactive app, so this is the first method-in-sandbox integration.
 - For meshes, use GEOM-035 to sample a surface cloud first, then feed the sampler.
+
+## Slice plan
+- **Slice A (this slice).** Add the CPU reference playground command and PointCloud processing UI. The runtime command validates selected point-cloud `GeometrySources`, runs METHOD-012 through a typed config DTO, publishes deterministic point properties (`p:poisson_level`, `p:poisson_phase`, `p:poisson_splat_radius`, `p:poisson_prefix_visible`), enables point rendering, and routes visualization to the selected scalar channel. Headless tests prove deterministic property population and command/direct-method equivalence. Mesh-to-cloud preprocessing remains documented but deferred unless the existing mesh surface-sampling API can be wired without expanding the slice.
+- **Slice B.** Add mesh-selection preprocessing via GEOM-035 if Slice A does not close it, including mesh-specific UI affordances and tests.
+- **Slice C.** Add backend toggle once METHOD-013 is unblocked and available.
+
+## Slice A status (2026-06-30)
+- Landed: CPU reference point-cloud command, explicit Processing-window run button, typed runtime command DTO validation, deterministic per-point publication for `p:poisson_level`, `p:poisson_phase`, `p:poisson_splat_radius`, and `p:poisson_prefix_visible`, visualization routing to the selected scalar channel, and headless command/direct-method equivalence coverage.
+- Still required before retirement: route knob persistence/preview through the CORE-003/RUNTIME-131 config-control facade, add debounced rerun-on-edit behavior, add mesh preprocessing through GEOM-035, and perform the broader default gate for the final interactive milestone.
 
 ## Required changes
 - [ ] Add a Sandbox editor panel exposing all `SamplerConfig` knobs (`dimension`, `grid_width`, `max_levels`, `hash_load_factor`, `radius_alpha`, `randomize_grid_origin`, `grid_origin_seed`, `shuffle_within_levels`, `shuffle_seed`) with sensible ranges and tooltips, routed through the CORE-003/RUNTIME-131 config path.

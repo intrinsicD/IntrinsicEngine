@@ -10,6 +10,7 @@ the authoritative open/unblocked view.
 
 - `GRAPHICS-104` — GPU Object-Space Normal Texture Bake (tasks/active/GRAPHICS-104-gpu-object-space-normal-texture-bake.md)
 - `RUNTIME-125` — Optional AoS fast lane for static geometry (profile-gated) (tasks/active/RUNTIME-125-aos-static-fast-lane.md)
+- `RUNTIME-134` — Interactive progressive-Poisson sampling playground in the Sandbox (tasks/active/RUNTIME-134-progressive-poisson-interactive-playground.md)
 
 ## Theme B — Rendering modernization
 
@@ -49,7 +50,6 @@ the authoritative open/unblocked view.
 - blocked by `GEOM-024`: `METHOD-006` — Cross-field / frame-field design reference backend (tasks/backlog/methods/METHOD-006-cross-field-design-reference-backend.md)
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
 - blocked by `GRAPHICS-108`: `METHOD-013` — Progressive Poisson-disk sampling: GPU (Vulkan compute) backend + parity (tasks/backlog/methods/METHOD-013-progressive-poisson-disk-gpu-backend.md)
-- unblocked: `RUNTIME-134` — Interactive progressive-Poisson sampling playground in the Sandbox (tasks/backlog/ui/RUNTIME-134-progressive-poisson-interactive-playground.md)
 
 ## Audits
 

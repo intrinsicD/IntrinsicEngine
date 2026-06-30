@@ -297,6 +297,19 @@ set(INTRINSIC_RUNTIME_SOURCE_ROOT "${INTRINSIC_SOURCE_ROOT}/runtime")
 set(INTRINSIC_APP_SOURCE_ROOT "${INTRINSIC_SOURCE_ROOT}/app")
 set(INTRINSIC_MODULE_INVENTORY_ROOT "${INTRINSIC_SOURCE_ROOT}")
 
+# METHOD-012 CPU reference package. Keep it as a plain hermetic C++ target so
+# runtime/UI callers, method tests, and smoke benchmarks share one definition.
+add_library(IntrinsicProgressivePoissonReference STATIC
+        methods/geometry/progressive_poisson/src/ProgressivePoissonReference.cpp
+)
+target_compile_features(IntrinsicProgressivePoissonReference PUBLIC cxx_std_23)
+target_compile_options(IntrinsicProgressivePoissonReference PRIVATE ${INTRINSIC_COMPILE_FLAGS})
+target_link_options(IntrinsicProgressivePoissonReference PRIVATE ${INTRINSIC_LINK_FLAGS})
+target_include_directories(IntrinsicProgressivePoissonReference PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/methods/geometry/progressive_poisson/include
+)
+target_link_libraries(IntrinsicProgressivePoissonReference PUBLIC IntrinsicConfig glm::glm)
+
 # ------------------------------------------------------------------------------
 # Subdirectories
 # ------------------------------------------------------------------------------

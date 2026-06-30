@@ -13,7 +13,6 @@ add_executable(IntrinsicBenchmarkSmoke
     geometry/Bench_QualityMetricsSmoke.cpp
     geometry/Bench_SignedHeatReferenceSmoke.cpp
     geometry/Bench_SurfaceSamplingSmoke.cpp
-    ${CMAKE_SOURCE_DIR}/methods/geometry/progressive_poisson/src/ProgressivePoissonReference.cpp
     physics/Bench_RigidBodyReferenceSmoke.cpp
     physics/Bench_ParticleSpringReferenceSmoke.cpp
     physics/Bench_XpbdClothReferenceSmoke.cpp
@@ -31,7 +30,6 @@ target_compile_features(IntrinsicBenchmarkSmoke PRIVATE cxx_std_23)
 target_compile_options(IntrinsicBenchmarkSmoke PRIVATE ${INTRINSIC_COMPILE_FLAGS})
 target_link_options(IntrinsicBenchmarkSmoke PRIVATE ${INTRINSIC_LINK_FLAGS})
 target_include_directories(IntrinsicBenchmarkSmoke PRIVATE
-    ${CMAKE_SOURCE_DIR}/methods/geometry/progressive_poisson/include
     ${CMAKE_SOURCE_DIR}/methods/physics/rigid_body_reference/include
     ${CMAKE_SOURCE_DIR}/methods/physics/particle_spring_reference/include
     ${CMAKE_SOURCE_DIR}/methods/physics/xpbd_cloth_reference/include
@@ -43,6 +41,7 @@ target_link_libraries(IntrinsicBenchmarkSmoke
         IntrinsicConfig
         IntrinsicCore
         IntrinsicGeometry
+        IntrinsicProgressivePoissonReference
 )
 
 set(INTRINSIC_BENCHMARK_SMOKE_OUTPUT

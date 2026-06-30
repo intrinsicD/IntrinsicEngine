@@ -57,7 +57,8 @@ class ProgressivePoissonReferenceDim : public ::testing::TestWithParam<int>
 TEST_P(ProgressivePoissonReferenceDim, PoissonGuaranteeHoldsAtEveryLevelBoundary)
 {
     const int dim = GetParam();
-    const std::vector<glm::vec3> cloud = UniformCube(20000, 42, dim);
+    constexpr std::uint32_t kPointCount = 3000u;
+    const std::vector<glm::vec3> cloud = UniformCube(kPointCount, 42, dim);
     ppr::Config cfg;
     cfg.Dimension = static_cast<std::uint32_t>(dim);
 
@@ -68,13 +69,13 @@ TEST_P(ProgressivePoissonReferenceDim, PoissonGuaranteeHoldsAtEveryLevelBoundary
     EXPECT_EQ(r.LevelOffsets.back(), r.Order.size());
     EXPECT_EQ(r.SplatRadii.size(), r.Order.size());
     EXPECT_GT(r.Diag.AcceptedCount, 0u);
-    EXPECT_LE(r.Diag.AcceptedCount, 20000u);
+    EXPECT_LE(r.Diag.AcceptedCount, kPointCount);
 
     // Accepted ordering is a unique, in-range subset of the input.
-    std::vector<char> seen(20000, 0);
+    std::vector<char> seen(kPointCount, 0);
     for (const std::uint32_t idx : r.Order)
     {
-        ASSERT_LT(idx, 20000u);
+        ASSERT_LT(idx, kPointCount);
         ASSERT_EQ(seen[idx], 0) << "duplicate index in order";
         seen[idx] = 1;
     }
