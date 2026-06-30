@@ -233,11 +233,15 @@ display bucket derived from level-local rank modulo the 2D/3D phase count becaus
 the CPU reference backend does not yet export internal phase assignments as a
 stable method result.
 
-Slices A-B are CPU-contracted and explicit-run: they do not yet auto-rerun on
-every knob edit or persist knob state through the broader config-control facade.
-Those remain tracked by active task `RUNTIME-134`. The command only composes
-runtime-owned ECS state and the public method/surface-sampling APIs; it does not
-add sampler logic to UI code or call renderer/RHI upload APIs directly.
+Slice C routes the same knobs through the engine config-control facade as
+`sandbox.progressive_poisson`: widget edits serialize a candidate
+`EngineConfig`, preview it with `Engine::PreviewEngineConfigControlDocument`,
+hot-apply it with `Engine::ApplyEngineConfigHotSubset`, and then schedule a
+debounced rerun when `auto_run_on_edit` is enabled. The explicit Run button uses
+the same config path before invoking the sampler command. The command only
+composes runtime-owned ECS state and the public method/surface-sampling APIs; it
+does not add sampler logic to UI code or call renderer/RHI upload APIs directly.
+The future backend toggle remains blocked on METHOD-013.
 
 ### Sandbox Editor Mesh Curvature
 
@@ -456,9 +460,9 @@ Recipe preview/activation uses
 `ApplyRenderRecipeConfigPreview(...)`. Engine-config preview uses
 `PreviewEngineConfigControlDocument(...)` /
 `LoadEngineConfigControlFile(...)`; hot apply is intentionally limited to
-`render.default_recipe_config_path` through `ApplyEngineConfigHotSubset(...)`.
-All other engine-config differences are reported as boot-only rejections and do
-not mutate the live engine.
+`render.default_recipe_config_path` and `sandbox.progressive_poisson` through
+`ApplyEngineConfigHotSubset(...)`. All other engine-config differences are
+reported as boot-only rejections and do not mutate the live engine.
 
 Runtime consumes `Extrinsic.Core.FrameLoop` for reusable platform/render/
 maintenance/shutdown phase contracts. The contract lives in `core` because it has

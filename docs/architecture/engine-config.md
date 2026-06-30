@@ -45,6 +45,27 @@ fail-closed.
   "camera": {
     "enabled": true,
     "controller": "Orbit"
+  },
+  "sandbox": {
+    "progressive_poisson": {
+      "dimension": 3,
+      "grid_width": 4,
+      "max_levels": 16,
+      "hash_load_factor": 0.25,
+      "radius_alpha": -1.0,
+      "randomize_grid_origin": true,
+      "grid_origin_seed": 1337,
+      "shuffle_within_levels": true,
+      "shuffle_seed": 1374496523,
+      "prefix_count": 0,
+      "channel": "Level",
+      "mesh_surface_sample_count": 4096,
+      "mesh_surface_seed": 1337,
+      "mesh_surface_min_triangle_area": 1e-14,
+      "mesh_surface_interpolate_normals": true,
+      "auto_run_on_edit": true,
+      "debounce_seconds": 0.25
+    }
   }
 }
 ```
@@ -69,6 +90,18 @@ fail-closed.
 | `reference_scene` | `selector` | `Triangle` |
 | `camera` | `enabled` | Boolean |
 | `camera` | `controller` | `Orbit`, `Fly`, `FreeLook`, `TopDown` |
+| `sandbox.progressive_poisson` | `dimension` | Integer in `[2, 3]` |
+| `sandbox.progressive_poisson` | `grid_width` | Integer in `[1, 4096]` |
+| `sandbox.progressive_poisson` | `max_levels` | Integer in `[1, 32]` |
+| `sandbox.progressive_poisson` | `hash_load_factor` | Number in `[0.01, 16.0]` |
+| `sandbox.progressive_poisson` | `radius_alpha` | Number in `[-1.0, 0.999]`; negative keeps method defaulting semantics |
+| `sandbox.progressive_poisson` | `randomize_grid_origin`, `shuffle_within_levels`, `mesh_surface_interpolate_normals`, `auto_run_on_edit` | Boolean |
+| `sandbox.progressive_poisson` | `grid_origin_seed`, `shuffle_seed`, `mesh_surface_seed` | Integer in `[0, 2147483647]` |
+| `sandbox.progressive_poisson` | `prefix_count` | Integer in `[0, 10000000]`; `0` means all accepted points |
+| `sandbox.progressive_poisson` | `channel` | `Level`, `Phase`, `SplatRadius`, `PrefixVisible` |
+| `sandbox.progressive_poisson` | `mesh_surface_sample_count` | Integer in `[1, 10000000]` |
+| `sandbox.progressive_poisson` | `mesh_surface_min_triangle_area` | Positive finite number in `[1e-30, 1e30]` |
+| `sandbox.progressive_poisson` | `debounce_seconds` | Number in `[0.0, 10.0]` |
 
 ## Mutability
 
@@ -83,14 +116,18 @@ The schema is primarily a boot config. Runtime reads it before constructing
 - reference-scene and initial camera-controller selection.
 
 The current live hot-apply subset is deliberately narrow:
-`render.default_recipe_config_path`. `Runtime::Engine::ApplyEngineConfigHotSubset`
+`render.default_recipe_config_path` and
+`sandbox.progressive_poisson`. `Runtime::Engine::ApplyEngineConfigHotSubset`
 previews a candidate document against the live config, rejects any difference in
-the boot-only fields above, and then applies only the render-recipe path change.
-A non-empty path is loaded and activated through the same validated
+the boot-only fields above, and then applies only those live fields. A non-empty
+recipe path is loaded and activated through the same validated
 `RenderRecipeConfig` path used by startup and the editor; invalid recipe files
 reject the hot apply without disturbing the currently active recipe override. An
 empty path clears the active override and returns to the derived default frame
-recipe. See [runtime config control](runtime-config-control.md).
+recipe. The sandbox progressive-Poisson block is value-only method/playground
+state consumed by the Sandbox Editor and agent/CLI callers; it does not import
+runtime from core or mutate renderer state by itself. See
+[runtime config control](runtime-config-control.md).
 
 ## Diagnostics
 

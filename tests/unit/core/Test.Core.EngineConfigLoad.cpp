@@ -46,6 +46,24 @@ TEST(CoreEngineConfigLoad, SerializesAndLoadsEveryBootField)
     config.ReferenceScene.Selector = ReferenceSceneSelector::Triangle;
     config.Camera.Enabled = false;
     config.Camera.Controller = CameraControllerKind::TopDown;
+    config.Sandbox.ProgressivePoisson.Dimension = 2;
+    config.Sandbox.ProgressivePoisson.GridWidth = 8;
+    config.Sandbox.ProgressivePoisson.MaxLevels = 12;
+    config.Sandbox.ProgressivePoisson.HashLoadFactor = 0.5;
+    config.Sandbox.ProgressivePoisson.RadiusAlpha = 0.25;
+    config.Sandbox.ProgressivePoisson.RandomizeGridOrigin = false;
+    config.Sandbox.ProgressivePoisson.GridOriginSeed = 99;
+    config.Sandbox.ProgressivePoisson.ShuffleWithinLevels = false;
+    config.Sandbox.ProgressivePoisson.ShuffleSeed = 1234;
+    config.Sandbox.ProgressivePoisson.PrefixCount = 64;
+    config.Sandbox.ProgressivePoisson.Channel =
+        ProgressivePoissonPlaygroundChannel::Phase;
+    config.Sandbox.ProgressivePoisson.MeshSurfaceSampleCount = 2048;
+    config.Sandbox.ProgressivePoisson.MeshSurfaceSampleSeed = 77;
+    config.Sandbox.ProgressivePoisson.MeshSurfaceMinTriangleArea = 1.0e-9;
+    config.Sandbox.ProgressivePoisson.MeshSurfaceInterpolateNormals = false;
+    config.Sandbox.ProgressivePoisson.AutoRunOnEdit = false;
+    config.Sandbox.ProgressivePoisson.DebounceSeconds = 0.5;
 
     const std::string document = SerializeEngineConfig(config);
     const EngineConfigLoadResult preview = PreviewEngineConfig(document, EngineConfig{});
@@ -53,7 +71,7 @@ TEST(CoreEngineConfigLoad, SerializesAndLoadsEveryBootField)
     ASSERT_EQ(preview.State, EngineConfigState::Valid);
     EXPECT_FALSE(HasErrors(preview));
     EXPECT_TRUE(preview.Preview.SideEffectFree);
-    EXPECT_EQ(preview.Preview.ParsedFieldCount, 17u);
+    EXPECT_EQ(preview.Preview.ParsedFieldCount, 34u);
     EXPECT_EQ(preview.Preview.Config.Window.Title, "Engine Config Test");
     EXPECT_EQ(preview.Preview.Config.Window.Width, 1280);
     EXPECT_EQ(preview.Preview.Config.Window.Height, 720);
@@ -72,6 +90,32 @@ TEST(CoreEngineConfigLoad, SerializesAndLoadsEveryBootField)
     EXPECT_EQ(preview.Preview.Config.ReferenceScene.Selector, ReferenceSceneSelector::Triangle);
     EXPECT_FALSE(preview.Preview.Config.Camera.Enabled);
     EXPECT_EQ(preview.Preview.Config.Camera.Controller, CameraControllerKind::TopDown);
+    EXPECT_EQ(preview.Preview.Config.Sandbox.ProgressivePoisson.Dimension, 2u);
+    EXPECT_EQ(preview.Preview.Config.Sandbox.ProgressivePoisson.GridWidth, 8u);
+    EXPECT_EQ(preview.Preview.Config.Sandbox.ProgressivePoisson.MaxLevels, 12u);
+    EXPECT_DOUBLE_EQ(preview.Preview.Config.Sandbox.ProgressivePoisson.HashLoadFactor,
+                     0.5);
+    EXPECT_DOUBLE_EQ(preview.Preview.Config.Sandbox.ProgressivePoisson.RadiusAlpha,
+                     0.25);
+    EXPECT_FALSE(preview.Preview.Config.Sandbox.ProgressivePoisson.RandomizeGridOrigin);
+    EXPECT_EQ(preview.Preview.Config.Sandbox.ProgressivePoisson.GridOriginSeed, 99u);
+    EXPECT_FALSE(preview.Preview.Config.Sandbox.ProgressivePoisson.ShuffleWithinLevels);
+    EXPECT_EQ(preview.Preview.Config.Sandbox.ProgressivePoisson.ShuffleSeed, 1234u);
+    EXPECT_EQ(preview.Preview.Config.Sandbox.ProgressivePoisson.PrefixCount, 64u);
+    EXPECT_EQ(preview.Preview.Config.Sandbox.ProgressivePoisson.Channel,
+              ProgressivePoissonPlaygroundChannel::Phase);
+    EXPECT_EQ(preview.Preview.Config.Sandbox.ProgressivePoisson.MeshSurfaceSampleCount,
+              2048u);
+    EXPECT_EQ(preview.Preview.Config.Sandbox.ProgressivePoisson.MeshSurfaceSampleSeed,
+              77u);
+    EXPECT_DOUBLE_EQ(preview.Preview.Config.Sandbox.ProgressivePoisson
+                         .MeshSurfaceMinTriangleArea,
+                     1.0e-9);
+    EXPECT_FALSE(preview.Preview.Config.Sandbox.ProgressivePoisson
+                     .MeshSurfaceInterpolateNormals);
+    EXPECT_FALSE(preview.Preview.Config.Sandbox.ProgressivePoisson.AutoRunOnEdit);
+    EXPECT_DOUBLE_EQ(preview.Preview.Config.Sandbox.ProgressivePoisson.DebounceSeconds,
+                     0.5);
 
     const std::filesystem::path path = TempConfigPath("intrinsic_engine_config_roundtrip");
     WriteTextFile(path, document);
@@ -85,6 +129,10 @@ TEST(CoreEngineConfigLoad, SerializesAndLoadsEveryBootField)
     EXPECT_EQ(loaded.Preview.Config.Render.DefaultRecipeConfigPath,
               "config/runtime-test-recipe.json");
     EXPECT_EQ(loaded.Preview.Config.Camera.Controller, CameraControllerKind::TopDown);
+    EXPECT_EQ(loaded.Preview.Config.Sandbox.ProgressivePoisson.Channel,
+              ProgressivePoissonPlaygroundChannel::Phase);
+    EXPECT_EQ(loaded.Preview.Config.Sandbox.ProgressivePoisson.MeshSurfaceSampleCount,
+              2048u);
 }
 
 TEST(CoreEngineConfigLoad, InvalidFieldsFallBackWithDiagnostics)
@@ -104,6 +152,13 @@ TEST(CoreEngineConfigLoad, InvalidFieldsFallBackWithDiagnostics)
     defaults.ReferenceScene.Enabled = true;
     defaults.Camera.Enabled = true;
     defaults.Camera.Controller = CameraControllerKind::Orbit;
+    defaults.Sandbox.ProgressivePoisson.Dimension = 2;
+    defaults.Sandbox.ProgressivePoisson.GridWidth = 7;
+    defaults.Sandbox.ProgressivePoisson.MaxLevels = 11;
+    defaults.Sandbox.ProgressivePoisson.Channel =
+        ProgressivePoissonPlaygroundChannel::SplatRadius;
+    defaults.Sandbox.ProgressivePoisson.AutoRunOnEdit = false;
+    defaults.Sandbox.ProgressivePoisson.DebounceSeconds = 0.75;
 
     const std::string document = R"json(
 {
@@ -136,6 +191,28 @@ TEST(CoreEngineConfigLoad, InvalidFieldsFallBackWithDiagnostics)
   "camera": {
     "enabled": false,
     "controller": "Arcball"
+  },
+  "sandbox": {
+    "progressive_poisson": {
+      "dimension": 4,
+      "grid_width": 0,
+      "max_levels": 0,
+      "hash_load_factor": "dense",
+      "radius_alpha": 2.0,
+      "randomize_grid_origin": "yes",
+      "grid_origin_seed": -1,
+      "shuffle_within_levels": "no",
+      "shuffle_seed": -4,
+      "prefix_count": -1,
+      "channel": "Variance",
+      "mesh_surface_sample_count": 0,
+      "mesh_surface_seed": -1,
+      "mesh_surface_min_triangle_area": 0.0,
+      "mesh_surface_interpolate_normals": "yes",
+      "auto_run_on_edit": "sometimes",
+      "debounce_seconds": -0.1,
+      "unused": true
+    }
   }
 }
 )json";
@@ -166,4 +243,12 @@ TEST(CoreEngineConfigLoad, InvalidFieldsFallBackWithDiagnostics)
     EXPECT_EQ(result.Preview.Config.ReferenceScene.Selector, ReferenceSceneSelector::Triangle);
     EXPECT_FALSE(result.Preview.Config.Camera.Enabled);
     EXPECT_EQ(result.Preview.Config.Camera.Controller, CameraControllerKind::Orbit);
+    EXPECT_EQ(result.Preview.Config.Sandbox.ProgressivePoisson.Dimension, 2u);
+    EXPECT_EQ(result.Preview.Config.Sandbox.ProgressivePoisson.GridWidth, 7u);
+    EXPECT_EQ(result.Preview.Config.Sandbox.ProgressivePoisson.MaxLevels, 11u);
+    EXPECT_EQ(result.Preview.Config.Sandbox.ProgressivePoisson.Channel,
+              ProgressivePoissonPlaygroundChannel::SplatRadius);
+    EXPECT_FALSE(result.Preview.Config.Sandbox.ProgressivePoisson.AutoRunOnEdit);
+    EXPECT_DOUBLE_EQ(result.Preview.Config.Sandbox.ProgressivePoisson.DebounceSeconds,
+                     0.75);
 }

@@ -40,6 +40,41 @@ namespace Extrinsic::Core::Config
             CameraControllerKind Controller{CameraControllerKind::Orbit};
         };
 
+        export enum class ProgressivePoissonPlaygroundChannel : std::uint32_t
+        {
+            Level = 0,
+            Phase = 1,
+            SplatRadius = 2,
+            PrefixVisible = 3,
+        };
+
+        export struct ProgressivePoissonPlaygroundConfig
+        {
+            std::uint32_t Dimension{3u};
+            std::uint32_t GridWidth{4u};
+            std::uint32_t MaxLevels{16u};
+            double HashLoadFactor{0.25};
+            double RadiusAlpha{-1.0};
+            bool RandomizeGridOrigin{true};
+            std::uint32_t GridOriginSeed{1337u};
+            bool ShuffleWithinLevels{true};
+            std::uint32_t ShuffleSeed{0x51ed270bu};
+            std::uint32_t PrefixCount{0u};
+            ProgressivePoissonPlaygroundChannel Channel{
+                ProgressivePoissonPlaygroundChannel::Level};
+            std::uint32_t MeshSurfaceSampleCount{4096u};
+            std::uint32_t MeshSurfaceSampleSeed{1337u};
+            double MeshSurfaceMinTriangleArea{1.0e-14};
+            bool MeshSurfaceInterpolateNormals{true};
+            bool AutoRunOnEdit{true};
+            double DebounceSeconds{0.25};
+        };
+
+        export struct SandboxConfig
+        {
+            ProgressivePoissonPlaygroundConfig ProgressivePoisson{};
+        };
+
         export struct EngineConfig
         {
             RenderConfig    Render;
@@ -47,6 +82,7 @@ namespace Extrinsic::Core::Config
             WindowConfig    Window;
             ReferenceSceneConfig ReferenceScene;
             CameraConfig Camera;
+            SandboxConfig Sandbox;
         };
 
 }

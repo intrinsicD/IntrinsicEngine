@@ -31,15 +31,16 @@ backend and parity reporting.
 
 ## Interactive usage
 
-`RUNTIME-134` Slices A-B expose the CPU reference backend in the Sandbox
+`RUNTIME-134` Slices A-C expose the CPU reference backend in the Sandbox
 PointCloud and Mesh processing windows. The runtime command validates selected
 point-cloud `GeometrySources`, or samples a selected editable mesh surface to a
 point cloud through `GEOM-035` (`Geometry.PointCloud.SurfaceSampling`), forwards
 every reference `Config` knob
 (`dimension`, `grid_width`, `max_levels`, `hash_load_factor`, `radius_alpha`,
 `randomize_grid_origin`, `grid_origin_seed`, `shuffle_within_levels`,
-`shuffle_seed`) through a typed command DTO, and publishes per-point float
-properties for visualization:
+`shuffle_seed`) through a typed command DTO and the engine config-control
+field `sandbox.progressive_poisson`, and publishes per-point float properties
+for visualization:
 
 - `p:poisson_level`
 - `p:poisson_phase`
@@ -57,6 +58,12 @@ Mesh runs expose additional surface-sampling controls (`sample_count`, `seed`,
 cloud back onto the selected entity for point rendering. The runtime result
 reports the written sample count, accepted triangle count, rejected face count,
 and total sampled surface area.
+
+Widget edits preview and hot-apply a serialized `EngineConfig` through
+`Engine::PreviewEngineConfigControlDocument` and
+`Engine::ApplyEngineConfigHotSubset`; when `auto_run_on_edit` is enabled, the
+Sandbox schedules a debounced rerun. The explicit Run action uses the same
+config path before invoking the CPU reference command.
 
 ## Known limitations
 

@@ -3,6 +3,7 @@ module;
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cmath>
 #include <initializer_list>
 #include <limits>
 #include <optional>
@@ -207,6 +208,38 @@ namespace Extrinsic::Core::Config
             return number;
         }
 
+        [[nodiscard]] std::optional<double> ReadNumber(EngineConfigLoadResult& result,
+                                                       const json& object,
+                                                       const std::string_view key,
+                                                       const std::string_view path,
+                                                       const double minValue,
+                                                       const double maxValue)
+        {
+            const json* value = FindMember(object, key);
+            if (value == nullptr)
+            {
+                return std::nullopt;
+            }
+            if (!value->is_number())
+            {
+                AddWarning(result,
+                           EngineConfigDiagnosticCode::InvalidValue,
+                           FieldSubject(path, key),
+                           "Expected a numeric value; reference default retained.");
+                return std::nullopt;
+            }
+            const double number = value->get<double>();
+            if (!std::isfinite(number) || number < minValue || number > maxValue)
+            {
+                AddWarning(result,
+                           EngineConfigDiagnosticCode::InvalidValue,
+                           FieldSubject(path, key),
+                           "Numeric value is outside the supported range; reference default retained.");
+                return std::nullopt;
+            }
+            return number;
+        }
+
         [[nodiscard]] std::optional<GraphicsBackend> ParseGraphicsBackend(
             const std::string_view value) noexcept
         {
@@ -236,6 +269,16 @@ namespace Extrinsic::Core::Config
             if (value == "Fly") return CameraControllerKind::Fly;
             if (value == "FreeLook") return CameraControllerKind::FreeLook;
             if (value == "TopDown") return CameraControllerKind::TopDown;
+            return std::nullopt;
+        }
+
+        [[nodiscard]] std::optional<ProgressivePoissonPlaygroundChannel>
+        ParseProgressivePoissonChannel(const std::string_view value) noexcept
+        {
+            if (value == "Level") return ProgressivePoissonPlaygroundChannel::Level;
+            if (value == "Phase") return ProgressivePoissonPlaygroundChannel::Phase;
+            if (value == "SplatRadius") return ProgressivePoissonPlaygroundChannel::SplatRadius;
+            if (value == "PrefixVisible") return ProgressivePoissonPlaygroundChannel::PrefixVisible;
             return std::nullopt;
         }
 
@@ -277,6 +320,19 @@ namespace Extrinsic::Core::Config
             case CameraControllerKind::TopDown: return "TopDown";
             }
             return "Orbit";
+        }
+
+        [[nodiscard]] std::string_view ToConfigString(
+            const ProgressivePoissonPlaygroundChannel value) noexcept
+        {
+            switch (value)
+            {
+            case ProgressivePoissonPlaygroundChannel::Level: return "Level";
+            case ProgressivePoissonPlaygroundChannel::Phase: return "Phase";
+            case ProgressivePoissonPlaygroundChannel::SplatRadius: return "SplatRadius";
+            case ProgressivePoissonPlaygroundChannel::PrefixVisible: return "PrefixVisible";
+            }
+            return "Level";
         }
 
         template <typename Enum, typename Parser>
@@ -539,6 +595,185 @@ namespace Extrinsic::Core::Config
             }
         }
 
+        void ParseSandboxConfig(EngineConfigLoadResult& result, const json& root)
+        {
+            const json* object = FindMember(root, "sandbox");
+            if (object == nullptr)
+            {
+                return;
+            }
+            if (!object->is_object())
+            {
+                AddWarning(result,
+                           EngineConfigDiagnosticCode::InvalidValue,
+                           "sandbox",
+                           "Expected an object; reference sandbox config retained.");
+                return;
+            }
+
+            AddUnknownFieldDiagnostics(result, *object, "sandbox", {"progressive_poisson"});
+
+            const json* poisson = FindMember(*object, "progressive_poisson");
+            if (poisson == nullptr)
+            {
+                return;
+            }
+            if (!poisson->is_object())
+            {
+                AddWarning(result,
+                           EngineConfigDiagnosticCode::InvalidValue,
+                           "sandbox.progressive_poisson",
+                           "Expected an object; reference progressive Poisson config retained.");
+                return;
+            }
+
+            AddUnknownFieldDiagnostics(
+                result,
+                *poisson,
+                "sandbox.progressive_poisson",
+                {"dimension",
+                 "grid_width",
+                 "max_levels",
+                 "hash_load_factor",
+                 "radius_alpha",
+                 "randomize_grid_origin",
+                 "grid_origin_seed",
+                 "shuffle_within_levels",
+                 "shuffle_seed",
+                 "prefix_count",
+                 "channel",
+                 "mesh_surface_sample_count",
+                 "mesh_surface_seed",
+                 "mesh_surface_min_triangle_area",
+                 "mesh_surface_interpolate_normals",
+                 "auto_run_on_edit",
+                 "debounce_seconds"});
+
+            ProgressivePoissonPlaygroundConfig& config =
+                result.Preview.Config.Sandbox.ProgressivePoisson;
+            if (const std::optional<std::int64_t> dimension =
+                    ReadInteger(result, *poisson, "dimension", "sandbox.progressive_poisson", 2, 3);
+                dimension.has_value())
+            {
+                config.Dimension = static_cast<std::uint32_t>(*dimension);
+                ++result.Preview.ParsedFieldCount;
+            }
+            if (const std::optional<std::int64_t> gridWidth =
+                    ReadInteger(result, *poisson, "grid_width", "sandbox.progressive_poisson", 1, 4096);
+                gridWidth.has_value())
+            {
+                config.GridWidth = static_cast<std::uint32_t>(*gridWidth);
+                ++result.Preview.ParsedFieldCount;
+            }
+            if (const std::optional<std::int64_t> maxLevels =
+                    ReadInteger(result, *poisson, "max_levels", "sandbox.progressive_poisson", 1, 32);
+                maxLevels.has_value())
+            {
+                config.MaxLevels = static_cast<std::uint32_t>(*maxLevels);
+                ++result.Preview.ParsedFieldCount;
+            }
+            if (const std::optional<double> hashLoad =
+                    ReadNumber(result, *poisson, "hash_load_factor", "sandbox.progressive_poisson", 0.01, 16.0);
+                hashLoad.has_value())
+            {
+                config.HashLoadFactor = *hashLoad;
+                ++result.Preview.ParsedFieldCount;
+            }
+            if (const std::optional<double> radiusAlpha =
+                    ReadNumber(result, *poisson, "radius_alpha", "sandbox.progressive_poisson", -1.0, 0.999);
+                radiusAlpha.has_value())
+            {
+                config.RadiusAlpha = *radiusAlpha;
+                ++result.Preview.ParsedFieldCount;
+            }
+            if (const std::optional<bool> randomize =
+                    ReadBool(result, *poisson, "randomize_grid_origin", "sandbox.progressive_poisson");
+                randomize.has_value())
+            {
+                config.RandomizeGridOrigin = *randomize;
+                ++result.Preview.ParsedFieldCount;
+            }
+            if (const std::optional<std::int64_t> gridSeed =
+                    ReadInteger(result, *poisson, "grid_origin_seed", "sandbox.progressive_poisson", 0, std::numeric_limits<std::int32_t>::max());
+                gridSeed.has_value())
+            {
+                config.GridOriginSeed = static_cast<std::uint32_t>(*gridSeed);
+                ++result.Preview.ParsedFieldCount;
+            }
+            if (const std::optional<bool> shuffle =
+                    ReadBool(result, *poisson, "shuffle_within_levels", "sandbox.progressive_poisson");
+                shuffle.has_value())
+            {
+                config.ShuffleWithinLevels = *shuffle;
+                ++result.Preview.ParsedFieldCount;
+            }
+            if (const std::optional<std::int64_t> shuffleSeed =
+                    ReadInteger(result, *poisson, "shuffle_seed", "sandbox.progressive_poisson", 0, std::numeric_limits<std::int32_t>::max());
+                shuffleSeed.has_value())
+            {
+                config.ShuffleSeed = static_cast<std::uint32_t>(*shuffleSeed);
+                ++result.Preview.ParsedFieldCount;
+            }
+            if (const std::optional<std::int64_t> prefix =
+                    ReadInteger(result, *poisson, "prefix_count", "sandbox.progressive_poisson", 0, 10'000'000);
+                prefix.has_value())
+            {
+                config.PrefixCount = static_cast<std::uint32_t>(*prefix);
+                ++result.Preview.ParsedFieldCount;
+            }
+            if (ReadEnum(result,
+                         *poisson,
+                         "channel",
+                         "sandbox.progressive_poisson",
+                         ParseProgressivePoissonChannel,
+                         config.Channel))
+            {
+                ++result.Preview.ParsedFieldCount;
+            }
+            if (const std::optional<std::int64_t> samples =
+                    ReadInteger(result, *poisson, "mesh_surface_sample_count", "sandbox.progressive_poisson", 1, 10'000'000);
+                samples.has_value())
+            {
+                config.MeshSurfaceSampleCount = static_cast<std::uint32_t>(*samples);
+                ++result.Preview.ParsedFieldCount;
+            }
+            if (const std::optional<std::int64_t> surfaceSeed =
+                    ReadInteger(result, *poisson, "mesh_surface_seed", "sandbox.progressive_poisson", 0, std::numeric_limits<std::int32_t>::max());
+                surfaceSeed.has_value())
+            {
+                config.MeshSurfaceSampleSeed = static_cast<std::uint32_t>(*surfaceSeed);
+                ++result.Preview.ParsedFieldCount;
+            }
+            if (const std::optional<double> minArea =
+                    ReadNumber(result, *poisson, "mesh_surface_min_triangle_area", "sandbox.progressive_poisson", 1.0e-30, 1.0e30);
+                minArea.has_value())
+            {
+                config.MeshSurfaceMinTriangleArea = *minArea;
+                ++result.Preview.ParsedFieldCount;
+            }
+            if (const std::optional<bool> interpolate =
+                    ReadBool(result, *poisson, "mesh_surface_interpolate_normals", "sandbox.progressive_poisson");
+                interpolate.has_value())
+            {
+                config.MeshSurfaceInterpolateNormals = *interpolate;
+                ++result.Preview.ParsedFieldCount;
+            }
+            if (const std::optional<bool> autoRun =
+                    ReadBool(result, *poisson, "auto_run_on_edit", "sandbox.progressive_poisson");
+                autoRun.has_value())
+            {
+                config.AutoRunOnEdit = *autoRun;
+                ++result.Preview.ParsedFieldCount;
+            }
+            if (const std::optional<double> debounce =
+                    ReadNumber(result, *poisson, "debounce_seconds", "sandbox.progressive_poisson", 0.0, 10.0);
+                debounce.has_value())
+            {
+                config.DebounceSeconds = *debounce;
+                ++result.Preview.ParsedFieldCount;
+            }
+        }
+
         [[nodiscard]] bool HasFallbackDiagnostics(const EngineConfigLoadResult& result) noexcept
         {
             return std::any_of(result.Diagnostics.begin(),
@@ -681,7 +916,8 @@ namespace Extrinsic::Core::Config
                                     "render",
                                     "simulation",
                                     "reference_scene",
-                                    "camera"});
+                                    "camera",
+                                    "sandbox"});
 
         const json* schema = FindMember(root, "schema");
         if (schema == nullptr || !schema->is_string()
@@ -730,6 +966,7 @@ namespace Extrinsic::Core::Config
         ParseSimulationConfig(result, root);
         ParseReferenceSceneConfig(result, root);
         ParseCameraConfig(result, root);
+        ParseSandboxConfig(result, root);
 
         if (HasErrors(result))
         {
@@ -830,6 +1067,35 @@ namespace Extrinsic::Core::Config
         root["camera"] = json::object({
             {"enabled", config.Camera.Enabled},
             {"controller", std::string{ToConfigString(config.Camera.Controller)}},
+        });
+        root["sandbox"] = json::object({
+            {"progressive_poisson",
+             json::object({
+                 {"dimension", config.Sandbox.ProgressivePoisson.Dimension},
+                 {"grid_width", config.Sandbox.ProgressivePoisson.GridWidth},
+                 {"max_levels", config.Sandbox.ProgressivePoisson.MaxLevels},
+                 {"hash_load_factor", config.Sandbox.ProgressivePoisson.HashLoadFactor},
+                 {"radius_alpha", config.Sandbox.ProgressivePoisson.RadiusAlpha},
+                 {"randomize_grid_origin",
+                  config.Sandbox.ProgressivePoisson.RandomizeGridOrigin},
+                 {"grid_origin_seed", config.Sandbox.ProgressivePoisson.GridOriginSeed},
+                 {"shuffle_within_levels",
+                  config.Sandbox.ProgressivePoisson.ShuffleWithinLevels},
+                 {"shuffle_seed", config.Sandbox.ProgressivePoisson.ShuffleSeed},
+                 {"prefix_count", config.Sandbox.ProgressivePoisson.PrefixCount},
+                 {"channel",
+                  std::string{ToConfigString(config.Sandbox.ProgressivePoisson.Channel)}},
+                 {"mesh_surface_sample_count",
+                  config.Sandbox.ProgressivePoisson.MeshSurfaceSampleCount},
+                 {"mesh_surface_seed",
+                  config.Sandbox.ProgressivePoisson.MeshSurfaceSampleSeed},
+                 {"mesh_surface_min_triangle_area",
+                  config.Sandbox.ProgressivePoisson.MeshSurfaceMinTriangleArea},
+                 {"mesh_surface_interpolate_normals",
+                  config.Sandbox.ProgressivePoisson.MeshSurfaceInterpolateNormals},
+                 {"auto_run_on_edit", config.Sandbox.ProgressivePoisson.AutoRunOnEdit},
+                 {"debounce_seconds", config.Sandbox.ProgressivePoisson.DebounceSeconds},
+             })},
         });
         return root.dump(2);
     }

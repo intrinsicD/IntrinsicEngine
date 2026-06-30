@@ -194,6 +194,75 @@ TEST(RuntimeConfigControlFacade, BootOnlyEngineConfigDifferencesAreRejected)
     engine.Shutdown();
 }
 
+TEST(RuntimeConfigControlFacade, SandboxProgressivePoissonConfigIsHotApplied)
+{
+    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+
+    CoreConfig::EngineConfig candidate = engine.GetEngineConfig();
+    candidate.Sandbox.ProgressivePoisson.Dimension = 2u;
+    candidate.Sandbox.ProgressivePoisson.GridWidth = 9u;
+    candidate.Sandbox.ProgressivePoisson.MaxLevels = 10u;
+    candidate.Sandbox.ProgressivePoisson.HashLoadFactor = 0.5;
+    candidate.Sandbox.ProgressivePoisson.RadiusAlpha = 0.2;
+    candidate.Sandbox.ProgressivePoisson.RandomizeGridOrigin = false;
+    candidate.Sandbox.ProgressivePoisson.GridOriginSeed = 91u;
+    candidate.Sandbox.ProgressivePoisson.ShuffleWithinLevels = false;
+    candidate.Sandbox.ProgressivePoisson.ShuffleSeed = 12345u;
+    candidate.Sandbox.ProgressivePoisson.PrefixCount = 17u;
+    candidate.Sandbox.ProgressivePoisson.Channel =
+        CoreConfig::ProgressivePoissonPlaygroundChannel::Phase;
+    candidate.Sandbox.ProgressivePoisson.MeshSurfaceSampleCount = 96u;
+    candidate.Sandbox.ProgressivePoisson.MeshSurfaceSampleSeed = 7u;
+    candidate.Sandbox.ProgressivePoisson.MeshSurfaceMinTriangleArea = 1.0e-8;
+    candidate.Sandbox.ProgressivePoisson.MeshSurfaceInterpolateNormals = false;
+    candidate.Sandbox.ProgressivePoisson.AutoRunOnEdit = false;
+    candidate.Sandbox.ProgressivePoisson.DebounceSeconds = 0.5;
+
+    const CoreConfig::EngineConfigLoadResult configPreview =
+        engine.PreviewEngineConfigControlDocument(
+            CoreConfig::SerializeEngineConfig(candidate),
+            "agent-progressive-poisson.json");
+    ASSERT_TRUE(CoreConfig::IsConfigUsable(configPreview));
+
+    const Runtime::RuntimeEngineConfigApplyResult configApply =
+        engine.ApplyEngineConfigHotSubset(
+            configPreview,
+            Runtime::RuntimeConfigControlSource::AgentCli);
+    ASSERT_TRUE(configApply.Succeeded());
+    EXPECT_EQ(configApply.Status,
+              Runtime::RuntimeEngineConfigApplyStatus::Applied);
+    EXPECT_TRUE(configApply.EngineConfigApplied);
+    EXPECT_FALSE(configApply.DefaultRecipeConfigPathChanged);
+    EXPECT_TRUE(configApply.SandboxProgressivePoissonChanged);
+
+    const CoreConfig::ProgressivePoissonPlaygroundConfig& active =
+        engine.GetEngineConfig().Sandbox.ProgressivePoisson;
+    EXPECT_EQ(active.Dimension, 2u);
+    EXPECT_EQ(active.GridWidth, 9u);
+    EXPECT_EQ(active.MaxLevels, 10u);
+    EXPECT_DOUBLE_EQ(active.HashLoadFactor, 0.5);
+    EXPECT_DOUBLE_EQ(active.RadiusAlpha, 0.2);
+    EXPECT_FALSE(active.RandomizeGridOrigin);
+    EXPECT_EQ(active.GridOriginSeed, 91u);
+    EXPECT_FALSE(active.ShuffleWithinLevels);
+    EXPECT_EQ(active.ShuffleSeed, 12345u);
+    EXPECT_EQ(active.PrefixCount, 17u);
+    EXPECT_EQ(active.Channel,
+              CoreConfig::ProgressivePoissonPlaygroundChannel::Phase);
+    EXPECT_EQ(active.MeshSurfaceSampleCount, 96u);
+    EXPECT_EQ(active.MeshSurfaceSampleSeed, 7u);
+    EXPECT_DOUBLE_EQ(active.MeshSurfaceMinTriangleArea, 1.0e-8);
+    EXPECT_FALSE(active.MeshSurfaceInterpolateNormals);
+    EXPECT_FALSE(active.AutoRunOnEdit);
+    EXPECT_DOUBLE_EQ(active.DebounceSeconds, 0.5);
+    EXPECT_EQ(engine.GetEngineConfigControlState().ActiveConfig.Sandbox
+                  .ProgressivePoisson.GridWidth,
+              9u);
+
+    engine.Shutdown();
+}
+
 TEST(RuntimeConfigControlFacade, InvalidHotRecipeConfigPreservesActiveOverride)
 {
     const std::filesystem::path invalidPath =

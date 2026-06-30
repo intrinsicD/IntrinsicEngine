@@ -2184,6 +2184,29 @@ namespace Extrinsic::Runtime
         }
     }
 
+    [[nodiscard]] bool ProgressivePoissonPlaygroundConfigEquals(
+        const Core::Config::ProgressivePoissonPlaygroundConfig& lhs,
+        const Core::Config::ProgressivePoissonPlaygroundConfig& rhs) noexcept
+    {
+        return lhs.Dimension == rhs.Dimension &&
+               lhs.GridWidth == rhs.GridWidth &&
+               lhs.MaxLevels == rhs.MaxLevels &&
+               lhs.HashLoadFactor == rhs.HashLoadFactor &&
+               lhs.RadiusAlpha == rhs.RadiusAlpha &&
+               lhs.RandomizeGridOrigin == rhs.RandomizeGridOrigin &&
+               lhs.GridOriginSeed == rhs.GridOriginSeed &&
+               lhs.ShuffleWithinLevels == rhs.ShuffleWithinLevels &&
+               lhs.ShuffleSeed == rhs.ShuffleSeed &&
+               lhs.PrefixCount == rhs.PrefixCount &&
+               lhs.Channel == rhs.Channel &&
+               lhs.MeshSurfaceSampleCount == rhs.MeshSurfaceSampleCount &&
+               lhs.MeshSurfaceSampleSeed == rhs.MeshSurfaceSampleSeed &&
+               lhs.MeshSurfaceMinTriangleArea == rhs.MeshSurfaceMinTriangleArea &&
+               lhs.MeshSurfaceInterpolateNormals == rhs.MeshSurfaceInterpolateNormals &&
+               lhs.AutoRunOnEdit == rhs.AutoRunOnEdit &&
+               lhs.DebounceSeconds == rhs.DebounceSeconds;
+    }
+
     [[nodiscard]] std::vector<std::string> FindBootOnlyEngineConfigDifferences(
         const Core::Config::EngineConfig& current,
         const Core::Config::EngineConfig& candidate)
@@ -3203,8 +3226,13 @@ namespace Extrinsic::Runtime
         const bool recipePathChanged =
             m_Config.Render.DefaultRecipeConfigPath !=
             candidate.Render.DefaultRecipeConfigPath;
+        const bool progressivePoissonChanged =
+            !ProgressivePoissonPlaygroundConfigEquals(
+                m_Config.Sandbox.ProgressivePoisson,
+                candidate.Sandbox.ProgressivePoisson);
         result.DefaultRecipeConfigPathChanged = recipePathChanged;
-        if (!recipePathChanged)
+        result.SandboxProgressivePoissonChanged = progressivePoissonChanged;
+        if (!recipePathChanged && !progressivePoissonChanged)
         {
             result.Status = RuntimeEngineConfigApplyStatus::NoChange;
             m_ConfigControlState.ActiveConfig = m_Config;
@@ -3213,47 +3241,50 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        if (candidate.Render.DefaultRecipeConfigPath.empty())
+        if (recipePathChanged && !candidate.Render.DefaultRecipeConfigPath.empty())
         {
-            m_Config.Render.DefaultRecipeConfigPath.clear();
-            m_ConfigControlState.ActiveConfig = m_Config;
-            ClearActiveRenderRecipeOverride();
-            result.Status = RuntimeEngineConfigApplyStatus::Applied;
-            result.EngineConfigApplied = true;
-            m_ConfigControlState.LastApply = result;
-            m_ConfigControlState.HasLastApply = true;
-            return result;
+            const Graphics::RenderRecipeConfigLoadResult recipeLoadResult =
+                LoadRenderRecipeConfigPreviewFile(candidate.Render.DefaultRecipeConfigPath);
+            result.RecipeApply = RuntimeRenderRecipeApplyResult{
+                .Source = ToRecipeActivationSource(source),
+                .LoadResult = recipeLoadResult,
+            };
+            if (!Graphics::IsConfigUsable(recipeLoadResult))
+            {
+                result.RecipeApply.Status =
+                    RuntimeRenderRecipeApplyStatus::Rejected;
+                result.Status = RuntimeEngineConfigApplyStatus::Rejected;
+                m_ConfigControlState.LastApply = result;
+                m_ConfigControlState.HasLastApply = true;
+                return result;
+            }
+
+            result.RecipeApply = ApplyRenderRecipeConfigPreview(
+                recipeLoadResult,
+                ToRecipeActivationSource(source));
+            if (!result.RecipeApply.Succeeded())
+            {
+                result.Status = RuntimeEngineConfigApplyStatus::Rejected;
+                m_ConfigControlState.LastApply = result;
+                m_ConfigControlState.HasLastApply = true;
+                return result;
+            }
         }
 
-        const Graphics::RenderRecipeConfigLoadResult recipeLoadResult =
-            LoadRenderRecipeConfigPreviewFile(candidate.Render.DefaultRecipeConfigPath);
-        result.RecipeApply = RuntimeRenderRecipeApplyResult{
-            .Source = ToRecipeActivationSource(source),
-            .LoadResult = recipeLoadResult,
-        };
-        if (!Graphics::IsConfigUsable(recipeLoadResult))
+        if (recipePathChanged)
         {
-            result.RecipeApply.Status =
-                RuntimeRenderRecipeApplyStatus::Rejected;
-            result.Status = RuntimeEngineConfigApplyStatus::Rejected;
-            m_ConfigControlState.LastApply = result;
-            m_ConfigControlState.HasLastApply = true;
-            return result;
+            m_Config.Render.DefaultRecipeConfigPath =
+                candidate.Render.DefaultRecipeConfigPath;
+            if (candidate.Render.DefaultRecipeConfigPath.empty())
+            {
+                ClearActiveRenderRecipeOverride();
+            }
         }
-
-        result.RecipeApply = ApplyRenderRecipeConfigPreview(
-            recipeLoadResult,
-            ToRecipeActivationSource(source));
-        if (!result.RecipeApply.Succeeded())
+        if (progressivePoissonChanged)
         {
-            result.Status = RuntimeEngineConfigApplyStatus::Rejected;
-            m_ConfigControlState.LastApply = result;
-            m_ConfigControlState.HasLastApply = true;
-            return result;
+            m_Config.Sandbox.ProgressivePoisson =
+                candidate.Sandbox.ProgressivePoisson;
         }
-
-        m_Config.Render.DefaultRecipeConfigPath =
-            candidate.Render.DefaultRecipeConfigPath;
         m_ConfigControlState.ActiveConfig = m_Config;
         result.Status = RuntimeEngineConfigApplyStatus::Applied;
         result.EngineConfigApplied = true;

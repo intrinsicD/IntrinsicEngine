@@ -32,6 +32,7 @@ import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
@@ -2400,6 +2401,144 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandMatchesDirectMethodConfig)
         }
     }
     EXPECT_EQ(levels.Vector(), expectedLevels);
+}
+
+TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigFacade)
+{
+    Runtime::RuntimeEngineConfigControlState controlState{};
+    controlState.ActiveConfig = Core::Config::EngineConfig{};
+
+    Runtime::SandboxEditorContext configContext{};
+    configContext.EngineConfigControlState = &controlState;
+    configContext.EngineConfigCommandsAvailable = true;
+
+    int previewCalls = 0;
+    int applyCalls = 0;
+    configContext.PreviewEngineConfigDocument =
+        [&](const std::string& document, const std::string& sourceId)
+    {
+        ++previewCalls;
+        return Core::Config::PreviewEngineConfig(
+            document,
+            controlState.ActiveConfig,
+            Core::Config::EngineConfigParseOptions{.SourceId = sourceId});
+    };
+    configContext.ApplyEngineConfigHotSubset =
+        [&](const Core::Config::EngineConfigLoadResult& loadResult)
+    {
+        ++applyCalls;
+        Runtime::RuntimeEngineConfigApplyResult apply{
+            .Source = Runtime::RuntimeConfigControlSource::Editor,
+            .LoadResult = loadResult,
+        };
+        if (!Core::Config::IsConfigUsable(loadResult))
+        {
+            apply.Status =
+                Runtime::RuntimeEngineConfigApplyStatus::Rejected;
+            return apply;
+        }
+        controlState.ActiveConfig = loadResult.Preview.Config;
+        apply.Status = Runtime::RuntimeEngineConfigApplyStatus::Applied;
+        apply.EngineConfigApplied = true;
+        apply.SandboxProgressivePoissonChanged = true;
+        return apply;
+    };
+
+    Core::Config::ProgressivePoissonPlaygroundConfig config{};
+    config.Dimension = 2u;
+    config.GridWidth = 3u;
+    config.MaxLevels = 5u;
+    config.HashLoadFactor = 0.75;
+    config.RadiusAlpha = 0.4;
+    config.RandomizeGridOrigin = true;
+    config.GridOriginSeed = 19u;
+    config.ShuffleWithinLevels = false;
+    config.ShuffleSeed = 29u;
+    config.PrefixCount = 3u;
+    config.Channel = Core::Config::ProgressivePoissonPlaygroundChannel::Phase;
+    config.AutoRunOnEdit = true;
+    config.DebounceSeconds = 0.2;
+
+    const Runtime::SandboxEditorProgressivePoissonConfigResult configResult =
+        Runtime::ApplySandboxEditorProgressivePoissonConfigCommand(
+            configContext,
+            Runtime::SandboxEditorProgressivePoissonConfigCommand{
+                .Config = config,
+                .SourceId = "test-progressive-poisson-config",
+            });
+
+    ASSERT_TRUE(configResult.Succeeded()) << configResult.Message;
+    EXPECT_EQ(previewCalls, 1);
+    EXPECT_EQ(applyCalls, 1);
+    EXPECT_EQ(controlState.ActiveConfig.Sandbox.ProgressivePoisson.GridWidth,
+              3u);
+    EXPECT_EQ(controlState.ActiveConfig.Sandbox.ProgressivePoisson.Channel,
+              Core::Config::ProgressivePoissonPlaygroundChannel::Phase);
+
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext commandContext =
+        MakeContext(registry, selection);
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "PoissonCloud");
+    AddPointCloudSource(registry, cloud, 6u);
+    const std::vector<glm::vec3> positions{
+        {0.0f, 0.0f, 0.0f},
+        {0.25f, 0.0f, 0.0f},
+        {0.5f, 0.5f, 0.0f},
+        {1.0f, 0.0f, 0.0f},
+        {1.0f, 1.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+    };
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
+
+    const Runtime::SandboxEditorProgressivePoissonConfig runtimeConfig =
+        Runtime::MakeSandboxEditorProgressivePoissonConfig(
+            controlState.ActiveConfig.Sandbox.ProgressivePoisson);
+    const Runtime::SandboxEditorProgressivePoissonResult result =
+        Runtime::ApplySandboxEditorProgressivePoissonCommand(
+            commandContext,
+            Runtime::SandboxEditorProgressivePoissonCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(cloud),
+                .Config = runtimeConfig,
+            });
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+
+    PPR::Config directConfig{};
+    directConfig.Dimension = runtimeConfig.Dimension;
+    directConfig.GridWidth = runtimeConfig.GridWidth;
+    directConfig.MaxLevels = runtimeConfig.MaxLevels;
+    directConfig.HashLoadFactor = runtimeConfig.HashLoadFactor;
+    directConfig.RadiusAlpha = runtimeConfig.RadiusAlpha;
+    directConfig.RandomizeGridOrigin = runtimeConfig.RandomizeGridOrigin;
+    directConfig.GridOriginSeed = runtimeConfig.GridOriginSeed;
+    directConfig.ShuffleWithinLevels = runtimeConfig.ShuffleWithinLevels;
+    directConfig.ShuffleSeed = runtimeConfig.ShuffleSeed;
+    const PPR::Result direct = PPR::Compute(positions, directConfig);
+    ASSERT_EQ(direct.Diag.Code, PPR::ValidationCode::Valid);
+    EXPECT_EQ(result.AcceptedCount, direct.Diag.AcceptedCount);
+    EXPECT_EQ(result.PrefixCount, std::min(3u, direct.Diag.AcceptedCount));
+    EXPECT_EQ(result.LevelCount, direct.Diag.LevelCounts.size());
+    EXPECT_FLOAT_EQ(result.BaseRadius, direct.BaseRadius);
+
+    Geometry::PropertySet& properties =
+        registry.Raw().get<GS::Vertices>(cloud).Properties;
+    const auto phases = properties.Get<float>("p:poisson_phase");
+    const auto visible = properties.Get<float>("p:poisson_prefix_visible");
+    ASSERT_TRUE(phases);
+    ASSERT_TRUE(visible);
+    ASSERT_EQ(phases.Vector().size(), positions.size());
+    ASSERT_EQ(visible.Vector().size(), positions.size());
+    std::size_t visibleCount = 0u;
+    for (float value : visible.Vector())
+    {
+        if (value > 0.5f)
+        {
+            ++visibleCount;
+        }
+    }
+    EXPECT_EQ(visibleCount, result.PrefixCount);
 }
 
 TEST(SandboxEditorUi, ProgressivePoissonCommandSamplesMeshSurfaceToPointCloud)

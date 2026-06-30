@@ -32,8 +32,9 @@ Live agent/CLI configuration uses the runtime-owned
 That facade previews render recipes and engine config documents without ImGui,
 activates recipes through the same renderer override path used by startup and
 the Sandbox Editor, and hot-applies only the current
-`render.default_recipe_config_path` engine-config subset. Other engine-config
-differences remain boot-only and are reported without mutating the live engine.
+`render.default_recipe_config_path` and `sandbox.progressive_poisson`
+engine-config subset. Other engine-config differences remain boot-only and are
+reported without mutating the live engine.
 
 `Engine::RunFrame()` is the promoted runtime lifecycle pipeline. Runtime owns the
 cross-layer composition, while reusable phase contracts live in

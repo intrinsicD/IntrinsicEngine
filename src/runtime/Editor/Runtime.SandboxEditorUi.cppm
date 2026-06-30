@@ -17,6 +17,7 @@ import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Component.SpatialDebugBinding;
@@ -371,6 +372,14 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] const char* DebugNameForSandboxEditorProgressivePoissonChannel(
         SandboxEditorProgressivePoissonChannel channel) noexcept;
 
+    [[nodiscard]] SandboxEditorProgressivePoissonChannel
+    MakeSandboxEditorProgressivePoissonChannel(
+        Core::Config::ProgressivePoissonPlaygroundChannel channel) noexcept;
+
+    [[nodiscard]] Core::Config::ProgressivePoissonPlaygroundChannel
+    MakeCoreProgressivePoissonPlaygroundChannel(
+        SandboxEditorProgressivePoissonChannel channel) noexcept;
+
     struct SandboxEditorProgressivePoissonConfig
     {
         std::uint32_t Dimension{3u};
@@ -390,6 +399,15 @@ export namespace Extrinsic::Runtime
         double MeshSurfaceMinTriangleArea{1.0e-14};
         bool MeshSurfaceInterpolateNormals{true};
     };
+
+    [[nodiscard]] SandboxEditorProgressivePoissonConfig
+    MakeSandboxEditorProgressivePoissonConfig(
+        const Core::Config::ProgressivePoissonPlaygroundConfig& config) noexcept;
+
+    [[nodiscard]] Core::Config::ProgressivePoissonPlaygroundConfig
+    MakeCoreProgressivePoissonPlaygroundConfig(
+        const SandboxEditorProgressivePoissonConfig& config,
+        const Core::Config::ProgressivePoissonPlaygroundConfig& defaults = {}) noexcept;
 
     struct SandboxEditorProgressivePoissonCommand
     {
@@ -423,6 +441,37 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] bool Succeeded() const noexcept
         {
             return Status == SandboxEditorCommandStatus::Applied;
+        }
+    };
+
+    enum class SandboxEditorProgressivePoissonConfigStatus : std::uint8_t
+    {
+        None = 0,
+        Applied,
+        NoChange,
+        MissingConfigFacade,
+        PreviewRejected,
+        ApplyRejected,
+    };
+
+    struct SandboxEditorProgressivePoissonConfigCommand
+    {
+        Core::Config::ProgressivePoissonPlaygroundConfig Config{};
+        std::string SourceId{"sandbox.progressive_poisson"};
+    };
+
+    struct SandboxEditorProgressivePoissonConfigResult
+    {
+        SandboxEditorProgressivePoissonConfigStatus Status{
+            SandboxEditorProgressivePoissonConfigStatus::None};
+        Core::Config::EngineConfigLoadResult Preview{};
+        RuntimeEngineConfigApplyResult Apply{};
+        std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SandboxEditorProgressivePoissonConfigStatus::Applied ||
+                   Status == SandboxEditorProgressivePoissonConfigStatus::NoChange;
         }
     };
 
@@ -1895,6 +1944,7 @@ export namespace Extrinsic::Runtime
         const Graphics::RenderRecipeConfigContext* RenderRecipeContext{nullptr};
         SandboxEditorRenderRecipeEditorState* RenderRecipeEditorState{nullptr};
         const RuntimeRenderRecipeState* RenderRecipeRuntimeState{nullptr};
+        const RuntimeEngineConfigControlState* EngineConfigControlState{nullptr};
         std::function<Graphics::RenderRecipeConfigLoadResult(
             const std::string&,
             const std::string&)>
@@ -1902,6 +1952,13 @@ export namespace Extrinsic::Runtime
         std::function<RuntimeRenderRecipeApplyResult(
             const Graphics::RenderRecipeConfigLoadResult&)>
             ApplyRenderRecipePreview{};
+        std::function<Core::Config::EngineConfigLoadResult(
+            const std::string&,
+            const std::string&)>
+            PreviewEngineConfigDocument{};
+        std::function<RuntimeEngineConfigApplyResult(
+            const Core::Config::EngineConfigLoadResult&)>
+            ApplyEngineConfigHotSubset{};
         RenderArtifactRegistry* RenderArtifacts{nullptr};
         bool ImGuiAdapterAvailable{false};
         bool AssetImportCommandsAvailable{false};
@@ -1909,6 +1966,7 @@ export namespace Extrinsic::Runtime
         bool CameraRenderCommandsAvailable{false};
         bool VisualizationCommandsAvailable{false};
         bool RenderRecipeCommandsAvailable{false};
+        bool EngineConfigCommandsAvailable{false};
         bool MeshDenoiseKernelAvailable{true};
         bool MeshCurvatureKernelAvailable{true};
         bool MeshCurvatureDirectionsAvailable{true};
@@ -2265,6 +2323,11 @@ export namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorProgressivePoissonCommand& command);
 
+    [[nodiscard]] SandboxEditorProgressivePoissonConfigResult
+    ApplySandboxEditorProgressivePoissonConfigCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorProgressivePoissonConfigCommand& command);
+
     [[nodiscard]] SandboxEditorRenderRecipeEditorModel
     BuildSandboxEditorRenderRecipeEditorModel(
         const SandboxEditorContext& context);
@@ -2328,6 +2391,8 @@ export namespace Extrinsic::Runtime
             m_LastPointCloudOutlierRemovalResult{};
         std::optional<SandboxEditorProgressivePoissonResult>
             m_LastProgressivePoissonResult{};
+        std::optional<SandboxEditorProgressivePoissonConfigResult>
+            m_LastProgressivePoissonConfigResult{};
         Graphics::RenderRecipeConfigContext m_RenderRecipeContext{};
         SandboxEditorRenderRecipeEditorState m_RenderRecipeState{};
         RenderArtifactRegistry m_RenderArtifactRegistry{};
@@ -2384,6 +2449,11 @@ export namespace Extrinsic::Runtime
         std::int32_t m_ProgressivePoissonMeshSurfaceSampleSeed{1337};
         float m_ProgressivePoissonMeshSurfaceMinTriangleArea{1.0e-14f};
         bool m_ProgressivePoissonMeshSurfaceInterpolateNormals{true};
+        bool m_ProgressivePoissonAutoRunOnEdit{true};
+        float m_ProgressivePoissonDebounceSeconds{0.25f};
+        bool m_ProgressivePoissonAutoRunPending{false};
+        double m_ProgressivePoissonLastEditTime{0.0};
+        std::uint32_t m_ProgressivePoissonPendingStableEntityId{0u};
         std::int32_t m_TextureBakeSourceIndex{0};
         std::int32_t m_TextureBakeTargetSemanticIndex{0};
         std::int32_t m_TextureBakeEncoderIndex{0};

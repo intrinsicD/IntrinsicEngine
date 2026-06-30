@@ -67,11 +67,13 @@ There are three current edit lanes over the same preview/apply contract:
   `ApplyRenderRecipeConfigPreview(...)` expose the same side-effect-free preview
   and fail-closed apply path to agents, CLI tools, tests, and application code.
 
-Runtime config control also exposes `render.default_recipe_config_path`.
+Runtime config control also exposes `render.default_recipe_config_path` and
+`sandbox.progressive_poisson`.
 `Engine::Initialize()` attempts the configured boot recipe after renderer
-initialization. Live hot-apply is deliberately limited to that render-config
-field: `ApplyEngineConfigHotSubset(...)` validates the referenced recipe before
-mutating the active engine config, and rejects boot-only field changes.
+initialization. Live hot-apply is deliberately limited to those fields:
+`ApplyEngineConfigHotSubset(...)` validates the referenced recipe before
+mutating the active engine config, updates sandbox playground state as value-only
+config, and rejects boot-only field changes.
 
 ## Frame Lifecycle
 

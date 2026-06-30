@@ -209,6 +209,7 @@ namespace Extrinsic::Runtime
         RuntimeRenderRecipeApplyResult RecipeApply{};
         bool EngineConfigApplied{false};
         bool DefaultRecipeConfigPathChanged{false};
+        bool SandboxProgressivePoissonChanged{false};
         std::vector<std::string> RejectedBootOnlyFields{};
 
         [[nodiscard]] bool Succeeded() const noexcept

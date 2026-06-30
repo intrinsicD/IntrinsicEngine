@@ -33,14 +33,23 @@ Engine-config control:
 
 ## Hot Subset
 
-The only live engine-config field in the current subset is
-`render.default_recipe_config_path`.
+The live engine-config fields in the current subset are:
+
+- `render.default_recipe_config_path`
+- `sandbox.progressive_poisson`
 
 Applying a non-empty path first loads and validates the referenced render recipe
 file. Only a usable recipe result reaches `ApplyRenderRecipeConfigPreview`, so an
 invalid file rejects the engine-config hot apply without clearing a previously
 active recipe override. Applying an empty path clears the active override and
 returns to the derived default frame recipe.
+
+The sandbox progressive-Poisson block carries the interactive playground's
+reference-sampler knobs, prefix/color-channel selection, mesh surface-sampling
+input controls, and auto-run debounce settings. Applying it updates only the
+active value-type `EngineConfig`; the Sandbox Editor consumes that state and
+drives METHOD-012 through its runtime command surface. The block has no renderer
+side effects and no direct RHI/device traffic.
 
 Every other engine-config difference is boot-only and is reported in
 `RuntimeEngineConfigApplyResult::RejectedBootOnlyFields`; the live config remains
@@ -55,6 +64,10 @@ activation commands call the same facade callbacks supplied by
 - preview routes to `Engine::PreviewRenderRecipeConfigDocument`;
 - activation routes to `Engine::ApplyRenderRecipeConfigPreview` with
   `RuntimeRenderRecipeActivationSource::Editor`.
+- progressive-Poisson knob edits route to
+  `Engine::PreviewEngineConfigControlDocument` and
+  `Engine::ApplyEngineConfigHotSubset` with
+  `RuntimeConfigControlSource::Editor`.
 
 Agent/CLI callers use the same Engine methods with
 `RuntimeConfigControlSource::AgentCli` or
