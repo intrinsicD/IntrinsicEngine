@@ -67,6 +67,7 @@ target_sources(${target_name}
         Geometry.Overlap.cppm
         Geometry.PCA.cppm
         Geometry.Parameterization.Diagnostics.cppm
+        Geometry.Parameterization.Harmonic.cppm
         Geometry.Plane.cppm
         Geometry.PointCloud.Conversion.cppm
         Geometry.PointCloud.Features.cppm
@@ -160,6 +161,7 @@ target_sources(${target_name}
         Geometry.Overlap.cpp
         Geometry.PCA.cpp
         Geometry.Parameterization.Diagnostics.cpp
+        Geometry.Parameterization.Harmonic.cpp
         Geometry.Plane.cpp
         Geometry.PointCloud.Conversion.cpp
         Geometry.PointCloud.Features.cpp
