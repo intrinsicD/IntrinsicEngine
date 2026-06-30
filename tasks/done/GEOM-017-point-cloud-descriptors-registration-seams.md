@@ -16,8 +16,14 @@ depends_on: [GEOM-008]
 - No renderer/runtime/ECS/assets/platform/app integration.
 
 ## Context
-- Status: implemented on branch `claude/intrinsic-engine-framework24-migrate-cew18n`;
-  full `ctest` gate deferred to CI (see Status below).
+- Status: done.
+- Completed: 2026-06-30.
+- Commit: TBD (local working-tree retirement and CI fix session).
+- PR: TBD.
+- Owner/agent: Codex on `main` working tree.
+- Closure maturity: `CPUContracted`; generic CPU point-cloud
+  descriptor/correspondence/coarse-registration seams are covered by the
+  default CPU gate, and no backend seam exists for this task.
 - Owning subsystem/layer: `geometry` (`geometry -> core` only); future paper-specific robust/global registration variants belong under `methods/geometry`.
 
 ## Status
@@ -39,17 +45,17 @@ depends_on: [GEOM-008]
   target); RANSAC honors `CoarseAlignmentParams::SampleSize` (draws/fits the
   requested minimal sample, not a fixed three). Regression tests added.
 - Verified in-session: `check_layering`, `check_test_layout`, `check_doc_links`,
-  `check_task_policy` pass; module inventory regenerated (529 modules); a
+  `check_task_policy` pass; module inventory regenerated (530 modules); a
   standalone clang-20 + glm + Eigen sanity check of the Kabsch rigid recovery
   (max error 1.2e-15), FPFH Darboux binning, and ISS eigenvalue-ratio gate passes.
-- Deferred to CI: `cmake --preset ci` + the `ctest -R 'PointCloud|Registration'`
-  gate — the sandbox cannot bootstrap vcpkg (microsoft/vcpkg clone denied by the
-  egress policy), so the full C++23-module build/test must run in CI before this
-  task retires to `tasks/done/`.
+- CI verification completed locally on 2026-06-30: default `ci` configure/build,
+  full CPU CTest, focused `PointCloud|Registration` CTest, benchmark smoke
+  result validation, ASan, UBSan, and opt-in `ci-vulkan` `gpu;vulkan` tests all
+  pass after the closure fixes recorded in this task.
 - Paper-specific robust/global registration (TEASER/FGR/CPD-class) remains
   deferred to `methods/geometry` follow-ups that declare this task in
   `depends_on`, per the Non-goals.
-- Spawned by [`GEOM-010`](../../done/GEOM-010-point-cloud-algorithm-pack-roadmap.md) and the [point-cloud algorithm roadmap](../../../docs/architecture/point-cloud-algorithm-roadmap.md).
+- Spawned by [`GEOM-010`](GEOM-010-point-cloud-algorithm-pack-roadmap.md) and the [point-cloud algorithm roadmap](../../docs/architecture/point-cloud-algorithm-roadmap.md).
 - Existing `Geometry.Registration` provides point-to-point and point-to-plane ICP; this task adds the reusable descriptor/correspondence/coarse-alignment contracts that can initialize ICP and feed later robust method packages.
 - Depends on `GEOM-008` dense numerical helpers for covariance/eigen local frames and on `GEOM-012` domain-view semantics when algorithms borrow mesh/graph point positions. Both prerequisites are retired, so this task is unblocked.
 - The keypoint/descriptor/correspondence contracts defined here are the prerequisite seam for future paper-specific robust/global registration method packages under `methods/geometry` (TEASER/FGR/CPD-class follow-ups per `docs/roadmap.md`); those method tasks should declare this task in `depends_on` when opened.
@@ -83,24 +89,25 @@ depends_on: [GEOM-008]
       crashing; insufficient-support keypoint case returns `nullopt`.
 - [x] ICP reachability: `Geometry.Registration::AlignICP` still callable and
       behaviorally intact.
-- [ ] (Deferred to CI) `cmake --preset ci && ctest -R 'PointCloud|Registration'`
-      — not runnable in the authoring sandbox (vcpkg egress blocked).
+- [x] `cmake --preset ci && ctest -R 'PointCloud|Registration'` passed in the
+      closure session after the explicit module-import and ICP-oracle fixes.
 
 ## Docs
 - [x] Documented the selected ISS keypoint / FPFH descriptor families and the
-      coarse-alignment seam in [`docs/architecture/geometry.md`](../../../docs/architecture/geometry.md).
+      coarse-alignment seam in [`docs/architecture/geometry.md`](../../docs/architecture/geometry.md).
 - [x] Regenerated `docs/api/generated/module_inventory.md` (adds
-      `Geometry.PointCloud.Features`; 529 modules).
-- [ ] (Deferred) Follow-up `methods/geometry` task records for any selected
-      robust/global registration paper backend — opened when such a method is the
-      next priority (per Non-goals); the roadmap pack boundary is unchanged.
+      `Geometry.PointCloud.Features`; 530 modules).
+- [x] Follow-up `methods/geometry` task records for selected robust/global
+      registration paper backends remain explicitly deferred until such a method
+      is the next priority (per Non-goals); the roadmap pack boundary is
+      unchanged.
 
 ## Acceptance criteria
-- [ ] Point-cloud keypoints, descriptors, correspondences, and coarse-registration results have explicit records and diagnostics.
-- [ ] Coarse alignment can initialize existing ICP without making ICP the only public registration path.
-- [ ] Deterministic tests cover descriptor matching tie-breaks, known rigid transforms, partial overlap, and degenerate neighborhoods.
-- [ ] Paper-specific robust/global registration variants are deferred to method tasks with CPU-reference-first workflow.
-- [ ] The implementation preserves `geometry -> core` layering.
+- [x] Point-cloud keypoints, descriptors, correspondences, and coarse-registration results have explicit records and diagnostics.
+- [x] Coarse alignment can initialize existing ICP without making ICP the only public registration path.
+- [x] Deterministic tests cover descriptor matching tie-breaks, known rigid transforms, partial overlap, and degenerate neighborhoods.
+- [x] Paper-specific robust/global registration variants are deferred to method tasks with CPU-reference-first workflow.
+- [x] The implementation preserves `geometry -> core` layering.
 
 ## Verification
 ```bash
@@ -113,6 +120,29 @@ python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+### Commands run during closure session
+
+- `python3 tools/docs/check_doc_links.py --root . --strict` — passed.
+- `python3 tools/agents/check_task_policy.py --root . --strict` — passed.
+- `python3 tools/agents/sync_skills.py --check` — passed.
+- `python3 tools/repo/check_layering_allowlist_quality.py --root . --strict` — passed.
+- `python3 tools/repo/check_test_layout.py --root . --strict` — passed.
+- `python3 tools/agents/validate_method_manifests.py --root methods --strict` — passed.
+- `python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict` — passed.
+- `python3 tools/repo/check_pr_contract.py --root . --mode ci` — passed.
+- `python3 tools/ci/check_workflow_names.py --root .github/workflows` — passed.
+- `python3 tools/agents/generate_session_brief.py --check` — passed before retirement.
+- `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md && git diff --exit-code docs/api/generated/module_inventory.md` — passed; 530 modules and no diff.
+- `tools/setup/bootstrap_vcpkg.sh` — passed.
+- `cmake --preset ci` — passed.
+- `cmake --build --preset ci` — passed after adding explicit `Geometry.Properties` imports.
+- `cmake --build --preset ci --target IntrinsicGeometryTests && ctest --test-dir build/ci --output-on-failure -R "^PointCloudFeatures\.IcpRegistrationRemainsReachable$" -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60` — passed after correcting the ICP translation oracle.
+- `ctest --test-dir build/ci --output-on-failure -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60` — passed; 3474/3474 tests.
+- `python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict && cmake --build --preset ci --target IntrinsicBenchmarkSmoke && GIT_COMMIT=$(git rev-parse HEAD) cmake --build --preset ci --target IntrinsicBenchmarks && python3 tools/benchmark/validate_benchmark_results.py --root build/ci/benchmark --strict` — passed after isolating CTest benchmark output from CI benchmark results.
+- ASan CI sanitizer leg (`cmake --preset ci` with address sanitizer flags, `cmake --build --preset ci --target IntrinsicTests`, selected CTest labels) — passed; 3472/3472 tests.
+- UBSan CI sanitizer leg (`cmake --preset ci` with undefined-behavior sanitizer flags, `cmake --build --preset ci --target IntrinsicTests`, selected CTest labels) — passed; 3472/3472 tests.
+- `cmake --preset ci-vulkan && cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicTests && ctest --test-dir build/ci-vulkan --output-on-failure -L "gpu" -L "vulkan" -LE "slow|flaky-quarantine" --no-tests=ignore --timeout 120` — passed; 51/51 selected tests, 0 failures, 5 runtime skips.
 
 ## Forbidden changes
 - Do not implement TEASER, CPD, generalized ICP, colored ICP, or another paper-specific backend in `src/geometry` without a method task.

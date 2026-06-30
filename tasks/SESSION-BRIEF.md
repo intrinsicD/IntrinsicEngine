@@ -40,7 +40,6 @@ the authoritative open/unblocked view.
 
 - unblocked: `GEOM-013` — Feature-preserving dual contouring (tasks/backlog/geometry/GEOM-013-feature-preserving-dual-contouring.md)
 - unblocked: `GEOM-014` — Feature-aware quadric error mesh simplification (tasks/backlog/geometry/GEOM-014-feature-aware-quadric-error-simplification.md)
-- unblocked: `GEOM-017` — Point-cloud descriptors and registration seams (tasks/backlog/geometry/GEOM-017-point-cloud-descriptors-registration-seams.md)
 - unblocked: `GEOM-019` — Harmonic/Tutte parameterization and boundary constraints (tasks/backlog/geometry/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md)
 - unblocked: `GEOM-024` — Sparse symmetric generalized eigensolver seam (tasks/backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)

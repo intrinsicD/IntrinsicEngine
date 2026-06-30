@@ -21,6 +21,7 @@
 
 import Geometry.PointCloud;
 import Geometry.PointCloud.Features;
+import Geometry.Properties;
 import Geometry.Registration;
 
 namespace
@@ -405,6 +406,9 @@ TEST(PointCloudFeatures, IcpRegistrationRemainsReachable)
     params.Variant = Geometry::Registration::ICPVariant::PointToPoint;
     const auto result = Geometry::Registration::AlignICP(src.Positions, tgt, {}, params);
     ASSERT_TRUE(result.has_value());
-    // The recovered translation should roughly cancel the applied offset.
-    EXPECT_LT(std::abs(result->Transform[3][0] + static_cast<double>(t.x)), 0.1);
+    // AlignICP maps source to target; this fixture applies the offset to the
+    // target, so the recovered translation should have the same sign.
+    EXPECT_NEAR(result->Transform[3][0], static_cast<double>(t.x), 0.02);
+    EXPECT_NEAR(result->Transform[3][1], static_cast<double>(t.y), 0.02);
+    EXPECT_NEAR(result->Transform[3][2], static_cast<double>(t.z), 0.02);
 }

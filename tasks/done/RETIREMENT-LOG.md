@@ -3050,3 +3050,15 @@ compaction, count readback, dispatch-args publication, and repeated-input
 determinism. The seam remains graphics/RHI-only with no Vulkan handle leakage,
 ECS/runtime/app/platform imports, CUDA path, or method-specific kernels.
 `METHOD-013` is now unblocked for the progressive Poisson Vulkan backend.
+
+[`GEOM-017`](GEOM-017-point-cloud-descriptors-registration-seams.md) —
+point-cloud descriptor, correspondence, and coarse-registration seams retired to
+`tasks/done/` on 2026-06-30 at `CPUContracted`. The generic geometry layer now
+owns ISS keypoint selection, FPFH descriptor storage, deterministic
+mutual-best/Lowe-ratio matching, and RANSAC coarse alignment with explicit
+status, inlier, RMSE, and iteration diagnostics. Existing ICP remains reachable
+and unchanged; paper-specific robust/global registration remains deferred to
+future `methods/geometry` packages that depend on this seam. The closure session
+fixed explicit C++23 module imports for `Geometry.Properties`, corrected the ICP
+translation oracle, and isolated CTest benchmark smoke output from CI benchmark
+result validation so the full local CI pipeline runs through cleanly.

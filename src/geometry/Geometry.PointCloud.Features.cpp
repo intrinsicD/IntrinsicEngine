@@ -23,6 +23,7 @@ module Geometry.PointCloud.Features;
 import Geometry.PointCloud;
 import Geometry.KDTree;
 import Geometry.PCA;
+import Geometry.Properties;
 
 namespace Geometry::PointCloud::Features
 {

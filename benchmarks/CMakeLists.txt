@@ -50,6 +50,7 @@ set(INTRINSIC_BENCHMARK_SMOKE_OUTPUT
 )
 
 add_custom_target(IntrinsicBenchmarks
+    COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_BINARY_DIR}/benchmark"
     COMMAND $<TARGET_FILE:IntrinsicBenchmarkSmoke> ${INTRINSIC_BENCHMARK_SMOKE_OUTPUT}
     DEPENDS IntrinsicBenchmarkSmoke
     COMMENT "Running benchmark smoke scaffold"
@@ -62,7 +63,7 @@ add_custom_target(IntrinsicBenchmarks
 if(BUILD_TESTING)
     set_property(GLOBAL APPEND PROPERTY INTRINSIC_REGISTERED_TEST_TARGETS IntrinsicBenchmarkSmoke)
 
-    set(_intrinsic_bench_smoke_test_dir "${CMAKE_BINARY_DIR}/benchmark/IntrinsicBenchmarkSmokeTest")
+    set(_intrinsic_bench_smoke_test_dir "${CMAKE_BINARY_DIR}/benchmark-ctest/IntrinsicBenchmarkSmokeTest")
 
     add_test(
         NAME IntrinsicBenchmarkSmoke.Run

@@ -15,8 +15,9 @@ module;
 module Geometry.Parameterization.Harmonic;
 
 import Geometry.HalfedgeMesh;
-import Geometry.Sparse;
 import Geometry.Parameterization.Diagnostics;
+import Geometry.Properties;
+import Geometry.Sparse;
 
 namespace Geometry::Parameterization
 {
