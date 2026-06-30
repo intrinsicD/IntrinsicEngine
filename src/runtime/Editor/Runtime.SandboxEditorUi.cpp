@@ -59,6 +59,7 @@ import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
+import Extrinsic.Runtime.ProgressivePoissonGpuBackend;
 import Extrinsic.Runtime.ProgressivePresentationExtraction;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -4332,10 +4333,28 @@ namespace Extrinsic::Runtime
             std::string FallbackReason{};
         };
 
+        [[nodiscard]] ProgressivePoissonGpuConfig ToProgressivePoissonGpuConfig(
+            const SandboxEditorProgressivePoissonConfig& config) noexcept
+        {
+            return ProgressivePoissonGpuConfig{
+                .Dimension = config.Dimension,
+                .GridWidth = config.GridWidth,
+                .MaxLevels = config.MaxLevels,
+                .HashLoadFactor = config.HashLoadFactor,
+                .RadiusAlpha = config.RadiusAlpha,
+                .RandomizeGridOrigin = config.RandomizeGridOrigin,
+                .GridOriginSeed = config.GridOriginSeed,
+                .ShuffleWithinLevels = config.ShuffleWithinLevels,
+                .ShuffleSeed = config.ShuffleSeed,
+            };
+        }
+
         [[nodiscard]] ProgressivePoissonBackendResolution
         ResolveProgressivePoissonBackend(
             const SandboxEditorProgressivePoissonBackend requested,
-            const RHI::IDevice* device)
+            const SandboxEditorProgressivePoissonConfig& config,
+            const std::uint32_t inputCount,
+            RHI::IDevice* device)
         {
             ProgressivePoissonBackendResolution resolved{};
             resolved.Requested = requested;
@@ -4346,21 +4365,32 @@ namespace Extrinsic::Runtime
             }
 
             resolved.Actual = SandboxEditorProgressivePoissonBackend::CpuReference;
-            if (device == nullptr)
+            const ProgressivePoissonGpuResolveResult gpu =
+                ResolveProgressivePoissonGpuRequest(
+                    ProgressivePoissonGpuResolveDesc{
+                        .Device = device,
+                        .Plan = ProgressivePoissonGpuPlanDesc{
+                            .InputCount = inputCount,
+                            .Config = ToProgressivePoissonGpuConfig(config),
+                        },
+                    });
+            if (gpu.GpuExecutionAvailable)
             {
-                resolved.FallbackReason =
-                    "Vulkan compute requested but no RHI device was available; ran CPU reference.";
-                return resolved;
-            }
-            if (!device->IsOperational())
-            {
-                resolved.FallbackReason =
-                    "Vulkan compute requested but the RHI device is not operational; ran CPU reference.";
+                resolved.Actual =
+                    SandboxEditorProgressivePoissonBackend::VulkanCompute;
                 return resolved;
             }
 
-            resolved.FallbackReason =
-                "Vulkan compute requested but METHOD-013 Slice A has not installed the GPU dispatches yet; ran CPU reference.";
+            resolved.FallbackReason = gpu.Diagnostic;
+            if (!resolved.FallbackReason.empty())
+            {
+                resolved.FallbackReason += " Ran CPU reference.";
+            }
+            else
+            {
+                resolved.FallbackReason =
+                    "Vulkan compute requested but GPU execution is unavailable; ran CPU reference.";
+            }
             return resolved;
         }
 
@@ -4369,10 +4399,14 @@ namespace Extrinsic::Runtime
             const std::span<const glm::vec3> positions,
             Geometry::PropertySet& properties,
             const SandboxEditorProgressivePoissonConfig& config,
-            const RHI::IDevice* device)
+            RHI::IDevice* device)
         {
             const ProgressivePoissonBackendResolution backend =
-                ResolveProgressivePoissonBackend(config.Backend, device);
+                ResolveProgressivePoissonBackend(
+                    config.Backend,
+                    config,
+                    static_cast<std::uint32_t>(positions.size()),
+                    device);
             const PPR::Config methodConfig =
                 ToProgressivePoissonReferenceConfig(config);
             const PPR::Result method = PPR::Compute(positions, methodConfig);

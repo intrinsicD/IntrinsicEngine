@@ -12,14 +12,14 @@ level — instant level-of-detail via a single index cutoff.
 | Backend | Status | Owning task |
 | --- | --- | --- |
 | `cpu_reference` | reference (canonical truth) | METHOD-012 |
-| `gpu_vulkan_compute` | declared; CPU fallback until Vulkan dispatch/parity slices land | METHOD-013 |
+| `gpu_vulkan_compute` | planning-only shader/layout seam; CPU fallback until Vulkan dispatch/parity slices land | METHOD-013 |
 
 This directory holds the **paper intake** (`paper.md`), the **manifest**
 (`method.yaml`), and the METHOD-012 CPU reference implementation under
 `include/` and `src/`. The reference backend is the canonical truth for
 correctness tests and smoke benchmarks. METHOD-013 owns the runtime/config
-backend selection contract, CPU fallback diagnostics, and the future Vulkan
-compute dispatch/parity reporting slices.
+backend selection contract, CPU fallback diagnostics, the Vulkan shader/layout
+planning seam, and the future Vulkan compute dispatch/parity reporting slices.
 
 ## Enabling work (engine backlog)
 
@@ -62,9 +62,13 @@ cloud back onto the selected entity for point rendering. The runtime result
 reports the written sample count, accepted triangle count, rejected face count,
 and total sampled surface area. It also carries requested backend id, actual
 backend id, CPU fallback reason when present, and accepted-point counts per
-progressive level for the Sandbox readout. As of METHOD-013 Slice A, requesting
-`gpu_vulkan_compute` runs the CPU reference fallback until Vulkan dispatches are
-installed by later METHOD-013 slices.
+progressive level for the Sandbox readout. As of METHOD-013 Slice B, requesting
+`gpu_vulkan_compute` builds against a runtime planning contract
+(`Runtime.ProgressivePoissonGpuBackend`) that pins storage-buffer layout,
+BDA push/state records, shader asset paths, and per-level build/accept plus
+GRAPHICS-108 compaction plans. Execution is still disabled, so requests run the
+CPU reference fallback until Vulkan dispatch recording and parity land in later
+METHOD-013 slices.
 
 Widget edits preview and hot-apply a serialized `EngineConfig` through
 `Engine::PreviewEngineConfigControlDocument` and
@@ -72,7 +76,8 @@ Widget edits preview and hot-apply a serialized `EngineConfig` through
 Sandbox schedules a debounced rerun. The explicit Run action uses the same
 config path before invoking the CPU reference command.
 The visible backend toggle is deferred to RUNTIME-136; METHOD-013 owns the
-backend command/config seam, Vulkan-compute backend, and CPU/GPU parity.
+backend command/config seam, planning-only Vulkan-compute seam, executable
+backend, and CPU/GPU parity.
 
 ## Known limitations
 

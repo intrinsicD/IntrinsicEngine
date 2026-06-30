@@ -21,7 +21,7 @@ Root scanned: `src`
 | `legacy` | 181 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 48 |
+| `runtime` | 49 |
 
 ## Modules
 
@@ -537,6 +537,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.PrimitiveSelectionRefinement` | `src/runtime/Runtime.PrimitiveSelectionRefinement.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProceduralGeometry` | `src/runtime/Runtime.ProceduralGeometry.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProceduralGeometryPacker` | `src/runtime/Runtime.ProceduralGeometryPacker.cppm` | `runtime` |
+| `Extrinsic.Runtime.ProgressivePoissonGpuBackend` | `src/runtime/Runtime.ProgressivePoissonGpuBackend.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressivePresentationExtraction` | `src/runtime/Runtime.ProgressivePresentationExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressiveRenderData` | `src/runtime/Runtime.ProgressiveRenderData.cppm` | `runtime` |
 | `Extrinsic.Runtime.ReferenceScene` | `src/runtime/Runtime.ReferenceScene.cppm` | `runtime` |
@@ -555,4 +556,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugClosestFace` | `src/runtime/SpatialDebug/Runtime.SpatialDebugClosestFace.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **527**
+Total modules: **528**

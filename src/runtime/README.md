@@ -245,11 +245,15 @@ debounced rerun when `auto_run_on_edit` is enabled. The explicit Run button uses
 the same config path before invoking the sampler command. The command only
 composes runtime-owned ECS state and the public method/surface-sampling APIs; it
 does not add sampler logic to UI code or call renderer/RHI upload APIs directly.
-METHOD-013 Slice A extends the command/config seam with a backend request
+METHOD-013 extends the command/config seam with a backend request
 (`CpuReference` or `VulkanCompute`) and reports requested backend, actual backend,
-and CPU fallback reason. The visible backend toggle remains tracked by
-RUNTIME-136; operational Vulkan dispatch/parity remains in later METHOD-013
-slices.
+and CPU fallback reason. Slice B adds
+`Extrinsic.Runtime.ProgressivePoissonGpuBackend`, which pins the Vulkan
+storage-buffer layout, BDA push/state records, shader asset paths, and per-level
+build/accept plus GRAPHICS-108 compaction dispatch plans. GPU execution remains
+disabled and reports planning-only CPU fallback until the next METHOD-013
+dispatch/parity slices. The visible backend toggle remains tracked by
+RUNTIME-136.
 
 ### Sandbox Editor Mesh Curvature
 

@@ -1,0 +1,84 @@
+#version 460
+
+// METHOD-013 Slice B — planned progressive Poisson phase accept mask.
+//
+// The shader pins the executable interface for the future conflict-check pass.
+// Runtime dispatch remains disabled in Slice B, so this body is a conservative
+// phase-mask producer rather than the final neighbor/claim resolver.
+
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+layout(buffer_reference, scalar) readonly buffer UIntArrayReadRef
+{
+    uint Values[];
+};
+
+layout(buffer_reference, scalar) buffer UIntArrayRef
+{
+    uint Values[];
+};
+
+layout(buffer_reference, scalar) readonly buffer ProgressivePoissonGpuStateRef
+{
+    uint64_t PositionXBDA;
+    uint64_t PositionYBDA;
+    uint64_t PositionZBDA;
+    uint64_t RemainingKeysBDA;
+    uint64_t NextRemainingKeysBDA;
+    uint64_t AcceptedKeysBDA;
+    uint64_t CellKeysBDA;
+    uint64_t CellPhasesBDA;
+    uint64_t AcceptFlagsBDA;
+    uint64_t HashKeysBDA;
+    uint64_t HashValuesBDA;
+    uint64_t LevelOffsetsBDA;
+    uint64_t SplatRadiiBDA;
+    uint64_t OutputCountBDA;
+    uint64_t CompactionScratchBDA;
+    uint64_t Reserved0;
+};
+
+layout(push_constant, scalar) uniform ProgressivePoissonPush
+{
+    uint64_t StateBDA;
+    uint InputCount;
+    uint RemainingCount;
+    uint HashTableCapacity;
+    uint Dimension;
+    uint GridWidth;
+    uint LevelIndex;
+    uint PhaseIndex;
+    uint PhaseCount;
+    float InvCellSize;
+    float RadiusSquared;
+    float OriginX;
+    float OriginY;
+    float OriginZ;
+    float Reserved0;
+} pc;
+
+void main()
+{
+    const uint globalIndex = gl_GlobalInvocationID.x;
+    if (globalIndex >= pc.RemainingCount || pc.StateBDA == uint64_t(0))
+    {
+        return;
+    }
+
+    ProgressivePoissonGpuStateRef state =
+        ProgressivePoissonGpuStateRef(pc.StateBDA);
+    if (state.CellPhasesBDA == uint64_t(0) ||
+        state.AcceptFlagsBDA == uint64_t(0))
+    {
+        return;
+    }
+
+    UIntArrayReadRef cellPhases = UIntArrayReadRef(state.CellPhasesBDA);
+    UIntArrayRef acceptFlags = UIntArrayRef(state.AcceptFlagsBDA);
+    acceptFlags.Values[globalIndex] =
+        cellPhases.Values[globalIndex] == pc.PhaseIndex ? 1u : 0u;
+}

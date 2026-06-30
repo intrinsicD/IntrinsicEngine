@@ -1,0 +1,170 @@
+#version 460
+
+// METHOD-013 Slice B — planned progressive Poisson per-level cell classification.
+//
+// This shader pins the BDA state table and push layout for the future Vulkan
+// backend. Runtime execution remains disabled until later METHOD-013 slices add
+// conflict-checked accept/compact dispatches and CPU/GPU parity tests.
+
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+const uint64_t EmptyHashKey = uint64_t(0xfffffffffffffffful);
+const uint InvalidIndex = 0xffffffffu;
+
+layout(buffer_reference, scalar) readonly buffer FloatArrayRef
+{
+    float Values[];
+};
+
+layout(buffer_reference, scalar) readonly buffer UIntArrayReadRef
+{
+    uint Values[];
+};
+
+layout(buffer_reference, scalar) buffer UIntArrayRef
+{
+    uint Values[];
+};
+
+layout(buffer_reference, scalar) buffer UInt64ArrayRef
+{
+    uint64_t Values[];
+};
+
+layout(buffer_reference, scalar) readonly buffer ProgressivePoissonGpuStateRef
+{
+    uint64_t PositionXBDA;
+    uint64_t PositionYBDA;
+    uint64_t PositionZBDA;
+    uint64_t RemainingKeysBDA;
+    uint64_t NextRemainingKeysBDA;
+    uint64_t AcceptedKeysBDA;
+    uint64_t CellKeysBDA;
+    uint64_t CellPhasesBDA;
+    uint64_t AcceptFlagsBDA;
+    uint64_t HashKeysBDA;
+    uint64_t HashValuesBDA;
+    uint64_t LevelOffsetsBDA;
+    uint64_t SplatRadiiBDA;
+    uint64_t OutputCountBDA;
+    uint64_t CompactionScratchBDA;
+    uint64_t Reserved0;
+};
+
+layout(push_constant, scalar) uniform ProgressivePoissonPush
+{
+    uint64_t StateBDA;
+    uint InputCount;
+    uint RemainingCount;
+    uint HashTableCapacity;
+    uint Dimension;
+    uint GridWidth;
+    uint LevelIndex;
+    uint PhaseIndex;
+    uint PhaseCount;
+    float InvCellSize;
+    float RadiusSquared;
+    float OriginX;
+    float OriginY;
+    float OriginZ;
+    float Reserved0;
+} pc;
+
+uint64_t packCell2D(int ix, int iy)
+{
+    const uint ux = uint(ix) ^ 0x80000000u;
+    const uint uy = uint(iy) ^ 0x80000000u;
+    return (uint64_t(ux) << 32) | uint64_t(uy);
+}
+
+uint64_t packCell3D(int ix, int iy, int iz)
+{
+    const uint64_t ux = uint64_t((ix + (1 << 20)) & 0x1fffff);
+    const uint64_t uy = uint64_t((iy + (1 << 20)) & 0x1fffff);
+    const uint64_t uz = uint64_t((iz + (1 << 20)) & 0x1fffff);
+    return (ux << 42) | (uy << 21) | uz;
+}
+
+uint phaseForCell(int ix, int iy, int iz)
+{
+    if (pc.Dimension == 3u)
+    {
+        return uint(ix & 1) | (uint(iy & 1) << 1) | (uint(iz & 1) << 2);
+    }
+    return uint(ix & 1) | (uint(iy & 1) << 1);
+}
+
+void main()
+{
+    const uint globalIndex = gl_GlobalInvocationID.x;
+    if (pc.StateBDA == uint64_t(0))
+    {
+        return;
+    }
+
+    ProgressivePoissonGpuStateRef state =
+        ProgressivePoissonGpuStateRef(pc.StateBDA);
+
+    if (globalIndex < pc.HashTableCapacity &&
+        state.HashKeysBDA != uint64_t(0) &&
+        state.HashValuesBDA != uint64_t(0))
+    {
+        UInt64ArrayRef hashKeys = UInt64ArrayRef(state.HashKeysBDA);
+        UIntArrayRef hashValues = UIntArrayRef(state.HashValuesBDA);
+        hashKeys.Values[globalIndex] = EmptyHashKey;
+        hashValues.Values[globalIndex] = InvalidIndex;
+    }
+
+    if (globalIndex >= pc.RemainingCount ||
+        state.PositionXBDA == uint64_t(0) ||
+        state.PositionYBDA == uint64_t(0) ||
+        state.RemainingKeysBDA == uint64_t(0) ||
+        state.CellKeysBDA == uint64_t(0) ||
+        state.CellPhasesBDA == uint64_t(0))
+    {
+        return;
+    }
+
+    UIntArrayReadRef remaining = UIntArrayReadRef(state.RemainingKeysBDA);
+    const uint pointIndex = remaining.Values[globalIndex];
+    if (pointIndex >= pc.InputCount)
+    {
+        return;
+    }
+
+    FloatArrayRef px = FloatArrayRef(state.PositionXBDA);
+    FloatArrayRef py = FloatArrayRef(state.PositionYBDA);
+    const float pzValue = (pc.Dimension == 3u && state.PositionZBDA != uint64_t(0))
+        ? FloatArrayRef(state.PositionZBDA).Values[pointIndex]
+        : 0.0;
+
+    const int ix = int(floor((px.Values[pointIndex] + pc.OriginX) * pc.InvCellSize));
+    const int iy = int(floor((py.Values[pointIndex] + pc.OriginY) * pc.InvCellSize));
+    const int iz = pc.Dimension == 3u
+        ? int(floor((pzValue + pc.OriginZ) * pc.InvCellSize))
+        : 0;
+    const uint64_t key = pc.Dimension == 3u
+        ? packCell3D(ix, iy, iz)
+        : packCell2D(ix, iy);
+    const uint phase = phaseForCell(ix, iy, iz);
+
+    UInt64ArrayRef cellKeys = UInt64ArrayRef(state.CellKeysBDA);
+    UIntArrayRef cellPhases = UIntArrayRef(state.CellPhasesBDA);
+    cellKeys.Values[globalIndex] = key;
+    cellPhases.Values[globalIndex] = phase;
+
+    if (pc.HashTableCapacity > 0u &&
+        state.HashKeysBDA != uint64_t(0) &&
+        state.HashValuesBDA != uint64_t(0))
+    {
+        const uint slot = uint(key % uint64_t(pc.HashTableCapacity));
+        UInt64ArrayRef hashKeys = UInt64ArrayRef(state.HashKeysBDA);
+        UIntArrayRef hashValues = UIntArrayRef(state.HashValuesBDA);
+        hashKeys.Values[slot] = key;
+        hashValues.Values[slot] = pointIndex;
+    }
+}

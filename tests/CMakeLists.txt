@@ -295,6 +295,7 @@ if(TARGET ExtrinsicRuntime)
         Test.MeshPrimitiveViewExtraction.cpp
         Test.ObjectSpaceNormalBakeQueue.cpp
         Test.ObjectSpaceNormalBakeSubmission.cpp
+        Test.ProgressivePoissonGpuBackend.cpp
         Test.ProgressivePresentationExtraction.cpp
         Test.ProgressiveRenderData.cpp
         Test.RenderArtifactPublication.cpp

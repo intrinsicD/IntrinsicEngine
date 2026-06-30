@@ -65,5 +65,6 @@ This index is the canonical entry point for method/paper implementation document
   [`progressive_poisson_reference_smoke.yaml`](../../benchmarks/geometry/manifests/progressive_poisson_reference_smoke.yaml).
   The Vulkan-compute GPU backend and CPU/GPU parity are owned by active
   [`METHOD-013`](../../tasks/active/METHOD-013-progressive-poisson-disk-gpu-backend.md);
-  its first slice exposes requested-vs-actual backend diagnostics and CPU
-  fallback for `gpu_vulkan_compute` requests.
+  current slices expose requested-vs-actual backend diagnostics, CPU fallback
+  for `gpu_vulkan_compute` requests, and a planning-only Vulkan shader/layout
+  seam before executable dispatch/parity lands.

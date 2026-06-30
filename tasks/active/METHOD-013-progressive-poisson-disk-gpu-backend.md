@@ -41,8 +41,9 @@ maturity_target: Operational
   command DTOs, report requested/actual backend plus fallback reason, and cover
   the non-operational Vulkan request in the default CPU gate. Closes
   `Scaffolded -> CPUContracted`.
-- **Slice B.** Add Vulkan storage-buffer layouts, shader descriptors, and
-  fail-closed dispatch planning for per-level hash/accept passes.
+- **Slice B (this slice).** Add Vulkan storage-buffer layouts, shader descriptors,
+  shader assets, and fail-closed dispatch planning for per-level hash/accept
+  passes.
 - **Slice C.** Implement the compute shaders and GRAPHICS-108 compaction
   integration, still falling back on pass failure.
 - **Slice D.** Add `gpu;vulkan` parity tests, parity diagnostics, and the
@@ -53,7 +54,14 @@ maturity_target: Operational
 - [x] Slice A: expose backend selection in config/command DTOs and return
       requested/actual backend diagnostics while preserving CPU reference output.
 - [x] Slice A: document and test CPU fallback for a non-operational Vulkan request.
-- [ ] Add per-level phase-parallel spatial-hash + accept compute shaders under `assets/shaders/` (cell hashing with configurable load factor; phase iteration so no two accepted points in a phase fall within `r_L`).
+- [x] Slice B: add the runtime GPU planning module, storage-buffer layout,
+      BDA state/push contracts, build-cells/accept-phase shader assets, and
+      per-level build/accept/compaction dispatch planning over the GRAPHICS-108
+      primitive plans without recording GPU execution yet.
+- [ ] Slice C: complete conflict-checked phase-parallel spatial-hash + accept
+      shader logic under `assets/shaders/` (cell hashing with configurable load
+      factor; phase iteration so no two accepted points in a phase fall within
+      `r_L`) and record the planned dispatches.
 - [ ] Add the GPU-capable overload (runtime seam) that uploads SoA positions, runs the per-level build/accept/compact passes via GRAPHICS-108, reads back `order`/`level_offsets`/`splat_radii`, and returns a result carrying `ActualBackend` and parity diagnostics.
 - [ ] Implement CPU fallback: when `IsOperational()` is false or a GPU pass fails, return the METHOD-012 reference result with `ActualBackend == CPU`.
 - [ ] Update `method.yaml` backends to include `gpu_vulkan_compute`; record parity tolerance and backend-identity reporting.
@@ -62,12 +70,16 @@ maturity_target: Operational
 - [x] Slice A: extend config/control tests for `sandbox.progressive_poisson.backend`.
 - [x] Slice A: add command fallback coverage asserting a Vulkan request reports
       actual CPU output and an explicit fallback reason in the default CPU gate.
+- [x] Slice B: add default-gate runtime contract coverage for GPU buffer layout,
+      per-level phase dispatch planning, GRAPHICS-108 compaction-plan handoff,
+      pipeline descriptor paths, and planning-only CPU fallback status.
 - [ ] Add `gpu;vulkan` parity tests (under `ci-vulkan`) asserting the GPU backend reproduces the CPU reference's per-level counts and the Poisson guarantee (`min_dist >= r_L`) on shared fixtures, within the documented tolerance; assert `ActualBackend == GPU` when a device is operational.
 - [ ] Add a fallback test asserting that on the Null device the API returns the CPU result with `ActualBackend == CPU` (runs on the default CPU gate).
 - [ ] Add or extend a benchmark manifest with a `gpu_time_ms` metric and a CPU-vs-GPU speedup diagnostic (heavy/nightly), with baseline comparison before any speedup claim.
 
 ## Docs
 - [x] Slice A: document backend selection and fallback status in method/runtime/config docs.
+- [x] Slice B: document the planning-only shader/layout seam and CPU fallback state.
 - [ ] Document the GPU backend, parity tolerance, and fallback behavior in the method `README.md` and `docs/methods/` backend notes; cross-link `docs/architecture/algorithm-variant-dispatch.md`.
 - [ ] Regenerate `docs/api/generated/module_inventory.md` if module surfaces change; re-validate the method manifest.
 
@@ -75,6 +87,9 @@ maturity_target: Operational
 - [x] Slice A default-gate contract proves a Vulkan request falls back to the CPU
       reference with requested/actual backend diagnostics and unchanged sampled
       output.
+- [x] Slice B pins the Vulkan planning contract and shader artifacts while
+      continuing to report planning-only CPU fallback for `gpu_vulkan_compute`
+      requests.
 - [ ] The GPU backend reproduces the CPU reference within the documented parity tolerance and preserves the Poisson guarantee on the tested datasets.
 - [ ] Backend identity (`ActualBackend`) and parity deltas are reported; the API falls back to CPU cleanly on a non-operational device.
 - [ ] `gpu;vulkan` parity tests pass under `ci-vulkan`; the CPU fallback test passes on the default gate.
@@ -109,6 +124,23 @@ Latest Slice A verification (2026-06-30):
 - `python3 tools/repo/check_test_layout.py --root . --strict`
 - `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md --check`
 
+Latest Slice B verification (2026-06-30):
+- `cmake --build --preset ci --target IntrinsicRuntimeContractTests`
+- `ctest --test-dir build/ci --output-on-failure -R 'ProgressivePoissonGpuBackend|SandboxEditorUi\.ProgressivePoisson|RuntimeConfigControlFacade\.SandboxProgressivePoissonConfigIsHotApplied' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+- `cmake --build --preset ci --target IntrinsicGraphicsVulkanSmokeTests`
+- `python3 tools/repo/check_shader_outputs.py --dir build/ci/bin/shaders --require progressive_poisson_build_cells.comp.spv --require progressive_poisson_accept_phase.comp.spv`
+- `cmake --build --preset ci --target IntrinsicTests`
+- `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+- `python3 tools/agents/validate_method_manifests.py --root methods --strict`
+- `python3 tools/agents/check_task_policy.py --root . --strict`
+- `python3 tools/agents/generate_session_brief.py --check`
+- `python3 tools/docs/check_doc_links.py --root .`
+- `python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main`
+- `python3 tools/repo/check_layering.py --root src --strict`
+- `python3 tools/repo/check_test_layout.py --root . --strict`
+- `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md --check`
+- `git diff --check`
+
 ## Forbidden changes
 - Mixing mechanical file moves with semantic refactors.
 - Changing the CPU reference semantics to make the GPU path "match".
@@ -119,4 +151,7 @@ Latest Slice A verification (2026-06-30):
 - Target: `Operational` on Vulkan-capable hosts; this task owns the GPU `Operational` and `ParityProven` milestones for the sampler (`Operational` owned by METHOD-013).
 - Slice A closes at `CPUContracted`; `Operational` owned by `METHOD-013` later
   slices.
+- Slice B remains `CPUContracted`: it pins the Vulkan planning and shader
+  contracts but intentionally keeps execution disabled until Slice C/D parity
+  evidence exists.
 - On non-Vulkan/Null hosts the documented endpoint is CPU fallback via METHOD-012; no separate follow-up is owed for that path.
