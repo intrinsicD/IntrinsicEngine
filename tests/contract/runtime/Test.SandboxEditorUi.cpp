@@ -2637,6 +2637,108 @@ TEST(SandboxEditorUi, PointCloudOutlierRemovalRadiusPublishesAndFailsClosed)
               Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
 }
 
+TEST(SandboxEditorUi, PointCloudOutlierRemovalPreservesSurvivingPointProperties)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const std::vector<glm::vec3> positions = MakeOutlierClusterPositions();
+    const std::size_t originalCount = positions.size();  // 20: 18 inliers + 2 outliers
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "LabeledCloud");
+    AddPointCloudSource(registry, cloud, originalCount);
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
+
+    // A non-built-in per-point property: every inlier carries the sentinel 7.0,
+    // the two trailing outliers carry 99.0. removal.Filtered would drop this
+    // property entirely; the command must compact it onto the kept points.
+    {
+        auto labels = registry.Raw()
+                          .get<GS::Vertices>(cloud)
+                          .Properties.GetOrAdd<float>("v:label", 0.0f);
+        ASSERT_EQ(labels.Vector().size(), originalCount);
+        for (std::size_t i = 0; i < originalCount; ++i)
+            labels.Vector()[i] = (i + 2u >= originalCount) ? 99.0f : 7.0f;
+    }
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
+
+    const Runtime::SandboxEditorPointCloudOutlierRemovalResult result =
+        Runtime::ApplySandboxEditorPointCloudOutlierRemovalCommand(
+            context,
+            Runtime::SandboxEditorPointCloudOutlierRemovalCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(cloud),
+                .Method =
+                    Runtime::SandboxEditorPointCloudOutlierMethod::Statistical,
+                .KNeighbors = 8u,
+                .StdDevMultiplier = 1.0f,
+            });
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+
+    // The "v:label" property must survive removal (bug: previously dropped).
+    auto survived = registry.Raw()
+                        .get<GS::Vertices>(cloud)
+                        .Properties.Get<float>("v:label");
+    ASSERT_TRUE(survived) << "v:label property was dropped after outlier removal";
+    EXPECT_EQ(survived.Vector().size(), result.KeptCount);
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud), result.KeptCount);
+    // All kept points are the inliers, so every surviving label is the sentinel.
+    for (const float label : survived.Vector())
+        EXPECT_FLOAT_EQ(label, 7.0f);
+}
+
+TEST(SandboxEditorUi, PointCloudOutlierRemovalRespectsDeletedSlots)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    // 20 live points plus one trailing slot marked deleted (a far position that
+    // would look like an outlier if it were wrongly treated as live).
+    std::vector<glm::vec3> positions = MakeOutlierClusterPositions();
+    const std::size_t liveCount = positions.size();  // 20
+    positions.push_back(glm::vec3{50.0f, 50.0f, 50.0f});
+    const std::size_t slotCount = positions.size();  // 21
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "DeletedSlotCloud");
+    AddPointCloudSource(registry, cloud, slotCount);
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
+    {
+        auto& vertices = registry.Raw().get<GS::Vertices>(cloud);
+        auto deleted =
+            vertices.Properties.GetOrAdd<bool>("p:deleted", false);
+        ASSERT_EQ(deleted.Vector().size(), slotCount);
+        deleted.Vector()[slotCount - 1u] = true;  // last slot is dead
+        vertices.NumDeleted = 1u;
+    }
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
+
+    const Runtime::SandboxEditorPointCloudOutlierRemovalResult result =
+        Runtime::ApplySandboxEditorPointCloudOutlierRemovalCommand(
+            context,
+            Runtime::SandboxEditorPointCloudOutlierRemovalCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(cloud),
+                .Method =
+                    Runtime::SandboxEditorPointCloudOutlierMethod::Statistical,
+                .KNeighbors = 8u,
+                .StdDevMultiplier = 1.0f,
+            });
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+
+    // The deleted slot is excluded: counts reflect the live point set only, and
+    // the dead point is never resurrected into the published cloud.
+    EXPECT_EQ(result.OriginalCount, liveCount);
+    EXPECT_EQ(result.KeptCount + result.RejectedCount, liveCount);
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud), result.KeptCount);
+    EXPECT_LE(result.KeptCount, liveCount);
+    EXPECT_EQ(registry.Raw().get<GS::Vertices>(cloud).NumDeleted, 0u);
+}
+
 TEST(SandboxEditorUi, MeshDenoiseCommandFailsClosedForInvalidTargetsAndUnavailableKernel)
 {
     ECS::Scene::Registry registry;

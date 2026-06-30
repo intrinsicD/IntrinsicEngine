@@ -164,8 +164,11 @@ exports `SandboxEditorPointCloudOutlierMethod` (statistical or radius),
 `SandboxEditorPointCloudOutlierRemovalCommand`,
 `SandboxEditorPointCloudOutlierRemovalResult`, and
 `ApplySandboxEditorPointCloudOutlierRemovalCommand(...)`. Runtime validates the
-selected point-cloud `GeometrySources`, borrows the live points into a scratch
-`Geometry.PointCloud.Cloud`, and calls the geometry-owned `GEOM-016` operators
+selected point-cloud `GeometrySources`, copies the point property set into a
+scratch `Geometry.PointCloud.Cloud` that binds the live deletion counter and is
+garbage-collected to live points first (so the operators — which iterate every
+slot — see only live points and report live-relative counts, never resurrecting
+dead slots), and calls the geometry-owned `GEOM-016` operators
 `Geometry.PointCloud::RemoveStatisticalOutliers` /
 `RemoveRadiusOutliers`. The window exposes a method toggle plus the per-method
 parameters: statistical removal takes `KNeighbors` (1–512) and a
@@ -177,11 +180,15 @@ statistical mean/std-dev/threshold) and fails closed with
 when the inputs or selection are invalid.
 
 Unlike the vertex-normal and denoise commands, outlier removal changes the
-point count, so it rebuilds the entity's point `GeometrySources` from the kept
-points via `GeometrySources::PopulateFromCloud` (preserving normals and other
-surviving point attributes) rather than rewriting a count-matched property. The
-publication is undoable through `EditorCommandHistory::Execute`: undo republishes
-the original cloud and redo reapplies the kept cloud. Because the count changed,
+point count, so it rebuilds the entity's point `GeometrySources` via
+`GeometrySources::PopulateFromCloud`. The published cloud is the full-property
+scratch cloud compacted to the kept points (the rejected slots are deleted and
+garbage-collected), so every surviving per-point attribute — normals, K-Means
+labels, visualization scalars — is preserved on the kept points rather than
+dropped to position-only. The publication is undoable through
+`EditorCommandHistory::Execute`: undo republishes the original cloud (restored
+exactly, including any prior deleted slots) and redo reapplies the kept cloud.
+Because the count changed,
 the commit stamps coarse `GpuDirty` plus `DirtyVertexPositions` /
 `DirtyVertexAttributes` / `DirtyVertexNormals` so point-cloud extraction performs
 a full deferred repack/reupload on the next extraction opportunity; the command

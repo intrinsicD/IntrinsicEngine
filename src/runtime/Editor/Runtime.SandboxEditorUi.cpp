@@ -14896,10 +14896,24 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        // Borrow the live point storage into a cloud (a copy of the property
-        // set, so the geometry operator never mutates the published source).
-        Geometry::Vertices scratchPoints = view.VertexSource->Properties;
-        Geometry::PointCloud::Cloud beforeCloud{scratchPoints};
+        // Snapshot the original point property set (including any deleted slots
+        // and the live deletion counter) so undo restores the entity exactly.
+        Geometry::Vertices originalPoints = view.VertexSource->Properties;
+        std::size_t originalNumDeleted = view.VertexSource->NumDeleted;
+        Geometry::PointCloud::Cloud beforeCloud{
+            originalPoints,
+            originalNumDeleted};
+
+        // Build a separate live-only working cloud: bind the deletion counter and
+        // garbage-collect so the GEOM-016 operators (which iterate every slot via
+        // VerticesSize()) run over the live points only, and so kept/rejected
+        // indices and result counts match the live point set rather than dead
+        // slots. The full property set is carried so user attributes survive.
+        Geometry::Vertices workPoints = view.VertexSource->Properties;
+        std::size_t workNumDeleted = view.VertexSource->NumDeleted;
+        Geometry::PointCloud::Cloud workCloud{workPoints, workNumDeleted};
+        if (workCloud.HasGarbage())
+            workCloud.GarbageCollection();
 
         Geometry::PointCloud::OutlierRemovalResult removal{};
         if (statistical)
@@ -14909,7 +14923,7 @@ namespace Extrinsic::Runtime
             params.StdDevMultiplier = command.StdDevMultiplier;
             removal =
                 Geometry::PointCloud::RemoveStatisticalOutliers(
-                    beforeCloud,
+                    workCloud,
                     params);
         }
         else
@@ -14919,7 +14933,7 @@ namespace Extrinsic::Runtime
             params.MinNeighbors = command.MinNeighbors;
             removal =
                 Geometry::PointCloud::RemoveRadiusOutliers(
-                    beforeCloud,
+                    workCloud,
                     params);
         }
 
@@ -14947,7 +14961,17 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        Geometry::PointCloud::Cloud afterCloud = removal.Filtered;
+        // Compact the full-property working cloud down to the kept points by
+        // deleting the rejected slots and garbage-collecting. This preserves
+        // every surviving per-point property (normals, K-Means labels,
+        // visualization scalars, ...), unlike `removal.Filtered`, which only
+        // carries the Cloud built-ins (position/normal/color/radius).
+        Geometry::PointCloud::Cloud afterCloud = workCloud;
+        for (const std::size_t rejected : removal.RejectedIndices)
+            afterCloud.DeletePoint(
+                Geometry::VertexHandle{static_cast<std::uint32_t>(rejected)});
+        afterCloud.GarbageCollection();
+
         const SandboxEditorCommandStatus status =
             CommitPointCloudReplacement(
                 context,
