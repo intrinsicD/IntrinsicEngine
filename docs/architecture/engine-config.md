@@ -59,6 +59,7 @@ fail-closed.
       "shuffle_seed": 1374496523,
       "prefix_count": 0,
       "channel": "Level",
+      "backend": "CpuReference",
       "mesh_surface_sample_count": 4096,
       "mesh_surface_seed": 1337,
       "mesh_surface_min_triangle_area": 1e-14,
@@ -99,6 +100,7 @@ fail-closed.
 | `sandbox.progressive_poisson` | `grid_origin_seed`, `shuffle_seed`, `mesh_surface_seed` | Integer in `[0, 2147483647]` |
 | `sandbox.progressive_poisson` | `prefix_count` | Integer in `[0, 10000000]`; `0` means all accepted points |
 | `sandbox.progressive_poisson` | `channel` | `Level`, `Phase`, `SplatRadius`, `PrefixVisible` |
+| `sandbox.progressive_poisson` | `backend` | `CpuReference`, `VulkanCompute`; `VulkanCompute` reports CPU fallback until METHOD-013 installs operational dispatches |
 | `sandbox.progressive_poisson` | `mesh_surface_sample_count` | Integer in `[1, 10000000]` |
 | `sandbox.progressive_poisson` | `mesh_surface_min_triangle_area` | Positive finite number in `[1e-30, 1e30]` |
 | `sandbox.progressive_poisson` | `debounce_seconds` | Number in `[0.0, 10.0]` |

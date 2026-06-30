@@ -63,6 +63,7 @@ This index is the canonical entry point for method/paper implementation document
   [`Test.ProgressivePoissonReference.cpp`](../../tests/unit/geometry/Test.ProgressivePoissonReference.cpp)
   and the smoke benchmark in
   [`progressive_poisson_reference_smoke.yaml`](../../benchmarks/geometry/manifests/progressive_poisson_reference_smoke.yaml).
-  The Vulkan-compute GPU backend and CPU/GPU parity are the parity-proven
-  follow-up
-  [`METHOD-013`](../../tasks/backlog/methods/METHOD-013-progressive-poisson-disk-gpu-backend.md).
+  The Vulkan-compute GPU backend and CPU/GPU parity are owned by active
+  [`METHOD-013`](../../tasks/active/METHOD-013-progressive-poisson-disk-gpu-backend.md);
+  its first slice exposes requested-vs-actual backend diagnostics and CPU
+  fallback for `gpu_vulkan_compute` requests.

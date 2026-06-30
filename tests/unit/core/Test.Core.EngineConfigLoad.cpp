@@ -58,6 +58,8 @@ TEST(CoreEngineConfigLoad, SerializesAndLoadsEveryBootField)
     config.Sandbox.ProgressivePoisson.PrefixCount = 64;
     config.Sandbox.ProgressivePoisson.Channel =
         ProgressivePoissonPlaygroundChannel::Phase;
+    config.Sandbox.ProgressivePoisson.Backend =
+        ProgressivePoissonPlaygroundBackend::VulkanCompute;
     config.Sandbox.ProgressivePoisson.MeshSurfaceSampleCount = 2048;
     config.Sandbox.ProgressivePoisson.MeshSurfaceSampleSeed = 77;
     config.Sandbox.ProgressivePoisson.MeshSurfaceMinTriangleArea = 1.0e-9;
@@ -71,7 +73,7 @@ TEST(CoreEngineConfigLoad, SerializesAndLoadsEveryBootField)
     ASSERT_EQ(preview.State, EngineConfigState::Valid);
     EXPECT_FALSE(HasErrors(preview));
     EXPECT_TRUE(preview.Preview.SideEffectFree);
-    EXPECT_EQ(preview.Preview.ParsedFieldCount, 34u);
+    EXPECT_EQ(preview.Preview.ParsedFieldCount, 35u);
     EXPECT_EQ(preview.Preview.Config.Window.Title, "Engine Config Test");
     EXPECT_EQ(preview.Preview.Config.Window.Width, 1280);
     EXPECT_EQ(preview.Preview.Config.Window.Height, 720);
@@ -104,6 +106,8 @@ TEST(CoreEngineConfigLoad, SerializesAndLoadsEveryBootField)
     EXPECT_EQ(preview.Preview.Config.Sandbox.ProgressivePoisson.PrefixCount, 64u);
     EXPECT_EQ(preview.Preview.Config.Sandbox.ProgressivePoisson.Channel,
               ProgressivePoissonPlaygroundChannel::Phase);
+    EXPECT_EQ(preview.Preview.Config.Sandbox.ProgressivePoisson.Backend,
+              ProgressivePoissonPlaygroundBackend::VulkanCompute);
     EXPECT_EQ(preview.Preview.Config.Sandbox.ProgressivePoisson.MeshSurfaceSampleCount,
               2048u);
     EXPECT_EQ(preview.Preview.Config.Sandbox.ProgressivePoisson.MeshSurfaceSampleSeed,
@@ -131,6 +135,8 @@ TEST(CoreEngineConfigLoad, SerializesAndLoadsEveryBootField)
     EXPECT_EQ(loaded.Preview.Config.Camera.Controller, CameraControllerKind::TopDown);
     EXPECT_EQ(loaded.Preview.Config.Sandbox.ProgressivePoisson.Channel,
               ProgressivePoissonPlaygroundChannel::Phase);
+    EXPECT_EQ(loaded.Preview.Config.Sandbox.ProgressivePoisson.Backend,
+              ProgressivePoissonPlaygroundBackend::VulkanCompute);
     EXPECT_EQ(loaded.Preview.Config.Sandbox.ProgressivePoisson.MeshSurfaceSampleCount,
               2048u);
 }
@@ -157,6 +163,8 @@ TEST(CoreEngineConfigLoad, InvalidFieldsFallBackWithDiagnostics)
     defaults.Sandbox.ProgressivePoisson.MaxLevels = 11;
     defaults.Sandbox.ProgressivePoisson.Channel =
         ProgressivePoissonPlaygroundChannel::SplatRadius;
+    defaults.Sandbox.ProgressivePoisson.Backend =
+        ProgressivePoissonPlaygroundBackend::VulkanCompute;
     defaults.Sandbox.ProgressivePoisson.AutoRunOnEdit = false;
     defaults.Sandbox.ProgressivePoisson.DebounceSeconds = 0.75;
 
@@ -205,6 +213,7 @@ TEST(CoreEngineConfigLoad, InvalidFieldsFallBackWithDiagnostics)
       "shuffle_seed": -4,
       "prefix_count": -1,
       "channel": "Variance",
+      "backend": "Cuda",
       "mesh_surface_sample_count": 0,
       "mesh_surface_seed": -1,
       "mesh_surface_min_triangle_area": 0.0,
@@ -248,6 +257,8 @@ TEST(CoreEngineConfigLoad, InvalidFieldsFallBackWithDiagnostics)
     EXPECT_EQ(result.Preview.Config.Sandbox.ProgressivePoisson.MaxLevels, 11u);
     EXPECT_EQ(result.Preview.Config.Sandbox.ProgressivePoisson.Channel,
               ProgressivePoissonPlaygroundChannel::SplatRadius);
+    EXPECT_EQ(result.Preview.Config.Sandbox.ProgressivePoisson.Backend,
+              ProgressivePoissonPlaygroundBackend::VulkanCompute);
     EXPECT_FALSE(result.Preview.Config.Sandbox.ProgressivePoisson.AutoRunOnEdit);
     EXPECT_DOUBLE_EQ(result.Preview.Config.Sandbox.ProgressivePoisson.DebounceSeconds,
                      0.75);

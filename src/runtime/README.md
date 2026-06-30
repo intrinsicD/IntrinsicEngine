@@ -245,8 +245,11 @@ debounced rerun when `auto_run_on_edit` is enabled. The explicit Run button uses
 the same config path before invoking the sampler command. The command only
 composes runtime-owned ECS state and the public method/surface-sampling APIs; it
 does not add sampler logic to UI code or call renderer/RHI upload APIs directly.
-The future backend toggle is tracked by RUNTIME-136 and remains blocked on
-METHOD-013.
+METHOD-013 Slice A extends the command/config seam with a backend request
+(`CpuReference` or `VulkanCompute`) and reports requested backend, actual backend,
+and CPU fallback reason. The visible backend toggle remains tracked by
+RUNTIME-136; operational Vulkan dispatch/parity remains in later METHOD-013
+slices.
 
 ### Sandbox Editor Mesh Curvature
 

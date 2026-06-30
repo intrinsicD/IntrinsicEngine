@@ -63,6 +63,7 @@ import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Window;
+import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.DerivedJobGraph;
@@ -90,6 +91,8 @@ import Geometry.Properties;
 import Geometry.Smoothing;
 import Geometry.UvAtlas;
 
+#include "MockRHI.hpp"
+
 namespace Runtime = Extrinsic::Runtime;
 namespace Assets = Extrinsic::Assets;
 namespace Core = Extrinsic::Core;
@@ -107,6 +110,7 @@ namespace GVN = Geometry::Graph::VertexNormals;
 namespace PCN = Geometry::PointCloud::Normals;
 namespace Smooth = Geometry::Smoothing;
 namespace PPR = Intrinsic::Methods::Geometry::ProgressivePoissonReference;
+namespace Tests = Extrinsic::Tests;
 
 namespace
 {
@@ -820,12 +824,14 @@ namespace
         ECS::Scene::Registry& registry,
         Runtime::SelectionController& selection,
         const bool imguiAvailable = true,
-        const std::optional<Runtime::PrimitiveSelectionResult>* lastPrimitive = nullptr)
+        const std::optional<Runtime::PrimitiveSelectionResult>* lastPrimitive = nullptr,
+        Extrinsic::RHI::IDevice* device = nullptr)
     {
         return Runtime::SandboxEditorContext{
             .Scene = &registry,
             .Selection = &selection,
             .LastRefinedPrimitive = lastPrimitive,
+            .Device = device,
             .ImGuiAdapterAvailable = imguiAvailable,
             .AssetImportCommandsAvailable = false,
             .CameraRenderCommandsAvailable = false,
@@ -2279,6 +2285,13 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandPublishesPointPropertiesAndVisual
         "Phase");
     EXPECT_EQ(result.BackendId, PPR::kBackendId);
     EXPECT_EQ(result.BackendDisplayName, "CPU reference");
+    EXPECT_EQ(result.RequestedBackend,
+              Runtime::SandboxEditorProgressivePoissonBackend::CpuReference);
+    EXPECT_EQ(result.ActualBackend,
+              Runtime::SandboxEditorProgressivePoissonBackend::CpuReference);
+    EXPECT_EQ(result.RequestedBackendId, PPR::kBackendId);
+    EXPECT_FALSE(result.FellBackToCpu);
+    EXPECT_TRUE(result.BackendFallbackReason.empty());
     EXPECT_EQ(result.LevelAcceptedCounts.size(), result.LevelCount);
     EXPECT_EQ(SumCounts(result.LevelAcceptedCounts), result.AcceptedCount);
     EXPECT_NE(result.Message.find(PPR::kBackendId), std::string::npos);
@@ -2334,6 +2347,81 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandPublishesPointPropertiesAndVisual
     EXPECT_TRUE(model.Processing.LastProgressivePoissonResult->Succeeded());
     EXPECT_EQ(model.Processing.LastProgressivePoissonResult->AcceptedCount,
               result.AcceptedCount);
+}
+
+TEST(SandboxEditorUi, ProgressivePoissonVulkanRequestFallsBackToCpuReference)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Tests::MockDevice device;
+    device.Operational = false;
+    Runtime::SandboxEditorContext context =
+        MakeContext(registry, selection, true, nullptr, &device);
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "PoissonCloud");
+    AddPointCloudSource(registry, cloud, 6u);
+    const std::vector<glm::vec3> positions{
+        {0.0f, 0.0f, 0.0f},
+        {0.25f, 0.0f, 0.0f},
+        {0.5f, 0.5f, 0.0f},
+        {1.0f, 0.0f, 0.0f},
+        {1.0f, 1.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+    };
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
+
+    Runtime::SandboxEditorProgressivePoissonConfig config{};
+    config.Dimension = 2u;
+    config.GridWidth = 3u;
+    config.MaxLevels = 5u;
+    config.HashLoadFactor = 0.75f;
+    config.RadiusAlpha = 0.4f;
+    config.RandomizeGridOrigin = false;
+    config.ShuffleWithinLevels = false;
+    config.PrefixCount = 3u;
+    config.Channel = Runtime::SandboxEditorProgressivePoissonChannel::Level;
+    config.Backend =
+        Runtime::SandboxEditorProgressivePoissonBackend::VulkanCompute;
+
+    const Runtime::SandboxEditorProgressivePoissonResult result =
+        Runtime::ApplySandboxEditorProgressivePoissonCommand(
+            context,
+            Runtime::SandboxEditorProgressivePoissonCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(cloud),
+                .Config = config,
+            });
+
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_EQ(result.RequestedBackend,
+              Runtime::SandboxEditorProgressivePoissonBackend::VulkanCompute);
+    EXPECT_EQ(result.ActualBackend,
+              Runtime::SandboxEditorProgressivePoissonBackend::CpuReference);
+    EXPECT_EQ(result.RequestedBackendId, "gpu_vulkan_compute");
+    EXPECT_EQ(result.BackendId, PPR::kBackendId);
+    EXPECT_TRUE(result.FellBackToCpu);
+    EXPECT_NE(result.BackendFallbackReason.find("not operational"),
+              std::string::npos);
+    EXPECT_NE(result.Message.find("requested gpu_vulkan_compute"),
+              std::string::npos);
+    EXPECT_NE(result.Message.find("actual cpu_reference"),
+              std::string::npos);
+
+    PPR::Config directConfig{};
+    directConfig.Dimension = config.Dimension;
+    directConfig.GridWidth = config.GridWidth;
+    directConfig.MaxLevels = config.MaxLevels;
+    directConfig.HashLoadFactor = config.HashLoadFactor;
+    directConfig.RadiusAlpha = config.RadiusAlpha;
+    directConfig.RandomizeGridOrigin = config.RandomizeGridOrigin;
+    directConfig.GridOriginSeed = config.GridOriginSeed;
+    directConfig.ShuffleWithinLevels = config.ShuffleWithinLevels;
+    directConfig.ShuffleSeed = config.ShuffleSeed;
+    const PPR::Result direct = PPR::Compute(positions, directConfig);
+    ASSERT_EQ(direct.Diag.Code, PPR::ValidationCode::Valid);
+    EXPECT_EQ(result.AcceptedCount, direct.Diag.AcceptedCount);
+    EXPECT_EQ(result.LevelAcceptedCounts, direct.Diag.LevelCounts);
+    EXPECT_EQ(result.PrefixCount, std::min(3u, direct.Diag.AcceptedCount));
 }
 
 TEST(SandboxEditorUi, ProgressivePoissonCommandMatchesDirectMethodConfig)
@@ -2473,6 +2561,7 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigFacade)
     config.ShuffleSeed = 29u;
     config.PrefixCount = 3u;
     config.Channel = Core::Config::ProgressivePoissonPlaygroundChannel::Phase;
+    config.Backend = Core::Config::ProgressivePoissonPlaygroundBackend::VulkanCompute;
     config.AutoRunOnEdit = true;
     config.DebounceSeconds = 0.2;
 
@@ -2491,6 +2580,8 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigFacade)
               3u);
     EXPECT_EQ(controlState.ActiveConfig.Sandbox.ProgressivePoisson.Channel,
               Core::Config::ProgressivePoissonPlaygroundChannel::Phase);
+    EXPECT_EQ(controlState.ActiveConfig.Sandbox.ProgressivePoisson.Backend,
+              Core::Config::ProgressivePoissonPlaygroundBackend::VulkanCompute);
 
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
@@ -2512,6 +2603,8 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigFacade)
     const Runtime::SandboxEditorProgressivePoissonConfig runtimeConfig =
         Runtime::MakeSandboxEditorProgressivePoissonConfig(
             controlState.ActiveConfig.Sandbox.ProgressivePoisson);
+    EXPECT_EQ(runtimeConfig.Backend,
+              Runtime::SandboxEditorProgressivePoissonBackend::VulkanCompute);
     const Runtime::SandboxEditorProgressivePoissonResult result =
         Runtime::ApplySandboxEditorProgressivePoissonCommand(
             commandContext,
@@ -2540,6 +2633,13 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigFacade)
     EXPECT_EQ(result.LevelAcceptedCounts, direct.Diag.LevelCounts);
     EXPECT_EQ(result.BackendId, PPR::kBackendId);
     EXPECT_EQ(result.BackendDisplayName, "CPU reference");
+    EXPECT_EQ(result.RequestedBackend,
+              Runtime::SandboxEditorProgressivePoissonBackend::VulkanCompute);
+    EXPECT_EQ(result.ActualBackend,
+              Runtime::SandboxEditorProgressivePoissonBackend::CpuReference);
+    EXPECT_TRUE(result.FellBackToCpu);
+    EXPECT_NE(result.BackendFallbackReason.find("no RHI device"),
+              std::string::npos);
     EXPECT_FLOAT_EQ(result.BaseRadius, direct.BaseRadius);
 
     Geometry::PropertySet& properties =

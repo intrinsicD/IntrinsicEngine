@@ -30,6 +30,7 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.DerivedJobGraph;
@@ -369,8 +370,17 @@ export namespace Extrinsic::Runtime
         PrefixVisible,
     };
 
+    enum class SandboxEditorProgressivePoissonBackend : std::uint8_t
+    {
+        CpuReference,
+        VulkanCompute,
+    };
+
     [[nodiscard]] const char* DebugNameForSandboxEditorProgressivePoissonChannel(
         SandboxEditorProgressivePoissonChannel channel) noexcept;
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorProgressivePoissonBackend(
+        SandboxEditorProgressivePoissonBackend backend) noexcept;
 
     [[nodiscard]] SandboxEditorProgressivePoissonChannel
     MakeSandboxEditorProgressivePoissonChannel(
@@ -379,6 +389,14 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] Core::Config::ProgressivePoissonPlaygroundChannel
     MakeCoreProgressivePoissonPlaygroundChannel(
         SandboxEditorProgressivePoissonChannel channel) noexcept;
+
+    [[nodiscard]] SandboxEditorProgressivePoissonBackend
+    MakeSandboxEditorProgressivePoissonBackend(
+        Core::Config::ProgressivePoissonPlaygroundBackend backend) noexcept;
+
+    [[nodiscard]] Core::Config::ProgressivePoissonPlaygroundBackend
+    MakeCoreProgressivePoissonPlaygroundBackend(
+        SandboxEditorProgressivePoissonBackend backend) noexcept;
 
     struct SandboxEditorProgressivePoissonConfig
     {
@@ -394,6 +412,8 @@ export namespace Extrinsic::Runtime
         std::uint32_t PrefixCount{0u}; // 0 means all accepted points.
         SandboxEditorProgressivePoissonChannel Channel{
             SandboxEditorProgressivePoissonChannel::Level};
+        SandboxEditorProgressivePoissonBackend Backend{
+            SandboxEditorProgressivePoissonBackend::CpuReference};
         std::uint32_t MeshSurfaceSampleCount{4096u};
         std::uint32_t MeshSurfaceSampleSeed{1337u};
         double MeshSurfaceMinTriangleArea{1.0e-14};
@@ -424,8 +444,16 @@ export namespace Extrinsic::Runtime
         std::uint32_t AcceptedCount{0u};
         std::uint32_t PrefixCount{0u};
         std::uint32_t LevelCount{0u};
+        SandboxEditorProgressivePoissonBackend RequestedBackend{
+            SandboxEditorProgressivePoissonBackend::CpuReference};
+        SandboxEditorProgressivePoissonBackend ActualBackend{
+            SandboxEditorProgressivePoissonBackend::CpuReference};
+        std::string RequestedBackendId{};
+        std::string RequestedBackendDisplayName{};
         std::string BackendId{};
         std::string BackendDisplayName{};
+        bool FellBackToCpu{false};
+        std::string BackendFallbackReason{};
         std::vector<std::uint32_t> LevelAcceptedCounts{};
         float BaseRadius{0.0f};
         float UsedAlpha{0.0f};
@@ -1911,6 +1939,7 @@ export namespace Extrinsic::Runtime
         const std::optional<PrimitiveSelectionResult>* LastRefinedPrimitive{nullptr};
         CameraControllerRegistry* CameraControllers{nullptr};
         Core::Extent2D CameraViewport{};
+        RHI::IDevice* Device{nullptr};
         SandboxEditorAssetImportCommandSurface AssetImportCommands{};
         SandboxEditorAssetImportQueueCommandSurface AssetImportQueueCommands{};
         SandboxEditorSceneFileCommandSurface SceneFileCommands{};
@@ -2448,6 +2477,7 @@ export namespace Extrinsic::Runtime
         std::int32_t m_ProgressivePoissonShuffleSeed{0x51ed270b};
         std::int32_t m_ProgressivePoissonPrefixCount{0};
         std::int32_t m_ProgressivePoissonChannel{0};
+        std::int32_t m_ProgressivePoissonBackend{0};
         std::int32_t m_ProgressivePoissonMeshSurfaceSampleCount{4096};
         std::int32_t m_ProgressivePoissonMeshSurfaceSampleSeed{1337};
         float m_ProgressivePoissonMeshSurfaceMinTriangleArea{1.0e-14f};

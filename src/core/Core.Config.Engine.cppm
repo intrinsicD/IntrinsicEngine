@@ -48,6 +48,12 @@ namespace Extrinsic::Core::Config
             PrefixVisible = 3,
         };
 
+        export enum class ProgressivePoissonPlaygroundBackend : std::uint32_t
+        {
+            CpuReference = 0,
+            VulkanCompute = 1,
+        };
+
         export struct ProgressivePoissonPlaygroundConfig
         {
             std::uint32_t Dimension{3u};
@@ -62,6 +68,8 @@ namespace Extrinsic::Core::Config
             std::uint32_t PrefixCount{0u};
             ProgressivePoissonPlaygroundChannel Channel{
                 ProgressivePoissonPlaygroundChannel::Level};
+            ProgressivePoissonPlaygroundBackend Backend{
+                ProgressivePoissonPlaygroundBackend::CpuReference};
             std::uint32_t MeshSurfaceSampleCount{4096u};
             std::uint32_t MeshSurfaceSampleSeed{1337u};
             double MeshSurfaceMinTriangleArea{1.0e-14};

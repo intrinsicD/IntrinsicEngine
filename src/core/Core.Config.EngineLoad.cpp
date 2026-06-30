@@ -282,6 +282,14 @@ namespace Extrinsic::Core::Config
             return std::nullopt;
         }
 
+        [[nodiscard]] std::optional<ProgressivePoissonPlaygroundBackend>
+        ParseProgressivePoissonBackend(const std::string_view value) noexcept
+        {
+            if (value == "CpuReference") return ProgressivePoissonPlaygroundBackend::CpuReference;
+            if (value == "VulkanCompute") return ProgressivePoissonPlaygroundBackend::VulkanCompute;
+            return std::nullopt;
+        }
+
         [[nodiscard]] std::string_view ToConfigString(const GraphicsBackend value) noexcept
         {
             switch (value)
@@ -333,6 +341,17 @@ namespace Extrinsic::Core::Config
             case ProgressivePoissonPlaygroundChannel::PrefixVisible: return "PrefixVisible";
             }
             return "Level";
+        }
+
+        [[nodiscard]] std::string_view ToConfigString(
+            const ProgressivePoissonPlaygroundBackend value) noexcept
+        {
+            switch (value)
+            {
+            case ProgressivePoissonPlaygroundBackend::CpuReference: return "CpuReference";
+            case ProgressivePoissonPlaygroundBackend::VulkanCompute: return "VulkanCompute";
+            }
+            return "CpuReference";
         }
 
         template <typename Enum, typename Parser>
@@ -642,6 +661,7 @@ namespace Extrinsic::Core::Config
                  "shuffle_seed",
                  "prefix_count",
                  "channel",
+                 "backend",
                  "mesh_surface_sample_count",
                  "mesh_surface_seed",
                  "mesh_surface_min_triangle_area",
@@ -727,6 +747,15 @@ namespace Extrinsic::Core::Config
                          "sandbox.progressive_poisson",
                          ParseProgressivePoissonChannel,
                          config.Channel))
+            {
+                ++result.Preview.ParsedFieldCount;
+            }
+            if (ReadEnum(result,
+                         *poisson,
+                         "backend",
+                         "sandbox.progressive_poisson",
+                         ParseProgressivePoissonBackend,
+                         config.Backend))
             {
                 ++result.Preview.ParsedFieldCount;
             }
@@ -1085,6 +1114,8 @@ namespace Extrinsic::Core::Config
                  {"prefix_count", config.Sandbox.ProgressivePoisson.PrefixCount},
                  {"channel",
                   std::string{ToConfigString(config.Sandbox.ProgressivePoisson.Channel)}},
+                 {"backend",
+                  std::string{ToConfigString(config.Sandbox.ProgressivePoisson.Backend)}},
                  {"mesh_surface_sample_count",
                   config.Sandbox.ProgressivePoisson.MeshSurfaceSampleCount},
                  {"mesh_surface_seed",

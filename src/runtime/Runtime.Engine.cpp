@@ -2199,6 +2199,7 @@ namespace Extrinsic::Runtime
                lhs.ShuffleSeed == rhs.ShuffleSeed &&
                lhs.PrefixCount == rhs.PrefixCount &&
                lhs.Channel == rhs.Channel &&
+               lhs.Backend == rhs.Backend &&
                lhs.MeshSurfaceSampleCount == rhs.MeshSurfaceSampleCount &&
                lhs.MeshSurfaceSampleSeed == rhs.MeshSurfaceSampleSeed &&
                lhs.MeshSurfaceMinTriangleArea == rhs.MeshSurfaceMinTriangleArea &&

@@ -49,6 +49,7 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.DerivedJobGraph;
@@ -163,6 +164,12 @@ namespace Extrinsic::Runtime
                 SandboxEditorProgressivePoissonChannel::Phase,
                 SandboxEditorProgressivePoissonChannel::SplatRadius,
                 SandboxEditorProgressivePoissonChannel::PrefixVisible,
+            }};
+
+        inline constexpr std::array<SandboxEditorProgressivePoissonBackend, 2>
+            kProgressivePoissonBackends{{
+                SandboxEditorProgressivePoissonBackend::CpuReference,
+                SandboxEditorProgressivePoissonBackend::VulkanCompute,
             }};
 
         inline constexpr std::array<SandboxEditorMeshDenoiseStage, 1>
@@ -313,6 +320,7 @@ namespace Extrinsic::Runtime
             std::int32_t* ShuffleSeed{nullptr};
             std::int32_t* PrefixCount{nullptr};
             std::int32_t* Channel{nullptr};
+            std::int32_t* Backend{nullptr};
             std::int32_t* MeshSurfaceSampleCount{nullptr};
             std::int32_t* MeshSurfaceSampleSeed{nullptr};
             float* MeshSurfaceMinTriangleArea{nullptr};
@@ -4111,6 +4119,36 @@ namespace Extrinsic::Runtime
             "p:poisson_prefix_visible";
         inline constexpr const char* kProgressivePoissonCpuBackendDisplayName =
             "CPU reference";
+        inline constexpr const char* kProgressivePoissonGpuBackendId =
+            "gpu_vulkan_compute";
+        inline constexpr const char* kProgressivePoissonGpuBackendDisplayName =
+            "Vulkan compute";
+
+        [[nodiscard]] const char* ProgressivePoissonBackendId(
+            const SandboxEditorProgressivePoissonBackend backend) noexcept
+        {
+            switch (backend)
+            {
+            case SandboxEditorProgressivePoissonBackend::CpuReference:
+                return PPR::kBackendId;
+            case SandboxEditorProgressivePoissonBackend::VulkanCompute:
+                return kProgressivePoissonGpuBackendId;
+            }
+            return PPR::kBackendId;
+        }
+
+        [[nodiscard]] const char* ProgressivePoissonBackendDisplayName(
+            const SandboxEditorProgressivePoissonBackend backend) noexcept
+        {
+            switch (backend)
+            {
+            case SandboxEditorProgressivePoissonBackend::CpuReference:
+                return kProgressivePoissonCpuBackendDisplayName;
+            case SandboxEditorProgressivePoissonBackend::VulkanCompute:
+                return kProgressivePoissonGpuBackendDisplayName;
+            }
+            return kProgressivePoissonCpuBackendDisplayName;
+        }
 
         [[nodiscard]] const char* ProgressivePoissonChannelPropertyName(
             const SandboxEditorProgressivePoissonChannel channel) noexcept
@@ -4285,12 +4323,56 @@ namespace Extrinsic::Runtime
             return text;
         }
 
+        struct ProgressivePoissonBackendResolution
+        {
+            SandboxEditorProgressivePoissonBackend Requested{
+                SandboxEditorProgressivePoissonBackend::CpuReference};
+            SandboxEditorProgressivePoissonBackend Actual{
+                SandboxEditorProgressivePoissonBackend::CpuReference};
+            std::string FallbackReason{};
+        };
+
+        [[nodiscard]] ProgressivePoissonBackendResolution
+        ResolveProgressivePoissonBackend(
+            const SandboxEditorProgressivePoissonBackend requested,
+            const RHI::IDevice* device)
+        {
+            ProgressivePoissonBackendResolution resolved{};
+            resolved.Requested = requested;
+            if (requested == SandboxEditorProgressivePoissonBackend::CpuReference)
+            {
+                resolved.Actual = SandboxEditorProgressivePoissonBackend::CpuReference;
+                return resolved;
+            }
+
+            resolved.Actual = SandboxEditorProgressivePoissonBackend::CpuReference;
+            if (device == nullptr)
+            {
+                resolved.FallbackReason =
+                    "Vulkan compute requested but no RHI device was available; ran CPU reference.";
+                return resolved;
+            }
+            if (!device->IsOperational())
+            {
+                resolved.FallbackReason =
+                    "Vulkan compute requested but the RHI device is not operational; ran CPU reference.";
+                return resolved;
+            }
+
+            resolved.FallbackReason =
+                "Vulkan compute requested but METHOD-013 Slice A has not installed the GPU dispatches yet; ran CPU reference.";
+            return resolved;
+        }
+
         [[nodiscard]] SandboxEditorProgressivePoissonResult
         RunProgressivePoissonAndPublish(
             const std::span<const glm::vec3> positions,
             Geometry::PropertySet& properties,
-            const SandboxEditorProgressivePoissonConfig& config)
+            const SandboxEditorProgressivePoissonConfig& config,
+            const RHI::IDevice* device)
         {
+            const ProgressivePoissonBackendResolution backend =
+                ResolveProgressivePoissonBackend(config.Backend, device);
             const PPR::Config methodConfig =
                 ToProgressivePoissonReferenceConfig(config);
             const PPR::Result method = PPR::Compute(positions, methodConfig);
@@ -4300,8 +4382,20 @@ namespace Extrinsic::Runtime
             result.AcceptedCount = method.Diag.AcceptedCount;
             result.LevelCount = static_cast<std::uint32_t>(
                 method.Diag.LevelCounts.size());
-            result.BackendId = PPR::kBackendId;
-            result.BackendDisplayName = kProgressivePoissonCpuBackendDisplayName;
+            result.RequestedBackend = backend.Requested;
+            result.ActualBackend = backend.Actual;
+            result.RequestedBackendId =
+                ProgressivePoissonBackendId(backend.Requested);
+            result.RequestedBackendDisplayName =
+                ProgressivePoissonBackendDisplayName(backend.Requested);
+            result.BackendId = ProgressivePoissonBackendId(backend.Actual);
+            result.BackendDisplayName =
+                ProgressivePoissonBackendDisplayName(backend.Actual);
+            result.FellBackToCpu =
+                backend.Requested != backend.Actual &&
+                backend.Actual ==
+                    SandboxEditorProgressivePoissonBackend::CpuReference;
+            result.BackendFallbackReason = backend.FallbackReason;
             result.LevelAcceptedCounts = method.Diag.LevelCounts;
             result.BaseRadius = method.BaseRadius;
             result.UsedAlpha = method.Diag.UsedAlpha;
@@ -4348,7 +4442,11 @@ namespace Extrinsic::Runtime
             SandboxEditorProgressivePoissonResult& result)
         {
             result.Message =
-                "Progressive Poisson (" +
+                "Progressive Poisson (requested " +
+                (result.RequestedBackendId.empty()
+                     ? result.BackendId
+                     : result.RequestedBackendId) +
+                ", actual " +
                 result.BackendId +
                 ") accepted " +
                 std::to_string(result.AcceptedCount) +
@@ -4377,6 +4475,12 @@ namespace Extrinsic::Runtime
                     std::to_string(result.MeshSurfaceAcceptedTriangleCount) +
                     "/" +
                     std::to_string(result.MeshSurfaceTotalFaceCount);
+            }
+            if (!result.BackendFallbackReason.empty())
+            {
+                result.Message += ", fallback=\"";
+                result.Message += result.BackendFallbackReason;
+                result.Message += "\"";
             }
             result.Message += ".";
         }
@@ -6659,6 +6763,7 @@ namespace Extrinsic::Runtime
                 .CameraViewport = Core::Extent2D{
                     engine.GetWindow().GetFramebufferExtent().Width,
                     engine.GetWindow().GetFramebufferExtent().Height},
+                .Device = &engine.GetDevice(),
                 .AssetImportCommands = SandboxEditorAssetImportCommandSurface{
                     .Import =
                         [&engine](const SandboxEditorFileImportCommand& command)
@@ -9695,6 +9800,31 @@ namespace Extrinsic::Runtime
             return 0;
         }
 
+        [[nodiscard]] SandboxEditorProgressivePoissonBackend
+        ProgressivePoissonBackendFromIndex(const std::int32_t index) noexcept
+        {
+            const std::int32_t clamped = std::clamp(
+                index,
+                0,
+                static_cast<std::int32_t>(
+                    kProgressivePoissonBackends.size() - 1u));
+            return kProgressivePoissonBackends[
+                static_cast<std::size_t>(clamped)];
+        }
+
+        [[nodiscard]] std::int32_t ProgressivePoissonBackendIndex(
+            const SandboxEditorProgressivePoissonBackend backend) noexcept
+        {
+            for (std::size_t i = 0u; i < kProgressivePoissonBackends.size(); ++i)
+            {
+                if (kProgressivePoissonBackends[i] == backend)
+                {
+                    return static_cast<std::int32_t>(i);
+                }
+            }
+            return 0;
+        }
+
         void DrawProgressivePoissonTooltip(const char* text)
         {
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
@@ -9719,6 +9849,11 @@ namespace Extrinsic::Runtime
             *state.PrefixCount = static_cast<std::int32_t>(config.PrefixCount);
             *state.Channel = ProgressivePoissonChannelIndex(
                 MakeSandboxEditorProgressivePoissonChannel(config.Channel));
+            if (state.Backend != nullptr)
+            {
+                *state.Backend = ProgressivePoissonBackendIndex(
+                    MakeSandboxEditorProgressivePoissonBackend(config.Backend));
+            }
             if (state.MeshSurfaceSampleCount != nullptr)
             {
                 *state.MeshSurfaceSampleCount =
@@ -9766,6 +9901,9 @@ namespace Extrinsic::Runtime
                 .ShuffleSeed = static_cast<std::uint32_t>(*state.ShuffleSeed),
                 .PrefixCount = static_cast<std::uint32_t>(*state.PrefixCount),
                 .Channel = ProgressivePoissonChannelFromIndex(*state.Channel),
+                .Backend = state.Backend == nullptr
+                    ? SandboxEditorProgressivePoissonBackend::CpuReference
+                    : ProgressivePoissonBackendFromIndex(*state.Backend),
             };
             if (state.MeshSurfaceSampleCount != nullptr)
             {
@@ -9843,6 +9981,21 @@ namespace Extrinsic::Runtime
                     ImGui::Text("Backend: %s", result.BackendId.c_str());
                 }
             }
+            if (!result.RequestedBackendId.empty() &&
+                result.RequestedBackendId != result.BackendId)
+            {
+                if (!result.RequestedBackendDisplayName.empty())
+                {
+                    ImGui::Text("Requested backend: %s (%s)",
+                                result.RequestedBackendDisplayName.c_str(),
+                                result.RequestedBackendId.c_str());
+                }
+                else
+                {
+                    ImGui::Text("Requested backend: %s",
+                                result.RequestedBackendId.c_str());
+                }
+            }
             if (result.Succeeded())
             {
                 ImGui::Text("Accepted %u / %u  prefix %u  levels %u",
@@ -9876,6 +10029,12 @@ namespace Extrinsic::Runtime
                         result.MeshSurfaceTotalFaceCount,
                         result.MeshSurfaceArea);
                 }
+            }
+            if (!result.BackendFallbackReason.empty())
+            {
+                ImGui::TextWrapped(
+                    "Backend fallback: %s",
+                    result.BackendFallbackReason.c_str());
             }
             if (!result.Message.empty())
                 ImGui::TextWrapped("%s", result.Message.c_str());
@@ -9994,6 +10153,14 @@ namespace Extrinsic::Runtime
                 0,
                 static_cast<std::int32_t>(
                     kProgressivePoissonChannels.size() - 1u));
+            if (poissonState->Backend != nullptr)
+            {
+                *poissonState->Backend = std::clamp(
+                    *poissonState->Backend,
+                    0,
+                    static_cast<std::int32_t>(
+                        kProgressivePoissonBackends.size() - 1u));
+            }
             if (meshInput)
             {
                 *poissonState->MeshSurfaceSampleCount =
@@ -13149,6 +13316,19 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
+    const char* DebugNameForSandboxEditorProgressivePoissonBackend(
+        const SandboxEditorProgressivePoissonBackend backend) noexcept
+    {
+        switch (backend)
+        {
+        case SandboxEditorProgressivePoissonBackend::CpuReference:
+            return "CPU reference";
+        case SandboxEditorProgressivePoissonBackend::VulkanCompute:
+            return "Vulkan compute";
+        }
+        return "Unknown";
+    }
+
     SandboxEditorProgressivePoissonChannel MakeSandboxEditorProgressivePoissonChannel(
         const Core::Config::ProgressivePoissonPlaygroundChannel channel) noexcept
     {
@@ -13184,6 +13364,33 @@ namespace Extrinsic::Runtime
         return Core::Config::ProgressivePoissonPlaygroundChannel::Level;
     }
 
+    SandboxEditorProgressivePoissonBackend MakeSandboxEditorProgressivePoissonBackend(
+        const Core::Config::ProgressivePoissonPlaygroundBackend backend) noexcept
+    {
+        switch (backend)
+        {
+        case Core::Config::ProgressivePoissonPlaygroundBackend::CpuReference:
+            return SandboxEditorProgressivePoissonBackend::CpuReference;
+        case Core::Config::ProgressivePoissonPlaygroundBackend::VulkanCompute:
+            return SandboxEditorProgressivePoissonBackend::VulkanCompute;
+        }
+        return SandboxEditorProgressivePoissonBackend::CpuReference;
+    }
+
+    Core::Config::ProgressivePoissonPlaygroundBackend
+    MakeCoreProgressivePoissonPlaygroundBackend(
+        const SandboxEditorProgressivePoissonBackend backend) noexcept
+    {
+        switch (backend)
+        {
+        case SandboxEditorProgressivePoissonBackend::CpuReference:
+            return Core::Config::ProgressivePoissonPlaygroundBackend::CpuReference;
+        case SandboxEditorProgressivePoissonBackend::VulkanCompute:
+            return Core::Config::ProgressivePoissonPlaygroundBackend::VulkanCompute;
+        }
+        return Core::Config::ProgressivePoissonPlaygroundBackend::CpuReference;
+    }
+
     SandboxEditorProgressivePoissonConfig MakeSandboxEditorProgressivePoissonConfig(
         const Core::Config::ProgressivePoissonPlaygroundConfig& config) noexcept
     {
@@ -13199,6 +13406,7 @@ namespace Extrinsic::Runtime
             .ShuffleSeed = config.ShuffleSeed,
             .PrefixCount = config.PrefixCount,
             .Channel = MakeSandboxEditorProgressivePoissonChannel(config.Channel),
+            .Backend = MakeSandboxEditorProgressivePoissonBackend(config.Backend),
             .MeshSurfaceSampleCount = config.MeshSurfaceSampleCount,
             .MeshSurfaceSampleSeed = config.MeshSurfaceSampleSeed,
             .MeshSurfaceMinTriangleArea = config.MeshSurfaceMinTriangleArea,
@@ -13223,6 +13431,7 @@ namespace Extrinsic::Runtime
         out.ShuffleSeed = config.ShuffleSeed;
         out.PrefixCount = config.PrefixCount;
         out.Channel = MakeCoreProgressivePoissonPlaygroundChannel(config.Channel);
+        out.Backend = MakeCoreProgressivePoissonPlaygroundBackend(config.Backend);
         out.MeshSurfaceSampleCount = config.MeshSurfaceSampleCount;
         out.MeshSurfaceSampleSeed = config.MeshSurfaceSampleSeed;
         out.MeshSurfaceMinTriangleArea = config.MeshSurfaceMinTriangleArea;
@@ -14892,7 +15101,8 @@ namespace Extrinsic::Runtime
                         positions->data(),
                         positions->size()},
                     view.VertexSource->Properties,
-                    command.Config);
+                    command.Config,
+                    context.Device);
             if (!result.Succeeded())
                 return result;
 
@@ -14973,7 +15183,8 @@ namespace Extrinsic::Runtime
         result = RunProgressivePoissonAndPublish(
             sampledPositions,
             sampled.Cloud.PointProperties(),
-            command.Config);
+            command.Config,
+            context.Device);
         result.MeshSurfaceSamplingUsed = true;
         result.MeshSurfaceSampleCount =
             SaturatingUint32(sampled.Info.WrittenSampleCount);
@@ -16584,6 +16795,7 @@ namespace Extrinsic::Runtime
                     .ShuffleSeed = &m_ProgressivePoissonShuffleSeed,
                     .PrefixCount = &m_ProgressivePoissonPrefixCount,
                     .Channel = &m_ProgressivePoissonChannel,
+                    .Backend = &m_ProgressivePoissonBackend,
                     .MeshSurfaceSampleCount =
                         &m_ProgressivePoissonMeshSurfaceSampleCount,
                     .MeshSurfaceSampleSeed =

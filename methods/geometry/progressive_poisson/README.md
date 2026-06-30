@@ -12,13 +12,14 @@ level — instant level-of-detail via a single index cutoff.
 | Backend | Status | Owning task |
 | --- | --- | --- |
 | `cpu_reference` | reference (canonical truth) | METHOD-012 |
-| `gpu_vulkan_compute` | planned (parity to reference) | METHOD-013 |
+| `gpu_vulkan_compute` | declared; CPU fallback until Vulkan dispatch/parity slices land | METHOD-013 |
 
 This directory holds the **paper intake** (`paper.md`), the **manifest**
 (`method.yaml`), and the METHOD-012 CPU reference implementation under
 `include/` and `src/`. The reference backend is the canonical truth for
-correctness tests and smoke benchmarks; METHOD-013 owns the future Vulkan compute
-backend and parity reporting.
+correctness tests and smoke benchmarks. METHOD-013 owns the runtime/config
+backend selection contract, CPU fallback diagnostics, and the future Vulkan
+compute dispatch/parity reporting slices.
 
 ## Enabling work (engine backlog)
 
@@ -39,9 +40,10 @@ point cloud through `GEOM-035` (`Geometry.PointCloud.SurfaceSampling`), forwards
 every reference `Config` knob
 (`dimension`, `grid_width`, `max_levels`, `hash_load_factor`, `radius_alpha`,
 `randomize_grid_origin`, `grid_origin_seed`, `shuffle_within_levels`,
-`shuffle_seed`) through a typed command DTO and the engine config-control
-field `sandbox.progressive_poisson`, and publishes per-point float properties
-for visualization:
+`shuffle_seed`) plus the backend request (`cpu_reference` or
+`gpu_vulkan_compute`) through a typed command DTO and the engine config-control
+field `sandbox.progressive_poisson`, and publishes per-point float properties for
+visualization:
 
 - `p:poisson_level`
 - `p:poisson_phase`
@@ -58,17 +60,19 @@ Mesh runs expose additional surface-sampling controls (`sample_count`, `seed`,
 `min_triangle_area`, and `interpolate_vertex_normals`) and publish the sampled
 cloud back onto the selected entity for point rendering. The runtime result
 reports the written sample count, accepted triangle count, rejected face count,
-and total sampled surface area. It also carries the active backend id
-(`cpu_reference`) and accepted-point counts per progressive level for the
-Sandbox readout.
+and total sampled surface area. It also carries requested backend id, actual
+backend id, CPU fallback reason when present, and accepted-point counts per
+progressive level for the Sandbox readout. As of METHOD-013 Slice A, requesting
+`gpu_vulkan_compute` runs the CPU reference fallback until Vulkan dispatches are
+installed by later METHOD-013 slices.
 
 Widget edits preview and hot-apply a serialized `EngineConfig` through
 `Engine::PreviewEngineConfigControlDocument` and
 `Engine::ApplyEngineConfigHotSubset`; when `auto_run_on_edit` is enabled, the
 Sandbox schedules a debounced rerun. The explicit Run action uses the same
 config path before invoking the CPU reference command.
-The backend toggle is deferred to RUNTIME-136 after METHOD-013 lands; METHOD-013
-owns the Vulkan-compute backend and CPU/GPU parity.
+The visible backend toggle is deferred to RUNTIME-136; METHOD-013 owns the
+backend command/config seam, Vulkan-compute backend, and CPU/GPU parity.
 
 ## Known limitations
 

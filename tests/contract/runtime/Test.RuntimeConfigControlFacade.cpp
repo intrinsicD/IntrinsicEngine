@@ -212,6 +212,8 @@ TEST(RuntimeConfigControlFacade, SandboxProgressivePoissonConfigIsHotApplied)
     candidate.Sandbox.ProgressivePoisson.PrefixCount = 17u;
     candidate.Sandbox.ProgressivePoisson.Channel =
         CoreConfig::ProgressivePoissonPlaygroundChannel::Phase;
+    candidate.Sandbox.ProgressivePoisson.Backend =
+        CoreConfig::ProgressivePoissonPlaygroundBackend::VulkanCompute;
     candidate.Sandbox.ProgressivePoisson.MeshSurfaceSampleCount = 96u;
     candidate.Sandbox.ProgressivePoisson.MeshSurfaceSampleSeed = 7u;
     candidate.Sandbox.ProgressivePoisson.MeshSurfaceMinTriangleArea = 1.0e-8;
@@ -250,6 +252,8 @@ TEST(RuntimeConfigControlFacade, SandboxProgressivePoissonConfigIsHotApplied)
     EXPECT_EQ(active.PrefixCount, 17u);
     EXPECT_EQ(active.Channel,
               CoreConfig::ProgressivePoissonPlaygroundChannel::Phase);
+    EXPECT_EQ(active.Backend,
+              CoreConfig::ProgressivePoissonPlaygroundBackend::VulkanCompute);
     EXPECT_EQ(active.MeshSurfaceSampleCount, 96u);
     EXPECT_EQ(active.MeshSurfaceSampleSeed, 7u);
     EXPECT_DOUBLE_EQ(active.MeshSurfaceMinTriangleArea, 1.0e-8);
