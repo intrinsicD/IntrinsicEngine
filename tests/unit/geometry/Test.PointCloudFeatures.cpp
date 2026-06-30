@@ -122,6 +122,59 @@ TEST(PointCloudFeatures, MatchTieBreakPrefersLowestTargetRow)
     EXPECT_EQ(result->Pairs[0].TargetRow, 0u);
 }
 
+TEST(PointCloudFeatures, MatchRatioRejectsSingleTargetAmbiguity)
+{
+    const Feat::DescriptorSet source = MakeDescriptorSet(2, {{1.0f, 0.0f}});
+    const Feat::DescriptorSet target = MakeDescriptorSet(2, {{0.0f, 1.0f}}); // only one row
+    Feat::CorrespondenceParams params;
+    params.MutualBest = false;
+    params.MaxRatio = 0.8f; // no valid second-best -> reject
+    const auto result = Feat::MatchDescriptors(source, target, params);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_TRUE(result->Pairs.empty());
+}
+
+TEST(PointCloudFeatures, MatchRatioRejectsDuplicateTargets)
+{
+    const Feat::DescriptorSet source = MakeDescriptorSet(2, {{1.0f, 0.0f}});
+    // Two exact-duplicate nearest targets => best == second == 0.
+    const Feat::DescriptorSet target = MakeDescriptorSet(2, {{1.0f, 0.0f}, {1.0f, 0.0f}});
+    Feat::CorrespondenceParams params;
+    params.MutualBest = false;
+    params.MaxRatio = 0.8f;
+    const auto result = Feat::MatchDescriptors(source, target, params);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_TRUE(result->Pairs.empty());
+}
+
+TEST(PointCloudFeatures, ComputeDescriptorsSkipsDeletedPoints)
+{
+    auto cloud = MakeCloud(MakeWavyGrid());
+    const std::size_t before = cloud.VertexCount();
+    cloud.DeletePoint(Geometry::VertexHandle{5}); // delete without garbage collection
+
+    const auto desc = Feat::ComputeDescriptors(cloud, {});
+    ASSERT_TRUE(desc.has_value());
+    EXPECT_EQ(desc->Count, cloud.VertexCount());
+    EXPECT_EQ(static_cast<std::size_t>(desc->Count), before - 1u);
+    for (const std::uint32_t idx : desc->SourceIndices)
+    {
+        EXPECT_NE(idx, 5u);
+    }
+}
+
+TEST(PointCloudFeatures, KeypointsSkipDeletedPoints)
+{
+    auto cloud = MakeCloud(MakeWavyGrid());
+    cloud.DeletePoint(Geometry::VertexHandle{5});
+    const auto kp = Feat::DetectKeypoints(cloud);
+    ASSERT_TRUE(kp.has_value());
+    for (const std::uint32_t idx : kp->Indices)
+    {
+        EXPECT_NE(idx, 5u);
+    }
+}
+
 TEST(PointCloudFeatures, ComputeDescriptorsRequiresNormals)
 {
     CloudData data = MakeWavyGrid(5);
@@ -280,6 +333,25 @@ TEST(PointCloudFeatures, CoarseAlignmentRejectsOutliers)
     EXPECT_LT(TransformError(result.Transform, src.Positions, tgt), 1e-2);
     // Roughly the 6/7 inlier correspondences should be recovered.
     EXPECT_GE(result.InlierCount, src.Positions.size() * 3 / 4);
+}
+
+TEST(PointCloudFeatures, CoarseAlignmentHonorsLargerSampleSize)
+{
+    const CloudData src = MakeWavyGrid();
+    const glm::mat3 R = RotationAboutAxis({0.5f, 0.2f, 1.0f}, 0.45f);
+    const glm::vec3 t(0.4f, -0.6f, 1.2f);
+    std::vector<glm::vec3> tgt;
+    for (const glm::vec3 p : src.Positions)
+        tgt.push_back(R * p + t);
+
+    Feat::CoarseAlignmentParams params;
+    params.SampleSize = 5; // larger minimal sample must still fit and converge
+    const auto corr = GroundTruthCorrespondences(src.Positions.size());
+    const auto result = Feat::EstimateCoarseAlignment(src.Positions, tgt, corr, params);
+
+    EXPECT_EQ(result.Status, Feat::CoarseAlignmentStatus::Success);
+    EXPECT_GE(result.InlierCount, src.Positions.size() * 9 / 10);
+    EXPECT_LT(TransformError(result.Transform, src.Positions, tgt), 1e-3);
 }
 
 TEST(PointCloudFeatures, CoarseAlignmentInsufficientCorrespondences)

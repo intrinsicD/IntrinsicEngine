@@ -46,14 +46,34 @@ namespace Geometry::PointCloud::Features
             return z ^ (z >> 31);
         }
 
-        // Neighbors within radius (excluding self), sorted ascending by index and
-        // optionally capped. Deterministic regardless of KDTree traversal order.
+        // Live (non-deleted, finite) mask over the cloud's raw position slots.
+        // Deleted-but-not-collected points must never seed descriptors, become
+        // neighbors, or be emitted, matching LivePoints()/p:deleted semantics.
+        [[nodiscard]] std::vector<std::uint8_t> BuildLiveMask(const Cloud& cloud)
+        {
+            const std::span<const glm::vec3> positions = cloud.Positions();
+            std::vector<std::uint8_t> live(positions.size(), 0u);
+            for (std::size_t i = 0; i < positions.size(); ++i)
+            {
+                const VertexHandle v{static_cast<PropertyIndex>(i)};
+                if (!cloud.IsDeleted(v) && IsFiniteVec(positions[i]))
+                {
+                    live[i] = 1u;
+                }
+            }
+            return live;
+        }
+
+        // Neighbors within radius (excluding self and deleted slots), sorted
+        // ascending by index and optionally capped. Deterministic regardless of
+        // KDTree traversal order.
         void GatherRadiusNeighbors(
             const KDTree& tree,
             std::uint32_t self,
             glm::vec3 query,
             float radius,
             std::uint32_t maxNeighbors,
+            const std::vector<std::uint8_t>& live,
             std::vector<KDTree::ElementIndex>& scratch,
             std::vector<std::uint32_t>& out)
         {
@@ -66,7 +86,7 @@ namespace Geometry::PointCloud::Features
             }
             for (const KDTree::ElementIndex idx : scratch)
             {
-                if (idx != self)
+                if (idx != self && idx < live.size() && live[idx] != 0u)
                 {
                     out.push_back(static_cast<std::uint32_t>(idx));
                 }
@@ -218,6 +238,7 @@ namespace Geometry::PointCloud::Features
         {
             return std::nullopt;
         }
+        const std::vector<std::uint8_t> live = BuildLiveMask(cloud);
         KDTree tree;
         if (!tree.BuildFromPoints(positions))
         {
@@ -228,19 +249,21 @@ namespace Geometry::PointCloud::Features
         std::size_t counted = 0;
         for (std::size_t i = 0; i < positions.size(); ++i)
         {
-            if (!IsFiniteVec(positions[i]))
+            if (live[i] == 0u)
             {
                 continue;
             }
             knn.clear();
-            const auto result = tree.QueryKNN(positions[i], 2, knn);
+            // Query a few neighbors so the nearest live (non-deleted) one is
+            // reachable even when deleted slots remain in the index.
+            const auto result = tree.QueryKNN(positions[i], 8, knn);
             if (!result)
             {
                 continue;
             }
             for (const KDTree::ElementIndex idx : knn)
             {
-                if (idx != i)
+                if (idx != i && idx < live.size() && live[idx] != 0u)
                 {
                     sum += glm::distance(positions[i], positions[idx]);
                     ++counted;
@@ -270,6 +293,7 @@ namespace Geometry::PointCloud::Features
         const float salientRadius = params.SalientRadius > 0.0f ? params.SalientRadius : 6.0f * *spacing;
         const float nonMaxRadius = params.NonMaxRadius > 0.0f ? params.NonMaxRadius : 4.0f * *spacing;
 
+        const std::vector<std::uint8_t> live = BuildLiveMask(cloud);
         KDTree tree;
         if (!tree.BuildFromPoints(positions))
         {
@@ -284,12 +308,12 @@ namespace Geometry::PointCloud::Features
         std::vector<glm::vec3> neighborhood;
         for (std::size_t i = 0; i < positions.size(); ++i)
         {
-            if (!IsFiniteVec(positions[i]))
+            if (live[i] == 0u)
             {
                 continue;
             }
             GatherRadiusNeighbors(tree, static_cast<std::uint32_t>(i), positions[i],
-                                  salientRadius, 0, radiusScratch, neighbors);
+                                  salientRadius, 0, live, radiusScratch, neighbors);
             if (neighbors.size() < params.MinNeighbors)
             {
                 continue;
@@ -330,7 +354,7 @@ namespace Geometry::PointCloud::Features
                 continue;
             }
             GatherRadiusNeighbors(tree, static_cast<std::uint32_t>(i), positions[i],
-                                  nonMaxRadius, 0, radiusScratch, neighbors);
+                                  nonMaxRadius, 0, live, radiusScratch, neighbors);
             bool isMax = true;
             for (const std::uint32_t j : neighbors)
             {
@@ -380,32 +404,40 @@ namespace Geometry::PointCloud::Features
         }
         const float featureRadius = params.FeatureRadius > 0.0f ? params.FeatureRadius : 5.0f * *spacing;
 
+        const std::vector<std::uint8_t> live = BuildLiveMask(cloud);
         KDTree tree;
         if (!tree.BuildFromPoints(positions))
         {
             return std::nullopt;
         }
 
-        // Stage 1: SPFH for every point (needed by neighbors of query points).
+        // Stage 1: SPFH for every live point (needed by neighbors of query
+        // points). Deleted slots keep a zero histogram and are never neighbors.
         std::vector<std::array<float, kFpfhDimension>> spfh(positions.size());
         std::vector<std::vector<std::uint32_t>> pointNeighbors(positions.size());
         std::vector<KDTree::ElementIndex> radiusScratch;
         for (std::size_t i = 0; i < positions.size(); ++i)
         {
+            if (live[i] == 0u)
+            {
+                continue;
+            }
             GatherRadiusNeighbors(tree, static_cast<std::uint32_t>(i), positions[i],
-                                  featureRadius, params.MaxNeighbors, radiusScratch,
+                                  featureRadius, params.MaxNeighbors, live, radiusScratch,
                                   pointNeighbors[i]);
             spfh[i] = ComputeSpfh(positions[i], normals[i], positions, normals, pointNeighbors[i]);
         }
 
-        // Stage 2: FPFH at the requested indices (empty => all points).
+        // Stage 2: FPFH at the requested indices (empty => all live points).
         std::vector<std::uint32_t> queryIndices;
         if (indices.empty())
         {
-            queryIndices.resize(positions.size());
             for (std::size_t i = 0; i < positions.size(); ++i)
             {
-                queryIndices[i] = static_cast<std::uint32_t>(i);
+                if (live[i] != 0u)
+                {
+                    queryIndices.push_back(static_cast<std::uint32_t>(i));
+                }
             }
         }
         else
@@ -423,9 +455,9 @@ namespace Geometry::PointCloud::Features
         for (std::size_t row = 0; row < queryIndices.size(); ++row)
         {
             const std::uint32_t i = queryIndices[row];
-            if (i >= positions.size())
+            if (i >= positions.size() || live[i] == 0u)
             {
-                return std::nullopt; // invalid query index
+                return std::nullopt; // invalid or deleted query index
             }
             std::array<double, kFpfhDimension> fpfh{};
             for (std::uint32_t b = 0; b < kFpfhDimension; ++b)
@@ -541,8 +573,16 @@ namespace Geometry::PointCloud::Features
             double second = 0.0;
             const std::uint32_t t = bestMatch(source, s, target, best, second);
 
-            if (params.MaxRatio > 0.0f && std::isfinite(second) && second > 0.0)
+            if (params.MaxRatio > 0.0f)
             {
+                // With only one target row, or two exact-duplicate nearest
+                // descriptors (second == 0), there is no valid best/second-best
+                // comparison. The match is ambiguous, so reject it rather than
+                // letting sparse or duplicate descriptors seed registration.
+                if (!std::isfinite(second) || second <= 0.0)
+                {
+                    continue;
+                }
                 const double ratio = std::sqrt(best / second);
                 if (ratio >= static_cast<double>(params.MaxRatio))
                 {
@@ -628,39 +668,54 @@ namespace Geometry::PointCloud::Features
         double bestRmse = std::numeric_limits<double>::infinity();
         glm::dmat4 bestTransform(1.0);
 
-        std::array<std::size_t, 3> sample{};
+        std::vector<std::size_t> sample(sampleSize);
+        std::vector<glm::dvec3> ss(sampleSize);
+        std::vector<glm::dvec3> tt(sampleSize);
         for (std::uint32_t iter = 0; iter < params.MaxIterations; ++iter)
         {
             ++result.IterationsUsed;
 
-            // Pick 3 distinct correspondences deterministically.
-            for (int k = 0; k < 3; ++k)
+            // Pick `sampleSize` distinct correspondences deterministically.
+            for (std::uint32_t k = 0; k < sampleSize; ++k)
             {
-                sample[static_cast<std::size_t>(k)] = NextRandom(rng) % m;
+                sample[k] = NextRandom(rng) % m;
             }
-            if (sample[0] == sample[1] || sample[0] == sample[2] || sample[1] == sample[2])
+            bool distinct = true;
+            for (std::uint32_t a = 0; a < sampleSize && distinct; ++a)
+            {
+                for (std::uint32_t b = a + 1; b < sampleSize; ++b)
+                {
+                    if (sample[a] == sample[b])
+                    {
+                        distinct = false;
+                        break;
+                    }
+                }
+            }
+            if (!distinct)
             {
                 continue;
             }
 
-            // Geometric consistency: pairwise source/target edge-length ratios.
+            // Geometric consistency: all pairwise source/target edge-length ratios.
             bool consistent = true;
-            for (int a = 0; a < 3 && consistent; ++a)
+            for (std::uint32_t a = 0; a < sampleSize && consistent; ++a)
             {
-                const int b = (a + 1) % 3;
-                const double sl = glm::length(srcPts[sample[static_cast<std::size_t>(a)]] -
-                                              srcPts[sample[static_cast<std::size_t>(b)]]);
-                const double tl = glm::length(dstPts[sample[static_cast<std::size_t>(a)]] -
-                                              dstPts[sample[static_cast<std::size_t>(b)]]);
-                if (sl < 1e-9 || tl < 1e-9)
+                for (std::uint32_t b = a + 1; b < sampleSize; ++b)
                 {
-                    consistent = false;
-                    break;
-                }
-                const double ratio = std::min(sl, tl) / std::max(sl, tl);
-                if (ratio < params.EdgeLengthSimilarity)
-                {
-                    consistent = false;
+                    const double sl = glm::length(srcPts[sample[a]] - srcPts[sample[b]]);
+                    const double tl = glm::length(dstPts[sample[a]] - dstPts[sample[b]]);
+                    if (sl < 1e-9 || tl < 1e-9)
+                    {
+                        consistent = false;
+                        break;
+                    }
+                    const double ratio = std::min(sl, tl) / std::max(sl, tl);
+                    if (ratio < params.EdgeLengthSimilarity)
+                    {
+                        consistent = false;
+                        break;
+                    }
                 }
             }
             if (!consistent)
@@ -668,8 +723,11 @@ namespace Geometry::PointCloud::Features
                 continue;
             }
 
-            std::array<glm::dvec3, 3> ss{srcPts[sample[0]], srcPts[sample[1]], srcPts[sample[2]]};
-            std::array<glm::dvec3, 3> tt{dstPts[sample[0]], dstPts[sample[1]], dstPts[sample[2]]};
+            for (std::uint32_t k = 0; k < sampleSize; ++k)
+            {
+                ss[k] = srcPts[sample[k]];
+                tt[k] = dstPts[sample[k]];
+            }
             const std::optional<glm::dmat4> candidate = KabschRigid(ss, tt);
             if (!candidate)
             {

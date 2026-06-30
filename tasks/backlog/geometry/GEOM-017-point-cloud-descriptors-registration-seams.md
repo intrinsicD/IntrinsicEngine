@@ -33,6 +33,11 @@ depends_on: [GEOM-008]
   `Geometry.PCA` and Eigen in the `.cpp`).
 - Existing `Geometry.Registration` ICP is untouched and explicitly covered by a
   reachability test; coarse alignment initializes it rather than replacing it.
+- Review follow-ups applied: deleted-but-not-collected points are filtered (live
+  mask) so they never seed keypoints/descriptors or become neighbors; the Lowe
+  ratio test rejects matches with no valid second-best (single or duplicate
+  target); RANSAC honors `CoarseAlignmentParams::SampleSize` (draws/fits the
+  requested minimal sample, not a fixed three). Regression tests added.
 - Verified in-session: `check_layering`, `check_test_layout`, `check_doc_links`,
   `check_task_policy` pass; module inventory regenerated (529 modules); a
   standalone clang-20 + glm + Eigen sanity check of the Kabsch rigid recovery
