@@ -13,19 +13,24 @@ The default CPU-supported gate owns two contracts:
 
 - deterministic CPU reference helpers for exclusive/inclusive prefix scan and
   stable compaction by flags;
-- backend-neutral GPU dispatch planning for the future Vulkan implementation.
+- backend-neutral GPU dispatch planning and RHI command recording for Vulkan
+  compute execution.
 
-The GPU record facade remains fail-closed until the Vulkan execution slice lands:
-non-operational devices report `DeviceUnavailable`, invalid handles report
-`InvalidGpuResource`, and operational devices with valid resources report
-`UnsupportedInCurrentSlice`.
+The GPU record API remains fail-closed on unsupported devices: non-operational
+devices report `DeviceUnavailable`, missing caller-owned recorder dependencies
+report `InvalidInput`, and invalid handles, BDAs, pipelines, or undersized
+scratch buffers report `InvalidGpuResource`. Operational Vulkan paths record
+commands through `RHI::ICommandContext`; no Vulkan-native type leaks through the
+graphics API.
 
 ## Shader Assets
 
 Slice B pins three shader assets under `assets/shaders/`:
 
 - `parallel_prefix_scan.comp` performs one 256-lane workgroup-local scan and
-  optionally writes one block sum per workgroup.
+  optionally writes one block sum per workgroup. For stream compaction, the
+  recorder sets a mode bit that normalizes nonzero flags to `1` before scan so
+  GPU compaction matches the CPU reference's "nonzero means keep" contract.
 - `parallel_scan_add_offsets.comp` adds recursively scanned block offsets back
   into an existing scan output.
 - `parallel_compact_by_flags.comp` scatters kept keys using exclusive prefix
@@ -60,6 +65,12 @@ Prefix scan planning emits:
 Stream compaction planning emits the same exclusive scan sequence over `Flags`,
 then one `StreamCompactScatter` pass.
 
+Slice C turns that plan into RHI commands by binding one of three caller-provided
+compute pipelines, pushing the matching scalar BDA push-constant block, and
+dispatching the planned group count. Scratch is either caller-provided or
+allocated as an owned `RHI::BufferManager::BufferLease` returned in the record
+result so its lifetime spans command execution.
+
 Between scan/add passes, scratch uses:
 
 ```text
@@ -73,5 +84,6 @@ ShaderWrite -> ShaderRead
 ```
 
 The plan records these barriers as `RHI::MemoryAccess` values. Slice C owns
-turning the plan into real Vulkan command recording and opt-in `gpu;vulkan`
-parity tests.
+the Vulkan parity smoke for scan and compaction. Slice D owns higher-level
+readback and/or indirect-args integration for the compacted count before task
+retirement.

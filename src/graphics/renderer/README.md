@@ -1750,13 +1750,17 @@ Concretely:
   backend-neutral dispatch planning for the `parallel_prefix_scan.comp`,
   `parallel_scan_add_offsets.comp`, and `parallel_compact_by_flags.comp` shader
   assets, including recursive scratch-level sizing and `ShaderWrite` publication
-  barriers. The GPU record facade is fail-closed in the default gate: Null or
+  barriers. Slice C adds RHI command recording: callers provide the command
+  context and compute pipeline handles, scratch is allocated through
+  `RHI::BufferManager` when needed and returned as a lease, and stream
+  compaction normalizes nonzero flags before the scan so GPU parity matches the
+  CPU reference. The GPU record API is fail-closed in the default gate: Null or
   non-operational devices report `DeviceUnavailable` with
-  `CpuFallbackRecommended`, operational devices report `UnsupportedInCurrentSlice`
-  until the Vulkan command-recording slice lands, and invalid buffer handles fail
-  as `InvalidGpuResource`. The module imports RHI device/handle/barrier/descriptor
-  types but exposes no Vulkan handles, ECS, runtime, platform, or asset-service
-  ownership. See
+  `CpuFallbackRecommended`, missing recorder dependencies report `InvalidInput`,
+  and invalid buffer/pipeline/BDA resources fail as `InvalidGpuResource`. The
+  module imports RHI device/handle/barrier/descriptor/buffer-manager types but
+  exposes no Vulkan handles, ECS, runtime, platform, or asset-service ownership.
+  See
   [`docs/architecture/compute-parallel-primitives.md`](../../../docs/architecture/compute-parallel-primitives.md).
 - Per `GRAPHICS-018Q`, the four remaining Vulkan integration follow-ups
   to the `GRAPHICS-018` guarded backend bring-up resolve as follows.

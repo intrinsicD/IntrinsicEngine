@@ -2,10 +2,12 @@ module;
 
 #include <cstdint>
 #include <span>
+#include <string>
 #include <vector>
 
 export module Extrinsic.Graphics.ComputeParallelPrimitives;
 
+import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
@@ -15,6 +17,8 @@ export namespace Extrinsic::Graphics
 {
     inline constexpr std::uint32_t kParallelPrimitiveGroupSize = 256u;
     inline constexpr std::uint64_t kParallelPrimitiveInvalidOffset = ~std::uint64_t{0u};
+    inline constexpr std::uint32_t kParallelPrefixScanModeInclusiveBit = 1u << 0u;
+    inline constexpr std::uint32_t kParallelPrefixScanModeNormalizeInputBit = 1u << 1u;
 
     enum class ParallelPrimitiveStatus : std::uint8_t
     {
@@ -177,9 +181,19 @@ export namespace Extrinsic::Graphics
     };
     static_assert(sizeof(ParallelCompactByFlagsPushConstants) == 56u);
 
+    struct ParallelPrimitivePipelineSet
+    {
+        RHI::PipelineHandle PrefixScan{};
+        RHI::PipelineHandle AddBlockOffsets{};
+        RHI::PipelineHandle CompactByFlags{};
+    };
+
     struct GpuPrefixScanRecordDesc
     {
         RHI::IDevice* Device = nullptr;
+        RHI::ICommandContext* CommandContext = nullptr;
+        RHI::BufferManager* Buffers = nullptr;
+        ParallelPrimitivePipelineSet Pipelines{};
         RHI::BufferHandle Input{};
         RHI::BufferHandle Output{};
         RHI::BufferHandle Scratch{};
@@ -190,6 +204,9 @@ export namespace Extrinsic::Graphics
     struct GpuStreamCompactionRecordDesc
     {
         RHI::IDevice* Device = nullptr;
+        RHI::ICommandContext* CommandContext = nullptr;
+        RHI::BufferManager* Buffers = nullptr;
+        ParallelPrimitivePipelineSet Pipelines{};
         RHI::BufferHandle Keys{};
         RHI::BufferHandle Flags{};
         RHI::BufferHandle OutputKeys{};
@@ -205,6 +222,9 @@ export namespace Extrinsic::Graphics
         ParallelPrimitiveDiagnostics Diagnostics{};
         bool Recorded = false;
         bool CpuFallbackRecommended = false;
+        RHI::BufferHandle Scratch{};
+        RHI::BufferManager::BufferLease ScratchLease{};
+        ParallelPrimitiveDispatchPlan Plan{};
 
         [[nodiscard]] bool Succeeded() const noexcept
         {
@@ -244,9 +264,18 @@ export namespace Extrinsic::Graphics
         const ParallelPrimitiveDispatchPlan& plan,
         const char* debugName = "ParallelPrimitives.Scratch") noexcept;
 
+    [[nodiscard]] RHI::PipelineDesc BuildParallelPrefixScanPipelineDesc(
+        const char* shaderPath = "shaders/parallel_prefix_scan.comp.spv");
+
+    [[nodiscard]] RHI::PipelineDesc BuildParallelScanAddOffsetsPipelineDesc(
+        const char* shaderPath = "shaders/parallel_scan_add_offsets.comp.spv");
+
+    [[nodiscard]] RHI::PipelineDesc BuildParallelCompactByFlagsPipelineDesc(
+        const char* shaderPath = "shaders/parallel_compact_by_flags.comp.spv");
+
     [[nodiscard]] GpuParallelPrimitiveRecordResult RecordGpuPrefixScan(
-        const GpuPrefixScanRecordDesc& desc) noexcept;
+        const GpuPrefixScanRecordDesc& desc);
 
     [[nodiscard]] GpuParallelPrimitiveRecordResult RecordGpuStreamCompaction(
-        const GpuStreamCompactionRecordDesc& desc) noexcept;
+        const GpuStreamCompactionRecordDesc& desc);
 }

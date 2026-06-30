@@ -231,8 +231,9 @@ inside individual method adapters. For scan/compaction-style compute workloads,
 `Extrinsic.Graphics.ComputeParallelPrimitives` is the shared GRAPHICS-108 seam:
 Slice A provides the deterministic CPU reference and fail-closed GPU request
 contract, Slice B pins the shader assets plus backend-neutral dispatch/scratch
-planning contract, and later Vulkan slices own command recording and
-`gpu;vulkan` parity.
+planning contract, and Slice C records RHI compute commands with opt-in
+`gpu;vulkan` parity. Later integration slices own method-specific GPU backends
+and runtime UI routing.
 Method adapters such as METHOD-013 should consume that seam instead of declaring
 private CUB-equivalent primitives.
 

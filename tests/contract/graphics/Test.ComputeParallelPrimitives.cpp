@@ -1,13 +1,17 @@
 #include <array>
+#include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 #include <span>
+#include <vector>
 
 #include <gtest/gtest.h>
 
 #include "MockRHI.hpp"
 
 import Extrinsic.Graphics.ComputeParallelPrimitives;
+import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
@@ -19,6 +23,32 @@ namespace
     [[nodiscard]] RHI::BufferHandle ValidBuffer(const std::uint32_t index) noexcept
     {
         return RHI::BufferHandle{index, 1u};
+    }
+
+    [[nodiscard]] RHI::PipelineHandle ValidPipeline(const std::uint32_t index) noexcept
+    {
+        return RHI::PipelineHandle{index, 1u};
+    }
+
+    [[nodiscard]] Graphics::ParallelPrimitivePipelineSet ValidPipelineSet() noexcept
+    {
+        return Graphics::ParallelPrimitivePipelineSet{
+            .PrefixScan = ValidPipeline(10u),
+            .AddBlockOffsets = ValidPipeline(11u),
+            .CompactByFlags = ValidPipeline(12u),
+        };
+    }
+
+    template <typename T>
+    [[nodiscard]] T ReadPushPayload(const std::vector<std::byte>& payload)
+    {
+        T value{};
+        EXPECT_EQ(payload.size(), sizeof(T));
+        if (payload.size() == sizeof(T))
+        {
+            std::memcpy(&value, payload.data(), sizeof(T));
+        }
+        return value;
     }
 }
 
@@ -302,6 +332,176 @@ TEST(ComputeParallelPrimitives, StreamCompactionPlanPinsOffsetsAndScatter)
     EXPECT_EQ(plan.Barriers[4].Buffer, Graphics::ParallelPrimitiveBufferRole::OutputCount);
 }
 
+TEST(ComputeParallelPrimitives, BuildsComputePipelineDescriptors)
+{
+    const RHI::PipelineDesc prefix = Graphics::BuildParallelPrefixScanPipelineDesc();
+    EXPECT_TRUE(prefix.ComputeShaderPath.ends_with(
+        "shaders/parallel_prefix_scan.comp.spv"));
+    EXPECT_EQ(prefix.PushConstantSize,
+              static_cast<std::uint32_t>(
+                  sizeof(Graphics::ParallelPrefixScanPushConstants)));
+
+    const RHI::PipelineDesc add = Graphics::BuildParallelScanAddOffsetsPipelineDesc();
+    EXPECT_TRUE(add.ComputeShaderPath.ends_with(
+        "shaders/parallel_scan_add_offsets.comp.spv"));
+    EXPECT_EQ(add.PushConstantSize,
+              static_cast<std::uint32_t>(
+                  sizeof(Graphics::ParallelScanAddOffsetsPushConstants)));
+
+    const RHI::PipelineDesc compact =
+        Graphics::BuildParallelCompactByFlagsPipelineDesc();
+    EXPECT_TRUE(compact.ComputeShaderPath.ends_with(
+        "shaders/parallel_compact_by_flags.comp.spv"));
+    EXPECT_EQ(compact.PushConstantSize,
+              static_cast<std::uint32_t>(
+                  sizeof(Graphics::ParallelCompactByFlagsPushConstants)));
+}
+
+TEST(ComputeParallelPrimitives, RecordsSingleBlockPrefixScanCommands)
+{
+    Tests::MockDevice device{};
+    RHI::BufferManager buffers{device};
+    const RHI::BufferHandle input = ValidBuffer(1u);
+    const RHI::BufferHandle output = ValidBuffer(2u);
+
+    const auto result = Graphics::RecordGpuPrefixScan(Graphics::GpuPrefixScanRecordDesc{
+        .Device = &device,
+        .CommandContext = &device.CommandContext,
+        .Buffers = &buffers,
+        .Pipelines = ValidPipelineSet(),
+        .Input = input,
+        .Output = output,
+        .ElementCount = 128u,
+        .Mode = Graphics::PrefixScanMode::Inclusive,
+    });
+
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_TRUE(result.Recorded);
+    EXPECT_FALSE(result.Scratch.IsValid());
+    EXPECT_EQ(device.CreateBufferCount, 0);
+    ASSERT_EQ(device.CommandContext.BoundPipelines.size(), 1u);
+    EXPECT_EQ(device.CommandContext.BoundPipelines[0], ValidPipeline(10u));
+    ASSERT_EQ(device.CommandContext.DispatchRecords.size(), 1u);
+    EXPECT_EQ(device.CommandContext.DispatchRecords[0].X, 1u);
+    ASSERT_EQ(device.CommandContext.PushConstantPayloads.size(), 1u);
+
+    const auto pc = ReadPushPayload<Graphics::ParallelPrefixScanPushConstants>(
+        device.CommandContext.PushConstantPayloads[0]);
+    EXPECT_EQ(pc.InputBDA, device.GetBufferDeviceAddress(input));
+    EXPECT_EQ(pc.OutputBDA, device.GetBufferDeviceAddress(output));
+    EXPECT_EQ(pc.BlockSumsBDA, 0u);
+    EXPECT_EQ(pc.ElementCount, 128u);
+    EXPECT_EQ(pc.Mode, 1u);
+
+    ASSERT_EQ(device.CommandContext.BufferBarrierCalls.size(), 1u);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[0].Buffer, output);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[0].Before,
+              RHI::MemoryAccess::ShaderWrite);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[0].After,
+              RHI::MemoryAccess::ShaderRead);
+}
+
+TEST(ComputeParallelPrimitives, RecordsMultiBlockPrefixScanWithAllocatedScratch)
+{
+    Tests::MockDevice device{};
+    RHI::BufferManager buffers{device};
+    const RHI::BufferHandle input = ValidBuffer(1u);
+    const RHI::BufferHandle output = ValidBuffer(2u);
+
+    const auto result = Graphics::RecordGpuPrefixScan(Graphics::GpuPrefixScanRecordDesc{
+        .Device = &device,
+        .CommandContext = &device.CommandContext,
+        .Buffers = &buffers,
+        .Pipelines = ValidPipelineSet(),
+        .Input = input,
+        .Output = output,
+        .ElementCount = 1024u,
+        .Mode = Graphics::PrefixScanMode::Exclusive,
+    });
+
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_TRUE(result.Recorded);
+    EXPECT_TRUE(result.Scratch.IsValid());
+    EXPECT_TRUE(result.ScratchLease.IsValid());
+    EXPECT_EQ(device.CreateBufferCount, 1);
+    ASSERT_EQ(result.Plan.Dispatches.size(), 3u);
+    ASSERT_EQ(device.CommandContext.BoundPipelines.size(), 3u);
+    EXPECT_EQ(device.CommandContext.BoundPipelines[0], ValidPipeline(10u));
+    EXPECT_EQ(device.CommandContext.BoundPipelines[1], ValidPipeline(10u));
+    EXPECT_EQ(device.CommandContext.BoundPipelines[2], ValidPipeline(11u));
+    ASSERT_EQ(device.CommandContext.DispatchRecords.size(), 3u);
+    EXPECT_EQ(device.CommandContext.DispatchRecords[0].X, 4u);
+    EXPECT_EQ(device.CommandContext.DispatchRecords[1].X, 1u);
+    EXPECT_EQ(device.CommandContext.DispatchRecords[2].X, 4u);
+
+    const auto firstPc = ReadPushPayload<Graphics::ParallelPrefixScanPushConstants>(
+        device.CommandContext.PushConstantPayloads[0]);
+    EXPECT_EQ(firstPc.BlockSumsBDA, device.GetBufferDeviceAddress(result.Scratch));
+    const auto addPc = ReadPushPayload<Graphics::ParallelScanAddOffsetsPushConstants>(
+        device.CommandContext.PushConstantPayloads[2]);
+    EXPECT_EQ(addPc.OutputBDA, device.GetBufferDeviceAddress(output));
+    EXPECT_EQ(addPc.OffsetsBDA, device.GetBufferDeviceAddress(result.Scratch));
+
+    ASSERT_EQ(device.CommandContext.BufferBarrierCalls.size(), 3u);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[0].Buffer, result.Scratch);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[2].Buffer, output);
+}
+
+TEST(ComputeParallelPrimitives, RecordsStreamCompactionWithScanAndScatter)
+{
+    Tests::MockDevice device{};
+    RHI::BufferManager buffers{device};
+    const RHI::BufferHandle keys = ValidBuffer(1u);
+    const RHI::BufferHandle flags = ValidBuffer(2u);
+    const RHI::BufferHandle outputKeys = ValidBuffer(3u);
+    const RHI::BufferHandle outputCount = ValidBuffer(4u);
+
+    const auto result =
+        Graphics::RecordGpuStreamCompaction(Graphics::GpuStreamCompactionRecordDesc{
+            .Device = &device,
+            .CommandContext = &device.CommandContext,
+            .Buffers = &buffers,
+            .Pipelines = ValidPipelineSet(),
+            .Keys = keys,
+            .Flags = flags,
+            .OutputKeys = outputKeys,
+            .OutputCount = outputCount,
+            .ElementCount = 1024u,
+        });
+
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_TRUE(result.Recorded);
+    EXPECT_TRUE(result.Scratch.IsValid());
+    EXPECT_EQ(device.CreateBufferCount, 1);
+    ASSERT_EQ(device.CommandContext.BoundPipelines.size(), 4u);
+    EXPECT_EQ(device.CommandContext.BoundPipelines[0], ValidPipeline(10u));
+    EXPECT_EQ(device.CommandContext.BoundPipelines[1], ValidPipeline(10u));
+    EXPECT_EQ(device.CommandContext.BoundPipelines[2], ValidPipeline(11u));
+    EXPECT_EQ(device.CommandContext.BoundPipelines[3], ValidPipeline(12u));
+    ASSERT_EQ(device.CommandContext.PushConstantPayloads.size(), 4u);
+
+    const auto scanPc = ReadPushPayload<Graphics::ParallelPrefixScanPushConstants>(
+        device.CommandContext.PushConstantPayloads[0]);
+    EXPECT_EQ(scanPc.InputBDA, device.GetBufferDeviceAddress(flags));
+    EXPECT_EQ(scanPc.OutputBDA, device.GetBufferDeviceAddress(result.Scratch));
+    EXPECT_EQ(scanPc.BlockSumsBDA,
+              device.GetBufferDeviceAddress(result.Scratch) + 4096u);
+    EXPECT_EQ(scanPc.Mode, Graphics::kParallelPrefixScanModeNormalizeInputBit);
+
+    const auto scatterPc =
+        ReadPushPayload<Graphics::ParallelCompactByFlagsPushConstants>(
+            device.CommandContext.PushConstantPayloads[3]);
+    EXPECT_EQ(scatterPc.KeysBDA, device.GetBufferDeviceAddress(keys));
+    EXPECT_EQ(scatterPc.FlagsBDA, device.GetBufferDeviceAddress(flags));
+    EXPECT_EQ(scatterPc.OffsetsBDA, device.GetBufferDeviceAddress(result.Scratch));
+    EXPECT_EQ(scatterPc.OutputKeysBDA, device.GetBufferDeviceAddress(outputKeys));
+    EXPECT_EQ(scatterPc.OutputCountBDA, device.GetBufferDeviceAddress(outputCount));
+
+    ASSERT_EQ(device.CommandContext.BufferBarrierCalls.size(), 5u);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[3].Buffer, outputKeys);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[4].Buffer, outputCount);
+}
+
 TEST(ComputeParallelPrimitives, GpuRecordReportsDeviceUnavailableForNullDevice)
 {
     Tests::MockDevice device{};
@@ -311,7 +511,6 @@ TEST(ComputeParallelPrimitives, GpuRecordReportsDeviceUnavailableForNullDevice)
         .Device = &device,
         .Input = ValidBuffer(1u),
         .Output = ValidBuffer(2u),
-        .Scratch = ValidBuffer(3u),
         .ElementCount = 32u,
     });
     EXPECT_EQ(scan.Status, Graphics::ParallelPrimitiveStatus::DeviceUnavailable);
@@ -325,7 +524,6 @@ TEST(ComputeParallelPrimitives, GpuRecordReportsDeviceUnavailableForNullDevice)
             .Flags = ValidBuffer(2u),
             .OutputKeys = ValidBuffer(3u),
             .OutputCount = ValidBuffer(4u),
-            .Scratch = ValidBuffer(5u),
             .ElementCount = 32u,
         });
     EXPECT_EQ(compact.Status, Graphics::ParallelPrimitiveStatus::DeviceUnavailable);
@@ -333,16 +531,30 @@ TEST(ComputeParallelPrimitives, GpuRecordReportsDeviceUnavailableForNullDevice)
     EXPECT_TRUE(compact.CpuFallbackRecommended);
 }
 
-TEST(ComputeParallelPrimitives, GpuRecordValidatesResourcesBeforeFutureDispatch)
+TEST(ComputeParallelPrimitives, GpuRecordValidatesRecorderInputsAndResources)
 {
     Tests::MockDevice device{};
     device.Operational = true;
+    RHI::BufferManager buffers{device};
+
+    const auto missingContext = Graphics::RecordGpuPrefixScan(
+        Graphics::GpuPrefixScanRecordDesc{
+            .Device = &device,
+            .Buffers = &buffers,
+            .Pipelines = ValidPipelineSet(),
+            .Input = ValidBuffer(1u),
+            .Output = ValidBuffer(2u),
+            .ElementCount = 4u,
+        });
+    EXPECT_EQ(missingContext.Status, Graphics::ParallelPrimitiveStatus::InvalidInput);
 
     const auto invalid = Graphics::RecordGpuPrefixScan(Graphics::GpuPrefixScanRecordDesc{
         .Device = &device,
+        .CommandContext = &device.CommandContext,
+        .Buffers = &buffers,
+        .Pipelines = ValidPipelineSet(),
         .Input = {},
         .Output = ValidBuffer(2u),
-        .Scratch = ValidBuffer(3u),
         .ElementCount = 4u,
     });
     EXPECT_EQ(invalid.Status, Graphics::ParallelPrimitiveStatus::InvalidGpuResource);
@@ -351,31 +563,37 @@ TEST(ComputeParallelPrimitives, GpuRecordValidatesResourcesBeforeFutureDispatch)
     const auto invalidScratch =
         Graphics::RecordGpuStreamCompaction(Graphics::GpuStreamCompactionRecordDesc{
             .Device = &device,
+            .CommandContext = &device.CommandContext,
+            .Pipelines = ValidPipelineSet(),
             .Keys = ValidBuffer(1u),
             .Flags = ValidBuffer(2u),
             .OutputKeys = ValidBuffer(3u),
             .OutputCount = ValidBuffer(4u),
-            .Scratch = {},
             .ElementCount = 4u,
         });
     EXPECT_EQ(invalidScratch.Status,
-              Graphics::ParallelPrimitiveStatus::InvalidGpuResource);
+              Graphics::ParallelPrimitiveStatus::InvalidInput);
     EXPECT_FALSE(invalidScratch.CpuFallbackRecommended);
 
-    const auto futureSlice =
+    const auto missingPipeline =
         Graphics::RecordGpuStreamCompaction(Graphics::GpuStreamCompactionRecordDesc{
             .Device = &device,
+            .CommandContext = &device.CommandContext,
+            .Buffers = &buffers,
+            .Pipelines = Graphics::ParallelPrimitivePipelineSet{
+                .PrefixScan = ValidPipeline(10u),
+                .AddBlockOffsets = ValidPipeline(11u),
+            },
             .Keys = ValidBuffer(1u),
             .Flags = ValidBuffer(2u),
             .OutputKeys = ValidBuffer(3u),
             .OutputCount = ValidBuffer(4u),
-            .Scratch = ValidBuffer(5u),
             .ElementCount = 4u,
         });
-    EXPECT_EQ(futureSlice.Status,
-              Graphics::ParallelPrimitiveStatus::UnsupportedInCurrentSlice);
-    EXPECT_FALSE(futureSlice.Recorded);
-    EXPECT_TRUE(futureSlice.CpuFallbackRecommended);
+    EXPECT_EQ(missingPipeline.Status,
+              Graphics::ParallelPrimitiveStatus::InvalidGpuResource);
+    EXPECT_FALSE(missingPipeline.Recorded);
+    EXPECT_FALSE(missingPipeline.CpuFallbackRecommended);
 }
 
 TEST(ComputeParallelPrimitives, StatusDebugNamesAreStable)

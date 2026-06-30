@@ -3,10 +3,13 @@ module;
 #include <cstdint>
 #include <limits>
 #include <span>
+#include <string>
+#include <utility>
 #include <vector>
 
 module Extrinsic.Graphics.ComputeParallelPrimitives;
 
+import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
@@ -229,30 +232,290 @@ namespace Extrinsic::Graphics
             }
         }
 
+        [[nodiscard]] GpuParallelPrimitiveRecordResult StatusResult(
+            const ParallelPrimitiveStatus status,
+            const ParallelPrimitiveKind kind,
+            const std::uint32_t elementCount,
+            const bool cpuFallbackRecommended = false) noexcept
+        {
+            return GpuParallelPrimitiveRecordResult{
+                .Status = status,
+                .Kind = kind,
+                .Diagnostics = ParallelPrimitiveDiagnostics{.ElementCount = elementCount},
+                .Recorded = false,
+                .CpuFallbackRecommended = cpuFallbackRecommended,
+            };
+        }
+
         [[nodiscard]] GpuParallelPrimitiveRecordResult DeviceUnavailableResult(
             const ParallelPrimitiveKind kind,
             const std::uint32_t elementCount) noexcept
         {
-            return GpuParallelPrimitiveRecordResult{
-                .Status = ParallelPrimitiveStatus::DeviceUnavailable,
-                .Kind = kind,
-                .Diagnostics = ParallelPrimitiveDiagnostics{.ElementCount = elementCount},
-                .Recorded = false,
-                .CpuFallbackRecommended = true,
-            };
+            return StatusResult(ParallelPrimitiveStatus::DeviceUnavailable,
+                                kind,
+                                elementCount,
+                                true);
         }
 
-        [[nodiscard]] GpuParallelPrimitiveRecordResult UnsupportedGpuSliceResult(
-            const ParallelPrimitiveKind kind,
-            const std::uint32_t elementCount) noexcept
+        struct RoleBindings
         {
-            return GpuParallelPrimitiveRecordResult{
-                .Status = ParallelPrimitiveStatus::UnsupportedInCurrentSlice,
-                .Kind = kind,
-                .Diagnostics = ParallelPrimitiveDiagnostics{.ElementCount = elementCount},
-                .Recorded = false,
-                .CpuFallbackRecommended = true,
-            };
+            RHI::BufferHandle Input{};
+            RHI::BufferHandle Output{};
+            RHI::BufferHandle Keys{};
+            RHI::BufferHandle Flags{};
+            RHI::BufferHandle OutputKeys{};
+            RHI::BufferHandle OutputCount{};
+            RHI::BufferHandle Scratch{};
+            std::uint64_t InputBDA = 0u;
+            std::uint64_t OutputBDA = 0u;
+            std::uint64_t KeysBDA = 0u;
+            std::uint64_t FlagsBDA = 0u;
+            std::uint64_t OutputKeysBDA = 0u;
+            std::uint64_t OutputCountBDA = 0u;
+            std::uint64_t ScratchBDA = 0u;
+        };
+
+        [[nodiscard]] RHI::BufferHandle HandleForRole(
+            const RoleBindings& bindings,
+            const ParallelPrimitiveBufferRole role) noexcept
+        {
+            switch (role)
+            {
+            case ParallelPrimitiveBufferRole::None:
+                return {};
+            case ParallelPrimitiveBufferRole::Input:
+                return bindings.Input;
+            case ParallelPrimitiveBufferRole::Output:
+                return bindings.Output;
+            case ParallelPrimitiveBufferRole::Keys:
+                return bindings.Keys;
+            case ParallelPrimitiveBufferRole::Flags:
+                return bindings.Flags;
+            case ParallelPrimitiveBufferRole::OutputKeys:
+                return bindings.OutputKeys;
+            case ParallelPrimitiveBufferRole::OutputCount:
+                return bindings.OutputCount;
+            case ParallelPrimitiveBufferRole::Scratch:
+                return bindings.Scratch;
+            }
+            return {};
+        }
+
+        [[nodiscard]] std::uint64_t AddressForRole(
+            const RoleBindings& bindings,
+            const ParallelPrimitiveBufferRole role,
+            const std::uint64_t offsetBytes) noexcept
+        {
+            std::uint64_t base = 0u;
+            switch (role)
+            {
+            case ParallelPrimitiveBufferRole::None:
+                return 0u;
+            case ParallelPrimitiveBufferRole::Input:
+                base = bindings.InputBDA;
+                break;
+            case ParallelPrimitiveBufferRole::Output:
+                base = bindings.OutputBDA;
+                break;
+            case ParallelPrimitiveBufferRole::Keys:
+                base = bindings.KeysBDA;
+                break;
+            case ParallelPrimitiveBufferRole::Flags:
+                base = bindings.FlagsBDA;
+                break;
+            case ParallelPrimitiveBufferRole::OutputKeys:
+                base = bindings.OutputKeysBDA;
+                break;
+            case ParallelPrimitiveBufferRole::OutputCount:
+                base = bindings.OutputCountBDA;
+                break;
+            case ParallelPrimitiveBufferRole::Scratch:
+                base = bindings.ScratchBDA;
+                break;
+            }
+
+            if (base == 0u)
+            {
+                return 0u;
+            }
+            return offsetBytes == kParallelPrimitiveInvalidOffset
+                ? base
+                : base + offsetBytes;
+        }
+
+        [[nodiscard]] bool DispatchResourcesAreValid(
+            const RoleBindings& bindings,
+            const ParallelPrimitiveDispatchDesc& dispatch) noexcept
+        {
+            const auto validAddress =
+                [&bindings](const ParallelPrimitiveBufferRole role,
+                            const std::uint64_t offsetBytes) noexcept
+                {
+                    return role == ParallelPrimitiveBufferRole::None ||
+                           AddressForRole(bindings, role, offsetBytes) != 0u;
+                };
+
+            return validAddress(dispatch.InputRole, dispatch.InputOffsetBytes) &&
+                   validAddress(dispatch.OutputRole, dispatch.OutputOffsetBytes) &&
+                   validAddress(dispatch.BlockSumsRole, dispatch.BlockSumsOffsetBytes) &&
+                   validAddress(dispatch.OffsetsRole, dispatch.OffsetsOffsetBytes) &&
+                   validAddress(dispatch.CountRole, dispatch.CountOffsetBytes);
+        }
+
+        [[nodiscard]] RHI::PipelineHandle PipelineForDispatch(
+            const ParallelPrimitivePipelineSet& pipelines,
+            const ParallelPrimitivePassKind kind) noexcept
+        {
+            switch (kind)
+            {
+            case ParallelPrimitivePassKind::PrefixBlockScan:
+                return pipelines.PrefixScan;
+            case ParallelPrimitivePassKind::PrefixAddBlockOffsets:
+                return pipelines.AddBlockOffsets;
+            case ParallelPrimitivePassKind::StreamCompactScatter:
+                return pipelines.CompactByFlags;
+            }
+            return {};
+        }
+
+        [[nodiscard]] bool PlanResourcesAreRecordable(
+            const ParallelPrimitiveDispatchPlan& plan,
+            const RoleBindings& bindings,
+            const ParallelPrimitivePipelineSet& pipelines) noexcept
+        {
+            for (const ParallelPrimitiveDispatchDesc& dispatch : plan.Dispatches)
+            {
+                if (!PipelineForDispatch(pipelines, dispatch.Kind).IsValid() ||
+                    !DispatchResourcesAreValid(bindings, dispatch))
+                {
+                    return false;
+                }
+                if (dispatch.Kind == ParallelPrimitivePassKind::StreamCompactScatter &&
+                    bindings.FlagsBDA == 0u)
+                {
+                    return false;
+                }
+            }
+
+            for (const ParallelPrimitiveBarrierDesc& barrier : plan.Barriers)
+            {
+                if (!HandleForRole(bindings, barrier.Buffer).IsValid())
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        void RecordPlanDispatches(RHI::ICommandContext& cmd,
+                                  const ParallelPrimitiveDispatchPlan& plan,
+                                  const RoleBindings& bindings,
+                                  const ParallelPrimitivePipelineSet& pipelines)
+        {
+            for (std::uint32_t index = 0u;
+                 index < static_cast<std::uint32_t>(plan.Dispatches.size());
+                 ++index)
+            {
+                const ParallelPrimitiveDispatchDesc& dispatch = plan.Dispatches[index];
+                cmd.BindPipeline(PipelineForDispatch(pipelines, dispatch.Kind));
+
+                switch (dispatch.Kind)
+                {
+                case ParallelPrimitivePassKind::PrefixBlockScan:
+                {
+                    const ParallelPrefixScanPushConstants pc{
+                        .InputBDA = AddressForRole(bindings,
+                                                   dispatch.InputRole,
+                                                   dispatch.InputOffsetBytes),
+                        .OutputBDA = AddressForRole(bindings,
+                                                    dispatch.OutputRole,
+                                                    dispatch.OutputOffsetBytes),
+                        .BlockSumsBDA = AddressForRole(bindings,
+                                                       dispatch.BlockSumsRole,
+                                                       dispatch.BlockSumsOffsetBytes),
+                        .ElementCount = dispatch.ElementCount,
+                        .Mode = (dispatch.Mode == PrefixScanMode::Inclusive
+                                     ? kParallelPrefixScanModeInclusiveBit
+                                     : 0u) |
+                                (dispatch.InputRole == ParallelPrimitiveBufferRole::Flags
+                                     ? kParallelPrefixScanModeNormalizeInputBit
+                                     : 0u),
+                        .LevelIndex = dispatch.LevelIndex,
+                        .Reserved0 = 0u,
+                    };
+                    cmd.PushConstants(&pc, static_cast<std::uint32_t>(sizeof(pc)), 0u);
+                    break;
+                }
+                case ParallelPrimitivePassKind::PrefixAddBlockOffsets:
+                {
+                    const ParallelScanAddOffsetsPushConstants pc{
+                        .OutputBDA = AddressForRole(bindings,
+                                                    dispatch.OutputRole,
+                                                    dispatch.OutputOffsetBytes),
+                        .OffsetsBDA = AddressForRole(bindings,
+                                                     dispatch.OffsetsRole,
+                                                     dispatch.OffsetsOffsetBytes),
+                        .ElementCount = dispatch.ElementCount,
+                        .Reserved0 = 0u,
+                        .Reserved1 = 0u,
+                        .Reserved2 = 0u,
+                    };
+                    cmd.PushConstants(&pc, static_cast<std::uint32_t>(sizeof(pc)), 0u);
+                    break;
+                }
+                case ParallelPrimitivePassKind::StreamCompactScatter:
+                {
+                    const ParallelCompactByFlagsPushConstants pc{
+                        .KeysBDA = AddressForRole(bindings,
+                                                  dispatch.InputRole,
+                                                  dispatch.InputOffsetBytes),
+                        .FlagsBDA = bindings.FlagsBDA,
+                        .OffsetsBDA = AddressForRole(bindings,
+                                                     dispatch.OffsetsRole,
+                                                     dispatch.OffsetsOffsetBytes),
+                        .OutputKeysBDA = AddressForRole(bindings,
+                                                        dispatch.OutputRole,
+                                                        dispatch.OutputOffsetBytes),
+                        .OutputCountBDA = AddressForRole(bindings,
+                                                         dispatch.CountRole,
+                                                         dispatch.CountOffsetBytes),
+                        .ElementCount = dispatch.ElementCount,
+                        .Reserved0 = 0u,
+                        .Reserved1 = 0u,
+                        .Reserved2 = 0u,
+                    };
+                    cmd.PushConstants(&pc, static_cast<std::uint32_t>(sizeof(pc)), 0u);
+                    break;
+                }
+                }
+
+                cmd.Dispatch(dispatch.GroupCountX,
+                             dispatch.GroupCountY,
+                             dispatch.GroupCountZ);
+
+                for (const ParallelPrimitiveBarrierDesc& barrier : plan.Barriers)
+                {
+                    if (barrier.AfterDispatchIndex == index)
+                    {
+                        cmd.BufferBarrier(HandleForRole(bindings, barrier.Buffer),
+                                          barrier.Before,
+                                          barrier.After);
+                    }
+                }
+            }
+        }
+
+        [[nodiscard]] bool ScratchBufferIsLargeEnough(
+            const RHI::BufferManager* buffers,
+            const RHI::BufferHandle scratch,
+            const std::uint64_t requiredBytes) noexcept
+        {
+            if (requiredBytes == 0u || !scratch.IsValid() || buffers == nullptr)
+            {
+                return true;
+            }
+            const RHI::BufferDesc* desc = buffers->GetDesc(scratch);
+            return desc == nullptr || desc->SizeBytes >= requiredBytes;
         }
     }
 
@@ -535,16 +798,44 @@ namespace Extrinsic::Graphics
         };
     }
 
+    RHI::PipelineDesc BuildParallelPrefixScanPipelineDesc(const char* shaderPath)
+    {
+        RHI::PipelineDesc desc{};
+        desc.ComputeShaderPath = shaderPath == nullptr ? "" : shaderPath;
+        desc.PushConstantSize = static_cast<std::uint32_t>(
+            sizeof(ParallelPrefixScanPushConstants));
+        desc.DebugName = "ParallelPrimitive.PrefixScan";
+        return desc;
+    }
+
+    RHI::PipelineDesc BuildParallelScanAddOffsetsPipelineDesc(const char* shaderPath)
+    {
+        RHI::PipelineDesc desc{};
+        desc.ComputeShaderPath = shaderPath == nullptr ? "" : shaderPath;
+        desc.PushConstantSize = static_cast<std::uint32_t>(
+            sizeof(ParallelScanAddOffsetsPushConstants));
+        desc.DebugName = "ParallelPrimitive.ScanAddOffsets";
+        return desc;
+    }
+
+    RHI::PipelineDesc BuildParallelCompactByFlagsPipelineDesc(const char* shaderPath)
+    {
+        RHI::PipelineDesc desc{};
+        desc.ComputeShaderPath = shaderPath == nullptr ? "" : shaderPath;
+        desc.PushConstantSize = static_cast<std::uint32_t>(
+            sizeof(ParallelCompactByFlagsPushConstants));
+        desc.DebugName = "ParallelPrimitive.CompactByFlags";
+        return desc;
+    }
+
     GpuParallelPrimitiveRecordResult RecordGpuPrefixScan(
-        const GpuPrefixScanRecordDesc& desc) noexcept
+        const GpuPrefixScanRecordDesc& desc)
     {
         if (desc.Device == nullptr)
         {
-            return GpuParallelPrimitiveRecordResult{
-                .Status = ParallelPrimitiveStatus::InvalidInput,
-                .Kind = ParallelPrimitiveKind::PrefixScan,
-                .Diagnostics = ParallelPrimitiveDiagnostics{.ElementCount = desc.ElementCount},
-            };
+            return StatusResult(ParallelPrimitiveStatus::InvalidInput,
+                                ParallelPrimitiveKind::PrefixScan,
+                                desc.ElementCount);
         }
 
         if (!desc.Device->IsOperational())
@@ -553,31 +844,120 @@ namespace Extrinsic::Graphics
                                            desc.ElementCount);
         }
 
-        if (desc.ElementCount > 0u &&
-            (!desc.Input.IsValid() || !desc.Output.IsValid() ||
-             !desc.Scratch.IsValid()))
+        ParallelPrimitiveDispatchPlan plan =
+            ComputePrefixScanDispatchPlan(desc.ElementCount, desc.Mode);
+        if (!plan.IsValid())
+        {
+            return StatusResult(plan.Status,
+                                ParallelPrimitiveKind::PrefixScan,
+                                desc.ElementCount);
+        }
+
+        if (plan.Dispatches.empty())
         {
             return GpuParallelPrimitiveRecordResult{
-                .Status = ParallelPrimitiveStatus::InvalidGpuResource,
+                .Status = ParallelPrimitiveStatus::Success,
                 .Kind = ParallelPrimitiveKind::PrefixScan,
-                .Diagnostics = ParallelPrimitiveDiagnostics{.ElementCount = desc.ElementCount},
+                .Diagnostics = ParallelPrimitiveDiagnostics{
+                    .ElementCount = desc.ElementCount,
+                    .OutputCount = desc.ElementCount,
+                },
+                .Recorded = false,
+                .CpuFallbackRecommended = false,
+                .Scratch = {},
+                .Plan = std::move(plan),
             };
         }
 
-        return UnsupportedGpuSliceResult(ParallelPrimitiveKind::PrefixScan,
-                                         desc.ElementCount);
+        if (desc.CommandContext == nullptr)
+        {
+            return StatusResult(ParallelPrimitiveStatus::InvalidInput,
+                                ParallelPrimitiveKind::PrefixScan,
+                                desc.ElementCount);
+        }
+
+        if (!desc.Input.IsValid() || !desc.Output.IsValid())
+        {
+            return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource,
+                                ParallelPrimitiveKind::PrefixScan,
+                                desc.ElementCount);
+        }
+
+        GpuParallelPrimitiveRecordResult result{};
+        result.Status = ParallelPrimitiveStatus::Success;
+        result.Kind = ParallelPrimitiveKind::PrefixScan;
+        result.Diagnostics = ParallelPrimitiveDiagnostics{
+            .ElementCount = desc.ElementCount,
+            .OutputCount = desc.ElementCount,
+        };
+
+        RHI::BufferHandle scratch = desc.Scratch;
+        if (plan.ScratchBytes > 0u && !scratch.IsValid())
+        {
+            if (desc.Buffers == nullptr)
+            {
+                return StatusResult(ParallelPrimitiveStatus::InvalidInput,
+                                    ParallelPrimitiveKind::PrefixScan,
+                                    desc.ElementCount);
+            }
+
+            auto scratchOr = desc.Buffers->Create(
+                BuildParallelPrimitiveScratchBufferDesc(plan));
+            if (!scratchOr.has_value())
+            {
+                return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource,
+                                    ParallelPrimitiveKind::PrefixScan,
+                                    desc.ElementCount);
+            }
+
+            result.ScratchLease = std::move(*scratchOr);
+            scratch = result.ScratchLease.GetHandle();
+        }
+
+        if (!ScratchBufferIsLargeEnough(desc.Buffers, scratch, plan.ScratchBytes))
+        {
+            return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource,
+                                ParallelPrimitiveKind::PrefixScan,
+                                desc.ElementCount);
+        }
+
+        const RoleBindings bindings{
+            .Input = desc.Input,
+            .Output = desc.Output,
+            .Scratch = scratch,
+            .InputBDA = desc.Device->GetBufferDeviceAddress(desc.Input),
+            .OutputBDA = desc.Device->GetBufferDeviceAddress(desc.Output),
+            .ScratchBDA = scratch.IsValid()
+                ? desc.Device->GetBufferDeviceAddress(scratch)
+                : 0u,
+        };
+
+        if (!PlanResourcesAreRecordable(plan, bindings, desc.Pipelines))
+        {
+            return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource,
+                                ParallelPrimitiveKind::PrefixScan,
+                                desc.ElementCount);
+        }
+
+        RecordPlanDispatches(*desc.CommandContext,
+                             plan,
+                             bindings,
+                             desc.Pipelines);
+
+        result.Recorded = true;
+        result.Scratch = scratch;
+        result.Plan = std::move(plan);
+        return result;
     }
 
     GpuParallelPrimitiveRecordResult RecordGpuStreamCompaction(
-        const GpuStreamCompactionRecordDesc& desc) noexcept
+        const GpuStreamCompactionRecordDesc& desc)
     {
         if (desc.Device == nullptr)
         {
-            return GpuParallelPrimitiveRecordResult{
-                .Status = ParallelPrimitiveStatus::InvalidInput,
-                .Kind = ParallelPrimitiveKind::StreamCompaction,
-                .Diagnostics = ParallelPrimitiveDiagnostics{.ElementCount = desc.ElementCount},
-            };
+            return StatusResult(ParallelPrimitiveStatus::InvalidInput,
+                                ParallelPrimitiveKind::StreamCompaction,
+                                desc.ElementCount);
         }
 
         if (!desc.Device->IsOperational())
@@ -586,19 +966,123 @@ namespace Extrinsic::Graphics
                                            desc.ElementCount);
         }
 
-        if (desc.ElementCount > 0u &&
-            (!desc.Keys.IsValid() || !desc.Flags.IsValid() ||
-             !desc.OutputKeys.IsValid() || !desc.OutputCount.IsValid() ||
-             !desc.Scratch.IsValid()))
+        ParallelPrimitiveDispatchPlan plan =
+            ComputeStreamCompactionDispatchPlan(desc.ElementCount);
+        if (!plan.IsValid())
         {
+            return StatusResult(plan.Status,
+                                ParallelPrimitiveKind::StreamCompaction,
+                                desc.ElementCount);
+        }
+
+        if (desc.CommandContext == nullptr)
+        {
+            return StatusResult(ParallelPrimitiveStatus::InvalidInput,
+                                ParallelPrimitiveKind::StreamCompaction,
+                                desc.ElementCount);
+        }
+
+        if (!desc.OutputCount.IsValid())
+        {
+            return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource,
+                                ParallelPrimitiveKind::StreamCompaction,
+                                desc.ElementCount);
+        }
+
+        if (desc.ElementCount == 0u)
+        {
+            desc.CommandContext->FillBuffer(desc.OutputCount,
+                                            0u,
+                                            sizeof(std::uint32_t),
+                                            0u);
+            desc.CommandContext->BufferBarrier(desc.OutputCount,
+                                               RHI::MemoryAccess::TransferWrite,
+                                               RHI::MemoryAccess::ShaderRead);
             return GpuParallelPrimitiveRecordResult{
-                .Status = ParallelPrimitiveStatus::InvalidGpuResource,
+                .Status = ParallelPrimitiveStatus::Success,
                 .Kind = ParallelPrimitiveKind::StreamCompaction,
-                .Diagnostics = ParallelPrimitiveDiagnostics{.ElementCount = desc.ElementCount},
+                .Diagnostics = ParallelPrimitiveDiagnostics{},
+                .Recorded = true,
+                .CpuFallbackRecommended = false,
+                .Scratch = {},
+                .Plan = std::move(plan),
             };
         }
 
-        return UnsupportedGpuSliceResult(ParallelPrimitiveKind::StreamCompaction,
-                                         desc.ElementCount);
+        if (!desc.Keys.IsValid() ||
+            !desc.Flags.IsValid() ||
+            !desc.OutputKeys.IsValid())
+        {
+            return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource,
+                                ParallelPrimitiveKind::StreamCompaction,
+                                desc.ElementCount);
+        }
+
+        GpuParallelPrimitiveRecordResult result{};
+        result.Status = ParallelPrimitiveStatus::Success;
+        result.Kind = ParallelPrimitiveKind::StreamCompaction;
+        result.Diagnostics.ElementCount = desc.ElementCount;
+
+        RHI::BufferHandle scratch = desc.Scratch;
+        if (plan.ScratchBytes > 0u && !scratch.IsValid())
+        {
+            if (desc.Buffers == nullptr)
+            {
+                return StatusResult(ParallelPrimitiveStatus::InvalidInput,
+                                    ParallelPrimitiveKind::StreamCompaction,
+                                    desc.ElementCount);
+            }
+
+            auto scratchOr = desc.Buffers->Create(
+                BuildParallelPrimitiveScratchBufferDesc(plan));
+            if (!scratchOr.has_value())
+            {
+                return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource,
+                                    ParallelPrimitiveKind::StreamCompaction,
+                                    desc.ElementCount);
+            }
+
+            result.ScratchLease = std::move(*scratchOr);
+            scratch = result.ScratchLease.GetHandle();
+        }
+
+        if (!ScratchBufferIsLargeEnough(desc.Buffers, scratch, plan.ScratchBytes))
+        {
+            return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource,
+                                ParallelPrimitiveKind::StreamCompaction,
+                                desc.ElementCount);
+        }
+
+        const RoleBindings bindings{
+            .Keys = desc.Keys,
+            .Flags = desc.Flags,
+            .OutputKeys = desc.OutputKeys,
+            .OutputCount = desc.OutputCount,
+            .Scratch = scratch,
+            .KeysBDA = desc.Device->GetBufferDeviceAddress(desc.Keys),
+            .FlagsBDA = desc.Device->GetBufferDeviceAddress(desc.Flags),
+            .OutputKeysBDA = desc.Device->GetBufferDeviceAddress(desc.OutputKeys),
+            .OutputCountBDA = desc.Device->GetBufferDeviceAddress(desc.OutputCount),
+            .ScratchBDA = scratch.IsValid()
+                ? desc.Device->GetBufferDeviceAddress(scratch)
+                : 0u,
+        };
+
+        if (!PlanResourcesAreRecordable(plan, bindings, desc.Pipelines))
+        {
+            return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource,
+                                ParallelPrimitiveKind::StreamCompaction,
+                                desc.ElementCount);
+        }
+
+        RecordPlanDispatches(*desc.CommandContext,
+                             plan,
+                             bindings,
+                             desc.Pipelines);
+
+        result.Recorded = true;
+        result.Scratch = scratch;
+        result.Plan = std::move(plan);
+        return result;
     }
 }
