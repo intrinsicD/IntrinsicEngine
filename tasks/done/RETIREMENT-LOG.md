@@ -2977,3 +2977,43 @@ legacy-background docs. The architecture review checklist now asks for a
 declared backend axis and round-trippable config/command reachability, while
 the task template and task-format guide carry optional `## Control surfaces`
 and `## Backends` prompts.
+
+[`GEOM-016`](GEOM-016-point-cloud-filtering-density-contracts.md) —
+point-cloud filtering and density diagnostics contracts retired to
+`tasks/done/` on 2026-06-29 at `CPUContracted`. `Geometry.PointCloud.Utils`
+gained explicit `RemoveStatisticalOutliers` and `RemoveRadiusOutliers`
+operators returning a shared `OutlierRemovalResult` (owned filtered cloud,
+ascending kept/rejected index partitions, an `OutlierRemovalStatus` fail-closed
+taxonomy, and statistical mean/std-dev/threshold diagnostics), hardening the
+pre-existing voxel/random downsampling, bilateral, outlier-score, KDE, and
+radius-estimation surfaces rather than replacing the module. Unit coverage
+(`Test.PointCloudOutlierRemoval.cpp`) proves known two-cluster + isolated-outlier
+rejection, deterministic ascending partitions, non-finite rejection, and
+invalid/insufficient/overflow input handling; the
+`geometry_pointcloud_filtering_smoke` benchmark emits schema-valid metrics
+without a performance claim. CPU-only contract with no backend seam; the editor
+wire-up of these operators is owned by `UI-027`.
+
+[`UI-027`](UI-027-editor-pointcloud-outlier-removal-window.md) — Sandbox
+EditorUI point-cloud outlier-removal window retired to `tasks/done/` on
+2026-06-29 at `CPUContracted`. The `PointCloud > Processing > Remove Outliers`
+window and its undoable editor command drive the `GEOM-016`
+`RemoveStatisticalOutliers` / `RemoveRadiusOutliers` operators on the selected
+point-cloud entity. New `SandboxEditorGeometryProcessingAlgorithm` members
+(`StatisticalOutlierRemoval` / `RadiusOutlierRemoval`) join every exhaustive
+switch; a new command/result pair plus
+`ApplySandboxEditorPointCloudOutlierRemovalCommand` run the geometry operators
+and — because removal changes the point count — rebuild the entity's point
+`GeometrySources` via `GeometrySources::PopulateFromCloud` (preserving surviving
+attributes) rather than rewriting a count-matched property. Publication is
+undoable through `EditorCommandHistory::Execute` (undo republishes the original
+cloud, redo the kept cloud) and stamps coarse `GpuDirty` plus position/attribute/
+normal tags for a full deferred point-cloud repack. Headless Null-backend
+contract tests cover statistical publication + undo/redo (published count equals
+`KeptCount`), radius publication, and fail-closed lanes. Continues the
+`bcg_code_base` geometry-processing port into interactive Sandbox workflows;
+geometry owns the algorithm and app imports runtime only. Verification caveat:
+the C++/CTest gate could not run in the authoring sandbox (vcpkg bootstrap needs
+a github clone the egress proxy denies, so the `ci` preset cannot configure
+there); the runnable structural checks pass and CI owns the compile + contract
+tests.

@@ -19,7 +19,7 @@
   explicitly owned by follow-up tasks and no point-cloud algorithm behavior ships
   in GEOM-010.
 - Roadmap: [`docs/architecture/point-cloud-algorithm-roadmap.md`](../../docs/architecture/point-cloud-algorithm-roadmap.md).
-- Follow-up implementation packs: [`GEOM-016`](../backlog/geometry/GEOM-016-point-cloud-filtering-density-contracts.md) and [`GEOM-017`](../backlog/geometry/GEOM-017-point-cloud-descriptors-registration-seams.md).
+- Follow-up implementation packs: [`GEOM-016`](../done/GEOM-016-point-cloud-filtering-density-contracts.md) and [`GEOM-017`](../backlog/geometry/GEOM-017-point-cloud-descriptors-registration-seams.md).
 
 ## Context
 - Owning subsystem/layer: `geometry` and `methods/geometry` where paper-specific work applies.
@@ -32,7 +32,7 @@
 - [x] Define candidate task packs for voxel/downsampling filters, statistical/radius outlier removal, MLS/RIMLS smoothing, bilateral normal filtering, keypoints/descriptors, robust primitive fitting, robust/global registration, multiway registration, and reconstruction alternatives.
 - [x] For each pack, record required data structures, dependencies on GEOM-005 through GEOM-009, correctness fixtures, diagnostics, and benchmark manifests.
 - [x] Identify which items belong in generic `src/geometry` APIs vs paper-specific `methods/geometry` packages.
-- [x] Add follow-up task files for the first two implementation packs selected by priority. ([`GEOM-016`](../backlog/geometry/GEOM-016-point-cloud-filtering-density-contracts.md) and [`GEOM-017`](../backlog/geometry/GEOM-017-point-cloud-descriptors-registration-seams.md).)
+- [x] Add follow-up task files for the first two implementation packs selected by priority. ([`GEOM-016`](../done/GEOM-016-point-cloud-filtering-density-contracts.md) and [`GEOM-017`](../backlog/geometry/GEOM-017-point-cloud-descriptors-registration-seams.md).)
 - [x] Document reproducibility requirements for randomized sampling, RANSAC, clustering, and registration initialization.
 
 ## Tests

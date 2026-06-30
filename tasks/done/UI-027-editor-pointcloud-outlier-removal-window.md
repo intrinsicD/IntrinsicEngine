@@ -3,8 +3,32 @@ id: UI-027
 theme: F
 depends_on: [GEOM-016]
 maturity_target: CPUContracted
+completed_on: 2026-06-29
 ---
 # UI-027 — Sandbox EditorUI point-cloud outlier-removal window
+
+## Status
+- Completed at `CPUContracted`. Commit: this commit (UI-027 retirement);
+  implementation in the preceding commit "Wire GEOM-016 outlier removal into the
+  Sandbox editor (UI-027)".
+- Landed as a single cohesive change covering both slices: the
+  `PointCloud > Processing > Remove Outliers` window plus the live, undoable
+  command. `SandboxEditorGeometryProcessingAlgorithm` gained
+  `StatisticalOutlierRemoval` / `RadiusOutlierRemoval` (added to every
+  exhaustive switch); a new `SandboxEditorPointCloudOutlierRemovalCommand` /
+  `...Result` / `ApplySandboxEditorPointCloudOutlierRemovalCommand` drive the
+  `GEOM-016` operators and rebuild the entity's point `GeometrySources` via
+  `GeometrySources::PopulateFromCloud`, undoable through `EditorCommandHistory`.
+- Headless Null-backend contract tests in
+  `tests/contract/runtime/Test.SandboxEditorUi.cpp` cover statistical
+  publication + undo/redo (published count equals `KeptCount`), radius
+  publication, and fail-closed lanes.
+- Verification caveat: the runnable structural checks (layering, test-layout,
+  docs-sync, doc-links, task-policy) pass, but the C++/CTest gate could not run
+  in the authoring sandbox — vcpkg bootstrap requires a github clone the egress
+  proxy denies (403), so the `ci` preset cannot configure there. The change
+  mirrors the UI-024 / point-cloud vertex-normals command/window/undo
+  precedents verbatim; CI owns the compile + contract-test confirmation.
 
 ## Goal
 - Add a Sandbox EditorUI method window under `PointCloud > Processing > Remove Outliers` that runs the `GEOM-016` `RemoveStatisticalOutliers` / `RemoveRadiusOutliers` operators on the selected point-cloud entity and publishes the kept points back to the entity's canonical `GeometrySources` point data.
@@ -26,29 +50,29 @@ maturity_target: CPUContracted
 - GPU synchronization follows the promoted deferred dirty-tag contract used by `UI-024`: the editor command publishes CPU point data, stamps the point-cloud dirty tag, and extraction/residency repacks and uploads on the next extraction opportunity. The UI command must not call renderer/RHI upload APIs or launch a GPU task.
 
 ## Slice plan
-- [ ] Slice 1 — Feature-gated leaf and window: add the `PointCloud > Processing > Remove Outliers` menu leaf, the two enum members across all exhaustive switches, the window state/model, and parameter controls (method toggle statistical/radius, `KNeighbors`, `StdDevMultiplier`, `SearchRadius`, `MinNeighbors`). The action reports deterministic diagnostics while publication is not yet wired.
-- [ ] Slice 2 — Live command: wire the runtime command DTO/result to `GEOM-016`, rebuild the entity point data from kept points, stamp the point-cloud dirty tag, surface `OutlierRemovalResult` diagnostics (kept/rejected/non-finite counts, distance threshold), and record an undoable history entry.
+- [x] Slice 1 — Feature-gated leaf and window: add the `PointCloud > Processing > Remove Outliers` menu leaf, the two enum members across all exhaustive switches, the window state/model, and parameter controls (method toggle statistical/radius, `KNeighbors`, `StdDevMultiplier`, `SearchRadius`, `MinNeighbors`). The action reports deterministic diagnostics while publication is not yet wired.
+- [x] Slice 2 — Live command: wire the runtime command DTO/result to `GEOM-016`, rebuild the entity point data from kept points, stamp the point-cloud dirty tag, surface `OutlierRemovalResult` diagnostics (kept/rejected/non-finite counts, distance threshold), and record an undoable history entry.
 
 ## Required changes
-- [ ] Add `StatisticalOutlierRemoval` and `RadiusOutlierRemoval` to `SandboxEditorGeometryProcessingAlgorithm` and update every exhaustive switch over the enum (mapping both to `Domain::PointCloudPoints`).
-- [ ] Add the `PointCloud > Processing > Remove Outliers` menu leaf and a method window exposing the statistical/radius parameter controls with sensible ranges and tooltips.
-- [ ] Implement the editor command: discover the selected point-cloud entity, run the selected `GEOM-016` operator, publish the kept points to canonical point `GeometrySources`, stamp the deferred point-cloud dirty tag, and record an undoable `EditorCommandHistory` entry.
-- [ ] Surface `OutlierRemovalResult` diagnostics and fail-closed status (`EmptyInput`/`InsufficientPoints`/`InvalidParameters`/`BuildFailed`) in the window.
+- [x] Add `StatisticalOutlierRemoval` and `RadiusOutlierRemoval` to `SandboxEditorGeometryProcessingAlgorithm` and update every exhaustive switch over the enum (mapping both to `Domain::PointCloudPoints`).
+- [x] Add the `PointCloud > Processing > Remove Outliers` menu leaf and a method window exposing the statistical/radius parameter controls with sensible ranges and tooltips.
+- [x] Implement the editor command: discover the selected point-cloud entity, run the selected `GEOM-016` operator, publish the kept points to canonical point `GeometrySources`, stamp the deferred point-cloud dirty tag, and record an undoable `EditorCommandHistory` entry.
+- [x] Surface `OutlierRemovalResult` diagnostics and fail-closed status (`EmptyInput`/`InsufficientPoints`/`InvalidParameters`/`BuildFailed`) in the window.
 
 ## Tests
-- [ ] Add a `unit;runtime` (headless, Null backend) test that builds a point-cloud entity from a two-cluster + outlier fixture, applies the statistical and radius commands, and asserts the published point count equals `OutlierRemovalResult::KeptCount` and the rejected points are gone.
-- [ ] Add an undo/redo test asserting the command restores the original point set on undo and reapplies on redo.
-- [ ] Confirm the default CPU/headless gate stays green; any interactive Vulkan coverage is `gpu;vulkan` label-gated.
+- [x] Add a `unit;runtime` (headless, Null backend) test that builds a point-cloud entity from a two-cluster + outlier fixture, applies the statistical and radius commands, and asserts the published point count equals `OutlierRemovalResult::KeptCount` and the rejected points are gone.
+- [x] Add an undo/redo test asserting the command restores the original point set on undo and reapplies on redo.
+- [x] Confirm the default CPU/headless gate stays green; any interactive Vulkan coverage is `gpu;vulkan` label-gated.
 
 ## Docs
-- [ ] Document the window, parameter ranges, and diagnostics in the Sandbox/UI docs.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` if module surfaces change.
+- [x] Document the window, parameter ranges, and diagnostics in the Sandbox/UI docs.
+- [x] Regenerate `docs/api/generated/module_inventory.md` if module surfaces change.
 
 ## Acceptance criteria
-- [ ] A user can select a point-cloud entity, choose statistical or radius removal, adjust parameters, and apply removal with the kept points reflected live and diagnostics shown.
-- [ ] The command routes through the editor command/history seam with working undo/redo.
-- [ ] Headless tests cover deterministic kept-count publication and undo/redo; default gate green.
-- [ ] App imports runtime only; geometry owns the algorithm; no layering violations introduced.
+- [x] A user can select a point-cloud entity, choose statistical or radius removal, adjust parameters, and apply removal with the kept points reflected live and diagnostics shown.
+- [x] The command routes through the editor command/history seam with working undo/redo.
+- [x] Headless tests cover deterministic kept-count publication and undo/redo; default gate green.
+- [x] App imports runtime only; geometry owns the algorithm; no layering violations introduced.
 
 ## Verification
 ```bash

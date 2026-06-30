@@ -33,7 +33,7 @@ The gaps below come from the [`src/geometry` gap analysis](../reviews/2026-05-12
 
 ## Pack 1 — Filtering, downsampling, and density diagnostics
 
-Follow-up task: [`GEOM-016`](../../tasks/backlog/geometry/GEOM-016-point-cloud-filtering-density-contracts.md).
+Follow-up task: [`GEOM-016`](../../tasks/done/GEOM-016-point-cloud-filtering-density-contracts.md).
 
 Scope:
 
@@ -224,7 +224,7 @@ Point-cloud algorithms must make stochastic and order-sensitive behavior explici
 
 The first two implementation packs are:
 
-1. [`GEOM-016`](../../tasks/backlog/geometry/GEOM-016-point-cloud-filtering-density-contracts.md) — filtering, downsampling, outlier removal, and density diagnostics. This is the smallest unblocked pack because much of the public surface already exists and needs hardening, tests, diagnostics, and smoke benchmarking.
+1. [`GEOM-016`](../../tasks/done/GEOM-016-point-cloud-filtering-density-contracts.md) — filtering, downsampling, outlier removal, and density diagnostics. This is the smallest unblocked pack because much of the public surface already exists and needs hardening, tests, diagnostics, and smoke benchmarking.
 2. [`GEOM-017`](../../tasks/backlog/geometry/GEOM-017-point-cloud-descriptors-registration-seams.md) — keypoints, descriptors, matching, and coarse registration seams. This unlocks robust/global registration and reconstruction work without prematurely importing paper-specific TEASER/CPD assumptions into `src/geometry`.
 
 Later packs should not begin until their prerequisites are either retired to `tasks/done/` or recorded as explicit out-of-scope assumptions in the candidate task file.

@@ -49,6 +49,7 @@ import Extrinsic.Runtime.VertexChannelBindings;
     import Geometry.Graph.Vertex.Normals;
     import Geometry.HalfedgeMesh.Vertices.Normals;
     import Geometry.PointCloud.Normals;
+    import Geometry.PointCloud.Utils;
     import Geometry.Smoothing;
     import Geometry.UvAtlas;
 
@@ -253,6 +254,8 @@ export namespace Extrinsic::Runtime
         BilateralFilter,
         OutlierEstimation,
         KernelDensity,
+        StatisticalOutlierRemoval,
+        RadiusOutlierRemoval,
     };
 
     struct SandboxEditorGeometryProcessingCapabilities
@@ -672,6 +675,49 @@ export namespace Extrinsic::Runtime
         std::size_t KNNVisitedNodeCount{0};
         std::size_t KNNDistanceEvaluationCount{0};
         bool FallbackNormalWasRepaired{false};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SandboxEditorCommandStatus::Applied;
+        }
+    };
+
+    // UI-027: explicit point-cloud outlier removal. Mirrors the GEOM-016
+    // operators; the editor command rebuilds the entity's point GeometrySources
+    // from the kept points and records an undoable history entry.
+    enum class SandboxEditorPointCloudOutlierMethod : std::uint8_t
+    {
+        Statistical,  // GEOM-016 RemoveStatisticalOutliers (mean-kNN distance).
+        Radius,       // GEOM-016 RemoveRadiusOutliers (neighbor count in radius).
+    };
+
+    struct SandboxEditorPointCloudOutlierRemovalCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        SandboxEditorPointCloudOutlierMethod Method{
+            SandboxEditorPointCloudOutlierMethod::Statistical};
+        std::uint32_t KNeighbors{16u};
+        float         StdDevMultiplier{1.0f};
+        float         SearchRadius{0.0f};
+        std::uint32_t MinNeighbors{4u};
+    };
+
+    struct SandboxEditorPointCloudOutlierRemovalResult
+    {
+        SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
+        SandboxEditorPointCloudOutlierMethod Method{
+            SandboxEditorPointCloudOutlierMethod::Statistical};
+        Geometry::PointCloud::OutlierRemovalStatus GeometryStatus{
+            Geometry::PointCloud::OutlierRemovalStatus::Success};
+        std::size_t OriginalCount{0};
+        std::size_t KeptCount{0};
+        std::size_t RejectedCount{0};
+        std::size_t NonFiniteCount{0};
+        float       MeanDistance{0.0f};
+        float       StdDevDistance{0.0f};
+        float       DistanceThreshold{0.0f};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
 
@@ -1668,6 +1714,7 @@ export namespace Extrinsic::Runtime
         bool MeshVertexNormalsAvailable{false};
         bool GraphVertexNormalsAvailable{false};
         bool PointCloudVertexNormalsAvailable{false};
+        bool PointCloudOutlierRemovalAvailable{false};
         std::optional<SandboxEditorKMeansResult> LastKMeansResult{};
         std::optional<SandboxEditorMeshDenoiseResult>
             LastMeshDenoiseResult{};
@@ -1683,6 +1730,8 @@ export namespace Extrinsic::Runtime
             LastGraphVertexNormalsResult{};
         std::optional<SandboxEditorPointCloudVertexNormalsResult>
             LastPointCloudVertexNormalsResult{};
+        std::optional<SandboxEditorPointCloudOutlierRemovalResult>
+            LastPointCloudOutlierRemovalResult{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
@@ -1767,6 +1816,8 @@ export namespace Extrinsic::Runtime
             LastGraphVertexNormalsResult{nullptr};
         const SandboxEditorPointCloudVertexNormalsResult*
             LastPointCloudVertexNormalsResult{nullptr};
+        const SandboxEditorPointCloudOutlierRemovalResult*
+            LastPointCloudOutlierRemovalResult{nullptr};
         const Graphics::RenderGraphFrameStats* RenderGraphStats{nullptr};
         const Graphics::RenderRecipeConfigContext* RenderRecipeContext{nullptr};
         SandboxEditorRenderRecipeEditorState* RenderRecipeEditorState{nullptr};
@@ -2131,6 +2182,11 @@ export namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorPointCloudVertexNormalsCommand& command);
 
+    SandboxEditorPointCloudOutlierRemovalResult
+    ApplySandboxEditorPointCloudOutlierRemovalCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorPointCloudOutlierRemovalCommand& command);
+
     [[nodiscard]] SandboxEditorRenderRecipeEditorModel
     BuildSandboxEditorRenderRecipeEditorModel(
         const SandboxEditorContext& context);
@@ -2190,6 +2246,8 @@ export namespace Extrinsic::Runtime
             m_LastGraphVertexNormalsResult{};
         std::optional<SandboxEditorPointCloudVertexNormalsResult>
             m_LastPointCloudVertexNormalsResult{};
+        std::optional<SandboxEditorPointCloudOutlierRemovalResult>
+            m_LastPointCloudOutlierRemovalResult{};
         Graphics::RenderRecipeConfigContext m_RenderRecipeContext{};
         SandboxEditorRenderRecipeEditorState m_RenderRecipeState{};
         RenderArtifactRegistry m_RenderArtifactRegistry{};
@@ -2226,6 +2284,11 @@ export namespace Extrinsic::Runtime
         float m_PointCloudVertexNormalsRadius{0.0f};
         std::int32_t m_PointCloudVertexNormalsOrientation{1};
         glm::vec3 m_PointCloudVertexNormalsFallback{0.0f, 0.0f, 1.0f};
+        std::int32_t m_PointCloudOutlierMethod{0};
+        std::int32_t m_PointCloudOutlierKNeighbors{16};
+        float m_PointCloudOutlierStdDevMultiplier{1.0f};
+        float m_PointCloudOutlierSearchRadius{0.0f};
+        std::int32_t m_PointCloudOutlierMinNeighbors{4};
         std::int32_t m_TextureBakeSourceIndex{0};
         std::int32_t m_TextureBakeTargetSemanticIndex{0};
         std::int32_t m_TextureBakeEncoderIndex{0};

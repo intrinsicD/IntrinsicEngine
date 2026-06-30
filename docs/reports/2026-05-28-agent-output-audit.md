@@ -16,7 +16,7 @@ window closed.
   [`GEOM-012`](../../tasks/done/GEOM-012-symmetric-domain-views-property-sharing.md)
   (active at the time of this audit; Slices A + B landed — `Geometry.DomainViews`;
   retired to `tasks/done/` on 2026-05-29 after Slice E),
-  [`GEOM-016`](../../tasks/backlog/geometry/GEOM-016-point-cloud-filtering-density-contracts.md)
+  [`GEOM-016`](../../tasks/done/GEOM-016-point-cloud-filtering-density-contracts.md)
   (backlog filing + LDLT follow-up gating METHOD-002/003),
   [`RUNTIME-082`](../../tasks/done/RUNTIME-082-spatial-debug-adapters.md)
   (active; Slice C `ConvexHullAdapter` + registry, Slice D extraction pump),

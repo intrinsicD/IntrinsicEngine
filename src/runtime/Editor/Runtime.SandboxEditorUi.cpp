@@ -79,6 +79,7 @@ import Geometry.MeshOperator;
 import Geometry.MeshSoup;
 import Geometry.PointCloud;
 import Geometry.PointCloud.Normals;
+import Geometry.PointCloud.Utils;
 import Geometry.Properties;
 import Geometry.Remeshing;
 import Geometry.Smoothing;
@@ -268,6 +269,17 @@ namespace Extrinsic::Runtime
             float* Radius{nullptr};
             std::int32_t* Orientation{nullptr};
             glm::vec3* FallbackNormal{nullptr};
+        };
+
+        struct PointCloudOutlierRemovalUiState
+        {
+            std::optional<SandboxEditorPointCloudOutlierRemovalResult>*
+                LastResult{nullptr};
+            std::int32_t* Method{nullptr};  // 0 = statistical, 1 = radius.
+            std::int32_t* KNeighbors{nullptr};
+            float*        StdDevMultiplier{nullptr};
+            float*        SearchRadius{nullptr};
+            std::int32_t* MinNeighbors{nullptr};
         };
 
         struct TextureBakeUiState
@@ -2704,6 +2716,8 @@ namespace Extrinsic::Runtime
             case SandboxEditorGeometryProcessingAlgorithm::BilateralFilter:
             case SandboxEditorGeometryProcessingAlgorithm::OutlierEstimation:
             case SandboxEditorGeometryProcessingAlgorithm::KernelDensity:
+            case SandboxEditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval:
+            case SandboxEditorGeometryProcessingAlgorithm::RadiusOutlierRemoval:
                 return false;
             }
             return false;
@@ -5313,6 +5327,105 @@ namespace Extrinsic::Runtime
                     after));
         }
 
+        // UI-027: outlier removal changes the point count, so the published
+        // point GeometrySources must be fully rebuilt (mirrors the mesh
+        // topology-replacement path but for point clouds). A full re-upload is
+        // requested because the count changed.
+        void MarkPointCloudReplacementDirty(
+            entt::registry& raw,
+            const ECS::EntityHandle entity)
+        {
+            Dirty::MarkGpuDirty(raw, entity);
+            Dirty::MarkVertexPositionsDirty(raw, entity);
+            Dirty::MarkVertexAttributesDirty(raw, entity);
+            Dirty::MarkVertexNormalsDirty(raw, entity);
+        }
+
+        [[nodiscard]] EditorCommandHistoryStatus ApplyPointCloudPointState(
+            ECS::Scene::Registry* scene,
+            const std::uint32_t stableEntityId,
+            const Geometry::PointCloud::Cloud& cloud)
+        {
+            if (scene == nullptr)
+                return EditorCommandHistoryStatus::MissingScene;
+
+            entt::registry& raw = scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, stableEntityId);
+            if (!entity.has_value())
+                return EditorCommandHistoryStatus::StaleEntity;
+
+            // PopulateFromCloud takes a mutable cloud (it may garbage-collect);
+            // operate on an owned copy so the captured undo/redo state is not
+            // mutated.
+            Geometry::PointCloud::Cloud published = cloud;
+            GS::PopulateFromCloud(raw, *entity, published);
+            MarkPointCloudReplacementDirty(raw, *entity);
+            return EditorCommandHistoryStatus::Applied;
+        }
+
+        [[nodiscard]] SandboxEditorCommandStatus CommitPointCloudReplacement(
+            const SandboxEditorContext& context,
+            const std::uint32_t stableEntityId,
+            const char* label,
+            Geometry::PointCloud::Cloud before,
+            Geometry::PointCloud::Cloud after)
+        {
+            if (context.CommandHistory != nullptr)
+            {
+                ECS::Scene::Registry* scene = context.Scene;
+                const EditorCommandHistoryResult history =
+                    context.CommandHistory->Execute(
+                        EditorCommandRecord{
+                            .Label = label,
+                            .Redo =
+                                [scene, stableEntityId, after]()
+                                {
+                                    return ApplyPointCloudPointState(
+                                        scene,
+                                        stableEntityId,
+                                        after);
+                                },
+                            .Undo =
+                                [scene, stableEntityId, before]()
+                                {
+                                    return ApplyPointCloudPointState(
+                                        scene,
+                                        stableEntityId,
+                                        before);
+                                },
+                            .Dirtying = true,
+                        });
+                return ToSandboxEditorCommandStatus(history.Status);
+            }
+
+            return ToSandboxEditorCommandStatus(
+                ApplyPointCloudPointState(
+                    context.Scene,
+                    stableEntityId,
+                    after));
+        }
+
+        [[nodiscard]] const char* DebugNameForOutlierRemovalStatus(
+            const Geometry::PointCloud::OutlierRemovalStatus status) noexcept
+        {
+            using Status = Geometry::PointCloud::OutlierRemovalStatus;
+            switch (status)
+            {
+            case Status::Success:
+                return "Success";
+            case Status::EmptyInput:
+                return "EmptyInput";
+            case Status::InsufficientPoints:
+                return "InsufficientPoints";
+            case Status::InvalidParameters:
+                return "InvalidParameters";
+            case Status::BuildFailed:
+                return "BuildFailed";
+            }
+            return "Unknown";
+        }
+
         [[nodiscard]] AdaptiveRemesh::SizingLaw ToAdaptiveSizingLaw(
             const SandboxEditorMeshRemeshSizingLaw sizingLaw) noexcept
         {
@@ -5467,6 +5580,10 @@ namespace Extrinsic::Runtime
                 HasAnySandboxEditorGeometryProcessingDomain(
                     model.Capabilities.Domains,
                     SandboxEditorGeometryProcessingDomain::PointCloudPoints);
+            model.PointCloudOutlierRemovalAvailable =
+                HasAnySandboxEditorGeometryProcessingDomain(
+                    model.Capabilities.Domains,
+                    SandboxEditorGeometryProcessingDomain::PointCloudPoints);
             if (context.LastKMeansResult != nullptr)
             {
                 model.LastKMeansResult = *context.LastKMeansResult;
@@ -5576,6 +5693,20 @@ namespace Extrinsic::Runtime
                         context.LastPointCloudVertexNormalsResult->Message.empty()
                             ? "Last point-cloud vertex-normal command failed."
                             : context.LastPointCloudVertexNormalsResult->Message);
+                }
+            }
+            if (context.LastPointCloudOutlierRemovalResult != nullptr)
+            {
+                model.LastPointCloudOutlierRemovalResult =
+                    *context.LastPointCloudOutlierRemovalResult;
+                if (!context.LastPointCloudOutlierRemovalResult->Succeeded())
+                {
+                    AddDiagnostic(
+                        model.Diagnostics,
+                        SandboxEditorDiagnosticCode::GeometryProcessingFailed,
+                        context.LastPointCloudOutlierRemovalResult->Message.empty()
+                            ? "Last point-cloud outlier-removal command failed."
+                            : context.LastPointCloudOutlierRemovalResult->Message);
                 }
             }
             if (!model.Capabilities.HasAny())
@@ -8997,6 +9128,155 @@ namespace Extrinsic::Runtime
             DrawPointCloudVertexNormalsResultStatus(result);
         }
 
+        void DrawPointCloudOutlierRemovalResultStatus(
+            const std::optional<SandboxEditorPointCloudOutlierRemovalResult>&
+                lastResult)
+        {
+            if (!lastResult.has_value())
+            {
+                ImGui::TextDisabled("Last outlier removal: none");
+                return;
+            }
+
+            const SandboxEditorPointCloudOutlierRemovalResult& result =
+                *lastResult;
+            ImGui::Text("Last outlier removal: %s",
+                        DebugNameForSandboxEditorCommandStatus(result.Status));
+            ImGui::Text(
+                "Method: %s",
+                result.Method ==
+                        SandboxEditorPointCloudOutlierMethod::Statistical
+                    ? "Statistical"
+                    : "Radius");
+            if (result.Succeeded())
+            {
+                ImGui::Text("Kept %zu / %zu  rejected %zu  non-finite %zu",
+                            result.KeptCount,
+                            result.OriginalCount,
+                            result.RejectedCount,
+                            result.NonFiniteCount);
+                if (result.Method ==
+                    SandboxEditorPointCloudOutlierMethod::Statistical)
+                {
+                    ImGui::Text("Mean %.4f  stddev %.4f  threshold %.4f",
+                                static_cast<double>(result.MeanDistance),
+                                static_cast<double>(result.StdDevDistance),
+                                static_cast<double>(result.DistanceThreshold));
+                }
+            }
+            if (!result.Message.empty())
+                ImGui::TextWrapped("%s", result.Message.c_str());
+        }
+
+        void DrawPointCloudOutlierRemovalControls(
+            const SandboxEditorDomainWindowModel& model,
+            const SandboxEditorContext& context,
+            const SandboxEditorGeometryProcessingModel& processing,
+            PointCloudOutlierRemovalUiState* outlierState)
+        {
+            ImGui::SeparatorText("Remove Outliers");
+            if (!processing.PointCloudOutlierRemovalAvailable)
+            {
+                ImGui::TextDisabled("Point-cloud outlier removal is unavailable for this selection.");
+                return;
+            }
+            if (outlierState == nullptr ||
+                outlierState->LastResult == nullptr ||
+                outlierState->Method == nullptr ||
+                outlierState->KNeighbors == nullptr ||
+                outlierState->StdDevMultiplier == nullptr ||
+                outlierState->SearchRadius == nullptr ||
+                outlierState->MinNeighbors == nullptr)
+            {
+                ImGui::TextDisabled("Point-cloud outlier-removal controls are not bound.");
+                return;
+            }
+
+            *outlierState->Method = std::clamp(*outlierState->Method, 0, 1);
+            const bool statistical = *outlierState->Method == 0;
+            if (ImGui::BeginCombo(
+                    "Method",
+                    statistical ? "Statistical" : "Radius"))
+            {
+                if (ImGui::Selectable("Statistical", statistical))
+                    *outlierState->Method = 0;
+                if (statistical)
+                    ImGui::SetItemDefaultFocus();
+                if (ImGui::Selectable("Radius", !statistical))
+                    *outlierState->Method = 1;
+                if (!statistical)
+                    ImGui::SetItemDefaultFocus();
+                ImGui::EndCombo();
+            }
+
+            if (statistical)
+            {
+                ImGui::TextDisabled("Reject points beyond mean + k*stddev of mean-kNN distance.");
+                *outlierState->KNeighbors =
+                    std::clamp(*outlierState->KNeighbors, 1, 512);
+                *outlierState->StdDevMultiplier =
+                    std::clamp(*outlierState->StdDevMultiplier, 0.0f, 100.0f);
+                ImGui::DragInt(
+                    "K neighbors",
+                    outlierState->KNeighbors,
+                    1.0f,
+                    1,
+                    512);
+                ImGui::DragFloat(
+                    "Std-dev multiplier",
+                    outlierState->StdDevMultiplier,
+                    0.05f,
+                    0.0f,
+                    100.0f);
+            }
+            else
+            {
+                ImGui::TextDisabled("Reject points with too few neighbors inside the search radius.");
+                *outlierState->SearchRadius =
+                    std::max(*outlierState->SearchRadius, 0.0f);
+                *outlierState->MinNeighbors =
+                    std::clamp(*outlierState->MinNeighbors, 0, 512);
+                ImGui::DragFloat(
+                    "Search radius",
+                    outlierState->SearchRadius,
+                    0.01f,
+                    0.0f,
+                    1000.0f);
+                ImGui::DragInt(
+                    "Min neighbors",
+                    outlierState->MinNeighbors,
+                    1.0f,
+                    0,
+                    512);
+            }
+
+            if (ImGui::Button("Remove Outliers"))
+            {
+                *outlierState->LastResult =
+                    ApplySandboxEditorPointCloudOutlierRemovalCommand(
+                        context,
+                        SandboxEditorPointCloudOutlierRemovalCommand{
+                            .StableEntityId = model.SelectedStableId,
+                            .Method = statistical
+                                ? SandboxEditorPointCloudOutlierMethod::Statistical
+                                : SandboxEditorPointCloudOutlierMethod::Radius,
+                            .KNeighbors = static_cast<std::uint32_t>(
+                                *outlierState->KNeighbors),
+                            .StdDevMultiplier =
+                                *outlierState->StdDevMultiplier,
+                            .SearchRadius = *outlierState->SearchRadius,
+                            .MinNeighbors = static_cast<std::uint32_t>(
+                                *outlierState->MinNeighbors),
+                        });
+            }
+
+            const std::optional<SandboxEditorPointCloudOutlierRemovalResult>&
+                result = outlierState->LastResult->has_value()
+                    ? *outlierState->LastResult
+                    : processing.LastPointCloudOutlierRemovalResult;
+            DrawPointCloudOutlierRemovalResultStatus(result);
+        }
+
         void DrawDomainProcessingWindow(
             const SandboxEditorDomainWindowModel& model,
             const SandboxEditorContext& context,
@@ -9007,7 +9287,8 @@ namespace Extrinsic::Runtime
             MeshSubdivideUiState* subdivideState,
             MeshVertexNormalsUiState* meshNormalsState,
             GraphVertexNormalsUiState* graphNormalsState,
-            PointCloudVertexNormalsUiState* pointCloudNormalsState)
+            PointCloudVertexNormalsUiState* pointCloudNormalsState,
+            PointCloudOutlierRemovalUiState* pointCloudOutlierState)
         {
             DrawDomainWindowHeader(model);
             ImGui::SeparatorText("Processing capabilities");
@@ -9101,6 +9382,11 @@ namespace Extrinsic::Runtime
                     context,
                     processing,
                     pointCloudNormalsState);
+                DrawPointCloudOutlierRemovalControls(
+                    model,
+                    context,
+                    processing,
+                    pointCloudOutlierState);
                 break;
             }
         }
@@ -9118,6 +9404,7 @@ namespace Extrinsic::Runtime
             MeshVertexNormalsUiState* normalsState,
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
+            PointCloudOutlierRemovalUiState* pointCloudOutlierState,
             TextureBakeUiState* textureBakeState)
         {
             const std::size_t slot = DomainWindowSlotIndex(kind, section);
@@ -9154,7 +9441,8 @@ namespace Extrinsic::Runtime
                         subdivideState,
                         normalsState,
                         graphNormalsState,
-                        pointCloudNormalsState);
+                        pointCloudNormalsState,
+                        pointCloudOutlierState);
                     break;
                 case DomainWindowSection::Count:
                     break;
@@ -9174,6 +9462,7 @@ namespace Extrinsic::Runtime
             MeshVertexNormalsUiState* normalsState,
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
+            PointCloudOutlierRemovalUiState* pointCloudOutlierState,
             TextureBakeUiState* textureBakeState)
         {
             if (context == nullptr || domainWindowOpen == nullptr)
@@ -9208,6 +9497,7 @@ namespace Extrinsic::Runtime
                     normalsState,
                     graphNormalsState,
                     pointCloudNormalsState,
+                    pointCloudOutlierState,
                     textureBakeState);
             }
             }
@@ -9601,6 +9891,7 @@ namespace Extrinsic::Runtime
             MeshVertexNormalsUiState* normalsState,
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
+            PointCloudOutlierRemovalUiState* pointCloudOutlierState,
             TextureBakeUiState* textureBakeState)
         {
             DrawMainMenuBar(panelWindowOpen, domainWindowOpen);
@@ -9615,6 +9906,7 @@ namespace Extrinsic::Runtime
                 normalsState,
                 graphNormalsState,
                 pointCloudNormalsState,
+                pointCloudOutlierState,
                 textureBakeState);
 
             if (BeginPanelWindow(panelWindowOpen,
@@ -11039,6 +11331,8 @@ namespace Extrinsic::Runtime
         case SandboxEditorGeometryProcessingAlgorithm::BilateralFilter:
         case SandboxEditorGeometryProcessingAlgorithm::OutlierEstimation:
         case SandboxEditorGeometryProcessingAlgorithm::KernelDensity:
+        case SandboxEditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval:
+        case SandboxEditorGeometryProcessingAlgorithm::RadiusOutlierRemoval:
             return Domain::PointCloudPoints;
         }
         return Domain::None;
@@ -11085,7 +11379,7 @@ namespace Extrinsic::Runtime
     ResolveSandboxEditorGeometryProcessingEntries(
         const SandboxEditorGeometryProcessingCapabilities capabilities)
     {
-        static constexpr std::array<SandboxEditorGeometryProcessingAlgorithm, 19>
+        static constexpr std::array<SandboxEditorGeometryProcessingAlgorithm, 21>
             kAlgorithmOrder{
                 SandboxEditorGeometryProcessingAlgorithm::KMeans,
                 SandboxEditorGeometryProcessingAlgorithm::NormalEstimation,
@@ -11095,6 +11389,8 @@ namespace Extrinsic::Runtime
                 SandboxEditorGeometryProcessingAlgorithm::BilateralFilter,
                 SandboxEditorGeometryProcessingAlgorithm::OutlierEstimation,
                 SandboxEditorGeometryProcessingAlgorithm::KernelDensity,
+                SandboxEditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval,
+                SandboxEditorGeometryProcessingAlgorithm::RadiusOutlierRemoval,
                 SandboxEditorGeometryProcessingAlgorithm::ShortestPath,
                 SandboxEditorGeometryProcessingAlgorithm::VectorHeat,
                 SandboxEditorGeometryProcessingAlgorithm::Parameterization,
@@ -11840,6 +12136,10 @@ namespace Extrinsic::Runtime
             return "Outlier Estimation";
         case SandboxEditorGeometryProcessingAlgorithm::KernelDensity:
             return "Kernel Density";
+        case SandboxEditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval:
+            return "Statistical Outlier Removal";
+        case SandboxEditorGeometryProcessingAlgorithm::RadiusOutlierRemoval:
+            return "Radius Outlier Removal";
         }
         return "Unknown";
     }
@@ -14522,9 +14822,190 @@ namespace Extrinsic::Runtime
         return result;
     }
 
+    SandboxEditorPointCloudOutlierRemovalResult
+    ApplySandboxEditorPointCloudOutlierRemovalCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorPointCloudOutlierRemovalCommand& command)
+    {
+        SandboxEditorPointCloudOutlierRemovalResult result{};
+        result.Method = command.Method;
+
+        if (context.Scene == nullptr)
+        {
+            result.Status = SandboxEditorCommandStatus::MissingScene;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Point-cloud outlier removal requires an attached scene.";
+            return result;
+        }
+
+        const bool statistical =
+            command.Method ==
+            SandboxEditorPointCloudOutlierMethod::Statistical;
+        if (statistical)
+        {
+            if (command.KNeighbors == 0u ||
+                !std::isfinite(command.StdDevMultiplier))
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::InvalidProcessingParameters;
+                result.GeometryStatus =
+                    Geometry::PointCloud::OutlierRemovalStatus::InvalidParameters;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message =
+                    "Statistical outlier removal requires KNeighbors > 0 and a finite std-dev multiplier.";
+                return result;
+            }
+        }
+        else if (!std::isfinite(command.SearchRadius) ||
+                 command.SearchRadius <= 0.0f)
+        {
+            result.Status =
+                SandboxEditorCommandStatus::InvalidProcessingParameters;
+            result.GeometryStatus =
+                Geometry::PointCloud::OutlierRemovalStatus::InvalidParameters;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Radius outlier removal requires a positive finite search radius.";
+            return result;
+        }
+
+        entt::registry& raw = context.Scene->Raw();
+        const std::optional<ECS::EntityHandle> entity =
+            ResolveStableEntity(raw, command.StableEntityId);
+        if (!entity.has_value())
+        {
+            result.Status = SandboxEditorCommandStatus::StaleEntity;
+            result.Error = Core::ErrorCode::ResourceNotFound;
+            result.Message =
+                "Point-cloud outlier-removal target entity is stale or no longer live.";
+            return result;
+        }
+
+        GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
+        const GS::SourceAvailability availability =
+            GS::BuildSourceAvailability(view);
+        if (availability.ProvenanceDomain != GS::Domain::PointCloud ||
+            view.VertexSource == nullptr)
+        {
+            result.Status =
+                SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Point-cloud outlier removal requires selected point-cloud GeometrySources.";
+            return result;
+        }
+
+        // Snapshot the original point property set (including any deleted slots
+        // and the live deletion counter) so undo restores the entity exactly.
+        Geometry::Vertices originalPoints = view.VertexSource->Properties;
+        std::size_t originalNumDeleted = view.VertexSource->NumDeleted;
+        Geometry::PointCloud::Cloud beforeCloud{
+            originalPoints,
+            originalNumDeleted};
+
+        // Build a separate live-only working cloud: bind the deletion counter and
+        // garbage-collect so the GEOM-016 operators (which iterate every slot via
+        // VerticesSize()) run over the live points only, and so kept/rejected
+        // indices and result counts match the live point set rather than dead
+        // slots. The full property set is carried so user attributes survive.
+        Geometry::Vertices workPoints = view.VertexSource->Properties;
+        std::size_t workNumDeleted = view.VertexSource->NumDeleted;
+        Geometry::PointCloud::Cloud workCloud{workPoints, workNumDeleted};
+        if (workCloud.HasGarbage())
+            workCloud.GarbageCollection();
+
+        Geometry::PointCloud::OutlierRemovalResult removal{};
+        if (statistical)
+        {
+            Geometry::PointCloud::StatisticalOutlierRemovalParams params{};
+            params.KNeighbors = command.KNeighbors;
+            params.StdDevMultiplier = command.StdDevMultiplier;
+            removal =
+                Geometry::PointCloud::RemoveStatisticalOutliers(
+                    workCloud,
+                    params);
+        }
+        else
+        {
+            Geometry::PointCloud::RadiusOutlierRemovalParams params{};
+            params.SearchRadius = command.SearchRadius;
+            params.MinNeighbors = command.MinNeighbors;
+            removal =
+                Geometry::PointCloud::RemoveRadiusOutliers(
+                    workCloud,
+                    params);
+        }
+
+        result.GeometryStatus = removal.Status;
+        result.OriginalCount = removal.OriginalCount;
+        result.KeptCount = removal.KeptCount;
+        result.RejectedCount = removal.RejectedCount;
+        result.NonFiniteCount = removal.NonFiniteCount;
+        result.MeanDistance = removal.MeanDistance;
+        result.StdDevDistance = removal.StdDevDistance;
+        result.DistanceThreshold = removal.DistanceThreshold;
+
+        if (removal.Status !=
+            Geometry::PointCloud::OutlierRemovalStatus::Success)
+        {
+            result.Status =
+                removal.Status ==
+                        Geometry::PointCloud::OutlierRemovalStatus::InvalidParameters
+                    ? SandboxEditorCommandStatus::InvalidProcessingParameters
+                    : SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message = "Geometry.PointCloud outlier removal failed with ";
+            result.Message += DebugNameForOutlierRemovalStatus(removal.Status);
+            result.Message += ".";
+            return result;
+        }
+
+        // Compact the full-property working cloud down to the kept points by
+        // deleting the rejected slots and garbage-collecting. This preserves
+        // every surviving per-point property (normals, K-Means labels,
+        // visualization scalars, ...), unlike `removal.Filtered`, which only
+        // carries the Cloud built-ins (position/normal/color/radius).
+        Geometry::PointCloud::Cloud afterCloud = workCloud;
+        for (const std::size_t rejected : removal.RejectedIndices)
+            afterCloud.DeletePoint(
+                Geometry::VertexHandle{static_cast<std::uint32_t>(rejected)});
+        afterCloud.GarbageCollection();
+
+        const SandboxEditorCommandStatus status =
+            CommitPointCloudReplacement(
+                context,
+                command.StableEntityId,
+                statistical
+                    ? "Remove statistical point-cloud outliers"
+                    : "Remove radius point-cloud outliers",
+                beforeCloud,
+                afterCloud);
+        result.Status = status;
+        if (status != SandboxEditorCommandStatus::Applied)
+        {
+            result.Error = Core::ErrorCode::ResourceNotFound;
+            result.Message =
+                "Point-cloud outlier-removal publication failed; the target entity may no longer be live.";
+            return result;
+        }
+
+        result.Message = "Removed " + std::to_string(result.RejectedCount) +
+                         " of " + std::to_string(result.OriginalCount) +
+                         " points (kept " + std::to_string(result.KeptCount);
+        if (result.NonFiniteCount > 0u)
+        {
+            result.Message +=
+                ", non-finite " + std::to_string(result.NonFiniteCount);
+        }
+        result.Message += ").";
+        return result;
+    }
+
     void DrawSandboxEditorPanelFrame(const SandboxEditorPanelFrame& frame)
     {
         DrawPanelFrame(frame,
+                       nullptr,
                        nullptr,
                        nullptr,
                        nullptr,
@@ -14602,6 +15083,9 @@ namespace Extrinsic::Runtime
                 if (m_LastPointCloudVertexNormalsResult.has_value())
                     context.LastPointCloudVertexNormalsResult =
                         &*m_LastPointCloudVertexNormalsResult;
+                if (m_LastPointCloudOutlierRemovalResult.has_value())
+                    context.LastPointCloudOutlierRemovalResult =
+                        &*m_LastPointCloudOutlierRemovalResult;
                 const Core::Extent2D viewport =
                     context.CameraViewport.Width != 0u &&
                             context.CameraViewport.Height != 0u
@@ -14687,6 +15171,14 @@ namespace Extrinsic::Runtime
                     .Orientation = &m_PointCloudVertexNormalsOrientation,
                     .FallbackNormal = &m_PointCloudVertexNormalsFallback,
                 };
+                PointCloudOutlierRemovalUiState pointCloudOutlierState{
+                    .LastResult = &m_LastPointCloudOutlierRemovalResult,
+                    .Method = &m_PointCloudOutlierMethod,
+                    .KNeighbors = &m_PointCloudOutlierKNeighbors,
+                    .StdDevMultiplier = &m_PointCloudOutlierStdDevMultiplier,
+                    .SearchRadius = &m_PointCloudOutlierSearchRadius,
+                    .MinNeighbors = &m_PointCloudOutlierMinNeighbors,
+                };
                 TextureBakeUiState textureBakeState{
                     .SourceIndex = &m_TextureBakeSourceIndex,
                     .TargetSemanticIndex = &m_TextureBakeTargetSemanticIndex,
@@ -14718,6 +15210,7 @@ namespace Extrinsic::Runtime
                     &normalsState,
                     &graphNormalsState,
                     &pointCloudNormalsState,
+                    &pointCloudOutlierState,
                     &textureBakeState);
             });
     }
