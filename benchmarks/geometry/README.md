@@ -86,3 +86,20 @@ The CTest registrations under the default CPU gate (label `benchmark`)
 exercise the runner and validate the emitted result JSON as part of the
 standard `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine'`
 flow.
+
+## FA-QEM vs classical-QEM simplification quality (GEOM-014, stub)
+
+Planned quality comparison for the feature-aware QEM metric added by GEOM-014.
+This is a **quality-only** comparison — no performance claims — pending the
+compiled smoke runner (owned by the `UI-028` executor follow-up).
+
+- Fixtures: the in-repo tessellated-cube and grid-plane fixtures used by
+  `tests/unit/geometry/Test_Simplification.cpp` (no external large datasets).
+- Metric per fixture, at a fixed target face count, for
+  `Metric::ClassicalQEM` vs `Metric::FA_QEM`:
+  - max vertex-to-original-surface distance (one-sided Hausdorff proxy),
+  - sharp-feature vertices retained (`Result::SharpFeatureVerticesPinned`),
+  - collapse-rejection counts (`Result::CollapsesRejected{Topology,Quality}`).
+- Expected qualitative result: on feature-rich inputs FA-QEM retains sharp
+  corners and reports max-surface-distance no worse than classical at the same
+  target, matching `Test_Simplification.FeatureAwareCornerErrorNotWorseThanClassical`.

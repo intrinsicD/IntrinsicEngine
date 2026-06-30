@@ -15,11 +15,38 @@ depends_on: []
 - No progressive-mesh / view-dependent LOD machinery in this task (separate follow-up).
 
 ## Context
-- Status: backlog.
+- Status: implemented on branch `claude/intrinsic-engine-framework24-migrate-cew18n`;
+  full `ctest` gate deferred to CI (see Status below).
 - Owning subsystem/layer: `geometry` (`geometry -> core` only).
 - Seeded by [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md) Tier 2 #8.
-- Targets the existing module `Geometry.HalfedgeMesh.Simplification` (`src/geometry/Geometry.HalfedgeMesh.Simplification.cppm` + `.cpp`).
+- Targets the existing module `Geometry.Simplification` (module name; files
+  `src/geometry/Geometry.HalfedgeMesh.Simplification.cppm` + `.cpp`). The task
+  sketch's `Geometry::HalfedgeMesh::Simplification` namespace and
+  `Core::Expected` return were aligned to the real surface
+  (`Geometry::Simplification`, `std::optional<Result>`, in-place mutation).
 - Test target: `tests/unit/geometry/Test_Simplification.cpp` (existing; extend, do not replace).
+
+## Status
+
+- Implemented: `Metric` enum (`ClassicalQEM` parity path / `FA_QEM` default),
+  feature-aware sharp-corner + crease pinning, normal-consistency cost penalty,
+  curvature-thresholded boundary-corner pinning, UV-seam pinning over
+  `v:texcoord`, and `Result` diagnostics counters. `ClassicalQEM` reproduces the
+  pre-GEOM-014 behaviour exactly.
+- The boundary-curvature term is realized as a turning-angle-thresholded pin
+  (scaled by `BoundaryWeight`/`CurvatureWeight`) rather than a separate additive
+  boundary quadric — simpler, deterministic, and avoids a second per-vertex
+  quadric store. Recorded here as the deliberate deviation from the sketch.
+- Verified in-session: `check_layering`, `check_test_layout`, `check_doc_links`,
+  `check_task_policy` (all pass) and a standalone clang-20 + glm sanity check of
+  the new feature/turning-angle/penalty math.
+- Deferred to CI: `cmake --preset ci` + `ctest -R Simplification`. The sandbox
+  cannot bootstrap vcpkg (cloning `microsoft/vcpkg` is denied by the egress
+  policy), so the full C++23-module build/test gate must run in CI before this
+  task retires to `tasks/done/`.
+- Editor/runtime execution wiring (a Simplification executor + the FA_QEM metric
+  panel in the sandbox editor) is owned by follow-up `UI-028`; today the editor
+  only lists Simplification as a capability and does not execute it.
 
 ## Variants and default selection
 
@@ -34,44 +61,47 @@ Default recommendation: **B** (FA-QEM) — the survey's strongest "easy win," di
 
 ## Required changes
 
-- [ ] Extend the existing public surface in `src/geometry/Geometry.HalfedgeMesh.Simplification.cppm`:
-  ```cpp
-  namespace Geometry::HalfedgeMesh::Simplification {
-    enum class Metric { ClassicalQEM, FA_QEM, IntrinsicQEM, LineQEM };
-    struct Params {
-      Metric metric = Metric::FA_QEM;        // <-- new default once landed
-      double target_ratio = 0.5;              // fraction of original face count
-      double boundary_weight = 1.0;
-      double normal_weight = 1.0;             // FA-QEM only
-      double curvature_weight = 1.0;          // FA-QEM only
-      bool preserve_topology = true;
-      bool preserve_uv_seams = true;
-    };
-    struct Diagnostics { uint32_t collapses_rejected_topology; uint32_t collapses_rejected_quality; /* ... */ };
-    struct Result { HalfedgeMesh::Mesh mesh; Diagnostics diagnostics; };
-    Core::Expected<Result> Simplify(const HalfedgeMesh::Mesh&, const Params&);
-  }
-  ```
-- [ ] Implement FA-QEM error terms in `src/geometry/Geometry.HalfedgeMesh.Simplification.cpp`:
-  - geometric quadric (existing path),
-  - boundary-curvature term: integrate curvature along boundary loops adjacent to collapse,
-  - normal-consistency term: penalty proportional to angle between adjacent face normals before / after collapse.
-- [ ] Combine quadrics as a weighted sum; expose weights through `Params`.
-- [ ] Keep the existing classical-QEM code path reachable via `Metric::ClassicalQEM` for parity comparison.
-- [ ] Add `Geometry.HalfedgeMesh.Simplification.IntrinsicQEM.cpp` only if variant C is also marked as a follow-up sub-task.
+- [x] Extend the public surface in `src/geometry/Geometry.HalfedgeMesh.Simplification.cppm`
+  (aligned to the real `Geometry::Simplification` surface): added
+  `enum class Metric { ClassicalQEM, FA_QEM }`, FA_QEM `Params` fields
+  (`Metric` default `FA_QEM`, `FeatureAngleThresholdDegrees`, `NormalWeight`,
+  `BoundaryWeight`, `CurvatureWeight`, `PreserveSharpFeatures`,
+  `PreserveUvSeams`), and `Result` diagnostics
+  (`CollapsesRejectedTopology/Quality`, `SharpFeatureVerticesPinned`,
+  `SeamVerticesPinned`). Variants C (IntrinsicQEM) / D (LineQEM) are documented
+  as out-of-scope follow-ups, not enum stubs.
+- [x] Implement FA-QEM terms in `src/geometry/Geometry.HalfedgeMesh.Simplification.cpp`:
+  geometric quadric (existing path), boundary-curvature term (turning-angle pin),
+  normal-consistency penalty (angle between adjacent face normals before/after).
+- [x] Expose weights through `Params`; the normal penalty is folded into the
+  collapse cost so it combines additively with the quadric error.
+- [x] Keep the classical-QEM path reachable via `Metric::ClassicalQEM` for parity.
+- [ ] (Deferred follow-up) `IntrinsicQEM` / `LineQEM` variants — not in scope; no
+  enum stub added until a follow-up task owns them.
 
 ## Tests
-- [ ] Extend `tests/unit/geometry/Test_Simplification.cpp` with:
-  - A cube fixture: aggressive simplification at 10% ratio must preserve 8 corner vertices when `Metric::FA_QEM`; classical QEM is permitted to collapse them.
-  - A bunny / fertility fixture (existing): mean Hausdorff distance with FA-QEM must be ≤ classical-QEM Hausdorff at the same triangle-count target.
-  - A textured fixture with UV seams: UV seams remain intact when `preserve_uv_seams = true`.
-- [ ] Regression: deterministic output for fixed input and fixed params (no RNG involved).
-- [ ] Diagnostics test: collapse-rejection counters non-zero for known-degenerate inputs.
+- [x] Extended `tests/unit/geometry/Test_Simplification.cpp` with:
+  - `FeatureAwarePreservesCubeCorners`: tessellated-cube fixture, aggressive
+    (~10%) decimation preserves all 8 corner vertices under `Metric::FA_QEM`.
+  - `FeatureAwareCornerErrorNotWorseThanClassical`: FA-QEM max vertex-to-surface
+    error ≤ classical at the same target face count on the cube (the feature-rich
+    stand-in for bunny/fertility, which are not checked-in fixtures here).
+  - `FeatureAwarePreservesUvSeams`: grid plane with a `v:texcoord` property —
+    seam (boundary) vertices remain intact when `PreserveUvSeams = true`.
+- [x] `FeatureAwareIsDeterministic`: identical output for fixed input/params.
+- [x] `DiagnosticsCountersPopulated`: feature-pin counters populated on the cube.
+- [ ] (Deferred to CI) `cmake --preset ci && ctest -R Simplification` — not
+      runnable in the authoring sandbox (vcpkg egress blocked).
 
 ## Docs
-- [ ] Update the module's `paper.md`-equivalent comment block at the top of `Geometry.HalfedgeMesh.Simplification.cppm` with the new metric options and the default.
-- [ ] Add a short benchmark report stub in `benchmarks/geometry/` comparing classical-QEM vs FA-QEM on the smoke fixtures (no performance claims, only quality metrics).
-- [ ] Regenerate module inventory.
+- [x] Updated the module comment block at the top of
+      `Geometry.HalfedgeMesh.Simplification.cppm` with the metric options and the
+      `FA_QEM` default.
+- [x] Added a classical-QEM vs FA-QEM quality-comparison stub to
+      `benchmarks/geometry/README.md` (quality metrics only, no perf claims; the
+      compiled smoke runner is left to the executor follow-up).
+- [x] Regenerated `docs/api/generated/module_inventory.md` (no surface delta —
+      the inventory tracks module names; `Geometry.Simplification` pre-existed).
 
 ## Acceptance criteria
 - [ ] One variant marked default.

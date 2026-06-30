@@ -425,6 +425,27 @@ Existing LSCM quality fields in `Geometry.Parameterization` are now populated
 from this shared evaluator, so future harmonic/Tutte, ARAP, atlas, and
 map-storage work can compare against the same metric vocabulary.
 
+### Harmonic / Tutte parameterization
+
+`Geometry.Parameterization.Harmonic` is the fixed-boundary peer of the free-
+boundary LSCM solver. It maps a disk-topology triangle mesh into the plane by
+pinning the single boundary loop to a convex target and solving a sparse SPD
+Laplacian system for the interior vertices. `HarmonicWeightType` selects the
+weighting — `Cotangent` (harmonic / Dirichlet-energy minimizing, with optional
+non-convex-weight clamping) or `Uniform` (Tutte barycentric, flip-free for a
+convex boundary). `HarmonicBoundaryPolicy` selects the boundary placement —
+`Circle` or `Square` (uniform or arc-length spacing) or `Custom` (caller-pinned
+boundary, plus optional interior pins). The interior system is assembled with
+per-edge weights and solved through the geometry-owned `Geometry.Sparse` LDLT
+factorization (the GEOM-020 SPD seam, factored once and back-substituted for the
+u and v components); no Eigen types are exposed. The result carries explicit
+failure states (empty / non-triangle / non-disk topology, degenerate boundary,
+mismatched or invalid pins, non-finite UVs, singular system, solver failure) and
+the shared `ParameterizationDiagnostics` (flipped-element and distortion
+metrics). The existing `ComputeLSCM` API is unchanged and remains reachable.
+ARAP/SLIM/ABF, atlas segmentation, seam generation, and chart packing remain out
+of scope.
+
 ### Halfedge Vertex Normal Recompute
 
 `Geometry.HalfedgeMesh.Vertices.Normals` owns the geometry-layer CPU contract
@@ -464,6 +485,26 @@ reconstruction, while `PointCloud::Cloud` and raw `Vertices` overloads write or
 get the output property and return the written normal handle with diagnostics
 for non-finite input, too-few neighbors, collinear or duplicate neighborhoods,
 fallback writes, orientation flips, and spatial-query work.
+
+### Point-cloud feature descriptors and coarse registration
+
+`Geometry.PointCloud.Features` owns the generic, paper-neutral seams that
+initialize robust point-cloud registration and feed later `methods/geometry`
+packages: keypoints → descriptors → correspondences → coarse alignment → ICP.
+The selected first families are ISS saliency keypoints (eigenvalue-ratio gated
+with deterministic non-maximum suppression) and FPFH descriptors (33-D, Darboux
+histograms), both deterministic and `geometry -> core` only. Descriptor
+computation requires `Cloud::HasNormals()` (generate via
+`Geometry.PointCloud.Normals`) and fails closed otherwise. Matching is brute
+force with mutual-best and optional Lowe-ratio filtering and lower-index
+tie-breaks. `EstimateCoarseAlignment` runs a deterministic RANSAC over feature
+correspondences (seeded SplitMix sampler, edge-length consistency, internal
+Kabsch/SVD with reflection correction) and returns a rigid transform plus
+inlier/RMSE/iteration diagnostics and a status enum. No Eigen types cross the
+public interface. The seam initializes, and does not replace, the existing
+`Geometry.Registration` ICP refinement path. Paper-specific robust/global
+registration backends (TEASER/FGR/CPD-class) remain deferred to
+`methods/geometry` follow-ups.
 
 ### UV atlas backend contract
 

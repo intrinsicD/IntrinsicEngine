@@ -5,6 +5,7 @@ module;
 #include <cassert>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <numbers>
 #include <optional>
@@ -603,6 +604,99 @@ namespace Geometry::Simplification
             }
         }
 
+        // =====================================================================
+        // Feature-Aware QEM (GEOM-014) helpers
+        //
+        // FA_QEM protects the sharp-feature skeleton of the input: corners
+        // (>= 3 incident feature edges) are immovable, and crease lines (exactly
+        // 2) may only collapse along themselves. An edge is a feature edge when
+        // it is a boundary edge or its dihedral angle exceeds the threshold.
+        // =====================================================================
+
+        enum class FeatureKind : std::uint8_t
+        {
+            None,    // smooth interior vertex
+            Line,    // lies on a crease / boundary segment
+            Corner   // sharp corner — never removed
+        };
+
+        [[nodiscard]] bool IsFeatureEdge(
+            HalfedgeMesh::Mesh const& mesh,
+            EdgeHandle e,
+            std::vector<glm::dvec3> const& faceNormals,
+            double cosThreshold) noexcept
+        {
+            if (!e.IsValid() || mesh.IsDeleted(e) || mesh.IsBoundary(e))
+            {
+                // Boundary (and any dangling) edge is always a feature.
+                return true;
+            }
+
+            const HalfedgeHandle h0 = mesh.Halfedge(e, 0);
+            const HalfedgeHandle h1 = mesh.Halfedge(e, 1);
+            const FaceHandle f0 = mesh.Face(h0);
+            const FaceHandle f1 = mesh.Face(h1);
+            if (!f0.IsValid() || !f1.IsValid()
+                || f0.Index >= faceNormals.size() || f1.Index >= faceNormals.size())
+            {
+                return true;
+            }
+
+            // Sharp when the two face normals diverge by more than the threshold
+            // angle, i.e. their dot product drops below cos(threshold).
+            const double dp = glm::dot(faceNormals[f0.Index], faceNormals[f1.Index]);
+            return dp < cosThreshold;
+        }
+
+        [[nodiscard]] std::size_t CountIncidentFeatureEdges(
+            HalfedgeMesh::Mesh const& mesh,
+            VertexHandle v,
+            std::vector<glm::dvec3> const& faceNormals,
+            double cosThreshold) noexcept
+        {
+            std::size_t count = 0;
+            for (const HalfedgeHandle h : mesh.HalfedgesAroundVertex(v))
+            {
+                if (IsFeatureEdge(mesh, mesh.Edge(h), faceNormals, cosThreshold))
+                {
+                    ++count;
+                }
+            }
+            return count;
+        }
+
+        // Deviation of a boundary vertex from straight, in degrees: 0 when the
+        // two incident boundary edges are colinear, growing as the loop bends.
+        [[nodiscard]] double BoundaryTurningAngleDegrees(
+            HalfedgeMesh::Mesh const& mesh,
+            VertexHandle v) noexcept
+        {
+            std::array<glm::dvec3, 2> dirs{};
+            int n = 0;
+            for (const HalfedgeHandle h : mesh.HalfedgesAroundVertex(v))
+            {
+                if (!mesh.IsBoundary(mesh.Edge(h)))
+                {
+                    continue;
+                }
+                const VertexHandle nb = mesh.ToVertex(h);
+                const glm::dvec3 d = glm::dvec3(mesh.Position(nb)) - glm::dvec3(mesh.Position(v));
+                const double len = glm::length(d);
+                if (len > 1e-12 && n < 2)
+                {
+                    dirs[static_cast<std::size_t>(n)] = d / len;
+                    ++n;
+                }
+            }
+            if (n < 2)
+            {
+                return 0.0;
+            }
+            const double dp = std::clamp(glm::dot(dirs[0], dirs[1]), -1.0, 1.0);
+            const double interior = std::acos(dp) * 180.0 / std::numbers::pi;
+            return 180.0 - interior;
+        }
+
     } // anonymous namespace
 
     // =========================================================================
@@ -627,6 +721,13 @@ namespace Geometry::Simplification
         const double normalDeviationRad = params.MaxNormalDeviationDegrees > 0.0
             ? params.MaxNormalDeviationDegrees / 180.0 * std::numbers::pi
             : 0.0;
+
+        // Feature-Aware QEM (GEOM-014). When disabled, every FA_QEM-only branch
+        // below is skipped and behaviour is identical to the pre-GEOM-014 path.
+        const bool faQem = params.Metric == Metric::FA_QEM;
+        const double featureCosThreshold = std::cos(
+            std::clamp(params.FeatureAngleThresholdDegrees, 0.0, 180.0)
+                / 180.0 * std::numbers::pi);
 
 
         const Property<glm::dmat3> vertexSigmaP = params.Quadric.ProbabilisticMode == QuadricProbabilisticMode::Covariance
@@ -655,6 +756,79 @@ namespace Geometry::Simplification
                 continue;
             }
             faceNormals[fi] = ComputeFaceNormalD(mesh, fh);
+        }
+
+        // -----------------------------------------------------------------
+        // Phase 1b (FA_QEM): classify the protected feature skeleton.
+        //
+        // The classification is taken once from the input mesh and held fixed
+        // for the run: the reference metric protects the input feature set, and
+        // recomputing per collapse would be both costlier and less predictable.
+        // -----------------------------------------------------------------
+
+        std::vector<FeatureKind> vertexFeature(nV, FeatureKind::None);
+        std::vector<std::uint8_t> seamVertex(nV, 0u);
+        std::size_t featurePinnedCount = 0;
+        std::size_t seamPinnedCount = 0;
+        if (faQem && (params.PreserveSharpFeatures || params.PreserveUvSeams))
+        {
+            const Property<glm::vec2> texcoord = params.PreserveUvSeams
+                ? mesh.VertexProperties().Get<glm::vec2>("v:texcoord")
+                : Property<glm::vec2>{};
+
+            for (std::size_t vi = 0; vi < nV; ++vi)
+            {
+                const VertexHandle vh{static_cast<PropertyIndex>(vi)};
+                if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh))
+                {
+                    continue;
+                }
+
+                if (params.PreserveSharpFeatures)
+                {
+                    const std::size_t fe =
+                        CountIncidentFeatureEdges(mesh, vh, faceNormals, featureCosThreshold);
+                    if (fe >= 3)
+                    {
+                        vertexFeature[vi] = FeatureKind::Corner;
+                    }
+                    else if (fe == 2)
+                    {
+                        vertexFeature[vi] = FeatureKind::Line;
+                    }
+
+                    // Boundary-curvature term: when the boundary is collapsible,
+                    // promote high-curvature boundary corners to immovable. The
+                    // boundary/curvature weights tighten the effective angle
+                    // threshold so larger weights protect gentler corners.
+                    if (!params.PreserveBoundary && mesh.IsBoundary(vh))
+                    {
+                        const double weight =
+                            std::max(params.CurvatureWeight * params.BoundaryWeight, 1e-6);
+                        const double boundaryThresholdDeg = std::clamp(
+                            params.FeatureAngleThresholdDegrees / weight, 0.0, 180.0);
+                        if (BoundaryTurningAngleDegrees(mesh, vh) > boundaryThresholdDeg)
+                        {
+                            vertexFeature[vi] = FeatureKind::Corner;
+                        }
+                        else if (vertexFeature[vi] == FeatureKind::None)
+                        {
+                            vertexFeature[vi] = FeatureKind::Line;
+                        }
+                    }
+                }
+
+                if (params.PreserveUvSeams && texcoord && mesh.IsBoundary(vh))
+                {
+                    seamVertex[vi] = 1u;
+                    ++seamPinnedCount;
+                }
+
+                if (vertexFeature[vi] != FeatureKind::None)
+                {
+                    ++featurePinnedCount;
+                }
+            }
         }
 
         std::vector<Quadric> vertexPointQuadrics(nV);
@@ -738,6 +912,35 @@ namespace Geometry::Simplification
                 || mesh.IsIsolated(vRemoved) || mesh.IsIsolated(vSurvivor))
             {
                 return false;
+            }
+
+            // FA_QEM feature pins: never remove a sharp corner, allow a crease
+            // vertex to collapse only along the crease, and never remove a
+            // pinned UV-seam vertex.
+            if (faQem)
+            {
+                if (params.PreserveSharpFeatures)
+                {
+                    const FeatureKind removedKind = vertexFeature[vRemoved.Index];
+                    if (removedKind == FeatureKind::Corner)
+                    {
+                        return false;
+                    }
+                    if (removedKind == FeatureKind::Line)
+                    {
+                        const bool edgeIsFeature = IsFeatureEdge(
+                            mesh, mesh.Edge(hCollapse), faceNormals, featureCosThreshold);
+                        const FeatureKind survivorKind = vertexFeature[vSurvivor.Index];
+                        if (!edgeIsFeature || survivorKind == FeatureKind::None)
+                        {
+                            return false;
+                        }
+                    }
+                }
+                if (params.PreserveUvSeams && seamVertex[vRemoved.Index] != 0u)
+                {
+                    return false;
+                }
             }
 
             const FaceHandle removedLeft = mesh.IsBoundary(hCollapse) ? FaceHandle{} : mesh.Face(hCollapse);
@@ -982,6 +1185,40 @@ namespace Geometry::Simplification
             }
         };
 
+        // FA_QEM normal-consistency penalty: a non-negative cost addend that
+        // grows with how far the collapse swings the surrounding face normals,
+        // scaled to squared-distance units by the collapsed edge length so it
+        // is comparable with the quadric error.
+        auto normalConsistencyPenalty =
+            [&](HalfedgeHandle hCollapse, glm::vec3 const& targetPosition) -> double
+        {
+            const VertexHandle vRemoved = mesh.FromVertex(hCollapse);
+            const VertexHandle vSurvivor = mesh.ToVertex(hCollapse);
+            const HalfedgeHandle hOpp = mesh.OppositeHalfedge(hCollapse);
+            const FaceHandle removedLeft = mesh.IsBoundary(hCollapse) ? FaceHandle{} : mesh.Face(hCollapse);
+            const FaceHandle removedRight = mesh.IsBoundary(hOpp) ? FaceHandle{} : mesh.Face(hOpp);
+
+            const glm::vec3 original = mesh.Position(vRemoved);
+            const glm::dvec3 edge = glm::dvec3(original) - glm::dvec3(mesh.Position(vSurvivor));
+            const double edgeLen2 = glm::dot(edge, edge);
+
+            mesh.Position(vRemoved) = targetPosition;
+            double sum = 0.0;
+            ForEachFace(mesh, vRemoved, [&](FaceHandle f)
+            {
+                if (f == removedLeft || f == removedRight || mesh.IsDeleted(f))
+                {
+                    return;
+                }
+                const double dp = glm::dot(faceNormals[f.Index], ComputeFaceNormalD(mesh, f));
+                sum += std::max(0.0, 1.0 - dp);
+            });
+            mesh.Position(vRemoved) = original;
+
+            const double penalty = params.NormalWeight * edgeLen2 * sum;
+            return IsFinite(penalty) ? std::max(0.0, penalty) : 0.0;
+        };
+
         // Compute directed collapse: evaluate cost of collapsing FromVertex(h) into ToVertex(h)
         auto computeDirectedCollapse = [&](HalfedgeHandle hCollapse) -> CollapseCandidate
         {
@@ -1035,7 +1272,11 @@ namespace Geometry::Simplification
                     continue;
                 }
 
-                const double cost = Q.Evaluate(candidatePosition);
+                double cost = Q.Evaluate(candidatePosition);
+                if (faQem && params.NormalWeight > 0.0)
+                {
+                    cost += normalConsistencyPenalty(hCollapse, candidatePosition);
+                }
                 if (IsFinite(cost) && cost < best.Cost)
                 {
                     best.Cost = std::max(0.0, cost);
@@ -1084,6 +1325,8 @@ namespace Geometry::Simplification
 
         Result result;
         result.FinalFaceCount = mesh.FaceCount();
+        result.SharpFeatureVerticesPinned = featurePinnedCount;
+        result.SeamVerticesPinned = seamPinnedCount;
 
         while (!heap.Empty() && result.FinalFaceCount > targetFaces)
         {
@@ -1102,10 +1345,12 @@ namespace Geometry::Simplification
             }
             if (!mesh.IsCollapseOk(top.Halfedge))
             {
+                ++result.CollapsesRejectedTopology;
                 continue;
             }
             if (!isCollapseLegal(top.Halfedge, top.Position))
             {
+                ++result.CollapsesRejectedQuality;
                 continue;
             }
 
