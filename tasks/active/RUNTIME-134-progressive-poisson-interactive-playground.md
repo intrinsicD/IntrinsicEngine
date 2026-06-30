@@ -22,8 +22,9 @@ maturity_target: CPUContracted
 ## Slice plan
 - **Slice A.** Add the CPU reference playground command and PointCloud processing UI. The runtime command validates selected point-cloud `GeometrySources`, runs METHOD-012 through a typed config DTO, publishes deterministic point properties (`p:poisson_level`, `p:poisson_phase`, `p:poisson_splat_radius`, `p:poisson_prefix_visible`), enables point rendering, and routes visualization to the selected scalar channel. Headless tests prove deterministic property population and command/direct-method equivalence.
 - **Slice B.** Add mesh-selection preprocessing via GEOM-035, including mesh-specific UI affordances and tests. Mesh selections are sampled to a point cloud, run through the same METHOD-012 path, and published back as point-cloud `GeometrySources` for visualization.
-- **Slice C (this slice).** Route playground knob state through CORE-003/RUNTIME-131 engine-config control, add hover tooltips, and schedule debounced METHOD-012 reruns from the Sandbox UI.
-- **Slice D.** Add backend identity/per-level-count readout and a backend toggle once METHOD-013 is unblocked and available.
+- **Slice C.** Route playground knob state through CORE-003/RUNTIME-131 engine-config control, add hover tooltips, and schedule debounced METHOD-012 reruns from the Sandbox UI.
+- **Slice D.1 (this slice).** Add CPU reference backend identity and per-level-count readout to the runtime command result and Sandbox UI.
+- **Slice D.2.** Add a backend toggle once METHOD-013 is unblocked and available.
 
 ## Slice A status (2026-06-30)
 - Landed: CPU reference point-cloud command, explicit Processing-window run button, typed runtime command DTO validation, deterministic per-point publication for `p:poisson_level`, `p:poisson_phase`, `p:poisson_splat_radius`, and `p:poisson_prefix_visible`, visualization routing to the selected scalar channel, and headless command/direct-method equivalence coverage.
@@ -37,15 +38,20 @@ maturity_target: CPUContracted
 - Landed: `EngineConfig.sandbox.progressive_poisson` value-type config with parser/serializer coverage, hot-apply support in `Engine::ApplyEngineConfigHotSubset`, Sandbox editor config command routing through `PreviewEngineConfigControlDocument`/`ApplyEngineConfigHotSubset`, UI hover tooltips, and debounced auto-rerun after knob edits for the METHOD-012 CPU reference path.
 - Remaining before retirement: backend identity/per-level-count readout and backend toggle once METHOD-013 exists. The Slice C default CPU/headless gate is green.
 
+## Slice D.1 status (2026-06-30)
+- Landed: METHOD-012 `cpu_reference` backend id and accepted-point counts per progressive level are exposed through `SandboxEditorProgressivePoissonResult`, rendered in the Sandbox UI readout, and pinned in headless command tests for point-cloud and mesh inputs.
+- Still deferred: backend toggle and CPU/GPU parity readout until METHOD-013 exists.
+
 ## Required changes
 - [x] Add a Sandbox editor panel exposing all `SamplerConfig` knobs (`dimension`, `grid_width`, `max_levels`, `hash_load_factor`, `radius_alpha`, `randomize_grid_origin`, `grid_origin_seed`, `shuffle_within_levels`, `shuffle_seed`) with sensible ranges and tooltips, routed through the CORE-003/RUNTIME-131 config path.
 - [x] On knob edit (debounced), re-run METHOD-012 (or METHOD-013 if available, with a backend toggle) on the loaded cloud and update residency.
 - [x] Map the result onto per-point scalar properties (`level`, `phase`, `splat_radius`) and drive `VisualizationConfig::ScalarField` + colormap so points color by the selected channel; add a prefix-count slider (`k`) that shows only `order[0..k)`.
-- [ ] Support loading a point cloud (PLY/XYZ/PCD) or a mesh (sampled to a cloud via GEOM-035) as the playground input, with a backend-identity / per-level-count readout.
+- [x] Support loading a point cloud (PLY/XYZ/PCD) or a mesh (sampled to a cloud via GEOM-035) as the playground input, with a backend-identity / per-level-count readout.
 
 ## Tests
 - [x] Add a headless runtime contract test that builds the playground state from a fixture cloud, applies a knob set through the config path, runs the sampler, and asserts the per-point `level`/`phase` scalar properties and prefix selection are populated deterministically.
 - [x] Add a config-path test asserting knob edits route through the validated CORE-003/RUNTIME-131 lane (no ad-hoc mutation) and produce the same result as a direct method call.
+- [x] Assert the runtime command result reports the active CPU backend id and per-level accepted counts for point-cloud and mesh inputs.
 - [x] Confirm the default CPU/headless gate stays green; any interactive Vulkan coverage is `gpu;vulkan` label-gated.
 
 ## Docs

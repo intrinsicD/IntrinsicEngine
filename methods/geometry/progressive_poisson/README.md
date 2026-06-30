@@ -31,7 +31,7 @@ backend and parity reporting.
 
 ## Interactive usage
 
-`RUNTIME-134` Slices A-C expose the CPU reference backend in the Sandbox
+`RUNTIME-134` Slices A-D.1 expose the CPU reference backend in the Sandbox
 PointCloud and Mesh processing windows. The runtime command validates selected
 point-cloud `GeometrySources`, or samples a selected editable mesh surface to a
 point cloud through `GEOM-035` (`Geometry.PointCloud.SurfaceSampling`), forwards
@@ -57,13 +57,17 @@ Mesh runs expose additional surface-sampling controls (`sample_count`, `seed`,
 `min_triangle_area`, and `interpolate_vertex_normals`) and publish the sampled
 cloud back onto the selected entity for point rendering. The runtime result
 reports the written sample count, accepted triangle count, rejected face count,
-and total sampled surface area.
+and total sampled surface area. It also carries the active backend id
+(`cpu_reference`) and accepted-point counts per progressive level for the
+Sandbox readout.
 
 Widget edits preview and hot-apply a serialized `EngineConfig` through
 `Engine::PreviewEngineConfigControlDocument` and
 `Engine::ApplyEngineConfigHotSubset`; when `auto_run_on_edit` is enabled, the
 Sandbox schedules a debounced rerun. The explicit Run action uses the same
 config path before invoking the CPU reference command.
+The backend toggle is deferred to METHOD-013, which owns the Vulkan-compute
+backend and CPU/GPU parity.
 
 ## Known limitations
 

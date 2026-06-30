@@ -197,10 +197,10 @@ history seam; `GEOM-016` owns the removal algorithm and its diagnostics.
 
 ### Sandbox Editor Progressive Poisson Sampling
 
-`RUNTIME-134` Slices A-B add a progressive Poisson sampling playground at
+`RUNTIME-134` Slices A-D.1 add a progressive Poisson sampling playground at
 `PointCloud > Processing > Progressive Poisson Sampling` and
 `Mesh > Processing > Progressive Poisson Sampling`. The
-Sandbox EditorUI surface exports
+Sandbox Editor UI surface exports
 `SandboxEditorProgressivePoissonChannel`,
 `SandboxEditorProgressivePoissonConfig`,
 `SandboxEditorProgressivePoissonCommand`,
@@ -224,6 +224,10 @@ area, and vertex-normal interpolation controls. Successful mesh runs publish the
 sampled cloud back onto the selected entity via `GeometrySources::PopulateFromCloud`,
 remove the stale surface render hint, enable point rendering, and report the
 surface-sampling diagnostics in `SandboxEditorProgressivePoissonResult`.
+Successful point-cloud and mesh runs also report the active method backend
+(`cpu_reference`) plus accepted-point counts per progressive level, so the UI can
+show backend identity and level-distribution readouts without querying method
+internals.
 
 The command routes `VisualizationConfig` to the selected scalar channel so
 existing point colormap extraction handles the display. Prefix count `0` shows

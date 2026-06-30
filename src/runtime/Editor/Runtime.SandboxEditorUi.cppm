@@ -424,6 +424,9 @@ export namespace Extrinsic::Runtime
         std::uint32_t AcceptedCount{0u};
         std::uint32_t PrefixCount{0u};
         std::uint32_t LevelCount{0u};
+        std::string BackendId{};
+        std::string BackendDisplayName{};
+        std::vector<std::uint32_t> LevelAcceptedCounts{};
         float BaseRadius{0.0f};
         float UsedAlpha{0.0f};
         bool AlphaDefaulted{false};

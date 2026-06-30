@@ -4109,6 +4109,8 @@ namespace Extrinsic::Runtime
             "p:poisson_splat_radius";
         inline constexpr const char* kProgressivePoissonPrefixVisibleProperty =
             "p:poisson_prefix_visible";
+        inline constexpr const char* kProgressivePoissonCpuBackendDisplayName =
+            "CPU reference";
 
         [[nodiscard]] const char* ProgressivePoissonChannelPropertyName(
             const SandboxEditorProgressivePoissonChannel channel) noexcept
@@ -4265,6 +4267,24 @@ namespace Extrinsic::Runtime
             return true;
         }
 
+        [[nodiscard]] std::string FormatProgressivePoissonLevelCounts(
+            const std::vector<std::uint32_t>& counts)
+        {
+            if (counts.empty())
+                return "none";
+
+            std::string text{};
+            for (std::size_t i = 0u; i < counts.size(); ++i)
+            {
+                if (i != 0u)
+                    text += ", ";
+                text += std::to_string(i);
+                text += ":";
+                text += std::to_string(counts[i]);
+            }
+            return text;
+        }
+
         [[nodiscard]] SandboxEditorProgressivePoissonResult
         RunProgressivePoissonAndPublish(
             const std::span<const glm::vec3> positions,
@@ -4280,6 +4300,9 @@ namespace Extrinsic::Runtime
             result.AcceptedCount = method.Diag.AcceptedCount;
             result.LevelCount = static_cast<std::uint32_t>(
                 method.Diag.LevelCounts.size());
+            result.BackendId = PPR::kBackendId;
+            result.BackendDisplayName = kProgressivePoissonCpuBackendDisplayName;
+            result.LevelAcceptedCounts = method.Diag.LevelCounts;
             result.BaseRadius = method.BaseRadius;
             result.UsedAlpha = method.Diag.UsedAlpha;
             result.AlphaDefaulted = method.Diag.AlphaDefaulted;
@@ -4325,7 +4348,9 @@ namespace Extrinsic::Runtime
             SandboxEditorProgressivePoissonResult& result)
         {
             result.Message =
-                "Progressive Poisson accepted " +
+                "Progressive Poisson (" +
+                result.BackendId +
+                ") accepted " +
                 std::to_string(result.AcceptedCount) +
                 " of " +
                 std::to_string(result.InputCount) +
@@ -4336,6 +4361,13 @@ namespace Extrinsic::Runtime
                 ", channel=" +
                 DebugNameForSandboxEditorProgressivePoissonChannel(
                     result.Channel);
+            if (!result.LevelAcceptedCounts.empty())
+            {
+                result.Message += ", level_counts=[";
+                result.Message += FormatProgressivePoissonLevelCounts(
+                    result.LevelAcceptedCounts);
+                result.Message += "]";
+            }
             if (result.MeshSurfaceSamplingUsed)
             {
                 result.Message +=
@@ -9798,6 +9830,19 @@ namespace Extrinsic::Runtime
                 "Channel: %s",
                 DebugNameForSandboxEditorProgressivePoissonChannel(
                     result.Channel));
+            if (!result.BackendId.empty())
+            {
+                if (!result.BackendDisplayName.empty())
+                {
+                    ImGui::Text("Backend: %s (%s)",
+                                result.BackendDisplayName.c_str(),
+                                result.BackendId.c_str());
+                }
+                else
+                {
+                    ImGui::Text("Backend: %s", result.BackendId.c_str());
+                }
+            }
             if (result.Succeeded())
             {
                 ImGui::Text("Accepted %u / %u  prefix %u  levels %u",
@@ -9808,6 +9853,11 @@ namespace Extrinsic::Runtime
                 ImGui::Text("Base radius %.6f  alpha %.6f",
                             static_cast<double>(result.BaseRadius),
                             static_cast<double>(result.UsedAlpha));
+                ImGui::TextWrapped(
+                    "Level counts: %s",
+                    FormatProgressivePoissonLevelCounts(
+                        result.LevelAcceptedCounts)
+                        .c_str());
                 if (result.AlphaDefaulted ||
                     result.ClampedGridWidth ||
                     result.ClampedMaxLevels)

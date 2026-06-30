@@ -142,6 +142,15 @@ namespace
         return false;
     }
 
+    [[nodiscard]] std::uint32_t SumCounts(
+        const std::vector<std::uint32_t>& counts)
+    {
+        std::uint32_t sum = 0u;
+        for (const std::uint32_t count : counts)
+            sum += count;
+        return sum;
+    }
+
     [[nodiscard]] bool LogSnapshotContains(
         const Core::Log::LogSnapshot& snapshot,
         const std::string_view needle)
@@ -2268,6 +2277,11 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandPublishesPointPropertiesAndVisual
         Runtime::DebugNameForSandboxEditorProgressivePoissonChannel(
             result.Channel),
         "Phase");
+    EXPECT_EQ(result.BackendId, PPR::kBackendId);
+    EXPECT_EQ(result.BackendDisplayName, "CPU reference");
+    EXPECT_EQ(result.LevelAcceptedCounts.size(), result.LevelCount);
+    EXPECT_EQ(SumCounts(result.LevelAcceptedCounts), result.AcceptedCount);
+    EXPECT_NE(result.Message.find(PPR::kBackendId), std::string::npos);
 
     Geometry::PropertySet& properties =
         registry.Raw().get<GS::Vertices>(cloud).Properties;
@@ -2381,6 +2395,9 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandMatchesDirectMethodConfig)
     EXPECT_EQ(result.AcceptedCount, direct.Diag.AcceptedCount);
     EXPECT_EQ(result.PrefixCount, direct.Diag.AcceptedCount);
     EXPECT_EQ(result.LevelCount, direct.Diag.LevelCounts.size());
+    EXPECT_EQ(result.LevelAcceptedCounts, direct.Diag.LevelCounts);
+    EXPECT_EQ(result.BackendId, PPR::kBackendId);
+    EXPECT_EQ(result.BackendDisplayName, "CPU reference");
     EXPECT_FLOAT_EQ(result.BaseRadius, direct.BaseRadius);
     EXPECT_FLOAT_EQ(result.UsedAlpha, direct.Diag.UsedAlpha);
 
@@ -2520,6 +2537,9 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigFacade)
     EXPECT_EQ(result.AcceptedCount, direct.Diag.AcceptedCount);
     EXPECT_EQ(result.PrefixCount, std::min(3u, direct.Diag.AcceptedCount));
     EXPECT_EQ(result.LevelCount, direct.Diag.LevelCounts.size());
+    EXPECT_EQ(result.LevelAcceptedCounts, direct.Diag.LevelCounts);
+    EXPECT_EQ(result.BackendId, PPR::kBackendId);
+    EXPECT_EQ(result.BackendDisplayName, "CPU reference");
     EXPECT_FLOAT_EQ(result.BaseRadius, direct.BaseRadius);
 
     Geometry::PropertySet& properties =
@@ -2635,6 +2655,9 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandSamplesMeshSurfaceToPointCloud)
     ASSERT_EQ(direct.Diag.Code, PPR::ValidationCode::Valid);
     EXPECT_EQ(result.AcceptedCount, direct.Diag.AcceptedCount);
     EXPECT_EQ(result.LevelCount, direct.Diag.LevelCounts.size());
+    EXPECT_EQ(result.LevelAcceptedCounts, direct.Diag.LevelCounts);
+    EXPECT_EQ(result.BackendId, PPR::kBackendId);
+    EXPECT_EQ(result.BackendDisplayName, "CPU reference");
     EXPECT_FLOAT_EQ(result.BaseRadius, direct.BaseRadius);
 
     EXPECT_FALSE(registry.Raw().all_of<G::RenderSurface>(mesh));
