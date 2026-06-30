@@ -81,6 +81,7 @@ import Geometry.MeshOperator;
 import Geometry.MeshSoup;
 import Geometry.PointCloud;
 import Geometry.PointCloud.Normals;
+import Geometry.PointCloud.SurfaceSampling;
 import Geometry.PointCloud.Utils;
 import Geometry.Properties;
 import Geometry.Remeshing;
@@ -102,6 +103,7 @@ namespace Extrinsic::Runtime
         namespace GN = Geometry::HalfedgeMesh::VertexNormals;
         namespace GraphNormals = Geometry::Graph::VertexNormals;
         namespace PointNormals = Geometry::PointCloud::Normals;
+        namespace SurfaceSampling = Geometry::PointCloud::SurfaceSampling;
         namespace Smooth = Geometry::Smoothing;
         namespace Curv = Geometry::Curvature;
         namespace Remesh = Geometry::Remeshing;
@@ -308,6 +310,10 @@ namespace Extrinsic::Runtime
             std::int32_t* ShuffleSeed{nullptr};
             std::int32_t* PrefixCount{nullptr};
             std::int32_t* Channel{nullptr};
+            std::int32_t* MeshSurfaceSampleCount{nullptr};
+            std::int32_t* MeshSurfaceSampleSeed{nullptr};
+            float* MeshSurfaceMinTriangleArea{nullptr};
+            bool* MeshSurfaceInterpolateNormals{nullptr};
         };
 
         struct TextureBakeUiState
@@ -4139,6 +4145,22 @@ namespace Extrinsic::Runtime
                    std::isfinite(config.RadiusAlpha);
         }
 
+        [[nodiscard]] bool IsValidProgressivePoissonMeshSurfaceConfig(
+            const SandboxEditorProgressivePoissonConfig& config) noexcept
+        {
+            return config.MeshSurfaceSampleCount > 0u &&
+                   std::isfinite(config.MeshSurfaceMinTriangleArea) &&
+                   config.MeshSurfaceMinTriangleArea > 0.0;
+        }
+
+        [[nodiscard]] std::uint32_t SaturatingUint32(
+            const std::size_t value) noexcept
+        {
+            return value > std::numeric_limits<std::uint32_t>::max()
+                ? std::numeric_limits<std::uint32_t>::max()
+                : static_cast<std::uint32_t>(value);
+        }
+
         [[nodiscard]] PPR::Config ToProgressivePoissonReferenceConfig(
             const SandboxEditorProgressivePoissonConfig& config) noexcept
         {
@@ -4152,6 +4174,19 @@ namespace Extrinsic::Runtime
             out.GridOriginSeed = config.GridOriginSeed;
             out.ShuffleWithinLevels = config.ShuffleWithinLevels;
             out.ShuffleSeed = config.ShuffleSeed;
+            return out;
+        }
+
+        [[nodiscard]] SurfaceSampling::Params ToProgressivePoissonSurfaceParams(
+            const SandboxEditorProgressivePoissonConfig& config) noexcept
+        {
+            SurfaceSampling::Params out{};
+            out.SampleCount =
+                static_cast<std::int64_t>(config.MeshSurfaceSampleCount);
+            out.Seed = config.MeshSurfaceSampleSeed;
+            out.MinTriangleArea = config.MeshSurfaceMinTriangleArea;
+            out.InterpolateVertexNormals =
+                config.MeshSurfaceInterpolateNormals;
             return out;
         }
 
@@ -4220,6 +4255,90 @@ namespace Extrinsic::Runtime
             splatProp.Vector() = std::move(splatRadii);
             prefixProp.Vector() = std::move(prefixVisible);
             return true;
+        }
+
+        [[nodiscard]] SandboxEditorProgressivePoissonResult
+        RunProgressivePoissonAndPublish(
+            const std::span<const glm::vec3> positions,
+            Geometry::PropertySet& properties,
+            const SandboxEditorProgressivePoissonConfig& config)
+        {
+            const PPR::Config methodConfig =
+                ToProgressivePoissonReferenceConfig(config);
+            const PPR::Result method = PPR::Compute(positions, methodConfig);
+            SandboxEditorProgressivePoissonResult result{};
+            result.Channel = config.Channel;
+            result.InputCount = method.Diag.InputCount;
+            result.AcceptedCount = method.Diag.AcceptedCount;
+            result.LevelCount = static_cast<std::uint32_t>(
+                method.Diag.LevelCounts.size());
+            result.BaseRadius = method.BaseRadius;
+            result.UsedAlpha = method.Diag.UsedAlpha;
+            result.AlphaDefaulted = method.Diag.AlphaDefaulted;
+            result.ClampedGridWidth = method.Diag.ClampedGridWidth;
+            result.ClampedMaxLevels = method.Diag.ClampedMaxLevels;
+
+            if (method.Diag.Code != PPR::ValidationCode::Valid)
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.Error =
+                    method.Diag.Code == PPR::ValidationCode::InvalidDimension
+                    ? Core::ErrorCode::InvalidArgument
+                    : Core::ErrorCode::InvalidState;
+                result.Message =
+                    "Progressive Poisson CPU reference rejected the input/config.";
+                return result;
+            }
+
+            result.PrefixCount = ClampProgressivePoissonPrefix(
+                config.PrefixCount,
+                result.AcceptedCount);
+            if (!PublishProgressivePoissonProperties(
+                    properties,
+                    method,
+                    config,
+                    result.PrefixCount))
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "Progressive Poisson property publication failed.";
+                return result;
+            }
+
+            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Error = Core::ErrorCode::Success;
+            return result;
+        }
+
+        void AppendProgressivePoissonSuccessMessage(
+            SandboxEditorProgressivePoissonResult& result)
+        {
+            result.Message =
+                "Progressive Poisson accepted " +
+                std::to_string(result.AcceptedCount) +
+                " of " +
+                std::to_string(result.InputCount) +
+                " points across " +
+                std::to_string(result.LevelCount) +
+                " levels; prefix=" +
+                std::to_string(result.PrefixCount) +
+                ", channel=" +
+                DebugNameForSandboxEditorProgressivePoissonChannel(
+                    result.Channel);
+            if (result.MeshSurfaceSamplingUsed)
+            {
+                result.Message +=
+                    ", mesh samples=" +
+                    std::to_string(result.MeshSurfaceSampleCount) +
+                    ", accepted triangles=" +
+                    std::to_string(result.MeshSurfaceAcceptedTriangleCount) +
+                    "/" +
+                    std::to_string(result.MeshSurfaceTotalFaceCount);
+            }
+            result.Message += ".";
         }
 
         void ApplyProgressivePoissonVisualization(
@@ -5799,6 +5918,11 @@ namespace Extrinsic::Runtime
                 HasAnySandboxEditorGeometryProcessingDomain(
                     model.Capabilities.Domains,
                     SandboxEditorGeometryProcessingDomain::PointCloudPoints);
+            model.MeshProgressivePoissonAvailable =
+                model.Capabilities.HasEditableSurfaceMesh &&
+                HasAnySandboxEditorGeometryProcessingDomain(
+                    model.Capabilities.Domains,
+                    SandboxEditorGeometryProcessingDomain::MeshVertices);
             if (context.LastKMeansResult != nullptr)
             {
                 model.LastKMeansResult = *context.LastKMeansResult;
@@ -9556,6 +9680,15 @@ namespace Extrinsic::Runtime
                                 result.ClampedGridWidth ? "yes" : "no",
                                 result.ClampedMaxLevels ? "yes" : "no");
                 }
+                if (result.MeshSurfaceSamplingUsed)
+                {
+                    ImGui::Text(
+                        "Surface samples %u  triangles %u/%u  area %.6f",
+                        result.MeshSurfaceSampleCount,
+                        result.MeshSurfaceAcceptedTriangleCount,
+                        result.MeshSurfaceTotalFaceCount,
+                        result.MeshSurfaceArea);
+                }
             }
             if (!result.Message.empty())
                 ImGui::TextWrapped("%s", result.Message.c_str());
@@ -9568,7 +9701,12 @@ namespace Extrinsic::Runtime
             ProgressivePoissonUiState* poissonState)
         {
             ImGui::SeparatorText("Progressive Poisson");
-            if (!processing.PointCloudProgressivePoissonAvailable)
+            const bool meshInput =
+                model.Kind == SandboxEditorDomainWindowKind::Mesh;
+            const bool progressivePoissonAvailable = meshInput
+                ? processing.MeshProgressivePoissonAvailable
+                : processing.PointCloudProgressivePoissonAvailable;
+            if (!progressivePoissonAvailable)
             {
                 ImGui::TextDisabled("Progressive Poisson is unavailable for this selection.");
                 return;
@@ -9585,7 +9723,12 @@ namespace Extrinsic::Runtime
                 poissonState->ShuffleWithinLevels == nullptr ||
                 poissonState->ShuffleSeed == nullptr ||
                 poissonState->PrefixCount == nullptr ||
-                poissonState->Channel == nullptr)
+                poissonState->Channel == nullptr ||
+                (meshInput &&
+                 (poissonState->MeshSurfaceSampleCount == nullptr ||
+                  poissonState->MeshSurfaceSampleSeed == nullptr ||
+                  poissonState->MeshSurfaceMinTriangleArea == nullptr ||
+                  poissonState->MeshSurfaceInterpolateNormals == nullptr)))
             {
                 ImGui::TextDisabled("Progressive Poisson controls are not bound.");
                 return;
@@ -9627,6 +9770,23 @@ namespace Extrinsic::Runtime
                 0,
                 static_cast<std::int32_t>(
                     kProgressivePoissonChannels.size() - 1u));
+            if (meshInput)
+            {
+                *poissonState->MeshSurfaceSampleCount =
+                    std::clamp(*poissonState->MeshSurfaceSampleCount,
+                               1,
+                               10'000'000);
+                *poissonState->MeshSurfaceSampleSeed =
+                    std::clamp(*poissonState->MeshSurfaceSampleSeed,
+                               0,
+                               1'000'000'000);
+                if (!std::isfinite(
+                        *poissonState->MeshSurfaceMinTriangleArea) ||
+                    *poissonState->MeshSurfaceMinTriangleArea <= 0.0f)
+                {
+                    *poissonState->MeshSurfaceMinTriangleArea = 1.0e-14f;
+                }
+            }
 
             ImGui::DragInt("Grid width", poissonState->GridWidth, 1.0f, 1, 4096);
             ImGui::DragInt("Max levels", poissonState->MaxLevels, 1.0f, 1, 32);
@@ -9654,6 +9814,38 @@ namespace Extrinsic::Runtime
                 1.0f,
                 0,
                 10'000'000);
+
+            if (meshInput)
+            {
+                ImGui::SeparatorText("Surface input");
+                ImGui::DragInt(
+                    "Surface samples",
+                    poissonState->MeshSurfaceSampleCount,
+                    1.0f,
+                    1,
+                    10'000'000);
+                ImGui::DragInt(
+                    "Surface seed",
+                    poissonState->MeshSurfaceSampleSeed,
+                    1.0f,
+                    0,
+                    1'000'000'000);
+                ImGui::InputFloat(
+                    "Min triangle area",
+                    poissonState->MeshSurfaceMinTriangleArea,
+                    0.0f,
+                    0.0f,
+                    "%.3e");
+                if (!std::isfinite(
+                        *poissonState->MeshSurfaceMinTriangleArea) ||
+                    *poissonState->MeshSurfaceMinTriangleArea <= 0.0f)
+                {
+                    *poissonState->MeshSurfaceMinTriangleArea = 1.0e-14f;
+                }
+                ImGui::Checkbox(
+                    "Interpolate normals",
+                    poissonState->MeshSurfaceInterpolateNormals);
+            }
 
             const SandboxEditorProgressivePoissonChannel channel =
                 ProgressivePoissonChannelFromIndex(*poissonState->Channel);
@@ -9684,34 +9876,58 @@ namespace Extrinsic::Runtime
 
             if (ImGui::Button("Run Progressive Poisson"))
             {
+                SandboxEditorProgressivePoissonConfig config{
+                    .Dimension = static_cast<std::uint32_t>(
+                        *poissonState->Dimension),
+                    .GridWidth = static_cast<std::uint32_t>(
+                        *poissonState->GridWidth),
+                    .MaxLevels = static_cast<std::uint32_t>(
+                        *poissonState->MaxLevels),
+                    .HashLoadFactor =
+                        *poissonState->HashLoadFactor,
+                    .RadiusAlpha = *poissonState->RadiusAlpha,
+                    .RandomizeGridOrigin =
+                        *poissonState->RandomizeGridOrigin,
+                    .GridOriginSeed = static_cast<std::uint32_t>(
+                        *poissonState->GridOriginSeed),
+                    .ShuffleWithinLevels =
+                        *poissonState->ShuffleWithinLevels,
+                    .ShuffleSeed = static_cast<std::uint32_t>(
+                        *poissonState->ShuffleSeed),
+                    .PrefixCount = static_cast<std::uint32_t>(
+                        *poissonState->PrefixCount),
+                    .Channel = ProgressivePoissonChannelFromIndex(
+                        *poissonState->Channel),
+                };
+                if (poissonState->MeshSurfaceSampleCount != nullptr)
+                {
+                    config.MeshSurfaceSampleCount =
+                        static_cast<std::uint32_t>(
+                            *poissonState->MeshSurfaceSampleCount);
+                }
+                if (poissonState->MeshSurfaceSampleSeed != nullptr)
+                {
+                    config.MeshSurfaceSampleSeed =
+                        static_cast<std::uint32_t>(
+                            *poissonState->MeshSurfaceSampleSeed);
+                }
+                if (poissonState->MeshSurfaceMinTriangleArea != nullptr)
+                {
+                    config.MeshSurfaceMinTriangleArea =
+                        static_cast<double>(
+                            *poissonState->MeshSurfaceMinTriangleArea);
+                }
+                if (poissonState->MeshSurfaceInterpolateNormals != nullptr)
+                {
+                    config.MeshSurfaceInterpolateNormals =
+                        *poissonState->MeshSurfaceInterpolateNormals;
+                }
                 *poissonState->LastResult =
                     ApplySandboxEditorProgressivePoissonCommand(
                         context,
                         SandboxEditorProgressivePoissonCommand{
                             .StableEntityId = model.SelectedStableId,
-                            .Config = SandboxEditorProgressivePoissonConfig{
-                                .Dimension = static_cast<std::uint32_t>(
-                                    *poissonState->Dimension),
-                                .GridWidth = static_cast<std::uint32_t>(
-                                    *poissonState->GridWidth),
-                                .MaxLevels = static_cast<std::uint32_t>(
-                                    *poissonState->MaxLevels),
-                                .HashLoadFactor =
-                                    *poissonState->HashLoadFactor,
-                                .RadiusAlpha = *poissonState->RadiusAlpha,
-                                .RandomizeGridOrigin =
-                                    *poissonState->RandomizeGridOrigin,
-                                .GridOriginSeed = static_cast<std::uint32_t>(
-                                    *poissonState->GridOriginSeed),
-                                .ShuffleWithinLevels =
-                                    *poissonState->ShuffleWithinLevels,
-                                .ShuffleSeed = static_cast<std::uint32_t>(
-                                    *poissonState->ShuffleSeed),
-                                .PrefixCount = static_cast<std::uint32_t>(
-                                    *poissonState->PrefixCount),
-                                .Channel = ProgressivePoissonChannelFromIndex(
-                                    *poissonState->Channel),
-                            },
+                            .Config = config,
                         });
             }
 
@@ -9814,6 +10030,11 @@ namespace Extrinsic::Runtime
                     context,
                     processing,
                     meshNormalsState);
+                DrawProgressivePoissonControls(
+                    model,
+                    context,
+                    processing,
+                    progressivePoissonState);
                 break;
             case SandboxEditorDomainWindowKind::Graph:
                 DrawGraphVertexNormalsControls(
@@ -11790,8 +12011,9 @@ namespace Extrinsic::Runtime
         case SandboxEditorGeometryProcessingAlgorithm::KernelDensity:
         case SandboxEditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval:
         case SandboxEditorGeometryProcessingAlgorithm::RadiusOutlierRemoval:
-        case SandboxEditorGeometryProcessingAlgorithm::ProgressivePoissonSampling:
             return Domain::PointCloudPoints;
+        case SandboxEditorGeometryProcessingAlgorithm::ProgressivePoissonSampling:
+            return Domain::MeshVertices | Domain::PointCloudPoints;
         }
         return Domain::None;
     }
@@ -14246,92 +14468,166 @@ namespace Extrinsic::Runtime
         GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
         const GS::SourceAvailability availability =
             GS::BuildSourceAvailability(view);
-        if (availability.ProvenanceDomain != GS::Domain::PointCloud ||
-            view.VertexSource == nullptr)
+        if (availability.ProvenanceDomain != GS::Domain::PointCloud &&
+            availability.ProvenanceDomain != GS::Domain::Mesh)
         {
             return MakeProgressivePoissonResult(
                 SandboxEditorCommandStatus::UnsupportedGeometryDomain,
                 command.Config.Channel,
                 Core::ErrorCode::InvalidArgument,
-                "Progressive Poisson sampling requires selected point-cloud GeometrySources.");
+                "Progressive Poisson sampling requires selected point-cloud or mesh GeometrySources.");
         }
 
-        std::optional<std::vector<glm::vec3>> positions =
-            CollectKMeansPositions(view.VertexSource->Properties);
-        if (!positions.has_value())
+        if (availability.ProvenanceDomain == GS::Domain::PointCloud)
+        {
+            if (view.VertexSource == nullptr)
+            {
+                return MakeProgressivePoissonResult(
+                    SandboxEditorCommandStatus::UnsupportedGeometryDomain,
+                    command.Config.Channel,
+                    Core::ErrorCode::InvalidArgument,
+                    "Progressive Poisson sampling requires selected point-cloud vertices.");
+            }
+
+            std::optional<std::vector<glm::vec3>> positions =
+                CollectKMeansPositions(view.VertexSource->Properties);
+            if (!positions.has_value())
+            {
+                return MakeProgressivePoissonResult(
+                    SandboxEditorCommandStatus::InvalidProcessingParameters,
+                    command.Config.Channel,
+                    Core::ErrorCode::InvalidArgument,
+                    "Progressive Poisson sampling requires a non-empty finite v:position property.");
+            }
+
+            SandboxEditorProgressivePoissonResult result =
+                RunProgressivePoissonAndPublish(
+                    std::span<const glm::vec3>{
+                        positions->data(),
+                        positions->size()},
+                    view.VertexSource->Properties,
+                    command.Config);
+            if (!result.Succeeded())
+                return result;
+
+            ApplyProgressivePoissonVisualization(
+                raw,
+                *entity,
+                command.Config.Channel);
+            Dirty::MarkVertexAttributesDirty(raw, *entity);
+            if (context.CommandHistory != nullptr)
+                (void)context.CommandHistory->MarkDirty(
+                    "Run progressive Poisson sampling");
+
+            AppendProgressivePoissonSuccessMessage(result);
+            return result;
+        }
+
+        if (!IsValidProgressivePoissonMeshSurfaceConfig(command.Config))
         {
             return MakeProgressivePoissonResult(
                 SandboxEditorCommandStatus::InvalidProcessingParameters,
                 command.Config.Channel,
                 Core::ErrorCode::InvalidArgument,
-                "Progressive Poisson sampling requires a non-empty finite v:position property.");
+                "Progressive Poisson mesh sampling requires a positive surface sample count and finite positive minimum triangle area.");
         }
 
-        const PPR::Config methodConfig =
-            ToProgressivePoissonReferenceConfig(command.Config);
-        const PPR::Result method = PPR::Compute(*positions, methodConfig);
+        const GS::ConstSourceView constView =
+            GS::BuildConstView(raw, *entity);
+        MeshDenoiseSourceResult source =
+            BuildHalfedgeMeshForDenoise(constView);
+        if (!source.Succeeded())
+        {
+            return MakeProgressivePoissonResult(
+                source.Status,
+                command.Config.Channel,
+                source.Error,
+                source.Diagnostic.empty()
+                    ? "Progressive Poisson mesh sampling could not build selected mesh GeometrySources."
+                    : source.Diagnostic);
+        }
+
+        SurfaceSampling::Result sampled =
+            SurfaceSampling::SampleTriangleMeshSurface(
+                source.Mesh,
+                ToProgressivePoissonSurfaceParams(command.Config));
         SandboxEditorProgressivePoissonResult result{};
         result.Channel = command.Config.Channel;
-        result.InputCount = method.Diag.InputCount;
-        result.AcceptedCount = method.Diag.AcceptedCount;
-        result.LevelCount = static_cast<std::uint32_t>(
-            method.Diag.LevelCounts.size());
-        result.BaseRadius = method.BaseRadius;
-        result.UsedAlpha = method.Diag.UsedAlpha;
-        result.AlphaDefaulted = method.Diag.AlphaDefaulted;
-        result.ClampedGridWidth = method.Diag.ClampedGridWidth;
-        result.ClampedMaxLevels = method.Diag.ClampedMaxLevels;
-
-        if (method.Diag.Code != PPR::ValidationCode::Valid)
+        result.MeshSurfaceSamplingUsed = true;
+        result.MeshSurfaceSampleCount =
+            SaturatingUint32(sampled.Info.WrittenSampleCount);
+        result.MeshSurfaceTotalFaceCount =
+            SaturatingUint32(sampled.Info.TotalFaceCount);
+        result.MeshSurfaceAcceptedTriangleCount =
+            SaturatingUint32(sampled.Info.AcceptedTriangleCount);
+        result.MeshSurfaceRejectedFaceCount = SaturatingUint32(
+            sampled.Info.RejectedNonTriangleFaceCount +
+            sampled.Info.RejectedDegenerateTriangleCount +
+            sampled.Info.RejectedNonFiniteTriangleCount);
+        result.MeshSurfaceArea = sampled.Info.TotalSurfaceArea;
+        if (!sampled.Succeeded())
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
-            result.Error = method.Diag.Code == PPR::ValidationCode::InvalidDimension
-                ? Core::ErrorCode::InvalidArgument
-                : Core::ErrorCode::InvalidState;
+            result.Status =
+                sampled.Status == SurfaceSampling::SurfaceSamplingStatus::InvalidSampleCount
+                    ? SandboxEditorCommandStatus::InvalidProcessingParameters
+                    : SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Error =
+                sampled.Status == SurfaceSampling::SurfaceSamplingStatus::InvalidSampleCount
+                    ? Core::ErrorCode::InvalidArgument
+                    : Core::ErrorCode::InvalidState;
             result.Message =
-                "Progressive Poisson CPU reference rejected the input/config.";
+                "Progressive Poisson mesh surface sampling failed with ";
+            result.Message += std::string(SurfaceSampling::ToString(sampled.Status));
+            result.Message += ".";
             return result;
         }
 
-        result.PrefixCount = ClampProgressivePoissonPrefix(
-            command.Config.PrefixCount,
-            result.AcceptedCount);
-        if (!PublishProgressivePoissonProperties(
-                view.VertexSource->Properties,
-                method,
-                command.Config,
-                result.PrefixCount))
+        const std::span<const glm::vec3> sampledPositions =
+            sampled.Cloud.Positions();
+        result = RunProgressivePoissonAndPublish(
+            sampledPositions,
+            sampled.Cloud.PointProperties(),
+            command.Config);
+        result.MeshSurfaceSamplingUsed = true;
+        result.MeshSurfaceSampleCount =
+            SaturatingUint32(sampled.Info.WrittenSampleCount);
+        result.MeshSurfaceTotalFaceCount =
+            SaturatingUint32(sampled.Info.TotalFaceCount);
+        result.MeshSurfaceAcceptedTriangleCount =
+            SaturatingUint32(sampled.Info.AcceptedTriangleCount);
+        result.MeshSurfaceRejectedFaceCount = SaturatingUint32(
+            sampled.Info.RejectedNonTriangleFaceCount +
+            sampled.Info.RejectedDegenerateTriangleCount +
+            sampled.Info.RejectedNonFiniteTriangleCount);
+        result.MeshSurfaceArea = sampled.Info.TotalSurfaceArea;
+        if (!result.Succeeded())
+            return result;
+
+        const EditorCommandHistoryStatus publishStatus =
+            ApplyPointCloudPointState(
+                context.Scene,
+                command.StableEntityId,
+                sampled.Cloud);
+        if (publishStatus != EditorCommandHistoryStatus::Applied)
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
-            result.Error = Core::ErrorCode::InvalidState;
+            result.Status = ToSandboxEditorCommandStatus(publishStatus);
+            result.Error = Core::ErrorCode::Unknown;
             result.Message =
-                "Progressive Poisson property publication failed.";
+                "Progressive Poisson mesh sample publication failed.";
             return result;
         }
 
+        if (raw.all_of<G::RenderSurface>(*entity))
+            raw.remove<G::RenderSurface>(*entity);
         ApplyProgressivePoissonVisualization(
             raw,
             *entity,
             command.Config.Channel);
-        Dirty::MarkVertexAttributesDirty(raw, *entity);
         if (context.CommandHistory != nullptr)
             (void)context.CommandHistory->MarkDirty(
-                "Run progressive Poisson sampling");
+                "Run progressive Poisson mesh sampling");
 
-        result.Status = SandboxEditorCommandStatus::Applied;
-        result.Error = Core::ErrorCode::Success;
-        result.Message =
-            "Progressive Poisson accepted " +
-            std::to_string(result.AcceptedCount) +
-            " of " +
-            std::to_string(result.InputCount) +
-            " points across " +
-            std::to_string(result.LevelCount) +
-            " levels; prefix=" +
-            std::to_string(result.PrefixCount) +
-            ", channel=" +
-            DebugNameForSandboxEditorProgressivePoissonChannel(result.Channel) +
-            ".";
+        AppendProgressivePoissonSuccessMessage(result);
         return result;
     }
 
@@ -15824,6 +16120,14 @@ namespace Extrinsic::Runtime
                     .ShuffleSeed = &m_ProgressivePoissonShuffleSeed,
                     .PrefixCount = &m_ProgressivePoissonPrefixCount,
                     .Channel = &m_ProgressivePoissonChannel,
+                    .MeshSurfaceSampleCount =
+                        &m_ProgressivePoissonMeshSurfaceSampleCount,
+                    .MeshSurfaceSampleSeed =
+                        &m_ProgressivePoissonMeshSurfaceSampleSeed,
+                    .MeshSurfaceMinTriangleArea =
+                        &m_ProgressivePoissonMeshSurfaceMinTriangleArea,
+                    .MeshSurfaceInterpolateNormals =
+                        &m_ProgressivePoissonMeshSurfaceInterpolateNormals,
                 };
                 TextureBakeUiState textureBakeState{
                     .SourceIndex = &m_TextureBakeSourceIndex,

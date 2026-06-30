@@ -385,6 +385,10 @@ export namespace Extrinsic::Runtime
         std::uint32_t PrefixCount{0u}; // 0 means all accepted points.
         SandboxEditorProgressivePoissonChannel Channel{
             SandboxEditorProgressivePoissonChannel::Level};
+        std::uint32_t MeshSurfaceSampleCount{4096u};
+        std::uint32_t MeshSurfaceSampleSeed{1337u};
+        double MeshSurfaceMinTriangleArea{1.0e-14};
+        bool MeshSurfaceInterpolateNormals{true};
     };
 
     struct SandboxEditorProgressivePoissonCommand
@@ -407,6 +411,12 @@ export namespace Extrinsic::Runtime
         bool AlphaDefaulted{false};
         bool ClampedGridWidth{false};
         bool ClampedMaxLevels{false};
+        bool MeshSurfaceSamplingUsed{false};
+        std::uint32_t MeshSurfaceSampleCount{0u};
+        std::uint32_t MeshSurfaceTotalFaceCount{0u};
+        std::uint32_t MeshSurfaceAcceptedTriangleCount{0u};
+        std::uint32_t MeshSurfaceRejectedFaceCount{0u};
+        double MeshSurfaceArea{0.0};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
 
@@ -1773,6 +1783,7 @@ export namespace Extrinsic::Runtime
         bool PointCloudVertexNormalsAvailable{false};
         bool PointCloudOutlierRemovalAvailable{false};
         bool PointCloudProgressivePoissonAvailable{false};
+        bool MeshProgressivePoissonAvailable{false};
         std::optional<SandboxEditorKMeansResult> LastKMeansResult{};
         std::optional<SandboxEditorMeshDenoiseResult>
             LastMeshDenoiseResult{};
@@ -2369,6 +2380,10 @@ export namespace Extrinsic::Runtime
         std::int32_t m_ProgressivePoissonShuffleSeed{0x51ed270b};
         std::int32_t m_ProgressivePoissonPrefixCount{0};
         std::int32_t m_ProgressivePoissonChannel{0};
+        std::int32_t m_ProgressivePoissonMeshSurfaceSampleCount{4096};
+        std::int32_t m_ProgressivePoissonMeshSurfaceSampleSeed{1337};
+        float m_ProgressivePoissonMeshSurfaceMinTriangleArea{1.0e-14f};
+        bool m_ProgressivePoissonMeshSurfaceInterpolateNormals{true};
         std::int32_t m_TextureBakeSourceIndex{0};
         std::int32_t m_TextureBakeTargetSemanticIndex{0};
         std::int32_t m_TextureBakeEncoderIndex{0};

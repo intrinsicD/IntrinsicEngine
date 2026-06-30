@@ -1989,18 +1989,19 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
 
     const std::vector<Runtime::SandboxEditorGeometryProcessingEntry> meshEntries =
         Runtime::ResolveSandboxEditorGeometryProcessingEntries(meshCaps);
-    ASSERT_EQ(meshEntries.size(), 14u);
+    ASSERT_EQ(meshEntries.size(), 15u);
     EXPECT_EQ(meshEntries[0].Algorithm, Algorithm::KMeans);
     EXPECT_EQ(meshEntries[1].Algorithm, Algorithm::NormalEstimation);
     EXPECT_EQ(meshEntries[2].Algorithm, Algorithm::MeshDenoise);
     EXPECT_EQ(meshEntries[3].Algorithm, Algorithm::Curvature);
-    EXPECT_EQ(meshEntries[4].Algorithm, Algorithm::ShortestPath);
-    EXPECT_EQ(meshEntries[5].Algorithm, Algorithm::VectorHeat);
-    EXPECT_EQ(meshEntries[6].Algorithm, Algorithm::Parameterization);
-    EXPECT_EQ(meshEntries[7].Algorithm, Algorithm::ConvexHull);
-    EXPECT_EQ(meshEntries[8].Algorithm, Algorithm::BooleanCSG);
-    EXPECT_EQ(meshEntries[9].Algorithm, Algorithm::Remeshing);
-    EXPECT_EQ(meshEntries[13].Algorithm, Algorithm::Repair);
+    EXPECT_EQ(meshEntries[4].Algorithm, Algorithm::ProgressivePoissonSampling);
+    EXPECT_EQ(meshEntries[5].Algorithm, Algorithm::ShortestPath);
+    EXPECT_EQ(meshEntries[6].Algorithm, Algorithm::VectorHeat);
+    EXPECT_EQ(meshEntries[7].Algorithm, Algorithm::Parameterization);
+    EXPECT_EQ(meshEntries[8].Algorithm, Algorithm::ConvexHull);
+    EXPECT_EQ(meshEntries[9].Algorithm, Algorithm::BooleanCSG);
+    EXPECT_EQ(meshEntries[10].Algorithm, Algorithm::Remeshing);
+    EXPECT_EQ(meshEntries[14].Algorithm, Algorithm::Repair);
 
     const std::vector<Domain> meshKMeans =
         Runtime::GetAvailableSandboxEditorKMeansDomains(registry, mesh);
@@ -2026,6 +2027,7 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
     EXPECT_TRUE(meshModel.Processing.MeshSubdivideSqrt3Available);
     EXPECT_TRUE(meshModel.Processing.MeshSubdivideLoopFeatureEdgesAvailable);
     EXPECT_TRUE(meshModel.Processing.MeshVertexNormalsAvailable);
+    EXPECT_TRUE(meshModel.Processing.MeshProgressivePoissonAvailable);
     EXPECT_FALSE(meshModel.Processing.GraphVertexNormalsAvailable);
     EXPECT_FALSE(meshModel.Processing.PointCloudVertexNormalsAvailable);
 
@@ -2065,6 +2067,7 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
     EXPECT_FALSE(graphModel.Processing.MeshCurvatureAvailable);
     EXPECT_FALSE(graphModel.Processing.MeshCurvatureDirectionsAvailable);
     EXPECT_FALSE(graphModel.Processing.MeshVertexNormalsAvailable);
+    EXPECT_FALSE(graphModel.Processing.MeshProgressivePoissonAvailable);
     EXPECT_TRUE(graphModel.Processing.GraphVertexNormalsAvailable);
     EXPECT_FALSE(graphModel.Processing.PointCloudVertexNormalsAvailable);
 
@@ -2100,6 +2103,7 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
     EXPECT_FALSE(cloudModel.Processing.MeshCurvatureAvailable);
     EXPECT_FALSE(cloudModel.Processing.MeshCurvatureDirectionsAvailable);
     EXPECT_FALSE(cloudModel.Processing.MeshVertexNormalsAvailable);
+    EXPECT_FALSE(cloudModel.Processing.MeshProgressivePoissonAvailable);
     EXPECT_FALSE(cloudModel.Processing.GraphVertexNormalsAvailable);
     EXPECT_TRUE(cloudModel.Processing.PointCloudVertexNormalsAvailable);
     EXPECT_TRUE(cloudModel.Processing.PointCloudProgressivePoissonAvailable);
@@ -2396,6 +2400,116 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandMatchesDirectMethodConfig)
         }
     }
     EXPECT_EQ(levels.Vector(), expectedLevels);
+}
+
+TEST(SandboxEditorUi, ProgressivePoissonCommandSamplesMeshSurfaceToPointCloud)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "PoissonMesh");
+    AddTriangleMeshSource(registry, mesh);
+    registry.Raw().emplace<G::RenderSurface>(mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    const Runtime::SandboxEditorProgressivePoissonConfig config{
+        .Dimension = 2u,
+        .GridWidth = 3u,
+        .MaxLevels = 5u,
+        .HashLoadFactor = 0.75f,
+        .RadiusAlpha = 0.4f,
+        .RandomizeGridOrigin = false,
+        .GridOriginSeed = 31u,
+        .ShuffleWithinLevels = true,
+        .ShuffleSeed = 37u,
+        .PrefixCount = 7u,
+        .Channel = Runtime::SandboxEditorProgressivePoissonChannel::Level,
+        .MeshSurfaceSampleCount = 32u,
+        .MeshSurfaceSampleSeed = 41u,
+        .MeshSurfaceMinTriangleArea = 1.0e-14,
+        .MeshSurfaceInterpolateNormals = true,
+    };
+
+    const Runtime::SandboxEditorProgressivePoissonResult result =
+        Runtime::ApplySandboxEditorProgressivePoissonCommand(
+            context,
+            Runtime::SandboxEditorProgressivePoissonCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+                .Config = config,
+            });
+
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_TRUE(result.MeshSurfaceSamplingUsed);
+    EXPECT_EQ(result.MeshSurfaceSampleCount, 32u);
+    EXPECT_EQ(result.MeshSurfaceTotalFaceCount, 1u);
+    EXPECT_EQ(result.MeshSurfaceAcceptedTriangleCount, 1u);
+    EXPECT_EQ(result.MeshSurfaceRejectedFaceCount, 0u);
+    EXPECT_GT(result.MeshSurfaceArea, 0.0);
+    EXPECT_EQ(result.InputCount, 32u);
+    EXPECT_GT(result.AcceptedCount, 0u);
+    EXPECT_EQ(result.PrefixCount, std::min(7u, result.AcceptedCount));
+
+    const GS::ConstSourceView view =
+        GS::BuildConstView(registry.Raw(), mesh);
+    const GS::SourceAvailability availability =
+        GS::BuildSourceAvailability(view);
+    EXPECT_EQ(availability.ProvenanceDomain, GS::Domain::PointCloud);
+    ASSERT_NE(view.VertexSource, nullptr);
+    EXPECT_EQ(view.HalfedgeSource, nullptr);
+    EXPECT_EQ(view.FaceSource, nullptr);
+
+    const Geometry::ConstPropertySet properties{
+        view.VertexSource->Properties};
+    const auto positions = properties.Get<glm::vec3>(PN::kPosition);
+    const auto normals = properties.Get<glm::vec3>(PN::kNormal);
+    const auto levels = properties.Get<float>("p:poisson_level");
+    const auto phases = properties.Get<float>("p:poisson_phase");
+    const auto splats = properties.Get<float>("p:poisson_splat_radius");
+    const auto visible = properties.Get<float>("p:poisson_prefix_visible");
+    ASSERT_TRUE(positions);
+    ASSERT_TRUE(normals);
+    ASSERT_TRUE(levels);
+    ASSERT_TRUE(phases);
+    ASSERT_TRUE(splats);
+    ASSERT_TRUE(visible);
+    ASSERT_EQ(positions.Vector().size(), 32u);
+    EXPECT_EQ(normals.Vector().size(), 32u);
+    EXPECT_EQ(levels.Vector().size(), 32u);
+    EXPECT_EQ(phases.Vector().size(), 32u);
+    EXPECT_EQ(splats.Vector().size(), 32u);
+    EXPECT_EQ(visible.Vector().size(), 32u);
+
+    PPR::Config directConfig{};
+    directConfig.Dimension = config.Dimension;
+    directConfig.GridWidth = config.GridWidth;
+    directConfig.MaxLevels = config.MaxLevels;
+    directConfig.HashLoadFactor = config.HashLoadFactor;
+    directConfig.RadiusAlpha = config.RadiusAlpha;
+    directConfig.RandomizeGridOrigin = config.RandomizeGridOrigin;
+    directConfig.GridOriginSeed = config.GridOriginSeed;
+    directConfig.ShuffleWithinLevels = config.ShuffleWithinLevels;
+    directConfig.ShuffleSeed = config.ShuffleSeed;
+    const PPR::Result direct =
+        PPR::Compute(positions.Vector(), directConfig);
+    ASSERT_EQ(direct.Diag.Code, PPR::ValidationCode::Valid);
+    EXPECT_EQ(result.AcceptedCount, direct.Diag.AcceptedCount);
+    EXPECT_EQ(result.LevelCount, direct.Diag.LevelCounts.size());
+    EXPECT_FLOAT_EQ(result.BaseRadius, direct.BaseRadius);
+
+    EXPECT_FALSE(registry.Raw().all_of<G::RenderSurface>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<G::RenderPoints>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+
+    ASSERT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
+    const G::VisualizationConfig& vis =
+        registry.Raw().get<G::VisualizationConfig>(mesh);
+    EXPECT_EQ(vis.Source, G::VisualizationConfig::ColorSource::ScalarField);
+    EXPECT_EQ(vis.ScalarDomain, G::VisualizationConfig::Domain::Vertex);
+    EXPECT_EQ(vis.ScalarFieldName, "p:poisson_level");
 }
 
 TEST(SandboxEditorUi, VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPointCloud)

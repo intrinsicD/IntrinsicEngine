@@ -31,9 +31,11 @@ backend and parity reporting.
 
 ## Interactive usage
 
-`RUNTIME-134` Slice A exposes the CPU reference backend in the Sandbox
-PointCloud processing window. The runtime command validates the selected
-point-cloud `GeometrySources`, forwards every reference `Config` knob
+`RUNTIME-134` Slices A-B expose the CPU reference backend in the Sandbox
+PointCloud and Mesh processing windows. The runtime command validates selected
+point-cloud `GeometrySources`, or samples a selected editable mesh surface to a
+point cloud through `GEOM-035` (`Geometry.PointCloud.SurfaceSampling`), forwards
+every reference `Config` knob
 (`dimension`, `grid_width`, `max_levels`, `hash_load_factor`, `radius_alpha`,
 `randomize_grid_origin`, `grid_origin_seed`, `shuffle_within_levels`,
 `shuffle_seed`) through a typed command DTO, and publishes per-point float
@@ -49,6 +51,12 @@ count of `0` means all accepted points. `p:poisson_phase` is a deterministic
 display bucket derived from level-local rank modulo the 2D/3D phase count because
 the CPU reference result does not expose its internal conflict-resolution phase
 as a stable public output yet.
+
+Mesh runs expose additional surface-sampling controls (`sample_count`, `seed`,
+`min_triangle_area`, and `interpolate_vertex_normals`) and publish the sampled
+cloud back onto the selected entity for point rendering. The runtime result
+reports the written sample count, accepted triangle count, rejected face count,
+and total sampled surface area.
 
 ## Known limitations
 

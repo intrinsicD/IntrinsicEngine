@@ -197,17 +197,19 @@ history seam; `GEOM-016` owns the removal algorithm and its diagnostics.
 
 ### Sandbox Editor Progressive Poisson Sampling
 
-`RUNTIME-134` Slice A adds a point-cloud-only progressive Poisson sampling
-playground at `PointCloud > Processing > Progressive Poisson Sampling`. The
+`RUNTIME-134` Slices A-B add a progressive Poisson sampling playground at
+`PointCloud > Processing > Progressive Poisson Sampling` and
+`Mesh > Processing > Progressive Poisson Sampling`. The
 Sandbox EditorUI surface exports
 `SandboxEditorProgressivePoissonChannel`,
 `SandboxEditorProgressivePoissonConfig`,
 `SandboxEditorProgressivePoissonCommand`,
 `SandboxEditorProgressivePoissonResult`, and
-`ApplySandboxEditorProgressivePoissonCommand(...)`. Runtime validates the
-selected point-cloud `GeometrySources`, collects finite `v:position` data, calls
-the METHOD-012 CPU reference backend, and publishes deterministic per-point float
-properties:
+`ApplySandboxEditorProgressivePoissonCommand(...)`. Runtime validates selected
+point-cloud `GeometrySources`, or reconstructs a selected editable mesh and
+samples its triangle surface through `Geometry.PointCloud.SurfaceSampling`
+before calling the METHOD-012 CPU reference backend. The command publishes
+deterministic per-point float properties:
 
 - `p:poisson_level`
 - `p:poisson_phase`
@@ -217,20 +219,25 @@ properties:
 The UI exposes the reference sampler knobs (`dimension`, `grid_width`,
 `max_levels`, `hash_load_factor`, `radius_alpha`, grid-origin randomization and
 seed, shuffle toggle and seed), plus a prefix count and color-channel selector.
-The command enables point rendering and routes `VisualizationConfig` to the
-selected scalar channel so existing point colormap extraction handles the
-display. Prefix count `0` shows every accepted point; positive values clamp to
-the accepted count and drive `p:poisson_prefix_visible`. The published
-`p:poisson_phase` is a deterministic display bucket derived from level-local rank
-modulo the 2D/3D phase count because the CPU reference backend does not yet
-export internal phase assignments as a stable method result.
+Mesh selections also expose surface sample count, surface seed, minimum triangle
+area, and vertex-normal interpolation controls. Successful mesh runs publish the
+sampled cloud back onto the selected entity via `GeometrySources::PopulateFromCloud`,
+remove the stale surface render hint, enable point rendering, and report the
+surface-sampling diagnostics in `SandboxEditorProgressivePoissonResult`.
 
-Slice A is CPU-contracted and explicit-run: it does not yet auto-rerun on every
-knob edit, persist knob state through the broader config-control facade, or
-preprocess selected meshes through GEOM-035. Those remain tracked by active task
-`RUNTIME-134`. The command only composes runtime-owned ECS state and the public
-method API; it does not add sampler logic to UI code or call renderer/RHI upload
-APIs directly.
+The command routes `VisualizationConfig` to the selected scalar channel so
+existing point colormap extraction handles the display. Prefix count `0` shows
+every accepted point; positive values clamp to the accepted count and drive
+`p:poisson_prefix_visible`. The published `p:poisson_phase` is a deterministic
+display bucket derived from level-local rank modulo the 2D/3D phase count because
+the CPU reference backend does not yet export internal phase assignments as a
+stable method result.
+
+Slices A-B are CPU-contracted and explicit-run: they do not yet auto-rerun on
+every knob edit or persist knob state through the broader config-control facade.
+Those remain tracked by active task `RUNTIME-134`. The command only composes
+runtime-owned ECS state and the public method/surface-sampling APIs; it does not
+add sampler logic to UI code or call renderer/RHI upload APIs directly.
 
 ### Sandbox Editor Mesh Curvature
 

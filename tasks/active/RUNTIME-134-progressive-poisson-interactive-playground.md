@@ -20,13 +20,17 @@ maturity_target: CPUContracted
 - For meshes, use GEOM-035 to sample a surface cloud first, then feed the sampler.
 
 ## Slice plan
-- **Slice A (this slice).** Add the CPU reference playground command and PointCloud processing UI. The runtime command validates selected point-cloud `GeometrySources`, runs METHOD-012 through a typed config DTO, publishes deterministic point properties (`p:poisson_level`, `p:poisson_phase`, `p:poisson_splat_radius`, `p:poisson_prefix_visible`), enables point rendering, and routes visualization to the selected scalar channel. Headless tests prove deterministic property population and command/direct-method equivalence. Mesh-to-cloud preprocessing remains documented but deferred unless the existing mesh surface-sampling API can be wired without expanding the slice.
-- **Slice B.** Add mesh-selection preprocessing via GEOM-035 if Slice A does not close it, including mesh-specific UI affordances and tests.
+- **Slice A.** Add the CPU reference playground command and PointCloud processing UI. The runtime command validates selected point-cloud `GeometrySources`, runs METHOD-012 through a typed config DTO, publishes deterministic point properties (`p:poisson_level`, `p:poisson_phase`, `p:poisson_splat_radius`, `p:poisson_prefix_visible`), enables point rendering, and routes visualization to the selected scalar channel. Headless tests prove deterministic property population and command/direct-method equivalence.
+- **Slice B (this slice).** Add mesh-selection preprocessing via GEOM-035, including mesh-specific UI affordances and tests. Mesh selections are sampled to a point cloud, run through the same METHOD-012 path, and published back as point-cloud `GeometrySources` for visualization.
 - **Slice C.** Add backend toggle once METHOD-013 is unblocked and available.
 
 ## Slice A status (2026-06-30)
 - Landed: CPU reference point-cloud command, explicit Processing-window run button, typed runtime command DTO validation, deterministic per-point publication for `p:poisson_level`, `p:poisson_phase`, `p:poisson_splat_radius`, and `p:poisson_prefix_visible`, visualization routing to the selected scalar channel, and headless command/direct-method equivalence coverage.
-- Still required before retirement: route knob persistence/preview through the CORE-003/RUNTIME-131 config-control facade, add debounced rerun-on-edit behavior, add mesh preprocessing through GEOM-035, and perform the broader default gate for the final interactive milestone.
+- Still required before retirement: route knob persistence/preview through the CORE-003/RUNTIME-131 config-control facade, add debounced rerun-on-edit behavior, and perform the broader default gate for the final interactive milestone.
+
+## Slice B status (2026-06-30)
+- Landed: `Mesh > Processing > Progressive Poisson Sampling` availability, GEOM-035 mesh-surface sampling controls (`sample_count`, `seed`, `min_triangle_area`, normal interpolation), deterministic mesh-to-cloud command path, surface-sampling diagnostics in `SandboxEditorProgressivePoissonResult`, point-cloud publication via `GeometrySources::PopulateFromCloud`, stale surface render-hint removal, and headless coverage proving the published sampled cloud matches a direct METHOD-012 run.
+- Still required before retirement: config-control facade routing, debounced rerun-on-edit behavior, and future backend identity/toggle once METHOD-013 exists.
 
 ## Required changes
 - [ ] Add a Sandbox editor panel exposing all `SamplerConfig` knobs (`dimension`, `grid_width`, `max_levels`, `hash_load_factor`, `radius_alpha`, `randomize_grid_origin`, `grid_origin_seed`, `shuffle_within_levels`, `shuffle_seed`) with sensible ranges and tooltips, routed through the CORE-003/RUNTIME-131 config path.
@@ -40,8 +44,8 @@ maturity_target: CPUContracted
 - [ ] Confirm the default CPU/headless gate stays green; any interactive Vulkan coverage is `gpu;vulkan` label-gated.
 
 ## Docs
-- [ ] Document the playground panel, knob ranges, and color channels in the Sandbox/UI docs and the method `README.md` "interactive usage" note.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` if module surfaces change.
+- [x] Document the playground panel, knob ranges, and color channels in the Sandbox/UI docs and the method `README.md` "interactive usage" note.
+- [x] Regenerate `docs/api/generated/module_inventory.md` if module surfaces change.
 
 ## Acceptance criteria
 - [ ] A user can load a point cloud or mesh, adjust every sampler knob live, and immediately see the result colored by level/phase with a working prefix slider.
