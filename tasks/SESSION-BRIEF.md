@@ -24,6 +24,8 @@ the authoritative open/unblocked view.
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
 - blocked by `GEOM-014`: `UI-028` — Sandbox EditorUI mesh simplification window (tasks/backlog/ui/UI-028-editor-mesh-simplification-window.md)
 - blocked by `GEOM-055`: `UI-029` — Editor ICP registration panel + convergence visualization (tasks/backlog/ui/UI-029-editor-registration-convergence-visualization.md)
+- unblocked: `UI-030` — Sandbox EditorUI frame-pacing diagnostics (tasks/backlog/ui/UI-030-editor-frame-pacing-diagnostics.md)
+- unblocked: `UI-031` — Sandbox EditorUI domain-window reorganization (tasks/backlog/ui/UI-031-editor-domain-ui-reorganization.md)
 
 ## Theme H — Agentic workflow hardening
 

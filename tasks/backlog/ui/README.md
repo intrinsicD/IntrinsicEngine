@@ -19,6 +19,15 @@ map.
   `Runtime.RegistrationAlignment` to run ICP and scrub the convergence
   trajectory. The controller + its headless test land first; the editor panel is
   the remaining open work).
+- [UI-030 — Sandbox EditorUI frame-pacing diagnostics](UI-030-editor-frame-pacing-diagnostics.md)
+  (diagnose editor stutter with phase timing across the editor callback, ImGui
+  copy/upload, frame-graph execution, Vulkan frame lifecycle waits, present
+  pacing, and synchronous upload/readback paths before opening scoped fixes).
+- [UI-031 — Sandbox EditorUI domain-window reorganization](UI-031-editor-domain-ui-reorganization.md)
+  (reorganize Mesh/Graph/PointCloud UI so `Properties` is a pure property
+  explorer, render hints/visualization/property assignment share one
+  appearance window, texture baking moves under rendering/appearance, and
+  processing leaves open focused method windows).
 
 The runtime SpatialDebug closest-face picking consumer for `GEOM-039` is
 retired under the runtime backlog as `RUNTIME-135`.
@@ -30,6 +39,12 @@ retired under the runtime backlog as `RUNTIME-135`.
 - UI-027 (retired) was the paired editor command/UI for the `GEOM-016`
   point-cloud outlier-removal operators under **Theme F**, continuing the
   `bcg_code_base` geometry-processing port into interactive Sandbox workflows.
+- UI-030 is the diagnostic follow-up from the 2026-07-01 editor-stutter review:
+  it builds an evidence loop before blaming barriers, fences, present pacing, or
+  editor CPU work.
+- UI-031 is the information-architecture follow-up from the 2026-07-01
+  domain-UI review: it separates property exploration, appearance/rendering
+  controls, texture baking, and method execution into user-intent windows.
 - UI-001 is retired as part of **Theme A — Working sandbox app path** and depends on
   `RUNTIME-090` + `GRAPHICS-079` for ImGui frame production/presentation plus
   runtime selection/geometry-residency tasks for live content. RUNTIME-095 closes
