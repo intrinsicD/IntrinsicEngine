@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <span>
+#include <string>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -115,6 +117,19 @@ namespace
                 return write.Handle == handle;
             });
         return it == device.BufferWrites.end() ? nullptr : &*it;
+    }
+
+    template <typename T>
+    void SeedBufferContents(Tests::MockDevice& device,
+                            const RHI::BufferHandle handle,
+                            const std::span<const T> values)
+    {
+        std::vector<std::byte> bytes(values.size_bytes());
+        if (!values.empty())
+        {
+            std::memcpy(bytes.data(), values.data(), values.size_bytes());
+        }
+        device.BufferContents[handle.Index] = std::move(bytes);
     }
 
     [[nodiscard]] const Runtime::ProgressivePoissonGpuBufferSpan* FindSpan(
@@ -649,11 +664,189 @@ TEST(ProgressivePoissonGpuBackend,
     EXPECT_EQ(device.CommandContext.DispatchCalls, 0);
 }
 
+TEST(ProgressivePoissonGpuBackend,
+     ReadbackParsesAcceptedPrefixAndValidatesShape)
+{
+    Tests::MockDevice device{};
+
+    Runtime::ProgressivePoissonGpuPlanDesc planDesc{};
+    planDesc.InputCount = 4u;
+    planDesc.Config.Dimension = 3u;
+    planDesc.Config.GridWidth = 4u;
+    planDesc.Config.MaxLevels = 2u;
+    const Runtime::ProgressivePoissonGpuDispatchPlan plan =
+        Runtime::ComputeProgressivePoissonGpuDispatchPlan(planDesc);
+    ASSERT_TRUE(plan.IsValid());
+
+    const RHI::BufferHandle order = ValidBuffer(100u);
+    const RHI::BufferHandle offsets = ValidBuffer(101u);
+    const RHI::BufferHandle splats = ValidBuffer(102u);
+    const std::array<std::uint32_t, 4> orderData{{2u, 0u, 1u, 99u}};
+    const std::array<std::uint32_t, 3> levelOffsets{{0u, 1u, 3u}};
+    const std::array<float, 4> splatData{{0.25f, 0.5f, 0.75f, 0.0f}};
+    SeedBufferContents(device, order, std::span<const std::uint32_t>{orderData});
+    SeedBufferContents(device, offsets,
+                       std::span<const std::uint32_t>{levelOffsets});
+    SeedBufferContents(device, splats, std::span<const float>{splatData});
+
+    const Runtime::ProgressivePoissonGpuReadbackResult result =
+        Runtime::ReadProgressivePoissonGpuReadbacks(
+            Runtime::ProgressivePoissonGpuReadbackDesc{
+                .Device = &device,
+                .OrderReadback = order,
+                .LevelOffsetsReadback = offsets,
+                .SplatRadiiReadback = splats,
+                .Plan = plan,
+            });
+
+    ASSERT_TRUE(result.Succeeded()) << result.Diagnostic;
+    EXPECT_TRUE(result.Read);
+    EXPECT_TRUE(result.StructurallyValid);
+    EXPECT_FALSE(result.CpuFallbackRecommended);
+    EXPECT_EQ(result.AcceptedCount, 3u);
+    EXPECT_EQ((std::vector<std::uint32_t>{2u, 0u, 1u}), result.Order);
+    EXPECT_EQ((std::vector<std::uint32_t>{0u, 1u, 3u}),
+              result.LevelOffsets);
+    EXPECT_EQ((std::vector<float>{0.25f, 0.5f, 0.75f}),
+              result.SplatRadii);
+}
+
+TEST(ProgressivePoissonGpuBackend,
+     ReadbackRejectsInvalidOrDuplicateAcceptedIndices)
+{
+    Tests::MockDevice device{};
+
+    Runtime::ProgressivePoissonGpuPlanDesc planDesc{};
+    planDesc.InputCount = 2u;
+    planDesc.Config.MaxLevels = 1u;
+    const Runtime::ProgressivePoissonGpuDispatchPlan plan =
+        Runtime::ComputeProgressivePoissonGpuDispatchPlan(planDesc);
+    ASSERT_TRUE(plan.IsValid());
+
+    const RHI::BufferHandle order = ValidBuffer(110u);
+    const RHI::BufferHandle offsets = ValidBuffer(111u);
+    const RHI::BufferHandle splats = ValidBuffer(112u);
+    const std::array<std::uint32_t, 2> duplicateOrder{{1u, 1u}};
+    const std::array<std::uint32_t, 2> levelOffsets{{0u, 2u}};
+    const std::array<float, 2> splatData{{0.5f, 0.5f}};
+    SeedBufferContents(device, order,
+                       std::span<const std::uint32_t>{duplicateOrder});
+    SeedBufferContents(device, offsets,
+                       std::span<const std::uint32_t>{levelOffsets});
+    SeedBufferContents(device, splats, std::span<const float>{splatData});
+
+    const Runtime::ProgressivePoissonGpuReadbackResult result =
+        Runtime::ReadProgressivePoissonGpuReadbacks(
+            Runtime::ProgressivePoissonGpuReadbackDesc{
+                .Device = &device,
+                .OrderReadback = order,
+                .LevelOffsetsReadback = offsets,
+                .SplatRadiiReadback = splats,
+                .Plan = plan,
+            });
+
+    EXPECT_EQ(result.Status, Runtime::ProgressivePoissonGpuStatus::InvalidReadback);
+    EXPECT_FALSE(result.StructurallyValid);
+    EXPECT_TRUE(result.CpuFallbackRecommended);
+    EXPECT_NE(result.Diagnostic.find("duplicate"), std::string::npos);
+}
+
+TEST(ProgressivePoissonGpuBackend,
+     ParityDiagnosticsAcceptReferenceMatchAndPoissonGuarantee)
+{
+    const std::array<glm::vec3, 3> positions{{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    }};
+    const std::array<std::uint32_t, 3> order{{0u, 1u, 2u}};
+    const std::array<std::uint32_t, 3> offsets{{0u, 2u, 3u}};
+    const std::array<float, 3> splats{{0.0f, 1.0f, 1.0f}};
+    const std::array<float, 2> levelRadii{{0.5f, 0.25f}};
+
+    const Runtime::ProgressivePoissonGpuParityDiagnostics parity =
+        Runtime::CompareProgressivePoissonGpuOutputToReference(
+            Runtime::ProgressivePoissonGpuParityDesc{
+                .Positions = positions,
+                .GpuOrder = order,
+                .GpuLevelOffsets = offsets,
+                .GpuSplatRadii = splats,
+                .Reference = Runtime::ProgressivePoissonGpuReferenceView{
+                    .Order = order,
+                    .LevelOffsets = offsets,
+                    .SplatRadii = splats,
+                    .LevelRadii = levelRadii,
+                },
+                .Dimension = 2u,
+            });
+
+    EXPECT_TRUE(parity.Succeeded()) << parity.Diagnostic;
+    EXPECT_TRUE(parity.Compared);
+    EXPECT_TRUE(parity.MatchesReference);
+    EXPECT_TRUE(parity.OrderMatches);
+    EXPECT_TRUE(parity.LevelOffsetsMatch);
+    EXPECT_TRUE(parity.SplatRadiiWithinTolerance);
+    EXPECT_TRUE(parity.PoissonGuaranteeHolds);
+    EXPECT_FALSE(parity.CpuFallbackRecommended);
+    EXPECT_EQ(parity.GpuAcceptedCount, 3u);
+    EXPECT_EQ(parity.ReferenceAcceptedCount, 3u);
+    EXPECT_GE(parity.MinPoissonRatio, 1.0f);
+}
+
+TEST(ProgressivePoissonGpuBackend,
+     ParityDiagnosticsRecommendCpuFallbackOnMismatch)
+{
+    const std::array<glm::vec3, 3> positions{{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{0.1f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+    }};
+    const std::array<std::uint32_t, 3> gpuOrder{{0u, 1u, 2u}};
+    const std::array<std::uint32_t, 3> refOrder{{0u, 2u, 1u}};
+    const std::array<std::uint32_t, 3> offsets{{0u, 2u, 3u}};
+    const std::array<float, 3> gpuSplats{{0.0f, 0.1f, 0.9f}};
+    const std::array<float, 3> refSplats{{0.0f, 1.0f, 0.9f}};
+    const std::array<float, 2> levelRadii{{0.5f, 0.25f}};
+
+    const Runtime::ProgressivePoissonGpuParityDiagnostics parity =
+        Runtime::CompareProgressivePoissonGpuOutputToReference(
+            Runtime::ProgressivePoissonGpuParityDesc{
+                .Positions = positions,
+                .GpuOrder = gpuOrder,
+                .GpuLevelOffsets = offsets,
+                .GpuSplatRadii = gpuSplats,
+                .Reference = Runtime::ProgressivePoissonGpuReferenceView{
+                    .Order = refOrder,
+                    .LevelOffsets = offsets,
+                    .SplatRadii = refSplats,
+                    .LevelRadii = levelRadii,
+                },
+                .Dimension = 2u,
+            });
+
+    EXPECT_EQ(parity.Status,
+              Runtime::ProgressivePoissonGpuStatus::ParityMismatch);
+    EXPECT_FALSE(parity.MatchesReference);
+    EXPECT_FALSE(parity.OrderMatches);
+    EXPECT_FALSE(parity.SplatRadiiWithinTolerance);
+    EXPECT_FALSE(parity.PoissonGuaranteeHolds);
+    EXPECT_TRUE(parity.CpuFallbackRecommended);
+    EXPECT_GT(parity.OrderMismatchCount, 0u);
+    EXPECT_GT(parity.SplatRadiusMismatchCount, 0u);
+    EXPECT_LT(parity.MinPoissonRatio, 1.0f);
+}
+
 TEST(ProgressivePoissonGpuBackend, DebugNamesAreStable)
 {
     EXPECT_STREQ(Runtime::DebugNameForProgressivePoissonGpuStatus(
                      Runtime::ProgressivePoissonGpuStatus::PlanningOnly),
                  "PlanningOnly");
+    EXPECT_STREQ(Runtime::DebugNameForProgressivePoissonGpuStatus(
+                     Runtime::ProgressivePoissonGpuStatus::InvalidReadback),
+                 "InvalidReadback");
+    EXPECT_STREQ(Runtime::DebugNameForProgressivePoissonGpuStatus(
+                     Runtime::ProgressivePoissonGpuStatus::ParityMismatch),
+                 "ParityMismatch");
     EXPECT_STREQ(Runtime::DebugNameForProgressivePoissonGpuPassKind(
                      Runtime::ProgressivePoissonGpuPassKind::AcceptPhase),
                  "AcceptPhase");

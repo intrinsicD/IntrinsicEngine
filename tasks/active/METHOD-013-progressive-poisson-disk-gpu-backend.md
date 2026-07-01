@@ -51,19 +51,23 @@ maturity_target: Operational
 - **Slice C.2 (implemented).** Add upload/readback ownership for SoA positions,
   `order`/`level_offsets`/`splat_radii`, then route the GPU-capable runtime
   overload through the recorded passes while still falling back on pass failure.
-- **Slice D.** Add `gpu;vulkan` parity tests, parity diagnostics, and the
-  heavy/nightly benchmark metric extension needed for `Operational` and
-  `ParityProven`.
+- **Slice D.1 (this slice).** Parse GPU readback payloads for
+  `order`/`level_offsets`/`splat_radii` and compare them against CPU-reference
+  output with parity diagnostics. Public Sandbox behavior remains CPU fallback.
+- **Slice D.2.** Add `gpu;vulkan` parity tests and the heavy/nightly benchmark
+  metric extension needed for `Operational` and `ParityProven`.
 
 ## Continuation note
 
-- Slice C.2 records runtime-owned allocation, SoA input upload, dispatch, and
-  readback-copy targets only; the public Sandbox command still returns METHOD-012
-  CPU reference output for `gpu_vulkan_compute` requests until output parsing and
-  parity evidence land.
-- Next resume point: parse readback results into `order`/`level_offsets`/
-  `splat_radii`, preserve CPU fallback on any GPU pass failure or parity miss,
-  then add opt-in `gpu;vulkan` parity tests before claiming `Operational`.
+- Slice D.1 records the runtime-owned readback parser for `order`,
+  `level_offsets`, and `splat_radii`, validates structural invariants, and
+  compares GPU-shaped output against METHOD-012 reference output plus per-level
+  Poisson guarantees.
+- The public Sandbox command still returns METHOD-012 CPU reference output for
+  `gpu_vulkan_compute` requests until operational Vulkan parity evidence lands.
+- Next resume point: connect completed Vulkan command output to the parser,
+  preserve CPU fallback on any GPU pass failure or parity miss, then add opt-in
+  `gpu;vulkan` parity tests before claiming `Operational`.
 
 ## Required changes
 - [x] Slice A: expose backend selection in config/command DTOs and return
@@ -85,9 +89,16 @@ maturity_target: Operational
 - [x] Slice C.2: add upload/readback ownership for SoA positions,
       `order`/`level_offsets`/`splat_radii`, and route the GPU-capable runtime
       overload through the recorded passes.
-- [ ] Add the GPU-capable overload (runtime seam) that uploads SoA positions, runs the per-level build/accept/compact passes via GRAPHICS-108, reads back `order`/`level_offsets`/`splat_radii`, and returns a result carrying `ActualBackend` and parity diagnostics.
+- [x] Slice D.1: add parsed readback payloads for
+      `order`/`level_offsets`/`splat_radii` plus CPU-reference parity
+      diagnostics for accepted order, per-level offsets, splat radii, and
+      Poisson guarantees.
+- [ ] Complete the GPU-capable runtime overload so completed Vulkan pass output
+      flows through the readback/parity diagnostics and returns a public result
+      carrying `ActualBackend` and parity deltas.
 - [ ] Implement CPU fallback: when `IsOperational()` is false or a GPU pass fails, return the METHOD-012 reference result with `ActualBackend == CPU`.
-- [ ] Update `method.yaml` backends to include `gpu_vulkan_compute`; record parity tolerance and backend-identity reporting.
+- [ ] Finalize `method.yaml` parity tolerance and backend-identity reporting
+      once the operational Vulkan path is parity-proven.
 
 ## Tests
 - [x] Slice A: extend config/control tests for `sandbox.progressive_poisson.backend`.
@@ -103,6 +114,9 @@ maturity_target: Operational
 - [x] Slice C.2: add default-gate runtime contract coverage for resource
       allocation, SoA position/key uploads, dispatch recording, readback-copy
       targets, and non-operational pre-allocation CPU fallback.
+- [x] Slice D.1: add default-gate runtime contract coverage for readback
+      parsing, invalid/duplicate accepted-index rejection, reference-match
+      parity diagnostics, and CPU fallback recommendation on parity mismatch.
 - [ ] Add `gpu;vulkan` parity tests (under `ci-vulkan`) asserting the GPU backend reproduces the CPU reference's per-level counts and the Poisson guarantee (`min_dist >= r_L`) on shared fixtures, within the documented tolerance; assert `ActualBackend == GPU` when a device is operational.
 - [ ] Add a fallback test asserting that on the Null device the API returns the CPU result with `ActualBackend == CPU` (runs on the default CPU gate).
 - [ ] Add or extend a benchmark manifest with a `gpu_time_ms` metric and a CPU-vs-GPU speedup diagnostic (heavy/nightly), with baseline comparison before any speedup claim.
@@ -114,8 +128,12 @@ maturity_target: Operational
       CPU fallback and deferring upload/readback parity.
 - [x] Slice C.2: document runtime-owned upload/readback-copy ownership while
       preserving CPU fallback and deferring Vulkan parity.
+- [x] Slice D.1: document parsed readback payloads and CPU-reference parity
+      diagnostics while preserving CPU fallback and deferring operational Vulkan
+      parity.
 - [ ] Document the GPU backend, parity tolerance, and fallback behavior in the method `README.md` and `docs/methods/` backend notes; cross-link `docs/architecture/algorithm-variant-dispatch.md`.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` if module surfaces change; re-validate the method manifest.
+- [x] Regenerate/check `docs/api/generated/module_inventory.md` after the
+      Slice D.1 module surface change; re-validate the method manifest.
 
 ## Acceptance criteria
 - [x] Slice A default-gate contract proves a Vulkan request falls back to the CPU
@@ -130,6 +148,9 @@ maturity_target: Operational
 - [x] Slice C.2 records runtime-owned SoA input upload, pass recording, and
       readback-copy targets for `order`/`level_offsets`/`splat_radii` while
       public execution still falls back to the CPU reference.
+- [x] Slice D.1 parses seeded GPU readback payloads, rejects malformed payloads,
+      and recommends CPU fallback when GPU-shaped output misses the CPU
+      reference or per-level Poisson guarantee.
 - [ ] The GPU backend reproduces the CPU reference within the documented parity tolerance and preserves the Poisson guarantee on the tested datasets.
 - [ ] Backend identity (`ActualBackend`) and parity deltas are reported; the API falls back to CPU cleanly on a non-operational device.
 - [ ] `gpu;vulkan` parity tests pass under `ci-vulkan`; the CPU fallback test passes on the default gate.
@@ -162,6 +183,7 @@ Latest Slice A verification (2026-06-30):
 - `python3 tools/docs/check_doc_links.py --root .`
 - `python3 tools/repo/check_layering.py --root src --strict`
 - `python3 tools/repo/check_test_layout.py --root . --strict`
+- `tools/ci/run_clean_workshop_review.sh . --strict` (automated rows passed; no follow-up findings)
 - `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md --check`
 
 Latest Slice B verification (2026-06-30):
@@ -222,6 +244,27 @@ Latest Slice C.2 verification (2026-07-01):
 - `ctest --test-dir build/ci-vulkan --output-on-failure -R '^ComputeParallelPrimitivesGpuSmoke\.VulkanScanAndCompactionMatchCpuReference$' --timeout 120`
 - `ctest --test-dir build/ci-vulkan --output-on-failure -R 'ProgressivePoissonGpuBackend|ComputeParallelPrimitivesGpuSmoke|BufferReadbackGpuSmoke|GpuTransferFacadeGpuSmoke|TextureReadbackGpuSmoke|GpuReadbackJobGpuSmoke|VulkanBootstrapSmoke' --timeout 120 -j1` (17 passed)
 
+Latest Slice D.1 verification (2026-07-01):
+- `cmake --build --preset ci --target IntrinsicRuntimeContractTests`
+- `ctest --test-dir build/ci --output-on-failure -R 'ProgressivePoissonGpuBackend|SandboxEditorUi\.ProgressivePoisson|RuntimeConfigControlFacade\.SandboxProgressivePoissonConfigIsHotApplied|ProgressivePoissonReference' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60` (49 passed)
+- `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`
+- `python3 tools/agents/generate_session_brief.py`
+- `python3 tools/agents/validate_method_manifests.py --root methods --strict`
+- `python3 tools/agents/check_task_policy.py --root . --strict`
+- `python3 tools/docs/check_doc_links.py --root .`
+- `python3 tools/repo/check_layering.py --root src --strict`
+- `python3 tools/repo/check_test_layout.py --root . --strict`
+- `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md --check`
+- `python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main`
+- `python3 tools/agents/generate_session_brief.py --check`
+- `git diff --check`
+- `cmake --build --preset ci --target IntrinsicTests`
+- `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j"$(nproc)"` (3502 passed)
+- `cmake --preset ci-vulkan`
+- `cmake --build --preset ci-vulkan --target IntrinsicTests`
+- `python3 tools/repo/check_shader_outputs.py --dir build/ci-vulkan/bin/shaders --require progressive_poisson_build_cells.comp.spv --require progressive_poisson_accept_phase.comp.spv`
+- `ctest --test-dir build/ci-vulkan --output-on-failure -R 'ProgressivePoissonGpuBackend|ComputeParallelPrimitivesGpuSmoke|BufferReadbackGpuSmoke|GpuTransferFacadeGpuSmoke|TextureReadbackGpuSmoke|GpuReadbackJobGpuSmoke|VulkanBootstrapSmoke' --timeout 120 -j1` (21 passed)
+
 ## Forbidden changes
 - Mixing mechanical file moves with semantic refactors.
 - Changing the CPU reference semantics to make the GPU path "match".
@@ -241,4 +284,7 @@ Latest Slice C.2 verification (2026-07-01):
 - Slice C.2 remains `CPUContracted`: it records runtime-owned upload/readback
   copy ownership but still lacks parsed GPU results and `gpu;vulkan` parity
   evidence.
+- Slice D.1 remains `CPUContracted`: it parses GPU-shaped readback payloads and
+  reports CPU-reference parity diagnostics, but public execution still falls
+  back to CPU until operational `gpu;vulkan` parity evidence exists.
 - On non-Vulkan/Null hosts the documented endpoint is CPU fallback via METHOD-012; no separate follow-up is owed for that path.

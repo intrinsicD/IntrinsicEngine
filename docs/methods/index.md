@@ -68,4 +68,5 @@ This index is the canonical entry point for method/paper implementation document
   current slices expose requested-vs-actual backend diagnostics, CPU fallback
   for `gpu_vulkan_compute` requests, and a recordable Vulkan shader/layout
   dispatch seam with runtime-owned SoA uploads plus readback-copy targets before
-  output parsing and parity tests land.
+  parsed readback payloads and CPU-reference parity diagnostics; public GPU
+  execution still falls back until Vulkan parity tests land.

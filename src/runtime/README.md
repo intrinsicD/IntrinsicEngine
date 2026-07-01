@@ -253,8 +253,10 @@ storage-buffer layout, BDA push/state records, shader asset paths, and per-level
 build/accept plus GRAPHICS-108 compaction dispatch plans. Slice C.2 adds the
 runtime-owned executable-resource seam: SoA position uploads, initial remaining
 keys, output-count initialization, pass recording, and readback-copy targets for
-`order`/`level_offsets`/`splat_radii`. Public Sandbox execution still reports CPU
-fallback for `gpu_vulkan_compute` requests until output parsing and parity tests
+`order`/`level_offsets`/`splat_radii`. Slice D.1 adds parsed readback payloads
+and CPU-reference parity diagnostics for `order`, `level_offsets`, `splat_radii`,
+and per-level Poisson guarantees. Public Sandbox execution still reports CPU
+fallback for `gpu_vulkan_compute` requests until operational Vulkan parity tests
 land. The visible backend toggle remains tracked by RUNTIME-136.
 
 ### Sandbox Editor Mesh Curvature

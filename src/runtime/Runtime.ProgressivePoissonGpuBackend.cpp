@@ -285,6 +285,32 @@ namespace Extrinsic::Runtime
             };
         }
 
+        [[nodiscard]] ProgressivePoissonGpuReadbackResult ReadbackStatus(
+            const ProgressivePoissonGpuStatus status,
+            std::string diagnostic)
+        {
+            return ProgressivePoissonGpuReadbackResult{
+                .Status = status,
+                .Read = false,
+                .StructurallyValid = false,
+                .CpuFallbackRecommended = true,
+                .Diagnostic = std::move(diagnostic),
+            };
+        }
+
+        [[nodiscard]] ProgressivePoissonGpuParityDiagnostics ParityStatus(
+            const ProgressivePoissonGpuStatus status,
+            std::string diagnostic)
+        {
+            return ProgressivePoissonGpuParityDiagnostics{
+                .Status = status,
+                .Compared = false,
+                .MatchesReference = false,
+                .CpuFallbackRecommended = true,
+                .Diagnostic = std::move(diagnostic),
+            };
+        }
+
         [[nodiscard]] const ProgressivePoissonGpuBufferSpan* FindSpan(
             const ProgressivePoissonGpuBufferLayout& layout,
             const ProgressivePoissonGpuBufferRole role) noexcept
@@ -559,6 +585,160 @@ namespace Extrinsic::Runtime
             result.ReadbackCopiesRecorded = result.ReadbackCopyCount == 3u;
         }
 
+        template <typename T>
+        void ReadBufferVector(RHI::IDevice& device,
+                              const RHI::BufferHandle handle,
+                              std::vector<T>& values)
+        {
+            if (!values.empty())
+            {
+                device.ReadBuffer(
+                    handle,
+                    values.data(),
+                    static_cast<std::uint64_t>(values.size()) * sizeof(T),
+                    0u);
+            }
+        }
+
+        [[nodiscard]] bool LevelOffsetsAreMonotonic(
+            const std::span<const std::uint32_t> offsets) noexcept
+        {
+            if (offsets.empty() || offsets.front() != 0u)
+            {
+                return false;
+            }
+            for (std::size_t index = 1u; index < offsets.size(); ++index)
+            {
+                if (offsets[index] < offsets[index - 1u])
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        [[nodiscard]] ProgressivePoissonGpuReadbackResult ValidateReadbackPayload(
+            std::vector<std::uint32_t> order,
+            std::vector<std::uint32_t> levelOffsets,
+            std::vector<float> splatRadii,
+            const std::uint32_t inputCount)
+        {
+            if (!LevelOffsetsAreMonotonic(std::span<const std::uint32_t>{
+                    levelOffsets}))
+            {
+                return ReadbackStatus(
+                    ProgressivePoissonGpuStatus::InvalidReadback,
+                    "Progressive Poisson GPU readback has non-monotonic level offsets.");
+            }
+
+            const std::uint32_t acceptedCount = levelOffsets.back();
+            if (acceptedCount > inputCount ||
+                acceptedCount > order.size() ||
+                acceptedCount > splatRadii.size())
+            {
+                return ReadbackStatus(
+                    ProgressivePoissonGpuStatus::InvalidReadback,
+                    "Progressive Poisson GPU readback accepted count exceeds buffer bounds.");
+            }
+
+            std::vector<bool> seen(inputCount, false);
+            for (std::uint32_t rank = 0u; rank < acceptedCount; ++rank)
+            {
+                const std::uint32_t pointIndex = order[rank];
+                if (pointIndex >= inputCount || seen[pointIndex])
+                {
+                    return ReadbackStatus(
+                        ProgressivePoissonGpuStatus::InvalidReadback,
+                        "Progressive Poisson GPU readback order contains an invalid or duplicate point index.");
+                }
+                seen[pointIndex] = true;
+
+                const float radius = splatRadii[rank];
+                if (!std::isfinite(radius) || radius < 0.0f)
+                {
+                    return ReadbackStatus(
+                        ProgressivePoissonGpuStatus::InvalidReadback,
+                        "Progressive Poisson GPU readback contains an invalid splat radius.");
+                }
+            }
+
+            order.resize(acceptedCount);
+            splatRadii.resize(acceptedCount);
+            return ProgressivePoissonGpuReadbackResult{
+                .Status = ProgressivePoissonGpuStatus::Success,
+                .Read = true,
+                .StructurallyValid = true,
+                .CpuFallbackRecommended = false,
+                .AcceptedCount = acceptedCount,
+                .Order = std::move(order),
+                .LevelOffsets = std::move(levelOffsets),
+                .SplatRadii = std::move(splatRadii),
+            };
+        }
+
+        [[nodiscard]] std::uint32_t CountSpanMismatches(
+            const std::span<const std::uint32_t> lhs,
+            const std::span<const std::uint32_t> rhs) noexcept
+        {
+            const std::size_t common = std::min(lhs.size(), rhs.size());
+            std::uint32_t mismatches = static_cast<std::uint32_t>(
+                lhs.size() > rhs.size() ? lhs.size() - rhs.size()
+                                        : rhs.size() - lhs.size());
+            for (std::size_t index = 0u; index < common; ++index)
+            {
+                if (lhs[index] != rhs[index])
+                {
+                    ++mismatches;
+                }
+            }
+            return mismatches;
+        }
+
+        [[nodiscard]] float DistanceSq(const glm::vec3& a,
+                                       const glm::vec3& b,
+                                       const std::uint32_t dimension) noexcept
+        {
+            const float dx = a.x - b.x;
+            const float dy = a.y - b.y;
+            const float dz = dimension == 3u ? a.z - b.z : 0.0f;
+            return dx * dx + dy * dy + dz * dz;
+        }
+
+        [[nodiscard]] float MinPairwiseDistanceForPrefix(
+            const std::span<const glm::vec3> positions,
+            const std::span<const std::uint32_t> order,
+            const std::uint32_t count,
+            const std::uint32_t dimension) noexcept
+        {
+            if (count < 2u)
+            {
+                return std::numeric_limits<float>::max();
+            }
+
+            float bestSq = std::numeric_limits<float>::max();
+            for (std::uint32_t i = 0u; i < count; ++i)
+            {
+                if (order[i] >= positions.size())
+                {
+                    return 0.0f;
+                }
+                for (std::uint32_t j = i + 1u; j < count; ++j)
+                {
+                    if (order[j] >= positions.size())
+                    {
+                        return 0.0f;
+                    }
+                    bestSq = std::min(bestSq,
+                                      DistanceSq(positions[order[i]],
+                                                 positions[order[j]],
+                                                 dimension));
+                }
+            }
+            return bestSq == std::numeric_limits<float>::max()
+                ? bestSq
+                : std::sqrt(bestSq);
+        }
+
         [[nodiscard]] ProgressivePoissonGpuPassPushConstants MakePushConstants(
             RHI::IDevice& device,
             const ProgressivePoissonGpuPlanDesc& desc,
@@ -656,6 +836,10 @@ namespace Extrinsic::Runtime
             return "SizeOverflow";
         case ProgressivePoissonGpuStatus::InvalidGpuResource:
             return "InvalidGpuResource";
+        case ProgressivePoissonGpuStatus::InvalidReadback:
+            return "InvalidReadback";
+        case ProgressivePoissonGpuStatus::ParityMismatch:
+            return "ParityMismatch";
         }
         return "Unknown";
     }
@@ -924,8 +1108,8 @@ namespace Extrinsic::Runtime
             .GpuExecutionAvailable = false,
             .CpuFallbackRecommended = true,
             .Diagnostic =
-                "Vulkan compute dispatch planning is available, but METHOD-013 "
-                "has not enabled executable GPU sampling yet.",
+                "Vulkan compute dispatch and readback/parity seams are available, "
+                "but METHOD-013 has not enabled public parity-proven GPU sampling yet.",
             .Plan = std::move(plan),
         };
     }
@@ -1207,5 +1391,184 @@ namespace Extrinsic::Runtime
                                  result);
         result.Recorded = result.Record.Recorded && result.ReadbackCopiesRecorded;
         return result;
+    }
+
+    ProgressivePoissonGpuReadbackResult ReadProgressivePoissonGpuReadbacks(
+        const ProgressivePoissonGpuReadbackDesc& desc)
+    {
+        if (desc.Device == nullptr)
+        {
+            return ReadbackStatus(ProgressivePoissonGpuStatus::MissingDevice,
+                                  "Progressive Poisson GPU readback requires an RHI device.");
+        }
+        if (!desc.Device->IsOperational())
+        {
+            return ReadbackStatus(ProgressivePoissonGpuStatus::DeviceUnavailable,
+                                  "Progressive Poisson GPU readback requires an operational RHI device.");
+        }
+        if (!desc.Plan.IsValid())
+        {
+            return ReadbackStatus(desc.Plan.Status,
+                                  "Progressive Poisson GPU readback requires a valid dispatch plan.");
+        }
+
+        const std::uint32_t inputCount = desc.Plan.InputCount;
+        if (inputCount == 0u)
+        {
+            return ProgressivePoissonGpuReadbackResult{
+                .Status = ProgressivePoissonGpuStatus::Success,
+                .Read = true,
+                .StructurallyValid = true,
+                .CpuFallbackRecommended = false,
+                .AcceptedCount = 0u,
+                .LevelOffsets = std::vector<std::uint32_t>{0u},
+            };
+        }
+
+        if (!desc.OrderReadback.IsValid() ||
+            !desc.LevelOffsetsReadback.IsValid() ||
+            !desc.SplatRadiiReadback.IsValid())
+        {
+            return ReadbackStatus(ProgressivePoissonGpuStatus::InvalidGpuResource,
+                                  "Progressive Poisson GPU readback requires valid readback buffers.");
+        }
+
+        std::vector<std::uint32_t> order(inputCount, 0u);
+        std::vector<std::uint32_t> levelOffsets(desc.Plan.Layout.MaxLevels + 1u, 0u);
+        std::vector<float> splatRadii(inputCount, 0.0f);
+
+        ReadBufferVector(*desc.Device, desc.OrderReadback, order);
+        ReadBufferVector(*desc.Device, desc.LevelOffsetsReadback, levelOffsets);
+        ReadBufferVector(*desc.Device, desc.SplatRadiiReadback, splatRadii);
+
+        return ValidateReadbackPayload(std::move(order),
+                                       std::move(levelOffsets),
+                                       std::move(splatRadii),
+                                       inputCount);
+    }
+
+    ProgressivePoissonGpuParityDiagnostics
+    CompareProgressivePoissonGpuOutputToReference(
+        const ProgressivePoissonGpuParityDesc& desc)
+    {
+        if (desc.Dimension != 2u && desc.Dimension != 3u)
+        {
+            return ParityStatus(ProgressivePoissonGpuStatus::InvalidInput,
+                                "Progressive Poisson GPU parity requires dimension 2 or 3.");
+        }
+        if (desc.GpuLevelOffsets.empty() ||
+            desc.Reference.LevelOffsets.empty() ||
+            desc.Reference.LevelRadii.size() + 1u !=
+                desc.Reference.LevelOffsets.size())
+        {
+            return ParityStatus(ProgressivePoissonGpuStatus::InvalidInput,
+                                "Progressive Poisson GPU parity requires reference level offsets and radii.");
+        }
+        if (!LevelOffsetsAreMonotonic(desc.GpuLevelOffsets) ||
+            !LevelOffsetsAreMonotonic(desc.Reference.LevelOffsets))
+        {
+            return ParityStatus(ProgressivePoissonGpuStatus::InvalidInput,
+                                "Progressive Poisson GPU parity requires monotonic level offsets.");
+        }
+
+        ProgressivePoissonGpuParityDiagnostics diagnostics{};
+        diagnostics.Compared = true;
+        diagnostics.GpuAcceptedCount = desc.GpuLevelOffsets.back();
+        diagnostics.ReferenceAcceptedCount = desc.Reference.LevelOffsets.back();
+        diagnostics.OrderMismatchCount =
+            CountSpanMismatches(desc.GpuOrder, desc.Reference.Order);
+        diagnostics.LevelOffsetMismatchCount =
+            CountSpanMismatches(desc.GpuLevelOffsets, desc.Reference.LevelOffsets);
+
+        diagnostics.OrderMatches = diagnostics.OrderMismatchCount == 0u;
+        diagnostics.LevelOffsetsMatch =
+            diagnostics.LevelOffsetMismatchCount == 0u;
+
+        const std::size_t commonSplat =
+            std::min(desc.GpuSplatRadii.size(), desc.Reference.SplatRadii.size());
+        diagnostics.SplatRadiusMismatchCount = static_cast<std::uint32_t>(
+            desc.GpuSplatRadii.size() > desc.Reference.SplatRadii.size()
+                ? desc.GpuSplatRadii.size() - desc.Reference.SplatRadii.size()
+                : desc.Reference.SplatRadii.size() - desc.GpuSplatRadii.size());
+        for (std::size_t index = 0u; index < commonSplat; ++index)
+        {
+            const float delta =
+                std::fabs(desc.GpuSplatRadii[index] -
+                          desc.Reference.SplatRadii[index]);
+            diagnostics.MaxSplatRadiusAbsDelta =
+                std::max(diagnostics.MaxSplatRadiusAbsDelta, delta);
+            if (!std::isfinite(delta) || delta > desc.SplatRadiusTolerance)
+            {
+                ++diagnostics.SplatRadiusMismatchCount;
+            }
+        }
+        diagnostics.SplatRadiiWithinTolerance =
+            diagnostics.SplatRadiusMismatchCount == 0u;
+
+        bool sawPoissonPrefix = false;
+        float minRatio = std::numeric_limits<float>::max();
+        bool poissonHolds = true;
+        const std::size_t levelCount =
+            std::min(desc.GpuLevelOffsets.size(),
+                     desc.Reference.LevelOffsets.size()) - 1u;
+        for (std::size_t level = 0u; level < levelCount; ++level)
+        {
+            const std::uint32_t prefixCount = desc.GpuLevelOffsets[level + 1u];
+            if (prefixCount < 2u)
+            {
+                continue;
+            }
+            if (prefixCount > desc.GpuOrder.size() ||
+                prefixCount > desc.Positions.size())
+            {
+                poissonHolds = false;
+                minRatio = 0.0f;
+                break;
+            }
+
+            const float radius = desc.Reference.LevelRadii[level];
+            if (!(radius > 0.0f) || !std::isfinite(radius))
+            {
+                poissonHolds = false;
+                minRatio = 0.0f;
+                break;
+            }
+
+            const float measured = MinPairwiseDistanceForPrefix(
+                desc.Positions,
+                desc.GpuOrder,
+                prefixCount,
+                desc.Dimension);
+            const float ratio = measured == std::numeric_limits<float>::max()
+                ? std::numeric_limits<float>::max()
+                : measured / radius;
+            minRatio = std::min(minRatio, ratio);
+            sawPoissonPrefix = true;
+            if (!std::isfinite(ratio) ||
+                ratio + desc.PoissonRatioTolerance < 1.0f)
+            {
+                poissonHolds = false;
+            }
+        }
+        diagnostics.MinPoissonRatio =
+            sawPoissonPrefix && minRatio != std::numeric_limits<float>::max()
+                ? minRatio
+                : 1.0f;
+        diagnostics.PoissonGuaranteeHolds = poissonHolds;
+
+        diagnostics.MatchesReference =
+            diagnostics.GpuAcceptedCount == diagnostics.ReferenceAcceptedCount &&
+            diagnostics.OrderMatches &&
+            diagnostics.LevelOffsetsMatch &&
+            diagnostics.SplatRadiiWithinTolerance &&
+            diagnostics.PoissonGuaranteeHolds;
+        diagnostics.Status = diagnostics.MatchesReference
+            ? ProgressivePoissonGpuStatus::Success
+            : ProgressivePoissonGpuStatus::ParityMismatch;
+        diagnostics.CpuFallbackRecommended = !diagnostics.MatchesReference;
+        diagnostics.Diagnostic = diagnostics.MatchesReference
+            ? "Progressive Poisson GPU output matches the CPU reference within tolerance."
+            : "Progressive Poisson GPU output differs from the CPU reference; CPU fallback is required.";
+        return diagnostics;
     }
 }

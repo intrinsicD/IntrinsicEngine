@@ -29,6 +29,8 @@ export namespace Extrinsic::Runtime
         PlanningOnly,
         SizeOverflow,
         InvalidGpuResource,
+        InvalidReadback,
+        ParityMismatch,
     };
 
     enum class ProgressivePoissonGpuPassKind : std::uint8_t
@@ -307,6 +309,78 @@ export namespace Extrinsic::Runtime
         }
     };
 
+    struct ProgressivePoissonGpuReadbackDesc
+    {
+        RHI::IDevice* Device{nullptr};
+        RHI::BufferHandle OrderReadback{};
+        RHI::BufferHandle LevelOffsetsReadback{};
+        RHI::BufferHandle SplatRadiiReadback{};
+        ProgressivePoissonGpuDispatchPlan Plan{};
+    };
+
+    struct ProgressivePoissonGpuReadbackResult
+    {
+        ProgressivePoissonGpuStatus Status{ProgressivePoissonGpuStatus::Success};
+        bool Read{false};
+        bool StructurallyValid{false};
+        bool CpuFallbackRecommended{true};
+        std::uint32_t AcceptedCount{0u};
+        std::vector<std::uint32_t> Order{};
+        std::vector<std::uint32_t> LevelOffsets{};
+        std::vector<float> SplatRadii{};
+        std::string Diagnostic{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == ProgressivePoissonGpuStatus::Success;
+        }
+    };
+
+    struct ProgressivePoissonGpuReferenceView
+    {
+        std::span<const std::uint32_t> Order{};
+        std::span<const std::uint32_t> LevelOffsets{};
+        std::span<const float> SplatRadii{};
+        std::span<const float> LevelRadii{};
+    };
+
+    struct ProgressivePoissonGpuParityDesc
+    {
+        std::span<const glm::vec3> Positions{};
+        std::span<const std::uint32_t> GpuOrder{};
+        std::span<const std::uint32_t> GpuLevelOffsets{};
+        std::span<const float> GpuSplatRadii{};
+        ProgressivePoissonGpuReferenceView Reference{};
+        std::uint32_t Dimension{3u};
+        float SplatRadiusTolerance{1.0e-5f};
+        float PoissonRatioTolerance{1.0e-5f};
+    };
+
+    struct ProgressivePoissonGpuParityDiagnostics
+    {
+        ProgressivePoissonGpuStatus Status{ProgressivePoissonGpuStatus::Success};
+        bool Compared{false};
+        bool MatchesReference{false};
+        bool OrderMatches{false};
+        bool LevelOffsetsMatch{false};
+        bool SplatRadiiWithinTolerance{false};
+        bool PoissonGuaranteeHolds{false};
+        bool CpuFallbackRecommended{true};
+        std::uint32_t GpuAcceptedCount{0u};
+        std::uint32_t ReferenceAcceptedCount{0u};
+        std::uint32_t OrderMismatchCount{0u};
+        std::uint32_t LevelOffsetMismatchCount{0u};
+        std::uint32_t SplatRadiusMismatchCount{0u};
+        float MaxSplatRadiusAbsDelta{0.0f};
+        float MinPoissonRatio{0.0f};
+        std::string Diagnostic{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == ProgressivePoissonGpuStatus::Success;
+        }
+    };
+
     [[nodiscard]] const char* DebugNameForProgressivePoissonGpuStatus(
         ProgressivePoissonGpuStatus status) noexcept;
 
@@ -355,4 +429,12 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] ProgressivePoissonGpuExecutionResult
     RecordProgressivePoissonGpuExecution(
         const ProgressivePoissonGpuExecutionDesc& desc);
+
+    [[nodiscard]] ProgressivePoissonGpuReadbackResult
+    ReadProgressivePoissonGpuReadbacks(
+        const ProgressivePoissonGpuReadbackDesc& desc);
+
+    [[nodiscard]] ProgressivePoissonGpuParityDiagnostics
+    CompareProgressivePoissonGpuOutputToReference(
+        const ProgressivePoissonGpuParityDesc& desc);
 }

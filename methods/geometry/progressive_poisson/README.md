@@ -12,15 +12,15 @@ level — instant level-of-detail via a single index cutoff.
 | Backend | Status | Owning task |
 | --- | --- | --- |
 | `cpu_reference` | reference (canonical truth) | METHOD-012 |
-| `gpu_vulkan_compute` | recordable Vulkan dispatch + upload/readback-copy seam; CPU fallback until parity slices land | METHOD-013 |
+| `gpu_vulkan_compute` | recordable Vulkan dispatch + parsed readback/parity-diagnostic seam; CPU fallback until operational parity lands | METHOD-013 |
 
 This directory holds the **paper intake** (`paper.md`), the **manifest**
 (`method.yaml`), and the METHOD-012 CPU reference implementation under
 `include/` and `src/`. The reference backend is the canonical truth for
 correctness tests and smoke benchmarks. METHOD-013 owns the runtime/config
 backend selection contract, CPU fallback diagnostics, the Vulkan shader/layout
-planning and recording seams, and the future Vulkan upload/readback/parity
-reporting slices.
+planning and recording seams, parsed GPU readback payloads, and the future
+operational Vulkan parity reporting slice.
 
 ## Enabling work (engine backlog)
 
@@ -63,15 +63,17 @@ cloud back onto the selected entity for point rendering. The runtime result
 reports the written sample count, accepted triangle count, rejected face count,
 and total sampled surface area. It also carries requested backend id, actual
 backend id, CPU fallback reason when present, and accepted-point counts per
-progressive level for the Sandbox readout. As of METHOD-013 Slice C.2,
+progressive level for the Sandbox readout. As of METHOD-013 Slice D.1,
 requesting `gpu_vulkan_compute` builds against a runtime recordable dispatch
 contract (`Runtime.ProgressivePoissonGpuBackend`) that pins storage-buffer
 layout, BDA push/state records, shader asset paths, per-level build/accept
 dispatches, accepted/remaining GRAPHICS-108 stream-compaction delegation,
 runtime-owned SoA position uploads, and readback-copy targets for
-`order`/`level_offsets`/`splat_radii`. Public Sandbox execution still returns
-the CPU reference fallback until Vulkan output parsing and CPU/GPU parity land
-in later METHOD-013 slices.
+`order`/`level_offsets`/`splat_radii`. The runtime seam can parse those
+readback buffers and compare them against CPU-reference `order`,
+`level_offsets`, `splat_radii`, and per-level Poisson guarantees. Public
+Sandbox execution still returns the CPU reference fallback until an operational
+`gpu;vulkan` parity test proves the Vulkan output path.
 
 Widget edits preview and hot-apply a serialized `EngineConfig` through
 `Engine::PreviewEngineConfigControlDocument` and
