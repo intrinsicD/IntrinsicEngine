@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 50 |
+| `runtime` | 52 |
 
 ## Modules
 
@@ -337,6 +337,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.AssetModelSceneHandoff` | `src/runtime/Runtime.AssetModelSceneHandoff.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetModelTextureHandoff` | `src/runtime/Runtime.AssetModelTextureHandoff.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetModelTextureIO` | `src/runtime/Runtime.AssetModelTextureIO.cppm` | `runtime` |
+| `Extrinsic.Runtime.AsyncBufferReadback` | `src/runtime/Runtime.AsyncBufferReadback.cppm` | `runtime` |
 | `Extrinsic.Runtime.DerivedJobGraph` | `src/runtime/Runtime.DerivedJobGraph.cppm` | `runtime` |
 | `Extrinsic.Runtime.EcsSystemBundle` | `src/runtime/Runtime.EcsSystemBundle.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorCommandHistory` | `src/runtime/Runtime.EditorCommandHistory.cppm` | `runtime` |
@@ -345,6 +346,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.GpuReadbackJob` | `src/runtime/Runtime.GpuReadbackJob.cppm` | `runtime` |
 | `Extrinsic.Runtime.GraphGeometryPacker` | `src/runtime/Runtime.GraphGeometryPacker.cppm` | `runtime` |
 | `Extrinsic.Runtime.KMeansBackend` | `src/runtime/Runtime.KMeansBackend.cppm` | `runtime` |
+| `Extrinsic.Runtime.KMeansGpuBackend` | `src/runtime/Runtime.KMeansGpuBackend.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshAttributeTextureBake` | `src/runtime/Runtime.MeshAttributeTextureBake.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshGeometryPacker` | `src/runtime/Runtime.MeshGeometryPacker.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshPrimitiveViewPacker` | `src/runtime/Runtime.MeshPrimitiveViewPacker.cppm` | `runtime` |
@@ -377,4 +379,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugClosestFace` | `src/runtime/SpatialDebug/Runtime.SpatialDebugClosestFace.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **350**
+Total modules: **352**

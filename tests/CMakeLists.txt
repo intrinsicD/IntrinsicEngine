@@ -260,6 +260,8 @@ if(TARGET ExtrinsicRuntime)
 
     set(_runtime_contract_test_files
         Test.GpuAssetCacheFallbackBootstrap.cpp
+        Test.AsyncBufferReadback.cpp
+        Test.KMeansGpuBackend.cpp
         Test.GpuReadbackJob.cpp
         Test.AssetGeometryIO.cpp
         Test.AssetIngestStateMachine.cpp

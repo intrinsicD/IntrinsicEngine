@@ -16,13 +16,17 @@ the authoritative open/unblocked view.
 
 - blocked by `GRAPHICS-104`: `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/backlog/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
 - unblocked: `GRAPHICS-110` — Per-frame/ring ImGui upload buffers for in-flight safety (tasks/backlog/rendering/GRAPHICS-110-imgui-upload-buffer-in-flight-safety.md)
+- unblocked: `GRAPHICS-111` — Float segmented/per-key reduction primitive in ComputeParallelPrimitives (tasks/backlog/rendering/GRAPHICS-111-float-segmented-reduction-primitive.md)
+- unblocked: `GRAPHICS-112` — Work-efficient workgroup scan + uint32 overflow guard in ComputeParallelPrimitives (tasks/backlog/rendering/GRAPHICS-112-work-efficient-workgroup-scan.md)
 - blocked by `GRAPHICS-104`: `RUNTIME-129` — Schedule GPU object-space normal bake jobs after import (tasks/backlog/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
+- blocked by `RUNTIME-137`: `GEOM-056` — KMeans GPU (Vulkan compute) backend + parity (tasks/backlog/geometry/GEOM-056-kmeans-gpu-vulkan-compute-backend.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
+- unblocked: `RUNTIME-137` — Async GPU readback helper + pooled destination for compute backends (tasks/backlog/runtime/RUNTIME-137-async-gpu-readback-helper-for-compute-backends.md)
 - blocked by `GEOM-014`: `UI-028` — Sandbox EditorUI mesh simplification window (tasks/backlog/ui/UI-028-editor-mesh-simplification-window.md)
 - blocked by `GEOM-055`: `UI-029` — Editor ICP registration panel + convergence visualization (tasks/backlog/ui/UI-029-editor-registration-convergence-visualization.md)
 - unblocked: `UI-030` — Sandbox EditorUI frame-pacing diagnostics (tasks/backlog/ui/UI-030-editor-frame-pacing-diagnostics.md)
