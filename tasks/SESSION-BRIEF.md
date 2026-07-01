@@ -15,6 +15,7 @@ the authoritative open/unblocked view.
 ## Theme B — Rendering modernization
 
 - blocked by `GRAPHICS-104`: `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/backlog/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
+- unblocked: `GRAPHICS-110` — Per-frame/ring ImGui upload buffers for in-flight safety (tasks/backlog/rendering/GRAPHICS-110-imgui-upload-buffer-in-flight-safety.md)
 - blocked by `GRAPHICS-104`: `RUNTIME-129` — Schedule GPU object-space normal bake jobs after import (tasks/backlog/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds

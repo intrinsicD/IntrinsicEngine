@@ -57,7 +57,7 @@ import Extrinsic.Runtime.VertexChannelBindings;
 
 namespace Extrinsic::Runtime::Detail
 {
-    inline constexpr std::size_t kSandboxEditorPanelWindowCount = 10u;
+    inline constexpr std::size_t kSandboxEditorPanelWindowCount = 11u;
 }
 
 export namespace Extrinsic::Runtime
@@ -292,6 +292,7 @@ export namespace Extrinsic::Runtime
         bool HasCurvatureMethod{false};
         bool HasRemeshMethod{false};
         bool HasSubdivideMethod{false};
+        bool HasSimplifyMethod{false};
     };
 
     [[nodiscard]] std::vector<SandboxEditorGeometryProcessingMenuItem>
@@ -541,6 +542,14 @@ export namespace Extrinsic::Runtime
         Sqrt3,
     };
 
+    // UI-028: error-metric selection for the Mesh > Processing > Simplify window.
+    // Mirrors Geometry::Simplification::Metric (FA_QEM is the GEOM-014 default).
+    enum class SandboxEditorMeshSimplifyMetric : std::uint8_t
+    {
+        ClassicalQEM,
+        FA_QEM,
+    };
+
     [[nodiscard]] const char* DebugNameForSandboxEditorMeshRemeshMode(
         SandboxEditorMeshRemeshMode mode) noexcept;
 
@@ -549,6 +558,9 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] const char* DebugNameForSandboxEditorMeshSubdivideOperator(
         SandboxEditorMeshSubdivideOperator op) noexcept;
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorMeshSimplifyMetric(
+        SandboxEditorMeshSimplifyMetric metric) noexcept;
 
     struct SandboxEditorMeshDenoiseCommand
     {
@@ -695,6 +707,101 @@ export namespace Extrinsic::Runtime
         std::size_t InputFaceCount{0u};
         std::size_t OutputVertexCount{0u};
         std::size_t OutputFaceCount{0u};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SandboxEditorCommandStatus::Applied;
+        }
+    };
+
+    struct SandboxEditorMeshSimplifyCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        SandboxEditorMeshSimplifyMetric Metric{
+            SandboxEditorMeshSimplifyMetric::FA_QEM};
+        // Stop the decimation when FaceCount() <= TargetFaces (0 = disabled).
+        std::size_t TargetFaces{0u};
+        // Maximum allowed error per collapse; 0 = unlimited (rely on TargetFaces).
+        double MaxError{0.0};
+        bool PreserveBoundary{true};
+        // FA_QEM feature-aware weights (ignored under ClassicalQEM).
+        double FeatureAngleThresholdDegrees{45.0};
+        double NormalWeight{1.0};
+        double BoundaryWeight{1.0};
+        double CurvatureWeight{1.0};
+        bool PreserveSharpFeatures{true};
+        bool PreserveUvSeams{true};
+    };
+
+    struct SandboxEditorMeshSimplifyResult
+    {
+        SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
+        SandboxEditorMeshSimplifyMetric Metric{
+            SandboxEditorMeshSimplifyMetric::FA_QEM};
+        std::size_t TargetFaces{0u};
+        double MaxError{0.0};
+        std::size_t InputVertexCount{0u};
+        std::size_t InputFaceCount{0u};
+        std::size_t OutputVertexCount{0u};
+        std::size_t OutputFaceCount{0u};
+        std::size_t CollapseCount{0u};
+        double MaxCollapseError{0.0};
+        std::size_t CollapsesRejectedTopology{0u};
+        std::size_t CollapsesRejectedQuality{0u};
+        std::size_t SharpFeatureVerticesPinned{0u};
+        std::size_t SeamVerticesPinned{0u};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SandboxEditorCommandStatus::Applied;
+        }
+    };
+
+    // UI-029: ICP registration between two selected point-cloud entities.
+    // Editor-local variant enum (mapped to Geometry::Registration::ICPVariant in
+    // the command implementation) so the editor interface stays decoupled from
+    // the geometry registration module.
+    enum class SandboxEditorICPVariant : std::uint8_t
+    {
+        PointToPoint,
+        PointToPlane,
+    };
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorICPVariant(
+        SandboxEditorICPVariant variant) noexcept;
+
+    struct SandboxEditorRegistrationCommand
+    {
+        std::uint32_t SourceStableEntityId{0u};
+        std::uint32_t TargetStableEntityId{0u};
+        SandboxEditorICPVariant Variant{SandboxEditorICPVariant::PointToPoint};
+        std::uint32_t MaxIterations{50u};
+        // World-space correspondence cutoff; <= 0 disables the cutoff.
+        double MaxCorrespondenceDistance{0.0};
+        double InlierRatio{0.9};
+        // Trajectory step whose cumulative source->target pose is written to the
+        // source entity Transform. 0 = identity (un-registered start); values at
+        // or beyond the completed iteration count clamp to the converged pose.
+        std::size_t TrajectoryStep{0u};
+    };
+
+    struct SandboxEditorRegistrationResult
+    {
+        SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
+        bool HasResult{false};
+        SandboxEditorICPVariant Variant{SandboxEditorICPVariant::PointToPoint};
+        std::size_t SourcePointCount{0u};
+        std::size_t TargetPointCount{0u};
+        std::size_t IterationsPerformed{0u};
+        std::size_t TrajectoryLength{0u};
+        std::size_t AppliedStep{0u};
+        double FinalRMSE{0.0};
+        bool Converged{false};
+        std::size_t FinalInlierCount{0u};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
 
@@ -1858,6 +1965,7 @@ export namespace Extrinsic::Runtime
         bool MeshSubdivideCatmullClarkAvailable{false};
         bool MeshSubdivideSqrt3Available{false};
         bool MeshSubdivideLoopFeatureEdgesAvailable{false};
+        bool MeshSimplifyAvailable{false};
         bool MeshVertexNormalsAvailable{false};
         bool GraphVertexNormalsAvailable{false};
         bool PointCloudVertexNormalsAvailable{false};
@@ -1873,6 +1981,8 @@ export namespace Extrinsic::Runtime
             LastMeshRemeshResult{};
         std::optional<SandboxEditorMeshSubdivideResult>
             LastMeshSubdivideResult{};
+        std::optional<SandboxEditorMeshSimplifyResult>
+            LastMeshSimplifyResult{};
         std::optional<SandboxEditorMeshVertexNormalsResult>
             LastMeshVertexNormalsResult{};
         std::optional<SandboxEditorGraphVertexNormalsResult>
@@ -1962,6 +2072,8 @@ export namespace Extrinsic::Runtime
             LastMeshRemeshResult{nullptr};
         const SandboxEditorMeshSubdivideResult*
             LastMeshSubdivideResult{nullptr};
+        const SandboxEditorMeshSimplifyResult*
+            LastMeshSimplifyResult{nullptr};
         const SandboxEditorMeshVertexNormalsResult*
             LastMeshVertexNormalsResult{nullptr};
         const SandboxEditorGraphVertexNormalsResult*
@@ -1972,6 +2084,8 @@ export namespace Extrinsic::Runtime
             LastPointCloudOutlierRemovalResult{nullptr};
         const SandboxEditorProgressivePoissonResult*
             LastProgressivePoissonResult{nullptr};
+        const SandboxEditorRegistrationResult*
+            LastRegistrationResult{nullptr};
         const Graphics::RenderGraphFrameStats* RenderGraphStats{nullptr};
         const Graphics::RenderRecipeConfigContext* RenderRecipeContext{nullptr};
         SandboxEditorRenderRecipeEditorState* RenderRecipeEditorState{nullptr};
@@ -2010,6 +2124,7 @@ export namespace Extrinsic::Runtime
         bool MeshSubdivideCatmullClarkKernelAvailable{true};
         bool MeshSubdivideSqrt3KernelAvailable{true};
         bool MeshSubdivideLoopFeatureEdgesAvailable{true};
+        bool MeshSimplifyKernelAvailable{true};
     };
 
     struct SandboxEditorTransformEditCommand
@@ -2330,6 +2445,10 @@ export namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorMeshSubdivideCommand& command);
 
+    SandboxEditorMeshSimplifyResult ApplySandboxEditorMeshSimplifyCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorMeshSimplifyCommand& command);
+
     SandboxEditorMeshVertexNormalsResult
     ApplySandboxEditorMeshVertexNormalsCommand(
         const SandboxEditorContext& context,
@@ -2349,6 +2468,10 @@ export namespace Extrinsic::Runtime
     ApplySandboxEditorPointCloudOutlierRemovalCommand(
         const SandboxEditorContext& context,
         const SandboxEditorPointCloudOutlierRemovalCommand& command);
+
+    SandboxEditorRegistrationResult ApplySandboxEditorRegistrationCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorRegistrationCommand& command);
 
     SandboxEditorProgressivePoissonResult
     ApplySandboxEditorProgressivePoissonCommand(
@@ -2413,6 +2536,8 @@ export namespace Extrinsic::Runtime
             m_LastMeshRemeshResult{};
         std::optional<SandboxEditorMeshSubdivideResult>
             m_LastMeshSubdivideResult{};
+        std::optional<SandboxEditorMeshSimplifyResult>
+            m_LastMeshSimplifyResult{};
         std::optional<SandboxEditorMeshVertexNormalsResult>
             m_LastMeshVertexNormalsResult{};
         std::optional<SandboxEditorGraphVertexNormalsResult>
@@ -2425,6 +2550,8 @@ export namespace Extrinsic::Runtime
             m_LastProgressivePoissonResult{};
         std::optional<SandboxEditorProgressivePoissonConfigResult>
             m_LastProgressivePoissonConfigResult{};
+        std::optional<SandboxEditorRegistrationResult>
+            m_LastRegistrationResult{};
         Graphics::RenderRecipeConfigContext m_RenderRecipeContext{};
         SandboxEditorRenderRecipeEditorState m_RenderRecipeState{};
         RenderArtifactRegistry m_RenderArtifactRegistry{};
@@ -2451,6 +2578,22 @@ export namespace Extrinsic::Runtime
         std::int32_t m_MeshSubdivideOperator{0};
         std::int32_t m_MeshSubdivideIterations{1};
         bool m_MeshSubdividePreserveLoopFeatures{false};
+        std::int32_t m_MeshSimplifyMetric{1};
+        std::int32_t m_MeshSimplifyTargetFaces{0};
+        float m_MeshSimplifyMaxError{0.0f};
+        bool m_MeshSimplifyPreserveBoundary{true};
+        float m_MeshSimplifyFeatureAngleThresholdDegrees{45.0f};
+        float m_MeshSimplifyNormalWeight{1.0f};
+        float m_MeshSimplifyBoundaryWeight{1.0f};
+        float m_MeshSimplifyCurvatureWeight{1.0f};
+        bool m_MeshSimplifyPreserveSharpFeatures{true};
+        bool m_MeshSimplifyPreserveUvSeams{true};
+        std::int32_t m_RegistrationVariant{0};
+        std::int32_t m_RegistrationMaxIterations{50};
+        float m_RegistrationMaxCorrespondenceDistance{0.0f};
+        float m_RegistrationInlierRatio{0.9f};
+        std::int32_t m_RegistrationTrajectoryStep{0};
+        bool m_RegistrationSwapSourceTarget{false};
         std::int32_t m_MeshVertexNormalsWeighting{1};
         glm::vec3 m_MeshVertexNormalsFallback{0.0f, 1.0f, 0.0f};
         glm::vec3 m_GraphVertexNormalsFallback{0.0f, 0.0f, 1.0f};

@@ -5,6 +5,38 @@ depends_on: [GEOM-055]
 ---
 # UI-029 — Editor ICP registration panel + convergence visualization
 
+## Status
+- Editor panel + command implemented (2026-07-01) on branch
+  `claude/ui-backlog-agentic-y3oap2`. The runtime controller
+  `Extrinsic.Runtime.RegistrationAlignment` and its headless test landed earlier;
+  this change adds the editor consumer.
+- `SandboxEditorRegistrationCommand` / `SandboxEditorRegistrationResult` +
+  `ApplySandboxEditorRegistrationCommand` read the source + target point clouds
+  from two selected entities, require `Domain::PointCloud`, run
+  `Runtime::AlignPointClouds`, and drive the source entity `Transform` with
+  `TrajectoryPose(outcome, step)` through an undoable `MakeTransformEditCommand`.
+  A top-level `ICP Registration` panel (new `SandboxEditorPanelWindowKind`,
+  reachable from the `View` menu) exposes source/target from the current
+  multi-selection (with a swap toggle), the `ICPVariant`, MaxIterations,
+  MaxCorrespondenceDistance, InlierRatio, and a trajectory-step slider over
+  `[0, IterationCount()]`.
+- Verified in-session: `check_layering --strict` (the new
+  `runtime -> Extrinsic.Runtime.RegistrationAlignment` and
+  `runtime -> Geometry.Registration` edges are allowed),
+  `check_test_layout --strict`, `validate_tasks --strict`,
+  `check_task_policy --strict`, `check_doc_links`, and adversarial diff review.
+- Follow-up fix (2026-07-01, review feedback): ICP now runs in world space. The
+  command composes each entity's model matrix (from its `Transform::Component`),
+  transforms both clouds' local `v:position` into world space, runs ICP, then
+  composes the returned delta with the source model matrix and decomposes it back
+  into the source `Transform`. Previously it ran ICP on raw local arrays and
+  never read the target Transform, so identical clouds with a translated target
+  produced an identity pose and left the source at the origin. Added
+  `SandboxEditorUi.RegistrationCommandAlignsAcrossEntityTransforms` (translated
+  target → source driven onto it).
+- Deferred to CI (sandbox = clang-18, no vcpkg): `cmake --preset ci` +
+  `ctest -R 'SandboxEditorUi|RuntimeRegistrationAlignment'`.
+
 ## Goal
 - Let the Sandbox editor run ICP registration between two selected point-cloud
   entities and visualize the source shape converging onto the target, consuming
@@ -56,14 +88,14 @@ depends_on: [GEOM-055]
 - [x] Add runtime controller `Extrinsic.Runtime.RegistrationAlignment`
       (`AlignPointClouds`, `TrajectoryPose`, `RegistrationAlignmentOutcome`) and
       register it in `src/runtime/CMakeLists.txt`.
-- [ ] Add `SandboxEditorRegistrationCommand` / `SandboxEditorRegistrationResult`
+- [x] Add `SandboxEditorRegistrationCommand` / `SandboxEditorRegistrationResult`
       structs + a `SandboxEditorContext::LastRegistrationResult` pointer in
       `Runtime.SandboxEditorUi.cppm`.
-- [ ] Implement `ApplySandboxEditorRegistrationCommand` in
+- [x] Implement `ApplySandboxEditorRegistrationCommand` in
       `Runtime.SandboxEditorUi.cpp`: read source+target point clouds from the two
       selected entities, call `Runtime::AlignPointClouds`, store the outcome, and
       apply `TrajectoryPose(outcome, step)` to the source entity `Transform`.
-- [ ] Add the panel (UiState + `SandboxEditorUi` member state + draw block +
+- [x] Add the panel (UiState + `SandboxEditorUi` member state + draw block +
       registration in the panel-draw frame) with the trajectory-step slider.
 
 ## Tests
@@ -72,22 +104,29 @@ depends_on: [GEOM-055]
       (`Traces.size() == Result.IterationsPerformed`, `Traces[i].RMSE ==
       RMSEHistory[i]`); `TrajectoryPose` returns identity at step 0, the final
       transform at step N, and clamps beyond N.
-- [ ] Add an editor-command CPU test for `ApplySandboxEditorRegistrationCommand`
+- [x] Add an editor-command CPU test for `ApplySandboxEditorRegistrationCommand`
       (two synthetic point-cloud entities → aligned source transform; missing/
-      wrong-domain selection → precise failure status).
+      wrong-domain selection → precise failure status). Added
+      `SandboxEditorUi.RegistrationCommandAlignsSourceOntoTargetAndSupportsUndoRedo`
+      and `...RegistrationCommandFailsClosedForInvalidSelectionAndParameters` to
+      `tests/contract/runtime/Test.SandboxEditorUi.cpp` (runs under the default
+      gate in CI; the sandbox cannot bootstrap the C++23 module build).
 
 ## Docs
 - [x] `docs/architecture/geometry-pipeline-modularity.md` §3.4 records the runtime
       controller + this editor consumer.
-- [ ] Note the registration panel in the editor/runtime docs when the panel lands.
+- [x] Note the registration panel in the editor/runtime docs when the panel
+      lands. Added the "Sandbox Editor ICP Registration" subsection to
+      `src/runtime/README.md`.
 
 ## Acceptance criteria
 - [x] The runtime controller runs ICP capturing the convergence trajectory and is
       covered by a headless CPU test (`runtime -> geometry`; no ECS/RHI).
 - [ ] Selecting a source + target point cloud and running the panel aligns the
       source onto the target; the slider scrubs the intermediate poses.
-- [ ] `python3 tools/repo/check_layering.py --root src --strict` passes.
-- [ ] Editor-command CPU test passes under the default gate.
+- [x] `python3 tools/repo/check_layering.py --root src --strict` passes.
+- [ ] Editor-command CPU test passes under the default gate (written; runs in
+      CI — the sandbox has clang-18 and cannot bootstrap vcpkg).
 
 ## Verification
 ```bash

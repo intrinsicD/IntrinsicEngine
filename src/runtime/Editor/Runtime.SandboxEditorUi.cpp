@@ -63,6 +63,7 @@ import Extrinsic.Runtime.ProgressivePoissonGpuBackend;
 import Extrinsic.Runtime.ProgressivePresentationExtraction;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
+import Extrinsic.Runtime.RegistrationAlignment;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.SceneSerialization;
@@ -87,7 +88,9 @@ import Geometry.PointCloud.Normals;
 import Geometry.PointCloud.SurfaceSampling;
 import Geometry.PointCloud.Utils;
 import Geometry.Properties;
+import Geometry.Registration;
 import Geometry.Remeshing;
+import Geometry.Simplification;
 import Geometry.Smoothing;
 import Geometry.Subdivision;
 import Geometry.UvAtlas;
@@ -114,6 +117,8 @@ namespace Extrinsic::Runtime
         namespace LoopSubdivide = Geometry::Subdivision;
         namespace CatmullClark = Geometry::CatmullClark;
         namespace Sqrt3Subdivide = Geometry::SubdivisionSqrt3;
+        namespace Simpl = Geometry::Simplification;
+        namespace Reg = Geometry::Registration;
         namespace PPR = Intrinsic::Methods::Geometry::ProgressivePoissonReference;
 
         inline constexpr std::array<A::AssetPayloadKind, 6> kImportPayloadKinds{{
@@ -198,6 +203,18 @@ namespace Extrinsic::Runtime
                 SandboxEditorMeshRemeshSizingLaw::ErrorBoundedTaubin,
             }};
 
+        inline constexpr std::array<SandboxEditorMeshSimplifyMetric, 2>
+            kMeshSimplifyMetrics{{
+                SandboxEditorMeshSimplifyMetric::ClassicalQEM,
+                SandboxEditorMeshSimplifyMetric::FA_QEM,
+            }};
+
+        inline constexpr std::array<SandboxEditorICPVariant, 2>
+            kSandboxEditorICPVariants{{
+                SandboxEditorICPVariant::PointToPoint,
+                SandboxEditorICPVariant::PointToPlane,
+            }};
+
         inline constexpr std::array<SandboxEditorMeshSubdivideOperator, 3>
             kMeshSubdivideOperators{{
                 SandboxEditorMeshSubdivideOperator::Loop,
@@ -268,6 +285,21 @@ namespace Extrinsic::Runtime
             bool* PreserveLoopFeatures{nullptr};
         };
 
+        struct MeshSimplifyUiState
+        {
+            std::optional<SandboxEditorMeshSimplifyResult>* LastResult{nullptr};
+            std::int32_t* Metric{nullptr};
+            std::int32_t* TargetFaces{nullptr};
+            float* MaxError{nullptr};
+            bool* PreserveBoundary{nullptr};
+            float* FeatureAngleThresholdDegrees{nullptr};
+            float* NormalWeight{nullptr};
+            float* BoundaryWeight{nullptr};
+            float* CurvatureWeight{nullptr};
+            bool* PreserveSharpFeatures{nullptr};
+            bool* PreserveUvSeams{nullptr};
+        };
+
         struct MeshVertexNormalsUiState
         {
             std::optional<SandboxEditorMeshVertexNormalsResult>* LastResult{nullptr};
@@ -302,6 +334,17 @@ namespace Extrinsic::Runtime
             float*        StdDevMultiplier{nullptr};
             float*        SearchRadius{nullptr};
             std::int32_t* MinNeighbors{nullptr};
+        };
+
+        struct RegistrationUiState
+        {
+            std::optional<SandboxEditorRegistrationResult>* LastResult{nullptr};
+            std::int32_t* Variant{nullptr};
+            std::int32_t* MaxIterations{nullptr};
+            float* MaxCorrespondenceDistance{nullptr};
+            float* InlierRatio{nullptr};
+            std::int32_t* TrajectoryStep{nullptr};
+            bool* SwapSourceTarget{nullptr};
         };
 
         struct ProgressivePoissonUiState
@@ -369,6 +412,7 @@ namespace Extrinsic::Runtime
             RenderRecipe,
             CameraRender,
             GeometryVisualization,
+            Registration,
             Count,
         };
 
@@ -389,6 +433,7 @@ namespace Extrinsic::Runtime
                 SandboxEditorPanelWindowKind::RenderRecipe,
                 SandboxEditorPanelWindowKind::CameraRender,
                 SandboxEditorPanelWindowKind::GeometryVisualization,
+                SandboxEditorPanelWindowKind::Registration,
             }};
 
         [[nodiscard]] const char* PanelWindowTitle(
@@ -416,6 +461,8 @@ namespace Extrinsic::Runtime
                 return "Camera / Render";
             case SandboxEditorPanelWindowKind::GeometryVisualization:
                 return "Geometry Visualization";
+            case SandboxEditorPanelWindowKind::Registration:
+                return "ICP Registration";
             case SandboxEditorPanelWindowKind::Count:
                 break;
             }
@@ -474,7 +521,7 @@ namespace Extrinsic::Runtime
             case SandboxEditorDomainWindowKind::Mesh:
                 switch (section)
                 {
-                case DomainWindowSection::Render: return "Mesh / Render";
+                case DomainWindowSection::Render: return "Mesh / Appearance";
                 case DomainWindowSection::Properties: return "Mesh / Properties";
                 case DomainWindowSection::Visualization: return "Mesh / Visualization";
                 case DomainWindowSection::Selection: return "Mesh / Selection";
@@ -485,7 +532,7 @@ namespace Extrinsic::Runtime
             case SandboxEditorDomainWindowKind::Graph:
                 switch (section)
                 {
-                case DomainWindowSection::Render: return "Graph / Render";
+                case DomainWindowSection::Render: return "Graph / Appearance";
                 case DomainWindowSection::Properties: return "Graph / Properties";
                 case DomainWindowSection::Visualization: return "Graph / Visualization";
                 case DomainWindowSection::Selection: return "Graph / Selection";
@@ -496,7 +543,7 @@ namespace Extrinsic::Runtime
             case SandboxEditorDomainWindowKind::PointCloud:
                 switch (section)
                 {
-                case DomainWindowSection::Render: return "PointCloud / Render";
+                case DomainWindowSection::Render: return "PointCloud / Appearance";
                 case DomainWindowSection::Properties: return "PointCloud / Properties";
                 case DomainWindowSection::Visualization: return "PointCloud / Visualization";
                 case DomainWindowSection::Selection: return "PointCloud / Selection";
@@ -5081,6 +5128,26 @@ namespace Extrinsic::Runtime
             return kMeshRemeshSizingLaws[static_cast<std::size_t>(clamped)];
         }
 
+        [[nodiscard]] SandboxEditorMeshSimplifyMetric
+        MeshSimplifyMetricFromIndex(const std::int32_t index) noexcept
+        {
+            const std::int32_t clamped = std::clamp(
+                index,
+                0,
+                static_cast<std::int32_t>(kMeshSimplifyMetrics.size() - 1u));
+            return kMeshSimplifyMetrics[static_cast<std::size_t>(clamped)];
+        }
+
+        [[nodiscard]] SandboxEditorICPVariant
+        SandboxEditorICPVariantFromIndex(const std::int32_t index) noexcept
+        {
+            const std::int32_t clamped = std::clamp(
+                index,
+                0,
+                static_cast<std::int32_t>(kSandboxEditorICPVariants.size() - 1u));
+            return kSandboxEditorICPVariants[static_cast<std::size_t>(clamped)];
+        }
+
         [[nodiscard]] SandboxEditorMeshSubdivideOperator
         MeshSubdivideOperatorFromIndex(const std::int32_t index) noexcept
         {
@@ -5687,6 +5754,30 @@ namespace Extrinsic::Runtime
                              op) != kMeshSubdivideOperators.end();
         }
 
+        [[nodiscard]] bool ValidMeshSimplifyMetric(
+            const SandboxEditorMeshSimplifyMetric metric) noexcept
+        {
+            return std::find(kMeshSimplifyMetrics.begin(),
+                             kMeshSimplifyMetrics.end(),
+                             metric) != kMeshSimplifyMetrics.end();
+        }
+
+        [[nodiscard]] bool ValidSandboxEditorICPVariant(
+            const SandboxEditorICPVariant variant) noexcept
+        {
+            return std::find(kSandboxEditorICPVariants.begin(),
+                             kSandboxEditorICPVariants.end(),
+                             variant) != kSandboxEditorICPVariants.end();
+        }
+
+        [[nodiscard]] Reg::ICPVariant ToGeometryICPVariant(
+            const SandboxEditorICPVariant variant) noexcept
+        {
+            return variant == SandboxEditorICPVariant::PointToPlane
+                       ? Reg::ICPVariant::PointToPlane
+                       : Reg::ICPVariant::PointToPoint;
+        }
+
         struct MeshTopologySourceResult
         {
             Geometry::HalfedgeMesh::Mesh Mesh{};
@@ -5991,6 +6082,73 @@ namespace Extrinsic::Runtime
             return message;
         }
 
+        [[nodiscard]] std::string BuildMeshSimplifySuccessMessage(
+            const SandboxEditorMeshSimplifyResult& result)
+        {
+            std::string message = "Mesh simplify completed (metric=";
+            message += DebugNameForSandboxEditorMeshSimplifyMetric(
+                result.Metric);
+            message += ", inputFaces=";
+            message += std::to_string(result.InputFaceCount);
+            message += ", outputFaces=";
+            message += std::to_string(result.OutputFaceCount);
+            message += ", collapses=";
+            message += std::to_string(result.CollapseCount);
+            message += ").";
+            return message;
+        }
+
+        [[nodiscard]] std::string BuildRegistrationSuccessMessage(
+            const SandboxEditorRegistrationResult& result)
+        {
+            std::string message = "ICP registration completed (variant=";
+            message += DebugNameForSandboxEditorICPVariant(result.Variant);
+            message += ", iterations=";
+            message += std::to_string(result.IterationsPerformed);
+            message += ", step=";
+            message += std::to_string(result.AppliedStep);
+            message += "/";
+            message += std::to_string(result.TrajectoryLength);
+            message += ", converged=";
+            message += result.Converged ? "yes" : "no";
+            message += ").";
+            return message;
+        }
+
+        // Compose an entity model matrix (translate * rotate * scale) from its
+        // local Transform::Component so ICP can run in world space.
+        [[nodiscard]] glm::mat4 ModelMatrixFromTransform(
+            const ECSC::Transform::Component& transform) noexcept
+        {
+            glm::mat4 model = glm::mat4_cast(transform.Rotation);
+            model[0] *= transform.Scale.x;
+            model[1] *= transform.Scale.y;
+            model[2] *= transform.Scale.z;
+            model[3] = glm::vec4(transform.Position, 1.0f);
+            return model;
+        }
+
+        // Decompose a composed model matrix back into a Transform::Component.
+        // The ICP delta is rigid, so the scale carried by the source model is
+        // preserved; rotation is recovered from the scale-normalized columns.
+        void DecomposeModelToTransform(
+            const glm::mat4& model,
+            ECSC::Transform::Component& out) noexcept
+        {
+            out.Position = glm::vec3(model[3]);
+            const glm::vec3 col0(model[0]);
+            const glm::vec3 col1(model[1]);
+            const glm::vec3 col2(model[2]);
+            const glm::vec3 scale(
+                glm::length(col0), glm::length(col1), glm::length(col2));
+            const glm::mat3 rotation(
+                scale.x > 0.0f ? col0 / scale.x : glm::vec3(1.0f, 0.0f, 0.0f),
+                scale.y > 0.0f ? col1 / scale.y : glm::vec3(0.0f, 1.0f, 0.0f),
+                scale.z > 0.0f ? col2 / scale.z : glm::vec3(0.0f, 0.0f, 1.0f));
+            out.Rotation = glm::quat_cast(rotation);
+            out.Scale = scale;
+        }
+
         [[nodiscard]] SandboxEditorGeometryProcessingModel BuildGeometryProcessingModel(
             const SandboxEditorContext& context)
         {
@@ -6075,6 +6233,12 @@ namespace Extrinsic::Runtime
             model.MeshSubdivideLoopFeatureEdgesAvailable =
                 model.MeshSubdivideLoopAvailable &&
                 context.MeshSubdivideLoopFeatureEdgesAvailable;
+            model.MeshSimplifyAvailable =
+                context.MeshSimplifyKernelAvailable &&
+                model.Capabilities.HasEditableSurfaceMesh &&
+                HasAnySandboxEditorGeometryProcessingDomain(
+                    model.Capabilities.Domains,
+                    SandboxEditorGeometryProcessingDomain::MeshVertices);
             model.MeshVertexNormalsAvailable =
                 model.Capabilities.HasEditableSurfaceMesh &&
                 HasAnySandboxEditorGeometryProcessingDomain(
@@ -6168,6 +6332,20 @@ namespace Extrinsic::Runtime
                         context.LastMeshSubdivideResult->Message.empty()
                             ? "Last mesh subdivide command failed."
                             : context.LastMeshSubdivideResult->Message);
+                }
+            }
+            if (context.LastMeshSimplifyResult != nullptr)
+            {
+                model.LastMeshSimplifyResult =
+                    *context.LastMeshSimplifyResult;
+                if (!context.LastMeshSimplifyResult->Succeeded())
+                {
+                    AddDiagnostic(
+                        model.Diagnostics,
+                        SandboxEditorDiagnosticCode::GeometryProcessingFailed,
+                        context.LastMeshSimplifyResult->Message.empty()
+                            ? "Last mesh simplify command failed."
+                            : context.LastMeshSimplifyResult->Message);
                 }
             }
             if (context.LastMeshVertexNormalsResult != nullptr)
@@ -7166,8 +7344,11 @@ namespace Extrinsic::Runtime
 
             if (domainWindowOpen != nullptr)
             {
+                // UI-031: the `Render` section is now the domain-aware Appearance
+                // window (render hints + bound render state + property/attribute
+                // assignment + texture baking).
                 ImGui::MenuItem(
-                    "Render hints",
+                    "Appearance",
                     nullptr,
                     &(*domainWindowOpen)[DomainWindowSlotIndex(kind, DomainWindowSection::Render)]);
                 ImGui::MenuItem(
@@ -7236,6 +7417,18 @@ namespace Extrinsic::Runtime
                                 return item.HasSubdivideMethod;
                             });
                     if (hasSubdivideLeaf && ImGui::MenuItem("Subdivide"))
+                    {
+                        processingOpen = true;
+                    }
+                    const bool hasSimplifyLeaf =
+                        std::any_of(
+                            menuItems.begin(),
+                            menuItems.end(),
+                            [](const SandboxEditorGeometryProcessingMenuItem& item)
+                            {
+                                return item.HasSimplifyMethod;
+                            });
+                    if (hasSimplifyLeaf && ImGui::MenuItem("Simplify"))
                     {
                         processingOpen = true;
                     }
@@ -7923,19 +8116,19 @@ namespace Extrinsic::Runtime
             DrawDiagnostics(model.Diagnostics);
         }
 
+        // UI-031 Slice D: the domain Properties window is a pure property
+        // explorer — it lists every property and its value preview and does NOT
+        // host render-hint, texture-bake, or property-binding controls (those
+        // moved to the Appearance window). Internal/connectivity/generated
+        // property rows stay visible; unsupported edit/bind states are marked by
+        // the catalog rows rather than hidden.
         void DrawDomainPropertyWindow(
-            const SandboxEditorDomainWindowModel& model,
-            const SandboxEditorContext* context,
-            TextureBakeUiState* textureBakeState)
+            const SandboxEditorDomainWindowModel& model)
         {
             DrawDomainWindowHeader(model);
             if (!DomainWindowReady(model))
                 return;
-            DrawBoundRenderStateRows(model.BoundState);
-            DrawTextureBakeControls(model.TextureBake, context, textureBakeState);
             DrawPropertyCatalogRows(model.PropertyCatalog);
-            DrawPropertyBindingTargets(model.PropertyCatalog);
-            DrawVertexChannelBindingTargets(model.PropertyCatalog, context);
             DrawDiagnostics(model.PropertyCatalog.Diagnostics);
         }
 
@@ -8319,8 +8512,13 @@ namespace Extrinsic::Runtime
             }
         }
 
+        // UI-031 Slices A/B: the domain `Render` section renders as the
+        // "Appearance" window and co-locates render hints, bound render-state
+        // inspection, property/attribute assignment, and texture baking (the
+        // last three relocated out of the Properties window).
         void DrawDomainRenderWindow(const SandboxEditorDomainWindowModel& model,
-                                    const SandboxEditorContext& context)
+                                    const SandboxEditorContext& context,
+                                    TextureBakeUiState* textureBakeState)
         {
             DrawDomainWindowHeader(model);
             ImGui::SeparatorText("Render hint status");
@@ -8344,6 +8542,18 @@ namespace Extrinsic::Runtime
             }
             if (!canEditRenderHints)
                 ImGui::EndDisabled();
+
+            if (DomainWindowReady(model))
+            {
+                ImGui::SeparatorText("Bound render state");
+                DrawBoundRenderStateRows(model.BoundState);
+                ImGui::SeparatorText("Property / attribute assignment");
+                DrawPropertyBindingTargets(model.PropertyCatalog);
+                DrawVertexChannelBindingTargets(model.PropertyCatalog, &context);
+                ImGui::SeparatorText("Texture baking");
+                DrawTextureBakeControls(model.TextureBake, &context,
+                                        textureBakeState);
+            }
         }
 
         void DrawDomainVisualizationWindow(
@@ -9262,6 +9472,205 @@ namespace Extrinsic::Runtime
                     ? *subdivideState->LastResult
                     : processing.LastMeshSubdivideResult;
             DrawMeshSubdivideResultStatus(result);
+        }
+
+        void DrawMeshSimplifyResultStatus(
+            const std::optional<SandboxEditorMeshSimplifyResult>& lastResult)
+        {
+            if (!lastResult.has_value())
+            {
+                ImGui::TextDisabled("Last simplify run: none");
+                return;
+            }
+
+            const SandboxEditorMeshSimplifyResult& result = *lastResult;
+            ImGui::Text("Last simplify run: %s",
+                        DebugNameForSandboxEditorCommandStatus(result.Status));
+            ImGui::Text("Metric: %s",
+                        DebugNameForSandboxEditorMeshSimplifyMetric(result.Metric));
+            if (result.Succeeded())
+            {
+                ImGui::Text("Vertices: %zu -> %zu  faces: %zu -> %zu",
+                            result.InputVertexCount,
+                            result.OutputVertexCount,
+                            result.InputFaceCount,
+                            result.OutputFaceCount);
+                ImGui::Text("Collapses: %zu  max error: %.6g",
+                            result.CollapseCount,
+                            result.MaxCollapseError);
+                ImGui::Text("Rejected: topology %zu  quality %zu",
+                            result.CollapsesRejectedTopology,
+                            result.CollapsesRejectedQuality);
+                ImGui::Text("Pinned: sharp features %zu  UV seams %zu",
+                            result.SharpFeatureVerticesPinned,
+                            result.SeamVerticesPinned);
+            }
+            if (!result.Message.empty())
+                ImGui::TextWrapped("%s", result.Message.c_str());
+        }
+
+        void DrawMeshSimplifyControls(
+            const SandboxEditorDomainWindowModel& model,
+            const SandboxEditorContext& context,
+            const SandboxEditorGeometryProcessingModel& processing,
+            MeshSimplifyUiState* simplifyState)
+        {
+            ImGui::SeparatorText("Simplify");
+            if (!processing.MeshSimplifyAvailable)
+            {
+                ImGui::TextDisabled("Mesh simplification is unavailable for this selection.");
+                return;
+            }
+            if (simplifyState == nullptr ||
+                simplifyState->LastResult == nullptr ||
+                simplifyState->Metric == nullptr ||
+                simplifyState->TargetFaces == nullptr ||
+                simplifyState->MaxError == nullptr ||
+                simplifyState->PreserveBoundary == nullptr ||
+                simplifyState->FeatureAngleThresholdDegrees == nullptr ||
+                simplifyState->NormalWeight == nullptr ||
+                simplifyState->BoundaryWeight == nullptr ||
+                simplifyState->CurvatureWeight == nullptr ||
+                simplifyState->PreserveSharpFeatures == nullptr ||
+                simplifyState->PreserveUvSeams == nullptr)
+            {
+                ImGui::TextDisabled("Mesh simplification controls are not bound.");
+                return;
+            }
+
+            *simplifyState->Metric = std::clamp(
+                *simplifyState->Metric,
+                0,
+                static_cast<std::int32_t>(kMeshSimplifyMetrics.size() - 1u));
+            *simplifyState->TargetFaces =
+                std::max(*simplifyState->TargetFaces, 0);
+            *simplifyState->MaxError =
+                std::max(*simplifyState->MaxError, 0.0f);
+
+            const SandboxEditorMeshSimplifyMetric metric =
+                MeshSimplifyMetricFromIndex(*simplifyState->Metric);
+            if (ImGui::BeginCombo(
+                    "Metric",
+                    DebugNameForSandboxEditorMeshSimplifyMetric(metric)))
+            {
+                for (std::size_t i = 0u; i < kMeshSimplifyMetrics.size(); ++i)
+                {
+                    const SandboxEditorMeshSimplifyMetric option =
+                        kMeshSimplifyMetrics[i];
+                    const bool selected =
+                        *simplifyState->Metric == static_cast<std::int32_t>(i);
+                    if (ImGui::Selectable(
+                            DebugNameForSandboxEditorMeshSimplifyMetric(option),
+                            selected))
+                    {
+                        *simplifyState->Metric = static_cast<std::int32_t>(i);
+                    }
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+
+            ImGui::DragInt(
+                "Target faces",
+                simplifyState->TargetFaces,
+                1.0f,
+                0,
+                1000000000);
+            ImGui::DragFloat(
+                "Max error (0 = unlimited)",
+                simplifyState->MaxError,
+                0.001f,
+                0.0f,
+                1.0e30f,
+                "%.6g");
+            ImGui::Checkbox("Preserve boundary", simplifyState->PreserveBoundary);
+
+            const bool faQem =
+                metric == SandboxEditorMeshSimplifyMetric::FA_QEM;
+            if (!faQem)
+                ImGui::BeginDisabled();
+            if (ImGui::CollapsingHeader("Feature-aware (FA-QEM) weights"))
+            {
+                ImGui::DragFloat(
+                    "Feature angle (deg)",
+                    simplifyState->FeatureAngleThresholdDegrees,
+                    0.5f,
+                    0.0f,
+                    180.0f,
+                    "%.1f");
+                ImGui::DragFloat(
+                    "Normal weight",
+                    simplifyState->NormalWeight,
+                    0.01f,
+                    0.0f,
+                    1000.0f,
+                    "%.3f");
+                ImGui::DragFloat(
+                    "Boundary weight",
+                    simplifyState->BoundaryWeight,
+                    0.01f,
+                    0.0f,
+                    1000.0f,
+                    "%.3f");
+                ImGui::DragFloat(
+                    "Curvature weight",
+                    simplifyState->CurvatureWeight,
+                    0.01f,
+                    0.0f,
+                    1000.0f,
+                    "%.3f");
+                ImGui::Checkbox(
+                    "Preserve sharp features",
+                    simplifyState->PreserveSharpFeatures);
+                ImGui::Checkbox(
+                    "Preserve UV seams",
+                    simplifyState->PreserveUvSeams);
+            }
+            if (!faQem)
+                ImGui::EndDisabled();
+
+            const bool canRun =
+                *simplifyState->TargetFaces > 0 ||
+                *simplifyState->MaxError > 0.0f;
+            if (!canRun)
+                ImGui::BeginDisabled();
+            if (ImGui::Button("Simplify"))
+            {
+                *simplifyState->LastResult =
+                    ApplySandboxEditorMeshSimplifyCommand(
+                        context,
+                        SandboxEditorMeshSimplifyCommand{
+                            .StableEntityId = model.SelectedStableId,
+                            .Metric = metric,
+                            .TargetFaces = static_cast<std::size_t>(
+                                std::max(*simplifyState->TargetFaces, 0)),
+                            .MaxError = static_cast<double>(
+                                *simplifyState->MaxError),
+                            .PreserveBoundary =
+                                *simplifyState->PreserveBoundary,
+                            .FeatureAngleThresholdDegrees = static_cast<double>(
+                                *simplifyState->FeatureAngleThresholdDegrees),
+                            .NormalWeight = static_cast<double>(
+                                *simplifyState->NormalWeight),
+                            .BoundaryWeight = static_cast<double>(
+                                *simplifyState->BoundaryWeight),
+                            .CurvatureWeight = static_cast<double>(
+                                *simplifyState->CurvatureWeight),
+                            .PreserveSharpFeatures =
+                                *simplifyState->PreserveSharpFeatures,
+                            .PreserveUvSeams =
+                                *simplifyState->PreserveUvSeams,
+                        });
+            }
+            if (!canRun)
+                ImGui::EndDisabled();
+
+            const std::optional<SandboxEditorMeshSimplifyResult>& result =
+                simplifyState->LastResult->has_value()
+                    ? *simplifyState->LastResult
+                    : processing.LastMeshSimplifyResult;
+            DrawMeshSimplifyResultStatus(result);
         }
 
         [[nodiscard]] GN::AveragingMode MeshVertexNormalWeightingFromIndex(
@@ -10452,6 +10861,7 @@ namespace Extrinsic::Runtime
             MeshCurvatureUiState* curvatureState,
             MeshRemeshUiState* remeshState,
             MeshSubdivideUiState* subdivideState,
+            MeshSimplifyUiState* simplifyState,
             MeshVertexNormalsUiState* meshNormalsState,
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
@@ -10531,6 +10941,11 @@ namespace Extrinsic::Runtime
                     context,
                     processing,
                     subdivideState);
+                DrawMeshSimplifyControls(
+                    model,
+                    context,
+                    processing,
+                    simplifyState);
                 DrawMeshVertexNormalsControls(
                     model,
                     context,
@@ -10579,6 +10994,7 @@ namespace Extrinsic::Runtime
             MeshCurvatureUiState* curvatureState,
             MeshRemeshUiState* remeshState,
             MeshSubdivideUiState* subdivideState,
+            MeshSimplifyUiState* simplifyState,
             MeshVertexNormalsUiState* normalsState,
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
@@ -10598,10 +11014,10 @@ namespace Extrinsic::Runtime
                 switch (section)
                 {
                 case DomainWindowSection::Render:
-                    DrawDomainRenderWindow(model, context);
+                    DrawDomainRenderWindow(model, context, textureBakeState);
                     break;
                 case DomainWindowSection::Properties:
-                    DrawDomainPropertyWindow(model, &context, textureBakeState);
+                    DrawDomainPropertyWindow(model);
                     break;
                 case DomainWindowSection::Visualization:
                     DrawDomainVisualizationWindow(model, context);
@@ -10618,6 +11034,7 @@ namespace Extrinsic::Runtime
                         curvatureState,
                         remeshState,
                         subdivideState,
+                        simplifyState,
                         normalsState,
                         graphNormalsState,
                         pointCloudNormalsState,
@@ -10639,6 +11056,7 @@ namespace Extrinsic::Runtime
             MeshCurvatureUiState* curvatureState,
             MeshRemeshUiState* remeshState,
             MeshSubdivideUiState* subdivideState,
+            MeshSimplifyUiState* simplifyState,
             MeshVertexNormalsUiState* normalsState,
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
@@ -10675,6 +11093,7 @@ namespace Extrinsic::Runtime
                     curvatureState,
                     remeshState,
                     subdivideState,
+                    simplifyState,
                     normalsState,
                     graphNormalsState,
                     pointCloudNormalsState,
@@ -11053,6 +11472,168 @@ namespace Extrinsic::Runtime
             }
         }
 
+        void DrawRegistrationResultStatus(
+            const std::optional<SandboxEditorRegistrationResult>& lastResult)
+        {
+            if (!lastResult.has_value())
+            {
+                ImGui::TextDisabled("Last ICP run: none");
+                return;
+            }
+            const SandboxEditorRegistrationResult& result = *lastResult;
+            ImGui::Text("Last ICP run: %s",
+                        DebugNameForSandboxEditorCommandStatus(result.Status));
+            if (result.Succeeded() && result.HasResult)
+            {
+                ImGui::Text("Variant: %s  points: %zu -> %zu",
+                            DebugNameForSandboxEditorICPVariant(result.Variant),
+                            result.SourcePointCount,
+                            result.TargetPointCount);
+                ImGui::Text("Iterations: %zu  final RMSE: %.6g  converged: %s",
+                            result.IterationsPerformed,
+                            result.FinalRMSE,
+                            result.Converged ? "yes" : "no");
+                ImGui::Text("Trajectory step: %zu / %zu  inliers: %zu",
+                            result.AppliedStep,
+                            result.TrajectoryLength,
+                            result.FinalInlierCount);
+            }
+            if (!result.Message.empty())
+                ImGui::TextWrapped("%s", result.Message.c_str());
+        }
+
+        void DrawRegistrationPanelContent(
+            const SandboxEditorContext* context,
+            RegistrationUiState* state)
+        {
+            if (context == nullptr || state == nullptr ||
+                state->LastResult == nullptr || state->Variant == nullptr ||
+                state->MaxIterations == nullptr ||
+                state->MaxCorrespondenceDistance == nullptr ||
+                state->InlierRatio == nullptr ||
+                state->TrajectoryStep == nullptr ||
+                state->SwapSourceTarget == nullptr)
+            {
+                ImGui::TextDisabled("ICP registration controls are not bound.");
+                return;
+            }
+
+            ImGui::TextWrapped(
+                "Aligns a source point cloud onto a target point cloud with ICP "
+                "and drives the source entity Transform along the convergence "
+                "trajectory.");
+
+            std::vector<std::uint32_t> selected{};
+            if (context->Selection != nullptr)
+            {
+                for (const std::uint32_t id :
+                     context->Selection->SelectedStableIds())
+                {
+                    selected.push_back(id);
+                }
+            }
+            if (selected.size() < 2u)
+            {
+                ImGui::TextDisabled(
+                    "Select two point-cloud entities (source + target) to register.");
+                DrawRegistrationResultStatus(*state->LastResult);
+                return;
+            }
+
+            const std::uint32_t sourceId =
+                selected[*state->SwapSourceTarget ? 1u : 0u];
+            const std::uint32_t targetId =
+                selected[*state->SwapSourceTarget ? 0u : 1u];
+            ImGui::Text("Source entity: %u", sourceId);
+            ImGui::Text("Target entity: %u", targetId);
+            ImGui::Checkbox("Swap source / target", state->SwapSourceTarget);
+
+            *state->Variant = std::clamp(
+                *state->Variant,
+                0,
+                static_cast<std::int32_t>(
+                    kSandboxEditorICPVariants.size() - 1u));
+            const SandboxEditorICPVariant variant =
+                SandboxEditorICPVariantFromIndex(*state->Variant);
+            if (ImGui::BeginCombo(
+                    "Variant",
+                    DebugNameForSandboxEditorICPVariant(variant)))
+            {
+                for (std::size_t i = 0u;
+                     i < kSandboxEditorICPVariants.size(); ++i)
+                {
+                    const SandboxEditorICPVariant option =
+                        kSandboxEditorICPVariants[i];
+                    const bool selectedOption =
+                        *state->Variant == static_cast<std::int32_t>(i);
+                    if (ImGui::Selectable(
+                            DebugNameForSandboxEditorICPVariant(option),
+                            selectedOption))
+                    {
+                        *state->Variant = static_cast<std::int32_t>(i);
+                    }
+                    if (selectedOption)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+
+            *state->MaxIterations = std::clamp(*state->MaxIterations, 1, 1000);
+            ImGui::DragInt("Max iterations", state->MaxIterations, 1.0f, 1, 1000);
+            *state->MaxCorrespondenceDistance =
+                std::max(*state->MaxCorrespondenceDistance, 0.0f);
+            ImGui::DragFloat("Max correspondence distance (0 = unlimited)",
+                             state->MaxCorrespondenceDistance, 0.01f, 0.0f,
+                             1.0e6f, "%.4f");
+            *state->InlierRatio = std::clamp(*state->InlierRatio, 0.01f, 1.0f);
+            ImGui::DragFloat("Inlier ratio", state->InlierRatio, 0.01f, 0.01f,
+                             1.0f, "%.2f");
+
+            const std::size_t trajectoryLength =
+                state->LastResult->has_value()
+                    ? (*state->LastResult)->TrajectoryLength
+                    : 0u;
+            bool run = ImGui::Button("Run ICP");
+            // Full-convergence request: MaxIterations >= the completed iteration
+            // count, so TrajectoryPose clamps to the final pose.
+            std::size_t requestedStep =
+                static_cast<std::size_t>(*state->MaxIterations);
+            if (trajectoryLength > 0u)
+            {
+                *state->TrajectoryStep = std::clamp(
+                    *state->TrajectoryStep,
+                    0,
+                    static_cast<std::int32_t>(trajectoryLength));
+                ImGui::SliderInt("Trajectory step", state->TrajectoryStep, 0,
+                                 static_cast<int>(trajectoryLength));
+                if (ImGui::IsItemDeactivatedAfterEdit())
+                {
+                    run = true;
+                    requestedStep = static_cast<std::size_t>(
+                        std::max(*state->TrajectoryStep, 0));
+                }
+            }
+            if (run)
+            {
+                *state->LastResult = ApplySandboxEditorRegistrationCommand(
+                    *context,
+                    SandboxEditorRegistrationCommand{
+                        .SourceStableEntityId = sourceId,
+                        .TargetStableEntityId = targetId,
+                        .Variant = variant,
+                        .MaxIterations =
+                            static_cast<std::uint32_t>(*state->MaxIterations),
+                        .MaxCorrespondenceDistance = static_cast<double>(
+                            *state->MaxCorrespondenceDistance),
+                        .InlierRatio =
+                            static_cast<double>(*state->InlierRatio),
+                        .TrajectoryStep = requestedStep,
+                    });
+            }
+
+            DrawRegistrationResultStatus(*state->LastResult);
+        }
+
         void DrawPanelFrame(
             const SandboxEditorPanelFrame& frame,
             const SandboxEditorContext* context,
@@ -11070,12 +11651,14 @@ namespace Extrinsic::Runtime
             MeshCurvatureUiState* curvatureState,
             MeshRemeshUiState* remeshState,
             MeshSubdivideUiState* subdivideState,
+            MeshSimplifyUiState* simplifyState,
             MeshVertexNormalsUiState* normalsState,
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
             PointCloudOutlierRemovalUiState* pointCloudOutlierState,
             ProgressivePoissonUiState* progressivePoissonState,
-            TextureBakeUiState* textureBakeState)
+            TextureBakeUiState* textureBakeState,
+            RegistrationUiState* registrationState)
         {
             DrawMainMenuBar(panelWindowOpen, domainWindowOpen);
             DrawDomainWindows(
@@ -11086,12 +11669,21 @@ namespace Extrinsic::Runtime
                 curvatureState,
                 remeshState,
                 subdivideState,
+                simplifyState,
                 normalsState,
                 graphNormalsState,
                 pointCloudNormalsState,
                 pointCloudOutlierState,
                 progressivePoissonState,
                 textureBakeState);
+
+            if (BeginPanelWindow(panelWindowOpen,
+                                 SandboxEditorPanelWindowKind::Registration,
+                                 ImVec2(360.0f, 320.0f)))
+            {
+                DrawRegistrationPanelContent(context, registrationState);
+                ImGui::End();
+            }
 
             if (BeginPanelWindow(panelWindowOpen,
                                  SandboxEditorPanelWindowKind::Shell,
@@ -12453,7 +13045,8 @@ namespace Extrinsic::Runtime
                  .HasDenoiseMethod = true,
                  .HasCurvatureMethod = true,
                  .HasRemeshMethod = true,
-                 .HasSubdivideMethod = true},
+                 .HasSubdivideMethod = true,
+                 .HasSimplifyMethod = true},
                 {.Domain = Domain::MeshEdges, .Label = "Edges"},
                 {.Domain = Domain::MeshFaces, .Label = "Faces"},
             };
@@ -13527,6 +14120,32 @@ namespace Extrinsic::Runtime
             return "Catmull-Clark";
         case SandboxEditorMeshSubdivideOperator::Sqrt3:
             return "Sqrt(3)";
+        }
+        return "Unknown";
+    }
+
+    const char* DebugNameForSandboxEditorMeshSimplifyMetric(
+        const SandboxEditorMeshSimplifyMetric metric) noexcept
+    {
+        switch (metric)
+        {
+        case SandboxEditorMeshSimplifyMetric::ClassicalQEM:
+            return "Classical QEM";
+        case SandboxEditorMeshSimplifyMetric::FA_QEM:
+            return "FA-QEM (feature-aware)";
+        }
+        return "Unknown";
+    }
+
+    const char* DebugNameForSandboxEditorICPVariant(
+        const SandboxEditorICPVariant variant) noexcept
+    {
+        switch (variant)
+        {
+        case SandboxEditorICPVariant::PointToPoint:
+            return "Point-to-point";
+        case SandboxEditorICPVariant::PointToPlane:
+            return "Point-to-plane";
         }
         return "Unknown";
     }
@@ -16073,6 +16692,165 @@ namespace Extrinsic::Runtime
         return result;
     }
 
+    SandboxEditorMeshSimplifyResult ApplySandboxEditorMeshSimplifyCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorMeshSimplifyCommand& command)
+    {
+        SandboxEditorMeshSimplifyResult result{
+            .Status = SandboxEditorCommandStatus::NoChange,
+            .Metric = command.Metric,
+            .TargetFaces = command.TargetFaces,
+            .MaxError = command.MaxError,
+            .Error = Core::ErrorCode::Success,
+        };
+
+        if (context.Scene == nullptr)
+        {
+            result.Status = SandboxEditorCommandStatus::MissingScene;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message = "Scene registry is unavailable for mesh simplify.";
+            return result;
+        }
+        const bool hasStopCriterion =
+            command.TargetFaces > 0u || command.MaxError > 0.0;
+        if (!ValidMeshSimplifyMetric(command.Metric) ||
+            !hasStopCriterion ||
+            command.NormalWeight < 0.0 ||
+            command.BoundaryWeight < 0.0 ||
+            command.CurvatureWeight < 0.0 ||
+            command.FeatureAngleThresholdDegrees < 0.0 ||
+            command.FeatureAngleThresholdDegrees > 180.0)
+        {
+            result.Status =
+                SandboxEditorCommandStatus::InvalidProcessingParameters;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Mesh simplify requires a valid metric, a positive target face count or maximum error, non-negative weights, and a feature angle within [0, 180].";
+            return result;
+        }
+        if (!context.MeshSimplifyKernelAvailable)
+        {
+            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message =
+                "Geometry.Simplification is unavailable in this runtime configuration.";
+            return result;
+        }
+
+        entt::registry& raw = context.Scene->Raw();
+        const std::optional<ECS::EntityHandle> entity =
+            ResolveStableEntity(raw, command.StableEntityId);
+        if (!entity.has_value())
+        {
+            result.Status = SandboxEditorCommandStatus::StaleEntity;
+            result.Error = Core::ErrorCode::ResourceNotFound;
+            result.Message =
+                "Mesh simplify target entity is stale or no longer live.";
+            return result;
+        }
+
+        const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
+        MeshTopologySourceResult source =
+            BuildHalfedgeMeshForTopologyEdit(view, "Mesh simplify");
+        if (!source.Succeeded())
+        {
+            result.Status = source.Status;
+            result.Error = source.Error;
+            result.Message = source.Diagnostic;
+            return result;
+        }
+
+        // BuildHalfedgeMeshForTopologyEdit carries only positions + topology, so
+        // the scratch halfedge mesh has no v:texcoord even when the selected mesh
+        // does. Copy it in (the builder guarantees a 1:1 source->halfedge vertex
+        // mapping) so FA_QEM's PreserveUvSeams can actually pin UV-seam vertices
+        // instead of silently no-opping when the halfedge mesh lacks texcoords.
+        if (view.VertexSource != nullptr)
+        {
+            const auto sourceTexcoords =
+                view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+            if (sourceTexcoords &&
+                sourceTexcoords.Vector().size() == source.Mesh.VerticesSize())
+            {
+                auto meshTexcoords =
+                    source.Mesh.VertexProperties().GetOrAdd<glm::vec2>(
+                        "v:texcoord", glm::vec2{0.0f});
+                for (std::size_t i = 0u;
+                     i < sourceTexcoords.Vector().size(); ++i)
+                {
+                    meshTexcoords[i] = sourceTexcoords.Vector()[i];
+                }
+            }
+        }
+
+        result.InputVertexCount = source.Mesh.VertexCount();
+        result.InputFaceCount = source.Mesh.FaceCount();
+        Geometry::HalfedgeMesh::Mesh before = source.Mesh;
+
+        Simpl::Params params{};
+        params.Metric =
+            command.Metric == SandboxEditorMeshSimplifyMetric::FA_QEM
+                ? Simpl::Metric::FA_QEM
+                : Simpl::Metric::ClassicalQEM;
+        params.TargetFaces = command.TargetFaces;
+        params.MaxError = command.MaxError > 0.0 ? command.MaxError : 1.0e30;
+        params.PreserveBoundary = command.PreserveBoundary;
+        params.FeatureAngleThresholdDegrees =
+            command.FeatureAngleThresholdDegrees;
+        params.NormalWeight = command.NormalWeight;
+        params.BoundaryWeight = command.BoundaryWeight;
+        params.CurvatureWeight = command.CurvatureWeight;
+        params.PreserveSharpFeatures = command.PreserveSharpFeatures;
+        params.PreserveUvSeams = command.PreserveUvSeams;
+
+        const std::optional<Simpl::Result> simplification =
+            Simpl::Simplify(source.Mesh, params);
+        if (!simplification.has_value())
+        {
+            result.Status =
+                SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Geometry.Simplification failed for the selected mesh and parameters.";
+            return result;
+        }
+
+        if (source.Mesh.HasGarbage())
+            source.Mesh.GarbageCollection();
+        result.OutputVertexCount = source.Mesh.VertexCount();
+        result.OutputFaceCount = source.Mesh.FaceCount();
+        result.CollapseCount = simplification->CollapseCount;
+        result.MaxCollapseError = simplification->MaxCollapseError;
+        result.CollapsesRejectedTopology =
+            simplification->CollapsesRejectedTopology;
+        result.CollapsesRejectedQuality =
+            simplification->CollapsesRejectedQuality;
+        result.SharpFeatureVerticesPinned =
+            simplification->SharpFeatureVerticesPinned;
+        result.SeamVerticesPinned = simplification->SeamVerticesPinned;
+
+        const SandboxEditorCommandStatus commitStatus =
+            CommitMeshTopologyReplacement(
+                context,
+                command.StableEntityId,
+                "Simplify mesh",
+                std::move(before),
+                std::move(source.Mesh));
+        if (commitStatus != SandboxEditorCommandStatus::Applied)
+        {
+            result.Status = commitStatus;
+            result.Error = Core::ErrorCode::Unknown;
+            result.Message =
+                "Mesh simplify publication failed during editor history commit.";
+            return result;
+        }
+
+        result.Status = SandboxEditorCommandStatus::Applied;
+        result.Error = Core::ErrorCode::Success;
+        result.Message = BuildMeshSimplifySuccessMessage(result);
+        return result;
+    }
+
     SandboxEditorMeshVertexNormalsResult
     ApplySandboxEditorMeshVertexNormalsCommand(
         const SandboxEditorContext& context,
@@ -16613,9 +17391,220 @@ namespace Extrinsic::Runtime
         return result;
     }
 
+    SandboxEditorRegistrationResult ApplySandboxEditorRegistrationCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorRegistrationCommand& command)
+    {
+        SandboxEditorRegistrationResult result{
+            .Status = SandboxEditorCommandStatus::NoChange,
+            .Variant = command.Variant,
+            .Error = Core::ErrorCode::Success,
+        };
+
+        if (context.Scene == nullptr)
+        {
+            result.Status = SandboxEditorCommandStatus::MissingScene;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message = "ICP registration requires an attached scene.";
+            return result;
+        }
+        if (command.SourceStableEntityId == command.TargetStableEntityId)
+        {
+            result.Status =
+                SandboxEditorCommandStatus::InvalidProcessingParameters;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "ICP registration requires two distinct source and target entities.";
+            return result;
+        }
+        if (!ValidSandboxEditorICPVariant(command.Variant) ||
+            command.MaxIterations == 0u ||
+            !(command.InlierRatio > 0.0 && command.InlierRatio <= 1.0) ||
+            !std::isfinite(command.MaxCorrespondenceDistance))
+        {
+            result.Status =
+                SandboxEditorCommandStatus::InvalidProcessingParameters;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "ICP registration requires a valid variant, a positive iteration count, an inlier ratio in (0, 1], and a finite correspondence distance.";
+            return result;
+        }
+
+        entt::registry& raw = context.Scene->Raw();
+        const std::optional<ECS::EntityHandle> sourceEntity =
+            ResolveStableEntity(raw, command.SourceStableEntityId);
+        if (!sourceEntity.has_value())
+        {
+            result.Status = SandboxEditorCommandStatus::StaleEntity;
+            result.Error = Core::ErrorCode::ResourceNotFound;
+            result.Message =
+                "ICP registration source entity is stale or no longer live.";
+            return result;
+        }
+        const std::optional<ECS::EntityHandle> targetEntity =
+            ResolveStableEntity(raw, command.TargetStableEntityId);
+        if (!targetEntity.has_value())
+        {
+            result.Status = SandboxEditorCommandStatus::StaleEntity;
+            result.Error = Core::ErrorCode::ResourceNotFound;
+            result.Message =
+                "ICP registration target entity is stale or no longer live.";
+            return result;
+        }
+
+        const GS::ConstSourceView sourceView =
+            GS::BuildConstView(raw, *sourceEntity);
+        if (GS::BuildSourceAvailability(sourceView).ProvenanceDomain !=
+                GS::Domain::PointCloud ||
+            sourceView.VertexSource == nullptr)
+        {
+            result.Status =
+                SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "ICP registration source must be a point-cloud entity.";
+            return result;
+        }
+        const GS::ConstSourceView targetView =
+            GS::BuildConstView(raw, *targetEntity);
+        if (GS::BuildSourceAvailability(targetView).ProvenanceDomain !=
+                GS::Domain::PointCloud ||
+            targetView.VertexSource == nullptr)
+        {
+            result.Status =
+                SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "ICP registration target must be a point-cloud entity.";
+            return result;
+        }
+
+        const std::optional<std::vector<glm::vec3>> sourcePoints =
+            CollectKMeansPositions(sourceView.VertexSource->Properties);
+        const std::optional<std::vector<glm::vec3>> targetPoints =
+            CollectKMeansPositions(targetView.VertexSource->Properties);
+        if (!sourcePoints.has_value() || !targetPoints.has_value())
+        {
+            result.Status =
+                SandboxEditorCommandStatus::InvalidProcessingParameters;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "ICP registration requires both point clouds to expose a count-matched, finite v:position property.";
+            return result;
+        }
+        result.SourcePointCount = sourcePoints->size();
+        result.TargetPointCount = targetPoints->size();
+
+        ECSC::Transform::Component* transform =
+            raw.try_get<ECSC::Transform::Component>(*sourceEntity);
+        if (transform == nullptr)
+        {
+            result.Status = SandboxEditorCommandStatus::MissingTransform;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message =
+                "ICP registration source entity has no Transform to drive.";
+            return result;
+        }
+
+        // Register in world space: transform each cloud's local v:position by its
+        // entity model matrix so a non-identity source/target Transform is
+        // respected (identical local clouds with a translated target must still
+        // converge onto the target). The ICP delta is composed with the existing
+        // source model matrix before being written back as the source Transform.
+        const glm::mat4 sourceModel = ModelMatrixFromTransform(*transform);
+        glm::mat4 targetModel(1.0f);
+        if (const ECSC::Transform::Component* targetTransform =
+                raw.try_get<ECSC::Transform::Component>(*targetEntity))
+        {
+            targetModel = ModelMatrixFromTransform(*targetTransform);
+        }
+
+        std::vector<glm::vec3> sourceWorld;
+        sourceWorld.reserve(sourcePoints->size());
+        for (const glm::vec3& p : *sourcePoints)
+            sourceWorld.push_back(glm::vec3(sourceModel * glm::vec4(p, 1.0f)));
+        std::vector<glm::vec3> targetWorld;
+        targetWorld.reserve(targetPoints->size());
+        for (const glm::vec3& p : *targetPoints)
+            targetWorld.push_back(glm::vec3(targetModel * glm::vec4(p, 1.0f)));
+
+        Reg::RegistrationParams params{};
+        params.Variant = ToGeometryICPVariant(command.Variant);
+        params.MaxIterations = command.MaxIterations;
+        params.MaxCorrespondenceDistance =
+            command.MaxCorrespondenceDistance > 0.0
+                ? command.MaxCorrespondenceDistance
+                : 1.0e6;
+        params.InlierRatio = command.InlierRatio;
+
+        const RegistrationAlignmentOutcome outcome =
+            AlignPointClouds(sourceWorld, targetWorld, {}, params);
+        if (!outcome.HasResult)
+        {
+            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "ICP rejected the selected point clouds (fewer than 3 points or invalid parameters).";
+            return result;
+        }
+
+        result.HasResult = true;
+        result.IterationsPerformed = outcome.Result.IterationsPerformed;
+        result.TrajectoryLength = outcome.IterationCount();
+        result.FinalRMSE = outcome.Result.FinalRMSE;
+        result.Converged = outcome.Result.Converged;
+        result.FinalInlierCount = outcome.Result.FinalInlierCount;
+
+        const std::size_t step =
+            std::min(command.TrajectoryStep, outcome.IterationCount());
+        result.AppliedStep = step;
+        const glm::mat4 pose = TrajectoryPose(outcome, step);
+
+        // The pose is the world-space source->target delta; compose it with the
+        // source's current model matrix and decompose the result back into the
+        // local Transform (position/rotation, preserving the existing scale).
+        ECSC::Transform::Component next = *transform;
+        DecomposeModelToTransform(pose * sourceModel, next);
+
+        if (context.CommandHistory != nullptr)
+        {
+            const EditorCommandHistoryResult history =
+                context.CommandHistory->Execute(
+                    MakeTransformEditCommand(
+                        EditorTransformEditCommand{
+                            .Scene = context.Scene,
+                            .StableEntityId = command.SourceStableEntityId,
+                            .Before = *transform,
+                            .After = next,
+                            .Label = "Align point clouds (ICP)",
+                        }));
+            result.Status = ToSandboxEditorCommandStatus(history.Status);
+        }
+        else
+        {
+            *transform = next;
+            raw.emplace_or_replace<ECSC::Transform::IsDirtyTag>(*sourceEntity);
+            result.Status = SandboxEditorCommandStatus::Applied;
+        }
+
+        if (result.Status != SandboxEditorCommandStatus::Applied)
+        {
+            result.Error = Core::ErrorCode::Unknown;
+            result.Message =
+                "ICP registration pose failed during editor history commit.";
+            return result;
+        }
+
+        result.Error = Core::ErrorCode::Success;
+        result.Message = BuildRegistrationSuccessMessage(result);
+        return result;
+    }
+
     void DrawSandboxEditorPanelFrame(const SandboxEditorPanelFrame& frame)
     {
         DrawPanelFrame(frame,
+                       nullptr,
+                       nullptr,
                        nullptr,
                        nullptr,
                        nullptr,
@@ -16686,6 +17675,9 @@ namespace Extrinsic::Runtime
                 if (m_LastMeshSubdivideResult.has_value())
                     context.LastMeshSubdivideResult =
                         &*m_LastMeshSubdivideResult;
+                if (m_LastMeshSimplifyResult.has_value())
+                    context.LastMeshSimplifyResult =
+                        &*m_LastMeshSimplifyResult;
                 if (m_LastMeshVertexNormalsResult.has_value())
                     context.LastMeshVertexNormalsResult =
                         &*m_LastMeshVertexNormalsResult;
@@ -16701,6 +17693,9 @@ namespace Extrinsic::Runtime
                 if (m_LastProgressivePoissonResult.has_value())
                     context.LastProgressivePoissonResult =
                         &*m_LastProgressivePoissonResult;
+                if (m_LastRegistrationResult.has_value())
+                    context.LastRegistrationResult =
+                        &*m_LastRegistrationResult;
                 const Core::Extent2D viewport =
                     context.CameraViewport.Width != 0u &&
                             context.CameraViewport.Height != 0u
@@ -16782,6 +17777,21 @@ namespace Extrinsic::Runtime
                     .PreserveLoopFeatures =
                         &m_MeshSubdividePreserveLoopFeatures,
                 };
+                MeshSimplifyUiState simplifyState{
+                    .LastResult = &m_LastMeshSimplifyResult,
+                    .Metric = &m_MeshSimplifyMetric,
+                    .TargetFaces = &m_MeshSimplifyTargetFaces,
+                    .MaxError = &m_MeshSimplifyMaxError,
+                    .PreserveBoundary = &m_MeshSimplifyPreserveBoundary,
+                    .FeatureAngleThresholdDegrees =
+                        &m_MeshSimplifyFeatureAngleThresholdDegrees,
+                    .NormalWeight = &m_MeshSimplifyNormalWeight,
+                    .BoundaryWeight = &m_MeshSimplifyBoundaryWeight,
+                    .CurvatureWeight = &m_MeshSimplifyCurvatureWeight,
+                    .PreserveSharpFeatures =
+                        &m_MeshSimplifyPreserveSharpFeatures,
+                    .PreserveUvSeams = &m_MeshSimplifyPreserveUvSeams,
+                };
                 MeshVertexNormalsUiState normalsState{
                     .LastResult = &m_LastMeshVertexNormalsResult,
                     .Weighting = &m_MeshVertexNormalsWeighting,
@@ -16859,6 +17869,16 @@ namespace Extrinsic::Runtime
                     .UvForceRegenerate = &m_UvAtlasForceRegenerate,
                     .UvPreserveAuthored = &m_UvAtlasPreserveAuthored,
                 };
+                RegistrationUiState registrationState{
+                    .LastResult = &m_LastRegistrationResult,
+                    .Variant = &m_RegistrationVariant,
+                    .MaxIterations = &m_RegistrationMaxIterations,
+                    .MaxCorrespondenceDistance =
+                        &m_RegistrationMaxCorrespondenceDistance,
+                    .InlierRatio = &m_RegistrationInlierRatio,
+                    .TrajectoryStep = &m_RegistrationTrajectoryStep,
+                    .SwapSourceTarget = &m_RegistrationSwapSourceTarget,
+                };
                 DrawPanelFrame(
                     m_LastFrame,
                     &context,
@@ -16875,12 +17895,14 @@ namespace Extrinsic::Runtime
                     &curvatureState,
                     &remeshState,
                     &subdivideState,
+                    &simplifyState,
                     &normalsState,
                     &graphNormalsState,
                     &pointCloudNormalsState,
                     &pointCloudOutlierState,
                     &progressivePoissonState,
-                    &textureBakeState);
+                    &textureBakeState,
+                    &registrationState);
             });
     }
 
