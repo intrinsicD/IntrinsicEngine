@@ -18,6 +18,8 @@ map.
 - [GEOM-054 — Registration pipeline: extract named ICP stages (zero behavior change)](GEOM-054-registration-pipeline-stage-extraction.md)
   (Slice 0 of the registration-pipeline modularity roadmap;
   [`docs/architecture/geometry-pipeline-modularity.md`](../../../docs/architecture/geometry-pipeline-modularity.md)).
+- [GEOM-055 — Registration: optional per-iteration observer (zero cost when off)](GEOM-055-registration-iteration-observer.md)
+  (observability slice of the same roadmap; depends on `GEOM-054`).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ### bcg_code_base geometry-processing port gaps (seeded 2026-06-26)

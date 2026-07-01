@@ -241,6 +241,75 @@ already branches on `ICPVariant` at `Geometry.Registration.cpp:476`. This keeps
 everything value-typed, allocation-free, and trivially deterministic (an
 `AGENTS.md` §7 / geometry-api-style requirement).
 
+### 3.4 Optional observability — the iteration-trace seam
+
+Iterative stages should expose an **optional observer** so callers can watch the
+intermediate solution (e.g. render the shape under the current estimate each
+iteration) — with **zero cost when it is not used**. This is the standard
+iteration-callback pattern (Open3D registration callbacks, PCL
+`registerVisualizationCallback`, Ceres `IterationCallback`, ITK observers).
+
+Why it is free when disabled: the observer is a null-by-default hook checked
+**once per iteration**, not per point. The ICP hot path is the per-point KDTree
+work *inside* an iteration; an `if (observer)` guard around it is O(iterations)
+predictable branches — immeasurable next to O(points × iterations). And the loop
+already computes everything worth observing (the cumulative transform, the
+per-iteration RMSE, the inlier count), so emitting a trace is *reading existing
+state*, never extra work or allocation.
+
+For rigid registration the complete description of "the shape under the current
+solution" is a single `glm::dmat4`: the observer forwards it and the renderer
+applies it on the GPU — no CPU point transformation, no copies. So the v1 trace
+is scalar+matrix only:
+
+```cpp
+// Geometry.Registration.cppm  (geometry -> core only; pure data)
+export namespace Geometry::Registration {
+
+// Read-only snapshot emitted at the end of each ICP iteration. Observing never
+// mutates solver state (determinism). Copy fields to retain them.
+struct IterationTrace {
+    std::size_t Iteration{0};    // 0-based iteration index
+    glm::dmat4  Transform{1.0};  // cumulative source->target estimate AFTER this iteration
+    double      RMSE{0.0};        // inlier RMSE evaluated this iteration (== RMSEHistory[Iteration])
+    std::size_t InlierCount{0};   // correspondences used this iteration
+};
+
+// Null by default => zero overhead. Passed SEPARATELY from RegistrationParams so
+// the serializable/reproducible config stays a pure value (a std::function is not
+// serializable and must not pollute the pipeline config / agent lane).
+using IterationObserver = std::function<void(const IterationTrace&)>;
+
+[[nodiscard]] std::optional<RegistrationResult> AlignICP(
+    std::span<const glm::vec3> sourcePoints,
+    std::span<const glm::vec3> targetPoints,
+    std::span<const glm::vec3> targetNormals = {},
+    const RegistrationParams& params = {},
+    const IterationObserver& observer = {});   // null => zero overhead
+}
+```
+
+Rules that keep it clean:
+
+- **Config vs hook are separate.** The observer is an argument, not a
+  `RegistrationParams` field — the config remains a serializable value that
+  drives reproducibility and the agent lane; the observer is a non-serializable
+  runtime concern.
+- **Geometry defines the seam; runtime forwards it.** `IterationTrace` is pure
+  geometry/core data (glm + scalars), so `geometry -> core` holds. The editor
+  supplies the concrete observer that pushes each `Transform` into the
+  visualization overlay, and owns any throttling (draw every Nth iteration) —
+  policy lives in the observer, not the kernel.
+- **Read-only.** The observer must not mutate solver state; this protects
+  determinism and lets the same run be replayed headlessly.
+
+This generalizes across the pipeline: every iterative stage (non-rigid,
+smoothing, remeshing) emits progress through the same observer contract. The one
+case that adds point data is **non-rigid**, where a single matrix cannot
+represent the deformation — there the trace gains a deformed-positions span
+(pointing at the buffer the deformation solve already fills), still with no extra
+compute when observing.
+
 ## 4. How registration decomposes onto existing code
 
 The `AlignICP` loop already *is* the reference model's structure with hard-wired
@@ -334,6 +403,11 @@ set):
 that drives any named scalar param over a list of levels; reuse it across
 families unchanged.
 
+**Observe / trace intermediate steps** (§3.4): pass an `IterationObserver`
+(null by default, so leaving it off costs nothing). To watch convergence, apply
+each trace's `Transform` to the source in the renderer — no CPU point work. The
+same hook records a per-iteration trajectory for diagnostics/reproducibility.
+
 **Add a whole new method / paper** (open set — TEASER, FGR, CPD, non-rigid,
 functional maps): implement it under `methods/geometry/<method_id>/` with a
 `method.yaml`, following [`docs/agent/method-workflow.md`](../agent/method-workflow.md)
@@ -363,6 +437,7 @@ deferred "future robust/global registration method packages" edge.
 | Slice | Goal | Behavior change | Task |
 |-------|------|-----------------|------|
 | 0 | Extract the four helpers into a named internal stage sequence (internal convergence helper; no public `.cppm` change) | **none** (bit-for-bit) | [`GEOM-054`](../../tasks/backlog/geometry/GEOM-054-registration-pipeline-stage-extraction.md) |
+| 0-obs | Optional per-iteration observer seam (`IterationTrace`), null by default — zero cost when off; the renderer applies each trace's transform to show the shape under the current solution (§3.4) | additive | [`GEOM-055`](../../tasks/backlog/geometry/GEOM-055-registration-iteration-observer.md) |
 | 1 | Swappable `CorrespondenceKind` + `RejectorChain` vector + surface existing `Geometry.Robust` kernels in params | defaults reproduce today exactly | (future) |
 | 2 | Public `ConvergenceCriteria` struct + `TransformKind` enum + `RegistrationResult` backend telemetry + convergence oscillation guard | additive | (future) |
 | 3 | Global/coarse glue: `RegisterCoarse(...)` running the `Features` pipeline + `init` pose param on the fine path | new capability | (future) |
