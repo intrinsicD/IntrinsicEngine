@@ -362,6 +362,25 @@ trajectory-step slider over `[0, IterationCount()]` that scrubs the previewed
 pose. The command owns no geometry, renderer, or asset state; it only reads
 point positions, calls the runtime controller, and edits the source `Transform`.
 
+### Sandbox Editor Appearance / Properties Reorganization
+
+`UI-031` (Slices B/D and part of A) reorganizes the per-domain windows so
+concern ownership is clear. The former `Render` window is renamed `Appearance`
+(`Mesh/Graph/PointCloud / Appearance`, opened from the `Appearance` menu item)
+and now co-locates render hints, bound render-state inspection, property/
+attribute assignment (`DrawPropertyBindingTargets` +
+`DrawVertexChannelBindingTargets`), and texture baking
+(`DrawTextureBakeControls`). The `Properties` window is now a pure property
+explorer — it lists every property and its value preview
+(`DrawPropertyCatalogRows`) plus diagnostics only, keeping
+internal/connectivity/generated rows visible, and no longer hosts render-hint,
+binding, or texture-bake controls. The underlying `DomainWindowSection::Render`
+enumerator name is unchanged; only the window title, menu label, and drawn
+content moved. Merging the separate `Visualization` window into `Appearance`
+and splitting the omnibus `Processing` window into per-leaf method windows are
+deferred follow-up slices that require restructuring the `DomainWindowSection`
+set and the coupled domain-window-open storage.
+
 ### Sandbox Editor Vertex Channel Bindings
 
 `RUNTIME-123` extends `Extrinsic.Runtime.SandboxEditorUi` with normal/color

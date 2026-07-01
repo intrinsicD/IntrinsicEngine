@@ -1158,7 +1158,7 @@ TEST(SandboxEditorUi, DefaultDrawStartsWithOnlyMenuBarVisible)
 
     EXPECT_TRUE(ImGuiWindowExists("##MainMenuBar"));
 
-    constexpr std::array<std::string_view, 24> kClosedByDefaultWindows{{
+    constexpr std::array<std::string_view, 25> kClosedByDefaultWindows{{
         "Sandbox Editor",
         "Scene Hierarchy",
         "Inspector",
@@ -1168,17 +1168,18 @@ TEST(SandboxEditorUi, DefaultDrawStartsWithOnlyMenuBarVisible)
         "Frame Graph",
         "Camera / Render",
         "Geometry Visualization",
-        "PointCloud / Render",
+        "ICP Registration",
+        "PointCloud / Appearance",
         "PointCloud / Properties",
         "PointCloud / Visualization",
         "PointCloud / Selection",
         "PointCloud / Processing",
-        "Graph / Render",
+        "Graph / Appearance",
         "Graph / Properties",
         "Graph / Visualization",
         "Graph / Selection",
         "Graph / Processing",
-        "Mesh / Render",
+        "Mesh / Appearance",
         "Mesh / Properties",
         "Mesh / Visualization",
         "Mesh / Selection",

@@ -521,7 +521,7 @@ namespace Extrinsic::Runtime
             case SandboxEditorDomainWindowKind::Mesh:
                 switch (section)
                 {
-                case DomainWindowSection::Render: return "Mesh / Render";
+                case DomainWindowSection::Render: return "Mesh / Appearance";
                 case DomainWindowSection::Properties: return "Mesh / Properties";
                 case DomainWindowSection::Visualization: return "Mesh / Visualization";
                 case DomainWindowSection::Selection: return "Mesh / Selection";
@@ -532,7 +532,7 @@ namespace Extrinsic::Runtime
             case SandboxEditorDomainWindowKind::Graph:
                 switch (section)
                 {
-                case DomainWindowSection::Render: return "Graph / Render";
+                case DomainWindowSection::Render: return "Graph / Appearance";
                 case DomainWindowSection::Properties: return "Graph / Properties";
                 case DomainWindowSection::Visualization: return "Graph / Visualization";
                 case DomainWindowSection::Selection: return "Graph / Selection";
@@ -543,7 +543,7 @@ namespace Extrinsic::Runtime
             case SandboxEditorDomainWindowKind::PointCloud:
                 switch (section)
                 {
-                case DomainWindowSection::Render: return "PointCloud / Render";
+                case DomainWindowSection::Render: return "PointCloud / Appearance";
                 case DomainWindowSection::Properties: return "PointCloud / Properties";
                 case DomainWindowSection::Visualization: return "PointCloud / Visualization";
                 case DomainWindowSection::Selection: return "PointCloud / Selection";
@@ -7310,8 +7310,11 @@ namespace Extrinsic::Runtime
 
             if (domainWindowOpen != nullptr)
             {
+                // UI-031: the `Render` section is now the domain-aware Appearance
+                // window (render hints + bound render state + property/attribute
+                // assignment + texture baking).
                 ImGui::MenuItem(
-                    "Render hints",
+                    "Appearance",
                     nullptr,
                     &(*domainWindowOpen)[DomainWindowSlotIndex(kind, DomainWindowSection::Render)]);
                 ImGui::MenuItem(
@@ -8079,19 +8082,19 @@ namespace Extrinsic::Runtime
             DrawDiagnostics(model.Diagnostics);
         }
 
+        // UI-031 Slice D: the domain Properties window is a pure property
+        // explorer — it lists every property and its value preview and does NOT
+        // host render-hint, texture-bake, or property-binding controls (those
+        // moved to the Appearance window). Internal/connectivity/generated
+        // property rows stay visible; unsupported edit/bind states are marked by
+        // the catalog rows rather than hidden.
         void DrawDomainPropertyWindow(
-            const SandboxEditorDomainWindowModel& model,
-            const SandboxEditorContext* context,
-            TextureBakeUiState* textureBakeState)
+            const SandboxEditorDomainWindowModel& model)
         {
             DrawDomainWindowHeader(model);
             if (!DomainWindowReady(model))
                 return;
-            DrawBoundRenderStateRows(model.BoundState);
-            DrawTextureBakeControls(model.TextureBake, context, textureBakeState);
             DrawPropertyCatalogRows(model.PropertyCatalog);
-            DrawPropertyBindingTargets(model.PropertyCatalog);
-            DrawVertexChannelBindingTargets(model.PropertyCatalog, context);
             DrawDiagnostics(model.PropertyCatalog.Diagnostics);
         }
 
@@ -8475,8 +8478,13 @@ namespace Extrinsic::Runtime
             }
         }
 
+        // UI-031 Slices A/B: the domain `Render` section renders as the
+        // "Appearance" window and co-locates render hints, bound render-state
+        // inspection, property/attribute assignment, and texture baking (the
+        // last three relocated out of the Properties window).
         void DrawDomainRenderWindow(const SandboxEditorDomainWindowModel& model,
-                                    const SandboxEditorContext& context)
+                                    const SandboxEditorContext& context,
+                                    TextureBakeUiState* textureBakeState)
         {
             DrawDomainWindowHeader(model);
             ImGui::SeparatorText("Render hint status");
@@ -8500,6 +8508,18 @@ namespace Extrinsic::Runtime
             }
             if (!canEditRenderHints)
                 ImGui::EndDisabled();
+
+            if (DomainWindowReady(model))
+            {
+                ImGui::SeparatorText("Bound render state");
+                DrawBoundRenderStateRows(model.BoundState);
+                ImGui::SeparatorText("Property / attribute assignment");
+                DrawPropertyBindingTargets(model.PropertyCatalog);
+                DrawVertexChannelBindingTargets(model.PropertyCatalog, &context);
+                ImGui::SeparatorText("Texture baking");
+                DrawTextureBakeControls(model.TextureBake, &context,
+                                        textureBakeState);
+            }
         }
 
         void DrawDomainVisualizationWindow(
@@ -10960,10 +10980,10 @@ namespace Extrinsic::Runtime
                 switch (section)
                 {
                 case DomainWindowSection::Render:
-                    DrawDomainRenderWindow(model, context);
+                    DrawDomainRenderWindow(model, context, textureBakeState);
                     break;
                 case DomainWindowSection::Properties:
-                    DrawDomainPropertyWindow(model, &context, textureBakeState);
+                    DrawDomainPropertyWindow(model);
                     break;
                 case DomainWindowSection::Visualization:
                     DrawDomainVisualizationWindow(model, context);
