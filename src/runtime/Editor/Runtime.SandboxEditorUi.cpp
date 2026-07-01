@@ -88,6 +88,7 @@ import Geometry.PointCloud.SurfaceSampling;
 import Geometry.PointCloud.Utils;
 import Geometry.Properties;
 import Geometry.Remeshing;
+import Geometry.Simplification;
 import Geometry.Smoothing;
 import Geometry.Subdivision;
 import Geometry.UvAtlas;
@@ -114,6 +115,7 @@ namespace Extrinsic::Runtime
         namespace LoopSubdivide = Geometry::Subdivision;
         namespace CatmullClark = Geometry::CatmullClark;
         namespace Sqrt3Subdivide = Geometry::SubdivisionSqrt3;
+        namespace Simpl = Geometry::Simplification;
         namespace PPR = Intrinsic::Methods::Geometry::ProgressivePoissonReference;
 
         inline constexpr std::array<A::AssetPayloadKind, 6> kImportPayloadKinds{{
@@ -198,6 +200,12 @@ namespace Extrinsic::Runtime
                 SandboxEditorMeshRemeshSizingLaw::ErrorBoundedTaubin,
             }};
 
+        inline constexpr std::array<SandboxEditorMeshSimplifyMetric, 2>
+            kMeshSimplifyMetrics{{
+                SandboxEditorMeshSimplifyMetric::ClassicalQEM,
+                SandboxEditorMeshSimplifyMetric::FA_QEM,
+            }};
+
         inline constexpr std::array<SandboxEditorMeshSubdivideOperator, 3>
             kMeshSubdivideOperators{{
                 SandboxEditorMeshSubdivideOperator::Loop,
@@ -266,6 +274,21 @@ namespace Extrinsic::Runtime
             std::int32_t* Operator{nullptr};
             std::int32_t* Iterations{nullptr};
             bool* PreserveLoopFeatures{nullptr};
+        };
+
+        struct MeshSimplifyUiState
+        {
+            std::optional<SandboxEditorMeshSimplifyResult>* LastResult{nullptr};
+            std::int32_t* Metric{nullptr};
+            std::int32_t* TargetFaces{nullptr};
+            float* MaxError{nullptr};
+            bool* PreserveBoundary{nullptr};
+            float* FeatureAngleThresholdDegrees{nullptr};
+            float* NormalWeight{nullptr};
+            float* BoundaryWeight{nullptr};
+            float* CurvatureWeight{nullptr};
+            bool* PreserveSharpFeatures{nullptr};
+            bool* PreserveUvSeams{nullptr};
         };
 
         struct MeshVertexNormalsUiState
@@ -5081,6 +5104,16 @@ namespace Extrinsic::Runtime
             return kMeshRemeshSizingLaws[static_cast<std::size_t>(clamped)];
         }
 
+        [[nodiscard]] SandboxEditorMeshSimplifyMetric
+        MeshSimplifyMetricFromIndex(const std::int32_t index) noexcept
+        {
+            const std::int32_t clamped = std::clamp(
+                index,
+                0,
+                static_cast<std::int32_t>(kMeshSimplifyMetrics.size() - 1u));
+            return kMeshSimplifyMetrics[static_cast<std::size_t>(clamped)];
+        }
+
         [[nodiscard]] SandboxEditorMeshSubdivideOperator
         MeshSubdivideOperatorFromIndex(const std::int32_t index) noexcept
         {
@@ -5687,6 +5720,14 @@ namespace Extrinsic::Runtime
                              op) != kMeshSubdivideOperators.end();
         }
 
+        [[nodiscard]] bool ValidMeshSimplifyMetric(
+            const SandboxEditorMeshSimplifyMetric metric) noexcept
+        {
+            return std::find(kMeshSimplifyMetrics.begin(),
+                             kMeshSimplifyMetrics.end(),
+                             metric) != kMeshSimplifyMetrics.end();
+        }
+
         struct MeshTopologySourceResult
         {
             Geometry::HalfedgeMesh::Mesh Mesh{};
@@ -5991,6 +6032,22 @@ namespace Extrinsic::Runtime
             return message;
         }
 
+        [[nodiscard]] std::string BuildMeshSimplifySuccessMessage(
+            const SandboxEditorMeshSimplifyResult& result)
+        {
+            std::string message = "Mesh simplify completed (metric=";
+            message += DebugNameForSandboxEditorMeshSimplifyMetric(
+                result.Metric);
+            message += ", inputFaces=";
+            message += std::to_string(result.InputFaceCount);
+            message += ", outputFaces=";
+            message += std::to_string(result.OutputFaceCount);
+            message += ", collapses=";
+            message += std::to_string(result.CollapseCount);
+            message += ").";
+            return message;
+        }
+
         [[nodiscard]] SandboxEditorGeometryProcessingModel BuildGeometryProcessingModel(
             const SandboxEditorContext& context)
         {
@@ -6075,6 +6132,12 @@ namespace Extrinsic::Runtime
             model.MeshSubdivideLoopFeatureEdgesAvailable =
                 model.MeshSubdivideLoopAvailable &&
                 context.MeshSubdivideLoopFeatureEdgesAvailable;
+            model.MeshSimplifyAvailable =
+                context.MeshSimplifyKernelAvailable &&
+                model.Capabilities.HasEditableSurfaceMesh &&
+                HasAnySandboxEditorGeometryProcessingDomain(
+                    model.Capabilities.Domains,
+                    SandboxEditorGeometryProcessingDomain::MeshVertices);
             model.MeshVertexNormalsAvailable =
                 model.Capabilities.HasEditableSurfaceMesh &&
                 HasAnySandboxEditorGeometryProcessingDomain(
@@ -6168,6 +6231,20 @@ namespace Extrinsic::Runtime
                         context.LastMeshSubdivideResult->Message.empty()
                             ? "Last mesh subdivide command failed."
                             : context.LastMeshSubdivideResult->Message);
+                }
+            }
+            if (context.LastMeshSimplifyResult != nullptr)
+            {
+                model.LastMeshSimplifyResult =
+                    *context.LastMeshSimplifyResult;
+                if (!context.LastMeshSimplifyResult->Succeeded())
+                {
+                    AddDiagnostic(
+                        model.Diagnostics,
+                        SandboxEditorDiagnosticCode::GeometryProcessingFailed,
+                        context.LastMeshSimplifyResult->Message.empty()
+                            ? "Last mesh simplify command failed."
+                            : context.LastMeshSimplifyResult->Message);
                 }
             }
             if (context.LastMeshVertexNormalsResult != nullptr)
@@ -7236,6 +7313,18 @@ namespace Extrinsic::Runtime
                                 return item.HasSubdivideMethod;
                             });
                     if (hasSubdivideLeaf && ImGui::MenuItem("Subdivide"))
+                    {
+                        processingOpen = true;
+                    }
+                    const bool hasSimplifyLeaf =
+                        std::any_of(
+                            menuItems.begin(),
+                            menuItems.end(),
+                            [](const SandboxEditorGeometryProcessingMenuItem& item)
+                            {
+                                return item.HasSimplifyMethod;
+                            });
+                    if (hasSimplifyLeaf && ImGui::MenuItem("Simplify"))
                     {
                         processingOpen = true;
                     }
@@ -9264,6 +9353,205 @@ namespace Extrinsic::Runtime
             DrawMeshSubdivideResultStatus(result);
         }
 
+        void DrawMeshSimplifyResultStatus(
+            const std::optional<SandboxEditorMeshSimplifyResult>& lastResult)
+        {
+            if (!lastResult.has_value())
+            {
+                ImGui::TextDisabled("Last simplify run: none");
+                return;
+            }
+
+            const SandboxEditorMeshSimplifyResult& result = *lastResult;
+            ImGui::Text("Last simplify run: %s",
+                        DebugNameForSandboxEditorCommandStatus(result.Status));
+            ImGui::Text("Metric: %s",
+                        DebugNameForSandboxEditorMeshSimplifyMetric(result.Metric));
+            if (result.Succeeded())
+            {
+                ImGui::Text("Vertices: %zu -> %zu  faces: %zu -> %zu",
+                            result.InputVertexCount,
+                            result.OutputVertexCount,
+                            result.InputFaceCount,
+                            result.OutputFaceCount);
+                ImGui::Text("Collapses: %zu  max error: %.6g",
+                            result.CollapseCount,
+                            result.MaxCollapseError);
+                ImGui::Text("Rejected: topology %zu  quality %zu",
+                            result.CollapsesRejectedTopology,
+                            result.CollapsesRejectedQuality);
+                ImGui::Text("Pinned: sharp features %zu  UV seams %zu",
+                            result.SharpFeatureVerticesPinned,
+                            result.SeamVerticesPinned);
+            }
+            if (!result.Message.empty())
+                ImGui::TextWrapped("%s", result.Message.c_str());
+        }
+
+        void DrawMeshSimplifyControls(
+            const SandboxEditorDomainWindowModel& model,
+            const SandboxEditorContext& context,
+            const SandboxEditorGeometryProcessingModel& processing,
+            MeshSimplifyUiState* simplifyState)
+        {
+            ImGui::SeparatorText("Simplify");
+            if (!processing.MeshSimplifyAvailable)
+            {
+                ImGui::TextDisabled("Mesh simplification is unavailable for this selection.");
+                return;
+            }
+            if (simplifyState == nullptr ||
+                simplifyState->LastResult == nullptr ||
+                simplifyState->Metric == nullptr ||
+                simplifyState->TargetFaces == nullptr ||
+                simplifyState->MaxError == nullptr ||
+                simplifyState->PreserveBoundary == nullptr ||
+                simplifyState->FeatureAngleThresholdDegrees == nullptr ||
+                simplifyState->NormalWeight == nullptr ||
+                simplifyState->BoundaryWeight == nullptr ||
+                simplifyState->CurvatureWeight == nullptr ||
+                simplifyState->PreserveSharpFeatures == nullptr ||
+                simplifyState->PreserveUvSeams == nullptr)
+            {
+                ImGui::TextDisabled("Mesh simplification controls are not bound.");
+                return;
+            }
+
+            *simplifyState->Metric = std::clamp(
+                *simplifyState->Metric,
+                0,
+                static_cast<std::int32_t>(kMeshSimplifyMetrics.size() - 1u));
+            *simplifyState->TargetFaces =
+                std::max(*simplifyState->TargetFaces, 0);
+            *simplifyState->MaxError =
+                std::max(*simplifyState->MaxError, 0.0f);
+
+            const SandboxEditorMeshSimplifyMetric metric =
+                MeshSimplifyMetricFromIndex(*simplifyState->Metric);
+            if (ImGui::BeginCombo(
+                    "Metric",
+                    DebugNameForSandboxEditorMeshSimplifyMetric(metric)))
+            {
+                for (std::size_t i = 0u; i < kMeshSimplifyMetrics.size(); ++i)
+                {
+                    const SandboxEditorMeshSimplifyMetric option =
+                        kMeshSimplifyMetrics[i];
+                    const bool selected =
+                        *simplifyState->Metric == static_cast<std::int32_t>(i);
+                    if (ImGui::Selectable(
+                            DebugNameForSandboxEditorMeshSimplifyMetric(option),
+                            selected))
+                    {
+                        *simplifyState->Metric = static_cast<std::int32_t>(i);
+                    }
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+
+            ImGui::DragInt(
+                "Target faces",
+                simplifyState->TargetFaces,
+                1.0f,
+                0,
+                1000000000);
+            ImGui::DragFloat(
+                "Max error (0 = unlimited)",
+                simplifyState->MaxError,
+                0.001f,
+                0.0f,
+                1.0e30f,
+                "%.6g");
+            ImGui::Checkbox("Preserve boundary", simplifyState->PreserveBoundary);
+
+            const bool faQem =
+                metric == SandboxEditorMeshSimplifyMetric::FA_QEM;
+            if (!faQem)
+                ImGui::BeginDisabled();
+            if (ImGui::CollapsingHeader("Feature-aware (FA-QEM) weights"))
+            {
+                ImGui::DragFloat(
+                    "Feature angle (deg)",
+                    simplifyState->FeatureAngleThresholdDegrees,
+                    0.5f,
+                    0.0f,
+                    180.0f,
+                    "%.1f");
+                ImGui::DragFloat(
+                    "Normal weight",
+                    simplifyState->NormalWeight,
+                    0.01f,
+                    0.0f,
+                    1000.0f,
+                    "%.3f");
+                ImGui::DragFloat(
+                    "Boundary weight",
+                    simplifyState->BoundaryWeight,
+                    0.01f,
+                    0.0f,
+                    1000.0f,
+                    "%.3f");
+                ImGui::DragFloat(
+                    "Curvature weight",
+                    simplifyState->CurvatureWeight,
+                    0.01f,
+                    0.0f,
+                    1000.0f,
+                    "%.3f");
+                ImGui::Checkbox(
+                    "Preserve sharp features",
+                    simplifyState->PreserveSharpFeatures);
+                ImGui::Checkbox(
+                    "Preserve UV seams",
+                    simplifyState->PreserveUvSeams);
+            }
+            if (!faQem)
+                ImGui::EndDisabled();
+
+            const bool canRun =
+                *simplifyState->TargetFaces > 0 ||
+                *simplifyState->MaxError > 0.0f;
+            if (!canRun)
+                ImGui::BeginDisabled();
+            if (ImGui::Button("Simplify"))
+            {
+                *simplifyState->LastResult =
+                    ApplySandboxEditorMeshSimplifyCommand(
+                        context,
+                        SandboxEditorMeshSimplifyCommand{
+                            .StableEntityId = model.SelectedStableId,
+                            .Metric = metric,
+                            .TargetFaces = static_cast<std::size_t>(
+                                std::max(*simplifyState->TargetFaces, 0)),
+                            .MaxError = static_cast<double>(
+                                *simplifyState->MaxError),
+                            .PreserveBoundary =
+                                *simplifyState->PreserveBoundary,
+                            .FeatureAngleThresholdDegrees = static_cast<double>(
+                                *simplifyState->FeatureAngleThresholdDegrees),
+                            .NormalWeight = static_cast<double>(
+                                *simplifyState->NormalWeight),
+                            .BoundaryWeight = static_cast<double>(
+                                *simplifyState->BoundaryWeight),
+                            .CurvatureWeight = static_cast<double>(
+                                *simplifyState->CurvatureWeight),
+                            .PreserveSharpFeatures =
+                                *simplifyState->PreserveSharpFeatures,
+                            .PreserveUvSeams =
+                                *simplifyState->PreserveUvSeams,
+                        });
+            }
+            if (!canRun)
+                ImGui::EndDisabled();
+
+            const std::optional<SandboxEditorMeshSimplifyResult>& result =
+                simplifyState->LastResult->has_value()
+                    ? *simplifyState->LastResult
+                    : processing.LastMeshSimplifyResult;
+            DrawMeshSimplifyResultStatus(result);
+        }
+
         [[nodiscard]] GN::AveragingMode MeshVertexNormalWeightingFromIndex(
             const std::int32_t index) noexcept
         {
@@ -10452,6 +10740,7 @@ namespace Extrinsic::Runtime
             MeshCurvatureUiState* curvatureState,
             MeshRemeshUiState* remeshState,
             MeshSubdivideUiState* subdivideState,
+            MeshSimplifyUiState* simplifyState,
             MeshVertexNormalsUiState* meshNormalsState,
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
@@ -10531,6 +10820,11 @@ namespace Extrinsic::Runtime
                     context,
                     processing,
                     subdivideState);
+                DrawMeshSimplifyControls(
+                    model,
+                    context,
+                    processing,
+                    simplifyState);
                 DrawMeshVertexNormalsControls(
                     model,
                     context,
@@ -10579,6 +10873,7 @@ namespace Extrinsic::Runtime
             MeshCurvatureUiState* curvatureState,
             MeshRemeshUiState* remeshState,
             MeshSubdivideUiState* subdivideState,
+            MeshSimplifyUiState* simplifyState,
             MeshVertexNormalsUiState* normalsState,
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
@@ -10618,6 +10913,7 @@ namespace Extrinsic::Runtime
                         curvatureState,
                         remeshState,
                         subdivideState,
+                        simplifyState,
                         normalsState,
                         graphNormalsState,
                         pointCloudNormalsState,
@@ -10639,6 +10935,7 @@ namespace Extrinsic::Runtime
             MeshCurvatureUiState* curvatureState,
             MeshRemeshUiState* remeshState,
             MeshSubdivideUiState* subdivideState,
+            MeshSimplifyUiState* simplifyState,
             MeshVertexNormalsUiState* normalsState,
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
@@ -10675,6 +10972,7 @@ namespace Extrinsic::Runtime
                     curvatureState,
                     remeshState,
                     subdivideState,
+                    simplifyState,
                     normalsState,
                     graphNormalsState,
                     pointCloudNormalsState,
@@ -11070,6 +11368,7 @@ namespace Extrinsic::Runtime
             MeshCurvatureUiState* curvatureState,
             MeshRemeshUiState* remeshState,
             MeshSubdivideUiState* subdivideState,
+            MeshSimplifyUiState* simplifyState,
             MeshVertexNormalsUiState* normalsState,
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
@@ -11086,6 +11385,7 @@ namespace Extrinsic::Runtime
                 curvatureState,
                 remeshState,
                 subdivideState,
+                simplifyState,
                 normalsState,
                 graphNormalsState,
                 pointCloudNormalsState,
@@ -12453,7 +12753,8 @@ namespace Extrinsic::Runtime
                  .HasDenoiseMethod = true,
                  .HasCurvatureMethod = true,
                  .HasRemeshMethod = true,
-                 .HasSubdivideMethod = true},
+                 .HasSubdivideMethod = true,
+                 .HasSimplifyMethod = true},
                 {.Domain = Domain::MeshEdges, .Label = "Edges"},
                 {.Domain = Domain::MeshFaces, .Label = "Faces"},
             };
@@ -13527,6 +13828,19 @@ namespace Extrinsic::Runtime
             return "Catmull-Clark";
         case SandboxEditorMeshSubdivideOperator::Sqrt3:
             return "Sqrt(3)";
+        }
+        return "Unknown";
+    }
+
+    const char* DebugNameForSandboxEditorMeshSimplifyMetric(
+        const SandboxEditorMeshSimplifyMetric metric) noexcept
+    {
+        switch (metric)
+        {
+        case SandboxEditorMeshSimplifyMetric::ClassicalQEM:
+            return "Classical QEM";
+        case SandboxEditorMeshSimplifyMetric::FA_QEM:
+            return "FA-QEM (feature-aware)";
         }
         return "Unknown";
     }
@@ -16073,6 +16387,142 @@ namespace Extrinsic::Runtime
         return result;
     }
 
+    SandboxEditorMeshSimplifyResult ApplySandboxEditorMeshSimplifyCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorMeshSimplifyCommand& command)
+    {
+        SandboxEditorMeshSimplifyResult result{
+            .Status = SandboxEditorCommandStatus::NoChange,
+            .Metric = command.Metric,
+            .TargetFaces = command.TargetFaces,
+            .MaxError = command.MaxError,
+            .Error = Core::ErrorCode::Success,
+        };
+
+        if (context.Scene == nullptr)
+        {
+            result.Status = SandboxEditorCommandStatus::MissingScene;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message = "Scene registry is unavailable for mesh simplify.";
+            return result;
+        }
+        const bool hasStopCriterion =
+            command.TargetFaces > 0u || command.MaxError > 0.0;
+        if (!ValidMeshSimplifyMetric(command.Metric) ||
+            !hasStopCriterion ||
+            command.NormalWeight < 0.0 ||
+            command.BoundaryWeight < 0.0 ||
+            command.CurvatureWeight < 0.0 ||
+            command.FeatureAngleThresholdDegrees < 0.0 ||
+            command.FeatureAngleThresholdDegrees > 180.0)
+        {
+            result.Status =
+                SandboxEditorCommandStatus::InvalidProcessingParameters;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Mesh simplify requires a valid metric, a positive target face count or maximum error, non-negative weights, and a feature angle within [0, 180].";
+            return result;
+        }
+        if (!context.MeshSimplifyKernelAvailable)
+        {
+            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message =
+                "Geometry.Simplification is unavailable in this runtime configuration.";
+            return result;
+        }
+
+        entt::registry& raw = context.Scene->Raw();
+        const std::optional<ECS::EntityHandle> entity =
+            ResolveStableEntity(raw, command.StableEntityId);
+        if (!entity.has_value())
+        {
+            result.Status = SandboxEditorCommandStatus::StaleEntity;
+            result.Error = Core::ErrorCode::ResourceNotFound;
+            result.Message =
+                "Mesh simplify target entity is stale or no longer live.";
+            return result;
+        }
+
+        const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
+        MeshTopologySourceResult source =
+            BuildHalfedgeMeshForTopologyEdit(view, "Mesh simplify");
+        if (!source.Succeeded())
+        {
+            result.Status = source.Status;
+            result.Error = source.Error;
+            result.Message = source.Diagnostic;
+            return result;
+        }
+
+        result.InputVertexCount = source.Mesh.VertexCount();
+        result.InputFaceCount = source.Mesh.FaceCount();
+        Geometry::HalfedgeMesh::Mesh before = source.Mesh;
+
+        Simpl::Params params{};
+        params.Metric =
+            command.Metric == SandboxEditorMeshSimplifyMetric::FA_QEM
+                ? Simpl::Metric::FA_QEM
+                : Simpl::Metric::ClassicalQEM;
+        params.TargetFaces = command.TargetFaces;
+        params.MaxError = command.MaxError > 0.0 ? command.MaxError : 1.0e30;
+        params.PreserveBoundary = command.PreserveBoundary;
+        params.FeatureAngleThresholdDegrees =
+            command.FeatureAngleThresholdDegrees;
+        params.NormalWeight = command.NormalWeight;
+        params.BoundaryWeight = command.BoundaryWeight;
+        params.CurvatureWeight = command.CurvatureWeight;
+        params.PreserveSharpFeatures = command.PreserveSharpFeatures;
+        params.PreserveUvSeams = command.PreserveUvSeams;
+
+        const std::optional<Simpl::Result> simplification =
+            Simpl::Simplify(source.Mesh, params);
+        if (!simplification.has_value())
+        {
+            result.Status =
+                SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Geometry.Simplification failed for the selected mesh and parameters.";
+            return result;
+        }
+
+        if (source.Mesh.HasGarbage())
+            source.Mesh.GarbageCollection();
+        result.OutputVertexCount = source.Mesh.VertexCount();
+        result.OutputFaceCount = source.Mesh.FaceCount();
+        result.CollapseCount = simplification->CollapseCount;
+        result.MaxCollapseError = simplification->MaxCollapseError;
+        result.CollapsesRejectedTopology =
+            simplification->CollapsesRejectedTopology;
+        result.CollapsesRejectedQuality =
+            simplification->CollapsesRejectedQuality;
+        result.SharpFeatureVerticesPinned =
+            simplification->SharpFeatureVerticesPinned;
+        result.SeamVerticesPinned = simplification->SeamVerticesPinned;
+
+        const SandboxEditorCommandStatus commitStatus =
+            CommitMeshTopologyReplacement(
+                context,
+                command.StableEntityId,
+                "Simplify mesh",
+                std::move(before),
+                std::move(source.Mesh));
+        if (commitStatus != SandboxEditorCommandStatus::Applied)
+        {
+            result.Status = commitStatus;
+            result.Error = Core::ErrorCode::Unknown;
+            result.Message =
+                "Mesh simplify publication failed during editor history commit.";
+            return result;
+        }
+
+        result.Status = SandboxEditorCommandStatus::Applied;
+        result.Error = Core::ErrorCode::Success;
+        result.Message = BuildMeshSimplifySuccessMessage(result);
+        return result;
+    }
+
     SandboxEditorMeshVertexNormalsResult
     ApplySandboxEditorMeshVertexNormalsCommand(
         const SandboxEditorContext& context,
@@ -16635,6 +17085,7 @@ namespace Extrinsic::Runtime
                        nullptr,
                        nullptr,
                        nullptr,
+                       nullptr,
                        nullptr);
     }
 
@@ -16686,6 +17137,9 @@ namespace Extrinsic::Runtime
                 if (m_LastMeshSubdivideResult.has_value())
                     context.LastMeshSubdivideResult =
                         &*m_LastMeshSubdivideResult;
+                if (m_LastMeshSimplifyResult.has_value())
+                    context.LastMeshSimplifyResult =
+                        &*m_LastMeshSimplifyResult;
                 if (m_LastMeshVertexNormalsResult.has_value())
                     context.LastMeshVertexNormalsResult =
                         &*m_LastMeshVertexNormalsResult;
@@ -16782,6 +17236,21 @@ namespace Extrinsic::Runtime
                     .PreserveLoopFeatures =
                         &m_MeshSubdividePreserveLoopFeatures,
                 };
+                MeshSimplifyUiState simplifyState{
+                    .LastResult = &m_LastMeshSimplifyResult,
+                    .Metric = &m_MeshSimplifyMetric,
+                    .TargetFaces = &m_MeshSimplifyTargetFaces,
+                    .MaxError = &m_MeshSimplifyMaxError,
+                    .PreserveBoundary = &m_MeshSimplifyPreserveBoundary,
+                    .FeatureAngleThresholdDegrees =
+                        &m_MeshSimplifyFeatureAngleThresholdDegrees,
+                    .NormalWeight = &m_MeshSimplifyNormalWeight,
+                    .BoundaryWeight = &m_MeshSimplifyBoundaryWeight,
+                    .CurvatureWeight = &m_MeshSimplifyCurvatureWeight,
+                    .PreserveSharpFeatures =
+                        &m_MeshSimplifyPreserveSharpFeatures,
+                    .PreserveUvSeams = &m_MeshSimplifyPreserveUvSeams,
+                };
                 MeshVertexNormalsUiState normalsState{
                     .LastResult = &m_LastMeshVertexNormalsResult,
                     .Weighting = &m_MeshVertexNormalsWeighting,
@@ -16875,6 +17344,7 @@ namespace Extrinsic::Runtime
                     &curvatureState,
                     &remeshState,
                     &subdivideState,
+                    &simplifyState,
                     &normalsState,
                     &graphNormalsState,
                     &pointCloudNormalsState,

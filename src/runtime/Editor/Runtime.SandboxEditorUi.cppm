@@ -292,6 +292,7 @@ export namespace Extrinsic::Runtime
         bool HasCurvatureMethod{false};
         bool HasRemeshMethod{false};
         bool HasSubdivideMethod{false};
+        bool HasSimplifyMethod{false};
     };
 
     [[nodiscard]] std::vector<SandboxEditorGeometryProcessingMenuItem>
@@ -541,6 +542,14 @@ export namespace Extrinsic::Runtime
         Sqrt3,
     };
 
+    // UI-028: error-metric selection for the Mesh > Processing > Simplify window.
+    // Mirrors Geometry::Simplification::Metric (FA_QEM is the GEOM-014 default).
+    enum class SandboxEditorMeshSimplifyMetric : std::uint8_t
+    {
+        ClassicalQEM,
+        FA_QEM,
+    };
+
     [[nodiscard]] const char* DebugNameForSandboxEditorMeshRemeshMode(
         SandboxEditorMeshRemeshMode mode) noexcept;
 
@@ -549,6 +558,9 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] const char* DebugNameForSandboxEditorMeshSubdivideOperator(
         SandboxEditorMeshSubdivideOperator op) noexcept;
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorMeshSimplifyMetric(
+        SandboxEditorMeshSimplifyMetric metric) noexcept;
 
     struct SandboxEditorMeshDenoiseCommand
     {
@@ -695,6 +707,51 @@ export namespace Extrinsic::Runtime
         std::size_t InputFaceCount{0u};
         std::size_t OutputVertexCount{0u};
         std::size_t OutputFaceCount{0u};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SandboxEditorCommandStatus::Applied;
+        }
+    };
+
+    struct SandboxEditorMeshSimplifyCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        SandboxEditorMeshSimplifyMetric Metric{
+            SandboxEditorMeshSimplifyMetric::FA_QEM};
+        // Stop the decimation when FaceCount() <= TargetFaces (0 = disabled).
+        std::size_t TargetFaces{0u};
+        // Maximum allowed error per collapse; 0 = unlimited (rely on TargetFaces).
+        double MaxError{0.0};
+        bool PreserveBoundary{true};
+        // FA_QEM feature-aware weights (ignored under ClassicalQEM).
+        double FeatureAngleThresholdDegrees{45.0};
+        double NormalWeight{1.0};
+        double BoundaryWeight{1.0};
+        double CurvatureWeight{1.0};
+        bool PreserveSharpFeatures{true};
+        bool PreserveUvSeams{true};
+    };
+
+    struct SandboxEditorMeshSimplifyResult
+    {
+        SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
+        SandboxEditorMeshSimplifyMetric Metric{
+            SandboxEditorMeshSimplifyMetric::FA_QEM};
+        std::size_t TargetFaces{0u};
+        double MaxError{0.0};
+        std::size_t InputVertexCount{0u};
+        std::size_t InputFaceCount{0u};
+        std::size_t OutputVertexCount{0u};
+        std::size_t OutputFaceCount{0u};
+        std::size_t CollapseCount{0u};
+        double MaxCollapseError{0.0};
+        std::size_t CollapsesRejectedTopology{0u};
+        std::size_t CollapsesRejectedQuality{0u};
+        std::size_t SharpFeatureVerticesPinned{0u};
+        std::size_t SeamVerticesPinned{0u};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
 
@@ -1858,6 +1915,7 @@ export namespace Extrinsic::Runtime
         bool MeshSubdivideCatmullClarkAvailable{false};
         bool MeshSubdivideSqrt3Available{false};
         bool MeshSubdivideLoopFeatureEdgesAvailable{false};
+        bool MeshSimplifyAvailable{false};
         bool MeshVertexNormalsAvailable{false};
         bool GraphVertexNormalsAvailable{false};
         bool PointCloudVertexNormalsAvailable{false};
@@ -1873,6 +1931,8 @@ export namespace Extrinsic::Runtime
             LastMeshRemeshResult{};
         std::optional<SandboxEditorMeshSubdivideResult>
             LastMeshSubdivideResult{};
+        std::optional<SandboxEditorMeshSimplifyResult>
+            LastMeshSimplifyResult{};
         std::optional<SandboxEditorMeshVertexNormalsResult>
             LastMeshVertexNormalsResult{};
         std::optional<SandboxEditorGraphVertexNormalsResult>
@@ -1962,6 +2022,8 @@ export namespace Extrinsic::Runtime
             LastMeshRemeshResult{nullptr};
         const SandboxEditorMeshSubdivideResult*
             LastMeshSubdivideResult{nullptr};
+        const SandboxEditorMeshSimplifyResult*
+            LastMeshSimplifyResult{nullptr};
         const SandboxEditorMeshVertexNormalsResult*
             LastMeshVertexNormalsResult{nullptr};
         const SandboxEditorGraphVertexNormalsResult*
@@ -2010,6 +2072,7 @@ export namespace Extrinsic::Runtime
         bool MeshSubdivideCatmullClarkKernelAvailable{true};
         bool MeshSubdivideSqrt3KernelAvailable{true};
         bool MeshSubdivideLoopFeatureEdgesAvailable{true};
+        bool MeshSimplifyKernelAvailable{true};
     };
 
     struct SandboxEditorTransformEditCommand
@@ -2330,6 +2393,10 @@ export namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorMeshSubdivideCommand& command);
 
+    SandboxEditorMeshSimplifyResult ApplySandboxEditorMeshSimplifyCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorMeshSimplifyCommand& command);
+
     SandboxEditorMeshVertexNormalsResult
     ApplySandboxEditorMeshVertexNormalsCommand(
         const SandboxEditorContext& context,
@@ -2413,6 +2480,8 @@ export namespace Extrinsic::Runtime
             m_LastMeshRemeshResult{};
         std::optional<SandboxEditorMeshSubdivideResult>
             m_LastMeshSubdivideResult{};
+        std::optional<SandboxEditorMeshSimplifyResult>
+            m_LastMeshSimplifyResult{};
         std::optional<SandboxEditorMeshVertexNormalsResult>
             m_LastMeshVertexNormalsResult{};
         std::optional<SandboxEditorGraphVertexNormalsResult>
@@ -2451,6 +2520,16 @@ export namespace Extrinsic::Runtime
         std::int32_t m_MeshSubdivideOperator{0};
         std::int32_t m_MeshSubdivideIterations{1};
         bool m_MeshSubdividePreserveLoopFeatures{false};
+        std::int32_t m_MeshSimplifyMetric{1};
+        std::int32_t m_MeshSimplifyTargetFaces{0};
+        float m_MeshSimplifyMaxError{0.0f};
+        bool m_MeshSimplifyPreserveBoundary{true};
+        float m_MeshSimplifyFeatureAngleThresholdDegrees{45.0f};
+        float m_MeshSimplifyNormalWeight{1.0f};
+        float m_MeshSimplifyBoundaryWeight{1.0f};
+        float m_MeshSimplifyCurvatureWeight{1.0f};
+        bool m_MeshSimplifyPreserveSharpFeatures{true};
+        bool m_MeshSimplifyPreserveUvSeams{true};
         std::int32_t m_MeshVertexNormalsWeighting{1};
         glm::vec3 m_MeshVertexNormalsFallback{0.0f, 1.0f, 0.0f};
         glm::vec3 m_GraphVertexNormalsFallback{0.0f, 0.0f, 1.0f};

@@ -5,6 +5,28 @@ depends_on: [GEOM-014]
 ---
 # UI-028 — Sandbox EditorUI mesh simplification window
 
+## Status
+- Implemented (2026-07-01) on branch `claude/ui-backlog-agentic-y3oap2`; the full
+  C++23-module build/`ctest` gate is deferred to CI because this sandbox cannot
+  bootstrap vcpkg (clang-18, no Clang 20 toolchain) — the same constraint under
+  which the `GEOM-014` kernel itself landed.
+- Landed as a single cohesive change mirroring the retired UI-024/025/026/027
+  seam pattern: `SandboxEditorMeshSimplifyMetric` (ClassicalQEM / FA_QEM),
+  `SandboxEditorMeshSimplifyCommand` / `...Result`, and
+  `ApplySandboxEditorMeshSimplifyCommand` drive
+  `Geometry::Simplification::Simplify` on the selected mesh, replace its
+  `GeometrySources`, mark topology dirty, and are undoable through
+  `EditorCommandHistory` via the existing `CommitMeshTopologyReplacement` seam.
+  A `Mesh > Processing > Simplify` window exposes Metric, target face count,
+  max error, boundary preservation, and the FA_QEM feature weights, and reads
+  out the `Result` diagnostics (collapses, rejections, pins).
+- Verified in-session: `check_layering --strict` (the new
+  `runtime -> Geometry.Simplification` import edge is allowed),
+  `check_test_layout --strict`, `check_doc_links`, `validate_tasks --strict`,
+  and `check_task_policy --strict` all pass; adversarial diff review against the
+  kernel/editor ground truth.
+- Deferred to CI: `cmake --preset ci` + `ctest -R SandboxEditorUi`.
+
 ## Goal
 - Add a `Mesh > Processing > Simplify` window to the promoted
   `Runtime.SandboxEditorUi` that decimates the selected mesh entity through an
@@ -34,18 +56,21 @@ depends_on: [GEOM-014]
   Sandbox workflows.
 
 ## Required changes
-- [ ] Add a runtime-owned simplification command (mirroring the denoise/remesh
+- [x] Add a runtime-owned simplification command (mirroring the denoise/remesh
       command seams) that runs `Geometry::Simplification::Simplify` on the
       selected mesh, replaces its `GeometrySources`, and marks geometry dirty.
-- [ ] Add a `Mesh > Processing > Simplify` window exposing target face count /
+- [x] Add a `Mesh > Processing > Simplify` window exposing target face count /
       ratio, `Metric` (ClassicalQEM / FA_QEM), and the FA_QEM weights, plus a
       read-out of `Result` diagnostics (collapses, pins, rejections).
-- [ ] Route the command through `EditorCommandHistory` so it is undoable.
+- [x] Route the command through `EditorCommandHistory` so it is undoable.
 
 ## Tests
-- [ ] Editor contract test that the simplify command reduces the selected mesh's
+- [x] Editor contract test that the simplify command reduces the selected mesh's
       face count and is undoable (CTest labels `unit;runtime` or the existing
-      editor test labels).
+      editor test labels). Added
+      `SandboxEditorUi.MeshSimplifyCommandReducesFaceCountAndSupportsUndoRedo`
+      and `...MeshSimplifyCommandFailsClosedForInvalidTargetsAndUnavailableKernel`
+      to `tests/contract/runtime/Test.SandboxEditorUi.cpp` (run in CI).
 
 ## Docs
 - [ ] Add the UI-028 entry to [`tasks/backlog/ui/README.md`](README.md) on

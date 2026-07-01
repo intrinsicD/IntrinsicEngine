@@ -1919,6 +1919,7 @@ TEST(SandboxEditorUi, GeometryProcessingMenusExposeDomainElementSubmenus)
     EXPECT_TRUE(mesh[0].HasCurvatureMethod);
     EXPECT_TRUE(mesh[0].HasRemeshMethod);
     EXPECT_TRUE(mesh[0].HasSubdivideMethod);
+    EXPECT_TRUE(mesh[0].HasSimplifyMethod);
     EXPECT_EQ(mesh[1].Domain, Domain::MeshEdges);
     EXPECT_STREQ(mesh[1].Label, "Edges");
     EXPECT_FALSE(mesh[1].HasNormalsMethod);
@@ -1926,6 +1927,7 @@ TEST(SandboxEditorUi, GeometryProcessingMenusExposeDomainElementSubmenus)
     EXPECT_FALSE(mesh[1].HasCurvatureMethod);
     EXPECT_FALSE(mesh[1].HasRemeshMethod);
     EXPECT_FALSE(mesh[1].HasSubdivideMethod);
+    EXPECT_FALSE(mesh[1].HasSimplifyMethod);
     EXPECT_EQ(mesh[2].Domain, Domain::MeshFaces);
     EXPECT_STREQ(mesh[2].Label, "Faces");
     EXPECT_FALSE(mesh[2].HasNormalsMethod);
@@ -1933,6 +1935,7 @@ TEST(SandboxEditorUi, GeometryProcessingMenusExposeDomainElementSubmenus)
     EXPECT_FALSE(mesh[2].HasCurvatureMethod);
     EXPECT_FALSE(mesh[2].HasRemeshMethod);
     EXPECT_FALSE(mesh[2].HasSubdivideMethod);
+    EXPECT_FALSE(mesh[2].HasSimplifyMethod);
 
     const std::vector<Runtime::SandboxEditorGeometryProcessingMenuItem> graph =
         Runtime::GetSandboxEditorGeometryProcessingMenuItems(
@@ -2042,6 +2045,7 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
     EXPECT_TRUE(meshModel.Processing.MeshSubdivideCatmullClarkAvailable);
     EXPECT_TRUE(meshModel.Processing.MeshSubdivideSqrt3Available);
     EXPECT_TRUE(meshModel.Processing.MeshSubdivideLoopFeatureEdgesAvailable);
+    EXPECT_TRUE(meshModel.Processing.MeshSimplifyAvailable);
     EXPECT_TRUE(meshModel.Processing.MeshVertexNormalsAvailable);
     EXPECT_TRUE(meshModel.Processing.MeshProgressivePoissonAvailable);
     EXPECT_FALSE(meshModel.Processing.GraphVertexNormalsAvailable);
@@ -3789,6 +3793,135 @@ TEST(SandboxEditorUi, MeshSubdivideCommandReplacesTopologyForAllOperatorsAndSupp
     EXPECT_GT(sqrt3.OutputVertexCount, sqrt3.InputVertexCount);
     EXPECT_GT(sqrt3.OutputFaceCount, sqrt3.InputFaceCount);
     EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(sqrt3Mesh));
+}
+
+TEST(SandboxEditorUi, MeshSimplifyCommandReducesFaceCountAndSupportsUndoRedo)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "SimplifyMesh");
+    AddIcosahedronMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    const MeshCounts before = SourceMeshCounts(registry, mesh);
+    ASSERT_GT(before.Faces, 12u);
+
+    const Runtime::SandboxEditorMeshSimplifyResult simplified =
+        Runtime::ApplySandboxEditorMeshSimplifyCommand(
+            context,
+            Runtime::SandboxEditorMeshSimplifyCommand{
+                .StableEntityId = stableId,
+                .Metric = Runtime::SandboxEditorMeshSimplifyMetric::FA_QEM,
+                .TargetFaces = 12u,
+                .PreserveBoundary = false,
+            });
+
+    ASSERT_TRUE(simplified.Succeeded()) << simplified.Message;
+    EXPECT_EQ(simplified.Metric,
+              Runtime::SandboxEditorMeshSimplifyMetric::FA_QEM);
+    EXPECT_EQ(simplified.TargetFaces, 12u);
+    EXPECT_EQ(simplified.InputVertexCount, before.Vertices);
+    EXPECT_EQ(simplified.InputFaceCount, before.Faces);
+    EXPECT_LT(simplified.OutputFaceCount, before.Faces);
+    EXPECT_GT(simplified.CollapseCount, 0u);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
+    EXPECT_TRUE(history.IsDirty());
+    EXPECT_TRUE(history.CanUndo());
+
+    const MeshCounts afterSimplify = SourceMeshCounts(registry, mesh);
+    EXPECT_EQ(afterSimplify.Vertices, simplified.OutputVertexCount);
+    EXPECT_EQ(afterSimplify.Faces, simplified.OutputFaceCount);
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), afterSimplify);
+
+    context.LastMeshSimplifyResult = &simplified;
+    const Runtime::SandboxEditorDomainWindowModel model =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    EXPECT_TRUE(model.Processing.MeshSimplifyAvailable);
+    ASSERT_TRUE(model.Processing.LastMeshSimplifyResult.has_value());
+    EXPECT_TRUE(model.Processing.LastMeshSimplifyResult->Succeeded());
+    EXPECT_EQ(model.Processing.LastMeshSimplifyResult->OutputFaceCount,
+              simplified.OutputFaceCount);
+
+    const ECS::EntityHandle classicalMesh =
+        MakeSelectable(registry, "SimplifyClassical");
+    AddIcosahedronMeshSource(registry, classicalMesh);
+    const Runtime::SandboxEditorMeshSimplifyResult classical =
+        Runtime::ApplySandboxEditorMeshSimplifyCommand(
+            context,
+            Runtime::SandboxEditorMeshSimplifyCommand{
+                .StableEntityId = Runtime::SelectionController::ToStableEntityId(
+                    classicalMesh),
+                .Metric =
+                    Runtime::SandboxEditorMeshSimplifyMetric::ClassicalQEM,
+                .TargetFaces = 12u,
+                .PreserveBoundary = false,
+            });
+    ASSERT_TRUE(classical.Succeeded()) << classical.Message;
+    EXPECT_EQ(classical.Metric,
+              Runtime::SandboxEditorMeshSimplifyMetric::ClassicalQEM);
+    EXPECT_LT(classical.OutputFaceCount, before.Faces);
+    EXPECT_EQ(classical.SharpFeatureVerticesPinned, 0u);
+    EXPECT_EQ(classical.SeamVerticesPinned, 0u);
+}
+
+TEST(SandboxEditorUi, MeshSimplifyCommandFailsClosedForInvalidTargetsAndUnavailableKernel)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "SimplifyGuard");
+    AddIcosahedronMeshSource(registry, mesh);
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    const Runtime::SandboxEditorMeshSimplifyResult invalid =
+        Runtime::ApplySandboxEditorMeshSimplifyCommand(
+            context,
+            Runtime::SandboxEditorMeshSimplifyCommand{
+                .StableEntityId = stableId,
+                .TargetFaces = 0u,
+                .MaxError = 0.0,
+            });
+    EXPECT_EQ(invalid.Status,
+              Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_FALSE(invalid.Succeeded());
+
+    const Runtime::SandboxEditorMeshSimplifyResult stale =
+        Runtime::ApplySandboxEditorMeshSimplifyCommand(
+            context,
+            Runtime::SandboxEditorMeshSimplifyCommand{
+                .StableEntityId = stableId + 4242u,
+                .TargetFaces = 8u,
+            });
+    EXPECT_EQ(stale.Status, Runtime::SandboxEditorCommandStatus::StaleEntity);
+
+    context.MeshSimplifyKernelAvailable = false;
+    const Runtime::SandboxEditorMeshSimplifyResult unavailable =
+        Runtime::ApplySandboxEditorMeshSimplifyCommand(
+            context,
+            Runtime::SandboxEditorMeshSimplifyCommand{
+                .StableEntityId = stableId,
+                .TargetFaces = 8u,
+            });
+    EXPECT_EQ(unavailable.Status,
+              Runtime::SandboxEditorCommandStatus::GeometryProcessingFailed);
 }
 
 TEST(SandboxEditorUi, MeshTopologyProcessingCommandsFailClosedForInvalidTargetsAndUnavailableKernels)
