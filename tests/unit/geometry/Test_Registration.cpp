@@ -7,6 +7,7 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <functional>
 #include <limits>
 #include <numbers>
 #include <span>
@@ -578,4 +579,79 @@ TEST(Registration_ICP, PointToPlaneConvergesWell)
     // Point-to-plane should achieve good alignment on smooth surfaces
     EXPECT_LT(result->FinalRMSE, 0.05);
     EXPECT_GT(result->FinalInlierCount, 0u);
+}
+
+// =============================================================================
+// Optional per-iteration observer (geometry-pipeline-modularity.md §3.4)
+// =============================================================================
+
+TEST(Registration_ICP, ObserverDoesNotChangeResult)
+{
+    auto target = MakeSpherePoints();
+    glm::mat4 transform = MakeTranslation(glm::vec3(0.05f, -0.03f, 0.02f))
+                         * MakeRotation(8.0f, glm::normalize(glm::vec3(1, 1, 0)));
+    auto source = TransformPoints(target, transform);
+
+    Geometry::Registration::RegistrationParams params;
+    params.Variant = Geometry::Registration::ICPVariant::PointToPoint;
+    params.MaxIterations = 100;
+
+    // Baseline run with no observer.
+    auto unobserved = Geometry::Registration::AlignICP(source, target, {}, params);
+    ASSERT_TRUE(unobserved.has_value());
+
+    // Same run with a recording observer; the result must be identical.
+    std::vector<Geometry::Registration::IterationTrace> traces;
+    auto observed = Geometry::Registration::AlignICP(
+        source, target, {}, params,
+        [&traces](const Geometry::Registration::IterationTrace& t) { traces.push_back(t); });
+    ASSERT_TRUE(observed.has_value());
+
+    EXPECT_EQ(observed->IterationsPerformed, unobserved->IterationsPerformed);
+    EXPECT_EQ(observed->Converged, unobserved->Converged);
+    EXPECT_EQ(observed->FinalInlierCount, unobserved->FinalInlierCount);
+    EXPECT_DOUBLE_EQ(observed->FinalRMSE, unobserved->FinalRMSE);
+    ASSERT_EQ(observed->RMSEHistory.size(), unobserved->RMSEHistory.size());
+    for (std::size_t i = 0; i < observed->RMSEHistory.size(); ++i)
+        EXPECT_DOUBLE_EQ(observed->RMSEHistory[i], unobserved->RMSEHistory[i]);
+    for (int col = 0; col < 4; ++col)
+        for (int row = 0; row < 4; ++row)
+            EXPECT_DOUBLE_EQ(observed->Transform[col][row], unobserved->Transform[col][row]);
+}
+
+TEST(Registration_ICP, ObserverReceivesPerIterationTraces)
+{
+    auto target = MakeSpherePoints();
+    glm::mat4 transform = MakeTranslation(glm::vec3(0.05f, -0.03f, 0.02f))
+                         * MakeRotation(8.0f, glm::normalize(glm::vec3(1, 1, 0)));
+    auto source = TransformPoints(target, transform);
+
+    Geometry::Registration::RegistrationParams params;
+    params.Variant = Geometry::Registration::ICPVariant::PointToPoint;
+    params.MaxIterations = 100;
+
+    std::vector<Geometry::Registration::IterationTrace> traces;
+    auto result = Geometry::Registration::AlignICP(
+        source, target, {}, params,
+        [&traces](const Geometry::Registration::IterationTrace& t) { traces.push_back(t); });
+    ASSERT_TRUE(result.has_value());
+
+    // One trace per completed iteration.
+    ASSERT_EQ(traces.size(), result->IterationsPerformed);
+    ASSERT_EQ(traces.size(), result->RMSEHistory.size());
+
+    for (std::size_t i = 0; i < traces.size(); ++i)
+    {
+        // Iteration indices are contiguous and ordered.
+        EXPECT_EQ(traces[i].Iteration, i);
+        // Trace RMSE ties to the recorded history and is finite.
+        EXPECT_TRUE(std::isfinite(traces[i].RMSE));
+        EXPECT_DOUBLE_EQ(traces[i].RMSE, result->RMSEHistory[i]);
+        EXPECT_GT(traces[i].InlierCount, 0u);
+    }
+
+    // The final trace carries the converged cumulative transform.
+    for (int col = 0; col < 4; ++col)
+        for (int row = 0; row < 4; ++row)
+            EXPECT_DOUBLE_EQ(traces.back().Transform[col][row], result->Transform[col][row]);
 }

@@ -23,8 +23,12 @@ depends_on: []
   methods/paper integration; `geometry -> core` only.
 - Open children (all under `tasks/backlog/geometry/`): `GEOM-013` (dual
   contouring), `GEOM-014` (FA-QEM simplification), `GEOM-019`
-  (harmonic/Tutte, unblocked by retired GEOM-020), and `GEOM-024`
-  (generalized eigensolver seam, gated on GEOM-020).
+  (harmonic/Tutte, unblocked by retired GEOM-020), `GEOM-024`
+  (generalized eigensolver seam, gated on GEOM-020), `GEOM-054`
+  (registration pipeline stage extraction, Slice 0 of the
+  [geometry-pipeline-modularity](../../../docs/architecture/geometry-pipeline-modularity.md)
+  roadmap), and `GEOM-055` (registration per-iteration observer seam, depends on
+  GEOM-054).
 - Retired children/foundations: `GEOM-005..012`, `GEOM-015`, `GEOM-016`,
   `GEOM-017`, `GEOM-020..023`, `GEOM-025..034`, `GEOM-037..052`, `GEOIO-002`,
   and `GEOIO-003`

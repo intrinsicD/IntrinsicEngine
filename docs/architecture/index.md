@@ -63,6 +63,7 @@ Status labels:
 | `backend_integration_slicing_policy.md` | legacy-background | Useful guidance, not canonical policy. |
 | `feature-module-playbook.md` | legacy-background | Candidate content for future module handbook consolidation. |
 | `frame-loop-rollback-strategy.md` | legacy-background | Runtime policy background; may be merged into runtime docs later. |
+| `geometry-pipeline-modularity.md` | roadmap | Registration-first swappable-stage pipeline design; slice roadmap owned by `GEOM-054` and follow-ups. |
 | `gpu-driven-modular-rendering-pipeline-plan.md` | migration | Planning doc for rendering migration; not canonical architecture. |
 | `ground-up-redesign-blueprint-2026.md` | archival | Vision/blueprint context. |
 | `ground-up-redesign-vision.md` | archival | Vision narrative; non-normative. |

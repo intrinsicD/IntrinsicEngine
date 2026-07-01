@@ -15,6 +15,11 @@ map.
 - [GEOM-024 — Sparse symmetric generalized eigensolver seam](GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
   (gates `methods/METHOD-006` variant B; depends on `GEOM-020`; promote when
   METHOD-006 is the next-priority method).
+- [GEOM-054 — Registration pipeline: extract named ICP stages (zero behavior change)](GEOM-054-registration-pipeline-stage-extraction.md)
+  (Slice 0 of the registration-pipeline modularity roadmap;
+  [`docs/architecture/geometry-pipeline-modularity.md`](../../../docs/architecture/geometry-pipeline-modularity.md)).
+- [GEOM-055 — Registration: optional per-iteration observer (zero cost when off)](GEOM-055-registration-iteration-observer.md)
+  (observability slice of the same roadmap; depends on `GEOM-054`).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ### bcg_code_base geometry-processing port gaps (seeded 2026-06-26)
@@ -82,6 +87,14 @@ the runtime SpatialDebug closest-face consumer in `RUNTIME-135`.
   for GEOM-013, FA-QEM for GEOM-014). GEOM-013 (dual contouring) is a
   peer of the existing `Geometry.MarchingCubes`; GEOM-014 (FA-QEM) is an in-place
   extension of `Geometry.HalfedgeMesh.Simplification`.
+- GEOM-054 is Slice 0 of the registration-pipeline modularity roadmap in
+  [`docs/architecture/geometry-pipeline-modularity.md`](../../../docs/architecture/geometry-pipeline-modularity.md):
+  a behavior-preserving refactor of `Geometry.Registration::AlignICP` into named
+  swappable stages, reusing the Algorithm-Variant-Dispatch idiom. Later slices
+  (swappable correspondence/transform, global/coarse alignment, coarse-to-fine
+  schedule, non-rigid *method* packages, and the schema-driven editor decoupling)
+  open as each becomes the priority; named-paper stages follow retired GEOM-017's
+  deferred method-package edge.
 - RORG-031E is part of **Theme F — Architecture/runtime/UI foundation seeds**.
 - Future geometry algorithm packages should follow
   [`docs/agent/method-workflow.md`](../../../docs/agent/method-workflow.md):
