@@ -240,6 +240,15 @@ Fuse the per-iteration reduction (inertia sum + farthest-point argmax) into the
 assign pass or a short follow-on reduce, so the empty-cluster reseed and
 convergence data are ready without an extra full-buffer pass.
 
+> **Reuse `ComputeParallelPrimitives` where it fits, but note the gap.** Its
+> compaction + on-GPU count→dispatch-indirect publication are a good fit for a
+> counting-sort assignment and variable-width follow-up passes. It has **no
+> float segmented/per-cluster reduction**, which is exactly the centroid
+> accumulate-and-divide step — so k-means must supply that (shared-memory
+> privatized float atomics per §5.1, or a dedicated segmented reduction) rather
+> than assume it exists. See the audit
+> (`docs/reviews/2026-07-01-gpu-geometry-backend-io-audit.md`, Finding 3).
+
 ---
 
 ## 6. Eliminating per-iteration CPU↔GPU I/O in the Lloyd loop
@@ -264,6 +273,16 @@ loop on the GPU in **one command submission**:
 
 Recommended default: single-submission unrolled loop with device-side early-out
 guard — **zero per-iteration I/O**, one final readback.
+
+> **Collect that final readback through the async path, not `IDevice::ReadBuffer`.**
+> The audit found that `IDevice::ReadBuffer` contractually does `vkDeviceWaitIdle`
+> per call (`RHI.Device.cppm:145-147`, `Backends.Vulkan.Device.cpp:3889-3937`),
+> and the ProgressivePoisson backend drifted onto that stalling default despite
+> otherwise-exemplary structure. k-means must route its final
+> labels/distances/centroids drain through `Runtime.GpuReadbackJob` /
+> `Graphics.GpuTransfer` (ticket → poll → deferred apply) so the device never
+> stalls — critical for interactive or repeated-solve use. See the audit
+> (`docs/reviews/2026-07-01-gpu-geometry-backend-io-audit.md`, Finding 1).
 
 ---
 
