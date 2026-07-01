@@ -43,8 +43,10 @@ namespace Geometry::Registration
             return glm::dvec3(result.x, result.y, result.z);
         }
 
-        // Find closest-point correspondences using KDTree.
-        // Returns sorted correspondence pairs with distances.
+        // Reference interface #1 — correspondence estimator (see
+        // docs/architecture/geometry-pipeline-modularity.md §2). Currently a
+        // fixed KDTree k=1 nearest search; a later slice makes this swappable via
+        // a CorrespondenceKind axis. Returns correspondence pairs with distances.
         void FindCorrespondences(
             std::span<const glm::vec3> sourcePoints,
             const glm::dmat4& currentTransform,
@@ -89,7 +91,9 @@ namespace Geometry::Registration
             }
         }
 
-        // Reject outliers: keep only the closest inlierRatio fraction of pairs.
+        // Reference interface #2 — correspondence rejector (hard cut). Keeps only
+        // the closest inlierRatio fraction of pairs; a later slice generalizes
+        // this to a composable RejectorChain.
         void RejectOutliers(std::vector<CorrespondencePair>& pairs, double inlierRatio)
         {
             if (pairs.empty() || inlierRatio >= 1.0)
@@ -110,7 +114,9 @@ namespace Geometry::Registration
             pairs.resize(keepCount);
         }
 
-        // Apply IRLS-style robust weights to the surviving correspondences.
+        // Reference interface #4 — robust kernel (soft IRLS weighting, orthogonal
+        // to the rejector). Applies per-residual weights to the surviving
+        // correspondences.
         void ApplyRobustWeights(std::vector<CorrespondencePair>& pairs,
                                 Geometry::Robust::RobustKernel kernel,
                                 double scale)
@@ -388,6 +394,131 @@ namespace Geometry::Registration
             return result;
         }
 
+        // =====================================================================
+        // Reference interface #3 — transformation estimator dispatch.
+        // =====================================================================
+        //
+        // Selects the per-iteration incremental solve. A later slice replaces this
+        // ICPVariant branch with a TransformKind axis (adding e.g. symmetric
+        // point-to-plane) following the Algorithm-Variant-Dispatch idiom. Behavior
+        // is identical to the historical inline if/else.
+        [[nodiscard]] glm::dmat4 SolveIncrement(
+            ICPVariant variant,
+            const std::vector<CorrespondencePair>& pairs,
+            const std::vector<glm::dvec3>& transformedSource,
+            std::span<const glm::vec3> targetPoints,
+            std::span<const glm::vec3> targetNormals)
+        {
+            if (variant == ICPVariant::PointToPlane)
+            {
+                return SolvePointToPlane(pairs, transformedSource, targetPoints, targetNormals);
+            }
+            return SolvePointToPoint(pairs, transformedSource, targetPoints);
+        }
+
+        // =====================================================================
+        // Reference interface #5 — convergence criteria.
+        // =====================================================================
+        //
+        // Relative-RMSE stopping test, identical to the historical inline check
+        // (guarded by iter > 0). A later slice adds the oscillation /
+        // similar-transform guard and promotes the criteria to a public
+        // ConvergenceCriteria struct.
+        [[nodiscard]] bool EvaluateConvergence(
+            double prevRMSE, double rmse, double threshold, std::size_t iter)
+        {
+            const double relChange = (prevRMSE > 1e-15)
+                ? std::abs(prevRMSE - rmse) / prevRMSE
+                : std::abs(prevRMSE - rmse);
+            return relChange < threshold && iter > 0;
+        }
+
+        // =====================================================================
+        // ICP loop driver — runs the named stage sequence per iteration.
+        // =====================================================================
+        //
+        // Pure CPU reference path (geometry -> core only). Each iteration runs, in
+        // order:
+        //   #1 correspondence  (FindCorrespondences)
+        //   #2 rejection       (RejectOutliers)
+        //   #4 robust weights  (ApplyRobustWeights, optional)
+        //   #3 transform solve (SolveIncrement)
+        //   #5 convergence     (EvaluateConvergence)
+        // Behavior is bit-for-bit identical to the historical monolithic loop;
+        // this driver only makes the stage boundaries explicit so later slices can
+        // make each axis swappable. See
+        // docs/architecture/geometry-pipeline-modularity.md.
+        [[nodiscard]] RegistrationResult RunIcpLoop(
+            std::span<const glm::vec3> sourcePoints,
+            std::span<const glm::vec3> targetPoints,
+            std::span<const glm::vec3> targetNormals,
+            const KDTree& targetTree,
+            ICPVariant effectiveVariant,
+            double maxDistSq,
+            const RegistrationParams& params)
+        {
+            const bool robustWeightingEnabled = params.RobustKernelKind.has_value();
+
+            RegistrationResult result;
+            result.Transform = glm::dmat4(1.0);
+            result.RMSEHistory.reserve(params.MaxIterations);
+
+            std::vector<CorrespondencePair> pairs;
+            std::vector<glm::dvec3> transformedSourceCache;
+            pairs.reserve(sourcePoints.size());
+            transformedSourceCache.reserve(sourcePoints.size());
+
+            double prevRMSE = std::numeric_limits<double>::max();
+
+            for (std::size_t iter = 0; iter < params.MaxIterations; ++iter)
+            {
+                // #1 Correspondence estimation.
+                FindCorrespondences(sourcePoints, result.Transform, targetTree,
+                                    maxDistSq, pairs, transformedSourceCache);
+
+                if (pairs.size() < 3)
+                    break;
+
+                // #2 Outlier rejection (+ #4 optional robust weighting).
+                RejectOutliers(pairs, params.InlierRatio);
+
+                if (robustWeightingEnabled)
+                {
+                    ApplyRobustWeights(pairs, *params.RobustKernelKind, params.RobustScale);
+                }
+
+                if (pairs.size() < 3)
+                    break;
+
+                // Objective before solving (weighted for robust ICP).
+                const double rmse = ComputeRMSE(pairs, robustWeightingEnabled);
+                result.RMSEHistory.push_back(rmse);
+
+                // #3 Incremental transform solve.
+                const glm::dmat4 increment = SolveIncrement(
+                    effectiveVariant, pairs, transformedSourceCache,
+                    targetPoints, targetNormals);
+
+                // Update cumulative transform.
+                result.Transform = increment * result.Transform;
+
+                result.IterationsPerformed = iter + 1;
+                result.FinalRMSE = rmse;
+                result.FinalInlierCount = pairs.size();
+
+                // #5 Convergence check.
+                if (EvaluateConvergence(prevRMSE, rmse, params.ConvergenceThreshold, iter))
+                {
+                    result.Converged = true;
+                    break;
+                }
+
+                prevRMSE = rmse;
+            }
+
+            return result;
+        }
+
     } // anonymous namespace
 
     // =========================================================================
@@ -434,78 +565,14 @@ namespace Geometry::Registration
             return std::nullopt;
 
         // --- ICP loop ---
+        // The per-iteration stage sequence (correspondence, rejection, robust
+        // weighting, transform solve, convergence) lives in RunIcpLoop so the
+        // stage boundaries are explicit and independently swappable in later
+        // slices. See docs/architecture/geometry-pipeline-modularity.md.
         const double maxDistSq = params.MaxCorrespondenceDistance * params.MaxCorrespondenceDistance;
 
-        RegistrationResult result;
-        result.Transform = glm::dmat4(1.0);
-        result.RMSEHistory.reserve(params.MaxIterations);
-
-        std::vector<CorrespondencePair> pairs;
-        std::vector<glm::dvec3> transformedSourceCache;
-        pairs.reserve(sourcePoints.size());
-        transformedSourceCache.reserve(sourcePoints.size());
-
-        double prevRMSE = std::numeric_limits<double>::max();
-
-        for (std::size_t iter = 0; iter < params.MaxIterations; ++iter)
-        {
-            // 1. Find correspondences
-            FindCorrespondences(sourcePoints, result.Transform, targetTree,
-                                maxDistSq, pairs, transformedSourceCache);
-
-            if (pairs.size() < 3)
-                break;
-
-            // 2. Reject outliers
-            RejectOutliers(pairs, params.InlierRatio);
-
-            if (robustWeightingEnabled)
-            {
-                ApplyRobustWeights(pairs, *params.RobustKernelKind, params.RobustScale);
-            }
-
-            if (pairs.size() < 3)
-                break;
-
-            // 3. Compute RMSE before solving
-            const double rmse = ComputeRMSE(pairs, robustWeightingEnabled);
-            result.RMSEHistory.push_back(rmse);
-
-            // 4. Solve for incremental transform
-            glm::dmat4 increment;
-            if (effectiveVariant == ICPVariant::PointToPlane)
-            {
-                increment = SolvePointToPlane(pairs, transformedSourceCache,
-                                               targetPoints, targetNormals);
-            }
-            else
-            {
-                increment = SolvePointToPoint(pairs, transformedSourceCache,
-                                               targetPoints);
-            }
-
-            // 5. Update cumulative transform
-            result.Transform = increment * result.Transform;
-
-            // 6. Check convergence
-            const double relChange = (prevRMSE > 1e-15)
-                ? std::abs(prevRMSE - rmse) / prevRMSE
-                : std::abs(prevRMSE - rmse);
-
-            result.IterationsPerformed = iter + 1;
-            result.FinalRMSE = rmse;
-            result.FinalInlierCount = pairs.size();
-
-            if (relChange < params.ConvergenceThreshold && iter > 0)
-            {
-                result.Converged = true;
-                break;
-            }
-
-            prevRMSE = rmse;
-        }
-
-        return result;
+        return RunIcpLoop(sourcePoints, targetPoints, targetNormals, targetTree,
+                          effectiveVariant, maxDistSq, params);
     }
 
 } // namespace Geometry::Registration
