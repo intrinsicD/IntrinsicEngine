@@ -2,10 +2,15 @@ module;
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <span>
 #include <string>
 #include <utility>
+#include <vector>
+
+#include <glm/glm.hpp>
 
 module Extrinsic.Runtime.ProgressivePoissonGpuBackend;
 
@@ -265,6 +270,293 @@ namespace Extrinsic::Runtime
                    resources.SplatRadii.IsValid() &&
                    resources.OutputCount.IsValid() &&
                    resources.CompactionScratch.IsValid();
+        }
+
+        [[nodiscard]] ProgressivePoissonGpuExecutionResult ExecutionStatus(
+            const ProgressivePoissonGpuStatus status,
+            const ProgressivePoissonGpuPlanDesc& desc,
+            const bool cpuFallbackRecommended = true)
+        {
+            return ProgressivePoissonGpuExecutionResult{
+                .Status = status,
+                .Recorded = false,
+                .CpuFallbackRecommended = cpuFallbackRecommended,
+                .Plan = ComputeProgressivePoissonGpuDispatchPlan(desc),
+            };
+        }
+
+        [[nodiscard]] const ProgressivePoissonGpuBufferSpan* FindSpan(
+            const ProgressivePoissonGpuBufferLayout& layout,
+            const ProgressivePoissonGpuBufferRole role) noexcept
+        {
+            const auto it = std::find_if(
+                layout.Spans.begin(),
+                layout.Spans.end(),
+                [role](const ProgressivePoissonGpuBufferSpan& span) noexcept
+                {
+                    return span.Role == role;
+                });
+            return it == layout.Spans.end() ? nullptr : &*it;
+        }
+
+        [[nodiscard]] std::uint64_t SizeForRole(
+            const ProgressivePoissonGpuBufferLayout& layout,
+            const ProgressivePoissonGpuBufferRole role) noexcept
+        {
+            const ProgressivePoissonGpuBufferSpan* span = FindSpan(layout, role);
+            return span == nullptr ? 0u : span->SizeBytes;
+        }
+
+        [[nodiscard]] RHI::BufferDesc BuildRoleBufferDesc(
+            const ProgressivePoissonGpuBufferRole role,
+            const std::uint64_t sizeBytes) noexcept
+        {
+            return RHI::BufferDesc{
+                .SizeBytes = sizeBytes,
+                .Usage = RHI::BufferUsage::Storage |
+                         RHI::BufferUsage::TransferSrc |
+                         RHI::BufferUsage::TransferDst,
+                .HostVisible = false,
+                .DebugName = DebugNameForProgressivePoissonGpuBufferRole(role),
+            };
+        }
+
+        [[nodiscard]] bool CreateOwnedBuffer(
+            RHI::BufferManager& buffers,
+            const RHI::BufferDesc& desc,
+            RHI::BufferHandle& out,
+            std::vector<RHI::BufferManager::BufferLease>& leases)
+        {
+            if (desc.SizeBytes == 0u)
+            {
+                return true;
+            }
+
+            auto leaseOr = buffers.Create(desc);
+            if (!leaseOr.has_value())
+            {
+                return false;
+            }
+
+            RHI::BufferManager::BufferLease lease = std::move(leaseOr.value());
+            out = lease.GetHandle();
+            leases.push_back(std::move(lease));
+            return true;
+        }
+
+        [[nodiscard]] bool CreateRoleBuffer(
+            RHI::BufferManager& buffers,
+            const ProgressivePoissonGpuBufferLayout& layout,
+            const ProgressivePoissonGpuBufferRole role,
+            RHI::BufferHandle& out,
+            std::vector<RHI::BufferManager::BufferLease>& leases)
+        {
+            return CreateOwnedBuffer(buffers,
+                                     BuildRoleBufferDesc(role,
+                                                         SizeForRole(layout, role)),
+                                     out,
+                                     leases);
+        }
+
+        [[nodiscard]] ProgressivePoissonGpuExecutionResources
+        BuildEmptyExecutionResources() noexcept
+        {
+            return ProgressivePoissonGpuExecutionResources{};
+        }
+
+        [[nodiscard]] bool AllocateExecutionResources(
+            RHI::BufferManager& buffers,
+            const ProgressivePoissonGpuDispatchPlan& plan,
+            ProgressivePoissonGpuExecutionResources& out)
+        {
+            if (!CreateOwnedBuffer(
+                    buffers,
+                    BuildProgressivePoissonGpuStateBufferDesc(),
+                    out.Resources.State,
+                    out.Leases))
+            {
+                return false;
+            }
+
+            const ProgressivePoissonGpuBufferLayout& layout = plan.Layout;
+            if (!CreateRoleBuffer(buffers, layout,
+                                  ProgressivePoissonGpuBufferRole::PositionX,
+                                  out.Resources.PositionX,
+                                  out.Leases) ||
+                !CreateRoleBuffer(buffers, layout,
+                                  ProgressivePoissonGpuBufferRole::PositionY,
+                                  out.Resources.PositionY,
+                                  out.Leases) ||
+                !CreateRoleBuffer(buffers, layout,
+                                  ProgressivePoissonGpuBufferRole::PositionZ,
+                                  out.Resources.PositionZ,
+                                  out.Leases) ||
+                !CreateRoleBuffer(buffers, layout,
+                                  ProgressivePoissonGpuBufferRole::RemainingKeys,
+                                  out.Resources.RemainingKeys,
+                                  out.Leases) ||
+                !CreateRoleBuffer(buffers, layout,
+                                  ProgressivePoissonGpuBufferRole::NextRemainingKeys,
+                                  out.Resources.NextRemainingKeys,
+                                  out.Leases) ||
+                !CreateRoleBuffer(buffers, layout,
+                                  ProgressivePoissonGpuBufferRole::AcceptedKeys,
+                                  out.Resources.AcceptedKeys,
+                                  out.Leases) ||
+                !CreateRoleBuffer(buffers, layout,
+                                  ProgressivePoissonGpuBufferRole::CellKeys,
+                                  out.Resources.CellKeys,
+                                  out.Leases) ||
+                !CreateRoleBuffer(buffers, layout,
+                                  ProgressivePoissonGpuBufferRole::CellPhases,
+                                  out.Resources.CellPhases,
+                                  out.Leases) ||
+                !CreateRoleBuffer(buffers, layout,
+                                  ProgressivePoissonGpuBufferRole::AcceptFlags,
+                                  out.Resources.AcceptFlags,
+                                  out.Leases) ||
+                !CreateRoleBuffer(buffers, layout,
+                                  ProgressivePoissonGpuBufferRole::CarryFlags,
+                                  out.Resources.CarryFlags,
+                                  out.Leases) ||
+                !CreateRoleBuffer(buffers, layout,
+                                  ProgressivePoissonGpuBufferRole::HashKeys,
+                                  out.Resources.HashKeys,
+                                  out.Leases) ||
+                !CreateRoleBuffer(buffers, layout,
+                                  ProgressivePoissonGpuBufferRole::HashValues,
+                                  out.Resources.HashValues,
+                                  out.Leases) ||
+                !CreateRoleBuffer(buffers, layout,
+                                  ProgressivePoissonGpuBufferRole::LevelOffsets,
+                                  out.Resources.LevelOffsets,
+                                  out.Leases) ||
+                !CreateRoleBuffer(buffers, layout,
+                                  ProgressivePoissonGpuBufferRole::SplatRadii,
+                                  out.Resources.SplatRadii,
+                                  out.Leases) ||
+                !CreateRoleBuffer(buffers, layout,
+                                  ProgressivePoissonGpuBufferRole::OutputCount,
+                                  out.Resources.OutputCount,
+                                  out.Leases) ||
+                !CreateRoleBuffer(buffers, layout,
+                                  ProgressivePoissonGpuBufferRole::CompactionScratch,
+                                  out.Resources.CompactionScratch,
+                                  out.Leases))
+            {
+                return false;
+            }
+
+            return CreateOwnedBuffer(
+                       buffers,
+                       BuildProgressivePoissonGpuReadbackBufferDesc(
+                           Uint32Bytes(plan.InputCount),
+                           "ProgressivePoissonGpu.Order.Readback"),
+                       out.OrderReadback,
+                       out.Leases) &&
+                   CreateOwnedBuffer(
+                       buffers,
+                       BuildProgressivePoissonGpuReadbackBufferDesc(
+                           Uint32Bytes(plan.Layout.MaxLevels + 1u),
+                           "ProgressivePoissonGpu.LevelOffsets.Readback"),
+                       out.LevelOffsetsReadback,
+                       out.Leases) &&
+                   CreateOwnedBuffer(
+                       buffers,
+                       BuildProgressivePoissonGpuReadbackBufferDesc(
+                           FloatBytes(plan.InputCount),
+                           "ProgressivePoissonGpu.SplatRadii.Readback"),
+                       out.SplatRadiiReadback,
+                       out.Leases);
+        }
+
+        void UploadExecutionInputs(
+            RHI::IDevice& device,
+            const std::span<const glm::vec3> positions,
+            const ProgressivePoissonGpuExecutionResources& resources,
+            ProgressivePoissonGpuExecutionResult& result)
+        {
+            std::vector<float> x(positions.size());
+            std::vector<float> y(positions.size());
+            std::vector<float> z(positions.size());
+            std::vector<std::uint32_t> remaining(positions.size());
+            for (std::size_t index = 0u; index < positions.size(); ++index)
+            {
+                x[index] = positions[index].x;
+                y[index] = positions[index].y;
+                z[index] = positions[index].z;
+                remaining[index] = static_cast<std::uint32_t>(index);
+            }
+
+            const auto write = [&device, &result](
+                                   const RHI::BufferHandle handle,
+                                   const void* data,
+                                   const std::uint64_t sizeBytes)
+            {
+                if (handle.IsValid() && sizeBytes > 0u)
+                {
+                    device.WriteBuffer(handle, data, sizeBytes, 0u);
+                    ++result.UploadWriteCount;
+                }
+            };
+
+            write(resources.Resources.PositionX, x.data(),
+                  FloatBytes(static_cast<std::uint32_t>(x.size())));
+            write(resources.Resources.PositionY, y.data(),
+                  FloatBytes(static_cast<std::uint32_t>(y.size())));
+            write(resources.Resources.PositionZ, z.data(),
+                  FloatBytes(static_cast<std::uint32_t>(z.size())));
+            write(resources.Resources.RemainingKeys, remaining.data(),
+                  Uint32Bytes(static_cast<std::uint32_t>(remaining.size())));
+
+            const std::uint32_t zero32 = 0u;
+            write(resources.Resources.OutputCount, &zero32, sizeof(zero32));
+            result.UploadedInputs = true;
+        }
+
+        void RecordExecutionReadbacks(
+            RHI::ICommandContext& cmd,
+            const ProgressivePoissonGpuDispatchPlan& plan,
+            const ProgressivePoissonGpuExecutionResources& resources,
+            ProgressivePoissonGpuExecutionResult& result)
+        {
+            if (plan.InputCount == 0u)
+            {
+                return;
+            }
+
+            cmd.BufferBarrier(resources.Resources.AcceptedKeys,
+                              RHI::MemoryAccess::ShaderWrite,
+                              RHI::MemoryAccess::TransferRead);
+            cmd.BufferBarrier(resources.Resources.LevelOffsets,
+                              RHI::MemoryAccess::ShaderWrite,
+                              RHI::MemoryAccess::TransferRead);
+            cmd.BufferBarrier(resources.Resources.SplatRadii,
+                              RHI::MemoryAccess::ShaderWrite,
+                              RHI::MemoryAccess::TransferRead);
+
+            cmd.CopyBuffer(resources.Resources.AcceptedKeys,
+                           resources.OrderReadback,
+                           0u,
+                           0u,
+                           Uint32Bytes(plan.InputCount));
+            ++result.ReadbackCopyCount;
+
+            cmd.CopyBuffer(resources.Resources.LevelOffsets,
+                           resources.LevelOffsetsReadback,
+                           0u,
+                           0u,
+                           Uint32Bytes(plan.Layout.MaxLevels + 1u));
+            ++result.ReadbackCopyCount;
+
+            cmd.CopyBuffer(resources.Resources.SplatRadii,
+                           resources.SplatRadiiReadback,
+                           0u,
+                           0u,
+                           FloatBytes(plan.InputCount));
+            ++result.ReadbackCopyCount;
+
+            result.ReadbackCopiesRecorded = result.ReadbackCopyCount == 3u;
         }
 
         [[nodiscard]] ProgressivePoissonGpuPassPushConstants MakePushConstants(
@@ -560,6 +852,19 @@ namespace Extrinsic::Runtime
         };
     }
 
+    RHI::BufferDesc BuildProgressivePoissonGpuReadbackBufferDesc(
+        const std::uint64_t sizeBytes,
+        const char* debugName) noexcept
+    {
+        return RHI::BufferDesc{
+            .SizeBytes = sizeBytes,
+            .Usage = RHI::BufferUsage::TransferDst |
+                     RHI::BufferUsage::TransferSrc,
+            .HostVisible = true,
+            .DebugName = debugName,
+        };
+    }
+
     RHI::PipelineDesc BuildProgressivePoissonBuildCellsPipelineDesc(
         const char* shaderPath)
     {
@@ -806,6 +1111,101 @@ namespace Extrinsic::Runtime
         }
 
         result.Recorded = true;
+        return result;
+    }
+
+    ProgressivePoissonGpuExecutionResult RecordProgressivePoissonGpuExecution(
+        const ProgressivePoissonGpuExecutionDesc& desc)
+    {
+        if (desc.Device == nullptr)
+        {
+            return ExecutionStatus(ProgressivePoissonGpuStatus::MissingDevice,
+                                   desc.Plan);
+        }
+
+        if (!desc.Device->IsOperational())
+        {
+            return ExecutionStatus(ProgressivePoissonGpuStatus::DeviceUnavailable,
+                                   desc.Plan);
+        }
+
+        if (desc.CommandContext == nullptr || desc.Buffers == nullptr)
+        {
+            return ExecutionStatus(ProgressivePoissonGpuStatus::InvalidInput,
+                                   desc.Plan);
+        }
+
+        if (desc.Positions.size() >
+            static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()))
+        {
+            return ExecutionStatus(ProgressivePoissonGpuStatus::SizeOverflow,
+                                   desc.Plan);
+        }
+
+        if (desc.Plan.InputCount !=
+            static_cast<std::uint32_t>(desc.Positions.size()))
+        {
+            return ExecutionStatus(ProgressivePoissonGpuStatus::InvalidInput,
+                                   desc.Plan);
+        }
+
+        ProgressivePoissonGpuDispatchPlan plan =
+            ComputeProgressivePoissonGpuDispatchPlan(desc.Plan);
+        if (!plan.IsValid())
+        {
+            return ProgressivePoissonGpuExecutionResult{
+                .Status = plan.Status,
+                .Recorded = false,
+                .CpuFallbackRecommended = true,
+                .Plan = std::move(plan),
+            };
+        }
+
+        ProgressivePoissonGpuExecutionResult result{};
+        result.Status = ProgressivePoissonGpuStatus::Success;
+        result.CpuFallbackRecommended = true;
+        result.Plan = plan;
+
+        if (plan.InputCount == 0u)
+        {
+            result.Resources = BuildEmptyExecutionResources();
+            return result;
+        }
+
+        if (!AllocateExecutionResources(*desc.Buffers,
+                                        plan,
+                                        result.Resources))
+        {
+            result.Status = ProgressivePoissonGpuStatus::InvalidGpuResource;
+            return result;
+        }
+
+        UploadExecutionInputs(*desc.Device,
+                              desc.Positions,
+                              result.Resources,
+                              result);
+
+        result.Record = RecordProgressivePoissonGpuPasses(
+            ProgressivePoissonGpuRecordDesc{
+                .Device = desc.Device,
+                .CommandContext = desc.CommandContext,
+                .Buffers = desc.Buffers,
+                .Pipelines = desc.Pipelines,
+                .Resources = result.Resources.Resources,
+                .Plan = desc.Plan,
+            });
+        if (!result.Record.Succeeded() || !result.Record.Recorded)
+        {
+            result.Status = result.Record.Status;
+            result.CpuFallbackRecommended = true;
+            return result;
+        }
+
+        RecordExecutionReadbacks(*desc.CommandContext,
+                                 plan,
+                                 result.Resources,
+                                 result);
+        result.Recorded = result.Record.Recorded && result.ReadbackCopiesRecorded;
         return result;
     }
 }

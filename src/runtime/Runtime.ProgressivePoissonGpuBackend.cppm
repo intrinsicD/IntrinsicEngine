@@ -1,8 +1,11 @@
 module;
 
 #include <cstdint>
+#include <span>
 #include <string>
 #include <vector>
+
+#include <glm/glm.hpp>
 
 export module Extrinsic.Runtime.ProgressivePoissonGpuBackend;
 
@@ -259,6 +262,51 @@ export namespace Extrinsic::Runtime
         }
     };
 
+    struct ProgressivePoissonGpuExecutionResources
+    {
+        ProgressivePoissonGpuResourceSet Resources{};
+        RHI::BufferHandle OrderReadback{};
+        RHI::BufferHandle LevelOffsetsReadback{};
+        RHI::BufferHandle SplatRadiiReadback{};
+        std::vector<RHI::BufferManager::BufferLease> Leases{};
+
+        [[nodiscard]] bool HasReadbackTargets() const noexcept
+        {
+            return OrderReadback.IsValid() &&
+                   LevelOffsetsReadback.IsValid() &&
+                   SplatRadiiReadback.IsValid();
+        }
+    };
+
+    struct ProgressivePoissonGpuExecutionDesc
+    {
+        RHI::IDevice* Device{nullptr};
+        RHI::ICommandContext* CommandContext{nullptr};
+        RHI::BufferManager* Buffers{nullptr};
+        ProgressivePoissonGpuPipelineSet Pipelines{};
+        std::span<const glm::vec3> Positions{};
+        ProgressivePoissonGpuPlanDesc Plan{};
+    };
+
+    struct ProgressivePoissonGpuExecutionResult
+    {
+        ProgressivePoissonGpuStatus Status{ProgressivePoissonGpuStatus::Success};
+        bool Recorded{false};
+        bool CpuFallbackRecommended{true};
+        bool UploadedInputs{false};
+        bool ReadbackCopiesRecorded{false};
+        std::uint32_t UploadWriteCount{0u};
+        std::uint32_t ReadbackCopyCount{0u};
+        ProgressivePoissonGpuDispatchPlan Plan{};
+        ProgressivePoissonGpuRecordResult Record{};
+        ProgressivePoissonGpuExecutionResources Resources{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == ProgressivePoissonGpuStatus::Success;
+        }
+    };
+
     [[nodiscard]] const char* DebugNameForProgressivePoissonGpuStatus(
         ProgressivePoissonGpuStatus status) noexcept;
 
@@ -278,6 +326,10 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] RHI::BufferDesc BuildProgressivePoissonGpuWorkBufferDesc(
         const ProgressivePoissonGpuBufferLayout& layout,
         const char* debugName = "ProgressivePoissonGpu.Work") noexcept;
+
+    [[nodiscard]] RHI::BufferDesc BuildProgressivePoissonGpuReadbackBufferDesc(
+        std::uint64_t sizeBytes,
+        const char* debugName = "ProgressivePoissonGpu.Readback") noexcept;
 
     [[nodiscard]] RHI::PipelineDesc BuildProgressivePoissonBuildCellsPipelineDesc(
         const char* shaderPath =
@@ -299,4 +351,8 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] ProgressivePoissonGpuRecordResult
     RecordProgressivePoissonGpuPasses(
         const ProgressivePoissonGpuRecordDesc& desc);
+
+    [[nodiscard]] ProgressivePoissonGpuExecutionResult
+    RecordProgressivePoissonGpuExecution(
+        const ProgressivePoissonGpuExecutionDesc& desc);
 }

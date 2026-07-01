@@ -1,9 +1,11 @@
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <vector>
 
+#include <glm/glm.hpp>
 #include <gtest/gtest.h>
 
 import Extrinsic.Runtime.ProgressivePoissonGpuBackend;
@@ -86,6 +88,33 @@ namespace
             std::memcpy(&value, payload.data(), sizeof(T));
         }
         return value;
+    }
+
+    template <typename T>
+    [[nodiscard]] std::vector<T> ReadVectorPayload(
+        const std::vector<std::byte>& payload)
+    {
+        std::vector<T> values(payload.size() / sizeof(T));
+        EXPECT_EQ(payload.size(), values.size() * sizeof(T));
+        if (!values.empty())
+        {
+            std::memcpy(values.data(), payload.data(), payload.size());
+        }
+        return values;
+    }
+
+    [[nodiscard]] const Tests::MockDevice::BufferWriteRecord* FindWrite(
+        const Tests::MockDevice& device,
+        const RHI::BufferHandle handle)
+    {
+        const auto it = std::find_if(
+            device.BufferWrites.begin(),
+            device.BufferWrites.end(),
+            [handle](const Tests::MockDevice::BufferWriteRecord& write)
+            {
+                return write.Handle == handle;
+            });
+        return it == device.BufferWrites.end() ? nullptr : &*it;
     }
 
     [[nodiscard]] const Runtime::ProgressivePoissonGpuBufferSpan* FindSpan(
@@ -231,6 +260,15 @@ TEST(ProgressivePoissonGpuBackend, BuildsBufferAndPipelineDescriptors)
     EXPECT_EQ(work.SizeBytes, plan.Layout.WorkBufferBytes);
     EXPECT_TRUE(RHI::HasUsage(work.Usage, RHI::BufferUsage::Storage));
     EXPECT_TRUE(RHI::HasUsage(work.Usage, RHI::BufferUsage::TransferSrc));
+
+    const RHI::BufferDesc readback =
+        Runtime::BuildProgressivePoissonGpuReadbackBufferDesc(
+            64u,
+            "ProgressivePoissonGpu.Test.Readback");
+    EXPECT_EQ(readback.SizeBytes, 64u);
+    EXPECT_TRUE(readback.HostVisible);
+    EXPECT_TRUE(RHI::HasUsage(readback.Usage, RHI::BufferUsage::TransferDst));
+    EXPECT_TRUE(RHI::HasUsage(readback.Usage, RHI::BufferUsage::TransferSrc));
 
     const RHI::PipelineDesc build =
         Runtime::BuildProgressivePoissonBuildCellsPipelineDesc();
@@ -379,6 +417,111 @@ TEST(ProgressivePoissonGpuBackend,
 }
 
 TEST(ProgressivePoissonGpuBackend,
+     ExecutionAllocatesUploadsRecordsAndCopiesReadbacks)
+{
+    Tests::MockDevice device{};
+    RHI::BufferManager buffers{device};
+
+    Runtime::ProgressivePoissonGpuPlanDesc planDesc{};
+    planDesc.InputCount = 3u;
+    planDesc.GroupSize = 64u;
+    planDesc.Config.Dimension = 3u;
+    planDesc.Config.GridWidth = 4u;
+    planDesc.Config.MaxLevels = 1u;
+    planDesc.Config.HashLoadFactor = 0.5f;
+    planDesc.Config.RandomizeGridOrigin = false;
+
+    const std::array<glm::vec3, 3> points{{
+        glm::vec3{1.0f, 2.0f, 3.0f},
+        glm::vec3{4.0f, 5.0f, 6.0f},
+        glm::vec3{7.0f, 8.0f, 9.0f},
+    }};
+
+    const Runtime::ProgressivePoissonGpuExecutionResult result =
+        Runtime::RecordProgressivePoissonGpuExecution(
+            Runtime::ProgressivePoissonGpuExecutionDesc{
+                .Device = &device,
+                .CommandContext = &device.CommandContext,
+                .Buffers = &buffers,
+                .Pipelines = ValidProgressivePoissonPipelines(),
+                .Positions = points,
+                .Plan = planDesc,
+            });
+
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_TRUE(result.Recorded);
+    EXPECT_TRUE(result.CpuFallbackRecommended);
+    EXPECT_TRUE(result.UploadedInputs);
+    EXPECT_TRUE(result.ReadbackCopiesRecorded);
+    EXPECT_TRUE(result.Record.Recorded);
+    EXPECT_TRUE(result.Resources.HasReadbackTargets());
+    EXPECT_EQ(result.UploadWriteCount, 5u);
+    EXPECT_EQ(result.ReadbackCopyCount, 3u);
+    EXPECT_EQ(result.Resources.Leases.size(), 20u);
+    EXPECT_EQ(device.CreateBufferCount, 20);
+    EXPECT_EQ(device.DestroyBufferCount, 0);
+
+    const Tests::MockDevice::BufferWriteRecord* xWrite =
+        FindWrite(device, result.Resources.Resources.PositionX);
+    ASSERT_NE(xWrite, nullptr);
+    EXPECT_EQ((std::vector<float>{1.0f, 4.0f, 7.0f}),
+              ReadVectorPayload<float>(xWrite->Data));
+
+    const Tests::MockDevice::BufferWriteRecord* yWrite =
+        FindWrite(device, result.Resources.Resources.PositionY);
+    ASSERT_NE(yWrite, nullptr);
+    EXPECT_EQ((std::vector<float>{2.0f, 5.0f, 8.0f}),
+              ReadVectorPayload<float>(yWrite->Data));
+
+    const Tests::MockDevice::BufferWriteRecord* zWrite =
+        FindWrite(device, result.Resources.Resources.PositionZ);
+    ASSERT_NE(zWrite, nullptr);
+    EXPECT_EQ((std::vector<float>{3.0f, 6.0f, 9.0f}),
+              ReadVectorPayload<float>(zWrite->Data));
+
+    const Tests::MockDevice::BufferWriteRecord* keysWrite =
+        FindWrite(device, result.Resources.Resources.RemainingKeys);
+    ASSERT_NE(keysWrite, nullptr);
+    EXPECT_EQ((std::vector<std::uint32_t>{0u, 1u, 2u}),
+              ReadVectorPayload<std::uint32_t>(keysWrite->Data));
+
+    const Tests::MockDevice::BufferWriteRecord* stateWrite =
+        FindWrite(device, result.Resources.Resources.State);
+    ASSERT_NE(stateWrite, nullptr);
+    const Runtime::ProgressivePoissonGpuStateBufferRecord state =
+        ReadPayload<Runtime::ProgressivePoissonGpuStateBufferRecord>(
+            stateWrite->Data);
+    EXPECT_EQ(state.PositionXBDA,
+              device.GetBufferDeviceAddress(result.Resources.Resources.PositionX));
+    EXPECT_EQ(state.RemainingKeysBDA,
+              device.GetBufferDeviceAddress(
+                  result.Resources.Resources.RemainingKeys));
+    EXPECT_EQ(state.LevelOffsetsBDA,
+              device.GetBufferDeviceAddress(
+                  result.Resources.Resources.LevelOffsets));
+
+    ASSERT_EQ(device.CommandContext.CopyBufferRecords.size(), 3u);
+    EXPECT_EQ(device.CommandContext.CopyBufferRecords[0].Src,
+              result.Resources.Resources.AcceptedKeys);
+    EXPECT_EQ(device.CommandContext.CopyBufferRecords[0].Dst,
+              result.Resources.OrderReadback);
+    EXPECT_EQ(device.CommandContext.CopyBufferRecords[0].Size,
+              3u * sizeof(std::uint32_t));
+    EXPECT_EQ(device.CommandContext.CopyBufferRecords[1].Src,
+              result.Resources.Resources.LevelOffsets);
+    EXPECT_EQ(device.CommandContext.CopyBufferRecords[1].Dst,
+              result.Resources.LevelOffsetsReadback);
+    EXPECT_EQ(device.CommandContext.CopyBufferRecords[1].Size,
+              2u * sizeof(std::uint32_t));
+    EXPECT_EQ(device.CommandContext.CopyBufferRecords[2].Src,
+              result.Resources.Resources.SplatRadii);
+    EXPECT_EQ(device.CommandContext.CopyBufferRecords[2].Dst,
+              result.Resources.SplatRadiiReadback);
+    EXPECT_EQ(device.CommandContext.CopyBufferRecords[2].Size,
+              3u * sizeof(float));
+}
+
+TEST(ProgressivePoissonGpuBackend,
      RecordFailsClosedForInvalidResourcesAndUnavailableDevice)
 {
     Runtime::ProgressivePoissonGpuPlanDesc planDesc{};
@@ -472,6 +615,38 @@ TEST(ProgressivePoissonGpuBackend, ResolveReportsCpuFallbackUntilExecutionLands)
     EXPECT_TRUE(planningOnly.Plan.IsValid());
     EXPECT_EQ(operational.CreateBufferCount, 0);
     EXPECT_EQ(operational.CreatePipelineCount, 0);
+}
+
+TEST(ProgressivePoissonGpuBackend,
+     ExecutionFallsBackBeforeAllocationWhenDeviceUnavailable)
+{
+    Tests::MockDevice device{};
+    device.Operational = false;
+    RHI::BufferManager buffers{device};
+
+    Runtime::ProgressivePoissonGpuPlanDesc planDesc{};
+    planDesc.InputCount = 1u;
+    const std::array<glm::vec3, 1> points{{glm::vec3{0.0f, 0.0f, 0.0f}}};
+
+    const Runtime::ProgressivePoissonGpuExecutionResult result =
+        Runtime::RecordProgressivePoissonGpuExecution(
+            Runtime::ProgressivePoissonGpuExecutionDesc{
+                .Device = &device,
+                .CommandContext = &device.CommandContext,
+                .Buffers = &buffers,
+                .Pipelines = ValidProgressivePoissonPipelines(),
+                .Positions = points,
+                .Plan = planDesc,
+            });
+
+    EXPECT_EQ(result.Status,
+              Runtime::ProgressivePoissonGpuStatus::DeviceUnavailable);
+    EXPECT_FALSE(result.Recorded);
+    EXPECT_TRUE(result.CpuFallbackRecommended);
+    EXPECT_FALSE(result.UploadedInputs);
+    EXPECT_EQ(device.CreateBufferCount, 0);
+    EXPECT_EQ(device.BufferWrites.size(), 0u);
+    EXPECT_EQ(device.CommandContext.DispatchCalls, 0);
 }
 
 TEST(ProgressivePoissonGpuBackend, DebugNamesAreStable)

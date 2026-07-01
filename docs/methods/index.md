@@ -67,4 +67,5 @@ This index is the canonical entry point for method/paper implementation document
   [`METHOD-013`](../../tasks/active/METHOD-013-progressive-poisson-disk-gpu-backend.md);
   current slices expose requested-vs-actual backend diagnostics, CPU fallback
   for `gpu_vulkan_compute` requests, and a recordable Vulkan shader/layout
-  dispatch seam before upload/readback parity lands.
+  dispatch seam with runtime-owned SoA uploads plus readback-copy targets before
+  output parsing and parity tests land.

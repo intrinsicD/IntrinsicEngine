@@ -250,10 +250,12 @@ METHOD-013 extends the command/config seam with a backend request
 and CPU fallback reason. Slice B adds
 `Extrinsic.Runtime.ProgressivePoissonGpuBackend`, which pins the Vulkan
 storage-buffer layout, BDA push/state records, shader asset paths, and per-level
-build/accept plus GRAPHICS-108 compaction dispatch plans. GPU execution remains
-disabled and reports planning-only CPU fallback until the next METHOD-013
-dispatch/parity slices. The visible backend toggle remains tracked by
-RUNTIME-136.
+build/accept plus GRAPHICS-108 compaction dispatch plans. Slice C.2 adds the
+runtime-owned executable-resource seam: SoA position uploads, initial remaining
+keys, output-count initialization, pass recording, and readback-copy targets for
+`order`/`level_offsets`/`splat_radii`. Public Sandbox execution still reports CPU
+fallback for `gpu_vulkan_compute` requests until output parsing and parity tests
+land. The visible backend toggle remains tracked by RUNTIME-136.
 
 ### Sandbox Editor Mesh Curvature
 
