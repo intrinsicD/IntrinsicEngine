@@ -63,6 +63,7 @@ import Extrinsic.Runtime.ProgressivePoissonGpuBackend;
 import Extrinsic.Runtime.ProgressivePresentationExtraction;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
+import Extrinsic.Runtime.RegistrationAlignment;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.SceneSerialization;
@@ -87,6 +88,7 @@ import Geometry.PointCloud.Normals;
 import Geometry.PointCloud.SurfaceSampling;
 import Geometry.PointCloud.Utils;
 import Geometry.Properties;
+import Geometry.Registration;
 import Geometry.Remeshing;
 import Geometry.Simplification;
 import Geometry.Smoothing;
@@ -116,6 +118,7 @@ namespace Extrinsic::Runtime
         namespace CatmullClark = Geometry::CatmullClark;
         namespace Sqrt3Subdivide = Geometry::SubdivisionSqrt3;
         namespace Simpl = Geometry::Simplification;
+        namespace Reg = Geometry::Registration;
         namespace PPR = Intrinsic::Methods::Geometry::ProgressivePoissonReference;
 
         inline constexpr std::array<A::AssetPayloadKind, 6> kImportPayloadKinds{{
@@ -204,6 +207,12 @@ namespace Extrinsic::Runtime
             kMeshSimplifyMetrics{{
                 SandboxEditorMeshSimplifyMetric::ClassicalQEM,
                 SandboxEditorMeshSimplifyMetric::FA_QEM,
+            }};
+
+        inline constexpr std::array<SandboxEditorICPVariant, 2>
+            kSandboxEditorICPVariants{{
+                SandboxEditorICPVariant::PointToPoint,
+                SandboxEditorICPVariant::PointToPlane,
             }};
 
         inline constexpr std::array<SandboxEditorMeshSubdivideOperator, 3>
@@ -327,6 +336,17 @@ namespace Extrinsic::Runtime
             std::int32_t* MinNeighbors{nullptr};
         };
 
+        struct RegistrationUiState
+        {
+            std::optional<SandboxEditorRegistrationResult>* LastResult{nullptr};
+            std::int32_t* Variant{nullptr};
+            std::int32_t* MaxIterations{nullptr};
+            float* MaxCorrespondenceDistance{nullptr};
+            float* InlierRatio{nullptr};
+            std::int32_t* TrajectoryStep{nullptr};
+            bool* SwapSourceTarget{nullptr};
+        };
+
         struct ProgressivePoissonUiState
         {
             std::optional<SandboxEditorProgressivePoissonResult>*
@@ -392,6 +412,7 @@ namespace Extrinsic::Runtime
             RenderRecipe,
             CameraRender,
             GeometryVisualization,
+            Registration,
             Count,
         };
 
@@ -412,6 +433,7 @@ namespace Extrinsic::Runtime
                 SandboxEditorPanelWindowKind::RenderRecipe,
                 SandboxEditorPanelWindowKind::CameraRender,
                 SandboxEditorPanelWindowKind::GeometryVisualization,
+                SandboxEditorPanelWindowKind::Registration,
             }};
 
         [[nodiscard]] const char* PanelWindowTitle(
@@ -439,6 +461,8 @@ namespace Extrinsic::Runtime
                 return "Camera / Render";
             case SandboxEditorPanelWindowKind::GeometryVisualization:
                 return "Geometry Visualization";
+            case SandboxEditorPanelWindowKind::Registration:
+                return "ICP Registration";
             case SandboxEditorPanelWindowKind::Count:
                 break;
             }
@@ -5114,6 +5138,16 @@ namespace Extrinsic::Runtime
             return kMeshSimplifyMetrics[static_cast<std::size_t>(clamped)];
         }
 
+        [[nodiscard]] SandboxEditorICPVariant
+        SandboxEditorICPVariantFromIndex(const std::int32_t index) noexcept
+        {
+            const std::int32_t clamped = std::clamp(
+                index,
+                0,
+                static_cast<std::int32_t>(kSandboxEditorICPVariants.size() - 1u));
+            return kSandboxEditorICPVariants[static_cast<std::size_t>(clamped)];
+        }
+
         [[nodiscard]] SandboxEditorMeshSubdivideOperator
         MeshSubdivideOperatorFromIndex(const std::int32_t index) noexcept
         {
@@ -5728,6 +5762,22 @@ namespace Extrinsic::Runtime
                              metric) != kMeshSimplifyMetrics.end();
         }
 
+        [[nodiscard]] bool ValidSandboxEditorICPVariant(
+            const SandboxEditorICPVariant variant) noexcept
+        {
+            return std::find(kSandboxEditorICPVariants.begin(),
+                             kSandboxEditorICPVariants.end(),
+                             variant) != kSandboxEditorICPVariants.end();
+        }
+
+        [[nodiscard]] Reg::ICPVariant ToGeometryICPVariant(
+            const SandboxEditorICPVariant variant) noexcept
+        {
+            return variant == SandboxEditorICPVariant::PointToPlane
+                       ? Reg::ICPVariant::PointToPlane
+                       : Reg::ICPVariant::PointToPoint;
+        }
+
         struct MeshTopologySourceResult
         {
             Geometry::HalfedgeMesh::Mesh Mesh{};
@@ -6044,6 +6094,23 @@ namespace Extrinsic::Runtime
             message += std::to_string(result.OutputFaceCount);
             message += ", collapses=";
             message += std::to_string(result.CollapseCount);
+            message += ").";
+            return message;
+        }
+
+        [[nodiscard]] std::string BuildRegistrationSuccessMessage(
+            const SandboxEditorRegistrationResult& result)
+        {
+            std::string message = "ICP registration completed (variant=";
+            message += DebugNameForSandboxEditorICPVariant(result.Variant);
+            message += ", iterations=";
+            message += std::to_string(result.IterationsPerformed);
+            message += ", step=";
+            message += std::to_string(result.AppliedStep);
+            message += "/";
+            message += std::to_string(result.TrajectoryLength);
+            message += ", converged=";
+            message += result.Converged ? "yes" : "no";
             message += ").";
             return message;
         }
@@ -11351,6 +11418,168 @@ namespace Extrinsic::Runtime
             }
         }
 
+        void DrawRegistrationResultStatus(
+            const std::optional<SandboxEditorRegistrationResult>& lastResult)
+        {
+            if (!lastResult.has_value())
+            {
+                ImGui::TextDisabled("Last ICP run: none");
+                return;
+            }
+            const SandboxEditorRegistrationResult& result = *lastResult;
+            ImGui::Text("Last ICP run: %s",
+                        DebugNameForSandboxEditorCommandStatus(result.Status));
+            if (result.Succeeded() && result.HasResult)
+            {
+                ImGui::Text("Variant: %s  points: %zu -> %zu",
+                            DebugNameForSandboxEditorICPVariant(result.Variant),
+                            result.SourcePointCount,
+                            result.TargetPointCount);
+                ImGui::Text("Iterations: %zu  final RMSE: %.6g  converged: %s",
+                            result.IterationsPerformed,
+                            result.FinalRMSE,
+                            result.Converged ? "yes" : "no");
+                ImGui::Text("Trajectory step: %zu / %zu  inliers: %zu",
+                            result.AppliedStep,
+                            result.TrajectoryLength,
+                            result.FinalInlierCount);
+            }
+            if (!result.Message.empty())
+                ImGui::TextWrapped("%s", result.Message.c_str());
+        }
+
+        void DrawRegistrationPanelContent(
+            const SandboxEditorContext* context,
+            RegistrationUiState* state)
+        {
+            if (context == nullptr || state == nullptr ||
+                state->LastResult == nullptr || state->Variant == nullptr ||
+                state->MaxIterations == nullptr ||
+                state->MaxCorrespondenceDistance == nullptr ||
+                state->InlierRatio == nullptr ||
+                state->TrajectoryStep == nullptr ||
+                state->SwapSourceTarget == nullptr)
+            {
+                ImGui::TextDisabled("ICP registration controls are not bound.");
+                return;
+            }
+
+            ImGui::TextWrapped(
+                "Aligns a source point cloud onto a target point cloud with ICP "
+                "and drives the source entity Transform along the convergence "
+                "trajectory.");
+
+            std::vector<std::uint32_t> selected{};
+            if (context->Selection != nullptr)
+            {
+                for (const std::uint32_t id :
+                     context->Selection->SelectedStableIds())
+                {
+                    selected.push_back(id);
+                }
+            }
+            if (selected.size() < 2u)
+            {
+                ImGui::TextDisabled(
+                    "Select two point-cloud entities (source + target) to register.");
+                DrawRegistrationResultStatus(*state->LastResult);
+                return;
+            }
+
+            const std::uint32_t sourceId =
+                selected[*state->SwapSourceTarget ? 1u : 0u];
+            const std::uint32_t targetId =
+                selected[*state->SwapSourceTarget ? 0u : 1u];
+            ImGui::Text("Source entity: %u", sourceId);
+            ImGui::Text("Target entity: %u", targetId);
+            ImGui::Checkbox("Swap source / target", state->SwapSourceTarget);
+
+            *state->Variant = std::clamp(
+                *state->Variant,
+                0,
+                static_cast<std::int32_t>(
+                    kSandboxEditorICPVariants.size() - 1u));
+            const SandboxEditorICPVariant variant =
+                SandboxEditorICPVariantFromIndex(*state->Variant);
+            if (ImGui::BeginCombo(
+                    "Variant",
+                    DebugNameForSandboxEditorICPVariant(variant)))
+            {
+                for (std::size_t i = 0u;
+                     i < kSandboxEditorICPVariants.size(); ++i)
+                {
+                    const SandboxEditorICPVariant option =
+                        kSandboxEditorICPVariants[i];
+                    const bool selectedOption =
+                        *state->Variant == static_cast<std::int32_t>(i);
+                    if (ImGui::Selectable(
+                            DebugNameForSandboxEditorICPVariant(option),
+                            selectedOption))
+                    {
+                        *state->Variant = static_cast<std::int32_t>(i);
+                    }
+                    if (selectedOption)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+
+            *state->MaxIterations = std::clamp(*state->MaxIterations, 1, 1000);
+            ImGui::DragInt("Max iterations", state->MaxIterations, 1.0f, 1, 1000);
+            *state->MaxCorrespondenceDistance =
+                std::max(*state->MaxCorrespondenceDistance, 0.0f);
+            ImGui::DragFloat("Max correspondence distance (0 = unlimited)",
+                             state->MaxCorrespondenceDistance, 0.01f, 0.0f,
+                             1.0e6f, "%.4f");
+            *state->InlierRatio = std::clamp(*state->InlierRatio, 0.01f, 1.0f);
+            ImGui::DragFloat("Inlier ratio", state->InlierRatio, 0.01f, 0.01f,
+                             1.0f, "%.2f");
+
+            const std::size_t trajectoryLength =
+                state->LastResult->has_value()
+                    ? (*state->LastResult)->TrajectoryLength
+                    : 0u;
+            bool run = ImGui::Button("Run ICP");
+            // Full-convergence request: MaxIterations >= the completed iteration
+            // count, so TrajectoryPose clamps to the final pose.
+            std::size_t requestedStep =
+                static_cast<std::size_t>(*state->MaxIterations);
+            if (trajectoryLength > 0u)
+            {
+                *state->TrajectoryStep = std::clamp(
+                    *state->TrajectoryStep,
+                    0,
+                    static_cast<std::int32_t>(trajectoryLength));
+                ImGui::SliderInt("Trajectory step", state->TrajectoryStep, 0,
+                                 static_cast<int>(trajectoryLength));
+                if (ImGui::IsItemDeactivatedAfterEdit())
+                {
+                    run = true;
+                    requestedStep = static_cast<std::size_t>(
+                        std::max(*state->TrajectoryStep, 0));
+                }
+            }
+            if (run)
+            {
+                *state->LastResult = ApplySandboxEditorRegistrationCommand(
+                    *context,
+                    SandboxEditorRegistrationCommand{
+                        .SourceStableEntityId = sourceId,
+                        .TargetStableEntityId = targetId,
+                        .Variant = variant,
+                        .MaxIterations =
+                            static_cast<std::uint32_t>(*state->MaxIterations),
+                        .MaxCorrespondenceDistance = static_cast<double>(
+                            *state->MaxCorrespondenceDistance),
+                        .InlierRatio =
+                            static_cast<double>(*state->InlierRatio),
+                        .TrajectoryStep = requestedStep,
+                    });
+            }
+
+            DrawRegistrationResultStatus(*state->LastResult);
+        }
+
         void DrawPanelFrame(
             const SandboxEditorPanelFrame& frame,
             const SandboxEditorContext* context,
@@ -11374,7 +11603,8 @@ namespace Extrinsic::Runtime
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
             PointCloudOutlierRemovalUiState* pointCloudOutlierState,
             ProgressivePoissonUiState* progressivePoissonState,
-            TextureBakeUiState* textureBakeState)
+            TextureBakeUiState* textureBakeState,
+            RegistrationUiState* registrationState)
         {
             DrawMainMenuBar(panelWindowOpen, domainWindowOpen);
             DrawDomainWindows(
@@ -11392,6 +11622,14 @@ namespace Extrinsic::Runtime
                 pointCloudOutlierState,
                 progressivePoissonState,
                 textureBakeState);
+
+            if (BeginPanelWindow(panelWindowOpen,
+                                 SandboxEditorPanelWindowKind::Registration,
+                                 ImVec2(360.0f, 320.0f)))
+            {
+                DrawRegistrationPanelContent(context, registrationState);
+                ImGui::End();
+            }
 
             if (BeginPanelWindow(panelWindowOpen,
                                  SandboxEditorPanelWindowKind::Shell,
@@ -13841,6 +14079,19 @@ namespace Extrinsic::Runtime
             return "Classical QEM";
         case SandboxEditorMeshSimplifyMetric::FA_QEM:
             return "FA-QEM (feature-aware)";
+        }
+        return "Unknown";
+    }
+
+    const char* DebugNameForSandboxEditorICPVariant(
+        const SandboxEditorICPVariant variant) noexcept
+    {
+        switch (variant)
+        {
+        case SandboxEditorICPVariant::PointToPoint:
+            return "Point-to-point";
+        case SandboxEditorICPVariant::PointToPlane:
+            return "Point-to-plane";
         }
         return "Unknown";
     }
@@ -17063,9 +17314,195 @@ namespace Extrinsic::Runtime
         return result;
     }
 
+    SandboxEditorRegistrationResult ApplySandboxEditorRegistrationCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorRegistrationCommand& command)
+    {
+        SandboxEditorRegistrationResult result{
+            .Status = SandboxEditorCommandStatus::NoChange,
+            .Variant = command.Variant,
+            .Error = Core::ErrorCode::Success,
+        };
+
+        if (context.Scene == nullptr)
+        {
+            result.Status = SandboxEditorCommandStatus::MissingScene;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message = "ICP registration requires an attached scene.";
+            return result;
+        }
+        if (command.SourceStableEntityId == command.TargetStableEntityId)
+        {
+            result.Status =
+                SandboxEditorCommandStatus::InvalidProcessingParameters;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "ICP registration requires two distinct source and target entities.";
+            return result;
+        }
+        if (!ValidSandboxEditorICPVariant(command.Variant) ||
+            command.MaxIterations == 0u ||
+            !(command.InlierRatio > 0.0 && command.InlierRatio <= 1.0) ||
+            !std::isfinite(command.MaxCorrespondenceDistance))
+        {
+            result.Status =
+                SandboxEditorCommandStatus::InvalidProcessingParameters;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "ICP registration requires a valid variant, a positive iteration count, an inlier ratio in (0, 1], and a finite correspondence distance.";
+            return result;
+        }
+
+        entt::registry& raw = context.Scene->Raw();
+        const std::optional<ECS::EntityHandle> sourceEntity =
+            ResolveStableEntity(raw, command.SourceStableEntityId);
+        if (!sourceEntity.has_value())
+        {
+            result.Status = SandboxEditorCommandStatus::StaleEntity;
+            result.Error = Core::ErrorCode::ResourceNotFound;
+            result.Message =
+                "ICP registration source entity is stale or no longer live.";
+            return result;
+        }
+        const std::optional<ECS::EntityHandle> targetEntity =
+            ResolveStableEntity(raw, command.TargetStableEntityId);
+        if (!targetEntity.has_value())
+        {
+            result.Status = SandboxEditorCommandStatus::StaleEntity;
+            result.Error = Core::ErrorCode::ResourceNotFound;
+            result.Message =
+                "ICP registration target entity is stale or no longer live.";
+            return result;
+        }
+
+        const GS::ConstSourceView sourceView =
+            GS::BuildConstView(raw, *sourceEntity);
+        if (GS::BuildSourceAvailability(sourceView).ProvenanceDomain !=
+                GS::Domain::PointCloud ||
+            sourceView.VertexSource == nullptr)
+        {
+            result.Status =
+                SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "ICP registration source must be a point-cloud entity.";
+            return result;
+        }
+        const GS::ConstSourceView targetView =
+            GS::BuildConstView(raw, *targetEntity);
+        if (GS::BuildSourceAvailability(targetView).ProvenanceDomain !=
+                GS::Domain::PointCloud ||
+            targetView.VertexSource == nullptr)
+        {
+            result.Status =
+                SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "ICP registration target must be a point-cloud entity.";
+            return result;
+        }
+
+        const std::optional<std::vector<glm::vec3>> sourcePoints =
+            CollectKMeansPositions(sourceView.VertexSource->Properties);
+        const std::optional<std::vector<glm::vec3>> targetPoints =
+            CollectKMeansPositions(targetView.VertexSource->Properties);
+        if (!sourcePoints.has_value() || !targetPoints.has_value())
+        {
+            result.Status =
+                SandboxEditorCommandStatus::InvalidProcessingParameters;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "ICP registration requires both point clouds to expose a count-matched, finite v:position property.";
+            return result;
+        }
+        result.SourcePointCount = sourcePoints->size();
+        result.TargetPointCount = targetPoints->size();
+
+        ECSC::Transform::Component* transform =
+            raw.try_get<ECSC::Transform::Component>(*sourceEntity);
+        if (transform == nullptr)
+        {
+            result.Status = SandboxEditorCommandStatus::MissingTransform;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message =
+                "ICP registration source entity has no Transform to drive.";
+            return result;
+        }
+
+        Reg::RegistrationParams params{};
+        params.Variant = ToGeometryICPVariant(command.Variant);
+        params.MaxIterations = command.MaxIterations;
+        params.MaxCorrespondenceDistance =
+            command.MaxCorrespondenceDistance > 0.0
+                ? command.MaxCorrespondenceDistance
+                : 1.0e6;
+        params.InlierRatio = command.InlierRatio;
+
+        const RegistrationAlignmentOutcome outcome =
+            AlignPointClouds(*sourcePoints, *targetPoints, {}, params);
+        if (!outcome.HasResult)
+        {
+            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "ICP rejected the selected point clouds (fewer than 3 points or invalid parameters).";
+            return result;
+        }
+
+        result.HasResult = true;
+        result.IterationsPerformed = outcome.Result.IterationsPerformed;
+        result.TrajectoryLength = outcome.IterationCount();
+        result.FinalRMSE = outcome.Result.FinalRMSE;
+        result.Converged = outcome.Result.Converged;
+        result.FinalInlierCount = outcome.Result.FinalInlierCount;
+
+        const std::size_t step =
+            std::min(command.TrajectoryStep, outcome.IterationCount());
+        result.AppliedStep = step;
+        const glm::mat4 pose = TrajectoryPose(outcome, step);
+
+        ECSC::Transform::Component next = *transform;
+        next.Position = glm::vec3(pose[3]);
+        next.Rotation = glm::quat_cast(glm::mat3(pose));
+
+        if (context.CommandHistory != nullptr)
+        {
+            const EditorCommandHistoryResult history =
+                context.CommandHistory->Execute(
+                    MakeTransformEditCommand(
+                        EditorTransformEditCommand{
+                            .Scene = context.Scene,
+                            .StableEntityId = command.SourceStableEntityId,
+                            .Before = *transform,
+                            .After = next,
+                            .Label = "Align point clouds (ICP)",
+                        }));
+            result.Status = ToSandboxEditorCommandStatus(history.Status);
+        }
+        else
+        {
+            *transform = next;
+            raw.emplace_or_replace<ECSC::Transform::IsDirtyTag>(*sourceEntity);
+            result.Status = SandboxEditorCommandStatus::Applied;
+        }
+
+        if (result.Status != SandboxEditorCommandStatus::Applied)
+        {
+            result.Error = Core::ErrorCode::Unknown;
+            result.Message =
+                "ICP registration pose failed during editor history commit.";
+            return result;
+        }
+
+        result.Error = Core::ErrorCode::Success;
+        result.Message = BuildRegistrationSuccessMessage(result);
+        return result;
+    }
+
     void DrawSandboxEditorPanelFrame(const SandboxEditorPanelFrame& frame)
     {
         DrawPanelFrame(frame,
+                       nullptr,
                        nullptr,
                        nullptr,
                        nullptr,
@@ -17155,6 +17592,9 @@ namespace Extrinsic::Runtime
                 if (m_LastProgressivePoissonResult.has_value())
                     context.LastProgressivePoissonResult =
                         &*m_LastProgressivePoissonResult;
+                if (m_LastRegistrationResult.has_value())
+                    context.LastRegistrationResult =
+                        &*m_LastRegistrationResult;
                 const Core::Extent2D viewport =
                     context.CameraViewport.Width != 0u &&
                             context.CameraViewport.Height != 0u
@@ -17328,6 +17768,16 @@ namespace Extrinsic::Runtime
                     .UvForceRegenerate = &m_UvAtlasForceRegenerate,
                     .UvPreserveAuthored = &m_UvAtlasPreserveAuthored,
                 };
+                RegistrationUiState registrationState{
+                    .LastResult = &m_LastRegistrationResult,
+                    .Variant = &m_RegistrationVariant,
+                    .MaxIterations = &m_RegistrationMaxIterations,
+                    .MaxCorrespondenceDistance =
+                        &m_RegistrationMaxCorrespondenceDistance,
+                    .InlierRatio = &m_RegistrationInlierRatio,
+                    .TrajectoryStep = &m_RegistrationTrajectoryStep,
+                    .SwapSourceTarget = &m_RegistrationSwapSourceTarget,
+                };
                 DrawPanelFrame(
                     m_LastFrame,
                     &context,
@@ -17350,7 +17800,8 @@ namespace Extrinsic::Runtime
                     &pointCloudNormalsState,
                     &pointCloudOutlierState,
                     &progressivePoissonState,
-                    &textureBakeState);
+                    &textureBakeState,
+                    &registrationState);
             });
     }
 

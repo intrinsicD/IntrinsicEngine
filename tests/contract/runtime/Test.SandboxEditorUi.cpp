@@ -399,6 +399,33 @@ namespace
         uv.Vector() = texcoords;
     }
 
+    // A small deterministic, asymmetric point lattice — distinct extents per axis
+    // give ICP a well-conditioned correspondence problem (UI-029).
+    [[nodiscard]] std::vector<glm::vec3> MakeRegistrationCloud()
+    {
+        std::vector<glm::vec3> points{};
+        for (int i = 0; i < 5; ++i)
+            for (int j = 0; j < 5; ++j)
+                for (int k = 0; k < 3; ++k)
+                    points.emplace_back(static_cast<float>(i) * 0.3f,
+                                        static_cast<float>(j) * 0.4f,
+                                        static_cast<float>(k) * 0.5f);
+        return points;
+    }
+
+    [[nodiscard]] ECS::EntityHandle MakePointCloudEntity(
+        ECS::Scene::Registry& registry,
+        std::string name,
+        const std::vector<glm::vec3>& positions)
+    {
+        const ECS::EntityHandle entity =
+            MakeSelectable(registry, std::move(name));
+        auto& vertices = registry.Raw().emplace<GS::Vertices>(entity);
+        SetPositions(vertices, positions);
+        registry.Raw().emplace<G::RenderPoints>(entity);
+        return entity;
+    }
+
     void ExpectKMeansVertexProperties(Geometry::PropertySet& properties,
                                       const std::size_t expectedCount,
                                       const bool pointCloudNames)
@@ -8142,4 +8169,137 @@ TEST(SandboxEditorUi, EngineAttachmentRegistersEditorCallback)
 
     ui.Detach();
     engine.Shutdown();
+}
+
+TEST(SandboxEditorUi, RegistrationCommandAlignsSourceOntoTargetAndSupportsUndoRedo)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const std::vector<glm::vec3> target = MakeRegistrationCloud();
+    const glm::vec3 offset{0.05f, -0.03f, 0.02f};
+    std::vector<glm::vec3> sourcePoints{};
+    sourcePoints.reserve(target.size());
+    for (const glm::vec3& p : target)
+        sourcePoints.push_back(p + offset);
+
+    const ECS::EntityHandle source =
+        MakePointCloudEntity(registry, "ICP Source", sourcePoints);
+    const ECS::EntityHandle targetEntity =
+        MakePointCloudEntity(registry, "ICP Target", target);
+    const std::uint32_t sourceId =
+        Runtime::SelectionController::ToStableEntityId(source);
+    const std::uint32_t targetId =
+        Runtime::SelectionController::ToStableEntityId(targetEntity);
+    const glm::vec3 originalPosition =
+        registry.Raw().get<ECSC::Transform::Component>(source).Position;
+
+    const Runtime::SandboxEditorRegistrationResult result =
+        Runtime::ApplySandboxEditorRegistrationCommand(
+            context,
+            Runtime::SandboxEditorRegistrationCommand{
+                .SourceStableEntityId = sourceId,
+                .TargetStableEntityId = targetId,
+                .Variant = Runtime::SandboxEditorICPVariant::PointToPoint,
+                .MaxIterations = 60u,
+                .InlierRatio = 1.0,
+                .TrajectoryStep = 1000u,
+            });
+
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_TRUE(result.HasResult);
+    EXPECT_EQ(result.SourcePointCount, sourcePoints.size());
+    EXPECT_EQ(result.TargetPointCount, target.size());
+    EXPECT_GT(result.IterationsPerformed, 0u);
+    EXPECT_EQ(result.TrajectoryLength, result.IterationsPerformed);
+    EXPECT_EQ(result.AppliedStep, result.TrajectoryLength);
+    EXPECT_LT(result.FinalRMSE, 1.0e-3);
+
+    // ICP recovers the transform mapping source (= target + offset) back onto
+    // target: a pure translation by -offset with identity rotation.
+    const ECSC::Transform::Component& aligned =
+        registry.Raw().get<ECSC::Transform::Component>(source);
+    EXPECT_NEAR(aligned.Position.x, -offset.x, 1.0e-2f);
+    EXPECT_NEAR(aligned.Position.y, -offset.y, 1.0e-2f);
+    EXPECT_NEAR(aligned.Position.z, -offset.z, 1.0e-2f);
+    EXPECT_NEAR(std::abs(aligned.Rotation.w), 1.0f, 1.0e-2f);
+
+    ASSERT_TRUE(history.CanUndo());
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    const glm::vec3 undone =
+        registry.Raw().get<ECSC::Transform::Component>(source).Position;
+    EXPECT_NEAR(undone.x, originalPosition.x, 1.0e-5f);
+    EXPECT_NEAR(undone.y, originalPosition.y, 1.0e-5f);
+    EXPECT_NEAR(undone.z, originalPosition.z, 1.0e-5f);
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_NEAR(
+        registry.Raw().get<ECSC::Transform::Component>(source).Position.x,
+        -offset.x, 1.0e-2f);
+}
+
+TEST(SandboxEditorUi, RegistrationCommandFailsClosedForInvalidSelectionAndParameters)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    const std::vector<glm::vec3> cloud = MakeRegistrationCloud();
+    const ECS::EntityHandle source =
+        MakePointCloudEntity(registry, "Src", cloud);
+    const ECS::EntityHandle target =
+        MakePointCloudEntity(registry, "Tgt", cloud);
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddIcosahedronMeshSource(registry, mesh);
+    const std::uint32_t sourceId =
+        Runtime::SelectionController::ToStableEntityId(source);
+    const std::uint32_t targetId =
+        Runtime::SelectionController::ToStableEntityId(target);
+    const std::uint32_t meshId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    EXPECT_EQ(
+        Runtime::ApplySandboxEditorRegistrationCommand(
+            context,
+            Runtime::SandboxEditorRegistrationCommand{
+                .SourceStableEntityId = sourceId,
+                .TargetStableEntityId = sourceId,
+            })
+            .Status,
+        Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
+
+    EXPECT_EQ(
+        Runtime::ApplySandboxEditorRegistrationCommand(
+            context,
+            Runtime::SandboxEditorRegistrationCommand{
+                .SourceStableEntityId = sourceId,
+                .TargetStableEntityId = targetId,
+                .MaxIterations = 0u,
+            })
+            .Status,
+        Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
+
+    EXPECT_EQ(
+        Runtime::ApplySandboxEditorRegistrationCommand(
+            context,
+            Runtime::SandboxEditorRegistrationCommand{
+                .SourceStableEntityId = sourceId,
+                .TargetStableEntityId = targetId + 9999u,
+            })
+            .Status,
+        Runtime::SandboxEditorCommandStatus::StaleEntity);
+
+    EXPECT_EQ(
+        Runtime::ApplySandboxEditorRegistrationCommand(
+            context,
+            Runtime::SandboxEditorRegistrationCommand{
+                .SourceStableEntityId = sourceId,
+                .TargetStableEntityId = meshId,
+            })
+            .Status,
+        Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
 }

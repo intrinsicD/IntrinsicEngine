@@ -57,7 +57,7 @@ import Extrinsic.Runtime.VertexChannelBindings;
 
 namespace Extrinsic::Runtime::Detail
 {
-    inline constexpr std::size_t kSandboxEditorPanelWindowCount = 10u;
+    inline constexpr std::size_t kSandboxEditorPanelWindowCount = 11u;
 }
 
 export namespace Extrinsic::Runtime
@@ -752,6 +752,56 @@ export namespace Extrinsic::Runtime
         std::size_t CollapsesRejectedQuality{0u};
         std::size_t SharpFeatureVerticesPinned{0u};
         std::size_t SeamVerticesPinned{0u};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SandboxEditorCommandStatus::Applied;
+        }
+    };
+
+    // UI-029: ICP registration between two selected point-cloud entities.
+    // Editor-local variant enum (mapped to Geometry::Registration::ICPVariant in
+    // the command implementation) so the editor interface stays decoupled from
+    // the geometry registration module.
+    enum class SandboxEditorICPVariant : std::uint8_t
+    {
+        PointToPoint,
+        PointToPlane,
+    };
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorICPVariant(
+        SandboxEditorICPVariant variant) noexcept;
+
+    struct SandboxEditorRegistrationCommand
+    {
+        std::uint32_t SourceStableEntityId{0u};
+        std::uint32_t TargetStableEntityId{0u};
+        SandboxEditorICPVariant Variant{SandboxEditorICPVariant::PointToPoint};
+        std::uint32_t MaxIterations{50u};
+        // World-space correspondence cutoff; <= 0 disables the cutoff.
+        double MaxCorrespondenceDistance{0.0};
+        double InlierRatio{0.9};
+        // Trajectory step whose cumulative source->target pose is written to the
+        // source entity Transform. 0 = identity (un-registered start); values at
+        // or beyond the completed iteration count clamp to the converged pose.
+        std::size_t TrajectoryStep{0u};
+    };
+
+    struct SandboxEditorRegistrationResult
+    {
+        SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
+        bool HasResult{false};
+        SandboxEditorICPVariant Variant{SandboxEditorICPVariant::PointToPoint};
+        std::size_t SourcePointCount{0u};
+        std::size_t TargetPointCount{0u};
+        std::size_t IterationsPerformed{0u};
+        std::size_t TrajectoryLength{0u};
+        std::size_t AppliedStep{0u};
+        double FinalRMSE{0.0};
+        bool Converged{false};
+        std::size_t FinalInlierCount{0u};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
 
@@ -2034,6 +2084,8 @@ export namespace Extrinsic::Runtime
             LastPointCloudOutlierRemovalResult{nullptr};
         const SandboxEditorProgressivePoissonResult*
             LastProgressivePoissonResult{nullptr};
+        const SandboxEditorRegistrationResult*
+            LastRegistrationResult{nullptr};
         const Graphics::RenderGraphFrameStats* RenderGraphStats{nullptr};
         const Graphics::RenderRecipeConfigContext* RenderRecipeContext{nullptr};
         SandboxEditorRenderRecipeEditorState* RenderRecipeEditorState{nullptr};
@@ -2417,6 +2469,10 @@ export namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorPointCloudOutlierRemovalCommand& command);
 
+    SandboxEditorRegistrationResult ApplySandboxEditorRegistrationCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorRegistrationCommand& command);
+
     SandboxEditorProgressivePoissonResult
     ApplySandboxEditorProgressivePoissonCommand(
         const SandboxEditorContext& context,
@@ -2494,6 +2550,8 @@ export namespace Extrinsic::Runtime
             m_LastProgressivePoissonResult{};
         std::optional<SandboxEditorProgressivePoissonConfigResult>
             m_LastProgressivePoissonConfigResult{};
+        std::optional<SandboxEditorRegistrationResult>
+            m_LastRegistrationResult{};
         Graphics::RenderRecipeConfigContext m_RenderRecipeContext{};
         SandboxEditorRenderRecipeEditorState m_RenderRecipeState{};
         RenderArtifactRegistry m_RenderArtifactRegistry{};
@@ -2530,6 +2588,12 @@ export namespace Extrinsic::Runtime
         float m_MeshSimplifyCurvatureWeight{1.0f};
         bool m_MeshSimplifyPreserveSharpFeatures{true};
         bool m_MeshSimplifyPreserveUvSeams{true};
+        std::int32_t m_RegistrationVariant{0};
+        std::int32_t m_RegistrationMaxIterations{50};
+        float m_RegistrationMaxCorrespondenceDistance{0.0f};
+        float m_RegistrationInlierRatio{0.9f};
+        std::int32_t m_RegistrationTrajectoryStep{0};
+        bool m_RegistrationSwapSourceTarget{false};
         std::int32_t m_MeshVertexNormalsWeighting{1};
         glm::vec3 m_MeshVertexNormalsFallback{0.0f, 1.0f, 0.0f};
         glm::vec3 m_GraphVertexNormalsFallback{0.0f, 0.0f, 1.0f};

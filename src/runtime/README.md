@@ -319,6 +319,49 @@ redo reapplies the generated mesh. Publication stamps `DirtyVertexPositions`,
 not call renderer/RHI upload APIs or stamp broad `GpuDirty`; mesh extraction
 repackages/reuploads on the next deferred extraction opportunity.
 
+### Sandbox Editor Mesh Simplify
+
+`UI-028` adds a mesh decimation command at `Mesh > Processing > Simplify`. The
+Sandbox EditorUI surface exports `SandboxEditorMeshSimplifyMetric`,
+`SandboxEditorMeshSimplifyCommand`, `SandboxEditorMeshSimplifyResult`, and
+`ApplySandboxEditorMeshSimplifyCommand(...)`. Runtime validates a live selected
+mesh `GeometrySources` entity, builds a scratch halfedge mesh, calls the
+geometry-owned `GEOM-014` `Geometry::Simplification::Simplify` kernel in place,
+and republishes the collapsed topology through the shared mesh
+topology-replacement seam. The window exposes the error metric (Classical QEM /
+feature-aware FA-QEM, the GEOM-014 default), a target face count, an optional
+per-collapse max-error cap (`0` = unlimited), boundary preservation, and the
+FA-QEM feature weights (feature angle, normal/boundary/curvature weights, sharp-
+feature and UV-seam pinning), and reads out the `Result` diagnostics: input →
+output vertex/face counts, collapse count, max collapse error, topology/quality
+rejections, and pinned sharp-feature/UV-seam counts. Commits are undoable
+through `EditorCommandHistory::Execute` and stamp the same
+`DirtyVertexPositions`/`DirtyVertexAttributes`/`DirtyEdgeTopology`/
+`DirtyFaceTopology` tags as remesh/subdivide, without renderer/RHI upload calls
+or broad `GpuDirty`. `SandboxEditorContext::MeshSimplifyKernelAvailable` gates
+the executor so an unavailable kernel returns deterministic diagnostics without
+mutating `GeometrySources`.
+
+### Sandbox Editor ICP Registration
+
+`UI-029` adds an `ICP Registration` top-level panel (a new
+`SandboxEditorPanelWindowKind`, reachable from the `View` menu). The Sandbox
+EditorUI surface exports `SandboxEditorICPVariant`,
+`SandboxEditorRegistrationCommand`, `SandboxEditorRegistrationResult`, and
+`ApplySandboxEditorRegistrationCommand(...)`. The command reads the source and
+target point positions from two selected point-cloud entities, requires both to
+resolve to `GeometrySources` `Domain::PointCloud`, runs the runtime-owned
+`Extrinsic::Runtime::AlignPointClouds` ICP controller (which forwards to
+`Geometry::Registration::AlignICP` and captures the per-iteration convergence
+trajectory), and drives the source entity's `Transform::Component` with
+`Extrinsic::Runtime::TrajectoryPose(outcome, step)` through an undoable
+`MakeTransformEditCommand`. The panel takes the source/target from the current
+multi-selection (with a swap toggle), exposes the `ICPVariant`, max iterations,
+max correspondence distance (`0` = unlimited), and inlier ratio, and provides a
+trajectory-step slider over `[0, IterationCount()]` that scrubs the previewed
+pose. The command owns no geometry, renderer, or asset state; it only reads
+point positions, calls the runtime controller, and edits the source `Transform`.
+
 ### Sandbox Editor Vertex Channel Bindings
 
 `RUNTIME-123` extends `Extrinsic.Runtime.SandboxEditorUi` with normal/color
