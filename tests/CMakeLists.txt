@@ -262,6 +262,7 @@ intrinsic_test_object_lib(EcsContractTestObjs
 if(TARGET ExtrinsicRuntime)
     set(_runtime_unit_test_files
         Test.MethodFigureExport.cpp
+        Test.RegistrationAlignment.cpp
     )
     intrinsic_resolve_test_sources(_runtime_unit_test_sources
         SEARCH_DIRS unit/runtime

@@ -310,6 +310,16 @@ represent the deformation — there the trace gains a deformed-positions span
 (pointing at the buffer the deformation solve already fills), still with no extra
 compute when observing.
 
+The runtime-side consumer is `Extrinsic.Runtime.RegistrationAlignment`
+(`runtime -> geometry`): `AlignPointClouds(...)` runs `AlignICP` with a
+trace-collecting observer and returns the final result plus the full
+per-iteration trajectory, and `TrajectoryPose(outcome, index)` yields the
+renderer-facing `glm::mat4` to preview at each step (identity at step 0). The
+Sandbox editor panel that lets a user select two point clouds, run registration,
+and scrub the convergence with a slider is tracked by
+[`UI-029`](../../tasks/backlog/ui/UI-029-editor-registration-convergence-visualization.md);
+the controller and its headless test land ahead of the panel.
+
 ## 4. How registration decomposes onto existing code
 
 The `AlignICP` loop already *is* the reference model's structure with hard-wired

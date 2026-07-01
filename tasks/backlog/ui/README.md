@@ -14,6 +14,11 @@ map.
 - [UI-028 — Sandbox EditorUI mesh simplification window](UI-028-editor-mesh-simplification-window.md)
   (depends on `GEOM-014`; the editor executor for feature-aware QEM
   simplification, continuing the `bcg_code_base` processing-window port).
+- [UI-029 — Editor ICP registration panel + convergence visualization](UI-029-editor-registration-convergence-visualization.md)
+  (depends on `GEOM-055`; consumes the runtime controller
+  `Runtime.RegistrationAlignment` to run ICP and scrub the convergence
+  trajectory. The controller + its headless test land first; the editor panel is
+  the remaining open work).
 
 The runtime SpatialDebug closest-face picking consumer for `GEOM-039` is
 retired under the runtime backlog as `RUNTIME-135`.

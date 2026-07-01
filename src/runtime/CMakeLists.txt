@@ -31,6 +31,7 @@ target_sources(${target_name}
         Runtime.GeometryAvailability.cppm
         Runtime.GpuReadbackJob.cppm
         Runtime.KMeansBackend.cppm
+        Runtime.RegistrationAlignment.cppm
         Runtime.PhysicsBridge.cppm
         Runtime.SceneSerialization.cppm
         Cameras/Runtime.CameraControllers.cppm
@@ -81,6 +82,7 @@ target_sources(${target_name}
         Runtime.GeometryAvailability.cpp
         Runtime.GpuReadbackJob.cpp
         Runtime.KMeansBackend.cpp
+        Runtime.RegistrationAlignment.cpp
         Runtime.PhysicsBridge.cpp
         Runtime.SceneSerialization.cpp
         Cameras/Runtime.CameraControllers.cpp
