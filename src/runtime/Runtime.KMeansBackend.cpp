@@ -1,5 +1,6 @@
 module;
 
+#include <cstdint>
 #include <optional>
 #include <span>
 
@@ -8,11 +9,38 @@ module;
 module Extrinsic.Runtime.KMeansBackend;
 
 import Extrinsic.RHI.Device;
+import Extrinsic.Runtime.KMeansGpuBackend;
 import Geometry.KMeans;
 
 namespace Extrinsic::Runtime
 {
     namespace GK = Geometry::KMeans;
+
+    namespace
+    {
+        // Route a Backend::GPU request through the GEOM-056 resolve seam. The
+        // recorded Lloyd loop lands in later slices, so this reports whether an
+        // operational GPU path exists and, for now, always recommends the CPU
+        // reference fallback. Returns true when GPU execution is available.
+        [[nodiscard]] bool TryResolveKMeansGpu(
+            std::span<const glm::vec3> points,
+            const GK::KMeansParams& params,
+            RHI::IDevice& device)
+        {
+            const KMeansGpuResolveDesc resolveDesc{
+                .Device = &device,
+                .Plan = KMeansGpuPlanDesc{
+                    .PointCount = static_cast<std::uint32_t>(points.size()),
+                    .ClusterCount = params.ClusterCount,
+                    .MaxIterations = params.MaxIterations,
+                    .GroupSize = kKMeansGpuGroupSize,
+                    .ConvergenceTolerance = params.ConvergenceTolerance,
+                },
+            };
+            const KMeansGpuResolveResult resolved = ResolveKMeansGpuRequest(resolveDesc);
+            return resolved.GpuExecutionAvailable;
+        }
+    }
 
     namespace
     {
@@ -46,10 +74,12 @@ namespace Extrinsic::Runtime
         RHI::IDevice& device)
     {
         const GK::Backend requestedBackend = params.Compute;
-        if (requestedBackend == GK::Backend::GPU && device.IsOperational())
+        if (requestedBackend == GK::Backend::GPU &&
+            TryResolveKMeansGpu(points, params, device))
         {
-            // GEOM-052 installs the RHI-visible seam only. A real GPU KMeans
-            // kernel must be added by a later parity-gated backend task.
+            // GEOM-056 later slices execute the recorded Lloyd loop here when
+            // the resolve seam reports an operational GPU path. Until then the
+            // resolve returns false and we fall through to the CPU reference.
         }
         return MarkResolvedBackend(
             GK::Cluster(points, CpuFallbackParams(params)),
@@ -64,10 +94,12 @@ namespace Extrinsic::Runtime
         RHI::IDevice& device)
     {
         const GK::Backend requestedBackend = params.Compute;
-        if (requestedBackend == GK::Backend::GPU && device.IsOperational())
+        if (requestedBackend == GK::Backend::GPU &&
+            TryResolveKMeansGpu(points, params, device))
         {
-            // GEOM-052 installs the RHI-visible seam only. A real GPU KMeans
-            // kernel must be added by a later parity-gated backend task.
+            // GEOM-056 later slices execute the recorded Lloyd loop here when
+            // the resolve seam reports an operational GPU path. Until then the
+            // resolve returns false and we fall through to the CPU reference.
         }
         return MarkResolvedBackend(
             GK::Cluster(points, initialCentroids, CpuFallbackParams(params), cpuScratch),

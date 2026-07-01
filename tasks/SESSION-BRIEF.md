@@ -22,6 +22,7 @@ the authoritative open/unblocked view.
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
+- blocked by `RUNTIME-137`: `GEOM-056` — KMeans GPU (Vulkan compute) backend + parity (tasks/backlog/geometry/GEOM-056-kmeans-gpu-vulkan-compute-backend.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
