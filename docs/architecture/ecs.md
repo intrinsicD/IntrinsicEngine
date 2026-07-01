@@ -58,9 +58,10 @@ surface:
   `CORE-002` retired the global catalog shape, and runtime activates promoted
   ECS systems explicitly through `Extrinsic.Runtime.EcsSystemBundle`.
 
-Remaining bare `import ECS` consumers are legacy subtrees or compatibility
-tests and are cleanup work for `LEGACY-012` / mechanical subtree deletion
-tasks, not feature blockers that justify new promoted ECS compatibility APIs.
+The bare legacy `import ECS` consumers have been retired with `LEGACY-012` and
+the final legacy subtree deletion sweep. Future ECS compatibility requests must
+name a promoted runtime/editor/app consumer rather than reviving legacy module
+aliases.
 
 ## Stable identity and scene metadata
 

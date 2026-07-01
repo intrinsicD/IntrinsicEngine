@@ -183,7 +183,6 @@ endfunction()
 
 # --- Core tests (pure algorithmic, no GPU, no ECS) ---
 set(_core_test_files
-    Test_BoundedHeap.cpp
     Test_IndexedHeap.cpp
     Test.CoreError.cpp
     Test.LogRingBuffer.cpp
@@ -195,12 +194,11 @@ intrinsic_resolve_test_sources(_core_test_sources
 intrinsic_test_object_lib(CoreTestObjs
     SOURCES
         ${_core_test_sources}
-    DEPS IntrinsicCore ExtrinsicCore EnTT::EnTT
+    DEPS ExtrinsicCore
 )
 
 # --- ECS tests (FrameGraph system integration) ---
 set(_ecs_test_files
-    Test_RuntimeECS.cpp
     Test.ECS.SceneRegistry.cpp
     Test.ECS.SceneBootstrap.cpp
     Test.ECS.Hierarchy.cpp
@@ -220,21 +218,7 @@ intrinsic_resolve_test_sources(_ecs_test_sources
 intrinsic_test_object_lib(ECSTestObjs
     SOURCES
         ${_ecs_test_sources}
-    DEPS IntrinsicCore IntrinsicECS IntrinsicGeometry ExtrinsicECS
-)
-
-# --- Contract/build checks ---
-set(_contract_build_test_files
-    Test_CompileHotspotRefactors.cpp
-)
-intrinsic_resolve_test_sources(_contract_build_test_sources
-    SEARCH_DIRS contract/build
-    FILES ${_contract_build_test_files}
-)
-intrinsic_test_object_lib(ContractBuildTestObjs
-    SOURCES
-        ${_contract_build_test_sources}
-    DEPS IntrinsicCore IntrinsicECS IntrinsicGeometry
+    DEPS ExtrinsicCore ExtrinsicECS IntrinsicGeometry
 )
 
 # --- ECS contract tests (CPU-only structural checks over src/ecs sources) ---
@@ -258,7 +242,7 @@ intrinsic_test_object_lib(EcsContractTestObjs
 # These tests exercise runtime-owned value types (procedural geometry descriptor,
 # cache, and packer) directly. They do not require IRenderer, GLFW, or Vulkan,
 # so they live in a dedicated CPU-only contract executable rather than the
-# headless-gated IntrinsicRuntimeTests umbrella.
+    # broader runtime/graphics integration targets.
 if(TARGET ExtrinsicRuntime)
     set(_runtime_unit_test_files
         Test.MethodFigureExport.cpp
@@ -385,7 +369,7 @@ intrinsic_test_object_lib(PhysicsMethodTestObjs
         ${CMAKE_SOURCE_DIR}/methods/physics/particle_spring_reference/src/ParticleSpringReference.cpp
         ${CMAKE_SOURCE_DIR}/methods/physics/xpbd_cloth_reference/src/XpbdClothReference.cpp
         ${CMAKE_SOURCE_DIR}/methods/physics/sph_fluid_reference/src/SphFluidReference.cpp
-    DEPS IntrinsicCore ExtrinsicPhysics
+    DEPS ExtrinsicCore ExtrinsicPhysics
 )
 target_include_directories(PhysicsMethodTestObjs PRIVATE
     ${CMAKE_SOURCE_DIR}/methods/physics/rigid_body_reference/include
@@ -520,7 +504,7 @@ intrinsic_resolve_test_sources(_geometry_test_sources
 intrinsic_test_object_lib(GeometryTestObjs
     SOURCES
         ${_geometry_test_sources}
-    DEPS IntrinsicCore IntrinsicGeometry
+    DEPS ExtrinsicCore IntrinsicGeometry
 )
 target_compile_definitions(GeometryTestObjs PRIVATE
     INTRINSIC_TEST_SUPPORT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/support"
@@ -540,7 +524,7 @@ intrinsic_resolve_test_sources(_geometry_method_test_sources
 intrinsic_test_object_lib(GeometryMethodTestObjs
     SOURCES
         ${_geometry_method_test_sources}
-    DEPS IntrinsicCore IntrinsicProgressivePoissonReference
+    DEPS ExtrinsicCore IntrinsicProgressivePoissonReference
 )
 
 # --- Relocated HARDEN-041 wrapper sources: assets/core/ecs/graphics/runtime taxonomy ---
@@ -862,90 +846,10 @@ intrinsic_test_object_lib(RuntimeGraphicsCpuTestObjs
     DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicRHI ExtrinsicECS ExtrinsicCore ExtrinsicPlatform glm::glm
 )
 
-# Runtime/integration test object libraries pull in test sources that
-# `#include "RHI.Vulkan.hpp"` (a legacy-RHI header) and `import` the legacy
-# single-segment modules (`RHI`, `Graphics`, `Asset.Pipeline`, ...). Those
-# legacy modules are only built when `INTRINSIC_HEADLESS_NO_GLFW=OFF`
-# (top-level `CMakeLists.txt:215-221`), so when configure auto-detects a
-# headless environment (no X11/Vulkan dev headers) the tests would fail to
-# compile.
-#
-# Gate the Runtime/Integration object libs behind both `ExtrinsicRuntime`
-# being available *and* the legacy GLFW stack being built. Headless CI jobs
-# (pr-fast, sanitizer-tests, benchmark-smoke) consequently don't compile the
-# legacy-Vulkan-dependent tests; an alternative `IntrinsicTests` umbrella
-# target is provided in the headless branch below so workflow steps that
-# build `IntrinsicTests` keep working.
-if(TARGET ExtrinsicRuntime AND NOT INTRINSIC_HEADLESS_NO_GLFW)
-    # --- Runtime tests (Graphics, I/O, RHI — need full Runtime) ---
-    set(_runtime_test_files
-        Test_RuntimeGraphics.cpp
-        Test_RuntimeRHI.cpp
-        Test_RuntimeSelection.cpp
-        Test_TextureMaterialHotReload.cpp
-        Test_RuntimeCulling.cpp
-        Test_GraphicsBackend.cpp
-        Test_SceneManager.cpp
-        Test_RenderOrchestrator.cpp
-        Test_HeadlessEngine.cpp
-        Test_IORegistry.cpp
-        Test_Exporters.cpp
-        Test_DebugDraw.cpp
-        Test_DebugDrawVisualizations.cpp
-        Test_PointCloudRenderPass.cpp
-        Test_GraphRenderPass.cpp
-        Test_RuntimeGeometry_Reuse.cpp
-        Test_BDASharedBufferContract.cpp
-        Test_PointCloudLifecycle.cpp
-        Test_MeshViewLifecycle.cpp
-        Test_GraphLifecycle.cpp
-        Test_MeshRendererLifecycle.cpp
-        Test_PerPassComponents.cpp
-        Test_PerFaceAttributes.cpp
-        Test_KMeansLabelRoundTrip.cpp
-        Test_PropertySetDirtySync.cpp
-        Test_SceneSerializer.cpp
-        Test_TransformGizmo.cpp
-        Test_CameraSpaceTransforms.cpp
-        Test_CompositionAndValidation.cpp
-        Test_ColorMapping.cpp
-        Test_PropertyEnumerator.cpp
-        Test_IsolineExtractor.cpp
-        Test_HeadlessAppSmoke.cpp
-        Test_SelectionGizmoRegression.cpp
-        Test_RenderUpdateIntegration.cpp
-        Test_RenderExtraction.cpp
-        Test_CudaDevice.cpp
-        Test_PrimitiveBVHBuild.cpp
-        Test_RenderGraphPackets.cpp
-        Test_ImporterUtils.cpp
-        Test_Importers.cpp
-        Test_RenderPassContracts.cpp
-        Test_ShaderHotReload.cpp
-    )
-    intrinsic_resolve_test_sources(_runtime_test_sources
-        SEARCH_DIRS
-            unit/core
-            unit/assets
-            unit/geometry
-            unit/runtime
-            unit/graphics
-            integration/runtime
-            integration/app
-            integration/graphics
-            contract/runtime
-            contract/ui
-            contract/graphics
-            regression
-            gpu
-        FILES ${_runtime_test_files}
-    )
-    intrinsic_test_object_lib(RuntimeTestObjs
-        SOURCES
-            ${_runtime_test_sources}
-        DEPS ExtrinsicRuntime nlohmann_json::nlohmann_json EnTT::EnTT glm::glm IntrinsicRHI IntrinsicGraphics IntrinsicRuntime
-    )
-
+# Promoted integration checks that survived the legacy test-consumer cleanup.
+# These sources import only `Extrinsic.*`/`Geometry.*` modules and no longer
+# depend on the deleted `src/legacy` subtree.
+if(TARGET ExtrinsicRuntime AND TARGET ExtrinsicBackendsVulkan)
     set(_runtime_integration_test_files
         Test.AssetLoadPipeline.cpp
         Test.AssetService.cpp
@@ -968,7 +872,7 @@ if(TARGET ExtrinsicRuntime AND NOT INTRINSIC_HEADLESS_NO_GLFW)
     intrinsic_test_object_lib(RuntimeIntegrationTestObjs
         SOURCES
             ${_runtime_integration_test_sources}
-        DEPS ExtrinsicRuntime glm::glm
+        DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore glm::glm
     )
 endif()
 
@@ -976,74 +880,17 @@ endif()
 intrinsic_test_object_lib(TestSupportObjs
     SOURCES
         support/Test_SanitizerConfig.cpp
-    DEPS IntrinsicCore
+    DEPS ExtrinsicCore
 )
 
 # =============================================================================
 # Executable targets — link pre-compiled objects, no recompilation
 # =============================================================================
 
-if(TARGET RuntimeTestObjs)
-    # --- Full suite link target (build-only; category targets own CTest registration) ---
-    intrinsic_test_executable(IntrinsicTests
-        OBJECTS  CoreTestObjs ECSTestObjs ContractBuildTestObjs BenchmarkTestObjs GeometryTestObjs RuntimeTestObjs
-        LINK_LIBS IntrinsicRuntime
-        NO_DISCOVER
-    )
-
-    # --- Runtime/headless coverage ---
-    # RuntimeTestObjs currently mixes CPU-side runtime contracts with Vulkan-backed
-    # headless graphics tests. Label the executable conservatively as gpu/vulkan
-    # until HARDEN-041 splits test sources into finer taxonomy targets.
-    intrinsic_test_executable(IntrinsicRuntimeTests
-        OBJECTS RuntimeTestObjs
-        LINK_LIBS IntrinsicRuntime
-        LABELS integration runtime headless graphics gpu vulkan slow
-    )
-
-    intrinsic_grouped_test(IntrinsicRuntimeTests.RuntimeRHIGrouped IntrinsicRuntimeTests
-        FILTER "RHIBindless.*:RHIBuffer.*:RHIImage.*:RHIShader.*:RHITexture.*:RHIDescriptors.*:RHITransfer.*:RHIStagingBelt.*:DescriptorAllocatorTest.*:TransferTest.*:RHIPipeline.*:PipelineBuilderTest.*:PresentPolicy.*:VkCheckPolicy.*:VkCheckPolicyDeathTest.*:QueueFamilyIndices.*:QueueFamilyContract.*:QueueDomain.*:QueueSubmitter.*"
-        LABELS integration runtime headless graphics gpu vulkan slow
-    )
-
-    intrinsic_grouped_test(IntrinsicRuntimeTests.RenderOrchestratorHeadlessGrouped IntrinsicRuntimeTests
-        FILTER "RenderOrchestratorHeadlessTest.*"
-        LABELS integration runtime headless graphics gpu vulkan slow
-    )
-
-    intrinsic_grouped_test(IntrinsicRuntimeTests.HeadlessEngineGrouped IntrinsicRuntimeTests
-        FILTER "HeadlessEngineTest.*"
-        LABELS integration runtime headless graphics gpu vulkan slow
-    )
-
-    intrinsic_grouped_test(IntrinsicRuntimeTests.RenderGraphPacketsGrouped IntrinsicRuntimeTests
-        FILTER "RenderGraphPacketTest.*"
-        LABELS integration runtime headless graphics gpu vulkan slow
-    )
-
-    intrinsic_grouped_test(IntrinsicRuntimeTests.GraphicsBackendHeadlessGrouped IntrinsicRuntimeTests
-        FILTER "GraphicsBackendHeadlessTest.*"
-        LABELS integration runtime headless graphics gpu vulkan slow
-    )
-
-    intrinsic_grouped_test(IntrinsicRuntimeTests.HeadlessAppSmokeGrouped IntrinsicRuntimeTests
-        FILTER "HeadlessAppSmokeTest.*"
-        LABELS integration runtime headless graphics gpu vulkan slow
-    )
-
-    intrinsic_grouped_test(IntrinsicRuntimeTests.SceneManagerGpuHooksGrouped IntrinsicRuntimeTests
-        FILTER "SceneManagerGpuHooksHeadlessTest.*"
-        LABELS integration runtime headless graphics gpu vulkan slow
-    )
-
-    intrinsic_grouped_test(IntrinsicRuntimeTests.GeometryReuseGrouped IntrinsicRuntimeTests
-        FILTER "GeometryReuseTest.*"
-        LABELS integration runtime headless graphics gpu vulkan slow
-    )
-
+if(TARGET RuntimeIntegrationTestObjs)
     intrinsic_test_executable(IntrinsicRuntimeIntegrationTests
         OBJECTS RuntimeIntegrationTestObjs
-        LINK_LIBS ExtrinsicRuntime
+        LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore
         LABELS integration runtime graphics gpu vulkan slow
     )
 endif()
@@ -1058,15 +905,8 @@ intrinsic_test_executable(IntrinsicCoreTests
 # --- Core + ECS (FrameGraph system integration) ---
 intrinsic_test_executable(IntrinsicECSTests
     OBJECTS  ECSTestObjs
-    LINK_LIBS IntrinsicCore IntrinsicECS ExtrinsicECS
+    LINK_LIBS ExtrinsicCore ExtrinsicECS
     LABELS unit ecs
-)
-
-# --- Contract/build checks ---
-intrinsic_test_executable(IntrinsicContractBuildTests
-    OBJECTS  ContractBuildTestObjs
-    LINK_LIBS IntrinsicCore IntrinsicECS
-    LABELS contract build
 )
 
 # --- ECS contract tests (CPU-only structural checks) ---
@@ -1103,14 +943,14 @@ intrinsic_test_executable(IntrinsicBenchmarkTests
 # --- Physics method reference tests (CPU-only) ---
 intrinsic_test_executable(IntrinsicPhysicsMethodTests
     OBJECTS PhysicsMethodTestObjs
-    LINK_LIBS IntrinsicCore ExtrinsicPhysics
+    LINK_LIBS ExtrinsicCore ExtrinsicPhysics
     LABELS unit physics
 )
 
 # --- Geometry method reference tests (CPU-only) ---
 intrinsic_test_executable(IntrinsicGeometryMethodTests
     OBJECTS GeometryMethodTestObjs
-    LINK_LIBS IntrinsicCore IntrinsicProgressivePoissonReference
+    LINK_LIBS ExtrinsicCore IntrinsicProgressivePoissonReference
     LABELS unit geometry
 )
 
@@ -1132,7 +972,7 @@ endif()
 # --- Core + Geometry (DEC, mesh algorithms — no GPU, no ECS) ---
 intrinsic_test_executable(IntrinsicGeometryTests
     OBJECTS  GeometryTestObjs
-    LINK_LIBS IntrinsicCore IntrinsicGeometry
+    LINK_LIBS ExtrinsicCore IntrinsicGeometry
     LABELS unit geometry
 )
 
@@ -1269,17 +1109,13 @@ if(_intrinsic_registered_test_labels)
 endif()
 
 if(NOT TARGET IntrinsicTests)
-    # Some CI configurations intentionally skip RuntimeTestObjs (e.g. the
-    # headless `pr-fast`, `sanitizer-tests`, and `benchmark-smoke` workflows
-    # that don't install GLFW/Vulkan dev packages). Keep a stable aggregate
-    # build target for agent/CI verification commands.
+    # Keep a stable aggregate build target for agent/CI verification commands.
     add_custom_target(IntrinsicTests)
 endif()
 
 # Make the aggregate build everything that registered itself with the helper,
-# whether or not RuntimeTestObjs was created. Workflows that invoke
-# `cmake --build --target IntrinsicTests` then exercise the full set of
-# headless-buildable test executables.
+# so workflows that invoke `cmake --build --target IntrinsicTests` exercise the
+# full set of configured test executables.
 get_property(_intrinsic_registered_test_targets GLOBAL PROPERTY INTRINSIC_REGISTERED_TEST_TARGETS)
 if(TARGET IntrinsicTests AND _intrinsic_registered_test_targets)
     add_dependencies(IntrinsicTests ${_intrinsic_registered_test_targets})

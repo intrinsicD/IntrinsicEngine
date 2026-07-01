@@ -2,11 +2,11 @@
 
 ## Goal
 
-Transition from the current mixed source roots to the final explicit source layout while preserving buildability and reviewability.
+Maintain the final explicit source layout while preserving buildability and reviewability for any remaining path cleanup.
 
 ## Current migration shape
 
-- Source root model: `src/{legacy,core,assets,ecs,geometry,graphics,runtime,platform,app}`
+- Source root model: `src/{core,assets,ecs,geometry,physics,graphics,runtime,platform,app}`
 
 ## Execution rules
 
@@ -19,7 +19,7 @@ Transition from the current mixed source roots to the final explicit source layo
 
 1. Establish path and policy scaffolding (docs, task tracking, guard scripts).
 2. Introduce path abstraction in build scripts where required.
-3. Move legacy source under `src/legacy/` and promote canonical roots.
+3. Retire the legacy compatibility tree after promoted parity exists.
 4. Tighten layering/docs/task checks to strict mode.
 
 ## Risks and mitigations

@@ -37,7 +37,7 @@
   [`LEGACY-002`](LEGACY-002-seed-src-legacy-retirement-backlog.md) under
   [`ARCH-004`](ARCH-004-legacy-retirement-first-deletion-target.md);
   structural template is
-  [`LEGACY-001`](../backlog/architecture/LEGACY-001-delete-src-legacy-interface.md).
+  [`LEGACY-001`](LEGACY-001-delete-src-legacy-interface.md).
 - Subtree size: 2 files. The legacy `Sandbox` target is a pure leaf binary —
   it **exports no module** and is imported by nothing, so the consumer
   relationship is inverted relative to the other legacy subtrees: the legacy

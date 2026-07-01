@@ -101,8 +101,8 @@ Legacy code is still approximately 42% of `src` C++ LOC.
 | --- | ---: |
 | `src/legacy/EditorUI/Runtime.EditorUI.cppm` (retired 2026-06-07 by `LEGACY-007`) | 860 |
 | [src/geometry/Geometry.Properties.cppm](../../src/geometry/Geometry.Properties.cppm) | 842 |
-| [src/legacy/Graphics/Graphics.RenderPipeline.cppm](../../src/legacy/Graphics/Graphics.RenderPipeline.cppm) | 836 |
-| [src/legacy/Asset/Asset.Manager.cppm](../../src/legacy/Asset/Asset.Manager.cppm) | 727 |
+| `src/legacy/Graphics/Graphics.RenderPipeline.cppm` (retired 2026-07-01 by `LEGACY-008`) | 836 |
+| `src/legacy/Asset/Asset.Manager.cppm` (retired 2026-07-01 by `LEGACY-004`) | 727 |
 | [src/graphics/renderer/Graphics.Renderer.cppm](../../src/graphics/renderer/Graphics.Renderer.cppm) | 680 |
 
 ### Test Distribution

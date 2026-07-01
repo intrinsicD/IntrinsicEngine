@@ -244,8 +244,8 @@ configure_build() {
 build_project() {
     echo "==> Building core libraries ..."
     if cmake --build "$BUILD_DIR" --parallel "$(nproc)" --target \
-        IntrinsicCore IntrinsicGeometry IntrinsicECS IntrinsicRHI \
-        IntrinsicGraphics IntrinsicInterface IntrinsicRuntime; then
+        ExtrinsicCore IntrinsicGeometry ExtrinsicECS ExtrinsicRHI \
+        ExtrinsicGraphics ExtrinsicRuntime; then
         echo "==> Library build succeeded."
     else
         echo "==> Library build failed (exit $?). Tests/agents can still iterate; rerun manually." >&2

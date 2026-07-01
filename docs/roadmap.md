@@ -6,23 +6,23 @@ This document tracks medium- and long-horizon feature planning for IntrinsicEngi
 
 ## Status legend (read this first)
 
-Many feature sections below use a `MVP complete` marker. Unless explicitly annotated otherwise, that marker describes the legacy-stack implementation: remaining legacy rendering under `src/legacy/Graphics/` plus the now-retired legacy editor subtree formerly under `src/legacy/EditorUI/`. It does **not** mean the promoted `src/graphics/*` rendering stack ships the same feature today.
+Several feature sections below preserve notes from the retired legacy stack. As of 2026-07-01, `src/legacy/` has been removed, so legacy-complete entries are historical requirement notes, not evidence that the promoted `src/graphics/*`, `src/runtime/`, or `src/app/` surfaces ship the same behavior today.
 
 As of 2026-06-02 the promoted Vulkan visible-triangle path is through the canonical default recipe. `GRAPHICS-033E/F`, `GRAPHICS-076E/F`, `GRAPHICS-080`, and `GRAPHICS-081` retired the operational-gate, default-recipe readback, promoted-preset, and bootstrap-scaffold work. Per the `SelectRuntimeDeviceBackend()` contract in `src/runtime/Runtime.Engine.cppm`, runtime selection still looks at config + build flags, **not** at `IsOperational()`: when the build defines `EXTRINSIC_RUNTIME_HAS_PROMOTED_VULKAN` and `RenderConfig::EnablePromotedVulkanDevice == true`, `Runtime::CreateDevice()` returns `Backends::Vulkan::CreateVulkanDevice()` and consumers gate real work on `IDevice::IsOperational()`. Hosts that do not satisfy the Vulkan gate continue to fall back or fail closed through the `VulkanRequestedButNotOperational` breadcrumb path; Vulkan-capable hosts use the default recipe rather than the retired bootstrap scaffold.
 
 Promoted-vs-legacy parity is tracked in:
 
 - `docs/migration/nonlegacy-parity-matrix.md` — promoted-surface vs legacy-feature coverage matrix.
-- `docs/migration/legacy-retirement.md` — exit criteria for `src/legacy/`.
+- `docs/migration/legacy-retirement.md` — historical retirement record for the deleted `src/legacy/` tree.
 - `tasks/backlog/rendering/` — promoted-stack rendering backlog (GRAPHICS-070..081 and the advanced track).
 
-When you see `(legacy stack)` next to an `MVP complete` marker below, read it as "shipped in `src/legacy/`, promoted-stack equivalent gated on the parity matrix."
+When a section refers to a retired legacy MVP, read it as "historically shipped before `src/legacy/` deletion; promoted-stack equivalent is gated on the parity matrix or a structured task."
 
 ---
 
 ## Cross-Cutting: source-tree reorganization hardening
 
-All feature tracks below target the reorganized `src/` layer layout. The current cross-cutting focus is hardening: enforce modularity, explicit dependencies, and one-way layering while preserving build/test reliability. Legacy retirement remains separately tracked and deferred in this phase.
+All feature tracks below target the reorganized `src/` layer layout. The current cross-cutting focus is hardening: enforce modularity, explicit dependencies, and one-way layering while preserving build/test reliability. The legacy tree is retired; missing promoted behavior belongs in the parity matrix and structured backlog tasks.
 
 - Contract and layering rules: `AGENTS.md` and `docs/agent/contract.md`.
 - Rendering target architecture: `docs/architecture/rendering-target-architecture.md`.
@@ -112,9 +112,9 @@ These constraints must be respected even when the underlying features are not be
 
 ## Phase 1 — Foundation
 
-### Post-Processing Pipeline (**MVP complete — legacy stack**)
+### Post-Processing Pipeline (**retired legacy MVP; promoted parity tracked**)
 
-The HDR post-processing foundation is in place in `src/legacy/Graphics/`. Scene passes render to an `R16G16B16A16_SFLOAT` intermediate target ("SceneColor"), and the `PostProcessPass` converts to LDR via tone mapping with selectable anti-aliasing (None, FXAA, or SMAA). Runtime toggles are exposed via `FeatureRegistry`.
+The retired legacy HDR post-processing path rendered scene passes to an `R16G16B16A16_SFLOAT` intermediate target ("SceneColor"), and `PostProcessPass` converted to LDR via tone mapping with selectable anti-aliasing (None, FXAA, or SMAA). Promoted-stack parity is tracked separately.
 
 **Tone mapping:** ACES, Reinhard, and Uncharted 2 (Hable 2010 filmic) operators are selectable at runtime. Exposure is adjustable via UI slider.
 
@@ -130,9 +130,9 @@ The HDR post-processing foundation is in place in `src/legacy/Graphics/`. Scene 
 
 Long-horizon additions (after MVP): SSAO, DOF.
 
-### Deferred Lighting Path (**MVP complete — legacy stack**)
+### Deferred Lighting Path (**retired legacy MVP; promoted parity tracked**)
 
-`CompositionPass` (in `src/legacy/Graphics/`) implements a fullscreen deferred lighting composition pass. When `FrameLightingPath::Deferred` is active (toggled via `FeatureRegistry` → "DeferredLighting"), `SurfacePass` writes to a 3-channel G-buffer MRT (SceneNormal RGBA16F, Albedo RGBA8, Material0 RGBA16F) instead of SceneColorHDR. `CompositionPass` reads the G-buffer + depth, reconstructs world positions from depth via push-constant `InvViewProj`, and applies Blinn-Phong lighting into SceneColorHDR. The forward path remains the default and is preserved as a fallback for unsupported cases. Selection outlines, debug views, and post-processing are completely independent of the lighting path. The `FrameRecipe` system automatically allocates G-buffer resources only when deferred is active.
+The retired legacy `CompositionPass` implemented a fullscreen deferred lighting composition pass. When `FrameLightingPath::Deferred` was active, `SurfacePass` wrote to a 3-channel G-buffer MRT (SceneNormal RGBA16F, Albedo RGBA8, Material0 RGBA16F) instead of SceneColorHDR. `CompositionPass` read the G-buffer + depth, reconstructed world positions from depth via push-constant `InvViewProj`, and applied Blinn-Phong lighting into SceneColorHDR. Promoted deferred lighting is tracked by the rendering backlog and architecture docs.
 
 ---
 
@@ -140,9 +140,9 @@ Long-horizon additions (after MVP): SSAO, DOF.
 
 These features turn the engine from a viewer into an interactive tool.
 
-### Transform Gizmos (**MVP complete — legacy stack**)
+### Transform Gizmos (**retired legacy MVP; promoted parity tracked**)
 
-`Graphics::TransformGizmo` (in `src/legacy/Graphics/`) is an ImGuizmo-backed editor wrapper. The engine caches selection/camera state during `OnUpdate()`, then executes the gizmo during the active ImGui frame through a lightweight overlay callback so transform interaction stays in the same input/render path as the rest of the editor UI.
+The retired legacy `Graphics::TransformGizmo` was an ImGuizmo-backed editor wrapper. The engine cached selection/camera state during `OnUpdate()`, then executed the gizmo during the active ImGui frame through a lightweight overlay callback so transform interaction stayed in the same input/render path as the rest of the editor UI.
 
 - **Three modes:** Translate (arrows + plane handles), Rotate (circles per axis), Scale (axis lines + uniform center cube).
 - **World/local space:** Gizmo orientation follows entity rotation in local mode. For parented entities, manipulation happens in world space and is converted back to parent-local `Transform::Component` via `Transform::TryComputeLocalTransform()`.
@@ -158,7 +158,7 @@ Undo/redo integration now lives in `Core::CommandHistory`; editor panels should 
 
 > All "complete" claims in this section describe the now-retired **legacy editor** formerly under `src/legacy/EditorUI/`. Promoted editor wiring lives in `Extrinsic.Runtime.SandboxEditorUi` and is attached by `src/app/Sandbox/`; promoted feature coverage is tracked by the migration parity matrix and the sandbox UI tasks, not by reviving the legacy editor.
 
-The editor UI foundation is in place: programmatic default dock layout (Hierarchy left, Viewport center, Inspector right, Assets/Stats bottom), three theme presets (Dark/Light/High Contrast) via View → Theme, keyboard shortcut hints on menu items and toolbar buttons, contextual tooltips on View Settings and toolbar controls, enriched status bar (selection mode, entity/sub-element counts, lighting path, active tool, GPU VRAM usage), and a properly nested hierarchy panel with entity type icons and per-entity context menus.
+The retired editor UI foundation included programmatic default dock layout (Hierarchy left, Viewport center, Inspector right, Assets/Stats bottom), three theme presets (Dark/Light/High Contrast) via View -> Theme, keyboard shortcut hints on menu items and toolbar buttons, contextual tooltips on View Settings and toolbar controls, enriched status bar (selection mode, entity/sub-element counts, lighting path, active tool, GPU VRAM usage), and a properly nested hierarchy panel with entity type icons and per-entity context menus.
 
 The UI Architecture & Feature Wiring scope has landed:
 
@@ -172,9 +172,9 @@ The UI Architecture & Feature Wiring scope has landed:
 
 Future incremental UI improvements are filed as structured tasks under `tasks/backlog/ui/` rather than tracked in this roadmap.
 
-### Scene Serialization (**MVP complete — legacy stack**)
+### Scene Serialization (**retired legacy MVP; promoted parity tracked**)
 
-JSON-based scene save/load is implemented in `src/legacy/Runtime/` (`Runtime::SaveScene()` / `Runtime::LoadScene()`). The serializer covers entity names, transforms, hierarchy, asset source paths, visibility, and rendering parameters. GPU state is reconstructed on load by re-importing assets from recorded source paths. Editor UI exposes File → Save/Load Scene with dirty-state prompts.
+The retired legacy JSON scene save/load path exposed `Runtime::SaveScene()` / `Runtime::LoadScene()`. The serializer covered entity names, transforms, hierarchy, asset source paths, visibility, and rendering parameters. GPU state was reconstructed on load by re-importing assets from recorded source paths. Editor UI exposed File -> Save/Load Scene with dirty-state prompts.
 
 Future extensions: project-level files (scene path + editor layout + camera preset), binary scene format for large scenes.
 
@@ -205,14 +205,14 @@ Currently only a single forward PBR pass (metallic-roughness) exists via `Surfac
 
 ### Shadow Mapping
 
-CSM for the directional light is complete in the legacy stack: shadow atlas, depth-only rendering, PCF sampling, cascade computation, and focused CPU-side tests. Promoted-stack shadow wiring is tracked by `GRAPHICS-073`. Remaining items beyond CSM:
+The retired legacy stack covered CSM for the directional light: shadow atlas, depth-only rendering, PCF sampling, cascade computation, and focused CPU-side tests. Promoted-stack shadow wiring is tracked by `GRAPHICS-073`. Remaining items beyond CSM:
 
 - Point light shadow maps (cubemap or dual-paraboloid) if point lights are added.
 - Variance shadow maps (VSM) as an alternative to PCF.
 
-### Benchmarking & Profiling (**MVP complete — legacy stack**)
+### Benchmarking & Profiling (**retired legacy MVP; promoted parity tracked**)
 
-GPU timestamp queries per major render pass via `RHI::GpuProfiler`, CPU per-system timings via `RenderGraph` instrumentation, and a deterministic benchmark runner (`Core::Benchmark::BenchmarkRunner`) with JSON output are in place under `src/legacy/`. The Performance panel shows per-pass GPU+CPU timings. Headless benchmark mode (`--benchmark <frames> --out file.json`) runs a fixed frame count and exits. Threshold-based regression checking via `tools/benchmark/check_perf_regression.sh` supports avg/p99 frame time and min FPS gates.
+The retired legacy stack had GPU timestamp queries per major render pass via `RHI::GpuProfiler`, CPU per-system timings via `RenderGraph` instrumentation, and a deterministic benchmark runner (`Core::Benchmark::BenchmarkRunner`) with JSON output. The Performance panel showed per-pass GPU+CPU timings. Headless benchmark mode (`--benchmark <frames> --out file.json`) ran a fixed frame count and exited. Threshold-based regression checking via `tools/benchmark/check_perf_regression.sh` supports avg/p99 frame time and min FPS gates.
 
 Long-horizon additions: GPU-driven pass culling profiling, multi-scene benchmark suites, historical regression tracking with baseline storage.
 
@@ -230,7 +230,7 @@ New geometry types and rendering techniques building on Phase 1–3 infrastructu
 
 ### Point Cloud Rendering — Advanced Modes
 
-Basic modes (FlatDisc, Surfel, EWA, Sphere impostor) are complete in the legacy stack. Each new mode is a shader + pipeline variant registered in `PointPass`.
+Basic modes (FlatDisc, Surfel, EWA, Sphere impostor) were complete in the retired legacy stack. Promoted status is tracked by the parity matrix. Each new mode is a shader + pipeline variant registered in `PointPass`.
 
 - **Gaussian Splatting (3DGS):** Oriented anisotropic splats via a dedicated compute rasterizer or tile-based sort+blend pipeline. Dominant representation in neural radiance field research.
 - **Potree-style octree LOD:** Hierarchical out-of-core streaming for billion-point clouds. Octree nodes loaded on demand by camera distance and screen-space error budget.
@@ -238,7 +238,7 @@ Basic modes (FlatDisc, Surfel, EWA, Sphere impostor) are complete in the legacy 
 
 ### Graph / Wireframe Rendering — Remaining
 
-Core rendering infrastructure (legacy stack) and CPU-side layout algorithms (promoted `src/geometry/`) are complete. Remaining:
+Core rendering infrastructure previously existed in the retired legacy stack, and CPU-side layout algorithms are promoted under `src/geometry/`. Remaining:
 - **Layout algorithm UI integration:** Interactive selection and real-time re-layout.
 - **Halfedge debug view:** Vertices as points, edges as directed arrows, face normals.
 - **Barycentric wireframe shader:** Alternative mesh wireframe via fragment-shader barycentric coordinates.
@@ -257,9 +257,9 @@ No transparency support. Required for translucent surfaces, point cloud blending
 
 Sub-mesh selection and geometry operators for research workflows.
 
-### Primitive Selection (**Click selection + GPU PrimitiveID complete — legacy stack**)
+### Primitive Selection (**retired legacy MVP; promoted parity tracked**)
 
-Click-based sub-element selection is implemented with GPU-native entity picking plus authoritative hit refinement. A dual-channel MRT picking pipeline produces both `EntityId` and `PrimitiveId` in one frame via three dedicated pick pipelines (mesh, line, point). `ElementMode` (Entity/Vertex/Edge/Face) enables sub-entity picking with highlighted overlays (red spheres for vertices, yellow lines for edges, blue tinted triangles for faces). Shift-click toggles multi-select. `SubElementSelection` tracks per-entity sets of selected vertex, edge, and face indices. Once the entity hit is known, the picker completes the full primitive tuple from the projected hit point: meshes resolve point-on-face → closest edge → closest vertex, graphs resolve the nearest edge/node pair, and point clouds use direct point `PrimitiveId` selection. Invalid primitive IDs use `UINT_MAX`, preserving zero-based primitive index 0. Geodesic distance UI integration is functional (heat-method distances from selected source vertices).
+The retired legacy click-based sub-element selection path used GPU-native entity picking plus authoritative hit refinement. A dual-channel MRT picking pipeline produced both `EntityId` and `PrimitiveId` in one frame via three dedicated pick pipelines (mesh, line, point). `ElementMode` (Entity/Vertex/Edge/Face) enabled sub-entity picking with highlighted overlays (red spheres for vertices, yellow lines for edges, blue tinted triangles for faces). Shift-click toggled multi-select. `SubElementSelection` tracked per-entity sets of selected vertex, edge, and face indices. Once the entity hit was known, the picker completed the full primitive tuple from the projected hit point: meshes resolved point-on-face -> closest edge -> closest vertex, graphs resolved the nearest edge/node pair, and point clouds used direct point `PrimitiveId` selection. Invalid primitive IDs used `UINT_MAX`, preserving zero-based primitive index 0. Geodesic distance UI integration was functional in that stack.
 
 **Remaining area selection modes:**
 - Lasso, box, paint-brush area selection.
@@ -338,7 +338,7 @@ The two-layer architecture (I/O backend + format loaders) is complete with 8 imp
 
 ## Ongoing
 
-- **Shader hot-reload (**MVP complete — legacy stack**):** `Graphics::ShaderHotReloadService` (in `src/legacy/Graphics/`) watches GLSL source files via `Core::Filesystem::FileWatcher`, recompiles to SPIR-V via `glslc` on change, and rebuilds all graphics pipelines via `PipelineLibrary::RebuildGraphicsPipelines()`. Feature-gated by `FeatureRegistry` toggle `ShaderHotReload` (default disabled). Graceful fallback on compilation failure (keeps previous pipeline). Debounce coalescing (200ms) prevents redundant rebuilds on rapid saves. Compute pipeline hot-reload deferred.
+- **Shader hot-reload (retired legacy MVP):** The retired legacy `Graphics::ShaderHotReloadService` watched GLSL source files via `Core::Filesystem::FileWatcher`, recompiled to SPIR-V via `glslc` on change, and rebuilt graphics pipelines via `PipelineLibrary::RebuildGraphicsPipelines()`. It was feature-gated by `FeatureRegistry` toggle `ShaderHotReload` (default disabled), kept the previous pipeline on compilation failure, and debounced rapid saves. Compute pipeline hot-reload remains deferred.
 - **Port-based testing boundaries:** Type-erased "port" interfaces for filesystem, windowing, and time so subsystems can be tested without Vulkan. Implement opportunistically as new subsystems are added.
 
 ---

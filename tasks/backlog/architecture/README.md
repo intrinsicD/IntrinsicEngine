@@ -10,42 +10,25 @@ map.
 
 ## Tasks
 
-- [LEGACY-012 — Migrate legacy consumer tests to promoted coverage](LEGACY-012-migrate-legacy-consumer-tests.md):
-  migrates or retires tests and non-legacy consumers that still import bare
-  legacy module names after their promoted feature owners exist.
-- [LEGACY-001 — Delete `src/legacy/Interface/`](LEGACY-001-delete-src-legacy-interface.md):
-  first concrete deletion under `ARCH-004`. Backlog until the consumer-grep
-  prerequisite passes; promotion to `tasks/active/` is gated by `ARCH-004`.
+No architecture backlog tasks are open in this slice.
 
-## Legacy retirement
+## Retired Legacy Program
 
-`LEGACY-002` (done 2026-06-10) seeded one structured deletion task per remaining
-`src/legacy/<Subsystem>/` subtree so the layering allowlist and migration docs
-can name a concrete owning task per subtree. Each task follows the
-[`LEGACY-001`](LEGACY-001-delete-src-legacy-interface.md) shape (scope,
-consumer-grep prerequisite gate, mechanical-deletion verification) and stays in
-backlog until its gate exits 0.
+`src/legacy/` is retired. The final sweep first retired the remaining legacy
+consumer tests under
+[`LEGACY-012`](../../done/LEGACY-012-migrate-legacy-consumer-tests.md), then
+deleted subtrees consumers-first and foundation-last:
+[`LEGACY-010`](../../done/LEGACY-010-delete-src-legacy-runtime.md) →
+[`LEGACY-008`](../../done/LEGACY-008-delete-src-legacy-graphics.md) →
+[`LEGACY-001`](../../done/LEGACY-001-delete-src-legacy-interface.md) /
+[`LEGACY-006`](../../done/LEGACY-006-delete-src-legacy-ecs.md) /
+[`LEGACY-004`](../../done/LEGACY-004-delete-src-legacy-asset.md) →
+[`LEGACY-009`](../../done/LEGACY-009-delete-src-legacy-rhi.md) →
+[`LEGACY-005`](../../done/LEGACY-005-delete-src-legacy-core.md).
 
-- [LEGACY-004 — Delete `src/legacy/Asset/`](LEGACY-004-delete-src-legacy-asset.md) (6 files → `src/assets/`).
-- [LEGACY-005 — Delete `src/legacy/Core/`](LEGACY-005-delete-src-legacy-core.md) (40 files → `src/core/`).
-- [LEGACY-006 — Delete `src/legacy/ECS/`](LEGACY-006-delete-src-legacy-ecs.md) (29 files → `src/ecs/`).
-- [LEGACY-008 — Delete `src/legacy/Graphics/`](LEGACY-008-delete-src-legacy-graphics.md) (168 files → `src/graphics/*`).
-- [LEGACY-009 — Delete `src/legacy/RHI/`](LEGACY-009-delete-src-legacy-rhi.md) (54 files → `src/graphics/rhi/`).
-- [LEGACY-010 — Delete `src/legacy/Runtime/`](LEGACY-010-delete-src-legacy-runtime.md) (29 files → `src/runtime/`).
-- [LEGACY-012 — Migrate legacy consumer tests to promoted coverage](LEGACY-012-migrate-legacy-consumer-tests.md):
-  cleanup task for tests and non-legacy consumers that keep the deletion
-  consumer-grep gates red after `LEGACY-011` retired the semantic feature map.
-
-Ordering hint — deletion is **consumer-leaves first, foundation last**: a
-subtree can only be mechanically deleted once no other subtree (and no promoted
-module) still imports it. `Apps` (`LEGACY-003`) and `EditorUI`
-(`LEGACY-007`) are retired; suggested remaining order is
-`Runtime` (`LEGACY-010`) → `Graphics` (`LEGACY-008`) →
-`Interface`/`ECS`/`Asset` (`LEGACY-001`/`LEGACY-006`/`LEGACY-004`) → `RHI`
-(`LEGACY-009`) → `Core` (`LEGACY-005`, the foundation, so it retires last). The
-`sequencing` table in
+The current record lives in
 [`docs/migration/legacy-retirement.md`](../../../docs/migration/legacy-retirement.md)
-tracks the per-subtree prerequisite checklists.
+and the narratives in [`tasks/done/RETIREMENT-LOG.md`](../../done/RETIREMENT-LOG.md).
 
 ## Convergence
 
@@ -69,8 +52,8 @@ split; narratives live in the retirement log.
   (done, 2026-06-18, `Scaffolded` planning map):
   closes the cross-domain child-task map after every retained/deferred legacy
   feature candidate gained a named done-task decision or explicit future
-  trigger. Remaining legacy-retirement blockers are consumer-grep cleanup,
-  the promoted-src Core import migration, and mechanical subtree ordering.
+  trigger. The final legacy-removal blockers later retired under `LEGACY-012`
+  and the ordered subtree-deletion tasks.
 - [LEGACY-013 — Migrate promoted Core imports off legacy modules](../../done/LEGACY-013-promoted-core-import-migration.md)
   (done, 2026-06-18, `CPUContracted`):
   moved promoted geometry/runtime imports from bare legacy `Core.*` modules to
@@ -236,34 +219,34 @@ split; narratives live in the retirement log.
   retired legacy `tests/integration/runtime/Test_ElementSelection.cpp` because
   promoted primitive selection uses `PrimitiveSelectionRefinement`,
   engine-owned refined-pick caching, and editor selection models rather than
-  mutable per-entity sub-element sets; remaining ECS external blockers are 19
-  tests and remaining Runtime external blockers are 11 tests.
+  mutable per-entity sub-element sets; the remaining ECS/Runtime external
+  blockers later retired under `LEGACY-012` and the final deletion sweep.
 - [LEGACY-040 — Retire legacy Asset.Manager safety test](../../done/LEGACY-040-retire-legacy-asset-manager-safety-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy `tests/unit/assets/Test_CoreAssetSafety.cpp` because its
   `Asset.Manager` loader-safety and pointer-returning error-path compatibility
   surface is replaced by promoted `AssetService`, `AssetRegistry`,
-  `AssetPayloadStore`, and `AssetLoadPipeline` contracts; remaining external
-  blockers are 8 Asset tests and 20 Core tests.
+  `AssetPayloadStore`, and `AssetLoadPipeline` contracts; the remaining
+  external blockers later retired under `LEGACY-012`.
 - [LEGACY-041 — Retire legacy Asset.Manager core test](../../done/LEGACY-041-retire-legacy-asset-manager-core-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy `tests/unit/assets/Test_CoreAssets.cpp` because its
   async/cache/lease/clear/TryGetFast manager compatibility surface is replaced
   by promoted asset service, registry, payload-store, load-pipeline, event-bus,
-  and runtime handoff contracts; remaining external blockers are 7 Asset tests,
-  19 Core tests, 36 Graphics tests, and 15 RHI tests.
+  and runtime handoff contracts; the remaining external blockers later retired
+  under `LEGACY-012`.
 - [LEGACY-042 — Retire legacy Asset.Pipeline test](../../done/LEGACY-042-retire-legacy-asset-pipeline-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy `tests/unit/assets/Test_AssetPipeline.cpp` and its grouped
   `AssetPipelineHeadless` CTest because promoted streaming/upload ownership is
   split across `AssetLoadPipeline`, `AssetService`, `GpuAssetCache`, and
-  runtime model/texture handoffs; remaining external blockers are 6 Asset
-  tests, 18 Core tests, and 14 RHI tests.
+  runtime model/texture handoffs; the remaining external blockers later retired
+  under `LEGACY-012`.
 - [LEGACY-018 — Retire legacy Interface panel-registration test](../../done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done, 2026-06-18, `CPUContracted`):
-  retired legacy-only `tests/contract/ui/Test_PanelRegistration.cpp`;
-  `LEGACY-001` now has zero external test consumers and remains blocked by six
-  legacy-internal Graphics/Runtime files.
+  retired legacy-only `tests/contract/ui/Test_PanelRegistration.cpp`. The
+  remaining legacy-internal Interface consumers later retired with
+  `LEGACY-010`, `LEGACY-008`, and `LEGACY-001`.
 - [CORE-002 — Command and feature catalog contract](../../done/CORE-002-command-feature-catalog-contract.md)
   (done, 2026-06-09, `CPUContracted` / explicit retirement decision):
   resolves remaining legacy `Core.Commands`, `Core.FeatureRegistry`, and
@@ -329,8 +312,8 @@ split; narratives live in the retirement log.
   target, recorded `src/legacy/Asset/` and `src/legacy/EditorUI/` as the
   second and third, and added the Sequencing table to
   [`docs/migration/legacy-retirement.md`](../../../docs/migration/legacy-retirement.md)
-  so retirement is a tracked program rather than an indefinite "blocked"
-  row. The executing task is `LEGACY-001` below.
+  so retirement is a tracked program rather than an indefinite "blocked" row.
+  The program completed on 2026-07-01.
 - [REVIEW-001 — Establish weekly human-led review of agent-authored slices](../../done/REVIEW-001-human-led-agent-week-review-cadence.md)
   (done 2026-05-17): landed `docs/agent/agent-output-review-checklist.md` with
   the nine-row failure-mode checklist, added the cadence pointer to
@@ -370,7 +353,8 @@ split; narratives live in the retirement log.
 - [HARDEN-082 — Rebind legacy allowlist umbrella rows to per-subtree owners](../../done/HARDEN-082-rebind-legacy-allowlist-umbrella-rows.md)
   (done, 2026-06-10): metadata-only rebind of the 54 `LEGACY-002` umbrella
   allowlist rows to `LEGACY-004..006`/`LEGACY-008..010`, unblocking the
-  `LEGACY-002` seed retirement.
+  `LEGACY-002` seed retirement. Those rows are now gone after final legacy
+  deletion.
 - [LEGACY-002 — Seed retirement tasks for remaining `src/legacy/` subtrees](../../done/LEGACY-002-seed-src-legacy-retirement-backlog.md)
   (done, 2026-06-10): seeded `LEGACY-003..010` (landed 2026-06-06) and
   retired once `HARDEN-082` rebound the umbrella allowlist rows to the

@@ -110,7 +110,8 @@ IntrinsicEngine/
 
 ## Migration notes and constraints
 
-- `src/legacy/` is **temporary** and should shrink over time as subsystems are promoted into canonical roots.
+- The `src/legacy/` compatibility tree has been retired; new source belongs in
+  canonical layer roots.
 - `methods/` is reserved for method packages and their implementation lifecycle artifacts (manifest, references, tests, benchmarking, reports).
 - `docs/`, `tasks/`, `tools/`, and CI workflows are part of the architecture contract and are not optional repository extras.
 - Source-tree movement during this migration must be mechanical and reviewed separately from semantic code changes.

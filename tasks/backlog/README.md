@@ -150,10 +150,6 @@ fallback telemetry, while `Extrinsic.Runtime.KMeansBackend` owns the
 for `PROC-011`.
 
 Open members:
-- [`architecture/LEGACY-012-migrate-legacy-consumer-tests.md`](architecture/LEGACY-012-migrate-legacy-consumer-tests.md) —
-  follow-up for tests and non-legacy consumers that still import bare legacy
-  module names after promoted equivalents exist; `LEGACY-011` retired the
-  feature-level value-gated map, so this is now unblocked by feature decisions.
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`ui/RORG-031-ui-integration.md`](ui/RORG-031-ui-integration.md).
 - [`platform/PLATFORM-004-alternative-platform-backend-onboarding.md`](platform/PLATFORM-004-alternative-platform-backend-onboarding.md) (planning-only seed).

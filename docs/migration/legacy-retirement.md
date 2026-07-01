@@ -1,132 +1,36 @@
-# Legacy Retirement Plan (`src/legacy/`)
+# Legacy Retirement Record (`src/legacy/`)
 
-## Purpose
+## Status
 
-`src/legacy/` is a temporary containment area for historical subsystems that have not yet been promoted into canonical final roots (`src/core`, `src/geometry`, `src/graphics/*`, etc.).
+`src/legacy/` was retired on 2026-07-01. No legacy compatibility subtree remains
+in the source tree, CMake no longer wires legacy targets, and
+`tools/repo/layering_allowlist.yaml` has no active legacy exceptions.
 
-## Policy
+## Exit Evidence
 
-- New feature work should target canonical layers, not `src/legacy/`, unless needed for compatibility.
-- Any temporary cross-layer exception inside `src/legacy/` must be tracked in a current task under `tasks/active/` with a removal task ID.
-- Layering allowlist rows must point at an open removal owner. As of `HARDEN-082`, `src/legacy/Interface/**` rows point at [`LEGACY-001`](../../tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md), and the remaining legacy subtree rows point at their specific per-subtree deletion tasks (`LEGACY-004`..`LEGACY-006`, `LEGACY-008`..`LEGACY-010`).
-- Promotion work from `src/legacy/` must keep mechanical path moves separate from semantic refactors.
-- Semantic reimplementation blockers were retired by
+- Canonical implementations build under promoted roots: `src/core`, `src/assets`,
+  `src/ecs`, `src/geometry`, `src/physics`, `src/graphics/*`, `src/platform`,
+  `src/runtime`, and `src/app`.
+- Semantic feature decisions were closed by
   [`LEGACY-011`](../../tasks/done/LEGACY-011-src-legacy-feature-reimplementation-map.md)
-  and its child tasks: candidates were retained only when necessary or when they
-  improved the current promoted architecture; otherwise they were deferred or
-  retired. The per-subtree `LEGACY-*` deletion tasks remain mechanical and
-  should not grow feature work.
-- The current per-subtree gate state — which subtrees are blocked only by test
-  consumers vs. by promoted engine code — is captured in the dated
-  [`legacy-removal-audit.md`](legacy-removal-audit.md) snapshot.
+  and its child tasks; the final removal did not add new engine features.
+- Remaining bare legacy test consumers were retired by
+  [`LEGACY-012`](../../tasks/done/LEGACY-012-migrate-legacy-consumer-tests.md).
+- Subtrees were then removed consumers-first, foundation-last:
+  [`LEGACY-010`](../../tasks/done/LEGACY-010-delete-src-legacy-runtime.md) →
+  [`LEGACY-008`](../../tasks/done/LEGACY-008-delete-src-legacy-graphics.md) →
+  [`LEGACY-001`](../../tasks/done/LEGACY-001-delete-src-legacy-interface.md) /
+  [`LEGACY-006`](../../tasks/done/LEGACY-006-delete-src-legacy-ecs.md) /
+  [`LEGACY-004`](../../tasks/done/LEGACY-004-delete-src-legacy-asset.md) →
+  [`LEGACY-009`](../../tasks/done/LEGACY-009-delete-src-legacy-rhi.md) →
+  [`LEGACY-005`](../../tasks/done/LEGACY-005-delete-src-legacy-core.md).
+- The generated module inventory contains promoted modules only.
 
-## Exit criteria
+## Historical Notes
 
-`src/legacy/` can be considered retired only when all are true:
-
-1. Canonical implementations exist and build under final roots.
-2. CI no longer depends on legacy include paths.
-3. Layering checks pass with no undocumented legacy exceptions.
-4. Migration docs referencing active legacy shims are closed or archived.
-
-## Cleanup expectations
-
-When a legacy area is retired:
-
-- Remove now-unused compatibility wrappers.
-- Update architecture docs and inventory outputs.
-- Mark related migration tasks as done with commit/PR references.
-
-## Sequencing
-
-Retirement runs as a tracked program. Targets are deleted in the order below, each as a single mechanical commit, gated by an explicit prerequisite checklist. The first/second/third deletion targets were pinned by [`ARCH-004 — Pin first legacy-deletion target and sequencing`](../../tasks/done/ARCH-004-legacy-retirement-first-deletion-target.md) (done 2026-05-17); new targets are added by a follow-up `ARCH-NNN` task once the upstream gates for the next subtree retire. The executing tasks live under `tasks/backlog/architecture/LEGACY-NNN-*.md`.
-
-| # | Subtree | Size | Promoted owner | Prerequisite checklist | Executing task |
-|---|---|---|---|---|---|
-| 1 | `src/legacy/Interface/` | 4 files | `src/platform/` (window/input ports), `src/app/Sandbox/` (UI shell entry) | (a) consumer-grep gate in `LEGACY-001` Verification exits 0 with `OK: no external consumers ...` (the gate inverts `git grep`'s match-exits-0 default and excludes `src/legacy/Interface/**` from the search); the gate still fails across remaining legacy Graphics/Runtime consumers. `LEGACY-018` retired the external `tests/contract/ui/` consumer; (b) remaining legacy modules build without it, or are fenced behind a build flag; (c) layering allowlist row count drops by exactly the count of removed rows. | [`LEGACY-001`](../../tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md) |
-| 2 | `src/legacy/Asset/` | 5 files | `src/assets/` | (a) legacy `Runtime/AssetIngestService` and remaining legacy graphics/runtime consumers migrate off the legacy asset surface; (b) parity matrix `assets` row no longer lists legacy `Asset.Manager` / `Asset.Pipeline` / `Asset.Errors` as live; (c) consumer grep clean. | [`LEGACY-004`](../../tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md) |
-| 3 | `src/legacy/EditorUI/` | 8 files | `src/runtime/Editor/` + `src/app/Sandbox/` attachment | Done 2026-06-07: promoted `SandboxEditorUi` shell/domain windows, geometry-processing discovery, file/scene command surfaces, and the `LEGACY-003` Sandbox-retirement prerequisite were in place; consumer grep exited clean before deletion. Follow-up UI-006 later restored Frame Graph diagnostics against renderer-owned stats. | [`LEGACY-007`](../../tasks/done/LEGACY-007-delete-src-legacy-editorui.md) |
-
-As of `LEGACY-002` (2026-06-06), every remaining `src/legacy/<Subsystem>/` subtree now has a seeded per-subtree executing task in `tasks/backlog/architecture/`, each carrying its own consumer-grep prerequisite gate; they stay in backlog until those gates exit 0. In addition to rows 2–3 above:
-
-- [`LEGACY-003`](../../tasks/done/LEGACY-003-delete-src-legacy-apps.md) (done 2026-06-07) — `src/legacy/Apps/` legacy Sandbox binary retired as a pure leaf consumer after `ExtrinsicSandbox` became canonical.
-- [`LEGACY-007`](../../tasks/done/LEGACY-007-delete-src-legacy-editorui.md) (done 2026-06-07) — `src/legacy/EditorUI/` retired after promoted `SandboxEditorUi` coverage replaced the legacy editor surface; UI-006 has since restored the Frame Graph diagnostics panel against renderer-owned stats.
-- [`LEGACY-005`](../../tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md) — `src/legacy/Core/` (foundation; retires last).
-  `LEGACY-013` cleared the promoted-src bare `Core.*` import subset; remaining
-  blockers are `LEGACY-012` test consumers and legacy-internal consumers that
-  retire through subtree ordering.
-- [`LEGACY-006`](../../tasks/backlog/architecture/LEGACY-006-delete-src-legacy-ecs.md) — `src/legacy/ECS/`.
-- [`LEGACY-008`](../../tasks/backlog/architecture/LEGACY-008-delete-src-legacy-graphics.md) — `src/legacy/Graphics/` (largest subtree; gated on the GRAPHICS-033 + GRAPHICS-070..076 + GRAPHICS-081 chain — now retired — plus migration of the remaining legacy consumers).
-- [`LEGACY-009`](../../tasks/backlog/architecture/LEGACY-009-delete-src-legacy-rhi.md) — `src/legacy/RHI/`.
-  `GRAPHICS-086` retired the command-helper, persistent-descriptor,
-  swapchain/image, scene-instance, and CUDA decision blockers; remaining
-  prerequisites are consumer-grep/subtree ordering and any independently named
-  Vulkan operational evidence.
-- [`LEGACY-010`](../../tasks/backlog/architecture/LEGACY-010-delete-src-legacy-runtime.md) — `src/legacy/Runtime/`.
-- [`LEGACY-011`](../../tasks/done/LEGACY-011-src-legacy-feature-reimplementation-map.md)
-  (done 2026-06-18) — value-gated feature-reimplementation map retired after
-  every remaining candidate gained a retained/deferred/retired outcome. Open
-  deletion tasks are now blocked by consumer-grep cleanup, promoted-src Core
-  import cleanup, and mechanical subtree ordering rather than unnamed feature
-  gaps.
-- [`CORE-002`](../../tasks/done/CORE-002-command-feature-catalog-contract.md)
-  is retired: legacy command/feature catalogs are not promoted as a global
-  service. Retained dependency-free core utility/telemetry seams use
-  `Extrinsic.Core.*`; runtime/editor command history is owned by `RUNTIME-102`.
-  Remaining `src/legacy/Core/` deletion blockers are consumer-grep cleanup and
-  legacy-only compatibility tests, not unnamed command/catalog feature gaps.
-- [`LEGACY-012`](../../tasks/backlog/architecture/LEGACY-012-migrate-legacy-consumer-tests.md) —
-  migrates or retires tests and other non-legacy consumers that still import
-  bare legacy module names after promoted feature owners exist. Retired slices
-  through `LEGACY-042` are reflected in
-  [`legacy-removal-audit.md`](legacy-removal-audit.md), which remains the
-  current consumer-count snapshot.
-- [`LEGACY-035`](../../tasks/done/LEGACY-035-resolve-legacy-rhi-deferred-destruction-tests.md)
-  (done 2026-06-18) — retired the Vulkan deferred-destruction coverage split
-  out of the legacy runtime maintenance-lane test as legacy RHI implementation
-  detail; future promoted Vulkan deletion behavior requires a fresh
-  value-gated graphics task.
-- [`LEGACY-036`](../../tasks/done/LEGACY-036-retire-legacy-event-bus-test.md)
-  (done 2026-06-18) — retired the legacy `ECS::Scene::GetDispatcher()`
-  event-bus compatibility test; promoted ECS owns event payload types only,
-  while promoted runtime owns selection/hover mutation through
-  `SelectionController`.
-- [`LEGACY-037`](../../tasks/done/LEGACY-037-retire-legacy-asset-ingest-service-test.md)
-  (done 2026-06-18) — retired the legacy `Runtime.AssetIngestService`
-  constructor-shape compatibility test; promoted ingest ownership is the
-  `Extrinsic.Runtime.AssetIngestStateMachine` plus promoted asset/runtime
-  handoff contracts, not the old service constructor.
-- [`LEGACY-038`](../../tasks/done/LEGACY-038-retire-runtime-selection-modes-test.md)
-  (done 2026-06-18) — retired the legacy `Runtime.Selection` /
-  `Runtime.SelectionModule` mode compatibility test after preserving retained
-  multi-selection mode behavior under promoted
-  `Extrinsic.Runtime.SelectionController` coverage.
-- [`LEGACY-039`](../../tasks/done/LEGACY-039-retire-legacy-element-selection-test.md)
-  (done 2026-06-18) — retired the legacy persistent
-  `Runtime.Selection::SubElementSelection` compatibility test; promoted
-  sub-primitive selection uses `Extrinsic.Runtime.PrimitiveSelectionRefinement`,
-  engine-owned refined-pick caching, and editor selection models.
-- [`LEGACY-040`](../../tasks/done/LEGACY-040-retire-legacy-asset-manager-safety-test.md)
-  (done 2026-06-18) — retired the legacy `Asset.Manager`
-  loader-safety/error-path compatibility test; promoted asset ownership is split
-  across `Extrinsic.Asset.Service`, `Asset.Registry`, `Asset.PayloadStore`, and
-  `Asset.LoadPipeline`, whose retained captured-loader, reload, wrong-type read,
-  dead-handle, failed-load, and event-ordering contracts are already covered.
-- [`LEGACY-041`](../../tasks/done/LEGACY-041-retire-legacy-asset-manager-core-test.md)
-  (done 2026-06-18) — retired the broader legacy `Asset.Manager`
-  async/cache/lease/clear compatibility test; promoted asset ownership uses
-  registry/payload tickets, load-state transitions, event fanout, typed reads,
-  and runtime-owned GPU handoff rather than the old manager/lease API.
-- [`LEGACY-042`](../../tasks/done/LEGACY-042-retire-legacy-asset-pipeline-test.md)
-  (done 2026-06-18) — retired the legacy `Asset.Pipeline` transfer-token
-  compatibility test; promoted asset streaming uses `Asset.LoadPipeline`,
-  `AssetService`, `Graphics.GpuAssetCache`, and runtime model/texture handoffs
-  rather than the old `Runtime::AssetPipeline` queue/material-list API.
-- [`LEGACY-018`](../../tasks/done/LEGACY-018-retire-interface-panel-registration-test.md)
-  (done 2026-06-18) — retired the legacy-only `Interface::GUI`
-  panel-registration test. `LEGACY-001` now has zero external test consumers and
-  remains blocked by legacy-internal Graphics/Runtime consumers.
-
-Deletion order is consumer-leaves first, foundation last (see the "Legacy retirement" section of [`tasks/backlog/architecture/README.md`](../../tasks/backlog/architecture/README.md) for the full ordering rationale). Current `find -type f` subtree sizes (including each `CMakeLists.txt`): `Graphics` 168, `RHI` 54, `Core` 40, `ECS` 29, `Runtime` 29, `Asset` 6, `Interface` 4.
-
-Process rule: a sequencing row is satisfied only when its prerequisite checklist is fully checked off by the agent promoting the executing task. Bypassing the checklist is forbidden by [`AGENTS.md`](../../AGENTS.md) §13.
+The valid deletion order was established by the
+[`legacy-removal-audit.md`](legacy-removal-audit.md) snapshot: legacy runtime had
+no legacy-internal consumers, graphics depended on runtime-facing consumers, RHI
+and core were foundational, and core had to retire last. That audit is now a
+historical explanation of why the final sweep ran in that order, not an open
+work queue.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Guardrail: large UI-controller diffs must be accompanied by EditorUI contract tests.
+# Guardrail: large sandbox-editor diffs must be accompanied by runtime UI contract tests.
 # Usage:
 #   tools/check_ui_contract_guard.sh [base_ref] [threshold]
 # Defaults:
@@ -23,9 +23,9 @@ if ! git rev-parse --verify --quiet "$BASE_REF" >/dev/null; then
   fi
 fi
 
-GUARDED_REGEX='^src/legacy/Runtime/EditorUI/Runtime\.EditorUI\.(InspectorController|Widgets|GeometryWorkflowController|SpatialDebugController)\.cpp$'
-GUARDED_AWK_REGEX='^src/legacy/Runtime/EditorUI/Runtime[.]EditorUI[.](InspectorController|Widgets|GeometryWorkflowController|SpatialDebugController)[.]cpp$'
-TEST_FILE='tests/Test_EditorUI.cpp'
+GUARDED_REGEX='^src/runtime/Editor/Runtime\.SandboxEditorUi\.cpp$'
+GUARDED_AWK_REGEX='^src/runtime/Editor/Runtime[.]SandboxEditorUi[.]cpp$'
+TEST_FILE='tests/contract/runtime/Test.SandboxEditorUi.cpp'
 
 mapfile -t changed_files < <(git diff --name-only "$BASE_REF"...HEAD)
 

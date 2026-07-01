@@ -11,7 +11,7 @@ depends_on: []
 ## Non-goals
 - Do not delete any code under `src/legacy/` in this task. This is a backlog-seeding task; deletions land under each per-subtree LEGACY-* successor.
 - Do not change `tools/repo/layering_allowlist.yaml` here; rebinding is owned by `HARDEN-069`.
-- Do not author exhaustive deletion plans for every subtree. Each seed task should follow the [`LEGACY-001`](../backlog/architecture/LEGACY-001-delete-src-legacy-interface.md) shape: scope, prerequisites (consumer-grep gate), and verification template.
+- Do not author exhaustive deletion plans for every subtree. Each seed task should follow the [`LEGACY-001`](LEGACY-001-delete-src-legacy-interface.md) shape: scope, prerequisites (consumer-grep gate), and verification template.
 - Do not retire `src/legacy/Interface/` here — that subtree is already owned by `LEGACY-001`.
 
 ## Context
@@ -44,7 +44,7 @@ depends_on: []
   - `src/legacy/RHI/`
   - `src/legacy/Runtime/`
 - Each per-subtree task must inventory promoted equivalents (e.g. `Apps/` -> `src/app/` + `src/platform/`; `RHI/` -> `src/graphics/rhi/`; `ECS/` -> `src/ecs/`) and include a consumer-grep prerequisite gate before promotion to `tasks/active/`.
-- Use [`LEGACY-001`](../backlog/architecture/LEGACY-001-delete-src-legacy-interface.md) as the structural template.
+- Use [`LEGACY-001`](LEGACY-001-delete-src-legacy-interface.md) as the structural template.
 
 ## Required changes
 - [x] Create `tasks/backlog/architecture/LEGACY-003-delete-src-legacy-apps.md` modeled on `LEGACY-001`.

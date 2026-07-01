@@ -8,6 +8,59 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+Backlog
+[`LEGACY-012`](LEGACY-012-migrate-legacy-consumer-tests.md) — Migrate legacy
+consumer tests to promoted coverage — retired on 2026-07-01 at maturity
+`Retired`. The remaining bare legacy test consumers were removed from the
+configured test graph or were already represented by promoted coverage. This
+made the subtree deletion gates mechanical rather than feature-blocked.
+
+Backlog
+[`LEGACY-010`](LEGACY-010-delete-src-legacy-runtime.md) — Delete
+`src/legacy/Runtime/` — retired on 2026-07-01 at maturity `Retired`. Runtime
+was deleted first in the final sweep because no other legacy subtree depended on
+it. CMake legacy runtime wiring and legacy allowlist rows are gone.
+
+Backlog
+[`LEGACY-008`](LEGACY-008-delete-src-legacy-graphics.md) — Delete
+`src/legacy/Graphics/` — retired on 2026-07-01 at maturity `Retired`. Graphics
+was deleted after Runtime so its legacy-internal consumers were gone before the
+Interface/ECS/Asset/RHI/Core removals. The promoted `src/graphics/*` surfaces
+remain the only graphics implementation roots.
+
+Backlog
+[`LEGACY-001`](LEGACY-001-delete-src-legacy-interface.md) — Delete
+`src/legacy/Interface/` — retired on 2026-07-01 at maturity `Retired`. The
+Interface subtree was removed after Runtime and Graphics no longer consumed it;
+`Interface::GUI` remains a retired non-promoted endpoint.
+
+Backlog
+[`LEGACY-006`](LEGACY-006-delete-src-legacy-ecs.md) — Delete `src/legacy/ECS/`
+— retired on 2026-07-01 at maturity `Retired`. The ECS legacy subtree was
+removed after Runtime and Graphics, leaving `Extrinsic.ECS.*` as the ECS module
+surface.
+
+Backlog
+[`LEGACY-004`](LEGACY-004-delete-src-legacy-asset.md) — Delete
+`src/legacy/Asset/` — retired on 2026-07-01 at maturity `Retired`. The Asset
+legacy subtree was removed after its legacy Runtime/Graphics consumers were
+gone; promoted `Extrinsic.Asset.*` plus runtime handoff seams own the retained
+asset behavior.
+
+Backlog
+[`LEGACY-009`](LEGACY-009-delete-src-legacy-rhi.md) — Delete `src/legacy/RHI/`
+— retired on 2026-07-01 at maturity `Retired`. RHI was removed after Runtime,
+Graphics, Interface, ECS, and Asset no longer consumed it; promoted
+`Extrinsic.RHI.*` and `Extrinsic.Backends.Vulkan` own the retained RHI/backend
+surface.
+
+Backlog
+[`LEGACY-005`](LEGACY-005-delete-src-legacy-core.md) — Delete
+`src/legacy/Core/` — retired on 2026-07-01 at maturity `Retired`. Core was
+removed last after all consumer subtrees and legacy test consumers were gone.
+The generated module inventory now contains promoted modules only, and the
+layering allowlist is empty.
+
 Active
 [`RUNTIME-134`](RUNTIME-134-progressive-poisson-interactive-playground.md) —
 Interactive progressive-Poisson sampling playground in the Sandbox — retired on

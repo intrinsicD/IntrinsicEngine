@@ -1,6 +1,8 @@
 # Build Troubleshooting (Container / CI)
 
-This document explains the most common reason `src/Core`, `src/Geometry`, `src/ECS`, and test targets fail to configure/compile in minimal container environments.
+This document explains the most common reason `src/core`, `src/geometry`,
+`src/ecs`, and test targets fail to configure/compile in minimal container
+environments.
 
 ## Symptom
 
@@ -8,7 +10,8 @@ This document explains the most common reason `src/Core`, `src/Geometry`, `src/E
 
 - `... has C++ sources that may use modules, but the compiler does not provide a way to discover the import graph dependencies ...`
 
-Affected targets typically include `IntrinsicCore`, `IntrinsicGeometry`, `IntrinsicECS`, and test object targets.
+Affected targets typically include `ExtrinsicCore`, `IntrinsicGeometry`,
+`ExtrinsicECS`, and test object targets.
 
 ## Root cause
 
@@ -41,7 +44,7 @@ If configure output shows `The CXX compiler identification is GNU ...` and then 
 
 ```bash
 cmake --preset dev
-cmake --build --preset dev --target IntrinsicCore IntrinsicGeometry IntrinsicECS
+cmake --build --preset dev --target ExtrinsicCore IntrinsicGeometry ExtrinsicECS
 cmake --build --preset dev --target IntrinsicCoreTests IntrinsicECSTests IntrinsicGeometryTests
 ctest --test-dir build/dev --output-on-failure
 ```

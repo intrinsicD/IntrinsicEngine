@@ -92,7 +92,6 @@ Cross-layer convenience imports that violate this table are prohibited.
 
 Target source layout:
 
-- `src/legacy/` (temporary migration area; must shrink over time).
 - `src/core/`.
 - `src/assets/`.
 - `src/ecs/`.
@@ -134,7 +133,8 @@ Agents must enforce ownership and dependency flow:
   `INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN=ON` and `RenderConfig::EnablePromotedVulkanDevice` are both enabled;
   otherwise Vulkan requests fall back to the Null device. Renderer/runtime code must gate on
   `RHI::IDevice::IsOperational()`, not Vulkan diagnostics.
-- `src/legacy` may contain transitional exceptions only when tracked in migration docs/tasks.
+- Temporary compatibility exceptions may exist only when tracked in migration docs/tasks and represented in the
+  layering allowlist with a current removal owner. There are no active legacy-tree exceptions.
 
 Every new dependency edge must be justifiable by layer policy and reflected in docs when architectural.
 

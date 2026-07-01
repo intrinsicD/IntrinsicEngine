@@ -943,13 +943,14 @@ first by `Geometry::RayTriangle_Classify`, is:
   geometric agreement plus boundary classification against the same inputs
   the legacy tests use.
 
-Existing callers (typically in `src/legacy/` for now) stay on the legacy
-entry point until their own per-callsite Slice 3.x commit replaces the call.
-The legacy entry point is removed only when every caller has migrated.
+Before final legacy retirement, existing callers stayed on the legacy entry
+point until their own per-callsite Slice 3.x commit replaced the call. That
+migration window is closed: `src/legacy/` no longer exists, and new callers
+must use the promoted geometry surfaces directly.
 
 ## Migration note
 
-As of RORG-093, canonical Geometry code is promoted to `src/geometry`. Remaining `src/legacy` geometry shims (if any) must be temporary, tracked, and removed via follow-up migration tasks.
+As of RORG-093, canonical Geometry code is promoted to `src/geometry`. As of the 2026-07-01 legacy sweep, no `src/legacy/` compatibility tree remains; future shims must live in an approved current layer, be temporary, and be tracked by a removal task.
 
 ## Related reviews
 

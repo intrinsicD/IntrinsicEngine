@@ -34,7 +34,7 @@
   [`LEGACY-002`](LEGACY-002-seed-src-legacy-retirement-backlog.md) under
   [`ARCH-004`](ARCH-004-legacy-retirement-first-deletion-target.md);
   structural template is
-  [`LEGACY-001`](../backlog/architecture/LEGACY-001-delete-src-legacy-interface.md). This is sequencing
+  [`LEGACY-001`](LEGACY-001-delete-src-legacy-interface.md). This is sequencing
   row 3 (originally tracked as the placeholder "EditorUI → LEGACY-003") in
   [`docs/migration/legacy-retirement.md`](../../docs/migration/legacy-retirement.md).
 - Subtree size: 8 files. Legacy module name (bare, non-`Extrinsic.`):

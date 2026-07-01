@@ -751,8 +751,9 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   done 2026-06-11 at `CPUContracted`. The audit maps legacy command helpers,
   persistent descriptors, swapchain/image ownership, and scene-instance
   convenience to promoted RHI/Vulkan/renderer seams, records CUDA as removed
-  from the promoted default path, and leaves `LEGACY-009` blocked by consumer
-  grep/subtree ordering rather than an unnamed RHI parity gap.
+  from the promoted default path, and records that `LEGACY-009` was blocked by
+  consumer grep/subtree ordering rather than an unnamed RHI parity gap. The
+  final legacy sweep later retired `LEGACY-009`.
 - [GRAPHICS-079 — Default-recipe `Pass.ImGui` wiring](../../done/GRAPHICS-079-default-recipe-imgui-pass-wiring.md)
   (done): depends on GRAPHICS-076 (PresentSource finalization) and
   `runtime/RUNTIME-090` (ImGui adapter producer). It wires the renderer

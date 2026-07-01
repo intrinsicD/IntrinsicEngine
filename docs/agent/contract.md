@@ -144,7 +144,8 @@ When structure, policy, or behavior changes:
 
 ## Temporary migration exceptions
 
-Exceptions are allowed only if:
+There are currently no active legacy-tree exceptions. Future temporary
+exceptions are allowed only if:
 
 - recorded in a current task under `tasks/active/`,
 - linked to a removal task ID,

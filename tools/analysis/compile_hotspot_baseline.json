@@ -4,10 +4,6 @@
     {
       "source": "src/geometry/Geometry.Octree.cppm",
       "max_duration_ms": 92000
-    },
-    {
-      "source": "src/legacy/ECS/Systems/ECS.Systems.Transform.cpp",
-      "max_duration_ms": 91000
     }
   ]
 }

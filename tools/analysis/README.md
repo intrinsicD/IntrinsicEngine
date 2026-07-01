@@ -13,6 +13,6 @@ Static analysis and performance analysis tooling.
 ## Migration status
 
 - RORG-072 completed: analysis scripts/baselines now live under `tools/analysis/` and CI/docs references use the new paths.
-- BUG-004 refreshed `compile_hotspot_baseline.json` to use canonical current
-  source paths under `src/geometry/` and `src/legacy/`; stale `src/Runtime/...`
-  migration aliases are not accepted by the gate.
+- BUG-004 refreshed `compile_hotspot_baseline.json` to use canonical source
+  paths under the then-current layout; stale `src/Runtime/...` migration aliases
+  are not accepted by the gate.

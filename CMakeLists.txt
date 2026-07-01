@@ -273,17 +273,8 @@ endif()
 # These variables centralize source tree paths so migration tasks can repoint
 # directories without touching every add_subdirectory call at once.
 set(INTRINSIC_SOURCE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/src")
-set(INTRINSIC_LEGACY_SOURCE_ROOT "${INTRINSIC_SOURCE_ROOT}/legacy")
 set(INTRINSIC_CORE_SOURCE_ROOT "${INTRINSIC_SOURCE_ROOT}/core")
-set(INTRINSIC_LEGACY_CORE_SOURCE_ROOT "${INTRINSIC_LEGACY_SOURCE_ROOT}/Core")
 set(INTRINSIC_GEOMETRY_SOURCE_ROOT "${INTRINSIC_SOURCE_ROOT}/geometry")
-set(INTRINSIC_LEGACY_ECS_SOURCE_ROOT "${INTRINSIC_LEGACY_SOURCE_ROOT}/ECS")
-set(INTRINSIC_LEGACY_RHI_SOURCE_ROOT "${INTRINSIC_LEGACY_SOURCE_ROOT}/RHI")
-set(INTRINSIC_LEGACY_ASSET_SOURCE_ROOT "${INTRINSIC_LEGACY_SOURCE_ROOT}/Asset")
-set(INTRINSIC_LEGACY_GRAPHICS_SOURCE_ROOT "${INTRINSIC_LEGACY_SOURCE_ROOT}/Graphics")
-set(INTRINSIC_LEGACY_INTERFACE_SOURCE_ROOT "${INTRINSIC_LEGACY_SOURCE_ROOT}/Interface")
-set(INTRINSIC_LEGACY_RUNTIME_SOURCE_ROOT "${INTRINSIC_LEGACY_SOURCE_ROOT}/Runtime")
-
 set(INTRINSIC_ASSETS_SOURCE_ROOT "${INTRINSIC_SOURCE_ROOT}/assets")
 set(INTRINSIC_ECS_SOURCE_ROOT "${INTRINSIC_SOURCE_ROOT}/ecs")
 set(INTRINSIC_PHYSICS_SOURCE_ROOT "${INTRINSIC_SOURCE_ROOT}/physics")
@@ -314,7 +305,6 @@ target_link_libraries(IntrinsicProgressivePoissonReference PUBLIC IntrinsicConfi
 # Subdirectories
 # ------------------------------------------------------------------------------
 add_subdirectory(${INTRINSIC_CORE_SOURCE_ROOT})
-add_subdirectory(${INTRINSIC_LEGACY_CORE_SOURCE_ROOT})
 add_subdirectory(${INTRINSIC_GEOMETRY_SOURCE_ROOT})
 add_subdirectory(${INTRINSIC_ASSETS_SOURCE_ROOT})
 add_subdirectory(${INTRINSIC_ECS_SOURCE_ROOT})
@@ -327,19 +317,6 @@ add_subdirectory(${INTRINSIC_PLATFORM_SOURCE_ROOT})
 add_subdirectory(${INTRINSIC_RUNTIME_SOURCE_ROOT})
 if(NOT INTRINSIC_HEADLESS_NO_GLFW)
     add_subdirectory(${INTRINSIC_APP_SOURCE_ROOT})
-endif()
-add_subdirectory(${INTRINSIC_LEGACY_ECS_SOURCE_ROOT})
-if(NOT INTRINSIC_HEADLESS_NO_GLFW)
-    add_subdirectory(${INTRINSIC_LEGACY_RHI_SOURCE_ROOT})
-    add_subdirectory(${INTRINSIC_LEGACY_ASSET_SOURCE_ROOT})       # needs Core + RHI
-    add_subdirectory(${INTRINSIC_LEGACY_GRAPHICS_SOURCE_ROOT})    # needs Asset
-    add_subdirectory(${INTRINSIC_LEGACY_INTERFACE_SOURCE_ROOT})
-    add_subdirectory(${INTRINSIC_LEGACY_RUNTIME_SOURCE_ROOT})     # needs Asset
-else()
-    message(WARNING
-        "INTRINSIC_HEADLESS_NO_GLFW=ON: skipping legacy GLFW-dependent modules "
-        "(RHI/Asset/Graphics/Interface/Runtime)."
-    )
 endif()
 
 if(INTRINSIC_BUILD_BENCHMARKS)

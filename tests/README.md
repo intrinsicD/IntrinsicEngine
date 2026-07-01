@@ -116,9 +116,9 @@ for valid longer-running cases without raising the default for cheap CPU tests.
 
 ## Shared fixtures
 
-Shared support fixtures live under `support/`. Runtime/Vulkan integration tests
-that borrow `RuntimeRhiTestEnvironment` must keep per-test mutable state local
-to each fixture and follow the reset contract in `support/README.md`.
+Shared support fixtures live under `support/`. Reusable GPU helpers should stay
+engine-free where possible and keep backend-specific setup local to the owning
+`gpu;vulkan` fixture or executable.
 
 Repo-tooling fixtures live alongside their consumers. The layering checker
 fixtures live under
@@ -127,20 +127,6 @@ and are exercised by `regression/tooling/Test.CheckLayering.py`. Positive
 cases live at the top level; negative cases live in sibling `negative_*`
 directories and are scanned per-case so the bulk fixture root can stay
 clean under `--exclude 'negative_*'`.
-
-Some slow runtime suites also have grouped CTest entries, such as
-`IntrinsicRuntimeTests.RuntimeRHIGrouped`,
-`IntrinsicRuntimeTests.RenderOrchestratorHeadlessGrouped`,
-`IntrinsicRuntimeTests.HeadlessEngineGrouped`, and
-`IntrinsicRuntimeTests.RenderGraphPacketsGrouped`. Smaller Vulkan-backed
-fixtures also have grouped entries, including
-`IntrinsicRuntimeTests.GraphicsBackendHeadlessGrouped`,
-`IntrinsicRuntimeTests.HeadlessAppSmokeGrouped`,
-`IntrinsicRuntimeTests.SceneManagerGpuHooksGrouped`,
-and `IntrinsicRuntimeTests.GeometryReuseGrouped`. These entries let
-shared per-process fixtures amortize setup cost in nightly/opt-in runs. They
-are additive: individual `gtest_discover_tests` cases must remain registered
-for focused filtering and diagnostics.
 
 ## New test naming
 

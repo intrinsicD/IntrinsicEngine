@@ -4,7 +4,7 @@ set(INTRINSIC_BENCHMARK_ROOT "${CMAKE_CURRENT_SOURCE_DIR}" CACHE INTERNAL "Intri
 
 # GEOM-009 — geometry smoke benchmark executable. The runner imports the
 # Geometry C++23 modules so the target enables module scanning and links
-# the IntrinsicGeometry/IntrinsicCore module libraries.
+# promoted geometry/core module libraries.
 add_executable(IntrinsicBenchmarkSmoke
     runners/BenchmarkSmokeRunner.cpp
     geometry/Bench_ExampleSmoke.cpp
@@ -39,7 +39,7 @@ target_include_directories(IntrinsicBenchmarkSmoke PRIVATE
 target_link_libraries(IntrinsicBenchmarkSmoke
     PRIVATE
         IntrinsicConfig
-        IntrinsicCore
+        ExtrinsicCore
         IntrinsicGeometry
         IntrinsicProgressivePoissonReference
 )

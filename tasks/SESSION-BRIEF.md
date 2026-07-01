@@ -19,14 +19,6 @@ the authoritative open/unblocked view.
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
-- unblocked: `LEGACY-001` — Delete `src/legacy/Interface/` (tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)
-- unblocked: `LEGACY-004` — Delete `src/legacy/Asset/` (tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md)
-- unblocked: `LEGACY-005` — Delete `src/legacy/Core/` (tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)
-- unblocked: `LEGACY-006` — Delete `src/legacy/ECS/` (tasks/backlog/architecture/LEGACY-006-delete-src-legacy-ecs.md)
-- unblocked: `LEGACY-008` — Delete `src/legacy/Graphics/` (tasks/backlog/architecture/LEGACY-008-delete-src-legacy-graphics.md)
-- unblocked: `LEGACY-009` — Delete `src/legacy/RHI/` (tasks/backlog/architecture/LEGACY-009-delete-src-legacy-rhi.md)
-- unblocked: `LEGACY-010` — Delete `src/legacy/Runtime/` (tasks/backlog/architecture/LEGACY-010-delete-src-legacy-runtime.md)
-- unblocked: `LEGACY-012` — Migrate legacy consumer tests to promoted coverage (tasks/backlog/architecture/LEGACY-012-migrate-legacy-consumer-tests.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)

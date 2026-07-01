@@ -56,7 +56,7 @@ the method adapter already consumes.
 
 ## Config files
 
-- `layering_allowlist.yaml`: temporary path-scoped exceptions for `check_layering.py`; each entry must include task and expiry notes, avoid broad `src/legacy/**` wildcards, and point at an open removal owner. Current legacy `Interface` rows point at `LEGACY-001`; the remaining legacy subtree rows point at `LEGACY-002` until that task seeds per-subtree deletion owners.
+- `layering_allowlist.yaml`: temporary path-scoped exceptions for `check_layering.py`; each entry must include task and expiry notes, avoid broad wildcards, and point at an open removal owner. The allowlist is currently empty.
 
 ## Compatibility entrypoints
 

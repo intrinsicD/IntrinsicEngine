@@ -2,7 +2,10 @@
 
 Use this file as a quick “what does what, and where should it live?” reference.
 
-> **Source-tree note.** The repository builds a single source tree under `src/`, with retired-but-still-referenced subsystems isolated in `src/legacy/`. Routing rules below describe where new work belongs in the promoted layout. See `AGENTS.md` for the authoritative source-tree map.
+> **Source-tree note.** The repository builds a single promoted source tree under
+> `src/`; the legacy compatibility tree has been retired. Routing rules below
+> describe where new work belongs. See `AGENTS.md` for the authoritative
+> source-tree map.
 
 ## Engine
 
@@ -74,7 +77,8 @@ In `src/` (promoted layout):
 - `runtime/` (`Extrinsic.Runtime.*`) — composition root that wires the engine together.
 - `app/` — sandbox/editor entry points.
 
-`src/legacy/` retains transitional subsystems pending retirement; follow `tasks/backlog/` and `docs/migration/legacy-retirement.md` for retirement order.
+No `src/legacy/` subtree remains. Historical retirement order and evidence live
+in `docs/migration/legacy-retirement.md` and `tasks/done/RETIREMENT-LOG.md`.
 
 ## GUI
 
