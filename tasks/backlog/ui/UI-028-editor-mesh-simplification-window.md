@@ -25,6 +25,14 @@ depends_on: [GEOM-014]
   `check_test_layout --strict`, `check_doc_links`, `validate_tasks --strict`,
   and `check_task_policy --strict` all pass; adversarial diff review against the
   kernel/editor ground truth.
+- Follow-up fix (2026-07-01, review feedback): the executor now forwards the
+  selected mesh's `v:texcoord` into the scratch halfedge mesh before simplifying.
+  `BuildHalfedgeMeshForTopologyEdit` (via `BuildMeshSoupFromGeometrySources`)
+  carries only positions + topology, so without this the FA_QEM `PreserveUvSeams`
+  default was silently ineffective and textured meshes could collapse across UV
+  seams while reporting zero pinned seam vertices. Added
+  `SandboxEditorUi.MeshSimplifyPreservesUvSeamsWhenTexcoordsPresent` (textured
+  grid plane → `SeamVerticesPinned > 0`).
 - Deferred to CI: `cmake --preset ci` + `ctest -R SandboxEditorUi`.
 
 ## Goal

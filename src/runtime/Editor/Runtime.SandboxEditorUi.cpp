@@ -6115,6 +6115,40 @@ namespace Extrinsic::Runtime
             return message;
         }
 
+        // Compose an entity model matrix (translate * rotate * scale) from its
+        // local Transform::Component so ICP can run in world space.
+        [[nodiscard]] glm::mat4 ModelMatrixFromTransform(
+            const ECSC::Transform::Component& transform) noexcept
+        {
+            glm::mat4 model = glm::mat4_cast(transform.Rotation);
+            model[0] *= transform.Scale.x;
+            model[1] *= transform.Scale.y;
+            model[2] *= transform.Scale.z;
+            model[3] = glm::vec4(transform.Position, 1.0f);
+            return model;
+        }
+
+        // Decompose a composed model matrix back into a Transform::Component.
+        // The ICP delta is rigid, so the scale carried by the source model is
+        // preserved; rotation is recovered from the scale-normalized columns.
+        void DecomposeModelToTransform(
+            const glm::mat4& model,
+            ECSC::Transform::Component& out) noexcept
+        {
+            out.Position = glm::vec3(model[3]);
+            const glm::vec3 col0(model[0]);
+            const glm::vec3 col1(model[1]);
+            const glm::vec3 col2(model[2]);
+            const glm::vec3 scale(
+                glm::length(col0), glm::length(col1), glm::length(col2));
+            const glm::mat3 rotation(
+                scale.x > 0.0f ? col0 / scale.x : glm::vec3(1.0f, 0.0f, 0.0f),
+                scale.y > 0.0f ? col1 / scale.y : glm::vec3(0.0f, 1.0f, 0.0f),
+                scale.z > 0.0f ? col2 / scale.z : glm::vec3(0.0f, 0.0f, 1.0f));
+            out.Rotation = glm::quat_cast(rotation);
+            out.Scale = scale;
+        }
+
         [[nodiscard]] SandboxEditorGeometryProcessingModel BuildGeometryProcessingModel(
             const SandboxEditorContext& context)
         {
@@ -16726,6 +16760,29 @@ namespace Extrinsic::Runtime
             return result;
         }
 
+        // BuildHalfedgeMeshForTopologyEdit carries only positions + topology, so
+        // the scratch halfedge mesh has no v:texcoord even when the selected mesh
+        // does. Copy it in (the builder guarantees a 1:1 source->halfedge vertex
+        // mapping) so FA_QEM's PreserveUvSeams can actually pin UV-seam vertices
+        // instead of silently no-opping when the halfedge mesh lacks texcoords.
+        if (view.VertexSource != nullptr)
+        {
+            const auto sourceTexcoords =
+                view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+            if (sourceTexcoords &&
+                sourceTexcoords.Vector().size() == source.Mesh.VerticesSize())
+            {
+                auto meshTexcoords =
+                    source.Mesh.VertexProperties().GetOrAdd<glm::vec2>(
+                        "v:texcoord", glm::vec2{0.0f});
+                for (std::size_t i = 0u;
+                     i < sourceTexcoords.Vector().size(); ++i)
+                {
+                    meshTexcoords[i] = sourceTexcoords.Vector()[i];
+                }
+            }
+        }
+
         result.InputVertexCount = source.Mesh.VertexCount();
         result.InputFaceCount = source.Mesh.FaceCount();
         Geometry::HalfedgeMesh::Mesh before = source.Mesh;
@@ -17449,6 +17506,28 @@ namespace Extrinsic::Runtime
             return result;
         }
 
+        // Register in world space: transform each cloud's local v:position by its
+        // entity model matrix so a non-identity source/target Transform is
+        // respected (identical local clouds with a translated target must still
+        // converge onto the target). The ICP delta is composed with the existing
+        // source model matrix before being written back as the source Transform.
+        const glm::mat4 sourceModel = ModelMatrixFromTransform(*transform);
+        glm::mat4 targetModel(1.0f);
+        if (const ECSC::Transform::Component* targetTransform =
+                raw.try_get<ECSC::Transform::Component>(*targetEntity))
+        {
+            targetModel = ModelMatrixFromTransform(*targetTransform);
+        }
+
+        std::vector<glm::vec3> sourceWorld;
+        sourceWorld.reserve(sourcePoints->size());
+        for (const glm::vec3& p : *sourcePoints)
+            sourceWorld.push_back(glm::vec3(sourceModel * glm::vec4(p, 1.0f)));
+        std::vector<glm::vec3> targetWorld;
+        targetWorld.reserve(targetPoints->size());
+        for (const glm::vec3& p : *targetPoints)
+            targetWorld.push_back(glm::vec3(targetModel * glm::vec4(p, 1.0f)));
+
         Reg::RegistrationParams params{};
         params.Variant = ToGeometryICPVariant(command.Variant);
         params.MaxIterations = command.MaxIterations;
@@ -17459,7 +17538,7 @@ namespace Extrinsic::Runtime
         params.InlierRatio = command.InlierRatio;
 
         const RegistrationAlignmentOutcome outcome =
-            AlignPointClouds(*sourcePoints, *targetPoints, {}, params);
+            AlignPointClouds(sourceWorld, targetWorld, {}, params);
         if (!outcome.HasResult)
         {
             result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
@@ -17481,9 +17560,11 @@ namespace Extrinsic::Runtime
         result.AppliedStep = step;
         const glm::mat4 pose = TrajectoryPose(outcome, step);
 
+        // The pose is the world-space source->target delta; compose it with the
+        // source's current model matrix and decompose the result back into the
+        // local Transform (position/rotation, preserving the existing scale).
         ECSC::Transform::Component next = *transform;
-        next.Position = glm::vec3(pose[3]);
-        next.Rotation = glm::quat_cast(glm::mat3(pose));
+        DecomposeModelToTransform(pose * sourceModel, next);
 
         if (context.CommandHistory != nullptr)
         {

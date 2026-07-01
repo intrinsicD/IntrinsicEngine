@@ -426,6 +426,42 @@ namespace
         return entity;
     }
 
+    // An open grid-plane triangle mesh; its outer ring is an open boundary, so
+    // texcoord-bearing boundary vertices are UV-seam vertices (UI-028).
+    [[nodiscard]] Geometry::HalfedgeMesh::Mesh MakeGridPlaneMesh(const int n)
+    {
+        Geometry::HalfedgeMesh::Mesh mesh;
+        std::vector<Geometry::VertexHandle> handles;
+        handles.reserve(static_cast<std::size_t>((n + 1) * (n + 1)));
+        for (int i = 0; i <= n; ++i)
+            for (int j = 0; j <= n; ++j)
+                handles.push_back(mesh.AddVertex(glm::vec3(
+                    static_cast<float>(i), static_cast<float>(j), 0.0f)));
+        const auto at = [&](const int i, const int j) {
+            return handles[static_cast<std::size_t>(i * (n + 1) + j)];
+        };
+        for (int i = 0; i < n; ++i)
+            for (int j = 0; j < n; ++j)
+            {
+                (void)mesh.AddTriangle(at(i, j), at(i + 1, j), at(i + 1, j + 1));
+                (void)mesh.AddTriangle(at(i, j), at(i + 1, j + 1), at(i, j + 1));
+            }
+        return mesh;
+    }
+
+    // Per-vertex texcoords in the same (i, j) order MakeGridPlaneMesh adds
+    // vertices, so they align 1:1 with the populated GeometrySources.
+    [[nodiscard]] std::vector<glm::vec2> GridPlaneTexcoords(const int n)
+    {
+        std::vector<glm::vec2> tex;
+        tex.reserve(static_cast<std::size_t>((n + 1) * (n + 1)));
+        for (int i = 0; i <= n; ++i)
+            for (int j = 0; j <= n; ++j)
+                tex.emplace_back(static_cast<float>(i) / static_cast<float>(n),
+                                 static_cast<float>(j) / static_cast<float>(n));
+        return tex;
+    }
+
     void ExpectKMeansVertexProperties(Geometry::PropertySet& properties,
                                       const std::size_t expectedCount,
                                       const bool pointCloudNames)
@@ -3950,6 +3986,47 @@ TEST(SandboxEditorUi, MeshSimplifyCommandFailsClosedForInvalidTargetsAndUnavaila
             });
     EXPECT_EQ(unavailable.Status,
               Runtime::SandboxEditorCommandStatus::GeometryProcessingFailed);
+}
+
+TEST(SandboxEditorUi, MeshSimplifyPreservesUvSeamsWhenTexcoordsPresent)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    constexpr int kGrid = 4;
+    const Geometry::HalfedgeMesh::Mesh grid = MakeGridPlaneMesh(kGrid);
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "TexturedGrid");
+    GS::PopulateFromMesh(registry.Raw(), mesh, grid);
+    registry.Raw().emplace<G::RenderSurface>(mesh);
+    // The GeometrySources must carry the texcoords the command forwards into the
+    // scratch halfedge mesh so FA_QEM can pin the boundary UV-seam vertices.
+    SetTexcoords(registry.Raw().get<GS::Vertices>(mesh),
+                 GridPlaneTexcoords(kGrid));
+
+    const MeshCounts before = SourceMeshCounts(registry, mesh);
+    ASSERT_GT(before.Faces, 4u);
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    const Runtime::SandboxEditorMeshSimplifyResult result =
+        Runtime::ApplySandboxEditorMeshSimplifyCommand(
+            context,
+            Runtime::SandboxEditorMeshSimplifyCommand{
+                .StableEntityId = stableId,
+                .Metric = Runtime::SandboxEditorMeshSimplifyMetric::FA_QEM,
+                .TargetFaces = 4u,
+                .PreserveBoundary = false,  // seams pinned by PreserveUvSeams
+                .PreserveSharpFeatures = true,
+                .PreserveUvSeams = true,
+            });
+
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    // Without forwarding v:texcoord the scratch mesh carries no texcoord and
+    // SeamVerticesPinned would be 0; the fix forwards it so the boundary UV-seam
+    // vertices are pinned.
+    EXPECT_GT(result.SeamVerticesPinned, 0u);
+    EXPECT_LT(result.OutputFaceCount, before.Faces);
 }
 
 TEST(SandboxEditorUi, MeshTopologyProcessingCommandsFailClosedForInvalidTargetsAndUnavailableKernels)
@@ -8303,4 +8380,49 @@ TEST(SandboxEditorUi, RegistrationCommandFailsClosedForInvalidSelectionAndParame
             })
             .Status,
         Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
+}
+
+TEST(SandboxEditorUi, RegistrationCommandAlignsAcrossEntityTransforms)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    // Identical local clouds, but the target is translated in the scene. ICP run
+    // on raw local arrays would return identity and leave the source at the
+    // origin; running in world space must drive the source onto the target.
+    const std::vector<glm::vec3> cloud = MakeRegistrationCloud();
+    const ECS::EntityHandle source =
+        MakePointCloudEntity(registry, "Src", cloud);
+    const ECS::EntityHandle target =
+        MakePointCloudEntity(registry, "Tgt", cloud);
+    const glm::vec3 targetWorldOffset{1.0f, 0.5f, -0.5f};
+    registry.Raw().get<ECSC::Transform::Component>(target).Position =
+        targetWorldOffset;
+
+    const std::uint32_t sourceId =
+        Runtime::SelectionController::ToStableEntityId(source);
+    const std::uint32_t targetId =
+        Runtime::SelectionController::ToStableEntityId(target);
+
+    const Runtime::SandboxEditorRegistrationResult result =
+        Runtime::ApplySandboxEditorRegistrationCommand(
+            context,
+            Runtime::SandboxEditorRegistrationCommand{
+                .SourceStableEntityId = sourceId,
+                .TargetStableEntityId = targetId,
+                .Variant = Runtime::SandboxEditorICPVariant::PointToPoint,
+                .MaxIterations = 60u,
+                .InlierRatio = 1.0,
+                .TrajectoryStep = 1000u,
+            });
+
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_LT(result.FinalRMSE, 1.0e-3);
+    const ECSC::Transform::Component& aligned =
+        registry.Raw().get<ECSC::Transform::Component>(source);
+    EXPECT_NEAR(aligned.Position.x, targetWorldOffset.x, 1.0e-2f);
+    EXPECT_NEAR(aligned.Position.y, targetWorldOffset.y, 1.0e-2f);
+    EXPECT_NEAR(aligned.Position.z, targetWorldOffset.z, 1.0e-2f);
+    EXPECT_NEAR(std::abs(aligned.Rotation.w), 1.0f, 1.0e-2f);
 }

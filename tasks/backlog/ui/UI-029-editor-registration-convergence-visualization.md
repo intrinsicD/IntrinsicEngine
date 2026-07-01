@@ -25,6 +25,15 @@ depends_on: [GEOM-055]
   `runtime -> Geometry.Registration` edges are allowed),
   `check_test_layout --strict`, `validate_tasks --strict`,
   `check_task_policy --strict`, `check_doc_links`, and adversarial diff review.
+- Follow-up fix (2026-07-01, review feedback): ICP now runs in world space. The
+  command composes each entity's model matrix (from its `Transform::Component`),
+  transforms both clouds' local `v:position` into world space, runs ICP, then
+  composes the returned delta with the source model matrix and decomposes it back
+  into the source `Transform`. Previously it ran ICP on raw local arrays and
+  never read the target Transform, so identical clouds with a translated target
+  produced an identity pose and left the source at the origin. Added
+  `SandboxEditorUi.RegistrationCommandAlignsAcrossEntityTransforms` (translated
+  target → source driven onto it).
 - Deferred to CI (sandbox = clang-18, no vcpkg): `cmake --preset ci` +
   `ctest -R 'SandboxEditorUi|RuntimeRegistrationAlignment'`.
 
