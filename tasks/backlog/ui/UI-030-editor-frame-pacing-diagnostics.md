@@ -6,6 +6,33 @@ maturity_target: Operational
 ---
 # UI-030 — Sandbox EditorUI frame-pacing diagnostics
 
+## Status
+- Partial (2026-07-01) on branch `claude/ui-backlog-agentic-y3oap2`. Only the
+  `ImGuiUploadHelper` buffer-ownership audit landed; the timing instrumentation
+  and the measured bottleneck ranking are **not** landed here because they
+  require a working C++23-module build (this sandbox has clang-18 and cannot
+  bootstrap vcpkg) and, for the GPU/Vulkan lifecycle timers plus the measured
+  ranking, a Vulkan-capable host. Neither is available in this environment, and
+  the task explicitly forbids claiming a performance finding without
+  measurement, so the evidence-backed ranking remains open for a build/Vulkan
+  session.
+- Completed audit finding: `Extrinsic.Graphics.ImGuiUploadHelper`
+  (`src/graphics/renderer/Graphics.ImGuiUploadHelper.cpp`) owns exactly one
+  growing host-visible vertex buffer and one growing host-visible index buffer,
+  reused across frames. `BeginFrame()` is a no-op and `UploadFrame(...)` writes
+  every frame's coalesced payload at byte offset `0` (`WriteBuffer(handle, data,
+  bytes, 0u)`), overwriting in place with no per-frame partition, ring offset,
+  or per-buffer fence. This is safe only under an effectively
+  single-frame-in-flight (or otherwise fence-gated) model; with more than one
+  frame in flight a new frame's overwrite can clobber storage an earlier
+  in-flight frame's GPU draw is still reading (the device `BeginFrame` fence
+  gates slot `N mod F`, i.e. frame `N-F`, not frame `N-1`, and the single buffer
+  is shared across all slots). Per the acceptance criterion this is now tracked
+  by a named follow-up rather than fixed in this diagnostic task.
+- Follow-up filed: `GRAPHICS-110` — per-frame/ring ImGui upload buffers for
+  in-flight safety
+  (`tasks/backlog/rendering/GRAPHICS-110-imgui-upload-buffer-in-flight-safety.md`).
+
 ## Goal
 - Build a deterministic frame-pacing investigation loop for the Sandbox EditorUI, identify whether stutter is caused by editor CPU work, ImGui data upload, Vulkan frame lifecycle waits, present pacing, render-graph pass work, or synchronous upload/readback paths, and record scoped follow-up fixes with evidence.
 
@@ -29,7 +56,7 @@ maturity_target: Operational
 - [ ] Add focused, low-overhead timing probes for `Engine::RunFrame` phases that can distinguish editor callback time, ImGui draw-data copy time, render snapshot/extraction time, frame-graph compile time, execute/record/submit time, present time, and maintenance time.
 - [ ] Add Vulkan frame lifecycle timing for `vkWaitForFences`, `vkAcquireNextImageKHR`, queue submit, and `vkQueuePresentKHR`, exposed through existing renderer/runtime diagnostics without lower layers importing runtime/UI.
 - [ ] Add ImGui overlay diagnostics for per-frame copied font-atlas bytes, draw-list bytes, vertex/index counts, command count, CPU flatten/copy time, GPU buffer write bytes, buffer allocation count, and whether font-atlas upload actually queued.
-- [ ] Audit `ImGuiUploadHelper` transient buffer ownership and either prove it is safe for the current frames-in-flight model or file a named follow-up task for per-frame/ring upload buffers.
+- [x] Audit `ImGuiUploadHelper` transient buffer ownership and either prove it is safe for the current frames-in-flight model or file a named follow-up task for per-frame/ring upload buffers. Audit complete (see Status); the single-shared-host-visible-buffer overwrite pattern is not provably in-flight-safe, so `GRAPHICS-110` was filed for per-frame/ring upload buffers.
 - [ ] Add a reproducible local diagnostic mode or test harness that runs the sandbox/editor frame loop for a bounded frame count and emits machine-readable frame timing samples.
 - [ ] Write a short report under `docs/reports/` summarizing the measured bottleneck ranking, ruled-out hypotheses, backend/present-mode conditions, and the follow-up task IDs for fixes.
 - [ ] If the investigation finds a specific bug or missing synchronization contract, open a scoped follow-up task under `tasks/backlog/bugs/`, `tasks/backlog/rendering/`, or `tasks/backlog/ui/` rather than expanding this task into the fix.
@@ -48,7 +75,7 @@ maturity_target: Operational
 ## Acceptance criteria
 - [ ] A user can capture frame-pacing data that separates CPU editor cost from GPU/frame lifecycle stalls.
 - [ ] The investigation reports whether stutter correlates with editor model rebuilds, ImGui copy/upload, frame-slot fence waits, acquire/present stalls, render-graph compile/execute spikes, synchronous upload/readback, or another measured cause.
-- [ ] `ImGuiUploadHelper` in-flight buffer safety is either proven by code/test evidence or tracked by a follow-up task with a concrete owner.
+- [x] `ImGuiUploadHelper` in-flight buffer safety is either proven by code/test evidence or tracked by a follow-up task with a concrete owner. Tracked by `GRAPHICS-110`.
 - [ ] Follow-up implementation tasks exist for every measured fix candidate that should not be completed inside this diagnostic task.
 - [ ] The report does not claim a performance improvement unless it cites before/after measurements and the exact verification commands.
 
