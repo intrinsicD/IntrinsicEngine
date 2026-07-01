@@ -3,6 +3,7 @@ module;
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <functional>
 #include <limits>
 #include <optional>
 #include <span>
@@ -455,7 +456,8 @@ namespace Geometry::Registration
             const KDTree& targetTree,
             ICPVariant effectiveVariant,
             double maxDistSq,
-            const RegistrationParams& params)
+            const RegistrationParams& params,
+            const IterationObserver& observer)
         {
             const bool robustWeightingEnabled = params.RobustKernelKind.has_value();
 
@@ -506,6 +508,14 @@ namespace Geometry::Registration
                 result.FinalRMSE = rmse;
                 result.FinalInlierCount = pairs.size();
 
+                // Optional observability: emit a read-only snapshot of the
+                // current solution. Null observer => a single skipped branch, no
+                // per-point cost (see geometry-pipeline-modularity.md §3.4).
+                if (observer)
+                {
+                    observer(IterationTrace{iter, result.Transform, rmse, pairs.size()});
+                }
+
                 // #5 Convergence check.
                 if (EvaluateConvergence(prevRMSE, rmse, params.ConvergenceThreshold, iter))
                 {
@@ -529,7 +539,8 @@ namespace Geometry::Registration
         std::span<const glm::vec3> sourcePoints,
         std::span<const glm::vec3> targetPoints,
         std::span<const glm::vec3> targetNormals,
-        const RegistrationParams& params)
+        const RegistrationParams& params,
+        const IterationObserver& observer)
     {
         // --- Input validation ---
         if (sourcePoints.size() < 3 || targetPoints.size() < 3)
@@ -572,7 +583,7 @@ namespace Geometry::Registration
         const double maxDistSq = params.MaxCorrespondenceDistance * params.MaxCorrespondenceDistance;
 
         return RunIcpLoop(sourcePoints, targetPoints, targetNormals, targetTree,
-                          effectiveVariant, maxDistSq, params);
+                          effectiveVariant, maxDistSq, params, observer);
     }
 
 } // namespace Geometry::Registration

@@ -2,6 +2,7 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <span>
 #include <vector>
@@ -128,6 +129,40 @@ export namespace Geometry::Registration
     };
 
     // -------------------------------------------------------------------------
+    // Optional iteration observability
+    // -------------------------------------------------------------------------
+    //
+    // See docs/architecture/geometry-pipeline-modularity.md §3.4.
+    //
+    // Read-only snapshot emitted at the end of each ICP iteration. Observing
+    // never mutates solver state, so an observed run and an unobserved run
+    // produce identical results. For rigid registration the cumulative Transform
+    // fully describes "the shape under the current solution" — apply it to the
+    // source (e.g. on the GPU) to visualize convergence with no CPU point work.
+
+    struct IterationTrace
+    {
+        // 0-based ICP iteration index.
+        std::size_t Iteration{0};
+
+        // Cumulative source->target estimate AFTER this iteration's update.
+        glm::dmat4 Transform{1.0};
+
+        // Inlier RMSE evaluated this iteration (equals RMSEHistory[Iteration]).
+        double RMSE{0.0};
+
+        // Number of inlier correspondences used this iteration.
+        std::size_t InlierCount{0};
+    };
+
+    // Optional per-iteration callback. Null (the default) means zero overhead:
+    // it is checked once per iteration, never per point. It is passed separately
+    // from RegistrationParams so the serializable/reproducible config stays a
+    // pure value (a std::function is not serializable). The callback must be
+    // read-only with respect to solver state.
+    using IterationObserver = std::function<void(const IterationTrace&)>;
+
+    // -------------------------------------------------------------------------
     // ICP Alignment
     // -------------------------------------------------------------------------
     //
@@ -136,6 +171,10 @@ export namespace Geometry::Registration
     // For PointToPlane variant, targetNormals must be provided and must have
     // the same size as targetPoints. If targetNormals is empty with PointToPlane,
     // the algorithm falls back to PointToPoint.
+    //
+    // If a non-null observer is supplied, it is invoked once at the end of each
+    // completed iteration with an IterationTrace snapshot. The observer does not
+    // affect the result; a null observer (the default) adds no per-point cost.
     //
     // Returns nullopt if:
     //   - Either point set has fewer than 3 points
@@ -146,6 +185,7 @@ export namespace Geometry::Registration
         std::span<const glm::vec3> sourcePoints,
         std::span<const glm::vec3> targetPoints,
         std::span<const glm::vec3> targetNormals = {},
-        const RegistrationParams& params = {});
+        const RegistrationParams& params = {},
+        const IterationObserver& observer = {});
 
 } // namespace Geometry::Registration
