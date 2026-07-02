@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `RUNTIME-125` — Optional AoS fast lane for static geometry (profile-gated) (tasks/active/RUNTIME-125-aos-static-fast-lane.md)
+- none
 
 ## Theme B — Rendering modernization
 
@@ -19,6 +19,7 @@ the authoritative open/unblocked view.
 - unblocked: `GRAPHICS-114` — Retained ImGui overlay copy/upload path (tasks/backlog/rendering/GRAPHICS-114-retained-imgui-overlay-copy-upload-path.md)
 - unblocked: `GRAPHICS-115` — Object-space normal GPU dilation pass (tasks/backlog/rendering/GRAPHICS-115-object-space-normal-gpu-dilation.md)
 - unblocked: `RUNTIME-129` — Schedule GPU object-space normal bake jobs after import (tasks/backlog/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
+- unblocked: `RUNTIME-139` — Static AoS storage and shader operational path (tasks/backlog/runtime/RUNTIME-139-static-aos-storage-shader-operational.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 

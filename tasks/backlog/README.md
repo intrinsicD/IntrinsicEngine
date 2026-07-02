@@ -68,8 +68,8 @@ contract-first renderer/snapshot/recipe architecture sequence
 [`rendering/README.md`](rendering/README.md) and the retirement log. Current
 open Theme B leaves include the compute/upload cleanup leaves
 (`GRAPHICS-111..114`), object-space normal bake operational follow-ups
-(`GRAPHICS-115`, `RUNTIME-129`), and the remaining profile-gated vertex
-attribute follow-up (`RUNTIME-125`). The runtime GPU readback job/write-back leg
+(`GRAPHICS-115`, `RUNTIME-129`), and the profile-gated vertex attribute
+operational follow-up (`RUNTIME-139`). The runtime GPU readback job/write-back leg
 (`RUNTIME-126`) is retired with the transfer facade/readback ring wired into the
 runtime derived-job graph.
 

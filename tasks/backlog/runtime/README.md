@@ -27,8 +27,11 @@ geometry kind has its own packer with inlined property names and a fixed AoS
 vertex struct, no vertex color channel, and no way to bind an arbitrary property
 as normals/colors. This series fixes that incrementally.
 
-`RUNTIME-125` is active and remains profile-gated: shader/storage work is
-blocked until its benchmark baseline justifies the optional AoS lane.
+`RUNTIME-125` is retired at `CPUContracted`: it added the PR-fast
+SoA-vs-interleaved probe benchmark and planning-only storage/promotion
+contracts without adopting an AoS lane. `RUNTIME-139` owns the optional
+operational AoS storage path, shader variants, promote-on-edit behavior, and
+`gpu;vulkan` parity evidence.
 
 Storage model is fixed by
 [`ADR-0022`](../../../docs/adr/0022-vertex-storage-soa-per-channel-streaming.md):
@@ -113,6 +116,12 @@ these as runtime work when scheduling and review:
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [RUNTIME-125 — Optional AoS fast lane for static geometry](../../done/RUNTIME-125-aos-static-fast-lane.md)
+  (done, 2026-07-02, `CPUContracted`): PR-fast SoA/probe benchmark evidence and
+  planning-only storage-lane/promotion contracts landed without allocating an
+  AoS GPU lane or selecting shader variants. Operational AoS storage/shaders,
+  promote-on-edit behavior, and Vulkan parity remain owned by open follow-up
+  `RUNTIME-139`.
 - [RUNTIME-135 — SpatialDebug closest-face picking via accelerated mesh query](../../done/RUNTIME-135-spatialdebug-closest-face-picking.md)
   (done, 2026-06-28, `CPUContracted`): runtime now has a data-only closest-face
   SpatialDebug overlay consumer that caches the GEOM-039 mesh closest-face

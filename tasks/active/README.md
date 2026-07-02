@@ -11,9 +11,8 @@ Each active task should include:
 
 ## Currently active
 
-- [`RUNTIME-125` — Optional AoS fast lane for static geometry](RUNTIME-125-aos-static-fast-lane.md)
-  — in progress; next verification step is Slice C focused graphics contract
-  coverage plus opt-in `gpu;vulkan` parity smoke for the AoS storage/shader path.
+- No active tasks. Promote from `tasks/SESSION-BRIEF.md` after choosing the next
+  unblocked item.
 
 ## History
 

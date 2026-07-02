@@ -9,6 +9,15 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`RUNTIME-125`](RUNTIME-125-aos-static-fast-lane.md) — Optional AoS fast lane
+for static geometry — retired on 2026-07-02 at maturity `CPUContracted`. The
+slice added the PR-fast SoA/interleaved probe benchmark and the planning-only
+storage-lane plus static-to-dynamic promotion contracts, without changing the
+default ADR-0022 SoA storage model. Operational AoS allocation, shader variants,
+promote-on-edit behavior, and Vulkan parity evidence are split to open follow-up
+`RUNTIME-139`.
+
+Active
 [`METHOD-013`](METHOD-013-progressive-poisson-disk-gpu-backend.md) —
 Progressive Poisson-disk sampling: GPU backend contract slices — retired on
 2026-07-02 at maturity `CPUContracted`. The runtime seam now has backend
