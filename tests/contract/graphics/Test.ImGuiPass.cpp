@@ -225,6 +225,8 @@ TEST(ImGuiPassContract, UploadHelperPacksTwoDrawListsAndPassRecordsPerList)
         ASSERT_FALSE(upload.Overflow);
         ASSERT_EQ(upload.DrawListCount, 2u);
         ASSERT_EQ(upload.DrawLists.size(), 2u);
+        EXPECT_EQ(upload.CommandUploadListBuilds, 2u);
+        EXPECT_EQ(upload.DrawCommandCount, 2u);
         EXPECT_EQ(upload.DrawLists[0].FirstVertex, 0u);
         EXPECT_EQ(upload.DrawLists[0].IndexOffsetBytes, 0u);
         EXPECT_EQ(upload.DrawLists[0].IndexCount, 3u);
@@ -288,6 +290,8 @@ TEST(ImGuiPassContract, UploadHelperPreservesPerCommandTextureBindlessIndices)
     const Graphics::ImGuiUploadResult upload = helper.UploadFrame(*frame);
     ASSERT_TRUE(upload.Uploaded);
     ASSERT_EQ(upload.DrawLists.size(), 1u);
+    EXPECT_EQ(upload.CommandUploadListBuilds, 1u);
+    EXPECT_EQ(upload.DrawCommandCount, 2u);
     ASSERT_EQ(upload.DrawLists[0].Commands.size(), 2u);
     EXPECT_EQ(upload.DrawLists[0].Commands[0].IndexOffset, 0u);
     EXPECT_EQ(upload.DrawLists[0].Commands[0].IndexCount, 3u);
@@ -327,6 +331,45 @@ TEST(ImGuiPassContract, UploadHelperPreservesPerCommandTextureBindlessIndices)
     EXPECT_EQ(secondPush.IndexCount, 3u);
     EXPECT_EQ(secondPush.TextureBindlessIndex, RHI::kInvalidBindlessIndex);
     EXPECT_EQ(secondPush.Flags & Graphics::kImGuiOverlayPushFlagUserTexture, 0u);
+}
+
+TEST(ImGuiPassContract, UploadHelperPartitionsStorageByFrameSlot)
+{
+    Tests::MockDevice device;
+    device.FramesInFlight = 2u;
+    RHI::BufferManager bufferManager{device};
+
+    Graphics::ImGuiOverlaySystem overlay;
+    overlay.Initialize();
+    overlay.SubmitFrame(MakePayloadOverlayFrame());
+    ASSERT_TRUE(overlay.HasOverlayWork());
+
+    const Graphics::ImGuiOverlayFrame* frame = overlay.GetCurrentFrame();
+    ASSERT_NE(frame, nullptr);
+
+    Graphics::ImGuiUploadHelper helper{device, bufferManager};
+    helper.BeginFrame(0u, device.FramesInFlight);
+    const Graphics::ImGuiUploadResult slot0 = helper.UploadFrame(*frame);
+    ASSERT_TRUE(slot0.Uploaded);
+    ASSERT_EQ(slot0.DrawLists.size(), 2u);
+
+    helper.BeginFrame(1u, device.FramesInFlight);
+    const Graphics::ImGuiUploadResult slot1 = helper.UploadFrame(*frame);
+    ASSERT_TRUE(slot1.Uploaded);
+    ASSERT_EQ(slot1.DrawLists.size(), 2u);
+
+    EXPECT_NE(slot0.DrawLists[0].VertexBuffer, slot1.DrawLists[0].VertexBuffer);
+    EXPECT_NE(slot0.DrawLists[0].IndexBuffer, slot1.DrawLists[0].IndexBuffer);
+    EXPECT_EQ(slot0.DrawLists[0].IndexOffsetBytes, 0u);
+    EXPECT_EQ(slot1.DrawLists[0].IndexOffsetBytes, 0u);
+    EXPECT_EQ(helper.GetBufferAllocationCount(), 4u);
+
+    helper.BeginFrame(2u, device.FramesInFlight);
+    const Graphics::ImGuiUploadResult slot0Again = helper.UploadFrame(*frame);
+    ASSERT_TRUE(slot0Again.Uploaded);
+    EXPECT_EQ(slot0Again.DrawLists[0].VertexBuffer, slot0.DrawLists[0].VertexBuffer);
+    EXPECT_EQ(slot0Again.DrawLists[0].IndexBuffer, slot0.DrawLists[0].IndexBuffer);
+    EXPECT_EQ(helper.GetBufferAllocationCount(), 4u);
 }
 
 TEST(ImGuiPassContract, FontAtlasUploadSurvivesOperationalRebuildByteIdentical)

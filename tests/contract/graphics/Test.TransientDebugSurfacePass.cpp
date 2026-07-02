@@ -36,6 +36,8 @@ import Extrinsic.Graphics.Pass.TransientDebug.Surface;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
+import Extrinsic.Graphics.TransientDebugUploadHelper;
+import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.Handles;
@@ -592,6 +594,47 @@ TEST(TransientDebugSurfacePassContract, PerFrameBufferRecyclingDoesNotLeak)
     EXPECT_EQ(stats.TransientDebugUpload.TriangleRecordsRecorded, 1u);
 
     renderer->Shutdown();
+}
+
+TEST(TransientDebugSurfacePassContract, UploadHelperPartitionsStorageByFrameSlot)
+{
+    static const std::array<Graphics::DebugTrianglePacket, 1> kTriangles{{
+        Graphics::DebugTrianglePacket{
+            .A = glm::vec3{0.0f, 0.5f, 0.0f},
+            .B = glm::vec3{-0.5f, -0.5f, 0.0f},
+            .C = glm::vec3{0.5f, -0.5f, 0.0f},
+            .Color = glm::vec4{1.0f},
+            .DepthTested = true,
+        },
+    }};
+
+    MockDevice device;
+    device.FramesInFlight = 2u;
+    RHI::BufferManager bufferManager{device};
+    Graphics::TransientDebugUploadHelper helper{device, bufferManager};
+
+    helper.BeginFrame(0u, device.FramesInFlight);
+    const Graphics::TransientDebugTriangleUploadResult slot0 =
+        helper.UploadTriangles(std::span<const Graphics::DebugTrianglePacket>{
+            kTriangles.data(), kTriangles.size()});
+    ASSERT_TRUE(slot0.Uploaded);
+
+    helper.BeginFrame(1u, device.FramesInFlight);
+    const Graphics::TransientDebugTriangleUploadResult slot1 =
+        helper.UploadTriangles(std::span<const Graphics::DebugTrianglePacket>{
+            kTriangles.data(), kTriangles.size()});
+    ASSERT_TRUE(slot1.Uploaded);
+
+    EXPECT_NE(slot0.VertexBuffer, slot1.VertexBuffer);
+    EXPECT_EQ(helper.GetBufferAllocationCount(), 2u);
+
+    helper.BeginFrame(2u, device.FramesInFlight);
+    const Graphics::TransientDebugTriangleUploadResult slot0Again =
+        helper.UploadTriangles(std::span<const Graphics::DebugTrianglePacket>{
+            kTriangles.data(), kTriangles.size()});
+    ASSERT_TRUE(slot0Again.Uploaded);
+    EXPECT_EQ(slot0Again.VertexBuffer, slot0.VertexBuffer);
+    EXPECT_EQ(helper.GetBufferAllocationCount(), 2u);
 }
 
 // -----------------------------------------------------------------------------

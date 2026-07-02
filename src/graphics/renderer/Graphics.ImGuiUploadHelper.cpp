@@ -145,10 +145,32 @@ namespace Extrinsic::Graphics
 
     ImGuiUploadHelper::~ImGuiUploadHelper() = default;
 
-    void ImGuiUploadHelper::BeginFrame()
+    void ImGuiUploadHelper::EnsureFrameSlots(const std::uint32_t framesInFlight)
     {
-        // Buffers are reused across frames; per-frame state is returned from
-        // `UploadFrame(...)`.
+        const std::uint32_t slotCount = framesInFlight == 0u ? 1u : framesInFlight;
+        if (m_VertexBufferSlots.size() != slotCount)
+        {
+            m_VertexBufferSlots.resize(slotCount);
+        }
+        if (m_IndexBufferSlots.size() != slotCount)
+        {
+            m_IndexBufferSlots.resize(slotCount);
+        }
+        if (m_ActiveSlot >= slotCount)
+        {
+            m_ActiveSlot = 0u;
+        }
+    }
+
+    void ImGuiUploadHelper::BeginFrame(const std::uint32_t frameIndex,
+                                       const std::uint32_t framesInFlight)
+    {
+        EnsureFrameSlots(framesInFlight);
+        const std::uint32_t slotCount =
+            static_cast<std::uint32_t>(m_VertexBufferSlots.empty()
+                ? 1u
+                : m_VertexBufferSlots.size());
+        m_ActiveSlot = slotCount == 0u ? 0u : (frameIndex % slotCount);
     }
 
     ImGuiUploadResult ImGuiUploadHelper::UploadFrame(const ImGuiOverlayFrame& frame)
@@ -164,16 +186,23 @@ namespace Extrinsic::Graphics
 
         std::uint64_t totalVertexCount = 0u;
         std::uint64_t totalIndexCount = 0u;
+        std::vector<std::vector<ImGuiDrawCommandUploadResult>> commandUploads;
+        commandUploads.reserve(frame.DrawLists.size());
         for (const ImGuiOverlayDrawList& drawList : frame.DrawLists)
         {
+            std::vector<ImGuiDrawCommandUploadResult> commands =
+                BuildCommandUploads(drawList);
             if (drawList.Vertices.size() != drawList.VertexCount ||
                 drawList.Indices.size() != drawList.IndexCount ||
-                BuildCommandUploads(drawList).empty())
+                commands.empty())
             {
                 return result;
             }
             totalVertexCount += static_cast<std::uint64_t>(drawList.VertexCount);
             totalIndexCount += static_cast<std::uint64_t>(drawList.IndexCount);
+            result.DrawCommandCount += static_cast<std::uint32_t>(commands.size());
+            ++result.CommandUploadListBuilds;
+            commandUploads.push_back(std::move(commands));
         }
 
         if (totalVertexCount == 0u || totalIndexCount == 0u)
@@ -186,14 +215,22 @@ namespace Extrinsic::Graphics
             return result;
         }
 
-        std::vector<ImGuiOverlayVertex> vertices;
-        vertices.reserve(static_cast<std::size_t>(totalVertexCount));
-        std::vector<std::uint32_t> indices;
-        indices.reserve(static_cast<std::size_t>(totalIndexCount));
+        if (m_VertexBufferSlots.empty() || m_IndexBufferSlots.empty())
+        {
+            EnsureFrameSlots(1u);
+        }
+        UploadBufferSlot& vertexSlot = m_VertexBufferSlots[m_ActiveSlot];
+        UploadBufferSlot& indexSlot = m_IndexBufferSlots[m_ActiveSlot];
+
+        m_VertexScratch.clear();
+        m_VertexScratch.reserve(static_cast<std::size_t>(totalVertexCount));
+        m_IndexScratch.clear();
+        m_IndexScratch.reserve(static_cast<std::size_t>(totalIndexCount));
         result.DrawLists.reserve(frame.DrawLists.size());
 
         std::uint32_t firstVertex = 0u;
         std::uint64_t indexOffsetBytes = 0u;
+        std::size_t drawListIndex = 0u;
         for (const ImGuiOverlayDrawList& drawList : frame.DrawLists)
         {
             ImGuiDrawListUploadResult listResult{};
@@ -201,29 +238,30 @@ namespace Extrinsic::Graphics
             listResult.IndexOffsetBytes = indexOffsetBytes;
             listResult.VertexCount = drawList.VertexCount;
             listResult.IndexCount = drawList.IndexCount;
-            listResult.Commands = BuildCommandUploads(drawList);
+            listResult.Commands = std::move(commandUploads[drawListIndex]);
             if (listResult.Commands.empty())
             {
                 return ImGuiUploadResult{};
             }
 
-            vertices.insert(vertices.end(), drawList.Vertices.begin(), drawList.Vertices.end());
-            indices.insert(indices.end(), drawList.Indices.begin(), drawList.Indices.end());
+            m_VertexScratch.insert(m_VertexScratch.end(), drawList.Vertices.begin(), drawList.Vertices.end());
+            m_IndexScratch.insert(m_IndexScratch.end(), drawList.Indices.begin(), drawList.Indices.end());
             result.DrawLists.push_back(listResult);
 
             firstVertex += drawList.VertexCount;
             indexOffsetBytes += static_cast<std::uint64_t>(drawList.IndexCount) *
                                 sizeof(std::uint32_t);
+            ++drawListIndex;
         }
 
         const LaneUploadOutput vertexUpload = UploadBytes(
             *m_Device,
             *m_BufferManager,
-            m_VertexBuffer,
-            m_VertexBufferCapacityBytes,
+            vertexSlot.Buffer,
+            vertexSlot.CapacityBytes,
             m_BufferAllocationCount,
-            vertices.data(),
-            static_cast<std::uint64_t>(vertices.size() * sizeof(ImGuiOverlayVertex)),
+            m_VertexScratch.data(),
+            static_cast<std::uint64_t>(m_VertexScratch.size() * sizeof(ImGuiOverlayVertex)),
             kInitialVertexCount * sizeof(ImGuiOverlayVertex),
             kMaxVertexCount * sizeof(ImGuiOverlayVertex),
             RHI::BufferUsage::Vertex | RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
@@ -237,11 +275,11 @@ namespace Extrinsic::Graphics
         const LaneUploadOutput indexUpload = UploadBytes(
             *m_Device,
             *m_BufferManager,
-            m_IndexBuffer,
-            m_IndexBufferCapacityBytes,
+            indexSlot.Buffer,
+            indexSlot.CapacityBytes,
             m_BufferAllocationCount,
-            indices.data(),
-            static_cast<std::uint64_t>(indices.size() * sizeof(std::uint32_t)),
+            m_IndexScratch.data(),
+            static_cast<std::uint64_t>(m_IndexScratch.size() * sizeof(std::uint32_t)),
             kInitialIndexCount * sizeof(std::uint32_t),
             kMaxIndexCount * sizeof(std::uint32_t),
             RHI::BufferUsage::Index | RHI::BufferUsage::TransferDst,

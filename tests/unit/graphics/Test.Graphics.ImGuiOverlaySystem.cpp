@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string>
+#include <vector>
 
 import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.RHI.Bindless;
@@ -89,6 +91,62 @@ TEST(GraphicsImGuiOverlaySystem, DisabledOrInvalidFramesHaveNoOverlayWork)
     overlay.ClearFrame();
     EXPECT_FALSE(overlay.HasOverlayWork());
     EXPECT_EQ(overlay.GetDiagnostics().DrawCommandCount, 0u);
+}
+
+TEST(GraphicsImGuiOverlaySystem, UnchangedFontAtlasPayloadIsRetained)
+{
+    Graphics::ImGuiOverlaySystem overlay;
+    overlay.Initialize();
+
+    Graphics::ImGuiOverlayFrame first{};
+    first.Enabled = true;
+    first.DisplayWidth = 64u;
+    first.DisplayHeight = 64u;
+    first.FontAtlas = Graphics::ImGuiOverlayFontAtlas{
+        .Valid = true,
+        .Width = 2u,
+        .Height = 2u,
+        .BytesPerPixel = 1u,
+        .UseColors = false,
+        .Dirty = true,
+        .Revision = 1u,
+        .Pixels = {
+            std::byte{0x10},
+            std::byte{0x20},
+            std::byte{0x30},
+            std::byte{0x40},
+        },
+    };
+    const std::vector<std::byte> expectedPixels = first.FontAtlas.Pixels;
+    overlay.SubmitFrame(std::move(first));
+    EXPECT_TRUE(overlay.GetDiagnostics().FontAtlasAvailable);
+    EXPECT_FALSE(overlay.GetDiagnostics().FontAtlasRetained);
+
+    Graphics::ImGuiOverlayFrame second{};
+    second.Enabled = true;
+    second.DisplayWidth = 64u;
+    second.DisplayHeight = 64u;
+    second.FontAtlas = Graphics::ImGuiOverlayFontAtlas{
+        .Valid = true,
+        .Width = 2u,
+        .Height = 2u,
+        .BytesPerPixel = 1u,
+        .UseColors = false,
+        .Dirty = false,
+        .Revision = 1u,
+    };
+    overlay.SubmitFrame(std::move(second));
+
+    const Graphics::ImGuiOverlayDiagnostics diagnostics =
+        overlay.GetDiagnostics();
+    EXPECT_TRUE(diagnostics.FontAtlasAvailable);
+    EXPECT_TRUE(diagnostics.FontAtlasRetained);
+    EXPECT_EQ(diagnostics.FontAtlasRetainCount, 1u);
+    EXPECT_EQ(diagnostics.FontAtlasRevision, 1u);
+
+    const Graphics::ImGuiOverlayFrame* retained = overlay.GetCurrentFrame();
+    ASSERT_NE(retained, nullptr);
+    EXPECT_EQ(retained->FontAtlas.Pixels, expectedPixels);
 }
 
 TEST(GraphicsImGuiOverlaySystem, DiagnosticsFormattingIsDeterministic)

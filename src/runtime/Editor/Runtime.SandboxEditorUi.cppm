@@ -2045,6 +2045,37 @@ export namespace Extrinsic::Runtime
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
+    struct SandboxEditorModelBuildRequest
+    {
+        bool Hierarchy{true};
+        bool Inspector{true};
+        bool Selection{true};
+        bool Document{true};
+        bool SceneFile{true};
+        bool FileImport{true};
+        bool AssetImportQueue{true};
+        bool RenderGraph{true};
+        bool RenderRecipe{true};
+        bool CameraRender{true};
+        bool Visualization{true};
+    };
+
+    struct SandboxEditorModelBuildStats
+    {
+        std::uint32_t HierarchyModelBuilds{0u};
+        std::uint32_t InspectorModelBuilds{0u};
+        std::uint32_t SelectionModelBuilds{0u};
+        std::uint32_t PropertyCatalogModelBuilds{0u};
+        std::uint32_t VertexChannelTargetBuilds{0u};
+        std::uint32_t ProgressiveModelBuilds{0u};
+        std::uint32_t BoundStateModelBuilds{0u};
+        std::uint32_t UvDiagnosticsModelBuilds{0u};
+        std::uint32_t TextureBakeModelBuilds{0u};
+        std::uint32_t VisualizationModelBuilds{0u};
+        std::uint32_t DomainWindowModelBuilds{0u};
+        std::uint32_t DomainWindowModelCacheHits{0u};
+    };
+
     struct SandboxEditorPanelFrame
     {
         std::vector<SandboxEditorEntityRow> Hierarchy{};
@@ -2058,6 +2089,7 @@ export namespace Extrinsic::Runtime
         SandboxEditorRenderRecipeEditorModel RenderRecipe{};
         SandboxEditorCameraRenderModel      CameraRender{};
         SandboxEditorVisualizationModel     Visualization{};
+        SandboxEditorModelBuildStats        ModelBuildStats{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
@@ -2112,6 +2144,7 @@ export namespace Extrinsic::Runtime
         SandboxEditorRenderRecipeEditorState* RenderRecipeEditorState{nullptr};
         const RuntimeRenderRecipeState* RenderRecipeRuntimeState{nullptr};
         const RuntimeEngineConfigControlState* EngineConfigControlState{nullptr};
+        SandboxEditorModelBuildStats* ModelBuildStats{nullptr};
         std::function<Graphics::RenderRecipeConfigLoadResult(
             const std::string&,
             const std::string&)>
@@ -2368,6 +2401,9 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] SandboxEditorPanelFrame BuildSandboxEditorPanelFrame(
         const SandboxEditorContext& context);
+    [[nodiscard]] SandboxEditorPanelFrame BuildSandboxEditorPanelFrame(
+        const SandboxEditorContext& context,
+        const SandboxEditorModelBuildRequest& request);
 
     [[nodiscard]] SandboxEditorDomainWindowModel BuildSandboxEditorDomainWindowModel(
         const SandboxEditorContext& context,

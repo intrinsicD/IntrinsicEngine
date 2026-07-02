@@ -61,11 +61,36 @@ namespace Extrinsic::Graphics
 
     TransientDebugUploadHelper::~TransientDebugUploadHelper() = default;
 
-    void TransientDebugUploadHelper::BeginFrame()
+    void TransientDebugUploadHelper::EnsureFrameSlots(const std::uint32_t framesInFlight)
     {
-        // Host-visible vertex buffers are reused across frames; per-
-        // frame state is the upload result returned from each
-        // `Upload*(...)` call (no allocator counters to clear here).
+        const std::uint32_t slotCount = framesInFlight == 0u ? 1u : framesInFlight;
+        if (m_TriangleVertexBufferSlots.size() != slotCount)
+        {
+            m_TriangleVertexBufferSlots.resize(slotCount);
+        }
+        if (m_LineVertexBufferSlots.size() != slotCount)
+        {
+            m_LineVertexBufferSlots.resize(slotCount);
+        }
+        if (m_PointVertexBufferSlots.size() != slotCount)
+        {
+            m_PointVertexBufferSlots.resize(slotCount);
+        }
+        if (m_ActiveSlot >= slotCount)
+        {
+            m_ActiveSlot = 0u;
+        }
+    }
+
+    void TransientDebugUploadHelper::BeginFrame(const std::uint32_t frameIndex,
+                                                const std::uint32_t framesInFlight)
+    {
+        EnsureFrameSlots(framesInFlight);
+        const std::uint32_t slotCount =
+            static_cast<std::uint32_t>(m_TriangleVertexBufferSlots.empty()
+                ? 1u
+                : m_TriangleVertexBufferSlots.size());
+        m_ActiveSlot = slotCount == 0u ? 0u : (frameIndex % slotCount);
     }
 
     namespace
@@ -174,6 +199,10 @@ namespace Extrinsic::Graphics
         {
             return result;
         }
+        if (m_TriangleVertexBufferSlots.empty())
+        {
+            EnsureFrameSlots(1u);
+        }
 
         const std::uint64_t requestedVertexCount = static_cast<std::uint64_t>(triangles.size()) * 3u;
         std::vector<PackedDebugVertex> staging(static_cast<std::size_t>(requestedVertexCount));
@@ -192,11 +221,12 @@ namespace Extrinsic::Graphics
             }
         }
 
+        UploadBufferSlot& slot = m_TriangleVertexBufferSlots[m_ActiveSlot];
         const LaneUploadOutput laneOutput = UploadPackedVertices(
             *m_Device,
             *m_BufferManager,
-            m_TriangleVertexBuffer,
-            m_TriangleVertexBufferCapacityBytes,
+            slot.Buffer,
+            slot.CapacityBytes,
             m_BufferAllocationCount,
             std::span<const PackedDebugVertex>{staging.data(), staging.size()},
             kInitialTriangleVertexCount,
@@ -229,6 +259,10 @@ namespace Extrinsic::Graphics
         {
             return result;
         }
+        if (m_LineVertexBufferSlots.empty())
+        {
+            EnsureFrameSlots(1u);
+        }
 
         // Two vertices per packet (Start, End). The pass records
         // `Draw(2, 1, 0, 0)` per packet with `FirstVertex = packetIndex
@@ -251,11 +285,12 @@ namespace Extrinsic::Graphics
             }
         }
 
+        UploadBufferSlot& slot = m_LineVertexBufferSlots[m_ActiveSlot];
         const LaneUploadOutput laneOutput = UploadPackedVertices(
             *m_Device,
             *m_BufferManager,
-            m_LineVertexBuffer,
-            m_LineVertexBufferCapacityBytes,
+            slot.Buffer,
+            slot.CapacityBytes,
             m_BufferAllocationCount,
             std::span<const PackedDebugVertex>{staging.data(), staging.size()},
             kInitialLineVertexCount,
@@ -288,6 +323,10 @@ namespace Extrinsic::Graphics
         {
             return result;
         }
+        if (m_PointVertexBufferSlots.empty())
+        {
+            EnsureFrameSlots(1u);
+        }
 
         // One vertex per packet. The pass records `Draw(1, 1, 0, 0)`
         // per packet with `FirstVertex = packetIndex` carried in the
@@ -305,11 +344,12 @@ namespace Extrinsic::Graphics
             vertex.PackedColor = packedColor;
         }
 
+        UploadBufferSlot& slot = m_PointVertexBufferSlots[m_ActiveSlot];
         const LaneUploadOutput laneOutput = UploadPackedVertices(
             *m_Device,
             *m_BufferManager,
-            m_PointVertexBuffer,
-            m_PointVertexBufferCapacityBytes,
+            slot.Buffer,
+            slot.CapacityBytes,
             m_BufferAllocationCount,
             std::span<const PackedDebugVertex>{staging.data(), staging.size()},
             kInitialPointVertexCount,

@@ -2670,6 +2670,51 @@ TEST(RendererFrameLifecycle, EntityIdPickingPipelineSurvivesOperationalRebuild)
     renderer->Shutdown();
 }
 
+TEST(RendererFrameLifecycle, EntityIdOutlinePipelineUsesSingleTargetShape)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{327u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::PipelineHandle initialPipeline =
+        renderer->GetSelectionEntityIdOutlinePipeline();
+    EXPECT_TRUE(initialPipeline.IsValid());
+
+    const Extrinsic::RHI::PipelineDesc initialDesc =
+        renderer->GetSelectionEntityIdOutlinePipelineDesc();
+    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
+        "shaders/selection/entity_id.vert.spv"))
+        << initialDesc.VertexShaderPath;
+    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
+        "shaders/selection/entity_id_outline.frag.spv"))
+        << initialDesc.FragmentShaderPath;
+    EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
+    EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
+    EXPECT_EQ(initialDesc.Rasterizer.Winding, kVulkanCameraTriangleFrontFace);
+    EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
+    EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
+    EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);
+    EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
+    EXPECT_EQ(initialDesc.ColorTargetCount, 1u);
+    EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::R32_UINT);
+    EXPECT_EQ(initialDesc.ColorTargetFormats[1], Extrinsic::RHI::Format::Undefined);
+    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
+    EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
+
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
+        renderer->GetSelectionEntityIdOutlinePipeline();
+    EXPECT_TRUE(rebuiltPipeline.IsValid());
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
+        renderer->GetSelectionEntityIdOutlinePipelineDesc();
+    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
+
+    renderer->Shutdown();
+}
+
 // ---------------------------------------------------------------------------
 // GRAPHICS-074 Slice B — default-recipe Face / Edge / Point selection ID
 // pipeline lease + republish. Each test mirrors the EntityId pipeline check:
@@ -3885,6 +3930,11 @@ TEST(RendererFrameLifecycle, SelectionOutlineBindsEntityIdToDedicatedSampledSlot
     EXPECT_EQ(CountCommandPass(stats, "PickingPass"), 1u)
         << "Outline-only selected frames need the EntityId target but must not "
            "record the face/edge/point primitive-picking subpasses.";
+    EXPECT_EQ(stats.SelectionOutlineEntityIdPassCount, 1u)
+        << "Outline-only selected frames should record exactly the one-target "
+           "EntityId producer.";
+    EXPECT_EQ(stats.SelectionPrimitiveIdPassCount, 0u)
+        << "Primitive ID refinement belongs only to pending click-pick frames.";
     EXPECT_EQ(stats.PickingReadbackCopyCount, 0u)
         << "Selected/hovered outline frames must not enqueue a pick readback "
            "unless a click-pick request is pending.";
@@ -3898,6 +3948,8 @@ TEST(RendererFrameLifecycle, SelectionOutlineBindsEntityIdToDedicatedSampledSlot
         FindCreatedTextureByDebugName(device, "EntityId");
     ASSERT_TRUE(entityId.IsValid())
         << "Selection outline must have a concrete EntityId texture to sample.";
+    EXPECT_FALSE(FindCreatedTextureByDebugName(device, "PrimitiveId").IsValid())
+        << "Outline-only selected frames must not allocate a PrimitiveId target.";
 
     Extrinsic::RHI::TextureHandle lastDefaultSlotBinding{};
     Extrinsic::RHI::TextureHandle lastSelectionOutlineSlotBinding{};
@@ -4193,6 +4245,10 @@ TEST(RendererFrameLifecycle, PickingReadbackCopyRecordedWhenPickPending)
     EXPECT_EQ(CountCommandPass(stats, "PickingPass"), 4u)
         << "Pending click-pick frames must still record entity, face, edge, "
            "and point ID subpasses before the readback copy.";
+    EXPECT_EQ(stats.SelectionOutlineEntityIdPassCount, 0u);
+    EXPECT_EQ(stats.SelectionPrimitiveIdPassCount, 1u)
+        << "Pending click-pick frames should expose one primitive-ID work "
+           "diagnostic after the face/edge/point subpasses record.";
 
     EXPECT_EQ(stats.PickingReadbackCopyCount, 1u)
         << "Picking-readback copy pair must record exactly once per operational "

@@ -50,7 +50,9 @@ retired under the runtime backlog as `RUNTIME-135`.
   domain-UI review: it separates property exploration, appearance/rendering
   controls, texture baking, and method execution into user-intent windows. Its
   remaining slices are gated on `RUNTIME-138` so they build on visibility-gated
-  cached selected-entity models.
+  cached selected-entity models. `RUNTIME-138` has landed the visibility-gated
+  model-construction slice; UI-031 remains blocked on the broader async
+  selected-analysis cache/job slices.
 - UI-001 is retired as part of **Theme A — Working sandbox app path** and depends on
   `RUNTIME-090` + `GRAPHICS-079` for ImGui frame production/presentation plus
   runtime selection/geometry-residency tasks for live content. RUNTIME-095 closes

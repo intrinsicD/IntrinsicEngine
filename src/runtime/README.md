@@ -66,6 +66,25 @@ closed until toggled from the menu. The open/closed bits live in the attached
 `SandboxEditorUi` instance and do not change panel models, command routing, or
 runtime ownership.
 
+`RUNTIME-138` makes the first selected-entity responsiveness slice
+visibility-gated: the attached `SandboxEditorUi` derives a
+`SandboxEditorModelBuildRequest` from currently open panel windows, so closed
+Scene Hierarchy, Inspector, Selection Details, and Geometry Visualization panels
+skip their selected-entity model sections. Cheap document/import/menu/status
+models are still built so command/status continuity is preserved. Open domain
+windows build their `SandboxEditorDomainWindowModel` only after `ImGui::Begin()`
+confirms the window is visible, and all sections for the same domain share one
+per-frame domain-window model cache. `SandboxEditorPanelFrame::ModelBuildStats`
+reports per-frame model-build and cache-hit counters for deterministic tests and
+diagnostics. The broader generation-keyed async selected-analysis cache/job
+pipeline remains owned by the open `RUNTIME-138` slices.
+
+`GRAPHICS-114` updates the runtime ImGui producer side so `ImGuiAdapter` keeps a
+font-atlas cache and revision. `EndFrame()` copies atlas bytes into
+`ImGuiOverlayFrame` only when the atlas payload changes; unchanged frames submit
+metadata-only atlas records for the graphics overlay system to retain. Adapter
+diagnostics report atlas copy/reuse counts and the last copied byte count.
+
 ### Render Artifact Publication
 
 `RUNTIME-127` makes renderer outputs observable as runtime artifacts before any

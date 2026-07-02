@@ -1792,10 +1792,10 @@ TEST(FrameRecipeContract, SelectionOutlineRequiresSelectionIdDepthPrepass)
     EXPECT_EQ(std::ranges::find(compiled->BufferNames, "Picking.Readback"), compiled->BufferNames.end());
 }
 
-// BUG-018 — hierarchy selection enables SelectionOutline without a pending
-// mouse pick. The recipe must still run the selection-ID producer so
-// SelectionOutlinePass has a written EntityId texture, while continuing to
-// drop the host readback buffer and TransferSrc-only texture usage.
+// GRAPHICS-113 — hierarchy selection enables SelectionOutline without a
+// pending mouse pick. The recipe must still run the selection-ID producer so
+// SelectionOutlinePass has a written EntityId texture, while dropping
+// PrimitiveId, the host readback buffer, and TransferSrc-only texture usage.
 TEST(FrameRecipeContract, SelectionOutlineWithoutPendingPickProducesIdsWithoutReadback)
 {
     FrameRecipeFeatures features{};
@@ -1808,7 +1808,7 @@ TEST(FrameRecipeContract, SelectionOutlineWithoutPendingPickProducesIdsWithoutRe
     ASSERT_NE(picking, nullptr);
     EXPECT_TRUE(picking->Enabled);
     EXPECT_TRUE(Contains(picking->Writes, "EntityId"));
-    EXPECT_TRUE(Contains(picking->Writes, "PrimitiveId"));
+    EXPECT_FALSE(Contains(picking->Writes, "PrimitiveId"));
     EXPECT_FALSE(Contains(picking->Writes, "Picking.Readback"));
 
     const auto* outline = FindPass(description, FrameRecipePassKind::SelectionOutline);
@@ -1818,7 +1818,7 @@ TEST(FrameRecipeContract, SelectionOutlineWithoutPendingPickProducesIdsWithoutRe
     EXPECT_TRUE(Contains(outline->Writes, "FrameRecipe.PresentSource"));
 
     EXPECT_TRUE(HasEnabledResource(description, FrameRecipeResourceKind::EntityId));
-    EXPECT_TRUE(HasEnabledResource(description, FrameRecipeResourceKind::PrimitiveId));
+    EXPECT_FALSE(HasEnabledResource(description, FrameRecipeResourceKind::PrimitiveId));
     EXPECT_FALSE(HasEnabledResource(description, FrameRecipeResourceKind::PickingReadback));
 
     RenderGraph graph;
@@ -1836,21 +1836,34 @@ TEST(FrameRecipeContract, SelectionOutlineWithoutPendingPickProducesIdsWithoutRe
             << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
     }
     EXPECT_NE(std::ranges::find(compiled->TextureNames, "EntityId"), compiled->TextureNames.end());
-    EXPECT_NE(std::ranges::find(compiled->TextureNames, "PrimitiveId"), compiled->TextureNames.end());
+    EXPECT_EQ(std::ranges::find(compiled->TextureNames, "PrimitiveId"), compiled->TextureNames.end());
     EXPECT_EQ(std::ranges::find(compiled->TextureNames, "SelectionOutline"), compiled->TextureNames.end());
     EXPECT_EQ(std::ranges::find(compiled->BufferNames, "Picking.Readback"), compiled->BufferNames.end());
     ExpectPassBefore(*compiled, "PickingPass", "SelectionOutlinePass");
 
     const TextureResourceDesc* entityId = TextureDescByName(graph, *compiled, "EntityId");
-    const TextureResourceDesc* primitiveId = TextureDescByName(graph, *compiled, "PrimitiveId");
     ASSERT_NE(entityId, nullptr);
-    ASSERT_NE(primitiveId, nullptr);
     EXPECT_TRUE(HasTextureUsage(entityId->Desc.Usage, RHI::TextureUsage::ColorTarget));
     EXPECT_TRUE(HasTextureUsage(entityId->Desc.Usage, RHI::TextureUsage::Sampled));
     EXPECT_FALSE(HasTextureUsage(entityId->Desc.Usage, RHI::TextureUsage::TransferSrc));
-    EXPECT_TRUE(HasTextureUsage(primitiveId->Desc.Usage, RHI::TextureUsage::ColorTarget));
-    EXPECT_TRUE(HasTextureUsage(primitiveId->Desc.Usage, RHI::TextureUsage::Sampled));
-    EXPECT_FALSE(HasTextureUsage(primitiveId->Desc.Usage, RHI::TextureUsage::TransferSrc));
+
+    const std::uint32_t pickingIndex = PassIndexByName(*compiled, "PickingPass");
+    std::size_t colorAttachments = 0u;
+    for (const CompiledRenderPassAttachment& attachment : compiled->RenderPassAttachments)
+    {
+        if (attachment.PassIndex != pickingIndex || attachment.IsDepthAttachment)
+        {
+            continue;
+        }
+        ++colorAttachments;
+        EXPECT_EQ(attachment.Format, RHI::Format::R32_UINT);
+        EXPECT_EQ(attachment.ClearR, 0.0f);
+        EXPECT_EQ(attachment.ClearG, 0.0f);
+        EXPECT_EQ(attachment.ClearB, 0.0f);
+        EXPECT_EQ(attachment.ClearA, 0.0f);
+    }
+    EXPECT_EQ(colorAttachments, 1u)
+        << "Outline-only PickingPass must declare exactly the EntityId color target.";
 
     const RenderGraphValidationResult validation = ValidateRecipeCompiledGraph(description, *compiled);
     EXPECT_FALSE(validation.HasErrors())

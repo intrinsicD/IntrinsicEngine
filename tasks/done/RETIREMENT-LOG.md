@@ -9,6 +9,17 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`GRAPHICS-110`](GRAPHICS-110-imgui-upload-buffer-in-flight-safety.md) —
+Per-frame/ring ImGui upload buffers for in-flight safety — retired on
+2026-07-02 at maturity `Operational`. The ImGui, transient-debug, and
+visualization-overlay upload helpers now partition host-visible upload storage
+by frame-in-flight slot so a new frame cannot overwrite ranges still consumed
+by an older frame. CPU contract tests cover deterministic multi-slot behavior,
+and targeted `gpu;vulkan` ImGui/overlay/sandbox smokes passed on the
+Vulkan-capable host. Retained overlay copy/upload reduction remains owned by
+open follow-up `GRAPHICS-114`.
+
+Backlog
 [`LEGACY-012`](LEGACY-012-migrate-legacy-consumer-tests.md) — Migrate legacy
 consumer tests to promoted coverage — retired on 2026-07-01 at maturity
 `Retired`. The remaining bare legacy test consumers were removed from the

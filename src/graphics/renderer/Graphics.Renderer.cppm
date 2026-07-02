@@ -252,6 +252,16 @@ namespace Extrinsic::Graphics
         // `BeginFrame()` drain + `SelectionSystem::PublishPickResult` /
         // `PublishNoHit` routing.
         std::uint32_t PickingReadbackCopyCount = 0;
+        // GRAPHICS-113 — count of frames in which the default-recipe
+        // `PickingPass` route recorded the one-target EntityId producer for
+        // selection outline without a pending click pick. This distinguishes
+        // selected/hovered outline ID work from full primitive-picking work.
+        std::uint32_t SelectionOutlineEntityIdPassCount = 0;
+        // GRAPHICS-113 — count of frames in which pending click-picking
+        // recorded the primitive ID refinement subpasses (face/edge/point).
+        // A successful pending-pick route increments this once per frame after
+        // the three primitive subpasses are recorded under `PickingPass`.
+        std::uint32_t SelectionPrimitiveIdPassCount = 0;
         // GRAPHICS-075 Slice E.2 — count of frames in which the default
         // recipe's `PostProcessHistogramPass` executor branch recorded the
         // histogram-readback `CopyBuffer(PostProcess.Histogram →
@@ -541,6 +551,11 @@ namespace Extrinsic::Graphics
         // `Picking.Readback` drain.
         [[nodiscard]] virtual RHI::PipelineHandle GetSelectionEntityIdPipeline() const noexcept = 0;
         [[nodiscard]] virtual RHI::PipelineDesc GetSelectionEntityIdPipelineDesc() const noexcept = 0;
+        // GRAPHICS-113 — one-target EntityId variant used by outline-only
+        // frames. Pending click-picking keeps using the two-target descriptor
+        // above so primitive refinement and readback still write `PrimitiveId`.
+        [[nodiscard]] virtual RHI::PipelineHandle GetSelectionEntityIdOutlinePipeline() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineDesc GetSelectionEntityIdOutlinePipelineDesc() const noexcept = 0;
 
         // GRAPHICS-074 (Slice B) — accessors for the default-recipe Face /
         // Edge / Point selection ID pipelines. Each pipeline mirrors the

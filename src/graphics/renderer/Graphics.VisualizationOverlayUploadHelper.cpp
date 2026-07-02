@@ -100,11 +100,32 @@ namespace Extrinsic::Graphics
 
     VisualizationOverlayUploadHelper::~VisualizationOverlayUploadHelper() = default;
 
-    void VisualizationOverlayUploadHelper::BeginFrame()
+    void VisualizationOverlayUploadHelper::EnsureFrameSlots(const std::uint32_t framesInFlight)
     {
-        // Host-visible vertex buffers are reused across frames; per-
-        // frame state is the upload result returned from each
-        // `Upload*(...)` call (no allocator counters to clear here).
+        const std::uint32_t slotCount = framesInFlight == 0u ? 1u : framesInFlight;
+        if (m_VectorFieldVertexBufferSlots.size() != slotCount)
+        {
+            m_VectorFieldVertexBufferSlots.resize(slotCount);
+        }
+        if (m_IsolineVertexBufferSlots.size() != slotCount)
+        {
+            m_IsolineVertexBufferSlots.resize(slotCount);
+        }
+        if (m_ActiveSlot >= slotCount)
+        {
+            m_ActiveSlot = 0u;
+        }
+    }
+
+    void VisualizationOverlayUploadHelper::BeginFrame(const std::uint32_t frameIndex,
+                                                      const std::uint32_t framesInFlight)
+    {
+        EnsureFrameSlots(framesInFlight);
+        const std::uint32_t slotCount =
+            static_cast<std::uint32_t>(m_VectorFieldVertexBufferSlots.empty()
+                ? 1u
+                : m_VectorFieldVertexBufferSlots.size());
+        m_ActiveSlot = slotCount == 0u ? 0u : (frameIndex % slotCount);
     }
 
     namespace
@@ -215,6 +236,10 @@ namespace Extrinsic::Graphics
         {
             return result;
         }
+        if (m_VectorFieldVertexBufferSlots.empty())
+        {
+            EnsureFrameSlots(1u);
+        }
 
         // Two vertices per glyph (anchor + tip). Per-packet vertex
         // count is `2 * ElementCount`; the helper packs all packets'
@@ -279,11 +304,12 @@ namespace Extrinsic::Graphics
             }
         }
 
+        UploadBufferSlot& slot = m_VectorFieldVertexBufferSlots[m_ActiveSlot];
         const LaneUploadOutput laneOutput = UploadPackedVertices(
             *m_Device,
             *m_BufferManager,
-            m_VectorFieldVertexBuffer,
-            m_VectorFieldVertexBufferCapacityBytes,
+            slot.Buffer,
+            slot.CapacityBytes,
             m_BufferAllocationCount,
             std::span<const PackedOverlayVertex>{staging.data(), staging.size()},
             kInitialVectorFieldVertexCount,
@@ -315,6 +341,10 @@ namespace Extrinsic::Graphics
         if (isolines.empty() || !m_Device->IsOperational())
         {
             return result;
+        }
+        if (m_IsolineVertexBufferSlots.empty())
+        {
+            EnsureFrameSlots(1u);
         }
 
         // CPU/null contract: each iso value contributes one deterministic
@@ -374,11 +404,12 @@ namespace Extrinsic::Graphics
             }
         }
 
+        UploadBufferSlot& slot = m_IsolineVertexBufferSlots[m_ActiveSlot];
         const LaneUploadOutput laneOutput = UploadPackedVertices(
             *m_Device,
             *m_BufferManager,
-            m_IsolineVertexBuffer,
-            m_IsolineVertexBufferCapacityBytes,
+            slot.Buffer,
+            slot.CapacityBytes,
             m_BufferAllocationCount,
             std::span<const PackedOverlayVertex>{staging.data(), staging.size()},
             kInitialIsolineVertexCount,

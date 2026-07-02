@@ -35,6 +35,10 @@ export namespace Extrinsic::Runtime
         std::uint32_t EditorCallbackInvocations{0u}; // editor hook invocations (cumulative)
         std::uint32_t DisplayWidth{0u};              // reported overlay-frame pixel width
         std::uint32_t DisplayHeight{0u};             // reported overlay-frame pixel height
+        std::uint32_t FontAtlasCopyCount{0u};        // CPU atlas payload copies into overlay frames
+        std::uint32_t FontAtlasReuseCount{0u};       // frames that reused the cached atlas payload
+        std::uint64_t LastFontAtlasByteCount{0u};
+        bool          LastFrameFontAtlasCopied{false};
     };
 
     // Runtime-side Dear ImGui platform/renderer adapter (RUNTIME-090, the
@@ -109,6 +113,8 @@ export namespace Extrinsic::Runtime
         std::function<void()>         m_EditorCallback{};
         ImGuiAdapterDiagnostics       m_Diagnostics{};
         std::string                   m_ClipboardScratch{}; // backing store for ImGui clipboard reads
+        Graphics::ImGuiOverlayFontAtlas m_FontAtlasCache{};
+        std::uint64_t                 m_FontAtlasRevision{0u};
         bool                          m_FrameStarted{false};
     };
 }

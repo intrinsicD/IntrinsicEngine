@@ -4,6 +4,7 @@ module;
 #include <memory>
 #include <optional>
 #include <span>
+#include <vector>
 
 export module Extrinsic.Graphics.VisualizationOverlayUploadHelper;
 
@@ -113,7 +114,8 @@ export namespace Extrinsic::Graphics
         IVisualizationOverlayUploadHelper(const IVisualizationOverlayUploadHelper&)            = delete;
         IVisualizationOverlayUploadHelper& operator=(const IVisualizationOverlayUploadHelper&) = delete;
 
-        virtual void BeginFrame() = 0;
+        virtual void BeginFrame(std::uint32_t frameIndex,
+                                std::uint32_t framesInFlight) = 0;
 
         [[nodiscard]] virtual VisualizationVectorFieldUploadResult UploadVectorFields(
             std::span<const VectorFieldOverlayPacket> vectorFields) = 0;
@@ -152,13 +154,11 @@ export namespace Extrinsic::Graphics
     // GRAPHICS-078E validates those placeholders with opt-in Vulkan
     // pixel-readback; actual source-BDA expansion remains future work.
     //
-    // Buffer recycling: a single growing buffer is reused across
-    // frames per lane. `GetBufferAllocationCount()` returns the
+    // Buffer recycling: one growing buffer is reused per lane and per
+    // frame-in-flight slot. `GetBufferAllocationCount()` returns the
     // cumulative number of underlying `BufferManager::Create(...)`
-    // calls across all lanes. The
-    // `PerFrameBufferRecyclingDoesNotLeakVectorField` contract test
-    // pins this to the post-frame-1 baseline across N frames with
-    // constant payload (no per-frame leak).
+    // calls across all lanes/slots. Recycling contract tests pin this after
+    // slot warm-up across N frames with constant payload.
     // Lifetime contract: constructed from `RHI::IDevice& + RHI::BufferManager&`;
     // the device and manager pointers are non-null for the helper's lifetime
     // (the renderer owns both and resets the helper before the manager in
@@ -170,7 +170,8 @@ export namespace Extrinsic::Graphics
         VisualizationOverlayUploadHelper(RHI::IDevice& device, RHI::BufferManager& bufferManager);
         ~VisualizationOverlayUploadHelper() override;
 
-        void BeginFrame() override;
+        void BeginFrame(std::uint32_t frameIndex,
+                        std::uint32_t framesInFlight) override;
 
         [[nodiscard]] VisualizationVectorFieldUploadResult UploadVectorFields(
             std::span<const VectorFieldOverlayPacket> vectorFields) override;
@@ -187,17 +188,24 @@ export namespace Extrinsic::Graphics
         RHI::IDevice*       m_Device{nullptr};
         RHI::BufferManager* m_BufferManager{nullptr};
 
-        std::optional<RHI::BufferManager::BufferLease> m_VectorFieldVertexBuffer{};
-        std::uint64_t  m_VectorFieldVertexBufferCapacityBytes{0u};
+        struct UploadBufferSlot
+        {
+            std::optional<RHI::BufferManager::BufferLease> Buffer{};
+            std::uint64_t CapacityBytes{0u};
+        };
+
+        void EnsureFrameSlots(std::uint32_t framesInFlight);
+
+        std::vector<UploadBufferSlot> m_VectorFieldVertexBufferSlots{};
 
         // GRAPHICS-078 Slice C — independent per-lane buffer lease for
         // the isoline lane. Grows independently of the vector-field
         // lane and is reset before the `BufferManager` in the
         // renderer's `Shutdown()` (via `m_VisualizationOverlayUploadHelper.reset()`
         // before `m_BufferManager.reset()`).
-        std::optional<RHI::BufferManager::BufferLease> m_IsolineVertexBuffer{};
-        std::uint64_t  m_IsolineVertexBufferCapacityBytes{0u};
+        std::vector<UploadBufferSlot> m_IsolineVertexBufferSlots{};
 
+        std::uint32_t  m_ActiveSlot{0u};
         std::uint64_t  m_BufferAllocationCount{0u};
     };
 }

@@ -87,7 +87,9 @@ backend readouts and fallback diagnostics. See
 `RUNTIME-138` is the runtime-owned selected-entity responsiveness task. It
 makes the Sandbox editor path read cached selected-entity state, submit
 commands/jobs, and move heavy property/channel/UV/scalar derivations out of the
-ImGui callback into generation-keyed async runtime jobs.
+ImGui callback into generation-keyed async runtime jobs. The first landed slice
+is visibility-gated model construction plus per-frame domain-window model reuse;
+the async cache/job and bounded-apply slices remain open.
 
 
 ## Cross-linked rendering tasks (runtime-owned)

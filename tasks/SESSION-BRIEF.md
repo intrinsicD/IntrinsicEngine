@@ -15,11 +15,10 @@ the authoritative open/unblocked view.
 ## Theme B — Rendering modernization
 
 - blocked by `GRAPHICS-104`: `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/backlog/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
-- unblocked: `GRAPHICS-110` — Per-frame/ring ImGui upload buffers for in-flight safety (tasks/backlog/rendering/GRAPHICS-110-imgui-upload-buffer-in-flight-safety.md)
 - unblocked: `GRAPHICS-111` — Float segmented/per-key reduction primitive in ComputeParallelPrimitives (tasks/backlog/rendering/GRAPHICS-111-float-segmented-reduction-primitive.md)
 - unblocked: `GRAPHICS-112` — Work-efficient workgroup scan + uint32 overflow guard in ComputeParallelPrimitives (tasks/backlog/rendering/GRAPHICS-112-work-efficient-workgroup-scan.md)
 - unblocked: `GRAPHICS-113` — Selection outline ID work pruning (tasks/backlog/rendering/GRAPHICS-113-selection-outline-id-work-pruning.md)
-- blocked by `GRAPHICS-110`: `GRAPHICS-114` — Retained ImGui overlay copy/upload path (tasks/backlog/rendering/GRAPHICS-114-retained-imgui-overlay-copy-upload-path.md)
+- unblocked: `GRAPHICS-114` — Retained ImGui overlay copy/upload path (tasks/backlog/rendering/GRAPHICS-114-retained-imgui-overlay-copy-upload-path.md)
 - blocked by `GRAPHICS-104`: `RUNTIME-129` — Schedule GPU object-space normal bake jobs after import (tasks/backlog/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds

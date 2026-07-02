@@ -4,6 +4,7 @@ module;
 #include <memory>
 #include <optional>
 #include <span>
+#include <vector>
 
 export module Extrinsic.Graphics.TransientDebugUploadHelper;
 
@@ -114,7 +115,8 @@ export namespace Extrinsic::Graphics
         ITransientDebugUploadHelper(const ITransientDebugUploadHelper&)            = delete;
         ITransientDebugUploadHelper& operator=(const ITransientDebugUploadHelper&) = delete;
 
-        virtual void BeginFrame() = 0;
+        virtual void BeginFrame(std::uint32_t frameIndex,
+                                std::uint32_t framesInFlight) = 0;
 
         [[nodiscard]] virtual TransientDebugTriangleUploadResult UploadTriangles(
             std::span<const DebugTrianglePacket> triangles) = 0;
@@ -150,12 +152,11 @@ export namespace Extrinsic::Graphics
     // PushConstants(BDA + FirstVertex) + Draw(N, 1, 0, 0)` per packet
     // (N = 3 for triangles, 2 for lines, 1 for points).
     //
-    // Buffer recycling: a single growing buffer is reused across frames
-    // per lane. `GetBufferAllocationCount()` returns the cumulative
-    // number of underlying `BufferManager::Create(...)` calls across
-    // all lanes. The `PerFrameBufferRecycling` contract test pins this
-    // to the post-frame-1 baseline across N frames with constant
-    // payload (no per-frame leak).
+    // Buffer recycling: one growing buffer is reused per lane and per
+    // frame-in-flight slot. `GetBufferAllocationCount()` returns the
+    // cumulative number of underlying `BufferManager::Create(...)` calls across
+    // all lanes/slots. The `PerFrameBufferRecycling` contract test pins this
+    // after slot warm-up across N frames with constant payload.
     // Lifetime contract: constructed from `RHI::IDevice& + RHI::BufferManager&`;
     // the device and manager pointers are non-null for the helper's lifetime
     // (the renderer owns both and resets the helper before the manager in
@@ -167,7 +168,8 @@ export namespace Extrinsic::Graphics
         TransientDebugUploadHelper(RHI::IDevice& device, RHI::BufferManager& bufferManager);
         ~TransientDebugUploadHelper() override;
 
-        void BeginFrame() override;
+        void BeginFrame(std::uint32_t frameIndex,
+                        std::uint32_t framesInFlight) override;
 
         [[nodiscard]] TransientDebugTriangleUploadResult UploadTriangles(
             std::span<const DebugTrianglePacket> triangles) override;
@@ -187,20 +189,26 @@ export namespace Extrinsic::Graphics
         RHI::IDevice*       m_Device{nullptr};
         RHI::BufferManager* m_BufferManager{nullptr};
 
-        std::optional<RHI::BufferManager::BufferLease> m_TriangleVertexBuffer{};
-        std::uint64_t  m_TriangleVertexBufferCapacityBytes{0u};
+        struct UploadBufferSlot
+        {
+            std::optional<RHI::BufferManager::BufferLease> Buffer{};
+            std::uint64_t CapacityBytes{0u};
+        };
+
+        void EnsureFrameSlots(std::uint32_t framesInFlight);
+
+        std::vector<UploadBufferSlot> m_TriangleVertexBufferSlots{};
 
         // GRAPHICS-077 Slice C — independent per-lane buffer leases
         // for the line + point lanes. Each lane grows independently
         // and is reset before the `BufferManager` in the renderer's
         // `Shutdown()` (via `m_TransientDebugUploadHelper.reset()`
         // before `m_BufferManager.reset()`).
-        std::optional<RHI::BufferManager::BufferLease> m_LineVertexBuffer{};
-        std::uint64_t  m_LineVertexBufferCapacityBytes{0u};
+        std::vector<UploadBufferSlot> m_LineVertexBufferSlots{};
 
-        std::optional<RHI::BufferManager::BufferLease> m_PointVertexBuffer{};
-        std::uint64_t  m_PointVertexBufferCapacityBytes{0u};
+        std::vector<UploadBufferSlot> m_PointVertexBufferSlots{};
 
+        std::uint32_t  m_ActiveSlot{0u};
         std::uint64_t  m_BufferAllocationCount{0u};
     };
 }

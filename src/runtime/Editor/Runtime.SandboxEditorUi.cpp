@@ -505,6 +505,27 @@ namespace Extrinsic::Runtime
             return false;
         }
 
+        [[nodiscard]] SandboxEditorModelBuildRequest BuildModelRequestFromOpenPanels(
+            const std::array<bool, Detail::kSandboxEditorPanelWindowCount>* panelWindowOpen)
+        {
+            if (panelWindowOpen == nullptr)
+            {
+                return SandboxEditorModelBuildRequest{};
+            }
+
+            const auto open = [panelWindowOpen](const SandboxEditorPanelWindowKind kind) {
+                return (*panelWindowOpen)[PanelWindowIndex(kind)];
+            };
+
+            SandboxEditorModelBuildRequest request{};
+            request.Hierarchy = open(SandboxEditorPanelWindowKind::SceneHierarchy);
+            request.Inspector = open(SandboxEditorPanelWindowKind::Inspector);
+            request.Selection = open(SandboxEditorPanelWindowKind::SelectionDetails);
+            request.Visualization =
+                open(SandboxEditorPanelWindowKind::GeometryVisualization);
+            return request;
+        }
+
         [[nodiscard]] GS::Domain ExpectedDomainForWindowKind(
             const SandboxEditorDomainWindowKind kind) noexcept
         {
@@ -2036,6 +2057,7 @@ namespace Extrinsic::Runtime
 
         void AppendVertexChannelBindingTargets(
             SandboxEditorPropertyCatalogModel& model,
+            const SandboxEditorContext& context,
             const entt::registry& raw,
             const ECS::EntityHandle entity,
             const GS::ConstSourceView& view)
@@ -2045,6 +2067,10 @@ namespace Extrinsic::Runtime
             if (!domain.has_value())
                 return;
 
+            if (context.ModelBuildStats != nullptr)
+            {
+                context.ModelBuildStats->VertexChannelTargetBuilds += 2u;
+            }
             model.VertexChannelTargets.push_back(
                 BuildVertexChannelBindingTargetModel(
                     raw,
@@ -2068,6 +2094,10 @@ namespace Extrinsic::Runtime
             const entt::registry& raw,
             const ECS::EntityHandle entity)
         {
+            if (context.ModelBuildStats != nullptr)
+            {
+                ++context.ModelBuildStats->PropertyCatalogModelBuilds;
+            }
             SandboxEditorPropertyCatalogModel model{};
             model.HasSelectedEntity = true;
             model.SelectedStableId = SelectionController::ToStableEntityId(entity);
@@ -2099,7 +2129,7 @@ namespace Extrinsic::Runtime
                         BuildPropertyBindingTargetModel(view, slot));
             }
 
-            AppendVertexChannelBindingTargets(model, raw, entity, view);
+            AppendVertexChannelBindingTargets(model, context, raw, entity, view);
 
             if (!view.Valid() && model.Rows.empty())
             {
@@ -3234,6 +3264,10 @@ namespace Extrinsic::Runtime
             const entt::registry& raw,
             const ECS::EntityHandle entity)
         {
+            if (context.ModelBuildStats != nullptr)
+            {
+                ++context.ModelBuildStats->ProgressiveModelBuilds;
+            }
             SandboxEditorProgressiveRenderDataModel model{};
             const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
             model.Shape = InferProgressiveEntityShape(raw, entity, view);
@@ -3436,12 +3470,17 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] SandboxEditorBoundRenderStateModel BuildBoundRenderStateModel(
+            const SandboxEditorContext& context,
             const SandboxEditorPropertyCatalogModel& catalog,
             const SandboxEditorProgressiveRenderDataModel& progressive,
             const SandboxEditorRenderHintModel& renderHints,
             const SandboxEditorGeometryDomainModel& geometry,
             const std::uint32_t stableEntityId)
         {
+            if (context.ModelBuildStats != nullptr)
+            {
+                ++context.ModelBuildStats->BoundStateModelBuilds;
+            }
             SandboxEditorBoundRenderStateModel model{};
             model.HasSelectedEntity = true;
             model.SelectedStableId = stableEntityId;
@@ -3816,8 +3855,13 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] SandboxEditorUvDiagnosticsModel BuildUvDiagnosticsModel(
+            const SandboxEditorContext& context,
             const GS::ConstSourceView& view)
         {
+            if (context.ModelBuildStats != nullptr)
+            {
+                ++context.ModelBuildStats->UvDiagnosticsModelBuilds;
+            }
             SandboxEditorUvDiagnosticsModel model{};
             model.HasSelectedEntity = true;
             const GS::SourceAvailability availability =
@@ -3887,6 +3931,10 @@ namespace Extrinsic::Runtime
             const SandboxEditorPropertyCatalogModel& catalog,
             const std::uint32_t stableEntityId)
         {
+            if (context.ModelBuildStats != nullptr)
+            {
+                ++context.ModelBuildStats->TextureBakeModelBuilds;
+            }
             SandboxEditorTextureBakeControlsModel model{};
             model.HasSelectedEntity = true;
             model.SelectedStableId = stableEntityId;
@@ -3898,7 +3946,7 @@ namespace Extrinsic::Runtime
                 availability.Has(GS::SourceCapability::Halfedges) &&
                 availability.Has(GS::SourceCapability::Faces);
             model.HasRuntimeBakeCommand = context.AssetService != nullptr;
-            model.Uv = BuildUvDiagnosticsModel(view);
+            model.Uv = BuildUvDiagnosticsModel(context, view);
 
             model.Sources.reserve(catalog.Rows.size());
             for (const SandboxEditorPropertyCatalogRow& row : catalog.Rows)
@@ -6286,6 +6334,18 @@ namespace Extrinsic::Runtime
             out.Scale = scale;
         }
 
+        [[nodiscard]] glm::vec3 ComputePointCentroid(
+            const std::span<const glm::vec3> points) noexcept
+        {
+            if (points.empty())
+                return glm::vec3(0.0f);
+
+            glm::dvec3 sum(0.0);
+            for (const glm::vec3& point : points)
+                sum += glm::dvec3(point);
+            return glm::vec3(sum / static_cast<double>(points.size()));
+        }
+
         [[nodiscard]] SandboxEditorGeometryProcessingModel BuildGeometryProcessingModel(
             const SandboxEditorContext& context)
         {
@@ -6580,6 +6640,10 @@ namespace Extrinsic::Runtime
         [[nodiscard]] SandboxEditorInspectorModel BuildInspectorModel(
             const SandboxEditorContext& context)
         {
+            if (context.ModelBuildStats != nullptr)
+            {
+                ++context.ModelBuildStats->InspectorModelBuilds;
+            }
             SandboxEditorInspectorModel model{};
             if (context.Scene == nullptr)
             {
@@ -6611,6 +6675,7 @@ namespace Extrinsic::Runtime
                 BuildProgressiveRenderDataModel(context, raw, *selected);
             model.BoundState =
                 BuildBoundRenderStateModel(
+                    context,
                     model.PropertyCatalog,
                     model.Progressive,
                     model.RenderHints,
@@ -6640,6 +6705,10 @@ namespace Extrinsic::Runtime
         [[nodiscard]] SandboxEditorSelectionModel BuildSelectionModel(
             const SandboxEditorContext& context)
         {
+            if (context.ModelBuildStats != nullptr)
+            {
+                ++context.ModelBuildStats->SelectionModelBuilds;
+            }
             SandboxEditorSelectionModel model{};
             if (context.Selection == nullptr)
             {
@@ -7023,6 +7092,10 @@ namespace Extrinsic::Runtime
             const SandboxEditorVisualizationTarget target =
                 SandboxEditorVisualizationTarget::Entity)
         {
+            if (context.ModelBuildStats != nullptr)
+            {
+                ++context.ModelBuildStats->VisualizationModelBuilds;
+            }
             SandboxEditorVisualizationModel model{};
             model.GeometryDomainControlsAvailable = context.VisualizationCommandsAvailable;
             model.AdapterBindingControlsAvailable =
@@ -11225,6 +11298,7 @@ namespace Extrinsic::Runtime
             const SandboxEditorDomainWindowKind kind,
             const DomainWindowSection section,
             std::array<bool, 15>& domainWindowOpen,
+            std::array<std::optional<SandboxEditorDomainWindowModel>, 3>& domainModelCache,
             KMeansUiState* kmeansState,
             MeshDenoiseUiState* denoiseState,
             MeshCurvatureUiState* curvatureState,
@@ -11242,11 +11316,20 @@ namespace Extrinsic::Runtime
             if (!domainWindowOpen[slot])
                 return;
 
-            const SandboxEditorDomainWindowModel model =
-                BuildSandboxEditorDomainWindowModel(context, kind);
             ImGui::SetNextWindowSize(ImVec2(340.0f, 300.0f), ImGuiCond_FirstUseEver);
             if (ImGui::Begin(DomainWindowTitle(kind, section), &domainWindowOpen[slot]))
             {
+                std::optional<SandboxEditorDomainWindowModel>& cached =
+                    domainModelCache[static_cast<std::size_t>(kind)];
+                if (!cached.has_value())
+                {
+                    cached = BuildSandboxEditorDomainWindowModel(context, kind);
+                }
+                else if (context.ModelBuildStats != nullptr)
+                {
+                    ++context.ModelBuildStats->DomainWindowModelCacheHits;
+                }
+                const SandboxEditorDomainWindowModel& model = *cached;
                 switch (section)
                 {
                 case DomainWindowSection::Render:
@@ -11303,6 +11386,8 @@ namespace Extrinsic::Runtime
             if (context == nullptr || domainWindowOpen == nullptr)
                 return;
 
+            std::array<std::optional<SandboxEditorDomainWindowModel>, 3>
+                domainModelCache{};
             constexpr std::array<SandboxEditorDomainWindowKind, 3> kKinds{
                 SandboxEditorDomainWindowKind::PointCloud,
                 SandboxEditorDomainWindowKind::Graph,
@@ -11324,6 +11409,7 @@ namespace Extrinsic::Runtime
                         kind,
                         section,
                     *domainWindowOpen,
+                    domainModelCache,
                     kmeansState,
                     denoiseState,
                     curvatureState,
@@ -14402,16 +14488,30 @@ namespace Extrinsic::Runtime
     SandboxEditorPanelFrame BuildSandboxEditorPanelFrame(
         const SandboxEditorContext& context)
     {
+        return BuildSandboxEditorPanelFrame(
+            context,
+            SandboxEditorModelBuildRequest{});
+    }
+
+    SandboxEditorPanelFrame BuildSandboxEditorPanelFrame(
+        const SandboxEditorContext& context,
+        const SandboxEditorModelBuildRequest& request)
+    {
         SandboxEditorPanelFrame frame{};
-        if (context.Scene == nullptr)
+        SandboxEditorModelBuildStats stats{};
+        SandboxEditorContext modelContext = context;
+        modelContext.ModelBuildStats = &stats;
+
+        if (modelContext.Scene == nullptr)
         {
             AddDiagnostic(frame.Diagnostics,
                           SandboxEditorDiagnosticCode::MissingScene,
                           "Scene registry is unavailable.");
         }
-        else
+        else if (request.Hierarchy)
         {
-            const entt::registry& raw = context.Scene->Raw();
+            ++stats.HierarchyModelBuilds;
+            const entt::registry& raw = modelContext.Scene->Raw();
             raw.view<entt::entity>().each(
                 [&frame, &raw](const ECS::EntityHandle entity)
                 {
@@ -14428,29 +14528,60 @@ namespace Extrinsic::Runtime
                       });
         }
 
-        if (context.Selection == nullptr)
+        if (modelContext.Selection == nullptr)
         {
             AddDiagnostic(frame.Diagnostics,
                           SandboxEditorDiagnosticCode::MissingSelectionController,
                           "Selection controller is unavailable.");
         }
-        if (!context.ImGuiAdapterAvailable)
+        if (!modelContext.ImGuiAdapterAvailable)
         {
             AddDiagnostic(frame.Diagnostics,
                           SandboxEditorDiagnosticCode::MissingImGuiAdapter,
                           "Runtime ImGui adapter is unavailable.");
         }
 
-        frame.Inspector = BuildInspectorModel(context);
-        frame.Selection = BuildSelectionModel(context);
-        frame.Document = BuildDocumentModel(context);
-        frame.SceneFile = BuildSceneFileModel(context);
-        frame.FileImport = BuildFileImportModel(context);
-        frame.AssetImportQueue = BuildAssetImportQueueModel(context);
-        frame.RenderGraph = BuildRenderGraphModel(context);
-        frame.RenderRecipe = BuildSandboxEditorRenderRecipeEditorModel(context);
-        frame.CameraRender = BuildCameraRenderModel(context);
-        frame.Visualization = BuildVisualizationModel(context);
+        if (request.Inspector)
+        {
+            frame.Inspector = BuildInspectorModel(modelContext);
+        }
+        if (request.Selection)
+        {
+            frame.Selection = BuildSelectionModel(modelContext);
+        }
+        if (request.Document)
+        {
+            frame.Document = BuildDocumentModel(modelContext);
+        }
+        if (request.SceneFile)
+        {
+            frame.SceneFile = BuildSceneFileModel(modelContext);
+        }
+        if (request.FileImport)
+        {
+            frame.FileImport = BuildFileImportModel(modelContext);
+        }
+        if (request.AssetImportQueue)
+        {
+            frame.AssetImportQueue = BuildAssetImportQueueModel(modelContext);
+        }
+        if (request.RenderGraph)
+        {
+            frame.RenderGraph = BuildRenderGraphModel(modelContext);
+        }
+        if (request.RenderRecipe)
+        {
+            frame.RenderRecipe = BuildSandboxEditorRenderRecipeEditorModel(modelContext);
+        }
+        if (request.CameraRender)
+        {
+            frame.CameraRender = BuildCameraRenderModel(modelContext);
+        }
+        if (request.Visualization)
+        {
+            frame.Visualization = BuildVisualizationModel(modelContext);
+        }
+        frame.ModelBuildStats = stats;
         return frame;
     }
 
@@ -14458,6 +14589,10 @@ namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorDomainWindowKind kind)
     {
+        if (context.ModelBuildStats != nullptr)
+        {
+            ++context.ModelBuildStats->DomainWindowModelBuilds;
+        }
         SandboxEditorDomainWindowModel model{};
         model.Kind = kind;
         model.ExpectedDomain = ExpectedDomainForWindowKind(kind);
@@ -14517,6 +14652,7 @@ namespace Extrinsic::Runtime
             BuildProgressiveRenderDataModel(context, raw, *selected);
         model.BoundState =
             BuildBoundRenderStateModel(
+                context,
                 model.PropertyCatalog,
                 progressive,
                 model.RenderHints,
@@ -17801,6 +17937,15 @@ namespace Extrinsic::Runtime
         for (const glm::vec3& p : *targetPoints)
             targetWorld.push_back(glm::vec3(targetModel * glm::vec4(p, 1.0f)));
 
+        const glm::vec3 prealignDelta =
+            ComputePointCentroid(std::span<const glm::vec3>(targetWorld)) -
+            ComputePointCentroid(std::span<const glm::vec3>(sourceWorld));
+        std::vector<glm::vec3> prealignedSourceWorld = sourceWorld;
+        for (glm::vec3& point : prealignedSourceWorld)
+            point += prealignDelta;
+        glm::mat4 prealignPose(1.0f);
+        prealignPose[3] = glm::vec4(prealignDelta, 1.0f);
+
         Reg::RegistrationParams params{};
         params.Variant = ToGeometryICPVariant(command.Variant);
         params.MaxIterations = command.MaxIterations;
@@ -17811,7 +17956,7 @@ namespace Extrinsic::Runtime
         params.InlierRatio = command.InlierRatio;
 
         const RegistrationAlignmentOutcome outcome =
-            AlignPointClouds(sourceWorld, targetWorld, {}, params);
+            AlignPointClouds(prealignedSourceWorld, targetWorld, {}, params);
         if (!outcome.HasResult)
         {
             result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
@@ -17831,7 +17976,9 @@ namespace Extrinsic::Runtime
         const std::size_t step =
             std::min(command.TrajectoryStep, outcome.IterationCount());
         result.AppliedStep = step;
-        const glm::mat4 pose = TrajectoryPose(outcome, step);
+        const glm::mat4 pose =
+            step == 0u ? glm::mat4(1.0f)
+                       : TrajectoryPose(outcome, step) * prealignPose;
 
         // The pose is the world-space source->target delta; compose it with the
         // source's current model matrix and decompose the result back into the
@@ -18007,7 +18154,10 @@ namespace Extrinsic::Runtime
                             RuntimeConfigControlSource::Editor);
                     };
                 context.EngineConfigCommandsAvailable = true;
-                m_LastFrame = BuildSandboxEditorPanelFrame(context);
+                const SandboxEditorModelBuildRequest modelRequest =
+                    BuildModelRequestFromOpenPanels(&m_PanelWindowOpen);
+                m_LastFrame = BuildSandboxEditorPanelFrame(context, modelRequest);
+                context.ModelBuildStats = &m_LastFrame.ModelBuildStats;
                 KMeansUiState kmeansState{
                     .LastResult = &m_LastKMeansResult,
                     .Domain = &m_KMeansDomain,

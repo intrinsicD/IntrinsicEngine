@@ -218,6 +218,19 @@ namespace Extrinsic::Graphics
                                  .ClearR = 0.0f, .ClearG = 0.0f, .ClearB = 0.0f, .ClearA = 0.0f},
         };
 
+        constexpr RHI::ColorAttachment kSelectionEntityIdClearColorAttachments[] = {
+            RHI::ColorAttachment{.Target = RenderPassAttachmentToken(), .Load = RHI::LoadOp::Clear, .Store = RHI::StoreOp::Store,
+                                 .ClearR = 0.0f, .ClearG = 0.0f, .ClearB = 0.0f, .ClearA = 0.0f},
+        };
+
+        [[nodiscard]] std::span<const RHI::ColorAttachment> SelectionIdColorAttachments(
+            const bool includePrimitiveId) noexcept
+        {
+            return includePrimitiveId
+                ? std::span<const RHI::ColorAttachment>{kSelectionIdClearColorAttachments}
+                : std::span<const RHI::ColorAttachment>{kSelectionEntityIdClearColorAttachments};
+        }
+
         constexpr RHI::ColorAttachment kDefaultClearThreeColorAttachments[] = {
             RHI::ColorAttachment{.Target = RenderPassAttachmentToken(), .Load = RHI::LoadOp::Clear, .Store = RHI::StoreOp::Store},
             RHI::ColorAttachment{.Target = RenderPassAttachmentToken(), .Load = RHI::LoadOp::Clear, .Store = RHI::StoreOp::Store},
@@ -430,9 +443,9 @@ namespace Extrinsic::Graphics
     {
         const bool usesDeferred = UsesDeferredResources(features);
         // The selection-ID pass feeds two independent consumers: host picking
-        // readback and screen-space selection outline. Keep the ID target
-        // producer active for either consumer, while keeping the host readback
-        // buffer/copies gated on actual picking.
+        // readback and screen-space selection outline. Keep the EntityId target
+        // producer active for either consumer, while keeping PrimitiveId and
+        // host readback gated on actual picking.
         const bool pickingActive = features.EnablePicking && features.EnableDepthPrepass;
         const bool selectionIdActive = features.EnableDepthPrepass &&
             (pickingActive || features.EnableSelectionOutline);
@@ -466,13 +479,13 @@ namespace Extrinsic::Graphics
                 clusterLightAssignmentActive, false,
                 {"ClusterGrid.AABBs", "GpuWorld.Lights"},
                 {"ClusterLights.Headers", "ClusterLights.Indices", "ClusterLights.Counter"});
-        // GRAPHICS-074/BUG-018 — the same selection-ID render pass is used
-        // for click readback and for hierarchy/hover outline. Readback remains
-        // picking-only; EntityId/PrimitiveId must still be produced when only
-        // SelectionOutlinePass consumes EntityId.
-        std::vector<std::string_view> pickingWrites{"EntityId", "PrimitiveId"};
+        // GRAPHICS-113 — click picking and outline-only selection share the
+        // EntityId producer, but PrimitiveId and host readback are active only
+        // for a pending pick request.
+        std::vector<std::string_view> pickingWrites{"EntityId"};
         if (pickingActive)
         {
+            pickingWrites.push_back("PrimitiveId");
             pickingWrites.push_back("Picking.Readback");
         }
         AddPassWithVectors(out, FrameRecipePassKind::Picking, "PickingPass",
@@ -634,12 +647,11 @@ namespace Extrinsic::Graphics
                     clusterLightAssignmentActive, true, false, true, true);
         AddResource(out, FrameRecipeResourceKind::ClusterLightCounter, "ClusterLights.Counter",
                     clusterLightAssignmentActive, true, false, true, true);
-        // BUG-018 — EntityId is read by SelectionOutlinePass even when no
-        // click pick is pending. PrimitiveId is a sibling color attachment in
-        // the selection-ID pipelines, so it follows the ID-pass gate; only
-        // Picking.Readback is picking-only.
+        // GRAPHICS-113 — EntityId is read by SelectionOutlinePass even when no
+        // click pick is pending. PrimitiveId is a picking-only target now that
+        // outline-only frames use the one-target EntityId pass variant.
         AddResource(out, FrameRecipeResourceKind::EntityId, "EntityId", selectionIdActive, false, false, true);
-        AddResource(out, FrameRecipeResourceKind::PrimitiveId, "PrimitiveId", selectionIdActive, false, false, true);
+        AddResource(out, FrameRecipeResourceKind::PrimitiveId, "PrimitiveId", pickingActive, false, false, true);
         AddResource(out, FrameRecipeResourceKind::SceneNormal, "SceneNormal", usesDeferred, false, false, true);
         AddResource(out, FrameRecipeResourceKind::Albedo, "Albedo", usesDeferred, false, false, true);
         AddResource(out, FrameRecipeResourceKind::Material0, "Material0", usesDeferred, false, false, true);
@@ -930,9 +942,10 @@ namespace Extrinsic::Graphics
         }
 
         const bool usesDeferred = UsesDeferredResources(features);
-        // BUG-018 — split host picking readback from the selection-ID pass.
-        // Hierarchy/hover outline still needs EntityId produced when no click
-        // pick is pending; only the readback import/copies are picking-only.
+        // GRAPHICS-113 — split host picking readback and PrimitiveId from the
+        // selection-ID pass. Hierarchy/hover outline still needs EntityId
+        // produced when no click pick is pending; primitive IDs and readback
+        // imports/copies are picking-only.
         const bool pickingActive = features.EnablePicking && features.EnableDepthPrepass;
         const bool selectionIdActive = features.EnableDepthPrepass &&
             (pickingActive || features.EnableSelectionOutline);
@@ -1108,6 +1121,9 @@ namespace Extrinsic::Graphics
             entityId = createTexture("EntityId",
                                      entityIdDesc,
                                      FrameRecipeResourceKind::EntityId);
+        }
+        if (pickingActive)
+        {
             const RHI::TextureDesc primitiveIdDesc = pickingActive
                 ? SelectionReadbackTargetDesc(width, height, "PrimitiveId")
                 : ColorTargetDesc(width, height, RHI::Format::R32_UINT, "PrimitiveId");
@@ -1389,9 +1405,10 @@ namespace Extrinsic::Graphics
             });
         }
 
-        // BUG-018 — this pass writes the per-pixel selection IDs needed by
-        // both click picking and selection outline. The readback buffer write
-        // is included only when a pick request is actually pending.
+        // GRAPHICS-113 — this pass writes the per-pixel EntityId needed by
+        // both click picking and selection outline. PrimitiveId and the
+        // readback buffer write are included only when a pick request is
+        // actually pending.
         if (selectionIdActive)
         {
             addRecipePass(FrameRecipePassKind::Picking, "PickingPass", [=](RenderGraphBuilder& builder) {
@@ -1403,15 +1420,15 @@ namespace Extrinsic::Graphics
                 builder.Read(pointDrawIndirect, BufferUsage::IndirectRead);
                 builder.Read(pointDrawCount, BufferUsage::IndirectRead);
                 builder.Write(entityId, TextureUsage::ColorAttachmentWrite);
-                builder.Write(primitiveId, TextureUsage::ColorAttachmentWrite);
                 if (pickingActive)
                 {
+                    builder.Write(primitiveId, TextureUsage::ColorAttachmentWrite);
                     builder.Write(pickingReadback, BufferUsage::TransferDst);
                 }
                 builder.SetRenderPass(RHI::RenderPassDesc{
                     // BUG-026: ID targets must clear to the background
                     // sentinel 0, not the scene-color blue.
-                    .ColorTargets = kSelectionIdClearColorAttachments,
+                    .ColorTargets = SelectionIdColorAttachments(pickingActive),
                     .Depth = RHI::DepthAttachment{
                         .Target = RenderPassAttachmentToken(),
                         .Load = RHI::LoadOp::Load,

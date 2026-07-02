@@ -838,18 +838,22 @@ Concretely:
   when a pick request is pending (`world.HasPendingPick ||
   world.PickRequest.Pending`) *and* a depth prepass is configured, while the
   selection-ID render pass also stays enabled for hierarchy/hover outline
-  frames that need a written `EntityId` texture. `EntityId` and `PrimitiveId`
-  follow `selectionIdActive` because the selection-ID pipelines write both
-  R32_UINT color attachments; `Picking.Readback` and `TransferSrc` texture
-  usage remain picking-only. This avoids both dead readback resources when no
-  pick is pending and missing-producer graphs when `SelectionOutlinePass`
-  samples `EntityId`. `BuildSelectionEntityIdPipelineDesc()`
-  now mirrors the depth-equal / depth-write-off / `D32_FLOAT` shape the
+  frames that need a written `EntityId` texture. `GRAPHICS-113` splits the
+  outline-only and pending-pick shapes: selected/hovered frames without a
+  pending pick declare and write only `EntityId`, using the
+  `Renderer.SelectionEntityId.OutlineOnly` pipeline and the
+  `assets/shaders/selection/entity_id_outline.frag` fragment shader, while
+  pending-pick frames keep the full `EntityId` + `PrimitiveId` attachments,
+  primitive subpasses, `Picking.Readback`, and `TransferSrc` usage. This avoids
+  both dead primitive/readback resources when no pick is pending and
+  missing-producer graphs when `SelectionOutlinePass` samples `EntityId`.
+  `BuildSelectionEntityIdPipelineDesc()` now mirrors the depth-equal /
+  depth-write-off / `D32_FLOAT` shape the
   forward and deferred GBuffer pipelines use against the same depth
   buffer, so the recipe-emitted render pass with a read-only `D32_FLOAT`
   depth attachment is render-pass-compatible *and* the depth-equal test
   guarantees only the nearest-surface fragment wins each pixel of
-  `EntityId`/`PrimitiveId`. Without this reorder Slice D's readback
+  `EntityId` or `EntityId`/`PrimitiveId`. Without this reorder Slice D's readback
   drain would return wrong IDs for any pixel covered by more than one
   draw because the previous color-only picking pass had no
   nearest-surface fragment selection. The Face/Edge/Point selection
@@ -1319,9 +1323,9 @@ Concretely:
   retains its bindless index; `IRenderer::RebuildOperationalResources()` invokes
   the same initializer so an overlay attached during Vulkan cold start allocates
   the atlas after the first operational transition. `ImGuiUploadHelper` packs
-  submitted POD
-  vertices/indices into one growing host-visible vertex buffer and one growing
-  index buffer; `ImGuiPass::Execute(...)` records deterministic
+  submitted POD vertices/indices into renderer-owned host-visible vertex/index
+  upload storage partitioned by the current frame-in-flight slot;
+  `ImGuiPass::Execute(...)` records deterministic
   `BindIndexBuffer + PushConstants + DrawIndexed` blocks and increments
   `ImGuiOverlayDiagnostics::DrawCalls`. Slice D.1 promotes the frame recipe's
   `"ImGuiPass"` node from side-effect-only to a load/store render-pass-scope
@@ -1339,6 +1343,17 @@ Concretely:
   0..3 and allocates real bindless textures from slot 4 upward, so the font
   atlas slot cannot be overwritten by DebugView/Present/SelectionOutline
   descriptor updates.
+  `GRAPHICS-110` extends the same frame-slot upload-storage model to the
+  transient debug and visualization overlay upload helpers, so a new frame never
+  overwrites the vertex/index ranges still consumed by an earlier in-flight
+  frame. `GRAPHICS-114` keeps the atlas and overlay transport retained: runtime
+  only copies font-atlas pixels into the overlay frame when the atlas bytes
+  change, graphics retains the prior atlas payload by metadata/revision for
+  unchanged frames, and `ImGuiUploadHelper` builds draw-command upload records
+  once per draw list while reusing CPU scratch vectors for flattened
+  vertex/index payloads. Runtime and graphics diagnostics expose atlas
+  copy/reuse, atlas retain, draw-command count, command-upload build count, and
+  per-frame uploaded byte counts.
   The imported `Backbuffer` remains owned solely by `Pass.Present`; render-graph validation
   still rejects non-present backbuffer writes. The opt-in `gpu;vulkan` smoke
   remains the GPU-host proof for the same path.
@@ -2203,13 +2218,13 @@ Concretely:
   Graphics never imports `imgui.h`, never calls Dear ImGui platform/renderer
   backends, and never sees `ImDrawData` directly. Overlay vertex/index payload
   upload mirrors the renderer-owned transient debug / visualization overlay
-  helpers: `ImGuiUploadHelper` owns one growing host-visible vertex buffer and
-  one growing index buffer, uploads the accepted `ImGuiOverlayFrame` POD
-  payloads through `RHI::IDevice::WriteBuffer`, and returns per-list offsets
+  helpers: `ImGuiUploadHelper` owns growing host-visible vertex/index storage
+  partitioned by frame-in-flight slot, uploads the accepted `ImGuiOverlayFrame`
+  POD payloads through `RHI::IDevice::WriteBuffer`, and returns per-list offsets
   plus per-command draw metadata to `Pass.ImGui`. The buffers are transient
   renderer resources, never retained on `GpuWorld` and never exposed to
-  runtime. Font atlas texture is graphics-owned
-  retained, mirroring SMAA `AreaTex`/`SearchTex` from `GRAPHICS-013AQ`
+  runtime. Font atlas texture is graphics-owned retained, mirroring SMAA
+  `AreaTex`/`SearchTex` from `GRAPHICS-013AQ`
   (`R8_UNORM` fallback or `R8G8B8A8_UNORM` for colored atlases, allocated
   through `RHI::TextureManager`/`RHI::SamplerManager` and released by
   `ShutdownGpuResources()` before renderer manager teardown); DPI/font rebuilds
@@ -2221,6 +2236,9 @@ Concretely:
   (or the retained font atlas) with no new graphics-visible descriptor surface.
   `ImGuiOverlayFrame::DrawLists[i].UsesUserTexture` remains a diagnostics flag
   summarizing the command metadata.
+  Steady frames reuse unchanged font-atlas payloads by metadata/revision instead
+  of copying the atlas bytes through runtime and graphics every frame; dirty
+  atlas rebuilds still submit and upload the full payload explicitly.
   `ImGuiPass` owns backend-created pipeline variants for the possible
   present-source color formats and binds the variant matching the active
   render-pass attachment through the existing `SetPipeline` /

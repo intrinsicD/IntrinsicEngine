@@ -31,7 +31,7 @@ maturity_target: Operational
   by a named follow-up rather than fixed in this diagnostic task.
 - Follow-up filed: `GRAPHICS-110` — per-frame/ring ImGui upload buffers for
   in-flight safety
-  (`tasks/backlog/rendering/GRAPHICS-110-imgui-upload-buffer-in-flight-safety.md`).
+  (`tasks/done/GRAPHICS-110-imgui-upload-buffer-in-flight-safety.md`).
 - Follow-ups filed from the selected-entity source diagnosis: `RUNTIME-138`
   owns the nonblocking selected-entity editor/cache/job pipeline,
   `GRAPHICS-113` owns selected-outline ID work pruning, and `GRAPHICS-114`

@@ -902,6 +902,33 @@ namespace
         };
     }
 
+    [[nodiscard]] Runtime::SandboxEditorModelBuildRequest
+    MakeNoSandboxEditorModelBuildRequest()
+    {
+        Runtime::SandboxEditorModelBuildRequest request{};
+        request.Hierarchy = false;
+        request.Inspector = false;
+        request.Selection = false;
+        request.Document = false;
+        request.SceneFile = false;
+        request.FileImport = false;
+        request.AssetImportQueue = false;
+        request.RenderGraph = false;
+        request.RenderRecipe = false;
+        request.CameraRender = false;
+        request.Visualization = false;
+        return request;
+    }
+
+    [[nodiscard]] Runtime::SandboxEditorModelBuildRequest
+    MakeOnlyInspectorModelBuildRequest()
+    {
+        Runtime::SandboxEditorModelBuildRequest request =
+            MakeNoSandboxEditorModelBuildRequest();
+        request.Inspector = true;
+        return request;
+    }
+
     class FakeWindow final : public Plat::IWindow
     {
     public:
@@ -1858,6 +1885,74 @@ TEST(SandboxEditorUi, HierarchyInspectorModelReportsSelectionRenderHintsAndDomai
     ASSERT_EQ(frame.Selection.SelectedEntities.size(), 1u);
     EXPECT_EQ(frame.Selection.SelectedEntities[0].Name, "Cloud A");
     EXPECT_FALSE(frame.FileImport.Enabled);
+}
+
+TEST(SandboxEditorUi, HiddenPanelBuildRequestSkipsSelectedEntityModels)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    const Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeNoSandboxEditorModelBuildRequest());
+
+    EXPECT_TRUE(frame.Hierarchy.empty());
+    EXPECT_FALSE(frame.Inspector.HasEntity);
+    EXPECT_TRUE(frame.Selection.SelectedStableIds.empty());
+    EXPECT_TRUE(frame.Visualization.Properties.empty());
+
+    const Runtime::SandboxEditorModelBuildStats& stats =
+        frame.ModelBuildStats;
+    EXPECT_EQ(stats.HierarchyModelBuilds, 0u);
+    EXPECT_EQ(stats.InspectorModelBuilds, 0u);
+    EXPECT_EQ(stats.SelectionModelBuilds, 0u);
+    EXPECT_EQ(stats.PropertyCatalogModelBuilds, 0u);
+    EXPECT_EQ(stats.VertexChannelTargetBuilds, 0u);
+    EXPECT_EQ(stats.ProgressiveModelBuilds, 0u);
+    EXPECT_EQ(stats.BoundStateModelBuilds, 0u);
+    EXPECT_EQ(stats.UvDiagnosticsModelBuilds, 0u);
+    EXPECT_EQ(stats.TextureBakeModelBuilds, 0u);
+    EXPECT_EQ(stats.VisualizationModelBuilds, 0u);
+}
+
+TEST(SandboxEditorUi, InspectorOnlyBuildRequestAvoidsSiblingPanelWork)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    const Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyInspectorModelBuildRequest());
+
+    ASSERT_TRUE(frame.Inspector.HasEntity);
+    EXPECT_TRUE(frame.Hierarchy.empty());
+    EXPECT_TRUE(frame.Selection.SelectedStableIds.empty());
+    EXPECT_TRUE(frame.Visualization.Properties.empty());
+
+    const Runtime::SandboxEditorModelBuildStats& stats =
+        frame.ModelBuildStats;
+    EXPECT_EQ(stats.HierarchyModelBuilds, 0u);
+    EXPECT_EQ(stats.InspectorModelBuilds, 1u);
+    EXPECT_EQ(stats.SelectionModelBuilds, 0u);
+    EXPECT_EQ(stats.PropertyCatalogModelBuilds, 1u);
+    EXPECT_EQ(stats.VertexChannelTargetBuilds, 2u);
+    EXPECT_EQ(stats.ProgressiveModelBuilds, 1u);
+    EXPECT_EQ(stats.BoundStateModelBuilds, 1u);
+    EXPECT_EQ(stats.UvDiagnosticsModelBuilds, 1u);
+    EXPECT_EQ(stats.TextureBakeModelBuilds, 1u);
+    EXPECT_EQ(stats.VisualizationModelBuilds, 0u);
 }
 
 TEST(SandboxEditorUi, GeometryProcessingSupportedDomainsMatchPromotedEditorContract)

@@ -38,7 +38,9 @@ import Extrinsic.Graphics.Pass.VisualizationOverlay;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
+import Extrinsic.Graphics.VisualizationOverlayUploadHelper;
 import Extrinsic.Graphics.VisualizationPackets;
+import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.Handles;
@@ -649,6 +651,74 @@ TEST(VisualizationOverlayPassContract, PerFrameBufferRecyclingDoesNotLeakVectorF
     EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsRecorded, 1u);
 
     renderer->Shutdown();
+}
+
+TEST(VisualizationOverlayPassContract, UploadHelperPartitionsStorageByFrameSlot)
+{
+    static const Graphics::VectorFieldOverlayPacket kVectorFields[1] = {
+        Graphics::VectorFieldOverlayPacket{
+            .Name         = "Test.VectorField",
+            .Domain       = Graphics::VisualizationAttributeDomain::Vertex,
+            .ElementCount = 2u,
+            .Scale        = 1.0f,
+            .Color        = glm::vec4{1.0f},
+            .DepthTested  = true,
+        },
+    };
+    static const Graphics::IsolineOverlayPacket kIsolines[1] = {
+        Graphics::IsolineOverlayPacket{
+            .SourceScalarName = "Test.Iso",
+            .Domain           = Graphics::VisualizationAttributeDomain::Face,
+            .IsoValueCount    = 2u,
+            .RangeMin         = 0.0f,
+            .RangeMax         = 1.0f,
+            .LineWidth        = 1.0f,
+            .Color            = glm::vec4{1.0f},
+            .DepthTested      = true,
+        },
+    };
+
+    MockDevice device;
+    device.FramesInFlight = 2u;
+    RHI::BufferManager bufferManager{device};
+    Graphics::VisualizationOverlayUploadHelper helper{device, bufferManager};
+
+    helper.BeginFrame(0u, device.FramesInFlight);
+    const Graphics::VisualizationVectorFieldUploadResult vectorSlot0 =
+        helper.UploadVectorFields(std::span<const Graphics::VectorFieldOverlayPacket>{
+            kVectorFields, 1u});
+    const Graphics::VisualizationIsolineUploadResult isolineSlot0 =
+        helper.UploadIsolines(std::span<const Graphics::IsolineOverlayPacket>{
+            kIsolines, 1u});
+    ASSERT_TRUE(vectorSlot0.Uploaded);
+    ASSERT_TRUE(isolineSlot0.Uploaded);
+
+    helper.BeginFrame(1u, device.FramesInFlight);
+    const Graphics::VisualizationVectorFieldUploadResult vectorSlot1 =
+        helper.UploadVectorFields(std::span<const Graphics::VectorFieldOverlayPacket>{
+            kVectorFields, 1u});
+    const Graphics::VisualizationIsolineUploadResult isolineSlot1 =
+        helper.UploadIsolines(std::span<const Graphics::IsolineOverlayPacket>{
+            kIsolines, 1u});
+    ASSERT_TRUE(vectorSlot1.Uploaded);
+    ASSERT_TRUE(isolineSlot1.Uploaded);
+
+    EXPECT_NE(vectorSlot0.VertexBuffer, vectorSlot1.VertexBuffer);
+    EXPECT_NE(isolineSlot0.VertexBuffer, isolineSlot1.VertexBuffer);
+    EXPECT_EQ(helper.GetBufferAllocationCount(), 4u);
+
+    helper.BeginFrame(2u, device.FramesInFlight);
+    const Graphics::VisualizationVectorFieldUploadResult vectorSlot0Again =
+        helper.UploadVectorFields(std::span<const Graphics::VectorFieldOverlayPacket>{
+            kVectorFields, 1u});
+    const Graphics::VisualizationIsolineUploadResult isolineSlot0Again =
+        helper.UploadIsolines(std::span<const Graphics::IsolineOverlayPacket>{
+            kIsolines, 1u});
+    ASSERT_TRUE(vectorSlot0Again.Uploaded);
+    ASSERT_TRUE(isolineSlot0Again.Uploaded);
+    EXPECT_EQ(vectorSlot0Again.VertexBuffer, vectorSlot0.VertexBuffer);
+    EXPECT_EQ(isolineSlot0Again.VertexBuffer, isolineSlot0.VertexBuffer);
+    EXPECT_EQ(helper.GetBufferAllocationCount(), 4u);
 }
 
 // -----------------------------------------------------------------------------

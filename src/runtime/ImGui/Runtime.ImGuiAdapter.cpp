@@ -139,6 +139,20 @@ namespace Extrinsic::Runtime
 
             return out;
         }
+
+        [[nodiscard]] bool FontAtlasMetadataMatches(
+            const Graphics::ImGuiOverlayFontAtlas& atlas,
+            const std::uint32_t width,
+            const std::uint32_t height,
+            const std::uint32_t bytesPerPixel,
+            const bool useColors) noexcept
+        {
+            return atlas.Valid &&
+                   atlas.Width == width &&
+                   atlas.Height == height &&
+                   atlas.BytesPerPixel == bytesPerPixel &&
+                   atlas.UseColors == useColors;
+        }
     }
 
     ImGuiAdapter::ImGuiAdapter(Platform::IWindow& window, Graphics::ImGuiOverlaySystem& overlaySystem)
@@ -165,6 +179,8 @@ namespace Extrinsic::Runtime
 
         m_Diagnostics.Initialized = true;
         m_FrameStarted = false;
+        m_FontAtlasCache = {};
+        m_FontAtlasRevision = 0u;
         return true;
     }
 
@@ -297,13 +313,61 @@ namespace Extrinsic::Runtime
                 static_cast<std::uint64_t>(fontWidth) *
                 static_cast<std::uint64_t>(fontHeight) *
                 static_cast<std::uint64_t>(fontBytesPerPixel);
-            frame.FontAtlas.Valid = true;
-            frame.FontAtlas.Width = static_cast<std::uint32_t>(fontWidth);
-            frame.FontAtlas.Height = static_cast<std::uint32_t>(fontHeight);
-            frame.FontAtlas.BytesPerPixel = static_cast<std::uint32_t>(fontBytesPerPixel);
-            frame.FontAtlas.UseColors = fontBytesPerPixel == 4;
-            frame.FontAtlas.Pixels.resize(static_cast<std::size_t>(byteCount));
-            std::memcpy(frame.FontAtlas.Pixels.data(), fontPixels, static_cast<std::size_t>(byteCount));
+            const std::uint32_t width = static_cast<std::uint32_t>(fontWidth);
+            const std::uint32_t height = static_cast<std::uint32_t>(fontHeight);
+            const std::uint32_t bytesPerPixel =
+                static_cast<std::uint32_t>(fontBytesPerPixel);
+            const bool useColors = fontBytesPerPixel == 4;
+            const bool cacheMetadataMatches =
+                FontAtlasMetadataMatches(
+                    m_FontAtlasCache,
+                    width,
+                    height,
+                    bytesPerPixel,
+                    useColors);
+            const bool cacheBytesMatch =
+                cacheMetadataMatches &&
+                static_cast<std::uint64_t>(m_FontAtlasCache.Pixels.size()) == byteCount &&
+                std::memcmp(m_FontAtlasCache.Pixels.data(),
+                            fontPixels,
+                            static_cast<std::size_t>(byteCount)) == 0;
+
+            m_Diagnostics.LastFontAtlasByteCount = byteCount;
+            if (!cacheBytesMatch)
+            {
+                ++m_FontAtlasRevision;
+                m_FontAtlasCache.Valid = true;
+                m_FontAtlasCache.Width = width;
+                m_FontAtlasCache.Height = height;
+                m_FontAtlasCache.BytesPerPixel = bytesPerPixel;
+                m_FontAtlasCache.UseColors = useColors;
+                m_FontAtlasCache.Dirty = true;
+                m_FontAtlasCache.Revision = m_FontAtlasRevision;
+                m_FontAtlasCache.Pixels.resize(static_cast<std::size_t>(byteCount));
+                std::memcpy(m_FontAtlasCache.Pixels.data(),
+                            fontPixels,
+                            static_cast<std::size_t>(byteCount));
+                frame.FontAtlas = m_FontAtlasCache;
+                ++m_Diagnostics.FontAtlasCopyCount;
+                m_Diagnostics.LastFrameFontAtlasCopied = true;
+            }
+            else
+            {
+                frame.FontAtlas.Valid = true;
+                frame.FontAtlas.Width = width;
+                frame.FontAtlas.Height = height;
+                frame.FontAtlas.BytesPerPixel = bytesPerPixel;
+                frame.FontAtlas.UseColors = useColors;
+                frame.FontAtlas.Dirty = false;
+                frame.FontAtlas.Revision = m_FontAtlasRevision;
+                ++m_Diagnostics.FontAtlasReuseCount;
+                m_Diagnostics.LastFrameFontAtlasCopied = false;
+            }
+        }
+        else
+        {
+            m_Diagnostics.LastFontAtlasByteCount = 0u;
+            m_Diagnostics.LastFrameFontAtlasCopied = false;
         }
 
         std::uint32_t drawListCount = 0u;
@@ -379,7 +443,7 @@ namespace Extrinsic::Runtime
 
         frame.DisplayWidth = pixelWidth;
         frame.DisplayHeight = pixelHeight;
-        m_OverlaySystem.SubmitFrame(frame);
+        m_OverlaySystem.SubmitFrame(std::move(frame));
 
         m_Diagnostics.FramesProduced += 1u;
         m_Diagnostics.LastDrawListCount = drawListCount;
@@ -400,6 +464,8 @@ namespace Extrinsic::Runtime
         m_OverlaySystem.Shutdown();
         DestroyContext();
         m_Diagnostics.Initialized = false;
+        m_FontAtlasCache = {};
+        m_FontAtlasRevision = 0u;
         m_FrameStarted = false;
     }
 
@@ -413,6 +479,8 @@ namespace Extrinsic::Runtime
         // atlas on Initialize() once GRAPHICS-079 lands; here it is a CPU no-op.
         m_OverlaySystem.Shutdown();
         DestroyContext();
+        m_FontAtlasCache = {};
+        m_FontAtlasRevision = 0u;
 
         m_Context = ImGui::CreateContext();
         ImGui::SetCurrentContext(m_Context);

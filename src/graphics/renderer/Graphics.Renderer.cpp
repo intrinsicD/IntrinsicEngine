@@ -1325,6 +1325,7 @@ namespace Extrinsic::Graphics
             m_DeferredGBufferPipelineLease.reset();
             m_DeferredLightingPipelineLease.reset();
             m_SelectionEntityIdPipelineLease.reset();
+            m_SelectionEntityIdOutlinePipelineLease.reset();
             m_SelectionFaceIdPipelineLease.reset();
             m_SelectionEdgeIdPipelineLease.reset();
             m_SelectionPointIdPipelineLease.reset();
@@ -1489,6 +1490,21 @@ namespace Extrinsic::Graphics
             if (began)
             {
                 m_CurrentFrame = outFrame;
+                const std::uint32_t framesInFlight = m_Device->GetFramesInFlight() == 0u
+                    ? 1u
+                    : m_Device->GetFramesInFlight();
+                if (m_TransientDebugUploadHelper)
+                {
+                    m_TransientDebugUploadHelper->BeginFrame(outFrame.FrameIndex, framesInFlight);
+                }
+                if (m_VisualizationOverlayUploadHelper)
+                {
+                    m_VisualizationOverlayUploadHelper->BeginFrame(outFrame.FrameIndex, framesInFlight);
+                }
+                if (m_ImGuiUploadHelper)
+                {
+                    m_ImGuiUploadHelper->BeginFrame(outFrame.FrameIndex, framesInFlight);
+                }
             }
             return began;
         }
@@ -3057,6 +3073,23 @@ namespace Extrinsic::Graphics
             return BuildSelectionEntityIdPipelineDesc();
         }
 
+        [[nodiscard]] RHI::PipelineHandle GetSelectionEntityIdOutlinePipeline() const noexcept override
+        {
+            if (!m_Subsystems.PipelineManager().has_value() ||
+                !m_SelectionEntityIdOutlinePipelineLease.has_value() ||
+                !m_SelectionEntityIdOutlinePipelineLease->IsValid())
+            {
+                return RHI::PipelineHandle{};
+            }
+            return m_Subsystems.PipelineManager()->GetDeviceHandle(
+                m_SelectionEntityIdOutlinePipelineLease->GetHandle());
+        }
+
+        [[nodiscard]] RHI::PipelineDesc GetSelectionEntityIdOutlinePipelineDesc() const noexcept override
+        {
+            return BuildSelectionEntityIdOutlinePipelineDesc();
+        }
+
         [[nodiscard]] RHI::PipelineHandle GetSelectionFaceIdPipeline() const noexcept override
         {
             if (!m_Subsystems.PipelineManager().has_value() || !m_SelectionFaceIdPipelineLease.has_value() ||
@@ -3752,6 +3785,18 @@ namespace Extrinsic::Graphics
             desc.DepthTargetFormat = RHI::Format::D32_FLOAT;
             desc.PushConstantSize = sizeof(RHI::GpuScenePushConstants);
             desc.DebugName = "Renderer.SelectionEntityId";
+            return desc;
+        }
+
+        [[nodiscard]] static RHI::PipelineDesc BuildSelectionEntityIdOutlinePipelineDesc() noexcept
+        {
+            RHI::PipelineDesc desc = BuildSelectionEntityIdPipelineDesc();
+            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/selection/entity_id_outline.frag.spv");
+            desc.ColorBlend[1].Enable = false;
+            desc.ColorTargetCount = 1u;
+            desc.ColorTargetFormats[1] = RHI::Format::Undefined;
+            desc.DebugName = "Renderer.SelectionEntityId.OutlineOnly";
             return desc;
         }
 
@@ -5900,6 +5945,28 @@ namespace Extrinsic::Graphics
                 }
             }
 
+            // GRAPHICS-113 — one-target EntityId pipeline for outline-only
+            // selected/hovered frames. Appended after all pre-existing
+            // default-recipe pipeline slots so historical
+            // `FailPipelineCreateCall` indices remain stable.
+            m_SelectionEntityIdOutlinePipelineLease.reset();
+            const RHI::PipelineDesc selectionEntityIdOutlineDesc =
+                BuildSelectionEntityIdOutlinePipelineDesc();
+            auto selectionEntityIdOutlinePipeline =
+                m_Subsystems.PipelineManager()->Create(selectionEntityIdOutlineDesc);
+            if (selectionEntityIdOutlinePipeline.has_value())
+            {
+                m_SelectionEntityIdOutlinePipelineLease.emplace(
+                    std::move(*selectionEntityIdOutlinePipeline));
+            }
+            else
+            {
+                Core::Log::Warn(
+                    "[Graphics] SelectionEntityId outline-only pipeline unavailable; "
+                    "outline-only selection ID recording will be skipped: error={}",
+                    static_cast<int>(selectionEntityIdOutlinePipeline.error()));
+            }
+
             return m_CullingOutputAvailable && m_DepthPrepassPipelineLease.has_value() &&
                 m_DepthPrepassPipelineLease->IsValid();
         }
@@ -6583,20 +6650,26 @@ namespace Extrinsic::Graphics
         // actual pending pick request.
         [[nodiscard]] RenderCommandPassStatus RecordSelectionEntityIdPass(RHI::ICommandContext& cmd,
                                                                            const RHI::CameraUBO& camera,
-                                                                           const std::uint32_t frameIndex)
+                                                                           const std::uint32_t frameIndex,
+                                                                           const bool primitivePickingActive)
         {
             if (m_Device == nullptr || !m_Device->IsOperational())
             {
                 return RenderCommandPassStatus::SkippedNonOperational;
             }
+            const auto& pipelineLease = primitivePickingActive
+                ? m_SelectionEntityIdPipelineLease
+                : m_SelectionEntityIdOutlinePipelineLease;
             if (!m_CullingOutputAvailable || !m_SelectionEntityIdPass.has_value() ||
-                !m_SelectionEntityIdPipelineLease.has_value() ||
-                !m_SelectionEntityIdPipelineLease->IsValid() ||
+                !pipelineLease.has_value() ||
+                !pipelineLease->IsValid() ||
                 !m_Subsystems.GpuWorldSystem().has_value() || !m_Subsystems.CullingSystemRegistry().has_value())
             {
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
 
+            m_SelectionEntityIdPass->SetPipeline(
+                m_Subsystems.PipelineManager()->GetDeviceHandle(pipelineLease->GetHandle()));
             m_SelectionEntityIdPass->Execute(cmd, camera, *m_Subsystems.GpuWorldSystem(), *m_Subsystems.CullingSystemRegistry(), frameIndex);
             return RenderCommandPassStatus::Recorded;
         }
@@ -7990,6 +8063,7 @@ namespace Extrinsic::Graphics
         std::optional<RHI::PipelineManager::PipelineLease> m_DeferredGBufferPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_DeferredLightingPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_SelectionEntityIdPipelineLease;
+        std::optional<RHI::PipelineManager::PipelineLease> m_SelectionEntityIdOutlinePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_SelectionFaceIdPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_SelectionEdgeIdPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_SelectionPointIdPipelineLease;
@@ -8167,8 +8241,12 @@ namespace Extrinsic::Graphics
         const bool primitivePickingActive = renderWorld.PickRequest.Pending;
 
         const RenderCommandPassStatus entityStatus =
-            RecordSelectionEntityIdPass(cmd, camera, frame.FrameIndex);
+            RecordSelectionEntityIdPass(cmd, camera, frame.FrameIndex, primitivePickingActive);
         AccumulateCommandRecordStatus(route.DebugName, route.PassId, entityStatus);
+        if (!primitivePickingActive && entityStatus == RenderCommandPassStatus::Recorded)
+        {
+            ++m_LastRenderGraphStats.SelectionOutlineEntityIdPassCount;
+        }
         if (primitivePickingActive)
         {
             const RenderCommandPassStatus faceStatus =
@@ -8180,6 +8258,12 @@ namespace Extrinsic::Graphics
             const RenderCommandPassStatus pointStatus =
                 RecordSelectionPointIdPass(cmd, camera, frame.FrameIndex);
             AccumulateCommandRecordStatus(route.DebugName, route.PassId, pointStatus);
+            if (faceStatus == RenderCommandPassStatus::Recorded &&
+                edgeStatus == RenderCommandPassStatus::Recorded &&
+                pointStatus == RenderCommandPassStatus::Recorded)
+            {
+                ++m_LastRenderGraphStats.SelectionPrimitiveIdPassCount;
+            }
         }
 
         if (m_Device != nullptr && m_Device->IsOperational() &&

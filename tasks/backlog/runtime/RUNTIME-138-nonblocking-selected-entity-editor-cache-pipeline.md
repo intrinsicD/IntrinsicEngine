@@ -33,9 +33,9 @@ maturity_target: Operational
 
 ## Required changes
 - [ ] Slice A: add low-overhead selected-entity timing/counter diagnostics for editor callback time, panel/model build time, inspector/property catalog time, vertex-channel validation time, UV diagnostics time, visualization model time, ImGui copy/upload counts, scanned element counts, scratch allocation bytes, cache hit/miss counts, queued job counts, stale-discard counts, and bounded apply time.
-- [ ] Slice A: add a deterministic capture path or test seam that records selected-entity frame samples without requiring Vulkan, and document the Vulkan-host smoke procedure for the real sandbox.
-- [ ] Slice B: make editor model construction visibility-gated so hidden panels and closed domain windows do not build selected-entity models; build only the visible model section requested by the current ImGui window/section.
-- [ ] Slice B: prevent open domain windows from rebuilding shared selected-entity models independently; either share one per-frame cached model view or request section-specific cached submodels.
+- [x] Slice A: add a deterministic capture path or test seam that records selected-entity frame samples without requiring Vulkan, and document the Vulkan-host smoke procedure for the real sandbox.
+- [x] Slice B: make editor model construction visibility-gated so hidden panels and closed domain windows do not build selected-entity models; build only the visible model section requested by the current ImGui window/section.
+- [x] Slice B: prevent open domain windows from rebuilding shared selected-entity models independently; either share one per-frame cached model view or request section-specific cached submodels.
 - [ ] Slice C: introduce a selected-entity editor model cache keyed by stable entity id, selection generation, primitive-selection generation, entity/source/property/binding/visualization generations, viewport/config revision where relevant, and the visible section/window key.
 - [ ] Slice C: ensure cache-hit frames reuse immutable model data and perform no selected geometry/property scans or scratch-buffer allocations.
 - [ ] Slice D: split cheap metadata queries from heavy derivations. Property catalogs may enumerate names/domains/counts/value kinds, but full normal/color resolver scans, scalar domain scans, color packing validation, and UV finite checks must not run for every candidate property every frame.
@@ -44,27 +44,27 @@ maturity_target: Operational
 - [ ] Slice F: move selected-entity job submission to a runtime frame-work seam (`IStreamingFrameHooks::SubmitFrameWork()` or equivalent) so `ImGuiAdapter::EndFrame()` only reads cached state and enqueues requests.
 - [ ] Slice F: add an explicit per-frame apply budget for editor/derived completions, by count or elapsed time, so a burst of completed jobs cannot stall the main loop.
 - [ ] Slice F: keep transform/gizmo/selection commands that are required for same-frame render as cheap main-thread commands, and document which work remains frame-critical.
-- [ ] File or update focused graphics follow-ups for selected outline GPU work and ImGui overlay copy/upload churn rather than expanding this runtime task into renderer implementation work.
+- [x] File or update focused graphics follow-ups for selected outline GPU work and ImGui overlay copy/upload churn rather than expanding this runtime task into renderer implementation work.
 
 ## Tests
-- [ ] Add contract tests proving hidden inspector/domain sections do not build selected-entity property, progressive, texture-bake, or visualization models.
+- [x] Add contract tests proving hidden inspector/domain sections do not build selected-entity property, progressive, texture-bake, or visualization models.
 - [ ] Add contract tests proving cache-hit selected frames do not rebuild property catalogs, do not call full vertex-channel resolvers, and do not allocate geometry-sized scratch buffers.
 - [ ] Add contract tests proving property option listing uses metadata compatibility only, while explicit active/requested validations use async job results.
 - [ ] Add tests proving async selected-analysis results apply only when the generation key is current and stale geometry/property/binding results are discarded.
 - [ ] Add tests proving repeated selected frames enqueue at most one job per cache key while a matching job is pending or ready.
 - [ ] Add tests proving bounded main-thread apply processes a limited number/time of completions per frame.
-- [ ] Run the default CPU-supported correctness gate after implementation.
+- [x] Run the default CPU-supported correctness gate after implementation.
 - [ ] On a Vulkan-capable host, run a sandbox responsiveness smoke with a large selected mesh/point cloud and record before/after selected-frame diagnostics.
 
 ## Docs
-- [ ] Update `src/runtime/README.md` with the factual nonblocking selected-entity editor/cache/job pipeline once implemented.
-- [ ] Update `tasks/backlog/runtime/README.md`, `tasks/backlog/ui/README.md`, and any touched rendering README entries so follow-up ownership stays clear.
+- [x] Update `src/runtime/README.md` with the factual nonblocking selected-entity editor/cache/job pipeline once implemented.
+- [x] Update `tasks/backlog/runtime/README.md`, `tasks/backlog/ui/README.md`, and any touched rendering README entries so follow-up ownership stays clear.
 - [ ] If a new diagnostic capture format is added, document the schema or report location.
 - [ ] Add or update a short report under `docs/reports/` with before/after selected-entity bottleneck evidence and links to renderer follow-up task IDs.
 
 ## Acceptance criteria
 - [ ] The Sandbox main loop selected-entity path reads cached editor state and submits commands/jobs; it does not synchronously scan large geometry/property buffers from `ImGuiAdapter::EndFrame()`.
-- [ ] Hidden panels and closed domain windows perform no selected-entity model work.
+- [x] Hidden panels and closed domain windows perform no selected-entity model work.
 - [ ] Holding the same selection steady for multiple frames produces cache hits with zero full-buffer normal/color/UV/scalar scans.
 - [ ] Heavy selected-entity analysis runs asynchronously from generation-stamped immutable snapshots and applies on the main thread only when current.
 - [ ] Completed async result apply is bounded per frame and cannot monopolize the main loop.
@@ -96,3 +96,9 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'Sa
 - Target: `Operational` for the real sandbox selected-entity path on a Vulkan-capable host; `CPUContracted` for backend-neutral cache/job contracts.
 - Renderer-specific GPU work pruning is owned by `GRAPHICS-113`.
 - ImGui overlay copy/upload cleanup is owned by `GRAPHICS-114`, after `GRAPHICS-110` resolves in-flight upload-buffer safety.
+- Current implementation state (2026-07-02): partial `CPUContracted` Slice B.
+  The editor now visibility-gates selected-entity model sections, shares
+  per-frame domain-window models, and exposes deterministic model-build/cache
+  counters. The full generation-keyed cache, async analysis jobs, bounded apply,
+  selected-frame timing/copy diagnostics, and Vulkan responsiveness smoke remain
+  open; this task is not ready to retire.

@@ -22,28 +22,28 @@ maturity_target: Operational
 - This task focuses on GPU/framegraph work that remains after `RUNTIME-138` removes selected-entity editor CPU stalls. It may use `RUNTIME-138` timing data, but should have its own renderer tests.
 
 ## Required changes
-- [ ] Split outline-only ID production from click-picking production in the frame recipe so `PrimitiveId` and `Picking.Readback` are active only when a pick request is pending.
-- [ ] Adjust the selection entity-ID pipeline/pass descriptor, render-pass attachment setup, and framegraph resource declarations so outline-only frames write only the resources they consume.
-- [ ] Preserve the existing primitive face/edge/point ID subpasses and readback route for actual pending picks.
+- [x] Split outline-only ID production from click-picking production in the frame recipe so `PrimitiveId` and `Picking.Readback` are active only when a pick request is pending.
+- [x] Adjust the selection entity-ID pipeline/pass descriptor, render-pass attachment setup, and framegraph resource declarations so outline-only frames write only the resources they consume.
+- [x] Preserve the existing primitive face/edge/point ID subpasses and readback route for actual pending picks.
 - [ ] Evaluate whether outline-only ID rendering can be narrowed to selected/hovered candidates rather than all surface cull buckets; implement only if it remains within graphics snapshot ownership and has focused tests.
-- [ ] Expose renderer diagnostics that distinguish outline-only ID work, pending-pick primitive ID work, and readback copies.
+- [x] Expose renderer diagnostics that distinguish outline-only ID work, pending-pick primitive ID work, and readback copies.
 
 ## Tests
-- [ ] Update frame-recipe contract tests proving selected-outline-only frames declare `EntityId` but not `PrimitiveId` or `Picking.Readback`.
-- [ ] Update renderer frame lifecycle/command-route tests proving primitive subpasses and readback run only for pending picks.
-- [ ] Add tests for the outline-only pass attachment/pipeline shape if a separate pipeline or render-pass variant is introduced.
-- [ ] Run opt-in `gpu;vulkan` smoke on selected-outline and click-picking frames.
+- [x] Update frame-recipe contract tests proving selected-outline-only frames declare `EntityId` but not `PrimitiveId` or `Picking.Readback`.
+- [x] Update renderer frame lifecycle/command-route tests proving primitive subpasses and readback run only for pending picks.
+- [x] Add tests for the outline-only pass attachment/pipeline shape if a separate pipeline or render-pass variant is introduced.
+- [x] Run opt-in `gpu;vulkan` smoke on selected-outline and click-picking frames.
 
 ## Docs
-- [ ] Update `src/graphics/renderer/README.md` and any frame-recipe docs to describe the outline-only vs picking resource split.
-- [ ] Link this task from `RUNTIME-138` and the rendering backlog index as the renderer-owned selected-frame work-pruning follow-up.
+- [x] Update `src/graphics/renderer/README.md` and any frame-recipe docs to describe the outline-only vs picking resource split.
+- [x] Link this task from `RUNTIME-138` and the rendering backlog index as the renderer-owned selected-frame work-pruning follow-up.
 
 ## Acceptance criteria
-- [ ] Selected-but-not-picking frames do not allocate, transition, write, or read `PrimitiveId`.
-- [ ] Pending click-picking frames still produce entity, primitive, and readback results with existing semantics.
-- [ ] Selection outline remains visually correct for hovered/selected entities.
-- [ ] Renderer diagnostics can show whether a selected frame ran outline-only ID work or full picking work.
-- [ ] Layering remains graphics/RHI-only for implementation changes.
+- [x] Selected-but-not-picking frames do not allocate, transition, write, or read `PrimitiveId`.
+- [x] Pending click-picking frames still produce entity, primitive, and readback results with existing semantics.
+- [x] Selection outline remains visually correct for hovered/selected entities.
+- [x] Renderer diagnostics can show whether a selected frame ran outline-only ID work or full picking work.
+- [x] Layering remains graphics/RHI-only for implementation changes.
 
 ## Verification
 ```bash
@@ -68,3 +68,8 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'Se
 ## Maturity
 - Target: `Operational` on Vulkan-capable hosts; `CPUContracted` for frame-recipe and command-route contracts.
 - This task may retire at `CPUContracted` only if `Operational` owned by a follow-up task is explicitly named; otherwise the selected-frame Vulkan smoke is required.
+- Current implementation state (2026-07-02): `Operational` for the outline-only
+  vs pending-pick split. Frame-recipe, command-route, diagnostics, and
+  pipeline-shape contracts are implemented, and targeted `gpu;vulkan` sandbox
+  smokes passed for click-picking and selected-outline visibility. The
+  candidate-narrowing evaluation remains open before retirement.

@@ -6,6 +6,7 @@
 // Vulkan dependency. `imgui.h` is included directly only to synthesize a real
 // panel draw in the draw-list test.
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -162,6 +163,44 @@ TEST(ImGuiAdapter, InitializeLoadsBundledRobotoAndBuildsLegacyFontAtlas)
     EXPECT_EQ(frame->FontAtlas.Height, static_cast<std::uint32_t>(fontHeight));
     EXPECT_EQ(frame->FontAtlas.BytesPerPixel, 1u);
     EXPECT_FALSE(frame->FontAtlas.Pixels.empty());
+}
+
+TEST(ImGuiAdapter, FontAtlasPayloadIsCopiedOnlyWhenDirty)
+{
+    FakeWindow         window(1280, 720);
+    ImGuiOverlaySystem overlay;
+    ImGuiAdapter       adapter(window, overlay);
+
+    ASSERT_TRUE(adapter.Initialize());
+
+    adapter.BeginFrame(kFrameDelta);
+    adapter.EndFrame();
+    {
+        const auto& diag = adapter.GetDiagnostics();
+        EXPECT_EQ(diag.FontAtlasCopyCount, 1u);
+        EXPECT_EQ(diag.FontAtlasReuseCount, 0u);
+        EXPECT_TRUE(diag.LastFrameFontAtlasCopied);
+        EXPECT_GT(diag.LastFontAtlasByteCount, 0u);
+    }
+    const auto* firstFrame = overlay.GetCurrentFrame();
+    ASSERT_NE(firstFrame, nullptr);
+    ASSERT_FALSE(firstFrame->FontAtlas.Pixels.empty());
+    const std::vector<std::byte> firstPixels = firstFrame->FontAtlas.Pixels;
+
+    adapter.BeginFrame(kFrameDelta);
+    adapter.EndFrame();
+
+    const auto& diag = adapter.GetDiagnostics();
+    EXPECT_EQ(diag.FontAtlasCopyCount, 1u);
+    EXPECT_EQ(diag.FontAtlasReuseCount, 1u);
+    EXPECT_FALSE(diag.LastFrameFontAtlasCopied);
+    EXPECT_EQ(diag.LastFontAtlasByteCount, firstPixels.size());
+
+    const auto* retainedFrame = overlay.GetCurrentFrame();
+    ASSERT_NE(retainedFrame, nullptr);
+    EXPECT_EQ(retainedFrame->FontAtlas.Pixels, firstPixels);
+    EXPECT_TRUE(overlay.GetDiagnostics().FontAtlasRetained);
+    EXPECT_EQ(overlay.GetDiagnostics().FontAtlasRetainCount, 1u);
 }
 
 // --- ImDrawData -> ImGuiOverlayFrame walk ------------------------------------

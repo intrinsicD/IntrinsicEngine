@@ -5,6 +5,21 @@ depends_on: []
 ---
 # GRAPHICS-110 — Per-frame/ring ImGui upload buffers for in-flight safety
 
+## Completion
+- Retired on 2026-07-02 at maturity `Operational` on a Vulkan-capable host.
+- Implementation commit: this commit adds frame-slot partitioning for the
+  ImGui, transient-debug, and visualization-overlay upload helpers, preserves
+  growth/allocation diagnostics, and keeps retained overlay copy/upload cleanup
+  owned by `GRAPHICS-114`.
+- Task-state commit: this retirement commit moves the task to `tasks/done/`
+  and removes it from the open rendering backlog list.
+- Final retirement evidence on 2026-07-02:
+  `cmake --build --preset ci-vulkan --target IntrinsicTests` passed, and
+  `ctest --test-dir build/ci-vulkan --output-on-failure -R
+  'KMeans|ImGuiSurfaceGpuSmoke|TransientDebugSurfaceGpuSmoke|VisualizationOverlaySurfaceGpuSmoke|RuntimeSandboxAcceptanceGpuSmoke\.(ClickPickReadbackSelectsReferenceTriangleAndBackgroundClears|HierarchySelectionKeepsDefaultSandboxVisibleWithOutline|InspectorTransformEditShiftsReferenceTrianglePixels|ReferenceTriangleScalarFieldColormapResolvesOnLineAndPointLanes)'
+  -L 'gpu' -L 'vulkan' --timeout 180` passed 13/13 tests. The default CPU gate
+  also passed 3459/3459 tests after the implementation.
+
 ## Goal
 - Make `Extrinsic.Graphics.ImGuiUploadHelper` (and, if they share the pattern,
   the sibling transient-debug / visualization-overlay upload helpers) safe for a
@@ -44,43 +59,43 @@ depends_on: []
   single-buffer assumption and, if so, whether they should be fixed together.
 
 ## Required changes
-- [ ] Determine the renderer's actual frames-in-flight count and whether the
+- [x] Determine the renderer's actual frames-in-flight count and whether the
       current single-buffer ImGui path is provably safe under it; record the
       finding.
-- [ ] If not provably safe, partition `ImGuiUploadHelper` storage per
+- [x] If not provably safe, partition `ImGuiUploadHelper` storage per
       frame-in-flight (or ring-offset within one buffer keyed by the frame slot)
       so concurrent in-flight frames never share the same written range;
       surface the frame-slot/ring index through `BeginFrame(...)` or the upload
       call.
-- [ ] Keep `GetBufferAllocationCount()` and the overflow/growth behavior intact;
+- [x] Keep `GetBufferAllocationCount()` and the overflow/growth behavior intact;
       grow per-slot capacity independently or share a capacity policy that does
       not reintroduce the hazard.
-- [ ] Audit the sibling transient-debug / visualization-overlay upload helpers
+- [x] Audit the sibling transient-debug / visualization-overlay upload helpers
       for the same pattern and either fix them here or file their own follow-up.
-- [ ] Keep the retained/copy-reduction follow-up (`GRAPHICS-114`) blocked until
+- [x] Keep the retained/copy-reduction follow-up (`GRAPHICS-114`) blocked until
       this task defines the safe per-frame/ring upload storage model it will
       build on.
 
 ## Tests
-- [ ] Extend/keep the default-gate contract tests for the upload helper (offsets,
+- [x] Extend/keep the default-gate contract tests for the upload helper (offsets,
       overflow, growth, allocation count) with the per-frame/ring model.
-- [ ] Add an opt-in `gpu;vulkan` smoke (or a deterministic multi-slot simulation)
+- [x] Add an opt-in `gpu;vulkan` smoke (or a deterministic multi-slot simulation)
       proving two in-flight frames use non-overlapping written ranges.
 
 ## Docs
-- [ ] Update `src/graphics/renderer/README.md` (or the ImGui pass/upload docs) to
+- [x] Update `src/graphics/renderer/README.md` (or the ImGui pass/upload docs) to
       describe the per-frame/ring upload-buffer model.
-- [ ] Link `GRAPHICS-114` as the follow-up for reducing steady-state ImGui
+- [x] Link `GRAPHICS-114` as the follow-up for reducing steady-state ImGui
       overlay copy/upload overhead.
 
 ## Acceptance criteria
-- [ ] Two frames in flight provably never share a written vertex/index range in
+- [x] Two frames in flight provably never share a written vertex/index range in
       the ImGui upload path (test or documented single-frame-in-flight proof).
-- [ ] `GRAPHICS-114` remains the named owner for retained overlay transport and
+- [x] `GRAPHICS-114` remains the named owner for retained overlay transport and
       CPU copy/upload reductions.
-- [ ] `python3 tools/repo/check_layering.py --root src --strict` passes; the
+- [x] `python3 tools/repo/check_layering.py --root src --strict` passes; the
       helper stays graphics/RHI-only.
-- [ ] Default CPU-gate upload-helper contract tests pass.
+- [x] Default CPU-gate upload-helper contract tests pass.
 
 ## Verification
 ```bash
@@ -101,3 +116,8 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'Im
 - Target: `Operational` on Vulkan-capable hosts (the opt-in `gpu;vulkan` smoke
   proves non-overlapping in-flight ranges); `CPUContracted` for the
   backend-neutral per-frame/ring contract tests.
+- Current implementation state (2026-07-02): `Operational`. Deterministic
+  multi-slot contract coverage is implemented for ImGui, transient-debug, and
+  visualization-overlay upload helpers, and targeted `gpu;vulkan` ImGui,
+  transient-debug, visualization-overlay, and sandbox smokes passed on the
+  Vulkan-capable host.

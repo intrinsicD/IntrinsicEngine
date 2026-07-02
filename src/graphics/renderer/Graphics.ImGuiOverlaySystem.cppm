@@ -40,6 +40,8 @@ export namespace Extrinsic::Graphics
         std::uint32_t Height{0u};
         std::uint32_t BytesPerPixel{1u};
         bool UseColors{false};
+        bool Dirty{true};
+        std::uint64_t Revision{0u};
         std::vector<std::byte> Pixels{};
     };
 
@@ -78,12 +80,15 @@ export namespace Extrinsic::Graphics
         bool FontAtlasAvailable{false};
         bool FontAtlasGpuAllocated{false};
         bool FontAtlasUploadQueued{false};
+        bool FontAtlasRetained{false};
         bool FontAtlasAllocationFailed{false};
         bool FontAtlasUploadFailed{false};
         std::uint32_t FontAtlasWidth{0u};
         std::uint32_t FontAtlasHeight{0u};
         std::uint32_t FontAtlasBytesPerPixel{0u};
         std::uint64_t FontAtlasByteCount{0u};
+        std::uint64_t FontAtlasRevision{0u};
+        std::uint32_t FontAtlasRetainCount{0u};
         std::uint32_t FontAtlasAllocationCount{0u};
         std::uint32_t FontAtlasUploadCount{0u};
         RHI::TextureHandle FontAtlasTexture{};
@@ -139,6 +144,7 @@ export namespace Extrinsic::Graphics
         void ShutdownGpuResources();
         void UploadPendingFontAtlas();
         void SubmitFrame(const ImGuiOverlayFrame& frame);
+        void SubmitFrame(ImGuiOverlayFrame&& frame);
         void ClearFrame();
         void RecordDrawCalls(std::uint32_t drawCalls) noexcept;
 

@@ -23,30 +23,30 @@ maturity_target: Operational
 
 ## Required changes
 - [ ] After `GRAPHICS-110`, measure/capture per-frame ImGui overlay copy bytes, font-atlas bytes, command count, flatten time, upload bytes, and allocation counts during selected-entity editor frames.
-- [ ] Stop copying font atlas pixels every frame when the atlas payload is unchanged; preserve explicit dirty/upload diagnostics.
-- [ ] Avoid redundant draw-command upload list construction inside `ImGuiUploadHelper::UploadFrame(...)`.
-- [ ] Reuse CPU staging vectors or retained upload scratch storage where safe, without retaining stale pointers to ImGui-owned memory.
-- [ ] Evaluate whether `ImGuiOverlaySystem::SubmitFrame(...)` can move accepted draw lists instead of copying them, while preserving validation and diagnostics.
-- [ ] Preserve the runtime/graphics boundary: runtime submits POD overlay frames, graphics never imports `imgui.h`.
-- [ ] Add diagnostics that show cache/reuse hits and per-frame copy/upload byte counts.
+- [x] Stop copying font atlas pixels every frame when the atlas payload is unchanged; preserve explicit dirty/upload diagnostics.
+- [x] Avoid redundant draw-command upload list construction inside `ImGuiUploadHelper::UploadFrame(...)`.
+- [x] Reuse CPU staging vectors or retained upload scratch storage where safe, without retaining stale pointers to ImGui-owned memory.
+- [x] Evaluate whether `ImGuiOverlaySystem::SubmitFrame(...)` can move accepted draw lists instead of copying them, while preserving validation and diagnostics.
+- [x] Preserve the runtime/graphics boundary: runtime submits POD overlay frames, graphics never imports `imgui.h`.
+- [x] Add diagnostics that show cache/reuse hits and per-frame copy/upload byte counts.
 
 ## Tests
-- [ ] Add contract tests proving unchanged font atlas payloads are not recopied/requeued every frame while a dirty atlas still uploads.
-- [ ] Add upload-helper tests proving command upload construction is single-pass and preserves draw-call order/scissor/user-texture data.
-- [ ] Add overlay-system tests proving move/reuse paths preserve validation diagnostics and rejected-list behavior.
-- [ ] Run focused ImGui adapter/overlay/upload/pass tests in the default CPU gate.
+- [x] Add contract tests proving unchanged font atlas payloads are not recopied/requeued every frame while a dirty atlas still uploads.
+- [x] Add upload-helper tests proving command upload construction is single-pass and preserves draw-call order/scissor/user-texture data.
+- [x] Add overlay-system tests proving move/reuse paths preserve validation diagnostics and rejected-list behavior.
+- [x] Run focused ImGui adapter/overlay/upload/pass tests in the default CPU gate.
 - [ ] Run opt-in `gpu;vulkan` smoke after `GRAPHICS-110` for selected-entity editor frames with large UI payloads.
 
 ## Docs
-- [ ] Update `src/runtime/README.md` and `src/graphics/renderer/README.md` to describe the retained/dirty ImGui overlay transport behavior once implemented.
-- [ ] Link this task from `UI-030`, `RUNTIME-138`, and `GRAPHICS-110` where they discuss selected-frame ImGui copy/upload costs.
+- [x] Update `src/runtime/README.md` and `src/graphics/renderer/README.md` to describe the retained/dirty ImGui overlay transport behavior once implemented.
+- [x] Link this task from `UI-030`, `RUNTIME-138`, and `GRAPHICS-110` where they discuss selected-frame ImGui copy/upload costs.
 
 ## Acceptance criteria
-- [ ] Unchanged font atlas bytes are not copied through the runtime/graphics overlay path every frame.
-- [ ] ImGui command upload data is built once per draw list per frame.
+- [x] Unchanged font atlas bytes are not copied through the runtime/graphics overlay path every frame.
+- [x] ImGui command upload data is built once per draw list per frame.
 - [ ] CPU-side allocations and copied bytes for steady selected-entity UI frames are observable and reduced versus the baseline captured for this task.
-- [ ] The upload path remains in-flight safe under the `GRAPHICS-110` per-frame/ring model.
-- [ ] No graphics module imports ImGui/runtime/platform/app ownership.
+- [x] The upload path remains in-flight safe under the `GRAPHICS-110` per-frame/ring model.
+- [x] No graphics module imports ImGui/runtime/platform/app ownership.
 
 ## Verification
 ```bash
@@ -71,3 +71,9 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'Im
 ## Maturity
 - Target: `Operational` on Vulkan-capable hosts after `GRAPHICS-110`; `CPUContracted` for backend-neutral copy/reuse/upload contracts.
 - This task may retire at `CPUContracted` only if `Operational` owned by a follow-up task is explicitly named; otherwise the selected-frame Vulkan smoke is required.
+- Current implementation state (2026-07-02): `CPUContracted` with targeted
+  Vulkan smoke evidence. Retained atlas transport, move submission, single-pass
+  command upload construction, scratch reuse, and CPU/null tests are
+  implemented; targeted `gpu;vulkan` ImGui and sandbox smokes passed. The
+  baseline-vs-after selected-frame measurement and large selected-entity UI
+  payload smoke remain required before `Operational`.

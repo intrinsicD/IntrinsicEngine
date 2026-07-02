@@ -134,9 +134,10 @@ contracts.
 `RUNTIME-138` is the next runtime/editor responsiveness leaf: the Sandbox
 selected-entity path should read cached state and submit commands/jobs, while
 heavy selected-entity derivations run asynchronously and apply through bounded
-main-thread results. It gates the remaining `UI-031` domain-window
-reorganization slices so new windows do not extend the eager selected-model
-rebuild pattern.
+main-thread results. Its first visibility-gated model-build slice is landed,
+but the generation-keyed async analysis cache and bounded main-thread apply are
+still open. It gates the remaining `UI-031` domain-window reorganization slices
+so new windows do not extend the eager selected-model rebuild pattern.
 
 `RUNTIME-131` is retired to `tasks/done`: `Engine` now exposes the
 agent/CLI config-control facade for render-recipe preview/activation and the
