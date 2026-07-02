@@ -24,7 +24,7 @@ import Extrinsic.Graphics.Component.RenderGeometry;  // ScalarFieldConfig
 //   PerVertexBuffer   — raw RGBA vec4 per vertex from a named buffer
 //   PerEdgeBuffer     — raw RGBA vec4 per edge from a named buffer
 //   PerFaceBuffer     — raw RGBA vec4 per face from a named buffer
-//   UniformColor      — flat single RGBA, no shading (Unlit flag set)
+//   UniformColor      — single RGBA value, shaded by the material path
 //   Material          — no override; MaterialInstance governs colour
 //
 // Buffer names are keys in GpuSceneSlot::Buffers (set by lifecycle
@@ -60,7 +60,7 @@ export namespace Extrinsic::Graphics::Components
         enum class ColorSource : std::uint8_t
         {
             Material,         ///< No override — MaterialInstance governs colour.
-            UniformColor,     ///< Flat single RGBA value (MaterialFlags::Unlit set).
+            UniformColor,     ///< Single RGBA value, shaded by the material path.
             ScalarField,      ///< GPU colourmap applied to a named float buffer.
             PerVertexBuffer,  ///< Raw RGBA vec4 per vertex from a named buffer.
             PerEdgeBuffer,    ///< Raw RGBA vec4 per edge from a named buffer.
@@ -70,7 +70,7 @@ export namespace Extrinsic::Graphics::Components
         ColorSource Source = ColorSource::Material;
 
         // ----- UniformColor -------------------------------------------------
-        /// Flat RGBA colour used when Source == UniformColor.
+        /// RGBA colour used when Source == UniformColor.
         glm::vec4 Color{1.f, 0.6f, 0.f, 1.f};
 
         // ----- ScalarField --------------------------------------------------

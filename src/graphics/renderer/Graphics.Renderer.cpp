@@ -6571,19 +6571,16 @@ namespace Extrinsic::Graphics
         }
 
         // GRAPHICS-074 Slice A — default-recipe `"PickingPass"` route. The
-        // recipe only declares the pass when `features.EnablePicking` is
-        // true (set from `world.HasPendingPick || world.PickRequest.Pending`
-        // in `DeriveDefaultFrameRecipeFeatures`), so this helper is reached
-        // only when a pick request was pending for the frame. Mirrors
-        // `RecordForwardSurfacePass` / `RecordShadowPass`: a non-operational
-        // device → `SkippedNonOperational`; a missing culling output, pass,
-        // lease, `GpuWorld`, or culling system → `SkippedUnavailable`;
-        // otherwise `EntityIdPass::Execute` records the
+        // recipe declares the pass for actual picking and for selection
+        // outline ID generation. Mirrors `RecordForwardSurfacePass` /
+        // `RecordShadowPass`: a non-operational device →
+        // `SkippedNonOperational`; a missing culling output, pass, lease,
+        // `GpuWorld`, or culling system → `SkippedUnavailable`; otherwise
+        // `EntityIdPass::Execute` records the
         // `Bind/Bind/Push/DrawIndexedIndirectCount` shape against the
         // `SurfaceOpaque` cull bucket and we return `Recorded`. The
-        // Face/Edge/Point selection sub-passes (Slice B) and the
-        // `Picking.Readback` drain + `PublishPickResult`/`PublishNoHit`
-        // wiring (Slice D) are intentionally not exercised here.
+        // primitive-id sub-passes and readback copy are only needed for an
+        // actual pending pick request.
         [[nodiscard]] RenderCommandPassStatus RecordSelectionEntityIdPass(RHI::ICommandContext& cmd,
                                                                            const RHI::CameraUBO& camera,
                                                                            const std::uint32_t frameIndex)
@@ -8167,24 +8164,28 @@ namespace Extrinsic::Graphics
         const RHI::FrameHandle& frame = *context.Frame;
         const RenderWorld& renderWorld = *context.World;
         const CompiledRenderGraph& compiled = *context.Compiled;
+        const bool primitivePickingActive = renderWorld.PickRequest.Pending;
 
         const RenderCommandPassStatus entityStatus =
             RecordSelectionEntityIdPass(cmd, camera, frame.FrameIndex);
         AccumulateCommandRecordStatus(route.DebugName, route.PassId, entityStatus);
-        const RenderCommandPassStatus faceStatus =
-            RecordSelectionFaceIdPass(cmd, camera, frame.FrameIndex);
-        AccumulateCommandRecordStatus(route.DebugName, route.PassId, faceStatus);
-        const RenderCommandPassStatus edgeStatus =
-            RecordSelectionEdgeIdPass(cmd, camera, frame.FrameIndex);
-        AccumulateCommandRecordStatus(route.DebugName, route.PassId, edgeStatus);
-        const RenderCommandPassStatus pointStatus =
-            RecordSelectionPointIdPass(cmd, camera, frame.FrameIndex);
-        AccumulateCommandRecordStatus(route.DebugName, route.PassId, pointStatus);
+        if (primitivePickingActive)
+        {
+            const RenderCommandPassStatus faceStatus =
+                RecordSelectionFaceIdPass(cmd, camera, frame.FrameIndex);
+            AccumulateCommandRecordStatus(route.DebugName, route.PassId, faceStatus);
+            const RenderCommandPassStatus edgeStatus =
+                RecordSelectionEdgeIdPass(cmd, camera, frame.FrameIndex);
+            AccumulateCommandRecordStatus(route.DebugName, route.PassId, edgeStatus);
+            const RenderCommandPassStatus pointStatus =
+                RecordSelectionPointIdPass(cmd, camera, frame.FrameIndex);
+            AccumulateCommandRecordStatus(route.DebugName, route.PassId, pointStatus);
+        }
 
         if (m_Device != nullptr && m_Device->IsOperational() &&
             m_PickingReadbackBuffer.has_value() &&
             m_PickingReadbackBuffer->IsValid() &&
-            renderWorld.PickRequest.Pending)
+            primitivePickingActive)
         {
             const RHI::BufferHandle pickingBuffer =
                 m_PickingReadbackBuffer->GetHandle();

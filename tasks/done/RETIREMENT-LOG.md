@@ -3146,3 +3146,19 @@ runtime contract coverage passed for default CPU selection and Vulkan-requested
 CPU fallback telemetry; the full CPU gate still reports the unrelated
 pre-existing `SandboxEditorUi.RegistrationCommandAlignsAcrossEntityTransforms`
 registration failure.
+
+[`BUG-052`](BUG-052-sandbox-selection-visualization-regressions.md) — Sandbox
+selection and visualization regressions retired to `tasks/done/` on
+2026-07-02 at `CPUContracted`. Outline-only selected/hovered frames now record
+only the entity-ID pass and skip face/edge/point primitive-picking subpasses
+plus readback work unless an actual pick request is pending. SciVis
+visualization color-source overrides no longer set the legacy `Unlit` flag, so
+uniform color, scalar colormaps/isolines, and KMeans/per-element label buffers
+continue to shade from assigned normals. Runtime auto property-buffer
+extraction now resolves mesh, graph, and point-cloud domains: graph vertex
+properties map to `Nodes`, graph edge properties to `Edges`, point-cloud
+vertex properties to `Vertices`, and unsupported domains fail closed with
+diagnostics. Focused graphics/runtime CPU contract coverage passed.
+The full CPU-supported gate still reports the unrelated pre-existing
+`SandboxEditorUi.RegistrationCommandAlignsAcrossEntityTransforms` registration
+failure.

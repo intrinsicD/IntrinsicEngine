@@ -202,6 +202,11 @@ TEST(GraphicsMinimalAcceptance, Triangle_FirstImplementationContract)
     }};
 
     visSync.Sync(visualizationRecords, matSys, colorSys, world);
+    const Graphics::MaterialParams uniformOverrideParams =
+        matSys.GetParams(Graphics::MaterialHandle{materialInstance.EffectiveSlot, 0u});
+    EXPECT_FALSE(Graphics::HasFlag(uniformOverrideParams.Flags,
+                                   Graphics::MaterialFlags::Unlit));
+    EXPECT_EQ(uniformOverrideParams.Shading, Graphics::ShadingModel::Lit);
     matSys.SyncGpuBuffer();
 
     RHI::GpuBounds bounds{};
@@ -407,6 +412,20 @@ TEST(GraphicsMinimalAcceptance, VisualizationSyncWritesEquivalentLinePointColorS
 
     visSync.Sync(records, matSys, colorSys, world);
 
+    const auto expectLitOverride =
+        [&](const Graphics::Components::MaterialInstance& material)
+    {
+        ASSERT_NE(material.EffectiveSlot, Graphics::kDefaultMaterialSlotIndex);
+        const Graphics::MaterialParams params =
+            matSys.GetParams(Graphics::MaterialHandle{material.EffectiveSlot, 0u});
+        EXPECT_FALSE(Graphics::HasFlag(params.Flags,
+                                       Graphics::MaterialFlags::Unlit));
+        EXPECT_EQ(params.Shading, Graphics::ShadingModel::Lit);
+    };
+    expectLitOverride(surfaceMaterial);
+    expectLitOverride(lineMaterial);
+    expectLitOverride(pointMaterial);
+
     const auto expectScalarConfig = [&](const Graphics::GpuInstanceHandle instance)
     {
         const RHI::GpuEntityConfig config = world.GetEntityConfigForTest(instance);
@@ -458,6 +477,10 @@ TEST(GraphicsMinimalAcceptance, VisualizationSyncWritesEquivalentLinePointColorS
         }
 
         visSync.Sync(records, matSys, colorSys, world);
+
+        expectLitOverride(surfaceMaterial);
+        expectLitOverride(lineMaterial);
+        expectLitOverride(pointMaterial);
 
         const auto expectColorConfig = [&](const Graphics::GpuInstanceHandle instance)
         {

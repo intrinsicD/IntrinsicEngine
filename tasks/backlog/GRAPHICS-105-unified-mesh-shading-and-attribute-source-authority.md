@@ -21,10 +21,10 @@ maturity_target: Operational
 
 ## Context
 - Owner/layer: `graphics` for the material shading-model + per-channel attribute-source metadata and the unified shader resolution; `runtime` for uniform default-lit material assignment across import routes, extraction, and mesh-only gating; `app`/editor for the UI selector.
-- The architectural smell — **two lit/unlit authorities** today:
-  1. `Graphics::Components::VisualizationConfig::ColorSource::UniformColor` explicitly sets `MaterialFlags::Unlit` (`Graphics.Component.VisualizationConfig.cppm:60-68`, resolved in `Graphics.VisualizationSyncSystem.cpp`). The `main` commit `3485151` worked around this for the **direct import** route by switching it to `ColorSource::Material`.
+- The architectural smell — **two lit/unlit authorities** historically existed:
+  1. `Graphics::Components::VisualizationConfig::ColorSource::UniformColor` explicitly set `MaterialFlags::Unlit` (`Graphics.Component.VisualizationConfig.cppm:60-68`, resolved in `Graphics.VisualizationSyncSystem.cpp`). The `main` commit `3485151` worked around this for the **direct import** route by switching it to `ColorSource::Material`; BUG-052 removed the visualization-mode-to-unlit coupling for uniform, scalar, and per-element SciVis overrides.
   2. The material slot/type itself (`DefaultDebugSurface` + `MaterialFlags::Unlit`). RUNTIME-128 fixed the **model-scene** route by binding a lit default instead of the unlit slot 0.
-  These two route-specific fixes are symptoms of the missing single authority; this task consolidates them.
+  These route-specific fixes are symptoms of the missing single authority; this task consolidates them.
 - The correct model (matches glTF 2.0 / Unreal / Unity / Godot): material owns a `ShadingModel { Lit, Unlit }` where **Unlit is an explicit opt-in**, never a fallback; missing material → a default **lit** material; vertex normals are guaranteed at import; a normal/attribute **texture perturbs/overrides the always-present vertex attribute**, gated by "is a texture bound + ready," in one über-shader. glTF `KHR_materials_unlit` maps onto `ShadingModel::Unlit`.
 - Existing building blocks to reuse: `MaterialFlags` (`Unlit`, `ObjectSpaceNormalMap`), the `VertexChannel`/`VertexAttributeBinding` resolver (`Runtime.VertexAttributeBinding.cppm`, RUNTIME-120), generic mesh attribute texture bake (RUNTIME-109), GPU object-space normal bake (GRAPHICS-104) + scheduling (RUNTIME-129), default-lit material for material-less model-scene imports (RUNTIME-128), and direct-import material-driven shading (`3485151`).
 - "Works end to end / only this path exists": this task must **remove** the divergent lit/unlit decision for ordinary mesh imports, not merely add a parallel one, and prove the unified path through the real runtime extraction path plus an opt-in Vulkan smoke.
@@ -163,7 +163,7 @@ Delete/collapse, with the single data path replacing each:
   1088/1156/1208). Replace with `ResolveImportedMeshMaterial`. This removes the
   `3485151` workaround by subsumption.
 - [ ] **Override-material synthesis** in `VisualizationSyncSystem` for
-  `UniformColor` (`BuildUniformColorParams` setting `Unlit`,
+  `UniformColor` (`BuildUniformColorParams`,
   `Graphics.VisualizationSyncSystem.cpp:229-239`) and the per-entity
   `EnsureOverrideLease`/`OverrideLeases`/`EffectiveSlot`-per-frame machinery
   (lines 56-86, 553-589). The scivis data path (`GpuEntityConfig`) already

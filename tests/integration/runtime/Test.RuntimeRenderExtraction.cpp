@@ -197,6 +197,35 @@ namespace
         };
     }
 
+    void AttachLineGraphSources(ECS::Scene::Registry& scene,
+                                entt::entity entity)
+    {
+        namespace GS = ECS::Components::GeometrySources;
+        namespace PN = ECS::Components::GeometrySources::PropertyNames;
+
+        auto& raw = scene.Raw();
+        auto& nodes = raw.emplace_or_replace<GS::Nodes>(entity);
+        nodes.Properties.Resize(3u);
+        nodes.Properties.GetOrAdd<glm::vec3>(
+            std::string{PN::kPosition},
+            glm::vec3{0.0f}).Vector() = {
+            {0.0f, 0.0f, 0.0f},
+            {1.0f, 0.0f, 0.0f},
+            {0.0f, 1.0f, 0.0f},
+        };
+
+        auto& edges = raw.emplace_or_replace<GS::Edges>(entity);
+        edges.Properties.Resize(2u);
+        edges.Properties.GetOrAdd<std::uint32_t>(
+            std::string{PN::kEdgeV0},
+            0u).Vector() = {0u, 1u};
+        edges.Properties.GetOrAdd<std::uint32_t>(
+            std::string{PN::kEdgeV1},
+            0u).Vector() = {1u, 2u};
+
+        raw.emplace_or_replace<GS::HasGraphTopology>(entity);
+    }
+
     void AttachTriangleMeshSources(ECS::Scene::Registry& scene,
                                    entt::entity entity)
     {
@@ -337,6 +366,40 @@ namespace
 
         auto& visualization = registry.emplace<Graphics::Components::VisualizationConfig>(entity);
         visualization.Source = Graphics::Components::VisualizationConfig::ColorSource::PerVertexBuffer;
+        visualization.ColorBufferName = propertyName;
+    }
+
+    void ConfigureGraphScalarVisualization(
+        ECS::Scene::Registry& scene,
+        entt::entity entity,
+        const std::string& propertyName,
+        Graphics::Components::VisualizationConfig::Domain domain)
+    {
+        auto& registry = scene.Raw();
+        registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
+        registry.emplace<Graphics::Components::RenderEdges>(entity);
+        AttachLineGraphSources(scene, entity);
+
+        auto& visualization = registry.emplace<Graphics::Components::VisualizationConfig>(entity);
+        visualization.Source = Graphics::Components::VisualizationConfig::ColorSource::ScalarField;
+        visualization.ScalarFieldName = propertyName;
+        visualization.ScalarDomain = domain;
+        visualization.Scalar.Map = Graphics::Colormap::Type::Plasma;
+    }
+
+    void ConfigureGraphColorVisualization(
+        ECS::Scene::Registry& scene,
+        entt::entity entity,
+        const std::string& propertyName,
+        Graphics::Components::VisualizationConfig::ColorSource source)
+    {
+        auto& registry = scene.Raw();
+        registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
+        registry.emplace<Graphics::Components::RenderEdges>(entity);
+        AttachLineGraphSources(scene, entity);
+
+        auto& visualization = registry.emplace<Graphics::Components::VisualizationConfig>(entity);
+        visualization.Source = source;
         visualization.ColorBufferName = propertyName;
     }
 }
@@ -744,6 +807,203 @@ TEST(RuntimeRenderExtraction, MeshColorVisualizationPropertyBufferUploadsFromGeo
     EXPECT_TRUE(world.Visualization.HasVisualizationPackets);
 }
 
+TEST(RuntimeRenderExtraction, PointCloudVisualizationPropertyBuffersUploadFromGeometrySources)
+{
+    namespace GS = ECS::Components::GeometrySources;
+
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+
+    const auto scalarEntity = scene.Create();
+    ConfigureScalarVisualization(scene, scalarEntity);
+    auto& scalarVertices =
+        scene.Raw().get<GS::Vertices>(scalarEntity);
+    scalarVertices.Properties.GetOrAdd<float>("curvature", 0.0f).Vector() =
+        {-0.5f, 0.25f, 1.5f};
+
+    const auto colorEntity = scene.Create();
+    ConfigureColorBufferVisualization(scene, colorEntity);
+    auto& colorVertices =
+        scene.Raw().get<GS::Vertices>(colorEntity);
+    colorVertices.Properties.GetOrAdd<glm::vec4>(
+        "v:kmeans_color",
+        glm::vec4{1.0f}).Vector() = {
+        {1.0f, 0.0f, 0.0f, 1.0f},
+        {0.0f, 1.0f, 0.0f, 1.0f},
+        {0.0f, 0.0f, 1.0f, 1.0f},
+    };
+
+    const auto stats = fixture.Extract(scene);
+    const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
+
+    EXPECT_EQ(stats.PointCloudGeometryUploads, 2u);
+    EXPECT_EQ(stats.VisualizationAdapterPacketAppendCount, 2u);
+    EXPECT_EQ(stats.VisualizationScalarPacketCount, 1u);
+    EXPECT_EQ(stats.VisualizationColorPacketCount, 1u);
+    EXPECT_EQ(stats.VisualizationAdapterMissingSourceCount, 0u);
+    EXPECT_EQ(stats.VisualizationAdapterUnsupportedSourceTypeCount, 0u);
+
+    ASSERT_EQ(world.Visualization.Scalars.size(), 1u);
+    const Graphics::ScalarAttributePacket& scalarPacket =
+        world.Visualization.Scalars.front();
+    EXPECT_EQ(scalarPacket.Name, "curvature");
+    EXPECT_EQ(scalarPacket.SourceBufferKey,
+              std::to_string(StableId(scalarEntity)) + ":scalar:curvature");
+    EXPECT_EQ(scalarPacket.Domain, Graphics::VisualizationAttributeDomain::Vertex);
+    EXPECT_EQ(scalarPacket.ElementCount, 3u);
+    EXPECT_NE(scalarPacket.ScalarBufferBDA, 0u);
+
+    ASSERT_EQ(world.Visualization.Colors.size(), 1u);
+    const Graphics::ColorAttributePacket& colorPacket =
+        world.Visualization.Colors.front();
+    EXPECT_EQ(colorPacket.Name, "v:kmeans_color");
+    EXPECT_EQ(colorPacket.SourceBufferKey,
+              std::to_string(StableId(colorEntity)) + ":color:v:kmeans_color");
+    EXPECT_EQ(colorPacket.Domain, Graphics::VisualizationAttributeDomain::Vertex);
+    EXPECT_EQ(colorPacket.ElementCount, 3u);
+    EXPECT_NE(colorPacket.ColorBufferBDA, 0u);
+
+    EXPECT_EQ(world.Visualization.PropertyBufferDiagnostics.InputBufferCount, 2u);
+    EXPECT_EQ(world.Visualization.PropertyBufferDiagnostics.UploadedBufferCount, 2u);
+    EXPECT_EQ(world.Visualization.Diagnostics.InputPacketCount, 2u);
+    EXPECT_EQ(world.Visualization.Diagnostics.AcceptedPacketCount, 2u);
+    EXPECT_FALSE(world.Visualization.Diagnostics.HasErrors);
+    EXPECT_TRUE(world.Visualization.HasVisualizationPackets);
+}
+
+TEST(RuntimeRenderExtraction, GraphVisualizationPropertyBuffersUploadFromNodeAndEdgeDomains)
+{
+    namespace GS = ECS::Components::GeometrySources;
+    using Domain = Graphics::Components::VisualizationConfig::Domain;
+    using ColorSource = Graphics::Components::VisualizationConfig::ColorSource;
+
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+
+    const auto nodeScalarEntity = scene.Create();
+    ConfigureGraphScalarVisualization(
+        scene, nodeScalarEntity, "node_score", Domain::Vertex);
+    auto& nodeScalarProperties =
+        scene.Raw().get<GS::Nodes>(nodeScalarEntity).Properties;
+    nodeScalarProperties.GetOrAdd<float>("node_score", 0.0f).Vector() =
+        {0.1f, 0.5f, 0.9f};
+
+    const auto edgeScalarEntity = scene.Create();
+    ConfigureGraphScalarVisualization(
+        scene, edgeScalarEntity, "edge_score", Domain::Edge);
+    auto& edgeScalarProperties =
+        scene.Raw().get<GS::Edges>(edgeScalarEntity).Properties;
+    edgeScalarProperties.GetOrAdd<float>("edge_score", 0.0f).Vector() =
+        {0.2f, 0.8f};
+
+    const auto nodeColorEntity = scene.Create();
+    ConfigureGraphColorVisualization(
+        scene, nodeColorEntity, "node_color", ColorSource::PerVertexBuffer);
+    auto& nodeColorProperties =
+        scene.Raw().get<GS::Nodes>(nodeColorEntity).Properties;
+    nodeColorProperties.GetOrAdd<glm::vec4>(
+        "node_color",
+        glm::vec4{1.0f}).Vector() = {
+        {1.0f, 0.0f, 0.0f, 1.0f},
+        {0.0f, 1.0f, 0.0f, 1.0f},
+        {0.0f, 0.0f, 1.0f, 1.0f},
+    };
+
+    const auto edgeColorEntity = scene.Create();
+    ConfigureGraphColorVisualization(
+        scene, edgeColorEntity, "edge_color", ColorSource::PerEdgeBuffer);
+    auto& edgeColorProperties =
+        scene.Raw().get<GS::Edges>(edgeColorEntity).Properties;
+    edgeColorProperties.GetOrAdd<glm::vec4>(
+        "edge_color",
+        glm::vec4{1.0f}).Vector() = {
+        {1.0f, 1.0f, 0.0f, 1.0f},
+        {0.0f, 1.0f, 1.0f, 1.0f},
+    };
+
+    const auto stats = fixture.Extract(scene);
+    const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
+
+    EXPECT_EQ(stats.GraphGeometryUploads, 4u);
+    EXPECT_EQ(stats.VisualizationAdapterPacketAppendCount, 4u);
+    EXPECT_EQ(stats.VisualizationScalarPacketCount, 2u);
+    EXPECT_EQ(stats.VisualizationColorPacketCount, 2u);
+    EXPECT_EQ(stats.VisualizationAdapterMissingSourceCount, 0u);
+    EXPECT_EQ(stats.VisualizationAdapterUnsupportedSourceTypeCount, 0u);
+
+    const auto findScalar =
+        [&](const std::string& name) -> const Graphics::ScalarAttributePacket*
+    {
+        for (const Graphics::ScalarAttributePacket& packet :
+             world.Visualization.Scalars)
+        {
+            if (packet.Name == name)
+            {
+                return &packet;
+            }
+        }
+        return nullptr;
+    };
+    const auto findColor =
+        [&](const std::string& name) -> const Graphics::ColorAttributePacket*
+    {
+        for (const Graphics::ColorAttributePacket& packet :
+             world.Visualization.Colors)
+        {
+            if (packet.Name == name)
+            {
+                return &packet;
+            }
+        }
+        return nullptr;
+    };
+
+    ASSERT_EQ(world.Visualization.Scalars.size(), 2u);
+    const Graphics::ScalarAttributePacket* nodeScalar =
+        findScalar("node_score");
+    ASSERT_NE(nodeScalar, nullptr);
+    EXPECT_EQ(nodeScalar->SourceBufferKey,
+              std::to_string(StableId(nodeScalarEntity)) + ":scalar:node_score");
+    EXPECT_EQ(nodeScalar->Domain, Graphics::VisualizationAttributeDomain::Vertex);
+    EXPECT_EQ(nodeScalar->ElementCount, 3u);
+    EXPECT_NE(nodeScalar->ScalarBufferBDA, 0u);
+
+    const Graphics::ScalarAttributePacket* edgeScalar =
+        findScalar("edge_score");
+    ASSERT_NE(edgeScalar, nullptr);
+    EXPECT_EQ(edgeScalar->SourceBufferKey,
+              std::to_string(StableId(edgeScalarEntity)) + ":scalar:edge_score");
+    EXPECT_EQ(edgeScalar->Domain, Graphics::VisualizationAttributeDomain::Edge);
+    EXPECT_EQ(edgeScalar->ElementCount, 2u);
+    EXPECT_NE(edgeScalar->ScalarBufferBDA, 0u);
+
+    ASSERT_EQ(world.Visualization.Colors.size(), 2u);
+    const Graphics::ColorAttributePacket* nodeColor =
+        findColor("node_color");
+    ASSERT_NE(nodeColor, nullptr);
+    EXPECT_EQ(nodeColor->SourceBufferKey,
+              std::to_string(StableId(nodeColorEntity)) + ":color:node_color");
+    EXPECT_EQ(nodeColor->Domain, Graphics::VisualizationAttributeDomain::Vertex);
+    EXPECT_EQ(nodeColor->ElementCount, 3u);
+    EXPECT_NE(nodeColor->ColorBufferBDA, 0u);
+
+    const Graphics::ColorAttributePacket* edgeColor =
+        findColor("edge_color");
+    ASSERT_NE(edgeColor, nullptr);
+    EXPECT_EQ(edgeColor->SourceBufferKey,
+              std::to_string(StableId(edgeColorEntity)) + ":color:edge_color");
+    EXPECT_EQ(edgeColor->Domain, Graphics::VisualizationAttributeDomain::Edge);
+    EXPECT_EQ(edgeColor->ElementCount, 2u);
+    EXPECT_NE(edgeColor->ColorBufferBDA, 0u);
+
+    EXPECT_EQ(world.Visualization.PropertyBufferDiagnostics.InputBufferCount, 4u);
+    EXPECT_EQ(world.Visualization.PropertyBufferDiagnostics.UploadedBufferCount, 4u);
+    EXPECT_EQ(world.Visualization.Diagnostics.InputPacketCount, 4u);
+    EXPECT_EQ(world.Visualization.Diagnostics.AcceptedPacketCount, 4u);
+    EXPECT_FALSE(world.Visualization.Diagnostics.HasErrors);
+    EXPECT_TRUE(world.Visualization.HasVisualizationPackets);
+}
+
 TEST(RuntimeRenderExtraction, MeshVertexColorDirtyChannelPartiallyUploadsStructuralColorStream)
 {
     RendererFixture fixture;
@@ -1078,7 +1338,7 @@ TEST(RuntimeRenderExtraction, VisualizationNonScalarAdapterFailuresAreCounted)
     EXPECT_EQ(stats.VisualizationAdapterBindingsMissing, 1u);
     EXPECT_EQ(stats.VisualizationAdapterMissingAdapterCount, 1u);
     EXPECT_EQ(stats.VisualizationAdapterInvokedCount, 1u);
-    EXPECT_EQ(stats.VisualizationAdapterMissingSourceCount, 1u);
+    EXPECT_EQ(stats.VisualizationAdapterMissingSourceCount, 2u);
     EXPECT_EQ(stats.VisualizationAdapterPacketAppendCount, 0u);
     EXPECT_EQ(stats.VisualizationColorPacketCount, 0u);
     EXPECT_EQ(stats.VisualizationVectorFieldPacketCount, 0u);

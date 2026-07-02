@@ -173,6 +173,18 @@ namespace
         return nullptr;
     }
 
+    [[nodiscard]] std::uint32_t CountCommandPass(
+        const Extrinsic::Graphics::RenderGraphFrameStats& stats,
+        const std::string& name)
+    {
+        return static_cast<std::uint32_t>(
+            std::ranges::count_if(stats.CommandRecords.Passes,
+                                  [&](const auto& pass)
+                                  {
+                                      return pass.Name == name;
+                                  }));
+    }
+
     [[nodiscard]] Extrinsic::Graphics::FrameRecipeOverride MakeRecipeOverride(
         std::vector<std::string> disabledSlots)
     {
@@ -3870,6 +3882,13 @@ TEST(RendererFrameLifecycle, SelectionOutlineBindsEntityIdToDedicatedSampledSlot
     const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
     EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
     EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_EQ(CountCommandPass(stats, "PickingPass"), 1u)
+        << "Outline-only selected frames need the EntityId target but must not "
+           "record the face/edge/point primitive-picking subpasses.";
+    EXPECT_EQ(stats.PickingReadbackCopyCount, 0u)
+        << "Selected/hovered outline frames must not enqueue a pick readback "
+           "unless a click-pick request is pending.";
+
     const Extrinsic::Graphics::RenderGraphCommandPassStats* outlinePass =
         FindCommandPass(stats, "SelectionOutlinePass");
     ASSERT_NE(outlinePass, nullptr);
@@ -4171,6 +4190,9 @@ TEST(RendererFrameLifecycle, PickingReadbackCopyRecordedWhenPickPending)
         FindCommandPass(stats, "PickingPass");
     ASSERT_NE(pickingPass, nullptr);
     EXPECT_EQ(pickingPass->Status, Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    EXPECT_EQ(CountCommandPass(stats, "PickingPass"), 4u)
+        << "Pending click-pick frames must still record entity, face, edge, "
+           "and point ID subpasses before the readback copy.";
 
     EXPECT_EQ(stats.PickingReadbackCopyCount, 1u)
         << "Picking-readback copy pair must record exactly once per operational "

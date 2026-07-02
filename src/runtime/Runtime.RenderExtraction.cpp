@@ -439,7 +439,7 @@ namespace Extrinsic::Runtime
             return Domain::Vertex;
         }
 
-        [[nodiscard]] const Geometry::PropertySet* PropertySetForMeshVisualizationDomain(
+        [[nodiscard]] const Geometry::PropertySet* PropertySetForVisualizationDomain(
             const ECS::Components::GeometrySources::ConstSourceView& view,
             const Graphics::Components::VisualizationConfig::Domain domain) noexcept
         {
@@ -447,26 +447,51 @@ namespace Extrinsic::Runtime
             using Domain = Graphics::Components::VisualizationConfig::Domain;
             const GS::SourceAvailability sources =
                 GS::BuildSourceAvailability(view);
-            if (sources.ProvenanceDomain != GS::Domain::Mesh)
+
+            if (sources.ProvenanceDomain == GS::Domain::Mesh)
             {
-                return nullptr;
+                switch (domain)
+                {
+                case Domain::Vertex:
+                    return view.VertexSource != nullptr
+                        ? &view.VertexSource->Properties
+                        : nullptr;
+                case Domain::Edge:
+                    return view.EdgeSource != nullptr
+                        ? &view.EdgeSource->Properties
+                        : nullptr;
+                case Domain::Face:
+                    return view.FaceSource != nullptr
+                        ? &view.FaceSource->Properties
+                        : nullptr;
+                }
             }
 
-            switch (domain)
+            if (sources.ProvenanceDomain == GS::Domain::Graph)
             {
-            case Domain::Vertex:
+                switch (domain)
+                {
+                case Domain::Vertex:
+                    return view.NodeSource != nullptr
+                        ? &view.NodeSource->Properties
+                        : nullptr;
+                case Domain::Edge:
+                    return view.EdgeSource != nullptr
+                        ? &view.EdgeSource->Properties
+                        : nullptr;
+                case Domain::Face:
+                    return nullptr;
+                }
+            }
+
+            if (sources.ProvenanceDomain == GS::Domain::PointCloud &&
+                domain == Domain::Vertex)
+            {
                 return view.VertexSource != nullptr
                     ? &view.VertexSource->Properties
                     : nullptr;
-            case Domain::Edge:
-                return view.EdgeSource != nullptr
-                    ? &view.EdgeSource->Properties
-                    : nullptr;
-            case Domain::Face:
-                return view.FaceSource != nullptr
-                    ? &view.FaceSource->Properties
-                    : nullptr;
             }
+
             return nullptr;
         }
 
@@ -605,7 +630,7 @@ namespace Extrinsic::Runtime
             return options;
         }
 
-        void AppendMeshScalarVisualizationPropertyBuffer(
+        void AppendScalarVisualizationPropertyBuffer(
             const std::uint32_t stableId,
             const ECS::Components::GeometrySources::ConstSourceView& view,
             const Graphics::Components::VisualizationConfig* visualization,
@@ -619,7 +644,7 @@ namespace Extrinsic::Runtime
             }
 
             const Geometry::PropertySet* properties =
-                PropertySetForMeshVisualizationDomain(
+                PropertySetForVisualizationDomain(
                     view, visualization->ScalarDomain);
             if (properties == nullptr)
             {
@@ -655,7 +680,7 @@ namespace Extrinsic::Runtime
             stats.VisualizationAdapterFlatAutoRangeExpandedCount += perAdapter.FlatAutoRangeExpandedCount;
         }
 
-        void AppendMeshColorVisualizationPropertyBuffer(
+        void AppendColorVisualizationPropertyBuffer(
             const std::uint32_t stableId,
             const ECS::Components::GeometrySources::ConstSourceView& view,
             const Graphics::Components::VisualizationConfig* visualization,
@@ -669,7 +694,7 @@ namespace Extrinsic::Runtime
             }
 
             const Geometry::PropertySet* properties =
-                PropertySetForMeshVisualizationDomain(
+                PropertySetForVisualizationDomain(
                     view,
                     ToColorBufferConfigDomain(visualization->Source));
             if (properties == nullptr)
@@ -2848,13 +2873,13 @@ namespace Extrinsic::Runtime
                     }
                     if (alreadyAppended)
                         continue;
-                    AppendMeshScalarVisualizationPropertyBuffer(
+                    AppendScalarVisualizationPropertyBuffer(
                         stableId,
                         *sourceViewThisFrame,
                         configs[i],
                         m_VisualizationState->Batch,
                         stats);
-                    AppendMeshColorVisualizationPropertyBuffer(
+                    AppendColorVisualizationPropertyBuffer(
                         stableId,
                         *sourceViewThisFrame,
                         configs[i],

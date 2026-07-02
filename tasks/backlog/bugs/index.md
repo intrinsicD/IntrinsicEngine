@@ -11,6 +11,8 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Verified / Closed
 
+- Closed 2026-07-02: [`BUG-052` — Sandbox selection and visualization regressions](../../done/BUG-052-sandbox-selection-visualization-regressions.md). Selection outline frames now avoid primitive picking/readback work unless a click-pick request is pending, visualization override materials stay lit by default so normals continue shading scalar/label colors, and runtime auto property-buffer extraction covers mesh, graph, and point-cloud scalar/color domains with fail-closed diagnostics.
+
 - Closed 2026-06-24: [`BUG-046` — Flaky `CoreTaskGraph.MainThreadReadyQueueUsesPriorityAndCostOrdering`](../../done/BUG-046-flaky-coretaskgraph-mainthread-ready-queue-ordering.md). `TaskGraph::Execute()` now batches simultaneously-ready main-thread successors under one ready-queue lock before the executor can drain them, so priority/cost ordering is applied to the full batch. The regression no longer relies on the fixed `40ms` `WorkerBlocker` sleep, preserved the `[HighHeavyMain, HighMain, LowMain]` assertions, passed 50/50 under `--repeat until-fail`, and the default CPU-supported gate passed 3024/3024.
 
 - Closed 2026-06-21 (retired from backlog 2026-06-22): [`BUG-049` — GpuWorld geometry rebind lacks upload-to-read barriers](../../done/BUG-049-gpuworld-geometry-rebind-upload-barriers.md). `GpuWorld` now tracks one-shot pending upload barriers for direct buffer writes, renderer drains them before consumers, and focused geometry-rebind plus dirty-extraction coverage passed during the 2026-06-22 backlog audit.

@@ -192,7 +192,6 @@ namespace Extrinsic::Graphics
             ColormapSystem&                        colormapSys)
         {
             MaterialParams p{};
-            p.Flags = MaterialFlags::Unlit;
 
             const RHI::BindlessIndex colormapIdx =
                 colormapSys.GetBindlessIndex(cfg.Scalar.Map);
@@ -231,7 +230,6 @@ namespace Extrinsic::Graphics
         {
             MaterialParams p{};
             p.BaseColorFactor = color;
-            p.Flags           = MaterialFlags::Unlit;
             p.CustomData[2]   = {
                 color.a, 0.f, 0.f, 0.f,
             };
@@ -242,7 +240,6 @@ namespace Extrinsic::Graphics
         static MaterialParams BuildPerElementParams()
         {
             MaterialParams p{};
-            p.Flags = MaterialFlags::Unlit;
             p.CustomData[2] = {
                 1.f, 0.f, 0.f, 0.f,
             };
