@@ -1,6 +1,10 @@
 # K-Means GPU backend — Framework24 → IntrinsicEngine migration proposal
 
-Status: proposal / design note (not yet a promoted task).
+Status: implemented design note; GEOM-056 Slices A-D implemented the planning,
+recording, persistent-buffer upload, post-submit async readback, shader-local
+privatized accumulation, opt-in `gpu;vulkan` parity smoke, and benchmark
+manifest/result path. Higher-level sandbox execution remains outside this
+task's scope.
 Scope: analyze the Framework24 CUDA k-means and propose a parity-gated GPU
 backend for `Geometry.KMeans` in IntrinsicEngine.
 
@@ -14,6 +18,8 @@ Related existing work:
   the CUDA remove/keep decision.
 - `tasks/active/METHOD-013-progressive-poisson-disk-gpu-backend.md` — the live
   template for a Vulkan-compute method backend (module shape, slices, tests).
+- `tasks/done/GEOM-056-kmeans-gpu-vulkan-compute-backend.md` — implemented and
+  parity-gated this KMeans Vulkan-compute backend.
 
 ---
 
@@ -34,9 +40,10 @@ Related existing work:
   compute only; no CUDA path," and the dispatch doc maps `Backend::GPU →
   gpu_vulkan_compute` for compute-style families.
 - **The seam is already wired.** `Extrinsic.Runtime.KMeansBackend::ClusterKMeans`
-  has the exact `if (requestedBackend == GPU && device.IsOperational())` hook,
-  currently a no-op comment: *"A real GPU KMeans kernel must be added by a later
-  parity-gated backend task."* This proposal is that task.
+  preserves honest CPU fallback telemetry, while
+  `Extrinsic.Runtime.KMeansGpuBackend` owns the explicit GPU execution surface
+  for callers that can supply command recording, pipelines, persistent buffer
+  cache, and async readbacks.
 
 A straight port of the Framework24 CUDA kernels is therefore the wrong shape for
 this repo. We migrate the **algorithm**, not the CUDA mechanics.
@@ -130,10 +137,10 @@ Geometry.KMeans (geometry, RHI-free)      ← canonical CPU reference (unchanged
 Extrinsic.Runtime.KMeansGpuBackend (runtime)
     ├─ buffer layout + BDA state record + push-constant structs
     ├─ pipeline set (reset / assign / update / reduce)
-    ├─ persistent resource set (created once, reused every iteration)
+    ├─ persistent resource cache keyed by `(n,k)`
     ├─ RecordKMeansGpuExecution(...)  → records the whole Lloyd loop
-    └─ ReadKMeansGpuReadbacks(...)    → one batched drain at the end
-Extrinsic.Runtime.KMeansBackend::ClusterKMeans(...)  ← existing seam, routes here
+    └─ KMeansGpuAsyncReadbacks        → post-submit async drain at the end
+Extrinsic.Runtime.KMeansBackend::ClusterKMeans(...)  ← thin CPU fallback overload
 ```
 
 ### 4.1 Shaders (`assets/shaders/`, `local_size_x = 256`, scalar BDA push)
@@ -176,7 +183,7 @@ TransferSrc | TransferDst`, reached by BDA:
 | `SquaredDistances` (f32) | `n` | output | resident, drained once |
 | `Reduction scratch` | few | `inertia`, farthest-point argmax, `changedCount` (from assign), `maxShiftBits` (from update), `converged` | cleared per iter on GPU |
 | `State` (BDA table) | 1 | device-address pointer table to the other buffers | resident |
-| Host-visible readback | `n`+`n`+`k` | outputs | **drained exactly once at the end** |
+| Async readback host pool | `n`+`n`+`k` | outputs | **drained exactly once at the end** through `AsyncBufferReadback` after the producing submission has retired |
 
 **I/O budget:** one bulk upload of positions + one batched readback of
 `Labels`/`SquaredDistances`/`Centroids`. Nothing is mapped, copied, or synced
@@ -205,12 +212,14 @@ and testable headless.
   (ref-counted leases + hot-reload).
 - **Buffers**: `RHI::BufferManager::Create({.SizeBytes, .Usage = Storage |
   TransferSrc | TransferDst})` → `BufferLease`; `IDevice::WriteBuffer` /
-  `ReadBuffer`; `IDevice::GetBufferDeviceAddress` for the BDA push table
+  `AsyncBufferReadback`; `IDevice::GetBufferDeviceAddress` for the BDA push table
   (requires `BufferUsage::Storage`).
 - **Recording**: `ICommandContext::BindPipeline` → `PushConstants` → `Dispatch(⌈n/256⌉,1,1)`
   → `BufferBarrier(MemoryAccess::ShaderWrite, ShaderRead)` between passes →
-  `ShaderWrite → HostRead` + `CopyBuffer` before readback. `DispatchIndirect`
-  available for device-driven early-out.
+  `AsyncBufferReadback` records `ShaderWrite → TransferRead` for the final
+  non-blocking drains after the compute-producing command submission has
+  retired. `DispatchIndirect` remains available for a future device-driven
+  early-out.
 - **Reductions**: reuse `Extrinsic.Graphics.ComputeParallelPrimitives` (prefix
   scan / compaction / count→dispatch-args) rather than reimplementing.
 - **Shader idiom**: model on `assets/shaders/instance_cull.comp` +
@@ -293,9 +302,10 @@ guard — **zero per-iteration I/O**, one final readback.
 > per call (`RHI.Device.cppm:145-147`, `Backends.Vulkan.Device.cpp:3889-3937`),
 > and the ProgressivePoisson backend drifted onto that stalling default despite
 > otherwise-exemplary structure. k-means must route its final
-> labels/distances/centroids drain through `Runtime.GpuReadbackJob` /
-> `Graphics.GpuTransfer` (ticket → poll → deferred apply) so the device never
-> stalls — critical for interactive or repeated-solve use. See the audit
+> labels/distances/centroids drain through `Runtime.AsyncBufferReadback` /
+> `Graphics.GpuTransfer` (ticket → poll → deferred apply) after the producing
+> compute submission has retired, so the drain does not race the producer and the
+> device never stalls — critical for interactive or repeated-solve use. See the audit
 > (`docs/reviews/2026-07-01-gpu-geometry-backend-io-audit.md`, Finding 1).
 
 ---
@@ -307,12 +317,15 @@ guard — **zero per-iteration I/O**, one final readback.
   within absolute tolerance; allow label differences only for near-equidistant
   ties. The deterministic fixed-point mode (§5.4) tightens this.
 - **`gpu;vulkan` parity test** (`ci-vulkan`): GPU reproduces the CPU reference on
-  shared fixtures; assert `ActualBackend == GPU` when operational.
+  shared fixtures; assert the explicit GPU execution surface reaches the GPU path
+  when operational and matches labels, centroids, inertia, and max-distance
+  index within tolerance.
 - **Default-gate fallback test**: on the Null device, a `Backend::GPU` request
   returns the CPU result with `ActualBackend == CPU`, `FellBackToCPU == true`
   (extends the existing `tests/contract/runtime/Test.KMeansBackend.cpp`).
-- **Benchmark**: add a manifest with `gpu_time_ms` and a CPU-vs-GPU speedup
-  diagnostic (heavy/nightly), baseline-compared before any speedup claim.
+- **Benchmark**: `IntrinsicKMeansGpuBenchmarkSmoke` emits `gpu_time_ms`, a
+  CPU-reference baseline timing, parity diagnostics, and `speedup_claimed=false`
+  until a separate baseline comparison task makes a supported performance claim.
 
 ---
 
@@ -325,11 +338,18 @@ guard — **zero per-iteration I/O**, one final readback.
 - **Slice B — layout + shaders (`CPUContracted`).** BDA state record,
   push-constant structs, `kmeans_reset/assign/update` shader assets, fail-closed
   dispatch planning; `check_shader_outputs` wiring. Execution still falls back.
-- **Slice C — record + persistent buffers.** Persistent resource set with
-  `BufferLease` caching, one-time upload (or retained-buffer alias), recorded
-  Lloyd loop with barriers, batched readback ownership.
-- **Slice D — parity + benchmark (`Operational` → `ParityProven`).** `gpu;vulkan`
-  parity tests, deterministic-mode validation, benchmark manifest + baseline.
+- **Slice C — record + persistent buffers.** Implemented by
+  `KMeansGpuResourceCache`, `RecordKMeansGpuExecution(...)`, and
+  `KMeansGpuAsyncReadbacks`: persistent `(n,k)` buffer leasing, one-time SoA
+  position + seed-centroid upload, recorded Lloyd loop with barriers, and async
+  labels/distances/centroids drains. The assign shader uses shared-memory
+  privatized accumulation for `k <= 256` with a direct global-atomic fallback.
+- **Slice D — parity + benchmark (`Operational` → `ParityProven`).** Implemented
+  by `IntrinsicRuntimeKMeansGpuSmokeTests` and
+  `IntrinsicKMeansGpuBenchmarkSmoke`: the opt-in `gpu;vulkan` smoke validates the
+  deterministic fixture against the CPU reference, and the benchmark manifest /
+  emitted result JSON report GPU wall time, CPU-reference baseline timing, and
+  parity diagnostics without claiming a speedup.
 
 Each slice is independently bisectable and keeps the default CPU gate green.
 

@@ -3995,7 +3995,7 @@ TEST(SandboxEditorUi, MeshSimplifyPreservesUvSeamsWhenTexcoordsPresent)
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
 
     constexpr int kGrid = 4;
-    const Geometry::HalfedgeMesh::Mesh grid = MakeGridPlaneMesh(kGrid);
+    Geometry::HalfedgeMesh::Mesh grid = MakeGridPlaneMesh(kGrid);
     const ECS::EntityHandle mesh = MakeSelectable(registry, "TexturedGrid");
     GS::PopulateFromMesh(registry.Raw(), mesh, grid);
     registry.Raw().emplace<G::RenderSurface>(mesh);

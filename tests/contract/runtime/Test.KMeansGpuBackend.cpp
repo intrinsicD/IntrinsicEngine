@@ -1,17 +1,34 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <array>
+#include <cstddef>
 #include <cstdint>
+#include <cstring>
+#include <deque>
+#include <span>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
+#include <glm/glm.hpp>
+
+import Extrinsic.Graphics.GpuTransfer;
+import Extrinsic.RHI.BufferManager;
+import Extrinsic.RHI.BufferTransfer;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.Transfer;
+import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Runtime.KMeansGpuBackend;
 
 #include "MockRHI.hpp"
 
 namespace
 {
+    namespace RHI = Extrinsic::RHI;
     namespace Runtime = Extrinsic::Runtime;
     namespace Tests = Extrinsic::Tests;
 
@@ -30,6 +47,27 @@ namespace
         };
     }
 
+    [[nodiscard]] RHI::PipelineHandle ValidPipeline(
+        const std::uint32_t index) noexcept
+    {
+        return RHI::PipelineHandle{index, 1u};
+    }
+
+    [[nodiscard]] RHI::BufferHandle ValidBuffer(
+        const std::uint32_t index) noexcept
+    {
+        return RHI::BufferHandle{index, 1u};
+    }
+
+    [[nodiscard]] Runtime::KMeansGpuPipelineSet ValidKMeansPipelines() noexcept
+    {
+        return Runtime::KMeansGpuPipelineSet{
+            .Reset = ValidPipeline(40u),
+            .Assign = ValidPipeline(41u),
+            .Update = ValidPipeline(42u),
+        };
+    }
+
     [[nodiscard]] const Runtime::KMeansGpuBufferSpan* FindSpan(
         const Runtime::KMeansGpuBufferLayout& layout,
         const Runtime::KMeansGpuBufferRole role)
@@ -41,6 +79,162 @@ namespace
         }
         return nullptr;
     }
+
+    template <typename T>
+    [[nodiscard]] std::vector<std::byte> BytesOf(std::span<const T> values)
+    {
+        const std::span<const std::byte> bytes = std::as_bytes(values);
+        return std::vector<std::byte>{bytes.begin(), bytes.end()};
+    }
+
+    template <typename T>
+    void WriteSpanBytes(std::vector<std::byte>& destination,
+                        const Runtime::KMeansGpuBufferLayout& layout,
+                        const Runtime::KMeansGpuBufferRole role,
+                        std::span<const T> values)
+    {
+        const Runtime::KMeansGpuBufferSpan* span = FindSpan(layout, role);
+        ASSERT_NE(span, nullptr);
+        ASSERT_LE(values.size_bytes(), span->SizeBytes);
+        ASSERT_LE(span->OffsetBytes + values.size_bytes(), destination.size());
+        std::memcpy(destination.data() + static_cast<std::size_t>(span->OffsetBytes),
+                    values.data(),
+                    values.size_bytes());
+    }
+
+    template <typename T>
+    [[nodiscard]] T ReadPayload(const std::vector<std::byte>& payload)
+    {
+        T value{};
+        EXPECT_EQ(payload.size(), sizeof(T));
+        if (payload.size() == sizeof(T))
+        {
+            std::memcpy(&value, payload.data(), sizeof(T));
+        }
+        return value;
+    }
+
+    template <typename T>
+    [[nodiscard]] std::vector<T> ReadVectorPayload(
+        const std::vector<std::byte>& payload)
+    {
+        std::vector<T> values(payload.size() / sizeof(T));
+        EXPECT_EQ(payload.size(), values.size() * sizeof(T));
+        if (!values.empty())
+        {
+            std::memcpy(values.data(), payload.data(), payload.size());
+        }
+        return values;
+    }
+
+    [[nodiscard]] const Tests::MockDevice::BufferWriteRecord* FindWrite(
+        const Tests::MockDevice& device,
+        const RHI::BufferHandle handle,
+        const std::uint64_t offset)
+    {
+        const auto it = std::find_if(
+            device.BufferWrites.begin(),
+            device.BufferWrites.end(),
+            [handle, offset](const Tests::MockDevice::BufferWriteRecord& write)
+            {
+                return write.Handle == handle && write.Offset == offset;
+            });
+        return it == device.BufferWrites.end() ? nullptr : &*it;
+    }
+
+    class MockReadbackTransferQueue final : public RHI::ITransferQueue
+    {
+    public:
+        std::unordered_map<std::uint32_t, std::vector<std::byte>> BufferContents{};
+        std::uint32_t DownloadCalls{0u};
+
+        [[nodiscard]] RHI::TransferToken UploadBuffer(
+            RHI::BufferHandle, const void*, std::uint64_t, std::uint64_t) override
+        {
+            return {};
+        }
+
+        [[nodiscard]] RHI::TransferToken UploadBuffer(
+            RHI::BufferHandle, std::span<const std::byte>, std::uint64_t) override
+        {
+            return {};
+        }
+
+        [[nodiscard]] RHI::TransferToken UploadTexture(
+            RHI::TextureHandle, const void*, std::uint64_t, std::uint32_t, std::uint32_t) override
+        {
+            return {};
+        }
+
+        [[nodiscard]] RHI::TransferToken UploadTextureFullChain(
+            RHI::TextureHandle, std::span<const std::byte>) override
+        {
+            return {};
+        }
+
+        [[nodiscard]] bool IsComplete(RHI::TransferToken token) const override
+        {
+            return !token.IsValid();
+        }
+
+        void CollectCompleted() override
+        {
+            while (!m_PendingReadbacks.empty())
+            {
+                PendingReadback pending = std::move(m_PendingReadbacks.front());
+                m_PendingReadbacks.pop_front();
+                pending.Sink.Deliver(std::span<const std::byte>{pending.Bytes});
+                m_CompletedReadback = std::max(m_CompletedReadback, pending.Token.Value);
+            }
+        }
+
+        [[nodiscard]] RHI::ReadbackToken DownloadBuffer(
+            RHI::BufferHandle src,
+            std::uint64_t size,
+            std::uint64_t offset,
+            RHI::ReadbackSink sink) override
+        {
+            if (!src.IsValid() || size == 0u || !sink.IsValidForSize(size))
+                return {};
+
+            std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+            if (const auto it = BufferContents.find(src.Index); it != BufferContents.end())
+            {
+                const std::vector<std::byte>& contents = it->second;
+                if (offset + size > contents.size())
+                    return {};
+                std::copy_n(contents.begin() + static_cast<std::ptrdiff_t>(offset),
+                            bytes.size(),
+                            bytes.begin());
+            }
+
+            const RHI::ReadbackToken token{++m_NextReadback};
+            m_PendingReadbacks.push_back(PendingReadback{
+                .Token = token,
+                .Sink = std::move(sink),
+                .Bytes = std::move(bytes),
+            });
+            ++DownloadCalls;
+            return token;
+        }
+
+        [[nodiscard]] bool IsComplete(RHI::ReadbackToken token) const override
+        {
+            return !token.IsValid() || token.Value <= m_CompletedReadback;
+        }
+
+    private:
+        struct PendingReadback
+        {
+            RHI::ReadbackToken Token{};
+            RHI::ReadbackSink Sink{};
+            std::vector<std::byte> Bytes{};
+        };
+
+        std::deque<PendingReadback> m_PendingReadbacks{};
+        std::uint64_t m_NextReadback{0u};
+        std::uint64_t m_CompletedReadback{0u};
+    };
 }
 
 TEST(KMeansGpuBackend, StructLayoutsMatchShaderContract)
@@ -82,6 +276,11 @@ TEST(KMeansGpuBackend, BufferLayoutIsPackedAlignedAndSized)
         previousEnd = span.OffsetBytes + span.SizeBytes;
     }
     EXPECT_GT(layout.WorkBufferBytes, 0u);
+
+    const Runtime::KMeansGpuBufferSpan* reduction =
+        FindSpan(layout, Runtime::KMeansGpuBufferRole::Reduction);
+    ASSERT_NE(reduction, nullptr);
+    EXPECT_EQ(reduction->SizeBytes, sizeof(Runtime::KMeansGpuReductionRecord));
 }
 
 TEST(KMeansGpuBackend, LayoutClampsClustersToPointCountAndRejectsEmpty)
@@ -167,7 +366,7 @@ TEST(KMeansGpuBackend, ResolveFailsClosedOnNonOperationalDevice)
     EXPECT_TRUE(resolved.Plan.IsValid());
 }
 
-TEST(KMeansGpuBackend, ResolveOnOperationalDeviceIsPlanningOnlyForNow)
+TEST(KMeansGpuBackend, ResolveOnOperationalDeviceReportsExecutionAvailable)
 {
     Tests::MockDevice device;
     device.Operational = true;
@@ -176,9 +375,9 @@ TEST(KMeansGpuBackend, ResolveOnOperationalDeviceIsPlanningOnlyForNow)
         Runtime::ResolveKMeansGpuRequest(Runtime::KMeansGpuResolveDesc{
             .Device = &device, .Plan = MakePlanDesc(4u, 2u, 8u)});
 
-    EXPECT_EQ(resolved.Status, Runtime::KMeansGpuStatus::PlanningOnly);
-    EXPECT_FALSE(resolved.GpuExecutionAvailable);
-    EXPECT_TRUE(resolved.CpuFallbackRecommended);
+    EXPECT_EQ(resolved.Status, Runtime::KMeansGpuStatus::Success);
+    EXPECT_TRUE(resolved.GpuExecutionAvailable);
+    EXPECT_FALSE(resolved.CpuFallbackRecommended);
     EXPECT_TRUE(resolved.Plan.IsValid());
     EXPECT_EQ(resolved.Plan.Dispatches.size(), 8u * 3u);
 }
@@ -338,4 +537,164 @@ TEST(KMeansGpuBackend, RecordEmitsResetAssignUpdatePerIterationWithBarriers)
         }
     }
     EXPECT_EQ(stateWrites, 1);
+}
+
+TEST(KMeansGpuBackend, ExecutionAllocatesUploadsRecordsAndPublishesReadbackResources)
+{
+    Tests::MockDevice device;
+    device.Operational = true;
+    RHI::BufferManager buffers{device};
+    Runtime::KMeansGpuResourceCache cache{buffers};
+    MockReadbackTransferQueue queue;
+    Extrinsic::Graphics::GpuTransfer transfer{queue};
+    Runtime::KMeansGpuAsyncReadbacks readbacks{transfer};
+
+    const Runtime::KMeansGpuPlanDesc plan = MakePlanDesc(3u, 2u, 2u);
+    const std::array<glm::vec3, 3> points{{
+        glm::vec3{1.0f, 2.0f, 3.0f},
+        glm::vec3{4.0f, 5.0f, 6.0f},
+        glm::vec3{7.0f, 8.0f, 9.0f},
+    }};
+    const std::array<glm::vec3, 2> seeds{{
+        glm::vec3{1.0f, 2.0f, 3.0f},
+        glm::vec3{7.0f, 8.0f, 9.0f},
+    }};
+
+    const Runtime::KMeansGpuExecutionResult result =
+        Runtime::RecordKMeansGpuExecution(Runtime::KMeansGpuExecutionDesc{
+            .Device = &device,
+            .CommandContext = &device.CommandContext,
+            .ResourceCache = &cache,
+            .Pipelines = ValidKMeansPipelines(),
+            .Points = points,
+            .SeedCentroids = seeds,
+            .Plan = plan,
+        });
+
+    ASSERT_TRUE(result.Succeeded());
+    ASSERT_NE(result.Resources, nullptr);
+    EXPECT_TRUE(result.Recorded);
+    EXPECT_TRUE(result.UploadedInputs);
+    EXPECT_TRUE(result.ReadbackResourcesReady);
+    EXPECT_FALSE(result.CpuFallbackRecommended);
+    EXPECT_EQ(result.UploadWriteCount, 6u);
+    EXPECT_EQ(cache.AllocationCount(), 1u);
+    EXPECT_EQ(device.CreateBufferCount, 2);
+    EXPECT_EQ(queue.DownloadCalls, 0u);
+    EXPECT_EQ(device.CommandContext.DispatchCalls, 6);
+
+    const Runtime::KMeansGpuBufferLayout& layout = result.Resources->Layout;
+    const RHI::BufferHandle work = result.Resources->Resources.Work;
+
+    const Runtime::KMeansGpuBufferSpan* xSpan =
+        FindSpan(layout, Runtime::KMeansGpuBufferRole::PositionX);
+    ASSERT_NE(xSpan, nullptr);
+    const Tests::MockDevice::BufferWriteRecord* xWrite =
+        FindWrite(device, work, xSpan->OffsetBytes);
+    ASSERT_NE(xWrite, nullptr);
+    EXPECT_EQ((std::vector<float>{1.0f, 4.0f, 7.0f}),
+              ReadVectorPayload<float>(xWrite->Data));
+
+    const Runtime::KMeansGpuBufferSpan* centroidSpan =
+        FindSpan(layout, Runtime::KMeansGpuBufferRole::Centroids);
+    ASSERT_NE(centroidSpan, nullptr);
+    const Tests::MockDevice::BufferWriteRecord* centroidWrite =
+        FindWrite(device, work, centroidSpan->OffsetBytes);
+    ASSERT_NE(centroidWrite, nullptr);
+    EXPECT_EQ((std::vector<float>{1.0f, 2.0f, 3.0f, 7.0f, 8.0f, 9.0f}),
+              ReadVectorPayload<float>(centroidWrite->Data));
+
+    const Tests::MockDevice::BufferWriteRecord* stateWrite =
+        FindWrite(device, result.Resources->Resources.State, 0u);
+    ASSERT_NE(stateWrite, nullptr);
+    const Runtime::KMeansGpuStateBufferRecord state =
+        ReadPayload<Runtime::KMeansGpuStateBufferRecord>(stateWrite->Data);
+    EXPECT_EQ(state.PositionXBDA,
+              device.GetBufferDeviceAddress(work) + xSpan->OffsetBytes);
+    EXPECT_EQ(state.CentroidsBDA,
+              device.GetBufferDeviceAddress(work) + centroidSpan->OffsetBytes);
+
+    ASSERT_TRUE(readbacks.Enqueue(device.CommandContext, *result.Resources));
+    EXPECT_EQ(queue.DownloadCalls, 3u);
+
+    std::uint32_t transferReadBarriers = 0u;
+    for (const auto& barrier : device.CommandContext.BufferBarrierCalls)
+    {
+        if (barrier.Buffer == work && barrier.After == RHI::MemoryAccess::TransferRead)
+            ++transferReadBarriers;
+    }
+    EXPECT_EQ(transferReadBarriers, 3u);
+
+    queue.CollectCompleted();
+    transfer.DrainCompleted(device.CommandContext);
+    ASSERT_TRUE(readbacks.Poll());
+    readbacks.Reset();
+
+    const Runtime::KMeansGpuExecutionResult reused =
+        Runtime::RecordKMeansGpuExecution(Runtime::KMeansGpuExecutionDesc{
+            .Device = &device,
+            .CommandContext = &device.CommandContext,
+            .ResourceCache = &cache,
+            .Pipelines = ValidKMeansPipelines(),
+            .Points = points,
+            .SeedCentroids = seeds,
+            .Plan = plan,
+        });
+    ASSERT_TRUE(reused.Succeeded());
+    EXPECT_EQ(cache.AllocationCount(), 1u);
+    EXPECT_EQ(device.CreateBufferCount, 2);
+}
+
+TEST(KMeansGpuBackend, AsyncReadbacksCollectLabelsDistancesAndCentroids)
+{
+    const Runtime::KMeansGpuDispatchPlan plan =
+        Runtime::ComputeKMeansGpuDispatchPlan(MakePlanDesc(3u, 2u, 1u));
+    ASSERT_TRUE(plan.IsValid());
+
+    Runtime::KMeansGpuExecutionResources resources{};
+    resources.Layout = plan.Layout;
+    resources.Key = Runtime::KMeansGpuResourceCacheKey{
+        .PointCount = plan.PointCount,
+        .ClusterCount = plan.ClusterCount,
+        .WorkBufferBytes = plan.Layout.WorkBufferBytes,
+        .StateBytes = plan.Layout.StateBytes,
+    };
+    resources.Resources.State = ValidBuffer(100u);
+    resources.Resources.Work = ValidBuffer(101u);
+
+    std::vector<std::byte> work(static_cast<std::size_t>(plan.Layout.WorkBufferBytes));
+    const std::array<std::uint32_t, 3> labels{{0u, 1u, 1u}};
+    const std::array<float, 3> distances{{0.25f, 1.5f, 0.75f}};
+    const std::array<float, 6> centroids{{1.0f, 2.0f, 3.0f, 7.0f, 8.0f, 9.0f}};
+    WriteSpanBytes(work, plan.Layout, Runtime::KMeansGpuBufferRole::Labels,
+                   std::span<const std::uint32_t>{labels});
+    WriteSpanBytes(work, plan.Layout, Runtime::KMeansGpuBufferRole::SquaredDistances,
+                   std::span<const float>{distances});
+    WriteSpanBytes(work, plan.Layout, Runtime::KMeansGpuBufferRole::Centroids,
+                   std::span<const float>{centroids});
+
+    MockReadbackTransferQueue queue;
+    queue.BufferContents[resources.Resources.Work.Index] = std::move(work);
+    Extrinsic::Graphics::GpuTransfer transfer{queue};
+    Runtime::KMeansGpuAsyncReadbacks readbacks{transfer};
+    Tests::MockDevice device;
+
+    ASSERT_TRUE(readbacks.Enqueue(device.CommandContext, resources));
+    EXPECT_FALSE(readbacks.Poll());
+
+    queue.CollectCompleted();
+    transfer.DrainCompleted(device.CommandContext);
+    ASSERT_TRUE(readbacks.Poll());
+
+    const Runtime::KMeansGpuReadbackResult result = readbacks.Collect(plan);
+    ASSERT_TRUE(result.Succeeded()) << result.Diagnostic;
+    EXPECT_TRUE(result.Read);
+    EXPECT_TRUE(result.StructurallyValid);
+    EXPECT_EQ((std::vector<std::uint32_t>{0u, 1u, 1u}), result.Labels);
+    EXPECT_EQ((std::vector<float>{0.25f, 1.5f, 0.75f}), result.SquaredDistances);
+    ASSERT_EQ(result.Centroids.size(), 2u);
+    EXPECT_EQ(result.Centroids[0], (glm::vec3{1.0f, 2.0f, 3.0f}));
+    EXPECT_EQ(result.Centroids[1], (glm::vec3{7.0f, 8.0f, 9.0f}));
+    EXPECT_FLOAT_EQ(result.Inertia, 2.5f);
+    EXPECT_EQ(result.MaxDistanceIndex, 1u);
 }

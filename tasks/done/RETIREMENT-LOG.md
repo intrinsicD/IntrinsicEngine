@@ -3115,3 +3115,19 @@ future `methods/geometry` packages that depend on this seam. The closure session
 fixed explicit C++23 module imports for `Geometry.Properties`, corrected the ICP
 translation oracle, and isolated CTest benchmark smoke output from CI benchmark
 result validation so the full local CI pipeline runs through cleanly.
+
+[`GEOM-056`](GEOM-056-kmeans-gpu-vulkan-compute-backend.md) — KMeans Vulkan
+compute backend retired to `tasks/done/` on 2026-07-02 at `ParityProven`. The
+runtime layer now owns the explicit `Extrinsic.Runtime.KMeansGpuBackend`
+execution surface: persistent `(n,k)` resource caching, one-time SoA position
+and seed-centroid upload, reset/assign/update Lloyd-loop recording, shader-local
+privatized centroid accumulation for bounded `k`, and post-submit async
+labels/distances/centroids drain through `AsyncBufferReadback` without
+`vkDeviceWaitIdle`. The synchronous `Extrinsic.Runtime.KMeansBackend` overload
+continues to fall back honestly when it lacks command/cache/readback ownership.
+Default-gate KMeans/readback contract coverage passed, opt-in `ci-vulkan`
+KMeans parity and benchmark/JSON validation passed, and the broader
+`gpu`+`vulkan` CTest selection passed on the Vulkan-capable host; the full CPU
+gate still reports the unrelated pre-existing
+`SandboxEditorUi.RegistrationCommandAlignsAcrossEntityTransforms` registration
+failure.

@@ -659,6 +659,24 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
     )
 endif()
 
+# GEOM-056 Slice D — opt-in `gpu;vulkan` KMeans backend parity smoke. Kept in
+# its own target so KMeans parity can be selected without running broader
+# runtime integration suites.
+if(TARGET ExtrinsicRuntime AND TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
+    set(_runtime_kmeans_gpu_smoke_test_files
+        Test.KMeansGpuBackendGpuSmoke.cpp
+    )
+    intrinsic_resolve_test_sources(_runtime_kmeans_gpu_smoke_test_sources
+        SEARCH_DIRS integration/runtime
+        FILES ${_runtime_kmeans_gpu_smoke_test_files}
+    )
+    intrinsic_test_object_lib(RuntimeKMeansGpuSmokeTestObjs
+        SOURCES
+            ${_runtime_kmeans_gpu_smoke_test_sources}
+        DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore IntrinsicGeometry glm::glm
+    )
+endif()
+
 set(_graphics_unit_test_files
     Test.RHI.BufferManager.cpp
     Test.RHI.SamplerManager.cpp
@@ -1025,6 +1043,15 @@ if(TARGET RuntimeSandboxAcceptanceGpuSmokeTestObjs)
         LABELS gpu vulkan integration runtime graphics
     )
     intrinsic_add_glsl_shaders(IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests)
+endif()
+
+if(TARGET RuntimeKMeansGpuSmokeTestObjs)
+    intrinsic_test_executable(IntrinsicRuntimeKMeansGpuSmokeTests
+        OBJECTS RuntimeKMeansGpuSmokeTestObjs
+        LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore IntrinsicGeometry
+        LABELS gpu vulkan integration runtime geometry
+    )
+    intrinsic_add_glsl_shaders(IntrinsicRuntimeKMeansGpuSmokeTests)
 endif()
 
 intrinsic_test_executable(IntrinsicGraphicsUnitTests

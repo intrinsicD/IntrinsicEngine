@@ -1,8 +1,10 @@
 # Geometry Benchmarks
 
-Geometry benchmark suites live here. Each smoke benchmark exercises a public
-`Geometry::*` API on a small, deterministic, CPU-only workload and emits a
-machine-readable result JSON.
+Geometry benchmark suites live here. Default smoke benchmarks exercise public
+`Geometry::*` APIs on small, deterministic, CPU-only workloads and emit
+machine-readable result JSON. Opt-in GPU benchmarks are kept in dedicated
+targets with explicit `gpu;vulkan` labels and do not run in the default CPU
+gate.
 
 ## Layout
 
@@ -14,11 +16,18 @@ machine-readable result JSON.
   thresholds the benchmark is expected to honour. Validated by
   `python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks`.
 
-The matching runner lives at
+The default matching runner lives at
 [`benchmarks/runners/BenchmarkSmokeRunner.cpp`](../runners/BenchmarkSmokeRunner.cpp).
 It links `IntrinsicGeometry` so workloads may use the public Geometry C++23
 module surface directly; benchmarks must not import `assets`, `ecs`,
 `runtime`, `graphics`, or `platform`.
+
+The GEOM-056 KMeans Vulkan smoke is the explicit exception: it lives in
+[`Bench_KMeansGpuVulkanSmoke.cpp`](Bench_KMeansGpuVulkanSmoke.cpp), imports the
+runtime/Vulkan stack, and is registered as `IntrinsicKMeansGpuBenchmarkSmoke`
+with `benchmark;geometry;runtime;gpu;vulkan` labels. It emits GPU timing,
+CPU-reference baseline timing, and parity diagnostics for the same deterministic
+fixture without claiming a speedup.
 
 ## Manifest schema
 
@@ -57,8 +66,9 @@ Smoke benchmarks must:
 - complete within the manifest's `smoke_runtime_ms_max` budget on a typical
   CI runner.
 
-Larger datasets, slower variants, or GPU workloads belong in a dedicated
-heavy/nightly benchmark task and are out of scope for this directory.
+Larger datasets, slower variants, or additional GPU workloads belong in a
+dedicated heavy/nightly benchmark task and must use the same opt-in labeling
+pattern as the KMeans Vulkan smoke.
 
 ## Adding a new geometry smoke benchmark
 

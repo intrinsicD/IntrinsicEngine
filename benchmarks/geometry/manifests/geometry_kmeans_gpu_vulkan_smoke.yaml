@@ -1,0 +1,26 @@
+# GEOM-056 — KMeans Vulkan GPU smoke manifest.
+#
+# Stable benchmark contract for the opt-in runner implemented by
+# benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp. This is not part of the
+# default CPU smoke runner because it requires GLFW + promoted Vulkan.
+
+benchmark_id: geometry.kmeans.gpu_vulkan.smoke
+method: geometry.kmeans
+dataset: builtin.kmeans.separated_clusters_6x2
+params:
+  intent: gpu
+  warmup_iterations: 1
+  measured_iterations: 3
+  point_count: 6
+  cluster_count: 2
+  max_iterations: 6
+  convergence_tolerance: 0.00001
+  baseline_comparison: cpu_reference_same_fixture
+metrics:
+  - runtime_ms
+  - gpu_time_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 5000
+  gpu_time_ms_max: 5000
+  quality_error_l2_max: 0.0001

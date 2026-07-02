@@ -1,29 +1,32 @@
 module;
 
 #include <cstdint>
+#include <span>
 #include <string>
 #include <vector>
 
+#include <glm/glm.hpp>
+
 export module Extrinsic.Runtime.KMeansGpuBackend;
 
+import Extrinsic.RHI.BufferManager;
+import Extrinsic.RHI.BufferTransfer;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
+import Extrinsic.Graphics.GpuTransfer;
+import Extrinsic.Runtime.AsyncBufferReadback;
 
 // ============================================================
-// KMeansGpuBackend (GEOM-056 Slice A — planning core)
+// KMeansGpuBackend (GEOM-056 — Vulkan compute backend seam)
 // ============================================================
-// The runtime-owned Vulkan-compute backend seam for Geometry.KMeans. This slice
-// ships the pure, CPU-testable planning core only: buffer-role/layout
-// computation, the BDA state record + push-constant layouts the future
-// kmeans_*.comp shaders consume, per-iteration dispatch-plan computation,
-// buffer/pipeline descriptor builders, and a device-aware resolve that reports
-// GPU availability and recommends CPU fallback. No RHI recording happens yet;
-// `Extrinsic.Runtime.KMeansBackend` routes its Backend::GPU request through the
-// resolve seam and still falls back to the geometry CPU reference with honest
-// telemetry. Later GEOM-056 slices add the shaders, recorded Lloyd loop,
-// persistent buffer reuse, async readback drain (RUNTIME-137), and parity.
+// Runtime-owned Vulkan-compute backend utilities for Geometry.KMeans. The
+// module owns CPU-testable planning, shader/BDA record contracts, fail-closed
+// pass recording, persistent `(n,k)` resource caching, one-time SoA/seed upload,
+// and RUNTIME-137 async result drains. `Extrinsic.Runtime.KMeansBackend` remains
+// the thin CPU-reference fallback overload unless a caller supplies the explicit
+// command context, pipelines, cache, and async readback set required here.
 //
 // Design: docs/migration/kmeans-gpu-vulkan-compute-proposal.md
 // ============================================================
@@ -41,6 +44,8 @@ export namespace Extrinsic::Runtime
         PlanningOnly,
         SizeOverflow,
         InvalidGpuResource,
+        ReadbackPending,
+        InvalidReadback,
     };
 
     enum class KMeansGpuPassKind : std::uint8_t
@@ -137,6 +142,17 @@ export namespace Extrinsic::Runtime
     };
     static_assert(sizeof(KMeansGpuPassPushConstants) == 32u);
 
+    // Matches the `KMeansReductionRef` buffer_reference record in kmeans_*.comp.
+    struct KMeansGpuReductionRecord
+    {
+        std::uint64_t PackedMaxDistIndex{0u};
+        float InertiaSum{0.0f};
+        std::uint32_t ChangedCount{0u};
+        std::uint32_t MaxShiftBits{0u};
+        std::uint32_t Converged{0u};
+    };
+    static_assert(sizeof(KMeansGpuReductionRecord) == 24u);
+
     struct KMeansGpuDispatchDesc
     {
         KMeansGpuPassKind Kind{KMeansGpuPassKind::Reset};
@@ -215,10 +231,9 @@ export namespace Extrinsic::Runtime
         const char* shaderPath = "shaders/kmeans_update.comp.spv");
 
     // Device-aware resolve. Computes the dispatch plan and reports whether an
-    // operational GPU execution path is available. In this slice the recorded
-    // path does not exist yet, so an operational device resolves to
-    // `PlanningOnly` with `CpuFallbackRecommended == true`; later slices flip
-    // this to `Success` / `GpuExecutionAvailable == true`.
+    // operational GPU execution path can be used when the caller supplies the
+    // explicit execution dependencies (pipelines, command context, cache, and
+    // async readbacks).
     [[nodiscard]] KMeansGpuResolveResult ResolveKMeansGpuRequest(
         const KMeansGpuResolveDesc& desc);
 
@@ -244,8 +259,9 @@ export namespace Extrinsic::Runtime
 
     // A single packed "Work" buffer holds every compute-touched role as a
     // sub-span (see ComputeKMeansGpuBufferLayout); State is the BDA pointer
-    // table; the readback buffers are host-visible drain targets used by a later
-    // execution slice.
+    // table. The readback handles are retained for compatibility with the Slice
+    // B descriptor builders; Slice C drains directly from Work through
+    // KMeansGpuAsyncReadbacks.
     struct KMeansGpuResourceSet
     {
         RHI::BufferHandle State{};
@@ -258,6 +274,61 @@ export namespace Extrinsic::Runtime
         {
             return State.IsValid() && Work.IsValid();
         }
+    };
+
+    struct KMeansGpuResourceCacheKey
+    {
+        std::uint32_t PointCount{0u};
+        std::uint32_t ClusterCount{0u};
+        std::uint64_t WorkBufferBytes{0u};
+        std::uint64_t StateBytes{0u};
+
+        [[nodiscard]] bool operator==(const KMeansGpuResourceCacheKey&) const noexcept = default;
+        [[nodiscard]] bool IsValid() const noexcept
+        {
+            return PointCount > 0u && ClusterCount > 0u &&
+                   WorkBufferBytes > 0u && StateBytes > 0u;
+        }
+    };
+
+    struct KMeansGpuExecutionResources
+    {
+        KMeansGpuResourceSet Resources{};
+        KMeansGpuBufferLayout Layout{};
+        KMeansGpuResourceCacheKey Key{};
+        std::vector<RHI::BufferManager::BufferLease> Leases{};
+
+        [[nodiscard]] bool IsValid() const noexcept
+        {
+            return Key.IsValid() && Layout.IsValid() && Resources.IsValid();
+        }
+    };
+
+    // Runtime-owned persistent `(n,k)` resource cache. The cache owns the
+    // BufferLease lifetimes and must be destroyed before the BufferManager it
+    // was constructed with. `Ensure(...)` reuses the current resource set when
+    // the effective `(PointCount, ClusterCount, WorkBufferBytes, StateBytes)`
+    // key is unchanged, and reallocates only when the shape changes.
+    class KMeansGpuResourceCache
+    {
+    public:
+        explicit KMeansGpuResourceCache(RHI::BufferManager& buffers) noexcept;
+        ~KMeansGpuResourceCache();
+
+        KMeansGpuResourceCache(const KMeansGpuResourceCache&) = delete;
+        KMeansGpuResourceCache& operator=(const KMeansGpuResourceCache&) = delete;
+
+        [[nodiscard]] KMeansGpuStatus Ensure(const KMeansGpuDispatchPlan& plan);
+        void Reset() noexcept;
+
+        [[nodiscard]] const KMeansGpuExecutionResources* Get() const noexcept;
+        [[nodiscard]] KMeansGpuResourceCacheKey Key() const noexcept;
+        [[nodiscard]] std::uint32_t AllocationCount() const noexcept;
+
+    private:
+        RHI::BufferManager* m_Buffers{nullptr};
+        KMeansGpuExecutionResources m_Resources{};
+        std::uint32_t m_AllocationCount{0u};
     };
 
     struct KMeansGpuRecordDesc
@@ -302,4 +373,86 @@ export namespace Extrinsic::Runtime
     // the host drain is a later execution slice.
     [[nodiscard]] KMeansGpuRecordResult RecordKMeansGpuPasses(
         const KMeansGpuRecordDesc& desc);
+
+    class KMeansGpuAsyncReadbacks;
+
+    struct KMeansGpuExecutionDesc
+    {
+        RHI::IDevice* Device{nullptr};
+        RHI::ICommandContext* CommandContext{nullptr};
+        KMeansGpuResourceCache* ResourceCache{nullptr};
+        KMeansGpuPipelineSet Pipelines{};
+        std::span<const glm::vec3> Points{};
+        std::span<const glm::vec3> SeedCentroids{};
+        KMeansGpuPlanDesc Plan{};
+    };
+
+    struct KMeansGpuExecutionResult
+    {
+        KMeansGpuStatus Status{KMeansGpuStatus::Success};
+        bool Recorded{false};
+        bool CpuFallbackRecommended{true};
+        bool UploadedInputs{false};
+        bool ReadbackResourcesReady{false};
+        std::uint32_t UploadWriteCount{0u};
+        KMeansGpuDispatchPlan Plan{};
+        KMeansGpuRecordResult Record{};
+        const KMeansGpuExecutionResources* Resources{nullptr};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == KMeansGpuStatus::Success;
+        }
+    };
+
+    struct KMeansGpuReadbackResult
+    {
+        KMeansGpuStatus Status{KMeansGpuStatus::Success};
+        bool Read{false};
+        bool StructurallyValid{false};
+        bool CpuFallbackRecommended{true};
+        std::vector<std::uint32_t> Labels{};
+        std::vector<float> SquaredDistances{};
+        std::vector<glm::vec3> Centroids{};
+        float Inertia{0.0f};
+        std::uint32_t MaxDistanceIndex{0u};
+        std::string Diagnostic{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == KMeansGpuStatus::Success;
+        }
+    };
+
+    class KMeansGpuAsyncReadbacks
+    {
+    public:
+        explicit KMeansGpuAsyncReadbacks(Extrinsic::Graphics::GpuTransfer& transfer) noexcept;
+
+        KMeansGpuAsyncReadbacks(const KMeansGpuAsyncReadbacks&) = delete;
+        KMeansGpuAsyncReadbacks& operator=(const KMeansGpuAsyncReadbacks&) = delete;
+
+        [[nodiscard]] bool Enqueue(RHI::ICommandContext& cmd,
+                                   const KMeansGpuExecutionResources& resources);
+        bool Poll() noexcept;
+        void Reset() noexcept;
+
+        [[nodiscard]] bool IsReady() const noexcept;
+        [[nodiscard]] KMeansGpuReadbackResult Collect(
+            const KMeansGpuDispatchPlan& plan) const;
+
+    private:
+        AsyncBufferReadback m_Labels;
+        AsyncBufferReadback m_SquaredDistances;
+        AsyncBufferReadback m_Centroids;
+    };
+
+    // Allocate/reuse persistent buffers, upload the SoA positions and supplied
+    // seed centroids once, and call RecordKMeansGpuPasses. The returned
+    // Resources pointer remains owned by the cache and is the source for
+    // KMeansGpuAsyncReadbacks::Enqueue after the producer command submission has
+    // retired. Scheduling transfer-queue readback from inside this recording
+    // call would race the compute work on real Vulkan queues.
+    [[nodiscard]] KMeansGpuExecutionResult RecordKMeansGpuExecution(
+        const KMeansGpuExecutionDesc& desc);
 }

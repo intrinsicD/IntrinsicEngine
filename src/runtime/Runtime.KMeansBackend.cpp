@@ -19,9 +19,11 @@ namespace Extrinsic::Runtime
     namespace
     {
         // Route a Backend::GPU request through the GEOM-056 resolve seam. The
-        // recorded Lloyd loop lands in later slices, so this reports whether an
-        // operational GPU path exists and, for now, always recommends the CPU
-        // reference fallback. Returns true when GPU execution is available.
+        // thin `ClusterKMeans(..., IDevice&)` overload deliberately lacks the
+        // command context, pipeline set, persistent cache, and async readbacks
+        // required by `RecordKMeansGpuExecution`, so it remains a truthful CPU
+        // reference fallback even when the explicit GPU execution surface is
+        // available to runtime callers that supply those dependencies.
         [[nodiscard]] bool TryResolveKMeansGpu(
             std::span<const glm::vec3> points,
             const GK::KMeansParams& params,
@@ -77,9 +79,9 @@ namespace Extrinsic::Runtime
         if (requestedBackend == GK::Backend::GPU &&
             TryResolveKMeansGpu(points, params, device))
         {
-            // GEOM-056 later slices execute the recorded Lloyd loop here when
-            // the resolve seam reports an operational GPU path. Until then the
-            // resolve returns false and we fall through to the CPU reference.
+            // The explicit GPU path is `RecordKMeansGpuExecution`; this
+            // synchronous convenience overload cannot safely allocate, submit,
+            // and poll async readbacks by itself.
         }
         return MarkResolvedBackend(
             GK::Cluster(points, CpuFallbackParams(params)),
@@ -97,9 +99,9 @@ namespace Extrinsic::Runtime
         if (requestedBackend == GK::Backend::GPU &&
             TryResolveKMeansGpu(points, params, device))
         {
-            // GEOM-056 later slices execute the recorded Lloyd loop here when
-            // the resolve seam reports an operational GPU path. Until then the
-            // resolve returns false and we fall through to the CPU reference.
+            // The explicit GPU path is `RecordKMeansGpuExecution`; this
+            // synchronous convenience overload cannot safely allocate, submit,
+            // and poll async readbacks by itself.
         }
         return MarkResolvedBackend(
             GK::Cluster(points, initialCentroids, CpuFallbackParams(params), cpuScratch),

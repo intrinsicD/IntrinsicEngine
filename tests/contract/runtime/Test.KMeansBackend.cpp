@@ -54,7 +54,7 @@ TEST(RuntimeKMeansBackend, NonOperationalGpuRequestFallsBackToCpu)
     EXPECT_EQ(device.CreatePipelineCount, 0);
 }
 
-TEST(RuntimeKMeansBackend, OperationalGpuRequestStillReportsCpuUntilGpuKernelExists)
+TEST(RuntimeKMeansBackend, OperationalThinGpuRequestFallsBackWithoutExecutionDependencies)
 {
     const std::vector<glm::vec3> points = MakeSeparatedPoints();
     GK::KMeansParams params = MakeGpuRequest();

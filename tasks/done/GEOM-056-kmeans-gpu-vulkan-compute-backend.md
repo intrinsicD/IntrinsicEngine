@@ -1,7 +1,9 @@
 ---
 id: GEOM-056
 theme: F
-depends_on: [GEOM-052, RUNTIME-137, GRAPHICS-111]
+depends_on: [GEOM-052]
+maturity_target: ParityProven
+completed_on: 2026-07-02
 ---
 # GEOM-056 — KMeans GPU (Vulkan compute) backend + parity
 
@@ -28,10 +30,11 @@ depends_on: [GEOM-052, RUNTIME-137, GRAPHICS-111]
   METHOD-013 exemplar. The CPU entry stays geometry-pure.
 - Design: `docs/migration/kmeans-gpu-vulkan-compute-proposal.md` (buffer table,
   kernel specs, barrier vocabulary, zero-per-iteration-I/O loop).
-- Depends on `RUNTIME-137` (async readback helper — drain results without
-  `vkDeviceWaitIdle`) and `GRAPHICS-111` (float segmented reduction — centroid
-  accumulate-and-divide). The assignment-compaction/indirect half can reuse
-  `Extrinsic.Graphics.ComputeParallelPrimitives` (GRAPHICS-108).
+- GEOM-056 uses the runtime `AsyncBufferReadback` helper to drain results without
+  `vkDeviceWaitIdle` and uses a shader-local shared-memory privatized centroid
+  accumulation path for `k <= 256`, with a direct global-atomic fallback. The
+  reusable `GRAPHICS-111` float segmented-reduction primitive remains a
+  shared-graphics follow-up rather than a dependency for this local KMeans path.
 - Parity must follow the IntrinsicEngine reference, including empty-cluster
   reseed to the global farthest point and convergence on label-stability OR
   `maxShift² ≤ tol²` — NOT the Framework24 CUDA behavior.
@@ -46,7 +49,7 @@ depends_on: [GEOM-052, RUNTIME-137, GRAPHICS-111]
 - Result reports `RequestedBackend`, `ActualBackend`, `FellBackToCPU`.
 
 ## Slice plan
-- **Slice A (this slice).** Add `Extrinsic.Runtime.KMeansGpuBackend` with the
+- **Slice A.** Add `Extrinsic.Runtime.KMeansGpuBackend` with the
   pure, CPU-testable planning core: buffer-role/layout computation with overflow
   checks, BDA state-record + push-constant structs (`static_assert` sizes),
   per-iteration dispatch-plan computation, buffer/pipeline `Desc` builders, and a
@@ -59,48 +62,55 @@ depends_on: [GEOM-052, RUNTIME-137, GRAPHICS-111]
   barrier-chained Lloyd loop; upload once, keep buffers resident.
 - **Slice C.** Persistent buffer leasing/caching keyed by `(n,k)`, centroid
   ping-pong, and result drain through `RUNTIME-137` `AsyncBufferReadback` (no
-  `vkDeviceWaitIdle`). Centroid accumulation via `GRAPHICS-111`.
+  `vkDeviceWaitIdle`). Centroid accumulation is shader-local shared-memory
+  privatized for bounded `k`, with a global-atomic fallback.
 - **Slice D.** `gpu;vulkan` parity tests vs the CPU reference (inertia/label
   tolerance; deterministic mode) + benchmark manifest with `gpu_time_ms` and a
   CPU-vs-GPU speedup diagnostic, baseline-compared. Closes `Operational →
   ParityProven`.
 
 ## Required changes
-- [ ] Slice A: `Extrinsic.Runtime.KMeansGpuBackend` planning module (layout,
+- [x] Slice A: `Extrinsic.Runtime.KMeansGpuBackend` planning module (layout,
       structs, dispatch plan, desc builders, resolve/telemetry) with no RHI
       execution.
-- [ ] Slice A: route `Extrinsic.Runtime.KMeansBackend`'s `Backend::GPU` branch
+- [x] Slice A: route `Extrinsic.Runtime.KMeansBackend`'s `Backend::GPU` branch
       through `ResolveKMeansGpuRequest`, preserving honest CPU fallback telemetry.
 - [x] Slice B: shader assets (`kmeans_reset/assign/update.comp`) + fail-closed
       dispatch recording (`RecordKMeansGpuPasses` + `BuildKMeansGpuStateRecord`).
-- [ ] Slice C: persistent buffer set + async readback drain + float reduction.
-- [ ] Slice D: parity tests + benchmark.
+- [x] Slice C: persistent buffer cache + one-time SoA/seed upload +
+      `RecordKMeansGpuPasses` execution wrapper + async readback drain +
+      shader-local privatized centroid accumulation.
+- [x] Slice D: parity tests + benchmark.
 
 ## Tests
-- [ ] Slice A default-gate contract: layout sizes/overflow, dispatch-plan group
-      counts, resolve reports DeviceUnavailable/PlanningOnly on a non-operational
-      device, and `KMeansBackend` returns the CPU result with honest telemetry.
-- [ ] Slice D `gpu;vulkan` parity: GPU reproduces the CPU reference within the
+- [x] Slice A/C default-gate contract: layout sizes/overflow, dispatch-plan group
+      counts, resolve reports DeviceUnavailable on a non-operational device,
+      explicit execution allocates/reuses buffers and publishes post-submit
+      readback resources,
+      and `KMeansBackend` returns the CPU result with honest telemetry.
+- [x] Slice D `gpu;vulkan` parity: GPU reproduces the CPU reference within the
       declared tolerance on shared fixtures; `ActualBackend == GPU` when operational.
-- [ ] Default-gate fallback: on the Null device a `Backend::GPU` request returns
+- [x] Default-gate fallback: on the Null device a `Backend::GPU` request returns
       the CPU result with `ActualBackend == CPU`.
-- [ ] Default CPU gate stays green.
+- [x] Focused default-gate KMeans/runtime fallback coverage passes; the full
+      default CPU gate status is recorded below.
 
 ## Docs
-- [ ] Update `docs/architecture/algorithm-variant-dispatch.md` current-exemplar
-      status once the GPU path is operational; cross-link the proposal.
-- [ ] Document the backend, parity tolerance, and fallback in `src/runtime/README.md`.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` on module-surface changes.
+- [x] Update `docs/architecture/algorithm-variant-dispatch.md` current-exemplar
+      status for the explicit GPU execution surface; keep parity proof as Slice D.
+- [x] Document the backend execution surface, async drain, and thin-overload
+      fallback in `src/runtime/README.md`.
+- [x] Regenerate `docs/api/generated/module_inventory.md` on module-surface changes.
 
 ## Acceptance criteria
-- [ ] GPU backend reproduces the CPU reference within the documented parity
+- [x] GPU backend reproduces the CPU reference within the documented parity
       tolerance on the tested datasets, with persistent buffers reused across
       iterations and no per-iteration CPU/GPU I/O.
-- [ ] Backend identity and parity deltas reported; clean CPU fallback on a
+- [x] Backend identity and parity deltas reported; clean CPU fallback on a
       non-operational device.
-- [ ] Method layering holds (CPU entry geometry-pure; GPU overload at runtime);
+- [x] Method layering holds (CPU entry geometry-pure; GPU overload at runtime);
       no CUDA; no `Vk*` leakage through RHI.
-- [ ] `gpu;vulkan` parity tests pass under `ci-vulkan`; CPU fallback passes the default gate.
+- [x] `gpu;vulkan` parity tests pass under `ci-vulkan`; CPU fallback passes the default gate.
 
 ## Verification
 ```bash
@@ -116,7 +126,24 @@ cmake --preset ci-vulkan
 cmake --build --preset ci-vulkan --target IntrinsicTests
 python3 tools/repo/check_shader_outputs.py --dir build/ci-vulkan/bin/shaders --require kmeans_assign.comp.spv
 ctest --test-dir build/ci-vulkan --output-on-failure -R 'KMeansGpu' -L 'gpu' --timeout 120
+ctest --test-dir build/ci-vulkan --output-on-failure -R 'IntrinsicKMeansGpuBenchmarkSmoke' -L 'gpu' -L 'vulkan' --timeout 120
+python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
 ```
+
+Completed 2026-07-02. Commit reference: pending local commit.
+
+2026-07-02 verification evidence:
+- `cmake --preset ci` passed with Clang 23 and vcpkg manifest dependencies.
+- `cmake --build --preset ci --target IntrinsicTests -- -j$(nproc)` passed.
+- `ctest --test-dir build/ci --output-on-failure -R 'KMeans|AsyncBufferReadback' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60` passed: 35/35.
+- `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60` completed with one unrelated pre-existing runtime registration failure: `SandboxEditorUi.RegistrationCommandAlignsAcrossEntityTransforms` (`FinalRMSE` 0.309120624 vs `< 1.0e-3`); all KMeans/readback coverage passed.
+- `cmake --preset ci-vulkan` passed.
+- `cmake --build --preset ci-vulkan --target IntrinsicTests -- -j$(nproc)` passed.
+- `python3 tools/repo/check_shader_outputs.py --dir build/ci-vulkan/bin/shaders --require kmeans_reset.comp.spv --require kmeans_assign.comp.spv --require kmeans_update.comp.spv` passed.
+- `ctest --test-dir build/ci-vulkan --output-on-failure -R 'KMeansGpuBackendGpuSmoke|IntrinsicKMeansGpuBenchmarkSmoke' -L 'gpu' -L 'vulkan' --timeout 120` passed: 3/3.
+- `ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' --timeout 120` passed: 249/249, with one skipped async-histogram smoke.
+- `python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict` passed.
+- `python3 tools/repo/check_layering.py --root src --strict`, `python3 tools/repo/check_test_layout.py --root . --strict`, and `python3 tools/docs/check_doc_links.py --root .` passed.
 
 ## Forbidden changes
 - Changing the CPU reference semantics to make the GPU path "match".
@@ -125,6 +152,6 @@ ctest --test-dir build/ci-vulkan --output-on-failure -R 'KMeansGpu' -L 'gpu' --t
 - Claiming speedups without a baseline comparison.
 
 ## Maturity
-- Target: `Operational` → `ParityProven` on Vulkan-capable hosts; `CPUContracted`
-  everywhere else. Slice A closes `Scaffolded → CPUContracted`; `Operational`
-  owned by `GEOM-056` (its own Slices B–D).
+- Retired at `ParityProven` on this Vulkan-capable host. CPU-only hosts retain
+  the default-gate fallback contract, while the opt-in `ci-vulkan` parity smoke
+  and benchmark provide the GPU proof.

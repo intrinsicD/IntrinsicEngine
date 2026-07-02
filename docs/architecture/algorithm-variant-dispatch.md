@@ -1,13 +1,17 @@
 # Algorithm Variant Dispatch Pattern
 
 Status: canonical template. `Geometry.KMeans` is the first implemented exemplar
-for the CPU-reference plus RHI-visible fallback seam.
+for the CPU-reference plus RHI-visible seam; GEOM-056 adds the opt-in
+Vulkan-compute execution surface behind that seam.
 
 This document describes the Strategy x Backend seam for geometry and method
 algorithms that may later gain GPU execution. The first exemplar is
-`Geometry.KMeans`: its CPU reference path is implemented in `src/geometry`, and
-`Extrinsic.Runtime.KMeansBackend` provides the `RHI::IDevice`-visible overload
-that falls back honestly until a real GPU kernel lands.
+`Geometry.KMeans`: its CPU reference path is implemented in `src/geometry`,
+`Extrinsic.Runtime.KMeansBackend` provides the `RHI::IDevice`-visible
+convenience overload that falls back honestly, and
+`Extrinsic.Runtime.KMeansGpuBackend` exposes the explicit command-recording
+Vulkan-compute path for callers that own pipelines, cache, and async readback
+lifetime.
 
 The seam keeps the CPU reference path testable without RHI while giving runtime
 or method-integration code a clear place to request a GPU backend and fall back
@@ -294,5 +298,17 @@ Use this checklist when adding a new dispatchable family:
 The CPU entry point always runs the CPU reference implementation. The runtime
 adapter `Extrinsic.Runtime.KMeansBackend::ClusterKMeans(...)` accepts
 `Extrinsic::RHI::IDevice&`, evaluates `IDevice::IsOperational()` for GPU
-requests, and falls back to the CPU reference with honest telemetry because no
-KMeans GPU kernel exists yet.
+requests, and falls back to the CPU reference with honest telemetry because that
+synchronous convenience overload does not own the command context, pipeline set,
+persistent buffer cache, or async readback set required to execute GPU work.
+The explicit runtime GPU surface lives in
+`Extrinsic.Runtime.KMeansGpuBackend`: callers supply those dependencies to
+`RecordKMeansGpuExecution(...)`, which reuses persistent `(n,k)` buffers, uploads
+SoA positions plus seed centroids once, records the reset/assign/update pass
+loop, and returns cache-owned result resources. Callers enqueue
+`KMeansGpuAsyncReadbacks` after the producing command submission has retired;
+the helper then drains labels/distances/centroids through
+`AsyncBufferReadback` without a device-wide readback stall. GEOM-056 proves this
+explicit path with an opt-in `gpu;vulkan` parity smoke and
+`IntrinsicKMeansGpuBenchmarkSmoke`, which emits GPU timing, CPU-reference
+baseline timing, and parity diagnostics without making a speedup claim.
