@@ -84,6 +84,11 @@ backend selectors for K-Means and Progressive Poisson, with requested-vs-actual
 backend readouts and fallback diagnostics. See
 [`RUNTIME-136`](../../done/RUNTIME-136-sandbox-method-backend-selectors.md).
 
+`RUNTIME-138` is the runtime-owned selected-entity responsiveness task. It
+makes the Sandbox editor path read cached selected-entity state, submit
+commands/jobs, and move heavy property/channel/UV/scalar derivations out of the
+ImGui callback into generation-keyed async runtime jobs.
+
 
 ## Cross-linked rendering tasks (runtime-owned)
 

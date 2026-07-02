@@ -22,6 +22,19 @@ without requiring them to read every file.
   mechanical cleanup task only; it must not change rendering, RHI, or backend
   behavior.
 
+## Current open rendering leaves
+
+- [`GRAPHICS-110`](GRAPHICS-110-imgui-upload-buffer-in-flight-safety.md) —
+  per-frame/ring ImGui upload buffers for in-flight safety.
+- [`GRAPHICS-111`](GRAPHICS-111-float-segmented-reduction-primitive.md) —
+  float segmented/per-key reduction primitive in compute parallel primitives.
+- [`GRAPHICS-112`](GRAPHICS-112-work-efficient-workgroup-scan.md) —
+  work-efficient workgroup scan and overflow guard in compute parallel primitives.
+- [`GRAPHICS-113`](GRAPHICS-113-selection-outline-id-work-pruning.md) —
+  selected-outline ID work pruning for selected-but-not-picking frames.
+- [`GRAPHICS-114`](GRAPHICS-114-retained-imgui-overlay-copy-upload-path.md) —
+  retained ImGui overlay copy/upload cleanup after `GRAPHICS-110`.
+
 ## Legacy Parity Follow-Ups
 
 These were opened by `LEGACY-011` as focused blockers for legacy graphics/RHI

@@ -18,6 +18,8 @@ the authoritative open/unblocked view.
 - unblocked: `GRAPHICS-110` — Per-frame/ring ImGui upload buffers for in-flight safety (tasks/backlog/rendering/GRAPHICS-110-imgui-upload-buffer-in-flight-safety.md)
 - unblocked: `GRAPHICS-111` — Float segmented/per-key reduction primitive in ComputeParallelPrimitives (tasks/backlog/rendering/GRAPHICS-111-float-segmented-reduction-primitive.md)
 - unblocked: `GRAPHICS-112` — Work-efficient workgroup scan + uint32 overflow guard in ComputeParallelPrimitives (tasks/backlog/rendering/GRAPHICS-112-work-efficient-workgroup-scan.md)
+- unblocked: `GRAPHICS-113` — Selection outline ID work pruning (tasks/backlog/rendering/GRAPHICS-113-selection-outline-id-work-pruning.md)
+- blocked by `GRAPHICS-110`: `GRAPHICS-114` — Retained ImGui overlay copy/upload path (tasks/backlog/rendering/GRAPHICS-114-retained-imgui-overlay-copy-upload-path.md)
 - blocked by `GRAPHICS-104`: `RUNTIME-129` — Schedule GPU object-space normal bake jobs after import (tasks/backlog/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
@@ -26,10 +28,11 @@ the authoritative open/unblocked view.
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
 - unblocked: `RUNTIME-137` — Async GPU readback helper + pooled destination for compute backends (tasks/backlog/runtime/RUNTIME-137-async-gpu-readback-helper-for-compute-backends.md)
+- unblocked: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
 - blocked by `GEOM-014`: `UI-028` — Sandbox EditorUI mesh simplification window (tasks/backlog/ui/UI-028-editor-mesh-simplification-window.md)
 - blocked by `GEOM-055`: `UI-029` — Editor ICP registration panel + convergence visualization (tasks/backlog/ui/UI-029-editor-registration-convergence-visualization.md)
 - unblocked: `UI-030` — Sandbox EditorUI frame-pacing diagnostics (tasks/backlog/ui/UI-030-editor-frame-pacing-diagnostics.md)
-- unblocked: `UI-031` — Sandbox EditorUI domain-window reorganization (tasks/backlog/ui/UI-031-editor-domain-ui-reorganization.md)
+- blocked by `RUNTIME-138`: `UI-031` — Sandbox EditorUI domain-window reorganization (tasks/backlog/ui/UI-031-editor-domain-ui-reorganization.md)
 
 ## Theme H — Agentic workflow hardening
 

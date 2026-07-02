@@ -22,12 +22,13 @@ map.
 - [UI-030 — Sandbox EditorUI frame-pacing diagnostics](UI-030-editor-frame-pacing-diagnostics.md)
   (diagnose editor stutter with phase timing across the editor callback, ImGui
   copy/upload, frame-graph execution, Vulkan frame lifecycle waits, present
-  pacing, and synchronous upload/readback paths before opening scoped fixes).
+  pacing, and synchronous upload/readback paths; selected-entity implementation
+  fixes are now tracked by `RUNTIME-138`, `GRAPHICS-113`, and `GRAPHICS-114`).
 - [UI-031 — Sandbox EditorUI domain-window reorganization](UI-031-editor-domain-ui-reorganization.md)
-  (reorganize Mesh/Graph/PointCloud UI so `Properties` is a pure property
-  explorer, render hints/visualization/property assignment share one
-  appearance window, texture baking moves under rendering/appearance, and
-  processing leaves open focused method windows).
+  (depends on `RUNTIME-138`; reorganize Mesh/Graph/PointCloud UI so
+  `Properties` is a pure property explorer, render hints/visualization/property
+  assignment share one appearance window, texture baking moves under
+  rendering/appearance, and processing leaves open focused method windows).
 
 The runtime SpatialDebug closest-face picking consumer for `GEOM-039` is
 retired under the runtime backlog as `RUNTIME-135`.
@@ -41,10 +42,15 @@ retired under the runtime backlog as `RUNTIME-135`.
   `bcg_code_base` geometry-processing port into interactive Sandbox workflows.
 - UI-030 is the diagnostic follow-up from the 2026-07-01 editor-stutter review:
   it builds an evidence loop before blaming barriers, fences, present pacing, or
-  editor CPU work.
+  editor CPU work. Source-level selected-entity findings are now tracked by
+  `RUNTIME-138` for the nonblocking runtime/editor cache-job pipeline,
+  `GRAPHICS-113` for selected-outline ID work pruning, and `GRAPHICS-114` for
+  retained ImGui overlay copy/upload cleanup.
 - UI-031 is the information-architecture follow-up from the 2026-07-01
   domain-UI review: it separates property exploration, appearance/rendering
-  controls, texture baking, and method execution into user-intent windows.
+  controls, texture baking, and method execution into user-intent windows. Its
+  remaining slices are gated on `RUNTIME-138` so they build on visibility-gated
+  cached selected-entity models.
 - UI-001 is retired as part of **Theme A — Working sandbox app path** and depends on
   `RUNTIME-090` + `GRAPHICS-079` for ImGui frame production/presentation plus
   runtime selection/geometry-residency tasks for live content. RUNTIME-095 closes

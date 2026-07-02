@@ -131,6 +131,13 @@ extraction, progressive helpers, GPU availability inspection, and the sandbox
 editor now share the promoted source/provenance and render-lane availability
 contracts.
 
+`RUNTIME-138` is the next runtime/editor responsiveness leaf: the Sandbox
+selected-entity path should read cached state and submit commands/jobs, while
+heavy selected-entity derivations run asynchronously and apply through bounded
+main-thread results. It gates the remaining `UI-031` domain-window
+reorganization slices so new windows do not extend the eager selected-model
+rebuild pattern.
+
 `RUNTIME-131` is retired to `tasks/done`: `Engine` now exposes the
 agent/CLI config-control facade for render-recipe preview/activation and the
 current engine-config hot subset (`render.default_recipe_config_path`), with the
@@ -151,6 +158,7 @@ for `PROC-011`.
 
 Open members:
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
+- [`runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md`](runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md).
 - [`ui/RORG-031-ui-integration.md`](ui/RORG-031-ui-integration.md).
 - [`platform/PLATFORM-004-alternative-platform-backend-onboarding.md`](platform/PLATFORM-004-alternative-platform-backend-onboarding.md) (planning-only seed).
 

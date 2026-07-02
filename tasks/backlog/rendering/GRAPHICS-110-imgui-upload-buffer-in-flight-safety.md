@@ -17,7 +17,8 @@ depends_on: []
 - No change to the ImGui overlay draw-data contract, `Pass.ImGui` recording, or
   the `ImGuiOverlayFrame` payload shape.
 - No change to the CPU-side flatten/copy in `Runtime.ImGuiAdapter` or
-  `Graphics.ImGuiOverlaySystem`.
+  `Graphics.ImGuiOverlaySystem`; retained overlay copy/upload cleanup is owned
+  by `GRAPHICS-114` after this safety task lands.
 - Not a rewrite of `RHI::BufferManager`; reuse its leasing API.
 
 ## Context
@@ -56,6 +57,9 @@ depends_on: []
       not reintroduce the hazard.
 - [ ] Audit the sibling transient-debug / visualization-overlay upload helpers
       for the same pattern and either fix them here or file their own follow-up.
+- [ ] Keep the retained/copy-reduction follow-up (`GRAPHICS-114`) blocked until
+      this task defines the safe per-frame/ring upload storage model it will
+      build on.
 
 ## Tests
 - [ ] Extend/keep the default-gate contract tests for the upload helper (offsets,
@@ -66,10 +70,14 @@ depends_on: []
 ## Docs
 - [ ] Update `src/graphics/renderer/README.md` (or the ImGui pass/upload docs) to
       describe the per-frame/ring upload-buffer model.
+- [ ] Link `GRAPHICS-114` as the follow-up for reducing steady-state ImGui
+      overlay copy/upload overhead.
 
 ## Acceptance criteria
 - [ ] Two frames in flight provably never share a written vertex/index range in
       the ImGui upload path (test or documented single-frame-in-flight proof).
+- [ ] `GRAPHICS-114` remains the named owner for retained overlay transport and
+      CPU copy/upload reductions.
 - [ ] `python3 tools/repo/check_layering.py --root src --strict` passes; the
       helper stays graphics/RHI-only.
 - [ ] Default CPU-gate upload-helper contract tests pass.

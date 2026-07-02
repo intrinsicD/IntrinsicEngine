@@ -1,7 +1,7 @@
 ---
 id: UI-031
 theme: F
-depends_on: []
+depends_on: [RUNTIME-138]
 maturity_target: CPUContracted
 ---
 # UI-031 — Sandbox EditorUI domain-window reorganization
@@ -42,6 +42,7 @@ maturity_target: CPUContracted
 - Do not change geometry algorithms, visualization adapters, render extraction, texture-bake command semantics, or method execution behavior.
 - Do not add new processing methods beyond the windows already exposed by existing tasks.
 - Do not implement frame-pacing diagnostics or performance fixes; `UI-030` owns that investigation.
+- Do not implement the selected-entity model cache or async derivation pipeline; `RUNTIME-138` owns the nonblocking editor/cache/job architecture and must land first.
 - Do not redesign the whole editor shell, docking model, or platform window system.
 
 ## Context
@@ -49,6 +50,7 @@ maturity_target: CPUContracted
 - Current menu shape exposes `Render hints`, `Properties`, `Visualization`, `Selection details`, and `Processing` under each of `PointCloud`, `Graph`, and `Mesh`.
 - Current `Properties` windows mix unrelated concerns: bound render-state rows, UV/texture-bake controls, property catalogs, binding targets, vertex-channel binding, and diagnostics.
 - Current `Processing` menu leaves such as `Denoise`, `Curvature`, `Remesh`, `Subdivide`, `Vertices > Normals`, and point-cloud outlier removal route to the same domain processing window, which then renders all available controls for that domain.
+- Domain-window reorganization touches the same `SandboxEditorUi` model builders that currently duplicate selected-entity property/progressive/texture/visualization work. Further UI-031 slices are gated on `RUNTIME-138` so new windows consume visibility-gated cached submodels instead of extending the eager-build pattern.
 - The desired user model is:
   - `Properties`: inspect all existing properties and numeric values.
   - `Render` or `Appearance`: render hints, visualization, uniform/lane color, and attribute/property assignment.
