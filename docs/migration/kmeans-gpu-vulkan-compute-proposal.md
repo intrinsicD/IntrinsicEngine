@@ -143,12 +143,20 @@ Follow the promoted BDA convention (storage buffers reached through
 `progressive_poisson_build_cells.comp` and the clustered-light shaders; **no
 descriptor-set storage bindings**).
 
-1. `kmeans_reset.comp` — zero `sums`, `counts`, and the reduction scratch.
-2. `kmeans_assign.comp` — **the hot kernel** (see §5).
+1. `kmeans_reset.comp` — zero `sums`, `counts`, and the reduction scratch
+   (including `changedCount` and `maxShiftBits`).
+2. `kmeans_assign.comp` — **the hot kernel** (see §5). Because label-change
+   detection is per point, this pass owns `changedCount`: each point compares its
+   new label against its previous one and `atomicAdd`s `changedCount` on a
+   change, mirroring the CPU reference's `anyLabelChanged` flag inside the
+   point-assignment loop (`Geometry.KMeans.cpp` assign loop). The update pass
+   only has per-cluster sums/counts and cannot know which point labels changed.
 3. `kmeans_update.comp` — per cluster: `new = count>0 ? sum/count :
-   points[farthestIndex]`; compute `shift² = |new-old|²`; `atomicMax` into a
-   `maxShiftBits` slot; write into the ping-pong centroid buffer.
-4. Convergence is read from the small state buffer (`changedCount`,
+   points[farthestIndex]`; compute `shift² = |new-old|²`; `atomicMax` into the
+   `maxShiftBits` slot; write the updated centroid (in place today; a `NextCentroids`
+   slot is reserved for an optional future double-buffer). It does **not** touch
+   `changedCount`.
+4. Convergence is read from the small reduction record (`changedCount`,
    `maxShiftBits`) — see §6.
 
 ### 4.2 Buffers — persistent, allocated once, reused every iteration
@@ -166,8 +174,8 @@ TransferSrc | TransferDst`, reached by BDA:
 | `Counts` (u32) | `k` | per-cluster counts | cleared per iter on GPU |
 | `Labels` (u32) | `n` | output | resident, drained once |
 | `SquaredDistances` (f32) | `n` | output | resident, drained once |
-| `Reduction scratch` | few | inertia + farthest-point argmax | per iter |
-| `State` (BDA table) | 1 | pointers + `changedCount`, `maxShiftBits`, `iter` | resident |
+| `Reduction scratch` | few | `inertia`, farthest-point argmax, `changedCount` (from assign), `maxShiftBits` (from update), `converged` | cleared per iter on GPU |
+| `State` (BDA table) | 1 | device-address pointer table to the other buffers | resident |
 | Host-visible readback | `n`+`n`+`k` | outputs | **drained exactly once at the end** |
 
 **I/O budget:** one bulk upload of positions + one batched readback of
@@ -260,13 +268,19 @@ loop on the GPU in **one command submission**:
   `ICommandContext::BufferBarrier(ShaderWrite → ShaderRead | ShaderWrite)`
   between them (the same `RHI::MemoryAccess` barrier vocabulary GRAPHICS-108
   uses). No `WaitIdle`, no readback, no host round-trip inside the loop.
-- **Early-out without host involvement:** the `update` pass writes
-  `changedCount` and `maxShiftBits` into the resident `State` buffer. A cheap
-  guard at the top of each subsequent `assign`/`update` pass reads a device-side
-  `converged` flag and returns immediately, so post-convergence iterations become
-  near-free no-ops. (A recorded command buffer can't `break`; guarding is the
-  Vulkan-idiomatic equivalent. `DispatchIndirect` with a device-computed group
-  count of 0 is an alternative.)
+- **Early-out without host involvement:** the two convergence inputs are
+  produced by the passes that actually have the data. The `reset` pass zeroes
+  `changedCount`; the `assign` pass increments `changedCount` per point whose
+  label changed (label-change detection is inherently per point — matching the
+  CPU reference); and the `update` pass writes `maxShiftBits`. Both live in the
+  resident reduction record. A cheap guard at the top of each subsequent
+  `assign`/`update` pass reads a device-side `converged` flag (set once
+  `changedCount == 0` **or** `maxShift² ≤ tol²`, matching `Geometry.KMeans.cpp`)
+  and returns immediately, so post-convergence iterations become near-free
+  no-ops. This keeps the `!anyLabelChanged` path without an extra O(n) label
+  scan in the update pass. (A recorded command buffer can't `break`; guarding is
+  the Vulkan-idiomatic equivalent. `DispatchIndirect` with a device-computed
+  group count of 0 is an alternative.)
 - Optionally split into a few submissions with a single readback of `State`
   between them to *actually* stop recording once converged, trading one
   round-trip per batch for a shorter command stream on high `MaxIterations`.
