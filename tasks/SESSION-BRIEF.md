@@ -8,7 +8,6 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `METHOD-013` — Progressive Poisson-disk sampling: GPU (Vulkan compute) backend + parity (tasks/active/METHOD-013-progressive-poisson-disk-gpu-backend.md)
 - `RUNTIME-125` — Optional AoS fast lane for static geometry (profile-gated) (tasks/active/RUNTIME-125-aos-static-fast-lane.md)
 
 ## Theme B — Rendering modernization
@@ -51,6 +50,7 @@ the authoritative open/unblocked view.
 - unblocked: `METHOD-005` — Robust mesh boolean reference backend (tasks/backlog/methods/METHOD-005-robust-mesh-boolean-reference-backend.md)
 - blocked by `GEOM-024`: `METHOD-006` — Cross-field / frame-field design reference backend (tasks/backlog/methods/METHOD-006-cross-field-design-reference-backend.md)
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
+- unblocked: `METHOD-014` — Progressive Poisson GPU operational parity (tasks/backlog/methods/METHOD-014-progressive-poisson-gpu-operational-parity.md)
 
 ## Audits
 

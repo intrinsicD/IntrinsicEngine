@@ -63,10 +63,12 @@ This index is the canonical entry point for method/paper implementation document
   [`Test.ProgressivePoissonReference.cpp`](../../tests/unit/geometry/Test.ProgressivePoissonReference.cpp)
   and the smoke benchmark in
   [`progressive_poisson_reference_smoke.yaml`](../../benchmarks/geometry/manifests/progressive_poisson_reference_smoke.yaml).
-  The Vulkan-compute GPU backend and CPU/GPU parity are owned by active
-  [`METHOD-013`](../../tasks/active/METHOD-013-progressive-poisson-disk-gpu-backend.md);
-  current slices expose requested-vs-actual backend diagnostics, CPU fallback
-  for `gpu_vulkan_compute` requests, and a recordable Vulkan shader/layout
-  dispatch seam with runtime-owned SoA uploads plus readback-copy targets before
-  parsed readback payloads and CPU-reference parity diagnostics; public GPU
-  execution still falls back until Vulkan parity tests land.
+  The Vulkan-compute GPU backend contract slices are retired in
+  [`METHOD-013`](../../tasks/done/METHOD-013-progressive-poisson-disk-gpu-backend.md):
+  requested-vs-actual backend diagnostics, CPU fallback for
+  `gpu_vulkan_compute` requests, recordable Vulkan shader/layout dispatch
+  seams, runtime-owned SoA uploads, readback-copy targets, parsed readback
+  payloads, and CPU-reference parity diagnostics are in place. Public GPU
+  execution, `gpu;vulkan` parity tests, and benchmark metric extension are owned
+  by open follow-up
+  [`METHOD-014`](../../tasks/backlog/methods/METHOD-014-progressive-poisson-gpu-operational-parity.md).

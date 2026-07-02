@@ -9,6 +9,16 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`METHOD-013`](METHOD-013-progressive-poisson-disk-gpu-backend.md) —
+Progressive Poisson-disk sampling: GPU backend contract slices — retired on
+2026-07-02 at maturity `CPUContracted`. The runtime seam now has backend
+selection/fallback telemetry, Vulkan planning and shader assets, recordable
+dispatch contracts, upload/readback-copy ownership, parsed readback payloads,
+and CPU-reference parity diagnostics. Public GPU result return,
+`gpu;vulkan` parity tests, and benchmark metric extension are split to open
+follow-up `METHOD-014`.
+
+Active
 [`GRAPHICS-104`](GRAPHICS-104-gpu-object-space-normal-texture-bake.md) —
 GPU Object-Space Normal Texture Bake — retired on 2026-07-02 at maturity
 `CPUContracted`. The graphics-owned zero-padding raster-bake plan/recording,

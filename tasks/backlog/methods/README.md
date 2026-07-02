@@ -26,6 +26,9 @@ map.
   (variant B default; gated on `geometry/GEOM-024` eigensolver seam).
 - [METHOD-007 — Constrained Delaunay tetrahedralization reference backend](METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
   (variant A default; `GEOM-007` gate satisfied 2026-05-27 — promotable now).
+- [METHOD-014 — Progressive Poisson GPU operational parity](METHOD-014-progressive-poisson-gpu-operational-parity.md)
+  (Vulkan compute operational/parity follow-up to retired `METHOD-013`; no
+  speedup claim without benchmark baseline comparison).
 
 ## Convergence
 
@@ -67,7 +70,13 @@ split; narratives live in the retirement log.
   (done, 2026-06-28, `CPUContracted`): deterministic CPU reference, manifest,
   docs, correctness tests, and smoke benchmark for progressive Poisson-disk
   subsampling. GPU parity remains owned by
-  [`METHOD-013`](../../active/METHOD-013-progressive-poisson-disk-gpu-backend.md).
+  [`METHOD-014`](METHOD-014-progressive-poisson-gpu-operational-parity.md).
+- [METHOD-013 — Progressive Poisson-disk sampling: GPU backend contract slices](../../done/METHOD-013-progressive-poisson-disk-gpu-backend.md)
+  (done, 2026-07-02, `CPUContracted`): Vulkan planning, shader assets,
+  recordable dispatch seams, upload/readback-copy ownership, parsed readback
+  payloads, and CPU-reference parity diagnostics. Public GPU result return,
+  `gpu;vulkan` parity tests, and benchmark metric extension remain owned by
+  `METHOD-014`.
 - [METHOD-001 — Rigid-body dynamics reference backend](../../done/METHOD-001-rigid-body-dynamics-reference-backend.md)
   (done 2026-06-05 at `CPUContracted`; ownership gate accepted by
   [`ARCH-001`](../../done/ARCH-001-physics-layer-ownership-and-ecs-integration.md)

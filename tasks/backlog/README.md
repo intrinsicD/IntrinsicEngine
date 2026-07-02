@@ -145,9 +145,9 @@ so new windows do not extend the eager selected-model rebuild pattern.
 agent/CLI config-control facade for render-recipe preview/activation and the
 current engine-config hot subset (`render.default_recipe_config_path`), with the
 Sandbox Editor routed through the same facade. This satisfies the config-control
-dependency for `RUNTIME-134`, which is now retired at `CPUContracted`. The
-future progressive-Poisson backend toggle is tracked by `RUNTIME-136` and remains
-blocked on `METHOD-013`.
+dependency for `RUNTIME-134`, which is now retired at `CPUContracted`.
+`RUNTIME-136` is also retired; operational progressive-Poisson GPU parity is now
+owned by `METHOD-014`.
 
 `DOCS-003` is retired to `tasks/done`: `algorithm-variant-dispatch.md` became an
 explicit target Strategy x Backend template using `RHI::IDevice`, method-policy
