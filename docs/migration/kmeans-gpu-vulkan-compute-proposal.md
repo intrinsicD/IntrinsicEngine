@@ -1,10 +1,12 @@
 # K-Means GPU backend — Framework24 → IntrinsicEngine migration proposal
 
 Status: implemented design note; GEOM-056 Slices A-D implemented the planning,
-recording, persistent-buffer upload, post-submit async readback, shader-local
-privatized accumulation, opt-in `gpu;vulkan` parity smoke, and benchmark
-manifest/result path. Higher-level sandbox execution remains outside this
-task's scope.
+recording, persistent-buffer upload, post-submit async readback, portable
+assignment/update shaders, opt-in `gpu;vulkan` parity smoke, and benchmark
+manifest/result path. BUG-053 wires the Sandbox editor to the queued runtime
+GPU path. The current promoted shader path avoids optional Vulkan float-atomic
+and int64-atomic feature requirements; the faster segmented-reduction path
+remains a follow-up.
 Scope: analyze the Framework24 CUDA k-means and propose a parity-gated GPU
 backend for `Geometry.KMeans` in IntrinsicEngine.
 
@@ -150,21 +152,21 @@ Follow the promoted BDA convention (storage buffers reached through
 `progressive_poisson_build_cells.comp` and the clustered-light shaders; **no
 descriptor-set storage bindings**).
 
-1. `kmeans_reset.comp` — zero `sums`, `counts`, and the reduction scratch
-   (including `changedCount` and `maxShiftBits`).
-2. `kmeans_assign.comp` — **the hot kernel** (see §5). Because label-change
-   detection is per point, this pass owns `changedCount`: each point compares its
-   new label against its previous one and `atomicAdd`s `changedCount` on a
-   change, mirroring the CPU reference's `anyLabelChanged` flag inside the
-   point-assignment loop (`Geometry.KMeans.cpp` assign loop). The update pass
-   only has per-cluster sums/counts and cannot know which point labels changed.
-3. `kmeans_update.comp` — per cluster: `new = count>0 ? sum/count :
-   points[farthestIndex]`; compute `shift² = |new-old|²`; `atomicMax` into the
-   `maxShiftBits` slot; write the updated centroid (in place today; a `NextCentroids`
-   slot is reserved for an optional future double-buffer). It does **not** touch
-   `changedCount`.
-4. Convergence is read from the small reduction record (`changedCount`,
-   `maxShiftBits`) — see §6.
+1. `kmeans_reset.comp` — zero the compatibility accumulator spans and reduction
+   scratch (`maxShiftBits` plus legacy fields kept in the BDA record).
+2. `kmeans_assign.comp` — one thread per point: scan centroids, write label, and
+   write squared distance. It deliberately does not use
+   `GL_EXT_shader_atomic_float`, `GL_EXT_shader_atomic_int64`, float atomics, or
+   64-bit atomics, so shader-module creation does not require optional device
+   features beyond the engine's baseline BDA/int64 requirements.
+3. `kmeans_update.comp` — one thread per cluster: scan current labels and
+   positions to compute `sum/count`, or reseed an empty cluster from the farthest
+   point in the squared-distance buffer. It computes `shift² = |new-old|²`,
+   `atomicMax`s that value as a 32-bit integer into `maxShiftBits`, and writes the
+   updated centroid in place. A `NextCentroids` slot remains reserved for a future
+   double-buffered variant.
+4. Final diagnostics (`Inertia`, farthest point) are reconstructed from the
+   read-back labels/distances/centroids in `KMeansGpuAsyncReadbacks::Collect`.
 
 ### 4.2 Buffers — persistent, allocated once, reused every iteration
 
@@ -181,7 +183,7 @@ TransferSrc | TransferDst`, reached by BDA:
 | `Counts` (u32) | `k` | per-cluster counts | cleared per iter on GPU |
 | `Labels` (u32) | `n` | output | resident, drained once |
 | `SquaredDistances` (f32) | `n` | output | resident, drained once |
-| `Reduction scratch` | few | `inertia`, farthest-point argmax, `changedCount` (from assign), `maxShiftBits` (from update), `converged` | cleared per iter on GPU |
+| `Reduction scratch` | few | `maxShiftBits` from update, plus legacy-compatible fields retained in the record | cleared per iter on GPU |
 | `State` (BDA table) | 1 | device-address pointer table to the other buffers | resident |
 | Async readback host pool | `n`+`n`+`k` | outputs | **drained exactly once at the end** through `AsyncBufferReadback` after the producing submission has retired |
 
@@ -224,46 +226,50 @@ and testable headless.
   scan / compaction / count→dispatch-args) rather than reimplementing.
 - **Shader idiom**: model on `assets/shaders/instance_cull.comp` +
   `assets/shaders/common/gpu_scene.glsl` (scalar push block of `uint64_t` BDAs,
-  `GL_EXT_buffer_reference2`, `atomicAdd`). Shaders compile via
+  `GL_EXT_buffer_reference2`). Shaders compile via
   `cmake/CompileShaders.cmake` (`glslc`, `--target-env=vulkan1.3`), validated by
   `tools/repo/check_shader_outputs.py`.
 
 ---
 
-## 5. Making the assignment kernel fast
+## 5. Making the assignment/update path fast
 
-The assignment pass is `O(n·k)` and dominates. Key optimizations over the
+The current promoted path is intentionally portable: assign is `O(n·k)` and the
+update pass scans `n` points once per cluster. That avoids optional Vulkan
+float-atomic and int64-atomic requirements, but it is not the final performance
+shape. Key follow-up optimizations over this portable baseline and over the
 Framework24 naive global-atomic kernel:
 
-1. **Privatized accumulation in shared memory.** Each workgroup keeps a local
+1. **Segmented/per-cluster reduction.** Each workgroup keeps a local
    copy of the `k` `sums`/`counts` in shared memory, `atomicAdd`s locally during
    assignment, then flushes once to global memory. This collapses global-atomic
    traffic from `O(n)` to `O(numGroups · k)` — typically a large speedup and the
-   main win. Guard on `k · 16B ≤ shared-memory budget`; fall back to the direct
-   global-atomic path when `k` is too large.
+   main win. Guard on `k · 16B ≤ shared-memory budget`; use a deterministic
+   two-pass/fixed-point fallback when `k` is too large or optional float atomics
+   are unavailable.
 2. **Cache centroids in shared memory** for the scan so all threads in a group
    reuse them instead of re-reading global memory `k` times.
 3. **SoA coalesced loads** for positions (keep Framework24's `d_x/d_y/d_z`
    layout; drop the AoS variant).
-4. **Deterministic accumulation option.** Float atomics are order-nondeterministic.
-   Offer scaled fixed-point (`int` atomics) or a two-pass tree reduction so
-   results are reproducible and parity is tight; keep float atomics as the fast
-   default with a declared tolerance.
+4. **Deterministic accumulation option.** Float atomics are order-nondeterministic
+   and feature-optional. Offer scaled fixed-point (`int` atomics) or a two-pass
+   tree reduction so results are reproducible and parity is tight; any
+   float-atomic path must be capability-gated before pipeline creation.
 5. **Large-`k` variant (later).** Port the `KmeansIndex` idea — a spatial
    structure over centroids — as an opt-in strategy when `k` is large. Not needed
    for the common `k ≤ few hundred` case where the shared-memory scan wins.
 
 Fuse the per-iteration reduction (inertia sum + farthest-point argmax) into the
-assign pass or a short follow-on reduce, so the empty-cluster reseed and
-convergence data are ready without an extra full-buffer pass.
+segmented-reduction path or a short follow-on reduce, so the empty-cluster reseed
+and convergence data are ready without the current `k` full-buffer scans.
 
 > **Reuse `ComputeParallelPrimitives` where it fits, but note the gap.** Its
 > compaction + on-GPU count→dispatch-indirect publication are a good fit for a
 > counting-sort assignment and variable-width follow-up passes. It has **no
 > float segmented/per-cluster reduction**, which is exactly the centroid
-> accumulate-and-divide step — so k-means must supply that (shared-memory
-> privatized float atomics per §5.1, or a dedicated segmented reduction) rather
-> than assume it exists. See the audit
+> accumulate-and-divide step — so k-means currently uses a portable per-cluster
+> scan and should switch to GRAPHICS-111's dedicated reduction primitive when it
+> lands. See the audit
 > (`docs/reviews/2026-07-01-gpu-geometry-backend-io-audit.md`, Finding 3).
 
 ---
@@ -277,25 +283,20 @@ loop on the GPU in **one command submission**:
   `ICommandContext::BufferBarrier(ShaderWrite → ShaderRead | ShaderWrite)`
   between them (the same `RHI::MemoryAccess` barrier vocabulary GRAPHICS-108
   uses). No `WaitIdle`, no readback, no host round-trip inside the loop.
-- **Early-out without host involvement:** the two convergence inputs are
-  produced by the passes that actually have the data. The `reset` pass zeroes
-  `changedCount`; the `assign` pass increments `changedCount` per point whose
-  label changed (label-change detection is inherently per point — matching the
-  CPU reference); and the `update` pass writes `maxShiftBits`. Both live in the
-  resident reduction record. A cheap guard at the top of each subsequent
-  `assign`/`update` pass reads a device-side `converged` flag (set once
-  `changedCount == 0` **or** `maxShift² ≤ tol²`, matching `Geometry.KMeans.cpp`)
-  and returns immediately, so post-convergence iterations become near-free
-  no-ops. This keeps the `!anyLabelChanged` path without an extra O(n) label
-  scan in the update pass. (A recorded command buffer can't `break`; guarding is
-  the Vulkan-idiomatic equivalent. `DispatchIndirect` with a device-computed
-  group count of 0 is an alternative.)
+- **Current convergence behavior:** the command stream records the requested
+  `MaxIterations`; final labels, distances, and centroids are drained once at the
+  end. This preserves zero per-iteration CPU I/O and avoids unsafe intermediate
+  readbacks. Device-side early-out remains a future optimization once the
+  reduction primitive can publish `changedCount`/`maxShiftBits` and gate later
+  dispatches without optional shader features.
 - Optionally split into a few submissions with a single readback of `State`
   between them to *actually* stop recording once converged, trading one
   round-trip per batch for a shorter command stream on high `MaxIterations`.
 
-Recommended default: single-submission unrolled loop with device-side early-out
-guard — **zero per-iteration I/O**, one final readback.
+Recommended default today: single-submission unrolled loop — **zero
+per-iteration I/O**, one final readback. Future default: add device-side early
+out after GRAPHICS-111 supplies the reduction data without reintroducing
+ungated optional atomics.
 
 > **Collect that final readback through the async path, not `IDevice::ReadBuffer`.**
 > The audit found that `IDevice::ReadBuffer` contractually does `vkDeviceWaitIdle`
@@ -342,8 +343,8 @@ guard — **zero per-iteration I/O**, one final readback.
   `KMeansGpuResourceCache`, `RecordKMeansGpuExecution(...)`, and
   `KMeansGpuAsyncReadbacks`: persistent `(n,k)` buffer leasing, one-time SoA
   position + seed-centroid upload, recorded Lloyd loop with barriers, and async
-  labels/distances/centroids drains. The assign shader uses shared-memory
-  privatized accumulation for `k <= 256` with a direct global-atomic fallback.
+  labels/distances/centroids drains. The current shaders use portable assignment
+  plus per-cluster scans and do not require optional float/int64 atomic features.
 - **Slice D — parity + benchmark (`Operational` → `ParityProven`).** Implemented
   by `IntrinsicRuntimeKMeansGpuSmokeTests` and
   `IntrinsicKMeansGpuBenchmarkSmoke`: the opt-in `gpu;vulkan` smoke validates the
@@ -357,10 +358,12 @@ Each slice is independently bisectable and keeps the default CPU gate green.
 
 ## 9. Risks / open questions
 
-- **Shared-memory `k` ceiling** → dual-path assign (privatized vs direct global
-  atomic); pick by `k` at record time.
-- **Float determinism vs speed** → ship both float-fast and fixed-point-exact
-  accumulation; declare which the parity test uses.
+- **Shared-memory `k` ceiling** → future dual-path reduction (privatized vs
+  deterministic two-pass/fixed-point fallback); pick by `k` and feature support
+  at record time.
+- **Float determinism vs speed** → ship both a feature-gated float-fast path and
+  fixed-point/two-pass deterministic accumulation; declare which the parity test
+  uses.
 - **Retained-buffer aliasing** depends on the point-cloud GPU buffer being
   created with `Storage` + BDA usage; if not, a one-time upload is the fallback
   (still zero per-iteration I/O). Confirm during Slice C.

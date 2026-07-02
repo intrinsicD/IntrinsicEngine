@@ -31,10 +31,11 @@ completed_on: 2026-07-02
 - Design: `docs/migration/kmeans-gpu-vulkan-compute-proposal.md` (buffer table,
   kernel specs, barrier vocabulary, zero-per-iteration-I/O loop).
 - GEOM-056 uses the runtime `AsyncBufferReadback` helper to drain results without
-  `vkDeviceWaitIdle` and uses a shader-local shared-memory privatized centroid
-  accumulation path for `k <= 256`, with a direct global-atomic fallback. The
-  reusable `GRAPHICS-111` float segmented-reduction primitive remains a
-  shared-graphics follow-up rather than a dependency for this local KMeans path.
+  `vkDeviceWaitIdle`. The current promoted shaders use portable assignment plus
+  per-cluster scans and do not require optional Vulkan float-atomic or int64
+  atomic shader features. The reusable `GRAPHICS-111` float segmented-reduction
+  primitive remains the shared-graphics follow-up that should replace the
+  portable scan for performance.
 - Parity must follow the IntrinsicEngine reference, including empty-cluster
   reseed to the global farthest point and convergence on label-stability OR
   `maxShift² ≤ tol²` — NOT the Framework24 CUDA behavior.
@@ -62,8 +63,9 @@ completed_on: 2026-07-02
   barrier-chained Lloyd loop; upload once, keep buffers resident.
 - **Slice C.** Persistent buffer leasing/caching keyed by `(n,k)`, centroid
   ping-pong, and result drain through `RUNTIME-137` `AsyncBufferReadback` (no
-  `vkDeviceWaitIdle`). Centroid accumulation is shader-local shared-memory
-  privatized for bounded `k`, with a global-atomic fallback.
+  `vkDeviceWaitIdle`). Centroid accumulation currently uses a portable
+  per-cluster scan; GRAPHICS-111 owns the future fast segmented-reduction
+  replacement.
 - **Slice D.** `gpu;vulkan` parity tests vs the CPU reference (inertia/label
   tolerance; deterministic mode) + benchmark manifest with `gpu_time_ms` and a
   CPU-vs-GPU speedup diagnostic, baseline-compared. Closes `Operational →
@@ -79,7 +81,7 @@ completed_on: 2026-07-02
       dispatch recording (`RecordKMeansGpuPasses` + `BuildKMeansGpuStateRecord`).
 - [x] Slice C: persistent buffer cache + one-time SoA/seed upload +
       `RecordKMeansGpuPasses` execution wrapper + async readback drain +
-      shader-local privatized centroid accumulation.
+      portable shader centroid update without optional float/int64 atomics.
 - [x] Slice D: parity tests + benchmark.
 
 ## Tests
@@ -130,7 +132,7 @@ ctest --test-dir build/ci-vulkan --output-on-failure -R 'IntrinsicKMeansGpuBench
 python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
 ```
 
-Completed 2026-07-02. Commit reference: pending local commit.
+Completed 2026-07-02. Commit reference: this local fix commit.
 
 2026-07-02 verification evidence:
 - `cmake --preset ci` passed with Clang 23 and vcpkg manifest dependencies.

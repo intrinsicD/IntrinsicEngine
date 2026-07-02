@@ -169,12 +169,14 @@ module owns the deterministic CPU reference path and does not import RHI. Its
 `ActualBackend`, and `FellBackToCPU` so a GPU request that runs on CPU is never
 silent.
 
-The RHI-visible integration hook lives in runtime:
+The RHI-visible integration hooks live in runtime:
 `Extrinsic.Runtime.KMeansBackend::ClusterKMeans(...)` accepts
 `Extrinsic::RHI::IDevice&`, evaluates `IDevice::IsOperational()` for GPU
-requests, and currently falls back to the CPU reference because no KMeans GPU
-kernel has landed. A real GPU backend must arrive as a separate parity-gated
-task.
+requests, and remains a nonblocking synchronous fallback seam. Real Vulkan
+KMeans execution is owned by `Extrinsic.Runtime.KMeansGpuBackend` and the
+renderer-hook-driven `Extrinsic.Runtime.KMeansGpuJobQueue`, which provide command
+recording, persistent GPU resources, and asynchronous readback ownership without
+importing RHI into geometry or creating an extra swapchain present.
 
 ### Geometry IO coverage
 
@@ -513,17 +515,23 @@ texture coordinates. Callers pass positions, triangle faces, optional authored
 UVs, and optional read-only vertex properties through `UvAtlasInput`; the result
 returns a `MeshSoup::IndexedMesh` with finite `v:texcoord`, source-vertex and
 source-face xrefs, output chart IDs, provenance (`AuthoredPreserved` or
-`Generated`), backend identity, atlas resolution, and GEOM-018 quality
-diagnostics. The default backend is the repository-pinned `jpcy/xatlas` overlay
-port, but callers can supply an `UvAtlasBackend` function to replace it without
-importing runtime, assets, ECS, graphics, platform, or app layers.
+`Generated`), requested and actual atlas method, backend identity, atlas
+resolution, fallback diagnostics, and GEOM-018 quality diagnostics. The default
+concrete backend remains the repository-pinned `jpcy/xatlas` overlay port.
+Callers can select `UvAtlasMethod::FastStaged` to target the fast replacement
+path, disable xatlas fallback with `AllowXAtlasFallback = false`, or supply an
+`UvAtlasBackend` function to satisfy that method without importing runtime,
+assets, ECS, graphics, platform, or app layers.
 
 Valid authored UVs are preserved by default when they are finite, count-matched,
 and triangle-usable. Missing or invalid authored UVs fall through to the
-selected backend unless the input mesh itself is invalid. Seam-split output may
-duplicate vertices, and the `SourceVertexForOutputVertex` table is the
-canonical way for runtime or future geometry consumers to remap normals, colors,
-scalar/vector attributes, selection data, and bake sources.
+selected backend unless the input mesh itself is invalid. Until GEOM-057 lands a
+built-in fast staged backend, a `FastStaged` request records `RequestedMethod =
+FastStaged`, `ActualMethod = XAtlas`, and `UsedFallback = true` when fallback is
+allowed; with fallback disabled it fails closed as `BackendUnavailable`.
+Seam-split output may duplicate vertices, and the `SourceVertexForOutputVertex`
+table is the canonical way for runtime or future geometry consumers to remap
+normals, colors, scalar/vector attributes, selection data, and bake sources.
 
 ## Topology connectivity ownership
 

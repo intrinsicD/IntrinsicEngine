@@ -3,20 +3,13 @@
 // GEOM-056 Slice B — k-means assignment (the hot pass).
 //
 // One invocation per point: find the nearest centroid under squared Euclidean
-// distance, write the label and squared distance, accumulate the point into its
-// cluster's SumX/Y/Z and Counts, and feed the shared reduction (inertia,
-// changed-label count, and the packed farthest-point argmax used to reseed empty
-// clusters in the update pass). Dispatched with ceil(PointCount / GroupSize).
-//
-// Slice C privatizes the hot centroid accumulation path: for k <= 256, each
-// workgroup accumulates per-cluster sums/counts in shared memory and flushes
-// once to global memory. Larger k falls back to direct global atomics.
+// distance, and write the label and squared distance. The update pass performs
+// the per-cluster scan so this shader does not require optional float or int64
+// atomic features. Dispatched with ceil(PointCount / GroupSize).
 
 #extension GL_EXT_scalar_block_layout : require
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
-#extension GL_EXT_shader_atomic_float : require
-#extension GL_EXT_shader_atomic_int64 : require
 
 layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
@@ -25,15 +18,6 @@ const uint KMEANS_SHARED_CLUSTER_CAPACITY = 256u;
 layout(buffer_reference, scalar) readonly buffer FloatArrayRO { float Values[]; };
 layout(buffer_reference, scalar) buffer FloatArray { float Values[]; };
 layout(buffer_reference, scalar) buffer UIntArray { uint Values[]; };
-
-layout(buffer_reference, scalar) buffer KMeansReductionRef
-{
-    uint64_t PackedMaxDistIndex;
-    float InertiaSum;
-    uint ChangedCount;
-    uint MaxShiftBits;
-    uint Converged;
-};
 
 layout(buffer_reference, scalar) readonly buffer KMeansStateRef
 {
@@ -65,10 +49,6 @@ layout(push_constant, scalar) uniform KMeansPush
 shared float sCentroidX[KMEANS_SHARED_CLUSTER_CAPACITY];
 shared float sCentroidY[KMEANS_SHARED_CLUSTER_CAPACITY];
 shared float sCentroidZ[KMEANS_SHARED_CLUSTER_CAPACITY];
-shared float sSumX[KMEANS_SHARED_CLUSTER_CAPACITY];
-shared float sSumY[KMEANS_SHARED_CLUSTER_CAPACITY];
-shared float sSumZ[KMEANS_SHARED_CLUSTER_CAPACITY];
-shared uint sCounts[KMEANS_SHARED_CLUSTER_CAPACITY];
 
 void main()
 {
@@ -91,10 +71,6 @@ void main()
             sCentroidX[cluster] = centroids.Values[cluster * 3u + 0u];
             sCentroidY[cluster] = centroids.Values[cluster * 3u + 1u];
             sCentroidZ[cluster] = centroids.Values[cluster * 3u + 2u];
-            sSumX[cluster] = 0.0;
-            sSumY[cluster] = 0.0;
-            sSumZ[cluster] = 0.0;
-            sCounts[cluster] = 0u;
         }
         barrier();
     }
@@ -143,59 +119,7 @@ void main()
         // Publish per-point outputs. Only this invocation touches these slots.
         UIntArray labels = UIntArray(state.LabelsBDA);
         FloatArray distances = FloatArray(state.SquaredDistancesBDA);
-        const uint previousLabel = labels.Values[index];
         labels.Values[index] = bestCluster;
         distances.Values[index] = bestDistance;
-
-        // Accumulate the point into its cluster. The common bounded-k path uses
-        // shared-memory atomics and flushes once per workgroup/cluster below.
-        if (useSharedReduction)
-        {
-            atomicAdd(sSumX[bestCluster], x);
-            atomicAdd(sSumY[bestCluster], y);
-            atomicAdd(sSumZ[bestCluster], z);
-            atomicAdd(sCounts[bestCluster], 1u);
-        }
-        else
-        {
-            atomicAdd(FloatArray(state.SumXBDA).Values[bestCluster], x);
-            atomicAdd(FloatArray(state.SumYBDA).Values[bestCluster], y);
-            atomicAdd(FloatArray(state.SumZBDA).Values[bestCluster], z);
-            atomicAdd(UIntArray(state.CountsBDA).Values[bestCluster], 1u);
-        }
-
-        if (state.ReductionBDA != uint64_t(0))
-        {
-            KMeansReductionRef reduction = KMeansReductionRef(state.ReductionBDA);
-            atomicAdd(reduction.InertiaSum, bestDistance);
-            if (previousLabel != bestCluster)
-            {
-                atomicAdd(reduction.ChangedCount, 1u);
-            }
-            // Squared distances are non-negative, so their float bit patterns are
-            // monotonic and a packed (distanceBits << 32 | index) atomicMax yields
-            // the global farthest point and its index for empty-cluster reseeding.
-            const uint64_t packed =
-                (uint64_t(floatBitsToUint(bestDistance)) << 32) | uint64_t(index);
-            atomicMax(reduction.PackedMaxDistIndex, packed);
-        }
-    }
-
-    if (useSharedReduction)
-    {
-        barrier();
-        for (uint cluster = gl_LocalInvocationID.x;
-             cluster < pc.ClusterCount;
-             cluster += gl_WorkGroupSize.x)
-        {
-            const uint count = sCounts[cluster];
-            if (count != 0u)
-            {
-                atomicAdd(FloatArray(state.SumXBDA).Values[cluster], sSumX[cluster]);
-                atomicAdd(FloatArray(state.SumYBDA).Values[cluster], sSumY[cluster]);
-                atomicAdd(FloatArray(state.SumZBDA).Values[cluster], sSumZ[cluster]);
-                atomicAdd(UIntArray(state.CountsBDA).Values[cluster], count);
-            }
-        }
     }
 }

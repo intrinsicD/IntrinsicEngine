@@ -43,6 +43,14 @@ export namespace Geometry::UvAtlas
         Generated,
     };
 
+    enum class UvAtlasMethod : std::uint8_t
+    {
+        None = 0,
+        Authored,
+        XAtlas,
+        FastStaged,
+    };
+
     struct UvAtlasInput
     {
         std::span<const glm::vec3> Positions{};
@@ -72,6 +80,8 @@ export namespace Geometry::UvAtlas
         bool RotateChartsToAxis{true};
         bool RotateCharts{true};
 
+        UvAtlasMethod Method{UvAtlasMethod::XAtlas};
+        bool AllowXAtlasFallback{true};
         std::string BackendName{"xatlas"};
     };
 
@@ -79,8 +89,12 @@ export namespace Geometry::UvAtlas
     {
         UvAtlasStatus Status{UvAtlasStatus::EmptyInput};
         UvAtlasProvenance Provenance{UvAtlasProvenance::None};
+        UvAtlasMethod RequestedMethod{UvAtlasMethod::XAtlas};
+        UvAtlasMethod ActualMethod{UvAtlasMethod::None};
         std::string BackendName{};
         std::string BackendDetail{};
+        bool UsedFallback{false};
+        std::string FallbackReason{};
 
         std::size_t InputVertexCount{0};
         std::size_t InputFaceCount{0};
@@ -140,6 +154,7 @@ export namespace Geometry::UvAtlas
 
     [[nodiscard]] const char* ToString(UvAtlasStatus status) noexcept;
     [[nodiscard]] const char* ToString(UvAtlasProvenance provenance) noexcept;
+    [[nodiscard]] const char* ToString(UvAtlasMethod method) noexcept;
 
     [[nodiscard]] UvAtlasInput BorrowInput(
         const MeshSoup::IndexedMesh& mesh,

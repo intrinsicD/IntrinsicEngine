@@ -6,6 +6,7 @@ module;
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
@@ -1419,6 +1420,7 @@ namespace Extrinsic::Graphics
                 m_ImGuiOverlaySystem->ShutdownGpuResources();
             }
             m_ImGuiOverlaySystem = nullptr;
+            m_RuntimeFrameCommandHook = {};
             // GRAPHICS-077 Slice B — drop the transient-debug upload
             // helper before the BufferManager is destroyed so the
             // helper's internal `BufferManager::BufferLease` destructor
@@ -1545,6 +1547,11 @@ namespace Extrinsic::Graphics
         bool HasImGuiOverlaySystem() const noexcept override
         {
             return m_ImGuiOverlaySystem != nullptr && m_ImGuiPass.has_value();
+        }
+
+        void SetRuntimeFrameCommandHook(RuntimeFrameCommandHook hook) override
+        {
+            m_RuntimeFrameCommandHook = std::move(hook);
         }
 
         void SubmitRuntimeSnapshots(const RuntimeRenderSnapshotBatch& snapshots,
@@ -2795,6 +2802,8 @@ namespace Extrinsic::Graphics
                         submitBarriersForContext(graphicsContext, packet);
                     });
                 recordPostGraphReadbacks(graphicsContext, result.has_value());
+                if (result.has_value() && m_RuntimeFrameCommandHook)
+                    m_RuntimeFrameCommandHook(graphicsContext);
                 graphicsContext.End();
                 return result;
             };
@@ -2887,6 +2896,8 @@ namespace Extrinsic::Graphics
                             return finalBarriers;
                         }
                         recordPostGraphReadbacks(context, true);
+                        if (m_RuntimeFrameCommandHook)
+                            m_RuntimeFrameCommandHook(context);
                     }
                     context.End();
                 }
@@ -7830,6 +7841,7 @@ namespace Extrinsic::Graphics
         // overlay system the route reports `SkippedUnavailable`.
         ImGuiOverlaySystem*                  m_ImGuiOverlaySystem{nullptr};
         std::optional<ImGuiPass>             m_ImGuiPass;
+        RuntimeFrameCommandHook              m_RuntimeFrameCommandHook{};
         // GRAPHICS-077 Slice A — scaffold-only `TransientDebugSurfacePass`.
         // Default-constructible (no system dependency), held as a plain
         // member so it lives for the renderer's full lifetime. Slice A

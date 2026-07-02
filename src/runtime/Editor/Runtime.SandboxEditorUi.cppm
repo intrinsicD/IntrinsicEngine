@@ -36,6 +36,7 @@ import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.KMeansGpuJobQueue;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressivePresentationExtraction;
@@ -86,6 +87,7 @@ export namespace Extrinsic::Runtime
     enum class SandboxEditorCommandStatus : std::uint8_t
     {
         Applied,
+        Pending,
         NoChange,
         MissingScene,
         MissingSelectionController,
@@ -1883,6 +1885,20 @@ export namespace Extrinsic::Runtime
         }
     };
 
+    struct SandboxEditorKMeansGpuCommandSurface
+    {
+        std::function<RuntimeKMeansGpuJobSubmission(RuntimeKMeansGpuJobRequest)>
+            Submit{};
+        std::function<std::optional<RuntimeKMeansGpuJobResult>()>
+            ConsumeCompleted{};
+
+        [[nodiscard]] bool Available() const noexcept
+        {
+            return static_cast<bool>(Submit) &&
+                   static_cast<bool>(ConsumeCompleted);
+        }
+    };
+
     struct SandboxEditorCameraRenderModel
     {
         bool CameraControlsAvailable{false};
@@ -2108,6 +2124,7 @@ export namespace Extrinsic::Runtime
         SandboxEditorSceneFileCommandSurface SceneFileCommands{};
         SandboxEditorPrimitiveViewCommandSurface PrimitiveViewCommands{};
         SandboxEditorVisualizationAdapterBindingCommandSurface VisualizationAdapterBindings{};
+        SandboxEditorKMeansGpuCommandSurface KMeansGpuCommands{};
         RuntimeAssetImportQueueSnapshot AssetImportQueue{};
         const DerivedJobQueueSnapshot* DerivedJobs{nullptr};
         std::string PendingAssetImportPath{};

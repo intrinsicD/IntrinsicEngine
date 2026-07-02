@@ -105,7 +105,7 @@ TEST(RuntimeEngineLayering, RunFrameStopsAfterPlatformCloseBeforeRendererContrac
 
     const auto platformContract = runFrame.find("Core::ExecutePlatformBeginFrameContract(platformHooks");
     const auto closeBranch = runFrame.find("platformResult.ShouldClose");
-    const auto requestExit = runFrame.find("RequestExit();", closeBranch);
+    const auto requestExit = runFrame.find("RequestExitFromWindowClose(", closeBranch);
     const auto returnFromClose = runFrame.find("return;", requestExit);
     const auto renderContract = runFrame.find("Core::ExecuteRenderFrameContract(renderHooks)");
 
@@ -119,6 +119,28 @@ TEST(RuntimeEngineLayering, RunFrameStopsAfterPlatformCloseBeforeRendererContrac
     EXPECT_LT(closeBranch, requestExit);
     EXPECT_LT(requestExit, returnFromClose);
     EXPECT_LT(returnFromClose, renderContract);
+}
+
+TEST(RuntimeEngineLayering, ShutdownWaitsIdleBeforeDestroyingRuntimeGpuJobQueue)
+{
+    const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto shutdown = SliceBetween(content,
+                                       "void Engine::Shutdown()",
+                                       "// ── Main loop");
+
+    const auto detachHook = shutdown.find("SetRuntimeFrameCommandHook({})");
+    const auto waitIdle = shutdown.find("m_Device->WaitIdle();", detachHook);
+    const auto destroyKMeans = shutdown.find("m_KMeansGpuJobs.reset();", waitIdle);
+    const auto executeShutdown = shutdown.find("Core::ExecuteShutdownContract(hooks)");
+
+    ASSERT_NE(detachHook, std::string::npos);
+    ASSERT_NE(waitIdle, std::string::npos);
+    ASSERT_NE(destroyKMeans, std::string::npos);
+    ASSERT_NE(executeShutdown, std::string::npos);
+
+    EXPECT_LT(detachHook, waitIdle);
+    EXPECT_LT(waitIdle, destroyKMeans);
+    EXPECT_LT(destroyKMeans, executeShutdown);
 }
 
 TEST(RuntimeEngineLayering, RunFrameCarriesDataOnlyFrameContext)

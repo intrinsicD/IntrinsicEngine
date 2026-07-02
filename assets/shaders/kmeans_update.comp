@@ -2,12 +2,12 @@
 
 // GEOM-056 Slice B — k-means centroid update.
 //
-// One invocation per cluster: recompute the centroid as the mean of its
-// assigned points (Sum / Count), or, when the cluster is empty, reseed it to the
-// globally farthest point recorded by the assignment pass — matching the CPU
-// reference (points[MaxDistanceIndex]). The squared shift from the old centroid
-// is folded into the shared reduction so the host loop can test convergence
-// (max shift <= tolerance^2). Dispatched with ceil(ClusterCount / GroupSize).
+// One invocation per cluster: scan the current labels, recompute the centroid as
+// the mean of its assigned points, or, when the cluster is empty, reseed it to
+// the farthest point recorded in the per-point squared-distance buffer. The scan
+// is intentionally portable: it avoids optional float atomics and replaces the
+// earlier global atomic-add reduction until the shared segmented-reduction
+// primitive lands.
 //
 // Requires an execution/memory barrier after the assignment pass so Sums,
 // Counts, and the packed argmax are visible here (the runtime recorder inserts
@@ -74,7 +74,36 @@ void main()
     const float oldY = centroids.Values[cluster * 3u + 1u];
     const float oldZ = centroids.Values[cluster * 3u + 2u];
 
-    const uint count = UIntArrayRO(state.CountsBDA).Values[cluster];
+    FloatArrayRO px = FloatArrayRO(state.PositionXBDA);
+    FloatArrayRO py = FloatArrayRO(state.PositionYBDA);
+    FloatArrayRO pz = FloatArrayRO(state.PositionZBDA);
+    UIntArrayRO labels = UIntArrayRO(state.LabelsBDA);
+    FloatArrayRO distances = FloatArrayRO(state.SquaredDistancesBDA);
+
+    float sumX = 0.0;
+    float sumY = 0.0;
+    float sumZ = 0.0;
+    uint count = 0u;
+    uint farthest = 0u;
+    float farthestDistance = -1.0;
+
+    for (uint index = 0u; index < pc.PointCount; ++index)
+    {
+        if (labels.Values[index] == cluster)
+        {
+            sumX += px.Values[index];
+            sumY += py.Values[index];
+            sumZ += pz.Values[index];
+            ++count;
+        }
+
+        const float distance = distances.Values[index];
+        if (distance > farthestDistance)
+        {
+            farthestDistance = distance;
+            farthest = index;
+        }
+    }
 
     float newX;
     float newY;
@@ -82,27 +111,19 @@ void main()
     if (count > 0u)
     {
         const float inv = 1.0 / float(count);
-        newX = FloatArrayRO(state.SumXBDA).Values[cluster] * inv;
-        newY = FloatArrayRO(state.SumYBDA).Values[cluster] * inv;
-        newZ = FloatArrayRO(state.SumZBDA).Values[cluster] * inv;
+        newX = sumX * inv;
+        newY = sumY * inv;
+        newZ = sumZ * inv;
     }
     else
     {
-        // Empty cluster: reseed to the globally farthest assigned point.
-        uint farthest = 0u;
-        if (state.ReductionBDA != uint64_t(0))
-        {
-            const uint64_t packed =
-                KMeansReductionRef(state.ReductionBDA).PackedMaxDistIndex;
-            farthest = uint(packed & uint64_t(0xffffffffu));
-        }
         if (farthest >= pc.PointCount)
         {
             farthest = 0u;
         }
-        newX = FloatArrayRO(state.PositionXBDA).Values[farthest];
-        newY = FloatArrayRO(state.PositionYBDA).Values[farthest];
-        newZ = FloatArrayRO(state.PositionZBDA).Values[farthest];
+        newX = px.Values[farthest];
+        newY = py.Values[farthest];
+        newZ = pz.Values[farthest];
     }
 
     centroids.Values[cluster * 3u + 0u] = newX;

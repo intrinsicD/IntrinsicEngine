@@ -14,8 +14,9 @@ depends_on: []
 
 ## Non-goals
 - No change to the existing prefix-scan / stream-compaction contracts.
-- No k-means backend wiring here (that is the pending k-means GPU backend task);
-  this task ships the primitive + its parity contract only.
+- No k-means backend wiring here; current KMeans GPU execution uses a portable
+  per-cluster scan until this primitive is available. This task ships the
+  primitive + its parity contract only.
 - No arbitrary-associative-operator reduction framework; scope is float sum and
   count-normalized mean over a bounded key range (segment count `k`).
 
@@ -31,10 +32,11 @@ depends_on: []
   step. Keys/values are `uint32`-only today (`parallel_prefix_scan.comp:23`).
 - Preferred implementation: workgroup-privatized per-segment accumulators in
   shared memory flushed once to global (bounded `k` fits shared memory), with a
-  direct global-atomic fallback when `k` exceeds the shared-memory budget — the
-  same privatization strategy the k-means proposal §5.1 specifies. Offer an
-  optional deterministic (fixed-point / two-pass) mode since float-atomic order
-  is nondeterministic.
+  deterministic fixed-point / two-pass fallback when `k` exceeds the shared-memory
+  budget or optional float-atomic features are unavailable. Any float-atomic fast
+  path must be capability-gated before pipeline creation because the Sandbox
+  KMeans GPU path must not create shaders that require unsupported Vulkan
+  features.
 - Consumes the same caller-provided-scratch + owned-lease-fallback pattern the
   existing primitives already use, so callers reuse buffers across dispatches.
 
@@ -43,7 +45,8 @@ depends_on: []
       a per-element segment key and float value stream and produces per-segment
       sums and counts, plus a count-normalized mean, into caller-owned buffers.
 - [ ] Add the shader asset(s) (BDA/scalar-push convention, `local_size_x=256`,
-      shared-memory privatization + global-atomic fallback for large `k`).
+      shared-memory privatization + deterministic fallback for large `k` or
+      missing optional float-atomic support).
 - [ ] Add a deterministic CPU reference (`...ReduceBySegmentCpu`) mirroring the
       existing CPU reference helpers, and a declared parity tolerance for the
       float-atomic GPU path.
@@ -72,7 +75,8 @@ depends_on: []
       one shared primitive with reused scratch buffers.
 - [ ] GPU path matches the CPU reference within a declared tolerance; a
       deterministic mode is available and bit-stable.
-- [ ] Large-`k` fallback path is covered when shared-memory privatization does not fit.
+- [ ] Large-`k` / missing-feature fallback path is covered when shared-memory
+      privatization or optional float atomics do not fit.
 - [ ] No RHI/Vulkan-native leakage; layering holds; default CPU gate green.
 
 ## Verification

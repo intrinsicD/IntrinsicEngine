@@ -40,6 +40,7 @@ import Extrinsic.Core.Logging;
 import Extrinsic.Core.IOBackend;
 import Extrinsic.Core.Tasks;
 import Extrinsic.Platform.Window;
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
@@ -68,6 +69,8 @@ import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.ImGuiAdapter;
+import Extrinsic.Runtime.KMeansGpuBackend;
+import Extrinsic.Runtime.KMeansGpuJobQueue;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Core.FrameLoop;
@@ -2465,6 +2468,16 @@ namespace Extrinsic::Runtime
             m_Renderer->GetTextureManager(),
             m_Renderer->GetSamplerManager(),
             m_Device->GetTransferQueue());
+        m_KMeansGpuJobs = std::make_unique<RuntimeKMeansGpuJobQueue>(
+            *m_Device,
+            m_Renderer->GetBufferManager(),
+            m_Device->GetTransferQueue());
+        m_Renderer->SetRuntimeFrameCommandHook(
+            [this](RHI::ICommandContext& commandContext)
+            {
+                if (m_KMeansGpuJobs)
+                    m_KMeansGpuJobs->AdvanceGpuWork(commandContext);
+            });
 
         // RUNTIME-070: bootstrap the runtime-owned 4×4 magenta-and-black
         // checkerboard fallback texture exactly once. Skipped when the
@@ -2546,6 +2559,7 @@ namespace Extrinsic::Runtime
 
         m_Initialized = true;
         m_Running     = true;
+        m_WindowCloseLogged = false;
 
         m_Window->Listen(
             [this](const Platform::Event& event)
@@ -2569,6 +2583,15 @@ namespace Extrinsic::Runtime
         // destructor shuts the overlay system + ImGui context down; the overlay
         // system value member is reusable on a later re-Initialize().
         m_ImGuiAdapter.reset();
+        if (m_Renderer)
+            m_Renderer->SetRuntimeFrameCommandHook({});
+        // Runtime K-Means GPU jobs own direct compute pipeline handles and
+        // cache BufferLease values. Detach the hook first, wait for any in-flight
+        // frame commands to retire, then drop the leases before renderer/device
+        // teardown.
+        if (m_KMeansGpuJobs && m_Device)
+            m_Device->WaitIdle();
+        m_KMeansGpuJobs.reset();
 
         struct ShutdownHooks final : Core::IShutdownHooks
         {
@@ -2760,11 +2783,11 @@ namespace Extrinsic::Runtime
 
     void Engine::Run()
     {
-        while (m_Running && !m_Window->ShouldClose())
+        while (m_Running && m_Window != nullptr && !m_Window->ShouldClose())
             RunFrame();
 
         if (m_Running && m_Window != nullptr && m_Window->ShouldClose())
-            RequestExit();
+            RequestExitFromWindowClose("native-poll");
     }
 
     void Engine::RunFrame()
@@ -2776,9 +2799,13 @@ namespace Extrinsic::Runtime
         const Core::PlatformFrameResult platformResult =
             Core::ExecutePlatformBeginFrameContract(platformHooks,
                                                     kIdleSleepSeconds);
-        if (platformResult.ShouldClose || !m_Running)
+        if (platformResult.ShouldClose)
         {
-            RequestExit();
+            RequestExitFromWindowClose("platform-poll");
+            return;
+        }
+        if (!m_Running)
+        {
             return;
         }
 
@@ -2980,6 +3007,8 @@ namespace Extrinsic::Runtime
                               m_RenderExtraction,
                               *m_Renderer);
         Core::ExecuteMaintenanceContract(transferHooks, streamingHooks, assetHooks, 8);
+        if (m_KMeansGpuJobs)
+            m_KMeansGpuJobs->DrainCompletedTransfers();
 
         // ── RUNTIME-092 Slice B: refresh the stable-entity lookup ──────────
         // Rebuild the runtime-owned StableId winner-map from the live registry
@@ -3021,6 +3050,18 @@ namespace Extrinsic::Runtime
 
     bool Engine::IsRunning() const noexcept { return m_Running; }
     void Engine::RequestExit()      noexcept { m_Running = false; }
+
+    void Engine::RequestExitFromWindowClose(const std::string_view source)
+    {
+        if (!m_WindowCloseLogged)
+        {
+            Core::Log::Info(
+                "[Runtime] Window close requested; stopping Engine::Run loop. source={}",
+                source);
+            m_WindowCloseLogged = true;
+        }
+        RequestExit();
+    }
 
     Platform::IWindow&    Engine::GetWindow()        noexcept { return *m_Window;        }
     RHI::IDevice&         Engine::GetDevice()        noexcept { return *m_Device;        }
@@ -3518,7 +3559,7 @@ namespace Extrinsic::Runtime
     {
         if (std::holds_alternative<Platform::WindowCloseEvent>(event))
         {
-            RequestExit();
+            RequestExitFromWindowClose("platform-event");
             return;
         }
 
@@ -4682,6 +4723,28 @@ namespace Extrinsic::Runtime
         const std::uint32_t stableEntityId) const noexcept
     {
         return m_RenderExtraction.GetVisualizationAdapterBinding(stableEntityId);
+    }
+
+    RuntimeKMeansGpuJobSubmission Engine::SubmitKMeansGpuJob(
+        RuntimeKMeansGpuJobRequest request)
+    {
+        if (!m_KMeansGpuJobs)
+        {
+            return RuntimeKMeansGpuJobSubmission{
+                .Status = RuntimeKMeansGpuJobStatus::GpuUnavailable,
+                .GpuStatus = KMeansGpuStatus::DeviceUnavailable,
+                .Diagnostic = "Runtime K-Means GPU job queue is unavailable.",
+            };
+        }
+        return m_KMeansGpuJobs->Submit(std::move(request));
+    }
+
+    std::optional<RuntimeKMeansGpuJobResult>
+    Engine::ConsumeCompletedKMeansGpuJob()
+    {
+        if (!m_KMeansGpuJobs)
+            return std::nullopt;
+        return m_KMeansGpuJobs->ConsumeCompleted();
     }
 
     void Engine::SetImGuiEditorCallback(std::function<void()> callback)

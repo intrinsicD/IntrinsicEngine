@@ -157,6 +157,72 @@ TEST(UvAtlas, FakeBackendCanReplaceDefault)
     EXPECT_EQ(g_FakeBackendState.FaceCount, mesh.FaceCount());
     EXPECT_EQ(g_FakeBackendState.Resolution, 256u);
     EXPECT_EQ(result.Diagnostics.BackendName, "fake");
+    EXPECT_EQ(result.Diagnostics.RequestedMethod, Geometry::UvAtlas::UvAtlasMethod::XAtlas);
+    EXPECT_EQ(result.Diagnostics.ActualMethod, Geometry::UvAtlas::UvAtlasMethod::XAtlas);
+    EXPECT_FALSE(result.Diagnostics.UsedFallback);
+}
+
+TEST(UvAtlas, FastStagedRequestFallsBackToXAtlasUntilDefaultBackendExists)
+{
+    auto mesh = MakeSquareMesh();
+
+    Geometry::UvAtlas::UvAtlasOptions options{};
+    options.PreserveValidAuthoredUvs = false;
+    options.Method = Geometry::UvAtlas::UvAtlasMethod::FastStaged;
+    options.Resolution = 64u;
+
+    const auto result = Geometry::UvAtlas::ResolveUvAtlas(Geometry::UvAtlas::BorrowInput(mesh), options);
+
+    ASSERT_EQ(result.Status, Geometry::UvAtlas::UvAtlasStatus::Success) << Geometry::UvAtlas::ToString(result.Status);
+    EXPECT_EQ(result.Provenance, Geometry::UvAtlas::UvAtlasProvenance::Generated);
+    EXPECT_EQ(result.Diagnostics.BackendName, "xatlas");
+    EXPECT_EQ(result.Diagnostics.RequestedMethod, Geometry::UvAtlas::UvAtlasMethod::FastStaged);
+    EXPECT_EQ(result.Diagnostics.ActualMethod, Geometry::UvAtlas::UvAtlasMethod::XAtlas);
+    EXPECT_TRUE(result.Diagnostics.UsedFallback);
+    EXPECT_FALSE(result.Diagnostics.FallbackReason.empty());
+}
+
+TEST(UvAtlas, FastStagedRequestFailsClosedWhenXAtlasFallbackDisabled)
+{
+    auto mesh = MakeSquareMesh();
+
+    Geometry::UvAtlas::UvAtlasOptions options{};
+    options.PreserveValidAuthoredUvs = false;
+    options.Method = Geometry::UvAtlas::UvAtlasMethod::FastStaged;
+    options.AllowXAtlasFallback = false;
+
+    const auto result = Geometry::UvAtlas::ResolveUvAtlas(Geometry::UvAtlas::BorrowInput(mesh), options);
+
+    EXPECT_EQ(result.Status, Geometry::UvAtlas::UvAtlasStatus::BackendUnavailable);
+    EXPECT_EQ(result.Diagnostics.BackendName, "fast-staged");
+    EXPECT_EQ(result.Diagnostics.RequestedMethod, Geometry::UvAtlas::UvAtlasMethod::FastStaged);
+    EXPECT_EQ(result.Diagnostics.ActualMethod, Geometry::UvAtlas::UvAtlasMethod::None);
+    EXPECT_FALSE(result.Diagnostics.UsedFallback);
+    EXPECT_FALSE(result.Diagnostics.BackendDetail.empty());
+}
+
+TEST(UvAtlas, FastStagedRequestCanUseCallerSuppliedBackend)
+{
+    g_FakeBackendState = {};
+    auto mesh = MakeSquareMesh();
+    const Geometry::UvAtlas::UvAtlasBackend fastBackend{.Name = "fast-staged-fake", .Generate = &FakeBackend};
+
+    Geometry::UvAtlas::UvAtlasOptions options{};
+    options.PreserveValidAuthoredUvs = false;
+    options.Method = Geometry::UvAtlas::UvAtlasMethod::FastStaged;
+    options.AllowXAtlasFallback = false;
+
+    const auto result = Geometry::UvAtlas::ResolveUvAtlas(
+        Geometry::UvAtlas::BorrowInput(mesh),
+        options,
+        &fastBackend);
+
+    ASSERT_EQ(result.Status, Geometry::UvAtlas::UvAtlasStatus::Success);
+    EXPECT_EQ(g_FakeBackendState.Called, 1);
+    EXPECT_EQ(result.Diagnostics.BackendName, "fake");
+    EXPECT_EQ(result.Diagnostics.RequestedMethod, Geometry::UvAtlas::UvAtlasMethod::FastStaged);
+    EXPECT_EQ(result.Diagnostics.ActualMethod, Geometry::UvAtlas::UvAtlasMethod::FastStaged);
+    EXPECT_FALSE(result.Diagnostics.UsedFallback);
 }
 
 TEST(UvAtlas, ValidAuthoredUvsArePreservedWithoutCallingBackend)
@@ -173,6 +239,7 @@ TEST(UvAtlas, ValidAuthoredUvsArePreservedWithoutCallingBackend)
 
     ASSERT_EQ(result.Status, Geometry::UvAtlas::UvAtlasStatus::Success);
     EXPECT_EQ(result.Provenance, Geometry::UvAtlas::UvAtlasProvenance::AuthoredPreserved);
+    EXPECT_EQ(result.Diagnostics.ActualMethod, Geometry::UvAtlas::UvAtlasMethod::Authored);
     EXPECT_EQ(g_FakeBackendState.Called, 0);
     ASSERT_EQ(result.OutputMesh.VertexCount(), authoredUvs.size());
     const auto outputUvs = result.OutputMesh.GetVertexProperty<glm::vec2>(
@@ -198,6 +265,8 @@ TEST(UvAtlas, MissingUvsGenerateFiniteNormalizedXAtlasUvs)
 
     ASSERT_EQ(result.Status, Geometry::UvAtlas::UvAtlasStatus::Success) << Geometry::UvAtlas::ToString(result.Status);
     EXPECT_EQ(result.Provenance, Geometry::UvAtlas::UvAtlasProvenance::Generated);
+    EXPECT_EQ(result.Diagnostics.RequestedMethod, Geometry::UvAtlas::UvAtlasMethod::XAtlas);
+    EXPECT_EQ(result.Diagnostics.ActualMethod, Geometry::UvAtlas::UvAtlasMethod::XAtlas);
     EXPECT_GE(result.OutputMesh.VertexCount(), mesh.VertexCount());
     EXPECT_EQ(result.OutputMesh.FaceCount(), mesh.FaceCount());
     EXPECT_GT(result.Diagnostics.ChartCount, 0u);

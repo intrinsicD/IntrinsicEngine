@@ -33,6 +33,7 @@ target_sources(${target_name}
         Runtime.GpuReadbackJob.cppm
         Runtime.KMeansBackend.cppm
         Runtime.KMeansGpuBackend.cppm
+        Runtime.KMeansGpuJobQueue.cppm
         Runtime.RegistrationAlignment.cppm
         Runtime.PhysicsBridge.cppm
         Runtime.SceneSerialization.cppm
@@ -86,6 +87,7 @@ target_sources(${target_name}
         Runtime.GpuReadbackJob.cpp
         Runtime.KMeansBackend.cpp
         Runtime.KMeansGpuBackend.cpp
+        Runtime.KMeansGpuJobQueue.cpp
         Runtime.RegistrationAlignment.cpp
         Runtime.PhysicsBridge.cpp
         Runtime.SceneSerialization.cpp

@@ -3160,10 +3160,12 @@ result validation so the full local CI pipeline runs through cleanly.
 compute backend retired to `tasks/done/` on 2026-07-02 at `ParityProven`. The
 runtime layer now owns the explicit `Extrinsic.Runtime.KMeansGpuBackend`
 execution surface: persistent `(n,k)` resource caching, one-time SoA position
-and seed-centroid upload, reset/assign/update Lloyd-loop recording, shader-local
-privatized centroid accumulation for bounded `k`, and post-submit async
+and seed-centroid upload, reset/assign/update Lloyd-loop recording, portable
+assignment plus per-cluster centroid scans, and post-submit async
 labels/distances/centroids drain through `AsyncBufferReadback` without
-`vkDeviceWaitIdle`. The synchronous `Extrinsic.Runtime.KMeansBackend` overload
+`vkDeviceWaitIdle`. The current promoted shader path avoids optional Vulkan
+float-atomic and int64-atomic feature requirements; GRAPHICS-111 owns the fast
+segmented-reduction replacement. The synchronous `Extrinsic.Runtime.KMeansBackend` overload
 continues to fall back honestly when it lacks command/cache/readback ownership.
 Default-gate KMeans/readback contract coverage passed, opt-in `ci-vulkan`
 KMeans parity and benchmark/JSON validation passed, and the broader
@@ -3202,3 +3204,18 @@ diagnostics. Focused graphics/runtime CPU contract coverage passed.
 The full CPU-supported gate still reports the unrelated pre-existing
 `SandboxEditorUi.RegistrationCommandAlignsAcrossEntityTransforms` registration
 failure.
+
+[`BUG-053`](BUG-053-sandbox-kmeans-gpu-backend-queue.md) — Sandbox K-Means GPU
+backend queue retired to `tasks/done/` on 2026-07-02 at `CPUContracted`.
+Sandbox Vulkan K-Means requests now submit to the runtime-owned
+`Extrinsic.Runtime.KMeansGpuJobQueue` instead of calling the synchronous
+`Extrinsic.Runtime.KMeansBackend` fallback seam. The queue owns the Vulkan
+compute pipeline handles, persistent KMeans GPU resources, transfer helper, and
+async readbacks; `Engine` installs it as the renderer runtime frame-command hook
+so command work records into the normal frame context without an extra swapchain
+present, then drains completions during maintenance. Accepted Sandbox requests report
+`Pending` until a later-frame completion publishes the same KMeans label/color
+properties as the CPU path. Device-unavailable cases still fall back honestly to
+the CPU reference, and the synchronous backend overload remains nonblocking.
+Focused runtime contract coverage passed for CPU fallback telemetry and queued
+Sandbox GPU submission routing.

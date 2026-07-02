@@ -6,13 +6,17 @@
 #include <cstdint>
 #include <cstring>
 #include <deque>
+#include <fstream>
 #include <span>
+#include <sstream>
+#include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
 
+import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.Graphics.GpuTransfer;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.BufferTransfer;
@@ -57,6 +61,19 @@ namespace
         const std::uint32_t index) noexcept
     {
         return RHI::BufferHandle{index, 1u};
+    }
+
+    [[nodiscard]] std::string ReadShaderSource(const char* relativePath)
+    {
+        const auto path =
+            Extrinsic::Core::Filesystem::GetRoot() / "assets" / "shaders" / relativePath;
+        std::ifstream input{path};
+        if (!input)
+            return {};
+
+        std::ostringstream stream;
+        stream << input.rdbuf();
+        return stream.str();
     }
 
     [[nodiscard]] Runtime::KMeansGpuPipelineSet ValidKMeansPipelines() noexcept
@@ -241,6 +258,18 @@ TEST(KMeansGpuBackend, StructLayoutsMatchShaderContract)
 {
     EXPECT_EQ(sizeof(Runtime::KMeansGpuStateBufferRecord), 96u);
     EXPECT_EQ(sizeof(Runtime::KMeansGpuPassPushConstants), 32u);
+}
+
+TEST(KMeansGpuBackend, AssignShaderAvoidsOptionalAtomicFeatureRequirements)
+{
+    const std::string source = ReadShaderSource("kmeans_assign.comp");
+    ASSERT_FALSE(source.empty());
+
+    EXPECT_EQ(source.find("GL_EXT_shader_atomic_float"), std::string::npos);
+    EXPECT_EQ(source.find("GL_EXT_shader_atomic_int64"), std::string::npos);
+    EXPECT_EQ(source.find("atomicAdd(sSum"), std::string::npos);
+    EXPECT_EQ(source.find("atomicAdd(FloatArray"), std::string::npos);
+    EXPECT_EQ(source.find("atomicMax(reduction.PackedMaxDistIndex"), std::string::npos);
 }
 
 TEST(KMeansGpuBackend, BufferLayoutIsPackedAlignedAndSized)

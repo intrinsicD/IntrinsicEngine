@@ -33,6 +33,7 @@ import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.ImGuiAdapter;
+import Extrinsic.Runtime.KMeansGpuJobQueue;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.ReferenceScene;
@@ -496,6 +497,16 @@ namespace Extrinsic::Runtime
         [[nodiscard]] std::optional<RenderExtractionCache::VisualizationAdapterBinding>
             GetVisualizationAdapterBinding(std::uint32_t stableEntityId) const noexcept;
 
+        // Runtime-owned operational K-Means GPU queue. The synchronous
+        // `Runtime.KMeansBackend` overload remains a CPU fallback seam; editor
+        // GPU requests submit copied point data here and consume completion on a
+        // later frame after the renderer runtime frame-command hook records one
+        // queue phase and maintenance drains async readbacks.
+        [[nodiscard]] RuntimeKMeansGpuJobSubmission SubmitKMeansGpuJob(
+            RuntimeKMeansGpuJobRequest request);
+        [[nodiscard]] std::optional<RuntimeKMeansGpuJobResult>
+            ConsumeCompletedKMeansGpuJob();
+
         // ── RUNTIME-090 Slice B — Dear ImGui editor hook ──────────────────
         // Registers the per-frame editor callback invoked between the
         // adapter's BeginFrame and EndFrame so editor/UI code can issue ImGui
@@ -512,6 +523,7 @@ namespace Extrinsic::Runtime
     private:
         void RunFrame();      // executes one full frame — called by Run()
         void HandlePlatformEvent(const Platform::Event& event);
+        void RequestExitFromWindowClose(std::string_view source);
         void HandleWindowDropEvent(const Platform::WindowDropEvent& event);
         void QueueDroppedGeometryImport(
             std::string path,
@@ -551,6 +563,7 @@ namespace Extrinsic::Runtime
         Graphics::ImGuiOverlaySystem         m_ImGuiOverlay{};
         std::function<void()>                m_ImGuiEditorCallback{};
         std::unique_ptr<ImGuiAdapter>        m_ImGuiAdapter{};
+        std::unique_ptr<RuntimeKMeansGpuJobQueue> m_KMeansGpuJobs{};
         RenderExtractionCache                 m_RenderExtraction;
         // GRAPHICS-036C — runtime-owned render-world slot pool. Constructed in
         // Initialize() sized from RenderConfig::SynchronousExtraction (held by
@@ -652,5 +665,6 @@ namespace Extrinsic::Runtime
         bool m_Initialized{false};
         bool m_Running{false};
         bool m_RendererOperational{false};
+        bool m_WindowCloseLogged{false};
     };
 }

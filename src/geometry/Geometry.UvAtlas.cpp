@@ -223,10 +223,26 @@ namespace Geometry::UvAtlas
         {
             result.Diagnostics.Status = result.Status;
             result.Diagnostics.Provenance = result.Provenance;
+            result.Diagnostics.RequestedMethod = options.Method;
             result.Diagnostics.InputVertexCount = input.Positions.size();
             result.Diagnostics.InputFaceCount = input.Faces.size();
             result.Diagnostics.OutputVertexCount = result.OutputMesh.VertexCount();
             result.Diagnostics.OutputFaceCount = result.OutputMesh.FaceCount();
+            if (result.Diagnostics.ActualMethod == UvAtlasMethod::None)
+            {
+                if (result.Provenance == UvAtlasProvenance::AuthoredPreserved)
+                {
+                    result.Diagnostics.ActualMethod = UvAtlasMethod::Authored;
+                }
+                else if (std::string_view{backendName} == "xatlas")
+                {
+                    result.Diagnostics.ActualMethod = UvAtlasMethod::XAtlas;
+                }
+                else
+                {
+                    result.Diagnostics.ActualMethod = options.Method;
+                }
+            }
             if (result.Diagnostics.BackendName.empty())
             {
                 result.Diagnostics.BackendName = std::string{backendName};
@@ -246,6 +262,7 @@ namespace Geometry::UvAtlas
             result.Diagnostics = validation;
             result.Diagnostics.Status = UvAtlasStatus::Success;
             result.Diagnostics.Provenance = UvAtlasProvenance::AuthoredPreserved;
+            result.Diagnostics.ActualMethod = UvAtlasMethod::Authored;
             result.Diagnostics.BackendName = "authored";
             result.Diagnostics.BackendDetail = "preserved valid authored texcoords";
             result.Diagnostics.PreservedAuthoredUvCount = input.AuthoredTexcoords.size();
@@ -389,6 +406,7 @@ namespace Geometry::UvAtlas
             result.Diagnostics = validation;
             result.Diagnostics.Status = UvAtlasStatus::Success;
             result.Diagnostics.Provenance = UvAtlasProvenance::Generated;
+            result.Diagnostics.ActualMethod = UvAtlasMethod::XAtlas;
             result.Diagnostics.BackendName = "xatlas";
             result.Diagnostics.BackendDetail = "jpcy/xatlas f700c7790aaa030e794b52ba7791a05c085faf0c";
             result.Diagnostics.ChartCount = atlas->chartCount;
@@ -498,6 +516,18 @@ namespace Geometry::UvAtlas
             case UvAtlasProvenance::None:              return "none";
             case UvAtlasProvenance::AuthoredPreserved: return "authored_preserved";
             case UvAtlasProvenance::Generated:         return "generated";
+        }
+        return "unknown";
+    }
+
+    const char* ToString(const UvAtlasMethod method) noexcept
+    {
+        switch (method)
+        {
+            case UvAtlasMethod::None:       return "none";
+            case UvAtlasMethod::Authored:   return "authored";
+            case UvAtlasMethod::XAtlas:     return "xatlas";
+            case UvAtlasMethod::FastStaged: return "fast_staged";
         }
         return "unknown";
     }
@@ -691,7 +721,14 @@ namespace Geometry::UvAtlas
     {
         if (options.CancelRequested)
         {
-            return MakeFailure(input, UvAtlasStatus::Cancelled, options.BackendName, "cancel requested before atlas resolution");
+            UvAtlasResult failure = MakeFailure(
+                input,
+                UvAtlasStatus::Cancelled,
+                options.BackendName,
+                "cancel requested before atlas resolution");
+            AttachDiagnostics(failure, input, options, options.BackendName);
+            failure.Diagnostics.ActualMethod = UvAtlasMethod::None;
+            return failure;
         }
 
         if (options.PreserveValidAuthoredUvs && !options.ForceRegenerate)
@@ -710,23 +747,53 @@ namespace Geometry::UvAtlas
                 UvAtlasResult failure = MakeFailure(input, baseValidation.Status, options.BackendName, "invalid atlas input");
                 failure.Diagnostics = baseValidation;
                 failure.Diagnostics.BackendName = options.BackendName;
+                AttachDiagnostics(failure, input, options, options.BackendName);
+                failure.Diagnostics.ActualMethod = UvAtlasMethod::None;
                 return failure;
             }
         }
 
         UvAtlasBackend defaultBackend{};
+        bool usedDefaultXAtlasFallback = false;
         if (backend == nullptr)
         {
+            if (options.Method == UvAtlasMethod::FastStaged && !options.AllowXAtlasFallback)
+            {
+                UvAtlasResult failure = MakeFailure(
+                    input,
+                    UvAtlasStatus::BackendUnavailable,
+                    "fast-staged",
+                    "fast staged UV atlas method has no default backend yet and xatlas fallback is disabled");
+                AttachDiagnostics(failure, input, options, "fast-staged");
+                failure.Diagnostics.ActualMethod = UvAtlasMethod::None;
+                return failure;
+            }
+
             defaultBackend = DefaultXAtlasBackend();
             backend = &defaultBackend;
+            usedDefaultXAtlasFallback = options.Method == UvAtlasMethod::FastStaged;
         }
         if (backend->Generate == nullptr)
         {
-            return MakeFailure(input, UvAtlasStatus::BackendUnavailable, options.BackendName, "atlas backend has no generate function");
+            UvAtlasResult failure = MakeFailure(
+                input,
+                UvAtlasStatus::BackendUnavailable,
+                options.BackendName,
+                "atlas backend has no generate function");
+            AttachDiagnostics(failure, input, options, backend->Name);
+            failure.Diagnostics.ActualMethod = UvAtlasMethod::None;
+            return failure;
         }
 
         UvAtlasResult result = backend->Generate(input, options);
         AttachDiagnostics(result, input, options, backend->Name);
+        if (usedDefaultXAtlasFallback)
+        {
+            result.Diagnostics.ActualMethod = UvAtlasMethod::XAtlas;
+            result.Diagnostics.UsedFallback = true;
+            result.Diagnostics.FallbackReason =
+                "fast staged UV atlas method has no default backend yet; used xatlas fallback";
+        }
         return result;
     }
 } // namespace Geometry::UvAtlas

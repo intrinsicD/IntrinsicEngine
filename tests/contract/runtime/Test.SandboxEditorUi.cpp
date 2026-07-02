@@ -70,6 +70,7 @@ import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.ImGuiAdapter;
+import Extrinsic.Runtime.KMeansGpuJobQueue;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressiveRenderData;
@@ -86,6 +87,7 @@ import Geometry.Graph.Vertex.Normals;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
 import Geometry.HalfedgeMesh.Vertices.Normals;
+import Geometry.KMeans;
 import Geometry.PointCloud.Normals;
 import Geometry.Properties;
 import Geometry.Smoothing;
@@ -163,6 +165,22 @@ namespace
         {
             if (entry.Message.find(needle) != std::string::npos)
                 return true;
+        }
+        return false;
+    }
+
+    [[nodiscard]] bool LogSnapshotContains(
+        const Core::Log::LogSnapshot& snapshot,
+        const Core::Log::Level level,
+        const std::string_view needle)
+    {
+        for (const Core::Log::LogEntry& entry : snapshot.Entries)
+        {
+            if (entry.Lvl == level &&
+                entry.Message.find(needle) != std::string::npos)
+            {
+                return true;
+            }
         }
         return false;
     }
@@ -2454,6 +2472,93 @@ TEST(SandboxEditorUi, KMeansVulkanRequestFallsBackToCpuReference)
         registry.Raw().get<GS::Vertices>(cloud).Properties,
         4u,
         true);
+}
+
+TEST(SandboxEditorUi, KMeansVulkanRequestQueuesGpuJobWhenSurfaceAccepts)
+{
+    using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
+
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
+    AddPointCloudSource(registry, cloud, 4u);
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
+                 {
+                     {0.0f, 0.0f, 0.0f},
+                     {0.1f, 0.0f, 0.0f},
+                     {2.0f, 0.0f, 0.0f},
+                     {2.1f, 0.0f, 0.0f},
+                 });
+
+    std::optional<Runtime::RuntimeKMeansGpuJobRequest> submitted{};
+    context.KMeansGpuCommands.Submit =
+        [&submitted](Runtime::RuntimeKMeansGpuJobRequest request)
+        {
+            request.Sequence = 77u;
+            submitted = request;
+            return Runtime::RuntimeKMeansGpuJobSubmission{
+                .Status = Runtime::RuntimeKMeansGpuJobStatus::Accepted,
+                .Sequence = request.Sequence,
+            };
+        };
+    context.KMeansGpuCommands.ConsumeCompleted =
+        []() -> std::optional<Runtime::RuntimeKMeansGpuJobResult>
+        {
+            return std::nullopt;
+        };
+
+    const Runtime::SandboxEditorKMeansResult result =
+        Runtime::ApplySandboxEditorKMeansCommand(
+            context,
+            Runtime::SandboxEditorKMeansCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(cloud),
+                .Domain = Domain::PointCloudPoints,
+                .ClusterCount = 2u,
+                .MaxIterations = 8u,
+                .Seed = 13u,
+                .Backend =
+                    Runtime::SandboxEditorKMeansBackend::VulkanCompute,
+            });
+
+    ASSERT_TRUE(submitted.has_value());
+    EXPECT_EQ(submitted->StableEntityId,
+              Runtime::SelectionController::ToStableEntityId(cloud));
+    EXPECT_EQ(submitted->DomainTag,
+              static_cast<std::uint32_t>(Domain::PointCloudPoints));
+    EXPECT_EQ(submitted->Points.size(), 4u);
+    EXPECT_EQ(submitted->Params.Compute, Geometry::KMeans::Backend::GPU);
+    EXPECT_EQ(submitted->Params.ClusterCount, 2u);
+    EXPECT_EQ(submitted->Params.MaxIterations, 8u);
+
+    EXPECT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_EQ(result.RequestedBackend,
+              Runtime::SandboxEditorKMeansBackend::VulkanCompute);
+    EXPECT_EQ(result.ActualBackend,
+              Runtime::SandboxEditorKMeansBackend::VulkanCompute);
+    EXPECT_EQ(result.RequestedBackendId, "gpu_vulkan_compute");
+    EXPECT_EQ(result.BackendId, "gpu_vulkan_compute");
+    EXPECT_FALSE(result.FellBackToCpu);
+    EXPECT_TRUE(result.BackendFallbackReason.empty());
+    EXPECT_NE(result.Message.find("queued"), std::string::npos);
+    EXPECT_FALSE(registry.Raw()
+                     .get<GS::Vertices>(cloud)
+                     .Properties.Get<std::uint32_t>("p:kmeans_label"));
+
+    context.LastKMeansResult = &result;
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
+    const Runtime::SandboxEditorDomainWindowModel model =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::PointCloud);
+    ASSERT_TRUE(model.Processing.LastKMeansResult.has_value());
+    EXPECT_EQ(model.Processing.LastKMeansResult->Status,
+              Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_FALSE(HasDiagnostic(
+        model.Processing.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::GeometryProcessingFailed));
 }
 
 TEST(SandboxEditorUi, ProgressivePoissonCommandPublishesPointPropertiesAndVisualization)
@@ -8094,7 +8199,15 @@ TEST(SandboxEditorUi, PlatformCloseEventStopsEngineRunState)
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
         << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
 
+    Core::Log::ClearEntries();
     engine.DispatchPlatformEventForTest(Plat::WindowCloseEvent{});
+
+    const Core::Log::LogSnapshot closeLogs = Core::Log::TakeSnapshot();
+    EXPECT_TRUE(LogSnapshotContains(closeLogs,
+                                    Core::Log::Level::Info,
+                                    "Window close requested"))
+        << "Sandbox window close must leave an [INFO] close breadcrumb.";
+
     engine.Run();
 
     EXPECT_FALSE(engine.IsRunning());

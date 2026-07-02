@@ -58,6 +58,7 @@ import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.KMeansBackend;
+import Extrinsic.Runtime.KMeansGpuJobQueue;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressivePoissonGpuBackend;
@@ -4016,6 +4017,10 @@ namespace Extrinsic::Runtime
         [[nodiscard]] const char* KMeansBackendDisplayName(
             SandboxEditorKMeansBackend backend) noexcept;
 
+        [[nodiscard]] std::string BuildKMeansSuccessMessage(
+            SandboxEditorGeometryProcessingDomain domain,
+            const SandboxEditorKMeansResult& result);
+
         [[nodiscard]] SandboxEditorKMeansResult MakeKMeansResult(
             const SandboxEditorCommandStatus status,
             const SandboxEditorGeometryProcessingDomain domain,
@@ -4301,6 +4306,161 @@ namespace Extrinsic::Runtime
             return result;
         }
 
+        [[nodiscard]] SandboxEditorKMeansResult MakePendingKMeansGpuResult(
+            const SandboxEditorKMeansCommand& command,
+            const RuntimeKMeansGpuJobSubmission& submission,
+            const std::uint32_t pointCount)
+        {
+            const SandboxEditorKMeansBackend backend =
+                SandboxEditorKMeansBackend::VulkanCompute;
+            SandboxEditorKMeansResult result{
+                .Status = SandboxEditorCommandStatus::Pending,
+                .Domain = command.Domain,
+                .LabelCount = pointCount,
+                .ClusterCount = std::min(command.ClusterCount, pointCount),
+                .RequestedBackend = backend,
+                .ActualBackend = backend,
+                .RequestedBackendId = KMeansBackendId(backend),
+                .RequestedBackendDisplayName =
+                    KMeansBackendDisplayName(backend),
+                .BackendId = KMeansBackendId(backend),
+                .BackendDisplayName = KMeansBackendDisplayName(backend),
+                .FellBackToCpu = false,
+                .Error = Core::ErrorCode::Success,
+            };
+            if (submission.Status == RuntimeKMeansGpuJobStatus::Busy)
+            {
+                result.Message = submission.Diagnostic.empty()
+                    ? "K-Means Vulkan compute job is already pending."
+                    : submission.Diagnostic;
+            }
+            else
+            {
+                result.Message = "K-Means Vulkan compute job queued";
+                if (submission.Sequence != 0u)
+                {
+                    result.Message += " (sequence ";
+                    result.Message += std::to_string(submission.Sequence);
+                    result.Message += ")";
+                }
+                result.Message += ".";
+            }
+            return result;
+        }
+
+        [[nodiscard]] SandboxEditorKMeansResult MakeCompletedKMeansResult(
+            const SandboxEditorGeometryProcessingDomain domain,
+            const GK::KMeansResult& clustered)
+        {
+            const SandboxEditorKMeansBackend requestedBackend =
+                MakeSandboxEditorKMeansBackend(clustered.RequestedBackend);
+            const SandboxEditorKMeansBackend actualBackend =
+                MakeSandboxEditorKMeansBackend(clustered.ActualBackend);
+            SandboxEditorKMeansResult result{
+                .Status = SandboxEditorCommandStatus::Applied,
+                .Domain = domain,
+                .LabelCount = static_cast<std::uint32_t>(clustered.Labels.size()),
+                .ClusterCount = static_cast<std::uint32_t>(clustered.Centroids.size()),
+                .Iterations = clustered.Iterations,
+                .Converged = clustered.Converged,
+                .Inertia = clustered.Inertia,
+                .MaxDistanceIndex = clustered.MaxDistanceIndex,
+                .RequestedBackend = requestedBackend,
+                .ActualBackend = actualBackend,
+                .RequestedBackendId = KMeansBackendId(requestedBackend),
+                .RequestedBackendDisplayName =
+                    KMeansBackendDisplayName(requestedBackend),
+                .BackendId = KMeansBackendId(actualBackend),
+                .BackendDisplayName = KMeansBackendDisplayName(actualBackend),
+                .FellBackToCpu = clustered.FellBackToCPU,
+                .Error = Core::ErrorCode::Success,
+            };
+            return result;
+        }
+
+        [[nodiscard]] SandboxEditorKMeansResult PublishCompletedKMeansGpuJob(
+            const SandboxEditorContext& context,
+            const RuntimeKMeansGpuJobResult& job)
+        {
+            const auto domain =
+                static_cast<SandboxEditorGeometryProcessingDomain>(job.DomainTag);
+            if (!job.Succeeded())
+            {
+                return MakeKMeansResult(
+                    SandboxEditorCommandStatus::GeometryProcessingFailed,
+                    domain,
+                    SandboxEditorKMeansBackend::VulkanCompute,
+                    Core::ErrorCode::Unknown,
+                    job.Diagnostic.empty()
+                        ? "K-Means Vulkan compute job failed before publication."
+                        : job.Diagnostic);
+            }
+
+            if (context.Scene == nullptr)
+            {
+                return MakeKMeansResult(
+                    SandboxEditorCommandStatus::MissingScene,
+                    domain,
+                    SandboxEditorKMeansBackend::VulkanCompute,
+                    Core::ErrorCode::InvalidState,
+                    "Scene registry is unavailable for completed K-Means GPU publication.");
+            }
+
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, job.StableEntityId);
+            if (!entity.has_value())
+            {
+                return MakeKMeansResult(
+                    SandboxEditorCommandStatus::StaleEntity,
+                    domain,
+                    SandboxEditorKMeansBackend::VulkanCompute,
+                    Core::ErrorCode::ResourceNotFound,
+                    "K-Means GPU target entity is stale or no longer live.");
+            }
+
+            GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
+            if (!view.Valid() || !SourceViewSupportsKMeansDomain(view, domain))
+            {
+                return MakeKMeansResult(
+                    SandboxEditorCommandStatus::UnsupportedGeometryDomain,
+                    domain,
+                    SandboxEditorKMeansBackend::VulkanCompute,
+                    Core::ErrorCode::InvalidArgument,
+                    "Completed K-Means GPU job no longer matches a writable GeometrySources domain.");
+            }
+
+            Geometry::PropertySet* properties =
+                KMeansTargetProperties(view, domain);
+            if (properties == nullptr)
+            {
+                return MakeKMeansResult(
+                    SandboxEditorCommandStatus::UnsupportedGeometryDomain,
+                    domain,
+                    SandboxEditorKMeansBackend::VulkanCompute,
+                    Core::ErrorCode::InvalidArgument,
+                    "Completed K-Means GPU domain has no writable property set.");
+            }
+
+            if (!PublishKMeansProperties(*properties, domain, job.Result))
+            {
+                return MakeKMeansResult(
+                    SandboxEditorCommandStatus::GeometryProcessingFailed,
+                    domain,
+                    SandboxEditorKMeansBackend::VulkanCompute,
+                    Core::ErrorCode::TypeMismatch,
+                    "K-Means GPU result publication failed because output properties have incompatible types or sizes.");
+            }
+
+            Dirty::MarkVertexAttributesDirty(raw, *entity);
+            SandboxEditorKMeansResult result =
+                MakeCompletedKMeansResult(domain, job.Result);
+            result.Message = BuildKMeansSuccessMessage(domain, result);
+            if (context.CommandHistory != nullptr)
+                (void)context.CommandHistory->MarkDirty("Run K-Means");
+            return result;
+        }
+
         [[nodiscard]] std::string BuildKMeansFallbackReason(
             const SandboxEditorKMeansResult& result,
             const RHI::IDevice* device)
@@ -4315,7 +4475,7 @@ namespace Extrinsic::Runtime
             {
                 return "Vulkan compute requested but the RHI device is not operational; ran CPU reference.";
             }
-            return "Vulkan compute requested but the synchronous Sandbox command does not own GPU command/readback resources; ran CPU reference.";
+            return "Vulkan compute requested but the runtime K-Means GPU queue is unavailable; ran CPU reference.";
         }
 
         [[nodiscard]] std::string BuildKMeansSuccessMessage(
@@ -6465,7 +6625,9 @@ namespace Extrinsic::Runtime
             if (context.LastKMeansResult != nullptr)
             {
                 model.LastKMeansResult = *context.LastKMeansResult;
-                if (!context.LastKMeansResult->Succeeded())
+                if (!context.LastKMeansResult->Succeeded() &&
+                    context.LastKMeansResult->Status !=
+                        SandboxEditorCommandStatus::Pending)
                 {
                     AddDiagnostic(
                         model.Diagnostics,
@@ -7352,6 +7514,18 @@ namespace Extrinsic::Runtime
                         [&engine](const std::uint32_t stableEntityId)
                         {
                             engine.ClearVisualizationAdapterBinding(stableEntityId);
+                        },
+                },
+                .KMeansGpuCommands = SandboxEditorKMeansGpuCommandSurface{
+                    .Submit =
+                        [&engine](RuntimeKMeansGpuJobRequest request)
+                        {
+                            return engine.SubmitKMeansGpuJob(std::move(request));
+                        },
+                    .ConsumeCompleted =
+                        [&engine]()
+                        {
+                            return engine.ConsumeCompletedKMeansGpuJob();
                         },
                 },
                 .AssetImportQueue = engine.GetAssetImportQueueSnapshot(),
@@ -9034,7 +9208,7 @@ namespace Extrinsic::Runtime
             const char* currentDomain =
                 DebugNameForSandboxEditorGeometryProcessingDomain(
                     *kmeansState->Domain);
-            if (ImGui::BeginCombo("Domain", currentDomain))
+            if (ImGui::BeginCombo("Domain##KMeans", currentDomain))
             {
                 for (const SandboxEditorGeometryProcessingDomain domain :
                      processing.KMeansDomains)
@@ -9059,7 +9233,7 @@ namespace Extrinsic::Runtime
             const SandboxEditorKMeansBackend backend =
                 KMeansBackendFromIndex(*kmeansState->Backend);
             if (ImGui::BeginCombo(
-                    "Backend",
+                    "Backend##KMeans",
                     DebugNameForSandboxEditorKMeansBackend(backend)))
             {
                 for (std::size_t i = 0u; i < kKMeansBackends.size(); ++i)
@@ -9081,19 +9255,19 @@ namespace Extrinsic::Runtime
                 ImGui::EndCombo();
             }
 
-            ImGui::DragInt("Clusters", kmeansState->ClusterCount, 1.0f, 1, 1024);
-            ImGui::DragInt("Max iterations", kmeansState->MaxIterations, 1.0f, 1, 4096);
-            ImGui::DragInt("Seed", kmeansState->Seed, 1.0f, 0, 1'000'000);
+            ImGui::DragInt("Clusters##KMeans", kmeansState->ClusterCount, 1.0f, 1, 1024);
+            ImGui::DragInt("Max iterations##KMeans", kmeansState->MaxIterations, 1.0f, 1, 4096);
+            ImGui::DragInt("Seed##KMeans", kmeansState->Seed, 1.0f, 0, 1'000'000);
             *kmeansState->ClusterCount =
                 std::clamp(*kmeansState->ClusterCount, 1, 1024);
             *kmeansState->MaxIterations =
                 std::clamp(*kmeansState->MaxIterations, 1, 4096);
             *kmeansState->Seed =
                 std::clamp(*kmeansState->Seed, 0, 1'000'000);
-            ImGui::Checkbox("Hierarchical initialization",
+            ImGui::Checkbox("Hierarchical initialization##KMeans",
                             kmeansState->UseHierarchicalInitialization);
 
-            if (ImGui::Button("Run K-Means"))
+            if (ImGui::Button("Run K-Means##KMeans"))
             {
                 *kmeansState->LastResult = ApplySandboxEditorKMeansCommand(
                     context,
@@ -9201,7 +9375,7 @@ namespace Extrinsic::Runtime
             const SandboxEditorMeshDenoiseStage stage =
                 MeshDenoiseStageFromIndex(*denoiseState->Stage);
             if (ImGui::BeginCombo(
-                    "Stage",
+                    "Stage##MeshDenoise",
                     DebugNameForSandboxEditorMeshDenoiseStage(stage)))
             {
                 for (std::size_t i = 0u; i < kMeshDenoiseStages.size(); ++i)
@@ -9230,34 +9404,34 @@ namespace Extrinsic::Runtime
             *denoiseState->SigmaRange =
                 std::clamp(*denoiseState->SigmaRange, 0.0f, 1.0e6f);
             ImGui::DragInt(
-                "Normal iterations",
+                "Normal iterations##MeshDenoise",
                 denoiseState->NormalIterations,
                 1.0f,
                 1,
                 4096);
             ImGui::DragInt(
-                "Vertex iterations",
+                "Vertex iterations##MeshDenoise",
                 denoiseState->VertexIterations,
                 1.0f,
                 1,
                 4096);
             ImGui::DragFloat(
-                "Sigma spatial",
+                "Sigma spatial##MeshDenoise",
                 denoiseState->SigmaSpatial,
                 0.01f,
                 0.0f,
                 1.0e6f);
             ImGui::DragFloat(
-                "Sigma range",
+                "Sigma range##MeshDenoise",
                 denoiseState->SigmaRange,
                 0.01f,
                 0.0f,
                 1.0e6f);
             ImGui::Checkbox(
-                "Preserve boundary",
+                "Preserve boundary##MeshDenoise",
                 denoiseState->PreserveBoundary);
 
-            if (ImGui::Button("Denoise"))
+            if (ImGui::Button("Denoise##MeshDenoise"))
             {
                 *denoiseState->LastResult =
                     ApplySandboxEditorMeshDenoiseCommand(
@@ -9343,7 +9517,7 @@ namespace Extrinsic::Runtime
             const SandboxEditorMeshCurvatureOutput output =
                 MeshCurvatureOutputFromIndex(*curvatureState->Output);
             if (ImGui::BeginCombo(
-                    "Output",
+                    "Output##MeshCurvature",
                     DebugNameForSandboxEditorMeshCurvatureOutput(output)))
             {
                 for (std::size_t i = 0u; i < kMeshCurvatureOutputs.size(); ++i)
@@ -9368,12 +9542,12 @@ namespace Extrinsic::Runtime
             if (!processing.MeshCurvatureDirectionsAvailable)
                 ImGui::BeginDisabled();
             ImGui::Checkbox(
-                "Principal directions",
+                "Principal directions##MeshCurvature",
                 curvatureState->PublishPrincipalDirections);
             if (!processing.MeshCurvatureDirectionsAvailable)
                 ImGui::EndDisabled();
 
-            if (ImGui::Button("Compute"))
+            if (ImGui::Button("Compute##MeshCurvature"))
             {
                 *curvatureState->LastResult =
                     ApplySandboxEditorMeshCurvatureCommand(
@@ -9467,7 +9641,7 @@ namespace Extrinsic::Runtime
             const SandboxEditorMeshRemeshMode mode =
                 MeshRemeshModeFromIndex(*remeshState->Mode);
             if (ImGui::BeginCombo(
-                    "Mode",
+                    "Mode##MeshRemesh",
                     DebugNameForSandboxEditorMeshRemeshMode(mode)))
             {
                 for (std::size_t i = 0u; i < kMeshRemeshModes.size(); ++i)
@@ -9496,9 +9670,9 @@ namespace Extrinsic::Runtime
                 ImGui::EndCombo();
             }
 
-            ImGui::DragInt("Iterations", remeshState->Iterations, 1.0f, 1, 64);
+            ImGui::DragInt("Iterations##MeshRemesh", remeshState->Iterations, 1.0f, 1, 64);
             ImGui::DragFloat(
-                "Target edge length",
+                "Target edge length##MeshRemesh",
                 remeshState->TargetEdgeLength,
                 0.01f,
                 0.0f,
@@ -9511,7 +9685,7 @@ namespace Extrinsic::Runtime
             const SandboxEditorMeshRemeshSizingLaw sizingLaw =
                 MeshRemeshSizingLawFromIndex(*remeshState->SizingLaw);
             if (ImGui::BeginCombo(
-                    "Sizing law",
+                    "Sizing law##MeshRemesh",
                     DebugNameForSandboxEditorMeshRemeshSizingLaw(sizingLaw)))
             {
                 for (std::size_t i = 0u; i < kMeshRemeshSizingLaws.size(); ++i)
@@ -9546,7 +9720,7 @@ namespace Extrinsic::Runtime
             if (!processing.MeshRemeshProjectToSurfaceAvailable)
                 ImGui::BeginDisabled();
             ImGui::Checkbox(
-                "Project to surface",
+                "Project to surface##MeshRemesh",
                 remeshState->ProjectToSurface);
             if (!processing.MeshRemeshProjectToSurfaceAvailable)
                 ImGui::EndDisabled();
@@ -9565,7 +9739,7 @@ namespace Extrinsic::Runtime
                 modeAvailable && sizingAvailable && projectionAvailable;
             if (!canRun)
                 ImGui::BeginDisabled();
-            if (ImGui::Button("Remesh"))
+            if (ImGui::Button("Remesh##MeshRemesh"))
             {
                 *remeshState->LastResult =
                     ApplySandboxEditorMeshRemeshCommand(
@@ -9654,7 +9828,7 @@ namespace Extrinsic::Runtime
             const SandboxEditorMeshSubdivideOperator op =
                 MeshSubdivideOperatorFromIndex(*subdivideState->Operator);
             if (ImGui::BeginCombo(
-                    "Operator",
+                    "Operator##MeshSubdivide",
                     DebugNameForSandboxEditorMeshSubdivideOperator(op)))
             {
                 for (std::size_t i = 0u; i < kMeshSubdivideOperators.size(); ++i)
@@ -9689,7 +9863,7 @@ namespace Extrinsic::Runtime
             }
 
             ImGui::DragInt(
-                "Iterations",
+                "Iterations##MeshSubdivide",
                 subdivideState->Iterations,
                 1.0f,
                 1,
@@ -9705,7 +9879,7 @@ namespace Extrinsic::Runtime
                 ImGui::BeginDisabled();
             }
             ImGui::Checkbox(
-                "Preserve Loop features",
+                "Preserve Loop features##MeshSubdivide",
                 subdivideState->PreserveLoopFeatures);
             if (!loop ||
                 !processing.MeshSubdivideLoopFeatureEdgesAvailable)
@@ -9725,7 +9899,7 @@ namespace Extrinsic::Runtime
             const bool canRun = operatorAvailable && featureAvailable;
             if (!canRun)
                 ImGui::BeginDisabled();
-            if (ImGui::Button("Subdivide"))
+            if (ImGui::Button("Subdivide##MeshSubdivide"))
             {
                 *subdivideState->LastResult =
                     ApplySandboxEditorMeshSubdivideCommand(
@@ -9825,7 +9999,7 @@ namespace Extrinsic::Runtime
             const SandboxEditorMeshSimplifyMetric metric =
                 MeshSimplifyMetricFromIndex(*simplifyState->Metric);
             if (ImGui::BeginCombo(
-                    "Metric",
+                    "Metric##MeshSimplify",
                     DebugNameForSandboxEditorMeshSimplifyMetric(metric)))
             {
                 for (std::size_t i = 0u; i < kMeshSimplifyMetrics.size(); ++i)
@@ -9847,59 +10021,59 @@ namespace Extrinsic::Runtime
             }
 
             ImGui::DragInt(
-                "Target faces",
+                "Target faces##MeshSimplify",
                 simplifyState->TargetFaces,
                 1.0f,
                 0,
                 1000000000);
             ImGui::DragFloat(
-                "Max error (0 = unlimited)",
+                "Max error (0 = unlimited)##MeshSimplify",
                 simplifyState->MaxError,
                 0.001f,
                 0.0f,
                 1.0e30f,
                 "%.6g");
-            ImGui::Checkbox("Preserve boundary", simplifyState->PreserveBoundary);
+            ImGui::Checkbox("Preserve boundary##MeshSimplify", simplifyState->PreserveBoundary);
 
             const bool faQem =
                 metric == SandboxEditorMeshSimplifyMetric::FA_QEM;
             if (!faQem)
                 ImGui::BeginDisabled();
-            if (ImGui::CollapsingHeader("Feature-aware (FA-QEM) weights"))
+            if (ImGui::CollapsingHeader("Feature-aware (FA-QEM) weights##MeshSimplify"))
             {
                 ImGui::DragFloat(
-                    "Feature angle (deg)",
+                    "Feature angle (deg)##MeshSimplify",
                     simplifyState->FeatureAngleThresholdDegrees,
                     0.5f,
                     0.0f,
                     180.0f,
                     "%.1f");
                 ImGui::DragFloat(
-                    "Normal weight",
+                    "Normal weight##MeshSimplify",
                     simplifyState->NormalWeight,
                     0.01f,
                     0.0f,
                     1000.0f,
                     "%.3f");
                 ImGui::DragFloat(
-                    "Boundary weight",
+                    "Boundary weight##MeshSimplify",
                     simplifyState->BoundaryWeight,
                     0.01f,
                     0.0f,
                     1000.0f,
                     "%.3f");
                 ImGui::DragFloat(
-                    "Curvature weight",
+                    "Curvature weight##MeshSimplify",
                     simplifyState->CurvatureWeight,
                     0.01f,
                     0.0f,
                     1000.0f,
                     "%.3f");
                 ImGui::Checkbox(
-                    "Preserve sharp features",
+                    "Preserve sharp features##MeshSimplify",
                     simplifyState->PreserveSharpFeatures);
                 ImGui::Checkbox(
-                    "Preserve UV seams",
+                    "Preserve UV seams##MeshSimplify",
                     simplifyState->PreserveUvSeams);
             }
             if (!faQem)
@@ -9910,7 +10084,7 @@ namespace Extrinsic::Runtime
                 *simplifyState->MaxError > 0.0f;
             if (!canRun)
                 ImGui::BeginDisabled();
-            if (ImGui::Button("Simplify"))
+            if (ImGui::Button("Simplify##MeshSimplify"))
             {
                 *simplifyState->LastResult =
                     ApplySandboxEditorMeshSimplifyCommand(
@@ -10027,7 +10201,7 @@ namespace Extrinsic::Runtime
             const GN::AveragingMode currentWeighting =
                 MeshVertexNormalWeightingFromIndex(*normalsState->Weighting);
             if (ImGui::BeginCombo(
-                    "Weighting",
+                    "Weighting##MeshVertexNormals",
                     std::string(GN::DebugName(currentWeighting)).c_str()))
             {
                 for (std::size_t i = 0u;
@@ -10052,13 +10226,13 @@ namespace Extrinsic::Runtime
                 ImGui::EndCombo();
             }
             ImGui::DragFloat3(
-                "Fallback normal",
+                "Fallback normal##MeshVertexNormals",
                 &normalsState->FallbackNormal->x,
                 0.01f,
                 -1.0f,
                 1.0f);
 
-            if (ImGui::Button("Recompute"))
+            if (ImGui::Button("Recompute##MeshVertexNormals"))
             {
                 *normalsState->LastResult =
                     ApplySandboxEditorMeshVertexNormalsCommand(
@@ -10139,15 +10313,15 @@ namespace Extrinsic::Runtime
             }
 
             ImGui::DragFloat3(
-                "Fallback normal",
+                "Fallback normal##GraphVertexNormals",
                 &normalsState->FallbackNormal->x,
                 0.01f,
                 -1.0f,
                 1.0f);
-            ImGui::Checkbox("Orient toward fallback",
+            ImGui::Checkbox("Orient toward fallback##GraphVertexNormals",
                             normalsState->OrientTowardFallback);
 
-            if (ImGui::Button("Recompute"))
+            if (ImGui::Button("Recompute##GraphVertexNormals"))
             {
                 *normalsState->LastResult =
                     ApplySandboxEditorGraphVertexNormalsCommand(
@@ -10259,20 +10433,20 @@ namespace Extrinsic::Runtime
                 0,
                 static_cast<std::int32_t>(
                     kPointCloudNormalOrientations.size() - 1u));
-            ImGui::DragInt("K", normalsState->KNeighbors, 1.0f, 1, 512);
+            ImGui::DragInt("K##PointCloudVertexNormals", normalsState->KNeighbors, 1.0f, 1, 512);
             ImGui::DragInt(
-                "Minimum neighbors",
+                "Minimum neighbors##PointCloudVertexNormals",
                 normalsState->MinimumNeighbors,
                 1.0f,
                 1,
                 512);
-            ImGui::Checkbox("Use radius", normalsState->UseRadiusSearch);
+            ImGui::Checkbox("Use radius##PointCloudVertexNormals", normalsState->UseRadiusSearch);
             if (*normalsState->UseRadiusSearch)
             {
                 *normalsState->Radius =
                     std::max(*normalsState->Radius, 0.001f);
                 ImGui::DragFloat(
-                    "Radius",
+                    "Radius##PointCloudVertexNormals",
                     normalsState->Radius,
                     0.01f,
                     0.001f,
@@ -10283,7 +10457,7 @@ namespace Extrinsic::Runtime
                 PointCloudNormalOrientationFromIndex(
                     *normalsState->Orientation);
             if (ImGui::BeginCombo(
-                    "Orientation",
+                    "Orientation##PointCloudVertexNormals",
                     std::string(PointNormals::DebugName(orientation)).c_str()))
             {
                 for (std::size_t i = 0u;
@@ -10309,13 +10483,13 @@ namespace Extrinsic::Runtime
                 ImGui::EndCombo();
             }
             ImGui::DragFloat3(
-                "Fallback normal",
+                "Fallback normal##PointCloudVertexNormals",
                 &normalsState->FallbackNormal->x,
                 0.01f,
                 -1.0f,
                 1.0f);
 
-            if (ImGui::Button("Recompute"))
+            if (ImGui::Button("Recompute##PointCloudVertexNormals"))
             {
                 *normalsState->LastResult =
                     ApplySandboxEditorPointCloudVertexNormalsCommand(
@@ -10411,14 +10585,14 @@ namespace Extrinsic::Runtime
             *outlierState->Method = std::clamp(*outlierState->Method, 0, 1);
             const bool statistical = *outlierState->Method == 0;
             if (ImGui::BeginCombo(
-                    "Method",
+                    "Method##PointCloudOutlierRemoval",
                     statistical ? "Statistical" : "Radius"))
             {
-                if (ImGui::Selectable("Statistical", statistical))
+                if (ImGui::Selectable("Statistical##PointCloudOutlierRemoval", statistical))
                     *outlierState->Method = 0;
                 if (statistical)
                     ImGui::SetItemDefaultFocus();
-                if (ImGui::Selectable("Radius", !statistical))
+                if (ImGui::Selectable("Radius##PointCloudOutlierRemoval", !statistical))
                     *outlierState->Method = 1;
                 if (!statistical)
                     ImGui::SetItemDefaultFocus();
@@ -10433,13 +10607,13 @@ namespace Extrinsic::Runtime
                 *outlierState->StdDevMultiplier =
                     std::clamp(*outlierState->StdDevMultiplier, 0.0f, 100.0f);
                 ImGui::DragInt(
-                    "K neighbors",
+                    "K neighbors##PointCloudOutlierRemoval",
                     outlierState->KNeighbors,
                     1.0f,
                     1,
                     512);
                 ImGui::DragFloat(
-                    "Std-dev multiplier",
+                    "Std-dev multiplier##PointCloudOutlierRemoval",
                     outlierState->StdDevMultiplier,
                     0.05f,
                     0.0f,
@@ -10453,20 +10627,20 @@ namespace Extrinsic::Runtime
                 *outlierState->MinNeighbors =
                     std::clamp(*outlierState->MinNeighbors, 0, 512);
                 ImGui::DragFloat(
-                    "Search radius",
+                    "Search radius##PointCloudOutlierRemoval",
                     outlierState->SearchRadius,
                     0.01f,
                     0.0f,
                     1000.0f);
                 ImGui::DragInt(
-                    "Min neighbors",
+                    "Min neighbors##PointCloudOutlierRemoval",
                     outlierState->MinNeighbors,
                     1.0f,
                     0,
                     512);
             }
 
-            if (ImGui::Button("Remove Outliers"))
+            if (ImGui::Button("Remove Outliers##PointCloudOutlierRemoval"))
             {
                 *outlierState->LastResult =
                     ApplySandboxEditorPointCloudOutlierRemovalCommand(
@@ -10826,17 +11000,17 @@ namespace Extrinsic::Runtime
                 *poissonState->Dimension <= 2 ? 2 : 3;
             bool configChanged = false;
             if (ImGui::BeginCombo(
-                    "Dimension",
+                    "Dimension##ProgressivePoisson",
                     *poissonState->Dimension == 2 ? "2D" : "3D"))
             {
-                if (ImGui::Selectable("2D", *poissonState->Dimension == 2))
+                if (ImGui::Selectable("2D##ProgressivePoisson", *poissonState->Dimension == 2))
                 {
                     *poissonState->Dimension = 2;
                     configChanged = true;
                 }
                 if (*poissonState->Dimension == 2)
                     ImGui::SetItemDefaultFocus();
-                if (ImGui::Selectable("3D", *poissonState->Dimension == 3))
+                if (ImGui::Selectable("3D##ProgressivePoisson", *poissonState->Dimension == 3))
                 {
                     *poissonState->Dimension = 3;
                     configChanged = true;
@@ -10900,15 +11074,15 @@ namespace Extrinsic::Runtime
                 std::clamp(*poissonState->DebounceSeconds, 0.0f, 10.0f);
 
             configChanged |=
-                ImGui::DragInt("Grid width", poissonState->GridWidth, 1.0f, 1, 4096);
+                ImGui::DragInt("Grid width##ProgressivePoisson", poissonState->GridWidth, 1.0f, 1, 4096);
             DrawProgressivePoissonTooltip(
                 "Spatial hash grid width used before method-side clamping.");
             configChanged |=
-                ImGui::DragInt("Max levels", poissonState->MaxLevels, 1.0f, 1, 32);
+                ImGui::DragInt("Max levels##ProgressivePoisson", poissonState->MaxLevels, 1.0f, 1, 32);
             DrawProgressivePoissonTooltip(
                 "Maximum progressive hierarchy levels to emit.");
             configChanged |= ImGui::DragFloat(
-                "Hash load",
+                "Hash load##ProgressivePoisson",
                 poissonState->HashLoadFactor,
                 0.01f,
                 0.01f,
@@ -10916,7 +11090,7 @@ namespace Extrinsic::Runtime
             DrawProgressivePoissonTooltip(
                 "Target hash load factor used by the CPU reference backend.");
             configChanged |= ImGui::DragFloat(
-                "Radius alpha",
+                "Radius alpha##ProgressivePoisson",
                 poissonState->RadiusAlpha,
                 0.01f,
                 -1.0f,
@@ -10924,12 +11098,12 @@ namespace Extrinsic::Runtime
             DrawProgressivePoissonTooltip(
                 "Negative values keep the reference backend's default radius alpha.");
             configChanged |= ImGui::Checkbox(
-                "Randomize grid origin",
+                "Randomize grid origin##ProgressivePoisson",
                 poissonState->RandomizeGridOrigin);
             DrawProgressivePoissonTooltip(
                 "Jitter the grid origin with the configured seed.");
             configChanged |= ImGui::DragInt(
-                "Grid seed",
+                "Grid seed##ProgressivePoisson",
                 poissonState->GridOriginSeed,
                 1.0f,
                 0,
@@ -10937,12 +11111,12 @@ namespace Extrinsic::Runtime
             DrawProgressivePoissonTooltip(
                 "Seed for grid-origin randomization.");
             configChanged |= ImGui::Checkbox(
-                "Shuffle within levels",
+                "Shuffle within levels##ProgressivePoisson",
                 poissonState->ShuffleWithinLevels);
             DrawProgressivePoissonTooltip(
                 "Shuffle accepted samples inside each progressive level.");
             configChanged |= ImGui::DragInt(
-                "Shuffle seed",
+                "Shuffle seed##ProgressivePoisson",
                 poissonState->ShuffleSeed,
                 1.0f,
                 0,
@@ -10950,7 +11124,7 @@ namespace Extrinsic::Runtime
             DrawProgressivePoissonTooltip(
                 "Seed for deterministic level-local shuffling.");
             configChanged |= ImGui::DragInt(
-                "Prefix count",
+                "Prefix count##ProgressivePoisson",
                 poissonState->PrefixCount,
                 1.0f,
                 0,
@@ -10958,12 +11132,12 @@ namespace Extrinsic::Runtime
             DrawProgressivePoissonTooltip(
                 "Visible prefix count; zero shows all accepted points.");
             configChanged |= ImGui::Checkbox(
-                "Auto run on edit",
+                "Auto run on edit##ProgressivePoisson",
                 poissonState->AutoRunOnEdit);
             DrawProgressivePoissonTooltip(
                 "Rerun the sampler after knob edits settle.");
             configChanged |= ImGui::DragFloat(
-                "Debounce seconds",
+                "Debounce seconds##ProgressivePoisson",
                 poissonState->DebounceSeconds,
                 0.01f,
                 0.0f,
@@ -10975,7 +11149,7 @@ namespace Extrinsic::Runtime
             {
                 ImGui::SeparatorText("Surface input");
                 configChanged |= ImGui::DragInt(
-                    "Surface samples",
+                    "Surface samples##ProgressivePoisson",
                     poissonState->MeshSurfaceSampleCount,
                     1.0f,
                     1,
@@ -10983,7 +11157,7 @@ namespace Extrinsic::Runtime
                 DrawProgressivePoissonTooltip(
                     "Number of deterministic points sampled from the mesh surface.");
                 configChanged |= ImGui::DragInt(
-                    "Surface seed",
+                    "Surface seed##ProgressivePoisson",
                     poissonState->MeshSurfaceSampleSeed,
                     1.0f,
                     0,
@@ -10991,7 +11165,7 @@ namespace Extrinsic::Runtime
                 DrawProgressivePoissonTooltip(
                     "Seed for deterministic mesh surface sampling.");
                 configChanged |= ImGui::InputFloat(
-                    "Min triangle area",
+                    "Min triangle area##ProgressivePoisson",
                     poissonState->MeshSurfaceMinTriangleArea,
                     0.0f,
                     0.0f,
@@ -11005,7 +11179,7 @@ namespace Extrinsic::Runtime
                     *poissonState->MeshSurfaceMinTriangleArea = 1.0e-14f;
                 }
                 configChanged |= ImGui::Checkbox(
-                    "Interpolate normals",
+                    "Interpolate normals##ProgressivePoisson",
                     poissonState->MeshSurfaceInterpolateNormals);
                 DrawProgressivePoissonTooltip(
                     "Interpolate vertex normals onto sampled surface points.");
@@ -11014,7 +11188,7 @@ namespace Extrinsic::Runtime
             const SandboxEditorProgressivePoissonChannel channel =
                 ProgressivePoissonChannelFromIndex(*poissonState->Channel);
             if (ImGui::BeginCombo(
-                    "Color channel",
+                    "Color channel##ProgressivePoisson",
                     DebugNameForSandboxEditorProgressivePoissonChannel(channel)))
             {
                 for (std::size_t i = 0u;
@@ -11046,7 +11220,7 @@ namespace Extrinsic::Runtime
                 const SandboxEditorProgressivePoissonBackend backend =
                     ProgressivePoissonBackendFromIndex(*poissonState->Backend);
                 if (ImGui::BeginCombo(
-                        "Backend",
+                        "Backend##ProgressivePoisson",
                         DebugNameForSandboxEditorProgressivePoissonBackend(
                             backend)))
                 {
@@ -11121,7 +11295,7 @@ namespace Extrinsic::Runtime
                 }
             }
 
-            if (ImGui::Button("Run Progressive Poisson"))
+            if (ImGui::Button("Run Progressive Poisson##ProgressivePoisson"))
             {
                 *poissonState->LastConfigResult = applyConfig();
                 if ((*poissonState->LastConfigResult)->Succeeded())
@@ -11868,7 +12042,8 @@ namespace Extrinsic::Runtime
                 selected[*state->SwapSourceTarget ? 0u : 1u];
             ImGui::Text("Source entity: %u", sourceId);
             ImGui::Text("Target entity: %u", targetId);
-            ImGui::Checkbox("Swap source / target", state->SwapSourceTarget);
+            ImGui::Checkbox("Swap source / target##ICP",
+                            state->SwapSourceTarget);
 
             *state->Variant = std::clamp(
                 *state->Variant,
@@ -11878,7 +12053,7 @@ namespace Extrinsic::Runtime
             const SandboxEditorICPVariant variant =
                 SandboxEditorICPVariantFromIndex(*state->Variant);
             if (ImGui::BeginCombo(
-                    "Variant",
+                    "Variant##ICP",
                     DebugNameForSandboxEditorICPVariant(variant)))
             {
                 for (std::size_t i = 0u;
@@ -11888,8 +12063,12 @@ namespace Extrinsic::Runtime
                         kSandboxEditorICPVariants[i];
                     const bool selectedOption =
                         *state->Variant == static_cast<std::int32_t>(i);
+                    std::string optionLabel =
+                        DebugNameForSandboxEditorICPVariant(option);
+                    optionLabel += "##ICPVariant";
+                    optionLabel += std::to_string(i);
                     if (ImGui::Selectable(
-                            DebugNameForSandboxEditorICPVariant(option),
+                            optionLabel.c_str(),
                             selectedOption))
                     {
                         *state->Variant = static_cast<std::int32_t>(i);
@@ -11901,21 +12080,29 @@ namespace Extrinsic::Runtime
             }
 
             *state->MaxIterations = std::clamp(*state->MaxIterations, 1, 1000);
-            ImGui::DragInt("Max iterations", state->MaxIterations, 1.0f, 1, 1000);
+            ImGui::DragInt("Max iterations##ICP",
+                           state->MaxIterations,
+                           1.0f,
+                           1,
+                           1000);
             *state->MaxCorrespondenceDistance =
                 std::max(*state->MaxCorrespondenceDistance, 0.0f);
-            ImGui::DragFloat("Max correspondence distance (0 = unlimited)",
+            ImGui::DragFloat("Max correspondence distance (0 = unlimited)##ICP",
                              state->MaxCorrespondenceDistance, 0.01f, 0.0f,
                              1.0e6f, "%.4f");
             *state->InlierRatio = std::clamp(*state->InlierRatio, 0.01f, 1.0f);
-            ImGui::DragFloat("Inlier ratio", state->InlierRatio, 0.01f, 0.01f,
-                             1.0f, "%.2f");
+            ImGui::DragFloat("Inlier ratio##ICP",
+                             state->InlierRatio,
+                             0.01f,
+                             0.01f,
+                             1.0f,
+                             "%.2f");
 
             const std::size_t trajectoryLength =
                 state->LastResult->has_value()
                     ? (*state->LastResult)->TrajectoryLength
                     : 0u;
-            bool run = ImGui::Button("Run ICP");
+            bool run = ImGui::Button("Run ICP##ICP");
             // Full-convergence request: MaxIterations >= the completed iteration
             // count, so TrajectoryPose clamps to the final pose.
             std::size_t requestedStep =
@@ -11926,7 +12113,7 @@ namespace Extrinsic::Runtime
                     *state->TrajectoryStep,
                     0,
                     static_cast<std::int32_t>(trajectoryLength));
-                ImGui::SliderInt("Trajectory step", state->TrajectoryStep, 0,
+                ImGui::SliderInt("Trajectory step##ICP", state->TrajectoryStep, 0,
                                  static_cast<int>(trajectoryLength));
                 if (ImGui::IsItemDeactivatedAfterEdit())
                 {
@@ -12929,6 +13116,8 @@ namespace Extrinsic::Runtime
         {
         case SandboxEditorCommandStatus::Applied:
             return "Applied";
+        case SandboxEditorCommandStatus::Pending:
+            return "Pending";
         case SandboxEditorCommandStatus::NoChange:
             return "NoChange";
         case SandboxEditorCommandStatus::MissingScene:
@@ -16031,6 +16220,42 @@ namespace Extrinsic::Runtime
             : GK::Initialization::Random;
         params.Compute = ToKMeansGeometryBackend(command.Backend);
 
+        std::string gpuQueueFallbackReason{};
+        if (command.Backend == SandboxEditorKMeansBackend::VulkanCompute &&
+            context.KMeansGpuCommands.Available())
+        {
+            RuntimeKMeansGpuJobRequest gpuRequest{
+                .StableEntityId = command.StableEntityId,
+                .DomainTag = static_cast<std::uint32_t>(command.Domain),
+                .Points = *points,
+                .Params = params,
+            };
+            const RuntimeKMeansGpuJobSubmission submission =
+                context.KMeansGpuCommands.Submit(std::move(gpuRequest));
+            if (submission.Accepted() ||
+                submission.Status == RuntimeKMeansGpuJobStatus::Busy)
+            {
+                return MakePendingKMeansGpuResult(
+                    command,
+                    submission,
+                    static_cast<std::uint32_t>(points->size()));
+            }
+            if (submission.Status != RuntimeKMeansGpuJobStatus::GpuUnavailable)
+            {
+                return MakeKMeansResult(
+                    SandboxEditorCommandStatus::GeometryProcessingFailed,
+                    command.Domain,
+                    command.Backend,
+                    Core::ErrorCode::InvalidState,
+                    submission.Diagnostic.empty()
+                        ? "K-Means Vulkan compute job submission failed."
+                        : submission.Diagnostic);
+            }
+            gpuQueueFallbackReason = submission.Diagnostic.empty()
+                ? "K-Means Vulkan compute execution is unavailable; ran CPU reference."
+                : submission.Diagnostic + " Ran CPU reference.";
+        }
+
         const std::optional<GK::KMeansResult> clustered =
             RunKMeansForSandbox(
                 std::span<const glm::vec3>{points->data(), points->size()},
@@ -16056,32 +16281,13 @@ namespace Extrinsic::Runtime
                 "K-Means result publication failed because output properties have incompatible types or sizes.");
         }
 
-        const SandboxEditorKMeansBackend requestedBackend =
-            MakeSandboxEditorKMeansBackend(clustered->RequestedBackend);
-        const SandboxEditorKMeansBackend actualBackend =
-            MakeSandboxEditorKMeansBackend(clustered->ActualBackend);
         Dirty::MarkVertexAttributesDirty(raw, *entity);
-        SandboxEditorKMeansResult result{
-            .Status = SandboxEditorCommandStatus::Applied,
-            .Domain = command.Domain,
-            .LabelCount = static_cast<std::uint32_t>(clustered->Labels.size()),
-            .ClusterCount = static_cast<std::uint32_t>(clustered->Centroids.size()),
-            .Iterations = clustered->Iterations,
-            .Converged = clustered->Converged,
-            .Inertia = clustered->Inertia,
-            .MaxDistanceIndex = clustered->MaxDistanceIndex,
-            .RequestedBackend = requestedBackend,
-            .ActualBackend = actualBackend,
-            .RequestedBackendId = KMeansBackendId(requestedBackend),
-            .RequestedBackendDisplayName =
-                KMeansBackendDisplayName(requestedBackend),
-            .BackendId = KMeansBackendId(actualBackend),
-            .BackendDisplayName = KMeansBackendDisplayName(actualBackend),
-            .FellBackToCpu = clustered->FellBackToCPU,
-            .Error = Core::ErrorCode::Success,
-        };
-        result.BackendFallbackReason =
-            BuildKMeansFallbackReason(result, context.Device);
+        SandboxEditorKMeansResult result =
+            MakeCompletedKMeansResult(command.Domain, *clustered);
+        result.BackendFallbackReason = !gpuQueueFallbackReason.empty() &&
+                                               result.FellBackToCpu
+            ? std::move(gpuQueueFallbackReason)
+            : BuildKMeansFallbackReason(result, context.Device);
         result.Message = BuildKMeansSuccessMessage(command.Domain, result);
         if (context.CommandHistory != nullptr)
             (void)context.CommandHistory->MarkDirty("Run K-Means");
@@ -18071,6 +18277,15 @@ namespace Extrinsic::Runtime
                     m_LastObservedRuntimeImportSequence = runtimeImport->Sequence;
                 }
                 SandboxEditorContext context = BuildContextFromEngine(*m_Engine);
+                if (context.KMeansGpuCommands.Available())
+                {
+                    while (std::optional<RuntimeKMeansGpuJobResult> completed =
+                               context.KMeansGpuCommands.ConsumeCompleted())
+                    {
+                        m_LastKMeansResult =
+                            PublishCompletedKMeansGpuJob(context, *completed);
+                    }
+                }
                 context.PendingAssetImportPath =
                     std::string(m_ImportPathBuffer.data());
                 context.PendingAssetImportPayloadKind =

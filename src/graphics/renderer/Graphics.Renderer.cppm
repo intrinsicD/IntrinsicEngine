@@ -1,6 +1,7 @@
 module;
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
@@ -12,6 +13,7 @@ module;
 export module Extrinsic.Graphics.Renderer;
 
 import Extrinsic.RHI.Device;
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.TextureManager;
 import Extrinsic.RHI.SamplerManager;
@@ -79,6 +81,9 @@ import Extrinsic.Core.Config.Render;
 
 namespace Extrinsic::Graphics
 {
+    export using RuntimeFrameCommandHook =
+        std::function<void(RHI::ICommandContext&)>;
+
     export struct RenderGraphCompileStats
     {
         bool Succeeded = false;
@@ -434,6 +439,12 @@ namespace Extrinsic::Graphics
         // consumer bound to a runtime-owned overlay; it does not expose the
         // borrowed overlay or allow graphics to call back into runtime.
         [[nodiscard]] virtual bool HasImGuiOverlaySystem() const noexcept = 0;
+
+        // Runtime-owned GPU work that must record inside the renderer's frame
+        // command context without creating a second swapchain present. Graphics
+        // owns the invocation point; the callback records only RHI commands and
+        // must not retain the borrowed command context.
+        virtual void SetRuntimeFrameCommandHook(RuntimeFrameCommandHook hook) = 0;
 
         [[nodiscard]] virtual RenderWorld ExtractRenderWorld(
             const RenderFrameInput& input,
