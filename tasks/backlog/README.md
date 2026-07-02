@@ -65,11 +65,13 @@ compute, HZB occlusion, clustered lights, TAA, and the further modernization
 seams), the CPU/GPU transfer foundation (`GRAPHICS-095..098`), and the
 contract-first renderer/snapshot/recipe architecture sequence
 (`GRAPHICS-099..103`, `RUNTIME-127`, `UI-023`) are retired — see
-[`rendering/README.md`](rendering/README.md) and the retirement log. The current
-open Theme B leaf is the remaining profile-gated vertex attribute follow-up
-(`RUNTIME-125`). The runtime GPU readback job/write-back leg (`RUNTIME-126`) is
-retired with the transfer facade/readback ring wired into the runtime
-derived-job graph.
+[`rendering/README.md`](rendering/README.md) and the retirement log. Current
+open Theme B leaves include the compute/upload cleanup leaves
+(`GRAPHICS-111..114`), object-space normal bake operational follow-ups
+(`GRAPHICS-115`, `RUNTIME-129`), and the remaining profile-gated vertex
+attribute follow-up (`RUNTIME-125`). The runtime GPU readback job/write-back leg
+(`RUNTIME-126`) is retired with the transfer facade/readback ring wired into the
+runtime derived-job graph.
 
 The research-control-surface recipe/config seam (see Theme H `PROC-010` for the
 proposed framing) opens new Theme B leaves that close the gap where an activated

@@ -11,10 +11,6 @@ Each active task should include:
 
 ## Currently active
 
-- [`GRAPHICS-104` — GPU Object-Space Normal Texture Bake](GRAPHICS-104-gpu-object-space-normal-texture-bake.md)
-  — in progress; next verification step is focused object-space normal bake
-  contract coverage plus the default CPU-supported gate after runtime
-  orchestration lands.
 - [`METHOD-013` — Progressive Poisson-disk sampling: GPU (Vulkan compute) backend + parity](METHOD-013-progressive-poisson-disk-gpu-backend.md)
   — in progress; Slice B pins the Vulkan shader/layout/dispatch-planning
   contract and CPU fallback status. Next implementation step is Slice C

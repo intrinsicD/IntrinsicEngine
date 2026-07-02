@@ -8,6 +8,16 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+Active
+[`GRAPHICS-104`](GRAPHICS-104-gpu-object-space-normal-texture-bake.md) —
+GPU Object-Space Normal Texture Bake — retired on 2026-07-02 at maturity
+`CPUContracted`. The graphics-owned zero-padding raster-bake plan/recording,
+object-space-normal shader/material contract, GPU-produced cache texture
+residency, and runtime queue/submission/binding helpers are now recorded as the
+completed slice. Padded GPU dilation is split to open follow-up `GRAPHICS-115`;
+engine/import render-thread scheduling and material swaps remain owned by
+`RUNTIME-129`.
+
 Backlog
 [`GRAPHICS-110`](GRAPHICS-110-imgui-upload-buffer-in-flight-safety.md) —
 Per-frame/ring ImGui upload buffers for in-flight safety — retired on
