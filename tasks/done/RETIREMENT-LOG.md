@@ -3131,3 +3131,18 @@ KMeans parity and benchmark/JSON validation passed, and the broader
 gate still reports the unrelated pre-existing
 `SandboxEditorUi.RegistrationCommandAlignsAcrossEntityTransforms` registration
 failure.
+
+[`RUNTIME-136`](RUNTIME-136-sandbox-method-backend-selectors.md) — Sandbox
+method backend selectors retired to `tasks/done/` on 2026-07-02 at
+`CPUContracted`. The Sandbox UI now exposes CPU reference vs Vulkan compute
+selectors for every currently exposed method with a GPU variant: K-Means and
+Progressive Poisson. K-Means command/result DTOs report requested backend,
+actual backend, stable ids/display names, and fallback reason; the synchronous
+Sandbox K-Means path preserves deterministic CPU behavior and reports an honest
+CPU fallback when it lacks an operational device or async GPU command/readback
+ownership. Progressive Poisson's existing config/backend telemetry is surfaced
+as a visible selector in both point-cloud and mesh processing controls. Focused
+runtime contract coverage passed for default CPU selection and Vulkan-requested
+CPU fallback telemetry; the full CPU gate still reports the unrelated
+pre-existing `SandboxEditorUi.RegistrationCommandAlignsAcrossEntityTransforms`
+registration failure.

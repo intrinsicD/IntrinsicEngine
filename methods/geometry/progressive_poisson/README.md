@@ -30,7 +30,8 @@ operational Vulkan parity reporting slice.
 - **RUNTIME-133** — figure/data export (CSV/JSON) for reproducible plots.
 - **GRAPHICS-109** — offscreen frame capture to PNG for rendered figures.
 - **RUNTIME-134** — interactive Sandbox playground binding every `SamplerConfig` knob.
-- **RUNTIME-136** — future Sandbox CPU/GPU backend toggle after METHOD-013.
+- **RUNTIME-136** — Sandbox CPU/GPU backend selector and requested-vs-actual
+  backend readout.
 
 ## Interactive usage
 
@@ -79,10 +80,11 @@ Widget edits preview and hot-apply a serialized `EngineConfig` through
 `Engine::PreviewEngineConfigControlDocument` and
 `Engine::ApplyEngineConfigHotSubset`; when `auto_run_on_edit` is enabled, the
 Sandbox schedules a debounced rerun. The explicit Run action uses the same
-config path before invoking the CPU reference command.
-The visible backend toggle is deferred to RUNTIME-136; METHOD-013 owns the
-backend command/config seam, planning-only Vulkan-compute seam, executable
-backend, and CPU/GPU parity.
+config path before invoking the command. The Sandbox backend selector writes
+that same config field, and the result readout shows requested backend, actual
+backend, and CPU fallback reason when present. METHOD-013 owns the backend
+command/config seam, planning-only Vulkan-compute seam, executable backend, and
+CPU/GPU parity.
 
 ## Known limitations
 

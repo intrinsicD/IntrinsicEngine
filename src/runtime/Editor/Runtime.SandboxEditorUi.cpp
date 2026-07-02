@@ -57,6 +57,7 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.ImGuiAdapter;
+import Extrinsic.Runtime.KMeansBackend;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressivePoissonGpuBackend;
@@ -178,6 +179,12 @@ namespace Extrinsic::Runtime
                 SandboxEditorProgressivePoissonBackend::VulkanCompute,
             }};
 
+        inline constexpr std::array<SandboxEditorKMeansBackend, 2>
+            kKMeansBackends{{
+                SandboxEditorKMeansBackend::CpuReference,
+                SandboxEditorKMeansBackend::VulkanCompute,
+            }};
+
         inline constexpr std::array<SandboxEditorMeshDenoiseStage, 1>
             kMeshDenoiseStages{{
                 SandboxEditorMeshDenoiseStage::FullBilateral,
@@ -243,6 +250,7 @@ namespace Extrinsic::Runtime
         {
             std::optional<SandboxEditorKMeansResult>* LastResult{nullptr};
             SandboxEditorGeometryProcessingDomain* Domain{nullptr};
+            std::int32_t* Backend{nullptr};
             std::int32_t* ClusterCount{nullptr};
             std::int32_t* MaxIterations{nullptr};
             std::int32_t* Seed{nullptr};
@@ -3954,15 +3962,26 @@ namespace Extrinsic::Runtime
             return std::nullopt;
         }
 
+        [[nodiscard]] const char* KMeansBackendId(
+            SandboxEditorKMeansBackend backend) noexcept;
+
+        [[nodiscard]] const char* KMeansBackendDisplayName(
+            SandboxEditorKMeansBackend backend) noexcept;
+
         [[nodiscard]] SandboxEditorKMeansResult MakeKMeansResult(
             const SandboxEditorCommandStatus status,
             const SandboxEditorGeometryProcessingDomain domain,
+            const SandboxEditorKMeansBackend requestedBackend,
             const Core::ErrorCode error,
             std::string message)
         {
             return SandboxEditorKMeansResult{
                 .Status = status,
                 .Domain = domain,
+                .RequestedBackend = requestedBackend,
+                .RequestedBackendId = KMeansBackendId(requestedBackend),
+                .RequestedBackendDisplayName =
+                    KMeansBackendDisplayName(requestedBackend),
                 .Error = error,
                 .Message = std::move(message),
             };
@@ -4141,11 +4160,129 @@ namespace Extrinsic::Runtime
             return true;
         }
 
+        inline constexpr const char* kKMeansCpuBackendId = "cpu_reference";
+        inline constexpr const char* kKMeansCpuBackendDisplayName =
+            "CPU reference";
+        inline constexpr const char* kKMeansGpuBackendId =
+            "gpu_vulkan_compute";
+        inline constexpr const char* kKMeansGpuBackendDisplayName =
+            "Vulkan compute";
+
+        [[nodiscard]] const char* KMeansBackendId(
+            const SandboxEditorKMeansBackend backend) noexcept
+        {
+            switch (backend)
+            {
+            case SandboxEditorKMeansBackend::CpuReference:
+                return kKMeansCpuBackendId;
+            case SandboxEditorKMeansBackend::VulkanCompute:
+                return kKMeansGpuBackendId;
+            }
+            return kKMeansCpuBackendId;
+        }
+
+        [[nodiscard]] const char* KMeansBackendDisplayName(
+            const SandboxEditorKMeansBackend backend) noexcept
+        {
+            switch (backend)
+            {
+            case SandboxEditorKMeansBackend::CpuReference:
+                return kKMeansCpuBackendDisplayName;
+            case SandboxEditorKMeansBackend::VulkanCompute:
+                return kKMeansGpuBackendDisplayName;
+            }
+            return kKMeansCpuBackendDisplayName;
+        }
+
+        [[nodiscard]] GK::Backend ToKMeansGeometryBackend(
+            const SandboxEditorKMeansBackend backend) noexcept
+        {
+            switch (backend)
+            {
+            case SandboxEditorKMeansBackend::CpuReference:
+                return GK::Backend::CPU;
+            case SandboxEditorKMeansBackend::VulkanCompute:
+                return GK::Backend::GPU;
+            }
+            return GK::Backend::CPU;
+        }
+
+        [[nodiscard]] SandboxEditorKMeansBackend MakeSandboxEditorKMeansBackend(
+            const GK::Backend backend) noexcept
+        {
+            switch (backend)
+            {
+            case GK::Backend::CPU:
+                return SandboxEditorKMeansBackend::CpuReference;
+            case GK::Backend::GPU:
+                return SandboxEditorKMeansBackend::VulkanCompute;
+            }
+            return SandboxEditorKMeansBackend::CpuReference;
+        }
+
+        [[nodiscard]] SandboxEditorKMeansBackend KMeansBackendFromIndex(
+            const std::int32_t index) noexcept
+        {
+            const std::int32_t clamped = std::clamp(
+                index,
+                0,
+                static_cast<std::int32_t>(kKMeansBackends.size() - 1u));
+            return kKMeansBackends[static_cast<std::size_t>(clamped)];
+        }
+
+        [[nodiscard]] std::optional<GK::KMeansResult> RunKMeansForSandbox(
+            const std::span<const glm::vec3> points,
+            const GK::KMeansParams& params,
+            RHI::IDevice* device)
+        {
+            const GK::Backend requestedBackend = params.Compute;
+            if (device != nullptr)
+                return ClusterKMeans(points, params, *device);
+
+            GK::KMeansParams cpuParams = params;
+            cpuParams.Compute = GK::Backend::CPU;
+            std::optional<GK::KMeansResult> result =
+                GK::Cluster(points, cpuParams);
+            if (result.has_value())
+            {
+                result->RequestedBackend = requestedBackend;
+                result->ActualBackend = GK::Backend::CPU;
+                result->FellBackToCPU =
+                    requestedBackend == GK::Backend::GPU;
+            }
+            return result;
+        }
+
+        [[nodiscard]] std::string BuildKMeansFallbackReason(
+            const SandboxEditorKMeansResult& result,
+            const RHI::IDevice* device)
+        {
+            if (!result.FellBackToCpu)
+                return {};
+            if (device == nullptr)
+            {
+                return "Vulkan compute requested but no RHI device is attached; ran CPU reference.";
+            }
+            if (!device->IsOperational())
+            {
+                return "Vulkan compute requested but the RHI device is not operational; ran CPU reference.";
+            }
+            return "Vulkan compute requested but the synchronous Sandbox command does not own GPU command/readback resources; ran CPU reference.";
+        }
+
         [[nodiscard]] std::string BuildKMeansSuccessMessage(
             const SandboxEditorGeometryProcessingDomain domain,
             const SandboxEditorKMeansResult& result)
         {
-            std::string message = "K-Means completed for ";
+            std::string message = "K-Means (requested ";
+            message += result.RequestedBackendId.empty()
+                ? KMeansBackendId(result.RequestedBackend)
+                : result.RequestedBackendId;
+            message += ", actual ";
+            message += result.BackendId.empty()
+                ? KMeansBackendId(result.ActualBackend)
+                : result.BackendId;
+            message += ") completed for ";
             message += DebugNameForSandboxEditorGeometryProcessingDomain(domain);
             message += " (labels=";
             message += std::to_string(result.LabelCount);
@@ -8742,6 +8879,34 @@ namespace Extrinsic::Runtime
             ImGui::Text("Domain: %s",
                         DebugNameForSandboxEditorGeometryProcessingDomain(
                             result.Domain));
+            if (!result.BackendId.empty())
+            {
+                if (!result.BackendDisplayName.empty())
+                {
+                    ImGui::Text("Backend: %s (%s)",
+                                result.BackendDisplayName.c_str(),
+                                result.BackendId.c_str());
+                }
+                else
+                {
+                    ImGui::Text("Backend: %s", result.BackendId.c_str());
+                }
+            }
+            if (!result.RequestedBackendId.empty() &&
+                result.RequestedBackendId != result.BackendId)
+            {
+                if (!result.RequestedBackendDisplayName.empty())
+                {
+                    ImGui::Text("Requested backend: %s (%s)",
+                                result.RequestedBackendDisplayName.c_str(),
+                                result.RequestedBackendId.c_str());
+                }
+                else
+                {
+                    ImGui::Text("Requested backend: %s",
+                                result.RequestedBackendId.c_str());
+                }
+            }
             if (result.Succeeded())
             {
                 ImGui::Text("Labels: %u  clusters: %u  iterations: %u",
@@ -8751,6 +8916,12 @@ namespace Extrinsic::Runtime
                 ImGui::Text("Converged: %s  inertia: %.6f",
                             result.Converged ? "yes" : "no",
                             result.Inertia);
+            }
+            if (!result.BackendFallbackReason.empty())
+            {
+                ImGui::TextWrapped(
+                    "Backend fallback: %s",
+                    result.BackendFallbackReason.c_str());
             }
             if (!result.Message.empty())
                 ImGui::TextWrapped("%s", result.Message.c_str());
@@ -8771,6 +8942,7 @@ namespace Extrinsic::Runtime
             if (kmeansState == nullptr ||
                 kmeansState->LastResult == nullptr ||
                 kmeansState->Domain == nullptr ||
+                kmeansState->Backend == nullptr ||
                 kmeansState->ClusterCount == nullptr ||
                 kmeansState->MaxIterations == nullptr ||
                 kmeansState->Seed == nullptr ||
@@ -8807,6 +8979,35 @@ namespace Extrinsic::Runtime
                 ImGui::EndCombo();
             }
 
+            *kmeansState->Backend = std::clamp(
+                *kmeansState->Backend,
+                0,
+                static_cast<std::int32_t>(kKMeansBackends.size() - 1u));
+            const SandboxEditorKMeansBackend backend =
+                KMeansBackendFromIndex(*kmeansState->Backend);
+            if (ImGui::BeginCombo(
+                    "Backend",
+                    DebugNameForSandboxEditorKMeansBackend(backend)))
+            {
+                for (std::size_t i = 0u; i < kKMeansBackends.size(); ++i)
+                {
+                    const bool selected =
+                        *kmeansState->Backend ==
+                        static_cast<std::int32_t>(i);
+                    if (ImGui::Selectable(
+                            DebugNameForSandboxEditorKMeansBackend(
+                                kKMeansBackends[i]),
+                            selected))
+                    {
+                        *kmeansState->Backend =
+                            static_cast<std::int32_t>(i);
+                    }
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+
             ImGui::DragInt("Clusters", kmeansState->ClusterCount, 1.0f, 1, 1024);
             ImGui::DragInt("Max iterations", kmeansState->MaxIterations, 1.0f, 1, 4096);
             ImGui::DragInt("Seed", kmeansState->Seed, 1.0f, 0, 1'000'000);
@@ -8833,6 +9034,7 @@ namespace Extrinsic::Runtime
                         .Seed = static_cast<std::uint32_t>(*kmeansState->Seed),
                         .UseHierarchicalInitialization =
                             *kmeansState->UseHierarchicalInitialization,
+                        .Backend = KMeansBackendFromIndex(*kmeansState->Backend),
                     });
             }
 
@@ -10765,6 +10967,40 @@ namespace Extrinsic::Runtime
             }
             DrawProgressivePoissonTooltip(
                 "Scalar property used for point color visualization.");
+
+            if (poissonState->Backend != nullptr)
+            {
+                const SandboxEditorProgressivePoissonBackend backend =
+                    ProgressivePoissonBackendFromIndex(*poissonState->Backend);
+                if (ImGui::BeginCombo(
+                        "Backend",
+                        DebugNameForSandboxEditorProgressivePoissonBackend(
+                            backend)))
+                {
+                    for (std::size_t i = 0u;
+                         i < kProgressivePoissonBackends.size();
+                         ++i)
+                    {
+                        const bool selected =
+                            *poissonState->Backend ==
+                            static_cast<std::int32_t>(i);
+                        if (ImGui::Selectable(
+                                DebugNameForSandboxEditorProgressivePoissonBackend(
+                                    kProgressivePoissonBackends[i]),
+                                selected))
+                        {
+                            *poissonState->Backend =
+                                static_cast<std::int32_t>(i);
+                            configChanged = true;
+                        }
+                        if (selected)
+                            ImGui::SetItemDefaultFocus();
+                    }
+                    ImGui::EndCombo();
+                }
+                DrawProgressivePoissonTooltip(
+                    "Requested method backend; the result readout reports the actual backend and any CPU fallback.");
+            }
 
             auto applyConfig = [&]() -> SandboxEditorProgressivePoissonConfigResult
             {
@@ -13943,6 +14179,19 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
+    const char* DebugNameForSandboxEditorKMeansBackend(
+        const SandboxEditorKMeansBackend backend) noexcept
+    {
+        switch (backend)
+        {
+        case SandboxEditorKMeansBackend::CpuReference:
+            return "CPU reference";
+        case SandboxEditorKMeansBackend::VulkanCompute:
+            return "Vulkan compute";
+        }
+        return "Unknown";
+    }
+
     const char* DebugNameForSandboxEditorProgressivePoissonBackend(
         const SandboxEditorProgressivePoissonBackend backend) noexcept
     {
@@ -15573,6 +15822,7 @@ namespace Extrinsic::Runtime
             return MakeKMeansResult(
                 SandboxEditorCommandStatus::MissingScene,
                 command.Domain,
+                command.Backend,
                 Core::ErrorCode::InvalidState,
                 "Scene registry is unavailable for K-Means.");
         }
@@ -15583,6 +15833,7 @@ namespace Extrinsic::Runtime
             return MakeKMeansResult(
                 SandboxEditorCommandStatus::InvalidProcessingParameters,
                 command.Domain,
+                command.Backend,
                 Core::ErrorCode::InvalidArgument,
                 "K-Means requires mesh vertices, graph nodes, or point-cloud points with positive cluster and iteration counts.");
         }
@@ -15595,6 +15846,7 @@ namespace Extrinsic::Runtime
             return MakeKMeansResult(
                 SandboxEditorCommandStatus::StaleEntity,
                 command.Domain,
+                command.Backend,
                 Core::ErrorCode::ResourceNotFound,
                 "K-Means target entity is stale or no longer live.");
         }
@@ -15605,6 +15857,7 @@ namespace Extrinsic::Runtime
             return MakeKMeansResult(
                 SandboxEditorCommandStatus::UnsupportedGeometryDomain,
                 command.Domain,
+                command.Backend,
                 Core::ErrorCode::InvalidArgument,
                 "Selected entity does not expose the requested K-Means GeometrySources domain.");
         }
@@ -15616,6 +15869,7 @@ namespace Extrinsic::Runtime
             return MakeKMeansResult(
                 SandboxEditorCommandStatus::UnsupportedGeometryDomain,
                 command.Domain,
+                command.Backend,
                 Core::ErrorCode::InvalidArgument,
                 "Requested K-Means GeometrySources domain has no writable property set.");
         }
@@ -15627,6 +15881,7 @@ namespace Extrinsic::Runtime
             return MakeKMeansResult(
                 SandboxEditorCommandStatus::InvalidProcessingParameters,
                 command.Domain,
+                command.Backend,
                 Core::ErrorCode::InvalidArgument,
                 "K-Means requires a non-empty finite v:position property on the requested domain.");
         }
@@ -15638,16 +15893,19 @@ namespace Extrinsic::Runtime
         params.Init = command.UseHierarchicalInitialization
             ? GK::Initialization::Hierarchical
             : GK::Initialization::Random;
-        params.Compute = GK::Backend::CPU;
+        params.Compute = ToKMeansGeometryBackend(command.Backend);
 
         const std::optional<GK::KMeansResult> clustered =
-            GK::Cluster(std::span<const glm::vec3>{points->data(), points->size()},
-                        params);
+            RunKMeansForSandbox(
+                std::span<const glm::vec3>{points->data(), points->size()},
+                params,
+                context.Device);
         if (!clustered.has_value())
         {
             return MakeKMeansResult(
                 SandboxEditorCommandStatus::GeometryProcessingFailed,
                 command.Domain,
+                command.Backend,
                 Core::ErrorCode::Unknown,
                 "Geometry.KMeans returned no result for the requested points.");
         }
@@ -15657,10 +15915,15 @@ namespace Extrinsic::Runtime
             return MakeKMeansResult(
                 SandboxEditorCommandStatus::GeometryProcessingFailed,
                 command.Domain,
+                command.Backend,
                 Core::ErrorCode::TypeMismatch,
                 "K-Means result publication failed because output properties have incompatible types or sizes.");
         }
 
+        const SandboxEditorKMeansBackend requestedBackend =
+            MakeSandboxEditorKMeansBackend(clustered->RequestedBackend);
+        const SandboxEditorKMeansBackend actualBackend =
+            MakeSandboxEditorKMeansBackend(clustered->ActualBackend);
         Dirty::MarkVertexAttributesDirty(raw, *entity);
         SandboxEditorKMeansResult result{
             .Status = SandboxEditorCommandStatus::Applied,
@@ -15671,8 +15934,18 @@ namespace Extrinsic::Runtime
             .Converged = clustered->Converged,
             .Inertia = clustered->Inertia,
             .MaxDistanceIndex = clustered->MaxDistanceIndex,
+            .RequestedBackend = requestedBackend,
+            .ActualBackend = actualBackend,
+            .RequestedBackendId = KMeansBackendId(requestedBackend),
+            .RequestedBackendDisplayName =
+                KMeansBackendDisplayName(requestedBackend),
+            .BackendId = KMeansBackendId(actualBackend),
+            .BackendDisplayName = KMeansBackendDisplayName(actualBackend),
+            .FellBackToCpu = clustered->FellBackToCPU,
             .Error = Core::ErrorCode::Success,
         };
+        result.BackendFallbackReason =
+            BuildKMeansFallbackReason(result, context.Device);
         result.Message = BuildKMeansSuccessMessage(command.Domain, result);
         if (context.CommandHistory != nullptr)
             (void)context.CommandHistory->MarkDirty("Run K-Means");
@@ -17738,6 +18011,7 @@ namespace Extrinsic::Runtime
                 KMeansUiState kmeansState{
                     .LastResult = &m_LastKMeansResult,
                     .Domain = &m_KMeansDomain,
+                    .Backend = &m_KMeansBackend,
                     .ClusterCount = &m_KMeansClusterCount,
                     .MaxIterations = &m_KMeansMaxIterations,
                     .Seed = &m_KMeansSeed,

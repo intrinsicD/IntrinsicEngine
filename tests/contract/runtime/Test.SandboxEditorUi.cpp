@@ -2227,6 +2227,16 @@ TEST(SandboxEditorUi, KMeansCommandPublishesMeshGraphAndPointCloudProperties)
     EXPECT_EQ(meshResult.Domain, Domain::MeshVertices);
     EXPECT_EQ(meshResult.LabelCount, 3u);
     EXPECT_EQ(meshResult.ClusterCount, 2u);
+    EXPECT_EQ(meshResult.RequestedBackend,
+              Runtime::SandboxEditorKMeansBackend::CpuReference);
+    EXPECT_EQ(meshResult.ActualBackend,
+              Runtime::SandboxEditorKMeansBackend::CpuReference);
+    EXPECT_EQ(meshResult.RequestedBackendId, "cpu_reference");
+    EXPECT_EQ(meshResult.BackendId, "cpu_reference");
+    EXPECT_FALSE(meshResult.FellBackToCpu);
+    EXPECT_TRUE(meshResult.BackendFallbackReason.empty());
+    EXPECT_NE(meshResult.Message.find("requested cpu_reference"),
+              std::string::npos);
     EXPECT_EQ(meshResult.Error, Core::ErrorCode::Success);
     ExpectKMeansVertexProperties(
         registry.Raw().get<GS::Vertices>(mesh).Properties,
@@ -2295,6 +2305,60 @@ TEST(SandboxEditorUi, KMeansCommandPublishesMeshGraphAndPointCloudProperties)
     ASSERT_TRUE(model.Processing.LastKMeansResult.has_value());
     EXPECT_TRUE(model.Processing.LastKMeansResult->Succeeded());
     EXPECT_EQ(model.Processing.LastKMeansResult->LabelCount, 4u);
+}
+
+TEST(SandboxEditorUi, KMeansVulkanRequestFallsBackToCpuReference)
+{
+    using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
+
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Tests::MockDevice device;
+    device.Operational = false;
+    Runtime::SandboxEditorContext context =
+        MakeContext(registry, selection, true, nullptr, &device);
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
+    AddPointCloudSource(registry, cloud, 4u);
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
+                 {
+                     {0.0f, 0.0f, 0.0f},
+                     {0.1f, 0.0f, 0.0f},
+                     {2.0f, 0.0f, 0.0f},
+                     {2.1f, 0.0f, 0.0f},
+                 });
+
+    const Runtime::SandboxEditorKMeansResult result =
+        Runtime::ApplySandboxEditorKMeansCommand(
+            context,
+            Runtime::SandboxEditorKMeansCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(cloud),
+                .Domain = Domain::PointCloudPoints,
+                .ClusterCount = 2u,
+                .MaxIterations = 8u,
+                .Seed = 13u,
+                .Backend =
+                    Runtime::SandboxEditorKMeansBackend::VulkanCompute,
+            });
+
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_EQ(result.RequestedBackend,
+              Runtime::SandboxEditorKMeansBackend::VulkanCompute);
+    EXPECT_EQ(result.ActualBackend,
+              Runtime::SandboxEditorKMeansBackend::CpuReference);
+    EXPECT_EQ(result.RequestedBackendId, "gpu_vulkan_compute");
+    EXPECT_EQ(result.BackendId, "cpu_reference");
+    EXPECT_TRUE(result.FellBackToCpu);
+    EXPECT_NE(result.BackendFallbackReason.find("not operational"),
+              std::string::npos);
+    EXPECT_NE(result.Message.find("requested gpu_vulkan_compute"),
+              std::string::npos);
+    EXPECT_NE(result.Message.find("actual cpu_reference"), std::string::npos);
+    ExpectKMeansVertexProperties(
+        registry.Raw().get<GS::Vertices>(cloud).Properties,
+        4u,
+        true);
 }
 
 TEST(SandboxEditorUi, ProgressivePoissonCommandPublishesPointPropertiesAndVisualization)

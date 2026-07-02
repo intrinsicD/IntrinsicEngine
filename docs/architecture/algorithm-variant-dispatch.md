@@ -295,6 +295,12 @@ Use this checklist when adding a new dispatchable family:
 `KMeansParams::Compute`, and reports `RequestedBackend`, `ActualBackend`, and
 `FellBackToCPU` in `KMeansResult`.
 
+The Sandbox K-Means panel exposes that backend request to users as CPU reference
+vs Vulkan compute. `SandboxEditorKMeansResult` reports stable requested and
+actual backend ids (`cpu_reference` / `gpu_vulkan_compute`), display names, and
+CPU fallback reason when applicable, so the UI and agent callers can choose a
+backend for one run without scraping diagnostics text.
+
 The CPU entry point always runs the CPU reference implementation. The runtime
 adapter `Extrinsic.Runtime.KMeansBackend::ClusterKMeans(...)` accepts
 `Extrinsic::RHI::IDevice&`, evaluates `IDevice::IsOperational()` for GPU

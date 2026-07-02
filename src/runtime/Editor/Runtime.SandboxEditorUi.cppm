@@ -326,6 +326,15 @@ export namespace Extrinsic::Runtime
         const ECS::Scene::Registry& registry,
         ECS::EntityHandle entity);
 
+    enum class SandboxEditorKMeansBackend : std::uint8_t
+    {
+        CpuReference,
+        VulkanCompute,
+    };
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorKMeansBackend(
+        SandboxEditorKMeansBackend backend) noexcept;
+
     [[nodiscard]] const char* DebugNameForSandboxEditorGeometryProcessingDomain(
         SandboxEditorGeometryProcessingDomain domain) noexcept;
 
@@ -341,6 +350,8 @@ export namespace Extrinsic::Runtime
         std::uint32_t MaxIterations{32u};
         std::uint32_t Seed{42u};
         bool UseHierarchicalInitialization{true};
+        SandboxEditorKMeansBackend Backend{
+            SandboxEditorKMeansBackend::CpuReference};
     };
 
     struct SandboxEditorKMeansResult
@@ -354,6 +365,16 @@ export namespace Extrinsic::Runtime
         bool Converged{false};
         float Inertia{0.0f};
         std::uint32_t MaxDistanceIndex{0u};
+        SandboxEditorKMeansBackend RequestedBackend{
+            SandboxEditorKMeansBackend::CpuReference};
+        SandboxEditorKMeansBackend ActualBackend{
+            SandboxEditorKMeansBackend::CpuReference};
+        std::string RequestedBackendId{};
+        std::string RequestedBackendDisplayName{};
+        std::string BackendId{};
+        std::string BackendDisplayName{};
+        bool FellBackToCpu{false};
+        std::string BackendFallbackReason{};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
 
@@ -2562,6 +2583,7 @@ export namespace Extrinsic::Runtime
         std::int32_t m_KMeansMaxIterations{32};
         std::int32_t m_KMeansSeed{42};
         bool m_KMeansUseHierarchicalInitialization{true};
+        std::int32_t m_KMeansBackend{0};
         std::int32_t m_MeshDenoiseStage{0};
         std::int32_t m_MeshDenoiseNormalIterations{5};
         std::int32_t m_MeshDenoiseVertexIterations{10};

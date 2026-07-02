@@ -49,7 +49,6 @@ the authoritative open/unblocked view.
 - unblocked: `METHOD-005` — Robust mesh boolean reference backend (tasks/backlog/methods/METHOD-005-robust-mesh-boolean-reference-backend.md)
 - blocked by `GEOM-024`: `METHOD-006` — Cross-field / frame-field design reference backend (tasks/backlog/methods/METHOD-006-cross-field-design-reference-backend.md)
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
-- blocked by `METHOD-013`: `RUNTIME-136` — Progressive Poisson GPU backend toggle in the Sandbox (tasks/backlog/runtime/RUNTIME-136-progressive-poisson-gpu-backend-toggle.md)
 
 ## Audits
 
