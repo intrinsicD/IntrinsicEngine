@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <string>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -124,6 +125,22 @@ namespace
         return result;
     }
 
+    [[nodiscard]] Geometry::UvAtlas::UvAtlasResult FailingFastBackend(
+        const Geometry::UvAtlas::UvAtlasInput& input,
+        const Geometry::UvAtlas::UvAtlasOptions&)
+    {
+        Geometry::UvAtlas::UvAtlasResult result{};
+        result.Status = Geometry::UvAtlas::UvAtlasStatus::BackendFailed;
+        result.Provenance = Geometry::UvAtlas::UvAtlasProvenance::None;
+        result.Diagnostics.InputVertexCount = input.Positions.size();
+        result.Diagnostics.InputFaceCount = input.Faces.size();
+        result.Diagnostics.Status = result.Status;
+        result.Diagnostics.Provenance = result.Provenance;
+        result.Diagnostics.BackendName = "failing-fast";
+        result.Diagnostics.BackendDetail = "test backend failure";
+        return result;
+    }
+
     void ExpectFiniteNormalizedUv(const glm::vec2 uv)
     {
         EXPECT_TRUE(std::isfinite(uv.x));
@@ -132,6 +149,17 @@ namespace
         EXPECT_GE(uv.y, -1.0e-5f);
         EXPECT_LE(uv.x, 1.0f + 1.0e-5f);
         EXPECT_LE(uv.y, 1.0f + 1.0e-5f);
+    }
+
+    [[nodiscard]] bool OverlapInterior(
+        const Geometry::UvAtlas::UvAtlasChartRecord& a,
+        const Geometry::UvAtlas::UvAtlasChartRecord& b)
+    {
+        constexpr float epsilon = 1.0e-6f;
+        return a.UvMin.x < b.UvMax.x - epsilon &&
+               a.UvMax.x > b.UvMin.x + epsilon &&
+               a.UvMin.y < b.UvMax.y - epsilon &&
+               a.UvMax.y > b.UvMin.y + epsilon;
     }
 } // namespace
 
@@ -162,27 +190,7 @@ TEST(UvAtlas, FakeBackendCanReplaceDefault)
     EXPECT_FALSE(result.Diagnostics.UsedFallback);
 }
 
-TEST(UvAtlas, FastStagedRequestFallsBackToXAtlasUntilDefaultBackendExists)
-{
-    auto mesh = MakeSquareMesh();
-
-    Geometry::UvAtlas::UvAtlasOptions options{};
-    options.PreserveValidAuthoredUvs = false;
-    options.Method = Geometry::UvAtlas::UvAtlasMethod::FastStaged;
-    options.Resolution = 64u;
-
-    const auto result = Geometry::UvAtlas::ResolveUvAtlas(Geometry::UvAtlas::BorrowInput(mesh), options);
-
-    ASSERT_EQ(result.Status, Geometry::UvAtlas::UvAtlasStatus::Success) << Geometry::UvAtlas::ToString(result.Status);
-    EXPECT_EQ(result.Provenance, Geometry::UvAtlas::UvAtlasProvenance::Generated);
-    EXPECT_EQ(result.Diagnostics.BackendName, "xatlas");
-    EXPECT_EQ(result.Diagnostics.RequestedMethod, Geometry::UvAtlas::UvAtlasMethod::FastStaged);
-    EXPECT_EQ(result.Diagnostics.ActualMethod, Geometry::UvAtlas::UvAtlasMethod::XAtlas);
-    EXPECT_TRUE(result.Diagnostics.UsedFallback);
-    EXPECT_FALSE(result.Diagnostics.FallbackReason.empty());
-}
-
-TEST(UvAtlas, FastStagedRequestFailsClosedWhenXAtlasFallbackDisabled)
+TEST(UvAtlas, FastStagedRequestUsesBuiltInBackendWithoutXAtlasFallback)
 {
     auto mesh = MakeSquareMesh();
 
@@ -190,15 +198,133 @@ TEST(UvAtlas, FastStagedRequestFailsClosedWhenXAtlasFallbackDisabled)
     options.PreserveValidAuthoredUvs = false;
     options.Method = Geometry::UvAtlas::UvAtlasMethod::FastStaged;
     options.AllowXAtlasFallback = false;
+    options.Resolution = 64u;
 
     const auto result = Geometry::UvAtlas::ResolveUvAtlas(Geometry::UvAtlas::BorrowInput(mesh), options);
 
-    EXPECT_EQ(result.Status, Geometry::UvAtlas::UvAtlasStatus::BackendUnavailable);
+    ASSERT_EQ(result.Status, Geometry::UvAtlas::UvAtlasStatus::Success) << Geometry::UvAtlas::ToString(result.Status);
+    EXPECT_EQ(result.Provenance, Geometry::UvAtlas::UvAtlasProvenance::Generated);
     EXPECT_EQ(result.Diagnostics.BackendName, "fast-staged");
     EXPECT_EQ(result.Diagnostics.RequestedMethod, Geometry::UvAtlas::UvAtlasMethod::FastStaged);
-    EXPECT_EQ(result.Diagnostics.ActualMethod, Geometry::UvAtlas::UvAtlasMethod::None);
+    EXPECT_EQ(result.Diagnostics.ActualMethod, Geometry::UvAtlas::UvAtlasMethod::FastStaged);
     EXPECT_FALSE(result.Diagnostics.UsedFallback);
-    EXPECT_FALSE(result.Diagnostics.BackendDetail.empty());
+    EXPECT_TRUE(result.Diagnostics.FallbackReason.empty());
+    EXPECT_EQ(result.Diagnostics.ChartCount, mesh.FaceCount());
+    EXPECT_EQ(result.Diagnostics.SeamCutCount, 1u);
+    EXPECT_EQ(result.Diagnostics.BoundarySeamCount, 4u);
+    EXPECT_EQ(result.Charts.size(), mesh.FaceCount());
+    EXPECT_EQ(result.SeamCuts.size(), 5u);
+    EXPECT_EQ(result.OutputMesh.FaceCount(), mesh.FaceCount());
+    EXPECT_EQ(result.OutputMesh.VertexCount(), mesh.FaceCount() * 3u);
+    EXPECT_EQ(result.Diagnostics.Quality.Status, Geometry::Parameterization::ParameterizationDiagnosticsStatus::Success);
+
+    const auto outputUvs = result.OutputMesh.GetVertexProperty<glm::vec2>(
+        Geometry::MeshUtils::kVertexTexcoordPropertyName);
+    ASSERT_TRUE(outputUvs.IsValid());
+    for (const glm::vec2 uv : outputUvs.Vector())
+    {
+        ExpectFiniteNormalizedUv(uv);
+    }
+    for (std::size_t i = 0; i < result.Charts.size(); ++i)
+    {
+        for (std::size_t j = i + 1u; j < result.Charts.size(); ++j)
+        {
+            EXPECT_FALSE(OverlapInterior(result.Charts[i], result.Charts[j]))
+                << "chart " << i << " overlaps chart " << j;
+        }
+    }
+}
+
+TEST(UvAtlas, FastStagedCubeCutsFaceChartsAndCopiesProperties)
+{
+    auto mesh = MakeCubeMesh();
+    auto colors = mesh.GetOrAddVertexProperty<glm::vec4>("v:color", glm::vec4{0.0f});
+    for (std::size_t i = 0; i < mesh.VertexCount(); ++i)
+    {
+        colors.Vector()[i] = glm::vec4{
+            static_cast<float>(i + 1u),
+            static_cast<float>(i + 2u),
+            static_cast<float>(i + 3u),
+            1.0f};
+    }
+
+    Geometry::UvAtlas::UvAtlasOptions options{};
+    options.PreserveValidAuthoredUvs = false;
+    options.Method = Geometry::UvAtlas::UvAtlasMethod::FastStaged;
+    options.AllowXAtlasFallback = false;
+    options.Resolution = 128u;
+
+    const auto result = Geometry::UvAtlas::ResolveUvAtlas(Geometry::UvAtlas::BorrowInput(mesh), options);
+
+    ASSERT_EQ(result.Status, Geometry::UvAtlas::UvAtlasStatus::Success) << Geometry::UvAtlas::ToString(result.Status);
+    EXPECT_EQ(result.Diagnostics.BackendName, "fast-staged");
+    EXPECT_EQ(result.Diagnostics.ActualMethod, Geometry::UvAtlas::UvAtlasMethod::FastStaged);
+    EXPECT_EQ(result.Diagnostics.ChartCount, mesh.FaceCount());
+    EXPECT_EQ(result.Charts.size(), mesh.FaceCount());
+    EXPECT_EQ(result.OutputMesh.VertexCount(), mesh.FaceCount() * 3u);
+    EXPECT_EQ(result.SourceVertexForOutputVertex.size(), result.OutputMesh.VertexCount());
+    EXPECT_GT(result.Diagnostics.SeamCutCount, 0u);
+    EXPECT_EQ(result.Diagnostics.BoundarySeamCount, 0u);
+    EXPECT_EQ(result.Diagnostics.Quality.Status, Geometry::Parameterization::ParameterizationDiagnosticsStatus::Success);
+    EXPECT_EQ(result.Diagnostics.Quality.FlippedElementCount, 0u);
+
+    const auto outputColors = result.OutputMesh.GetVertexProperty<glm::vec4>("v:color");
+    ASSERT_TRUE(outputColors.IsValid());
+    for (std::size_t i = 0; i < result.SourceVertexForOutputVertex.size(); ++i)
+    {
+        const std::uint32_t source = result.SourceVertexForOutputVertex[i];
+        ASSERT_LT(source, mesh.VertexCount());
+        EXPECT_EQ(outputColors[i], colors.Vector()[source]);
+    }
+}
+
+TEST(UvAtlas, FastStagedFailingBackendFallsBackToXAtlasWhenAllowed)
+{
+    auto mesh = MakeSquareMesh();
+    const Geometry::UvAtlas::UvAtlasBackend failingFast{
+        .Name = "failing-fast",
+        .Generate = &FailingFastBackend};
+
+    Geometry::UvAtlas::UvAtlasOptions options{};
+    options.PreserveValidAuthoredUvs = false;
+    options.Method = Geometry::UvAtlas::UvAtlasMethod::FastStaged;
+    options.AllowXAtlasFallback = true;
+
+    const auto result = Geometry::UvAtlas::ResolveUvAtlas(
+        Geometry::UvAtlas::BorrowInput(mesh),
+        options,
+        &failingFast);
+
+    ASSERT_EQ(result.Status, Geometry::UvAtlas::UvAtlasStatus::Success) << Geometry::UvAtlas::ToString(result.Status);
+    EXPECT_EQ(result.Diagnostics.BackendName, "xatlas");
+    EXPECT_EQ(result.Diagnostics.RequestedMethod, Geometry::UvAtlas::UvAtlasMethod::FastStaged);
+    EXPECT_EQ(result.Diagnostics.ActualMethod, Geometry::UvAtlas::UvAtlasMethod::XAtlas);
+    EXPECT_TRUE(result.Diagnostics.UsedFallback);
+    EXPECT_NE(result.Diagnostics.FallbackReason.find("failing-fast"), std::string::npos);
+}
+
+TEST(UvAtlas, FastStagedFailingBackendFailsClosedWhenXAtlasFallbackDisabled)
+{
+    auto mesh = MakeSquareMesh();
+    const Geometry::UvAtlas::UvAtlasBackend failingFast{
+        .Name = "failing-fast",
+        .Generate = &FailingFastBackend};
+
+    Geometry::UvAtlas::UvAtlasOptions options{};
+    options.PreserveValidAuthoredUvs = false;
+    options.Method = Geometry::UvAtlas::UvAtlasMethod::FastStaged;
+    options.AllowXAtlasFallback = false;
+
+    const auto result = Geometry::UvAtlas::ResolveUvAtlas(
+        Geometry::UvAtlas::BorrowInput(mesh),
+        options,
+        &failingFast);
+
+    EXPECT_EQ(result.Status, Geometry::UvAtlas::UvAtlasStatus::BackendFailed);
+    EXPECT_EQ(result.Diagnostics.BackendName, "failing-fast");
+    EXPECT_EQ(result.Diagnostics.RequestedMethod, Geometry::UvAtlas::UvAtlasMethod::FastStaged);
+    EXPECT_EQ(result.Diagnostics.ActualMethod, Geometry::UvAtlas::UvAtlasMethod::FastStaged);
+    EXPECT_FALSE(result.Diagnostics.UsedFallback);
 }
 
 TEST(UvAtlas, FastStagedRequestCanUseCallerSuppliedBackend)

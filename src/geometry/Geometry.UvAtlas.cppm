@@ -113,6 +113,8 @@ export namespace Geometry::UvAtlas
         std::size_t PropertyXrefOutOfRangeCount{0};
 
         std::uint32_t ChartCount{0};
+        std::uint32_t SeamCutCount{0};
+        std::uint32_t BoundarySeamCount{0};
         std::uint32_t AtlasWidth{0};
         std::uint32_t AtlasHeight{0};
         std::uint32_t AtlasCount{0};
@@ -126,6 +128,30 @@ export namespace Geometry::UvAtlas
         [[nodiscard]] bool Succeeded() const noexcept { return Status == UvAtlasStatus::Success; }
     };
 
+    struct UvAtlasChartRecord
+    {
+        std::uint32_t ChartId{0};
+        std::uint32_t SourceFaceStart{0};
+        std::uint32_t SourceFaceCount{0};
+        std::uint32_t OutputFaceStart{0};
+        std::uint32_t OutputFaceCount{0};
+        std::uint32_t OutputVertexStart{0};
+        std::uint32_t OutputVertexCount{0};
+        glm::vec2 UvMin{0.0f};
+        glm::vec2 UvMax{0.0f};
+    };
+
+    struct UvAtlasSeamCutRecord
+    {
+        std::uint32_t SourceVertexA{0};
+        std::uint32_t SourceVertexB{0};
+        std::uint32_t SourceFaceA{0};
+        std::uint32_t SourceFaceB{0};
+        std::uint32_t ChartA{0};
+        std::uint32_t ChartB{0};
+        bool Boundary{false};
+    };
+
     struct UvAtlasResult
     {
         UvAtlasStatus Status{UvAtlasStatus::EmptyInput};
@@ -134,6 +160,8 @@ export namespace Geometry::UvAtlas
         std::vector<std::uint32_t> SourceVertexForOutputVertex{};
         std::vector<std::uint32_t> SourceFaceForOutputFace{};
         std::vector<std::uint32_t> OutputFaceChart{};
+        std::vector<UvAtlasChartRecord> Charts{};
+        std::vector<UvAtlasSeamCutRecord> SeamCuts{};
         UvAtlasDiagnostics Diagnostics{};
 
         [[nodiscard]] bool Succeeded() const noexcept { return Status == UvAtlasStatus::Success; }
@@ -169,6 +197,7 @@ export namespace Geometry::UvAtlas
         PropertySet& target);
 
     [[nodiscard]] UvAtlasBackend DefaultXAtlasBackend() noexcept;
+    [[nodiscard]] UvAtlasBackend DefaultFastStagedBackend() noexcept;
 
     [[nodiscard]] UvAtlasResult ResolveUvAtlas(
         const UvAtlasInput& input,

@@ -167,6 +167,18 @@ namespace
             .DebugName = "runtime-extraction-material-binding-sampler",
         };
     }
+
+    void RequestReadyTestTexture(
+        Extrinsic::Graphics::GpuAssetCache& cache,
+        const Extrinsic::Assets::AssetId id)
+    {
+        ASSERT_TRUE(cache.RequestUpload(Extrinsic::Graphics::GpuTextureRequest{
+            .Id = id,
+            .Bytes = std::span{ZeroTextureBytes},
+            .Desc = TestTextureDesc(),
+            .SamplerDesc = TestSamplerDesc(),
+        }).has_value());
+    }
 }
 
 TEST(MeshGeometryExtraction, SingleMeshEntityUploadsOnceAndBindsInstanceGeometry)
@@ -338,6 +350,111 @@ TEST(MeshGeometryExtraction, ProgressivePresentationBindingsAreConsumedDuringExt
     const Extrinsic::Graphics::MaterialParams params =
         renderer->GetMaterialSystem().GetParams(sidecar->MaterialHandle);
     EXPECT_NE(params.NormalID, Extrinsic::RHI::kInvalidBindlessIndex);
+    EXPECT_TRUE(Extrinsic::Graphics::HasFlag(
+        params.Flags,
+        Extrinsic::Graphics::MaterialFlags::ObjectSpaceNormalMap));
+
+    extraction.Shutdown(*renderer);
+    renderer->Shutdown();
+}
+
+TEST(MeshGeometryExtraction, ProgressiveGeneratedPropertyTexturesBindUniqueMaterialSlots)
+{
+    Extrinsic::Tests::MockDevice device{};
+    Extrinsic::RHI::BufferManager buffers{device};
+    Extrinsic::RHI::TextureManager textures{device, device.Bindless};
+    Extrinsic::RHI::SamplerManager samplers{device};
+    Extrinsic::Tests::MockTransferQueue transfer{};
+    Extrinsic::Graphics::GpuAssetCache cache{buffers, textures, samplers, transfer};
+    ASSERT_TRUE(cache.InitializeFallbackTexture(
+        Extrinsic::Graphics::GpuTextureFallbackDesc{
+            .Bytes = std::span{ZeroTextureBytes},
+            .Desc = TestTextureDesc(),
+            .SamplerDesc = TestSamplerDesc(),
+        }).has_value());
+
+    const Extrinsic::Assets::AssetId albedoAsset{124u, 1u};
+    const Extrinsic::Assets::AssetId normalAsset{125u, 1u};
+    const Extrinsic::Assets::AssetId roughnessAsset{126u, 1u};
+    RequestReadyTestTexture(cache, albedoAsset);
+    RequestReadyTestTexture(cache, normalAsset);
+    RequestReadyTestTexture(cache, roughnessAsset);
+    cache.Tick(0u, 2u);
+
+    const auto albedoView = cache.GetViewOrFallback(albedoAsset);
+    const auto normalView = cache.GetViewOrFallback(normalAsset);
+    const auto roughnessView = cache.GetViewOrFallback(roughnessAsset);
+    ASSERT_TRUE(albedoView.has_value());
+    ASSERT_TRUE(normalView.has_value());
+    ASSERT_TRUE(roughnessView.has_value());
+    ASSERT_FALSE(albedoView->UsedFallback);
+    ASSERT_FALSE(normalView->UsedFallback);
+    ASSERT_FALSE(roughnessView->UsedFallback);
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer =
+        Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    Registry scene;
+    const EntityHandle entity = MakeMeshRenderable(scene);
+
+    namespace R = Extrinsic::Runtime;
+    R::ProgressiveSlotBinding albedo{};
+    albedo.Semantic = R::ProgressiveSlotSemantic::Albedo;
+    albedo.SourceKind = R::ProgressiveSlotSourceKind::GeneratedTextureAsset;
+    albedo.GeneratedTexture = albedoAsset;
+    albedo.Readiness = R::ProgressiveReadinessState::Ready;
+
+    R::ProgressiveSlotBinding normal{};
+    normal.Semantic = R::ProgressiveSlotSemantic::Normal;
+    normal.SourceKind = R::ProgressiveSlotSourceKind::GeneratedTextureAsset;
+    normal.GeneratedTexture = normalAsset;
+    normal.Readiness = R::ProgressiveReadinessState::Ready;
+
+    R::ProgressiveSlotBinding roughness{};
+    roughness.Semantic = R::ProgressiveSlotSemantic::Roughness;
+    roughness.SourceKind = R::ProgressiveSlotSourceKind::GeneratedTextureAsset;
+    roughness.GeneratedTexture = roughnessAsset;
+    roughness.Readiness = R::ProgressiveReadinessState::Ready;
+
+    scene.Raw().emplace_or_replace<R::ProgressivePresentationBindings>(
+        entity,
+        R::ProgressivePresentationBindings{
+            .Shape = R::ProgressiveEntityShape::MeshLeaf,
+            .Lanes = {R::ProgressiveRenderLaneBinding{
+                .Lane = R::ProgressiveRenderLane::Surface,
+                .PresentationKey = "mesh.surface",
+            }},
+            .Presentations = {R::ProgressivePresentationBinding{
+                .Key = "mesh.surface",
+                .Kind = R::ProgressivePresentationKind::SurfaceMaterial,
+                .Slots = {albedo, normal, roughness},
+            }},
+        });
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    const auto stats = extraction.ExtractAndSubmit(scene, *renderer, &cache);
+
+    EXPECT_EQ(stats.ProgressivePresentationEntityCount, 1u);
+    EXPECT_EQ(stats.ProgressivePresentationLaneCount, 1u);
+    EXPECT_EQ(stats.ProgressivePresentationSlotCount, 3u);
+    EXPECT_EQ(stats.ProgressiveReadyTextureSlotCount, 3u);
+    EXPECT_EQ(stats.ProgressiveMaterialTextureBindingResolveCount, 1u);
+    EXPECT_EQ(stats.ProgressiveMaterialTextureBindingResolveFailureCount, 0u);
+
+    const auto sidecar = extraction.FindRenderableSidecarForTest(
+        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
+    ASSERT_TRUE(sidecar.has_value());
+    ASSERT_TRUE(sidecar->HasMaterialLease);
+    const Extrinsic::Graphics::MaterialParams params =
+        renderer->GetMaterialSystem().GetParams(sidecar->MaterialHandle);
+
+    EXPECT_EQ(params.AlbedoID, albedoView->View.BindlessIdx);
+    EXPECT_EQ(params.NormalID, normalView->View.BindlessIdx);
+    EXPECT_EQ(params.MetallicRoughnessID, roughnessView->View.BindlessIdx);
+    EXPECT_NE(params.AlbedoID, params.NormalID);
+    EXPECT_NE(params.AlbedoID, params.MetallicRoughnessID);
+    EXPECT_NE(params.NormalID, params.MetallicRoughnessID);
     EXPECT_TRUE(Extrinsic::Graphics::HasFlag(
         params.Flags,
         Extrinsic::Graphics::MaterialFlags::ObjectSpaceNormalMap));

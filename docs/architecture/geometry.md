@@ -514,24 +514,31 @@ registration backends (TEASER/FGR/CPD-class) remain deferred to
 texture coordinates. Callers pass positions, triangle faces, optional authored
 UVs, and optional read-only vertex properties through `UvAtlasInput`; the result
 returns a `MeshSoup::IndexedMesh` with finite `v:texcoord`, source-vertex and
-source-face xrefs, output chart IDs, provenance (`AuthoredPreserved` or
-`Generated`), requested and actual atlas method, backend identity, atlas
-resolution, fallback diagnostics, and GEOM-018 quality diagnostics. The default
-concrete backend remains the repository-pinned `jpcy/xatlas` overlay port.
-Callers can select `UvAtlasMethod::FastStaged` to target the fast replacement
-path, disable xatlas fallback with `AllowXAtlasFallback = false`, or supply an
-`UvAtlasBackend` function to satisfy that method without importing runtime,
-assets, ECS, graphics, platform, or app layers.
+source-face xrefs, output chart IDs, optional chart/seam-cut records,
+provenance (`AuthoredPreserved` or `Generated`), requested and actual atlas
+method, backend identity, atlas resolution, fallback diagnostics, and GEOM-018
+quality diagnostics. The default concrete backend remains the repository-pinned
+`jpcy/xatlas` overlay port for `UvAtlasMethod::XAtlas`. Callers can select
+`UvAtlasMethod::FastStaged` to target the fast replacement path, disable xatlas
+fallback with `AllowXAtlasFallback = false`, or supply an `UvAtlasBackend`
+function to satisfy that method without importing runtime, assets, ECS,
+graphics, platform, or app layers.
 
 Valid authored UVs are preserved by default when they are finite, count-matched,
 and triangle-usable. Missing or invalid authored UVs fall through to the
-selected backend unless the input mesh itself is invalid. Until GEOM-057 lands a
-built-in fast staged backend, a `FastStaged` request records `RequestedMethod =
-FastStaged`, `ActualMethod = XAtlas`, and `UsedFallback = true` when fallback is
-allowed; with fallback disabled it fails closed as `BackendUnavailable`.
-Seam-split output may duplicate vertices, and the `SourceVertexForOutputVertex`
-table is the canonical way for runtime or future geometry consumers to remap
-normals, colors, scalar/vector attributes, selection data, and bake sources.
+selected backend unless the input mesh itself is invalid. The built-in
+`FastStaged` backend is conservative: it cuts one deterministic chart per
+triangle, flattens each chart isometrically in local 2D, grid-packs the charts
+with texel padding, records chart and seam-cut metadata, and emits whole-atlas
+quality diagnostics. It is suitable for finite, non-overlapping generated UVs
+but is not yet the default because multi-face chart growth, TABI-style packing,
+and benchmark comparisons remain GEOM-057 follow-up work. If a caller-supplied
+fast backend fails and `AllowXAtlasFallback` is enabled, diagnostics report
+`RequestedMethod = FastStaged`, `ActualMethod = XAtlas`, and
+`UsedFallback = true`. Seam-split output may duplicate vertices, and the
+`SourceVertexForOutputVertex` table is the canonical way for runtime or future
+geometry consumers to remap normals, colors, scalar/vector attributes,
+selection data, and bake sources.
 
 ## Topology connectivity ownership
 

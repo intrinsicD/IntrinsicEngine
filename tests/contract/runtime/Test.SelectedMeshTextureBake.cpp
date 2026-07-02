@@ -170,6 +170,24 @@ namespace
         return request;
     }
 
+    [[nodiscard]] Runtime::SelectedMeshTextureBakeRequest MakeHeatRequest(
+        const ECS::EntityHandle entity)
+    {
+        Runtime::SelectedMeshTextureBakeRequest request{};
+        request.StableEntityId =
+            Runtime::SelectionController::ToStableEntityId(entity);
+        request.SourceDomain = Runtime::ProgressiveGeometryDomain::MeshVertex;
+        request.SourcePropertyName = "v:heat";
+        request.ExpectedValueKind = Runtime::ProgressivePropertyValueKind::ScalarFloat;
+        request.Encoder = Runtime::MeshAttributeTextureBakeEncoder::LinearScalar;
+        request.Width = 4u;
+        request.Height = 4u;
+        request.TargetPresentationKey = "mesh.surface";
+        request.TargetSemantic = Runtime::ProgressiveSlotSemantic::Albedo;
+        request.GeneratedKey = "heat";
+        return request;
+    }
+
     [[nodiscard]] const Runtime::ProgressiveSlotBinding* FindSlot(
         const Runtime::ProgressivePresentationBindings& bindings,
         const Runtime::ProgressiveSlotSemantic semantic)
@@ -245,6 +263,63 @@ TEST(RuntimeSelectedMeshTextureBake, SynchronousCommandBakesBindsAndUsesHistory)
               Runtime::ProgressiveSlotSourceKind::GeneratedTextureAsset);
     EXPECT_EQ(slot->Readiness, Runtime::ProgressiveReadinessState::Ready);
     EXPECT_EQ(slot->GeneratedTexture, result.GeneratedTexture);
+}
+
+TEST(RuntimeSelectedMeshTextureBake, DistinctPropertiesCreateDistinctGeneratedTexturesAndBindings)
+{
+    ECS::Scene::Registry scene{};
+    const ECS::EntityHandle entity = MakeMeshEntity(scene);
+    Assets::AssetService assets{};
+
+    Runtime::SelectedMeshTextureBakeContext context{
+        .Scene = &scene,
+        .AssetService = &assets,
+    };
+
+    const Runtime::SelectedMeshTextureBakeResult normal =
+        Runtime::ApplySelectedMeshTextureBakeCommand(context, MakeNormalRequest(entity));
+    ASSERT_EQ(normal.Status, Runtime::SelectedMeshTextureBakeStatus::Success);
+    ASSERT_TRUE(normal.GeneratedTexture.IsValid());
+
+    const Runtime::SelectedMeshTextureBakeResult heat =
+        Runtime::ApplySelectedMeshTextureBakeCommand(context, MakeHeatRequest(entity));
+    ASSERT_EQ(heat.Status, Runtime::SelectedMeshTextureBakeStatus::Success);
+    ASSERT_TRUE(heat.GeneratedTexture.IsValid());
+
+    EXPECT_NE(normal.GeneratedTexture, heat.GeneratedTexture);
+    EXPECT_NE(normal.GeneratedAssetPath, heat.GeneratedAssetPath);
+    EXPECT_NE(normal.GeneratedAssetPath.find("normal"), std::string::npos);
+    EXPECT_NE(heat.GeneratedAssetPath.find("heat"), std::string::npos);
+
+    const auto normalTexture =
+        assets.Read<Assets::AssetTexture2DPayload>(normal.GeneratedTexture);
+    const auto heatTexture =
+        assets.Read<Assets::AssetTexture2DPayload>(heat.GeneratedTexture);
+    ASSERT_TRUE(normalTexture.has_value());
+    ASSERT_TRUE(heatTexture.has_value());
+    ASSERT_EQ(normalTexture->size(), 1u);
+    ASSERT_EQ(heatTexture->size(), 1u);
+    EXPECT_EQ((*normalTexture)[0].Metadata.SourceKind,
+              Assets::AssetTextureSourceKind::Generated);
+    EXPECT_EQ((*heatTexture)[0].Metadata.SourceKind,
+              Assets::AssetTextureSourceKind::Generated);
+
+    const auto& bindings =
+        scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
+    const Runtime::ProgressiveSlotBinding* normalSlot =
+        FindSlot(bindings, Runtime::ProgressiveSlotSemantic::Normal);
+    const Runtime::ProgressiveSlotBinding* albedoSlot =
+        FindSlot(bindings, Runtime::ProgressiveSlotSemantic::Albedo);
+    ASSERT_NE(normalSlot, nullptr);
+    ASSERT_NE(albedoSlot, nullptr);
+    EXPECT_EQ(normalSlot->SourceKind,
+              Runtime::ProgressiveSlotSourceKind::GeneratedTextureAsset);
+    EXPECT_EQ(albedoSlot->SourceKind,
+              Runtime::ProgressiveSlotSourceKind::GeneratedTextureAsset);
+    EXPECT_EQ(normalSlot->Readiness, Runtime::ProgressiveReadinessState::Ready);
+    EXPECT_EQ(albedoSlot->Readiness, Runtime::ProgressiveReadinessState::Ready);
+    EXPECT_EQ(normalSlot->GeneratedTexture, normal.GeneratedTexture);
+    EXPECT_EQ(albedoSlot->GeneratedTexture, heat.GeneratedTexture);
 }
 
 TEST(RuntimeSelectedMeshTextureBake, ExplicitExistingGeneratedTextureReloadsPayload)

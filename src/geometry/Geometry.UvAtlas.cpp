@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -153,6 +154,121 @@ namespace Geometry::UvAtlas
 
             const std::vector<glm::vec2> texcoords = ExtractTexcoords(mesh);
             return Parameterization::EvaluateParameterizationDiagnostics(*halfedge, texcoords);
+        }
+
+        struct LocalChartTriangle
+        {
+            std::array<glm::vec2, 3u> LocalUvs{};
+            glm::vec2 Min{0.0f};
+            glm::vec2 Max{0.0f};
+            glm::vec2 Extent{0.0f};
+        };
+
+        [[nodiscard]] LocalChartTriangle FlattenTriangleToLocalChart(
+            const glm::vec3 p0,
+            const glm::vec3 p1,
+            const glm::vec3 p2)
+        {
+            const glm::vec3 e01 = p1 - p0;
+            const glm::vec3 e02 = p2 - p0;
+            const float len01 = glm::length(e01);
+            const glm::vec3 axis = len01 > 0.0f
+                ? e01 / len01
+                : glm::vec3{1.0f, 0.0f, 0.0f};
+            const float projected = glm::dot(e02, axis);
+            const float len02Sq = glm::dot(e02, e02);
+            const float height = std::sqrt(std::max(0.0f, len02Sq - projected * projected));
+
+            LocalChartTriangle chart{};
+            chart.LocalUvs = {
+                glm::vec2{0.0f, 0.0f},
+                glm::vec2{len01, 0.0f},
+                glm::vec2{projected, height},
+            };
+            chart.Min = chart.LocalUvs[0u];
+            chart.Max = chart.LocalUvs[0u];
+            for (const glm::vec2 uv : chart.LocalUvs)
+            {
+                chart.Min = glm::min(chart.Min, uv);
+                chart.Max = glm::max(chart.Max, uv);
+            }
+            chart.Extent = chart.Max - chart.Min;
+            return chart;
+        }
+
+        struct SourceEdgeObservation
+        {
+            std::uint32_t A{kInvalidIndex};
+            std::uint32_t B{kInvalidIndex};
+            std::uint32_t Face{kInvalidIndex};
+            std::uint32_t Chart{kInvalidIndex};
+            bool Matched{false};
+        };
+
+        void RecordFastStagedSeams(
+            const UvAtlasInput& input,
+            UvAtlasResult& result)
+        {
+            std::vector<SourceEdgeObservation> observed;
+            observed.reserve(input.Faces.size() * 3u);
+
+            for (std::size_t faceIndex = 0; faceIndex < input.Faces.size(); ++faceIndex)
+            {
+                const MeshSoup::PolygonFace& face = input.Faces[faceIndex];
+                for (std::size_t corner = 0u; corner < 3u; ++corner)
+                {
+                    const std::uint32_t rawA = face.Indices[corner];
+                    const std::uint32_t rawB = face.Indices[(corner + 1u) % 3u];
+                    const std::uint32_t a = std::min(rawA, rawB);
+                    const std::uint32_t b = std::max(rawA, rawB);
+
+                    auto match = std::find_if(
+                        observed.begin(),
+                        observed.end(),
+                        [a, b](const SourceEdgeObservation& candidate)
+                        {
+                            return !candidate.Matched && candidate.A == a && candidate.B == b;
+                        });
+                    if (match == observed.end())
+                    {
+                        observed.push_back(SourceEdgeObservation{
+                            .A = a,
+                            .B = b,
+                            .Face = static_cast<std::uint32_t>(faceIndex),
+                            .Chart = static_cast<std::uint32_t>(faceIndex),
+                        });
+                        continue;
+                    }
+
+                    match->Matched = true;
+                    result.SeamCuts.push_back(UvAtlasSeamCutRecord{
+                        .SourceVertexA = a,
+                        .SourceVertexB = b,
+                        .SourceFaceA = match->Face,
+                        .SourceFaceB = static_cast<std::uint32_t>(faceIndex),
+                        .ChartA = match->Chart,
+                        .ChartB = static_cast<std::uint32_t>(faceIndex),
+                        .Boundary = false,
+                    });
+                }
+            }
+
+            for (const SourceEdgeObservation& edge : observed)
+            {
+                if (edge.Matched)
+                {
+                    continue;
+                }
+                result.SeamCuts.push_back(UvAtlasSeamCutRecord{
+                    .SourceVertexA = edge.A,
+                    .SourceVertexB = edge.B,
+                    .SourceFaceA = edge.Face,
+                    .SourceFaceB = kInvalidIndex,
+                    .ChartA = edge.Chart,
+                    .ChartB = kInvalidIndex,
+                    .Boundary = true,
+                });
+            }
         }
 
         template <class T>
@@ -308,6 +424,171 @@ namespace Geometry::UvAtlas
             result.Diagnostics.Quality = EvaluateQuality(result.OutputMesh);
             result.Diagnostics.OutputVertexCount = result.OutputMesh.VertexCount();
             result.Diagnostics.OutputFaceCount = result.OutputMesh.FaceCount();
+            return result;
+        }
+
+        [[nodiscard]] UvAtlasResult GenerateWithFastStaged(const UvAtlasInput& input, const UvAtlasOptions& options)
+        {
+            if (options.CancelRequested)
+            {
+                return MakeFailure(input, UvAtlasStatus::Cancelled, "fast-staged", "cancel requested before fast staged generation");
+            }
+
+            UvAtlasDiagnostics validation = ValidateUvAtlasInput(input);
+            if (validation.Status != UvAtlasStatus::Success)
+            {
+                UvAtlasResult failure = MakeFailure(input, validation.Status, "fast-staged", "invalid atlas input");
+                failure.Diagnostics = validation;
+                failure.Diagnostics.BackendName = "fast-staged";
+                return failure;
+            }
+            if (validation.DegenerateFaceCount > 0u)
+            {
+                UvAtlasResult failure = MakeFailure(
+                    input,
+                    UvAtlasStatus::BackendRejectedInput,
+                    "fast-staged",
+                    "fast staged charting requires every triangle to be non-degenerate");
+                failure.Diagnostics = validation;
+                failure.Diagnostics.Status = failure.Status;
+                failure.Diagnostics.BackendName = "fast-staged";
+                return failure;
+            }
+
+            const std::size_t faceCount = input.Faces.size();
+            const std::uint32_t resolution = options.Resolution == 0u ? 1024u : options.Resolution;
+            const auto chartCount = static_cast<std::uint32_t>(faceCount);
+            const std::uint32_t cols = std::max<std::uint32_t>(
+                1u,
+                static_cast<std::uint32_t>(std::ceil(std::sqrt(static_cast<float>(chartCount)))));
+            const std::uint32_t rows = std::max<std::uint32_t>(
+                1u,
+                static_cast<std::uint32_t>((chartCount + cols - 1u) / cols));
+            const glm::vec2 cellSize{
+                1.0f / static_cast<float>(cols),
+                1.0f / static_cast<float>(rows),
+            };
+            const float requestedPadding = static_cast<float>(options.Padding) / static_cast<float>(resolution);
+            const float maxPadding = std::min(cellSize.x, cellSize.y) * 0.20f;
+            const float padding = std::clamp(requestedPadding, 0.0f, maxPadding);
+
+            UvAtlasResult result{};
+            result.Status = UvAtlasStatus::Success;
+            result.Provenance = UvAtlasProvenance::Generated;
+            result.Diagnostics = validation;
+            result.Diagnostics.Status = UvAtlasStatus::Success;
+            result.Diagnostics.Provenance = UvAtlasProvenance::Generated;
+            result.Diagnostics.ActualMethod = UvAtlasMethod::FastStaged;
+            result.Diagnostics.BackendName = "fast-staged";
+            result.Diagnostics.BackendDetail = "deterministic per-triangle charting with isometric local flattening and grid packing";
+            result.Diagnostics.ChartCount = chartCount;
+            result.Diagnostics.AtlasWidth = resolution;
+            result.Diagnostics.AtlasHeight = resolution;
+            result.Diagnostics.AtlasCount = 1u;
+
+            result.SourceVertexForOutputVertex.reserve(faceCount * 3u);
+            result.SourceFaceForOutputFace.reserve(faceCount);
+            result.OutputFaceChart.reserve(faceCount);
+            result.Charts.reserve(faceCount);
+            std::vector<glm::vec2> outputUvs;
+            outputUvs.reserve(faceCount * 3u);
+
+            for (std::size_t faceIndex = 0; faceIndex < faceCount; ++faceIndex)
+            {
+                const MeshSoup::PolygonFace& face = input.Faces[faceIndex];
+                const glm::vec3 p0 = input.Positions[face.Indices[0u]];
+                const glm::vec3 p1 = input.Positions[face.Indices[1u]];
+                const glm::vec3 p2 = input.Positions[face.Indices[2u]];
+                const LocalChartTriangle local = FlattenTriangleToLocalChart(p0, p1, p2);
+                if (local.Extent.x <= 0.0f || local.Extent.y <= 0.0f)
+                {
+                    return MakeFailure(input, UvAtlasStatus::BackendRejectedInput, "fast-staged", "fast staged chart produced a degenerate local uv domain");
+                }
+
+                const std::uint32_t chartId = static_cast<std::uint32_t>(faceIndex);
+                const std::uint32_t col = chartId % cols;
+                const std::uint32_t row = chartId / cols;
+                const glm::vec2 cellMin{
+                    static_cast<float>(col) * cellSize.x,
+                    static_cast<float>(row) * cellSize.y,
+                };
+                const glm::vec2 available = glm::max(
+                    cellSize - glm::vec2{2.0f * padding},
+                    glm::vec2{cellSize.x * 0.1f, cellSize.y * 0.1f});
+                const float scale = std::min(
+                    available.x / local.Extent.x,
+                    available.y / local.Extent.y);
+                const glm::vec2 packedExtent = local.Extent * scale;
+                const glm::vec2 origin =
+                    cellMin + glm::vec2{padding} + (available - packedExtent) * 0.5f;
+
+                const std::uint32_t outputVertexStart =
+                    static_cast<std::uint32_t>(result.OutputMesh.VertexCount());
+                glm::vec2 uvMin{std::numeric_limits<float>::max()};
+                glm::vec2 uvMax{std::numeric_limits<float>::lowest()};
+                for (std::size_t corner = 0u; corner < 3u; ++corner)
+                {
+                    const std::uint32_t sourceVertex = face.Indices[corner];
+                    (void)result.OutputMesh.AddVertex(input.Positions[sourceVertex]);
+                    result.SourceVertexForOutputVertex.push_back(sourceVertex);
+
+                    const glm::vec2 uv = origin + (local.LocalUvs[corner] - local.Min) * scale;
+                    outputUvs.push_back(glm::clamp(uv, glm::vec2{0.0f}, glm::vec2{1.0f}));
+                    uvMin = glm::min(uvMin, outputUvs.back());
+                    uvMax = glm::max(uvMax, outputUvs.back());
+                }
+
+                (void)result.OutputMesh.AddTriangle(
+                    outputVertexStart + 0u,
+                    outputVertexStart + 1u,
+                    outputVertexStart + 2u);
+                result.SourceFaceForOutputFace.push_back(chartId);
+                result.OutputFaceChart.push_back(chartId);
+                result.Charts.push_back(UvAtlasChartRecord{
+                    .ChartId = chartId,
+                    .SourceFaceStart = chartId,
+                    .SourceFaceCount = 1u,
+                    .OutputFaceStart = chartId,
+                    .OutputFaceCount = 1u,
+                    .OutputVertexStart = outputVertexStart,
+                    .OutputVertexCount = 3u,
+                    .UvMin = uvMin,
+                    .UvMax = uvMax,
+                });
+            }
+
+            if (input.HasVertexProperties && options.CopySourceVertexProperties)
+            {
+                const auto copyDiagnostics = CopySourceVertexPropertiesByXref(
+                    input.VertexProperties,
+                    result.SourceVertexForOutputVertex,
+                    result.OutputMesh.VertexProperties());
+                result.Diagnostics.CopiedVertexPropertyCount = copyDiagnostics.CopiedPropertyCount;
+                result.Diagnostics.SkippedVertexPropertyCount = copyDiagnostics.SkippedPropertyCount;
+                result.Diagnostics.PropertyXrefOutOfRangeCount = copyDiagnostics.XrefOutOfRangeCount;
+            }
+
+            auto texcoords = result.OutputMesh.GetOrAddVertexProperty<glm::vec2>(
+                MeshUtils::kVertexTexcoordPropertyName,
+                glm::vec2{0.0f});
+            for (std::size_t i = 0; i < outputUvs.size(); ++i)
+            {
+                texcoords.Vector()[i] = outputUvs[i];
+            }
+
+            RecordFastStagedSeams(input, result);
+            result.Diagnostics.SeamCutCount = static_cast<std::uint32_t>(std::count_if(
+                result.SeamCuts.begin(),
+                result.SeamCuts.end(),
+                [](const UvAtlasSeamCutRecord& seam) { return !seam.Boundary; }));
+            result.Diagnostics.BoundarySeamCount = static_cast<std::uint32_t>(std::count_if(
+                result.SeamCuts.begin(),
+                result.SeamCuts.end(),
+                [](const UvAtlasSeamCutRecord& seam) { return seam.Boundary; }));
+
+            FinalizeUvBounds(result.Diagnostics, outputUvs);
+            result.Diagnostics.Quality = EvaluateQuality(result.OutputMesh);
+            AttachDiagnostics(result, input, options, "fast-staged");
             return result;
         }
 
@@ -714,6 +995,11 @@ namespace Geometry::UvAtlas
         return UvAtlasBackend{.Name = "xatlas", .Generate = &GenerateWithXAtlas};
     }
 
+    UvAtlasBackend DefaultFastStagedBackend() noexcept
+    {
+        return UvAtlasBackend{.Name = "fast-staged", .Generate = &GenerateWithFastStaged};
+    }
+
     UvAtlasResult ResolveUvAtlas(
         const UvAtlasInput& input,
         const UvAtlasOptions& options,
@@ -754,24 +1040,12 @@ namespace Geometry::UvAtlas
         }
 
         UvAtlasBackend defaultBackend{};
-        bool usedDefaultXAtlasFallback = false;
         if (backend == nullptr)
         {
-            if (options.Method == UvAtlasMethod::FastStaged && !options.AllowXAtlasFallback)
-            {
-                UvAtlasResult failure = MakeFailure(
-                    input,
-                    UvAtlasStatus::BackendUnavailable,
-                    "fast-staged",
-                    "fast staged UV atlas method has no default backend yet and xatlas fallback is disabled");
-                AttachDiagnostics(failure, input, options, "fast-staged");
-                failure.Diagnostics.ActualMethod = UvAtlasMethod::None;
-                return failure;
-            }
-
-            defaultBackend = DefaultXAtlasBackend();
+            defaultBackend = options.Method == UvAtlasMethod::FastStaged
+                ? DefaultFastStagedBackend()
+                : DefaultXAtlasBackend();
             backend = &defaultBackend;
-            usedDefaultXAtlasFallback = options.Method == UvAtlasMethod::FastStaged;
         }
         if (backend->Generate == nullptr)
         {
@@ -787,12 +1061,26 @@ namespace Geometry::UvAtlas
 
         UvAtlasResult result = backend->Generate(input, options);
         AttachDiagnostics(result, input, options, backend->Name);
-        if (usedDefaultXAtlasFallback)
+        if (result.Status != UvAtlasStatus::Success &&
+            options.Method == UvAtlasMethod::FastStaged &&
+            options.AllowXAtlasFallback &&
+            std::string_view{backend->Name} != "xatlas")
         {
-            result.Diagnostics.ActualMethod = UvAtlasMethod::XAtlas;
-            result.Diagnostics.UsedFallback = true;
-            result.Diagnostics.FallbackReason =
-                "fast staged UV atlas method has no default backend yet; used xatlas fallback";
+            UvAtlasBackend fallbackBackend = DefaultXAtlasBackend();
+            UvAtlasResult fallback = fallbackBackend.Generate(input, options);
+            AttachDiagnostics(fallback, input, options, fallbackBackend.Name);
+            fallback.Diagnostics.ActualMethod =
+                fallback.Status == UvAtlasStatus::Success
+                    ? UvAtlasMethod::XAtlas
+                    : fallback.Diagnostics.ActualMethod;
+            fallback.Diagnostics.UsedFallback = true;
+            fallback.Diagnostics.FallbackReason =
+                std::string{"fast staged backend '"} +
+                std::string{backend->Name} +
+                "' returned " +
+                ToString(result.Status) +
+                "; used xatlas fallback";
+            return fallback;
         }
         return result;
     }
