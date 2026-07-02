@@ -8,6 +8,7 @@ option(INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN
 target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
+        Runtime.AsyncBufferReadback.cppm
         Runtime.AssetGeometryIO.cppm
         Runtime.AssetIngestStateMachine.cppm
         Runtime.AssetMeshNormals.cppm
@@ -31,6 +32,7 @@ target_sources(${target_name}
         Runtime.GeometryAvailability.cppm
         Runtime.GpuReadbackJob.cppm
         Runtime.KMeansBackend.cppm
+        Runtime.KMeansGpuBackend.cppm
         Runtime.RegistrationAlignment.cppm
         Runtime.PhysicsBridge.cppm
         Runtime.SceneSerialization.cppm
@@ -59,6 +61,7 @@ target_sources(${target_name}
         SpatialDebug/Runtime.SpatialDebugClosestFace.cppm
         Visualization/Runtime.VisualizationAdapters.cppm
         PRIVATE
+        Runtime.AsyncBufferReadback.cpp
         Runtime.AssetGeometryIO.cpp
         Runtime.AssetIngestStateMachine.cpp
         Runtime.AssetMeshNormals.cpp
@@ -82,6 +85,7 @@ target_sources(${target_name}
         Runtime.GeometryAvailability.cpp
         Runtime.GpuReadbackJob.cpp
         Runtime.KMeansBackend.cpp
+        Runtime.KMeansGpuBackend.cpp
         Runtime.RegistrationAlignment.cpp
         Runtime.PhysicsBridge.cpp
         Runtime.SceneSerialization.cpp

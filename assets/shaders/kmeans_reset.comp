@@ -1,0 +1,90 @@
+#version 460
+
+// GEOM-056 Slice B — k-means per-iteration reset.
+//
+// Zeroes the per-cluster accumulators (SumX/Y/Z, Counts) and, on the first
+// invocation, the shared reduction slots (inertia, packed farthest-point
+// argmax, changed-label counter, max centroid shift, converged flag). One
+// invocation per cluster; dispatched with ceil(ClusterCount / GroupSize).
+//
+// All storage is reached through Buffer Device Addresses carried in a scalar
+// push constant, matching Extrinsic.Runtime.KMeansGpuBackend and the promoted
+// clustered-light / progressive-Poisson compute convention. No descriptor-set
+// storage bindings.
+
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+layout(buffer_reference, scalar) buffer FloatArray { float Values[]; };
+layout(buffer_reference, scalar) buffer UIntArray { uint Values[]; };
+
+layout(buffer_reference, scalar) buffer KMeansReductionRef
+{
+    uint64_t PackedMaxDistIndex; // (floatBitsToUint(dist) << 32) | pointIndex
+    float InertiaSum;            // sum of assigned squared distances
+    uint ChangedCount;           // number of points whose label changed
+    uint MaxShiftBits;           // floatBitsToUint(max squared centroid shift)
+    uint Converged;              // set by the host loop once tolerance is met
+};
+
+layout(buffer_reference, scalar) readonly buffer KMeansStateRef
+{
+    uint64_t PositionXBDA;
+    uint64_t PositionYBDA;
+    uint64_t PositionZBDA;
+    uint64_t CentroidsBDA;
+    uint64_t NextCentroidsBDA;
+    uint64_t SumXBDA;
+    uint64_t SumYBDA;
+    uint64_t SumZBDA;
+    uint64_t CountsBDA;
+    uint64_t LabelsBDA;
+    uint64_t SquaredDistancesBDA;
+    uint64_t ReductionBDA;
+};
+
+layout(push_constant, scalar) uniform KMeansPush
+{
+    uint64_t StateBDA;
+    uint PointCount;
+    uint ClusterCount;
+    uint GroupSize;
+    uint Iteration;
+    float ConvergenceTolSquared;
+    float Reserved0;
+} pc;
+
+void main()
+{
+    if (pc.StateBDA == uint64_t(0))
+    {
+        return;
+    }
+    KMeansStateRef state = KMeansStateRef(pc.StateBDA);
+
+    const uint cluster = gl_GlobalInvocationID.x;
+
+    // The first invocation clears the shared reduction record once per pass.
+    if (cluster == 0u && state.ReductionBDA != uint64_t(0))
+    {
+        KMeansReductionRef reduction = KMeansReductionRef(state.ReductionBDA);
+        reduction.PackedMaxDistIndex = uint64_t(0);
+        reduction.InertiaSum = 0.0;
+        reduction.ChangedCount = 0u;
+        reduction.MaxShiftBits = 0u;
+        reduction.Converged = 0u;
+    }
+
+    if (cluster >= pc.ClusterCount)
+    {
+        return;
+    }
+
+    if (state.SumXBDA != uint64_t(0)) { FloatArray(state.SumXBDA).Values[cluster] = 0.0; }
+    if (state.SumYBDA != uint64_t(0)) { FloatArray(state.SumYBDA).Values[cluster] = 0.0; }
+    if (state.SumZBDA != uint64_t(0)) { FloatArray(state.SumZBDA).Values[cluster] = 0.0; }
+    if (state.CountsBDA != uint64_t(0)) { UIntArray(state.CountsBDA).Values[cluster] = 0u; }
+}

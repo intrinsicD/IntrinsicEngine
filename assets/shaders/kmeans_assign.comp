@@ -1,0 +1,128 @@
+#version 460
+
+// GEOM-056 Slice B — k-means assignment (the hot pass).
+//
+// One invocation per point: find the nearest centroid under squared Euclidean
+// distance, write the label and squared distance, accumulate the point into its
+// cluster's SumX/Y/Z and Counts, and feed the shared reduction (inertia,
+// changed-label count, and the packed farthest-point argmax used to reseed empty
+// clusters in the update pass). Dispatched with ceil(PointCount / GroupSize).
+//
+// Correctness-first: accumulation uses global atomics. Shared-memory
+// privatization of the per-cluster sums/counts and a centroid tile cache are the
+// planned Slice C performance pass (see the k-means GPU proposal, section 5).
+
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_shader_atomic_float : require
+#extension GL_EXT_shader_atomic_int64 : require
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+layout(buffer_reference, scalar) readonly buffer FloatArrayRO { float Values[]; };
+layout(buffer_reference, scalar) buffer FloatArray { float Values[]; };
+layout(buffer_reference, scalar) buffer UIntArray { uint Values[]; };
+
+layout(buffer_reference, scalar) buffer KMeansReductionRef
+{
+    uint64_t PackedMaxDistIndex;
+    float InertiaSum;
+    uint ChangedCount;
+    uint MaxShiftBits;
+    uint Converged;
+};
+
+layout(buffer_reference, scalar) readonly buffer KMeansStateRef
+{
+    uint64_t PositionXBDA;
+    uint64_t PositionYBDA;
+    uint64_t PositionZBDA;
+    uint64_t CentroidsBDA;
+    uint64_t NextCentroidsBDA;
+    uint64_t SumXBDA;
+    uint64_t SumYBDA;
+    uint64_t SumZBDA;
+    uint64_t CountsBDA;
+    uint64_t LabelsBDA;
+    uint64_t SquaredDistancesBDA;
+    uint64_t ReductionBDA;
+};
+
+layout(push_constant, scalar) uniform KMeansPush
+{
+    uint64_t StateBDA;
+    uint PointCount;
+    uint ClusterCount;
+    uint GroupSize;
+    uint Iteration;
+    float ConvergenceTolSquared;
+    float Reserved0;
+} pc;
+
+void main()
+{
+    const uint index = gl_GlobalInvocationID.x;
+    if (index >= pc.PointCount || pc.StateBDA == uint64_t(0))
+    {
+        return;
+    }
+
+    KMeansStateRef state = KMeansStateRef(pc.StateBDA);
+
+    FloatArrayRO px = FloatArrayRO(state.PositionXBDA);
+    FloatArrayRO py = FloatArrayRO(state.PositionYBDA);
+    FloatArrayRO pz = FloatArrayRO(state.PositionZBDA);
+    FloatArrayRO centroids = FloatArrayRO(state.CentroidsBDA);
+
+    const float x = px.Values[index];
+    const float y = py.Values[index];
+    const float z = pz.Values[index];
+
+    uint bestCluster = 0u;
+    float bestDistance = 3.402823466e+38; // FLT_MAX
+    for (uint cluster = 0u; cluster < pc.ClusterCount; ++cluster)
+    {
+        const float cx = centroids.Values[cluster * 3u + 0u];
+        const float cy = centroids.Values[cluster * 3u + 1u];
+        const float cz = centroids.Values[cluster * 3u + 2u];
+        const float dx = x - cx;
+        const float dy = y - cy;
+        const float dz = z - cz;
+        const float distance = dx * dx + dy * dy + dz * dz;
+        if (distance < bestDistance)
+        {
+            bestDistance = distance;
+            bestCluster = cluster;
+        }
+    }
+
+    // Publish per-point outputs. Only this invocation touches these slots.
+    UIntArray labels = UIntArray(state.LabelsBDA);
+    FloatArray distances = FloatArray(state.SquaredDistancesBDA);
+    const uint previousLabel = labels.Values[index];
+    labels.Values[index] = bestCluster;
+    distances.Values[index] = bestDistance;
+
+    // Accumulate the point into its cluster.
+    atomicAdd(FloatArray(state.SumXBDA).Values[bestCluster], x);
+    atomicAdd(FloatArray(state.SumYBDA).Values[bestCluster], y);
+    atomicAdd(FloatArray(state.SumZBDA).Values[bestCluster], z);
+    atomicAdd(UIntArray(state.CountsBDA).Values[bestCluster], 1u);
+
+    if (state.ReductionBDA != uint64_t(0))
+    {
+        KMeansReductionRef reduction = KMeansReductionRef(state.ReductionBDA);
+        atomicAdd(reduction.InertiaSum, bestDistance);
+        if (previousLabel != bestCluster)
+        {
+            atomicAdd(reduction.ChangedCount, 1u);
+        }
+        // Squared distances are non-negative, so their float bit patterns are
+        // monotonic and a packed (distanceBits << 32 | index) atomicMax yields
+        // the global farthest point and its index for empty-cluster reseeding.
+        const uint64_t packed =
+            (uint64_t(floatBitsToUint(bestDistance)) << 32) | uint64_t(index);
+        atomicMax(reduction.PackedMaxDistIndex, packed);
+    }
+}

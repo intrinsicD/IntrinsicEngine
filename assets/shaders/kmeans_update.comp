@@ -1,0 +1,123 @@
+#version 460
+
+// GEOM-056 Slice B — k-means centroid update.
+//
+// One invocation per cluster: recompute the centroid as the mean of its
+// assigned points (Sum / Count), or, when the cluster is empty, reseed it to the
+// globally farthest point recorded by the assignment pass — matching the CPU
+// reference (points[MaxDistanceIndex]). The squared shift from the old centroid
+// is folded into the shared reduction so the host loop can test convergence
+// (max shift <= tolerance^2). Dispatched with ceil(ClusterCount / GroupSize).
+//
+// Requires an execution/memory barrier after the assignment pass so Sums,
+// Counts, and the packed argmax are visible here (the runtime recorder inserts
+// ShaderWrite -> ShaderRead between passes).
+
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+layout(buffer_reference, scalar) readonly buffer FloatArrayRO { float Values[]; };
+layout(buffer_reference, scalar) readonly buffer UIntArrayRO { uint Values[]; };
+layout(buffer_reference, scalar) buffer FloatArray { float Values[]; };
+
+layout(buffer_reference, scalar) buffer KMeansReductionRef
+{
+    uint64_t PackedMaxDistIndex;
+    float InertiaSum;
+    uint ChangedCount;
+    uint MaxShiftBits;
+    uint Converged;
+};
+
+layout(buffer_reference, scalar) readonly buffer KMeansStateRef
+{
+    uint64_t PositionXBDA;
+    uint64_t PositionYBDA;
+    uint64_t PositionZBDA;
+    uint64_t CentroidsBDA;
+    uint64_t NextCentroidsBDA;
+    uint64_t SumXBDA;
+    uint64_t SumYBDA;
+    uint64_t SumZBDA;
+    uint64_t CountsBDA;
+    uint64_t LabelsBDA;
+    uint64_t SquaredDistancesBDA;
+    uint64_t ReductionBDA;
+};
+
+layout(push_constant, scalar) uniform KMeansPush
+{
+    uint64_t StateBDA;
+    uint PointCount;
+    uint ClusterCount;
+    uint GroupSize;
+    uint Iteration;
+    float ConvergenceTolSquared;
+    float Reserved0;
+} pc;
+
+void main()
+{
+    const uint cluster = gl_GlobalInvocationID.x;
+    if (cluster >= pc.ClusterCount || pc.StateBDA == uint64_t(0))
+    {
+        return;
+    }
+
+    KMeansStateRef state = KMeansStateRef(pc.StateBDA);
+    FloatArray centroids = FloatArray(state.CentroidsBDA);
+
+    const float oldX = centroids.Values[cluster * 3u + 0u];
+    const float oldY = centroids.Values[cluster * 3u + 1u];
+    const float oldZ = centroids.Values[cluster * 3u + 2u];
+
+    const uint count = UIntArrayRO(state.CountsBDA).Values[cluster];
+
+    float newX;
+    float newY;
+    float newZ;
+    if (count > 0u)
+    {
+        const float inv = 1.0 / float(count);
+        newX = FloatArrayRO(state.SumXBDA).Values[cluster] * inv;
+        newY = FloatArrayRO(state.SumYBDA).Values[cluster] * inv;
+        newZ = FloatArrayRO(state.SumZBDA).Values[cluster] * inv;
+    }
+    else
+    {
+        // Empty cluster: reseed to the globally farthest assigned point.
+        uint farthest = 0u;
+        if (state.ReductionBDA != uint64_t(0))
+        {
+            const uint64_t packed =
+                KMeansReductionRef(state.ReductionBDA).PackedMaxDistIndex;
+            farthest = uint(packed & uint64_t(0xffffffffu));
+        }
+        if (farthest >= pc.PointCount)
+        {
+            farthest = 0u;
+        }
+        newX = FloatArrayRO(state.PositionXBDA).Values[farthest];
+        newY = FloatArrayRO(state.PositionYBDA).Values[farthest];
+        newZ = FloatArrayRO(state.PositionZBDA).Values[farthest];
+    }
+
+    centroids.Values[cluster * 3u + 0u] = newX;
+    centroids.Values[cluster * 3u + 1u] = newY;
+    centroids.Values[cluster * 3u + 2u] = newZ;
+
+    const float sdx = newX - oldX;
+    const float sdy = newY - oldY;
+    const float sdz = newZ - oldZ;
+    const float shiftSquared = sdx * sdx + sdy * sdy + sdz * sdz;
+
+    if (state.ReductionBDA != uint64_t(0))
+    {
+        // shiftSquared >= 0, so its float bits are monotonic under atomicMax.
+        atomicMax(KMeansReductionRef(state.ReductionBDA).MaxShiftBits,
+                  floatBitsToUint(shiftSquared));
+    }
+}

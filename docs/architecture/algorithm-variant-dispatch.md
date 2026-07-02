@@ -238,6 +238,14 @@ Method adapters such as METHOD-013 should consume that seam instead of declaring
 private CUB-equivalent primitives; later tasks own method-specific GPU backends
 and runtime UI routing.
 
+GPU backends should also drain their results through the runtime-owned
+`Extrinsic.Runtime.AsyncBufferReadback` helper (RUNTIME-137) rather than
+`RHI::IDevice::ReadBuffer`, which performs a device-wide `vkDeviceWaitIdle` on
+every call. The helper composes `Graphics::GpuTransfer` (record barrier →
+non-blocking download → `Poll()` for delivery) and pools the host destination
+across drains. `IDevice::ReadBuffer` remains the explicit-stall escape hatch. See
+`docs/reviews/2026-07-01-gpu-geometry-backend-io-audit.md` Finding 1.
+
 ## Config And Agent Lane
 
 The backend field on the algorithm params is the supported override surface for
