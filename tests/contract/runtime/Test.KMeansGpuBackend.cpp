@@ -2,6 +2,10 @@
 
 #include <cstdint>
 
+import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.Descriptors;
+import Extrinsic.RHI.Device;
+import Extrinsic.RHI.Handles;
 import Extrinsic.Runtime.KMeansGpuBackend;
 
 #include "MockRHI.hpp"
@@ -196,4 +200,142 @@ TEST(KMeansGpuBackend, ResolveReportsMissingDeviceAndInvalidPlan)
     EXPECT_EQ(invalid.Status, Runtime::KMeansGpuStatus::InvalidInput);
     EXPECT_FALSE(invalid.GpuExecutionAvailable);
     EXPECT_TRUE(invalid.CpuFallbackRecommended);
+}
+
+namespace
+{
+    struct RecordFixture
+    {
+        Tests::MockDevice Device{};
+        Runtime::KMeansGpuPipelineSet Pipelines{};
+        Runtime::KMeansGpuResourceSet Resources{};
+
+        void CreateResources(const Runtime::KMeansGpuPlanDesc& plan)
+        {
+            const Runtime::KMeansGpuBufferLayout layout =
+                Runtime::ComputeKMeansGpuBufferLayout(plan);
+            Resources.State = Device.CreateBuffer(Runtime::BuildKMeansGpuStateBufferDesc());
+            Resources.Work = Device.CreateBuffer(Runtime::BuildKMeansGpuWorkBufferDesc(layout));
+            Resources.LabelsReadback = Device.CreateBuffer(
+                Runtime::BuildKMeansGpuReadbackBufferDesc(layout.LabelsReadbackBytes));
+            Resources.SquaredDistancesReadback = Device.CreateBuffer(
+                Runtime::BuildKMeansGpuReadbackBufferDesc(layout.SquaredDistancesReadbackBytes));
+            Resources.CentroidsReadback = Device.CreateBuffer(
+                Runtime::BuildKMeansGpuReadbackBufferDesc(layout.CentroidsReadbackBytes));
+            Pipelines.Reset = Device.CreatePipeline(Runtime::BuildKMeansResetPipelineDesc());
+            Pipelines.Assign = Device.CreatePipeline(Runtime::BuildKMeansAssignPipelineDesc());
+            Pipelines.Update = Device.CreatePipeline(Runtime::BuildKMeansUpdatePipelineDesc());
+        }
+    };
+}
+
+TEST(KMeansGpuBackend, RecordFailsClosedOnMissingDeviceAndCommandContext)
+{
+    Tests::MockDevice device;
+    device.Operational = true;
+
+    const Runtime::KMeansGpuRecordResult missingDevice =
+        Runtime::RecordKMeansGpuPasses(Runtime::KMeansGpuRecordDesc{
+            .Device = nullptr, .CommandContext = &device.CommandContext,
+            .Plan = MakePlanDesc(4u, 2u, 4u)});
+    EXPECT_EQ(missingDevice.Status, Runtime::KMeansGpuStatus::MissingDevice);
+    EXPECT_FALSE(missingDevice.Recorded);
+    EXPECT_TRUE(missingDevice.CpuFallbackRecommended);
+
+    const Runtime::KMeansGpuRecordResult missingCmd =
+        Runtime::RecordKMeansGpuPasses(Runtime::KMeansGpuRecordDesc{
+            .Device = &device, .CommandContext = nullptr,
+            .Plan = MakePlanDesc(4u, 2u, 4u)});
+    EXPECT_EQ(missingCmd.Status, Runtime::KMeansGpuStatus::InvalidInput);
+    EXPECT_FALSE(missingCmd.Recorded);
+}
+
+TEST(KMeansGpuBackend, RecordFailsClosedOnNonOperationalDevice)
+{
+    Tests::MockDevice device;
+    device.Operational = false;
+
+    const Runtime::KMeansGpuRecordResult result =
+        Runtime::RecordKMeansGpuPasses(Runtime::KMeansGpuRecordDesc{
+            .Device = &device, .CommandContext = &device.CommandContext,
+            .Plan = MakePlanDesc(4u, 2u, 4u)});
+
+    EXPECT_EQ(result.Status, Runtime::KMeansGpuStatus::DeviceUnavailable);
+    EXPECT_FALSE(result.Recorded);
+    EXPECT_TRUE(result.CpuFallbackRecommended);
+    EXPECT_EQ(device.CommandContext.DispatchCalls, 0);
+}
+
+TEST(KMeansGpuBackend, RecordFailsClosedOnInvalidResources)
+{
+    Tests::MockDevice device;
+    device.Operational = true;
+
+    // Valid plan + operational device but default (invalid) resource/pipeline
+    // handles must fail closed without recording.
+    const Runtime::KMeansGpuRecordResult result =
+        Runtime::RecordKMeansGpuPasses(Runtime::KMeansGpuRecordDesc{
+            .Device = &device, .CommandContext = &device.CommandContext,
+            .Plan = MakePlanDesc(4u, 2u, 4u)});
+
+    EXPECT_EQ(result.Status, Runtime::KMeansGpuStatus::InvalidGpuResource);
+    EXPECT_FALSE(result.Recorded);
+    EXPECT_TRUE(result.CpuFallbackRecommended);
+    EXPECT_EQ(device.CommandContext.DispatchCalls, 0);
+}
+
+TEST(KMeansGpuBackend, RecordEmitsResetAssignUpdatePerIterationWithBarriers)
+{
+    RecordFixture fixture;
+    fixture.Device.Operational = true;
+    const Runtime::KMeansGpuPlanDesc plan = MakePlanDesc(4u, 2u, 3u);
+    fixture.CreateResources(plan);
+
+    const Runtime::KMeansGpuRecordResult result =
+        Runtime::RecordKMeansGpuPasses(Runtime::KMeansGpuRecordDesc{
+            .Device = &fixture.Device,
+            .CommandContext = &fixture.Device.CommandContext,
+            .Pipelines = fixture.Pipelines,
+            .Resources = fixture.Resources,
+            .Plan = plan});
+
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_TRUE(result.Recorded);
+    EXPECT_TRUE(result.StateRecordUploaded);
+    EXPECT_FALSE(result.CpuFallbackRecommended);
+    EXPECT_EQ(result.MethodDispatchCount, 3u * 3u);
+
+    const Tests::MockCommandContext& cmd = fixture.Device.CommandContext;
+    EXPECT_EQ(cmd.BindPipelineCalls, 9);
+    EXPECT_EQ(cmd.PushConstantsCalls, 9);
+    EXPECT_EQ(cmd.DispatchCalls, 9);
+    for (const auto& record : cmd.DispatchRecords)
+    {
+        EXPECT_EQ(record.X, 1u); // ceil(4/256) and ceil(2/256) both collapse to 1
+        EXPECT_EQ(record.Y, 1u);
+        EXPECT_EQ(record.Z, 1u);
+    }
+
+    // One State visibility barrier + one Work barrier per dispatch.
+    ASSERT_EQ(cmd.BufferBarrierCalls.size(), 1u + 9u);
+    EXPECT_EQ(cmd.BufferBarrierCalls[0].Buffer, fixture.Resources.State);
+    EXPECT_EQ(cmd.BufferBarrierCalls[0].Before, RHI::MemoryAccess::TransferWrite);
+    EXPECT_EQ(cmd.BufferBarrierCalls[0].After, RHI::MemoryAccess::ShaderRead);
+    for (std::size_t i = 1; i < cmd.BufferBarrierCalls.size(); ++i)
+    {
+        EXPECT_EQ(cmd.BufferBarrierCalls[i].Buffer, fixture.Resources.Work);
+        EXPECT_EQ(cmd.BufferBarrierCalls[i].Before, RHI::MemoryAccess::ShaderWrite);
+    }
+
+    // The State BDA table was uploaded once at its full size.
+    int stateWrites = 0;
+    for (const auto& write : fixture.Device.BufferWrites)
+    {
+        if (write.Handle == fixture.Resources.State)
+        {
+            ++stateWrites;
+            EXPECT_EQ(write.Data.size(), sizeof(Runtime::KMeansGpuStateBufferRecord));
+        }
+    }
+    EXPECT_EQ(stateWrites, 1);
 }

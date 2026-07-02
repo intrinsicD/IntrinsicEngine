@@ -6,8 +6,10 @@ module;
 
 export module Extrinsic.Runtime.KMeansGpuBackend;
 
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
+import Extrinsic.RHI.Handles;
 
 // ============================================================
 // KMeansGpuBackend (GEOM-056 Slice A — planning core)
@@ -38,6 +40,7 @@ export namespace Extrinsic::Runtime
         DeviceUnavailable,
         PlanningOnly,
         SizeOverflow,
+        InvalidGpuResource,
     };
 
     enum class KMeansGpuPassKind : std::uint8_t
@@ -218,4 +221,85 @@ export namespace Extrinsic::Runtime
     // this to `Success` / `GpuExecutionAvailable == true`.
     [[nodiscard]] KMeansGpuResolveResult ResolveKMeansGpuRequest(
         const KMeansGpuResolveDesc& desc);
+
+    // -------------------------------------------------------------------------
+    // Recording (GEOM-056 Slice B) — bind pipelines and record the barrier-
+    // chained reset/assign/update Lloyd loop into a command context. Buffers are
+    // pre-created and their inputs (positions, seed centroids) pre-uploaded by
+    // the caller / execution slice; this seam only records the State BDA table
+    // upload and the compute dispatches. No readback here.
+    // -------------------------------------------------------------------------
+
+    struct KMeansGpuPipelineSet
+    {
+        RHI::PipelineHandle Reset{};
+        RHI::PipelineHandle Assign{};
+        RHI::PipelineHandle Update{};
+
+        [[nodiscard]] bool IsValid() const noexcept
+        {
+            return Reset.IsValid() && Assign.IsValid() && Update.IsValid();
+        }
+    };
+
+    // A single packed "Work" buffer holds every compute-touched role as a
+    // sub-span (see ComputeKMeansGpuBufferLayout); State is the BDA pointer
+    // table; the readback buffers are host-visible drain targets used by a later
+    // execution slice.
+    struct KMeansGpuResourceSet
+    {
+        RHI::BufferHandle State{};
+        RHI::BufferHandle Work{};
+        RHI::BufferHandle LabelsReadback{};
+        RHI::BufferHandle SquaredDistancesReadback{};
+        RHI::BufferHandle CentroidsReadback{};
+
+        [[nodiscard]] bool IsValid() const noexcept
+        {
+            return State.IsValid() && Work.IsValid();
+        }
+    };
+
+    struct KMeansGpuRecordDesc
+    {
+        RHI::IDevice* Device{nullptr};
+        RHI::ICommandContext* CommandContext{nullptr};
+        KMeansGpuPipelineSet Pipelines{};
+        KMeansGpuResourceSet Resources{};
+        KMeansGpuPlanDesc Plan{};
+    };
+
+    struct KMeansGpuRecordResult
+    {
+        KMeansGpuStatus Status{KMeansGpuStatus::Success};
+        bool Recorded{false};
+        bool CpuFallbackRecommended{true};
+        bool StateRecordUploaded{false};
+        std::uint32_t MethodDispatchCount{0u};
+        KMeansGpuDispatchPlan Plan{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == KMeansGpuStatus::Success;
+        }
+    };
+
+    // Build the BDA pointer table for the compute-touched roles. Each pointer is
+    // the packed Work buffer's device address plus the role's span offset; the
+    // State buffer carries this record. Returns an all-zero record (which the
+    // shaders treat as "skip") when the device lacks Buffer Device Address
+    // support or the layout is invalid.
+    [[nodiscard]] KMeansGpuStateBufferRecord BuildKMeansGpuStateRecord(
+        RHI::IDevice& device,
+        const KMeansGpuResourceSet& resources,
+        const KMeansGpuBufferLayout& layout) noexcept;
+
+    // Record the reset/assign/update dispatches for every planned iteration,
+    // chained by ShaderWrite -> ShaderRead|ShaderWrite barriers on the Work
+    // buffer. Fail-closed: reports MissingDevice / DeviceUnavailable /
+    // InvalidGpuResource / plan status and recommends CPU fallback without
+    // recording. The recorded command stream still leaves the results resident;
+    // the host drain is a later execution slice.
+    [[nodiscard]] KMeansGpuRecordResult RecordKMeansGpuPasses(
+        const KMeansGpuRecordDesc& desc);
 }

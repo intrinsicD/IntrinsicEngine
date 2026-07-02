@@ -8,8 +8,10 @@ module;
 
 module Extrinsic.Runtime.KMeansGpuBackend;
 
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
+import Extrinsic.RHI.Handles;
 
 namespace Extrinsic::Runtime
 {
@@ -41,6 +43,7 @@ namespace Extrinsic::Runtime
         case KMeansGpuStatus::DeviceUnavailable: return "DeviceUnavailable";
         case KMeansGpuStatus::PlanningOnly: return "PlanningOnly";
         case KMeansGpuStatus::SizeOverflow: return "SizeOverflow";
+        case KMeansGpuStatus::InvalidGpuResource: return "InvalidGpuResource";
         }
         return "Unknown";
     }
@@ -293,6 +296,143 @@ namespace Extrinsic::Runtime
         result.GpuExecutionAvailable = false;
         result.CpuFallbackRecommended = true;
         result.Diagnostic = "k-means GPU recording not implemented yet (GEOM-056 Slice A)";
+        return result;
+    }
+
+    namespace
+    {
+        [[nodiscard]] std::uint64_t SpanOffset(const KMeansGpuBufferLayout& layout,
+                                               const KMeansGpuBufferRole role) noexcept
+        {
+            for (const KMeansGpuBufferSpan& span : layout.Spans)
+            {
+                if (span.Role == role)
+                    return span.OffsetBytes;
+            }
+            return 0u;
+        }
+    }
+
+    KMeansGpuStateBufferRecord BuildKMeansGpuStateRecord(
+        RHI::IDevice& device,
+        const KMeansGpuResourceSet& resources,
+        const KMeansGpuBufferLayout& layout) noexcept
+    {
+        KMeansGpuStateBufferRecord record{};
+        if (!layout.IsValid() || !resources.Work.IsValid())
+            return record;
+
+        const std::uint64_t base = device.GetBufferDeviceAddress(resources.Work);
+        if (base == 0u)
+            return record; // BDA unsupported: shaders treat zero pointers as skip.
+
+        const auto address = [&](const KMeansGpuBufferRole role)
+        {
+            return base + SpanOffset(layout, role);
+        };
+
+        record.PositionXBDA = address(KMeansGpuBufferRole::PositionX);
+        record.PositionYBDA = address(KMeansGpuBufferRole::PositionY);
+        record.PositionZBDA = address(KMeansGpuBufferRole::PositionZ);
+        record.CentroidsBDA = address(KMeansGpuBufferRole::Centroids);
+        record.NextCentroidsBDA = address(KMeansGpuBufferRole::NextCentroids);
+        record.SumXBDA = address(KMeansGpuBufferRole::SumX);
+        record.SumYBDA = address(KMeansGpuBufferRole::SumY);
+        record.SumZBDA = address(KMeansGpuBufferRole::SumZ);
+        record.CountsBDA = address(KMeansGpuBufferRole::Counts);
+        record.LabelsBDA = address(KMeansGpuBufferRole::Labels);
+        record.SquaredDistancesBDA = address(KMeansGpuBufferRole::SquaredDistances);
+        record.ReductionBDA = address(KMeansGpuBufferRole::Reduction);
+        return record;
+    }
+
+    KMeansGpuRecordResult RecordKMeansGpuPasses(const KMeansGpuRecordDesc& desc)
+    {
+        KMeansGpuRecordResult result{};
+        result.CpuFallbackRecommended = true;
+
+        if (desc.Device == nullptr)
+        {
+            result.Status = KMeansGpuStatus::MissingDevice;
+            return result;
+        }
+        if (desc.CommandContext == nullptr)
+        {
+            result.Status = KMeansGpuStatus::InvalidInput;
+            return result;
+        }
+        if (!desc.Device->IsOperational())
+        {
+            result.Status = KMeansGpuStatus::DeviceUnavailable;
+            return result;
+        }
+
+        result.Plan = ComputeKMeansGpuDispatchPlan(desc.Plan);
+        if (!result.Plan.IsValid())
+        {
+            result.Status = result.Plan.Status;
+            return result;
+        }
+
+        if (!desc.Resources.IsValid() || !desc.Pipelines.IsValid())
+        {
+            result.Status = KMeansGpuStatus::InvalidGpuResource;
+            return result;
+        }
+
+        RHI::IDevice& device = *desc.Device;
+        RHI::ICommandContext& cmd = *desc.CommandContext;
+
+        // Publish the BDA pointer table into the State buffer, then make it
+        // visible to the compute passes.
+        const KMeansGpuStateBufferRecord stateRecord =
+            BuildKMeansGpuStateRecord(device, desc.Resources, result.Plan.Layout);
+        device.WriteBuffer(desc.Resources.State, &stateRecord, sizeof(stateRecord), 0u);
+        result.StateRecordUploaded = true;
+        cmd.BufferBarrier(desc.Resources.State,
+                          RHI::MemoryAccess::TransferWrite,
+                          RHI::MemoryAccess::ShaderRead);
+
+        const std::uint64_t stateBDA = device.GetBufferDeviceAddress(desc.Resources.State);
+        const float tol = desc.Plan.ConvergenceTolerance;
+        const float tolSquared = tol * tol;
+
+        for (const KMeansGpuDispatchDesc& dispatch : result.Plan.Dispatches)
+        {
+            RHI::PipelineHandle pipeline{};
+            switch (dispatch.Kind)
+            {
+            case KMeansGpuPassKind::Reset: pipeline = desc.Pipelines.Reset; break;
+            case KMeansGpuPassKind::Assign: pipeline = desc.Pipelines.Assign; break;
+            case KMeansGpuPassKind::Update: pipeline = desc.Pipelines.Update; break;
+            }
+
+            const KMeansGpuPassPushConstants push{
+                .StateBDA = stateBDA,
+                .PointCount = result.Plan.PointCount,
+                .ClusterCount = result.Plan.ClusterCount,
+                .GroupSize = result.Plan.GroupSize,
+                .Iteration = dispatch.Iteration,
+                .ConvergenceTolSquared = tolSquared,
+                .Reserved0 = 0.0f,
+            };
+
+            cmd.BindPipeline(pipeline);
+            cmd.PushConstants(&push, static_cast<std::uint32_t>(sizeof(push)), 0u);
+            cmd.Dispatch(dispatch.GroupCountX, dispatch.GroupCountY, dispatch.GroupCountZ);
+            ++result.MethodDispatchCount;
+
+            // Every role lives in the packed Work buffer, so one barrier orders
+            // this pass's writes before the next pass's reads/writes (and the
+            // final barrier before any downstream readback copy).
+            cmd.BufferBarrier(desc.Resources.Work,
+                              RHI::MemoryAccess::ShaderWrite,
+                              RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite);
+        }
+
+        result.Recorded = true;
+        result.CpuFallbackRecommended = false;
+        result.Status = KMeansGpuStatus::Success;
         return result;
     }
 }

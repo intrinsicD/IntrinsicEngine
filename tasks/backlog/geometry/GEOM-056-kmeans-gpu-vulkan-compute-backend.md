@@ -71,7 +71,8 @@ depends_on: [GEOM-052, RUNTIME-137, GRAPHICS-111]
       execution.
 - [ ] Slice A: route `Extrinsic.Runtime.KMeansBackend`'s `Backend::GPU` branch
       through `ResolveKMeansGpuRequest`, preserving honest CPU fallback telemetry.
-- [ ] Slice B: shader assets + fail-closed dispatch recording.
+- [x] Slice B: shader assets (`kmeans_reset/assign/update.comp`) + fail-closed
+      dispatch recording (`RecordKMeansGpuPasses` + `BuildKMeansGpuStateRecord`).
 - [ ] Slice C: persistent buffer set + async readback drain + float reduction.
 - [ ] Slice D: parity tests + benchmark.
 
