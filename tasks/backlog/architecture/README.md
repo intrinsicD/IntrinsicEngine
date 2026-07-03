@@ -10,7 +10,25 @@ map.
 
 ## Tasks
 
-No architecture backlog tasks are open in this slice.
+Opened from the 2026-07-03 main-loop/task-graph/render-graph review
+([`docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`](../../../docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md)):
+
+- [`CORE-005`](CORE-005-nonblocking-taskgraph-submit-api.md) — non-blocking
+  TaskGraph submission/completion API (gated on `BUG-055`).
+- [`CORE-006`](CORE-006-domain-free-core-task-vocabulary.md) — domain-free
+  core task/DAG vocabulary (opaque task kinds; GPU/streaming naming out of
+  core).
+- [`CORE-007`](CORE-007-scheduler-priority-wait-wake-hardening.md) —
+  scheduler priority lanes, waiter stealing, wake and hot-path hardening.
+- [`CORE-008`](CORE-008-compiled-taskgraph-plan-reuse.md) — compiled
+  task-graph plan reuse across executions (fixed-step FrameGraph and
+  render-prep adoption).
+- [`CORE-009`](CORE-009-app-owned-config-sections.md) — app-owned config
+  sections out of core `EngineConfig` (Progressive Poisson block moves
+  behind a generic section mechanism).
+- [`ARCH-006`](ARCH-006-sandbox-editor-content-out-of-runtime.md) — move
+  Sandbox application editor content from `runtime` to `app` (sliced
+  migration; planning slice first).
 
 ## Retired Legacy Program
 

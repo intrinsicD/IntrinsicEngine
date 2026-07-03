@@ -18,20 +18,41 @@ the authoritative open/unblocked view.
 - unblocked: `GRAPHICS-113` — Selection outline ID work pruning (tasks/backlog/rendering/GRAPHICS-113-selection-outline-id-work-pruning.md)
 - unblocked: `GRAPHICS-114` — Retained ImGui overlay copy/upload path (tasks/backlog/rendering/GRAPHICS-114-retained-imgui-overlay-copy-upload-path.md)
 - unblocked: `GRAPHICS-115` — Object-space normal GPU dilation pass (tasks/backlog/rendering/GRAPHICS-115-object-space-normal-gpu-dilation.md)
+- unblocked: `GRAPHICS-116` — Frame-recipe pass contribution seam and typed record-path resolution (tasks/backlog/rendering/GRAPHICS-116-recipe-pass-contribution-seam.md)
+- unblocked: `GRAPHICS-117` — Render-graph compile caching and gated debug dump (tasks/backlog/rendering/GRAPHICS-117-render-graph-compile-cache.md)
+- unblocked: `GRAPHICS-118` — Placed transient resource allocation with real memory aliasing (tasks/backlog/rendering/GRAPHICS-118-placed-transient-memory-aliasing.md)
+- unblocked: `GRAPHICS-119` — Parallel render-pass command recording via the task scheduler (tasks/backlog/rendering/GRAPHICS-119-parallel-pass-command-recording.md)
+- unblocked: `GRAPHICS-120` — Framegraph compiler/executor efficiency and hygiene polish (tasks/backlog/rendering/GRAPHICS-120-framegraph-compiler-executor-efficiency.md)
 - unblocked: `RUNTIME-129` — Schedule GPU object-space normal bake jobs after import (tasks/backlog/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
 - unblocked: `RUNTIME-139` — Static AoS storage and shader operational path (tasks/backlog/runtime/RUNTIME-139-static-aos-storage-shader-operational.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
+- unblocked: `ARCH-006` — Move Sandbox application editor content out of runtime (tasks/backlog/architecture/ARCH-006-sandbox-editor-content-out-of-runtime.md)
+- blocked by `BUG-055`: `CORE-005` — Non-blocking TaskGraph submission and completion API (tasks/backlog/architecture/CORE-005-nonblocking-taskgraph-submit-api.md)
+- unblocked: `CORE-006` — Domain-free core task/DAG vocabulary (tasks/backlog/architecture/CORE-006-domain-free-core-task-vocabulary.md)
+- unblocked: `CORE-007` — Scheduler priority, wait, and wake hardening (tasks/backlog/architecture/CORE-007-scheduler-priority-wait-wake-hardening.md)
+- unblocked: `CORE-008` — Compiled task-graph plan reuse across executions (tasks/backlog/architecture/CORE-008-compiled-taskgraph-plan-reuse.md)
+- unblocked: `CORE-009` — App-owned config sections out of core EngineConfig (tasks/backlog/architecture/CORE-009-app-owned-config-sections.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
 - unblocked: `RUNTIME-137` — Async GPU readback helper + pooled destination for compute backends (tasks/backlog/runtime/RUNTIME-137-async-gpu-readback-helper-for-compute-backends.md)
 - unblocked: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
+- unblocked: `RUNTIME-140` — Remove the global scheduler barrier from the import apply path (tasks/backlog/runtime/RUNTIME-140-remove-global-waitforall-from-import-apply.md)
+- unblocked: `RUNTIME-141` — Async editor method-command lane (no heavy compute in the ImGui callback) (tasks/backlog/runtime/RUNTIME-141-async-editor-method-command-lane.md)
+- unblocked: `RUNTIME-142` — Async model-scene/texture import and scene-file IO (tasks/backlog/runtime/RUNTIME-142-async-modelscene-texture-scenefile-io.md)
+- unblocked: `RUNTIME-143` — Multi-subscriber frame-command hook and K-Means decoupling from Engine (tasks/backlog/runtime/RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md)
+- unblocked: `RUNTIME-144` — Post-import processor and import UX-policy seam (tasks/backlog/runtime/RUNTIME-144-post-import-processor-and-ux-policy-seam.md)
+- unblocked: `RUNTIME-145` — Runtime frame-path steady-state efficiency polish (tasks/backlog/runtime/RUNTIME-145-runtime-frame-path-efficiency-polish.md)
 - blocked by `GEOM-014`: `UI-028` — Sandbox EditorUI mesh simplification window (tasks/backlog/ui/UI-028-editor-mesh-simplification-window.md)
 - blocked by `GEOM-055`: `UI-029` — Editor ICP registration panel + convergence visualization (tasks/backlog/ui/UI-029-editor-registration-convergence-visualization.md)
 - unblocked: `UI-030` — Sandbox EditorUI frame-pacing diagnostics (tasks/backlog/ui/UI-030-editor-frame-pacing-diagnostics.md)
 - blocked by `RUNTIME-138`: `UI-031` — Sandbox EditorUI domain-window reorganization (tasks/backlog/ui/UI-031-editor-domain-ui-reorganization.md)
+
+## Theme G — Active bugs
+
+- unblocked: `BUG-055` — TaskGraph::Execute / CounterEvent latch-destruction race (tasks/backlog/bugs/BUG-055-taskgraph-counterevent-latch-destruction-race.md)
 
 ## Theme H — Agentic workflow hardening
 

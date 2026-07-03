@@ -7,6 +7,38 @@ another backlog directory.
 
 ## Runtime backlog tasks
 
+### Main-loop non-blocking and composition-root cleanup (seeded 2026-07-03)
+
+Opened from the main-loop/task-graph/render-graph review
+([`docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`](../../../docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md)).
+Blocking fixes first, then abstractness seams, then steady-state efficiency:
+
+- [`RUNTIME-140`](RUNTIME-140-remove-global-waitforall-from-import-apply.md) —
+  remove the global `Scheduler::WaitForAll()` barrier from the asset-import
+  apply path (per-load waits only).
+- [`RUNTIME-141`](RUNTIME-141-async-editor-method-command-lane.md) — async
+  editor method-command lane; no heavy solves inside the ImGui callback
+  (GPU readback leg stays with `RUNTIME-137`/`METHOD-014`; selected-entity
+  models stay with `RUNTIME-138`).
+- [`RUNTIME-142`](RUNTIME-142-async-modelscene-texture-scenefile-io.md) —
+  async model-scene/texture import and scene save/load (extends the
+  deferred-geometry streaming shape).
+- [`RUNTIME-143`](RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md) —
+  multi-subscriber renderer frame-command hook; K-Means GPU queue decoupled
+  from `Engine` internals and public API.
+- [`RUNTIME-144`](RUNTIME-144-post-import-processor-and-ux-policy-seam.md) —
+  post-import processor + import UX-policy seam (normal-bake registration,
+  focus/auto-select policy, `F`-key routing; coordinates with
+  `RUNTIME-129`).
+- [`RUNTIME-145`](RUNTIME-145-runtime-frame-path-efficiency-polish.md) —
+  steady-state frame-path efficiency polish (incremental
+  `StableEntityLookup`, `StreamingExecutor` slot recycling, dirty-gated
+  pre-render flush, extraction/import allocation cleanup).
+
+Related core-layer work from the same review lives in
+[`tasks/backlog/architecture/`](../architecture/README.md) (`BUG-055`,
+`CORE-005..009`, `ARCH-006`).
+
 ### bcg geometry-processing port integration (seeded 2026-06-26)
 
 Core/runtime work paired with the `bcg_code_base` geometry port gaps tracked in

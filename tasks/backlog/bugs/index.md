@@ -5,7 +5,17 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- None currently tracked.
+- [`BUG-055` — TaskGraph::Execute / CounterEvent latch-destruction race](BUG-055-taskgraph-counterevent-latch-destruction-race.md).
+  A worker's final `state.Done.Signal()` CAS releases `TaskGraph::Execute`'s
+  waiting caller before `Signal` touches `this->m_Token`
+  (`src/core/Core.Tasks.CounterEvent.cpp:40-45`) and while the worker is
+  still inside the stack-captured completion lambda
+  (`src/core/Core.Dag.TaskGraph.cpp:970-1020`), so the stack-local
+  `ExecutionState` can be destroyed under a live signaler — a
+  use-after-free on every fixed-step tick and render-prep run. Fix plan:
+  shared ownership of execution state (or a signals-retired fence) plus a
+  TSan-verified stress regression. Origin:
+  `docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md` R1.
 
 ---
 

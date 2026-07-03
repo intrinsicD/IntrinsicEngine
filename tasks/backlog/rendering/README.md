@@ -35,6 +35,21 @@ without requiring them to read every file.
 - [`GRAPHICS-115`](GRAPHICS-115-object-space-normal-gpu-dilation.md) —
   GPU image-space dilation for object-space normal texture bake padding after
   retired `GRAPHICS-104`.
+- [`GRAPHICS-116`](GRAPHICS-116-recipe-pass-contribution-seam.md) —
+  frame-recipe pass contribution seam and typed record-path resolution
+  (2026-07-03 review R7).
+- [`GRAPHICS-117`](GRAPHICS-117-render-graph-compile-cache.md) —
+  render-graph compile caching keyed on recipe features/sizing/imports and
+  lazily built debug dump (2026-07-03 review R16/R17).
+- [`GRAPHICS-118`](GRAPHICS-118-placed-transient-memory-aliasing.md) —
+  placed transient resource allocation with real GPU memory aliasing
+  (2026-07-03 review R15).
+- [`GRAPHICS-119`](GRAPHICS-119-parallel-pass-command-recording.md) —
+  parallel render-pass command recording via the task scheduler
+  (2026-07-03 review R13).
+- [`GRAPHICS-120`](GRAPHICS-120-framegraph-compiler-executor-efficiency.md) —
+  framegraph compiler/executor efficiency and hygiene polish
+  (2026-07-03 review R18).
 
 ## Legacy Parity Follow-Ups
 

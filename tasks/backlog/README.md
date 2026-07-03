@@ -68,8 +68,14 @@ contract-first renderer/snapshot/recipe architecture sequence
 [`rendering/README.md`](rendering/README.md) and the retirement log. Current
 open Theme B leaves include the compute/upload cleanup leaves
 (`GRAPHICS-111..114`), object-space normal bake operational follow-ups
-(`GRAPHICS-115`, `RUNTIME-129`), and the profile-gated vertex attribute
-operational follow-up (`RUNTIME-139`). The runtime GPU readback job/write-back leg
+(`GRAPHICS-115`, `RUNTIME-129`), the profile-gated vertex attribute
+operational follow-up (`RUNTIME-139`), and the 2026-07-03 render-graph
+review leaves — pass contribution seam (`GRAPHICS-116`), compile caching
+(`GRAPHICS-117`), placed transient aliasing (`GRAPHICS-118`), parallel
+command recording (`GRAPHICS-119`), and compiler/executor polish
+(`GRAPHICS-120`); see
+[`rendering/README.md`](rendering/README.md) and
+[`docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`](../../docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md). The runtime GPU readback job/write-back leg
 (`RUNTIME-126`) is retired with the transfer facade/readback ring wired into the
 runtime derived-job graph.
 
@@ -159,9 +165,31 @@ fallback telemetry, while `Extrinsic.Runtime.KMeansBackend` owns the
 `RHI::IDevice`-visible fallback hook. This satisfies the backend-seam dependency
 for `PROC-011`.
 
+The 2026-07-03 main-loop/task-graph/render-graph review
+([`docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`](../../docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md))
+seeded a Theme F set spanning the core task system and the runtime
+composition root: non-blocking frame-path fixes (`RUNTIME-140..142`),
+composition-root/abstractness seams (`RUNTIME-143`, `RUNTIME-144`,
+`CORE-006`, `CORE-009`, `ARCH-006`), scheduler/DAG capability and
+efficiency (`CORE-005`, `CORE-007`, `CORE-008`), and steady-state frame
+efficiency (`RUNTIME-145`). The correctness fix `BUG-055` (Theme G) gates
+`CORE-005`.
+
 Open members:
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md`](runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md).
+- [`runtime/RUNTIME-140-remove-global-waitforall-from-import-apply.md`](runtime/RUNTIME-140-remove-global-waitforall-from-import-apply.md).
+- [`runtime/RUNTIME-141-async-editor-method-command-lane.md`](runtime/RUNTIME-141-async-editor-method-command-lane.md).
+- [`runtime/RUNTIME-142-async-modelscene-texture-scenefile-io.md`](runtime/RUNTIME-142-async-modelscene-texture-scenefile-io.md).
+- [`runtime/RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md`](runtime/RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md).
+- [`runtime/RUNTIME-144-post-import-processor-and-ux-policy-seam.md`](runtime/RUNTIME-144-post-import-processor-and-ux-policy-seam.md).
+- [`runtime/RUNTIME-145-runtime-frame-path-efficiency-polish.md`](runtime/RUNTIME-145-runtime-frame-path-efficiency-polish.md).
+- [`architecture/CORE-005-nonblocking-taskgraph-submit-api.md`](architecture/CORE-005-nonblocking-taskgraph-submit-api.md).
+- [`architecture/CORE-006-domain-free-core-task-vocabulary.md`](architecture/CORE-006-domain-free-core-task-vocabulary.md).
+- [`architecture/CORE-007-scheduler-priority-wait-wake-hardening.md`](architecture/CORE-007-scheduler-priority-wait-wake-hardening.md).
+- [`architecture/CORE-008-compiled-taskgraph-plan-reuse.md`](architecture/CORE-008-compiled-taskgraph-plan-reuse.md).
+- [`architecture/CORE-009-app-owned-config-sections.md`](architecture/CORE-009-app-owned-config-sections.md).
+- [`architecture/ARCH-006-sandbox-editor-content-out-of-runtime.md`](architecture/ARCH-006-sandbox-editor-content-out-of-runtime.md).
 - [`ui/RORG-031-ui-integration.md`](ui/RORG-031-ui-integration.md).
 - [`platform/PLATFORM-004-alternative-platform-backend-onboarding.md`](platform/PLATFORM-004-alternative-platform-backend-onboarding.md) (planning-only seed).
 
