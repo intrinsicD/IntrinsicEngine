@@ -36,7 +36,8 @@ Manifests follow the canonical schema documented in
 Required top-level fields are `benchmark_id`, `method`, `dataset`, `params`,
 `metrics`, and `thresholds`. Allowed metric names are listed in the schema
 document; the smoke runner currently emits `runtime_ms` and
-`quality_error_l2`.
+`quality_error_l2`, with selected promotion gates also emitting
+`quality_error_linf`.
 
 The `benchmark_id` in the manifest must match the value embedded in the
 runner output JSON for the same workload. The runner reads stable constants
@@ -53,8 +54,18 @@ binds the GEOM-016 filtering/outlier-removal workload (voxel downsample plus
 statistical and radius outlier removal on a two-cluster + injected-outlier
 fixture). `kSignedHeatReferenceSmokeBenchmarkId`
 from [`Bench.SignedHeatReferenceSmoke.hpp`](Bench.SignedHeatReferenceSmoke.hpp)
-binds the signed heat reference workload. Keeping the constants in the headers
-is the binding mechanism.
+binds the signed heat reference workload. `kUvAtlasSmokeBenchmarkId` from
+[`Bench.UvAtlasSmoke.hpp`](Bench.UvAtlasSmoke.hpp) binds the GEOM-057
+fast-staged versus xatlas comparison workload; its result diagnostics record
+the xatlas baseline runtime, fast-staged probe runtime, chart counts, and
+quality deltas with `adoption_claim: false`. The same header also exposes
+`kUvAtlasPromotionBenchmarkId`, which binds
+`geometry.uv_atlas.fast_staged_promotion.smoke`: the GEOM-057 default-promotion
+gate over the built-in planar grid, strip, cube, cylinder, octahedron proxy,
+high-valence fan, and disconnected-quad fixtures. Its result diagnostics record
+per-fixture runtime ratios, signed quality regressions, fast-path flipped
+elements, chart-overlap counts, `promotion_pass`, and `adoption_claim`.
+Keeping the constants in the headers is the binding mechanism.
 
 ## Fixture policy
 

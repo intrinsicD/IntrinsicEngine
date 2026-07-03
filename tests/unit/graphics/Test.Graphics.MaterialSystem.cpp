@@ -261,6 +261,7 @@ TEST(GraphicsMaterialSystem, GeneratedTextureAssetBindingsUseStandardMaterialSlo
 
     const auto generatedAlbedo = MakeAssetId(201u);
     const auto generatedNormal = MakeAssetId(202u);
+    const auto generatedMetallicRoughness = MakeAssetId(204u);
     ASSERT_TRUE(assets.RequestUpload(Graphics::GpuTextureRequest{
         .Id = generatedAlbedo,
         .Bytes = std::span{ZeroBytes64},
@@ -273,12 +274,20 @@ TEST(GraphicsMaterialSystem, GeneratedTextureAssetBindingsUseStandardMaterialSlo
         .Desc = AnyTextureDesc(),
         .SamplerDesc = AnySamplerDesc(),
     }).has_value());
+    ASSERT_TRUE(assets.RequestUpload(Graphics::GpuTextureRequest{
+        .Id = generatedMetallicRoughness,
+        .Bytes = std::span{ZeroBytes64},
+        .Desc = AnyTextureDesc(),
+        .SamplerDesc = AnySamplerDesc(),
+    }).has_value());
     assets.Tick(0, 2);
 
     const auto albedoView = assets.GetView(generatedAlbedo);
     const auto normalView = assets.GetView(generatedNormal);
+    const auto metallicRoughnessView = assets.GetView(generatedMetallicRoughness);
     ASSERT_TRUE(albedoView.has_value());
     ASSERT_TRUE(normalView.has_value());
+    ASSERT_TRUE(metallicRoughnessView.has_value());
 
     auto material = materials.CreateInstance(materials.FindType(Graphics::kMaterialTypeName_StandardPBR), {});
     ASSERT_TRUE(material.IsValid());
@@ -288,18 +297,23 @@ TEST(GraphicsMaterialSystem, GeneratedTextureAssetBindingsUseStandardMaterialSlo
         Graphics::MaterialTextureAssetBindings{
             .Albedo = generatedAlbedo,
             .Normal = generatedNormal,
+            .MetallicRoughness = generatedMetallicRoughness,
         },
         assets).has_value());
 
     const Graphics::MaterialParams params = materials.GetParams(material.GetHandle());
     EXPECT_EQ(params.AlbedoID, albedoView->BindlessIdx);
     EXPECT_EQ(params.NormalID, normalView->BindlessIdx);
-    EXPECT_EQ(params.MetallicRoughnessID, RHI::kInvalidBindlessIndex);
+    EXPECT_EQ(params.MetallicRoughnessID, metallicRoughnessView->BindlessIdx);
     EXPECT_EQ(params.EmissiveID, RHI::kInvalidBindlessIndex);
+    EXPECT_EQ(Graphics::GetChannelSource(
+                  params.ChannelSourceBits,
+                  Graphics::MaterialChannel::MetallicRoughness),
+              Graphics::AttributeSource::Texture);
     EXPECT_FALSE(Graphics::HasFlag(
         params.Flags,
         Graphics::MaterialFlags::ObjectSpaceNormalMap));
-    EXPECT_EQ(materials.GetDiagnostics().TextureAssetResolveCount, 2u);
+    EXPECT_EQ(materials.GetDiagnostics().TextureAssetResolveCount, 3u);
     EXPECT_EQ(materials.GetDiagnostics().TextureAssetFallbackResolveCount, 0u);
     EXPECT_EQ(materials.GetDiagnostics().TextureAssetResolveFailureCount, 0u);
 

@@ -1,0 +1,24 @@
+# GEOM-057 — UV atlas fast staged vs xatlas smoke manifest.
+#
+# Stable benchmark contract for the workload defined by
+# benchmarks/geometry/Bench_UvAtlasSmoke.cpp and emitted by the
+# IntrinsicBenchmarkSmoke runner. The benchmark_id below must match
+# kUvAtlasSmokeBenchmarkId.
+
+benchmark_id: geometry.uv_atlas.fast_staged_vs_xatlas.smoke
+method: geometry.uv_atlas.fast_staged_vs_xatlas
+dataset: builtin.cube_surface
+params:
+  fixture: cube_surface
+  baseline_method: xatlas
+  probe_method: fast_staged
+  resolution: 128
+  padding: 2
+  warmup_iterations: 1
+  measured_iterations: 4
+  adoption_claim: false
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 50

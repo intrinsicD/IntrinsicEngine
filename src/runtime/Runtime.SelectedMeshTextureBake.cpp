@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <expected>
 #include <memory>
@@ -8,6 +9,7 @@ module;
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 module Extrinsic.Runtime.SelectedMeshTextureBake;
 
@@ -201,6 +203,180 @@ namespace Extrinsic::Runtime
                 break;
             }
             return false;
+        }
+
+        [[nodiscard]] bool IsScalarKind(const ProgressivePropertyValueKind kind) noexcept
+        {
+            return kind == ProgressivePropertyValueKind::ScalarFloat ||
+                   kind == ProgressivePropertyValueKind::ScalarDouble;
+        }
+
+        [[nodiscard]] MeshAttributeTextureBakeEncoder ResolveMaterialSlotEncoder(
+            const SelectedMeshTextureBakeRequest& request,
+            const ProgressivePropertyValueKind kind) noexcept
+        {
+            if (request.Encoder != MeshAttributeTextureBakeEncoder::Auto)
+                return request.Encoder;
+
+            switch (request.TargetSemantic)
+            {
+            case ProgressiveSlotSemantic::Normal:
+                return MeshAttributeTextureBakeEncoder::Normal;
+            case ProgressiveSlotSemantic::Roughness:
+            case ProgressiveSlotSemantic::Metallic:
+            case ProgressiveSlotSemantic::Displacement:
+                return MeshAttributeTextureBakeEncoder::LinearScalar;
+            case ProgressiveSlotSemantic::ScalarField:
+                return kind == ProgressivePropertyValueKind::UInt32
+                    ? MeshAttributeTextureBakeEncoder::LabelPalette
+                    : MeshAttributeTextureBakeEncoder::ScalarColormap;
+            case ProgressiveSlotSemantic::Albedo:
+                switch (kind)
+                {
+                case ProgressivePropertyValueKind::ScalarFloat:
+                case ProgressivePropertyValueKind::ScalarDouble:
+                    return MeshAttributeTextureBakeEncoder::ScalarColormap;
+                case ProgressivePropertyValueKind::UInt32:
+                    return MeshAttributeTextureBakeEncoder::LabelPalette;
+                case ProgressivePropertyValueKind::Vec3:
+                case ProgressivePropertyValueKind::Vec4:
+                    return MeshAttributeTextureBakeEncoder::RgbaColor;
+                case ProgressivePropertyValueKind::Vec2:
+                    return MeshAttributeTextureBakeEncoder::Vector2;
+                case ProgressivePropertyValueKind::Any:
+                case ProgressivePropertyValueKind::Unknown:
+                    break;
+                }
+                break;
+            case ProgressiveSlotSemantic::PointColor:
+            case ProgressiveSlotSemantic::PointScalarField:
+            case ProgressiveSlotSemantic::PointSize:
+            case ProgressiveSlotSemantic::PointNormalOrientation:
+            case ProgressiveSlotSemantic::LineColor:
+            case ProgressiveSlotSemantic::LineScalarField:
+            case ProgressiveSlotSemantic::LineWidth:
+                break;
+            }
+
+            return MeshAttributeTextureBakeEncoder::Auto;
+        }
+
+        [[nodiscard]] SelectedMeshTextureBakeStatus ValidateTargetSlotCompatibility(
+            const ProgressiveSlotSemantic semantic,
+            const ProgressivePropertyValueKind kind,
+            const MeshAttributeTextureBakeEncoder encoder,
+            std::string& diagnostic)
+        {
+            const auto incompatible =
+                [&diagnostic](std::string message)
+                {
+                    diagnostic = std::move(message);
+                    return SelectedMeshTextureBakeStatus::IncompatibleTargetSlot;
+                };
+
+            switch (semantic)
+            {
+            case ProgressiveSlotSemantic::Normal:
+                if (kind == ProgressivePropertyValueKind::Vec3 &&
+                    encoder == MeshAttributeTextureBakeEncoder::Normal)
+                {
+                    return SelectedMeshTextureBakeStatus::Success;
+                }
+                return incompatible("normal material slot requires a vec3 property encoded as a normal texture");
+            case ProgressiveSlotSemantic::Roughness:
+            case ProgressiveSlotSemantic::Metallic:
+                if (IsScalarKind(kind) &&
+                    encoder == MeshAttributeTextureBakeEncoder::LinearScalar)
+                {
+                    return SelectedMeshTextureBakeStatus::Success;
+                }
+                return incompatible("roughness and metallic material slots require scalar properties encoded as linear scalar textures");
+            case ProgressiveSlotSemantic::Albedo:
+                if ((IsScalarKind(kind) &&
+                     (encoder == MeshAttributeTextureBakeEncoder::LinearScalar ||
+                      encoder == MeshAttributeTextureBakeEncoder::ScalarColormap)) ||
+                    (kind == ProgressivePropertyValueKind::UInt32 &&
+                     encoder == MeshAttributeTextureBakeEncoder::LabelPalette) ||
+                    ((kind == ProgressivePropertyValueKind::Vec3 ||
+                      kind == ProgressivePropertyValueKind::Vec4) &&
+                     encoder == MeshAttributeTextureBakeEncoder::RgbaColor))
+                {
+                    return SelectedMeshTextureBakeStatus::Success;
+                }
+                return incompatible("albedo material slot requires a color, scalar colormap, scalar grayscale, or label-palette texture");
+            case ProgressiveSlotSemantic::ScalarField:
+                if ((IsScalarKind(kind) &&
+                     (encoder == MeshAttributeTextureBakeEncoder::LinearScalar ||
+                      encoder == MeshAttributeTextureBakeEncoder::ScalarColormap)) ||
+                    (kind == ProgressivePropertyValueKind::UInt32 &&
+                     encoder == MeshAttributeTextureBakeEncoder::LabelPalette))
+                {
+                    return SelectedMeshTextureBakeStatus::Success;
+                }
+                return incompatible("scalar-field material slot requires scalar or label properties");
+            case ProgressiveSlotSemantic::Displacement:
+                diagnostic = "displacement bake output has no backend-resident material texture slot yet";
+                return SelectedMeshTextureBakeStatus::UnsupportedTargetSemantic;
+            case ProgressiveSlotSemantic::PointColor:
+            case ProgressiveSlotSemantic::PointScalarField:
+            case ProgressiveSlotSemantic::PointSize:
+            case ProgressiveSlotSemantic::PointNormalOrientation:
+            case ProgressiveSlotSemantic::LineColor:
+            case ProgressiveSlotSemantic::LineScalarField:
+            case ProgressiveSlotSemantic::LineWidth:
+                diagnostic = "target semantic is not a mesh surface material texture slot";
+                return SelectedMeshTextureBakeStatus::UnsupportedTargetSemantic;
+            }
+
+            return SelectedMeshTextureBakeStatus::UnsupportedTargetSemantic;
+        }
+
+        [[nodiscard]] bool IsPackedMetallicRoughnessTarget(
+            const ProgressiveSlotSemantic semantic) noexcept
+        {
+            return semantic == ProgressiveSlotSemantic::Roughness ||
+                   semantic == ProgressiveSlotSemantic::Metallic;
+        }
+
+        [[nodiscard]] Assets::AssetTexture2DPayload AdaptPayloadForMaterialSlot(
+            const SelectedMeshTextureBakeRequest& request,
+            const Assets::AssetTexture2DPayload& payload)
+        {
+            if (!IsPackedMetallicRoughnessTarget(request.TargetSemantic) ||
+                payload.Metadata.PixelFormat != Assets::AssetTexturePixelFormat::R8Unorm)
+            {
+                return payload;
+            }
+
+            Assets::AssetTexture2DPayload adapted = payload;
+            const std::size_t pixelCount =
+                static_cast<std::size_t>(payload.Metadata.Width) *
+                static_cast<std::size_t>(payload.Metadata.Height);
+            if (payload.PixelBytes.size() != pixelCount)
+            {
+                return adapted;
+            }
+
+            std::vector<std::byte> packed(pixelCount * 4u);
+            for (std::size_t pixel = 0u; pixel < pixelCount; ++pixel)
+            {
+                const std::byte scalar = payload.PixelBytes[pixel];
+                const std::size_t offset = pixel * 4u;
+                packed[offset + 0u] = std::byte{0xFF};
+                packed[offset + 1u] = request.TargetSemantic == ProgressiveSlotSemantic::Roughness
+                    ? scalar
+                    : std::byte{0xFF};
+                packed[offset + 2u] = request.TargetSemantic == ProgressiveSlotSemantic::Metallic
+                    ? scalar
+                    : std::byte{0x00};
+                packed[offset + 3u] = std::byte{0xFF};
+            }
+
+            adapted.Metadata.Components = 4u;
+            adapted.Metadata.PixelFormat = Assets::AssetTexturePixelFormat::Rgba8Unorm;
+            adapted.Metadata.ColorSpace = Assets::AssetTextureColorSpace::Linear;
+            adapted.PixelBytes = std::move(packed);
+            return adapted;
         }
 
         [[nodiscard]] SelectedMeshTextureBakeStatus StatusForResolution(
@@ -715,7 +891,7 @@ namespace Extrinsic::Runtime
 
             const LoadedTexture loaded = LoadOrReloadGeneratedTexture(
                 *context.AssetService,
-                bake.Payload,
+                AdaptPayloadForMaterialSlot(request, bake.Payload),
                 build.GeneratedAssetPath,
                 request.ExistingGeneratedTexture);
             if (loaded.Status != SelectedMeshTextureBakeStatus::Success)
@@ -900,11 +1076,27 @@ namespace Extrinsic::Runtime
                 StatusForResolution(resolution.Status),
                 resolution.Diagnostic);
         }
-        if (!EncoderCanHandle(request.Encoder, resolution.ActualValueKind))
+        const MeshAttributeTextureBakeEncoder resolvedEncoder =
+            ResolveMaterialSlotEncoder(request, resolution.ActualValueKind);
+        if (!EncoderCanHandle(resolvedEncoder, resolution.ActualValueKind))
         {
             return FailureBuild(
                 SelectedMeshTextureBakeStatus::IncompatibleTargetSlot,
                 "encoder is incompatible with the selected property type");
+        }
+
+        std::string compatibilityDiagnostic{};
+        const SelectedMeshTextureBakeStatus compatibility =
+            ValidateTargetSlotCompatibility(
+                request.TargetSemantic,
+                resolution.ActualValueKind,
+                resolvedEncoder,
+                compatibilityDiagnostic);
+        if (compatibility != SelectedMeshTextureBakeStatus::Success)
+        {
+            return FailureBuild(
+                compatibility,
+                std::move(compatibilityDiagnostic));
         }
 
         if (request.BindGeneratedTexture)
@@ -932,7 +1124,7 @@ namespace Extrinsic::Runtime
             ? ToBakeValueKind(resolution.ActualValueKind)
             : request.ValueKind;
         bake.TargetSemantic = std::string{ToString(request.TargetSemantic)};
-        bake.Encoder = request.Encoder;
+        bake.Encoder = resolvedEncoder;
         bake.TexcoordPropertyName = request.TexcoordPropertyName;
         bake.Width = request.Width;
         bake.Height = request.Height;

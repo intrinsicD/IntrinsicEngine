@@ -517,23 +517,31 @@ returns a `MeshSoup::IndexedMesh` with finite `v:texcoord`, source-vertex and
 source-face xrefs, output chart IDs, optional chart/seam-cut records,
 provenance (`AuthoredPreserved` or `Generated`), requested and actual atlas
 method, backend identity, atlas resolution, fallback diagnostics, and GEOM-018
-quality diagnostics. The default concrete backend remains the repository-pinned
-`jpcy/xatlas` overlay port for `UvAtlasMethod::XAtlas`. Callers can select
-`UvAtlasMethod::FastStaged` to target the fast replacement path, disable xatlas
-fallback with `AllowXAtlasFallback = false`, or supply an `UvAtlasBackend`
-function to satisfy that method without importing runtime, assets, ECS,
-graphics, platform, or app layers.
+quality diagnostics. The default concrete backend is now the geometry-owned
+`UvAtlasMethod::FastStaged` path. The repository-pinned `jpcy/xatlas` overlay
+port remains available through explicit `UvAtlasMethod::XAtlas` requests and as
+the compatibility fallback when the fast path fails and
+`AllowXAtlasFallback = true`. Callers can disable xatlas fallback with
+`AllowXAtlasFallback = false`, or supply an `UvAtlasBackend` function to
+satisfy the selected method without importing runtime, assets, ECS, graphics,
+platform, or app layers.
 
 Valid authored UVs are preserved by default when they are finite, count-matched,
 and triangle-usable. Missing or invalid authored UVs fall through to the
 selected backend unless the input mesh itself is invalid. The built-in
-`FastStaged` backend is conservative: it cuts one deterministic chart per
-triangle, flattens each chart isometrically in local 2D, grid-packs the charts
-with texel padding, records chart and seam-cut metadata, and emits whole-atlas
-quality diagnostics. It is suitable for finite, non-overlapping generated UVs
-but is not yet the default because multi-face chart growth, TABI-style packing,
-and benchmark comparisons remain GEOM-057 follow-up work. If a caller-supplied
-fast backend fails and `AllowXAtlasFallback` is enabled, diagnostics report
+`FastStaged` backend is conservative: it grows deterministic connected planar
+multi-face charts, parameterizes each accepted disk-topology chart through the
+existing LSCM solver or harmonic/Tutte solver where those solvers accept the
+chart topology, falls back to deterministic local projection for unsupported
+chart topology, and records the chosen per-chart parameterization backend plus
+GEOM-018 quality diagnostics on each chart record. Atlas placement uses a
+deterministic shelf packer with texel padding and optional right-angle chart
+rotation instead of the earlier uniform grid lower bound. The path emits
+finite, non-overlapping generated UVs, chart/seam-cut metadata, whole-atlas
+quality diagnostics, a cube smoke benchmark comparison against xatlas, and a
+multi-fixture promotion benchmark that gates default adoption. If a
+caller-supplied fast backend fails and
+`AllowXAtlasFallback` is enabled, diagnostics report
 `RequestedMethod = FastStaged`, `ActualMethod = XAtlas`, and
 `UsedFallback = true`. Seam-split output may duplicate vertices, and the
 `SourceVertexForOutputVertex` table is the canonical way for runtime or future

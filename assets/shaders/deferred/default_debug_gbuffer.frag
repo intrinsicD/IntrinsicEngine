@@ -53,6 +53,19 @@ bool IsValidTextureID(uint id) {
     return id != 0u && id != 0xFFFFFFFFu;
 }
 
+vec2 ResolveMetallicRoughness(GpuMaterialSlot mat, vec2 uv)
+{
+    vec2 roughnessMetallic = vec2(mat.RoughnessFactor, mat.MetallicFactor);
+    const bool metallicRoughnessFromTexture =
+        GpuMaterialChannelSource(mat, GpuMaterialChannel_MetallicRoughness) == GpuAttributeSource_Texture;
+    if (!metallicRoughnessFromTexture || !IsValidTextureID(mat.MetallicRoughnessID)) {
+        return roughnessMetallic;
+    }
+
+    const vec4 mrSample = texture(globalTextures[nonuniformEXT(mat.MetallicRoughnessID)], uv);
+    return vec2(mrSample.g, mrSample.b);
+}
+
 void main() {
     const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;
     const GpuMaterialSlot mat = GpuMaterialSlotRef(scene.MaterialBDA).Data[fragMaterialSlot];
@@ -73,5 +86,6 @@ void main() {
 
     SceneNormal = vec4(n, 0.0);
     Albedo = baseColor;
-    Material0 = vec4(mat.RoughnessFactor, mat.MetallicFactor, 0.0, 0.0);
+    const vec2 roughnessMetallic = ResolveMetallicRoughness(mat, fragUv);
+    Material0 = vec4(roughnessMetallic.x, roughnessMetallic.y, 0.0, 0.0);
 }

@@ -34,10 +34,13 @@ const uint GpuMaterialFlag_ObjectSpaceNormalMap = 1u << 5;
 const uint GpuShadingModel_Lit = 0u;
 const uint GpuShadingModel_Unlit = 1u;
 // Per-channel attribute source (GpuMaterialSlot.ChannelSourceBits) + channel
-// slot indices. V1 uses the Normal channel; others reserved (GRAPHICS-105).
+// slot indices. Color/emissive slots remain reserved for future material paths.
 const uint GpuAttributeSource_VertexAttribute = 0u;
 const uint GpuAttributeSource_Texture = 1u;
 const uint GpuMaterialChannel_Normal = 0u;
+const uint GpuMaterialChannel_Color = 1u;
+const uint GpuMaterialChannel_MetallicRoughness = 2u;
+const uint GpuMaterialChannel_Emissive = 3u;
 const uint GpuColorSource_Material = 0u;
 const uint GpuColorSource_UniformColor = 1u;
 const uint GpuColorSource_ScalarField = 2u;

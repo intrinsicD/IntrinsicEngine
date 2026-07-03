@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `GEOM-057` — Fast UV atlas charting and packing replacement path (tasks/active/GEOM-057-fast-uv-atlas-charting-and-packing.md)
+- none
 
 ## Theme B — Rendering modernization
 

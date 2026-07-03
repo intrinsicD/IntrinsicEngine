@@ -17,7 +17,7 @@ The current promoted geometry layer already provides useful parameterization and
 
 - `Geometry.Parameterization` provides LSCM for disk-topology triangle meshes, including pinned-vertex selection, UV output, conformal distortion summaries, flipped-triangle counts, and optional mesh-backed `v:texcoord` / `v:lscm_pinned` properties.
 - `Geometry.Parameterization.Diagnostics` provides the reusable diagnostics record for mesh positions plus per-vertex UVs, including evaluated/skipped counts, invalid-input classification, flipped elements, conformal/area/symmetric-Dirichlet/stretch metrics, deterministic boundary length distortion, and seam-discontinuity placeholders.
-- `Geometry.UvAtlas` provides the backend-neutral UV atlas seam with authored-UV preservation, source xrefs for seam splits, chart/seam-cut records, GEOM-018 quality diagnostics, a method selector for `XAtlas` versus `FastStaged`, and `jpcy/xatlas` as the default concrete CPU backend through the repository vcpkg overlay. `FastStaged` now has a conservative built-in backend that cuts one chart per triangle, performs local isometric flattening, and grid-packs finite non-overlapping UVs; xatlas remains the promoted default until multi-face charting, a faster packer, and benchmark quality gates justify promotion.
+- `Geometry.UvAtlas` provides the backend-neutral UV atlas seam with authored-UV preservation, source xrefs for seam splits, chart/seam-cut records, GEOM-018 quality diagnostics, a method selector for `FastStaged` versus `XAtlas`, and `FastStaged` as the default concrete CPU backend. `FastStaged` grows connected planar multi-face charts, attempts existing LSCM then harmonic/Tutte parameterization per chart where topology allows, records per-chart quality diagnostics, and shelf-packs finite non-overlapping UVs; the repository-pinned `jpcy/xatlas` overlay remains available through explicit `XAtlas` requests and as compatibility fallback when enabled.
 - `Extrinsic.Runtime.AssetMeshNormals` consumes `Geometry.UvAtlas` from the runtime layer for imported renderable meshes, preserving valid authored UVs or generating atlas UVs before generated texture bakes. Geometry stays independent of assets, ECS, graphics, runtime, platform, and app layers.
 - `Geometry.DEC` and the reusable `Geometry.Sparse` seam provide sparse matrix and conjugate-gradient infrastructure that future parameterization solvers can share.
 - `Geometry.Linalg` provides dense decomposition, covariance, least-squares, and GLM/Eigen adapter utilities behind an explicit geometry-owned numerical module.
@@ -160,12 +160,12 @@ Correctness and benchmarks:
 
 Implementation tasks:
 
-- [`GEOM-025`](../../tasks/done/GEOM-025-uv-atlas-backend-xatlas.md) established the backend-neutral UV atlas contract and xatlas default.
-- [`GEOM-057`](../../tasks/active/GEOM-057-fast-uv-atlas-charting-and-packing.md) opens the fast staged replacement path while keeping xatlas as the visible fallback.
+- [`GEOM-025`](../../tasks/done/GEOM-025-uv-atlas-backend-xatlas.md) established the backend-neutral UV atlas contract and initial xatlas default.
+- [`GEOM-057`](../../tasks/done/GEOM-057-fast-uv-atlas-charting-and-packing.md) promotes the fast staged replacement path to the default while keeping xatlas as the visible compatibility fallback.
 
 Scope:
 
-- Add geometry-owned chart records, seam cuts, atlas segmentation, and CPU chart packing suitable for later renderer/material consumers without depending on those layers. Current promoted state is the `Geometry.UvAtlas` backend contract with xatlas as the default concrete CPU backend and a requestable `FastStaged` method backed by deterministic per-triangle charting, local flattening, grid packing, chart records, seam records, and explicit xatlas fallback diagnostics for failing caller-supplied fast backends. Future GEOM-057 slices should replace the per-triangle lower-bound backend with PartUV-inspired multi-face chart proposals, per-chart LSCM/harmonic parameterization where topology allows, and a TABI-inspired fast packer before making the fast method the default.
+- Add geometry-owned chart records, seam cuts, atlas segmentation, and CPU chart packing suitable for later renderer/material consumers without depending on those layers. Current promoted state is the `Geometry.UvAtlas` backend contract with `FastStaged` as the default concrete CPU backend, deterministic connected planar chart proposals, per-chart LSCM/harmonic attempts with projection fallback for unsupported topology, per-chart quality records, deterministic shelf packing, chart records, seam records, and explicit xatlas fallback diagnostics for failing fast backends when compatibility fallback is enabled.
 - Clarify how `Geometry.HtexPatch` patch metadata relates to UV charts and atlas tiles.
 
 Primary home: `src/geometry`.
@@ -183,7 +183,7 @@ Correctness and benchmarks:
 - Mesh with known seams and chart count.
 - Packing fixture with deterministic tile positions and no overlap.
 - UV-seam continuity/discontinuity diagnostics.
-- Fixtures proving the built-in fast staged backend emits finite non-overlapping UVs, chart records, seam cuts, and property xrefs, plus fallback fixtures proving `RequestedMethod`, `ActualMethod`, and `UsedFallback` distinguish xatlas compatibility from the fast staged method actually running.
+- Fixtures proving the built-in fast staged backend emits finite non-overlapping UVs, per-chart quality diagnostics, chart records, seam cuts, and property xrefs, plus fallback fixtures proving `RequestedMethod`, `ActualMethod`, and `UsedFallback` distinguish xatlas compatibility from the fast staged method actually running. The smoke benchmark `geometry.uv_atlas.fast_staged_vs_xatlas.smoke` records fast-staged versus xatlas runtime and quality deltas on the deterministic cube-surface fixture without making an adoption claim. The promotion benchmark `geometry.uv_atlas.fast_staged_promotion.smoke` runs the multi-fixture PR-fast suite and records `promotion_pass`/`adoption_claim` for default adoption.
 
 Forbidden shortcuts:
 

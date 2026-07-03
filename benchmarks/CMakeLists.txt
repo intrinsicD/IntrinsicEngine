@@ -27,6 +27,7 @@ add_executable(IntrinsicBenchmarkSmoke
     geometry/Bench_QualityMetricsSmoke.cpp
     geometry/Bench_SignedHeatReferenceSmoke.cpp
     geometry/Bench_SurfaceSamplingSmoke.cpp
+    geometry/Bench_UvAtlasSmoke.cpp
     physics/Bench_RigidBodyReferenceSmoke.cpp
     physics/Bench_ParticleSpringReferenceSmoke.cpp
     physics/Bench_XpbdClothReferenceSmoke.cpp

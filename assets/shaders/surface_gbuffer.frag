@@ -109,15 +109,28 @@ vec3 ResolveSurfaceNormal(MaterialData mat, vec3 vertexWorldNormal, vec2 uv)
     return (worldNormalLen > 1.0e-6) ? (worldNormal / worldNormalLen) : n;
 }
 
+vec2 ResolveSurfaceMetallicRoughness(MaterialData mat, vec2 uv)
+{
+    vec2 roughnessMetallic = vec2(mat.RoughnessFactor, mat.MetallicFactor);
+    if (!IsValidSurfaceTextureID(mat.MetallicRoughnessID))
+    {
+        return roughnessMetallic;
+    }
+
+    vec4 mrSample = texture(globalTextures[nonuniformEXT(mat.MetallicRoughnessID)], uv);
+    return vec2(mrSample.g, mrSample.b);
+}
+
 void main() {
     vec4 baseColor = ResolveSurfaceBaseColor();
 
     // Read PBR factors from material SSBO.
     MaterialData mat = materials.Materials[fragMaterialSlot];
     vec3 norm = ResolveSurfaceNormal(mat, fragNormal, fragTexCoord);
+    vec2 roughnessMetallic = ResolveSurfaceMetallicRoughness(mat, fragTexCoord);
 
     // Write G-buffer with real material properties.
     outNormal   = vec4(norm, 0.0);
     outAlbedo   = baseColor;
-    outMaterial  = vec4(mat.RoughnessFactor, mat.MetallicFactor, 0.0, 0.0);
+    outMaterial  = vec4(roughnessMetallic.x, roughnessMetallic.y, 0.0, 0.0);
 }

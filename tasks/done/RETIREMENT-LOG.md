@@ -9,6 +9,19 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`GEOM-057`](GEOM-057-fast-uv-atlas-charting-and-packing.md) — Fast UV atlas
+charting and packing replacement path — retired on 2026-07-03 at maturity
+`ParityProven`. `Geometry.UvAtlas` now defaults to the geometry-owned
+`FastStaged` backend with deterministic multi-face charting, per-chart solver
+attempts, shelf packing, chart/seam diagnostics, property xrefs, and visible
+xatlas compatibility fallback when explicitly enabled. The promotion benchmark
+`geometry.uv_atlas.fast_staged_promotion.smoke` passed 7/7 fixtures with zero
+fast flips, zero fast chart overlaps, zero quality error, and a mean
+fast/xatlas runtime ratio of 0.282, so the default replacement decision is
+gated by machine-readable benchmark output. Removing xatlas itself remains a
+separate retirement decision.
+
+Active
 [`RUNTIME-125`](RUNTIME-125-aos-static-fast-lane.md) — Optional AoS fast lane
 for static geometry — retired on 2026-07-02 at maturity `CPUContracted`. The
 slice added the PR-fast SoA/interleaved probe benchmark and the planning-only

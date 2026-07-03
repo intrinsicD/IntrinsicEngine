@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <string>
@@ -64,6 +65,19 @@ namespace
         vertices.Properties
             .GetOrAdd<float>("v:heat", 0.0f)
             .Vector() = {0.0f, 1.0f, 0.5f};
+        vertices.Properties
+            .GetOrAdd<glm::vec4>("v:albedo", glm::vec4{1.0f})
+            .Vector() = {
+            {0.25f, 0.5f, 1.0f, 1.0f},
+            {0.25f, 0.5f, 1.0f, 1.0f},
+            {0.25f, 0.5f, 1.0f, 1.0f},
+        };
+        vertices.Properties
+            .GetOrAdd<float>("v:roughness", 0.5f)
+            .Vector() = {0.2f, 0.4f, 0.6f};
+        vertices.Properties
+            .GetOrAdd<float>("v:metallic", 0.0f)
+            .Vector() = {0.0f, 0.5f, 1.0f};
 
         auto& edges = raw.emplace<GS::Edges>(entity);
         edges.Properties.Resize(3u);
@@ -122,6 +136,26 @@ namespace
         normal.Provenance =
             Runtime::ProgressiveGeneratedOutputProvenance::PropertyBinding;
 
+        Runtime::ProgressiveSlotBinding roughness{};
+        roughness.Semantic = Runtime::ProgressiveSlotSemantic::Roughness;
+        roughness.SourceKind = Runtime::ProgressiveSlotSourceKind::UniformDefault;
+        roughness.UniformDefault.Kind =
+            Runtime::ProgressivePropertyValueKind::ScalarFloat;
+        roughness.UniformDefault.Scalar = 0.5;
+        roughness.Readiness = Runtime::ProgressiveReadinessState::DefaultValue;
+        roughness.Provenance =
+            Runtime::ProgressiveGeneratedOutputProvenance::UniformDefault;
+
+        Runtime::ProgressiveSlotBinding metallic{};
+        metallic.Semantic = Runtime::ProgressiveSlotSemantic::Metallic;
+        metallic.SourceKind = Runtime::ProgressiveSlotSourceKind::UniformDefault;
+        metallic.UniformDefault.Kind =
+            Runtime::ProgressivePropertyValueKind::ScalarFloat;
+        metallic.UniformDefault.Scalar = 0.0;
+        metallic.Readiness = Runtime::ProgressiveReadinessState::DefaultValue;
+        metallic.Provenance =
+            Runtime::ProgressiveGeneratedOutputProvenance::UniformDefault;
+
         return Runtime::ProgressivePresentationBindings{
             .Shape = Runtime::ProgressiveEntityShape::MeshLeaf,
             .Lanes = {
@@ -134,7 +168,7 @@ namespace
                 Runtime::ProgressivePresentationBinding{
                     .Key = "mesh.surface",
                     .Kind = Runtime::ProgressivePresentationKind::SurfaceMaterial,
-                    .Slots = {albedo, normal},
+                    .Slots = {albedo, normal, roughness, metallic},
                 },
             },
             .BindingGeneration = 7u,
@@ -188,6 +222,61 @@ namespace
         return request;
     }
 
+    [[nodiscard]] Runtime::SelectedMeshTextureBakeRequest MakeAlbedoRequest(
+        const ECS::EntityHandle entity)
+    {
+        Runtime::SelectedMeshTextureBakeRequest request{};
+        request.StableEntityId =
+            Runtime::SelectionController::ToStableEntityId(entity);
+        request.SourceDomain = Runtime::ProgressiveGeometryDomain::MeshVertex;
+        request.SourcePropertyName = "v:albedo";
+        request.ExpectedValueKind = Runtime::ProgressivePropertyValueKind::Vec4;
+        request.Width = 4u;
+        request.Height = 4u;
+        request.TargetPresentationKey = "mesh.surface";
+        request.TargetSemantic = Runtime::ProgressiveSlotSemantic::Albedo;
+        request.GeneratedKey = "albedo";
+        return request;
+    }
+
+    [[nodiscard]] Runtime::SelectedMeshTextureBakeRequest MakeFaceAlbedoRequest(
+        const ECS::EntityHandle entity)
+    {
+        Runtime::SelectedMeshTextureBakeRequest request = MakeAlbedoRequest(entity);
+        request.SourceDomain = Runtime::ProgressiveGeometryDomain::MeshFace;
+        request.SourcePropertyName = "f:debug_color";
+        request.ExpectedValueKind = Runtime::ProgressivePropertyValueKind::Vec4;
+        request.GeneratedKey = "face-albedo";
+        return request;
+    }
+
+    [[nodiscard]] Runtime::SelectedMeshTextureBakeRequest MakeRoughnessRequest(
+        const ECS::EntityHandle entity)
+    {
+        Runtime::SelectedMeshTextureBakeRequest request{};
+        request.StableEntityId =
+            Runtime::SelectionController::ToStableEntityId(entity);
+        request.SourceDomain = Runtime::ProgressiveGeometryDomain::MeshVertex;
+        request.SourcePropertyName = "v:roughness";
+        request.ExpectedValueKind = Runtime::ProgressivePropertyValueKind::ScalarFloat;
+        request.Width = 4u;
+        request.Height = 4u;
+        request.TargetPresentationKey = "mesh.surface";
+        request.TargetSemantic = Runtime::ProgressiveSlotSemantic::Roughness;
+        request.GeneratedKey = "roughness";
+        return request;
+    }
+
+    [[nodiscard]] Runtime::SelectedMeshTextureBakeRequest MakeMetallicRequest(
+        const ECS::EntityHandle entity)
+    {
+        Runtime::SelectedMeshTextureBakeRequest request = MakeRoughnessRequest(entity);
+        request.SourcePropertyName = "v:metallic";
+        request.TargetSemantic = Runtime::ProgressiveSlotSemantic::Metallic;
+        request.GeneratedKey = "metallic";
+        return request;
+    }
+
     [[nodiscard]] const Runtime::ProgressiveSlotBinding* FindSlot(
         const Runtime::ProgressivePresentationBindings& bindings,
         const Runtime::ProgressiveSlotSemantic semantic)
@@ -197,6 +286,45 @@ namespace
         if (presentation == nullptr)
             return nullptr;
         return Runtime::FindSlotBinding(*presentation, semantic);
+    }
+
+    void ExpectPackedMetallicRoughnessPayload(
+        const Assets::AssetTexture2DPayload& texture,
+        const Runtime::ProgressiveSlotSemantic semantic)
+    {
+        ASSERT_EQ(texture.Metadata.PixelFormat,
+                  Assets::AssetTexturePixelFormat::Rgba8Unorm);
+        ASSERT_EQ(texture.Metadata.ColorSpace,
+                  Assets::AssetTextureColorSpace::Linear);
+        ASSERT_EQ(texture.Metadata.Components, 4u);
+
+        const std::size_t pixelCount =
+            static_cast<std::size_t>(texture.Metadata.Width) *
+            static_cast<std::size_t>(texture.Metadata.Height);
+        ASSERT_EQ(texture.PixelBytes.size(), pixelCount * 4u);
+
+        bool sawAuthoredValue = false;
+        for (std::size_t pixel = 0u; pixel < pixelCount; ++pixel)
+        {
+            const std::size_t offset = pixel * 4u;
+            EXPECT_EQ(texture.PixelBytes[offset + 0u], std::byte{0xFF});
+            EXPECT_EQ(texture.PixelBytes[offset + 3u], std::byte{0xFF});
+            if (semantic == Runtime::ProgressiveSlotSemantic::Roughness)
+            {
+                EXPECT_EQ(texture.PixelBytes[offset + 2u], std::byte{0x00});
+                sawAuthoredValue =
+                    sawAuthoredValue ||
+                    texture.PixelBytes[offset + 1u] != std::byte{0xFF};
+            }
+            else
+            {
+                EXPECT_EQ(texture.PixelBytes[offset + 1u], std::byte{0xFF});
+                sawAuthoredValue =
+                    sawAuthoredValue ||
+                    texture.PixelBytes[offset + 2u] != std::byte{0x00};
+            }
+        }
+        EXPECT_TRUE(sawAuthoredValue);
     }
 }
 
@@ -221,6 +349,70 @@ TEST(RuntimeSelectedMeshTextureBake, BuildsVertexNormalBakeRequest)
     EXPECT_EQ(build.ExpectedElementCount, 3u);
     EXPECT_NE(build.GeneratedAssetPath.find("selected-mesh-"), std::string::npos);
     EXPECT_NE(build.GeneratedAssetPath.find("normal"), std::string::npos);
+}
+
+TEST(RuntimeSelectedMeshTextureBake, AutoEncodersMatchTargetMaterialSlots)
+{
+    ECS::Scene::Registry scene{};
+    const ECS::EntityHandle entity = MakeMeshEntity(scene);
+
+    Runtime::SelectedMeshTextureBakeRequest normal = MakeNormalRequest(entity);
+    normal.Encoder = Runtime::MeshAttributeTextureBakeEncoder::Auto;
+    const Runtime::SelectedMeshTextureBakeBuildResult normalBuild =
+        Runtime::BuildSelectedMeshTextureBakeRequest(scene, normal);
+    ASSERT_EQ(normalBuild.Status, Runtime::SelectedMeshTextureBakeStatus::Success);
+    EXPECT_EQ(normalBuild.BakeRequest.Encoder,
+              Runtime::MeshAttributeTextureBakeEncoder::Normal);
+
+    const Runtime::SelectedMeshTextureBakeBuildResult albedoBuild =
+        Runtime::BuildSelectedMeshTextureBakeRequest(
+            scene,
+            MakeAlbedoRequest(entity));
+    ASSERT_EQ(albedoBuild.Status, Runtime::SelectedMeshTextureBakeStatus::Success);
+    EXPECT_EQ(albedoBuild.BakeRequest.Encoder,
+              Runtime::MeshAttributeTextureBakeEncoder::RgbaColor);
+
+    const Runtime::SelectedMeshTextureBakeBuildResult roughnessBuild =
+        Runtime::BuildSelectedMeshTextureBakeRequest(
+            scene,
+            MakeRoughnessRequest(entity));
+    ASSERT_EQ(roughnessBuild.Status, Runtime::SelectedMeshTextureBakeStatus::Success);
+    EXPECT_EQ(roughnessBuild.BakeRequest.Encoder,
+              Runtime::MeshAttributeTextureBakeEncoder::LinearScalar);
+
+    const Runtime::SelectedMeshTextureBakeBuildResult metallicBuild =
+        Runtime::BuildSelectedMeshTextureBakeRequest(
+            scene,
+            MakeMetallicRequest(entity));
+    ASSERT_EQ(metallicBuild.Status, Runtime::SelectedMeshTextureBakeStatus::Success);
+    EXPECT_EQ(metallicBuild.BakeRequest.Encoder,
+              Runtime::MeshAttributeTextureBakeEncoder::LinearScalar);
+}
+
+TEST(RuntimeSelectedMeshTextureBake, IncompatibleMaterialSlotEncodersFailClosed)
+{
+    ECS::Scene::Registry scene{};
+    const ECS::EntityHandle entity = MakeMeshEntity(scene);
+
+    Runtime::SelectedMeshTextureBakeRequest badNormal = MakeNormalRequest(entity);
+    badNormal.Encoder = Runtime::MeshAttributeTextureBakeEncoder::RgbaColor;
+    EXPECT_EQ(
+        Runtime::BuildSelectedMeshTextureBakeRequest(scene, badNormal).Status,
+        Runtime::SelectedMeshTextureBakeStatus::IncompatibleTargetSlot);
+
+    Runtime::SelectedMeshTextureBakeRequest badRoughness = MakeRoughnessRequest(entity);
+    badRoughness.SourcePropertyName = "v:normal";
+    badRoughness.ExpectedValueKind = Runtime::ProgressivePropertyValueKind::Vec3;
+    badRoughness.Encoder = Runtime::MeshAttributeTextureBakeEncoder::Normal;
+    EXPECT_EQ(
+        Runtime::BuildSelectedMeshTextureBakeRequest(scene, badRoughness).Status,
+        Runtime::SelectedMeshTextureBakeStatus::IncompatibleTargetSlot);
+
+    Runtime::SelectedMeshTextureBakeRequest displacement = MakeHeatRequest(entity);
+    displacement.TargetSemantic = Runtime::ProgressiveSlotSemantic::Displacement;
+    EXPECT_EQ(
+        Runtime::BuildSelectedMeshTextureBakeRequest(scene, displacement).Status,
+        Runtime::SelectedMeshTextureBakeStatus::UnsupportedTargetSemantic);
 }
 
 TEST(RuntimeSelectedMeshTextureBake, SynchronousCommandBakesBindsAndUsesHistory)
@@ -263,6 +455,132 @@ TEST(RuntimeSelectedMeshTextureBake, SynchronousCommandBakesBindsAndUsesHistory)
               Runtime::ProgressiveSlotSourceKind::GeneratedTextureAsset);
     EXPECT_EQ(slot->Readiness, Runtime::ProgressiveReadinessState::Ready);
     EXPECT_EQ(slot->GeneratedTexture, result.GeneratedTexture);
+}
+
+TEST(RuntimeSelectedMeshTextureBake, SynchronousCommandBakesFaceColorToAlbedoSlot)
+{
+    ECS::Scene::Registry scene{};
+    const ECS::EntityHandle entity = MakeMeshEntity(scene);
+    Assets::AssetService assets{};
+
+    Runtime::SelectedMeshTextureBakeContext context{
+        .Scene = &scene,
+        .AssetService = &assets,
+    };
+
+    const Runtime::SelectedMeshTextureBakeResult result =
+        Runtime::ApplySelectedMeshTextureBakeCommand(
+            context,
+            MakeFaceAlbedoRequest(entity));
+
+    ASSERT_EQ(result.Status, Runtime::SelectedMeshTextureBakeStatus::Success);
+    ASSERT_TRUE(result.GeneratedTexture.IsValid());
+    EXPECT_TRUE(result.BoundGeneratedTexture);
+    EXPECT_EQ(result.BakeDiagnostics.SourceDomain,
+              Runtime::MeshAttributeTextureBakeSourceDomain::Face);
+    EXPECT_EQ(result.BakeDiagnostics.Encoder,
+              Runtime::MeshAttributeTextureBakeEncoder::RgbaColor);
+
+    const auto texture =
+        assets.Read<Assets::AssetTexture2DPayload>(result.GeneratedTexture);
+    ASSERT_TRUE(texture.has_value());
+    ASSERT_EQ(texture->size(), 1u);
+    EXPECT_EQ((*texture)[0].Metadata.PixelFormat,
+              Assets::AssetTexturePixelFormat::Rgba8Unorm);
+    EXPECT_EQ((*texture)[0].Metadata.ColorSpace,
+              Assets::AssetTextureColorSpace::SRGB);
+
+    const auto& bindings =
+        scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
+    const Runtime::ProgressiveSlotBinding* albedo =
+        FindSlot(bindings, Runtime::ProgressiveSlotSemantic::Albedo);
+    ASSERT_NE(albedo, nullptr);
+    EXPECT_EQ(albedo->SourceKind,
+              Runtime::ProgressiveSlotSourceKind::GeneratedTextureAsset);
+    EXPECT_EQ(albedo->Readiness, Runtime::ProgressiveReadinessState::Ready);
+    EXPECT_EQ(albedo->GeneratedTexture, result.GeneratedTexture);
+}
+
+TEST(RuntimeSelectedMeshTextureBake, SynchronousCommandBakesScalarToRoughnessSlot)
+{
+    ECS::Scene::Registry scene{};
+    const ECS::EntityHandle entity = MakeMeshEntity(scene);
+    Assets::AssetService assets{};
+
+    Runtime::SelectedMeshTextureBakeContext context{
+        .Scene = &scene,
+        .AssetService = &assets,
+    };
+
+    const Runtime::SelectedMeshTextureBakeResult result =
+        Runtime::ApplySelectedMeshTextureBakeCommand(
+            context,
+            MakeRoughnessRequest(entity));
+
+    ASSERT_EQ(result.Status, Runtime::SelectedMeshTextureBakeStatus::Success);
+    ASSERT_TRUE(result.GeneratedTexture.IsValid());
+    EXPECT_TRUE(result.BoundGeneratedTexture);
+    EXPECT_EQ(result.BakeDiagnostics.Encoder,
+              Runtime::MeshAttributeTextureBakeEncoder::LinearScalar);
+
+    const auto texture =
+        assets.Read<Assets::AssetTexture2DPayload>(result.GeneratedTexture);
+    ASSERT_TRUE(texture.has_value());
+    ASSERT_EQ(texture->size(), 1u);
+    ExpectPackedMetallicRoughnessPayload(
+        (*texture)[0],
+        Runtime::ProgressiveSlotSemantic::Roughness);
+
+    const auto& bindings =
+        scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
+    const Runtime::ProgressiveSlotBinding* roughness =
+        FindSlot(bindings, Runtime::ProgressiveSlotSemantic::Roughness);
+    ASSERT_NE(roughness, nullptr);
+    EXPECT_EQ(roughness->SourceKind,
+              Runtime::ProgressiveSlotSourceKind::GeneratedTextureAsset);
+    EXPECT_EQ(roughness->Readiness, Runtime::ProgressiveReadinessState::Ready);
+    EXPECT_EQ(roughness->GeneratedTexture, result.GeneratedTexture);
+}
+
+TEST(RuntimeSelectedMeshTextureBake, SynchronousCommandBakesScalarToMetallicSlot)
+{
+    ECS::Scene::Registry scene{};
+    const ECS::EntityHandle entity = MakeMeshEntity(scene);
+    Assets::AssetService assets{};
+
+    Runtime::SelectedMeshTextureBakeContext context{
+        .Scene = &scene,
+        .AssetService = &assets,
+    };
+
+    const Runtime::SelectedMeshTextureBakeResult result =
+        Runtime::ApplySelectedMeshTextureBakeCommand(
+            context,
+            MakeMetallicRequest(entity));
+
+    ASSERT_EQ(result.Status, Runtime::SelectedMeshTextureBakeStatus::Success);
+    ASSERT_TRUE(result.GeneratedTexture.IsValid());
+    EXPECT_TRUE(result.BoundGeneratedTexture);
+    EXPECT_EQ(result.BakeDiagnostics.Encoder,
+              Runtime::MeshAttributeTextureBakeEncoder::LinearScalar);
+
+    const auto texture =
+        assets.Read<Assets::AssetTexture2DPayload>(result.GeneratedTexture);
+    ASSERT_TRUE(texture.has_value());
+    ASSERT_EQ(texture->size(), 1u);
+    ExpectPackedMetallicRoughnessPayload(
+        (*texture)[0],
+        Runtime::ProgressiveSlotSemantic::Metallic);
+
+    const auto& bindings =
+        scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
+    const Runtime::ProgressiveSlotBinding* metallic =
+        FindSlot(bindings, Runtime::ProgressiveSlotSemantic::Metallic);
+    ASSERT_NE(metallic, nullptr);
+    EXPECT_EQ(metallic->SourceKind,
+              Runtime::ProgressiveSlotSourceKind::GeneratedTextureAsset);
+    EXPECT_EQ(metallic->Readiness, Runtime::ProgressiveReadinessState::Ready);
+    EXPECT_EQ(metallic->GeneratedTexture, result.GeneratedTexture);
 }
 
 TEST(RuntimeSelectedMeshTextureBake, DistinctPropertiesCreateDistinctGeneratedTexturesAndBindings)

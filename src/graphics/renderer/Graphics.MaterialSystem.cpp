@@ -519,6 +519,8 @@ namespace Extrinsic::Graphics
         bool anyFailure = false;
         bool normalTextureRequested = false;
         bool normalResolvedWithoutFallback = false;
+        bool metallicRoughnessTextureRequested = false;
+        bool metallicRoughnessResolvedWithoutFallback = false;
 
         for (const Binding& binding : requested)
         {
@@ -536,6 +538,10 @@ namespace Extrinsic::Graphics
             if (binding.Semantic == MaterialTextureSemantic::Normal)
             {
                 normalTextureRequested = true;
+            }
+            if (binding.Semantic == MaterialTextureSemantic::MetallicRoughness)
+            {
+                metallicRoughnessTextureRequested = true;
             }
 
             ++m_Impl->Diagnostics.TextureAssetResolveCount;
@@ -559,6 +565,11 @@ namespace Extrinsic::Graphics
             {
                 normalResolvedWithoutFallback = true;
             }
+            if (binding.Semantic == MaterialTextureSemantic::MetallicRoughness &&
+                !resolved->UsedFallback)
+            {
+                metallicRoughnessResolvedWithoutFallback = true;
+            }
         }
 
         if (normalTextureRequested)
@@ -577,6 +588,15 @@ namespace Extrinsic::Graphics
                 MaterialChannel::Normal,
                 useObjectSpaceNormalTexture ? AttributeSource::Texture
                                             : AttributeSource::VertexAttribute);
+        }
+        if (metallicRoughnessTextureRequested)
+        {
+            params.ChannelSourceBits = SetChannelSource(
+                params.ChannelSourceBits,
+                MaterialChannel::MetallicRoughness,
+                metallicRoughnessResolvedWithoutFallback
+                    ? AttributeSource::Texture
+                    : AttributeSource::VertexAttribute);
         }
 
         SetParams(handle, params);

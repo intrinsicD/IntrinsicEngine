@@ -433,9 +433,10 @@ Concretely:
   transforms it by the model normal matrix, normalizes it, and falls back to the
   vertex normal for uncovered alpha-zero texels. Tangent-space normal maps are
   still reserved for a future path and are not inferred from `NormalID` alone.
-  The fragment stage is still a debug Lambert-style
+  The forward fragment stage is still a debug Lambert-style
   surface shader, not full PBR lighting; metallic/roughness/emissive texture
-  evaluation remains future surface-shading work. The legacy
+  lighting remains future forward-surface work. The promoted GBuffer path emits
+  texture-backed metallic/roughness material channels when available. The legacy
   `assets/shaders/surface.vert/frag` pair predates
   the GpuScene seam (it declares `mat4 Model` + `PtrPositions` push constants
   plus `set = 0/2/3` descriptor sets) and is deliberately *not* referenced by
@@ -1698,10 +1699,11 @@ Concretely:
   `MaterialSystem::ResolveTextureAssetBindings()`. That flagged path decodes
   object-space normal RGB, transforms through the model normal matrix, and
   otherwise preserves vertex-normal shading. Tangent-space authored normal maps
-  remain reserved for a future material path. Metallic/roughness factors
-  are carried in `MaterialParams` and the deferred GBuffer metadata, but full
-  PBR texture/factor lighting is not implemented in the current default
-  forward shader.
+  remain reserved for a future material path. `MaterialParams::MetallicRoughnessID`
+  is consumed by the promoted GBuffer shaders when `MaterialSystem` marks the
+  metallic-roughness channel as texture-backed; the texture follows the glTF
+  convention (`G = roughness`, `B = metallic`). Full PBR texture/factor lighting
+  is still not implemented in the current default forward shader.
   Runtime-generated vertex-property textures are still consumed through the same
   albedo/normal material slots as authored texture assets; graphics never
   imports `AssetService` or knows whether a bindless index came from an

@@ -108,9 +108,10 @@ renderables.
   when `NormalID` is invalid, pending/fallback, or not explicitly flagged as an
   object-space normal map. Ready object-space generated normal textures are
   consumed only through `MaterialFlags::ObjectSpaceNormalMap`; tangent-space
-  normal-map support remains future work.
-  Metallic/roughness/emissive texture evaluation is
-  not part of the current default forward surface shader. Visualization and
+  normal-map support remains future work. Ready metallic-roughness textures are
+  consumed by promoted GBuffer shaders through the packed `G = roughness`,
+  `B = metallic` convention, while full metallic/roughness/emissive evaluation
+  is not part of the current default forward surface shader. Visualization and
   Htex/UV bake
   atlas references do **not** use this fallback: per `GRAPHICS-014Q`
   visualization atlas descriptors with deferred residency are dropped

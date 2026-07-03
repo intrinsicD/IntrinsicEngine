@@ -1,0 +1,39 @@
+# GEOM-057 - UV atlas fast staged default-promotion smoke manifest.
+#
+# This benchmark is the promotion gate for replacing xatlas as the default UV
+# atlas method. It must stay deterministic and PR-fast; broader/heavier mesh
+# corpora belong in a separate nightly benchmark.
+
+benchmark_id: geometry.uv_atlas.fast_staged_promotion.smoke
+method: geometry.uv_atlas.fast_staged_promotion
+dataset: builtin.uv_atlas_promotion_suite
+params:
+  fixtures:
+    - planar_grid_4x4
+    - thin_strip_12x1
+    - cube_surface
+    - open_cylinder_12
+    - octahedron_sphere_proxy
+    - high_valence_fan_16
+    - disconnected_quads
+  baseline_method: xatlas
+  probe_method: fast_staged
+  resolution: 256
+  padding: 2
+  warmup_iterations: 1
+  measured_iterations: 3
+  adoption_claim: true
+  runtime_ratio_mean_max: 1.0
+  runtime_ratio_per_fixture_max: 1.25
+  conformal_regression_tolerance: 0.25
+  stretch_regression_tolerance: 0.05
+  fast_flipped_element_count_max: 0
+  fast_chart_overlap_count_max: 0
+metrics:
+  - runtime_ms
+  - quality_error_l2
+  - quality_error_linf
+thresholds:
+  smoke_runtime_ms_max: 50
+  quality_error_l2_max: 0.0
+  quality_error_linf_max: 0.0

@@ -588,7 +588,7 @@ struct GpuMaterialData {
     uint   Flags;                 // alpha mode, double-sided, emissive, unlit
     uint   AlbedoID;              // bindless texture index (0 = white)
     uint   NormalID;              // bindless texture index (0 = use vertex normal or derivative)
-    uint   MetallicRoughnessID;   // bindless texture index (0 = use factors)
+    uint   MetallicRoughnessID;   // bindless texture index; use factors unless channel source selects texture
     // uint   DisplacementID;     // [DEFERRED — §13.6] — uncomment when tessellation ships
     uint   _reserved1;            // placeholder for DisplacementID
     uint   EmissiveID;            // bindless texture index (0 = none)

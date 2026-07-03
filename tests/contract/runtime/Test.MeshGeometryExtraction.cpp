@@ -452,6 +452,10 @@ TEST(MeshGeometryExtraction, ProgressiveGeneratedPropertyTexturesBindUniqueMater
     EXPECT_EQ(params.AlbedoID, albedoView->View.BindlessIdx);
     EXPECT_EQ(params.NormalID, normalView->View.BindlessIdx);
     EXPECT_EQ(params.MetallicRoughnessID, roughnessView->View.BindlessIdx);
+    EXPECT_EQ(Extrinsic::Graphics::GetChannelSource(
+                  params.ChannelSourceBits,
+                  Extrinsic::Graphics::MaterialChannel::MetallicRoughness),
+              Extrinsic::Graphics::AttributeSource::Texture);
     EXPECT_NE(params.AlbedoID, params.NormalID);
     EXPECT_NE(params.AlbedoID, params.MetallicRoughnessID);
     EXPECT_NE(params.NormalID, params.MetallicRoughnessID);

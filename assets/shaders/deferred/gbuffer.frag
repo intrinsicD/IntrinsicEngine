@@ -81,6 +81,19 @@ vec3 ResolveSurfaceNormal(
         : n;
 }
 
+vec2 ResolveSurfaceMetallicRoughness(GpuMaterialSlot mat, vec2 uv)
+{
+    vec2 roughnessMetallic = vec2(mat.RoughnessFactor, mat.MetallicFactor);
+    const bool metallicRoughnessFromTexture =
+        GpuMaterialChannelSource(mat, GpuMaterialChannel_MetallicRoughness) == GpuAttributeSource_Texture;
+    if (!metallicRoughnessFromTexture || !IsValidTextureID(mat.MetallicRoughnessID)) {
+        return roughnessMetallic;
+    }
+
+    const vec4 mrSample = texture(globalTextures[nonuniformEXT(mat.MetallicRoughnessID)], uv);
+    return vec2(mrSample.g, mrSample.b);
+}
+
 void main() {
     const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;
 
@@ -119,8 +132,9 @@ void main() {
             baseColor);
 
     const vec3 n = ResolveSurfaceNormal(mat, dyn, vWorldNormal, vUv);
+    const vec2 roughnessMetallic = ResolveSurfaceMetallicRoughness(mat, vUv);
     GBuf_Normal = vec4(n, 0.0);
     GBuf_Albedo = baseColor;
-    GBuf_Material = vec4(mat.RoughnessFactor, mat.MetallicFactor, float(cfg.ColorSourceMode), 0.0);
+    GBuf_Material = vec4(roughnessMetallic.x, roughnessMetallic.y, float(cfg.ColorSourceMode), 0.0);
     GBuf_EntityId = uvec4(vEntityId, 0u, 0u, 0u);
 }
