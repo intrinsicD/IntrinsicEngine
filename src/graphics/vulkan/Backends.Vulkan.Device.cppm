@@ -101,12 +101,26 @@ namespace Extrinsic::Backends::Vulkan
         void ReadBuffer(RHI::BufferHandle handle, void* data,
                         uint64_t size, uint64_t offset) override;
         [[nodiscard]] uint64_t GetBufferDeviceAddress(RHI::BufferHandle handle) const override;
+        [[nodiscard]] RHI::ResourceMemoryRequirements GetBufferMemoryRequirements(
+            const RHI::BufferDesc& desc) const noexcept override;
+        [[nodiscard]] RHI::MemoryBlockHandle CreateMemoryBlock(const RHI::MemoryBlockDesc& desc) override;
+        void DestroyMemoryBlock(RHI::MemoryBlockHandle handle) override;
+        [[nodiscard]] RHI::MemoryBlockInfo GetMemoryBlockInfo(
+            RHI::MemoryBlockHandle handle) const noexcept override;
+        [[nodiscard]] RHI::BufferHandle CreatePlacedBuffer(const RHI::PlacedBufferDesc& desc) override;
+        [[nodiscard]] RHI::PlacedResourceInfo GetBufferMemoryPlacement(
+            RHI::BufferHandle handle) const noexcept override;
 
         [[nodiscard]] RHI::TextureHandle CreateTexture(const RHI::TextureDesc& desc) override;
         void DestroyTexture(RHI::TextureHandle handle) override;
         void WriteTexture(RHI::TextureHandle handle, const void* data,
                           uint64_t dataSizeBytes, uint32_t mipLevel,
                           uint32_t arrayLayer) override;
+        [[nodiscard]] RHI::ResourceMemoryRequirements GetTextureMemoryRequirements(
+            const RHI::TextureDesc& desc) const noexcept override;
+        [[nodiscard]] RHI::TextureHandle CreatePlacedTexture(const RHI::PlacedTextureDesc& desc) override;
+        [[nodiscard]] RHI::PlacedResourceInfo GetTextureMemoryPlacement(
+            RHI::TextureHandle handle) const noexcept override;
 
         [[nodiscard]] RHI::SamplerHandle CreateSampler(const RHI::SamplerDesc& desc) override;
         void DestroySampler(RHI::SamplerHandle handle) override;
@@ -303,6 +317,7 @@ namespace Extrinsic::Backends::Vulkan
 
         Core::ResourcePool<VulkanBuffer,   RHI::BufferHandle,   kMaxFramesInFlight> m_Buffers;
         Core::ResourcePool<VulkanImage,    RHI::TextureHandle,  kMaxFramesInFlight> m_Images;
+        Core::ResourcePool<VulkanMemoryBlock, RHI::MemoryBlockHandle, kMaxFramesInFlight> m_MemoryBlocks;
         Core::ResourcePool<VulkanSampler,  RHI::SamplerHandle,  kMaxFramesInFlight> m_Samplers;
         Core::ResourcePool<VulkanPipeline, RHI::PipelineHandle, kMaxFramesInFlight> m_Pipelines;
 

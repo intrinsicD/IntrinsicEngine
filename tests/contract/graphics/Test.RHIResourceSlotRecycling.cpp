@@ -81,6 +81,7 @@ TEST(RHIPlacedMemoryContract, NullDeviceReportsRequirementsAndCreatesMemoryBlock
 
     const Extrinsic::RHI::MemoryBlockHandle block = device->CreateMemoryBlock({
         .SizeBytes = deviceLocalReq.SizeBytes,
+        .AlignmentBytes = deviceLocalReq.AlignmentBytes,
         .MemoryTypeBits = deviceLocalReq.MemoryTypeBits,
         .DebugName = "PlacedMemory.DeviceLocalBlock",
     });
@@ -89,6 +90,7 @@ TEST(RHIPlacedMemoryContract, NullDeviceReportsRequirementsAndCreatesMemoryBlock
     const Extrinsic::RHI::MemoryBlockInfo info = device->GetMemoryBlockInfo(block);
     ASSERT_TRUE(info.IsValid);
     EXPECT_EQ(info.SizeBytes, deviceLocalReq.SizeBytes);
+    EXPECT_EQ(info.AlignmentBytes, deviceLocalReq.AlignmentBytes);
     EXPECT_EQ(info.MemoryTypeBits, deviceLocalReq.MemoryTypeBits);
     EXPECT_NE(info.SelectedMemoryTypeBit & deviceLocalReq.MemoryTypeBits, 0u);
 
@@ -129,11 +131,13 @@ TEST(RHIPlacedMemoryContract, NullDeviceCreatesPlacedBufferAndTextureWithRecorde
 
     const Extrinsic::RHI::MemoryBlockHandle bufferBlock = device->CreateMemoryBlock({
         .SizeBytes = bufferReq.SizeBytes,
+        .AlignmentBytes = bufferReq.AlignmentBytes,
         .MemoryTypeBits = bufferReq.MemoryTypeBits,
         .DebugName = "PlacedMemory.BufferBlock",
     });
     const Extrinsic::RHI::MemoryBlockHandle textureBlock = device->CreateMemoryBlock({
         .SizeBytes = textureReq.SizeBytes + textureReq.AlignmentBytes,
+        .AlignmentBytes = textureReq.AlignmentBytes,
         .MemoryTypeBits = textureReq.MemoryTypeBits,
         .DebugName = "PlacedMemory.TextureBlock",
     });
@@ -201,16 +205,19 @@ TEST(RHIPlacedMemoryContract, NullDeviceRejectsIncompatibleAndMisalignedPlacedRe
 
     const Extrinsic::RHI::MemoryBlockHandle hostBlock = device->CreateMemoryBlock({
         .SizeBytes = deviceLocalReq.SizeBytes,
+        .AlignmentBytes = deviceLocalReq.AlignmentBytes,
         .MemoryTypeBits = hostVisibleReq.MemoryTypeBits,
         .DebugName = "PlacedMemory.HostOnlyBlock",
     });
     const Extrinsic::RHI::MemoryBlockHandle deviceBlock = device->CreateMemoryBlock({
         .SizeBytes = deviceLocalReq.SizeBytes + deviceLocalReq.AlignmentBytes,
+        .AlignmentBytes = deviceLocalReq.AlignmentBytes,
         .MemoryTypeBits = deviceLocalReq.MemoryTypeBits,
         .DebugName = "PlacedMemory.DeviceBlock",
     });
     const Extrinsic::RHI::MemoryBlockHandle smallBlock = device->CreateMemoryBlock({
         .SizeBytes = deviceLocalReq.SizeBytes - 1u,
+        .AlignmentBytes = deviceLocalReq.AlignmentBytes,
         .MemoryTypeBits = deviceLocalReq.MemoryTypeBits,
         .DebugName = "PlacedMemory.SmallBlock",
     });
@@ -254,6 +261,7 @@ TEST(RHIResourceSlotRecycling, NullDeviceReusesDestroyedMemoryBlockSlotWithNewGe
 
     const Extrinsic::RHI::MemoryBlockHandle first = device->CreateMemoryBlock({
         .SizeBytes = req.SizeBytes,
+        .AlignmentBytes = req.AlignmentBytes,
         .MemoryTypeBits = req.MemoryTypeBits,
         .DebugName = "SlotRecycling.PlacedMemory.First",
     });
@@ -264,6 +272,7 @@ TEST(RHIResourceSlotRecycling, NullDeviceReusesDestroyedMemoryBlockSlotWithNewGe
 
     const Extrinsic::RHI::MemoryBlockHandle reused = device->CreateMemoryBlock({
         .SizeBytes = req.SizeBytes,
+        .AlignmentBytes = req.AlignmentBytes,
         .MemoryTypeBits = req.MemoryTypeBits,
         .DebugName = "SlotRecycling.PlacedMemory.Reused",
     });

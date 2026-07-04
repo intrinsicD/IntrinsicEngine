@@ -271,6 +271,20 @@ available through the Vulkan 1.2/1.3 feature chain.
   families. This lets transfer-queue uploads and graphics-queue reads touch
   the same resource without explicit queue-family ownership-transfer barrier
   pairs while operational pass execution is being landed.
+- `GRAPHICS-118` placed memory is implemented behind the backend-neutral RHI
+  contract. `GetBufferMemoryRequirements()` and
+  `GetTextureMemoryRequirements()` use Vulkan 1.3 objectless memory-requirement
+  queries, filter compatible memory types by the requested resource properties,
+  and include `bufferImageGranularity` in the reported placement alignment so a
+  shared block can safely mix buffers and images. `CreateMemoryBlock()` creates a
+  standalone VMA allocation, records the selected memory-type bit, and frees it
+  through the deferred deletion path. `CreatePlacedBuffer()` and
+  `CreatePlacedTexture()` create raw Vulkan objects, bind them to the block at
+  the requested offset with VMA binding helpers, and record placement
+  introspection without exposing `Vk*` types through RHI. Host-visible placed
+  buffers fail closed for now because transient aliasing only requires
+  device-local resources; renderer adoption and the measured aliasing smoke
+  remain owned by `GRAPHICS-118` Slice D.
 - Buffer, texture, sampler, and pipeline `IDevice` overrides are symbol-complete
   in `Backends.Vulkan.Device.cpp`. They guard null/non-live backend state and can
   be exercised directly after service-ready bootstrap while `IsOperational()`

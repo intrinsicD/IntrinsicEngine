@@ -92,6 +92,7 @@ namespace Extrinsic::Backends::Null
     struct MemoryBlockEntry
     {
         std::uint64_t SizeBytes = 0;
+        std::uint64_t AlignmentBytes = 1;
         std::uint32_t MemoryTypeBits = 0;
         std::uint32_t SelectedMemoryTypeBit = 0;
         std::string DebugName;
@@ -240,11 +241,12 @@ namespace Extrinsic::Backends::Null
         [[nodiscard]] RHI::MemoryBlockHandle CreateMemoryBlock(const RHI::MemoryBlockDesc& desc) override
         {
             const std::uint32_t selectedBit = SelectLowestMemoryTypeBit(desc.MemoryTypeBits);
-            if (desc.SizeBytes == 0u || selectedBit == 0u)
+            if (desc.SizeBytes == 0u || desc.AlignmentBytes == 0u || selectedBit == 0u)
                 return {};
 
             return m_MemoryBlocks.Add(MemoryBlockEntry{
                 .SizeBytes = desc.SizeBytes,
+                .AlignmentBytes = desc.AlignmentBytes,
                 .MemoryTypeBits = desc.MemoryTypeBits,
                 .SelectedMemoryTypeBit = selectedBit,
                 .DebugName = desc.DebugName ? desc.DebugName : "",
@@ -265,6 +267,7 @@ namespace Extrinsic::Backends::Null
 
             return RHI::MemoryBlockInfo{
                 .SizeBytes = block->SizeBytes,
+                .AlignmentBytes = block->AlignmentBytes,
                 .MemoryTypeBits = block->MemoryTypeBits,
                 .SelectedMemoryTypeBit = block->SelectedMemoryTypeBit,
                 .IsValid = true,

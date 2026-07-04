@@ -59,8 +59,10 @@ This directory contains the `RHI` module/files.
   backing memory. The public `IDevice` seam exposes memory requirement queries
   for buffers/textures, opaque memory-block creation/destruction, placed
   buffer/texture creation, and placement introspection records. Requirements
-  report byte size, alignment, `MemoryTypeBits`, and whether a backend requires
-  a dedicated allocation.
+  report byte size, required placement alignment, `MemoryTypeBits`, and whether
+  a backend requires a dedicated allocation. `MemoryBlockDesc` repeats the
+  selected maximum alignment so backends can allocate a block whose base address
+  is compatible with every resource that will be placed inside it.
 - Default `IDevice` implementations fail closed by returning invalid handles or
   empty requirement/info records. This keeps capability-absent backends and CPU
   mocks source-compatible until they implement real placement.
@@ -68,10 +70,10 @@ This directory contains the `RHI` module/files.
   `GRAPHICS-118` Slice B: blocks select one compatible memory-type bit, placed
   resources validate alignment/range/compatibility, and overlapping placements
   are allowed because render-graph lifetime planning owns alias safety.
-- Vulkan placed allocation and renderer adoption are not implemented in this
-  slice. They remain deferred to `GRAPHICS-118` Slices C-D, where backend memory
-  blocks bind real buffers/images and the renderer consumes compiled transient
-  placements.
+- Vulkan implements the placed allocation seam with backend-local memory blocks
+  and placed buffer/image binding. Renderer adoption is still deferred to
+  `GRAPHICS-118` Slice D, where compiled transient placements become the
+  default allocation path under the existing aliasing toggle.
 
 ## Transfer uploads and readbacks
 

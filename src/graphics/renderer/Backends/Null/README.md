@@ -8,8 +8,9 @@ leases to resources that point to nothing.
 Null still keeps CPU-visible resource bookkeeping for contracts that are useful
 without an operational GPU. It implements `GRAPHICS-118` placed-memory
 bookkeeping by reporting deterministic buffer/texture memory requirements,
-creating opaque memory-block handles, validating placed buffer/texture
-alignment/range/memory-type compatibility, and recording the accepted
+creating opaque memory-block handles with the selected block-base alignment,
+validating placed buffer/texture alignment/range/memory-type compatibility, and
+recording the accepted
 block+offset placement for introspection tests. It does not allocate real GPU
 memory or enforce alias overlap hazards; render-graph planning and the Vulkan
 backend own those later slices.

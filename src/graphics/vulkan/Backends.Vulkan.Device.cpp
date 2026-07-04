@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <atomic>
 #include <cstddef>
@@ -1257,6 +1258,7 @@ VkResult VulkanDevice::CreateSwapchainResources(const std::uint32_t requestedWid
         importedImage.MipLevels = 1u;
         importedImage.ArrayLayers = 1u;
         importedImage.CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        importedImage.OwnsImage = false;
         importedImage.OwnsMemory = false;
 
         outState.Handles.push_back(m_Images.Add(std::move(importedImage)));
@@ -2043,6 +2045,7 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
             importedImage.MipLevels = 1u;
             importedImage.ArrayLayers = 1u;
             importedImage.CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            importedImage.OwnsImage = false;
             importedImage.OwnsMemory = false;
 
             m_SwapchainViews.push_back(imageView);
@@ -2265,22 +2268,37 @@ void VulkanDevice::Shutdown()
         if (image.OwnsMemory && vma != VK_NULL_HANDLE && image.Image != VK_NULL_HANDLE &&
             image.Allocation != VK_NULL_HANDLE)
             vmaDestroyImage(vma, image.Image, image.Allocation);
+        else if (!image.OwnsMemory && image.OwnsImage && device != VK_NULL_HANDLE &&
+                 image.Image != VK_NULL_HANDLE)
+            vkDestroyImage(device, image.Image, nullptr);
         image.Image = VK_NULL_HANDLE;
         image.View = VK_NULL_HANDLE;
         image.Allocation = VK_NULL_HANDLE;
+        image.Placement = {};
     });
     m_Images.Clear();
 
-    m_Buffers.ForEach([vma](RHI::BufferHandle, VulkanBuffer& buffer)
+    m_Buffers.ForEach([device, vma](RHI::BufferHandle, VulkanBuffer& buffer)
     {
-        if (vma != VK_NULL_HANDLE && buffer.Buffer != VK_NULL_HANDLE &&
+        if (buffer.OwnsMemory && vma != VK_NULL_HANDLE && buffer.Buffer != VK_NULL_HANDLE &&
             buffer.Allocation != VK_NULL_HANDLE)
             vmaDestroyBuffer(vma, buffer.Buffer, buffer.Allocation);
+        else if (!buffer.OwnsMemory && device != VK_NULL_HANDLE && buffer.Buffer != VK_NULL_HANDLE)
+            vkDestroyBuffer(device, buffer.Buffer, nullptr);
         buffer.Buffer = VK_NULL_HANDLE;
         buffer.Allocation = VK_NULL_HANDLE;
         buffer.MappedPtr = nullptr;
+        buffer.Placement = {};
     });
     m_Buffers.Clear();
+
+    m_MemoryBlocks.ForEach([vma](RHI::MemoryBlockHandle, VulkanMemoryBlock& block)
+    {
+        if (vma != VK_NULL_HANDLE && block.Allocation != VK_NULL_HANDLE)
+            vmaFreeMemory(vma, block.Allocation);
+        block.Allocation = VK_NULL_HANDLE;
+    });
+    m_MemoryBlocks.Clear();
 
     m_SwapchainHandles.clear();
     if (device != VK_NULL_HANDLE)
@@ -2409,6 +2427,7 @@ void VulkanDevice::ProcessResourcePoolDeletions()
 {
     m_Buffers.ProcessDeletions(m_GlobalFrameNumber);
     m_Images.ProcessDeletions(m_GlobalFrameNumber);
+    m_MemoryBlocks.ProcessDeletions(m_GlobalFrameNumber);
     m_Samplers.ProcessDeletions(m_GlobalFrameNumber);
     m_Pipelines.ProcessDeletions(m_GlobalFrameNumber);
 }
@@ -3533,6 +3552,170 @@ namespace
         }
     }
 
+    void PushUniqueQueueFamily(std::uint32_t* queueFamilies,
+                               std::uint32_t& queueFamilyCount,
+                               const std::uint32_t family)
+    {
+        for (std::uint32_t index = 0; index < queueFamilyCount; ++index)
+        {
+            if (queueFamilies[index] == family)
+                return;
+        }
+        queueFamilies[queueFamilyCount++] = family;
+    }
+
+    [[nodiscard]] VkBufferCreateInfo MakeVulkanBufferCreateInfo(
+        const RHI::BufferDesc& desc,
+        std::array<std::uint32_t, 3>& queueFamilies,
+        const std::uint32_t graphicsFamily,
+        const std::uint32_t transferFamily)
+    {
+        VkBufferCreateInfo info{};
+        info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        info.size = desc.SizeBytes;
+        info.usage = ToVkBufferUsage(desc.Usage) |
+                     VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                     VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
+        std::uint32_t queueFamilyCount = 0;
+        PushUniqueQueueFamily(queueFamilies.data(), queueFamilyCount, graphicsFamily);
+        if (transferFamily != graphicsFamily)
+            PushUniqueQueueFamily(queueFamilies.data(), queueFamilyCount, transferFamily);
+
+        if (queueFamilyCount > 1u)
+        {
+            info.sharingMode = VK_SHARING_MODE_CONCURRENT;
+            info.queueFamilyIndexCount = queueFamilyCount;
+            info.pQueueFamilyIndices = queueFamilies.data();
+        }
+        else
+        {
+            info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        }
+
+        return info;
+    }
+
+    struct VulkanImageCreateInfoBundle
+    {
+        VkImageCreateInfo Info{};
+        std::array<std::uint32_t, 2> QueueFamilies{};
+        VkFormat Format = VK_FORMAT_UNDEFINED;
+        VkImageUsageFlags Usage = 0;
+        std::uint32_t Depth = 1;
+        std::uint32_t ArrayLayers = 1;
+        bool IsValid = false;
+    };
+
+    [[nodiscard]] VulkanImageCreateInfoBundle MakeVulkanImageCreateInfo(
+        const RHI::TextureDesc& desc,
+        const std::uint32_t graphicsFamily,
+        const std::uint32_t transferFamily)
+    {
+        VulkanImageCreateInfoBundle bundle{};
+        bundle.Format = ToVkFormat(desc.Fmt);
+        bundle.Usage = ToVkTextureUsage(desc.Usage);
+        if (bundle.Format == VK_FORMAT_UNDEFINED || bundle.Usage == 0u ||
+            desc.Width == 0u || desc.Height == 0u ||
+            desc.DepthOrArrayLayers == 0u || desc.MipLevels == 0u)
+        {
+            return bundle;
+        }
+        if (desc.Dimension == RHI::TextureDimension::TexCube && desc.DepthOrArrayLayers != 6u)
+            return bundle;
+
+        bundle.Depth = desc.Dimension == RHI::TextureDimension::Tex3D ? desc.DepthOrArrayLayers : 1u;
+        bundle.ArrayLayers = desc.Dimension == RHI::TextureDimension::Tex3D ? 1u : desc.DepthOrArrayLayers;
+
+        VkImageCreateInfo& info = bundle.Info;
+        info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        info.imageType = ToVkImageType(desc.Dimension);
+        info.format = bundle.Format;
+        info.extent = VkExtent3D{.width = desc.Width,
+                                 .height = desc.Height,
+                                 .depth = bundle.Depth};
+        info.mipLevels = desc.MipLevels;
+        info.arrayLayers = bundle.ArrayLayers;
+        info.samples = ToVkSampleCount(desc.SampleCount);
+        info.tiling = VK_IMAGE_TILING_OPTIMAL;
+        info.usage = bundle.Usage;
+
+        if (transferFamily != graphicsFamily)
+        {
+            bundle.QueueFamilies = {graphicsFamily, transferFamily};
+            info.sharingMode = VK_SHARING_MODE_CONCURRENT;
+            info.queueFamilyIndexCount = 2u;
+            info.pQueueFamilyIndices = bundle.QueueFamilies.data();
+        }
+        else
+        {
+            info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        }
+
+        info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        if (desc.Dimension == RHI::TextureDimension::TexCube)
+            info.flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+
+        bundle.IsValid = true;
+        return bundle;
+    }
+
+    void RebindVulkanImageCreateInfoPointers(VulkanImageCreateInfoBundle& bundle) noexcept
+    {
+        if (bundle.Info.queueFamilyIndexCount != 0u)
+            bundle.Info.pQueueFamilyIndices = bundle.QueueFamilies.data();
+    }
+
+    [[nodiscard]] std::uint64_t VulkanPlacedAlignment(
+        const VkPhysicalDevice physicalDevice,
+        const std::uint64_t resourceAlignment) noexcept
+    {
+        if (physicalDevice == VK_NULL_HANDLE)
+            return resourceAlignment;
+
+        VkPhysicalDeviceProperties properties{};
+        vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+        return std::max<std::uint64_t>(
+            resourceAlignment,
+            static_cast<std::uint64_t>(properties.limits.bufferImageGranularity));
+    }
+
+    [[nodiscard]] std::uint32_t FilterMemoryTypeBits(
+        const VkPhysicalDevice physicalDevice,
+        const std::uint32_t memoryTypeBits,
+        const VkMemoryPropertyFlags requiredFlags) noexcept
+    {
+        if (physicalDevice == VK_NULL_HANDLE || memoryTypeBits == 0u || requiredFlags == 0u)
+            return memoryTypeBits;
+
+        VkPhysicalDeviceMemoryProperties properties{};
+        vkGetPhysicalDeviceMemoryProperties(physicalDevice, &properties);
+
+        std::uint32_t filtered = 0u;
+        for (std::uint32_t index = 0; index < properties.memoryTypeCount && index < 32u; ++index)
+        {
+            const std::uint32_t bit = 1u << index;
+            if ((memoryTypeBits & bit) == 0u)
+                continue;
+            if ((properties.memoryTypes[index].propertyFlags & requiredFlags) == requiredFlags)
+                filtered |= bit;
+        }
+        return filtered;
+    }
+
+    [[nodiscard]] bool IsAligned(const std::uint64_t value,
+                                 const std::uint64_t alignment) noexcept
+    {
+        return alignment != 0u && (value % alignment) == 0u;
+    }
+
+    [[nodiscard]] bool RangeFits(const std::uint64_t offset,
+                                 const std::uint64_t size,
+                                 const std::uint64_t blockSize) noexcept
+    {
+        return offset <= blockSize && size <= (blockSize - offset);
+    }
+
     [[nodiscard]] std::uint32_t MipExtent(const std::uint32_t extent, const std::uint32_t mipLevel)
     {
         const std::uint32_t shifted = extent >> mipLevel;
@@ -3649,41 +3832,14 @@ RHI::BufferHandle VulkanDevice::CreateBuffer(const RHI::BufferDesc& desc)
     if (!HasLiveOperationalPrerequisites() || desc.SizeBytes == 0)
         return {};
 
-    VkBufferCreateInfo bci{};
-    bci.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bci.size  = desc.SizeBytes;
-    bci.usage = ToVkBufferUsage(desc.Usage) | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    // TransferSrc always present so WriteBuffer's staging copy (dst→src) works.
-    bci.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-
     // GRAPHICS-018 §4 queue-family handling: if the transfer queue lives on a
     // different family from graphics, declare CONCURRENT sharing so transfer
     // uploads and graphics reads can touch the same buffer without explicit
     // queue-family ownership-transfer barriers between the two queues. The
     // simpler EXCLUSIVE path is preserved when families coincide.
-    std::uint32_t bufferQueueFamilies[3] = {m_GraphicsFamily, m_TransferFamily, m_PresentFamily};
-    std::uint32_t bufferQueueFamilyCount = 0;
-    auto pushUniqueFamily = [&bufferQueueFamilies, &bufferQueueFamilyCount](std::uint32_t family)
-    {
-        for (std::uint32_t index = 0; index < bufferQueueFamilyCount; ++index)
-        {
-            if (bufferQueueFamilies[index] == family) return;
-        }
-        bufferQueueFamilies[bufferQueueFamilyCount++] = family;
-    };
-    bufferQueueFamilyCount = 0;
-    pushUniqueFamily(m_GraphicsFamily);
-    if (m_TransferFamily != m_GraphicsFamily) pushUniqueFamily(m_TransferFamily);
-    if (bufferQueueFamilyCount > 1)
-    {
-        bci.sharingMode = VK_SHARING_MODE_CONCURRENT;
-        bci.queueFamilyIndexCount = bufferQueueFamilyCount;
-        bci.pQueueFamilyIndices = bufferQueueFamilies;
-    }
-    else
-    {
-        bci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    }
+    std::array<std::uint32_t, 3> bufferQueueFamilies{};
+    const VkBufferCreateInfo bci =
+        MakeVulkanBufferCreateInfo(desc, bufferQueueFamilies, m_GraphicsFamily, m_TransferFamily);
 
     VmaAllocationCreateInfo aci{};
     VmaAllocationInfo info{};
@@ -3705,6 +3861,7 @@ RHI::BufferHandle VulkanDevice::CreateBuffer(const RHI::BufferDesc& desc)
     buf.SizeBytes   = desc.SizeBytes;
     buf.HostVisible = desc.HostVisible;
     buf.HasBDA      = RHI::HasUsage(desc.Usage, RHI::BufferUsage::Storage);
+    buf.OwnsMemory  = true;
 
     VkResult result = vmaCreateBuffer(m_Vma, &bci, &aci,
                                       &buf.Buffer, &buf.Allocation, &info);
@@ -3753,20 +3910,26 @@ void VulkanDevice::DestroyBuffer(RHI::BufferHandle handle)
     // Move the Vulkan objects out so the pool slot can be reclaimed.
     VkBuffer      vkBuf   = buf->Buffer;
     VmaAllocation vkAlloc = buf->Allocation;
+    const bool ownsMemory = buf->OwnsMemory;
     buf->Buffer     = VK_NULL_HANDLE;
     buf->Allocation = VK_NULL_HANDLE;
     buf->MappedPtr  = nullptr;
+    buf->Placement  = {};
 
     m_Buffers.Remove(handle, m_GlobalFrameNumber);
 
     // Defer the actual VMA destroy until this frame's resources are safe to release.
-    VmaAllocator vma = m_Vma;
-    if (vma == VK_NULL_HANDLE || vkBuf == VK_NULL_HANDLE || vkAlloc == VK_NULL_HANDLE)
+    const VkDevice device = m_Device;
+    const VmaAllocator vma = m_Vma;
+    if (vkBuf == VK_NULL_HANDLE)
         return;
 
-    DeferDelete([vma, vkBuf, vkAlloc]() mutable
+    DeferDelete([device, vma, vkBuf, vkAlloc, ownsMemory]() mutable
     {
-        vmaDestroyBuffer(vma, vkBuf, vkAlloc);
+        if (ownsMemory && vma != VK_NULL_HANDLE && vkAlloc != VK_NULL_HANDLE)
+            vmaDestroyBuffer(vma, vkBuf, vkAlloc);
+        else if (!ownsMemory && device != VK_NULL_HANDLE)
+            vkDestroyBuffer(device, vkBuf, nullptr);
     });
 }
 
@@ -3999,20 +4162,227 @@ uint64_t VulkanDevice::GetBufferDeviceAddress(RHI::BufferHandle handle) const
     return vkGetBufferDeviceAddress(m_Device, &info);
 }
 
+RHI::ResourceMemoryRequirements VulkanDevice::GetBufferMemoryRequirements(
+    const RHI::BufferDesc& desc) const noexcept
+{
+    if (!HasLiveOperationalPrerequisites() || desc.SizeBytes == 0u ||
+        vkGetDeviceBufferMemoryRequirements == nullptr)
+    {
+        return {};
+    }
+
+    std::array<std::uint32_t, 3> bufferQueueFamilies{};
+    const VkBufferCreateInfo bufferInfo =
+        MakeVulkanBufferCreateInfo(desc, bufferQueueFamilies, m_GraphicsFamily, m_TransferFamily);
+
+    VkMemoryDedicatedRequirements dedicated{};
+    dedicated.sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_REQUIREMENTS;
+
+    VkMemoryRequirements2 requirements{};
+    requirements.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2;
+    requirements.pNext = &dedicated;
+
+    VkDeviceBufferMemoryRequirements query{};
+    query.sType = VK_STRUCTURE_TYPE_DEVICE_BUFFER_MEMORY_REQUIREMENTS;
+    query.pCreateInfo = &bufferInfo;
+
+    vkGetDeviceBufferMemoryRequirements(m_Device, &query, &requirements);
+
+    const VkMemoryPropertyFlags requiredFlags =
+        desc.HostVisible ? VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT : VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    const std::uint32_t memoryTypeBits =
+        FilterMemoryTypeBits(m_PhysDevice, requirements.memoryRequirements.memoryTypeBits, requiredFlags);
+    if (memoryTypeBits == 0u)
+        return {};
+
+    return RHI::ResourceMemoryRequirements{
+        .SizeBytes = static_cast<std::uint64_t>(requirements.memoryRequirements.size),
+        .AlignmentBytes = VulkanPlacedAlignment(
+            m_PhysDevice,
+            static_cast<std::uint64_t>(requirements.memoryRequirements.alignment)),
+        .MemoryTypeBits = memoryTypeBits,
+        .DedicatedAllocationRequired = dedicated.requiresDedicatedAllocation == VK_TRUE,
+    };
+}
+
+RHI::MemoryBlockHandle VulkanDevice::CreateMemoryBlock(const RHI::MemoryBlockDesc& desc)
+{
+    if (!HasLiveOperationalPrerequisites() || desc.SizeBytes == 0u ||
+        desc.AlignmentBytes == 0u || desc.MemoryTypeBits == 0u)
+    {
+        return {};
+    }
+
+    VkMemoryRequirements requirements{};
+    requirements.size = static_cast<VkDeviceSize>(desc.SizeBytes);
+    requirements.alignment = static_cast<VkDeviceSize>(desc.AlignmentBytes);
+    requirements.memoryTypeBits = desc.MemoryTypeBits;
+
+    VmaAllocationCreateInfo allocationInfo{};
+    allocationInfo.usage = VMA_MEMORY_USAGE_UNKNOWN;
+    allocationInfo.memoryTypeBits = desc.MemoryTypeBits;
+
+    VmaAllocation allocation = VK_NULL_HANDLE;
+    VmaAllocationInfo allocatedInfo{};
+    const VkResult result =
+        vmaAllocateMemory(m_Vma, &requirements, &allocationInfo, &allocation, &allocatedInfo);
+    if (result != VK_SUCCESS)
+    {
+        NoteDeviceLostIfNeeded(result);
+        return {};
+    }
+
+    const std::uint32_t selectedMemoryTypeBit =
+        allocatedInfo.memoryType < 32u ? (1u << allocatedInfo.memoryType) : 0u;
+    if (selectedMemoryTypeBit == 0u)
+    {
+        vmaFreeMemory(m_Vma, allocation);
+        return {};
+    }
+
+    if (desc.DebugName != nullptr)
+        vmaSetAllocationName(m_Vma, allocation, desc.DebugName);
+
+    return m_MemoryBlocks.Add(VulkanMemoryBlock{
+        .Allocation = allocation,
+        .SizeBytes = static_cast<std::uint64_t>(allocatedInfo.size),
+        .AlignmentBytes = desc.AlignmentBytes,
+        .MemoryTypeBits = desc.MemoryTypeBits,
+        .SelectedMemoryTypeBit = selectedMemoryTypeBit,
+    });
+}
+
+void VulkanDevice::DestroyMemoryBlock(RHI::MemoryBlockHandle handle)
+{
+    VulkanMemoryBlock* block = m_MemoryBlocks.GetIfValid(handle);
+    if (block == nullptr)
+        return;
+
+    const VmaAllocation allocation = block->Allocation;
+    block->Allocation = VK_NULL_HANDLE;
+    m_MemoryBlocks.Remove(handle, m_GlobalFrameNumber);
+
+    const VmaAllocator vma = m_Vma;
+    if (vma == VK_NULL_HANDLE || allocation == VK_NULL_HANDLE)
+        return;
+
+    DeferDelete([vma, allocation]() mutable
+    {
+        vmaFreeMemory(vma, allocation);
+    });
+}
+
+RHI::MemoryBlockInfo VulkanDevice::GetMemoryBlockInfo(
+    RHI::MemoryBlockHandle handle) const noexcept
+{
+    const VulkanMemoryBlock* block = m_MemoryBlocks.GetIfValid(handle);
+    if (block == nullptr || block->Allocation == VK_NULL_HANDLE)
+        return {};
+
+    return RHI::MemoryBlockInfo{
+        .SizeBytes = block->SizeBytes,
+        .AlignmentBytes = block->AlignmentBytes,
+        .MemoryTypeBits = block->MemoryTypeBits,
+        .SelectedMemoryTypeBit = block->SelectedMemoryTypeBit,
+        .IsValid = true,
+    };
+}
+
+RHI::BufferHandle VulkanDevice::CreatePlacedBuffer(const RHI::PlacedBufferDesc& placedDesc)
+{
+    if (!HasLiveOperationalPrerequisites() || placedDesc.Desc.HostVisible)
+        return {};
+
+    const RHI::ResourceMemoryRequirements requirements =
+        GetBufferMemoryRequirements(placedDesc.Desc);
+    if (!requirements.IsValid() || requirements.DedicatedAllocationRequired)
+        return {};
+
+    const VulkanMemoryBlock* block = m_MemoryBlocks.GetIfValid(placedDesc.Placement.Block);
+    if (block == nullptr || block->Allocation == VK_NULL_HANDLE)
+        return {};
+    if ((block->SelectedMemoryTypeBit & requirements.MemoryTypeBits) == 0u)
+        return {};
+    if (block->AlignmentBytes < requirements.AlignmentBytes)
+        return {};
+    if (!IsAligned(placedDesc.Placement.OffsetBytes, requirements.AlignmentBytes))
+        return {};
+    if (!RangeFits(placedDesc.Placement.OffsetBytes, requirements.SizeBytes, block->SizeBytes))
+        return {};
+
+    std::array<std::uint32_t, 3> bufferQueueFamilies{};
+    const VkBufferCreateInfo bufferInfo =
+        MakeVulkanBufferCreateInfo(placedDesc.Desc, bufferQueueFamilies, m_GraphicsFamily, m_TransferFamily);
+
+    VkBuffer buffer = VK_NULL_HANDLE;
+    VkResult result = vkCreateBuffer(m_Device, &bufferInfo, nullptr, &buffer);
+    if (result != VK_SUCCESS)
+    {
+        NoteDeviceLostIfNeeded(result);
+        return {};
+    }
+
+    result = vmaBindBufferMemory2(m_Vma,
+                                  block->Allocation,
+                                  static_cast<VkDeviceSize>(placedDesc.Placement.OffsetBytes),
+                                  buffer,
+                                  nullptr);
+    if (result != VK_SUCCESS)
+    {
+        NoteDeviceLostIfNeeded(result);
+        vkDestroyBuffer(m_Device, buffer, nullptr);
+        return {};
+    }
+
+    if (placedDesc.Desc.DebugName && m_ValidationEnabled && vkSetDebugUtilsObjectNameEXT)
+    {
+        VkDebugUtilsObjectNameInfoEXT name{};
+        name.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+        name.objectType = VK_OBJECT_TYPE_BUFFER;
+        name.objectHandle = reinterpret_cast<std::uint64_t>(buffer);
+        name.pObjectName = placedDesc.Desc.DebugName;
+        vkSetDebugUtilsObjectNameEXT(m_Device, &name);
+    }
+
+    const RHI::PlacedResourceInfo placement{
+        .Block = placedDesc.Placement.Block,
+        .OffsetBytes = placedDesc.Placement.OffsetBytes,
+        .SizeBytes = requirements.SizeBytes,
+        .AlignmentBytes = requirements.AlignmentBytes,
+        .MemoryTypeBit = block->SelectedMemoryTypeBit,
+        .IsPlaced = true,
+    };
+
+    return m_Buffers.Add(VulkanBuffer{
+        .Buffer = buffer,
+        .Allocation = VK_NULL_HANDLE,
+        .MappedPtr = nullptr,
+        .Usage = bufferInfo.usage,
+        .SizeBytes = placedDesc.Desc.SizeBytes,
+        .HostVisible = false,
+        .HostCoherent = false,
+        .HasBDA = RHI::HasUsage(placedDesc.Desc.Usage, RHI::BufferUsage::Storage),
+        .OwnsMemory = false,
+        .Placement = placement,
+    });
+}
+
+RHI::PlacedResourceInfo VulkanDevice::GetBufferMemoryPlacement(
+    RHI::BufferHandle handle) const noexcept
+{
+    const VulkanBuffer* buffer = m_Buffers.GetIfValid(handle);
+    return buffer != nullptr ? buffer->Placement : RHI::PlacedResourceInfo{};
+}
+
 RHI::TextureHandle VulkanDevice::CreateTexture(const RHI::TextureDesc& desc)
 {
     if (!HasLiveOperationalPrerequisites())
         return {};
 
-    const VkFormat format = ToVkFormat(desc.Fmt);
-    const VkImageUsageFlags usage = ToVkTextureUsage(desc.Usage);
-    if (format == VK_FORMAT_UNDEFINED || usage == 0 || desc.Width == 0 || desc.Height == 0 ||
-        desc.DepthOrArrayLayers == 0 || desc.MipLevels == 0)
-    {
-        return {};
-    }
-
-    if (desc.Dimension == RHI::TextureDimension::TexCube && desc.DepthOrArrayLayers != 6)
+    VulkanImageCreateInfoBundle imageInfoBundle =
+        MakeVulkanImageCreateInfo(desc, m_GraphicsFamily, m_TransferFamily);
+    RebindVulkanImageCreateInfoPointers(imageInfoBundle);
+    if (!imageInfoBundle.IsValid)
         return {};
 
     // RHI::TextureDesc::DepthOrArrayLayers maps to depth for Tex3D and to
@@ -4020,56 +4390,28 @@ RHI::TextureHandle VulkanDevice::CreateTexture(const RHI::TextureDesc& desc)
     // layers in the current RHI contract; 2D array textures are represented by
     // Tex2D with DepthOrArrayLayers > 1.
     VulkanImage image{};
-    image.Format = format;
+    image.Format = imageInfoBundle.Format;
     image.RhiFormat = desc.Fmt;
     image.Dimension = desc.Dimension;
-    image.Usage = usage;
+    image.Usage = imageInfoBundle.Usage;
     image.Width = desc.Width;
     image.Height = desc.Height;
-    image.Depth = desc.Dimension == RHI::TextureDimension::Tex3D ? desc.DepthOrArrayLayers : 1u;
+    image.Depth = imageInfoBundle.Depth;
     image.MipLevels = desc.MipLevels;
-    image.ArrayLayers = desc.Dimension == RHI::TextureDimension::Tex3D ? 1u : desc.DepthOrArrayLayers;
+    image.ArrayLayers = imageInfoBundle.ArrayLayers;
     image.CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image.OwnsImage = true;
     image.OwnsMemory = true;
-
-    VkImageCreateInfo imageInfo{};
-    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    imageInfo.imageType = ToVkImageType(desc.Dimension);
-    imageInfo.format = format;
-    imageInfo.extent = VkExtent3D{.width = desc.Width,
-                                  .height = desc.Height,
-                                  .depth = desc.Dimension == RHI::TextureDimension::Tex3D
-                                               ? desc.DepthOrArrayLayers
-                                               : 1u};
-    imageInfo.mipLevels = desc.MipLevels;
-    imageInfo.arrayLayers = image.ArrayLayers;
-    imageInfo.samples = ToVkSampleCount(desc.SampleCount);
-    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-    imageInfo.usage = usage;
-    // GRAPHICS-018 §4 queue-family handling: when transfer queue lives on a
-    // different family from graphics, declare CONCURRENT sharing so transfer
-    // uploads (TRANSFER_DST → SHADER_READ_ONLY) and graphics reads can touch
-    // the same image without explicit queue-family ownership-transfer
-    // barriers. EXCLUSIVE is preserved when families coincide.
-    std::uint32_t imageQueueFamilies[2] = {m_GraphicsFamily, m_TransferFamily};
-    if (m_TransferFamily != m_GraphicsFamily)
-    {
-        imageInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
-        imageInfo.queueFamilyIndexCount = 2u;
-        imageInfo.pQueueFamilyIndices = imageQueueFamilies;
-    }
-    else
-    {
-        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    }
-    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    if (desc.Dimension == RHI::TextureDimension::TexCube)
-        imageInfo.flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
 
     VmaAllocationCreateInfo allocationInfo{};
     allocationInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 
-    VkResult result = vmaCreateImage(m_Vma, &imageInfo, &allocationInfo, &image.Image, &image.Allocation, nullptr);
+    VkResult result = vmaCreateImage(m_Vma,
+                                     &imageInfoBundle.Info,
+                                     &allocationInfo,
+                                     &image.Image,
+                                     &image.Allocation,
+                                     nullptr);
     if (result != VK_SUCCESS)
     {
         NoteDeviceLostIfNeeded(result);
@@ -4081,8 +4423,8 @@ RHI::TextureHandle VulkanDevice::CreateTexture(const RHI::TextureDesc& desc)
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.image = image.Image;
     viewInfo.viewType = ToVkImageViewType(desc.Dimension);
-    viewInfo.format = format;
-    viewInfo.subresourceRange.aspectMask = AspectFromFormat(format);
+    viewInfo.format = imageInfoBundle.Format;
+    viewInfo.subresourceRange.aspectMask = AspectFromFormat(imageInfoBundle.Format);
     viewInfo.subresourceRange.baseMipLevel = 0;
     viewInfo.subresourceRange.levelCount = desc.MipLevels;
     viewInfo.subresourceRange.baseArrayLayer = 0;
@@ -4139,24 +4481,193 @@ void VulkanDevice::DestroyTexture(RHI::TextureHandle handle)
     const VkImage vkImage = image->Image;
     const VkImageView view = image->View;
     const VmaAllocation allocation = image->Allocation;
+    const bool ownsImage = image->OwnsImage;
     const bool ownsMemory = image->OwnsMemory;
 
     image->Image = VK_NULL_HANDLE;
     image->View = VK_NULL_HANDLE;
     image->Allocation = VK_NULL_HANDLE;
     image->CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image->Placement = {};
     m_Images.Remove(handle, m_GlobalFrameNumber);
 
     if (device == VK_NULL_HANDLE)
         return;
 
-    DeferDelete([device, vma, vkImage, view, allocation, ownsMemory]() mutable
+    DeferDelete([device, vma, vkImage, view, allocation, ownsImage, ownsMemory]() mutable
     {
         if (view != VK_NULL_HANDLE)
             vkDestroyImageView(device, view, nullptr);
         if (ownsMemory && vma != VK_NULL_HANDLE && vkImage != VK_NULL_HANDLE && allocation != VK_NULL_HANDLE)
             vmaDestroyImage(vma, vkImage, allocation);
+        else if (!ownsMemory && ownsImage && vkImage != VK_NULL_HANDLE)
+            vkDestroyImage(device, vkImage, nullptr);
     });
+}
+
+RHI::ResourceMemoryRequirements VulkanDevice::GetTextureMemoryRequirements(
+    const RHI::TextureDesc& desc) const noexcept
+{
+    if (!HasLiveOperationalPrerequisites() || vkGetDeviceImageMemoryRequirements == nullptr)
+        return {};
+
+    VulkanImageCreateInfoBundle imageInfoBundle =
+        MakeVulkanImageCreateInfo(desc, m_GraphicsFamily, m_TransferFamily);
+    RebindVulkanImageCreateInfoPointers(imageInfoBundle);
+    if (!imageInfoBundle.IsValid)
+        return {};
+
+    VkMemoryDedicatedRequirements dedicated{};
+    dedicated.sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_REQUIREMENTS;
+
+    VkMemoryRequirements2 requirements{};
+    requirements.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2;
+    requirements.pNext = &dedicated;
+
+    VkDeviceImageMemoryRequirements query{};
+    query.sType = VK_STRUCTURE_TYPE_DEVICE_IMAGE_MEMORY_REQUIREMENTS;
+    query.pCreateInfo = &imageInfoBundle.Info;
+    query.planeAspect = VK_IMAGE_ASPECT_NONE;
+
+    vkGetDeviceImageMemoryRequirements(m_Device, &query, &requirements);
+
+    const std::uint32_t memoryTypeBits =
+        FilterMemoryTypeBits(m_PhysDevice,
+                             requirements.memoryRequirements.memoryTypeBits,
+                             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    if (memoryTypeBits == 0u)
+        return {};
+
+    return RHI::ResourceMemoryRequirements{
+        .SizeBytes = static_cast<std::uint64_t>(requirements.memoryRequirements.size),
+        .AlignmentBytes = VulkanPlacedAlignment(
+            m_PhysDevice,
+            static_cast<std::uint64_t>(requirements.memoryRequirements.alignment)),
+        .MemoryTypeBits = memoryTypeBits,
+        .DedicatedAllocationRequired = dedicated.requiresDedicatedAllocation == VK_TRUE,
+    };
+}
+
+RHI::TextureHandle VulkanDevice::CreatePlacedTexture(const RHI::PlacedTextureDesc& placedDesc)
+{
+    if (!HasLiveOperationalPrerequisites())
+        return {};
+
+    const RHI::ResourceMemoryRequirements requirements =
+        GetTextureMemoryRequirements(placedDesc.Desc);
+    if (!requirements.IsValid() || requirements.DedicatedAllocationRequired)
+        return {};
+
+    const VulkanMemoryBlock* block = m_MemoryBlocks.GetIfValid(placedDesc.Placement.Block);
+    if (block == nullptr || block->Allocation == VK_NULL_HANDLE)
+        return {};
+    if ((block->SelectedMemoryTypeBit & requirements.MemoryTypeBits) == 0u)
+        return {};
+    if (block->AlignmentBytes < requirements.AlignmentBytes)
+        return {};
+    if (!IsAligned(placedDesc.Placement.OffsetBytes, requirements.AlignmentBytes))
+        return {};
+    if (!RangeFits(placedDesc.Placement.OffsetBytes, requirements.SizeBytes, block->SizeBytes))
+        return {};
+
+    VulkanImageCreateInfoBundle imageInfoBundle =
+        MakeVulkanImageCreateInfo(placedDesc.Desc, m_GraphicsFamily, m_TransferFamily);
+    RebindVulkanImageCreateInfoPointers(imageInfoBundle);
+    if (!imageInfoBundle.IsValid)
+        return {};
+
+    VkImage imageHandle = VK_NULL_HANDLE;
+    VkResult result = vkCreateImage(m_Device, &imageInfoBundle.Info, nullptr, &imageHandle);
+    if (result != VK_SUCCESS)
+    {
+        NoteDeviceLostIfNeeded(result);
+        return {};
+    }
+
+    result = vmaBindImageMemory2(m_Vma,
+                                 block->Allocation,
+                                 static_cast<VkDeviceSize>(placedDesc.Placement.OffsetBytes),
+                                 imageHandle,
+                                 nullptr);
+    if (result != VK_SUCCESS)
+    {
+        NoteDeviceLostIfNeeded(result);
+        vkDestroyImage(m_Device, imageHandle, nullptr);
+        return {};
+    }
+
+    VkImageView view = VK_NULL_HANDLE;
+    VkImageViewCreateInfo viewInfo{};
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.image = imageHandle;
+    viewInfo.viewType = ToVkImageViewType(placedDesc.Desc.Dimension);
+    viewInfo.format = imageInfoBundle.Format;
+    viewInfo.subresourceRange.aspectMask = AspectFromFormat(imageInfoBundle.Format);
+    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.subresourceRange.levelCount = placedDesc.Desc.MipLevels;
+    viewInfo.subresourceRange.baseArrayLayer = 0;
+    viewInfo.subresourceRange.layerCount = imageInfoBundle.ArrayLayers;
+
+    result = vkCreateImageView(m_Device, &viewInfo, nullptr, &view);
+    if (result != VK_SUCCESS)
+    {
+        NoteDeviceLostIfNeeded(result);
+        vkDestroyImage(m_Device, imageHandle, nullptr);
+        return {};
+    }
+
+    if (placedDesc.Desc.DebugName && m_ValidationEnabled && vkSetDebugUtilsObjectNameEXT)
+    {
+        VkDebugUtilsObjectNameInfoEXT imageName{};
+        imageName.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+        imageName.objectType = VK_OBJECT_TYPE_IMAGE;
+        imageName.objectHandle = reinterpret_cast<std::uint64_t>(imageHandle);
+        imageName.pObjectName = placedDesc.Desc.DebugName;
+        vkSetDebugUtilsObjectNameEXT(m_Device, &imageName);
+
+        VkDebugUtilsObjectNameInfoEXT viewName{};
+        viewName.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+        viewName.objectType = VK_OBJECT_TYPE_IMAGE_VIEW;
+        viewName.objectHandle = reinterpret_cast<std::uint64_t>(view);
+        viewName.pObjectName = placedDesc.Desc.DebugName;
+        vkSetDebugUtilsObjectNameEXT(m_Device, &viewName);
+    }
+
+    const RHI::PlacedResourceInfo placement{
+        .Block = placedDesc.Placement.Block,
+        .OffsetBytes = placedDesc.Placement.OffsetBytes,
+        .SizeBytes = requirements.SizeBytes,
+        .AlignmentBytes = requirements.AlignmentBytes,
+        .MemoryTypeBit = block->SelectedMemoryTypeBit,
+        .IsPlaced = true,
+    };
+
+    VulkanImage image{};
+    image.Image = imageHandle;
+    image.View = view;
+    image.Allocation = VK_NULL_HANDLE;
+    image.Format = imageInfoBundle.Format;
+    image.RhiFormat = placedDesc.Desc.Fmt;
+    image.Dimension = placedDesc.Desc.Dimension;
+    image.Usage = imageInfoBundle.Usage;
+    image.Width = placedDesc.Desc.Width;
+    image.Height = placedDesc.Desc.Height;
+    image.Depth = imageInfoBundle.Depth;
+    image.MipLevels = placedDesc.Desc.MipLevels;
+    image.ArrayLayers = imageInfoBundle.ArrayLayers;
+    image.CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image.OwnsImage = true;
+    image.OwnsMemory = false;
+    image.Placement = placement;
+
+    return m_Images.Add(std::move(image));
+}
+
+RHI::PlacedResourceInfo VulkanDevice::GetTextureMemoryPlacement(
+    RHI::TextureHandle handle) const noexcept
+{
+    const VulkanImage* image = m_Images.GetIfValid(handle);
+    return image != nullptr ? image->Placement : RHI::PlacedResourceInfo{};
 }
 
 void VulkanDevice::WriteTexture(RHI::TextureHandle handle,

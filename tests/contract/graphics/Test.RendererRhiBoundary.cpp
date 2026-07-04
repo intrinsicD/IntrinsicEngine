@@ -178,9 +178,18 @@ TEST(RendererRhiBoundary, VulkanBackendDefinesPromotedSymbols)
         "VulkanDevice::DestroyBuffer(",
         "VulkanDevice::WriteBuffer(",
         "VulkanDevice::GetBufferDeviceAddress(",
+        "VulkanDevice::GetBufferMemoryRequirements(",
+        "VulkanDevice::CreateMemoryBlock(",
+        "VulkanDevice::DestroyMemoryBlock(",
+        "VulkanDevice::GetMemoryBlockInfo(",
+        "VulkanDevice::CreatePlacedBuffer(",
+        "VulkanDevice::GetBufferMemoryPlacement(",
         "VulkanDevice::CreateTexture(",
         "VulkanDevice::DestroyTexture(",
         "VulkanDevice::WriteTexture(",
+        "VulkanDevice::GetTextureMemoryRequirements(",
+        "VulkanDevice::CreatePlacedTexture(",
+        "VulkanDevice::GetTextureMemoryPlacement(",
         "VulkanDevice::CreateSampler(",
         "VulkanDevice::DestroySampler(",
         "VulkanDevice::CreatePipeline(",
@@ -197,5 +206,4 @@ TEST(RendererRhiBoundary, VulkanBackendDefinesPromotedSymbols)
     for (const auto& symbol : requiredSymbols)
         EXPECT_NE(content.find(symbol), std::string::npos) << symbol;
 }
-
 

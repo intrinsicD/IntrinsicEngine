@@ -10,12 +10,12 @@ depends_on: []
 - Status: in-progress.
 - Owner/agent: Codex.
 - Branch/PR: local `main` stack, PR not opened.
-- Current slice: Slice C — Vulkan placed allocation and binding behind the RHI
-  contract.
-- Last completed slice: Slice B — RHI placed-memory contract and Null backend
-  bookkeeping; CPU/null contract verified.
-- Next verification step: implement Vulkan placed allocation and run the
-  focused backend contract/smoke gates for Slice C.
+- Current slice: Slice D — renderer adoption of compiled transient placements.
+- Last completed slice: Slice C — Vulkan placed allocation and binding behind
+  the RHI contract; CPU/null and Vulkan fail-closed contracts verified.
+- Next verification step: adopt compiled placements in renderer transient
+  allocation, then run the opt-in GPU/Vulkan smoke with measured memory
+  reduction.
 
 ## Slice plan
 
@@ -28,7 +28,9 @@ depends_on: []
   memory block compatibility, placed texture creation, and placed buffer
   creation.
 - **Slice C.** Implement Vulkan placed allocation and binding behind the RHI
-  contract, including backend-required aliasing barriers and layout handling.
+  contract (VMA-backed memory blocks, placed buffer/image binds, ownership
+  bookkeeping, and placement introspection). Renderer use of compiled
+  alias-reuse barriers and layout state remains Slice D with adoption.
 - **Slice D.** Adopt compiled placements in renderer transient allocation and
   cite the opt-in Vulkan smoke with measured memory reduction.
 
@@ -82,8 +84,10 @@ depends_on: []
 - [x] Slice B: RHI contract for memory blocks + placed texture/buffer
       creation with alignment/`memoryTypeBits` compatibility queries; Null
       backend bookkeeping implementation.
-- [ ] Slice C: Vulkan implementation (VMA block allocation, placed binds,
-      required aliasing barriers/initial-layout handling per reuse).
+- [x] Slice C: Vulkan implementation (VMA block allocation, placed binds,
+      ownership/destruction bookkeeping, and placement introspection behind
+      the RHI seam). Renderer use of compiled alias-reuse barriers and
+      initial-layout handling remains Slice D with allocation adoption.
 - [ ] Slice D: renderer adoption — `AllocateFrameTransientResources` binds
       compiled placements per frame-in-flight slot instead of per-resource
       allocations; `SetTransientAliasingEnabled` gates real behavior with
@@ -99,6 +103,10 @@ depends_on: []
       placed buffer/texture creation, placement introspection, compatibility
       rejection, alignment rejection, range rejection, and memory-block slot
       recycling.
+- [x] Vulkan fail-closed/backend contract: Vulkan target builds under
+      `ci-vulkan`; the unavailable-device constructor path rejects memory
+      requirements, memory blocks, placed buffer/texture creation, and
+      placement introspection without exposing Vulkan types through RHI.
 - [ ] Opt-in `gpu;vulkan` smoke: default sandbox recipe renders correctly
       with aliasing on (image compare vs aliasing off), reported transient
       memory drops, and validation layers are clean (no hazard errors).
@@ -110,6 +118,10 @@ depends_on: []
 - [x] Update `src/graphics/rhi/README.md` and
       `src/graphics/renderer/Backends/Null/README.md` for the Slice B
       placed-memory contract and Null bookkeeping state.
+- [x] Update `src/graphics/rhi/README.md`,
+      `src/graphics/vulkan/README.md`, and
+      `src/graphics/renderer/Backends/Null/README.md` for Slice C placed
+      memory-block alignment, Vulkan binding, and deferred renderer adoption.
 
 ## Acceptance criteria
 - [ ] Real measured transient memory reduction on the default sandbox
@@ -158,6 +170,40 @@ rm -rf build/ci
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -R 'RHI(ResourceSlotRecycling|PlacedMemoryContract)' --timeout 60
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
+python3 tools/agents/generate_session_brief.py
+git diff --check
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/repo/check_pr_contract.py
+python3 tools/repo/check_root_hygiene.py --root .
+tools/ci/run_clean_workshop_review.sh . --strict
+```
+
+Slice C local verification:
+
+All commands below passed locally on 2026-07-04. The default `ci` configure
+emitted the existing promoted-Vulkan fallback warning. `check_root_hygiene`
+remains warning-mode and reported existing root entries `ara/` and
+`imgui.ini`. Clean-workshop manual rows: row 3 pass; rows 4-6 n/a; row 7 pass;
+row 8 pass; no follow-up findings. The `ci-vulkan` coverage below proves the
+backend fail-closed/compile contract; the operational GPU/Vulkan smoke and
+measured transient-memory reduction remain Slice D.
+
+```bash
+cmake --build --preset ci --target IntrinsicGraphicsContractTests IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure -R 'RHI(ResourceSlotRecycling|PlacedMemoryContract)|RendererRhiBoundary' --timeout 60
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target IntrinsicGraphicsVulkanContractTests
+ctest --test-dir build/ci-vulkan --output-on-failure -R 'VulkanFailClosedContract' --timeout 60
+rm -rf build/ci
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -R 'RHI(ResourceSlotRecycling|PlacedMemoryContract)|RendererRhiBoundary' --timeout 60
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 python3 tools/agents/generate_session_brief.py

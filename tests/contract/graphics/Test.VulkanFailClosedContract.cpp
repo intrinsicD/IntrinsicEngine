@@ -124,8 +124,13 @@ TEST(VulkanFailClosedContract, DeviceConstructorIsFailClosedWithoutGpuBringup)
 
     EXPECT_FALSE(device->IsOperational());
 
-    EXPECT_FALSE(device->CreateBuffer(Extrinsic::RHI::BufferDesc{.SizeBytes = 64u}).IsValid());
-    EXPECT_FALSE(device->CreateTexture(Extrinsic::RHI::TextureDesc{
+    const Extrinsic::RHI::BufferDesc bufferDesc{
+        .SizeBytes = 64u,
+        .Usage = Extrinsic::RHI::BufferUsage::Storage,
+        .HostVisible = false,
+        .DebugName = "VulkanFailClosed.PlacedBuffer",
+    };
+    const Extrinsic::RHI::TextureDesc textureDesc{
         .Width = 1u,
         .Height = 1u,
         .DepthOrArrayLayers = 1u,
@@ -133,9 +138,38 @@ TEST(VulkanFailClosedContract, DeviceConstructorIsFailClosedWithoutGpuBringup)
         .Fmt = Extrinsic::RHI::Format::RGBA8_UNORM,
         .Dimension = Extrinsic::RHI::TextureDimension::Tex2D,
         .Usage = Extrinsic::RHI::TextureUsage::Sampled,
-    }).IsValid());
+        .DebugName = "VulkanFailClosed.PlacedTexture",
+    };
+
+    EXPECT_FALSE(device->CreateBuffer(bufferDesc).IsValid());
+    EXPECT_FALSE(device->CreateTexture(textureDesc).IsValid());
     EXPECT_FALSE(device->CreateSampler(Extrinsic::RHI::SamplerDesc{}).IsValid());
     EXPECT_FALSE(device->CreatePipeline(Extrinsic::RHI::PipelineDesc{}).IsValid());
+    EXPECT_FALSE(device->GetBufferMemoryRequirements(bufferDesc).IsValid());
+    EXPECT_FALSE(device->GetTextureMemoryRequirements(textureDesc).IsValid());
+
+    const Extrinsic::RHI::MemoryBlockHandle block = device->CreateMemoryBlock({
+        .SizeBytes = 4096u,
+        .AlignmentBytes = 256u,
+        .MemoryTypeBits = 1u,
+        .DebugName = "VulkanFailClosed.MemoryBlock",
+    });
+    EXPECT_FALSE(block.IsValid());
+    EXPECT_FALSE(device->GetMemoryBlockInfo(block).IsValid);
+
+    const Extrinsic::RHI::BufferHandle placedBuffer = device->CreatePlacedBuffer({
+        .Desc = bufferDesc,
+        .Placement = {.Block = block, .OffsetBytes = 0u},
+    });
+    EXPECT_FALSE(placedBuffer.IsValid());
+    EXPECT_FALSE(device->GetBufferMemoryPlacement(placedBuffer).IsPlaced);
+
+    const Extrinsic::RHI::TextureHandle placedTexture = device->CreatePlacedTexture({
+        .Desc = textureDesc,
+        .Placement = {.Block = block, .OffsetBytes = 0u},
+    });
+    EXPECT_FALSE(placedTexture.IsValid());
+    EXPECT_FALSE(device->GetTextureMemoryPlacement(placedTexture).IsPlaced);
 
     const std::uint64_t beforeFallbackAllocations =
         Extrinsic::Backends::Vulkan::GetFallbackBindlessAllocationAttemptCount();

@@ -7,9 +7,19 @@ module;
 export module Extrinsic.Backends.Vulkan:Memory;
 
 export import Extrinsic.RHI.Descriptors;
+export import Extrinsic.RHI.Device;
 
 namespace Extrinsic::Backends::Vulkan
 {
+    export struct VulkanMemoryBlock
+    {
+        VmaAllocation Allocation = VK_NULL_HANDLE;
+        std::uint64_t SizeBytes = 0;
+        std::uint64_t AlignmentBytes = 1;
+        std::uint32_t MemoryTypeBits = 0;
+        std::uint32_t SelectedMemoryTypeBit = 0;
+    };
+
     export struct VulkanBuffer
     {
         VkBuffer      Buffer       = VK_NULL_HANDLE;
@@ -20,6 +30,8 @@ namespace Extrinsic::Backends::Vulkan
         bool          HostVisible  = false;
         bool          HostCoherent = false;
         bool          HasBDA       = false;
+        bool          OwnsMemory   = true;
+        RHI::PlacedResourceInfo Placement{};
     };
 
     export struct VulkanImage
@@ -37,7 +49,9 @@ namespace Extrinsic::Backends::Vulkan
         uint32_t      MipLevels   = 1;
         uint32_t      ArrayLayers = 1;
         VkImageLayout CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        bool          OwnsImage   = true;
         bool          OwnsMemory  = true;
+        RHI::PlacedResourceInfo Placement{};
     };
 
     export struct VulkanSampler

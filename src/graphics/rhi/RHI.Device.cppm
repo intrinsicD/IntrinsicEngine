@@ -90,6 +90,7 @@ namespace Extrinsic::RHI
     export struct MemoryBlockDesc
     {
         std::uint64_t SizeBytes = 0;
+        std::uint64_t AlignmentBytes = 1;
         std::uint32_t MemoryTypeBits = 0;
         const char* DebugName = nullptr;
     };
@@ -97,6 +98,7 @@ namespace Extrinsic::RHI
     export struct MemoryBlockInfo
     {
         std::uint64_t SizeBytes = 0;
+        std::uint64_t AlignmentBytes = 0;
         std::uint32_t MemoryTypeBits = 0;
         std::uint32_t SelectedMemoryTypeBit = 0;
         bool IsValid = false;
