@@ -1,7 +1,8 @@
 # Compute Parallel Primitives
 
-Status: canonical for the `GRAPHICS-108` scan/compaction seam and the
-`GRAPHICS-111` segmented float reduction seam.
+Status: canonical for the `GRAPHICS-108` scan/compaction seam, the
+`GRAPHICS-111` segmented float reduction seam, and the `GRAPHICS-112`
+work-efficient scan/overflow guard.
 
 `Extrinsic.Graphics.ComputeParallelPrimitives` owns generic `uint32` prefix-scan,
 stream-compaction, count-publication, and deterministic float segmented-reduction
@@ -21,6 +22,13 @@ The default CPU-supported gate owns two contracts:
   per-segment sums, counts, and count-normalized means. Empty segments produce
   count `0` and mean
   `kParallelSegmentedFloatReductionMeanForEmptySegment` (`0.0f`).
+
+CPU prefix scan reports `SumOverflow` before a `uint32` accumulation can wrap.
+The operational GPU shader cannot surface that post-dispatch status through the
+unchanged record API, so its defined overflow guard is saturating: local scan
+values, recursively published block sums, and add-offset fixups clamp to
+`UINT32_MAX` on overflow. This keeps the GPU path fail-stable and prevents
+silent wrap while preserving the public scan/compaction API and scratch layout.
 
 The GPU record API remains fail-closed on unsupported devices: non-operational
 devices report `DeviceUnavailable`, missing caller-owned recorder dependencies
@@ -45,14 +53,16 @@ CPU round trip.
 
 ## Shader Assets
 
-GRAPHICS-108/111 pin five shader assets under `assets/shaders/`:
+GRAPHICS-108/111/112 pin five shader assets under `assets/shaders/`:
 
-- `parallel_prefix_scan.comp` performs one 256-lane workgroup-local scan and
-  optionally writes one block sum per workgroup. For stream compaction, the
-  recorder sets a mode bit that normalizes nonzero flags to `1` before scan so
-  GPU compaction matches the CPU reference's "nonzero means keep" contract.
+- `parallel_prefix_scan.comp` performs one 256-lane workgroup-local scan with
+  subgroup arithmetic, scans the small per-subgroup totals in shared memory, and
+  optionally writes one saturated block sum per workgroup. For stream
+  compaction, the recorder sets a mode bit that normalizes nonzero flags to `1`
+  before scan so GPU compaction matches the CPU reference's "nonzero means keep"
+  contract.
 - `parallel_scan_add_offsets.comp` adds recursively scanned block offsets back
-  into an existing scan output.
+  into an existing scan output with the same `UINT32_MAX` saturation guard.
 - `parallel_compact_by_flags.comp` scatters kept keys using exclusive prefix
   offsets and writes the compacted count.
 - `parallel_count_to_dispatch_args.comp` converts a compacted `uint32` count
@@ -137,5 +147,6 @@ DispatchArgs: ShaderWrite -> IndirectRead
 The plan and publication helpers record these barriers as `RHI::MemoryAccess`
 values. The opt-in Vulkan smoke compares scan, compaction, and segmented
 reduction results with the CPU reference, verifies readback count and
-dispatch-args publication, and repeats the same compaction and segmented
-reduction inputs to pin deterministic output/count behavior.
+dispatch-args publication, verifies scan overflow saturation on in-workgroup and
+multiblock fixtures, and repeats the same compaction and segmented reduction
+inputs to pin deterministic output/count behavior.

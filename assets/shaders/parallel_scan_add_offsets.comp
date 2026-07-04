@@ -10,6 +10,19 @@
 
 layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
+const uint UintMax = 0xffffffffu;
+
+uint SaturatingAdd(const uint lhs, const uint rhs)
+{
+    if (lhs == UintMax || rhs == UintMax)
+    {
+        return UintMax;
+    }
+
+    const uint sum = lhs + rhs;
+    return sum < lhs ? UintMax : sum;
+}
+
 layout(buffer_reference, scalar) buffer PrefixScanOutputRef
 {
     uint Values[];
@@ -49,5 +62,6 @@ void main()
     }
 
     PrefixScanOutputRef outputRef = PrefixScanOutputRef(pc.OutputBDA);
-    outputRef.Values[globalIndex] += addend;
+    outputRef.Values[globalIndex] = SaturatingAdd(outputRef.Values[globalIndex],
+                                                  addend);
 }

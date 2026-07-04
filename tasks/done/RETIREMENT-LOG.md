@@ -3262,3 +3262,15 @@ resource validation; the opt-in Vulkan smoke compares GPU output against the CPU
 reference within the declared tolerance and repeats the same input for bit
 stability. KMeans integration remains a separate consumer task; this slice only
 ships the shared primitive and docs.
+
+[`GRAPHICS-112`](GRAPHICS-112-work-efficient-workgroup-scan.md) —
+Work-efficient workgroup scan and overflow guard retired to `tasks/done/` on
+2026-07-04 at `Operational` on promoted Vulkan hosts with subgroup arithmetic
+and `CPUContracted` elsewhere. `parallel_prefix_scan.comp` now uses subgroup
+arithmetic plus a small shared scan over per-subgroup totals instead of a
+workgroup-wide Hillis-Steele scan. Prefix scan and add-offset accumulation clamp
+to `UINT32_MAX` on GPU overflow, while the CPU reference continues to report
+`SumOverflow` before wrap; the public scan/compaction API, scratch layout, and
+dispatch planning contract are unchanged. The Vulkan smoke covers existing
+scan/compaction parity plus local and multiblock overflow fixtures, and the
+architecture/audit docs record the saturation semantics.

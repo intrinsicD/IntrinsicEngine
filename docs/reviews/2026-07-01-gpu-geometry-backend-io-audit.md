@@ -115,13 +115,12 @@ buffers), owned-lease fallback only when the caller omits scratch
 args are published entirely on-GPU (`parallel_count_to_dispatch_args.comp:47-49`).
 
 Gaps:
-- **Workgroup scan is Hillis-Steele with two `barrier()`s per step** (16 barriers
-  for 256 lanes), O(n log n) work (`parallel_prefix_scan.comp:74-80`). → move to
-  `subgroupInclusive/ExclusiveAdd` or a work-efficient Blelloch scan to roughly
-  halve the barriers and shared-memory traffic. This is the only material
-  performance gap in the shared substrate.
-- **uint32-only accumulation** can silently overflow at scale; the CPU reference
-  guards this, the GPU path does not (`...cpp:617-623`).
+- **Retired by GRAPHICS-112:** the original audit found a Hillis-Steele
+  workgroup scan with two `barrier()`s per step and silent GPU `uint32`
+  overflow. The scan now uses subgroup arithmetic plus a small shared scan over
+  subgroup totals, and GPU scan/add-offset accumulation saturates to
+  `UINT32_MAX` instead of wrapping. The CPU reference still reports
+  `SumOverflow` as the fail-closed oracle.
 
 Fit for k-means: at audit time it was a good substrate for the *assignment-compaction and
 indirect-dispatch* half (counting-sort offsets, variable-width follow-up passes
@@ -141,7 +140,7 @@ separate task to consume it. Folded into the proposal's §5.
    centroid-style means. Retired by GRAPHICS-111; k-means §5 now depends on a
    consumer integration task rather than a primitive gap.
 3. **Work-efficient workgroup scan** (subgroup/Blelloch) + uint32-overflow note in
-   `ComputeParallelPrimitives`.
+   `ComputeParallelPrimitives`. Retired by GRAPHICS-112.
 4. **ProgressivePoisson dispatch-sizing + indirect-shrink + hash-probe** items —
    route into METHOD-013's remaining slices, do not patch out-of-band.
 

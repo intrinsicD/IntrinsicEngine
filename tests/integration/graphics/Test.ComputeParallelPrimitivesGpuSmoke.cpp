@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <span>
 #include <string>
@@ -200,19 +201,54 @@ namespace
         device.Present(frame);
     }
 
-    [[nodiscard]] bool RunPrefixCase(RHI::IDevice& device,
-                                     RHI::BufferManager& buffers,
-                                     const Graphics::ParallelPrimitivePipelineSet pipelines,
-                                     const std::vector<std::uint32_t>& input,
-                                     const Graphics::PrefixScanMode mode,
-                                     const std::string_view caseName)
+    [[nodiscard]] std::uint32_t SaturatingAdd(const std::uint32_t lhs,
+                                              const std::uint32_t rhs) noexcept
     {
-        std::vector<std::uint32_t> expected(input.size(), 0u);
-        const Graphics::ParallelPrimitiveCpuResult cpu =
-            Graphics::ComputePrefixScanCpu(input, expected, mode);
-        if (!cpu.Succeeded())
+        constexpr std::uint32_t kUintMax =
+            std::numeric_limits<std::uint32_t>::max();
+        if (lhs == kUintMax || rhs == kUintMax)
         {
-            ADD_FAILURE() << caseName << ": CPU reference failed";
+            return kUintMax;
+        }
+
+        const std::uint32_t sum = lhs + rhs;
+        return sum < lhs ? kUintMax : sum;
+    }
+
+    [[nodiscard]] std::vector<std::uint32_t> ComputeSaturatingPrefixScan(
+        const std::vector<std::uint32_t>& input,
+        const Graphics::PrefixScanMode mode)
+    {
+        std::vector<std::uint32_t> output(input.size(), 0u);
+        std::uint32_t accumulator = 0u;
+        for (std::size_t index = 0u; index < input.size(); ++index)
+        {
+            if (mode == Graphics::PrefixScanMode::Exclusive)
+            {
+                output[index] = accumulator;
+                accumulator = SaturatingAdd(accumulator, input[index]);
+            }
+            else
+            {
+                accumulator = SaturatingAdd(accumulator, input[index]);
+                output[index] = accumulator;
+            }
+        }
+        return output;
+    }
+
+    [[nodiscard]] bool RunPrefixCaseWithExpected(
+        RHI::IDevice& device,
+        RHI::BufferManager& buffers,
+        const Graphics::ParallelPrimitivePipelineSet pipelines,
+        const std::vector<std::uint32_t>& input,
+        const Graphics::PrefixScanMode mode,
+        const std::string_view caseName,
+        const std::span<const std::uint32_t> expected)
+    {
+        if (expected.size() != input.size())
+        {
+            ADD_FAILURE() << caseName << ": expected output size mismatch";
             return false;
         }
 
@@ -300,12 +336,68 @@ namespace
                               actual.data(),
                               actual.size() * sizeof(std::uint32_t),
                               0u);
-            EXPECT_EQ(actual, expected) << caseName;
+            EXPECT_EQ(actual,
+                      std::vector<std::uint32_t>(expected.begin(), expected.end()))
+                << caseName;
         }
 
         DestroyBufferIfValid(device, outputBuffer);
         DestroyBufferIfValid(device, inputBuffer);
         return true;
+    }
+
+    [[nodiscard]] bool RunPrefixCase(RHI::IDevice& device,
+                                     RHI::BufferManager& buffers,
+                                     const Graphics::ParallelPrimitivePipelineSet pipelines,
+                                     const std::vector<std::uint32_t>& input,
+                                     const Graphics::PrefixScanMode mode,
+                                     const std::string_view caseName)
+    {
+        std::vector<std::uint32_t> expected(input.size(), 0u);
+        const Graphics::ParallelPrimitiveCpuResult cpu =
+            Graphics::ComputePrefixScanCpu(input, expected, mode);
+        if (!cpu.Succeeded())
+        {
+            ADD_FAILURE() << caseName << ": CPU reference failed";
+            return false;
+        }
+
+        return RunPrefixCaseWithExpected(device,
+                                         buffers,
+                                         pipelines,
+                                         input,
+                                         mode,
+                                         caseName,
+                                         expected);
+    }
+
+    [[nodiscard]] bool RunPrefixOverflowGuardCase(
+        RHI::IDevice& device,
+        RHI::BufferManager& buffers,
+        const Graphics::ParallelPrimitivePipelineSet pipelines,
+        const std::vector<std::uint32_t>& input,
+        const Graphics::PrefixScanMode mode,
+        const std::string_view caseName)
+    {
+        std::vector<std::uint32_t> cpuOutput(input.size(), 0u);
+        const Graphics::ParallelPrimitiveCpuResult cpu =
+            Graphics::ComputePrefixScanCpu(input, cpuOutput, mode);
+        if (cpu.Status != Graphics::ParallelPrimitiveStatus::SumOverflow)
+        {
+            ADD_FAILURE() << caseName
+                          << ": CPU reference did not report SumOverflow";
+            return false;
+        }
+
+        const std::vector<std::uint32_t> expected =
+            ComputeSaturatingPrefixScan(input, mode);
+        return RunPrefixCaseWithExpected(device,
+                                         buffers,
+                                         pipelines,
+                                         input,
+                                         mode,
+                                         caseName,
+                                         expected);
     }
 
     struct CompactionSmokeResult
@@ -890,6 +982,22 @@ TEST(ComputeParallelPrimitivesGpuSmoke, VulkanScanAndCompactionMatchCpuReference
                                   large,
                                   Graphics::PrefixScanMode::Exclusive,
                                   "prefix multiblock exclusive"));
+
+        ASSERT_TRUE(RunPrefixOverflowGuardCase(
+            device,
+            buffers,
+            pipelines,
+            {std::numeric_limits<std::uint32_t>::max() - 2u, 1u, 2u, 5u},
+            Graphics::PrefixScanMode::Inclusive,
+            "prefix overflow in-workgroup inclusive"));
+
+        std::vector<std::uint32_t> largeOverflow(300u, 16'000'000u);
+        ASSERT_TRUE(RunPrefixOverflowGuardCase(device,
+                                              buffers,
+                                              pipelines,
+                                              largeOverflow,
+                                              Graphics::PrefixScanMode::Inclusive,
+                                              "prefix overflow multiblock inclusive"));
 
         ASSERT_TRUE(RunCompactionCase(device,
                                       buffers,

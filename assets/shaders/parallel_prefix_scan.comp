@@ -1,6 +1,7 @@
 #version 460
 
-// GRAPHICS-108 Slice B — one workgroup-local uint32 prefix-scan pass.
+// GRAPHICS-108 Slice B / GRAPHICS-112 — one workgroup-local uint32
+// prefix-scan pass.
 //
 // The host planner composes this into a device-wide scan by recursively scanning
 // per-block sums, then dispatching `parallel_scan_add_offsets.comp`.
@@ -12,11 +13,15 @@
 #extension GL_EXT_scalar_block_layout : require
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_KHR_shader_subgroup_basic : require
+#extension GL_KHR_shader_subgroup_arithmetic : require
+#extension GL_KHR_shader_subgroup_ballot : require
 
 layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 const uint PrefixScanMode_InclusiveBit = 1u << 0u;
 const uint PrefixScanMode_NormalizeInputBit = 1u << 1u;
+const uint UintMax = 0xffffffffu;
 
 layout(buffer_reference, scalar) readonly buffer PrefixScanInputRef
 {
@@ -44,7 +49,18 @@ layout(push_constant, scalar) uniform PrefixScanPush
     uint Reserved0;
 } pc;
 
-shared uint sharedValues[256];
+shared uint sharedSubgroupTotals[256];
+
+uint SaturatingAdd(const uint lhs, const uint rhs)
+{
+    if (lhs == UintMax || rhs == UintMax)
+    {
+        return UintMax;
+    }
+
+    const uint sum = lhs + rhs;
+    return sum < lhs ? UintMax : sum;
+}
 
 void main()
 {
@@ -68,31 +84,72 @@ void main()
         }
     }
 
-    sharedValues[localIndex] = value;
+    const uint subgroupInclusiveWrapped = subgroupInclusiveAdd(value);
+    const uint subgroupExclusiveWrapped = subgroupInclusiveWrapped - value;
+    const bool subgroupOverflowHere =
+        value != 0u && subgroupInclusiveWrapped < value;
+    const uvec4 subgroupOverflowMask = subgroupBallot(subgroupOverflowHere);
+    const bool subgroupHasOverflow =
+        subgroupBallotBitCount(subgroupOverflowMask) != 0u;
+    const uint firstSubgroupOverflowLane = subgroupHasOverflow
+        ? subgroupBallotFindLSB(subgroupOverflowMask)
+        : gl_SubgroupSize;
+    const bool subgroupOverflowAtOrBeforeLane =
+        subgroupHasOverflow &&
+        gl_SubgroupInvocationID >= firstSubgroupOverflowLane;
+    const bool subgroupOverflowBeforeLane =
+        subgroupHasOverflow &&
+        gl_SubgroupInvocationID > firstSubgroupOverflowLane;
+
+    const uint subgroupInclusive = subgroupOverflowAtOrBeforeLane
+        ? UintMax
+        : subgroupInclusiveWrapped;
+    const uint subgroupExclusive = subgroupOverflowBeforeLane
+        ? UintMax
+        : subgroupExclusiveWrapped;
+
+    if (gl_SubgroupInvocationID + 1u == gl_SubgroupSize)
+    {
+        sharedSubgroupTotals[gl_SubgroupID] = subgroupHasOverflow
+            ? UintMax
+            : subgroupInclusiveWrapped;
+    }
     barrier();
 
-    for (uint offset = 1u; offset < gl_WorkGroupSize.x; offset <<= 1u)
+    for (uint offset = 1u; offset < gl_NumSubgroups; offset <<= 1u)
     {
-        const uint addend = localIndex >= offset ? sharedValues[localIndex - offset] : 0u;
+        const uint addend =
+            localIndex < gl_NumSubgroups && localIndex >= offset
+                ? sharedSubgroupTotals[localIndex - offset]
+                : 0u;
         barrier();
-        sharedValues[localIndex] += addend;
+        if (localIndex < gl_NumSubgroups && localIndex >= offset)
+        {
+            sharedSubgroupTotals[localIndex] =
+                SaturatingAdd(sharedSubgroupTotals[localIndex], addend);
+        }
         barrier();
     }
 
     if (inBounds && pc.OutputBDA != uint64_t(0))
     {
         PrefixScanOutputRef outputRef = PrefixScanOutputRef(pc.OutputBDA);
-        const uint inclusive = sharedValues[localIndex];
+        const uint subgroupOffset = gl_SubgroupID == 0u
+            ? 0u
+            : sharedSubgroupTotals[gl_SubgroupID - 1u];
+        const uint inclusive = SaturatingAdd(subgroupOffset, subgroupInclusive);
+        const uint exclusive = SaturatingAdd(subgroupOffset, subgroupExclusive);
         outputRef.Values[globalIndex] = (pc.Mode & PrefixScanMode_InclusiveBit) != 0u
             ? inclusive
-            : inclusive - value;
+            : exclusive;
     }
 
     if (pc.BlockSumsBDA != uint64_t(0) &&
         activeInBlock > 0u &&
-        localIndex + 1u == activeInBlock)
+        localIndex == 0u)
     {
         PrefixScanBlockSumsRef blockSumsRef = PrefixScanBlockSumsRef(pc.BlockSumsBDA);
-        blockSumsRef.Values[gl_WorkGroupID.x] = sharedValues[localIndex];
+        blockSumsRef.Values[gl_WorkGroupID.x] =
+            sharedSubgroupTotals[gl_NumSubgroups - 1u];
     }
 }

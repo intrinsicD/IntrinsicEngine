@@ -24,8 +24,6 @@ without requiring them to read every file.
 
 ## Current open rendering leaves
 
-- [`GRAPHICS-112`](GRAPHICS-112-work-efficient-workgroup-scan.md) —
-  work-efficient workgroup scan and overflow guard in compute parallel primitives.
 - [`GRAPHICS-113`](GRAPHICS-113-selection-outline-id-work-pruning.md) —
   selected-outline ID work pruning for selected-but-not-picking frames.
 - [`GRAPHICS-114`](GRAPHICS-114-retained-imgui-overlay-copy-upload-path.md) —
