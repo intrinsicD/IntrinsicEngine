@@ -276,6 +276,53 @@ namespace Extrinsic::Graphics
             },
         };
 
+        struct FrameRecipeContributionState
+        {
+            bool SelectionOutline{false};
+            bool DebugView{false};
+            bool ImGui{false};
+            bool VisualizationOverlay{false};
+        };
+
+        [[nodiscard]] FrameRecipeContributionState DeriveContributionState(
+            const std::vector<FrameRecipePassContribution>& contributions) noexcept
+        {
+            FrameRecipeContributionState state{};
+            for (const FrameRecipePassContribution& contribution : contributions)
+            {
+                if (!contribution.Enabled)
+                {
+                    continue;
+                }
+
+                switch (contribution.Kind)
+                {
+                case FrameRecipePassKind::SelectionOutline:
+                    state.SelectionOutline = true;
+                    break;
+                case FrameRecipePassKind::DebugView:
+                    state.DebugView = true;
+                    break;
+                case FrameRecipePassKind::ImGui:
+                    state.ImGui = true;
+                    break;
+                case FrameRecipePassKind::VisualizationOverlay:
+                    state.VisualizationOverlay = true;
+                    break;
+                default:
+                    break;
+                }
+            }
+            return state;
+        }
+
+        [[nodiscard]] bool IsEnabledContributionKind(
+            const FrameRecipePassContribution& contribution,
+            const FrameRecipePassKind kind) noexcept
+        {
+            return contribution.Enabled && contribution.Kind == kind;
+        }
+
     }
 
     std::string_view FrameRecipePassKindName(const FrameRecipePassKind kind) noexcept
@@ -376,6 +423,10 @@ namespace Extrinsic::Graphics
         {
             return "InvalidResource";
         }
+        if (id == FrameRecipePresentSourceResourceId())
+        {
+            return "FrameRecipe.PresentSource";
+        }
         return FrameRecipeResourceKindName(static_cast<FrameRecipeResourceKind>(id.Value - 1u));
     }
 
@@ -426,6 +477,12 @@ namespace Extrinsic::Graphics
         return features;
     }
 
+    static FrameRecipeIntrospection DescribeDefaultFrameRecipeBase(
+        const FrameRecipeFeatures& features,
+        const FrameRecipeAAOptions& aaOptions,
+        FrameRecipeTemporalOptions temporalOptions,
+        FrameRecipeContributionState contributionState);
+
     [[nodiscard]] FrameRecipeIntrospection DescribeDefaultFrameRecipe(const FrameRecipeFeatures& features)
     {
         return DescribeDefaultFrameRecipe(features, FrameRecipeAAOptions{}, FrameRecipeTemporalOptions{});
@@ -441,6 +498,44 @@ namespace Extrinsic::Graphics
                                                                       const FrameRecipeAAOptions& aaOptions,
                                                                       const FrameRecipeTemporalOptions temporalOptions)
     {
+        FrameRecipePassContributionRegistry registry{};
+        RegisterDefaultFrameRecipeOverlayContributions(registry, features, aaOptions, temporalOptions);
+        return DescribeDefaultFrameRecipeWithContributions(
+            features,
+            aaOptions,
+            temporalOptions,
+            registry.Passes).Recipe;
+    }
+
+    [[nodiscard]] FrameRecipeContributionDescriptionResult DescribeDefaultFrameRecipeWithContributions(
+        const FrameRecipeFeatures& features,
+        const std::vector<FrameRecipePassContribution>& contributions)
+    {
+        return DescribeDefaultFrameRecipeWithContributions(
+            features,
+            FrameRecipeAAOptions{},
+            FrameRecipeTemporalOptions{},
+            contributions);
+    }
+
+    [[nodiscard]] FrameRecipeContributionDescriptionResult DescribeDefaultFrameRecipeWithContributions(
+        const FrameRecipeFeatures& features,
+        const FrameRecipeAAOptions& aaOptions,
+        const FrameRecipeTemporalOptions temporalOptions,
+        const std::vector<FrameRecipePassContribution>& contributions)
+    {
+        const FrameRecipeContributionState contributionState = DeriveContributionState(contributions);
+        const FrameRecipeIntrospection baseRecipe =
+            DescribeDefaultFrameRecipeBase(features, aaOptions, temporalOptions, contributionState);
+        return DescribeFrameRecipeWithContributions(baseRecipe, contributions);
+    }
+
+    static FrameRecipeIntrospection DescribeDefaultFrameRecipeBase(
+        const FrameRecipeFeatures& features,
+        const FrameRecipeAAOptions& aaOptions,
+        const FrameRecipeTemporalOptions temporalOptions,
+        const FrameRecipeContributionState contributionState)
+    {
         const bool usesDeferred = UsesDeferredResources(features);
         // The selection-ID pass feeds two independent consumers: host picking
         // readback and screen-space selection outline. Keep the EntityId target
@@ -448,8 +543,7 @@ namespace Extrinsic::Graphics
         // host readback gated on actual picking.
         const bool pickingActive = features.EnablePicking && features.EnableDepthPrepass;
         const bool selectionIdActive = features.EnableDepthPrepass &&
-            (pickingActive || features.EnableSelectionOutline);
-        const bool selectionOutlineActive = features.EnableSelectionOutline && selectionIdActive;
+            (pickingActive || contributionState.SelectionOutline);
         const bool hzbBuildActive = features.EnableHZBBuild && features.EnableDepthPrepass;
         const bool clusterGridBuildActive = features.EnableClusterGridBuild && features.EnableDepthPrepass;
         const bool clusterLightAssignmentActive =
@@ -585,21 +679,6 @@ namespace Extrinsic::Graphics
         AddPass(out, FrameRecipePassKind::TransientDebugSurface, "TransientDebugSurfacePass",
                 features.EnableTransientDebugSurface, false,
                 {"SceneColorHDR", "SceneDepth"}, {"SceneColorHDR"});
-        // GRAPHICS-078 Slice A — visualization-overlay pass. Placed
-        // immediately after `TransientDebugSurfacePass` (same "post-lit,
-        // pre-postprocess" band) and before the postprocess chain so
-        // vector-field glyphs / isoline polylines reach postprocess
-        // inputs deterministically when present. The pass reads
-        // `SceneDepth` (depth-test variant per packet `DepthTested`
-        // field, lands in Slice B/C), reads + writes `SceneColorHDR`
-        // (LOAD-store color attachment so the lit + transient-debug
-        // composition survives), and is omitted entirely when no
-        // visualization overlay packets exist for the frame. Slice A
-        // is scaffold-only — the executor branch reports
-        // `SkippedUnavailable` because no pipelines exist yet.
-        AddPass(out, FrameRecipePassKind::VisualizationOverlay, "VisualizationOverlayPass",
-                features.EnableVisualizationOverlay, false,
-                {"SceneColorHDR", "SceneDepth"}, {"SceneColorHDR"});
         AddPass(out, FrameRecipePassKind::Reconstruction, "ReconstructionPass",
                 reconstructionActive, false,
                 {"SceneColorHDR", "SceneDepth", "MotionVectors", "Reconstruction.HistoryPrevious"},
@@ -628,12 +707,6 @@ namespace Extrinsic::Graphics
                            false,
                            aaResolveReads,
                            {"PostProcess.AATemp.Resolved"});
-        AddPass(out, FrameRecipePassKind::SelectionOutline, "SelectionOutlinePass", selectionOutlineActive, false,
-                {"EntityId", "SceneDepth", "FrameRecipe.PresentSource"}, {"FrameRecipe.PresentSource"});
-        AddPass(out, FrameRecipePassKind::DebugView, "DebugViewPass", features.EnableDebugView, false,
-                {"FrameRecipe.PresentSource"}, {"DebugViewRGBA"});
-        AddPass(out, FrameRecipePassKind::ImGui, "ImGuiPass", features.EnableImGui, false,
-                {"FrameRecipe.PresentSource"}, {"FrameRecipe.PresentSource"});
         AddPass(out, FrameRecipePassKind::Present, "Present", true, true, {"FrameRecipe.PresentSource"}, {"Backbuffer"});
 
         AddResource(out, FrameRecipeResourceKind::Backbuffer, "Backbuffer", true, true, true);
@@ -680,7 +753,7 @@ namespace Extrinsic::Graphics
         AddResource(out, FrameRecipeResourceKind::PostProcessAATempResolved, "PostProcess.AATemp.Resolved",
                     features.EnablePostProcess && spatialAAActive, false, false, true);
         AddResource(out, FrameRecipeResourceKind::SelectionOutline, "SelectionOutline", false, false, false, true);
-        AddResource(out, FrameRecipeResourceKind::DebugViewRGBA, "DebugViewRGBA", features.EnableDebugView, false, false, true);
+        AddResource(out, FrameRecipeResourceKind::DebugViewRGBA, "DebugViewRGBA", contributionState.DebugView, false, false, true);
         AddResource(out, FrameRecipeResourceKind::SceneTable, "GpuWorld.SceneTable", true, true);
         AddResource(out, FrameRecipeResourceKind::InstanceStatic, "GpuWorld.InstanceStatic", true, true);
         AddResource(out, FrameRecipeResourceKind::InstanceDynamic, "GpuWorld.InstanceDynamic", true, true);
@@ -839,6 +912,10 @@ namespace Extrinsic::Graphics
         {
             for (const FrameResourceId resourceId : resources)
             {
+                if (IsFrameRecipePseudoResourceId(resourceId))
+                {
+                    continue;
+                }
                 if (FindResourceDeclarationById(baseRecipe, resourceId, true) != nullptr)
                 {
                     continue;
@@ -857,14 +934,20 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] std::vector<std::string_view> ContributionResourceNames(
             const FrameRecipeIntrospection& baseRecipe,
-            const std::vector<FrameResourceId>& resources)
+            const std::vector<FrameResourceId>& resources,
+            const bool requireEnabled)
         {
             std::vector<std::string_view> names{};
             names.reserve(resources.size());
             for (const FrameResourceId resourceId : resources)
             {
+                if (resourceId == FrameRecipePresentSourceResourceId())
+                {
+                    names.push_back("FrameRecipe.PresentSource");
+                    continue;
+                }
                 const FrameRecipeResourceDeclaration* resource =
-                    FindResourceDeclarationById(baseRecipe, resourceId, true);
+                    FindResourceDeclarationById(baseRecipe, resourceId, requireEnabled);
                 if (resource != nullptr)
                 {
                     names.push_back(resource->Name);
@@ -877,16 +960,17 @@ namespace Extrinsic::Graphics
                                     const FrameRecipeIntrospection& baseRecipe,
                                     const FrameRecipePassContribution& contribution)
         {
+            const bool requireEnabledResources = contribution.Enabled;
             out.Passes.push_back(FrameRecipePassDeclaration{
                 .Kind = contribution.Kind,
                 .Id = contribution.Id,
                 .Name = contribution.Name,
-                .Enabled = true,
+                .Enabled = contribution.Enabled,
                 .FinalizesBackbuffer = contribution.FinalizesBackbuffer,
                 .Queue = contribution.Queue,
                 .Contributed = true,
-                .Reads = ContributionResourceNames(baseRecipe, contribution.Reads),
-                .Writes = ContributionResourceNames(baseRecipe, contribution.Writes),
+                .Reads = ContributionResourceNames(baseRecipe, contribution.Reads, requireEnabledResources),
+                .Writes = ContributionResourceNames(baseRecipe, contribution.Writes, requireEnabledResources),
             });
         }
 
@@ -914,6 +998,101 @@ namespace Extrinsic::Graphics
     void ClearFrameRecipePassContributions(FrameRecipePassContributionRegistry& registry)
     {
         registry.Passes.clear();
+    }
+
+    void RegisterDefaultFrameRecipeOverlayContributions(FrameRecipePassContributionRegistry& registry,
+                                                        const FrameRecipeFeatures& features,
+                                                        const FrameRecipeAAOptions& aaOptions,
+                                                        const FrameRecipeTemporalOptions temporalOptions)
+    {
+        (void)aaOptions;
+        (void)temporalOptions;
+
+        const bool selectionOutlineActive =
+            features.EnableDepthPrepass && features.EnableSelectionOutline;
+        const FramePassId presentPassId = ToFramePassId(FrameRecipePassKind::Present);
+
+        RegisterFrameRecipePassContribution(
+            registry,
+            FrameRecipePassContribution{
+                .Kind = FrameRecipePassKind::VisualizationOverlay,
+                .Id = ToFramePassId(FrameRecipePassKind::VisualizationOverlay),
+                .Name = "VisualizationOverlayPass",
+                .Enabled = features.EnableVisualizationOverlay,
+                .PreserveDisabledDeclaration = true,
+                .Anchor = FrameRecipeContributionAnchor{
+                    .PassId = features.EnableTransientDebugSurface
+                        ? ToFramePassId(FrameRecipePassKind::TransientDebugSurface)
+                        : ToFramePassId(FrameRecipePassKind::Point),
+                    .Placement = FrameRecipeContributionAnchorPlacement::After,
+                },
+                .Reads = {
+                    ToFrameResourceId(FrameRecipeResourceKind::SceneColorHDR),
+                    ToFrameResourceId(FrameRecipeResourceKind::SceneDepth),
+                },
+                .Writes = {
+                    ToFrameResourceId(FrameRecipeResourceKind::SceneColorHDR),
+                },
+            });
+        RegisterFrameRecipePassContribution(
+            registry,
+            FrameRecipePassContribution{
+                .Kind = FrameRecipePassKind::SelectionOutline,
+                .Id = ToFramePassId(FrameRecipePassKind::SelectionOutline),
+                .Name = "SelectionOutlinePass",
+                .Enabled = selectionOutlineActive,
+                .PreserveDisabledDeclaration = true,
+                .Anchor = FrameRecipeContributionAnchor{
+                    .PassId = presentPassId,
+                    .Placement = FrameRecipeContributionAnchorPlacement::Before,
+                },
+                .Reads = {
+                    ToFrameResourceId(FrameRecipeResourceKind::EntityId),
+                    ToFrameResourceId(FrameRecipeResourceKind::SceneDepth),
+                    FrameRecipePresentSourceResourceId(),
+                },
+                .Writes = {
+                    FrameRecipePresentSourceResourceId(),
+                },
+            });
+        RegisterFrameRecipePassContribution(
+            registry,
+            FrameRecipePassContribution{
+                .Kind = FrameRecipePassKind::DebugView,
+                .Id = ToFramePassId(FrameRecipePassKind::DebugView),
+                .Name = "DebugViewPass",
+                .Enabled = features.EnableDebugView,
+                .PreserveDisabledDeclaration = true,
+                .Anchor = FrameRecipeContributionAnchor{
+                    .PassId = presentPassId,
+                    .Placement = FrameRecipeContributionAnchorPlacement::Before,
+                },
+                .Reads = {
+                    FrameRecipePresentSourceResourceId(),
+                },
+                .Writes = {
+                    ToFrameResourceId(FrameRecipeResourceKind::DebugViewRGBA),
+                },
+            });
+        RegisterFrameRecipePassContribution(
+            registry,
+            FrameRecipePassContribution{
+                .Kind = FrameRecipePassKind::ImGui,
+                .Id = ToFramePassId(FrameRecipePassKind::ImGui),
+                .Name = "ImGuiPass",
+                .Enabled = features.EnableImGui,
+                .PreserveDisabledDeclaration = true,
+                .Anchor = FrameRecipeContributionAnchor{
+                    .PassId = presentPassId,
+                    .Placement = FrameRecipeContributionAnchorPlacement::Before,
+                },
+                .Reads = {
+                    FrameRecipePresentSourceResourceId(),
+                },
+                .Writes = {
+                    FrameRecipePresentSourceResourceId(),
+                },
+            });
     }
 
     [[nodiscard]] FrameRecipeContributionValidationResult ValidateFrameRecipePassContributions(
@@ -1004,7 +1183,7 @@ namespace Extrinsic::Graphics
         {
             for (const FrameRecipePassContribution& contribution : contributions)
             {
-                if (contribution.Enabled &&
+                if ((contribution.Enabled || contribution.PreserveDisabledDeclaration) &&
                     contribution.Anchor.PassId == basePass.Id &&
                     contribution.Anchor.Placement == FrameRecipeContributionAnchorPlacement::Before)
                 {
@@ -1016,7 +1195,7 @@ namespace Extrinsic::Graphics
 
             for (const FrameRecipePassContribution& contribution : contributions)
             {
-                if (contribution.Enabled &&
+                if ((contribution.Enabled || contribution.PreserveDisabledDeclaration) &&
                     contribution.Anchor.PassId == basePass.Id &&
                     contribution.Anchor.Placement == FrameRecipeContributionAnchorPlacement::After)
                 {
@@ -1191,6 +1370,28 @@ namespace Extrinsic::Graphics
                                                                         const FrameRecipeShadowSizing& shadowSizing,
                                                                         const FrameRecipeTemporalOptions temporalOptions)
     {
+        FrameRecipePassContributionRegistry registry{};
+        RegisterDefaultFrameRecipeOverlayContributions(registry, features, aaOptions, temporalOptions);
+        return BuildDefaultFrameRecipeWithContributions(graph,
+                                                        features,
+                                                        imports,
+                                                        sizing,
+                                                        aaOptions,
+                                                        shadowSizing,
+                                                        temporalOptions,
+                                                        registry.Passes);
+    }
+
+    [[nodiscard]] FrameRecipeBuildResult BuildDefaultFrameRecipeWithContributions(
+        RenderGraph& graph,
+        const FrameRecipeFeatures& features,
+        const FrameRecipeImports& imports,
+        const FrameRecipeSizing& sizing,
+        const FrameRecipeAAOptions& aaOptions,
+        const FrameRecipeShadowSizing& shadowSizing,
+        const FrameRecipeTemporalOptions temporalOptions,
+        const std::vector<FrameRecipePassContribution>& contributions)
+    {
         if (!imports.Backbuffer.IsValid())
         {
             return FrameRecipeBuildResult{
@@ -1204,10 +1405,14 @@ namespace Extrinsic::Graphics
         // selection-ID pass. Hierarchy/hover outline still needs EntityId
         // produced when no click pick is pending; primitive IDs and readback
         // imports/copies are picking-only.
+        const FrameRecipeContributionState contributionState = DeriveContributionState(contributions);
         const bool pickingActive = features.EnablePicking && features.EnableDepthPrepass;
         const bool selectionIdActive = features.EnableDepthPrepass &&
-            (pickingActive || features.EnableSelectionOutline);
-        const bool selectionOutlineActive = features.EnableSelectionOutline && selectionIdActive;
+            (pickingActive || contributionState.SelectionOutline);
+        const bool selectionOutlineActive = contributionState.SelectionOutline && selectionIdActive;
+        const bool debugViewActive = contributionState.DebugView;
+        const bool imguiActive = contributionState.ImGui;
+        const bool visualizationOverlayActive = contributionState.VisualizationOverlay;
         const bool hzbBuildActive = features.EnableHZBBuild && features.EnableDepthPrepass && imports.HZBCurrent.IsValid();
         const bool clusterGridBuildActive = features.EnableClusterGridBuild && features.EnableDepthPrepass &&
                                             imports.ClusterGridAABBs.IsValid();
@@ -1236,7 +1441,20 @@ namespace Extrinsic::Graphics
         const auto height = ClampExtent(sizing.Height);
         const auto inputWidth = ClampExtent(aaOptions.InputWidth == 0u ? sizing.Width : aaOptions.InputWidth);
         const auto inputHeight = ClampExtent(aaOptions.InputHeight == 0u ? sizing.Height : aaOptions.InputHeight);
-        const FrameRecipeIntrospection declaration = DescribeDefaultFrameRecipe(features, aaOptions, temporalOptions);
+        const FrameRecipeContributionDescriptionResult declarationResult =
+            DescribeDefaultFrameRecipeWithContributions(features, aaOptions, temporalOptions, contributions);
+        if (!declarationResult.Succeeded)
+        {
+            return FrameRecipeBuildResult{
+                .Succeeded = false,
+                .MissingPrerequisiteCount = static_cast<std::uint32_t>(
+                    declarationResult.Validation.Diagnostics.size()),
+                .Diagnostic = declarationResult.Validation.Diagnostics.empty()
+                    ? "FrameRecipe contribution validation failed."
+                    : declarationResult.Validation.Diagnostics.front().Message,
+            };
+        }
+        const FrameRecipeIntrospection& declaration = declarationResult.Recipe;
 
         auto importBackbuffer = [&graph](std::string name,
                                          const RHI::TextureHandle handle,
@@ -1576,22 +1794,28 @@ namespace Extrinsic::Graphics
                                                  FrameRecipeResourceKind::HistogramReadback);
             }
         }
-        if (features.EnableDebugView)
+        if (debugViewActive)
         {
             debugView = createTexture("DebugViewRGBA",
                                       ColorTargetDesc(width, height, RHI::Format::RGBA8_UNORM, "DebugViewRGBA"),
                                       FrameRecipeResourceKind::DebugViewRGBA);
         }
 
-        auto addRecipePass = [&graph](const FrameRecipePassKind kind,
-                                      std::string name,
-                                      auto setup,
-                                      const bool sideEffect = false) {
+        auto addRecipePassWithId = [&graph](const FramePassId id,
+                                            std::string name,
+                                            auto setup,
+                                            const bool sideEffect = false) {
             PassRef pass = graph.AddPass(std::move(name), [setup](RenderGraphBuilder& builder) mutable {
                 setup(builder);
             }, sideEffect);
-            (void)graph.SetPassId(pass, ToFramePassId(kind));
+            (void)graph.SetPassId(pass, id);
             return pass;
+        };
+        auto addRecipePass = [&addRecipePassWithId](const FrameRecipePassKind kind,
+                                                    std::string name,
+                                                    auto setup,
+                                                    const bool sideEffect = false) {
+            return addRecipePassWithId(ToFramePassId(kind), std::move(name), setup, sideEffect);
         };
 
         addRecipePass(FrameRecipePassKind::Culling, "CullingPass", [=](RenderGraphBuilder& builder) {
@@ -1905,20 +2129,24 @@ namespace Extrinsic::Graphics
         // returns `SkippedUnavailable` because no pipelines exist yet.
         // Slice B wires the vector-field lane; Slice C wires the
         // isoline lane.
-        if (features.EnableVisualizationOverlay)
+        for (const FrameRecipePassContribution& contribution : contributions)
         {
-            addRecipePass(FrameRecipePassKind::VisualizationOverlay, "VisualizationOverlayPass", [=](RenderGraphBuilder& builder) {
-                builder.Read(depth, TextureUsage::DepthRead);
-                builder.Write(hdr, TextureUsage::ColorAttachmentWrite);
-                builder.SetRenderPass(RHI::RenderPassDesc{
-                    .ColorTargets = kVisualizationOverlayRenderPassColorAttachments,
-                    .Depth = RHI::DepthAttachment{
-                        .Target = RenderPassAttachmentToken(),
-                        .Load = RHI::LoadOp::Load,
-                        .Store = RHI::StoreOp::Store,
-                    },
+            if (IsEnabledContributionKind(contribution, FrameRecipePassKind::VisualizationOverlay) &&
+                visualizationOverlayActive)
+            {
+                addRecipePassWithId(contribution.Id, std::string{contribution.Name}, [=](RenderGraphBuilder& builder) {
+                    builder.Read(depth, TextureUsage::DepthRead);
+                    builder.Write(hdr, TextureUsage::ColorAttachmentWrite);
+                    builder.SetRenderPass(RHI::RenderPassDesc{
+                        .ColorTargets = kVisualizationOverlayRenderPassColorAttachments,
+                        .Depth = RHI::DepthAttachment{
+                            .Target = RenderPassAttachmentToken(),
+                            .Load = RHI::LoadOp::Load,
+                            .Store = RHI::StoreOp::Store,
+                        },
+                    });
                 });
-            });
+            }
         }
 
         TextureRef postProcessInput = hdr;
@@ -2037,48 +2265,54 @@ namespace Extrinsic::Graphics
                 (features.EnableAntiAliasing && spatialAAActive) ? postProcessAATempResolved : ldr;
         }
 
-        if (selectionOutlineActive)
+        for (const FrameRecipePassContribution& contribution : contributions)
         {
-            addRecipePass(FrameRecipePassKind::SelectionOutline, "SelectionOutlinePass", [=](RenderGraphBuilder& builder) {
-                builder.Read(entityId, TextureUsage::ShaderRead);
-                builder.Read(depth, TextureUsage::DepthRead);
-                builder.Read(presentSource, TextureUsage::ColorAttachmentRead);
-                builder.Write(presentSource, TextureUsage::ColorAttachmentWrite);
-                builder.SetRenderPass(RHI::RenderPassDesc{
-                    .ColorTargets = kDefaultLoadColorAttachments,
-                    .Depth = RHI::DepthAttachment{
-                        .Target = RenderPassAttachmentToken(),
-                        .Load = RHI::LoadOp::Load,
-                        .Store = RHI::StoreOp::Store,
-                    },
-                });
-            });
-        }
+            if (!contribution.Enabled)
+            {
+                continue;
+            }
 
-        if (features.EnableDebugView)
-        {
-            const TextureRef input = presentSource;
-            addRecipePass(FrameRecipePassKind::DebugView, "DebugViewPass", [=](RenderGraphBuilder& builder) {
-                builder.Read(input, TextureUsage::ShaderRead);
-                builder.Write(debugView, TextureUsage::ColorAttachmentWrite);
-                builder.SetRenderPass(RHI::RenderPassDesc{
-                    .ColorTargets = kDefaultClearColorAttachments,
+            if (contribution.Kind == FrameRecipePassKind::SelectionOutline && selectionOutlineActive)
+            {
+                addRecipePassWithId(contribution.Id, std::string{contribution.Name}, [=](RenderGraphBuilder& builder) {
+                    builder.Read(entityId, TextureUsage::ShaderRead);
+                    builder.Read(depth, TextureUsage::DepthRead);
+                    builder.Read(presentSource, TextureUsage::ColorAttachmentRead);
+                    builder.Write(presentSource, TextureUsage::ColorAttachmentWrite);
+                    builder.SetRenderPass(RHI::RenderPassDesc{
+                        .ColorTargets = kDefaultLoadColorAttachments,
+                        .Depth = RHI::DepthAttachment{
+                            .Target = RenderPassAttachmentToken(),
+                            .Load = RHI::LoadOp::Load,
+                            .Store = RHI::StoreOp::Store,
+                        },
+                    });
                 });
-            });
-            presentSource = debugView;
-        }
-
-        if (features.EnableImGui)
-        {
-            const TextureRef input = presentSource;
-            addRecipePass(FrameRecipePassKind::ImGui, "ImGuiPass", [=](RenderGraphBuilder& builder) {
-                builder.Read(input, TextureUsage::ShaderRead);
-                builder.Write(input, TextureUsage::ColorAttachmentWrite);
-                builder.SetRenderPass(RHI::RenderPassDesc{
-                    .ColorTargets = kDefaultLoadColorAttachments,
+            }
+            else if (contribution.Kind == FrameRecipePassKind::DebugView && debugViewActive)
+            {
+                const TextureRef input = presentSource;
+                addRecipePassWithId(contribution.Id, std::string{contribution.Name}, [=](RenderGraphBuilder& builder) {
+                    builder.Read(input, TextureUsage::ShaderRead);
+                    builder.Write(debugView, TextureUsage::ColorAttachmentWrite);
+                    builder.SetRenderPass(RHI::RenderPassDesc{
+                        .ColorTargets = kDefaultClearColorAttachments,
+                    });
                 });
-                builder.SideEffect();
-            });
+                presentSource = debugView;
+            }
+            else if (contribution.Kind == FrameRecipePassKind::ImGui && imguiActive)
+            {
+                const TextureRef input = presentSource;
+                addRecipePassWithId(contribution.Id, std::string{contribution.Name}, [=](RenderGraphBuilder& builder) {
+                    builder.Read(input, TextureUsage::ShaderRead);
+                    builder.Write(input, TextureUsage::ColorAttachmentWrite);
+                    builder.SetRenderPass(RHI::RenderPassDesc{
+                        .ColorTargets = kDefaultLoadColorAttachments,
+                    });
+                    builder.SideEffect();
+                });
+            }
         }
 
         // GRAPHICS-076 Slice A follow-up — the canonical default-recipe

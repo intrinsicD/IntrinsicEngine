@@ -10,12 +10,13 @@ maturity_target: Operational
 - Status: in-progress.
 - Owner/agent: Codex.
 - Branch: `main`.
-- Last completed slice: Slice B — contribution descriptors and fail-closed
-  validation.
-- Next slice: Slice C — convert SelectionOutline, DebugView, ImGui, and
-  VisualizationOverlay to registered overlay contributions.
-- Next verification step: byte-identical default composition and overlay-absent
-  null-frame contracts, then the default CPU gate before retirement.
+- Last completed slice: Slice C — default overlay contribution registration
+  and overlay-absent core recipe path.
+- Next slice: Slice D — retire the task by proving byte-identical default
+  composition, headless/null overlay-absent frame behavior, docs sync, and the
+  full CPU-supported gate.
+- Next verification step: final retirement checklist, generated docs/task sync,
+  default CPU gate, and self-review before moving the task to `tasks/done/`.
 
 ## Goal
 - Open the closed default frame recipe behind a validated contribution seam:

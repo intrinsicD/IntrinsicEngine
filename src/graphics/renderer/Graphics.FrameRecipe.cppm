@@ -200,6 +200,16 @@ namespace Extrinsic::Graphics
         return FrameResourceId{static_cast<std::uint32_t>(kind) + 1u};
     }
 
+    export [[nodiscard]] constexpr FrameResourceId FrameRecipePresentSourceResourceId() noexcept
+    {
+        return FrameResourceId{0xFFFF'FFF0u};
+    }
+
+    export [[nodiscard]] constexpr bool IsFrameRecipePseudoResourceId(const FrameResourceId id) noexcept
+    {
+        return id == FrameRecipePresentSourceResourceId();
+    }
+
     export [[nodiscard]] std::string_view FrameRecipePassKindName(FrameRecipePassKind kind) noexcept;
     export [[nodiscard]] std::string_view FrameRecipeResourceKindName(FrameRecipeResourceKind kind) noexcept;
     export [[nodiscard]] std::string_view FrameRecipePassIdName(FramePassId id) noexcept;
@@ -426,6 +436,7 @@ namespace Extrinsic::Graphics
         FramePassId Id{};
         std::string_view Name{};
         bool Enabled{true};
+        bool PreserveDisabledDeclaration{false};
         bool FinalizesBackbuffer{false};
         RenderQueue Queue{RenderQueue::Graphics};
         FrameRecipeContributionAnchor Anchor{};
@@ -475,10 +486,22 @@ namespace Extrinsic::Graphics
     export [[nodiscard]] FrameRecipeIntrospection DescribeDefaultFrameRecipe(const FrameRecipeFeatures& features,
                                                                              const FrameRecipeAAOptions& aaOptions,
                                                                              FrameRecipeTemporalOptions temporalOptions = {});
+    export [[nodiscard]] FrameRecipeContributionDescriptionResult DescribeDefaultFrameRecipeWithContributions(
+        const FrameRecipeFeatures& features,
+        const std::vector<FrameRecipePassContribution>& contributions);
+    export [[nodiscard]] FrameRecipeContributionDescriptionResult DescribeDefaultFrameRecipeWithContributions(
+        const FrameRecipeFeatures& features,
+        const FrameRecipeAAOptions& aaOptions,
+        FrameRecipeTemporalOptions temporalOptions,
+        const std::vector<FrameRecipePassContribution>& contributions);
 
     export void RegisterFrameRecipePassContribution(FrameRecipePassContributionRegistry& registry,
                                                     FrameRecipePassContribution contribution);
     export void ClearFrameRecipePassContributions(FrameRecipePassContributionRegistry& registry);
+    export void RegisterDefaultFrameRecipeOverlayContributions(FrameRecipePassContributionRegistry& registry,
+                                                               const FrameRecipeFeatures& features,
+                                                               const FrameRecipeAAOptions& aaOptions = {},
+                                                               FrameRecipeTemporalOptions temporalOptions = {});
     export [[nodiscard]] FrameRecipeContributionValidationResult ValidateFrameRecipePassContributions(
         const FrameRecipeIntrospection& baseRecipe,
         const std::vector<FrameRecipePassContribution>& contributions);
@@ -526,4 +549,13 @@ namespace Extrinsic::Graphics
                                                                         const FrameRecipeAAOptions& aaOptions,
                                                                         const FrameRecipeShadowSizing& shadowSizing = {},
                                                                         FrameRecipeTemporalOptions temporalOptions = {});
+    export [[nodiscard]] FrameRecipeBuildResult BuildDefaultFrameRecipeWithContributions(
+        RenderGraph& graph,
+        const FrameRecipeFeatures& features,
+        const FrameRecipeImports& imports,
+        const FrameRecipeSizing& sizing,
+        const FrameRecipeAAOptions& aaOptions,
+        const FrameRecipeShadowSizing& shadowSizing,
+        FrameRecipeTemporalOptions temporalOptions,
+        const std::vector<FrameRecipePassContribution>& contributions);
 }

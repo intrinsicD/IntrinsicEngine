@@ -12,7 +12,11 @@ services, and platform state do not enter the graphics frame graph directly.
   `FrameRecipeFeatures` selects optional pass families, `FrameRecipePassKind`
   and `FrameRecipeResourceKind` map to stable `FramePassId` /
   `FrameResourceId` values, and `BuildDefaultFrameRecipe(...)` declares the
-  pass/resource graph for the current frame.
+  pass/resource graph for the current frame by registering the default overlay
+  contribution family before graph construction.
+  `BuildDefaultFrameRecipeWithContributions(...)` is the explicit seam for
+  tests and renderer code that need a specific contribution registry; an empty
+  registry compiles the fixed core without overlay passes.
 - `DeriveDefaultFrameRecipeFeatures(const RenderWorld&)` derives the default
   feature set from render-ready snapshot data. Renderer-local state may then
   refine those defaults before the graph is built.
@@ -22,7 +26,11 @@ services, and platform state do not enter the graphics frame graph directly.
   typed pass descriptors. `ValidateFrameRecipePassContributions(...)` rejects
   disabled-anchor, duplicate-ID, fixed-core-conflict, and unknown-resource
   descriptors before `DescribeFrameRecipeWithContributions(...)` projects them
-  into introspection. This is not a document/config injection surface.
+  into introspection. `RegisterDefaultFrameRecipeOverlayContributions(...)`
+  registers SelectionOutline, DebugView, ImGui, and VisualizationOverlay as
+  code-level contributions; `FrameRecipePresentSourceResourceId()` is the typed
+  pseudo-resource for their dynamic current-color input/output. This is not a
+  document/config injection surface.
 - `RenderGraph` owns the compiled pass/resource DAG and resource-state
   scheduling. It receives declarations from the recipe; it is not the authority
   for deciding which gameplay or editor features are enabled. The compiled graph
@@ -91,7 +99,10 @@ On each frame, runtime drives the renderer through:
 2. Runtime extraction publishes a `RenderWorld` snapshot.
 3. The renderer derives default `FrameRecipeFeatures` from that snapshot.
 4. Any active `FrameRecipeOverride` is projected onto those features.
-5. `BuildDefaultFrameRecipe(...)` declares the pass/resource DAG.
+5. The renderer registers the default overlay contribution family and calls
+   `BuildDefaultFrameRecipeWithContributions(...)` to declare the pass/resource
+   DAG. The compatibility `BuildDefaultFrameRecipe(...)` helper performs the
+   same default registration internally.
 6. `RenderGraph` compiles the DAG and the renderer records command bodies.
 7. `IRenderer::EndFrame(...)` publishes completion diagnostics.
 
@@ -111,7 +122,8 @@ active override is an overlay, not a replacement render graph.
 - `RenderRecipeConfig` is a document/config overlay. It is not a public pass
   injection API and does not bypass `BuildDefaultFrameRecipe(...)`. Code-level
   renderer contributions must use typed `FramePassId` / `FrameResourceId`
-  descriptors and the frame-recipe contribution validator instead.
+  descriptors, the `FrameRecipe.PresentSource` pseudo-resource token when
+  needed, and the frame-recipe contribution validator instead.
 - Frame graph inputs are render-ready snapshots, handles, and renderer-owned
   imports. Live ECS registries, live `AssetService` traffic, platform windows,
   and backend-native `Vk*` types do not cross into recipe/config public APIs.

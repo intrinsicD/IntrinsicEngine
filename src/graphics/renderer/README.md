@@ -54,8 +54,13 @@ typed `FramePassId` / `FrameResourceId` declarations, an enabled feature gate,
 an anchor relative to an enabled base pass, and queue/finalizer metadata.
 `ValidateFrameRecipePassContributions(...)` fails closed for fixed-core pass
 conflicts, duplicate IDs, unknown or disabled resources, and invalid anchors;
-`DescribeFrameRecipeWithContributions(...)` projects only validated enabled
-descriptors into recipe introspection.
+`DescribeFrameRecipeWithContributions(...)` projects validated descriptors into
+recipe introspection. `RegisterDefaultFrameRecipeOverlayContributions(...)`
+registers SelectionOutline, DebugView, ImGui, and VisualizationOverlay as the
+default overlay family; `BuildDefaultFrameRecipeWithContributions(...)` is the
+explicit build path, and an empty registry compiles the overlay-absent core
+recipe. The dynamic current color target is declared with the typed
+`FrameRecipePresentSourceResourceId()` pseudo-resource rather than a raw string.
 
 `RenderRecipe*` names the renderer-independent contract/config vocabulary.
 `RenderRecipeDescriptor`, `RenderRecipeConfig`, view/output recipes, and binding
@@ -330,9 +335,12 @@ into graphics public contracts.
   alongside debug names so renderer record paths bind declared resources by
   `FrameResourceId` rather than scanning per-frame resource-name strings.
   Code-level pass contributions register through typed
-  `FrameRecipePassContribution` descriptors and are validated before they are
-  projected into introspection; config documents remain limited to the existing
-  optional-slot overlay.
+  `FrameRecipePassContribution` descriptors and are validated before graph
+  construction. The renderer registers the default overlay family explicitly,
+  while tests can pass an empty registry to
+  `BuildDefaultFrameRecipeWithContributions(...)` to compile the fixed core
+  without SelectionOutline, DebugView, ImGui, or VisualizationOverlay. Config
+  documents remain limited to the existing optional-slot overlay.
 - `Graphics.RenderCommandRouter` owns the renderer command-recording dispatch
   seam. The renderer registers command recorders by `FramePassId`, command
   status records carry both `FramePassId` and the debug label, and unknown typed
@@ -1198,13 +1206,13 @@ Concretely:
   `!world.Visualization.VectorFields.empty() ||
   !world.Visualization.Isolines.empty()` so the pass is omitted
   entirely from `CommandRecords` on frames with no overlay payload.
-  When enabled, `DescribeDefaultFrameRecipe` declares the pass
+  When enabled, the default overlay contribution registry projects the pass
   immediately after `TransientDebugSurfacePass` (same "post-lit,
   pre-postprocess" band) with `Reads = {SceneColorHDR, SceneDepth}`
-  and `Writes = {SceneColorHDR}`; `BuildDefaultFrameRecipe` adds the
-  ordered pass with `Read(SceneDepth, DepthRead) + Write(SceneColorHDR,
-  ColorAttachmentWrite) + SetRenderPass(LOAD-store color, LOAD/Store
-  depth)` so the framegraph compiler emits a real
+  and `Writes = {SceneColorHDR}`; `BuildDefaultFrameRecipeWithContributions`
+  adds the ordered pass with `Read(SceneDepth, DepthRead) +
+  Write(SceneColorHDR, ColorAttachmentWrite) + SetRenderPass(LOAD-store color,
+  LOAD/Store depth)` so the framegraph compiler emits a real
   `CompiledRenderPassAttachment` pair before any future Slice B/C
   bind/draw lands. Renderer-side, `NullRenderer` owns a plain
   `m_VisualizationOverlayPass` member (no system dependency) and a typed `VisualizationOverlayPass` command route invokes

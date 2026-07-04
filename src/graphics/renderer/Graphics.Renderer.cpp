@@ -2464,13 +2464,20 @@ namespace Extrinsic::Graphics
                     defaultRecipeFeatures = projection.Features;
                 }
             }
-            const FrameRecipeBuildResult recipe = BuildDefaultFrameRecipe(m_RenderGraph,
-                                                                              defaultRecipeFeatures,
-                                                                              imports,
-                                                                              sizing,
-                                                                              aaOptions,
-                                                                              shadowSizing,
-                                                                              temporalOptions);
+            FrameRecipePassContributionRegistry frameRecipeContributions{};
+            RegisterDefaultFrameRecipeOverlayContributions(frameRecipeContributions,
+                                                           defaultRecipeFeatures,
+                                                           aaOptions,
+                                                           temporalOptions);
+            const FrameRecipeBuildResult recipe =
+                BuildDefaultFrameRecipeWithContributions(m_RenderGraph,
+                                                         defaultRecipeFeatures,
+                                                         imports,
+                                                         sizing,
+                                                         aaOptions,
+                                                         shadowSizing,
+                                                         temporalOptions,
+                                                         frameRecipeContributions.Passes);
             if (!recipe.Succeeded)
             {
                 m_LastRenderGraphStats.Diagnostic = recipe.Diagnostic;
@@ -2509,8 +2516,12 @@ namespace Extrinsic::Graphics
             // `UnauthorizedImportedBufferWrite`). Gate 7
             // (`BarrierValidationClean`) therefore flips to `true` when the
             // recipe-aware validation reports zero `Error`-severity findings.
-            const FrameRecipeIntrospection recipeIntrospection =
-                DescribeDefaultFrameRecipe(defaultRecipeFeatures, aaOptions, temporalOptions);
+            const FrameRecipeContributionDescriptionResult recipeDescription =
+                DescribeDefaultFrameRecipeWithContributions(defaultRecipeFeatures,
+                                                            aaOptions,
+                                                            temporalOptions,
+                                                            frameRecipeContributions.Passes);
+            const FrameRecipeIntrospection& recipeIntrospection = recipeDescription.Recipe;
             // GRAPHICS-076 Slice B — drive the renderer-owned
             // `DebugViewSystem` from the current frame's world + recipe
             // declarations before the executor records the

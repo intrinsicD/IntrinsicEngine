@@ -839,6 +839,156 @@ TEST(FrameRecipeContract, ContributionValidationFailsClosedForInvalidDescriptors
     EXPECT_EQ(projected.Recipe.Resources.size(), baseRecipe.Resources.size());
 }
 
+TEST(FrameRecipeContract, DefaultOverlayContributionsProjectLegacyOverlayShape)
+{
+    FrameRecipeFeatures features{};
+    features.EnableSelectionOutline = true;
+    features.EnableDebugView = true;
+    features.EnableTransientDebugSurface = true;
+    features.EnableVisualizationOverlay = true;
+    features.EnableAntiAliasing = true;
+    const FrameRecipeAAOptions aaOptions{.Mode = FrameRecipeAAMode::SMAA};
+
+    FrameRecipePassContributionRegistry registry{};
+    RegisterDefaultFrameRecipeOverlayContributions(
+        registry,
+        features,
+        aaOptions,
+        FrameRecipeTemporalOptions{});
+    ASSERT_EQ(registry.Passes.size(), 4u);
+
+    const FrameRecipeContributionDescriptionResult described =
+        DescribeDefaultFrameRecipeWithContributions(
+            features,
+            aaOptions,
+            FrameRecipeTemporalOptions{},
+            registry.Passes);
+    ASSERT_TRUE(described.Succeeded);
+    EXPECT_FALSE(described.Validation.HasErrors());
+
+    const auto* visualization = FindPass(described.Recipe, FrameRecipePassKind::VisualizationOverlay);
+    ASSERT_NE(visualization, nullptr);
+    EXPECT_TRUE(visualization->Enabled);
+    EXPECT_TRUE(visualization->Contributed);
+    EXPECT_TRUE(Contains(visualization->Reads, "SceneColorHDR"));
+    EXPECT_TRUE(Contains(visualization->Reads, "SceneDepth"));
+    EXPECT_TRUE(Contains(visualization->Writes, "SceneColorHDR"));
+
+    const auto* outline = FindPass(described.Recipe, FrameRecipePassKind::SelectionOutline);
+    ASSERT_NE(outline, nullptr);
+    EXPECT_TRUE(outline->Enabled);
+    EXPECT_TRUE(outline->Contributed);
+    EXPECT_TRUE(Contains(outline->Reads, "EntityId"));
+    EXPECT_TRUE(Contains(outline->Reads, "FrameRecipe.PresentSource"));
+    EXPECT_TRUE(Contains(outline->Writes, "FrameRecipe.PresentSource"));
+
+    const auto* debug = FindPass(described.Recipe, FrameRecipePassKind::DebugView);
+    ASSERT_NE(debug, nullptr);
+    EXPECT_TRUE(debug->Enabled);
+    EXPECT_TRUE(debug->Contributed);
+    EXPECT_TRUE(Contains(debug->Reads, "FrameRecipe.PresentSource"));
+    EXPECT_TRUE(Contains(debug->Writes, "DebugViewRGBA"));
+
+    const auto* imgui = FindPass(described.Recipe, FrameRecipePassKind::ImGui);
+    ASSERT_NE(imgui, nullptr);
+    EXPECT_TRUE(imgui->Enabled);
+    EXPECT_TRUE(imgui->Contributed);
+    EXPECT_TRUE(Contains(imgui->Reads, "FrameRecipe.PresentSource"));
+    EXPECT_TRUE(Contains(imgui->Writes, "FrameRecipe.PresentSource"));
+}
+
+TEST(FrameRecipeContract, ExplicitDefaultOverlayContributionsMatchDefaultBuildShape)
+{
+    FrameRecipeFeatures features{};
+    features.EnablePicking = true;
+    features.EnableSelectionOutline = true;
+    features.EnableDebugView = true;
+    features.EnableTransientDebugSurface = true;
+    features.EnableVisualizationOverlay = true;
+    features.EnableAntiAliasing = true;
+    const FrameRecipeAAOptions aaOptions{.Mode = FrameRecipeAAMode::SMAA};
+
+    RenderGraph defaultGraph;
+    const FrameRecipeBuildResult defaultBuild = BuildDefaultFrameRecipe(
+        defaultGraph,
+        features,
+        MakeImports(),
+        FrameRecipeSizing{.Width = 640u, .Height = 360u},
+        aaOptions);
+    ASSERT_TRUE(defaultBuild.Succeeded) << defaultBuild.Diagnostic;
+    const auto defaultCompiled = defaultGraph.Compile();
+    ASSERT_TRUE(defaultCompiled.has_value());
+
+    FrameRecipePassContributionRegistry registry{};
+    RegisterDefaultFrameRecipeOverlayContributions(
+        registry,
+        features,
+        aaOptions,
+        FrameRecipeTemporalOptions{});
+
+    RenderGraph explicitGraph;
+    const FrameRecipeBuildResult explicitBuild =
+        BuildDefaultFrameRecipeWithContributions(
+            explicitGraph,
+            features,
+            MakeImports(),
+            FrameRecipeSizing{.Width = 640u, .Height = 360u},
+            aaOptions,
+            FrameRecipeShadowSizing{},
+            FrameRecipeTemporalOptions{},
+            registry.Passes);
+    ASSERT_TRUE(explicitBuild.Succeeded) << explicitBuild.Diagnostic;
+    const auto explicitCompiled = explicitGraph.Compile();
+    ASSERT_TRUE(explicitCompiled.has_value());
+
+    EXPECT_EQ(explicitBuild.DeclaredPassCount, defaultBuild.DeclaredPassCount);
+    EXPECT_EQ(explicitBuild.DeclaredResourceCount, defaultBuild.DeclaredResourceCount);
+    EXPECT_EQ(OrderedPassNames(*explicitCompiled), OrderedPassNames(*defaultCompiled));
+}
+
+TEST(FrameRecipeContract, EmptyContributionRegistryCompilesOverlayAbsentCoreRecipe)
+{
+    FrameRecipeFeatures features{};
+    features.EnablePicking = false;
+    features.EnableSelectionOutline = true;
+    features.EnableDebugView = true;
+    features.EnableImGui = true;
+    features.EnableVisualizationOverlay = true;
+
+    const std::vector<FrameRecipePassContribution> noContributions{};
+    const FrameRecipeContributionDescriptionResult described =
+        DescribeDefaultFrameRecipeWithContributions(features, noContributions);
+    ASSERT_TRUE(described.Succeeded);
+    EXPECT_EQ(FindPass(described.Recipe, FrameRecipePassKind::SelectionOutline), nullptr);
+    EXPECT_EQ(FindPass(described.Recipe, FrameRecipePassKind::DebugView), nullptr);
+    EXPECT_EQ(FindPass(described.Recipe, FrameRecipePassKind::ImGui), nullptr);
+    EXPECT_EQ(FindPass(described.Recipe, FrameRecipePassKind::VisualizationOverlay), nullptr);
+
+    RenderGraph graph;
+    const FrameRecipeBuildResult build =
+        BuildDefaultFrameRecipeWithContributions(
+            graph,
+            features,
+            MakeImports(),
+            FrameRecipeSizing{.Width = 640u, .Height = 480u},
+            FrameRecipeAAOptions{},
+            FrameRecipeShadowSizing{},
+            FrameRecipeTemporalOptions{},
+            noContributions);
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    const std::vector<std::string> passNames = OrderedPassNames(*compiled);
+    EXPECT_EQ(std::ranges::find(passNames, "SelectionOutlinePass"), passNames.end());
+    EXPECT_EQ(std::ranges::find(passNames, "DebugViewPass"), passNames.end());
+    EXPECT_EQ(std::ranges::find(passNames, "ImGuiPass"), passNames.end());
+    EXPECT_EQ(std::ranges::find(passNames, "VisualizationOverlayPass"), passNames.end());
+    EXPECT_EQ(std::ranges::find(passNames, "PickingPass"), passNames.end());
+    EXPECT_EQ(std::ranges::find(compiled->TextureNames, "EntityId"), compiled->TextureNames.end());
+    EXPECT_EQ(std::ranges::find(compiled->TextureNames, "DebugViewRGBA"), compiled->TextureNames.end());
+}
+
 TEST(FrameRecipeContract, DefaultRecipeUsesResourceDependenciesWithoutLinearChain)
 {
     RenderGraph graph;
