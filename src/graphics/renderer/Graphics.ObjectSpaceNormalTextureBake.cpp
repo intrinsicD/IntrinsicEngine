@@ -88,6 +88,123 @@ namespace Extrinsic::Graphics
             }
             return normal / length;
         }
+
+        [[nodiscard]] bool AreDilationResourcesUsable(
+            const ObjectSpaceNormalTextureBakeDilationResources& resources) noexcept
+        {
+            return resources.IsValid();
+        }
+
+        [[nodiscard]] RHI::TextureHandle SelectDilationTarget(
+            const RHI::TextureHandle output,
+            const RHI::TextureHandle scratch,
+            const bool useOutput) noexcept
+        {
+            return useOutput ? output : scratch;
+        }
+
+        struct TextureRecordingState
+        {
+            RHI::TextureHandle Handle{};
+            RHI::TextureLayout Layout = RHI::TextureLayout::Undefined;
+        };
+
+        void TransitionTexture(RHI::ICommandContext& cmd,
+                               TextureRecordingState& state,
+                               const RHI::TextureLayout next)
+        {
+            if (state.Layout == next)
+            {
+                return;
+            }
+            cmd.TextureBarrier(state.Handle, state.Layout, next);
+            state.Layout = next;
+        }
+
+        void RecordSingleColorFullscreenPass(
+            RHI::ICommandContext& cmd,
+            const RHI::TextureHandle target,
+            const std::uint32_t width,
+            const std::uint32_t height,
+            const RHI::LoadOp load,
+            const RHI::PipelineHandle pipeline)
+        {
+            const std::array<RHI::ColorAttachment, 1u> colorAttachments{{
+                RHI::ColorAttachment{
+                    .Target = target,
+                    .Load = load,
+                    .Store = RHI::StoreOp::Store,
+                    .ClearR = 0.5f,
+                    .ClearG = 0.5f,
+                    .ClearB = 1.0f,
+                    .ClearA = 0.0f,
+                },
+            }};
+
+            cmd.BeginRenderPass(RHI::RenderPassDesc{
+                .ColorTargets = std::span<const RHI::ColorAttachment>{
+                    colorAttachments},
+            });
+            cmd.SetViewport(0.0f,
+                            0.0f,
+                            static_cast<float>(width),
+                            static_cast<float>(height),
+                            0.0f,
+                            1.0f);
+            cmd.SetScissor(0, 0, width, height);
+            cmd.BindPipeline(pipeline);
+        }
+
+        void RecordRasterBakePass(
+            RHI::ICommandContext& cmd,
+            const ObjectSpaceNormalTextureBakeGpuRecordDesc& desc,
+            const RHI::TextureHandle target)
+        {
+            const ObjectSpaceNormalTextureBakeGpuPushConstants push{
+                .TexcoordBDA = desc.TexcoordBDA,
+                .NormalBDA = desc.NormalBDA,
+            };
+
+            RecordSingleColorFullscreenPass(cmd,
+                                            target,
+                                            desc.Width,
+                                            desc.Height,
+                                            RHI::LoadOp::Clear,
+                                            desc.Pipeline);
+            cmd.BindIndexBuffer(desc.IndexBuffer, 0u, RHI::IndexType::Uint32);
+            cmd.PushConstants(
+                &push,
+                static_cast<std::uint32_t>(
+                    sizeof(ObjectSpaceNormalTextureBakeGpuPushConstants)),
+                0u);
+            cmd.DrawIndexed(desc.IndexCount, 1u, 0u, 0, 0u);
+            cmd.EndRenderPass();
+        }
+
+        void RecordDilationPass(
+            RHI::ICommandContext& cmd,
+            const ObjectSpaceNormalTextureBakeGpuRecordDesc& desc,
+            const RHI::TextureHandle target,
+            const std::uint32_t sourceDescriptorSlot)
+        {
+            const ObjectSpaceNormalTextureBakeDilationPushConstants push{
+                .SourceTextureSlot = sourceDescriptorSlot,
+            };
+
+            RecordSingleColorFullscreenPass(cmd,
+                                            target,
+                                            desc.Width,
+                                            desc.Height,
+                                            RHI::LoadOp::DontCare,
+                                            desc.Dilation.Pipeline);
+            cmd.PushConstants(
+                &push,
+                static_cast<std::uint32_t>(
+                    sizeof(ObjectSpaceNormalTextureBakeDilationPushConstants)),
+                0u);
+            cmd.Draw(3u, 1u, 0u, 0u);
+            cmd.EndRenderPass();
+        }
     }
 
     const char* DebugNameForObjectSpaceNormalTextureBakeStatus(
@@ -355,6 +472,178 @@ namespace Extrinsic::Graphics
         return desc;
     }
 
+    RHI::PipelineDesc MakeObjectSpaceNormalTextureBakeDilationPipelineDesc(
+        std::string vertexShaderPath,
+        std::string fragmentShaderPath,
+        const RHI::Format colorFormat)
+    {
+        RHI::PipelineDesc desc{};
+        desc.VertexShaderPath = std::move(vertexShaderPath);
+        desc.FragmentShaderPath = std::move(fragmentShaderPath);
+        desc.Rasterizer.Culling = RHI::CullMode::None;
+        desc.DepthStencil.DepthTestEnable = false;
+        desc.DepthStencil.DepthWriteEnable = false;
+        desc.ColorTargetCount = 1u;
+        desc.ColorTargetFormats[0] = colorFormat;
+        desc.PushConstantSize =
+            static_cast<std::uint32_t>(
+                sizeof(ObjectSpaceNormalTextureBakeDilationPushConstants));
+        desc.DebugName = "ObjectSpaceNormalTextureBake.Dilation";
+        return desc;
+    }
+
+    RHI::TextureDesc MakeObjectSpaceNormalTextureBakeDilationScratchTextureDesc(
+        const ObjectSpaceNormalTextureBakeOptions& options,
+        const char* debugName) noexcept
+    {
+        const ObjectSpaceNormalTextureBakeResolvedOptions resolved =
+            ResolveObjectSpaceNormalTextureBakeOptions(options);
+        return RHI::TextureDesc{
+            .Width = resolved.Width,
+            .Height = resolved.Height,
+            .MipLevels = 1u,
+            .Fmt = RHI::Format::RGBA8_UNORM,
+            .Usage = RHI::TextureUsage::Sampled | RHI::TextureUsage::ColorTarget,
+            .InitialLayout = RHI::TextureLayout::Undefined,
+            .DebugName = debugName != nullptr
+                ? debugName
+                : "ObjectSpaceNormalTextureBake.DilationScratch",
+        };
+    }
+
+    ObjectSpaceNormalTextureBakeDilationResourceDesc
+    MakeObjectSpaceNormalTextureBakeDilationResourceDesc(
+        const ObjectSpaceNormalTextureBakeOptions& options,
+        std::string vertexShaderPath,
+        std::string fragmentShaderPath,
+        const char* scratchDebugName)
+    {
+        return ObjectSpaceNormalTextureBakeDilationResourceDesc{
+            .Pipeline = MakeObjectSpaceNormalTextureBakeDilationPipelineDesc(
+                std::move(vertexShaderPath),
+                std::move(fragmentShaderPath)),
+            .ScratchTexture =
+                MakeObjectSpaceNormalTextureBakeDilationScratchTextureDesc(
+                    options,
+                    scratchDebugName),
+        };
+    }
+
+    ObjectSpaceNormalTextureBakeDilationResourceLease::
+        ~ObjectSpaceNormalTextureBakeDilationResourceLease()
+    {
+        Shutdown();
+    }
+
+    ObjectSpaceNormalTextureBakeDilationResourceLease::
+        ObjectSpaceNormalTextureBakeDilationResourceLease(
+            ObjectSpaceNormalTextureBakeDilationResourceLease&& other) noexcept
+        : m_Device(std::exchange(other.m_Device, nullptr))
+        , m_Pipeline(std::exchange(other.m_Pipeline, {}))
+        , m_ScratchTexture(std::exchange(other.m_ScratchTexture, {}))
+        , m_ScratchInitialLayout(other.m_ScratchInitialLayout)
+        , m_OutputDescriptorSlot(other.m_OutputDescriptorSlot)
+        , m_ScratchDescriptorSlot(other.m_ScratchDescriptorSlot)
+    {
+    }
+
+    ObjectSpaceNormalTextureBakeDilationResourceLease&
+    ObjectSpaceNormalTextureBakeDilationResourceLease::operator=(
+        ObjectSpaceNormalTextureBakeDilationResourceLease&& other) noexcept
+    {
+        if (this == &other)
+        {
+            return *this;
+        }
+
+        Shutdown();
+        m_Device = std::exchange(other.m_Device, nullptr);
+        m_Pipeline = std::exchange(other.m_Pipeline, {});
+        m_ScratchTexture = std::exchange(other.m_ScratchTexture, {});
+        m_ScratchInitialLayout = other.m_ScratchInitialLayout;
+        m_OutputDescriptorSlot = other.m_OutputDescriptorSlot;
+        m_ScratchDescriptorSlot = other.m_ScratchDescriptorSlot;
+        return *this;
+    }
+
+    Core::Result ObjectSpaceNormalTextureBakeDilationResourceLease::Initialize(
+        RHI::IDevice& device,
+        const ObjectSpaceNormalTextureBakeDilationResourceDesc& desc)
+    {
+        Shutdown();
+
+        if (!device.IsOperational())
+        {
+            return Core::Err(Core::ErrorCode::DeviceNotOperational);
+        }
+        if (desc.OutputDescriptorSlot == desc.ScratchDescriptorSlot ||
+            desc.ScratchTexture.Width == 0u ||
+            desc.ScratchTexture.Height == 0u)
+        {
+            return Core::Err(Core::ErrorCode::InvalidArgument);
+        }
+
+        RHI::PipelineHandle pipeline = device.CreatePipeline(desc.Pipeline);
+        if (!pipeline.IsValid())
+        {
+            return Core::Err(Core::ErrorCode::PipelineCreationFailed);
+        }
+
+        RHI::TextureHandle scratch = device.CreateTexture(desc.ScratchTexture);
+        if (!scratch.IsValid())
+        {
+            device.DestroyPipeline(pipeline);
+            return Core::Err(Core::ErrorCode::OutOfDeviceMemory);
+        }
+
+        m_Device = &device;
+        m_Pipeline = pipeline;
+        m_ScratchTexture = scratch;
+        m_ScratchInitialLayout = desc.ScratchTexture.InitialLayout;
+        m_OutputDescriptorSlot = desc.OutputDescriptorSlot;
+        m_ScratchDescriptorSlot = desc.ScratchDescriptorSlot;
+        return Core::Ok();
+    }
+
+    void ObjectSpaceNormalTextureBakeDilationResourceLease::Shutdown() noexcept
+    {
+        if (m_Device != nullptr)
+        {
+            if (m_ScratchTexture.IsValid())
+            {
+                m_Device->DestroyTexture(m_ScratchTexture);
+            }
+            if (m_Pipeline.IsValid())
+            {
+                m_Device->DestroyPipeline(m_Pipeline);
+            }
+        }
+        m_Device = nullptr;
+        m_Pipeline = {};
+        m_ScratchTexture = {};
+        m_ScratchInitialLayout = RHI::TextureLayout::Undefined;
+        m_OutputDescriptorSlot = kObjectSpaceNormalBakeDilationOutputDescriptorSlot;
+        m_ScratchDescriptorSlot =
+            kObjectSpaceNormalBakeDilationScratchDescriptorSlot;
+    }
+
+    bool ObjectSpaceNormalTextureBakeDilationResourceLease::IsValid() const noexcept
+    {
+        return GetResources().IsValid();
+    }
+
+    ObjectSpaceNormalTextureBakeDilationResources
+    ObjectSpaceNormalTextureBakeDilationResourceLease::GetResources() const noexcept
+    {
+        return ObjectSpaceNormalTextureBakeDilationResources{
+            .Pipeline = m_Pipeline,
+            .ScratchTexture = m_ScratchTexture,
+            .ScratchInitialLayout = m_ScratchInitialLayout,
+            .OutputDescriptorSlot = m_OutputDescriptorSlot,
+            .ScratchDescriptorSlot = m_ScratchDescriptorSlot,
+        };
+    }
+
     ObjectSpaceNormalTextureBakePlan BuildObjectSpaceNormalTextureBakePlan(
         const ObjectSpaceNormalTextureBakePlanRequest& request) noexcept
     {
@@ -364,6 +653,8 @@ namespace Extrinsic::Graphics
         plan.Diagnostics.VertexCount = request.Geometry.VertexCount;
         plan.Diagnostics.TriangleCount = request.Geometry.IndexCount / 3u;
         plan.DilationRequested = plan.Diagnostics.Options.PaddingTexels > 0u;
+        plan.DilationAvailable =
+            AreDilationResourcesUsable(request.Dilation);
 
         const auto fail = [&plan](const ObjectSpaceNormalTextureBakeStatus status) noexcept
         {
@@ -442,12 +733,14 @@ namespace Extrinsic::Graphics
 
         plan.RecordTemplate = ObjectSpaceNormalTextureBakeGpuRecordTemplate{
             .Pipeline = request.Pipeline,
+            .Dilation = request.Dilation,
             .IndexBuffer = request.Geometry.IndexBuffer,
             .TexcoordBDA = request.Geometry.TexcoordBDA,
             .NormalBDA = request.Geometry.NormalBDA,
             .IndexCount = request.Geometry.IndexCount,
             .Width = plan.Diagnostics.Options.Width,
             .Height = plan.Diagnostics.Options.Height,
+            .PaddingTexels = plan.Diagnostics.Options.PaddingTexels,
             .InitialLayout = request.InitialLayout,
             .FinalLayout = request.FinalLayout,
         };
@@ -481,12 +774,14 @@ namespace Extrinsic::Graphics
         return ObjectSpaceNormalTextureBakeGpuRecordDesc{
             .Pipeline = plan.RecordTemplate.Pipeline,
             .OutputTexture = outputTexture,
+            .Dilation = plan.RecordTemplate.Dilation,
             .IndexBuffer = plan.RecordTemplate.IndexBuffer,
             .TexcoordBDA = plan.RecordTemplate.TexcoordBDA,
             .NormalBDA = plan.RecordTemplate.NormalBDA,
             .IndexCount = plan.RecordTemplate.IndexCount,
             .Width = plan.RecordTemplate.Width,
             .Height = plan.RecordTemplate.Height,
+            .PaddingTexels = plan.RecordTemplate.PaddingTexels,
             .InitialLayout = plan.RecordTemplate.InitialLayout,
             .FinalLayout = plan.RecordTemplate.FinalLayout,
         };
@@ -503,56 +798,75 @@ namespace Extrinsic::Graphics
             desc.NormalBDA == 0u ||
             desc.IndexCount == 0u ||
             desc.Width == 0u ||
-            desc.Height == 0u)
+            desc.Height == 0u ||
+            desc.PaddingTexels > kObjectSpaceNormalBakeMaxPaddingTexels)
         {
             return Core::Err(Core::ErrorCode::InvalidArgument);
         }
 
-        const ObjectSpaceNormalTextureBakeGpuPushConstants push{
-            .TexcoordBDA = desc.TexcoordBDA,
-            .NormalBDA = desc.NormalBDA,
+        if (desc.PaddingTexels == 0u)
+        {
+            TextureRecordingState output{
+                .Handle = desc.OutputTexture,
+                .Layout = desc.InitialLayout,
+            };
+            TransitionTexture(cmd, output, RHI::TextureLayout::ColorAttachment);
+            RecordRasterBakePass(cmd, desc, desc.OutputTexture);
+            TransitionTexture(cmd, output, desc.FinalLayout);
+            return Core::Ok();
+        }
+
+        if (!AreDilationResourcesUsable(desc.Dilation) ||
+            desc.Dilation.ScratchTexture == desc.OutputTexture)
+        {
+            return Core::Err(Core::ErrorCode::InvalidArgument);
+        }
+
+        TextureRecordingState output{
+            .Handle = desc.OutputTexture,
+            .Layout = desc.InitialLayout,
+        };
+        TextureRecordingState scratch{
+            .Handle = desc.Dilation.ScratchTexture,
+            .Layout = desc.Dilation.ScratchInitialLayout,
         };
 
-        cmd.TextureBarrier(desc.OutputTexture,
-                           desc.InitialLayout,
-                           RHI::TextureLayout::ColorAttachment);
+        cmd.BindFrameSampledTextureAt(desc.OutputTexture,
+                                      desc.Dilation.OutputDescriptorSlot);
+        cmd.BindFrameSampledTextureAt(desc.Dilation.ScratchTexture,
+                                      desc.Dilation.ScratchDescriptorSlot);
 
-        const std::array<RHI::ColorAttachment, 1u> colorAttachments{{
-            RHI::ColorAttachment{
-                .Target = desc.OutputTexture,
-                .Load = RHI::LoadOp::Clear,
-                .Store = RHI::StoreOp::Store,
-                .ClearR = 0.5f,
-                .ClearG = 0.5f,
-                .ClearB = 1.0f,
-                .ClearA = 0.0f,
-            },
-        }};
+        const bool rasterToOutput = (desc.PaddingTexels % 2u) == 0u;
+        TextureRecordingState& rasterTarget = rasterToOutput ? output : scratch;
+        TransitionTexture(cmd, rasterTarget, RHI::TextureLayout::ColorAttachment);
+        RecordRasterBakePass(cmd, desc, rasterTarget.Handle);
+        TransitionTexture(cmd, rasterTarget, RHI::TextureLayout::ShaderReadOnly);
 
-        cmd.BeginRenderPass(RHI::RenderPassDesc{
-            .ColorTargets = std::span<const RHI::ColorAttachment>{
-                colorAttachments},
-        });
-        cmd.SetViewport(0.0f,
-                        0.0f,
-                        static_cast<float>(desc.Width),
-                        static_cast<float>(desc.Height),
-                        0.0f,
-                        1.0f);
-        cmd.SetScissor(0, 0, desc.Width, desc.Height);
-        cmd.BindPipeline(desc.Pipeline);
-        cmd.BindIndexBuffer(desc.IndexBuffer, 0u, RHI::IndexType::Uint32);
-        cmd.PushConstants(
-            &push,
-            static_cast<std::uint32_t>(
-                sizeof(ObjectSpaceNormalTextureBakeGpuPushConstants)),
-            0u);
-        cmd.DrawIndexed(desc.IndexCount, 1u, 0u, 0, 0u);
-        cmd.EndRenderPass();
+        bool sourceIsOutput = rasterToOutput;
+        for (std::uint32_t pass = 0u; pass < desc.PaddingTexels; ++pass)
+        {
+            const bool targetIsOutput = !sourceIsOutput;
+            TextureRecordingState& target = targetIsOutput ? output : scratch;
+            const std::uint32_t sourceSlot = sourceIsOutput
+                ? desc.Dilation.OutputDescriptorSlot
+                : desc.Dilation.ScratchDescriptorSlot;
+            const bool lastPass = (pass + 1u) == desc.PaddingTexels;
 
-        cmd.TextureBarrier(desc.OutputTexture,
-                           RHI::TextureLayout::ColorAttachment,
-                           desc.FinalLayout);
+            TransitionTexture(cmd, target, RHI::TextureLayout::ColorAttachment);
+            RecordDilationPass(cmd,
+                               desc,
+                               SelectDilationTarget(desc.OutputTexture,
+                                                    desc.Dilation.ScratchTexture,
+                                                    targetIsOutput),
+                               sourceSlot);
+            TransitionTexture(cmd,
+                              target,
+                              lastPass && targetIsOutput
+                                  ? desc.FinalLayout
+                                  : RHI::TextureLayout::ShaderReadOnly);
+
+            sourceIsOutput = targetIsOutput;
+        }
         return Core::Ok();
     }
 }

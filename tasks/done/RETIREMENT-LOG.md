@@ -9,6 +9,20 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`GRAPHICS-115`](GRAPHICS-115-object-space-normal-gpu-dilation.md) —
+Object-space normal GPU dilation pass — retired on 2026-07-04 at maturity
+`Operational` on Vulkan-capable hosts and `CPUContracted` for backend-neutral
+planning/resource/command contracts. Padded generated-normal bakes now consume
+graphics-owned dilation resources: a fullscreen dilation pipeline and
+same-extent sampled/color-target scratch texture, allocated through RHI handles
+without leaking backend-native types. The recorder reserves sampled bridge slots
+4/5 for output/scratch, ping-pongs one fullscreen pass per requested padding
+texel, preserves covered texels, fills neighboring alpha-zero gutter texels on
+GPU, and fails closed without a CPU dilation fallback when resources are
+missing or the backend is non-operational. Focused CPU/null contracts and the
+opt-in `ObjectSpaceNormalTextureBakeGpuSmoke` Vulkan smoke passed.
+
+Backlog
 [`BUG-055`](BUG-055-taskgraph-counterevent-latch-destruction-race.md) —
 TaskGraph::Execute / CounterEvent latch-destruction race — retired on
 2026-07-04 at maturity `CPUContracted`. `TaskGraph::Execute()` now keeps its
@@ -60,9 +74,9 @@ GPU Object-Space Normal Texture Bake — retired on 2026-07-02 at maturity
 `CPUContracted`. The graphics-owned zero-padding raster-bake plan/recording,
 object-space-normal shader/material contract, GPU-produced cache texture
 residency, and runtime queue/submission/binding helpers are now recorded as the
-completed slice. Padded GPU dilation is split to open follow-up `GRAPHICS-115`;
-engine/import render-thread scheduling and material swaps remain owned by
-`RUNTIME-129`.
+completed slice. Padded GPU dilation was split to follow-up `GRAPHICS-115`,
+which is now retired; engine/import render-thread scheduling and material swaps
+remain owned by `RUNTIME-129`.
 
 Backlog
 [`GRAPHICS-110`](GRAPHICS-110-imgui-upload-buffer-in-flight-safety.md) —

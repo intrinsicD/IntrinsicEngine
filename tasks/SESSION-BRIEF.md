@@ -13,7 +13,6 @@ the authoritative open/unblocked view.
 ## Theme B — Rendering modernization
 
 - blocked by `RUNTIME-129`: `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/backlog/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
-- unblocked: `GRAPHICS-115` — Object-space normal GPU dilation pass (tasks/backlog/rendering/GRAPHICS-115-object-space-normal-gpu-dilation.md)
 - unblocked: `GRAPHICS-116` — Frame-recipe pass contribution seam and typed record-path resolution (tasks/backlog/rendering/GRAPHICS-116-recipe-pass-contribution-seam.md)
 - unblocked: `GRAPHICS-117` — Render-graph compile caching and gated debug dump (tasks/backlog/rendering/GRAPHICS-117-render-graph-compile-cache.md)
 - unblocked: `GRAPHICS-118` — Placed transient resource allocation with real memory aliasing (tasks/backlog/rendering/GRAPHICS-118-placed-transient-memory-aliasing.md)

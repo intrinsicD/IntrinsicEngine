@@ -14,8 +14,11 @@ import Extrinsic.Core.Error;
 import Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
+import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Types;
+
+#include "MockRHI.hpp"
 
 using namespace Extrinsic;
 
@@ -31,10 +34,20 @@ namespace
         SetViewport,
         SetScissor,
         BindPipeline,
+        BindFrameSampledTextureAt,
         BindIndexBuffer,
         PushConstants,
+        Draw,
         DrawIndexed,
         EndRenderPass,
+    };
+
+    struct DrawRecord
+    {
+        std::uint32_t VertexCount = 0u;
+        std::uint32_t InstanceCount = 0u;
+        std::uint32_t FirstVertex = 0u;
+        std::uint32_t FirstInstance = 0u;
     };
 
     class RecordingCommandContext final : public RHI::ICommandContext
@@ -56,6 +69,9 @@ namespace
                 FirstClearG = desc.ColorTargets.front().ClearG;
                 FirstClearB = desc.ColorTargets.front().ClearB;
                 FirstClearA = desc.ColorTargets.front().ClearA;
+                ColorTargetHistory.push_back(desc.ColorTargets.front().Target);
+                ColorLoadHistory.push_back(desc.ColorTargets.front().Load);
+                ColorStoreHistory.push_back(desc.ColorTargets.front().Store);
             }
         }
 
@@ -90,6 +106,16 @@ namespace
         {
             Events.push_back(RecordedEvent::BindPipeline);
             Pipeline = pipeline;
+            BoundPipelines.push_back(pipeline);
+        }
+
+        void BindFrameSampledTextureAt(
+            const RHI::TextureHandle texture,
+            const std::uint32_t descriptorIndex) override
+        {
+            Events.push_back(RecordedEvent::BindFrameSampledTextureAt);
+            SampledTextureBindings.push_back(texture);
+            SampledTextureBindingSlots.push_back(descriptorIndex);
         }
 
         void BindIndexBuffer(const RHI::BufferHandle buffer,
@@ -114,12 +140,23 @@ namespace
             {
                 std::memcpy(PushConstantBytes.data(), data, size);
             }
+            PushConstantPayloads.push_back(PushConstantBytes);
+            PushConstantSizes.push_back(size);
         }
 
-        void Draw(std::uint32_t,
-                  std::uint32_t,
-                  std::uint32_t,
-                  std::uint32_t) override {}
+        void Draw(const std::uint32_t vertexCount,
+                  const std::uint32_t instanceCount,
+                  const std::uint32_t firstVertex,
+                  const std::uint32_t firstInstance) override
+        {
+            Events.push_back(RecordedEvent::Draw);
+            DrawRecords.push_back(DrawRecord{
+                .VertexCount = vertexCount,
+                .InstanceCount = instanceCount,
+                .FirstVertex = firstVertex,
+                .FirstInstance = firstInstance,
+            });
+        }
 
         void DrawIndexed(const std::uint32_t indexCount,
                          const std::uint32_t instanceCount,
@@ -180,6 +217,11 @@ namespace
         std::vector<RHI::TextureHandle> TextureBarrierTextures{};
         std::vector<RHI::TextureLayout> TextureBarrierBefore{};
         std::vector<RHI::TextureLayout> TextureBarrierAfter{};
+        std::vector<RHI::TextureHandle> ColorTargetHistory{};
+        std::vector<RHI::LoadOp> ColorLoadHistory{};
+        std::vector<RHI::StoreOp> ColorStoreHistory{};
+        std::vector<RHI::TextureHandle> SampledTextureBindings{};
+        std::vector<std::uint32_t> SampledTextureBindingSlots{};
         RHI::TextureHandle FirstColorTarget{};
         RHI::LoadOp FirstColorLoad = RHI::LoadOp::DontCare;
         RHI::StoreOp FirstColorStore = RHI::StoreOp::DontCare;
@@ -193,12 +235,16 @@ namespace
         std::uint32_t ScissorWidth = 0u;
         std::uint32_t ScissorHeight = 0u;
         RHI::PipelineHandle Pipeline{};
+        std::vector<RHI::PipelineHandle> BoundPipelines{};
         RHI::BufferHandle IndexBuffer{};
         std::uint64_t IndexOffset = 0u;
         RHI::IndexType IndexType = RHI::IndexType::Uint16;
         std::uint32_t PushConstantSize = 0u;
         std::uint32_t PushConstantOffset = 0u;
         std::vector<std::byte> PushConstantBytes{};
+        std::vector<std::vector<std::byte>> PushConstantPayloads{};
+        std::vector<std::uint32_t> PushConstantSizes{};
+        std::vector<DrawRecord> DrawRecords{};
         std::uint32_t DrawIndexCount = 0u;
         std::uint32_t DrawInstanceCount = 0u;
         std::uint32_t DrawFirstIndex = 0u;
@@ -290,6 +336,32 @@ namespace
             .ReadyFrame = 17u,
             .HasReadyFrame = true,
         };
+    }
+
+    [[nodiscard]] Graphics::ObjectSpaceNormalTextureBakeDilationResources
+    MakeValidDilationResources()
+    {
+        return Graphics::ObjectSpaceNormalTextureBakeDilationResources{
+            .Pipeline = RHI::PipelineHandle{8u, 1u},
+            .ScratchTexture = RHI::TextureHandle{10u, 1u},
+            .ScratchInitialLayout = RHI::TextureLayout::Undefined,
+            .OutputDescriptorSlot =
+                Graphics::kObjectSpaceNormalBakeDilationOutputDescriptorSlot,
+            .ScratchDescriptorSlot =
+                Graphics::kObjectSpaceNormalBakeDilationScratchDescriptorSlot,
+        };
+    }
+
+    template <typename T>
+    [[nodiscard]] T DecodePushConstant(const std::vector<std::byte>& payload)
+    {
+        T out{};
+        EXPECT_EQ(payload.size(), sizeof(T));
+        if (payload.size() == sizeof(T))
+        {
+            std::memcpy(&out, payload.data(), sizeof(T));
+        }
+        return out;
     }
 }
 
@@ -444,6 +516,98 @@ TEST(ObjectSpaceNormalTextureBake, BuildsGpuPipelineDescForRgbaBakeTarget)
               sizeof(Graphics::ObjectSpaceNormalTextureBakeGpuPushConstants));
 }
 
+TEST(ObjectSpaceNormalTextureBake, BuildsDilationResourceDescs)
+{
+    const RHI::PipelineDesc pipeline =
+        Graphics::MakeObjectSpaceNormalTextureBakeDilationPipelineDesc(
+            "post_fullscreen.vert.spv",
+            "object_space_normal_dilate.frag.spv");
+
+    EXPECT_EQ(pipeline.VertexShaderPath, "post_fullscreen.vert.spv");
+    EXPECT_EQ(pipeline.FragmentShaderPath,
+              "object_space_normal_dilate.frag.spv");
+    EXPECT_TRUE(pipeline.ComputeShaderPath.empty());
+    EXPECT_EQ(pipeline.Rasterizer.Culling, RHI::CullMode::None);
+    EXPECT_FALSE(pipeline.DepthStencil.DepthTestEnable);
+    EXPECT_FALSE(pipeline.DepthStencil.DepthWriteEnable);
+    EXPECT_EQ(pipeline.ColorTargetCount, 1u);
+    EXPECT_EQ(pipeline.ColorTargetFormats[0], RHI::Format::RGBA8_UNORM);
+    EXPECT_EQ(pipeline.PushConstantSize,
+              sizeof(Graphics::ObjectSpaceNormalTextureBakeDilationPushConstants));
+
+    const RHI::TextureDesc scratch =
+        Graphics::MakeObjectSpaceNormalTextureBakeDilationScratchTextureDesc(
+            Graphics::ObjectSpaceNormalTextureBakeOptions{
+                .Width = 12u,
+                .Height = 99999u,
+            },
+            "DilationScratch.Contract");
+    EXPECT_EQ(scratch.Width, Graphics::kObjectSpaceNormalBakeMinExtent);
+    EXPECT_EQ(scratch.Height, Graphics::kObjectSpaceNormalBakeMaxExtent);
+    EXPECT_EQ(scratch.Fmt, RHI::Format::RGBA8_UNORM);
+    EXPECT_TRUE(HasTextureUsage(scratch.Usage, RHI::TextureUsage::Sampled));
+    EXPECT_TRUE(HasTextureUsage(scratch.Usage, RHI::TextureUsage::ColorTarget));
+    EXPECT_FALSE(HasTextureUsage(scratch.Usage, RHI::TextureUsage::Storage));
+    EXPECT_STREQ(scratch.DebugName, "DilationScratch.Contract");
+}
+
+TEST(ObjectSpaceNormalTextureBake, DilationResourceLeaseOwnsPipelineAndScratch)
+{
+    Tests::MockDevice device;
+    const auto desc =
+        Graphics::MakeObjectSpaceNormalTextureBakeDilationResourceDesc(
+            Graphics::ObjectSpaceNormalTextureBakeOptions{
+                .Width = 32u,
+                .Height = 32u,
+            },
+            "post_fullscreen.vert.spv",
+            "object_space_normal_dilate.frag.spv",
+            "ObjectSpaceNormalBake.LeaseScratch");
+
+    Graphics::ObjectSpaceNormalTextureBakeDilationResourceLease lease;
+    const Core::Result initialized = lease.Initialize(device, desc);
+    ASSERT_TRUE(initialized.has_value());
+    ASSERT_TRUE(lease.IsValid());
+    EXPECT_EQ(device.CreatePipelineCount, 1);
+    EXPECT_EQ(device.CreateTextureCount, 1);
+    ASSERT_EQ(device.CreatedTextureDescs.size(), 1u);
+    EXPECT_STREQ(device.CreatedTextureDescs.front().DebugName,
+                 "ObjectSpaceNormalBake.LeaseScratch");
+
+    const auto resources = lease.GetResources();
+    EXPECT_TRUE(resources.Pipeline.IsValid());
+    EXPECT_TRUE(resources.ScratchTexture.IsValid());
+    EXPECT_EQ(resources.OutputDescriptorSlot,
+              Graphics::kObjectSpaceNormalBakeDilationOutputDescriptorSlot);
+    EXPECT_EQ(resources.ScratchDescriptorSlot,
+              Graphics::kObjectSpaceNormalBakeDilationScratchDescriptorSlot);
+
+    lease.Shutdown();
+    EXPECT_FALSE(lease.IsValid());
+    EXPECT_EQ(device.DestroyTextureCount, 1);
+    EXPECT_EQ(device.DestroyPipelineCount, 1);
+}
+
+TEST(ObjectSpaceNormalTextureBake, DilationResourceLeaseFailsClosedWhenDeviceIsUnavailable)
+{
+    Tests::MockDevice device;
+    device.Operational = false;
+
+    Graphics::ObjectSpaceNormalTextureBakeDilationResourceLease lease;
+    const Core::Result initialized = lease.Initialize(
+        device,
+        Graphics::MakeObjectSpaceNormalTextureBakeDilationResourceDesc(
+            {},
+            "post_fullscreen.vert.spv",
+            "object_space_normal_dilate.frag.spv"));
+
+    ASSERT_FALSE(initialized.has_value());
+    EXPECT_EQ(initialized.error(), Core::ErrorCode::DeviceNotOperational);
+    EXPECT_FALSE(lease.IsValid());
+    EXPECT_EQ(device.CreatePipelineCount, 0);
+    EXPECT_EQ(device.CreateTextureCount, 0);
+}
+
 TEST(ObjectSpaceNormalTextureBake, BuildsGpuProducedTexturePlanWithCompletionKey)
 {
     const auto request = MakeValidPlanRequest();
@@ -464,7 +628,7 @@ TEST(ObjectSpaceNormalTextureBake, BuildsGpuProducedTexturePlanWithCompletionKey
                                 RHI::TextureUsage::TransferSrc));
     EXPECT_FALSE(HasTextureUsage(plan.TextureRequest.Desc.Usage,
                                  RHI::TextureUsage::Storage))
-        << "The zero-padding path does not require the future dilation compute pass.";
+        << "The zero-padding path does not require dilation storage-image usage.";
     EXPECT_EQ(plan.TextureRequest.Desc.InitialLayout,
               RHI::TextureLayout::Undefined);
     EXPECT_STREQ(plan.TextureRequest.Desc.DebugName,
@@ -517,6 +681,45 @@ TEST(ObjectSpaceNormalTextureBake, PaddedGpuProducedTexturePlanFailsClosed)
     EXPECT_EQ(plan.Diagnostics.Options.PaddingTexels, 4u);
     EXPECT_FALSE(plan.TextureRequest.Id.IsValid());
     EXPECT_FALSE(plan.RecordTemplate.Pipeline.IsValid());
+}
+
+TEST(ObjectSpaceNormalTextureBake, PaddedGpuProducedTexturePlanUsesDilationResources)
+{
+    auto request = MakeValidPlanRequest();
+    request.Options.PaddingTexels = 999u;
+    request.Dilation = MakeValidDilationResources();
+
+    const auto plan = Graphics::BuildObjectSpaceNormalTextureBakePlan(request);
+
+    ASSERT_TRUE(plan.Succeeded())
+        << Graphics::DebugNameForObjectSpaceNormalTextureBakeStatus(plan.Status);
+    EXPECT_TRUE(plan.DilationRequested);
+    EXPECT_TRUE(plan.DilationAvailable);
+    EXPECT_EQ(plan.Diagnostics.Options.PaddingTexels,
+              Graphics::kObjectSpaceNormalBakeMaxPaddingTexels);
+    EXPECT_EQ(plan.CompletionKey.PaddingTexels,
+              Graphics::kObjectSpaceNormalBakeMaxPaddingTexels);
+    EXPECT_TRUE(HasTextureUsage(plan.TextureRequest.Desc.Usage,
+                                RHI::TextureUsage::Sampled));
+    EXPECT_TRUE(HasTextureUsage(plan.TextureRequest.Desc.Usage,
+                                RHI::TextureUsage::ColorTarget));
+    EXPECT_FALSE(HasTextureUsage(plan.TextureRequest.Desc.Usage,
+                                 RHI::TextureUsage::Storage));
+    EXPECT_EQ(plan.RecordTemplate.PaddingTexels,
+              Graphics::kObjectSpaceNormalBakeMaxPaddingTexels);
+    EXPECT_EQ(plan.RecordTemplate.Dilation.Pipeline,
+              request.Dilation.Pipeline);
+    EXPECT_EQ(plan.RecordTemplate.Dilation.ScratchTexture,
+              request.Dilation.ScratchTexture);
+
+    const RHI::TextureHandle outputTexture{9u, 2u};
+    const auto record =
+        Graphics::MakeObjectSpaceNormalTextureBakeGpuRecordDesc(plan,
+                                                                outputTexture);
+    EXPECT_EQ(record.PaddingTexels,
+              Graphics::kObjectSpaceNormalBakeMaxPaddingTexels);
+    EXPECT_EQ(record.Dilation.ScratchTexture,
+              request.Dilation.ScratchTexture);
 }
 
 TEST(ObjectSpaceNormalTextureBake, CompletionKeyDetectsStaleBakeResults)
@@ -637,6 +840,149 @@ TEST(ObjectSpaceNormalTextureBake, RecordGpuBakeCommandsPinsRasterExtentAndDraw)
     EXPECT_EQ(cmd.DrawFirstInstance, 0u);
 }
 
+TEST(ObjectSpaceNormalTextureBake, RecordGpuBakeCommandsPingPongDilationPasses)
+{
+    RecordingCommandContext cmd;
+    const RHI::TextureHandle outputTexture{6u, 1u};
+    const RHI::TextureHandle scratchTexture{9u, 1u};
+    const RHI::PipelineHandle rasterPipeline{5u, 1u};
+    const RHI::PipelineHandle dilationPipeline{8u, 1u};
+    const Graphics::ObjectSpaceNormalTextureBakeGpuRecordDesc desc{
+        .Pipeline = rasterPipeline,
+        .OutputTexture = outputTexture,
+        .Dilation = Graphics::ObjectSpaceNormalTextureBakeDilationResources{
+            .Pipeline = dilationPipeline,
+            .ScratchTexture = scratchTexture,
+            .ScratchInitialLayout = RHI::TextureLayout::Undefined,
+            .OutputDescriptorSlot =
+                Graphics::kObjectSpaceNormalBakeDilationOutputDescriptorSlot,
+            .ScratchDescriptorSlot =
+                Graphics::kObjectSpaceNormalBakeDilationScratchDescriptorSlot,
+        },
+        .IndexBuffer = RHI::BufferHandle{7u, 1u},
+        .TexcoordBDA = 0x1000u,
+        .NormalBDA = 0x2000u,
+        .IndexCount = 3u,
+        .Width = 16u,
+        .Height = 8u,
+        .PaddingTexels = 2u,
+        .InitialLayout = RHI::TextureLayout::Undefined,
+        .FinalLayout = RHI::TextureLayout::TransferSrc,
+    };
+
+    const auto result = Graphics::RecordObjectSpaceNormalTextureBake(cmd, desc);
+    ASSERT_TRUE(result.has_value());
+
+    const std::vector<RecordedEvent> expected{
+        RecordedEvent::BindFrameSampledTextureAt,
+        RecordedEvent::BindFrameSampledTextureAt,
+        RecordedEvent::TextureBarrier,
+        RecordedEvent::BeginRenderPass,
+        RecordedEvent::SetViewport,
+        RecordedEvent::SetScissor,
+        RecordedEvent::BindPipeline,
+        RecordedEvent::BindIndexBuffer,
+        RecordedEvent::PushConstants,
+        RecordedEvent::DrawIndexed,
+        RecordedEvent::EndRenderPass,
+        RecordedEvent::TextureBarrier,
+        RecordedEvent::TextureBarrier,
+        RecordedEvent::BeginRenderPass,
+        RecordedEvent::SetViewport,
+        RecordedEvent::SetScissor,
+        RecordedEvent::BindPipeline,
+        RecordedEvent::PushConstants,
+        RecordedEvent::Draw,
+        RecordedEvent::EndRenderPass,
+        RecordedEvent::TextureBarrier,
+        RecordedEvent::TextureBarrier,
+        RecordedEvent::BeginRenderPass,
+        RecordedEvent::SetViewport,
+        RecordedEvent::SetScissor,
+        RecordedEvent::BindPipeline,
+        RecordedEvent::PushConstants,
+        RecordedEvent::Draw,
+        RecordedEvent::EndRenderPass,
+        RecordedEvent::TextureBarrier,
+    };
+    EXPECT_EQ(cmd.Events, expected);
+
+    ASSERT_EQ(cmd.SampledTextureBindings.size(), 2u);
+    EXPECT_EQ(cmd.SampledTextureBindings[0], outputTexture);
+    EXPECT_EQ(cmd.SampledTextureBindingSlots[0],
+              Graphics::kObjectSpaceNormalBakeDilationOutputDescriptorSlot);
+    EXPECT_EQ(cmd.SampledTextureBindings[1], scratchTexture);
+    EXPECT_EQ(cmd.SampledTextureBindingSlots[1],
+              Graphics::kObjectSpaceNormalBakeDilationScratchDescriptorSlot);
+
+    ASSERT_EQ(cmd.TextureBarrierTextures.size(), 6u);
+    EXPECT_EQ(cmd.TextureBarrierTextures[0], outputTexture);
+    EXPECT_EQ(cmd.TextureBarrierBefore[0], RHI::TextureLayout::Undefined);
+    EXPECT_EQ(cmd.TextureBarrierAfter[0], RHI::TextureLayout::ColorAttachment);
+    EXPECT_EQ(cmd.TextureBarrierTextures[1], outputTexture);
+    EXPECT_EQ(cmd.TextureBarrierBefore[1], RHI::TextureLayout::ColorAttachment);
+    EXPECT_EQ(cmd.TextureBarrierAfter[1], RHI::TextureLayout::ShaderReadOnly);
+    EXPECT_EQ(cmd.TextureBarrierTextures[2], scratchTexture);
+    EXPECT_EQ(cmd.TextureBarrierBefore[2], RHI::TextureLayout::Undefined);
+    EXPECT_EQ(cmd.TextureBarrierAfter[2], RHI::TextureLayout::ColorAttachment);
+    EXPECT_EQ(cmd.TextureBarrierTextures[3], scratchTexture);
+    EXPECT_EQ(cmd.TextureBarrierBefore[3], RHI::TextureLayout::ColorAttachment);
+    EXPECT_EQ(cmd.TextureBarrierAfter[3], RHI::TextureLayout::ShaderReadOnly);
+    EXPECT_EQ(cmd.TextureBarrierTextures[4], outputTexture);
+    EXPECT_EQ(cmd.TextureBarrierBefore[4], RHI::TextureLayout::ShaderReadOnly);
+    EXPECT_EQ(cmd.TextureBarrierAfter[4], RHI::TextureLayout::ColorAttachment);
+    EXPECT_EQ(cmd.TextureBarrierTextures[5], outputTexture);
+    EXPECT_EQ(cmd.TextureBarrierBefore[5], RHI::TextureLayout::ColorAttachment);
+    EXPECT_EQ(cmd.TextureBarrierAfter[5], RHI::TextureLayout::TransferSrc);
+
+    const std::vector<RHI::TextureHandle> expectedTargets{
+        outputTexture,
+        scratchTexture,
+        outputTexture,
+    };
+    EXPECT_EQ(cmd.ColorTargetHistory, expectedTargets);
+    const std::vector<RHI::LoadOp> expectedLoads{
+        RHI::LoadOp::Clear,
+        RHI::LoadOp::DontCare,
+        RHI::LoadOp::DontCare,
+    };
+    EXPECT_EQ(cmd.ColorLoadHistory, expectedLoads);
+    const std::vector<RHI::PipelineHandle> expectedPipelines{
+        rasterPipeline,
+        dilationPipeline,
+        dilationPipeline,
+    };
+    EXPECT_EQ(cmd.BoundPipelines, expectedPipelines);
+
+    ASSERT_EQ(cmd.PushConstantPayloads.size(), 3u);
+    const auto rasterPush =
+        DecodePushConstant<Graphics::ObjectSpaceNormalTextureBakeGpuPushConstants>(
+            cmd.PushConstantPayloads[0]);
+    EXPECT_EQ(rasterPush.TexcoordBDA, desc.TexcoordBDA);
+    EXPECT_EQ(rasterPush.NormalBDA, desc.NormalBDA);
+    const auto firstDilationPush =
+        DecodePushConstant<
+            Graphics::ObjectSpaceNormalTextureBakeDilationPushConstants>(
+            cmd.PushConstantPayloads[1]);
+    const auto secondDilationPush =
+        DecodePushConstant<
+            Graphics::ObjectSpaceNormalTextureBakeDilationPushConstants>(
+            cmd.PushConstantPayloads[2]);
+    EXPECT_EQ(firstDilationPush.SourceTextureSlot,
+              Graphics::kObjectSpaceNormalBakeDilationOutputDescriptorSlot);
+    EXPECT_EQ(secondDilationPush.SourceTextureSlot,
+              Graphics::kObjectSpaceNormalBakeDilationScratchDescriptorSlot);
+
+    ASSERT_EQ(cmd.DrawRecords.size(), 2u);
+    EXPECT_EQ(cmd.DrawRecords[0].VertexCount, 3u);
+    EXPECT_EQ(cmd.DrawRecords[0].InstanceCount, 1u);
+    EXPECT_EQ(cmd.DrawRecords[0].FirstVertex, 0u);
+    EXPECT_EQ(cmd.DrawRecords[0].FirstInstance, 0u);
+    EXPECT_EQ(cmd.DrawRecords[1].VertexCount, 3u);
+    EXPECT_EQ(cmd.DrawRecords[1].InstanceCount, 1u);
+    EXPECT_EQ(cmd.DrawIndexCount, 3u);
+}
+
 TEST(ObjectSpaceNormalTextureBake, RecordGpuBakeRejectsInvalidResourcesBeforeCommands)
 {
     RecordingCommandContext cmd;
@@ -656,5 +1002,42 @@ TEST(ObjectSpaceNormalTextureBake, RecordGpuBakeRejectsInvalidResourcesBeforeCom
 
     ASSERT_FALSE(result.has_value());
     EXPECT_EQ(result.error(), Core::ErrorCode::InvalidArgument);
+    EXPECT_TRUE(cmd.Events.empty());
+
+    const auto missingDilation = Graphics::RecordObjectSpaceNormalTextureBake(
+        cmd,
+        Graphics::ObjectSpaceNormalTextureBakeGpuRecordDesc{
+            .Pipeline = RHI::PipelineHandle{5u, 1u},
+            .OutputTexture = RHI::TextureHandle{6u, 1u},
+            .IndexBuffer = RHI::BufferHandle{7u, 1u},
+            .TexcoordBDA = 0x1000u,
+            .NormalBDA = 0x2000u,
+            .IndexCount = 3u,
+            .Width = 16u,
+            .Height = 16u,
+            .PaddingTexels = 1u,
+        });
+
+    ASSERT_FALSE(missingDilation.has_value());
+    EXPECT_EQ(missingDilation.error(), Core::ErrorCode::InvalidArgument);
+    EXPECT_TRUE(cmd.Events.empty());
+
+    const auto unclampedPadding = Graphics::RecordObjectSpaceNormalTextureBake(
+        cmd,
+        Graphics::ObjectSpaceNormalTextureBakeGpuRecordDesc{
+            .Pipeline = RHI::PipelineHandle{5u, 1u},
+            .OutputTexture = RHI::TextureHandle{6u, 1u},
+            .Dilation = MakeValidDilationResources(),
+            .IndexBuffer = RHI::BufferHandle{7u, 1u},
+            .TexcoordBDA = 0x1000u,
+            .NormalBDA = 0x2000u,
+            .IndexCount = 3u,
+            .Width = 16u,
+            .Height = 16u,
+            .PaddingTexels = Graphics::kObjectSpaceNormalBakeMaxPaddingTexels + 1u,
+        });
+
+    ASSERT_FALSE(unclampedPadding.has_value());
+    EXPECT_EQ(unclampedPadding.error(), Core::ErrorCode::InvalidArgument);
     EXPECT_TRUE(cmd.Events.empty());
 }

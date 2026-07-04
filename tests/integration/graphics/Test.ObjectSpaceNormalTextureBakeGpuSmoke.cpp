@@ -408,7 +408,138 @@ TEST(ObjectSpaceNormalTextureBakeGpuSmoke, VulkanBakeMatchesCpuContractAtSelecte
                     15u,
                     ToExpectedPixel(glm::vec4{0.5f, 0.5f, 1.0f, 0.0f}));
 
+    Extrinsic::RHI::TextureHandle dilationScratch = device.CreateTexture(
+        Extrinsic::Graphics::
+            MakeObjectSpaceNormalTextureBakeDilationScratchTextureDesc(
+                Extrinsic::Graphics::ObjectSpaceNormalTextureBakeOptions{
+                    .Width = kBakeWidth,
+                    .Height = kBakeHeight,
+                    .PaddingTexels = 1u,
+                },
+                "ObjectSpaceNormalBakeGpuSmoke.DilationScratch"));
+    Extrinsic::RHI::PipelineHandle dilationPipeline = device.CreatePipeline(
+        Extrinsic::Graphics::MakeObjectSpaceNormalTextureBakeDilationPipelineDesc(
+            Extrinsic::Core::Filesystem::GetShaderPath(
+                "shaders/post_fullscreen.vert.spv"),
+            Extrinsic::Core::Filesystem::GetShaderPath(
+                "shaders/object_space_normal_dilate.frag.spv")));
+    if (!dilationScratch.IsValid() || !dilationPipeline.IsValid())
+    {
+        DestroyPipelineIfValid(device, dilationPipeline);
+        DestroyTextureIfValid(device, dilationScratch);
+        DestroyPipelineIfValid(device, pipeline);
+        DestroyTextureIfValid(device, outputTexture);
+        DestroyBufferIfValid(device, readbackBuffer);
+        DestroyBufferIfValid(device, indexBuffer);
+        DestroyBufferIfValid(device, normalBuffer);
+        DestroyBufferIfValid(device, texcoordBuffer);
+        engine.Shutdown();
+        ASSERT_TRUE(dilationScratch.IsValid());
+        ASSERT_TRUE(dilationPipeline.IsValid());
+    }
+
+    Extrinsic::RHI::FrameHandle paddedFrame{};
+    if (!device.BeginFrame(paddedFrame))
+    {
+        DestroyPipelineIfValid(device, dilationPipeline);
+        DestroyTextureIfValid(device, dilationScratch);
+        DestroyPipelineIfValid(device, pipeline);
+        DestroyTextureIfValid(device, outputTexture);
+        DestroyBufferIfValid(device, readbackBuffer);
+        DestroyBufferIfValid(device, indexBuffer);
+        DestroyBufferIfValid(device, normalBuffer);
+        DestroyBufferIfValid(device, texcoordBuffer);
+        engine.Shutdown();
+        ADD_FAILURE() << "Operational Vulkan device failed to begin the padded object-space normal bake frame.";
+        return;
+    }
+
+    Extrinsic::RHI::ICommandContext& paddedCmd =
+        device.GetGraphicsContext(paddedFrame.FrameIndex);
+    paddedCmd.Begin();
+    const auto paddedRecordResult =
+        Extrinsic::Graphics::RecordObjectSpaceNormalTextureBake(
+            paddedCmd,
+            Extrinsic::Graphics::ObjectSpaceNormalTextureBakeGpuRecordDesc{
+                .Pipeline = pipeline,
+                .OutputTexture = outputTexture,
+                .Dilation =
+                    Extrinsic::Graphics::ObjectSpaceNormalTextureBakeDilationResources{
+                        .Pipeline = dilationPipeline,
+                        .ScratchTexture = dilationScratch,
+                        .ScratchInitialLayout =
+                            Extrinsic::RHI::TextureLayout::Undefined,
+                        .OutputDescriptorSlot =
+                            Extrinsic::Graphics::
+                                kObjectSpaceNormalBakeDilationOutputDescriptorSlot,
+                        .ScratchDescriptorSlot =
+                            Extrinsic::Graphics::
+                                kObjectSpaceNormalBakeDilationScratchDescriptorSlot,
+                    },
+                .IndexBuffer = indexBuffer,
+                .TexcoordBDA = texcoordBDA,
+                .NormalBDA = normalBDA,
+                .IndexCount = static_cast<std::uint32_t>(indices.size()),
+                .Width = kBakeWidth,
+                .Height = kBakeHeight,
+                .PaddingTexels = 1u,
+                .InitialLayout = Extrinsic::RHI::TextureLayout::TransferSrc,
+                .FinalLayout = Extrinsic::RHI::TextureLayout::TransferSrc,
+            });
+    ASSERT_TRUE(paddedRecordResult.has_value());
+
+    paddedCmd.CopyTextureToBuffer(outputTexture,
+                                  Extrinsic::RHI::TextureLayout::TransferSrc,
+                                  0u,
+                                  0u,
+                                  readbackBuffer,
+                                  0u,
+                                  0u,
+                                  0u,
+                                  kBakeWidth,
+                                  kBakeHeight);
+    paddedCmd.End();
+    device.EndFrame(paddedFrame);
+    device.Present(paddedFrame);
+
+    device.ReadBuffer(readbackBuffer, pixels.data(), pixels.size(), 0u);
+
+    expectSample(0u, 0u);
+    expectSample(1u, 1u);
+
+    const auto outsideBeforeDilation =
+        Extrinsic::Graphics::SampleObjectSpaceNormalTextureBakeAtUv(
+            std::span<const BakeVertex>{vertices},
+            std::span<const BakeTriangle>{triangles},
+            Extrinsic::Graphics::UvForObjectSpaceNormalBakeTexelCenter(
+                8u,
+                8u,
+                resolved),
+            options);
+    EXPECT_EQ(outsideBeforeDilation.Status,
+              Extrinsic::Graphics::ObjectSpaceNormalTextureBakeStatus::
+                  NoContainingTriangle);
+    const auto gutterSource =
+        Extrinsic::Graphics::SampleObjectSpaceNormalTextureBakeAtUv(
+            std::span<const BakeVertex>{vertices},
+            std::span<const BakeTriangle>{triangles},
+            Extrinsic::Graphics::UvForObjectSpaceNormalBakeTexelCenter(
+                7u,
+                7u,
+                resolved),
+            options);
+    ASSERT_TRUE(gutterSource.Succeeded())
+        << Extrinsic::Graphics::DebugNameForObjectSpaceNormalTextureBakeStatus(
+               gutterSource.Status);
+    ExpectPixelNear(pixels, 8u, 8u, ToExpectedPixel(gutterSource.EncodedRgba));
+    ExpectPixelNear(pixels,
+                    15u,
+                    15u,
+                    ToExpectedPixel(glm::vec4{0.5f, 0.5f, 1.0f, 0.0f}));
+
     device.WaitIdle();
+    DestroyPipelineIfValid(device, dilationPipeline);
+    DestroyTextureIfValid(device, dilationScratch);
     DestroyPipelineIfValid(device, pipeline);
     DestroyTextureIfValid(device, outputTexture);
     DestroyBufferIfValid(device, readbackBuffer);

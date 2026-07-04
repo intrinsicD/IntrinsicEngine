@@ -3,6 +3,7 @@ id: RUNTIME-129
 theme: B
 depends_on:
   - GRAPHICS-104
+  - GRAPHICS-115
 maturity_target: Operational
 ---
 # RUNTIME-129 — Schedule GPU object-space normal bake jobs after import
@@ -12,9 +13,9 @@ maturity_target: Operational
 
 ## Non-goals
 - The graphics-owned RHI bake pass, shaders, and `GpuAssetCache` GPU-produced texture residency — owned by GRAPHICS-104 (this task consumes them).
-- GPU dilation for padded object-space normal bakes — owned by GRAPHICS-115.
-  Until that lands, the first operational runtime slice must consume the
-  zero-padding path or fail closed for padded requests.
+- GPU dilation for padded object-space normal bakes — already owned and retired
+  by `GRAPHICS-115`; this task consumes the graphics-owned dilation resources
+  when runtime scheduling asks for padded bakes.
 - Tangent-space normal-map baking or MikkTSpace tangents.
 - GPU porting of scalar/label/vector/face/selected-mesh attribute bakes.
 - A CPU fallback for GPU bake failure on a non-operational backend (fail closed; keep the existing vertex-normal shading).
@@ -24,8 +25,10 @@ maturity_target: Operational
 - Owner/layer: `runtime` for job orchestration, generated `AssetId` selection, stale-generation keys, render-thread submission timing, and material-binding swap; `graphics` owns the bake command recorder (`Extrinsic.Graphics.ObjectSpaceNormalTextureBake`, `RecordObjectSpaceNormalTextureBake(...)` at `src/graphics/renderer/Graphics.ObjectSpaceNormalTextureBake.cppm:168`) and the cache residency path (`GpuAssetCache::BeginGpuProducedTexture(...)` / `SetGpuProducedTextureReadyFrame(...)`).
 - `GRAPHICS-104` is retired at `CPUContracted`: zero-padding raster-bake
   planning/recording, shader/material metadata, GPU-produced texture residency,
-  and runtime queue/submission/binding helpers exist. Requested padding still
-  reports `DilationUnavailable` until `GRAPHICS-115` lands.
+  and runtime queue/submission/binding helpers exist. `GRAPHICS-115` is retired
+  at `Operational`: requested padding is submittable when the runtime provides
+  graphics-owned dilation resources, and still fails closed when those resources
+  are unavailable.
 - Current state: `Extrinsic.Runtime.ObjectSpaceNormalBakeQueue` owns the CPU-contract scheduling metadata for generated texture `AssetId` selection, content-key reuse, stale-key matching, and non-operational no-op behavior. `Extrinsic.Runtime.ObjectSpaceNormalBakeSubmission` now validates queued stale keys against graphics bake plans, registers cache-owned GPU-produced textures, returns record descriptors for render-thread command recording, and attaches submitted ready-frame values without completing the queue early. `Extrinsic.Runtime.ObjectSpaceNormalBakeBinding` now consumes completions only after `GpuAssetCache` exposes a ready generated texture view, rejects stale completions before material mutation, and installs data-only `ObjectSpaceNormal` material bindings through `RenderExtractionCache`. These helpers are not yet wired into Engine import scheduling, command-list submission, or the GPU completion feed. Existing import/enrichment bake requests are still hardcoded to CPU — `Runtime.SelectedMeshTextureBake.cpp:1028` and the import/normal path in `Runtime.AssetModelSceneHandoff.cpp` set `RequestedJobDomain = ProgressiveJobDomain::Cpu`. The derived-job graph fail-closes any non-CPU domain: `IsUnsupportedJobDomain(domain) { return domain != ProgressiveJobDomain::Cpu; }` (`Runtime.DerivedJobGraph.cpp:36-47`, rejection at `:348-355`). `ProgressiveJobDomain` already reserves `GpuCompute`/`GpuGraphics`/`Auto` (`Runtime.ProgressiveRenderData.cppm:122`).
 - The shader fallback already exists: forward/deferred sample the object-space normal texture only when the material flag is set and `NormalID` is valid, otherwise use the vertex-normal attribute (`ResolveSurfaceNormal`). So "use texture when ready, else attribute" needs no shader work — only the runtime swap of the `Normal` binding once the cache entry is `Ready`.
 - Architectural crux (open design decision — see questions below): a GPU graphics bake cannot run on the existing background streaming `Execute` callback (that lane is CPU). It must record commands and submit on the render thread, and promote via the GPU-completion fence already wired into `GpuAssetCache`.

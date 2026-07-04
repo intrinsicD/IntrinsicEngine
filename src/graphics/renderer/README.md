@@ -1753,20 +1753,28 @@ Concretely:
   API packages resolved index-buffer/texcoord-BDA/normal-BDA geometry, generated
   `AssetId`, resolved extent/padding, sampler policy, frame-readiness metadata,
   and a stale-completion key into a `GpuProducedTextureRequest` plus command
-  record template. The GPU recorder then binds a caller-provided pipeline,
-  index buffer, texcoord/normal BDAs, and output texture; it sets viewport and
-  scissor to the exact target texture extent, clears to encoded `+Z` with alpha
-  `0`, rasterizes UV triangles by mapping UV to clip space, writes normalized
-  object-space normals with alpha `1`, and transitions to the requested final
-  texture layout. The bake shader uses the same vertical orientation as the CPU
+  record template. The GPU recorder then binds a caller-provided raster
+  pipeline, index buffer, texcoord/normal BDAs, and output texture; it sets
+  viewport and scissor to the exact target texture extent, clears to encoded
+  `+Z` with alpha `0`, rasterizes UV triangles by mapping UV to clip space,
+  writes normalized object-space normals with alpha `1`, and transitions to the
+  requested final texture layout. Padded requests are submittable when callers
+  provide graphics-owned dilation resources: a fullscreen pipeline using
+  `post_fullscreen.vert` + `object_space_normal_dilate.frag` and a same-extent
+  sampled/color-target scratch texture. The recorder binds the output and
+  scratch textures into the reserved sampled bridge slots 4 and 5, then
+  ping-pongs one fullscreen dilation pass per requested padding texel so the
+  final result lands back in the output texture. Each dilation pass preserves
+  covered alpha-one texels and fills alpha-zero gutter texels from covered
+  8-neighbors; far uncovered texels remain encoded `+Z` alpha `0`. Missing or
+  non-operational dilation resources still fail closed with
+  `DilationUnavailable`/`InvalidArgument`, and there is no CPU dilation
+  fallback. The bake shader uses the same vertical orientation as the CPU
   texel-center sampling contract so a point addressed by mesh UV samples the
   same baked texel on Vulkan. Runtime job scheduling, stale-key rejection at the
   runtime completion boundary and generated-normal import replacement remain
-  open parts of `GRAPHICS-104`. Requested dilation padding currently fails
-  closed with `DilationUnavailable`; the zero-padding path is the only
-  submittable GPU-produced texture plan until the GPU compute dilation pass
-  lands, and no CPU dilation is implied. This graphics surface does not import
-  ECS, runtime, live `AssetService`, or Vulkan handles.
+  owned by `RUNTIME-129`. This graphics surface does not import ECS, runtime,
+  live `AssetService`, or Vulkan handles.
 - `Extrinsic.Graphics.ComputeParallelPrimitives` owns the generic
   scan/compaction primitive contract introduced by `GRAPHICS-108`. It exports
   deterministic CPU reference helpers for `uint32` exclusive/inclusive

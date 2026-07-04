@@ -2631,7 +2631,8 @@ namespace Extrinsic::Graphics
                         // the prior color content as a LOAD attachment; its
                         // fragment shader samples its own retained font-atlas /
                         // per-command user textures from dedicated bindless
-                        // leases (reserved slots >= 4 per BUG-019), never the
+                        // leases (real bindless texture leases start after the
+                        // frame-sampled bridge slots 0..5), never the
                         // shared frame-sampled bridge slot 0. All passes share a
                         // single bindless descriptor set, so the *last* host-side
                         // descriptor write to a slot is what every recorded draw

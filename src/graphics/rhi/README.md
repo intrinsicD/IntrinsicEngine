@@ -168,6 +168,10 @@ any other exported polymorphic RHI interface):
   that bridge framegraph sampled inputs through a global bindless array use it
   when two fullscreen passes in one command buffer must keep distinct sampled
   descriptors alive; backends with explicit descriptor binding may ignore it.
+  The promoted Vulkan bridge reserves descriptor elements 0..5 for direct
+  command-context updates: 0 default sampled input, 1 DebugView, 2 Present,
+  3 SelectionOutline, and 4/5 object-space normal bake dilation output/scratch.
+  Real bindless texture leases start after those bridge slots.
 
 History: HARDEN-072 (`tasks/done/HARDEN-072-rhi-surface-fixes-for-default-recipe-pipeline-bringup.md`)
 removed default arguments from `CopyTextureToBuffer` after they tripped a related

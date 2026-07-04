@@ -108,9 +108,9 @@ completed_on: 2026-07-02
 - [x] Runtime queue/submission/binding contracts reject stale completions before
       material mutation and no-op without CPU fallback on non-operational
       backends.
-- [x] Requested padding currently fails closed with `DilationUnavailable`;
-      `GRAPHICS-115` owns the GPU dilation path before default padded bakes can
-      claim `Operational`.
+- [x] At GRAPHICS-104 retirement, requested padding failed closed with
+      `DilationUnavailable`; `GRAPHICS-115` now owns the retired GPU dilation
+      path required before default padded bakes can claim `Operational`.
 - [x] Import/enrichment replacement and end-to-end material swaps are owned by
       `RUNTIME-129`.
 

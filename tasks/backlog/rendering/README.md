@@ -24,9 +24,6 @@ without requiring them to read every file.
 
 ## Current open rendering leaves
 
-- [`GRAPHICS-115`](GRAPHICS-115-object-space-normal-gpu-dilation.md) —
-  GPU image-space dilation for object-space normal texture bake padding after
-  retired `GRAPHICS-104`.
 - [`GRAPHICS-116`](GRAPHICS-116-recipe-pass-contribution-seam.md) —
   frame-recipe pass contribution seam and typed record-path resolution
   (2026-07-03 review R7).

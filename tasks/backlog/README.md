@@ -64,11 +64,12 @@ breaking the foundation. The umbrella roadmap (`GRAPHICS-035`), all
 compute, HZB occlusion, clustered lights, TAA, and the further modernization
 seams), the CPU/GPU transfer foundation (`GRAPHICS-095..098`), and the
 contract-first renderer/snapshot/recipe architecture sequence
-(`GRAPHICS-099..103`, `RUNTIME-127`, `UI-023`) are retired — see
+(`GRAPHICS-099..103`, `RUNTIME-127`, `UI-023`) and the object-space normal
+bake graphics dilation follow-up (`GRAPHICS-115`) are retired — see
 [`rendering/README.md`](rendering/README.md) and the retirement log. Current
-open Theme B leaves include object-space normal bake operational follow-ups
-(`GRAPHICS-115`, `RUNTIME-129`), the profile-gated vertex attribute
-operational follow-up (`RUNTIME-139`), and the 2026-07-03 render-graph
+open Theme B leaves include the object-space normal bake runtime scheduling
+follow-up (`RUNTIME-129`), the profile-gated vertex attribute operational
+follow-up (`RUNTIME-139`), and the 2026-07-03 render-graph
 review leaves — pass contribution seam (`GRAPHICS-116`), compile caching
 (`GRAPHICS-117`), placed transient aliasing (`GRAPHICS-118`), parallel
 command recording (`GRAPHICS-119`), and compiler/executor polish

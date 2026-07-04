@@ -12,6 +12,7 @@ import Extrinsic.Core.Error;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
+import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 
 export namespace Extrinsic::Graphics
@@ -21,6 +22,8 @@ export namespace Extrinsic::Graphics
     inline constexpr std::uint32_t kObjectSpaceNormalBakeMaxExtent = 4096u;
     inline constexpr std::uint32_t kObjectSpaceNormalBakeDefaultPaddingTexels = 4u;
     inline constexpr std::uint32_t kObjectSpaceNormalBakeMaxPaddingTexels = 32u;
+    inline constexpr std::uint32_t kObjectSpaceNormalBakeDilationOutputDescriptorSlot = 4u;
+    inline constexpr std::uint32_t kObjectSpaceNormalBakeDilationScratchDescriptorSlot = 5u;
 
     enum class NormalTextureSpace : std::uint8_t
     {
@@ -124,16 +127,87 @@ export namespace Extrinsic::Graphics
         std::uint64_t NormalBDA = 0u;
     };
 
+    struct alignas(4) ObjectSpaceNormalTextureBakeDilationPushConstants
+    {
+        std::uint32_t SourceTextureSlot = kObjectSpaceNormalBakeDilationOutputDescriptorSlot;
+    };
+
+    struct ObjectSpaceNormalTextureBakeDilationResources
+    {
+        RHI::PipelineHandle Pipeline{};
+        RHI::TextureHandle ScratchTexture{};
+        RHI::TextureLayout ScratchInitialLayout = RHI::TextureLayout::Undefined;
+        std::uint32_t OutputDescriptorSlot =
+            kObjectSpaceNormalBakeDilationOutputDescriptorSlot;
+        std::uint32_t ScratchDescriptorSlot =
+            kObjectSpaceNormalBakeDilationScratchDescriptorSlot;
+
+        [[nodiscard]] bool IsValid() const noexcept
+        {
+            return Pipeline.IsValid() &&
+                   ScratchTexture.IsValid() &&
+                   OutputDescriptorSlot != ScratchDescriptorSlot;
+        }
+    };
+
+    struct ObjectSpaceNormalTextureBakeDilationResourceDesc
+    {
+        RHI::PipelineDesc Pipeline{};
+        RHI::TextureDesc ScratchTexture{};
+        std::uint32_t OutputDescriptorSlot =
+            kObjectSpaceNormalBakeDilationOutputDescriptorSlot;
+        std::uint32_t ScratchDescriptorSlot =
+            kObjectSpaceNormalBakeDilationScratchDescriptorSlot;
+    };
+
+    class ObjectSpaceNormalTextureBakeDilationResourceLease
+    {
+    public:
+        ObjectSpaceNormalTextureBakeDilationResourceLease() = default;
+        ~ObjectSpaceNormalTextureBakeDilationResourceLease();
+
+        ObjectSpaceNormalTextureBakeDilationResourceLease(
+            const ObjectSpaceNormalTextureBakeDilationResourceLease&) = delete;
+        ObjectSpaceNormalTextureBakeDilationResourceLease& operator=(
+            const ObjectSpaceNormalTextureBakeDilationResourceLease&) = delete;
+
+        ObjectSpaceNormalTextureBakeDilationResourceLease(
+            ObjectSpaceNormalTextureBakeDilationResourceLease&& other) noexcept;
+        ObjectSpaceNormalTextureBakeDilationResourceLease& operator=(
+            ObjectSpaceNormalTextureBakeDilationResourceLease&& other) noexcept;
+
+        [[nodiscard]] Core::Result Initialize(
+            RHI::IDevice& device,
+            const ObjectSpaceNormalTextureBakeDilationResourceDesc& desc);
+        void Shutdown() noexcept;
+
+        [[nodiscard]] bool IsValid() const noexcept;
+        [[nodiscard]] ObjectSpaceNormalTextureBakeDilationResources
+            GetResources() const noexcept;
+
+    private:
+        RHI::IDevice* m_Device = nullptr;
+        RHI::PipelineHandle m_Pipeline{};
+        RHI::TextureHandle m_ScratchTexture{};
+        RHI::TextureLayout m_ScratchInitialLayout = RHI::TextureLayout::Undefined;
+        std::uint32_t m_OutputDescriptorSlot =
+            kObjectSpaceNormalBakeDilationOutputDescriptorSlot;
+        std::uint32_t m_ScratchDescriptorSlot =
+            kObjectSpaceNormalBakeDilationScratchDescriptorSlot;
+    };
+
     struct ObjectSpaceNormalTextureBakeGpuRecordDesc
     {
         RHI::PipelineHandle Pipeline{};
         RHI::TextureHandle OutputTexture{};
+        ObjectSpaceNormalTextureBakeDilationResources Dilation{};
         RHI::BufferHandle IndexBuffer{};
         std::uint64_t TexcoordBDA = 0u;
         std::uint64_t NormalBDA = 0u;
         std::uint32_t IndexCount = 0u;
         std::uint32_t Width = 0u;
         std::uint32_t Height = 0u;
+        std::uint32_t PaddingTexels = 0u;
         RHI::TextureLayout InitialLayout = RHI::TextureLayout::Undefined;
         RHI::TextureLayout FinalLayout = RHI::TextureLayout::ShaderReadOnly;
     };
@@ -168,12 +242,14 @@ export namespace Extrinsic::Graphics
     struct ObjectSpaceNormalTextureBakeGpuRecordTemplate
     {
         RHI::PipelineHandle Pipeline{};
+        ObjectSpaceNormalTextureBakeDilationResources Dilation{};
         RHI::BufferHandle IndexBuffer{};
         std::uint64_t TexcoordBDA = 0u;
         std::uint64_t NormalBDA = 0u;
         std::uint32_t IndexCount = 0u;
         std::uint32_t Width = 0u;
         std::uint32_t Height = 0u;
+        std::uint32_t PaddingTexels = 0u;
         RHI::TextureLayout InitialLayout = RHI::TextureLayout::Undefined;
         RHI::TextureLayout FinalLayout = RHI::TextureLayout::ShaderReadOnly;
     };
@@ -185,6 +261,7 @@ export namespace Extrinsic::Graphics
         ObjectSpaceNormalTextureBakeOptions Options{};
         ObjectSpaceNormalTextureBakeSourceKey SourceKey{};
         RHI::PipelineHandle Pipeline{};
+        ObjectSpaceNormalTextureBakeDilationResources Dilation{};
         RHI::SamplerDesc SamplerDesc{};
         RHI::SamplerHandle Sampler{};
         RHI::TextureUsage AdditionalTextureUsage = RHI::TextureUsage::None;
@@ -244,6 +321,26 @@ export namespace Extrinsic::Graphics
         std::string vertexShaderPath,
         std::string fragmentShaderPath,
         RHI::Format colorFormat = RHI::Format::RGBA8_UNORM);
+
+    [[nodiscard]] RHI::PipelineDesc
+        MakeObjectSpaceNormalTextureBakeDilationPipelineDesc(
+            std::string vertexShaderPath,
+            std::string fragmentShaderPath,
+            RHI::Format colorFormat = RHI::Format::RGBA8_UNORM);
+
+    [[nodiscard]] RHI::TextureDesc
+        MakeObjectSpaceNormalTextureBakeDilationScratchTextureDesc(
+            const ObjectSpaceNormalTextureBakeOptions& options,
+            const char* debugName =
+                "ObjectSpaceNormalTextureBake.DilationScratch") noexcept;
+
+    [[nodiscard]] ObjectSpaceNormalTextureBakeDilationResourceDesc
+        MakeObjectSpaceNormalTextureBakeDilationResourceDesc(
+            const ObjectSpaceNormalTextureBakeOptions& options,
+            std::string vertexShaderPath,
+            std::string fragmentShaderPath,
+            const char* scratchDebugName =
+                "ObjectSpaceNormalTextureBake.DilationScratch");
 
     [[nodiscard]] ObjectSpaceNormalTextureBakePlan
         BuildObjectSpaceNormalTextureBakePlan(
