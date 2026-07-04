@@ -1352,7 +1352,8 @@ Concretely:
   change, graphics retains the prior atlas payload by metadata/revision for
   unchanged frames, and `ImGuiUploadHelper` builds draw-command upload records
   once per draw list while reusing CPU scratch vectors for flattened
-  vertex/index payloads. Runtime and graphics diagnostics expose atlas
+  vertex/index payloads. `ImGuiUploadResult` reports vertex, index, and total
+  upload bytes for the frame. Runtime and graphics diagnostics expose atlas
   copy/reuse, atlas retain, draw-command count, command-upload build count, and
   per-frame uploaded byte counts.
   The imported `Backbuffer` remains owned solely by `Pass.Present`; render-graph validation

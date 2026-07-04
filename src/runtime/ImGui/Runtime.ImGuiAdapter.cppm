@@ -38,6 +38,11 @@ export namespace Extrinsic::Runtime
         std::uint32_t FontAtlasCopyCount{0u};        // CPU atlas payload copies into overlay frames
         std::uint32_t FontAtlasReuseCount{0u};       // frames that reused the cached atlas payload
         std::uint64_t LastFontAtlasByteCount{0u};
+        std::uint64_t LastFrameFontAtlasCopyBytes{0u};
+        std::uint64_t LastFrameVertexCopyBytes{0u};
+        std::uint64_t LastFrameIndexCopyBytes{0u};
+        std::uint64_t LastFrameCommandCopyBytes{0u};
+        std::uint64_t LastFrameOverlayCopyBytes{0u};
         bool          LastFrameFontAtlasCopied{false};
     };
 

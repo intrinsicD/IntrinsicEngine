@@ -254,6 +254,13 @@ namespace Extrinsic::Graphics
             ++drawListIndex;
         }
 
+        const std::uint64_t vertexUploadBytes =
+            static_cast<std::uint64_t>(m_VertexScratch.size() *
+                                       sizeof(ImGuiOverlayVertex));
+        const std::uint64_t indexUploadBytes =
+            static_cast<std::uint64_t>(m_IndexScratch.size() *
+                                       sizeof(std::uint32_t));
+
         const LaneUploadOutput vertexUpload = UploadBytes(
             *m_Device,
             *m_BufferManager,
@@ -261,7 +268,7 @@ namespace Extrinsic::Graphics
             vertexSlot.CapacityBytes,
             m_BufferAllocationCount,
             m_VertexScratch.data(),
-            static_cast<std::uint64_t>(m_VertexScratch.size() * sizeof(ImGuiOverlayVertex)),
+            vertexUploadBytes,
             kInitialVertexCount * sizeof(ImGuiOverlayVertex),
             kMaxVertexCount * sizeof(ImGuiOverlayVertex),
             RHI::BufferUsage::Vertex | RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
@@ -279,7 +286,7 @@ namespace Extrinsic::Graphics
             indexSlot.CapacityBytes,
             m_BufferAllocationCount,
             m_IndexScratch.data(),
-            static_cast<std::uint64_t>(m_IndexScratch.size() * sizeof(std::uint32_t)),
+            indexUploadBytes,
             kInitialIndexCount * sizeof(std::uint32_t),
             kMaxIndexCount * sizeof(std::uint32_t),
             RHI::BufferUsage::Index | RHI::BufferUsage::TransferDst,
@@ -299,6 +306,9 @@ namespace Extrinsic::Graphics
         }
 
         result.Uploaded = !result.DrawLists.empty();
+        result.VertexUploadBytes = vertexUploadBytes;
+        result.IndexUploadBytes = indexUploadBytes;
+        result.TotalUploadBytes = vertexUploadBytes + indexUploadBytes;
         return result;
     }
 }

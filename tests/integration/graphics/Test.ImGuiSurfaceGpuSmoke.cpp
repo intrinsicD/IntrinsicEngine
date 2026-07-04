@@ -13,6 +13,7 @@
 
 import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.RHI.Descriptors;
@@ -172,6 +173,54 @@ struct Rgba8Pixel
         [passName](const auto& pass) { return pass.Name == passName; });
     return it == stats.CommandRecords.Passes.end() ? nullptr : &*it;
 }
+
+void DrawLargeSelectedEntityInspectorPayload()
+{
+    ImGui::SetNextWindowPos(ImVec2(6.0f, 18.0f), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(244.0f, 228.0f), ImGuiCond_Always);
+    ImGui::Begin("GRAPHICS-114 Selected Entity Inspector");
+    ImGui::TextUnformatted("Selected entity: ReferenceTriangle");
+    ImGui::TextUnformatted("Stable id: 101");
+    ImGui::Separator();
+    for (int section = 0; section < 4; ++section)
+    {
+        ImGui::PushID(section);
+        if (ImGui::TreeNodeEx("Component group", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            for (int row = 0; row < 5; ++row)
+            {
+                ImGui::PushID(row);
+                bool enabled = ((section + row) % 2) == 0;
+                float values[3] = {
+                    static_cast<float>(section),
+                    static_cast<float>(row),
+                    static_cast<float>(section * row) * 0.25f,
+                };
+                ImGui::Checkbox("enabled", &enabled);
+                ImGui::SameLine();
+                ImGui::DragFloat3("value", values, 0.01f);
+                ImGui::PopID();
+            }
+            ImGui::TreePop();
+        }
+        ImGui::PopID();
+    }
+    ImGui::End();
+
+    ImDrawList* foreground = ImGui::GetForegroundDrawList();
+    for (int y = 0; y < 12; ++y)
+    {
+        for (int x = 0; x < 20; ++x)
+        {
+            const float left = 8.0f + static_cast<float>(x) * 12.0f;
+            const float top = 8.0f + static_cast<float>(y) * 10.0f;
+            foreground->AddRectFilled(
+                ImVec2(left, top),
+                ImVec2(left + 7.0f, top + 5.0f),
+                IM_COL32(40 + (x * 7) % 180, 70 + (y * 11) % 160, 210, 180));
+        }
+    }
+}
 } // namespace
 
 TEST(ImGuiSurfaceGpuSmoke, UserTextureImageRecordsOnOperationalVulkanCommandStream)
@@ -232,6 +281,82 @@ TEST(ImGuiSurfaceGpuSmoke, UserTextureImageRecordsOnOperationalVulkanCommandStre
 
     EXPECT_TRUE(Counters::IsStable(before, after))
         << "Vulkan fallback counters incremented across the ImGui frame: "
+        << "fallbackToNull " << before.FallbackToNull << " -> " << after.FallbackToNull
+        << ", initFailure " << before.InitFailure << " -> " << after.InitFailure
+        << ", validationError " << before.ValidationError << " -> " << after.ValidationError
+        << ", gateFailure " << before.OperationalGateFailure << " -> " << after.OperationalGateFailure;
+
+    engine.Shutdown();
+}
+
+TEST(ImGuiSurfaceGpuSmoke, LargeSelectedEntityPayloadRetainsAtlasOnOperationalVulkan)
+{
+    auto bootstrap = BootstrapOperationalDefaultRecipe(6u);
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+
+    engine.SetImGuiEditorCallback(DrawLargeSelectedEntityInspectorPayload);
+
+    const Counters::Snapshot before =
+        ToCounterSnapshot(GetVulkanOperationalDiagnosticsSnapshot());
+    engine.Run();
+    const Counters::Snapshot after =
+        ToCounterSnapshot(GetVulkanOperationalDiagnosticsSnapshot());
+
+    const auto status = EvaluateVulkanDeviceOperationalStatus(&engine.GetDevice());
+    if (!engine.GetDevice().IsOperational())
+    {
+        engine.Shutdown();
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during large selected-entity ImGui frame: status="
+                      << ToString(status.Code) << " reason=" << ToString(status.Reason);
+        return;
+    }
+
+    EXPECT_EQ(status.Code, Extrinsic::Backends::Vulkan::VulkanOperationalStatusCode::Operational);
+    EXPECT_EQ(status.Reason, Extrinsic::Backends::Vulkan::VulkanOperationalReason::None);
+
+    const auto& diag = engine.GetImGuiAdapter().GetDiagnostics();
+    EXPECT_GE(diag.FramesProduced, 6u);
+    EXPECT_EQ(diag.FontAtlasCopyCount, 1u);
+    EXPECT_GE(diag.FontAtlasReuseCount, 5u);
+    EXPECT_FALSE(diag.LastFrameFontAtlasCopied);
+    EXPECT_GT(diag.LastFontAtlasByteCount, 0u);
+    EXPECT_EQ(diag.LastFrameFontAtlasCopyBytes, 0u);
+    EXPECT_GE(diag.LastDrawListCount, 1u);
+    EXPECT_GE(diag.LastVertexCount, 900u);
+    EXPECT_GE(diag.LastIndexCount, 1200u);
+    EXPECT_GE(diag.LastCommandCount, 1u);
+    EXPECT_EQ(diag.LastFrameVertexCopyBytes,
+              static_cast<std::uint64_t>(diag.LastVertexCount) *
+                  sizeof(Extrinsic::Graphics::ImGuiOverlayVertex));
+    EXPECT_EQ(diag.LastFrameIndexCopyBytes,
+              static_cast<std::uint64_t>(diag.LastIndexCount) *
+                  sizeof(std::uint32_t));
+    EXPECT_EQ(diag.LastFrameCommandCopyBytes,
+              static_cast<std::uint64_t>(diag.LastCommandCount) *
+                  sizeof(Extrinsic::Graphics::ImGuiOverlayDrawCommand));
+    EXPECT_EQ(diag.LastFrameOverlayCopyBytes,
+              diag.LastFrameFontAtlasCopyBytes +
+                  diag.LastFrameVertexCopyBytes +
+                  diag.LastFrameIndexCopyBytes +
+                  diag.LastFrameCommandCopyBytes);
+
+    const auto& stats = engine.GetRenderer().GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.DeviceOperational);
+
+    const auto* pass = FindCommandPass(stats, "ImGuiPass");
+    ASSERT_NE(pass, nullptr)
+        << "Default recipe omitted ImGuiPass despite large selected-entity overlay work.";
+    EXPECT_EQ(pass->Status, RenderCommandPassStatus::Recorded)
+        << "ImGuiPass did not record the large selected-entity overlay payload.";
+
+    EXPECT_TRUE(Counters::IsStable(before, after))
+        << "Vulkan fallback counters incremented across the large selected-entity ImGui frame: "
         << "fallbackToNull " << before.FallbackToNull << " -> " << after.FallbackToNull
         << ", initFailure " << before.InitFailure << " -> " << after.InitFailure
         << ", validationError " << before.ValidationError << " -> " << after.ValidationError

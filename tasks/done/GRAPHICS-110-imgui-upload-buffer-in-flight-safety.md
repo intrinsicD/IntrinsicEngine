@@ -9,8 +9,8 @@ depends_on: []
 - Retired on 2026-07-02 at maturity `Operational` on a Vulkan-capable host.
 - Implementation commit: this commit adds frame-slot partitioning for the
   ImGui, transient-debug, and visualization-overlay upload helpers, preserves
-  growth/allocation diagnostics, and keeps retained overlay copy/upload cleanup
-  owned by `GRAPHICS-114`.
+  growth/allocation diagnostics, and left retained overlay copy/upload cleanup
+  to the now-retired follow-up `GRAPHICS-114`.
 - Task-state commit: this retirement commit moves the task to `tasks/done/`
   and removes it from the open rendering backlog list.
 - Final retirement evidence on 2026-07-02:
@@ -32,8 +32,8 @@ depends_on: []
 - No change to the ImGui overlay draw-data contract, `Pass.ImGui` recording, or
   the `ImGuiOverlayFrame` payload shape.
 - No change to the CPU-side flatten/copy in `Runtime.ImGuiAdapter` or
-  `Graphics.ImGuiOverlaySystem`; retained overlay copy/upload cleanup is owned
-  by `GRAPHICS-114` after this safety task lands.
+  `Graphics.ImGuiOverlaySystem`; retained overlay copy/upload cleanup was owned
+  by the follow-up `GRAPHICS-114`.
 - Not a rewrite of `RHI::BufferManager`; reuse its leasing API.
 
 ## Context
@@ -91,7 +91,7 @@ depends_on: []
 ## Acceptance criteria
 - [x] Two frames in flight provably never share a written vertex/index range in
       the ImGui upload path (test or documented single-frame-in-flight proof).
-- [x] `GRAPHICS-114` remains the named owner for retained overlay transport and
+- [x] `GRAPHICS-114` is the named follow-up for retained overlay transport and
       CPU copy/upload reductions.
 - [x] `python3 tools/repo/check_layering.py --root src --strict` passes; the
       helper stays graphics/RHI-only.

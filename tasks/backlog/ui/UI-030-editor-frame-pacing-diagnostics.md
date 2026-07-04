@@ -34,8 +34,8 @@ maturity_target: Operational
   (`tasks/done/GRAPHICS-110-imgui-upload-buffer-in-flight-safety.md`).
 - Follow-ups filed from the selected-entity source diagnosis: `RUNTIME-138`
   owns the nonblocking selected-entity editor/cache/job pipeline,
-  `GRAPHICS-113` owns selected-outline ID work pruning, and `GRAPHICS-114`
-  owns retained ImGui overlay copy/upload cleanup after `GRAPHICS-110`.
+  `GRAPHICS-113` retired selected-outline ID work pruning, and `GRAPHICS-114`
+  retired retained ImGui overlay copy/upload cleanup after `GRAPHICS-110`.
 
 ## Goal
 - Build a deterministic frame-pacing investigation loop for the Sandbox EditorUI, identify whether stutter is caused by editor CPU work, ImGui data upload, Vulkan frame lifecycle waits, present pacing, render-graph pass work, or synchronous upload/readback paths, and record scoped follow-up fixes with evidence.
@@ -64,7 +64,7 @@ maturity_target: Operational
 - [x] Audit `ImGuiUploadHelper` transient buffer ownership and either prove it is safe for the current frames-in-flight model or file a named follow-up task for per-frame/ring upload buffers. Audit complete (see Status); the single-shared-host-visible-buffer overwrite pattern is not provably in-flight-safe, so `GRAPHICS-110` was filed for per-frame/ring upload buffers.
 - [ ] Add a reproducible local diagnostic mode or test harness that runs the sandbox/editor frame loop for a bounded frame count and emits machine-readable frame timing samples.
 - [ ] Write a short report under `docs/reports/` summarizing the measured bottleneck ranking, ruled-out hypotheses, backend/present-mode conditions, and the follow-up task IDs for fixes.
-- [ ] If the investigation finds a specific bug or missing synchronization contract beyond `RUNTIME-138`, `GRAPHICS-113`, `GRAPHICS-114`, or `GRAPHICS-110`, open a scoped follow-up task under `tasks/backlog/bugs/`, `tasks/backlog/rendering/`, `tasks/backlog/runtime/`, or `tasks/backlog/ui/` rather than expanding this task into the fix.
+- [ ] If the investigation finds a specific bug or missing synchronization contract beyond open `RUNTIME-138` or the retired `GRAPHICS-110`/`GRAPHICS-113`/`GRAPHICS-114` fixes, open a scoped follow-up task under `tasks/backlog/bugs/`, `tasks/backlog/rendering/`, `tasks/backlog/runtime/`, or `tasks/backlog/ui/` rather than expanding this task into the fix.
 
 ## Tests
 - [ ] Add or update contract tests proving the new diagnostics are populated in the Null backend path without requiring GPU/Vulkan.
@@ -82,7 +82,7 @@ maturity_target: Operational
 - [ ] The investigation reports whether stutter correlates with editor model rebuilds, ImGui copy/upload, frame-slot fence waits, acquire/present stalls, render-graph compile/execute spikes, synchronous upload/readback, or another measured cause.
 - [x] `ImGuiUploadHelper` in-flight buffer safety is either proven by code/test evidence or tracked by a follow-up task with a concrete owner. Tracked by `GRAPHICS-110`.
 - [ ] Follow-up implementation tasks exist for every measured fix candidate that should not be completed inside this diagnostic task.
-- [ ] Selected-entity main-loop responsiveness fixes remain owned by `RUNTIME-138` and renderer/upload follow-ups remain owned by `GRAPHICS-113`/`GRAPHICS-114`; this task stays an evidence loop and report.
+- [ ] Selected-entity main-loop responsiveness fixes remain owned by open `RUNTIME-138`; retired renderer/upload evidence remains in `GRAPHICS-113`/`GRAPHICS-114`; this task stays an evidence loop and report.
 - [ ] The report does not claim a performance improvement unless it cites before/after measurements and the exact verification commands.
 
 ## Verification

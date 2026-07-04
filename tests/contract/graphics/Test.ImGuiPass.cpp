@@ -227,6 +227,12 @@ TEST(ImGuiPassContract, UploadHelperPacksTwoDrawListsAndPassRecordsPerList)
         ASSERT_EQ(upload.DrawLists.size(), 2u);
         EXPECT_EQ(upload.CommandUploadListBuilds, 2u);
         EXPECT_EQ(upload.DrawCommandCount, 2u);
+        EXPECT_EQ(upload.VertexUploadBytes,
+                  7u * sizeof(Graphics::ImGuiOverlayVertex));
+        EXPECT_EQ(upload.IndexUploadBytes,
+                  9u * sizeof(std::uint32_t));
+        EXPECT_EQ(upload.TotalUploadBytes,
+                  upload.VertexUploadBytes + upload.IndexUploadBytes);
         EXPECT_EQ(upload.DrawLists[0].FirstVertex, 0u);
         EXPECT_EQ(upload.DrawLists[0].IndexOffsetBytes, 0u);
         EXPECT_EQ(upload.DrawLists[0].IndexCount, 3u);
@@ -292,6 +298,12 @@ TEST(ImGuiPassContract, UploadHelperPreservesPerCommandTextureBindlessIndices)
     ASSERT_EQ(upload.DrawLists.size(), 1u);
     EXPECT_EQ(upload.CommandUploadListBuilds, 1u);
     EXPECT_EQ(upload.DrawCommandCount, 2u);
+    EXPECT_EQ(upload.VertexUploadBytes,
+              4u * sizeof(Graphics::ImGuiOverlayVertex));
+    EXPECT_EQ(upload.IndexUploadBytes,
+              6u * sizeof(std::uint32_t));
+    EXPECT_EQ(upload.TotalUploadBytes,
+              upload.VertexUploadBytes + upload.IndexUploadBytes);
     ASSERT_EQ(upload.DrawLists[0].Commands.size(), 2u);
     EXPECT_EQ(upload.DrawLists[0].Commands[0].IndexOffset, 0u);
     EXPECT_EQ(upload.DrawLists[0].Commands[0].IndexCount, 3u);

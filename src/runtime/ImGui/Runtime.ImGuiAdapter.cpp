@@ -306,6 +306,11 @@ namespace Extrinsic::Runtime
 
         Graphics::ImGuiOverlayFrame frame;
         frame.Enabled = true;
+        m_Diagnostics.LastFrameFontAtlasCopyBytes = 0u;
+        m_Diagnostics.LastFrameVertexCopyBytes = 0u;
+        m_Diagnostics.LastFrameIndexCopyBytes = 0u;
+        m_Diagnostics.LastFrameCommandCopyBytes = 0u;
+        m_Diagnostics.LastFrameOverlayCopyBytes = 0u;
         if (fontPixels != nullptr && fontWidth > 0 && fontHeight > 0 &&
             (fontBytesPerPixel == 1 || fontBytesPerPixel == 4))
         {
@@ -350,6 +355,7 @@ namespace Extrinsic::Runtime
                 frame.FontAtlas = m_FontAtlasCache;
                 ++m_Diagnostics.FontAtlasCopyCount;
                 m_Diagnostics.LastFrameFontAtlasCopied = true;
+                m_Diagnostics.LastFrameFontAtlasCopyBytes = byteCount;
             }
             else
             {
@@ -362,12 +368,14 @@ namespace Extrinsic::Runtime
                 frame.FontAtlas.Revision = m_FontAtlasRevision;
                 ++m_Diagnostics.FontAtlasReuseCount;
                 m_Diagnostics.LastFrameFontAtlasCopied = false;
+                m_Diagnostics.LastFrameFontAtlasCopyBytes = 0u;
             }
         }
         else
         {
             m_Diagnostics.LastFontAtlasByteCount = 0u;
             m_Diagnostics.LastFrameFontAtlasCopied = false;
+            m_Diagnostics.LastFrameFontAtlasCopyBytes = 0u;
         }
 
         std::uint32_t drawListCount = 0u;
@@ -453,6 +461,20 @@ namespace Extrinsic::Runtime
         m_Diagnostics.LastFrameUsedUserTexture = usesUserTexture;
         m_Diagnostics.DisplayWidth = pixelWidth;
         m_Diagnostics.DisplayHeight = pixelHeight;
+        m_Diagnostics.LastFrameVertexCopyBytes =
+            static_cast<std::uint64_t>(vertexCount) *
+            sizeof(Graphics::ImGuiOverlayVertex);
+        m_Diagnostics.LastFrameIndexCopyBytes =
+            static_cast<std::uint64_t>(indexCount) *
+            sizeof(std::uint32_t);
+        m_Diagnostics.LastFrameCommandCopyBytes =
+            static_cast<std::uint64_t>(commandCount) *
+            sizeof(Graphics::ImGuiOverlayDrawCommand);
+        m_Diagnostics.LastFrameOverlayCopyBytes =
+            m_Diagnostics.LastFrameFontAtlasCopyBytes +
+            m_Diagnostics.LastFrameVertexCopyBytes +
+            m_Diagnostics.LastFrameIndexCopyBytes +
+            m_Diagnostics.LastFrameCommandCopyBytes;
         m_FrameStarted = false;
     }
 

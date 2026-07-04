@@ -72,8 +72,8 @@ visualization-overlay upload helpers now partition host-visible upload storage
 by frame-in-flight slot so a new frame cannot overwrite ranges still consumed
 by an older frame. CPU contract tests cover deterministic multi-slot behavior,
 and targeted `gpu;vulkan` ImGui/overlay/sandbox smokes passed on the
-Vulkan-capable host. Retained overlay copy/upload reduction remains owned by
-open follow-up `GRAPHICS-114`.
+Vulkan-capable host. Retained overlay copy/upload reduction is retired by
+follow-up `GRAPHICS-114`.
 
 Backlog
 [`LEGACY-012`](LEGACY-012-migrate-legacy-consumer-tests.md) — Migrate legacy
@@ -3288,3 +3288,18 @@ without local implementation: current graphics seams expose whole
 `SurfaceOpaque` indirect buckets and CPU snapshot selected IDs, so further
 selected/hovered-only draw narrowing needs a separate filtered indirect
 draw/shader-visible selected-ID contract rather than a safe local pass tweak.
+
+[`GRAPHICS-114`](GRAPHICS-114-retained-imgui-overlay-copy-upload-path.md) —
+Retained ImGui overlay copy/upload path retired to `tasks/done/` on 2026-07-04
+at `Operational` on Vulkan-capable hosts and `CPUContracted` for backend-neutral
+copy/reuse/upload contracts. Runtime `ImGuiAdapterDiagnostics` now reports
+per-frame font-atlas, vertex, index, command, and total overlay copy bytes;
+graphics `ImGuiUploadResult` reports vertex/index/total upload bytes. The
+retained atlas path copies atlas bytes only on dirty payload changes, steady
+frames retain atlas payload metadata/revision, accepted draw lists move through
+the graphics boundary after validation, and command upload records are built
+once per draw list. The measurement report is
+`docs/reports/2026-07-04-graphics-114-imgui-overlay-retention.md`; focused
+CPU/null contracts and the opt-in
+`ImGuiSurfaceGpuSmoke.LargeSelectedEntityPayloadRetainsAtlasOnOperationalVulkan`
+smoke passed.

@@ -53,6 +53,9 @@ export namespace Extrinsic::Graphics
         std::uint32_t DrawListCount{0u};
         std::uint32_t DrawCommandCount{0u};
         std::uint32_t CommandUploadListBuilds{0u};
+        std::uint64_t VertexUploadBytes{0u};
+        std::uint64_t IndexUploadBytes{0u};
+        std::uint64_t TotalUploadBytes{0u};
         bool Uploaded{false};
         bool Overflow{false};
     };

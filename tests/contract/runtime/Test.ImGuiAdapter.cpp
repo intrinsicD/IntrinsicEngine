@@ -181,6 +181,8 @@ TEST(ImGuiAdapter, FontAtlasPayloadIsCopiedOnlyWhenDirty)
         EXPECT_EQ(diag.FontAtlasReuseCount, 0u);
         EXPECT_TRUE(diag.LastFrameFontAtlasCopied);
         EXPECT_GT(diag.LastFontAtlasByteCount, 0u);
+        EXPECT_EQ(diag.LastFrameFontAtlasCopyBytes,
+                  diag.LastFontAtlasByteCount);
     }
     const auto* firstFrame = overlay.GetCurrentFrame();
     ASSERT_NE(firstFrame, nullptr);
@@ -195,6 +197,7 @@ TEST(ImGuiAdapter, FontAtlasPayloadIsCopiedOnlyWhenDirty)
     EXPECT_EQ(diag.FontAtlasReuseCount, 1u);
     EXPECT_FALSE(diag.LastFrameFontAtlasCopied);
     EXPECT_EQ(diag.LastFontAtlasByteCount, firstPixels.size());
+    EXPECT_EQ(diag.LastFrameFontAtlasCopyBytes, 0u);
 
     const auto* retainedFrame = overlay.GetCurrentFrame();
     ASSERT_NE(retainedFrame, nullptr);
@@ -240,6 +243,20 @@ TEST(ImGuiAdapter, EditorPanelDrawProducesNonEmptyDrawList)
     EXPECT_GT(diag.LastIndexCount, 0u);
     EXPECT_GE(diag.LastCommandCount, 1u);
     EXPECT_FALSE(diag.LastFrameUsedUserTexture); // a text panel only uses the font atlas
+    EXPECT_EQ(diag.LastFrameVertexCopyBytes,
+              static_cast<std::uint64_t>(diag.LastVertexCount) *
+                  sizeof(Extrinsic::Graphics::ImGuiOverlayVertex));
+    EXPECT_EQ(diag.LastFrameIndexCopyBytes,
+              static_cast<std::uint64_t>(diag.LastIndexCount) *
+                  sizeof(std::uint32_t));
+    EXPECT_EQ(diag.LastFrameCommandCopyBytes,
+              static_cast<std::uint64_t>(diag.LastCommandCount) *
+                  sizeof(Extrinsic::Graphics::ImGuiOverlayDrawCommand));
+    EXPECT_EQ(diag.LastFrameOverlayCopyBytes,
+              diag.LastFrameFontAtlasCopyBytes +
+                  diag.LastFrameVertexCopyBytes +
+                  diag.LastFrameIndexCopyBytes +
+                  diag.LastFrameCommandCopyBytes);
 }
 
 TEST(ImGuiAdapter, ImageDrawPreservesUserTextureBindlessCommand)

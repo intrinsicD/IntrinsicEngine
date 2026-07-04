@@ -23,7 +23,8 @@ map.
   (diagnose editor stutter with phase timing across the editor callback, ImGui
   copy/upload, frame-graph execution, Vulkan frame lifecycle waits, present
   pacing, and synchronous upload/readback paths; selected-entity implementation
-  fixes are now tracked by `RUNTIME-138`, `GRAPHICS-113`, and `GRAPHICS-114`).
+  fixes are tracked by open `RUNTIME-138` plus retired `GRAPHICS-113` and
+  `GRAPHICS-114` evidence).
 - [UI-031 — Sandbox EditorUI domain-window reorganization](UI-031-editor-domain-ui-reorganization.md)
   (depends on `RUNTIME-138`; reorganize Mesh/Graph/PointCloud UI so
   `Properties` is a pure property explorer, render hints/visualization/property
@@ -44,8 +45,8 @@ retired under the runtime backlog as `RUNTIME-135`.
   it builds an evidence loop before blaming barriers, fences, present pacing, or
   editor CPU work. Source-level selected-entity findings are now tracked by
   `RUNTIME-138` for the nonblocking runtime/editor cache-job pipeline, retired
-  `GRAPHICS-113` for selected-outline ID work pruning, and `GRAPHICS-114` for
-  retained ImGui overlay copy/upload cleanup.
+  `GRAPHICS-113` for selected-outline ID work pruning, and retired
+  `GRAPHICS-114` for retained ImGui overlay copy/upload cleanup.
 - UI-031 is the information-architecture follow-up from the 2026-07-01
   domain-UI review: it separates property exploration, appearance/rendering
   controls, texture baking, and method execution into user-intent windows. Its

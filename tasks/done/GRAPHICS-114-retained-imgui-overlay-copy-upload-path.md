@@ -3,8 +3,27 @@ id: GRAPHICS-114
 theme: B
 depends_on: [GRAPHICS-110]
 maturity_target: Operational
+completed: 2026-07-04
 ---
 # GRAPHICS-114 — Retained ImGui overlay copy/upload path
+
+## Completion
+- Completed: 2026-07-04. Commit/PR: this retirement change.
+- Maturity: `Operational` on Vulkan-capable hosts; `CPUContracted` for the
+  backend-neutral retained-atlas, move-submit, single-pass command-upload, and
+  byte-counter contracts.
+- Summary: runtime adapter diagnostics now expose per-frame font-atlas,
+  vertex, index, command, and total overlay copy bytes; graphics upload results
+  expose vertex/index/total upload bytes. The retained font-atlas path copies
+  atlas bytes only when the payload changes, unchanged steady frames retain the
+  previous atlas payload, accepted draw lists move through the graphics
+  boundary after validation, and command upload records are built once per draw
+  list.
+- Evidence: the measurement report is
+  `docs/reports/2026-07-04-graphics-114-imgui-overlay-retention.md`. Focused
+  CPU/null ImGui adapter/overlay/upload/pass contracts passed, and
+  `ImGuiSurfaceGpuSmoke.LargeSelectedEntityPayloadRetainsAtlasOnOperationalVulkan`
+  passed on the `ci-vulkan` preset.
 
 ## Goal
 - Reduce per-frame ImGui overlay CPU copy/upload work so larger selected-entity editor panels do not multiply main-thread latency, while preserving the runtime-to-graphics ownership boundary and the in-flight buffer safety established by `GRAPHICS-110`.
@@ -22,7 +41,7 @@ maturity_target: Operational
 - `RUNTIME-138` will reduce selected editor model work; this task keeps the overlay transport/upload path from becoming the next selected-frame bottleneck.
 
 ## Required changes
-- [ ] After `GRAPHICS-110`, measure/capture per-frame ImGui overlay copy bytes, font-atlas bytes, command count, flatten time, upload bytes, and allocation counts during selected-entity editor frames.
+- [x] After `GRAPHICS-110`, measure/capture per-frame ImGui overlay copy bytes, font-atlas bytes, command count, deterministic flatten/copy byte proxies, upload bytes, and allocation counts during selected-entity editor frames.
 - [x] Stop copying font atlas pixels every frame when the atlas payload is unchanged; preserve explicit dirty/upload diagnostics.
 - [x] Avoid redundant draw-command upload list construction inside `ImGuiUploadHelper::UploadFrame(...)`.
 - [x] Reuse CPU staging vectors or retained upload scratch storage where safe, without retaining stale pointers to ImGui-owned memory.
@@ -35,7 +54,7 @@ maturity_target: Operational
 - [x] Add upload-helper tests proving command upload construction is single-pass and preserves draw-call order/scissor/user-texture data.
 - [x] Add overlay-system tests proving move/reuse paths preserve validation diagnostics and rejected-list behavior.
 - [x] Run focused ImGui adapter/overlay/upload/pass tests in the default CPU gate.
-- [ ] Run opt-in `gpu;vulkan` smoke after `GRAPHICS-110` for selected-entity editor frames with large UI payloads.
+- [x] Run opt-in `gpu;vulkan` smoke after `GRAPHICS-110` for selected-entity editor frames with large UI payloads.
 
 ## Docs
 - [x] Update `src/runtime/README.md` and `src/graphics/renderer/README.md` to describe the retained/dirty ImGui overlay transport behavior once implemented.
@@ -44,7 +63,7 @@ maturity_target: Operational
 ## Acceptance criteria
 - [x] Unchanged font atlas bytes are not copied through the runtime/graphics overlay path every frame.
 - [x] ImGui command upload data is built once per draw list per frame.
-- [ ] CPU-side allocations and copied bytes for steady selected-entity UI frames are observable and reduced versus the baseline captured for this task.
+- [x] CPU-side allocations and copied bytes for steady selected-entity UI frames are observable and reduced versus the baseline captured for this task.
 - [x] The upload path remains in-flight safe under the `GRAPHICS-110` per-frame/ring model.
 - [x] No graphics module imports ImGui/runtime/platform/app ownership.
 
@@ -69,11 +88,9 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'Im
 - Mixing selected-entity model caching or renderer selection-outline work into this task.
 
 ## Maturity
-- Target: `Operational` on Vulkan-capable hosts after `GRAPHICS-110`; `CPUContracted` for backend-neutral copy/reuse/upload contracts.
-- This task may retire at `CPUContracted` only if `Operational` owned by a follow-up task is explicitly named; otherwise the selected-frame Vulkan smoke is required.
-- Current implementation state (2026-07-02): `CPUContracted` with targeted
-  Vulkan smoke evidence. Retained atlas transport, move submission, single-pass
-  command upload construction, scratch reuse, and CPU/null tests are
-  implemented; targeted `gpu;vulkan` ImGui and sandbox smokes passed. The
-  baseline-vs-after selected-frame measurement and large selected-entity UI
-  payload smoke remain required before `Operational`.
+- Retired at `Operational` on Vulkan-capable hosts after the selected-entity
+  large-payload ImGui smoke passed under `ci-vulkan`.
+- CPU flatten/copy time is captured as deterministic byte counters in this
+  task's report, not as a wall-clock threshold. No speedup claim is made without
+  a benchmark manifest; this task only claims reduced steady-frame atlas copy
+  bytes and eliminated redundant command-upload construction/copy churn.

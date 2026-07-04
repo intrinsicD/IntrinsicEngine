@@ -1328,6 +1328,15 @@ private sidecar layout.
 cache is a test-only refcount setter that lets saturation coverage exercise
 the rejection path without `2^32` `EnsureResident` calls.
 
+`ImGuiAdapterDiagnostics` exposes the GRAPHICS-114 overlay-transport byte
+counters alongside the existing draw-list counts: `LastFrameFontAtlasCopyBytes`
+is non-zero only when the atlas bytes are recopied into an overlay frame, while
+`LastFrameVertexCopyBytes`, `LastFrameIndexCopyBytes`,
+`LastFrameCommandCopyBytes`, and `LastFrameOverlayCopyBytes` report the POD
+vertex/index/command payload copied for the current submitted frame. These
+counters are runtime-side observability only; graphics still owns retained atlas
+resources and upload buffers.
+
 Runtime owns camera motion, input-to-pick-request translation, gizmo hit testing,
 and transform application. Graphics receives only immutable `CameraViewInput`,
 `PickPixelRequest`, and transform-gizmo render packets during extraction.
