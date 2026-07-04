@@ -11,10 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`GRAPHICS-116`](GRAPHICS-116-recipe-pass-contribution-seam.md) — in
-  progress on `main` by Codex. Current slice: typed record-path resource
-  resolution. Next verification: focused frame-recipe/renderer contract tests,
-  then the default CPU gate before retirement.
+- none
 
 ## History
 

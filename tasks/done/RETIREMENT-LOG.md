@@ -3317,3 +3317,15 @@ once per draw list. The measurement report is
 CPU/null contracts and the opt-in
 `ImGuiSurfaceGpuSmoke.LargeSelectedEntityPayloadRetainsAtlasOnOperationalVulkan`
 smoke passed.
+
+[`GRAPHICS-116`](GRAPHICS-116-recipe-pass-contribution-seam.md) —
+Frame-recipe pass contribution seam and typed record-path resolution retired to
+`tasks/done/` on 2026-07-04 at `Operational` for the default renderer
+composition seam. `BuildDefaultFrameRecipe(...)` now delegates through the
+contribution-aware path, and the renderer registers SelectionOutline, DebugView,
+ImGui, and VisualizationOverlay as typed overlay contributions before graph
+construction. The fixed core can also be compiled with an empty contribution
+registry; contract coverage proves the overlay-absent graph validates, executes
+through the headless render-graph executor, and omits overlay passes/resources,
+while the default contributed graph matches the compatibility build's compiled
+debug dump.

@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `GRAPHICS-116` — Frame-recipe pass contribution seam and typed record-path resolution (tasks/active/GRAPHICS-116-recipe-pass-contribution-seam.md)
+- none
 
 ## Theme B — Rendering modernization
 

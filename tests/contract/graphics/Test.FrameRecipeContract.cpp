@@ -944,6 +944,7 @@ TEST(FrameRecipeContract, ExplicitDefaultOverlayContributionsMatchDefaultBuildSh
     EXPECT_EQ(explicitBuild.DeclaredPassCount, defaultBuild.DeclaredPassCount);
     EXPECT_EQ(explicitBuild.DeclaredResourceCount, defaultBuild.DeclaredResourceCount);
     EXPECT_EQ(OrderedPassNames(*explicitCompiled), OrderedPassNames(*defaultCompiled));
+    EXPECT_EQ(BuildRenderGraphDebugDump(*explicitCompiled), BuildRenderGraphDebugDump(*defaultCompiled));
 }
 
 TEST(FrameRecipeContract, EmptyContributionRegistryCompilesOverlayAbsentCoreRecipe)
@@ -979,6 +980,19 @@ TEST(FrameRecipeContract, EmptyContributionRegistryCompilesOverlayAbsentCoreReci
 
     const auto compiled = graph.Compile();
     ASSERT_TRUE(compiled.has_value());
+    const RenderGraphValidationResult validation = ValidateRecipeCompiledGraph(described.Recipe, *compiled);
+    EXPECT_FALSE(validation.HasErrors());
+    EXPECT_FALSE(validation.HasWarnings());
+
+    std::vector<std::uint32_t> executedPasses{};
+    RenderGraphExecutor executor;
+    const auto result = executor.Execute(
+        *compiled,
+        [&executedPasses](const std::uint32_t passIndex) { executedPasses.push_back(passIndex); },
+        {});
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(executedPasses, compiled->TopologicalOrder);
+
     const std::vector<std::string> passNames = OrderedPassNames(*compiled);
     EXPECT_EQ(std::ranges::find(passNames, "SelectionOutlinePass"), passNames.end());
     EXPECT_EQ(std::ranges::find(passNames, "DebugViewPass"), passNames.end());

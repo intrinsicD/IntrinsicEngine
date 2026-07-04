@@ -24,9 +24,6 @@ without requiring them to read every file.
 
 ## Current open rendering leaves
 
-- [`GRAPHICS-116`](../../active/GRAPHICS-116-recipe-pass-contribution-seam.md) —
-  frame-recipe pass contribution seam and typed record-path resolution
-  (2026-07-03 review R7).
 - [`GRAPHICS-117`](GRAPHICS-117-render-graph-compile-cache.md) —
   render-graph compile caching keyed on recipe features/sizing/imports and
   lazily built debug dump (2026-07-03 review R16/R17).
