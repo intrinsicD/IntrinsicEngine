@@ -71,9 +71,13 @@ This directory contains the `RHI` module/files.
   resources validate alignment/range/compatibility, and overlapping placements
   are allowed because render-graph lifetime planning owns alias safety.
 - Vulkan implements the placed allocation seam with backend-local memory blocks
-  and placed buffer/image binding. Renderer adoption is still deferred to
-  `GRAPHICS-118` Slice D, where compiled transient placements become the
-  default allocation path under the existing aliasing toggle.
+  and placed buffer/image binding. The renderer consumes the seam for
+  non-imported frame transients only when renderer transient aliasing is
+  explicitly enabled and compiled aliasing reports a lower peak than the naive
+  sum. Renderer aliasing currently defaults to the fallback lane until the
+  `GRAPHICS-118` opt-in Vulkan smoke is cited. The renderer falls back to
+  ordinary per-resource allocations when a backend reports unsupported
+  requirements, incompatible memory blocks, or a failed placed-resource bind.
 
 ## Transfer uploads and readbacks
 

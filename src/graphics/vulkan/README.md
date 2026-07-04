@@ -283,8 +283,11 @@ available through the Vulkan 1.2/1.3 feature chain.
   the requested offset with VMA binding helpers, and record placement
   introspection without exposing `Vk*` types through RHI. Host-visible placed
   buffers fail closed for now because transient aliasing only requires
-  device-local resources; renderer adoption and the measured aliasing smoke
-  remain owned by `GRAPHICS-118` Slice D.
+  device-local resources. Renderer transient allocation consumes this seam only
+  when renderer aliasing is explicitly enabled; the renderer default remains the
+  ordinary per-resource fallback lane until the `GRAPHICS-118` opt-in Vulkan
+  smoke is cited. It falls back to ordinary per-resource allocations if any
+  requirement, memory-block, or placed bind operation fails.
 - Buffer, texture, sampler, and pipeline `IDevice` overrides are symbol-complete
   in `Backends.Vulkan.Device.cpp`. They guard null/non-live backend state and can
   be exercised directly after service-ready bootstrap while `IsOperational()`

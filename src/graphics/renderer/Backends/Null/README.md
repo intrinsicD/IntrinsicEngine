@@ -12,8 +12,9 @@ creating opaque memory-block handles with the selected block-base alignment,
 validating placed buffer/texture alignment/range/memory-type compatibility, and
 recording the accepted
 block+offset placement for introspection tests. It does not allocate real GPU
-memory or enforce alias overlap hazards; render-graph planning and the Vulkan
-backend own those later slices.
+memory or enforce alias overlap hazards; render-graph planning owns lifetime
+safety, renderer allocation owns the opt-in placed allocation and fallback
+lanes, and the Vulkan backend owns real GPU placed binding.
 
 The file preserves `TODO:` markers that indicate where a real Vulkan /
 VMA / swapchain wiring would live. When a real Vulkan backend is added

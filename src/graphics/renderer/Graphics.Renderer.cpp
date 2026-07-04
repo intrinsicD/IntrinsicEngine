@@ -7,6 +7,7 @@ module;
 #include <chrono>
 #include <cmath>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <span>
@@ -990,6 +991,290 @@ namespace Extrinsic::Graphics
             return RHI::MemoryAccess::None;
         }
 
+        [[nodiscard]] constexpr std::uint64_t AlignUpForRendererPlacement(
+            const std::uint64_t value,
+            const std::uint64_t alignment) noexcept
+        {
+            if (alignment <= 1u)
+            {
+                return value;
+            }
+            const std::uint64_t remainder = value % alignment;
+            return remainder == 0u ? value : value + (alignment - remainder);
+        }
+
+        inline constexpr std::uint32_t kInvalidRendererTransientPlacementResource =
+            std::numeric_limits<std::uint32_t>::max();
+
+        struct RendererTransientPlacementItem
+        {
+            std::uint32_t ResourceIndex = 0u;
+            std::uint32_t FirstUsePass = 0u;
+            std::uint32_t LastUsePass = 0u;
+            RHI::ResourceMemoryRequirements Requirements{};
+        };
+
+        struct RendererTransientAliasReuseHazard
+        {
+            std::uint32_t PreviousResourceIndex = 0u;
+            std::uint32_t ResourceIndex = 0u;
+            std::uint32_t PassIndex = 0u;
+            std::uint32_t BlockIndex = 0u;
+            std::uint64_t OffsetBytes = 0u;
+            std::uint64_t SizeBytes = 0u;
+        };
+
+        struct RendererTransientPlacementPlan
+        {
+            std::vector<TransientResourcePlacement> Placements{};
+            std::vector<RendererTransientAliasReuseHazard> AliasReuseHazards{};
+            std::uint64_t NaiveBytes = 0u;
+            std::uint64_t PeakBytes = 0u;
+            std::uint64_t BlockAlignmentBytes = 1u;
+            std::uint32_t MemoryTypeBits = 0u;
+            bool IsValid = true;
+        };
+
+        [[nodiscard]] RendererTransientPlacementPlan BuildRendererTransientPlacementPlan(
+            std::vector<RendererTransientPlacementItem> items,
+            const bool aliasingEnabled)
+        {
+            struct ActiveRange
+            {
+                std::uint32_t ResourceIndex = 0u;
+                std::uint32_t LastUsePass = 0u;
+                std::uint32_t BlockIndex = 0u;
+                std::uint64_t OffsetBytes = 0u;
+                std::uint64_t SizeBytes = 0u;
+            };
+
+            struct FreeRange
+            {
+                std::uint32_t BlockIndex = 0u;
+                std::uint64_t OffsetBytes = 0u;
+                std::uint64_t SizeBytes = 0u;
+                std::uint32_t PreviousResourceIndex = kInvalidRendererTransientPlacementResource;
+            };
+
+            RendererTransientPlacementPlan plan{};
+            plan.Placements.reserve(items.size());
+
+            if (items.empty())
+            {
+                return plan;
+            }
+
+            std::ranges::sort(items, [](const RendererTransientPlacementItem& lhs,
+                                        const RendererTransientPlacementItem& rhs)
+            {
+                return std::tie(lhs.FirstUsePass, lhs.ResourceIndex) <
+                       std::tie(rhs.FirstUsePass, rhs.ResourceIndex);
+            });
+
+            plan.MemoryTypeBits = items.front().Requirements.MemoryTypeBits;
+            for (const RendererTransientPlacementItem& item : items)
+            {
+                if (!item.Requirements.IsValid() || item.Requirements.DedicatedAllocationRequired)
+                {
+                    plan.IsValid = false;
+                    return plan;
+                }
+                plan.NaiveBytes += item.Requirements.SizeBytes;
+                plan.BlockAlignmentBytes =
+                    std::max(plan.BlockAlignmentBytes, item.Requirements.AlignmentBytes);
+                plan.MemoryTypeBits &= item.Requirements.MemoryTypeBits;
+            }
+
+            if (plan.MemoryTypeBits == 0u)
+            {
+                plan.IsValid = false;
+                return plan;
+            }
+
+            std::vector<ActiveRange> activeRanges{};
+            std::vector<FreeRange> freeRanges{};
+            std::uint64_t blockSize = 0u;
+
+            auto sortFreeRanges = [&]() {
+                std::ranges::sort(freeRanges, [](const FreeRange& lhs, const FreeRange& rhs) {
+                    return std::tuple{lhs.BlockIndex, lhs.OffsetBytes, lhs.SizeBytes, lhs.PreviousResourceIndex} <
+                           std::tuple{rhs.BlockIndex, rhs.OffsetBytes, rhs.SizeBytes, rhs.PreviousResourceIndex};
+                });
+            };
+
+            for (const RendererTransientPlacementItem& item : items)
+            {
+                for (std::size_t activeIndex = 0u; activeIndex < activeRanges.size();)
+                {
+                    const ActiveRange& active = activeRanges[activeIndex];
+                    if (active.LastUsePass < item.FirstUsePass)
+                    {
+                        if (aliasingEnabled && active.SizeBytes != 0u)
+                        {
+                            freeRanges.push_back(FreeRange{
+                                .BlockIndex = active.BlockIndex,
+                                .OffsetBytes = active.OffsetBytes,
+                                .SizeBytes = active.SizeBytes,
+                                .PreviousResourceIndex = active.ResourceIndex,
+                            });
+                        }
+                        activeRanges.erase(activeRanges.begin() + static_cast<std::ptrdiff_t>(activeIndex));
+                        continue;
+                    }
+                    ++activeIndex;
+                }
+
+                sortFreeRanges();
+
+                bool placedInFreeRange = false;
+                std::uint32_t blockIndex = 0u;
+                std::uint64_t offsetBytes = 0u;
+
+                if (aliasingEnabled && item.Requirements.SizeBytes != 0u)
+                {
+                    for (std::size_t rangeIndex = 0u; rangeIndex < freeRanges.size(); ++rangeIndex)
+                    {
+                        const FreeRange range = freeRanges[rangeIndex];
+                        const std::uint64_t alignedOffset =
+                            AlignUpForRendererPlacement(range.OffsetBytes, item.Requirements.AlignmentBytes);
+                        const std::uint64_t rangeEnd = range.OffsetBytes + range.SizeBytes;
+                        if (alignedOffset > rangeEnd ||
+                            item.Requirements.SizeBytes > rangeEnd - alignedOffset)
+                        {
+                            continue;
+                        }
+
+                        blockIndex = range.BlockIndex;
+                        offsetBytes = alignedOffset;
+                        placedInFreeRange = true;
+                        freeRanges.erase(freeRanges.begin() + static_cast<std::ptrdiff_t>(rangeIndex));
+
+                        if (range.OffsetBytes < alignedOffset)
+                        {
+                            freeRanges.push_back(FreeRange{
+                                .BlockIndex = range.BlockIndex,
+                                .OffsetBytes = range.OffsetBytes,
+                                .SizeBytes = alignedOffset - range.OffsetBytes,
+                                .PreviousResourceIndex = range.PreviousResourceIndex,
+                            });
+                        }
+
+                        const std::uint64_t allocationEnd =
+                            alignedOffset + item.Requirements.SizeBytes;
+                        if (allocationEnd < rangeEnd)
+                        {
+                            freeRanges.push_back(FreeRange{
+                                .BlockIndex = range.BlockIndex,
+                                .OffsetBytes = allocationEnd,
+                                .SizeBytes = rangeEnd - allocationEnd,
+                                .PreviousResourceIndex = range.PreviousResourceIndex,
+                            });
+                        }
+
+                        if (range.PreviousResourceIndex != kInvalidRendererTransientPlacementResource)
+                        {
+                            plan.AliasReuseHazards.push_back(RendererTransientAliasReuseHazard{
+                                .PreviousResourceIndex = range.PreviousResourceIndex,
+                                .ResourceIndex = item.ResourceIndex,
+                                .PassIndex = item.FirstUsePass,
+                                .BlockIndex = blockIndex,
+                                .OffsetBytes = offsetBytes,
+                                .SizeBytes = item.Requirements.SizeBytes,
+                            });
+                        }
+                        break;
+                    }
+                }
+
+                if (!placedInFreeRange)
+                {
+                    offsetBytes =
+                        AlignUpForRendererPlacement(blockSize, item.Requirements.AlignmentBytes);
+                    blockSize = offsetBytes + item.Requirements.SizeBytes;
+                }
+
+                plan.Placements.push_back(TransientResourcePlacement{
+                    .ResourceIndex = item.ResourceIndex,
+                    .BlockIndex = blockIndex,
+                    .OffsetBytes = offsetBytes,
+                    .SizeBytes = item.Requirements.SizeBytes,
+                    .AlignmentBytes = item.Requirements.AlignmentBytes,
+                    .FirstUsePass = item.FirstUsePass,
+                    .LastUsePass = item.LastUsePass,
+                });
+
+                activeRanges.push_back(ActiveRange{
+                    .ResourceIndex = item.ResourceIndex,
+                    .LastUsePass = item.LastUsePass,
+                    .BlockIndex = blockIndex,
+                    .OffsetBytes = offsetBytes,
+                    .SizeBytes = item.Requirements.SizeBytes,
+                });
+            }
+
+            plan.PeakBytes = AlignUpForRendererPlacement(blockSize, plan.BlockAlignmentBytes);
+            std::ranges::sort(plan.Placements, [](const TransientResourcePlacement& lhs,
+                                                  const TransientResourcePlacement& rhs)
+            {
+                return lhs.ResourceIndex < rhs.ResourceIndex;
+            });
+            return plan;
+        }
+
+        [[nodiscard]] BarrierPacket& FindOrCreateRendererBarrierPacket(
+            std::vector<BarrierPacket>& packets,
+            const std::uint32_t passIndex,
+            const BarrierPacketStage stage)
+        {
+            const auto it = std::ranges::find_if(packets, [passIndex, stage](const BarrierPacket& packet) {
+                return packet.PassIndex == passIndex && packet.Stage == stage;
+            });
+            if (it != packets.end())
+            {
+                return *it;
+            }
+
+            packets.push_back(BarrierPacket{
+                .Kind = BarrierKind::AliasReuse,
+                .PassIndex = passIndex,
+                .Stage = stage,
+            });
+            return packets.back();
+        }
+
+        void SortRendererBarrierPackets(std::vector<BarrierPacket>& packets)
+        {
+            std::ranges::sort(packets, [](const BarrierPacket& lhs, const BarrierPacket& rhs) {
+                const auto stageKey = [](const BarrierPacketStage stage) {
+                    return stage == BarrierPacketStage::BeforePass ? 0u : 1u;
+                };
+                return std::tuple{lhs.PassIndex, stageKey(lhs.Stage)} <
+                       std::tuple{rhs.PassIndex, stageKey(rhs.Stage)};
+            });
+        }
+
+        [[nodiscard]] constexpr RHI::MemoryAccess AliasReuseBeforeAccess() noexcept
+        {
+            return RHI::MemoryAccess::ShaderWrite |
+                   RHI::MemoryAccess::TransferWrite |
+                   RHI::MemoryAccess::ColorAttachmentWrite |
+                   RHI::MemoryAccess::DepthStencilWrite;
+        }
+
+        [[nodiscard]] constexpr RHI::MemoryAccess AliasReuseAfterAccess() noexcept
+        {
+            return RHI::MemoryAccess::IndirectRead |
+                   RHI::MemoryAccess::IndexRead |
+                   RHI::MemoryAccess::ShaderRead |
+                   RHI::MemoryAccess::ShaderWrite |
+                   RHI::MemoryAccess::TransferRead |
+                   RHI::MemoryAccess::TransferWrite |
+                   RHI::MemoryAccess::ColorAttachmentRead |
+                   RHI::MemoryAccess::ColorAttachmentWrite |
+                   RHI::MemoryAccess::DepthStencilRead |
+                   RHI::MemoryAccess::DepthStencilWrite;
+        }
+
         void SubmitBarrierPacket(RHI::ICommandContext& cmd,
                                  const CompiledRenderGraph& graph,
                                  const BarrierPacket& packet,
@@ -1047,7 +1332,27 @@ namespace Extrinsic::Graphics
                 });
             }
 
-            if (textureBarriers.empty() && bufferBarriers.empty())
+            std::vector<RHI::MemoryBarrierDesc> memoryBarriers;
+            memoryBarriers.reserve(packet.TextureAliasReuseBarriers.size() +
+                                   packet.BufferAliasReuseBarriers.size());
+            for (const TextureAliasReuseBarrierPacket& barrier : packet.TextureAliasReuseBarriers)
+            {
+                (void)barrier;
+                memoryBarriers.push_back(RHI::MemoryBarrierDesc{
+                    .BeforeAccess = AliasReuseBeforeAccess(),
+                    .AfterAccess = AliasReuseAfterAccess(),
+                });
+            }
+            for (const BufferAliasReuseBarrierPacket& barrier : packet.BufferAliasReuseBarriers)
+            {
+                (void)barrier;
+                memoryBarriers.push_back(RHI::MemoryBarrierDesc{
+                    .BeforeAccess = AliasReuseBeforeAccess(),
+                    .AfterAccess = AliasReuseAfterAccess(),
+                });
+            }
+
+            if (textureBarriers.empty() && bufferBarriers.empty() && memoryBarriers.empty())
             {
                 return;
             }
@@ -1055,6 +1360,7 @@ namespace Extrinsic::Graphics
             cmd.SubmitBarriers(RHI::BarrierBatchDesc{
                 .TextureBarriers = textureBarriers,
                 .BufferBarriers = bufferBarriers,
+                .MemoryBarriers = memoryBarriers,
             });
         }
 
@@ -1320,6 +1626,7 @@ namespace Extrinsic::Graphics
     public:
         NullRenderer()
         {
+            m_RenderGraph.SetTransientAliasingEnabled(false);
             RegisterCommandRoutes();
         }
 
@@ -1599,6 +1906,7 @@ namespace Extrinsic::Graphics
 
         void Shutdown() override
         {
+            ReleaseAllFrameTransientResources();
             m_Device = nullptr;
             ClearRuntimeSnapshotSlots();
             m_Subsystems.ShutdownSystems();
@@ -1743,7 +2051,6 @@ namespace Extrinsic::Graphics
             m_HZBBuildPipelineLease.reset();
             m_ClusterGridBuildPipelineLease.reset();
             m_ClusterLightAssignmentPipelineLease.reset();
-            ReleaseAllFrameTransientResources();
             m_ClusterGridAABBBuffer.reset();
             m_ClusterLightHeaderBuffer.reset();
             m_ClusterLightIndexBuffer.reset();
@@ -2909,6 +3216,7 @@ namespace Extrinsic::Graphics
             }
             const RenderGraphValidationResult recipeValidation =
                 ValidateRecipeCompiledGraph(*recipeIntrospection, *compiled);
+            m_InvalidateRenderGraphCompileCacheAfterFrame = false;
             const bool transientResourcesReady = AllocateFrameTransientResources(*compiled, frame.FrameIndex);
             const bool recipeValidationClean =
                 recipeValidation.CountBySeverity(RenderGraphValidationSeverity::Error) == 0u && transientResourcesReady;
@@ -3354,12 +3662,21 @@ namespace Extrinsic::Graphics
             const auto executeEnd = std::chrono::steady_clock::now();
             m_LastRenderGraphStats.Execute.TimeMicros = static_cast<std::uint64_t>(
                 std::chrono::duration_cast<std::chrono::microseconds>(executeEnd - executeBegin).count());
+            const auto resetCacheAfterFallback = [&]()
+            {
+                if (m_InvalidateRenderGraphCompileCacheAfterFrame)
+                {
+                    m_RenderGraphCompileCache.reset();
+                    m_InvalidateRenderGraphCompileCacheAfterFrame = false;
+                }
+            };
             if (!executeResult.has_value())
             {
                 m_LastRenderGraphStats.Diagnostic = "RenderGraph execute failed.";
                 Core::Log::Error("[Graphics] RenderGraph Execute() failed: error={}",
                                  static_cast<int>(executeResult.error()));
                 FinalizeCurrentRendererContractIntegrationStats(m_LastRenderGraphStats);
+                resetCacheAfterFallback();
                 return;
             }
             if (asyncComputeSubmitPlanAccepted)
@@ -3368,6 +3685,7 @@ namespace Extrinsic::Graphics
             }
             m_LastRenderGraphStats.Execute.Succeeded = true;
             FinalizeCurrentRendererContractIntegrationStats(m_LastRenderGraphStats);
+            resetCacheAfterFallback();
             if (m_HZBSystem.has_value() && m_LastRenderGraphStats.HZBBuildRecordedFrames > 0u)
             {
                 m_HZBSystem->AdvanceFrame();
@@ -3908,6 +4226,21 @@ namespace Extrinsic::Graphics
         ShadowSystem&          GetShadowSystem()    override { return *m_Subsystems.ShadowSystemRegistry();    }
         HZBSystem&             GetHZBSystem()       override { return *m_HZBSystem;       }
         const RenderGraphFrameStats& GetLastRenderGraphStats() const override { return m_LastRenderGraphStats; }
+
+        void SetTransientAliasingEnabled(const bool enabled) noexcept override
+        {
+            if (m_RenderGraph.IsTransientAliasingEnabled() == enabled)
+            {
+                return;
+            }
+            m_RenderGraph.SetTransientAliasingEnabled(enabled);
+            m_RenderGraphCompileCache.reset();
+        }
+
+        [[nodiscard]] bool IsTransientAliasingEnabled() const noexcept override
+        {
+            return m_RenderGraph.IsTransientAliasingEnabled();
+        }
 
         void SetRenderGraphDebugDumpEnabled(const bool enabled) noexcept override
         {
@@ -6540,22 +6873,96 @@ namespace Extrinsic::Graphics
             return lhs.SizeBytes == rhs.SizeBytes && lhs.Usage == rhs.Usage && lhs.HostVisible == rhs.HostVisible;
         }
 
+        struct TransientMemoryBlockCache
+        {
+            RHI::MemoryBlockHandle Handle{};
+            std::uint64_t SizeBytes = 0u;
+            std::uint64_t AlignmentBytes = 1u;
+            std::uint32_t MemoryTypeBits = 0u;
+        };
+
+        enum class PlacedTransientAllocationStatus
+        {
+            Succeeded,
+            Unsupported,
+            Failed,
+        };
+
+        [[nodiscard]] static bool HasValidTransientMemoryBlock(
+            const std::vector<TransientMemoryBlockCache>& blocks) noexcept
+        {
+            return std::ranges::any_of(blocks, [](const TransientMemoryBlockCache& block) {
+                return block.Handle.IsValid();
+            });
+        }
+
+        [[nodiscard]] static bool CompatibleTransientMemoryBlocks(
+            const std::vector<TransientMemoryBlockCache>& blocks,
+            const RendererTransientPlacementPlan& plan) noexcept
+        {
+            if (plan.PeakBytes == 0u)
+            {
+                return !HasValidTransientMemoryBlock(blocks);
+            }
+            if (blocks.empty() || !blocks.front().Handle.IsValid())
+            {
+                return true;
+            }
+            return blocks.size() == 1u &&
+                   blocks.front().SizeBytes == plan.PeakBytes &&
+                   blocks.front().AlignmentBytes == plan.BlockAlignmentBytes &&
+                   blocks.front().MemoryTypeBits == plan.MemoryTypeBits;
+        }
+
+        [[nodiscard]] static bool CompatiblePlacedResource(
+            const RHI::PlacedResourceInfo& actual,
+            const RHI::MemoryBlockHandle block,
+            const TransientResourcePlacement& placement) noexcept
+        {
+            return actual.IsPlaced &&
+                   actual.Block == block &&
+                   actual.OffsetBytes == placement.OffsetBytes &&
+                   actual.SizeBytes == placement.SizeBytes &&
+                   actual.AlignmentBytes == placement.AlignmentBytes;
+        }
+
+        void ResizeFrameTransientSlot(const CompiledRenderGraph& compiled,
+                                      const std::uint32_t slot)
+        {
+            m_FrameTransientTextures[slot].resize(compiled.TextureHandles.size());
+            m_FrameTransientTextureDescs[slot].resize(compiled.TextureHandles.size());
+            m_FrameTransientBuffers[slot].resize(compiled.BufferHandles.size());
+            m_FrameTransientBufferDescs[slot].resize(compiled.BufferHandles.size());
+        }
+
         void ReleaseFrameTransientResources(const std::uint32_t slot)
         {
-            if (m_Device == nullptr || slot >= m_FrameTransientTextures.size() || slot >= m_FrameTransientBuffers.size())
+            if (m_Device == nullptr)
             {
                 return;
             }
-            for (const RHI::TextureHandle handle : m_FrameTransientTextures[slot])
+            if (slot < m_FrameTransientTextures.size())
             {
-                m_Device->DestroyTexture(handle);
+                for (const RHI::TextureHandle handle : m_FrameTransientTextures[slot])
+                {
+                    if (handle.IsValid())
+                    {
+                        m_Device->DestroyTexture(handle);
+                    }
+                }
+                m_FrameTransientTextures[slot].clear();
             }
-            for (const RHI::BufferHandle handle : m_FrameTransientBuffers[slot])
+            if (slot < m_FrameTransientBuffers.size())
             {
-                m_Device->DestroyBuffer(handle);
+                for (const RHI::BufferHandle handle : m_FrameTransientBuffers[slot])
+                {
+                    if (handle.IsValid())
+                    {
+                        m_Device->DestroyBuffer(handle);
+                    }
+                }
+                m_FrameTransientBuffers[slot].clear();
             }
-            m_FrameTransientTextures[slot].clear();
-            m_FrameTransientBuffers[slot].clear();
             if (slot < m_FrameTransientTextureDescs.size())
             {
                 m_FrameTransientTextureDescs[slot].clear();
@@ -6563,6 +6970,28 @@ namespace Extrinsic::Graphics
             if (slot < m_FrameTransientBufferDescs.size())
             {
                 m_FrameTransientBufferDescs[slot].clear();
+            }
+            if (slot < m_FrameTransientTextureMemoryBlocks.size())
+            {
+                for (const TransientMemoryBlockCache& block : m_FrameTransientTextureMemoryBlocks[slot])
+                {
+                    if (block.Handle.IsValid())
+                    {
+                        m_Device->DestroyMemoryBlock(block.Handle);
+                    }
+                }
+                m_FrameTransientTextureMemoryBlocks[slot].clear();
+            }
+            if (slot < m_FrameTransientBufferMemoryBlocks.size())
+            {
+                for (const TransientMemoryBlockCache& block : m_FrameTransientBufferMemoryBlocks[slot])
+                {
+                    if (block.Handle.IsValid())
+                    {
+                        m_Device->DestroyMemoryBlock(block.Handle);
+                    }
+                }
+                m_FrameTransientBufferMemoryBlocks[slot].clear();
             }
         }
 
@@ -6576,6 +7005,388 @@ namespace Extrinsic::Graphics
             m_FrameTransientBuffers.clear();
             m_FrameTransientTextureDescs.clear();
             m_FrameTransientBufferDescs.clear();
+            m_FrameTransientTextureMemoryBlocks.clear();
+            m_FrameTransientBufferMemoryBlocks.clear();
+        }
+
+        [[nodiscard]] bool SlotHasPlacedTransientMemoryBlocks(const std::uint32_t slot) const noexcept
+        {
+            return (slot < m_FrameTransientTextureMemoryBlocks.size() &&
+                    HasValidTransientMemoryBlock(m_FrameTransientTextureMemoryBlocks[slot])) ||
+                   (slot < m_FrameTransientBufferMemoryBlocks.size() &&
+                    HasValidTransientMemoryBlock(m_FrameTransientBufferMemoryBlocks[slot]));
+        }
+
+        [[nodiscard]] std::optional<RendererTransientPlacementPlan> BuildTexturePlacementPlanForDevice(
+            const CompiledRenderGraph& compiled,
+            const bool aliasingEnabled) const
+        {
+            if (m_Device == nullptr)
+            {
+                return std::nullopt;
+            }
+
+            std::vector<RendererTransientPlacementItem> items{};
+            items.reserve(compiled.TextureTransientPlacements.size());
+            for (const TransientResourcePlacement& placement : compiled.TextureTransientPlacements)
+            {
+                const TextureResourceDesc* desc = m_RenderGraph.GetTextureDescByIndex(placement.ResourceIndex);
+                if (desc == nullptr)
+                {
+                    return std::nullopt;
+                }
+                const RHI::ResourceMemoryRequirements requirements =
+                    m_Device->GetTextureMemoryRequirements(desc->Desc);
+                if (!requirements.IsValid() || requirements.DedicatedAllocationRequired)
+                {
+                    return std::nullopt;
+                }
+                items.push_back(RendererTransientPlacementItem{
+                    .ResourceIndex = placement.ResourceIndex,
+                    .FirstUsePass = placement.FirstUsePass,
+                    .LastUsePass = placement.LastUsePass,
+                    .Requirements = requirements,
+                });
+            }
+
+            RendererTransientPlacementPlan plan =
+                BuildRendererTransientPlacementPlan(std::move(items), aliasingEnabled);
+            if (!plan.IsValid)
+            {
+                return std::nullopt;
+            }
+            return plan;
+        }
+
+        [[nodiscard]] std::optional<RendererTransientPlacementPlan> BuildBufferPlacementPlanForDevice(
+            const CompiledRenderGraph& compiled,
+            const bool aliasingEnabled) const
+        {
+            if (m_Device == nullptr)
+            {
+                return std::nullopt;
+            }
+
+            std::vector<RendererTransientPlacementItem> items{};
+            items.reserve(compiled.BufferTransientPlacements.size());
+            for (const TransientResourcePlacement& placement : compiled.BufferTransientPlacements)
+            {
+                const BufferResourceDesc* desc = m_RenderGraph.GetBufferDescByIndex(placement.ResourceIndex);
+                if (desc == nullptr)
+                {
+                    return std::nullopt;
+                }
+                const RHI::ResourceMemoryRequirements requirements =
+                    m_Device->GetBufferMemoryRequirements(desc->Desc);
+                if (!requirements.IsValid() || requirements.DedicatedAllocationRequired)
+                {
+                    return std::nullopt;
+                }
+                items.push_back(RendererTransientPlacementItem{
+                    .ResourceIndex = placement.ResourceIndex,
+                    .FirstUsePass = placement.FirstUsePass,
+                    .LastUsePass = placement.LastUsePass,
+                    .Requirements = requirements,
+                });
+            }
+
+            RendererTransientPlacementPlan plan =
+                BuildRendererTransientPlacementPlan(std::move(items), aliasingEnabled);
+            if (!plan.IsValid)
+            {
+                return std::nullopt;
+            }
+            return plan;
+        }
+
+        [[nodiscard]] bool EnsureFrameTransientMemoryBlock(
+            std::vector<TransientMemoryBlockCache>& blocks,
+            const RendererTransientPlacementPlan& plan,
+            const char* debugName)
+        {
+            if (m_Device == nullptr || plan.PeakBytes == 0u)
+            {
+                return plan.PeakBytes == 0u;
+            }
+
+            blocks.resize(1u);
+            TransientMemoryBlockCache& block = blocks.front();
+            if (block.Handle.IsValid())
+            {
+                return true;
+            }
+
+            const RHI::MemoryBlockHandle handle = m_Device->CreateMemoryBlock({
+                .SizeBytes = plan.PeakBytes,
+                .AlignmentBytes = plan.BlockAlignmentBytes,
+                .MemoryTypeBits = plan.MemoryTypeBits,
+                .DebugName = debugName,
+            });
+            if (!handle.IsValid())
+            {
+                return false;
+            }
+
+            block = TransientMemoryBlockCache{
+                .Handle = handle,
+                .SizeBytes = plan.PeakBytes,
+                .AlignmentBytes = plan.BlockAlignmentBytes,
+                .MemoryTypeBits = plan.MemoryTypeBits,
+            };
+            return true;
+        }
+
+        void ReplaceCompiledAliasReuseBarriers(
+            CompiledRenderGraph& compiled,
+            const RendererTransientPlacementPlan& texturePlan,
+            const RendererTransientPlacementPlan& bufferPlan)
+        {
+            for (BarrierPacket& packet : compiled.BarrierPackets)
+            {
+                packet.TextureAliasReuseBarriers.clear();
+                packet.BufferAliasReuseBarriers.clear();
+            }
+
+            for (const RendererTransientAliasReuseHazard& hazard : texturePlan.AliasReuseHazards)
+            {
+                BarrierPacket& packet = FindOrCreateRendererBarrierPacket(
+                    compiled.BarrierPackets, hazard.PassIndex, BarrierPacketStage::BeforePass);
+                packet.TextureAliasReuseBarriers.push_back(TextureAliasReuseBarrierPacket{
+                    .PreviousTextureIndex = hazard.PreviousResourceIndex,
+                    .TextureIndex = hazard.ResourceIndex,
+                    .BlockIndex = hazard.BlockIndex,
+                    .OffsetBytes = hazard.OffsetBytes,
+                    .SizeBytes = hazard.SizeBytes,
+                });
+            }
+
+            for (const RendererTransientAliasReuseHazard& hazard : bufferPlan.AliasReuseHazards)
+            {
+                BarrierPacket& packet = FindOrCreateRendererBarrierPacket(
+                    compiled.BarrierPackets, hazard.PassIndex, BarrierPacketStage::BeforePass);
+                packet.BufferAliasReuseBarriers.push_back(BufferAliasReuseBarrierPacket{
+                    .PreviousBufferIndex = hazard.PreviousResourceIndex,
+                    .BufferIndex = hazard.ResourceIndex,
+                    .BlockIndex = hazard.BlockIndex,
+                    .OffsetBytes = hazard.OffsetBytes,
+                    .SizeBytes = hazard.SizeBytes,
+                });
+            }
+
+            std::erase_if(compiled.BarrierPackets, [](const BarrierPacket& packet) {
+                return packet.TextureBarriers.empty() &&
+                       packet.BufferBarriers.empty() &&
+                       packet.TextureAliasReuseBarriers.empty() &&
+                       packet.BufferAliasReuseBarriers.empty();
+            });
+            SortRendererBarrierPackets(compiled.BarrierPackets);
+        }
+
+        void ClearCompiledAliasReuseBarriers(CompiledRenderGraph& compiled)
+        {
+            RendererTransientPlacementPlan emptyTexturePlan{};
+            RendererTransientPlacementPlan emptyBufferPlan{};
+            ReplaceCompiledAliasReuseBarriers(compiled, emptyTexturePlan, emptyBufferPlan);
+        }
+
+        [[nodiscard]] bool AllocatePlacedFrameTransientTextures(
+            CompiledRenderGraph& compiled,
+            const std::uint32_t slot,
+            const RendererTransientPlacementPlan& plan)
+        {
+            if (plan.PeakBytes == 0u)
+            {
+                return true;
+            }
+
+            const RHI::MemoryBlockHandle block =
+                m_FrameTransientTextureMemoryBlocks[slot].front().Handle;
+            if (!block.IsValid())
+            {
+                return false;
+            }
+
+            for (const TransientResourcePlacement& placement : plan.Placements)
+            {
+                const std::uint32_t index = placement.ResourceIndex;
+                if (index >= m_FrameTransientTextures[slot].size())
+                {
+                    return false;
+                }
+
+                const TextureResourceDesc* desc = m_RenderGraph.GetTextureDescByIndex(index);
+                if (desc == nullptr)
+                {
+                    return false;
+                }
+
+                if (m_FrameTransientTextures[slot][index].IsValid() &&
+                    CompatibleTextureDesc(m_FrameTransientTextureDescs[slot][index], desc->Desc) &&
+                    CompatiblePlacedResource(
+                        m_Device->GetTextureMemoryPlacement(m_FrameTransientTextures[slot][index]),
+                        block,
+                        placement))
+                {
+                    compiled.TextureHandles[index] = m_FrameTransientTextures[slot][index];
+                    continue;
+                }
+
+                if (m_FrameTransientTextures[slot][index].IsValid())
+                {
+                    m_Device->DestroyTexture(m_FrameTransientTextures[slot][index]);
+                    m_FrameTransientTextures[slot][index] = RHI::TextureHandle{};
+                }
+
+                const RHI::TextureHandle handle = m_Device->CreatePlacedTexture({
+                    .Desc = desc->Desc,
+                    .Placement = {.Block = block, .OffsetBytes = placement.OffsetBytes},
+                });
+                if (!handle.IsValid())
+                {
+                    return false;
+                }
+
+                if (!CompatiblePlacedResource(
+                        m_Device->GetTextureMemoryPlacement(handle),
+                        block,
+                        placement))
+                {
+                    m_Device->DestroyTexture(handle);
+                    return false;
+                }
+
+                compiled.TextureHandles[index] = handle;
+                m_FrameTransientTextures[slot][index] = handle;
+                m_FrameTransientTextureDescs[slot][index] = desc->Desc;
+            }
+
+            return true;
+        }
+
+        [[nodiscard]] bool AllocatePlacedFrameTransientBuffers(
+            CompiledRenderGraph& compiled,
+            const std::uint32_t slot,
+            const RendererTransientPlacementPlan& plan)
+        {
+            if (plan.PeakBytes == 0u)
+            {
+                return true;
+            }
+
+            const RHI::MemoryBlockHandle block =
+                m_FrameTransientBufferMemoryBlocks[slot].front().Handle;
+            if (!block.IsValid())
+            {
+                return false;
+            }
+
+            for (const TransientResourcePlacement& placement : plan.Placements)
+            {
+                const std::uint32_t index = placement.ResourceIndex;
+                if (index >= m_FrameTransientBuffers[slot].size())
+                {
+                    return false;
+                }
+
+                const BufferResourceDesc* desc = m_RenderGraph.GetBufferDescByIndex(index);
+                if (desc == nullptr)
+                {
+                    return false;
+                }
+
+                if (m_FrameTransientBuffers[slot][index].IsValid() &&
+                    CompatibleBufferDesc(m_FrameTransientBufferDescs[slot][index], desc->Desc) &&
+                    CompatiblePlacedResource(
+                        m_Device->GetBufferMemoryPlacement(m_FrameTransientBuffers[slot][index]),
+                        block,
+                        placement))
+                {
+                    compiled.BufferHandles[index] = m_FrameTransientBuffers[slot][index];
+                    continue;
+                }
+
+                if (m_FrameTransientBuffers[slot][index].IsValid())
+                {
+                    m_Device->DestroyBuffer(m_FrameTransientBuffers[slot][index]);
+                    m_FrameTransientBuffers[slot][index] = RHI::BufferHandle{};
+                }
+
+                const RHI::BufferHandle handle = m_Device->CreatePlacedBuffer({
+                    .Desc = desc->Desc,
+                    .Placement = {.Block = block, .OffsetBytes = placement.OffsetBytes},
+                });
+                if (!handle.IsValid())
+                {
+                    return false;
+                }
+
+                if (!CompatiblePlacedResource(
+                        m_Device->GetBufferMemoryPlacement(handle),
+                        block,
+                        placement))
+                {
+                    m_Device->DestroyBuffer(handle);
+                    return false;
+                }
+
+                compiled.BufferHandles[index] = handle;
+                m_FrameTransientBuffers[slot][index] = handle;
+                m_FrameTransientBufferDescs[slot][index] = desc->Desc;
+            }
+
+            return true;
+        }
+
+        [[nodiscard]] PlacedTransientAllocationStatus AllocateFramePlacedTransientResources(
+            CompiledRenderGraph& compiled,
+            const std::uint32_t slot)
+        {
+            const bool aliasingEnabled =
+                compiled.TransientPlacedPeakMemoryEstimateBytes <
+                compiled.TransientNaiveMemoryEstimateBytes;
+            auto texturePlan = BuildTexturePlacementPlanForDevice(compiled, aliasingEnabled);
+            auto bufferPlan = BuildBufferPlacementPlanForDevice(compiled, aliasingEnabled);
+            if (!texturePlan.has_value() || !bufferPlan.has_value())
+            {
+                return PlacedTransientAllocationStatus::Unsupported;
+            }
+
+            if (!CompatibleTransientMemoryBlocks(m_FrameTransientTextureMemoryBlocks[slot], *texturePlan) ||
+                !CompatibleTransientMemoryBlocks(m_FrameTransientBufferMemoryBlocks[slot], *bufferPlan))
+            {
+                ReleaseFrameTransientResources(slot);
+                ResizeFrameTransientSlot(compiled, slot);
+            }
+
+            if (!EnsureFrameTransientMemoryBlock(
+                    m_FrameTransientTextureMemoryBlocks[slot],
+                    *texturePlan,
+                    "Renderer.TransientTextures.PlacedBlock") ||
+                !EnsureFrameTransientMemoryBlock(
+                    m_FrameTransientBufferMemoryBlocks[slot],
+                    *bufferPlan,
+                    "Renderer.TransientBuffers.PlacedBlock"))
+            {
+                return PlacedTransientAllocationStatus::Failed;
+            }
+
+            compiled.TextureTransientPlacements = texturePlan->Placements;
+            compiled.BufferTransientPlacements = bufferPlan->Placements;
+            compiled.TransientNaiveMemoryEstimateBytes =
+                texturePlan->NaiveBytes + bufferPlan->NaiveBytes;
+            compiled.TransientPlacedPeakMemoryEstimateBytes =
+                texturePlan->PeakBytes + bufferPlan->PeakBytes;
+            compiled.TransientMemoryEstimateBytes =
+                compiled.TransientPlacedPeakMemoryEstimateBytes;
+            ReplaceCompiledAliasReuseBarriers(compiled, *texturePlan, *bufferPlan);
+
+            if (!AllocatePlacedFrameTransientTextures(compiled, slot, *texturePlan) ||
+                !AllocatePlacedFrameTransientBuffers(compiled, slot, *bufferPlan))
+            {
+                return PlacedTransientAllocationStatus::Failed;
+            }
+
+            return PlacedTransientAllocationStatus::Succeeded;
         }
 
         [[nodiscard]] bool AllocateFrameTransientResources(CompiledRenderGraph& compiled,
@@ -6587,20 +7398,52 @@ namespace Extrinsic::Graphics
             }
 
             const std::uint32_t framesInFlight = std::max(1u, m_Device->GetFramesInFlight());
-            if (m_FrameTransientTextures.size() != framesInFlight || m_FrameTransientBuffers.size() != framesInFlight)
+            if (m_FrameTransientTextures.size() != framesInFlight ||
+                m_FrameTransientBuffers.size() != framesInFlight ||
+                m_FrameTransientTextureMemoryBlocks.size() != framesInFlight ||
+                m_FrameTransientBufferMemoryBlocks.size() != framesInFlight)
             {
                 ReleaseAllFrameTransientResources();
                 m_FrameTransientTextures.resize(framesInFlight);
                 m_FrameTransientBuffers.resize(framesInFlight);
                 m_FrameTransientTextureDescs.resize(framesInFlight);
                 m_FrameTransientBufferDescs.resize(framesInFlight);
+                m_FrameTransientTextureMemoryBlocks.resize(framesInFlight);
+                m_FrameTransientBufferMemoryBlocks.resize(framesInFlight);
             }
 
             const std::uint32_t slot = frameIndex % framesInFlight;
-            m_FrameTransientTextures[slot].resize(compiled.TextureHandles.size());
-            m_FrameTransientTextureDescs[slot].resize(compiled.TextureHandles.size());
-            m_FrameTransientBuffers[slot].resize(compiled.BufferHandles.size());
-            m_FrameTransientBufferDescs[slot].resize(compiled.BufferHandles.size());
+            ResizeFrameTransientSlot(compiled, slot);
+
+            const bool hasAliasingSavings =
+                compiled.TransientPlacedPeakMemoryEstimateBytes <
+                compiled.TransientNaiveMemoryEstimateBytes;
+            if (hasAliasingSavings)
+            {
+                const PlacedTransientAllocationStatus placedAllocationStatus =
+                    AllocateFramePlacedTransientResources(compiled, slot);
+                if (placedAllocationStatus == PlacedTransientAllocationStatus::Succeeded)
+                {
+                    return true;
+                }
+
+                ReleaseFrameTransientResources(slot);
+                ResizeFrameTransientSlot(compiled, slot);
+                compiled.TransientPlacedPeakMemoryEstimateBytes =
+                    compiled.TransientNaiveMemoryEstimateBytes;
+                compiled.TransientMemoryEstimateBytes =
+                    compiled.TransientNaiveMemoryEstimateBytes;
+                ClearCompiledAliasReuseBarriers(compiled);
+                Core::Log::Warn(
+                    "[Graphics] Placed transient allocation unavailable; using non-aliased transient resource allocation for this frame");
+                m_InvalidateRenderGraphCompileCacheAfterFrame =
+                    placedAllocationStatus == PlacedTransientAllocationStatus::Failed;
+            }
+            else if (SlotHasPlacedTransientMemoryBlocks(slot))
+            {
+                ReleaseFrameTransientResources(slot);
+                ResizeFrameTransientSlot(compiled, slot);
+            }
 
             for (std::uint32_t index = 0; index < compiled.TextureHandles.size(); ++index)
             {
@@ -8244,6 +9087,7 @@ namespace Extrinsic::Graphics
         RHI::IDevice*                        m_Device{nullptr};
         RenderGraph                          m_RenderGraph;
         std::optional<RenderGraphCompileCacheEntry> m_RenderGraphCompileCache{};
+        bool                                 m_InvalidateRenderGraphCompileCacheAfterFrame{false};
         bool                                 m_RenderGraphDebugDumpEnabled{false};
         RenderGraphExecutor                  m_RenderGraphExecutor;
         RenderCommandRouter                  m_CommandRouter;
@@ -8251,6 +9095,8 @@ namespace Extrinsic::Graphics
         std::vector<std::vector<RHI::BufferHandle>>  m_FrameTransientBuffers{};
         std::vector<std::vector<RHI::TextureDesc>>   m_FrameTransientTextureDescs{};
         std::vector<std::vector<RHI::BufferDesc>>    m_FrameTransientBufferDescs{};
+        std::vector<std::vector<TransientMemoryBlockCache>> m_FrameTransientTextureMemoryBlocks{};
+        std::vector<std::vector<TransientMemoryBlockCache>> m_FrameTransientBufferMemoryBlocks{};
         RenderPrepPipeline                  m_RenderPrepPipeline;
         RenderPrepPipelineResult            m_LastRenderPrepResult{};
         DepthPrepassPass                     m_DepthPrepassPass;

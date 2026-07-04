@@ -142,11 +142,18 @@ before the new occupant's first use pass. Reuse emits a
 `TextureAliasReuseBarrierPacket` or `BufferAliasReuseBarrierPacket` on the
 new occupant's `BeforePass` barrier packet.
 
-This is the GRAPHICS-118 Slice A contract. Real RHI memory-block compatibility,
-Null bookkeeping, Vulkan placed binds, backend alias barriers, renderer adoption,
-and measured Vulkan memory reduction remain follow-up slices. Until those land,
-renderer transient allocation still creates/caches concrete per-frame RHI
-textures and buffers per resource index.
+The renderer lowers the compiled plan through the RHI placed-memory seam only
+when renderer transient aliasing is explicitly enabled and the device reports
+compatible requirements. Renderer aliasing defaults to the non-aliased fallback
+lane until the opt-in Vulkan smoke for `GRAPHICS-118` is cited. The renderer
+recomputes placements from backend requirements, creates per-frame memory
+blocks, binds transient textures/buffers at planned offsets, and submits
+alias-reuse memory barriers before the first pass that reuses a range. If
+aliasing is disabled or any requirement, memory-block, or placed-resource
+operation fails, the renderer clears alias-reuse barriers and uses the
+non-aliased fallback lane: concrete per-frame RHI textures and buffers cached per
+resource index. The opt-in Vulkan smoke with measured memory reduction remains
+the operational evidence for closing `GRAPHICS-118`.
 
 ## Boundaries
 

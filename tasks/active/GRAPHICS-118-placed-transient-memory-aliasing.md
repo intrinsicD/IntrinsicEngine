@@ -10,16 +10,17 @@ depends_on: []
 - Status: in-progress.
 - Owner/agent: Codex.
 - Branch/PR: local `main` stack, PR not opened.
-- Current slice: Slice D — renderer adoption of compiled transient placements.
-- Last completed slice: Slice C — Vulkan placed allocation and binding behind
-  the RHI contract; CPU/null and Vulkan fail-closed contracts verified.
-- Next verification step: adopt compiled placements in renderer transient
-  allocation, then run the opt-in GPU/Vulkan smoke with measured memory
-  reduction.
+- Current slice: Slice D.2 — opt-in Vulkan smoke and measured memory
+  evidence.
+- Last completed slice: Slice D.1 — renderer adoption of compiled transient
+  placements with CPU fallback/retry coverage.
+- Next verification step: run the opt-in GPU/Vulkan smoke with the default
+  sandbox recipe, image compare aliasing on/off, validation-layer-clean
+  evidence, and recorded before/after transient-memory bytes.
 
 ## Slice plan
 
-- **Slice A (this slice).** Compute deterministic placed-layout metadata from
+- **Slice A.** Compute deterministic placed-layout metadata from
   render-graph lifetime intervals, expose naive vs planned peak transient
   memory, and report alias-reuse hazards in the compiled barrier plan. This
   closes the CPU placement contract only and keeps renderer/RHI allocation
@@ -30,9 +31,13 @@ depends_on: []
 - **Slice C.** Implement Vulkan placed allocation and binding behind the RHI
   contract (VMA-backed memory blocks, placed buffer/image binds, ownership
   bookkeeping, and placement introspection). Renderer use of compiled
-  alias-reuse barriers and layout state remains Slice D with adoption.
-- **Slice D.** Adopt compiled placements in renderer transient allocation and
-  cite the opt-in Vulkan smoke with measured memory reduction.
+  alias-reuse barriers and layout state remained Slice D.1 with adoption.
+- **Slice D.1.** Adopt compiled placements in renderer transient allocation,
+  submit alias-reuse memory barriers, preserve the per-resource allocation
+  fallback/debug lane, and prove unsupported/failing placed allocation paths
+  under the CPU renderer contract.
+- **Slice D.2.** Cite the opt-in Vulkan smoke with measured memory reduction
+  and validation-layer-clean evidence.
 
 ## Goal
 - Make transient render-graph resources actually alias GPU memory: placed
@@ -53,7 +58,8 @@ depends_on: []
 - Owner/layer: `graphics/framegraph` (placement planning),
   `graphics/rhi` + `graphics/vulkan` (placed-resource creation),
   `graphics/renderer` (adoption).
-- Today "transient aliasing" never reaches GPU memory: `TransientAllocator`
+- Before `GRAPHICS-118`, "transient aliasing" never reached GPU memory:
+  `TransientAllocator`
   pools virtual handles by exact desc match with no heap/offset placement
   (`src/graphics/framegraph/Graphics.RenderGraph.TransientAllocator.cpp:27-63`),
   and `AllocateFrameTransientResources` then creates/caches one real device
@@ -87,11 +93,18 @@ depends_on: []
 - [x] Slice C: Vulkan implementation (VMA block allocation, placed binds,
       ownership/destruction bookkeeping, and placement introspection behind
       the RHI seam). Renderer use of compiled alias-reuse barriers and
-      initial-layout handling remains Slice D with allocation adoption.
-- [ ] Slice D: renderer adoption — `AllocateFrameTransientResources` binds
-      compiled placements per frame-in-flight slot instead of per-resource
-      allocations; `SetTransientAliasingEnabled` gates real behavior with
-      the non-aliased path kept as the fallback/debug lane.
+      initial-layout handling remained Slice D.1 with allocation adoption.
+- [x] Slice D.1: renderer adoption — `AllocateFrameTransientResources`
+      binds compiled placements per frame-in-flight slot instead of
+      per-resource allocations when backend requirements are available,
+      submits alias-reuse memory barriers, and keeps the non-aliased
+      per-resource path as the default fallback/debug lane. The public
+      renderer aliasing toggle gates real placed allocation until the
+      operational Vulkan smoke is cited.
+- [ ] Slice D.2: operational Vulkan evidence — run the default sandbox recipe
+      through an opt-in `gpu;vulkan` smoke with aliasing on/off image compare,
+      validation layers clean, and measured before/after transient-memory
+      bytes recorded below.
 
 ## Tests
 - [x] CPU/null contract: placement never overlaps live ranges (property
@@ -107,6 +120,11 @@ depends_on: []
       `ci-vulkan`; the unavailable-device constructor path rejects memory
       requirements, memory blocks, placed buffer/texture creation, and
       placement introspection without exposing Vulkan types through RHI.
+- [x] CPU renderer contract: Mock RHI placed memory proves memory-block
+      allocation, placed texture/buffer creation, alias-reuse memory
+      barriers, default-off per-resource fallback, fallback-to-naive stats
+      on one-shot memory-block failure, retry after that failure, and stable
+      unsupported-device fallback without compile-cache churn.
 - [ ] Opt-in `gpu;vulkan` smoke: default sandbox recipe renders correctly
       with aliasing on (image compare vs aliasing off), reported transient
       memory drops, and validation layers are clean (no hazard errors).
@@ -122,6 +140,12 @@ depends_on: []
       `src/graphics/vulkan/README.md`, and
       `src/graphics/renderer/Backends/Null/README.md` for Slice C placed
       memory-block alignment, Vulkan binding, and deferred renderer adoption.
+- [x] Update `src/graphics/renderer/README.md`,
+      `src/graphics/rhi/README.md`, `src/graphics/vulkan/README.md`,
+      `src/graphics/renderer/Backends/Null/README.md`, and
+      `docs/architecture/frame-graph.md` for Slice D.1 renderer adoption,
+      alias-reuse barriers, default-off opt-in policy, and fallback/retry
+      behavior.
 
 ## Acceptance criteria
 - [ ] Real measured transient memory reduction on the default sandbox
@@ -155,7 +179,7 @@ python3 tools/repo/check_pr_contract.py
 python3 tools/repo/check_root_hygiene.py --root .
 ```
 
-Operational Vulkan smoke remains owned by the closing adoption slice.
+Operational Vulkan smoke remains owned by the closing operational slice.
 
 Slice B local verification:
 
@@ -218,6 +242,35 @@ python3 tools/repo/check_root_hygiene.py --root .
 tools/ci/run_clean_workshop_review.sh . --strict
 ```
 
+Slice D.1 local verification:
+
+All commands below passed locally on 2026-07-04. The closing operational
+`gpu;vulkan` smoke and measured default-sandbox transient-memory reduction
+remain Slice D.2. `check_root_hygiene` remains warning-mode and reported
+existing root entries `ara/` and `imgui.ini`. Clean-workshop manual rows:
+row 3 pass; row 4 pass (renderer growth is bounded to the frame-transient
+allocation cache/toggle seam); rows 5-6 n/a; row 7 pass; row 8 pass; no
+follow-up findings.
+
+```bash
+cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure -R 'TransientDebugSurfacePassContract\.PerFrameBufferRecyclingDoesNotLeak|VisualizationOverlayPassContract\.PerFrameBufferRecyclingDoesNotLeak(VectorField|Isoline)|RendererFrameLifecycle\.PlacedTransientAliasing' --timeout 60
+ctest --test-dir build/ci --output-on-failure -R 'RendererFrameLifecycle|TransientDebugSurfacePassContract\.PerFrameBufferRecyclingDoesNotLeak|VisualizationOverlayPassContract\.PerFrameBufferRecyclingDoesNotLeak(VectorField|Isoline)|RHI(ResourceSlotRecycling|PlacedMemoryContract)|RendererRhiBoundary|RHICommandContextBarriers' --timeout 60
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
+python3 tools/agents/generate_session_brief.py
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+git diff --check
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/repo/check_pr_contract.py
+python3 tools/repo/check_root_hygiene.py --root .
+tools/ci/run_clean_workshop_review.sh . --strict
+```
+
 ## Forbidden changes
 - Passing `Vk*` types through RHI/renderer/framegraph public APIs.
 - Enabling aliasing by default before the Vulkan smoke is cited.
@@ -225,6 +278,7 @@ tools/ci/run_clean_workshop_review.sh . --strict
 
 ## Maturity
 - Target: `Operational` on Vulkan-capable hosts; `CPUContracted` for the
-  placement planner everywhere. Slices A–B close `CPUContracted`; Slice C–D
-  close `Operational` with the cited `gpu;vulkan` smoke. If sliced across
-  PRs, the closing slice owns the smoke.
+  placement planner and renderer fallback/retry path everywhere. Slices A–B
+  and D.1 close `CPUContracted`; Slice C provides the Vulkan backend seam;
+  Slice D.2 closes `Operational` with the cited `gpu;vulkan` smoke. If sliced
+  across PRs, the closing slice owns the smoke.

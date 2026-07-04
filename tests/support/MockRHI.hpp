@@ -19,6 +19,7 @@
 #include <cstddef>
 #include <cstring>
 #include <expected>
+#include <optional>
 #include <string_view>
 #include <unordered_map>
 #include <utility>
@@ -38,6 +39,7 @@ import Extrinsic.RHI.QueueAffinity;
 import Extrinsic.RHI.Types;
 import Extrinsic.RHI.Transfer;
 import Extrinsic.RHI.TransferQueue;
+import Extrinsic.RHI.TextureUpload;
 
 namespace Extrinsic::Tests
 {
@@ -180,6 +182,7 @@ namespace Extrinsic::Tests
             DrawIndexedIndirectCount,
             DrawIndirectCount,
             TextureBarrier,
+            MemoryBarrier,
             CopyBuffer,
         };
 
@@ -218,6 +221,12 @@ namespace Extrinsic::Tests
         struct BufferBarrierRecord
         {
             RHI::BufferHandle Buffer{};
+            RHI::MemoryAccess Before = RHI::MemoryAccess::None;
+            RHI::MemoryAccess After = RHI::MemoryAccess::None;
+        };
+
+        struct MemoryBarrierRecord
+        {
             RHI::MemoryAccess Before = RHI::MemoryAccess::None;
             RHI::MemoryAccess After = RHI::MemoryAccess::None;
         };
@@ -383,6 +392,14 @@ namespace Extrinsic::Tests
             {
                 BufferBarrier(barrier.Buffer, barrier.BeforeAccess, barrier.AfterAccess);
             }
+            for (const RHI::MemoryBarrierDesc& barrier : batch.MemoryBarriers)
+            {
+                MemoryBarrierCalls.push_back(MemoryBarrierRecord{
+                    .Before = barrier.BeforeAccess,
+                    .After = barrier.AfterAccess,
+                });
+                Events.push_back(EventKind::MemoryBarrier);
+            }
         }
 
         void FillBuffer(RHI::BufferHandle, std::uint64_t, std::uint64_t, std::uint32_t) override
@@ -411,6 +428,7 @@ namespace Extrinsic::Tests
         std::vector<TextureBarrierRecord> TextureBarrierCalls{};
         std::vector<SampledTextureBindingRecord> SampledTextureBindings{};
         std::vector<BufferBarrierRecord>  BufferBarrierCalls{};
+        std::vector<MemoryBarrierRecord>  MemoryBarrierCalls{};
         std::vector<DispatchRecord> DispatchRecords{};
         std::vector<DispatchIndirectRecord> DispatchIndirectRecords{};
         std::vector<CopyBufferRecord> CopyBufferRecords{};
@@ -503,6 +521,10 @@ namespace Extrinsic::Tests
         bool FailNextTextureCreate  = false;
         bool FailNextSamplerCreate  = false;
         bool FailNextPipelineCreate = false;
+        bool PlacedMemorySupported  = false;
+        bool FailNextMemoryBlockCreate = false;
+        bool FailNextPlacedBufferCreate = false;
+        bool FailNextPlacedTextureCreate = false;
         int  FailPipelineCreateCall = 0;
         bool BeginFrameResult       = true;
         bool AsyncComputeQueueAvailable = false;
@@ -528,6 +550,12 @@ namespace Extrinsic::Tests
         int DestroySamplerCount  = 0;
         int CreatePipelineCount  = 0;
         int DestroyPipelineCount = 0;
+        mutable int GetBufferMemoryRequirementsCount = 0;
+        mutable int GetTextureMemoryRequirementsCount = 0;
+        int CreateMemoryBlockCount = 0;
+        int DestroyMemoryBlockCount = 0;
+        int CreatePlacedBufferCount = 0;
+        int CreatePlacedTextureCount = 0;
         int BeginFrameCount      = 0;
         int EndFrameCount        = 0;
         int PresentCount         = 0;
@@ -538,6 +566,10 @@ namespace Extrinsic::Tests
         std::vector<TextureWriteRecord> TextureWrites;
         std::vector<RHI::TextureDesc> CreatedTextureDescs;
         std::vector<RHI::TextureHandle> CreatedTextureHandles;
+        std::vector<RHI::BufferDesc> CreatedPlacedBufferDescs;
+        std::vector<RHI::BufferHandle> CreatedPlacedBufferHandles;
+        std::vector<RHI::TextureDesc> CreatedPlacedTextureDescs;
+        std::vector<RHI::TextureHandle> CreatedPlacedTextureHandles;
         std::vector<RHI::PipelineDesc> CreatedPipelineDescs;
         std::vector<RHI::PipelineHandle> CreatedPipelineHandles;
         std::vector<RHI::SamplerHandle> CreatedSamplerHandles;
@@ -686,7 +718,11 @@ namespace Extrinsic::Tests
             if (FailNextBufferCreate) { FailNextBufferCreate = false; return {}; }
             return RHI::BufferHandle{m_NextBuffer++, 1u};
         }
-        void DestroyBuffer(RHI::BufferHandle) override { ++DestroyBufferCount; }
+        void DestroyBuffer(RHI::BufferHandle handle) override
+        {
+            ++DestroyBufferCount;
+            BufferPlacements.erase(handle.Index);
+        }
         void WriteBuffer(RHI::BufferHandle handle, const void* src, std::uint64_t size, std::uint64_t offset) override
         {
             BufferWriteRecord rec;
@@ -752,7 +788,11 @@ namespace Extrinsic::Tests
             CreatedTextureHandles.push_back(handle);
             return handle;
         }
-        void DestroyTexture(RHI::TextureHandle) override { ++DestroyTextureCount; }
+        void DestroyTexture(RHI::TextureHandle handle) override
+        {
+            ++DestroyTextureCount;
+            TexturePlacements.erase(handle.Index);
+        }
         void WriteTexture(RHI::TextureHandle handle, const void* data, std::uint64_t size,
                           std::uint32_t mipLevel, std::uint32_t arrayLayer) override
         {
@@ -805,10 +845,206 @@ namespace Extrinsic::Tests
         [[nodiscard]] std::uint32_t GetFramesInFlight()    const override { return FramesInFlight; }
         [[nodiscard]] std::uint64_t GetGlobalFrameNumber() const override { return GlobalFrameNumber; }
 
+        [[nodiscard]] RHI::ResourceMemoryRequirements GetBufferMemoryRequirements(
+            const RHI::BufferDesc& desc) const noexcept override
+        {
+            ++GetBufferMemoryRequirementsCount;
+            if (!PlacedMemorySupported || desc.SizeBytes == 0u)
+            {
+                return {};
+            }
+            return RHI::ResourceMemoryRequirements{
+                .SizeBytes = AlignUp(desc.SizeBytes, kPlacedMemoryAlignment),
+                .AlignmentBytes = kPlacedMemoryAlignment,
+                .MemoryTypeBits = kPlacedMemoryTypeBit,
+                .DedicatedAllocationRequired = false,
+            };
+        }
+
+        [[nodiscard]] RHI::ResourceMemoryRequirements GetTextureMemoryRequirements(
+            const RHI::TextureDesc& desc) const noexcept override
+        {
+            ++GetTextureMemoryRequirementsCount;
+            if (!PlacedMemorySupported)
+            {
+                return {};
+            }
+            const std::uint64_t storageBytes = RHI::EstimateTextureStorageBytes(desc);
+            if (storageBytes == 0u)
+            {
+                return {};
+            }
+            return RHI::ResourceMemoryRequirements{
+                .SizeBytes = AlignUp(storageBytes, kPlacedMemoryAlignment),
+                .AlignmentBytes = kPlacedMemoryAlignment,
+                .MemoryTypeBits = kPlacedMemoryTypeBit,
+                .DedicatedAllocationRequired = false,
+            };
+        }
+
+        [[nodiscard]] RHI::MemoryBlockHandle CreateMemoryBlock(const RHI::MemoryBlockDesc& desc) override
+        {
+            ++CreateMemoryBlockCount;
+            if (!PlacedMemorySupported || FailNextMemoryBlockCreate ||
+                desc.SizeBytes == 0u || desc.AlignmentBytes == 0u ||
+                desc.MemoryTypeBits == 0u ||
+                (desc.SizeBytes % desc.AlignmentBytes) != 0u)
+            {
+                FailNextMemoryBlockCreate = false;
+                return {};
+            }
+
+            const std::uint32_t selectedBit = SelectMemoryTypeBit(desc.MemoryTypeBits);
+            if (selectedBit == 0u)
+            {
+                return {};
+            }
+
+            const RHI::MemoryBlockHandle handle{m_NextMemoryBlock++, 1u};
+            MemoryBlocks.emplace(handle.Index, RHI::MemoryBlockInfo{
+                .SizeBytes = desc.SizeBytes,
+                .AlignmentBytes = desc.AlignmentBytes,
+                .MemoryTypeBits = desc.MemoryTypeBits,
+                .SelectedMemoryTypeBit = selectedBit,
+                .IsValid = true,
+            });
+            return handle;
+        }
+
+        void DestroyMemoryBlock(RHI::MemoryBlockHandle handle) override
+        {
+            ++DestroyMemoryBlockCount;
+            MemoryBlocks.erase(handle.Index);
+        }
+
+        [[nodiscard]] RHI::MemoryBlockInfo GetMemoryBlockInfo(
+            RHI::MemoryBlockHandle handle) const noexcept override
+        {
+            const auto it = MemoryBlocks.find(handle.Index);
+            return it == MemoryBlocks.end() ? RHI::MemoryBlockInfo{} : it->second;
+        }
+
+        [[nodiscard]] RHI::BufferHandle CreatePlacedBuffer(const RHI::PlacedBufferDesc& desc) override
+        {
+            ++CreatePlacedBufferCount;
+            if (!PlacedMemorySupported || FailNextPlacedBufferCreate)
+            {
+                FailNextPlacedBufferCreate = false;
+                return {};
+            }
+
+            const std::optional<RHI::PlacedResourceInfo> placement =
+                ValidatePlacedResource(GetBufferMemoryRequirements(desc.Desc), desc.Placement);
+            if (!placement.has_value())
+            {
+                return {};
+            }
+
+            const RHI::BufferHandle handle{m_NextBuffer++, 1u};
+            BufferPlacements.emplace(handle.Index, *placement);
+            CreatedPlacedBufferDescs.push_back(desc.Desc);
+            CreatedPlacedBufferHandles.push_back(handle);
+            return handle;
+        }
+
+        [[nodiscard]] RHI::TextureHandle CreatePlacedTexture(const RHI::PlacedTextureDesc& desc) override
+        {
+            ++CreatePlacedTextureCount;
+            if (!PlacedMemorySupported || FailNextPlacedTextureCreate)
+            {
+                FailNextPlacedTextureCreate = false;
+                return {};
+            }
+
+            const std::optional<RHI::PlacedResourceInfo> placement =
+                ValidatePlacedResource(GetTextureMemoryRequirements(desc.Desc), desc.Placement);
+            if (!placement.has_value())
+            {
+                return {};
+            }
+
+            const RHI::TextureHandle handle{m_NextTexture++, 1u};
+            TexturePlacements.emplace(handle.Index, *placement);
+            CreatedPlacedTextureDescs.push_back(desc.Desc);
+            CreatedPlacedTextureHandles.push_back(handle);
+            return handle;
+        }
+
+        [[nodiscard]] RHI::PlacedResourceInfo GetBufferMemoryPlacement(
+            RHI::BufferHandle handle) const noexcept override
+        {
+            const auto it = BufferPlacements.find(handle.Index);
+            return it == BufferPlacements.end() ? RHI::PlacedResourceInfo{} : it->second;
+        }
+
+        [[nodiscard]] RHI::PlacedResourceInfo GetTextureMemoryPlacement(
+            RHI::TextureHandle handle) const noexcept override
+        {
+            const auto it = TexturePlacements.find(handle.Index);
+            return it == TexturePlacements.end() ? RHI::PlacedResourceInfo{} : it->second;
+        }
+
     private:
+        static constexpr std::uint64_t kPlacedMemoryAlignment = 256u;
+        static constexpr std::uint32_t kPlacedMemoryTypeBit = 1u;
+
+        [[nodiscard]] static constexpr std::uint64_t AlignUp(
+            const std::uint64_t value,
+            const std::uint64_t alignment) noexcept
+        {
+            if (alignment <= 1u)
+            {
+                return value;
+            }
+            const std::uint64_t remainder = value % alignment;
+            return remainder == 0u ? value : value + (alignment - remainder);
+        }
+
+        [[nodiscard]] static constexpr std::uint32_t SelectMemoryTypeBit(
+            const std::uint32_t memoryTypeBits) noexcept
+        {
+            return memoryTypeBits & (~memoryTypeBits + 1u);
+        }
+
+        [[nodiscard]] std::optional<RHI::PlacedResourceInfo> ValidatePlacedResource(
+            const RHI::ResourceMemoryRequirements requirements,
+            const RHI::PlacedResourceBinding& binding) const noexcept
+        {
+            if (!requirements.IsValid() || !binding.Block.IsValid())
+            {
+                return std::nullopt;
+            }
+            const auto blockIt = MemoryBlocks.find(binding.Block.Index);
+            if (blockIt == MemoryBlocks.end() || !blockIt->second.IsValid)
+            {
+                return std::nullopt;
+            }
+            const RHI::MemoryBlockInfo& block = blockIt->second;
+            if ((block.SelectedMemoryTypeBit & requirements.MemoryTypeBits) == 0u ||
+                (binding.OffsetBytes % requirements.AlignmentBytes) != 0u ||
+                binding.OffsetBytes > block.SizeBytes ||
+                requirements.SizeBytes > block.SizeBytes - binding.OffsetBytes)
+            {
+                return std::nullopt;
+            }
+            return RHI::PlacedResourceInfo{
+                .Block = binding.Block,
+                .OffsetBytes = binding.OffsetBytes,
+                .SizeBytes = requirements.SizeBytes,
+                .AlignmentBytes = requirements.AlignmentBytes,
+                .MemoryTypeBit = block.SelectedMemoryTypeBit,
+                .IsPlaced = true,
+            };
+        }
+
+        std::unordered_map<std::uint32_t, RHI::MemoryBlockInfo> MemoryBlocks;
+        std::unordered_map<std::uint32_t, RHI::PlacedResourceInfo> BufferPlacements;
+        std::unordered_map<std::uint32_t, RHI::PlacedResourceInfo> TexturePlacements;
+
         std::uint32_t m_NextBuffer   = 1; // 0 is reserved / invalid
         std::uint32_t m_NextTexture  = 1;
         std::uint32_t m_NextSampler  = 1;
         std::uint32_t m_NextPipeline = 1;
+        std::uint32_t m_NextMemoryBlock = 1;
     };
 }

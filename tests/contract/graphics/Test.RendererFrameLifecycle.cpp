@@ -797,6 +797,160 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     renderer->Shutdown();
 }
 
+TEST(RendererFrameLifecycle, PlacedTransientAliasingUsesMemoryBlocksAndAliasBarriers)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.PlacedMemorySupported = true;
+    device.NextFrame = Extrinsic::RHI::FrameHandle{.FrameIndex = 3u, .SwapchainImageIndex = 0u};
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{77u, 3u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer =
+        Extrinsic::Graphics::CreateRenderer();
+    renderer->SetTransientAliasingEnabled(true);
+    renderer->Initialize(device);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats =
+        renderer->GetLastRenderGraphStats();
+    ASSERT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    ASSERT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_GT(stats.Compile.TransientNaiveMemoryEstimateBytes, 0u);
+    EXPECT_LT(stats.Compile.TransientPlacedPeakMemoryEstimateBytes,
+              stats.Compile.TransientNaiveMemoryEstimateBytes);
+    EXPECT_EQ(stats.Compile.TransientMemoryEstimateBytes,
+              stats.Compile.TransientPlacedPeakMemoryEstimateBytes);
+
+    EXPECT_GT(device.GetTextureMemoryRequirementsCount +
+                  device.GetBufferMemoryRequirementsCount,
+              0);
+    EXPECT_GT(device.CreateMemoryBlockCount, 0);
+    EXPECT_GT(device.CreatePlacedTextureCount + device.CreatePlacedBufferCount, 0);
+    EXPECT_FALSE(device.CommandContext.MemoryBarrierCalls.empty());
+
+    renderer->Shutdown();
+    EXPECT_EQ(device.DestroyMemoryBlockCount, device.CreateMemoryBlockCount);
+}
+
+TEST(RendererFrameLifecycle, PlacedTransientAliasingDefaultsToPerResourceFallback)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.PlacedMemorySupported = true;
+    device.NextFrame = Extrinsic::RHI::FrameHandle{.FrameIndex = 4u, .SwapchainImageIndex = 0u};
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{77u, 3u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer =
+        Extrinsic::Graphics::CreateRenderer();
+    ASSERT_FALSE(renderer->IsTransientAliasingEnabled());
+    renderer->Initialize(device);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats =
+        renderer->GetLastRenderGraphStats();
+    ASSERT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    ASSERT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_GT(stats.Compile.TransientNaiveMemoryEstimateBytes, 0u);
+    EXPECT_EQ(stats.Compile.TransientPlacedPeakMemoryEstimateBytes,
+              stats.Compile.TransientNaiveMemoryEstimateBytes);
+    EXPECT_EQ(stats.Compile.TransientMemoryEstimateBytes,
+              stats.Compile.TransientNaiveMemoryEstimateBytes);
+
+    EXPECT_EQ(device.GetTextureMemoryRequirementsCount +
+                  device.GetBufferMemoryRequirementsCount,
+              0);
+    EXPECT_EQ(device.CreateMemoryBlockCount, 0);
+    EXPECT_EQ(device.CreatePlacedTextureCount + device.CreatePlacedBufferCount, 0);
+    EXPECT_TRUE(device.CommandContext.MemoryBarrierCalls.empty());
+    EXPECT_GT(device.CreateTextureCount, 0);
+
+    renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle, PlacedTransientAliasingFallsBackWhenMemoryBlocksUnavailable)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.PlacedMemorySupported = true;
+    device.FailNextMemoryBlockCreate = true;
+    device.NextFrame = Extrinsic::RHI::FrameHandle{.FrameIndex = 5u, .SwapchainImageIndex = 0u};
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{77u, 3u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer =
+        Extrinsic::Graphics::CreateRenderer();
+    renderer->SetTransientAliasingEnabled(true);
+    renderer->Initialize(device);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats =
+        renderer->GetLastRenderGraphStats();
+    ASSERT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    ASSERT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_GT(stats.Compile.TransientNaiveMemoryEstimateBytes, 0u);
+    EXPECT_EQ(stats.Compile.TransientPlacedPeakMemoryEstimateBytes,
+              stats.Compile.TransientNaiveMemoryEstimateBytes);
+    EXPECT_EQ(stats.Compile.TransientMemoryEstimateBytes,
+              stats.Compile.TransientNaiveMemoryEstimateBytes);
+
+    EXPECT_GT(device.GetTextureMemoryRequirementsCount +
+                  device.GetBufferMemoryRequirementsCount,
+              0);
+    EXPECT_GT(device.CreateMemoryBlockCount, 0);
+    EXPECT_EQ(device.CreatePlacedTextureCount + device.CreatePlacedBufferCount, 0);
+    EXPECT_TRUE(device.CommandContext.MemoryBarrierCalls.empty());
+    EXPECT_GT(device.CreateTextureCount, 0);
+
+    const int memoryBlockCreateCountAfterFallback = device.CreateMemoryBlockCount;
+    const int placedResourceCreateCountAfterFallback =
+        device.CreatePlacedTextureCount + device.CreatePlacedBufferCount;
+    const std::uint64_t completedFrame = renderer->EndFrame(frame);
+    EXPECT_EQ(completedFrame, 1u);
+
+    device.CommandContext.MemoryBarrierCalls.clear();
+    device.NextFrame = Extrinsic::RHI::FrameHandle{.FrameIndex = 6u, .SwapchainImageIndex = 0u};
+
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& retryStats =
+        renderer->GetLastRenderGraphStats();
+    ASSERT_TRUE(retryStats.Compile.Succeeded) << retryStats.Diagnostic;
+    ASSERT_TRUE(retryStats.Execute.Succeeded) << retryStats.Diagnostic;
+    EXPECT_LT(retryStats.Compile.TransientPlacedPeakMemoryEstimateBytes,
+              retryStats.Compile.TransientNaiveMemoryEstimateBytes);
+    EXPECT_EQ(retryStats.Compile.TransientMemoryEstimateBytes,
+              retryStats.Compile.TransientPlacedPeakMemoryEstimateBytes);
+    EXPECT_GT(device.CreateMemoryBlockCount, memoryBlockCreateCountAfterFallback);
+    EXPECT_GT(device.CreatePlacedTextureCount + device.CreatePlacedBufferCount,
+              placedResourceCreateCountAfterFallback);
+    EXPECT_FALSE(device.CommandContext.MemoryBarrierCalls.empty());
+
+    renderer->Shutdown();
+}
+
 TEST(RendererFrameLifecycle, RuntimeFrameCommandHookRunsInsideExecuteFrameCommandContext)
 {
     Extrinsic::Tests::MockDevice device;

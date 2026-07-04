@@ -488,6 +488,8 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual ShadowSystem&          GetShadowSystem()    = 0;
         [[nodiscard]] virtual HZBSystem&             GetHZBSystem()       = 0;
         [[nodiscard]] virtual const RenderGraphFrameStats& GetLastRenderGraphStats() const = 0;
+        virtual void SetTransientAliasingEnabled(bool enabled) noexcept = 0;
+        [[nodiscard]] virtual bool IsTransientAliasingEnabled() const noexcept = 0;
         virtual void SetRenderGraphDebugDumpEnabled(bool enabled) noexcept = 0;
         [[nodiscard]] virtual bool GetRenderGraphDebugDumpEnabled() const noexcept = 0;
 
