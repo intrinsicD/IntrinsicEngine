@@ -24,6 +24,7 @@
 #include "../physics/Bench.RigidBodyReferenceSmoke.hpp"
 #include "../physics/Bench.SphFluidReferenceSmoke.hpp"
 #include "../physics/Bench.XpbdClothReferenceSmoke.hpp"
+#include "../rendering/Bench.FrameRecipeCompileCacheSmoke.hpp"
 #include "../rendering/Bench.VertexFetchLayoutSmoke.hpp"
 
 #include <cstdlib>
@@ -751,6 +752,60 @@ auto EmitVertexFetchLayoutSmoke(const std::string &commit) -> EmittedBenchmark {
                           metrics.Succeeded};
 }
 
+auto EmitFrameRecipeCompileCacheSmoke(const std::string &commit)
+    -> EmittedBenchmark {
+  using namespace Intrinsic::Bench::Rendering;
+
+  const auto metrics = RunFrameRecipeCompileCacheSmoke();
+
+  std::ostringstream out;
+  out.setf(std::ios::fixed);
+  out.precision(6);
+  out << "{\n"
+      << "  \"benchmark_id\": \""
+      << EscapeJson(kFrameRecipeCompileCacheSmokeBenchmarkId) << "\",\n"
+      << "  \"method\": \""
+      << EscapeJson(kFrameRecipeCompileCacheSmokeMethod) << "\",\n"
+      << "  \"backend\": \"cpu_reference\",\n"
+      << "  \"dataset\": \""
+      << EscapeJson(kFrameRecipeCompileCacheSmokeDataset) << "\",\n"
+      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
+      << "  \"metrics\": {\n"
+      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
+      << "  },\n"
+      << "  \"diagnostics\": {\n"
+      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+      << "    \"mode\": \"smoke\",\n"
+      << "    \"warmup_iterations\": " << metrics.WarmupIterations << ",\n"
+      << "    \"measured_iterations\": " << metrics.MeasuredIterations << ",\n"
+      << "    \"baseline_mode\": \"rebuild_each_frame\",\n"
+      << "    \"probe_mode\": \"cached_steady_state\",\n"
+      << "    \"adoption_claim\": false,\n"
+      << "    \"baseline_rebuild_declare_compile_ms\": "
+      << metrics.BaselineRebuildDeclareCompileMilliseconds << ",\n"
+      << "    \"cached_steady_state_declare_compile_ms\": "
+      << metrics.CachedSteadyStateDeclareCompileMilliseconds << ",\n"
+      << "    \"avoided_declare_compile_ms\": "
+      << metrics.AvoidedDeclareCompileMilliseconds << ",\n"
+      << "    \"baseline_compile_attempts_per_frame\": "
+      << metrics.BaselineCompileAttemptsPerFrame << ",\n"
+      << "    \"cached_compile_attempts_per_frame\": "
+      << metrics.CachedCompileAttemptsPerFrame << ",\n"
+      << "    \"pass_count\": " << metrics.PassCount << ",\n"
+      << "    \"resource_count\": " << metrics.ResourceCount << ",\n"
+      << "    \"barrier_count\": " << metrics.BarrierCount << ",\n"
+      << "    \"validation_error_count\": "
+      << metrics.ValidationErrorCount << "\n"
+      << "  },\n"
+      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
+      << "\"\n"
+      << "}\n";
+
+  return EmittedBenchmark{kFrameRecipeCompileCacheSmokeBenchmarkId, out.str(),
+                          metrics.Succeeded};
+}
+
 auto WriteFile(const std::filesystem::path &path, std::string_view payload)
     -> bool {
   std::error_code ec;
@@ -788,6 +843,7 @@ auto main(int argc, char **argv) -> int {
   emitted.push_back(EmitParticleSpringReferenceSmoke(commit));
   emitted.push_back(EmitXpbdClothReferenceSmoke(commit));
   emitted.push_back(EmitSphFluidReferenceSmoke(commit));
+  emitted.push_back(EmitFrameRecipeCompileCacheSmoke(commit));
   emitted.push_back(EmitVertexFetchLayoutSmoke(commit));
 
   // Output target: an existing directory or a path with no extension (or no

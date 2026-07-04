@@ -3,15 +3,24 @@ id: GRAPHICS-117
 theme: B
 depends_on: []
 maturity_target: Operational
+completed: 2026-07-04
 ---
 # GRAPHICS-117 — Render-graph compile caching and gated debug dump
 
-## Status
-- Active: 2026-07-04. Owner: Codex on `main`.
-- Slice A complete: renderer compile-cache contract and lazy debug dump gate.
-- Next slice: Slice B — PR-fast declare/compile benchmark evidence and task
-  retirement if the cache contract remains stable.
-- Slice A evidence:
+## Completion
+- Completed: 2026-07-04. Commit/PR: this retirement change.
+- Maturity: `Operational` for the default renderer compile-cache contract and
+  debug-dump request seam. The renderer recompiles on key-relevant recipe,
+  sizing, import-shape, and contribution changes, reuses a cached
+  `CompiledRenderGraph` for steady-state frames, and still rebinds current
+  imported handles per frame.
+- Summary: `Graphics.Renderer` now owns a structural default-frame recipe
+  compile key, records per-frame compile/cache-hit counters, reuses cached
+  compiled graphs when topology is unchanged, invalidates on rebuild/shutdown/
+  resize, and builds render-graph debug dumps only when explicitly requested.
+  A PR-fast smoke benchmark records rebuild declare+compile cost against the
+  steady-state cached compile-attempt contract.
+- Evidence:
   `cmake --preset ci`;
   `cmake --build --preset ci --target IntrinsicTests`;
   explicit `ctest --test-dir build/ci --output-on-failure -R 'GraphicsRenderer' --timeout 60`
@@ -19,10 +28,40 @@ maturity_target: Operational
   `gpu|vulkan|slow` labels);
   focused `RendererFrameLifecycle|FrameRecipeContract|RenderGraphDebugDump|SandboxEditorUi`
   CPU-supported CTest (219/219 passed);
-  full CPU-supported CTest (3493/3493 passed).
+  full CPU-supported CTest (3493/3493 passed);
+  `python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict`;
+  `cmake --build --preset ci --target IntrinsicBenchmarkSmoke`;
+  `ctest --test-dir build/ci --output-on-failure -R 'IntrinsicBenchmarkSmoke' --timeout 60`
+  (2/2 passed);
+  `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+  (3493/3493 passed);
+  `build/ci/bin/IntrinsicBenchmarkSmoke build/ci/benchmark-ctest/IntrinsicBenchmarkSmokeSliceB`;
+  `python3 tools/benchmark/validate_benchmark_results.py --root build/ci/benchmark-ctest/IntrinsicBenchmarkSmokeSliceB --strict`;
+  `python3 tools/agents/check_task_policy.py --root . --strict`;
+  `python3 tools/docs/check_doc_links.py --root .`;
+  `python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main`;
+  `python3 tools/repo/check_layering.py --root src --strict`;
+  `python3 tools/repo/check_test_layout.py --root . --strict`;
+  `python3 tools/repo/check_pr_contract.py`;
+  `python3 tools/repo/check_root_hygiene.py --root .`
+  (warning-mode only for pre-existing root entries `ara/` and `imgui.ini`).
+  Local debug+sanitizer benchmark result for
+  `rendering.frame_recipe_compile_cache.smoke`: `runtime_ms=1.122644`,
+  `baseline_rebuild_declare_compile_ms=1.122644`,
+  `cached_steady_state_declare_compile_ms=0.0`,
+  `baseline_compile_attempts_per_frame=1`,
+  `cached_compile_attempts_per_frame=0`, `pass_count=10`,
+  `resource_count=26`, `barrier_count=10`,
+  `validation_error_count=0`, `quality_error_l2=0.0`.
+
+## Status
+- Retired: 2026-07-04.
+- Slice A complete: renderer compile-cache contract and lazy debug dump gate.
+- Slice B complete: PR-fast declare/compile benchmark evidence added and CPU
+  gate passed.
 
 ## Slice plan
-- **Slice A (this slice).** Add the renderer-owned default-frame recipe cache
+- **Slice A.** Add the renderer-owned default-frame recipe cache
   key, cache/reuse the compiled graph while the key is unchanged, publish
   per-frame compile-attempt/cache-hit counters, and make the compiler debug
   dump opt-in through an explicit renderer request seam. Update CPU/null
@@ -93,7 +132,7 @@ maturity_target: Operational
 - [x] Contract: cached-path frame output identical to recompiled-path
       (golden compiled-description comparison after N reused frames).
 - [x] Existing recipe validation/renderer lifecycle suites stay green.
-- [ ] PR-fast benchmark: CPU ms/frame of the declare+compile stage before/
+- [x] PR-fast benchmark: CPU ms/frame of the declare+compile stage before/
       after for the default sandbox recipe.
 
 ## Docs
@@ -103,7 +142,7 @@ maturity_target: Operational
 
 ## Acceptance criteria
 - [x] Zero steady-state compiles proven by counters in a contract test.
-- [ ] Benchmark evidence recorded in this file.
+- [x] Benchmark evidence recorded in this file.
 - [x] Recipe-change/resize behavior unchanged; CPU gate green.
 
 ## Verification

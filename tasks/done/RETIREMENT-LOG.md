@@ -3329,3 +3329,17 @@ registry; contract coverage proves the overlay-absent graph validates, executes
 through the headless render-graph executor, and omits overlay passes/resources,
 while the default contributed graph matches the compatibility build's compiled
 debug dump.
+
+[`GRAPHICS-117`](GRAPHICS-117-render-graph-compile-cache.md) —
+Render-graph compile caching and gated debug dump retired to `tasks/done/` on
+2026-07-04 at `Operational` for the default renderer frame recipe. The renderer
+now owns a structural compile key over recipe features, sizing, import shape,
+and contribution descriptors, reuses a cached `CompiledRenderGraph` on
+steady-state frames, rebinds current imported handles before execution, and
+invalidates on operational rebuild, shutdown, and resize. Debug dump generation
+is opt-in through the renderer request seam. Contract tests prove zero
+steady-state compile attempts, feature/resize recompilation, imported-handle
+rebinding on reuse, and lazy debug dumps; the PR-fast
+`rendering.frame_recipe_compile_cache.smoke` benchmark records the default
+1280x720 recipe rebuild declare+compile baseline and the cached steady-state
+compile-attempt contract.

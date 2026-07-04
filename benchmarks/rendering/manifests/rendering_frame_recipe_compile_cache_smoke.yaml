@@ -1,0 +1,26 @@
+# GRAPHICS-117 - frame-recipe compile-cache baseline/probe.
+#
+# This smoke benchmark records PR-fast CPU evidence for the default frame
+# recipe declare+compile stage. The baseline rebuilds the recipe every frame;
+# the probe records the renderer compile-cache steady-state contract. It does
+# not claim renderer-wide frame-time adoption benefit.
+
+benchmark_id: rendering.frame_recipe_compile_cache.smoke
+method: rendering.frame_recipe_compile_cache
+dataset: builtin.default_frame_recipe.1280x720
+params:
+  intent: smoke
+  viewport_width: 1280
+  viewport_height: 720
+  warmup_iterations: 2
+  measured_iterations: 16
+  baseline_mode: rebuild_each_frame
+  probe_mode: cached_steady_state
+  baseline_compile_attempts_per_frame: 1
+  cached_compile_attempts_per_frame: 0
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 250
+  quality_error_l2_max: 0.0

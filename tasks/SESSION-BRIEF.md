@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `GRAPHICS-117` — Render-graph compile caching and gated debug dump (tasks/active/GRAPHICS-117-render-graph-compile-cache.md)
+- none
 
 ## Theme B — Rendering modernization
 
