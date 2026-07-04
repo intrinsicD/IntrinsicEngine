@@ -371,6 +371,8 @@ namespace Extrinsic::Graphics
         std::string_view Name{};
         bool Enabled{false};
         bool FinalizesBackbuffer{false};
+        RenderQueue Queue{RenderQueue::Graphics};
+        bool Contributed{false};
         std::vector<std::string_view> Reads{};
         std::vector<std::string_view> Writes{};
     };
@@ -387,10 +389,73 @@ namespace Extrinsic::Graphics
         bool ImportedWriteAllowed{false};
     };
 
+    export enum class FrameRecipeContributionAnchorPlacement : std::uint8_t
+    {
+        Before = 0,
+        After,
+    };
+
+    export struct FrameRecipeContributionAnchor
+    {
+        FramePassId PassId{};
+        FrameRecipeContributionAnchorPlacement Placement{FrameRecipeContributionAnchorPlacement::After};
+    };
+
+    export enum class FrameRecipeContributionDiagnosticCode : std::uint8_t
+    {
+        InvalidPassId = 0,
+        EmptyName,
+        FixedCorePassConflict,
+        DuplicatePassId,
+        UnknownResource,
+        InvalidAnchor,
+    };
+
+    export struct FrameRecipeContributionDiagnostic
+    {
+        FrameRecipeContributionDiagnosticCode Code{FrameRecipeContributionDiagnosticCode::InvalidPassId};
+        std::string Message{};
+        FramePassId PassId{};
+        FrameResourceId ResourceId{};
+        FramePassId AnchorPassId{};
+    };
+
+    export struct FrameRecipePassContribution
+    {
+        FrameRecipePassKind Kind{FrameRecipePassKind::Culling};
+        FramePassId Id{};
+        std::string_view Name{};
+        bool Enabled{true};
+        bool FinalizesBackbuffer{false};
+        RenderQueue Queue{RenderQueue::Graphics};
+        FrameRecipeContributionAnchor Anchor{};
+        std::vector<FrameResourceId> Reads{};
+        std::vector<FrameResourceId> Writes{};
+    };
+
+    export struct FrameRecipePassContributionRegistry
+    {
+        std::vector<FrameRecipePassContribution> Passes{};
+    };
+
+    export struct FrameRecipeContributionValidationResult
+    {
+        std::vector<FrameRecipeContributionDiagnostic> Diagnostics{};
+
+        [[nodiscard]] bool HasErrors() const;
+    };
+
     export struct FrameRecipeIntrospection
     {
         std::vector<FrameRecipePassDeclaration> Passes{};
         std::vector<FrameRecipeResourceDeclaration> Resources{};
+    };
+
+    export struct FrameRecipeContributionDescriptionResult
+    {
+        FrameRecipeIntrospection Recipe{};
+        FrameRecipeContributionValidationResult Validation{};
+        bool Succeeded{false};
     };
 
     export struct FrameRecipeBuildResult
@@ -410,6 +475,16 @@ namespace Extrinsic::Graphics
     export [[nodiscard]] FrameRecipeIntrospection DescribeDefaultFrameRecipe(const FrameRecipeFeatures& features,
                                                                              const FrameRecipeAAOptions& aaOptions,
                                                                              FrameRecipeTemporalOptions temporalOptions = {});
+
+    export void RegisterFrameRecipePassContribution(FrameRecipePassContributionRegistry& registry,
+                                                    FrameRecipePassContribution contribution);
+    export void ClearFrameRecipePassContributions(FrameRecipePassContributionRegistry& registry);
+    export [[nodiscard]] FrameRecipeContributionValidationResult ValidateFrameRecipePassContributions(
+        const FrameRecipeIntrospection& baseRecipe,
+        const std::vector<FrameRecipePassContribution>& contributions);
+    export [[nodiscard]] FrameRecipeContributionDescriptionResult DescribeFrameRecipeWithContributions(
+        const FrameRecipeIntrospection& baseRecipe,
+        const std::vector<FrameRecipePassContribution>& contributions);
 
     export [[nodiscard]] RenderGraphValidationResult ValidateRecipeCompiledGraph(
         const FrameRecipeIntrospection& recipe,

@@ -182,6 +182,15 @@ namespace
         return std::ranges::find(values, value) != values.end();
     }
 
+    [[nodiscard]] bool HasContributionDiagnostic(
+        const FrameRecipeContributionValidationResult& result,
+        const FrameRecipeContributionDiagnosticCode code)
+    {
+        return std::ranges::any_of(result.Diagnostics, [code](const FrameRecipeContributionDiagnostic& diagnostic) {
+            return diagnostic.Code == code;
+        });
+    }
+
     [[nodiscard]] bool HasTextureUsage(const RHI::TextureUsage flags,
                                        const RHI::TextureUsage bit) noexcept
     {
@@ -655,6 +664,179 @@ TEST(FrameRecipeContract, DefaultRecipeCompiledGraphHasNoValidationFindings)
     EXPECT_EQ(validation.CountBySeverity(RenderGraphValidationSeverity::Error), 0u);
     EXPECT_EQ(validation.CountBySeverity(RenderGraphValidationSeverity::Warning), 0u);
     EXPECT_TRUE(validation.Findings.empty());
+}
+
+TEST(FrameRecipeContract, ContributionDescriptorProjectsTypedResourcesIntoRecipeIntrospection)
+{
+    const FrameRecipeIntrospection baseRecipe = DescribeDefaultFrameRecipe(FrameRecipeFeatures{});
+
+    FrameRecipePassContributionRegistry registry{};
+    RegisterFrameRecipePassContribution(
+        registry,
+        FrameRecipePassContribution{
+            .Kind = FrameRecipePassKind::Culling,
+            .Id = FramePassId{9000u},
+            .Name = "RegisteredOverlayPass",
+            .Enabled = true,
+            .Queue = RenderQueue::AsyncCompute,
+            .Anchor = FrameRecipeContributionAnchor{
+                .PassId = ToFramePassId(FrameRecipePassKind::Surface),
+                .Placement = FrameRecipeContributionAnchorPlacement::After,
+            },
+            .Reads = {
+                ToFrameResourceId(FrameRecipeResourceKind::SceneColorHDR),
+                ToFrameResourceId(FrameRecipeResourceKind::SceneDepth),
+            },
+            .Writes = {
+                ToFrameResourceId(FrameRecipeResourceKind::SceneColorHDR),
+            },
+        });
+
+    const FrameRecipeContributionDescriptionResult result =
+        DescribeFrameRecipeWithContributions(baseRecipe, registry.Passes);
+
+    ASSERT_TRUE(result.Succeeded);
+    EXPECT_FALSE(result.Validation.HasErrors());
+    ASSERT_EQ(result.Recipe.Resources.size(), baseRecipe.Resources.size());
+    ASSERT_EQ(result.Recipe.Passes.size(), baseRecipe.Passes.size() + 1u);
+
+    const std::optional<std::uint32_t> surfaceIndex =
+        FindFrameRecipePassIndexById(result.Recipe, ToFramePassId(FrameRecipePassKind::Surface));
+    ASSERT_TRUE(surfaceIndex.has_value());
+    ASSERT_LT(*surfaceIndex + 1u, result.Recipe.Passes.size());
+
+    const FrameRecipePassDeclaration& contribution = result.Recipe.Passes[*surfaceIndex + 1u];
+    EXPECT_EQ(contribution.Id, FramePassId{9000u});
+    EXPECT_EQ(contribution.Name, std::string_view{"RegisteredOverlayPass"});
+    EXPECT_TRUE(contribution.Enabled);
+    EXPECT_TRUE(contribution.Contributed);
+    EXPECT_EQ(contribution.Queue, RenderQueue::AsyncCompute);
+    EXPECT_TRUE(Contains(contribution.Reads, "SceneColorHDR"));
+    EXPECT_TRUE(Contains(contribution.Reads, "SceneDepth"));
+    EXPECT_TRUE(Contains(contribution.Writes, "SceneColorHDR"));
+
+    ClearFrameRecipePassContributions(registry);
+    EXPECT_TRUE(registry.Passes.empty());
+}
+
+TEST(FrameRecipeContract, DisabledContributionDescriptorIsFeatureGatedNoOp)
+{
+    const FrameRecipeIntrospection baseRecipe = DescribeDefaultFrameRecipe(FrameRecipeFeatures{});
+
+    FrameRecipePassContributionRegistry registry{};
+    RegisterFrameRecipePassContribution(
+        registry,
+        FrameRecipePassContribution{
+            .Kind = FrameRecipePassKind::Culling,
+            .Id = {},
+            .Name = {},
+            .Enabled = false,
+            .Anchor = FrameRecipeContributionAnchor{
+                .PassId = FramePassId{7777u},
+                .Placement = FrameRecipeContributionAnchorPlacement::Before,
+            },
+            .Reads = {FrameResourceId{9999u}},
+            .Writes = {FrameResourceId{9998u}},
+        });
+
+    const FrameRecipeContributionDescriptionResult result =
+        DescribeFrameRecipeWithContributions(baseRecipe, registry.Passes);
+
+    EXPECT_TRUE(result.Succeeded);
+    EXPECT_FALSE(result.Validation.HasErrors());
+    EXPECT_EQ(result.Recipe.Passes.size(), baseRecipe.Passes.size());
+    EXPECT_EQ(result.Recipe.Resources.size(), baseRecipe.Resources.size());
+}
+
+TEST(FrameRecipeContract, ContributionValidationFailsClosedForInvalidDescriptors)
+{
+    const FrameRecipeIntrospection baseRecipe = DescribeDefaultFrameRecipe(FrameRecipeFeatures{});
+
+    FrameRecipePassContributionRegistry registry{};
+    RegisterFrameRecipePassContribution(
+        registry,
+        FrameRecipePassContribution{
+            .Kind = FrameRecipePassKind::Surface,
+            .Id = ToFramePassId(FrameRecipePassKind::Surface),
+            .Name = "SurfaceReplacement",
+            .Anchor = FrameRecipeContributionAnchor{
+                .PassId = ToFramePassId(FrameRecipePassKind::Present),
+            },
+            .Reads = {ToFrameResourceId(FrameRecipeResourceKind::SceneDepth)},
+        });
+    RegisterFrameRecipePassContribution(
+        registry,
+        FrameRecipePassContribution{
+            .Kind = FrameRecipePassKind::Culling,
+            .Id = FramePassId{9001u},
+            .Name = "DuplicateContributionA",
+            .Anchor = FrameRecipeContributionAnchor{
+                .PassId = ToFramePassId(FrameRecipePassKind::Present),
+            },
+            .Reads = {ToFrameResourceId(FrameRecipeResourceKind::SceneDepth)},
+        });
+    RegisterFrameRecipePassContribution(
+        registry,
+        FrameRecipePassContribution{
+            .Kind = FrameRecipePassKind::Culling,
+            .Id = FramePassId{9001u},
+            .Name = "DuplicateContributionB",
+            .Anchor = FrameRecipeContributionAnchor{
+                .PassId = ToFramePassId(FrameRecipePassKind::Present),
+            },
+            .Writes = {ToFrameResourceId(FrameRecipeResourceKind::SceneColorHDR)},
+        });
+    RegisterFrameRecipePassContribution(
+        registry,
+        FrameRecipePassContribution{
+            .Kind = FrameRecipePassKind::Culling,
+            .Id = FramePassId{9002u},
+            .Name = "UnknownResourceContribution",
+            .Anchor = FrameRecipeContributionAnchor{
+                .PassId = ToFramePassId(FrameRecipePassKind::Present),
+            },
+            .Reads = {FrameResourceId{9999u}},
+        });
+    RegisterFrameRecipePassContribution(
+        registry,
+        FrameRecipePassContribution{
+            .Kind = FrameRecipePassKind::Culling,
+            .Id = FramePassId{9003u},
+            .Name = "InvalidAnchorContribution",
+            .Anchor = FrameRecipeContributionAnchor{
+                .PassId = FramePassId{8888u},
+                .Placement = FrameRecipeContributionAnchorPlacement::Before,
+            },
+            .Reads = {ToFrameResourceId(FrameRecipeResourceKind::SceneDepth)},
+        });
+    RegisterFrameRecipePassContribution(
+        registry,
+        FrameRecipePassContribution{
+            .Kind = FrameRecipePassKind::Culling,
+            .Id = {},
+            .Name = {},
+            .Anchor = FrameRecipeContributionAnchor{
+                .PassId = ToFramePassId(FrameRecipePassKind::Present),
+            },
+        });
+
+    const FrameRecipeContributionValidationResult validation =
+        ValidateFrameRecipePassContributions(baseRecipe, registry.Passes);
+    EXPECT_TRUE(validation.HasErrors());
+    EXPECT_TRUE(HasContributionDiagnostic(validation, FrameRecipeContributionDiagnosticCode::FixedCorePassConflict));
+    EXPECT_TRUE(HasContributionDiagnostic(validation, FrameRecipeContributionDiagnosticCode::DuplicatePassId));
+    EXPECT_TRUE(HasContributionDiagnostic(validation, FrameRecipeContributionDiagnosticCode::UnknownResource));
+    EXPECT_TRUE(HasContributionDiagnostic(validation, FrameRecipeContributionDiagnosticCode::InvalidAnchor));
+    EXPECT_TRUE(HasContributionDiagnostic(validation, FrameRecipeContributionDiagnosticCode::InvalidPassId));
+    EXPECT_TRUE(HasContributionDiagnostic(validation, FrameRecipeContributionDiagnosticCode::EmptyName));
+
+    const FrameRecipeContributionDescriptionResult projected =
+        DescribeFrameRecipeWithContributions(baseRecipe, registry.Passes);
+    EXPECT_FALSE(projected.Succeeded);
+    EXPECT_TRUE(projected.Validation.HasErrors());
+    EXPECT_EQ(projected.Recipe.Passes.size(), baseRecipe.Passes.size())
+        << "Invalid contributions must not partially mutate the recipe surface.";
+    EXPECT_EQ(projected.Recipe.Resources.size(), baseRecipe.Resources.size());
 }
 
 TEST(FrameRecipeContract, DefaultRecipeUsesResourceDependenciesWithoutLinearChain)

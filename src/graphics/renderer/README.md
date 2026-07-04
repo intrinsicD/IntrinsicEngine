@@ -49,6 +49,13 @@ validated `FrameRecipeOverride` onto those feature gates, and then calls
 `BuildDefaultFrameRecipe(...)` to declare the render-graph pass/resource DAG for
 that frame. `DescribeDefaultFrameRecipe(...)` is the matching introspection
 surface for tests, debug views, UI, and config validation.
+Renderer-owned pass additions use `FrameRecipePassContribution` descriptors:
+typed `FramePassId` / `FrameResourceId` declarations, an enabled feature gate,
+an anchor relative to an enabled base pass, and queue/finalizer metadata.
+`ValidateFrameRecipePassContributions(...)` fails closed for fixed-core pass
+conflicts, duplicate IDs, unknown or disabled resources, and invalid anchors;
+`DescribeFrameRecipeWithContributions(...)` projects only validated enabled
+descriptors into recipe introspection.
 
 `RenderRecipe*` names the renderer-independent contract/config vocabulary.
 `RenderRecipeDescriptor`, `RenderRecipeConfig`, view/output recipes, and binding
@@ -322,6 +329,10 @@ into graphics public contracts.
   `CompiledRenderGraph` carries the recipe's typed texture/buffer resource IDs
   alongside debug names so renderer record paths bind declared resources by
   `FrameResourceId` rather than scanning per-frame resource-name strings.
+  Code-level pass contributions register through typed
+  `FrameRecipePassContribution` descriptors and are validated before they are
+  projected into introspection; config documents remain limited to the existing
+  optional-slot overlay.
 - `Graphics.RenderCommandRouter` owns the renderer command-recording dispatch
   seam. The renderer registers command recorders by `FramePassId`, command
   status records carry both `FramePassId` and the debug label, and unknown typed

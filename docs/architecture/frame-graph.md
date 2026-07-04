@@ -18,6 +18,11 @@ services, and platform state do not enter the graphics frame graph directly.
   refine those defaults before the graph is built.
 - `DescribeDefaultFrameRecipe(...)` exposes the same recipe shape as
   introspection data for tests, debug views, UI, and config validation.
+- `FrameRecipePassContributionRegistry` is the renderer-layer code seam for
+  typed pass descriptors. `ValidateFrameRecipePassContributions(...)` rejects
+  disabled-anchor, duplicate-ID, fixed-core-conflict, and unknown-resource
+  descriptors before `DescribeFrameRecipeWithContributions(...)` projects them
+  into introspection. This is not a document/config injection surface.
 - `RenderGraph` owns the compiled pass/resource DAG and resource-state
   scheduling. It receives declarations from the recipe; it is not the authority
   for deciding which gameplay or editor features are enabled. The compiled graph
@@ -104,7 +109,9 @@ active override is an overlay, not a replacement render graph.
 - The sandbox editor and agent/CLI surfaces may preview and request activation,
   but they do not mutate renderer internals directly.
 - `RenderRecipeConfig` is a document/config overlay. It is not a public pass
-  injection API and does not bypass `BuildDefaultFrameRecipe(...)`.
+  injection API and does not bypass `BuildDefaultFrameRecipe(...)`. Code-level
+  renderer contributions must use typed `FramePassId` / `FrameResourceId`
+  descriptors and the frame-recipe contribution validator instead.
 - Frame graph inputs are render-ready snapshots, handles, and renderer-owned
   imports. Live ECS registries, live `AssetService` traffic, platform windows,
   and backend-native `Vk*` types do not cross into recipe/config public APIs.

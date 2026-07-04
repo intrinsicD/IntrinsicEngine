@@ -755,8 +755,141 @@ namespace Extrinsic::Graphics
         return std::nullopt;
     }
 
+    bool FrameRecipeContributionValidationResult::HasErrors() const
+    {
+        return !Diagnostics.empty();
+    }
+
     namespace
     {
+        [[nodiscard]] const FrameRecipePassDeclaration* FindPassDeclarationById(
+            const FrameRecipeIntrospection& recipe,
+            const FramePassId id,
+            const bool requireEnabled)
+        {
+            if (!id.IsValid())
+            {
+                return nullptr;
+            }
+
+            for (const FrameRecipePassDeclaration& pass : recipe.Passes)
+            {
+                if (pass.Id == id && (!requireEnabled || pass.Enabled))
+                {
+                    return &pass;
+                }
+            }
+            return nullptr;
+        }
+
+        [[nodiscard]] const FrameRecipeResourceDeclaration* FindResourceDeclarationById(
+            const FrameRecipeIntrospection& recipe,
+            const FrameResourceId id,
+            const bool requireEnabled)
+        {
+            if (!id.IsValid())
+            {
+                return nullptr;
+            }
+
+            for (const FrameRecipeResourceDeclaration& resource : recipe.Resources)
+            {
+                if (resource.Id == id && (!requireEnabled || resource.Enabled))
+                {
+                    return &resource;
+                }
+            }
+            return nullptr;
+        }
+
+        [[nodiscard]] bool ContainsContributionPassId(const std::vector<FramePassId>& ids,
+                                                      const FramePassId id) noexcept
+        {
+            for (const FramePassId candidate : ids)
+            {
+                if (candidate == id)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        void AddContributionDiagnostic(FrameRecipeContributionValidationResult& result,
+                                       const FrameRecipeContributionDiagnosticCode code,
+                                       std::string message,
+                                       const FramePassId passId,
+                                       const FrameResourceId resourceId = {},
+                                       const FramePassId anchorPassId = {})
+        {
+            result.Diagnostics.push_back(FrameRecipeContributionDiagnostic{
+                .Code = code,
+                .Message = std::move(message),
+                .PassId = passId,
+                .ResourceId = resourceId,
+                .AnchorPassId = anchorPassId,
+            });
+        }
+
+        void ValidateContributionResources(FrameRecipeContributionValidationResult& result,
+                                           const FrameRecipeIntrospection& baseRecipe,
+                                           const FrameRecipePassContribution& contribution,
+                                           const std::vector<FrameResourceId>& resources,
+                                           const std::string_view accessKind)
+        {
+            for (const FrameResourceId resourceId : resources)
+            {
+                if (FindResourceDeclarationById(baseRecipe, resourceId, true) != nullptr)
+                {
+                    continue;
+                }
+
+                std::string message = "Frame recipe contribution references an unknown or disabled ";
+                message += accessKind;
+                message += " resource.";
+                AddContributionDiagnostic(result,
+                                          FrameRecipeContributionDiagnosticCode::UnknownResource,
+                                          std::move(message),
+                                          contribution.Id,
+                                          resourceId);
+            }
+        }
+
+        [[nodiscard]] std::vector<std::string_view> ContributionResourceNames(
+            const FrameRecipeIntrospection& baseRecipe,
+            const std::vector<FrameResourceId>& resources)
+        {
+            std::vector<std::string_view> names{};
+            names.reserve(resources.size());
+            for (const FrameResourceId resourceId : resources)
+            {
+                const FrameRecipeResourceDeclaration* resource =
+                    FindResourceDeclarationById(baseRecipe, resourceId, true);
+                if (resource != nullptr)
+                {
+                    names.push_back(resource->Name);
+                }
+            }
+            return names;
+        }
+
+        void AppendContributionPass(FrameRecipeIntrospection& out,
+                                    const FrameRecipeIntrospection& baseRecipe,
+                                    const FrameRecipePassContribution& contribution)
+        {
+            out.Passes.push_back(FrameRecipePassDeclaration{
+                .Kind = contribution.Kind,
+                .Id = contribution.Id,
+                .Name = contribution.Name,
+                .Enabled = true,
+                .FinalizesBackbuffer = contribution.FinalizesBackbuffer,
+                .Queue = contribution.Queue,
+                .Contributed = true,
+                .Reads = ContributionResourceNames(baseRecipe, contribution.Reads),
+                .Writes = ContributionResourceNames(baseRecipe, contribution.Writes),
+            });
+        }
+
         [[nodiscard]] std::optional<std::uint32_t> FindCompiledResourceIdIndex(
             const std::vector<FrameResourceId>& ids,
             const FrameResourceId id)
@@ -770,6 +903,131 @@ namespace Extrinsic::Graphics
             }
             return std::nullopt;
         }
+    }
+
+    void RegisterFrameRecipePassContribution(FrameRecipePassContributionRegistry& registry,
+                                             FrameRecipePassContribution contribution)
+    {
+        registry.Passes.push_back(std::move(contribution));
+    }
+
+    void ClearFrameRecipePassContributions(FrameRecipePassContributionRegistry& registry)
+    {
+        registry.Passes.clear();
+    }
+
+    [[nodiscard]] FrameRecipeContributionValidationResult ValidateFrameRecipePassContributions(
+        const FrameRecipeIntrospection& baseRecipe,
+        const std::vector<FrameRecipePassContribution>& contributions)
+    {
+        FrameRecipeContributionValidationResult result{};
+        std::vector<FramePassId> seenEnabledIds{};
+        seenEnabledIds.reserve(contributions.size());
+
+        for (const FrameRecipePassContribution& contribution : contributions)
+        {
+            if (!contribution.Enabled)
+            {
+                continue;
+            }
+
+            if (!contribution.Id.IsValid())
+            {
+                AddContributionDiagnostic(result,
+                                          FrameRecipeContributionDiagnosticCode::InvalidPassId,
+                                          "Frame recipe contribution requires a valid typed pass id.",
+                                          contribution.Id);
+            }
+            else
+            {
+                if (FindPassDeclarationById(baseRecipe, contribution.Id, false) != nullptr)
+                {
+                    AddContributionDiagnostic(result,
+                                              FrameRecipeContributionDiagnosticCode::FixedCorePassConflict,
+                                              "Frame recipe contribution pass id conflicts with the fixed core recipe.",
+                                              contribution.Id);
+                }
+
+                if (ContainsContributionPassId(seenEnabledIds, contribution.Id))
+                {
+                    AddContributionDiagnostic(result,
+                                              FrameRecipeContributionDiagnosticCode::DuplicatePassId,
+                                              "Frame recipe contribution pass id is registered more than once.",
+                                              contribution.Id);
+                }
+                seenEnabledIds.push_back(contribution.Id);
+            }
+
+            if (contribution.Name.empty())
+            {
+                AddContributionDiagnostic(result,
+                                          FrameRecipeContributionDiagnosticCode::EmptyName,
+                                          "Frame recipe contribution requires a non-empty pass name.",
+                                          contribution.Id);
+            }
+
+            if (FindPassDeclarationById(baseRecipe, contribution.Anchor.PassId, true) == nullptr)
+            {
+                AddContributionDiagnostic(result,
+                                          FrameRecipeContributionDiagnosticCode::InvalidAnchor,
+                                          "Frame recipe contribution anchor must reference an enabled base recipe pass.",
+                                          contribution.Id,
+                                          {},
+                                          contribution.Anchor.PassId);
+            }
+
+            ValidateContributionResources(result, baseRecipe, contribution, contribution.Reads, "read");
+            ValidateContributionResources(result, baseRecipe, contribution, contribution.Writes, "write");
+        }
+
+        return result;
+    }
+
+    [[nodiscard]] FrameRecipeContributionDescriptionResult DescribeFrameRecipeWithContributions(
+        const FrameRecipeIntrospection& baseRecipe,
+        const std::vector<FrameRecipePassContribution>& contributions)
+    {
+        FrameRecipeContributionDescriptionResult result{
+            .Recipe = baseRecipe,
+            .Validation = ValidateFrameRecipePassContributions(baseRecipe, contributions),
+            .Succeeded = false,
+        };
+        if (result.Validation.HasErrors())
+        {
+            return result;
+        }
+
+        FrameRecipeIntrospection projected{};
+        projected.Resources = baseRecipe.Resources;
+
+        for (const FrameRecipePassDeclaration& basePass : baseRecipe.Passes)
+        {
+            for (const FrameRecipePassContribution& contribution : contributions)
+            {
+                if (contribution.Enabled &&
+                    contribution.Anchor.PassId == basePass.Id &&
+                    contribution.Anchor.Placement == FrameRecipeContributionAnchorPlacement::Before)
+                {
+                    AppendContributionPass(projected, baseRecipe, contribution);
+                }
+            }
+
+            projected.Passes.push_back(basePass);
+
+            for (const FrameRecipePassContribution& contribution : contributions)
+            {
+                if (contribution.Enabled &&
+                    contribution.Anchor.PassId == basePass.Id &&
+                    contribution.Anchor.Placement == FrameRecipeContributionAnchorPlacement::After)
+                {
+                    AppendContributionPass(projected, baseRecipe, contribution);
+                }
+            }
+        }
+
+        result.Recipe = std::move(projected);
+        result.Succeeded = true;
+        return result;
     }
 
     std::optional<std::uint32_t> FindCompiledPassIndexForRecipeId(
