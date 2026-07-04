@@ -24,8 +24,6 @@ without requiring them to read every file.
 
 ## Current open rendering leaves
 
-- [`GRAPHICS-113`](GRAPHICS-113-selection-outline-id-work-pruning.md) —
-  selected-outline ID work pruning for selected-but-not-picking frames.
 - [`GRAPHICS-114`](GRAPHICS-114-retained-imgui-overlay-copy-upload-path.md) —
   retained ImGui overlay copy/upload cleanup after retired `GRAPHICS-110`.
 - [`GRAPHICS-115`](GRAPHICS-115-object-space-normal-gpu-dilation.md) —

@@ -3,8 +3,27 @@ id: GRAPHICS-113
 theme: B
 depends_on: []
 maturity_target: Operational
+completed: 2026-07-04
 ---
 # GRAPHICS-113 — Selection outline ID work pruning
+
+## Completion
+- Completed: 2026-07-04. Commit/PR: this retirement change.
+- Maturity: `Operational` on Vulkan-capable hosts; `CPUContracted` on the
+  default frame-recipe and command-route contracts.
+- Summary: selected/hovered outline frames now use the one-target
+  `Renderer.SelectionEntityId.OutlineOnly` path and declare/write only
+  `EntityId`; pending click-pick frames keep the full `EntityId` +
+  `PrimitiveId` + `Picking.Readback` route and primitive subpasses.
+- Candidate narrowing evaluation: no additional selected/hovered-only draw
+  narrowing landed in this slice. The current graphics-owned execution seam
+  exposes whole `SurfaceOpaque` cull-bucket indirect buffers to
+  `EntityIdPass::Execute(...)`, while selected/hovered stable IDs are CPU
+  snapshot data consumed by outline push constants, not a GPU-readable filtered
+  draw list. Narrowing ID rendering further would require a new graphics-owned
+  filtered indirect buffer/cull bucket or shader-visible selected-ID data
+  contract with its own tests, so it remains outside this task's safe local
+  scope.
 
 ## Goal
 - Reduce selected-but-not-picking renderer work so selection outline frames do only the ID/mask work actually required for hovered/selected highlighting, without carrying primitive-picking resources or full-scene primitive ID work when no click pick is pending.
@@ -25,7 +44,7 @@ maturity_target: Operational
 - [x] Split outline-only ID production from click-picking production in the frame recipe so `PrimitiveId` and `Picking.Readback` are active only when a pick request is pending.
 - [x] Adjust the selection entity-ID pipeline/pass descriptor, render-pass attachment setup, and framegraph resource declarations so outline-only frames write only the resources they consume.
 - [x] Preserve the existing primitive face/edge/point ID subpasses and readback route for actual pending picks.
-- [ ] Evaluate whether outline-only ID rendering can be narrowed to selected/hovered candidates rather than all surface cull buckets; implement only if it remains within graphics snapshot ownership and has focused tests.
+- [x] Evaluate whether outline-only ID rendering can be narrowed to selected/hovered candidates rather than all surface cull buckets; implement only if it remains within graphics snapshot ownership and has focused tests.
 - [x] Expose renderer diagnostics that distinguish outline-only ID work, pending-pick primitive ID work, and readback copies.
 
 ## Tests
@@ -36,7 +55,9 @@ maturity_target: Operational
 
 ## Docs
 - [x] Update `src/graphics/renderer/README.md` and any frame-recipe docs to describe the outline-only vs picking resource split.
-- [x] Link this task from `RUNTIME-138` and the rendering backlog index as the renderer-owned selected-frame work-pruning follow-up.
+- [x] Update `RUNTIME-138`, the rendering backlog index, and related review
+      links so selected-frame work-pruning ownership reflects this retired
+      renderer slice.
 
 ## Acceptance criteria
 - [x] Selected-but-not-picking frames do not allocate, transition, write, or read `PrimitiveId`.
@@ -49,7 +70,15 @@ maturity_target: Operational
 ```bash
 python3 tools/agents/validate_tasks.py --root tasks --strict
 python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/check_task_state_links.py --root . --strict
+python3 tools/agents/generate_session_brief.py --check
 python3 tools/repo/check_layering.py --root src --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main
+python3 tools/repo/check_test_layout.py --root . --strict
+git diff --check
+git grep -n "\\[DBG-" -- .
+tools/ci/run_clean_workshop_review.sh . --strict
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -R 'FrameRecipe|RendererFrameLifecycle|Selection' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
@@ -66,10 +95,9 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'Se
 - Mixing unrelated frame-recipe or pass rewrites into this work.
 
 ## Maturity
-- Target: `Operational` on Vulkan-capable hosts; `CPUContracted` for frame-recipe and command-route contracts.
-- This task may retire at `CPUContracted` only if `Operational` owned by a follow-up task is explicitly named; otherwise the selected-frame Vulkan smoke is required.
-- Current implementation state (2026-07-02): `Operational` for the outline-only
-  vs pending-pick split. Frame-recipe, command-route, diagnostics, and
-  pipeline-shape contracts are implemented, and targeted `gpu;vulkan` sandbox
-  smokes passed for click-picking and selected-outline visibility. The
-  candidate-narrowing evaluation remains open before retirement.
+- Retired at `Operational` on Vulkan-capable hosts; `CPUContracted` for the
+  default CPU frame-recipe and command-route contracts.
+- The selected-frame Vulkan smoke remains the operational proof for the
+  outline-only vs pending-pick split. Further selected/hovered-only draw-list
+  narrowing is a separate graphics design/implementation task because it needs a
+  new filtered indirect draw or shader-visible selected-ID contract.

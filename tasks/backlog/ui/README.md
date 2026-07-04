@@ -43,7 +43,7 @@ retired under the runtime backlog as `RUNTIME-135`.
 - UI-030 is the diagnostic follow-up from the 2026-07-01 editor-stutter review:
   it builds an evidence loop before blaming barriers, fences, present pacing, or
   editor CPU work. Source-level selected-entity findings are now tracked by
-  `RUNTIME-138` for the nonblocking runtime/editor cache-job pipeline,
+  `RUNTIME-138` for the nonblocking runtime/editor cache-job pipeline, retired
   `GRAPHICS-113` for selected-outline ID work pruning, and `GRAPHICS-114` for
   retained ImGui overlay copy/upload cleanup.
 - UI-031 is the information-architecture follow-up from the 2026-07-01

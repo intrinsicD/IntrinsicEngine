@@ -94,7 +94,7 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'Sa
 
 ## Maturity
 - Target: `Operational` for the real sandbox selected-entity path on a Vulkan-capable host; `CPUContracted` for backend-neutral cache/job contracts.
-- Renderer-specific GPU work pruning is owned by `GRAPHICS-113`.
+- Renderer-specific GPU work pruning was retired by `GRAPHICS-113`.
 - ImGui overlay copy/upload cleanup is owned by `GRAPHICS-114`, after `GRAPHICS-110` resolves in-flight upload-buffer safety.
 - Current implementation state (2026-07-02): partial `CPUContracted` Slice B.
   The editor now visibility-gates selected-entity model sections, shares

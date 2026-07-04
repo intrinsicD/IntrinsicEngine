@@ -3274,3 +3274,17 @@ to `UINT32_MAX` on GPU overflow, while the CPU reference continues to report
 dispatch planning contract are unchanged. The Vulkan smoke covers existing
 scan/compaction parity plus local and multiblock overflow fixtures, and the
 architecture/audit docs record the saturation semantics.
+
+[`GRAPHICS-113`](GRAPHICS-113-selection-outline-id-work-pruning.md) —
+Selection outline ID work pruning retired to `tasks/done/` on 2026-07-04 at
+`Operational` on Vulkan-capable hosts and `CPUContracted` for the default
+frame-recipe/command-route contracts. The implemented path splits outline-only
+selection frames from pending click-picking: selected/hovered frames declare and
+write only `EntityId` through the one-target
+`Renderer.SelectionEntityId.OutlineOnly` pipeline, while pending picks keep the
+full `EntityId` + `PrimitiveId` + `Picking.Readback` route and primitive
+subpasses. The remaining candidate-narrowing question was evaluated and closed
+without local implementation: current graphics seams expose whole
+`SurfaceOpaque` indirect buckets and CPU snapshot selected IDs, so further
+selected/hovered-only draw narrowing needs a separate filtered indirect
+draw/shader-visible selected-ID contract rather than a safe local pass tweak.

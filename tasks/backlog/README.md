@@ -66,8 +66,8 @@ seams), the CPU/GPU transfer foundation (`GRAPHICS-095..098`), and the
 contract-first renderer/snapshot/recipe architecture sequence
 (`GRAPHICS-099..103`, `RUNTIME-127`, `UI-023`) are retired — see
 [`rendering/README.md`](rendering/README.md) and the retirement log. Current
-open Theme B leaves include the compute/upload cleanup leaves
-(`GRAPHICS-113..114`), object-space normal bake operational follow-ups
+open Theme B leaves include the compute/upload cleanup leaf
+(`GRAPHICS-114`), object-space normal bake operational follow-ups
 (`GRAPHICS-115`, `RUNTIME-129`), the profile-gated vertex attribute
 operational follow-up (`RUNTIME-139`), and the 2026-07-03 render-graph
 review leaves — pass contribution seam (`GRAPHICS-116`), compile caching
