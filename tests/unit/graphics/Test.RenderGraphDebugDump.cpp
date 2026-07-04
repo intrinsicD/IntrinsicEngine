@@ -73,7 +73,7 @@ TEST(RenderGraphDebugDump, GoldenSmallRenderPassGraphIncludesAttachmentsAndResou
 
     const std::string expected =
         "RenderGraph\n"
-        "  pass_count=3 culled_pass_count=0 resource_count=3 edge_count=2 queue_handoff_edges=0 cross_queue_timeline_edges=0 cross_queue_ownership_transfers=0 barrier_packet_count=4\n"
+        "  pass_count=3 culled_pass_count=0 resource_count=3 edge_count=2 queue_handoff_edges=0 cross_queue_timeline_edges=0 cross_queue_ownership_transfers=0 barrier_packet_count=4 transient_naive_memory_bytes=512 transient_placed_peak_memory_bytes=512\n"
         "  passes:\n"
         "    [0] pass=0 name=\"DepthPrepass\" layer=0 queue=graphics side_effect=false\n"
         "      explicit_dependencies: none\n"
@@ -119,5 +119,4 @@ TEST(RenderGraphDebugDump, ResourceOnlyGraphRetainsImportedStateMetadata)
     EXPECT_NE(dump.find("texture[0] name=\"HistoryColor\" used=false imported=true sharing=exclusive final_state=Present"),
               std::string::npos);
 }
-
 

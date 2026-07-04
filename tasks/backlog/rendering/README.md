@@ -24,9 +24,6 @@ without requiring them to read every file.
 
 ## Current open rendering leaves
 
-- [`GRAPHICS-118`](GRAPHICS-118-placed-transient-memory-aliasing.md) —
-  placed transient resource allocation with real GPU memory aliasing
-  (2026-07-03 review R15).
 - [`GRAPHICS-119`](GRAPHICS-119-parallel-pass-command-recording.md) —
   parallel render-pass command recording via the task scheduler
   (2026-07-03 review R13).

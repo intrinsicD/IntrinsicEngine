@@ -122,6 +122,32 @@ reports per-frame compile attempt/cache-hit counters through
 default frames leave `RenderGraphFrameStats::DebugDump` empty, and explicit
 renderer debug-dump enablement builds it from the current compiled graph.
 
+## Transient Placement
+
+The framegraph compile product includes a deterministic placement plan for used
+non-imported transient textures and buffers. Placement is driven by the same
+first/last pass lifetime intervals used for logical transient handle reuse. Each
+placement records `{block, offset, size, alignment}` plus the owning resource and
+lifetime. The compiler exposes both the aligned naive sum and the planned peak
+through `CompiledRenderGraph::TransientNaiveMemoryEstimateBytes` and
+`CompiledRenderGraph::TransientPlacedPeakMemoryEstimateBytes`; renderer frame
+stats mirror those fields. `TransientMemoryEstimateBytes` remains as the legacy
+single estimate and currently equals the planned peak.
+
+`SetTransientAliasingEnabled(false)` is the CPU and debug fallback lane: it
+keeps the placement records but disables range reuse, so planned peak equals the
+naive sum and alias-reuse hazard packets are absent. With aliasing enabled, a
+range can be reused only after the prior occupant's last use pass is strictly
+before the new occupant's first use pass. Reuse emits a
+`TextureAliasReuseBarrierPacket` or `BufferAliasReuseBarrierPacket` on the
+new occupant's `BeforePass` barrier packet.
+
+This is the GRAPHICS-118 Slice A contract. Real RHI memory-block compatibility,
+Null bookkeeping, Vulkan placed binds, backend alias barriers, renderer adoption,
+and measured Vulkan memory reduction remain follow-up slices. Until those land,
+renderer transient allocation still creates/caches concrete per-frame RHI
+textures and buffers per resource index.
+
 ## Boundaries
 
 - Graphics owns frame recipes, render-graph compilation, resource transitions,

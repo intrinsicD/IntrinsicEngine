@@ -61,6 +61,24 @@ namespace Extrinsic::Graphics
                     }
                 }
 
+                for (const TextureAliasReuseBarrierPacket& aliasBarrier : packet.TextureAliasReuseBarriers)
+                {
+                    if (aliasBarrier.PreviousTextureIndex >= graph.TextureHandles.size() ||
+                        aliasBarrier.TextureIndex >= graph.TextureHandles.size())
+                    {
+                        return Core::Err(Core::ErrorCode::OutOfRange);
+                    }
+                }
+
+                for (const BufferAliasReuseBarrierPacket& aliasBarrier : packet.BufferAliasReuseBarriers)
+                {
+                    if (aliasBarrier.PreviousBufferIndex >= graph.BufferHandles.size() ||
+                        aliasBarrier.BufferIndex >= graph.BufferHandles.size())
+                    {
+                        return Core::Err(Core::ErrorCode::OutOfRange);
+                    }
+                }
+
                 if (onBarriers)
                 {
                     onBarriers(packet);

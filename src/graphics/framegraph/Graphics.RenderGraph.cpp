@@ -8,6 +8,7 @@ module;
 #include <limits>
 #include <memory>
 #include <ranges>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -23,6 +24,7 @@ import :TransientAllocator;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.TextureUpload;
 
 namespace Extrinsic::Graphics
 {
@@ -49,6 +51,230 @@ namespace Extrinsic::Graphics
         [[nodiscard]] constexpr bool BufferStateAllowsWrite(const BufferState state)
         {
             return state == BufferState::ShaderWrite || state == BufferState::TransferDst;
+        }
+
+        inline constexpr std::uint32_t kInvalidTransientPlacementResource =
+            std::numeric_limits<std::uint32_t>::max();
+        inline constexpr std::uint64_t kDefaultTransientPlacementAlignmentBytes = 256u;
+
+        [[nodiscard]] constexpr std::uint64_t AlignUp(const std::uint64_t value,
+                                                       const std::uint64_t alignment) noexcept
+        {
+            if (alignment <= 1u)
+            {
+                return value;
+            }
+            const std::uint64_t remainder = value % alignment;
+            return remainder == 0u ? value : value + (alignment - remainder);
+        }
+
+        [[nodiscard]] constexpr std::uint64_t AlignedTransientSize(const std::uint64_t sizeBytes,
+                                                                   const std::uint64_t alignmentBytes) noexcept
+        {
+            return sizeBytes == 0u ? 0u : AlignUp(sizeBytes, alignmentBytes);
+        }
+
+        [[nodiscard]] constexpr std::uint8_t BarrierStageSortKey(const BarrierPacketStage stage) noexcept
+        {
+            switch (stage)
+            {
+            case BarrierPacketStage::BeforePass:
+                return 0u;
+            case BarrierPacketStage::AfterPass:
+                return 1u;
+            }
+            return 0u;
+        }
+
+        void SortBarrierPacketsByPass(std::vector<BarrierPacket>& packets)
+        {
+            std::ranges::stable_sort(packets, [](const BarrierPacket& lhs, const BarrierPacket& rhs) {
+                return std::tuple{lhs.PassIndex, BarrierStageSortKey(lhs.Stage)} <
+                       std::tuple{rhs.PassIndex, BarrierStageSortKey(rhs.Stage)};
+            });
+        }
+
+        [[nodiscard]] BarrierPacket& FindOrCreateBarrierPacket(std::vector<BarrierPacket>& packets,
+                                                               const std::uint32_t passIndex,
+                                                               const BarrierPacketStage stage)
+        {
+            const auto it = std::ranges::find_if(packets, [passIndex, stage](const BarrierPacket& packet) {
+                return packet.PassIndex == passIndex && packet.Stage == stage;
+            });
+            if (it != packets.end())
+            {
+                return *it;
+            }
+
+            packets.push_back(BarrierPacket{
+                .Kind = BarrierKind::AliasReuse,
+                .PassIndex = passIndex,
+                .Stage = stage,
+            });
+            return packets.back();
+        }
+
+        struct TransientPlacementItem
+        {
+            std::uint32_t ResourceIndex = 0u;
+            std::uint32_t FirstUsePass = 0u;
+            std::uint32_t LastUsePass = 0u;
+            std::uint64_t SizeBytes = 0u;
+            std::uint64_t AlignmentBytes = 1u;
+        };
+
+        struct TransientPlacementPlan
+        {
+            std::vector<TransientResourcePlacement> Placements{};
+            std::uint64_t PeakBytes = 0u;
+        };
+
+        template <typename EmitAliasReuseHazard>
+        [[nodiscard]] TransientPlacementPlan BuildTransientPlacementPlan(
+            const std::span<const TransientPlacementItem> items,
+            const bool aliasingEnabled,
+            EmitAliasReuseHazard&& emitAliasReuseHazard)
+        {
+            struct ActiveRange
+            {
+                std::uint32_t ResourceIndex = 0u;
+                std::uint32_t LastUsePass = 0u;
+                std::uint32_t BlockIndex = 0u;
+                std::uint64_t OffsetBytes = 0u;
+                std::uint64_t SizeBytes = 0u;
+            };
+
+            struct FreeRange
+            {
+                std::uint32_t BlockIndex = 0u;
+                std::uint64_t OffsetBytes = 0u;
+                std::uint64_t SizeBytes = 0u;
+                std::uint32_t PreviousResourceIndex = kInvalidTransientPlacementResource;
+            };
+
+            std::vector<ActiveRange> activeRanges{};
+            std::vector<FreeRange> freeRanges{};
+            std::uint64_t blockSize = 0u;
+            TransientPlacementPlan plan{};
+            plan.Placements.reserve(items.size());
+
+            auto sortFreeRanges = [&]() {
+                std::ranges::sort(freeRanges, [](const FreeRange& lhs, const FreeRange& rhs) {
+                    return std::tuple{lhs.BlockIndex, lhs.OffsetBytes, lhs.SizeBytes, lhs.PreviousResourceIndex} <
+                           std::tuple{rhs.BlockIndex, rhs.OffsetBytes, rhs.SizeBytes, rhs.PreviousResourceIndex};
+                });
+            };
+
+            for (const TransientPlacementItem& item : items)
+            {
+                for (std::size_t activeIndex = 0u; activeIndex < activeRanges.size();)
+                {
+                    const ActiveRange& active = activeRanges[activeIndex];
+                    if (active.LastUsePass < item.FirstUsePass)
+                    {
+                        if (aliasingEnabled && active.SizeBytes != 0u)
+                        {
+                            freeRanges.push_back(FreeRange{
+                                .BlockIndex = active.BlockIndex,
+                                .OffsetBytes = active.OffsetBytes,
+                                .SizeBytes = active.SizeBytes,
+                                .PreviousResourceIndex = active.ResourceIndex,
+                            });
+                        }
+                        activeRanges.erase(activeRanges.begin() + static_cast<std::ptrdiff_t>(activeIndex));
+                        continue;
+                    }
+                    ++activeIndex;
+                }
+
+                sortFreeRanges();
+
+                bool placedInFreeRange = false;
+                std::uint32_t blockIndex = 0u;
+                std::uint64_t offsetBytes = 0u;
+
+                if (aliasingEnabled && item.SizeBytes != 0u)
+                {
+                    for (std::size_t rangeIndex = 0u; rangeIndex < freeRanges.size(); ++rangeIndex)
+                    {
+                        const FreeRange range = freeRanges[rangeIndex];
+                        const std::uint64_t alignedOffset = AlignUp(range.OffsetBytes, item.AlignmentBytes);
+                        const std::uint64_t rangeEnd = range.OffsetBytes + range.SizeBytes;
+                        if (alignedOffset > rangeEnd || item.SizeBytes > rangeEnd - alignedOffset)
+                        {
+                            continue;
+                        }
+
+                        blockIndex = range.BlockIndex;
+                        offsetBytes = alignedOffset;
+                        placedInFreeRange = true;
+                        freeRanges.erase(freeRanges.begin() + static_cast<std::ptrdiff_t>(rangeIndex));
+
+                        if (range.OffsetBytes < alignedOffset)
+                        {
+                            freeRanges.push_back(FreeRange{
+                                .BlockIndex = range.BlockIndex,
+                                .OffsetBytes = range.OffsetBytes,
+                                .SizeBytes = alignedOffset - range.OffsetBytes,
+                                .PreviousResourceIndex = range.PreviousResourceIndex,
+                            });
+                        }
+
+                        const std::uint64_t allocationEnd = alignedOffset + item.SizeBytes;
+                        if (allocationEnd < rangeEnd)
+                        {
+                            freeRanges.push_back(FreeRange{
+                                .BlockIndex = range.BlockIndex,
+                                .OffsetBytes = allocationEnd,
+                                .SizeBytes = rangeEnd - allocationEnd,
+                                .PreviousResourceIndex = range.PreviousResourceIndex,
+                            });
+                        }
+
+                        if (range.PreviousResourceIndex != kInvalidTransientPlacementResource)
+                        {
+                            emitAliasReuseHazard(range.PreviousResourceIndex,
+                                                 item.ResourceIndex,
+                                                 item.FirstUsePass,
+                                                 blockIndex,
+                                                 offsetBytes,
+                                                 item.SizeBytes);
+                        }
+                        break;
+                    }
+                }
+
+                if (!placedInFreeRange)
+                {
+                    offsetBytes = AlignUp(blockSize, item.AlignmentBytes);
+                    blockSize = offsetBytes + item.SizeBytes;
+                }
+
+                plan.Placements.push_back(TransientResourcePlacement{
+                    .ResourceIndex = item.ResourceIndex,
+                    .BlockIndex = blockIndex,
+                    .OffsetBytes = offsetBytes,
+                    .SizeBytes = item.SizeBytes,
+                    .AlignmentBytes = item.AlignmentBytes,
+                    .FirstUsePass = item.FirstUsePass,
+                    .LastUsePass = item.LastUsePass,
+                });
+
+                activeRanges.push_back(ActiveRange{
+                    .ResourceIndex = item.ResourceIndex,
+                    .LastUsePass = item.LastUsePass,
+                    .BlockIndex = blockIndex,
+                    .OffsetBytes = offsetBytes,
+                    .SizeBytes = item.SizeBytes,
+                });
+            }
+
+            plan.PeakBytes = blockSize;
+            std::ranges::sort(plan.Placements, [](const TransientResourcePlacement& lhs,
+                                                  const TransientResourcePlacement& rhs) {
+                return lhs.ResourceIndex < rhs.ResourceIndex;
+            });
+            return plan;
         }
     }
 
@@ -411,34 +637,6 @@ namespace Extrinsic::Graphics
 
         m_Impl->LastCompileValidationResult.Findings = compiled->ValidationFindings;
 
-        auto BytesPerPixel = [](const RHI::Format fmt) -> std::uint64_t {
-            switch (fmt)
-            {
-            case RHI::Format::R8_UNORM: return 1u;
-            case RHI::Format::RG8_UNORM: return 2u;
-            case RHI::Format::RGBA8_UNORM:
-            case RHI::Format::RGBA8_SRGB:
-            case RHI::Format::BGRA8_UNORM:
-            case RHI::Format::BGRA8_SRGB:
-            case RHI::Format::R32_FLOAT:
-            case RHI::Format::R32_UINT:
-            case RHI::Format::R32_SINT:
-            case RHI::Format::D32_FLOAT: return 4u;
-            case RHI::Format::RG16_FLOAT:
-            case RHI::Format::R16_FLOAT:
-            case RHI::Format::R16_UINT:
-            case RHI::Format::R16_UNORM:
-            case RHI::Format::D16_UNORM: return 2u;
-            case RHI::Format::RGBA16_FLOAT:
-            case RHI::Format::RG32_FLOAT:
-            case RHI::Format::D24_UNORM_S8_UINT: return 8u;
-            case RHI::Format::RGB32_FLOAT:
-            case RHI::Format::D32_FLOAT_S8_UINT: return 12u;
-            case RHI::Format::RGBA32_FLOAT: return 16u;
-            default: return 4u;
-            }
-        };
-
         m_Impl->Transients.ResetFrame();
 
         struct TextureAllocItem
@@ -446,12 +644,16 @@ namespace Extrinsic::Graphics
             std::uint32_t ResourceIndex = 0u;
             std::uint32_t FirstUsePass = 0u;
             std::uint32_t LastUsePass = 0u;
+            std::uint64_t SizeBytes = 0u;
+            std::uint64_t AlignmentBytes = kDefaultTransientPlacementAlignmentBytes;
         };
         struct BufferAllocItem
         {
             std::uint32_t ResourceIndex = 0u;
             std::uint32_t FirstUsePass = 0u;
             std::uint32_t LastUsePass = 0u;
+            std::uint64_t SizeBytes = 0u;
+            std::uint64_t AlignmentBytes = kDefaultTransientPlacementAlignmentBytes;
         };
         std::vector<TextureAllocItem> texturesToAllocate{};
         std::vector<BufferAllocItem> buffersToAllocate{};
@@ -464,11 +666,17 @@ namespace Extrinsic::Graphics
             {
                 continue;
             }
+            const std::uint64_t sizeBytes = AlignedTransientSize(
+                RHI::EstimateTextureStorageBytes(m_Impl->Textures[i].Desc),
+                kDefaultTransientPlacementAlignmentBytes);
             texturesToAllocate.push_back(TextureAllocItem{
                 .ResourceIndex = i,
                 .FirstUsePass = compiled->TextureLifetimes[i].FirstUsePass,
                 .LastUsePass = compiled->TextureLifetimes[i].LastUsePass,
+                .SizeBytes = sizeBytes,
+                .AlignmentBytes = kDefaultTransientPlacementAlignmentBytes,
             });
+            compiled->TransientNaiveMemoryEstimateBytes += sizeBytes;
         }
         for (std::uint32_t i = 0; i < m_Impl->Buffers.size(); ++i)
         {
@@ -476,11 +684,17 @@ namespace Extrinsic::Graphics
             {
                 continue;
             }
+            const std::uint64_t sizeBytes = AlignedTransientSize(
+                m_Impl->Buffers[i].Desc.SizeBytes,
+                kDefaultTransientPlacementAlignmentBytes);
             buffersToAllocate.push_back(BufferAllocItem{
                 .ResourceIndex = i,
                 .FirstUsePass = compiled->BufferLifetimes[i].FirstUsePass,
                 .LastUsePass = compiled->BufferLifetimes[i].LastUsePass,
+                .SizeBytes = sizeBytes,
+                .AlignmentBytes = kDefaultTransientPlacementAlignmentBytes,
             });
+            compiled->TransientNaiveMemoryEstimateBytes += sizeBytes;
         }
 
         auto byFirstThenIndex = [](const auto& lhs, const auto& rhs) {
@@ -561,29 +775,79 @@ namespace Extrinsic::Graphics
             }
         }
 
-        for (std::uint32_t i = 0; i < m_Impl->Textures.size(); ++i)
+        std::vector<TransientPlacementItem> texturePlacementItems{};
+        texturePlacementItems.reserve(texturesToAllocate.size());
+        for (const TextureAllocItem& item : texturesToAllocate)
         {
-            if (m_Impl->Textures[i].Imported || !compiled->TextureLifetimes[i].HasUse)
-            {
-                continue;
-            }
-            const auto& desc = m_Impl->Textures[i].Desc;
-            compiled->TransientMemoryEstimateBytes += static_cast<std::uint64_t>(desc.Width) *
-                                                      static_cast<std::uint64_t>(desc.Height) *
-                                                      static_cast<std::uint64_t>(desc.DepthOrArrayLayers) *
-                                                      static_cast<std::uint64_t>(desc.MipLevels) *
-                                                      static_cast<std::uint64_t>(std::max(desc.SampleCount, 1u)) *
-                                                      BytesPerPixel(desc.Fmt);
+            texturePlacementItems.push_back(TransientPlacementItem{
+                .ResourceIndex = item.ResourceIndex,
+                .FirstUsePass = item.FirstUsePass,
+                .LastUsePass = item.LastUsePass,
+                .SizeBytes = item.SizeBytes,
+                .AlignmentBytes = item.AlignmentBytes,
+            });
         }
 
-        for (std::uint32_t i = 0; i < m_Impl->Buffers.size(); ++i)
+        std::vector<TransientPlacementItem> bufferPlacementItems{};
+        bufferPlacementItems.reserve(buffersToAllocate.size());
+        for (const BufferAllocItem& item : buffersToAllocate)
         {
-            if (m_Impl->Buffers[i].Imported || !compiled->BufferLifetimes[i].HasUse)
-            {
-                continue;
-            }
-            compiled->TransientMemoryEstimateBytes += m_Impl->Buffers[i].Desc.SizeBytes;
+            bufferPlacementItems.push_back(TransientPlacementItem{
+                .ResourceIndex = item.ResourceIndex,
+                .FirstUsePass = item.FirstUsePass,
+                .LastUsePass = item.LastUsePass,
+                .SizeBytes = item.SizeBytes,
+                .AlignmentBytes = item.AlignmentBytes,
+            });
         }
+
+        auto emitTextureAliasReuseHazard =
+            [&compiled](const std::uint32_t previousResourceIndex,
+                        const std::uint32_t resourceIndex,
+                        const std::uint32_t passIndex,
+                        const std::uint32_t blockIndex,
+                        const std::uint64_t offsetBytes,
+                        const std::uint64_t sizeBytes)
+        {
+            BarrierPacket& packet = FindOrCreateBarrierPacket(
+                compiled->BarrierPackets, passIndex, BarrierPacketStage::BeforePass);
+            packet.TextureAliasReuseBarriers.push_back(TextureAliasReuseBarrierPacket{
+                .PreviousTextureIndex = previousResourceIndex,
+                .TextureIndex = resourceIndex,
+                .BlockIndex = blockIndex,
+                .OffsetBytes = offsetBytes,
+                .SizeBytes = sizeBytes,
+            });
+        };
+
+        auto emitBufferAliasReuseHazard =
+            [&compiled](const std::uint32_t previousResourceIndex,
+                        const std::uint32_t resourceIndex,
+                        const std::uint32_t passIndex,
+                        const std::uint32_t blockIndex,
+                        const std::uint64_t offsetBytes,
+                        const std::uint64_t sizeBytes)
+        {
+            BarrierPacket& packet = FindOrCreateBarrierPacket(
+                compiled->BarrierPackets, passIndex, BarrierPacketStage::BeforePass);
+            packet.BufferAliasReuseBarriers.push_back(BufferAliasReuseBarrierPacket{
+                .PreviousBufferIndex = previousResourceIndex,
+                .BufferIndex = resourceIndex,
+                .BlockIndex = blockIndex,
+                .OffsetBytes = offsetBytes,
+                .SizeBytes = sizeBytes,
+            });
+        };
+
+        TransientPlacementPlan texturePlan =
+            BuildTransientPlacementPlan(texturePlacementItems, m_Impl->TransientAliasingEnabled, emitTextureAliasReuseHazard);
+        TransientPlacementPlan bufferPlan =
+            BuildTransientPlacementPlan(bufferPlacementItems, m_Impl->TransientAliasingEnabled, emitBufferAliasReuseHazard);
+        compiled->TextureTransientPlacements = std::move(texturePlan.Placements);
+        compiled->BufferTransientPlacements = std::move(bufferPlan.Placements);
+        compiled->TransientPlacedPeakMemoryEstimateBytes = texturePlan.PeakBytes + bufferPlan.PeakBytes;
+        compiled->TransientMemoryEstimateBytes = compiled->TransientPlacedPeakMemoryEstimateBytes;
+        SortBarrierPacketsByPass(compiled->BarrierPackets);
 
         return compiled;
     }

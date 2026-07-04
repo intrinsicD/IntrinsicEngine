@@ -79,8 +79,9 @@ This directory contains the `RHI` module/files.
   `Tex2D` arrays and six-face cubemaps deliver exactly one mip/layer byte span,
   while depth-stencil, unsupported formats, invalid layouts, invalid sinks, and
   out-of-range subresources fail closed with dropped-readback diagnostics.
-- `RHI.TextureUpload.cppm` owns backend-neutral texture upload math:
-  per-format byte/block helpers, Vulkan-safe subresource offset alignment, and
+- `RHI.TextureUpload.cppm` owns backend-neutral texture upload and storage-size
+  math: upload byte/block helpers, storage byte/block helpers used by
+  framegraph transient placement, Vulkan-safe subresource offset alignment, and
   the layer-major / mip-minor `TextureUploadLayout` used by future batched
   transfer submissions.
 - `RHI.BufferTransfer.cppm` owns backend-neutral buffer transfer math:

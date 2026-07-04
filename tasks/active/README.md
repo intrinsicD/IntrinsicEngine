@@ -11,7 +11,9 @@ Each active task should include:
 
 ## Currently active
 
-- None.
+- [`GRAPHICS-118`](GRAPHICS-118-placed-transient-memory-aliasing.md) —
+  placed transient resource allocation with real memory aliasing. Current slice:
+  CPU-provable placement planning and alias-reuse hazard reporting.
 
 ## History
 

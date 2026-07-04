@@ -141,6 +141,23 @@ export namespace Extrinsic::RHI
         return 0;
     }
 
+    /// Bytes per texel block for approximate GPU storage footprint. Unlike
+    /// `BytesPerBlock`, this includes depth/stencil formats because transient
+    /// placement planning needs backend-neutral memory sizing even when a
+    /// format has no current flat CPU upload contract.
+    [[nodiscard]] constexpr std::uint32_t StorageBytesPerBlock(Format fmt) noexcept
+    {
+        switch (fmt)
+        {
+        case Format::D16_UNORM:          return 2;
+        case Format::D32_FLOAT:          return 4;
+        case Format::D24_UNORM_S8_UINT:  return 4;
+        case Format::D32_FLOAT_S8_UINT:  return 8;
+        case Format::Undefined:          return 0;
+        default:                         return BytesPerBlock(fmt);
+        }
+    }
+
     /// Returns true when the format has a defined contiguous host
     /// upload representation through `WriteTexture()` /
     /// `ITransferQueue::UploadTexture()`.
@@ -231,6 +248,56 @@ export namespace Extrinsic::RHI
         }
 
         return static_cast<std::uint64_t>(width) * height * depth * blockBytes;
+    }
+
+    /// Approximate storage byte count for one texture subresource. Returns 0
+    /// for `Format::Undefined`, an out-of-range mip, or any format whose
+    /// storage block size is unknown. This is placement/statistics math, not
+    /// an upload eligibility predicate.
+    [[nodiscard]] constexpr std::uint64_t ComputeSubresourceStorageSize(
+        const TextureDesc& desc, std::uint32_t mipLevel) noexcept
+    {
+        const std::uint32_t blockBytes = StorageBytesPerBlock(desc.Fmt);
+        if (blockBytes == 0u)
+            return 0u;
+        if (mipLevel >= desc.MipLevels)
+            return 0u;
+
+        const std::uint32_t width  = MipExtent(desc.Width,  mipLevel);
+        const std::uint32_t height = MipExtent(desc.Height, mipLevel);
+        const std::uint32_t depth  = (desc.Dimension == TextureDimension::Tex3D)
+                                         ? MipExtent(desc.DepthOrArrayLayers, mipLevel)
+                                         : 1u;
+
+        if (IsBlockCompressedFormat(desc.Fmt))
+        {
+            const std::uint32_t bx = BlockExtent(desc.Fmt);
+            const std::uint64_t blocksWide = (static_cast<std::uint64_t>(width)  + bx - 1u) / bx;
+            const std::uint64_t blocksHigh = (static_cast<std::uint64_t>(height) + bx - 1u) / bx;
+            return blocksWide * blocksHigh * depth * blockBytes;
+        }
+
+        return static_cast<std::uint64_t>(width) * height * depth * blockBytes;
+    }
+
+    /// Approximate storage byte count for the whole texture descriptor. For
+    /// 2D/cube resources the layer count multiplies each mip; for 3D textures
+    /// `DepthOrArrayLayers` is treated as depth and shrinks per mip.
+    [[nodiscard]] constexpr std::uint64_t EstimateTextureStorageBytes(const TextureDesc& desc) noexcept
+    {
+        if (desc.Width == 0u || desc.Height == 0u || desc.DepthOrArrayLayers == 0u || desc.MipLevels == 0u)
+            return 0u;
+
+        const std::uint64_t layerCount =
+            (desc.Dimension == TextureDimension::Tex3D) ? 1u : static_cast<std::uint64_t>(desc.DepthOrArrayLayers);
+        const std::uint64_t sampleCount = static_cast<std::uint64_t>(desc.SampleCount == 0u ? 1u : desc.SampleCount);
+
+        std::uint64_t total = 0u;
+        for (std::uint32_t mip = 0u; mip < desc.MipLevels; ++mip)
+        {
+            total += ComputeSubresourceStorageSize(desc, mip) * layerCount * sampleCount;
+        }
+        return total;
     }
 
     // ----------------------------------------------------------

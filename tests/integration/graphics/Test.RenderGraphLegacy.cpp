@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <iterator>
 #include <string>
@@ -9,15 +10,159 @@ import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.Core.Error;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
+import Extrinsic.RHI.TextureUpload;
 
 using namespace Extrinsic::Graphics;
 
 namespace
 {
+    namespace RHI = Extrinsic::RHI;
+
+    inline constexpr std::uint64_t kExpectedPlacementAlignmentBytes = 256u;
+
     std::size_t FindOrder(const CompiledRenderGraph& compiled, const std::uint32_t passIndex)
     {
         auto it = std::find(compiled.TopologicalOrder.begin(), compiled.TopologicalOrder.end(), passIndex);
         return static_cast<std::size_t>(std::distance(compiled.TopologicalOrder.begin(), it));
+    }
+
+    [[nodiscard]] constexpr std::uint64_t AlignUpForPlacementTest(const std::uint64_t value,
+                                                                  const std::uint64_t alignment) noexcept
+    {
+        const std::uint64_t remainder = value % alignment;
+        return remainder == 0u ? value : value + (alignment - remainder);
+    }
+
+    [[nodiscard]] std::uint64_t ExpectedTexturePlacementBytes(const RHI::TextureDesc& desc) noexcept
+    {
+        return AlignUpForPlacementTest(RHI::EstimateTextureStorageBytes(desc), kExpectedPlacementAlignmentBytes);
+    }
+
+    [[nodiscard]] std::uint64_t ExpectedBufferPlacementBytes(const std::uint64_t sizeBytes) noexcept
+    {
+        return AlignUpForPlacementTest(sizeBytes, kExpectedPlacementAlignmentBytes);
+    }
+
+    [[nodiscard]] const TransientResourcePlacement* FindTexturePlacement(const CompiledRenderGraph& compiled,
+                                                                        const std::uint32_t resourceIndex)
+    {
+        const auto it = std::find_if(compiled.TextureTransientPlacements.begin(),
+                                     compiled.TextureTransientPlacements.end(),
+                                     [resourceIndex](const TransientResourcePlacement& placement) {
+                                         return placement.ResourceIndex == resourceIndex;
+                                     });
+        return it == compiled.TextureTransientPlacements.end() ? nullptr : &*it;
+    }
+
+    [[nodiscard]] const TransientResourcePlacement* FindBufferPlacement(const CompiledRenderGraph& compiled,
+                                                                       const std::uint32_t resourceIndex)
+    {
+        const auto it = std::find_if(compiled.BufferTransientPlacements.begin(),
+                                     compiled.BufferTransientPlacements.end(),
+                                     [resourceIndex](const TransientResourcePlacement& placement) {
+                                         return placement.ResourceIndex == resourceIndex;
+                                     });
+        return it == compiled.BufferTransientPlacements.end() ? nullptr : &*it;
+    }
+
+    [[nodiscard]] std::uint32_t CountTextureAliasReuseHazards(const CompiledRenderGraph& compiled)
+    {
+        std::uint32_t count = 0u;
+        for (const BarrierPacket& packet : compiled.BarrierPackets)
+        {
+            count += static_cast<std::uint32_t>(packet.TextureAliasReuseBarriers.size());
+        }
+        return count;
+    }
+
+    [[nodiscard]] std::uint32_t CountBufferAliasReuseHazards(const CompiledRenderGraph& compiled)
+    {
+        std::uint32_t count = 0u;
+        for (const BarrierPacket& packet : compiled.BarrierPackets)
+        {
+            count += static_cast<std::uint32_t>(packet.BufferAliasReuseBarriers.size());
+        }
+        return count;
+    }
+
+    [[nodiscard]] std::uint32_t CountRegularBarrierTransitions(const CompiledRenderGraph& compiled)
+    {
+        std::uint32_t count = 0u;
+        for (const BarrierPacket& packet : compiled.BarrierPackets)
+        {
+            count += static_cast<std::uint32_t>(packet.TextureBarriers.size());
+            count += static_cast<std::uint32_t>(packet.BufferBarriers.size());
+        }
+        return count;
+    }
+
+    [[nodiscard]] constexpr bool LifetimesOverlap(const ResourceLifetime& lhs,
+                                                  const ResourceLifetime& rhs) noexcept
+    {
+        return lhs.HasUse && rhs.HasUse && lhs.FirstUsePass <= rhs.LastUsePass && rhs.FirstUsePass <= lhs.LastUsePass;
+    }
+
+    [[nodiscard]] constexpr bool ByteRangesOverlap(const TransientResourcePlacement& lhs,
+                                                   const TransientResourcePlacement& rhs) noexcept
+    {
+        const std::uint64_t lhsEnd = lhs.OffsetBytes + lhs.SizeBytes;
+        const std::uint64_t rhsEnd = rhs.OffsetBytes + rhs.SizeBytes;
+        return lhs.OffsetBytes < rhsEnd && rhs.OffsetBytes < lhsEnd;
+    }
+
+    void ExpectPlacementVectorsEqual(const std::vector<TransientResourcePlacement>& lhs,
+                                     const std::vector<TransientResourcePlacement>& rhs)
+    {
+        ASSERT_EQ(lhs.size(), rhs.size());
+        for (std::size_t i = 0u; i < lhs.size(); ++i)
+        {
+            EXPECT_EQ(lhs[i].ResourceIndex, rhs[i].ResourceIndex);
+            EXPECT_EQ(lhs[i].BlockIndex, rhs[i].BlockIndex);
+            EXPECT_EQ(lhs[i].OffsetBytes, rhs[i].OffsetBytes);
+            EXPECT_EQ(lhs[i].SizeBytes, rhs[i].SizeBytes);
+            EXPECT_EQ(lhs[i].AlignmentBytes, rhs[i].AlignmentBytes);
+            EXPECT_EQ(lhs[i].FirstUsePass, rhs[i].FirstUsePass);
+            EXPECT_EQ(lhs[i].LastUsePass, rhs[i].LastUsePass);
+        }
+    }
+
+    void ExpectAliasHazardsEqual(const CompiledRenderGraph& lhs,
+                                 const CompiledRenderGraph& rhs)
+    {
+        ASSERT_EQ(lhs.BarrierPackets.size(), rhs.BarrierPackets.size());
+        for (std::size_t packetIndex = 0u; packetIndex < lhs.BarrierPackets.size(); ++packetIndex)
+        {
+            const BarrierPacket& leftPacket = lhs.BarrierPackets[packetIndex];
+            const BarrierPacket& rightPacket = rhs.BarrierPackets[packetIndex];
+            ASSERT_EQ(leftPacket.TextureAliasReuseBarriers.size(), rightPacket.TextureAliasReuseBarriers.size());
+            ASSERT_EQ(leftPacket.BufferAliasReuseBarriers.size(), rightPacket.BufferAliasReuseBarriers.size());
+            for (std::size_t i = 0u; i < leftPacket.TextureAliasReuseBarriers.size(); ++i)
+            {
+                EXPECT_EQ(leftPacket.TextureAliasReuseBarriers[i].PreviousTextureIndex,
+                          rightPacket.TextureAliasReuseBarriers[i].PreviousTextureIndex);
+                EXPECT_EQ(leftPacket.TextureAliasReuseBarriers[i].TextureIndex,
+                          rightPacket.TextureAliasReuseBarriers[i].TextureIndex);
+                EXPECT_EQ(leftPacket.TextureAliasReuseBarriers[i].BlockIndex,
+                          rightPacket.TextureAliasReuseBarriers[i].BlockIndex);
+                EXPECT_EQ(leftPacket.TextureAliasReuseBarriers[i].OffsetBytes,
+                          rightPacket.TextureAliasReuseBarriers[i].OffsetBytes);
+                EXPECT_EQ(leftPacket.TextureAliasReuseBarriers[i].SizeBytes,
+                          rightPacket.TextureAliasReuseBarriers[i].SizeBytes);
+            }
+            for (std::size_t i = 0u; i < leftPacket.BufferAliasReuseBarriers.size(); ++i)
+            {
+                EXPECT_EQ(leftPacket.BufferAliasReuseBarriers[i].PreviousBufferIndex,
+                          rightPacket.BufferAliasReuseBarriers[i].PreviousBufferIndex);
+                EXPECT_EQ(leftPacket.BufferAliasReuseBarriers[i].BufferIndex,
+                          rightPacket.BufferAliasReuseBarriers[i].BufferIndex);
+                EXPECT_EQ(leftPacket.BufferAliasReuseBarriers[i].BlockIndex,
+                          rightPacket.BufferAliasReuseBarriers[i].BlockIndex);
+                EXPECT_EQ(leftPacket.BufferAliasReuseBarriers[i].OffsetBytes,
+                          rightPacket.BufferAliasReuseBarriers[i].OffsetBytes);
+                EXPECT_EQ(leftPacket.BufferAliasReuseBarriers[i].SizeBytes,
+                          rightPacket.BufferAliasReuseBarriers[i].SizeBytes);
+            }
+        }
     }
 }
 
@@ -962,6 +1107,245 @@ TEST(GraphicsRenderGraph, TransientResourcesAllocateHandlesForUsedVirtualResourc
     EXPECT_GT(compiled->TransientMemoryEstimateBytes, 0u);
 }
 
+TEST(GraphicsRenderGraph, TransientPlacementReportsNaivePeakAndAliasHazards)
+{
+    RenderGraph graph;
+    RHI::TextureDesc textureDesc{};
+    textureDesc.Width = 16u;
+    textureDesc.Height = 16u;
+    textureDesc.Fmt = RHI::Format::RGBA8_UNORM;
+    const auto firstTexture = graph.CreateTexture("FirstTexture", textureDesc);
+    const auto secondTexture = graph.CreateTexture("SecondTexture", textureDesc);
+    const auto firstBuffer = graph.CreateBuffer("FirstBuffer", RHI::BufferDesc{.SizeBytes = 384u});
+    const auto secondBuffer = graph.CreateBuffer("SecondBuffer", RHI::BufferDesc{.SizeBytes = 384u});
+
+    (void)graph.AddPass("UseFirst",
+                        [firstTexture, firstBuffer](RenderGraphBuilder& builder) {
+                            (void)builder.Write(firstTexture, TextureUsage::ColorAttachmentWrite);
+                            (void)builder.Write(firstBuffer, BufferUsage::ShaderWrite);
+                        },
+                        true);
+    (void)graph.AddPass("UseSecond",
+                        [secondTexture, secondBuffer](RenderGraphBuilder& builder) {
+                            (void)builder.Write(secondTexture, TextureUsage::ColorAttachmentWrite);
+                            (void)builder.Write(secondBuffer, BufferUsage::ShaderWrite);
+                        },
+                        true);
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+
+    const std::uint64_t textureBytes = ExpectedTexturePlacementBytes(textureDesc);
+    const std::uint64_t bufferBytes = ExpectedBufferPlacementBytes(384u);
+    EXPECT_EQ(compiled->TransientNaiveMemoryEstimateBytes, (textureBytes + bufferBytes) * 2u);
+    EXPECT_EQ(compiled->TransientPlacedPeakMemoryEstimateBytes, textureBytes + bufferBytes);
+    EXPECT_EQ(compiled->TransientMemoryEstimateBytes, compiled->TransientPlacedPeakMemoryEstimateBytes);
+
+    const TransientResourcePlacement* firstTexturePlacement = FindTexturePlacement(*compiled, firstTexture.Index);
+    const TransientResourcePlacement* secondTexturePlacement = FindTexturePlacement(*compiled, secondTexture.Index);
+    const TransientResourcePlacement* firstBufferPlacement = FindBufferPlacement(*compiled, firstBuffer.Index);
+    const TransientResourcePlacement* secondBufferPlacement = FindBufferPlacement(*compiled, secondBuffer.Index);
+    ASSERT_NE(firstTexturePlacement, nullptr);
+    ASSERT_NE(secondTexturePlacement, nullptr);
+    ASSERT_NE(firstBufferPlacement, nullptr);
+    ASSERT_NE(secondBufferPlacement, nullptr);
+
+    EXPECT_EQ(firstTexturePlacement->BlockIndex, secondTexturePlacement->BlockIndex);
+    EXPECT_EQ(firstTexturePlacement->OffsetBytes, secondTexturePlacement->OffsetBytes);
+    EXPECT_EQ(firstTexturePlacement->SizeBytes, textureBytes);
+    EXPECT_EQ(firstTexturePlacement->AlignmentBytes, kExpectedPlacementAlignmentBytes);
+    EXPECT_EQ(firstBufferPlacement->BlockIndex, secondBufferPlacement->BlockIndex);
+    EXPECT_EQ(firstBufferPlacement->OffsetBytes, secondBufferPlacement->OffsetBytes);
+    EXPECT_EQ(firstBufferPlacement->SizeBytes, bufferBytes);
+    EXPECT_EQ(firstBufferPlacement->AlignmentBytes, kExpectedPlacementAlignmentBytes);
+
+    EXPECT_EQ(CountTextureAliasReuseHazards(*compiled), 1u);
+    EXPECT_EQ(CountBufferAliasReuseHazards(*compiled), 1u);
+
+    const TextureAliasReuseBarrierPacket* textureHazard = nullptr;
+    const BufferAliasReuseBarrierPacket* bufferHazard = nullptr;
+    for (const BarrierPacket& packet : compiled->BarrierPackets)
+    {
+        if (!packet.TextureAliasReuseBarriers.empty())
+        {
+            textureHazard = &packet.TextureAliasReuseBarriers.front();
+            EXPECT_EQ(packet.PassIndex, 1u);
+            EXPECT_EQ(packet.Stage, BarrierPacketStage::BeforePass);
+        }
+        if (!packet.BufferAliasReuseBarriers.empty())
+        {
+            bufferHazard = &packet.BufferAliasReuseBarriers.front();
+            EXPECT_EQ(packet.PassIndex, 1u);
+            EXPECT_EQ(packet.Stage, BarrierPacketStage::BeforePass);
+        }
+    }
+    ASSERT_NE(textureHazard, nullptr);
+    ASSERT_NE(bufferHazard, nullptr);
+    EXPECT_EQ(textureHazard->PreviousTextureIndex, firstTexture.Index);
+    EXPECT_EQ(textureHazard->TextureIndex, secondTexture.Index);
+    EXPECT_EQ(textureHazard->BlockIndex, secondTexturePlacement->BlockIndex);
+    EXPECT_EQ(textureHazard->OffsetBytes, secondTexturePlacement->OffsetBytes);
+    EXPECT_EQ(textureHazard->SizeBytes, secondTexturePlacement->SizeBytes);
+    EXPECT_EQ(bufferHazard->PreviousBufferIndex, firstBuffer.Index);
+    EXPECT_EQ(bufferHazard->BufferIndex, secondBuffer.Index);
+    EXPECT_EQ(bufferHazard->BlockIndex, secondBufferPlacement->BlockIndex);
+    EXPECT_EQ(bufferHazard->OffsetBytes, secondBufferPlacement->OffsetBytes);
+    EXPECT_EQ(bufferHazard->SizeBytes, secondBufferPlacement->SizeBytes);
+}
+
+TEST(GraphicsRenderGraph, TransientPlacementAliasingDisabledEqualsNaiveAndOmitsHazards)
+{
+    RenderGraph graph;
+    graph.SetTransientAliasingEnabled(false);
+    RHI::TextureDesc desc{};
+    desc.Width = 16u;
+    desc.Height = 16u;
+    const auto first = graph.CreateTexture("First", desc);
+    const auto second = graph.CreateTexture("Second", desc);
+
+    (void)graph.AddPass("UseFirst",
+                        [first](RenderGraphBuilder& builder) { (void)builder.Write(first, TextureUsage::ColorAttachmentWrite); },
+                        true);
+    (void)graph.AddPass("UseSecond",
+                        [second](RenderGraphBuilder& builder) { (void)builder.Write(second, TextureUsage::ColorAttachmentWrite); },
+                        true);
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    EXPECT_EQ(compiled->TransientPlacedPeakMemoryEstimateBytes, compiled->TransientNaiveMemoryEstimateBytes);
+    EXPECT_EQ(compiled->TransientMemoryEstimateBytes, compiled->TransientNaiveMemoryEstimateBytes);
+    EXPECT_EQ(CountTextureAliasReuseHazards(*compiled), 0u);
+    EXPECT_EQ(CountBufferAliasReuseHazards(*compiled), 0u);
+
+    const TransientResourcePlacement* firstPlacement = FindTexturePlacement(*compiled, first.Index);
+    const TransientResourcePlacement* secondPlacement = FindTexturePlacement(*compiled, second.Index);
+    ASSERT_NE(firstPlacement, nullptr);
+    ASSERT_NE(secondPlacement, nullptr);
+    EXPECT_EQ(firstPlacement->BlockIndex, secondPlacement->BlockIndex);
+    EXPECT_FALSE(ByteRangesOverlap(*firstPlacement, *secondPlacement));
+}
+
+TEST(GraphicsRenderGraph, TransientPlacementDoesNotOverlapLiveRanges)
+{
+    struct Interval
+    {
+        TextureRef Ref{};
+        std::uint32_t FirstUse = 0u;
+        std::uint32_t LastUse = 0u;
+    };
+
+    for (std::uint32_t seed = 0u; seed < 16u; ++seed)
+    {
+        RenderGraph graph;
+        RHI::TextureDesc desc{};
+        desc.Width = 32u + seed;
+        desc.Height = 16u;
+        std::array<Interval, 8u> intervals{};
+        for (std::uint32_t i = 0u; i < intervals.size(); ++i)
+        {
+            const std::uint32_t firstUse = (seed * 5u + i * 3u) % 7u;
+            const std::uint32_t span = (seed + i * 2u) % 4u;
+            intervals[i] = Interval{
+                .Ref = graph.CreateTexture("Transient", desc),
+                .FirstUse = firstUse,
+                .LastUse = std::min<std::uint32_t>(7u, firstUse + span),
+            };
+        }
+
+        for (std::uint32_t passIndex = 0u; passIndex < 8u; ++passIndex)
+        {
+            (void)graph.AddPass("PlacementPass" + std::to_string(passIndex),
+                                [intervals, passIndex](RenderGraphBuilder& builder) {
+                                    for (const Interval& interval : intervals)
+                                    {
+                                        if (interval.FirstUse == passIndex)
+                                        {
+                                            (void)builder.Write(interval.Ref, TextureUsage::ColorAttachmentWrite);
+                                        }
+                                        else if (interval.LastUse == passIndex)
+                                        {
+                                            (void)builder.Read(interval.Ref, TextureUsage::ShaderRead);
+                                        }
+                                    }
+                                    builder.SideEffect();
+                                });
+        }
+
+        const auto compiled = graph.Compile();
+        ASSERT_TRUE(compiled.has_value()) << seed;
+        EXPECT_LE(compiled->TransientPlacedPeakMemoryEstimateBytes,
+                  compiled->TransientNaiveMemoryEstimateBytes) << seed;
+        for (std::size_t lhsIndex = 0u; lhsIndex < compiled->TextureTransientPlacements.size(); ++lhsIndex)
+        {
+            for (std::size_t rhsIndex = lhsIndex + 1u; rhsIndex < compiled->TextureTransientPlacements.size(); ++rhsIndex)
+            {
+                const TransientResourcePlacement& lhs = compiled->TextureTransientPlacements[lhsIndex];
+                const TransientResourcePlacement& rhs = compiled->TextureTransientPlacements[rhsIndex];
+                if (lhs.BlockIndex != rhs.BlockIndex || !ByteRangesOverlap(lhs, rhs))
+                {
+                    continue;
+                }
+                ASSERT_LT(lhs.ResourceIndex, compiled->TextureLifetimes.size());
+                ASSERT_LT(rhs.ResourceIndex, compiled->TextureLifetimes.size());
+                EXPECT_FALSE(LifetimesOverlap(compiled->TextureLifetimes[lhs.ResourceIndex],
+                                              compiled->TextureLifetimes[rhs.ResourceIndex]))
+                    << "seed=" << seed << " lhs=" << lhs.ResourceIndex << " rhs=" << rhs.ResourceIndex;
+            }
+        }
+    }
+}
+
+TEST(GraphicsRenderGraph, TransientPlacementIsDeterministicForFixedGraph)
+{
+    auto buildGraph = [] {
+        RenderGraph graph;
+        RHI::TextureDesc desc{};
+        desc.Width = 48u;
+        desc.Height = 32u;
+        const auto a = graph.CreateTexture("A", desc);
+        const auto b = graph.CreateTexture("B", desc);
+        const auto c = graph.CreateTexture("C", desc);
+        const auto d = graph.CreateTexture("D", desc);
+        const auto firstBuffer = graph.CreateBuffer("FirstBuffer", RHI::BufferDesc{.SizeBytes = 1024u});
+        const auto secondBuffer = graph.CreateBuffer("SecondBuffer", RHI::BufferDesc{.SizeBytes = 512u});
+
+        (void)graph.AddPass("WriteA",
+                            [a, firstBuffer](RenderGraphBuilder& builder) {
+                                (void)builder.Write(a, TextureUsage::ColorAttachmentWrite);
+                                (void)builder.Write(firstBuffer, BufferUsage::ShaderWrite);
+                            },
+                            true);
+        (void)graph.AddPass("WriteB",
+                            [b](RenderGraphBuilder& builder) {
+                                (void)builder.Write(b, TextureUsage::ColorAttachmentWrite);
+                            },
+                            true);
+        (void)graph.AddPass("ReadAWriteC",
+                            [a, c](RenderGraphBuilder& builder) {
+                                (void)builder.Read(a, TextureUsage::ShaderRead);
+                                (void)builder.Write(c, TextureUsage::ColorAttachmentWrite);
+                            },
+                            true);
+        (void)graph.AddPass("WriteDAndSecondBuffer",
+                            [d, secondBuffer](RenderGraphBuilder& builder) {
+                                (void)builder.Write(d, TextureUsage::ColorAttachmentWrite);
+                                (void)builder.Write(secondBuffer, BufferUsage::ShaderWrite);
+                            },
+                            true);
+        return graph.Compile();
+    };
+
+    const auto first = buildGraph();
+    const auto second = buildGraph();
+    ASSERT_TRUE(first.has_value());
+    ASSERT_TRUE(second.has_value());
+    EXPECT_EQ(first->TransientNaiveMemoryEstimateBytes, second->TransientNaiveMemoryEstimateBytes);
+    EXPECT_EQ(first->TransientPlacedPeakMemoryEstimateBytes, second->TransientPlacedPeakMemoryEstimateBytes);
+    ExpectPlacementVectorsEqual(first->TextureTransientPlacements, second->TextureTransientPlacements);
+    ExpectPlacementVectorsEqual(first->BufferTransientPlacements, second->BufferTransientPlacements);
+    ExpectAliasHazardsEqual(*first, *second);
+}
+
 TEST(GraphicsRenderGraph, TransientAllocatorReusesCompatibleHandlesAcrossFrames)
 {
     RenderGraph graph;
@@ -1166,5 +1550,5 @@ TEST(GraphicsRenderGraph, TransientAliasingTogglePreservesLogicalPassOrderAndBar
     ASSERT_TRUE(withAliasing.has_value());
     ASSERT_TRUE(withoutAliasing.has_value());
     EXPECT_EQ(withAliasing->TopologicalOrder, withoutAliasing->TopologicalOrder);
-    EXPECT_EQ(withAliasing->BarrierPackets.size(), withoutAliasing->BarrierPackets.size());
+    EXPECT_EQ(CountRegularBarrierTransitions(*withAliasing), CountRegularBarrierTransitions(*withoutAliasing));
 }

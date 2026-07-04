@@ -928,6 +928,8 @@ namespace Extrinsic::Graphics
         CrossQueueTimelineEdgeCount = other.CrossQueueTimelineEdgeCount;
         CrossQueueOwnershipTransferCount = other.CrossQueueOwnershipTransferCount;
         TransientMemoryEstimateBytes = other.TransientMemoryEstimateBytes;
+        TransientNaiveMemoryEstimateBytes = other.TransientNaiveMemoryEstimateBytes;
+        TransientPlacedPeakMemoryEstimateBytes = other.TransientPlacedPeakMemoryEstimateBytes;
         TopologicalOrder = other.TopologicalOrder;
         TopologicalLayerByPass = other.TopologicalLayerByPass;
         PassNames = other.PassNames;
@@ -947,6 +949,8 @@ namespace Extrinsic::Graphics
         BufferFinalStates = other.BufferFinalStates;
         TextureHandles = other.TextureHandles;
         BufferHandles = other.BufferHandles;
+        TextureTransientPlacements = other.TextureTransientPlacements;
+        BufferTransientPlacements = other.BufferTransientPlacements;
         TextureImported = other.TextureImported;
         TextureIsBackbuffer = other.TextureIsBackbuffer;
         BufferImported = other.BufferImported;
@@ -978,6 +982,8 @@ namespace Extrinsic::Graphics
         CrossQueueTimelineEdgeCount = other.CrossQueueTimelineEdgeCount;
         CrossQueueOwnershipTransferCount = other.CrossQueueOwnershipTransferCount;
         TransientMemoryEstimateBytes = other.TransientMemoryEstimateBytes;
+        TransientNaiveMemoryEstimateBytes = other.TransientNaiveMemoryEstimateBytes;
+        TransientPlacedPeakMemoryEstimateBytes = other.TransientPlacedPeakMemoryEstimateBytes;
         TopologicalOrder = std::move(other.TopologicalOrder);
         TopologicalLayerByPass = std::move(other.TopologicalLayerByPass);
         PassNames = std::move(other.PassNames);
@@ -997,6 +1003,8 @@ namespace Extrinsic::Graphics
         BufferFinalStates = std::move(other.BufferFinalStates);
         TextureHandles = std::move(other.TextureHandles);
         BufferHandles = std::move(other.BufferHandles);
+        TextureTransientPlacements = std::move(other.TextureTransientPlacements);
+        BufferTransientPlacements = std::move(other.BufferTransientPlacements);
         TextureImported = std::move(other.TextureImported);
         TextureIsBackbuffer = std::move(other.TextureIsBackbuffer);
         BufferImported = std::move(other.BufferImported);
@@ -2188,7 +2196,9 @@ namespace Extrinsic::Graphics
             << " queue_handoff_edges=" << compiled.QueueHandoffEdgeCount
             << " cross_queue_timeline_edges=" << compiled.CrossQueueTimelineEdgeCount
             << " cross_queue_ownership_transfers=" << compiled.CrossQueueOwnershipTransferCount
-            << " barrier_packet_count=" << compiled.BarrierPackets.size() << '\n';
+            << " barrier_packet_count=" << compiled.BarrierPackets.size()
+            << " transient_naive_memory_bytes=" << compiled.TransientNaiveMemoryEstimateBytes
+            << " transient_placed_peak_memory_bytes=" << compiled.TransientPlacedPeakMemoryEstimateBytes << '\n';
 
         out << "  passes:\n";
         for (std::size_t orderIndex = 0; orderIndex < compiled.TopologicalOrder.size(); ++orderIndex)

@@ -2933,6 +2933,10 @@ namespace Extrinsic::Graphics
             m_LastRenderGraphStats.Compile.CrossQueueOwnershipTransferCount =
                 compiled->CrossQueueOwnershipTransferCount;
             m_LastRenderGraphStats.Compile.TransientMemoryEstimateBytes = compiled->TransientMemoryEstimateBytes;
+            m_LastRenderGraphStats.Compile.TransientNaiveMemoryEstimateBytes =
+                compiled->TransientNaiveMemoryEstimateBytes;
+            m_LastRenderGraphStats.Compile.TransientPlacedPeakMemoryEstimateBytes =
+                compiled->TransientPlacedPeakMemoryEstimateBytes;
             if (m_RenderGraphDebugDumpEnabled)
             {
                 m_LastRenderGraphStats.DebugDump = BuildRenderGraphDebugDump(*compiled);
@@ -3260,6 +3264,22 @@ namespace Extrinsic::Graphics
                         for (const BufferBarrierPacket& bufferBarrier : packet.BufferBarriers)
                         {
                             if (bufferBarrier.BufferIndex >= compiled->BufferHandles.size())
+                            {
+                                return Core::Err(Core::ErrorCode::OutOfRange);
+                            }
+                        }
+                        for (const TextureAliasReuseBarrierPacket& aliasBarrier : packet.TextureAliasReuseBarriers)
+                        {
+                            if (aliasBarrier.PreviousTextureIndex >= compiled->TextureHandles.size() ||
+                                aliasBarrier.TextureIndex >= compiled->TextureHandles.size())
+                            {
+                                return Core::Err(Core::ErrorCode::OutOfRange);
+                            }
+                        }
+                        for (const BufferAliasReuseBarrierPacket& aliasBarrier : packet.BufferAliasReuseBarriers)
+                        {
+                            if (aliasBarrier.PreviousBufferIndex >= compiled->BufferHandles.size() ||
+                                aliasBarrier.BufferIndex >= compiled->BufferHandles.size())
                             {
                                 return Core::Err(Core::ErrorCode::OutOfRange);
                             }

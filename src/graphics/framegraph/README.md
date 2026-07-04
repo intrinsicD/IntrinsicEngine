@@ -56,6 +56,32 @@ where available, and may assert pass/resource names only for diagnostics and
 debug dump stability. Tests must not depend on transient allocation IDs or
 backend-native handles.
 
+## Transient Placement Contract
+
+`RenderGraph::Compile()` computes a CPU-visible placement plan for every used
+non-imported transient texture and buffer. Each
+`TransientResourcePlacement` records the resource index, placement block, byte
+offset, aligned size, alignment, and first/last pass use. Texture and buffer
+placements use separate block domains; Slice A uses a deterministic 256-byte
+alignment and first-fit reuse of ranges whose prior occupant's lifetime ended
+before the new occupant's first use.
+
+The compiled graph reports both
+`TransientNaiveMemoryEstimateBytes` (sum of aligned transient sizes without
+reuse) and `TransientPlacedPeakMemoryEstimateBytes` (sum of planned placement
+block peaks). The legacy `TransientMemoryEstimateBytes` field mirrors the
+planned peak so existing diagnostics keep a single useful estimate. When
+`SetTransientAliasingEnabled(false)` is selected, placement stays deterministic
+but does not reuse ranges: planned peak equals the naive estimate and no
+alias-reuse hazards are emitted.
+
+Alias reuse is represented in the barrier plan through
+`TextureAliasReuseBarrierPacket` / `BufferAliasReuseBarrierPacket` entries on a
+`BeforePass` packet for the first pass that uses the new occupant. These records
+are CPU-visible planning hazards for the RHI/Vulkan placed-allocation follow-up;
+the current renderer still binds per-resource frame-slot RHI allocations and
+does not lower alias-reuse hazards to backend commands yet.
+
 ## Queue Affinity Contract
 
 `RenderPassRecord::Queue` uses `RHI::QueueAffinity` as the canonical queue

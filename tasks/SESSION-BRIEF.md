@@ -8,12 +8,11 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `GRAPHICS-118` — Placed transient resource allocation with real memory aliasing (tasks/active/GRAPHICS-118-placed-transient-memory-aliasing.md)
 
 ## Theme B — Rendering modernization
 
 - blocked by `RUNTIME-129`: `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/backlog/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
-- unblocked: `GRAPHICS-118` — Placed transient resource allocation with real memory aliasing (tasks/backlog/rendering/GRAPHICS-118-placed-transient-memory-aliasing.md)
 - unblocked: `GRAPHICS-119` — Parallel render-pass command recording via the task scheduler (tasks/backlog/rendering/GRAPHICS-119-parallel-pass-command-recording.md)
 - unblocked: `GRAPHICS-120` — Framegraph compiler/executor efficiency and hygiene polish (tasks/backlog/rendering/GRAPHICS-120-framegraph-compiler-executor-efficiency.md)
 - unblocked: `RUNTIME-129` — Schedule GPU object-space normal bake jobs after import (tasks/backlog/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)

@@ -86,6 +86,18 @@ TEST(TextureUploadFormat, DepthStencilAndUndefinedAreNotUploadable)
     EXPECT_TRUE(RHI::IsUploadableFormat(Format::BC7_SRGB));
 }
 
+TEST(TextureUploadFormat, StorageBytesPerBlockIncludesDepthStencil)
+{
+    EXPECT_EQ(RHI::StorageBytesPerBlock(Format::Undefined),         0u);
+    EXPECT_EQ(RHI::StorageBytesPerBlock(Format::RGBA8_UNORM),       4u);
+    EXPECT_EQ(RHI::StorageBytesPerBlock(Format::BC1_UNORM),         8u);
+    EXPECT_EQ(RHI::StorageBytesPerBlock(Format::BC7_SRGB),          16u);
+    EXPECT_EQ(RHI::StorageBytesPerBlock(Format::D16_UNORM),         2u);
+    EXPECT_EQ(RHI::StorageBytesPerBlock(Format::D32_FLOAT),         4u);
+    EXPECT_EQ(RHI::StorageBytesPerBlock(Format::D24_UNORM_S8_UINT), 4u);
+    EXPECT_EQ(RHI::StorageBytesPerBlock(Format::D32_FLOAT_S8_UINT), 8u);
+}
+
 TEST(TextureUploadFormat, BlockExtentIsFourForBlockCompressed)
 {
     EXPECT_EQ(RHI::BlockExtent(Format::RGBA8_UNORM), 1u);
@@ -159,6 +171,24 @@ TEST(TextureUploadSize, UnsupportedFormatReturnsZero)
 
     const TextureDesc depth = Make2D(4u, 4u, 1u, 1u, Format::D32_FLOAT);
     EXPECT_EQ(RHI::ComputeSubresourceUploadSize(depth, 0u), 0u);
+}
+
+TEST(TextureUploadSize, StorageEstimateIncludesMipsLayersDepthAndBlockCompression)
+{
+    TextureDesc color = Make2D(4u, 4u, 3u, 2u, Format::RGBA8_UNORM);
+    EXPECT_EQ(RHI::EstimateTextureStorageBytes(color), (64u + 16u + 4u) * 2u);
+
+    TextureDesc compressed = Make2D(5u, 5u, 1u, 1u, Format::BC1_UNORM);
+    EXPECT_EQ(RHI::EstimateTextureStorageBytes(compressed), 32u);
+
+    TextureDesc depth = Make2D(4u, 4u, 1u, 1u, Format::D32_FLOAT);
+    EXPECT_EQ(RHI::EstimateTextureStorageBytes(depth), 64u);
+
+    TextureDesc volume = Make2D(4u, 4u, 3u, 8u, Format::RGBA8_UNORM);
+    volume.Dimension = TextureDimension::Tex3D;
+    EXPECT_EQ(RHI::EstimateTextureStorageBytes(volume), 4u * 4u * 8u * 4u +
+                                                       2u * 2u * 4u * 4u +
+                                                       1u * 1u * 2u * 4u);
 }
 
 // ---------- ComputeFullChainUploadLayout ------------------------------------
@@ -443,4 +473,3 @@ TEST(TransferQueueFullChain, NullBackendRejectsFullChainUploadsFailClosed)
     EXPECT_FALSE(token.IsValid());
     EXPECT_TRUE(queue.IsComplete(token));
 }
-

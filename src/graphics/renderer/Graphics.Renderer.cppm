@@ -102,6 +102,8 @@ namespace Extrinsic::Graphics
         std::uint32_t CrossQueueTimelineWaitCount = 0;
         std::uint32_t CrossQueueOwnershipTransferCount = 0;
         std::uint64_t TransientMemoryEstimateBytes = 0;
+        std::uint64_t TransientNaiveMemoryEstimateBytes = 0;
+        std::uint64_t TransientPlacedPeakMemoryEstimateBytes = 0;
         std::uint64_t TimeMicros = 0;
     };
 

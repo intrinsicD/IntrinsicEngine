@@ -141,6 +141,17 @@ namespace Extrinsic::Graphics
         std::uint32_t LastUsePass = 0;
     };
 
+    export struct TransientResourcePlacement
+    {
+        std::uint32_t ResourceIndex = 0;
+        std::uint32_t BlockIndex = 0;
+        std::uint64_t OffsetBytes = 0;
+        std::uint64_t SizeBytes = 0;
+        std::uint64_t AlignmentBytes = 1;
+        std::uint32_t FirstUsePass = 0;
+        std::uint32_t LastUsePass = 0;
+    };
+
     export struct CrossQueueTimelineSignal
     {
         std::uint32_t PassIndex = 0;
@@ -187,6 +198,8 @@ namespace Extrinsic::Graphics
         std::uint32_t CrossQueueTimelineEdgeCount = 0;
         std::uint32_t CrossQueueOwnershipTransferCount = 0;
         std::uint64_t TransientMemoryEstimateBytes = 0;
+        std::uint64_t TransientNaiveMemoryEstimateBytes = 0;
+        std::uint64_t TransientPlacedPeakMemoryEstimateBytes = 0;
         std::vector<std::uint32_t> TopologicalOrder{};
         std::vector<std::uint32_t> TopologicalLayerByPass{};
         std::vector<std::string> PassNames{};
@@ -206,6 +219,8 @@ namespace Extrinsic::Graphics
         std::vector<BufferState> BufferFinalStates{};
         std::vector<RHI::TextureHandle> TextureHandles{};
         std::vector<RHI::BufferHandle> BufferHandles{};
+        std::vector<TransientResourcePlacement> TextureTransientPlacements{};
+        std::vector<TransientResourcePlacement> BufferTransientPlacements{};
         std::vector<bool> TextureImported{};
         std::vector<bool> TextureIsBackbuffer{};
         std::vector<bool> BufferImported{};

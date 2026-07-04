@@ -15,6 +15,7 @@ namespace Extrinsic::Graphics
     export enum class BarrierKind : std::uint8_t
     {
         None = 0,
+        AliasReuse,
     };
 
     export enum class BarrierPacketStage : std::uint8_t
@@ -117,6 +118,24 @@ namespace Extrinsic::Graphics
         QueueOwnershipTransfer OwnershipTransfer{};
     };
 
+    export struct TextureAliasReuseBarrierPacket
+    {
+        std::uint32_t PreviousTextureIndex = 0;
+        std::uint32_t TextureIndex = 0;
+        std::uint32_t BlockIndex = 0;
+        std::uint64_t OffsetBytes = 0;
+        std::uint64_t SizeBytes = 0;
+    };
+
+    export struct BufferAliasReuseBarrierPacket
+    {
+        std::uint32_t PreviousBufferIndex = 0;
+        std::uint32_t BufferIndex = 0;
+        std::uint32_t BlockIndex = 0;
+        std::uint64_t OffsetBytes = 0;
+        std::uint64_t SizeBytes = 0;
+    };
+
     export struct BarrierPacket
     {
         BarrierKind Kind = BarrierKind::None;
@@ -124,5 +143,7 @@ namespace Extrinsic::Graphics
         BarrierPacketStage Stage = BarrierPacketStage::BeforePass;
         std::vector<TextureBarrierPacket> TextureBarriers{};
         std::vector<BufferBarrierPacket> BufferBarriers{};
+        std::vector<TextureAliasReuseBarrierPacket> TextureAliasReuseBarriers{};
+        std::vector<BufferAliasReuseBarrierPacket> BufferAliasReuseBarriers{};
     };
 }
