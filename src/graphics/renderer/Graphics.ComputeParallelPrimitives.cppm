@@ -19,6 +19,8 @@ export namespace Extrinsic::Graphics
     inline constexpr std::uint64_t kParallelPrimitiveInvalidOffset = ~std::uint64_t{0u};
     inline constexpr std::uint32_t kParallelPrefixScanModeInclusiveBit = 1u << 0u;
     inline constexpr std::uint32_t kParallelPrefixScanModeNormalizeInputBit = 1u << 1u;
+    inline constexpr float kParallelSegmentedFloatReductionMeanForEmptySegment = 0.0f;
+    inline constexpr float kParallelSegmentedFloatReductionParityTolerance = 1.0e-5f;
 
     enum class ParallelPrimitiveStatus : std::uint8_t
     {
@@ -42,6 +44,7 @@ export namespace Extrinsic::Graphics
     {
         PrefixScan,
         StreamCompaction,
+        SegmentedFloatReduction,
     };
 
     enum class ParallelPrimitivePassKind : std::uint8_t
@@ -49,6 +52,7 @@ export namespace Extrinsic::Graphics
         PrefixBlockScan,
         PrefixAddBlockOffsets,
         StreamCompactScatter,
+        SegmentedFloatReduce,
     };
 
     enum class ParallelPrimitiveBufferRole : std::uint8_t
@@ -60,6 +64,10 @@ export namespace Extrinsic::Graphics
         Flags,
         OutputKeys,
         OutputCount,
+        Values,
+        SegmentSums,
+        SegmentCounts,
+        SegmentMeans,
         Scratch,
     };
 
@@ -97,6 +105,7 @@ export namespace Extrinsic::Graphics
         PrefixScanMode Mode = PrefixScanMode::Exclusive;
         std::uint32_t LevelIndex = 0u;
         std::uint32_t ElementCount = 0u;
+        std::uint32_t SegmentCount = 0u;
         std::uint32_t GroupSize = kParallelPrimitiveGroupSize;
         std::uint32_t GroupCountX = 0u;
         std::uint32_t GroupCountY = 1u;
@@ -106,11 +115,19 @@ export namespace Extrinsic::Graphics
         ParallelPrimitiveBufferRole BlockSumsRole = ParallelPrimitiveBufferRole::None;
         ParallelPrimitiveBufferRole OffsetsRole = ParallelPrimitiveBufferRole::None;
         ParallelPrimitiveBufferRole CountRole = ParallelPrimitiveBufferRole::None;
+        ParallelPrimitiveBufferRole ValuesRole = ParallelPrimitiveBufferRole::None;
+        ParallelPrimitiveBufferRole SumsRole = ParallelPrimitiveBufferRole::None;
+        ParallelPrimitiveBufferRole CountsRole = ParallelPrimitiveBufferRole::None;
+        ParallelPrimitiveBufferRole MeansRole = ParallelPrimitiveBufferRole::None;
         std::uint64_t InputOffsetBytes = kParallelPrimitiveInvalidOffset;
         std::uint64_t OutputOffsetBytes = kParallelPrimitiveInvalidOffset;
         std::uint64_t BlockSumsOffsetBytes = kParallelPrimitiveInvalidOffset;
         std::uint64_t OffsetsOffsetBytes = kParallelPrimitiveInvalidOffset;
         std::uint64_t CountOffsetBytes = kParallelPrimitiveInvalidOffset;
+        std::uint64_t ValuesOffsetBytes = kParallelPrimitiveInvalidOffset;
+        std::uint64_t SumsOffsetBytes = kParallelPrimitiveInvalidOffset;
+        std::uint64_t CountsOffsetBytes = kParallelPrimitiveInvalidOffset;
+        std::uint64_t MeansOffsetBytes = kParallelPrimitiveInvalidOffset;
     };
 
     struct ParallelPrimitiveBarrierDesc
@@ -127,6 +144,7 @@ export namespace Extrinsic::Graphics
         ParallelPrimitiveKind Kind = ParallelPrimitiveKind::PrefixScan;
         PrefixScanMode Mode = PrefixScanMode::Exclusive;
         std::uint32_t ElementCount = 0u;
+        std::uint32_t SegmentCount = 0u;
         std::uint32_t GroupSize = kParallelPrimitiveGroupSize;
         std::uint64_t ScratchBytes = 0u;
         std::uint64_t PrefixOffsetsOffsetBytes = kParallelPrimitiveInvalidOffset;
@@ -181,6 +199,21 @@ export namespace Extrinsic::Graphics
     };
     static_assert(sizeof(ParallelCompactByFlagsPushConstants) == 56u);
 
+    // Matches `assets/shaders/parallel_segmented_float_reduce.comp` scalar push layout.
+    struct ParallelSegmentedFloatReducePushConstants
+    {
+        std::uint64_t KeysBDA = 0u;
+        std::uint64_t ValuesBDA = 0u;
+        std::uint64_t SegmentSumsBDA = 0u;
+        std::uint64_t SegmentCountsBDA = 0u;
+        std::uint64_t SegmentMeansBDA = 0u;
+        std::uint32_t ElementCount = 0u;
+        std::uint32_t SegmentCount = 0u;
+        std::uint32_t Reserved0 = 0u;
+        std::uint32_t Reserved1 = 0u;
+    };
+    static_assert(sizeof(ParallelSegmentedFloatReducePushConstants) == 56u);
+
     // Matches `assets/shaders/parallel_count_to_dispatch_args.comp` scalar push layout.
     struct ParallelCountToDispatchArgsPushConstants
     {
@@ -206,6 +239,7 @@ export namespace Extrinsic::Graphics
         RHI::PipelineHandle PrefixScan{};
         RHI::PipelineHandle AddBlockOffsets{};
         RHI::PipelineHandle CompactByFlags{};
+        RHI::PipelineHandle SegmentedFloatReduce{};
     };
 
     struct GpuPrefixScanRecordDesc
@@ -233,6 +267,22 @@ export namespace Extrinsic::Graphics
         RHI::BufferHandle OutputCount{};
         RHI::BufferHandle Scratch{};
         std::uint32_t ElementCount = 0u;
+    };
+
+    struct GpuSegmentedFloatReductionRecordDesc
+    {
+        RHI::IDevice* Device = nullptr;
+        RHI::ICommandContext* CommandContext = nullptr;
+        RHI::BufferManager* Buffers = nullptr;
+        ParallelPrimitivePipelineSet Pipelines{};
+        RHI::BufferHandle Keys{};
+        RHI::BufferHandle Values{};
+        RHI::BufferHandle SegmentSums{};
+        RHI::BufferHandle SegmentCounts{};
+        RHI::BufferHandle SegmentMeans{};
+        RHI::BufferHandle Scratch{};
+        std::uint32_t ElementCount = 0u;
+        std::uint32_t SegmentCount = 0u;
     };
 
     struct GpuParallelPrimitiveRecordResult
@@ -298,6 +348,14 @@ export namespace Extrinsic::Graphics
         std::span<const std::uint32_t> flags,
         std::span<std::uint32_t> outputKeys) noexcept;
 
+    [[nodiscard]] ParallelPrimitiveCpuResult ReduceFloatBySegmentCpu(
+        std::span<const std::uint32_t> keys,
+        std::span<const float> values,
+        std::uint32_t segmentCount,
+        std::span<float> segmentSums,
+        std::span<std::uint32_t> segmentCounts,
+        std::span<float> segmentMeans) noexcept;
+
     [[nodiscard]] ParallelPrimitiveDispatchPlan ComputePrefixScanDispatchPlan(
         std::uint32_t elementCount,
         PrefixScanMode mode,
@@ -305,6 +363,11 @@ export namespace Extrinsic::Graphics
 
     [[nodiscard]] ParallelPrimitiveDispatchPlan ComputeStreamCompactionDispatchPlan(
         std::uint32_t elementCount,
+        std::uint32_t groupSize = kParallelPrimitiveGroupSize);
+
+    [[nodiscard]] ParallelPrimitiveDispatchPlan ComputeSegmentedFloatReductionDispatchPlan(
+        std::uint32_t elementCount,
+        std::uint32_t segmentCount,
         std::uint32_t groupSize = kParallelPrimitiveGroupSize);
 
     [[nodiscard]] RHI::BufferDesc BuildParallelPrimitiveScratchBufferDesc(
@@ -329,11 +392,17 @@ export namespace Extrinsic::Graphics
     [[nodiscard]] RHI::PipelineDesc BuildParallelCountToDispatchArgsPipelineDesc(
         const char* shaderPath = "shaders/parallel_count_to_dispatch_args.comp.spv");
 
+    [[nodiscard]] RHI::PipelineDesc BuildParallelSegmentedFloatReducePipelineDesc(
+        const char* shaderPath = "shaders/parallel_segmented_float_reduce.comp.spv");
+
     [[nodiscard]] GpuParallelPrimitiveRecordResult RecordGpuPrefixScan(
         const GpuPrefixScanRecordDesc& desc);
 
     [[nodiscard]] GpuParallelPrimitiveRecordResult RecordGpuStreamCompaction(
         const GpuStreamCompactionRecordDesc& desc);
+
+    [[nodiscard]] GpuParallelPrimitiveRecordResult RecordGpuSegmentedFloatReduction(
+        const GpuSegmentedFloatReductionRecordDesc& desc);
 
     [[nodiscard]] GpuCompactionCountPublicationResult RecordCompactionCountPublication(
         const GpuCompactionCountPublicationDesc& desc);

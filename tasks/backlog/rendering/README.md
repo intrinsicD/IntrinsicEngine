@@ -24,8 +24,6 @@ without requiring them to read every file.
 
 ## Current open rendering leaves
 
-- [`GRAPHICS-111`](GRAPHICS-111-float-segmented-reduction-primitive.md) —
-  float segmented/per-key reduction primitive in compute parallel primitives.
 - [`GRAPHICS-112`](GRAPHICS-112-work-efficient-workgroup-scan.md) —
   work-efficient workgroup scan and overflow guard in compute parallel primitives.
 - [`GRAPHICS-113`](GRAPHICS-113-selection-outline-id-work-pruning.md) —

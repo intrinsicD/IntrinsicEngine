@@ -123,12 +123,13 @@ Gaps:
 - **uint32-only accumulation** can silently overflow at scale; the CPU reference
   guards this, the GPU path does not (`...cpp:617-623`).
 
-Fit for k-means: it is a good substrate for the *assignment-compaction and
+Fit for k-means: at audit time it was a good substrate for the *assignment-compaction and
 indirect-dispatch* half (counting-sort offsets, variable-width follow-up passes
-with no CPU sync), but it has **no float segmented/per-cluster reduction** — the
-actual centroid accumulate-and-divide step. That primitive must be added (either
-shared-memory-privatized float atomics or a dedicated segmented reduction) rather
-than assumed present. Folded into the proposal's §5.
+with no CPU sync), but it had **no float segmented/per-cluster reduction** — the
+actual centroid accumulate-and-divide step. GRAPHICS-111 added a deterministic
+segmented float sum/count/mean primitive under
+`Extrinsic.Graphics.ComputeParallelPrimitives`; k-means integration still needs a
+separate task to consume it. Folded into the proposal's §5.
 
 ---
 
@@ -136,9 +137,9 @@ than assumed present. Folded into the proposal's §5.
 
 1. **Async-readback ergonomics + pooled destination** (shared infra). Removes the
    `vkDeviceWaitIdle` default for all geometry backends. Highest leverage.
-2. **Float segmented-reduction primitive** in `ComputeParallelPrimitives` (or a
-   geometry-owned helper) for centroid-style means. Unblocks k-means §5 and any
-   future per-cluster reduction.
+2. **Float segmented-reduction primitive** in `ComputeParallelPrimitives` for
+   centroid-style means. Retired by GRAPHICS-111; k-means §5 now depends on a
+   consumer integration task rather than a primitive gap.
 3. **Work-efficient workgroup scan** (subgroup/Blelloch) + uint32-overflow note in
    `ComputeParallelPrimitives`.
 4. **ProgressivePoisson dispatch-sizing + indirect-shrink + hash-probe** items —

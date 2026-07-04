@@ -1,0 +1,115 @@
+#version 460
+
+// GRAPHICS-111 — deterministic per-segment float sum/count/mean reduction.
+//
+// One workgroup owns one segment and scans the full key/value stream in a
+// fixed order. This avoids optional float atomics while keeping GPU output
+// bit-stable for the same input and shader compiler.
+
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+layout(buffer_reference, scalar) readonly buffer SegmentKeysRef
+{
+    uint Values[];
+};
+
+layout(buffer_reference, scalar) readonly buffer SegmentValuesRef
+{
+    float Values[];
+};
+
+layout(buffer_reference, scalar) buffer SegmentSumsRef
+{
+    float Values[];
+};
+
+layout(buffer_reference, scalar) buffer SegmentCountsRef
+{
+    uint Values[];
+};
+
+layout(buffer_reference, scalar) buffer SegmentMeansRef
+{
+    float Values[];
+};
+
+layout(push_constant, scalar) uniform SegmentedFloatReducePush
+{
+    uint64_t KeysBDA;
+    uint64_t ValuesBDA;
+    uint64_t SegmentSumsBDA;
+    uint64_t SegmentCountsBDA;
+    uint64_t SegmentMeansBDA;
+    uint ElementCount;
+    uint SegmentCount;
+    uint Reserved0;
+    uint Reserved1;
+} pc;
+
+shared float sharedSums[256];
+shared uint sharedCounts[256];
+
+void main()
+{
+    const uint segment = gl_WorkGroupID.x;
+    const uint localIndex = gl_LocalInvocationIndex;
+    if (segment >= pc.SegmentCount ||
+        pc.SegmentSumsBDA == uint64_t(0) ||
+        pc.SegmentCountsBDA == uint64_t(0) ||
+        pc.SegmentMeansBDA == uint64_t(0))
+    {
+        return;
+    }
+
+    float partialSum = 0.0;
+    uint partialCount = 0u;
+    const bool canReadInputs =
+        pc.ElementCount == 0u ||
+        (pc.KeysBDA != uint64_t(0) && pc.ValuesBDA != uint64_t(0));
+    if (canReadInputs && pc.ElementCount > 0u)
+    {
+        SegmentKeysRef keysRef = SegmentKeysRef(pc.KeysBDA);
+        SegmentValuesRef valuesRef = SegmentValuesRef(pc.ValuesBDA);
+        for (uint index = localIndex;
+             index < pc.ElementCount;
+             index += gl_WorkGroupSize.x)
+        {
+            if (keysRef.Values[index] == segment)
+            {
+                partialSum += valuesRef.Values[index];
+                ++partialCount;
+            }
+        }
+    }
+
+    sharedSums[localIndex] = partialSum;
+    sharedCounts[localIndex] = partialCount;
+    barrier();
+
+    for (uint stride = gl_WorkGroupSize.x >> 1u; stride > 0u; stride >>= 1u)
+    {
+        if (localIndex < stride)
+        {
+            sharedSums[localIndex] += sharedSums[localIndex + stride];
+            sharedCounts[localIndex] += sharedCounts[localIndex + stride];
+        }
+        barrier();
+    }
+
+    if (localIndex == 0u)
+    {
+        SegmentSumsRef sumsRef = SegmentSumsRef(pc.SegmentSumsBDA);
+        SegmentCountsRef countsRef = SegmentCountsRef(pc.SegmentCountsBDA);
+        SegmentMeansRef meansRef = SegmentMeansRef(pc.SegmentMeansBDA);
+
+        const float sum = sharedSums[0];
+        const uint count = sharedCounts[0];
+        sumsRef.Values[segment] = sum;
+        countsRef.Values[segment] = count;
+        meansRef.Values[segment] = count == 0u ? 0.0 : sum / float(count);
+    }
+}

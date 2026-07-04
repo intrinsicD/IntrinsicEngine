@@ -13,7 +13,6 @@ the authoritative open/unblocked view.
 ## Theme B — Rendering modernization
 
 - blocked by `RUNTIME-129`: `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/backlog/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
-- unblocked: `GRAPHICS-111` — Float segmented/per-key reduction primitive in ComputeParallelPrimitives (tasks/backlog/rendering/GRAPHICS-111-float-segmented-reduction-primitive.md)
 - unblocked: `GRAPHICS-112` — Work-efficient workgroup scan + uint32 overflow guard in ComputeParallelPrimitives (tasks/backlog/rendering/GRAPHICS-112-work-efficient-workgroup-scan.md)
 - unblocked: `GRAPHICS-113` — Selection outline ID work pruning (tasks/backlog/rendering/GRAPHICS-113-selection-outline-id-work-pruning.md)
 - unblocked: `GRAPHICS-114` — Retained ImGui overlay copy/upload path (tasks/backlog/rendering/GRAPHICS-114-retained-imgui-overlay-copy-upload-path.md)

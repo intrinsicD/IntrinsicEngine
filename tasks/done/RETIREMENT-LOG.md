@@ -3246,3 +3246,19 @@ properties as the CPU path. Device-unavailable cases still fall back honestly to
 the CPU reference, and the synchronous backend overload remains nonblocking.
 Focused runtime contract coverage passed for CPU fallback telemetry and queued
 Sandbox GPU submission routing.
+
+[`GRAPHICS-111`](GRAPHICS-111-float-segmented-reduction-primitive.md) — Float
+segmented/per-key reduction primitive retired to `tasks/done/` on 2026-07-04 at
+`Operational` on Vulkan-capable hosts and `CPUContracted` everywhere else. The
+graphics/renderer `Extrinsic.Graphics.ComputeParallelPrimitives` seam now owns a
+deterministic CPU reference and RHI record path for per-segment float sums,
+`uint32` counts, and count-normalized means, with empty segments producing count
+0 and mean 0. The shipped GPU shader is the deterministic missing-feature path:
+one 256-lane workgroup per segment scans the key/value stream in fixed order, so
+no optional float-atomic Vulkan features or Vulkan-native API leakage are
+introduced. Contract tests cover CPU fixtures, empty segments, invalid shapes,
+dispatch planning, pipeline descriptors, mock-RHI recording, and fail-closed
+resource validation; the opt-in Vulkan smoke compares GPU output against the CPU
+reference within the declared tolerance and repeats the same input for bit
+stability. KMeans integration remains a separate consumer task; this slice only
+ships the shared primitive and docs.

@@ -36,6 +36,7 @@ namespace
             .PrefixScan = ValidPipeline(10u),
             .AddBlockOffsets = ValidPipeline(11u),
             .CompactByFlags = ValidPipeline(12u),
+            .SegmentedFloatReduce = ValidPipeline(14u),
         };
     }
 
@@ -153,6 +154,88 @@ TEST(ComputeParallelPrimitives, StreamCompactionFailsClosedForBadShapes)
     const auto small = Graphics::CompactByFlagsCpu(keys, flags, smallOutput);
     EXPECT_EQ(small.Status, Graphics::ParallelPrimitiveStatus::OutputTooSmall);
     EXPECT_EQ(small.Diagnostics.OutputCount, 2u);
+}
+
+TEST(ComputeParallelPrimitives, SegmentedFloatReductionCpuComputesSumsCountsAndMeans)
+{
+    const std::array<std::uint32_t, 6> keys{{0u, 2u, 1u, 2u, 0u, 2u}};
+    const std::array<float, 6> values{{1.0f, 3.0f, 5.0f, -1.0f, 2.0f, 4.0f}};
+    std::array<float, 4> sums{};
+    std::array<std::uint32_t, 4> counts{};
+    std::array<float, 4> means{};
+
+    const auto result = Graphics::ReduceFloatBySegmentCpu(
+        keys, values, 4u, sums, counts, means);
+
+    EXPECT_TRUE(result.Succeeded());
+    EXPECT_EQ(result.Diagnostics.ElementCount, keys.size());
+    EXPECT_EQ(result.Diagnostics.OutputCount, 4u);
+    EXPECT_EQ(result.Diagnostics.Total, keys.size());
+    EXPECT_FLOAT_EQ(sums[0], 3.0f);
+    EXPECT_FLOAT_EQ(sums[1], 5.0f);
+    EXPECT_FLOAT_EQ(sums[2], 6.0f);
+    EXPECT_FLOAT_EQ(sums[3], 0.0f);
+    EXPECT_EQ((std::array<std::uint32_t, 4>{{2u, 1u, 3u, 0u}}), counts);
+    EXPECT_FLOAT_EQ(means[0], 1.5f);
+    EXPECT_FLOAT_EQ(means[1], 5.0f);
+    EXPECT_FLOAT_EQ(means[2], 2.0f);
+    EXPECT_FLOAT_EQ(
+        means[3],
+        Graphics::kParallelSegmentedFloatReductionMeanForEmptySegment);
+}
+
+TEST(ComputeParallelPrimitives, SegmentedFloatReductionCpuHandlesEmptyInputs)
+{
+    std::array<float, 3> sums{{99.0f, 99.0f, 99.0f}};
+    std::array<std::uint32_t, 3> counts{{9u, 9u, 9u}};
+    std::array<float, 3> means{{99.0f, 99.0f, 99.0f}};
+
+    const auto result = Graphics::ReduceFloatBySegmentCpu(
+        std::span<const std::uint32_t>{},
+        std::span<const float>{},
+        3u,
+        sums,
+        counts,
+        means);
+
+    EXPECT_TRUE(result.Succeeded());
+    EXPECT_EQ((std::array<float, 3>{{0.0f, 0.0f, 0.0f}}), sums);
+    EXPECT_EQ((std::array<std::uint32_t, 3>{{0u, 0u, 0u}}), counts);
+    EXPECT_EQ((std::array<float, 3>{{
+                  Graphics::kParallelSegmentedFloatReductionMeanForEmptySegment,
+                  Graphics::kParallelSegmentedFloatReductionMeanForEmptySegment,
+                  Graphics::kParallelSegmentedFloatReductionMeanForEmptySegment}}),
+              means);
+}
+
+TEST(ComputeParallelPrimitives, SegmentedFloatReductionCpuFailsClosedForBadShapes)
+{
+    const std::array<std::uint32_t, 3> keys{{0u, 1u, 2u}};
+    const std::array<float, 2> shortValues{{1.0f, 2.0f}};
+    std::array<float, 3> sums{};
+    std::array<std::uint32_t, 3> counts{};
+    std::array<float, 3> means{};
+
+    const auto mismatch = Graphics::ReduceFloatBySegmentCpu(
+        keys, shortValues, 3u, sums, counts, means);
+    EXPECT_EQ(mismatch.Status, Graphics::ParallelPrimitiveStatus::SizeMismatch);
+
+    std::array<float, 2> smallSums{};
+    const std::array<float, 3> values{{1.0f, 2.0f, 3.0f}};
+    const auto small = Graphics::ReduceFloatBySegmentCpu(
+        keys, values, 3u, smallSums, counts, means);
+    EXPECT_EQ(small.Status, Graphics::ParallelPrimitiveStatus::OutputTooSmall);
+    EXPECT_EQ(small.Diagnostics.OutputCount, 2u);
+
+    const auto zeroSegments = Graphics::ReduceFloatBySegmentCpu(
+        keys, values, 0u, sums, counts, means);
+    EXPECT_EQ(zeroSegments.Status, Graphics::ParallelPrimitiveStatus::InvalidInput);
+
+    const std::array<std::uint32_t, 3> badKey{{0u, 3u, 1u}};
+    const auto invalidKey = Graphics::ReduceFloatBySegmentCpu(
+        badKey, values, 3u, sums, counts, means);
+    EXPECT_EQ(invalidKey.Status, Graphics::ParallelPrimitiveStatus::InvalidInput);
+    EXPECT_EQ(invalidKey.Diagnostics.FirstFailureIndex, 1u);
 }
 
 TEST(ComputeParallelPrimitives, DispatchPlansHandleEmptyAndInvalidInputs)
@@ -332,6 +415,64 @@ TEST(ComputeParallelPrimitives, StreamCompactionPlanPinsOffsetsAndScatter)
     EXPECT_EQ(plan.Barriers[4].Buffer, Graphics::ParallelPrimitiveBufferRole::OutputCount);
 }
 
+TEST(ComputeParallelPrimitives, SegmentedFloatReductionPlanPinsOneDispatchPerSegment)
+{
+    const auto plan = Graphics::ComputeSegmentedFloatReductionDispatchPlan(777u, 4u);
+
+    ASSERT_TRUE(plan.IsValid());
+    EXPECT_EQ(plan.Kind, Graphics::ParallelPrimitiveKind::SegmentedFloatReduction);
+    EXPECT_EQ(plan.ElementCount, 777u);
+    EXPECT_EQ(plan.SegmentCount, 4u);
+    EXPECT_EQ(plan.GroupSize, Graphics::kParallelPrimitiveGroupSize);
+    EXPECT_EQ(plan.ScratchBytes, 0u);
+    EXPECT_TRUE(plan.ScratchLevels.empty());
+
+    ASSERT_EQ(plan.Dispatches.size(), 1u);
+    const auto& dispatch = plan.Dispatches[0];
+    EXPECT_EQ(dispatch.Kind,
+              Graphics::ParallelPrimitivePassKind::SegmentedFloatReduce);
+    EXPECT_EQ(dispatch.ElementCount, 777u);
+    EXPECT_EQ(dispatch.SegmentCount, 4u);
+    EXPECT_EQ(dispatch.GroupCountX, 4u);
+    EXPECT_EQ(dispatch.GroupCountY, 1u);
+    EXPECT_EQ(dispatch.GroupCountZ, 1u);
+    EXPECT_EQ(dispatch.InputRole, Graphics::ParallelPrimitiveBufferRole::Keys);
+    EXPECT_EQ(dispatch.ValuesRole, Graphics::ParallelPrimitiveBufferRole::Values);
+    EXPECT_EQ(dispatch.SumsRole,
+              Graphics::ParallelPrimitiveBufferRole::SegmentSums);
+    EXPECT_EQ(dispatch.CountsRole,
+              Graphics::ParallelPrimitiveBufferRole::SegmentCounts);
+    EXPECT_EQ(dispatch.MeansRole,
+              Graphics::ParallelPrimitiveBufferRole::SegmentMeans);
+
+    ASSERT_EQ(plan.Barriers.size(), 3u);
+    EXPECT_EQ(plan.Barriers[0].Buffer,
+              Graphics::ParallelPrimitiveBufferRole::SegmentSums);
+    EXPECT_EQ(plan.Barriers[1].Buffer,
+              Graphics::ParallelPrimitiveBufferRole::SegmentCounts);
+    EXPECT_EQ(plan.Barriers[2].Buffer,
+              Graphics::ParallelPrimitiveBufferRole::SegmentMeans);
+
+    const auto empty = Graphics::ComputeSegmentedFloatReductionDispatchPlan(0u, 3u);
+    ASSERT_TRUE(empty.IsValid());
+    ASSERT_EQ(empty.Dispatches.size(), 1u);
+    EXPECT_EQ(empty.Dispatches[0].InputRole,
+              Graphics::ParallelPrimitiveBufferRole::None);
+    EXPECT_EQ(empty.Dispatches[0].ValuesRole,
+              Graphics::ParallelPrimitiveBufferRole::None);
+    EXPECT_EQ(empty.Dispatches[0].GroupCountX, 3u);
+
+    const auto zeroSegments =
+        Graphics::ComputeSegmentedFloatReductionDispatchPlan(16u, 0u);
+    EXPECT_EQ(zeroSegments.Status,
+              Graphics::ParallelPrimitiveStatus::InvalidInput);
+
+    const auto zeroGroup =
+        Graphics::ComputeSegmentedFloatReductionDispatchPlan(16u, 2u, 0u);
+    EXPECT_EQ(zeroGroup.Status,
+              Graphics::ParallelPrimitiveStatus::InvalidInput);
+}
+
 TEST(ComputeParallelPrimitives, BuildsComputePipelineDescriptors)
 {
     const RHI::PipelineDesc prefix = Graphics::BuildParallelPrefixScanPipelineDesc();
@@ -363,6 +504,14 @@ TEST(ComputeParallelPrimitives, BuildsComputePipelineDescriptors)
     EXPECT_EQ(countToDispatch.PushConstantSize,
               static_cast<std::uint32_t>(
                   sizeof(Graphics::ParallelCountToDispatchArgsPushConstants)));
+
+    const RHI::PipelineDesc segmented =
+        Graphics::BuildParallelSegmentedFloatReducePipelineDesc();
+    EXPECT_TRUE(segmented.ComputeShaderPath.ends_with(
+        "shaders/parallel_segmented_float_reduce.comp.spv"));
+    EXPECT_EQ(segmented.PushConstantSize,
+              static_cast<std::uint32_t>(
+                  sizeof(Graphics::ParallelSegmentedFloatReducePushConstants)));
 }
 
 TEST(ComputeParallelPrimitives, BuildsCountPublicationBufferDescriptors)
@@ -529,6 +678,69 @@ TEST(ComputeParallelPrimitives, RecordsStreamCompactionWithScanAndScatter)
     EXPECT_EQ(device.CommandContext.BufferBarrierCalls[4].Buffer, outputCount);
 }
 
+TEST(ComputeParallelPrimitives, RecordsSegmentedFloatReductionCommands)
+{
+    Tests::MockDevice device{};
+    RHI::BufferManager buffers{device};
+    const RHI::BufferHandle keys = ValidBuffer(1u);
+    const RHI::BufferHandle values = ValidBuffer(2u);
+    const RHI::BufferHandle segmentSums = ValidBuffer(3u);
+    const RHI::BufferHandle segmentCounts = ValidBuffer(4u);
+    const RHI::BufferHandle segmentMeans = ValidBuffer(5u);
+
+    const auto result = Graphics::RecordGpuSegmentedFloatReduction(
+        Graphics::GpuSegmentedFloatReductionRecordDesc{
+            .Device = &device,
+            .CommandContext = &device.CommandContext,
+            .Buffers = &buffers,
+            .Pipelines = ValidPipelineSet(),
+            .Keys = keys,
+            .Values = values,
+            .SegmentSums = segmentSums,
+            .SegmentCounts = segmentCounts,
+            .SegmentMeans = segmentMeans,
+            .ElementCount = 777u,
+            .SegmentCount = 4u,
+        });
+
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_TRUE(result.Recorded);
+    EXPECT_FALSE(result.Scratch.IsValid());
+    EXPECT_EQ(device.CreateBufferCount, 0);
+    ASSERT_EQ(result.Plan.Dispatches.size(), 1u);
+    EXPECT_EQ(result.Plan.Kind,
+              Graphics::ParallelPrimitiveKind::SegmentedFloatReduction);
+    EXPECT_EQ(result.Plan.SegmentCount, 4u);
+
+    ASSERT_EQ(device.CommandContext.BoundPipelines.size(), 1u);
+    EXPECT_EQ(device.CommandContext.BoundPipelines[0], ValidPipeline(14u));
+    ASSERT_EQ(device.CommandContext.DispatchRecords.size(), 1u);
+    EXPECT_EQ(device.CommandContext.DispatchRecords[0].X, 4u);
+    EXPECT_EQ(device.CommandContext.DispatchRecords[0].Y, 1u);
+    EXPECT_EQ(device.CommandContext.DispatchRecords[0].Z, 1u);
+
+    ASSERT_EQ(device.CommandContext.PushConstantPayloads.size(), 1u);
+    const auto pc =
+        ReadPushPayload<Graphics::ParallelSegmentedFloatReducePushConstants>(
+            device.CommandContext.PushConstantPayloads[0]);
+    EXPECT_EQ(pc.KeysBDA, device.GetBufferDeviceAddress(keys));
+    EXPECT_EQ(pc.ValuesBDA, device.GetBufferDeviceAddress(values));
+    EXPECT_EQ(pc.SegmentSumsBDA, device.GetBufferDeviceAddress(segmentSums));
+    EXPECT_EQ(pc.SegmentCountsBDA, device.GetBufferDeviceAddress(segmentCounts));
+    EXPECT_EQ(pc.SegmentMeansBDA, device.GetBufferDeviceAddress(segmentMeans));
+    EXPECT_EQ(pc.ElementCount, 777u);
+    EXPECT_EQ(pc.SegmentCount, 4u);
+
+    ASSERT_EQ(device.CommandContext.BufferBarrierCalls.size(), 3u);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[0].Buffer, segmentSums);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[0].Before,
+              RHI::MemoryAccess::ShaderWrite);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[0].After,
+              RHI::MemoryAccess::ShaderRead);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[1].Buffer, segmentCounts);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls[2].Buffer, segmentMeans);
+}
+
 TEST(ComputeParallelPrimitives, PublishesCompactionCountForReadbackAndIndirectDispatch)
 {
     Tests::MockDevice device{};
@@ -630,6 +842,22 @@ TEST(ComputeParallelPrimitives, GpuRecordReportsDeviceUnavailableForNullDevice)
     EXPECT_FALSE(compact.Recorded);
     EXPECT_TRUE(compact.CpuFallbackRecommended);
 
+    const auto segmented = Graphics::RecordGpuSegmentedFloatReduction(
+        Graphics::GpuSegmentedFloatReductionRecordDesc{
+            .Device = &device,
+            .Keys = ValidBuffer(1u),
+            .Values = ValidBuffer(2u),
+            .SegmentSums = ValidBuffer(3u),
+            .SegmentCounts = ValidBuffer(4u),
+            .SegmentMeans = ValidBuffer(5u),
+            .ElementCount = 32u,
+            .SegmentCount = 3u,
+        });
+    EXPECT_EQ(segmented.Status,
+              Graphics::ParallelPrimitiveStatus::DeviceUnavailable);
+    EXPECT_FALSE(segmented.Recorded);
+    EXPECT_TRUE(segmented.CpuFallbackRecommended);
+
     const auto countPublication =
         Graphics::RecordCompactionCountPublication(
             Graphics::GpuCompactionCountPublicationDesc{
@@ -707,6 +935,83 @@ TEST(ComputeParallelPrimitives, GpuRecordValidatesRecorderInputsAndResources)
     EXPECT_FALSE(missingPipeline.Recorded);
     EXPECT_FALSE(missingPipeline.CpuFallbackRecommended);
 
+    const auto segmentedMissingContext =
+        Graphics::RecordGpuSegmentedFloatReduction(
+            Graphics::GpuSegmentedFloatReductionRecordDesc{
+                .Device = &device,
+                .Buffers = &buffers,
+                .Pipelines = ValidPipelineSet(),
+                .Keys = ValidBuffer(1u),
+                .Values = ValidBuffer(2u),
+                .SegmentSums = ValidBuffer(3u),
+                .SegmentCounts = ValidBuffer(4u),
+                .SegmentMeans = ValidBuffer(5u),
+                .ElementCount = 4u,
+                .SegmentCount = 2u,
+            });
+    EXPECT_EQ(segmentedMissingContext.Status,
+              Graphics::ParallelPrimitiveStatus::InvalidInput);
+
+    const auto segmentedInvalidOutput =
+        Graphics::RecordGpuSegmentedFloatReduction(
+            Graphics::GpuSegmentedFloatReductionRecordDesc{
+                .Device = &device,
+                .CommandContext = &device.CommandContext,
+                .Buffers = &buffers,
+                .Pipelines = ValidPipelineSet(),
+                .Keys = ValidBuffer(1u),
+                .Values = ValidBuffer(2u),
+                .SegmentSums = ValidBuffer(3u),
+                .SegmentCounts = {},
+                .SegmentMeans = ValidBuffer(5u),
+                .ElementCount = 4u,
+                .SegmentCount = 2u,
+            });
+    EXPECT_EQ(segmentedInvalidOutput.Status,
+              Graphics::ParallelPrimitiveStatus::InvalidGpuResource);
+
+    const auto segmentedInvalidInput =
+        Graphics::RecordGpuSegmentedFloatReduction(
+            Graphics::GpuSegmentedFloatReductionRecordDesc{
+                .Device = &device,
+                .CommandContext = &device.CommandContext,
+                .Buffers = &buffers,
+                .Pipelines = ValidPipelineSet(),
+                .Keys = {},
+                .Values = ValidBuffer(2u),
+                .SegmentSums = ValidBuffer(3u),
+                .SegmentCounts = ValidBuffer(4u),
+                .SegmentMeans = ValidBuffer(5u),
+                .ElementCount = 4u,
+                .SegmentCount = 2u,
+            });
+    EXPECT_EQ(segmentedInvalidInput.Status,
+              Graphics::ParallelPrimitiveStatus::InvalidGpuResource);
+
+    const auto segmentedMissingPipeline =
+        Graphics::RecordGpuSegmentedFloatReduction(
+            Graphics::GpuSegmentedFloatReductionRecordDesc{
+                .Device = &device,
+                .CommandContext = &device.CommandContext,
+                .Buffers = &buffers,
+                .Pipelines = Graphics::ParallelPrimitivePipelineSet{
+                    .PrefixScan = ValidPipeline(10u),
+                    .AddBlockOffsets = ValidPipeline(11u),
+                    .CompactByFlags = ValidPipeline(12u),
+                },
+                .Keys = ValidBuffer(1u),
+                .Values = ValidBuffer(2u),
+                .SegmentSums = ValidBuffer(3u),
+                .SegmentCounts = ValidBuffer(4u),
+                .SegmentMeans = ValidBuffer(5u),
+                .ElementCount = 4u,
+                .SegmentCount = 2u,
+            });
+    EXPECT_EQ(segmentedMissingPipeline.Status,
+              Graphics::ParallelPrimitiveStatus::InvalidGpuResource);
+    EXPECT_FALSE(segmentedMissingPipeline.Recorded);
+    EXPECT_FALSE(segmentedMissingPipeline.CpuFallbackRecommended);
+
     const auto missingCountTarget =
         Graphics::RecordCompactionCountPublication(
             Graphics::GpuCompactionCountPublicationDesc{
@@ -761,7 +1066,15 @@ TEST(ComputeParallelPrimitives, StatusDebugNamesAreStable)
             Graphics::ParallelPrimitivePassKind::StreamCompactScatter),
         "StreamCompactScatter");
     EXPECT_STREQ(
+        Graphics::DebugNameForParallelPrimitivePassKind(
+            Graphics::ParallelPrimitivePassKind::SegmentedFloatReduce),
+        "SegmentedFloatReduce");
+    EXPECT_STREQ(
         Graphics::DebugNameForParallelPrimitiveBufferRole(
             Graphics::ParallelPrimitiveBufferRole::OutputCount),
         "OutputCount");
+    EXPECT_STREQ(
+        Graphics::DebugNameForParallelPrimitiveBufferRole(
+            Graphics::ParallelPrimitiveBufferRole::SegmentMeans),
+        "SegmentMeans");
 }

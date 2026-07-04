@@ -156,6 +156,22 @@ namespace
         });
     }
 
+    [[nodiscard]] RHI::BufferHandle CreateFloatStorageBuffer(RHI::IDevice& device,
+                                                             const std::uint32_t count,
+                                                             const char* debugName)
+    {
+        const std::uint64_t sizeBytes =
+            static_cast<std::uint64_t>(std::max(count, 1u)) * sizeof(float);
+        return device.CreateBuffer(RHI::BufferDesc{
+            .SizeBytes = sizeBytes,
+            .Usage = RHI::BufferUsage::Storage |
+                     RHI::BufferUsage::TransferSrc |
+                     RHI::BufferUsage::TransferDst,
+            .HostVisible = true,
+            .DebugName = debugName,
+        });
+    }
+
     [[nodiscard]] bool BeginComputeFrame(RHI::IDevice& device,
                                          RHI::FrameHandle& frame,
                                          RHI::ICommandContext*& cmd,
@@ -298,6 +314,13 @@ namespace
         std::uint32_t OutputCount = 0u;
         std::uint32_t ReadbackCount = 0u;
         Graphics::ParallelDispatchIndirectArgs DispatchArgs{};
+    };
+
+    struct SegmentedReductionSmokeResult
+    {
+        std::vector<float> Sums{};
+        std::vector<std::uint32_t> Counts{};
+        std::vector<float> Means{};
     };
 
     [[nodiscard]] std::uint32_t CeilDiv(const std::uint32_t value,
@@ -549,6 +572,214 @@ namespace
         destroyAll();
         return true;
     }
+
+    [[nodiscard]] bool RunSegmentedReductionCase(
+        RHI::IDevice& device,
+        RHI::BufferManager& buffers,
+        const Graphics::ParallelPrimitivePipelineSet pipelines,
+        const std::vector<std::uint32_t>& keys,
+        const std::vector<float>& values,
+        const std::uint32_t segmentCount,
+        const std::string_view caseName,
+        SegmentedReductionSmokeResult* outResult = nullptr)
+    {
+        std::vector<float> expectedSums(segmentCount, 0.0f);
+        std::vector<std::uint32_t> expectedCounts(segmentCount, 0u);
+        std::vector<float> expectedMeans(segmentCount, 0.0f);
+        const Graphics::ParallelPrimitiveCpuResult cpu =
+            Graphics::ReduceFloatBySegmentCpu(keys,
+                                              values,
+                                              segmentCount,
+                                              expectedSums,
+                                              expectedCounts,
+                                              expectedMeans);
+        if (!cpu.Succeeded())
+        {
+            ADD_FAILURE() << caseName << ": CPU reference failed";
+            return false;
+        }
+
+        RHI::BufferHandle keysBuffer =
+            CreateU32StorageBuffer(device, static_cast<std::uint32_t>(keys.size()),
+                                   "ComputePrimitiveSmoke.SegmentKeys");
+        RHI::BufferHandle valuesBuffer =
+            CreateFloatStorageBuffer(device,
+                                     static_cast<std::uint32_t>(values.size()),
+                                     "ComputePrimitiveSmoke.SegmentValues");
+        RHI::BufferHandle sumsBuffer =
+            CreateFloatStorageBuffer(device, segmentCount,
+                                     "ComputePrimitiveSmoke.SegmentSums");
+        RHI::BufferHandle countsBuffer =
+            CreateU32StorageBuffer(device, segmentCount,
+                                   "ComputePrimitiveSmoke.SegmentCounts");
+        RHI::BufferHandle meansBuffer =
+            CreateFloatStorageBuffer(device, segmentCount,
+                                     "ComputePrimitiveSmoke.SegmentMeans");
+        if (!keysBuffer.IsValid() ||
+            !valuesBuffer.IsValid() ||
+            !sumsBuffer.IsValid() ||
+            !countsBuffer.IsValid() ||
+            !meansBuffer.IsValid())
+        {
+            ADD_FAILURE() << caseName << ": buffer allocation failed";
+            DestroyBufferIfValid(device, meansBuffer);
+            DestroyBufferIfValid(device, countsBuffer);
+            DestroyBufferIfValid(device, sumsBuffer);
+            DestroyBufferIfValid(device, valuesBuffer);
+            DestroyBufferIfValid(device, keysBuffer);
+            return false;
+        }
+
+        std::vector<float> initialFloats(std::max<std::uint32_t>(segmentCount, 1u),
+                                         -77.0f);
+        std::vector<std::uint32_t> initialCounts(
+            std::max<std::uint32_t>(segmentCount, 1u),
+            0xdeadbeefu);
+        if (!keys.empty())
+        {
+            device.WriteBuffer(keysBuffer,
+                               keys.data(),
+                               keys.size() * sizeof(std::uint32_t),
+                               0u);
+            device.WriteBuffer(valuesBuffer,
+                               values.data(),
+                               values.size() * sizeof(float),
+                               0u);
+        }
+        device.WriteBuffer(sumsBuffer,
+                           initialFloats.data(),
+                           initialFloats.size() * sizeof(float),
+                           0u);
+        device.WriteBuffer(countsBuffer,
+                           initialCounts.data(),
+                           initialCounts.size() * sizeof(std::uint32_t),
+                           0u);
+        device.WriteBuffer(meansBuffer,
+                           initialFloats.data(),
+                           initialFloats.size() * sizeof(float),
+                           0u);
+
+        auto destroyAll = [&device,
+                           &meansBuffer,
+                           &countsBuffer,
+                           &sumsBuffer,
+                           &valuesBuffer,
+                           &keysBuffer]() noexcept
+        {
+            DestroyBufferIfValid(device, meansBuffer);
+            DestroyBufferIfValid(device, countsBuffer);
+            DestroyBufferIfValid(device, sumsBuffer);
+            DestroyBufferIfValid(device, valuesBuffer);
+            DestroyBufferIfValid(device, keysBuffer);
+        };
+
+        RHI::FrameHandle frame{};
+        RHI::ICommandContext* cmd = nullptr;
+        if (!BeginComputeFrame(device, frame, cmd, caseName))
+        {
+            destroyAll();
+            return false;
+        }
+
+        if (!keys.empty())
+        {
+            cmd->BufferBarrier(keysBuffer,
+                               RHI::MemoryAccess::HostWrite,
+                               RHI::MemoryAccess::ShaderRead);
+            cmd->BufferBarrier(valuesBuffer,
+                               RHI::MemoryAccess::HostWrite,
+                               RHI::MemoryAccess::ShaderRead);
+        }
+        cmd->BufferBarrier(sumsBuffer,
+                           RHI::MemoryAccess::HostWrite,
+                           RHI::MemoryAccess::ShaderWrite);
+        cmd->BufferBarrier(countsBuffer,
+                           RHI::MemoryAccess::HostWrite,
+                           RHI::MemoryAccess::ShaderWrite);
+        cmd->BufferBarrier(meansBuffer,
+                           RHI::MemoryAccess::HostWrite,
+                           RHI::MemoryAccess::ShaderWrite);
+
+        const Graphics::GpuParallelPrimitiveRecordResult gpu =
+            Graphics::RecordGpuSegmentedFloatReduction(
+                Graphics::GpuSegmentedFloatReductionRecordDesc{
+                    .Device = &device,
+                    .CommandContext = cmd,
+                    .Buffers = &buffers,
+                    .Pipelines = pipelines,
+                    .Keys = keysBuffer,
+                    .Values = valuesBuffer,
+                    .SegmentSums = sumsBuffer,
+                    .SegmentCounts = countsBuffer,
+                    .SegmentMeans = meansBuffer,
+                    .ElementCount = static_cast<std::uint32_t>(keys.size()),
+                    .SegmentCount = segmentCount,
+                });
+
+        if (gpu.Succeeded())
+        {
+            cmd->BufferBarrier(sumsBuffer,
+                               RHI::MemoryAccess::ShaderRead,
+                               RHI::MemoryAccess::HostRead);
+            cmd->BufferBarrier(countsBuffer,
+                               RHI::MemoryAccess::ShaderRead,
+                               RHI::MemoryAccess::HostRead);
+            cmd->BufferBarrier(meansBuffer,
+                               RHI::MemoryAccess::ShaderRead,
+                               RHI::MemoryAccess::HostRead);
+        }
+
+        EndComputeFrame(device, frame, cmd);
+
+        if (!gpu.Succeeded())
+        {
+            ADD_FAILURE() << caseName
+                          << ": GPU segmented reduction record failed with status "
+                          << Graphics::DebugNameForParallelPrimitiveStatus(gpu.Status);
+            destroyAll();
+            return false;
+        }
+
+        std::vector<float> actualSums(segmentCount, 0.0f);
+        std::vector<std::uint32_t> actualCounts(segmentCount, 0u);
+        std::vector<float> actualMeans(segmentCount, 0.0f);
+        device.ReadBuffer(sumsBuffer,
+                          actualSums.data(),
+                          actualSums.size() * sizeof(float),
+                          0u);
+        device.ReadBuffer(countsBuffer,
+                          actualCounts.data(),
+                          actualCounts.size() * sizeof(std::uint32_t),
+                          0u);
+        device.ReadBuffer(meansBuffer,
+                          actualMeans.data(),
+                          actualMeans.size() * sizeof(float),
+                          0u);
+
+        for (std::uint32_t segment = 0u; segment < segmentCount; ++segment)
+        {
+            EXPECT_NEAR(actualSums[segment],
+                        expectedSums[segment],
+                        Graphics::kParallelSegmentedFloatReductionParityTolerance)
+                << caseName << " sum segment " << segment;
+            EXPECT_EQ(actualCounts[segment], expectedCounts[segment])
+                << caseName << " count segment " << segment;
+            EXPECT_NEAR(actualMeans[segment],
+                        expectedMeans[segment],
+                        Graphics::kParallelSegmentedFloatReductionParityTolerance)
+                << caseName << " mean segment " << segment;
+        }
+
+        if (outResult != nullptr)
+        {
+            outResult->Sums = std::move(actualSums);
+            outResult->Counts = std::move(actualCounts);
+            outResult->Means = std::move(actualMeans);
+        }
+
+        destroyAll();
+        return true;
+    }
 } // namespace
 
 TEST(ComputeParallelPrimitivesGpuSmoke, VulkanScanAndCompactionMatchCpuReference)
@@ -582,6 +813,9 @@ TEST(ComputeParallelPrimitivesGpuSmoke, VulkanScanAndCompactionMatchCpuReference
     const std::string compactShader =
         Extrinsic::Core::Filesystem::GetShaderPath(
             "shaders/parallel_compact_by_flags.comp.spv");
+    const std::string segmentedShader =
+        Extrinsic::Core::Filesystem::GetShaderPath(
+            "shaders/parallel_segmented_float_reduce.comp.spv");
     const std::string countToDispatchShader =
         Extrinsic::Core::Filesystem::GetShaderPath(
             "shaders/parallel_count_to_dispatch_args.comp.spv");
@@ -595,6 +829,10 @@ TEST(ComputeParallelPrimitivesGpuSmoke, VulkanScanAndCompactionMatchCpuReference
     RHI::PipelineHandle compactPipeline =
         device.CreatePipeline(Graphics::BuildParallelCompactByFlagsPipelineDesc(
             compactShader.c_str()));
+    RHI::PipelineHandle segmentedPipeline =
+        device.CreatePipeline(
+            Graphics::BuildParallelSegmentedFloatReducePipelineDesc(
+                segmentedShader.c_str()));
     RHI::PipelineHandle countToDispatchPipeline =
         device.CreatePipeline(Graphics::BuildParallelCountToDispatchArgsPipelineDesc(
             countToDispatchShader.c_str()));
@@ -602,9 +840,11 @@ TEST(ComputeParallelPrimitivesGpuSmoke, VulkanScanAndCompactionMatchCpuReference
     if (!prefixPipeline.IsValid() ||
         !addPipeline.IsValid() ||
         !compactPipeline.IsValid() ||
+        !segmentedPipeline.IsValid() ||
         !countToDispatchPipeline.IsValid())
     {
         DestroyPipelineIfValid(device, countToDispatchPipeline);
+        DestroyPipelineIfValid(device, segmentedPipeline);
         DestroyPipelineIfValid(device, compactPipeline);
         DestroyPipelineIfValid(device, addPipeline);
         DestroyPipelineIfValid(device, prefixPipeline);
@@ -615,6 +855,7 @@ TEST(ComputeParallelPrimitivesGpuSmoke, VulkanScanAndCompactionMatchCpuReference
         .PrefixScan = prefixPipeline,
         .AddBlockOffsets = addPipeline,
         .CompactByFlags = compactPipeline,
+        .SegmentedFloatReduce = segmentedPipeline,
     };
 
     {
@@ -723,9 +964,64 @@ TEST(ComputeParallelPrimitivesGpuSmoke, VulkanScanAndCompactionMatchCpuReference
                   secondDeterministic.DispatchArgs.GroupCountY);
         EXPECT_EQ(firstDeterministic.DispatchArgs.GroupCountZ,
                   secondDeterministic.DispatchArgs.GroupCountZ);
+
+        ASSERT_TRUE(RunSegmentedReductionCase(device,
+                                              buffers,
+                                              pipelines,
+                                              {},
+                                              {},
+                                              3u,
+                                              "segmented empty"));
+        ASSERT_TRUE(RunSegmentedReductionCase(
+            device,
+            buffers,
+            pipelines,
+            {0u, 2u, 1u, 2u, 0u, 2u},
+            {1.0f, 3.0f, 5.0f, -1.0f, 2.0f, 4.0f},
+            4u,
+            "segmented small"));
+
+        std::vector<std::uint32_t> segmentKeys(777u, 0u);
+        std::vector<float> segmentValues(777u, 0.0f);
+        for (std::uint32_t i = 0u; i < segmentKeys.size(); ++i)
+        {
+            segmentKeys[i] = (i * 29u + 7u) % 6u;
+            segmentValues[i] =
+                static_cast<float>((static_cast<int>(i % 17u) - 8)) * 0.25f;
+        }
+        ASSERT_TRUE(RunSegmentedReductionCase(device,
+                                              buffers,
+                                              pipelines,
+                                              segmentKeys,
+                                              segmentValues,
+                                              6u,
+                                              "segmented multiblock"));
+
+        SegmentedReductionSmokeResult firstSegmented{};
+        SegmentedReductionSmokeResult secondSegmented{};
+        ASSERT_TRUE(RunSegmentedReductionCase(device,
+                                              buffers,
+                                              pipelines,
+                                              segmentKeys,
+                                              segmentValues,
+                                              6u,
+                                              "segmented deterministic first",
+                                              &firstSegmented));
+        ASSERT_TRUE(RunSegmentedReductionCase(device,
+                                              buffers,
+                                              pipelines,
+                                              segmentKeys,
+                                              segmentValues,
+                                              6u,
+                                              "segmented deterministic second",
+                                              &secondSegmented));
+        EXPECT_EQ(firstSegmented.Sums, secondSegmented.Sums);
+        EXPECT_EQ(firstSegmented.Counts, secondSegmented.Counts);
+        EXPECT_EQ(firstSegmented.Means, secondSegmented.Means);
     }
 
     DestroyPipelineIfValid(device, countToDispatchPipeline);
+    DestroyPipelineIfValid(device, segmentedPipeline);
     DestroyPipelineIfValid(device, compactPipeline);
     DestroyPipelineIfValid(device, addPipeline);
     DestroyPipelineIfValid(device, prefixPipeline);

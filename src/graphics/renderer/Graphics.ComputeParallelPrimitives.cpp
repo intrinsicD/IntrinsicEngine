@@ -1,6 +1,7 @@
 module;
 
 #include <cstdint>
+#include <algorithm>
 #include <limits>
 #include <span>
 #include <string>
@@ -275,6 +276,10 @@ namespace Extrinsic::Graphics
             RHI::BufferHandle Flags{};
             RHI::BufferHandle OutputKeys{};
             RHI::BufferHandle OutputCount{};
+            RHI::BufferHandle Values{};
+            RHI::BufferHandle SegmentSums{};
+            RHI::BufferHandle SegmentCounts{};
+            RHI::BufferHandle SegmentMeans{};
             RHI::BufferHandle Scratch{};
             std::uint64_t InputBDA = 0u;
             std::uint64_t OutputBDA = 0u;
@@ -282,6 +287,10 @@ namespace Extrinsic::Graphics
             std::uint64_t FlagsBDA = 0u;
             std::uint64_t OutputKeysBDA = 0u;
             std::uint64_t OutputCountBDA = 0u;
+            std::uint64_t ValuesBDA = 0u;
+            std::uint64_t SegmentSumsBDA = 0u;
+            std::uint64_t SegmentCountsBDA = 0u;
+            std::uint64_t SegmentMeansBDA = 0u;
             std::uint64_t ScratchBDA = 0u;
         };
 
@@ -305,6 +314,14 @@ namespace Extrinsic::Graphics
                 return bindings.OutputKeys;
             case ParallelPrimitiveBufferRole::OutputCount:
                 return bindings.OutputCount;
+            case ParallelPrimitiveBufferRole::Values:
+                return bindings.Values;
+            case ParallelPrimitiveBufferRole::SegmentSums:
+                return bindings.SegmentSums;
+            case ParallelPrimitiveBufferRole::SegmentCounts:
+                return bindings.SegmentCounts;
+            case ParallelPrimitiveBufferRole::SegmentMeans:
+                return bindings.SegmentMeans;
             case ParallelPrimitiveBufferRole::Scratch:
                 return bindings.Scratch;
             }
@@ -339,6 +356,18 @@ namespace Extrinsic::Graphics
             case ParallelPrimitiveBufferRole::OutputCount:
                 base = bindings.OutputCountBDA;
                 break;
+            case ParallelPrimitiveBufferRole::Values:
+                base = bindings.ValuesBDA;
+                break;
+            case ParallelPrimitiveBufferRole::SegmentSums:
+                base = bindings.SegmentSumsBDA;
+                break;
+            case ParallelPrimitiveBufferRole::SegmentCounts:
+                base = bindings.SegmentCountsBDA;
+                break;
+            case ParallelPrimitiveBufferRole::SegmentMeans:
+                base = bindings.SegmentMeansBDA;
+                break;
             case ParallelPrimitiveBufferRole::Scratch:
                 base = bindings.ScratchBDA;
                 break;
@@ -369,7 +398,11 @@ namespace Extrinsic::Graphics
                    validAddress(dispatch.OutputRole, dispatch.OutputOffsetBytes) &&
                    validAddress(dispatch.BlockSumsRole, dispatch.BlockSumsOffsetBytes) &&
                    validAddress(dispatch.OffsetsRole, dispatch.OffsetsOffsetBytes) &&
-                   validAddress(dispatch.CountRole, dispatch.CountOffsetBytes);
+                   validAddress(dispatch.CountRole, dispatch.CountOffsetBytes) &&
+                   validAddress(dispatch.ValuesRole, dispatch.ValuesOffsetBytes) &&
+                   validAddress(dispatch.SumsRole, dispatch.SumsOffsetBytes) &&
+                   validAddress(dispatch.CountsRole, dispatch.CountsOffsetBytes) &&
+                   validAddress(dispatch.MeansRole, dispatch.MeansOffsetBytes);
         }
 
         [[nodiscard]] RHI::PipelineHandle PipelineForDispatch(
@@ -384,6 +417,8 @@ namespace Extrinsic::Graphics
                 return pipelines.AddBlockOffsets;
             case ParallelPrimitivePassKind::StreamCompactScatter:
                 return pipelines.CompactByFlags;
+            case ParallelPrimitivePassKind::SegmentedFloatReduce:
+                return pipelines.SegmentedFloatReduce;
             }
             return {};
         }
@@ -402,6 +437,13 @@ namespace Extrinsic::Graphics
                 }
                 if (dispatch.Kind == ParallelPrimitivePassKind::StreamCompactScatter &&
                     bindings.FlagsBDA == 0u)
+                {
+                    return false;
+                }
+                if (dispatch.Kind == ParallelPrimitivePassKind::SegmentedFloatReduce &&
+                    (bindings.SegmentSumsBDA == 0u ||
+                     bindings.SegmentCountsBDA == 0u ||
+                     bindings.SegmentMeansBDA == 0u))
                 {
                     return false;
                 }
@@ -497,6 +539,32 @@ namespace Extrinsic::Graphics
                     cmd.PushConstants(&pc, static_cast<std::uint32_t>(sizeof(pc)), 0u);
                     break;
                 }
+                case ParallelPrimitivePassKind::SegmentedFloatReduce:
+                {
+                    const ParallelSegmentedFloatReducePushConstants pc{
+                        .KeysBDA = AddressForRole(bindings,
+                                                  dispatch.InputRole,
+                                                  dispatch.InputOffsetBytes),
+                        .ValuesBDA = AddressForRole(bindings,
+                                                    dispatch.ValuesRole,
+                                                    dispatch.ValuesOffsetBytes),
+                        .SegmentSumsBDA = AddressForRole(bindings,
+                                                         dispatch.SumsRole,
+                                                         dispatch.SumsOffsetBytes),
+                        .SegmentCountsBDA = AddressForRole(bindings,
+                                                           dispatch.CountsRole,
+                                                           dispatch.CountsOffsetBytes),
+                        .SegmentMeansBDA = AddressForRole(bindings,
+                                                          dispatch.MeansRole,
+                                                          dispatch.MeansOffsetBytes),
+                        .ElementCount = dispatch.ElementCount,
+                        .SegmentCount = dispatch.SegmentCount,
+                        .Reserved0 = 0u,
+                        .Reserved1 = 0u,
+                    };
+                    cmd.PushConstants(&pc, static_cast<std::uint32_t>(sizeof(pc)), 0u);
+                    break;
+                }
                 }
 
                 cmd.Dispatch(dispatch.GroupCountX,
@@ -565,6 +633,8 @@ namespace Extrinsic::Graphics
             return "PrefixAddBlockOffsets";
         case ParallelPrimitivePassKind::StreamCompactScatter:
             return "StreamCompactScatter";
+        case ParallelPrimitivePassKind::SegmentedFloatReduce:
+            return "SegmentedFloatReduce";
         }
         return "Unknown";
     }
@@ -588,6 +658,14 @@ namespace Extrinsic::Graphics
             return "OutputKeys";
         case ParallelPrimitiveBufferRole::OutputCount:
             return "OutputCount";
+        case ParallelPrimitiveBufferRole::Values:
+            return "Values";
+        case ParallelPrimitiveBufferRole::SegmentSums:
+            return "SegmentSums";
+        case ParallelPrimitiveBufferRole::SegmentCounts:
+            return "SegmentCounts";
+        case ParallelPrimitiveBufferRole::SegmentMeans:
+            return "SegmentMeans";
         case ParallelPrimitiveBufferRole::Scratch:
             return "Scratch";
         }
@@ -680,6 +758,84 @@ namespace Extrinsic::Graphics
             }
         }
 
+        return result;
+    }
+
+    ParallelPrimitiveCpuResult ReduceFloatBySegmentCpu(
+        const std::span<const std::uint32_t> keys,
+        const std::span<const float> values,
+        const std::uint32_t segmentCount,
+        const std::span<float> segmentSums,
+        const std::span<std::uint32_t> segmentCounts,
+        const std::span<float> segmentMeans) noexcept
+    {
+        ParallelPrimitiveCpuResult result{};
+        result.Diagnostics.ElementCount = static_cast<std::uint32_t>(keys.size());
+        result.Diagnostics.OutputCount = segmentCount;
+
+        if (keys.size() != values.size())
+        {
+            result.Status = ParallelPrimitiveStatus::SizeMismatch;
+            result.Diagnostics.OutputCount = static_cast<std::uint32_t>(
+                std::min(segmentSums.size(),
+                         std::min(segmentCounts.size(), segmentMeans.size())));
+            return result;
+        }
+
+        if (segmentCount == 0u)
+        {
+            result.Status = ParallelPrimitiveStatus::InvalidInput;
+            result.Diagnostics.OutputCount = 0u;
+            return result;
+        }
+
+        if (segmentSums.size() < segmentCount ||
+            segmentCounts.size() < segmentCount ||
+            segmentMeans.size() < segmentCount)
+        {
+            result.Status = ParallelPrimitiveStatus::OutputTooSmall;
+            result.Diagnostics.OutputCount = static_cast<std::uint32_t>(
+                std::min(segmentSums.size(),
+                         std::min(segmentCounts.size(), segmentMeans.size())));
+            return result;
+        }
+
+        for (std::uint32_t segment = 0u; segment < segmentCount; ++segment)
+        {
+            segmentSums[segment] = 0.0f;
+            segmentCounts[segment] = 0u;
+            segmentMeans[segment] =
+                kParallelSegmentedFloatReductionMeanForEmptySegment;
+        }
+
+        std::uint64_t accumulatedCount = 0u;
+        for (std::size_t index = 0u; index < keys.size(); ++index)
+        {
+            const std::uint32_t segment = keys[index];
+            if (segment >= segmentCount)
+            {
+                result.Status = ParallelPrimitiveStatus::InvalidInput;
+                result.Diagnostics.FirstFailureIndex =
+                    static_cast<std::uint32_t>(index);
+                result.Diagnostics.Total = accumulatedCount;
+                return result;
+            }
+
+            segmentSums[segment] += values[index];
+            ++segmentCounts[segment];
+            ++accumulatedCount;
+        }
+
+        for (std::uint32_t segment = 0u; segment < segmentCount; ++segment)
+        {
+            if (segmentCounts[segment] != 0u)
+            {
+                segmentMeans[segment] =
+                    segmentSums[segment] / static_cast<float>(segmentCounts[segment]);
+            }
+        }
+
+        result.Diagnostics.Total = accumulatedCount;
         return result;
     }
 
@@ -794,6 +950,50 @@ namespace Extrinsic::Graphics
         return plan;
     }
 
+    ParallelPrimitiveDispatchPlan ComputeSegmentedFloatReductionDispatchPlan(
+        const std::uint32_t elementCount,
+        const std::uint32_t segmentCount,
+        const std::uint32_t groupSize)
+    {
+        ParallelPrimitiveDispatchPlan plan{};
+        plan.Kind = ParallelPrimitiveKind::SegmentedFloatReduction;
+        plan.ElementCount = elementCount;
+        plan.SegmentCount = segmentCount;
+        plan.GroupSize = groupSize;
+
+        if (groupSize == 0u || segmentCount == 0u)
+        {
+            plan.Status = ParallelPrimitiveStatus::InvalidInput;
+            return plan;
+        }
+
+        plan.Dispatches.push_back(ParallelPrimitiveDispatchDesc{
+            .Kind = ParallelPrimitivePassKind::SegmentedFloatReduce,
+            .Mode = PrefixScanMode::Exclusive,
+            .LevelIndex = 0u,
+            .ElementCount = elementCount,
+            .SegmentCount = segmentCount,
+            .GroupSize = groupSize,
+            .GroupCountX = segmentCount,
+            .GroupCountY = 1u,
+            .GroupCountZ = 1u,
+            .InputRole = elementCount > 0u
+                ? ParallelPrimitiveBufferRole::Keys
+                : ParallelPrimitiveBufferRole::None,
+            .ValuesRole = elementCount > 0u
+                ? ParallelPrimitiveBufferRole::Values
+                : ParallelPrimitiveBufferRole::None,
+            .SumsRole = ParallelPrimitiveBufferRole::SegmentSums,
+            .CountsRole = ParallelPrimitiveBufferRole::SegmentCounts,
+            .MeansRole = ParallelPrimitiveBufferRole::SegmentMeans,
+        });
+
+        AddShaderReadBarrier(plan, 0u, ParallelPrimitiveBufferRole::SegmentSums);
+        AddShaderReadBarrier(plan, 0u, ParallelPrimitiveBufferRole::SegmentCounts);
+        AddShaderReadBarrier(plan, 0u, ParallelPrimitiveBufferRole::SegmentMeans);
+        return plan;
+    }
+
     RHI::BufferDesc BuildParallelPrimitiveScratchBufferDesc(
         const ParallelPrimitiveDispatchPlan& plan,
         const char* debugName) noexcept
@@ -872,6 +1072,17 @@ namespace Extrinsic::Graphics
         desc.PushConstantSize = static_cast<std::uint32_t>(
             sizeof(ParallelCountToDispatchArgsPushConstants));
         desc.DebugName = "ParallelPrimitive.CountToDispatchArgs";
+        return desc;
+    }
+
+    RHI::PipelineDesc BuildParallelSegmentedFloatReducePipelineDesc(
+        const char* shaderPath)
+    {
+        RHI::PipelineDesc desc{};
+        desc.ComputeShaderPath = shaderPath == nullptr ? "" : shaderPath;
+        desc.PushConstantSize = static_cast<std::uint32_t>(
+            sizeof(ParallelSegmentedFloatReducePushConstants));
+        desc.DebugName = "ParallelPrimitive.SegmentedFloatReduce";
         return desc;
     }
 
@@ -1119,6 +1330,129 @@ namespace Extrinsic::Graphics
         {
             return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource,
                                 ParallelPrimitiveKind::StreamCompaction,
+                                desc.ElementCount);
+        }
+
+        RecordPlanDispatches(*desc.CommandContext,
+                             plan,
+                             bindings,
+                             desc.Pipelines);
+
+        result.Recorded = true;
+        result.Scratch = scratch;
+        result.Plan = std::move(plan);
+        return result;
+    }
+
+    GpuParallelPrimitiveRecordResult RecordGpuSegmentedFloatReduction(
+        const GpuSegmentedFloatReductionRecordDesc& desc)
+    {
+        if (desc.Device == nullptr)
+        {
+            return StatusResult(ParallelPrimitiveStatus::InvalidInput,
+                                ParallelPrimitiveKind::SegmentedFloatReduction,
+                                desc.ElementCount);
+        }
+
+        if (!desc.Device->IsOperational())
+        {
+            return DeviceUnavailableResult(
+                ParallelPrimitiveKind::SegmentedFloatReduction,
+                desc.ElementCount);
+        }
+
+        ParallelPrimitiveDispatchPlan plan =
+            ComputeSegmentedFloatReductionDispatchPlan(desc.ElementCount,
+                                                       desc.SegmentCount);
+        if (!plan.IsValid())
+        {
+            return StatusResult(plan.Status,
+                                ParallelPrimitiveKind::SegmentedFloatReduction,
+                                desc.ElementCount);
+        }
+
+        if (desc.CommandContext == nullptr)
+        {
+            return StatusResult(ParallelPrimitiveStatus::InvalidInput,
+                                ParallelPrimitiveKind::SegmentedFloatReduction,
+                                desc.ElementCount);
+        }
+
+        if (!desc.SegmentSums.IsValid() ||
+            !desc.SegmentCounts.IsValid() ||
+            !desc.SegmentMeans.IsValid() ||
+            (desc.ElementCount > 0u &&
+             (!desc.Keys.IsValid() || !desc.Values.IsValid())))
+        {
+            return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource,
+                                ParallelPrimitiveKind::SegmentedFloatReduction,
+                                desc.ElementCount);
+        }
+
+        GpuParallelPrimitiveRecordResult result{};
+        result.Status = ParallelPrimitiveStatus::Success;
+        result.Kind = ParallelPrimitiveKind::SegmentedFloatReduction;
+        result.Diagnostics = ParallelPrimitiveDiagnostics{
+            .ElementCount = desc.ElementCount,
+            .OutputCount = desc.SegmentCount,
+            .Total = desc.ElementCount,
+        };
+
+        RHI::BufferHandle scratch = desc.Scratch;
+        if (plan.ScratchBytes > 0u && !scratch.IsValid())
+        {
+            if (desc.Buffers == nullptr)
+            {
+                return StatusResult(ParallelPrimitiveStatus::InvalidInput,
+                                    ParallelPrimitiveKind::SegmentedFloatReduction,
+                                    desc.ElementCount);
+            }
+
+            auto scratchOr = desc.Buffers->Create(
+                BuildParallelPrimitiveScratchBufferDesc(plan));
+            if (!scratchOr.has_value())
+            {
+                return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource,
+                                    ParallelPrimitiveKind::SegmentedFloatReduction,
+                                    desc.ElementCount);
+            }
+
+            result.ScratchLease = std::move(*scratchOr);
+            scratch = result.ScratchLease.GetHandle();
+        }
+
+        if (!ScratchBufferIsLargeEnough(desc.Buffers, scratch, plan.ScratchBytes))
+        {
+            return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource,
+                                ParallelPrimitiveKind::SegmentedFloatReduction,
+                                desc.ElementCount);
+        }
+
+        const RoleBindings bindings{
+            .Keys = desc.Keys,
+            .Values = desc.Values,
+            .SegmentSums = desc.SegmentSums,
+            .SegmentCounts = desc.SegmentCounts,
+            .SegmentMeans = desc.SegmentMeans,
+            .Scratch = scratch,
+            .KeysBDA = desc.Keys.IsValid()
+                ? desc.Device->GetBufferDeviceAddress(desc.Keys)
+                : 0u,
+            .ValuesBDA = desc.Values.IsValid()
+                ? desc.Device->GetBufferDeviceAddress(desc.Values)
+                : 0u,
+            .SegmentSumsBDA = desc.Device->GetBufferDeviceAddress(desc.SegmentSums),
+            .SegmentCountsBDA = desc.Device->GetBufferDeviceAddress(desc.SegmentCounts),
+            .SegmentMeansBDA = desc.Device->GetBufferDeviceAddress(desc.SegmentMeans),
+            .ScratchBDA = scratch.IsValid()
+                ? desc.Device->GetBufferDeviceAddress(scratch)
+                : 0u,
+        };
+
+        if (!PlanResourcesAreRecordable(plan, bindings, desc.Pipelines))
+        {
+            return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource,
+                                ParallelPrimitiveKind::SegmentedFloatReduction,
                                 desc.ElementCount);
         }
 

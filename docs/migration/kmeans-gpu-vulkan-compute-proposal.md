@@ -240,13 +240,14 @@ float-atomic and int64-atomic requirements, but it is not the final performance
 shape. Key follow-up optimizations over this portable baseline and over the
 Framework24 naive global-atomic kernel:
 
-1. **Segmented/per-cluster reduction.** Each workgroup keeps a local
-   copy of the `k` `sums`/`counts` in shared memory, `atomicAdd`s locally during
-   assignment, then flushes once to global memory. This collapses global-atomic
-   traffic from `O(n)` to `O(numGroups · k)` — typically a large speedup and the
-   main win. Guard on `k · 16B ≤ shared-memory budget`; use a deterministic
-   two-pass/fixed-point fallback when `k` is too large or optional float atomics
-   are unavailable.
+1. **Segmented/per-cluster reduction.** GRAPHICS-111 adds
+   `Extrinsic.Graphics.ComputeParallelPrimitives` support for deterministic
+   per-segment float sums, counts, and count-normalized means without optional
+   float atomics. A future fast path can keep a local copy of the `k`
+   `sums`/`counts` in shared memory, use capability-gated float atomics or
+   privatized accumulation locally during assignment, then flush once to global
+   memory. Guard any such path on `k · 16B ≤ shared-memory budget`; keep the
+   deterministic path as the missing-feature fallback.
 2. **Cache centroids in shared memory** for the scan so all threads in a group
    reuse them instead of re-reading global memory `k` times.
 3. **SoA coalesced loads** for positions (keep Framework24's `d_x/d_y/d_z`
@@ -263,13 +264,13 @@ Fuse the per-iteration reduction (inertia sum + farthest-point argmax) into the
 segmented-reduction path or a short follow-on reduce, so the empty-cluster reseed
 and convergence data are ready without the current `k` full-buffer scans.
 
-> **Reuse `ComputeParallelPrimitives` where it fits, but note the gap.** Its
-> compaction + on-GPU count→dispatch-indirect publication are a good fit for a
-> counting-sort assignment and variable-width follow-up passes. It has **no
-> float segmented/per-cluster reduction**, which is exactly the centroid
-> accumulate-and-divide step — so k-means currently uses a portable per-cluster
-> scan and should switch to GRAPHICS-111's dedicated reduction primitive when it
-> lands. See the audit
+> **Reuse `ComputeParallelPrimitives` where it fits.** Its compaction +
+> on-GPU count→dispatch-indirect publication are a good fit for a counting-sort
+> assignment and variable-width follow-up passes. GRAPHICS-111 now also provides
+> the float segmented/per-cluster reduction primitive for the centroid
+> accumulate-and-divide step, with a deterministic no-float-atomic fallback. The
+> current k-means GPU execution still uses the portable per-cluster scan until a
+> dedicated integration task switches it to this primitive. See the audit
 > (`docs/reviews/2026-07-01-gpu-geometry-backend-io-audit.md`, Finding 3).
 
 ---
