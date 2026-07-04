@@ -146,6 +146,85 @@ namespace Extrinsic::Graphics
         constexpr std::uint32_t kFrameSampledDescriptorSlotPresent = 2u;
         constexpr std::uint32_t kFrameSampledDescriptorSlotSelectionOutline = 3u;
 
+        [[nodiscard]] std::optional<std::uint32_t> FindCompiledTextureIndexByResourceId(
+            const CompiledRenderGraph& compiled,
+            const FrameResourceId id) noexcept
+        {
+            if (!id.IsValid())
+            {
+                return std::nullopt;
+            }
+
+            for (std::uint32_t index = 0u; index < compiled.TextureResourceIds.size(); ++index)
+            {
+                if (compiled.TextureResourceIds[index] == id)
+                {
+                    return index;
+                }
+            }
+            return std::nullopt;
+        }
+
+        [[nodiscard]] constexpr std::uint32_t FrameSampledDescriptorSlotForPass(
+            const FramePassId passId) noexcept
+        {
+            return passId == ToFramePassId(FrameRecipePassKind::Present)
+                ? kFrameSampledDescriptorSlotPresent
+                : kFrameSampledDescriptorSlotDefault;
+        }
+
+        bool BindFrameSampledTextureByResourceId(RHI::ICommandContext& cmd,
+                                                 const CompiledRenderGraph& compiled,
+                                                 const FrameResourceId id,
+                                                 const std::uint32_t descriptorSlot)
+        {
+            const std::optional<std::uint32_t> textureIndex =
+                FindCompiledTextureIndexByResourceId(compiled, id);
+            if (!textureIndex.has_value() || *textureIndex >= compiled.TextureHandles.size())
+            {
+                return false;
+            }
+
+            const RHI::TextureHandle texture = compiled.TextureHandles[*textureIndex];
+            if (!texture.IsValid())
+            {
+                return false;
+            }
+
+            cmd.BindFrameSampledTextureAt(texture, descriptorSlot);
+            return true;
+        }
+
+        bool BindFrameSampledDeclaredTexture(RHI::ICommandContext& cmd,
+                                             const CompiledRenderGraph& compiled,
+                                             const std::uint32_t textureIndex,
+                                             const std::uint32_t descriptorSlot)
+        {
+            if (textureIndex >= compiled.TextureHandles.size())
+            {
+                return false;
+            }
+
+            if (textureIndex < compiled.TextureResourceIds.size() &&
+                compiled.TextureResourceIds[textureIndex].IsValid())
+            {
+                return BindFrameSampledTextureByResourceId(
+                    cmd,
+                    compiled,
+                    compiled.TextureResourceIds[textureIndex],
+                    descriptorSlot);
+            }
+
+            const RHI::TextureHandle texture = compiled.TextureHandles[textureIndex];
+            if (!texture.IsValid())
+            {
+                return false;
+            }
+
+            cmd.BindFrameSampledTextureAt(texture, descriptorSlot);
+            return true;
+        }
+
         [[nodiscard]] bool IsContractOutputDiagnostic(
             const RenderingContractDiagnosticCode code) noexcept
         {
@@ -2589,40 +2668,23 @@ namespace Extrinsic::Graphics
                         bool sampledTextureBound = false;
                         if (passId == ToFramePassId(FrameRecipePassKind::SelectionOutline))
                         {
-                            const auto entityId = std::find(compiled->TextureNames.begin(),
-                                                            compiled->TextureNames.end(),
-                                                            std::string_view{"EntityId"});
-                            if (entityId != compiled->TextureNames.end())
-                            {
-                                const std::size_t textureIndex = static_cast<std::size_t>(
-                                    std::distance(compiled->TextureNames.begin(), entityId));
-                                if (textureIndex < compiled->TextureHandles.size())
-                                {
-                                    graphicsContext.BindFrameSampledTextureAt(
-                                        compiled->TextureHandles[textureIndex],
-                                        kFrameSampledDescriptorSlotSelectionOutline);
-                                    sampledTextureBound = true;
-                                }
-                            }
+                            sampledTextureBound = BindFrameSampledTextureByResourceId(
+                                graphicsContext,
+                                *compiled,
+                                ToFrameResourceId(FrameRecipeResourceKind::EntityId),
+                                kFrameSampledDescriptorSlotSelectionOutline);
                         }
                         if (passId == ToFramePassId(FrameRecipePassKind::DebugView) &&
                             m_DebugViewSystem.has_value())
                         {
                             const DebugViewResolvedSelection selection = m_DebugViewSystem->GetResolvedSelection();
-                            const auto selected = std::find(compiled->TextureNames.begin(),
-                                                            compiled->TextureNames.end(),
-                                                            selection.SelectedResourceName);
-                            if (selection.Enabled && selected != compiled->TextureNames.end())
+                            if (selection.Enabled)
                             {
-                                const std::size_t textureIndex = static_cast<std::size_t>(
-                                    std::distance(compiled->TextureNames.begin(), selected));
-                                if (textureIndex < compiled->TextureHandles.size())
-                                {
-                                    graphicsContext.BindFrameSampledTextureAt(
-                                        compiled->TextureHandles[textureIndex],
-                                        kFrameSampledDescriptorSlotDebugView);
-                                    sampledTextureBound = true;
-                                }
+                                sampledTextureBound = BindFrameSampledTextureByResourceId(
+                                    graphicsContext,
+                                    *compiled,
+                                    selection.SelectedResourceId,
+                                    kFrameSampledDescriptorSlotDebugView);
                             }
                         }
                         const CompiledPassDeclarations& declarations = compiled->PassDeclarations[passIndex];
@@ -2652,15 +2714,13 @@ namespace Extrinsic::Graphics
                         if (bindsFrameSampledBridge)
                         {
                             const std::uint32_t textureIndex = declarations.ReadTextures.front();
-                            if (textureIndex < compiled->TextureHandles.size())
-                            {
-                                const std::uint32_t descriptorSlot =
-                                    passId == ToFramePassId(FrameRecipePassKind::Present)
-                                        ? kFrameSampledDescriptorSlotPresent
-                                        : kFrameSampledDescriptorSlotDefault;
-                                graphicsContext.BindFrameSampledTextureAt(
-                                    compiled->TextureHandles[textureIndex], descriptorSlot);
-                            }
+                            const std::uint32_t descriptorSlot =
+                                FrameSampledDescriptorSlotForPass(passId);
+                            (void)BindFrameSampledDeclaredTexture(
+                                graphicsContext,
+                                *compiled,
+                                textureIndex,
+                                descriptorSlot);
                         }
                     }
                     if (activeRenderPass.HasAttachments)

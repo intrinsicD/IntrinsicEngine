@@ -424,6 +424,57 @@ TEST(FrameRecipeContract, CompiledPassLookupUsesTypedIdWhenDebugNameChanges)
     EXPECT_EQ(compiled->PassNames[*surfaceIndex], "RenamedSurfacePass");
 }
 
+TEST(FrameRecipeContract, CompiledResourceLookupUsesTypedIdWhenDebugNameChanges)
+{
+    const FrameRecipeIntrospection recipe = DescribeDefaultFrameRecipe(FrameRecipeFeatures{});
+    RenderGraph graph;
+    const TextureRef renamedHdr = graph.CreateTexture("RenamedHdrTarget", RHI::TextureDesc{
+        .Width = 32u,
+        .Height = 32u,
+        .Fmt = RHI::Format::RGBA16_FLOAT,
+        .Usage = RHI::TextureUsage::ColorTarget | RHI::TextureUsage::Sampled,
+        .DebugName = "RenamedHdrTarget",
+    });
+    ASSERT_TRUE(graph.SetTextureResourceId(
+        renamedHdr,
+        ToFrameResourceId(FrameRecipeResourceKind::SceneColorHDR)).has_value());
+    const BufferRef renamedSceneTable = graph.CreateBuffer("RenamedSceneTable", RHI::BufferDesc{
+        .SizeBytes = 64u,
+        .Usage = RHI::BufferUsage::Storage,
+        .DebugName = "RenamedSceneTable",
+    });
+    ASSERT_TRUE(graph.SetBufferResourceId(
+        renamedSceneTable,
+        ToFrameResourceId(FrameRecipeResourceKind::SceneTable)).has_value());
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+
+    const std::optional<std::uint32_t> hdrIndex =
+        FindCompiledTextureIndexForRecipeId(
+            recipe,
+            *compiled,
+            ToFrameResourceId(FrameRecipeResourceKind::SceneColorHDR));
+    ASSERT_TRUE(hdrIndex.has_value());
+    ASSERT_LT(*hdrIndex, compiled->TextureNames.size());
+    ASSERT_LT(*hdrIndex, compiled->TextureResourceIds.size());
+    EXPECT_EQ(compiled->TextureNames[*hdrIndex], "RenamedHdrTarget");
+    EXPECT_EQ(compiled->TextureResourceIds[*hdrIndex],
+              ToFrameResourceId(FrameRecipeResourceKind::SceneColorHDR));
+
+    const std::optional<std::uint32_t> sceneTableIndex =
+        FindCompiledBufferIndexForRecipeId(
+            recipe,
+            *compiled,
+            ToFrameResourceId(FrameRecipeResourceKind::SceneTable));
+    ASSERT_TRUE(sceneTableIndex.has_value());
+    ASSERT_LT(*sceneTableIndex, compiled->BufferNames.size());
+    ASSERT_LT(*sceneTableIndex, compiled->BufferResourceIds.size());
+    EXPECT_EQ(compiled->BufferNames[*sceneTableIndex], "RenamedSceneTable");
+    EXPECT_EQ(compiled->BufferResourceIds[*sceneTableIndex],
+              ToFrameResourceId(FrameRecipeResourceKind::SceneTable));
+}
+
 TEST(FrameRecipeContract, TypedIdentityDoesNotChangeDebugNames)
 {
     RenderGraph graph;

@@ -7,6 +7,7 @@ module;
 
 export module Extrinsic.Graphics.DebugViewSystem;
 
+import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.Graphics.FrameRecipe;
 
 export namespace Extrinsic::Graphics
@@ -55,6 +56,7 @@ export namespace Extrinsic::Graphics
         std::string RequestedResourceName{};
         std::string SelectedResourceName{};
         FrameRecipeResourceKind SelectedKind{FrameRecipeResourceKind::SceneColorHDR};
+        FrameResourceId SelectedResourceId{ToFrameResourceId(FrameRecipeResourceKind::SceneColorHDR)};
         DebugViewResourceClass SelectedClass{DebugViewResourceClass::Unknown};
         bool UsedFallback{false};
         DebugViewFallbackReason FallbackReason{DebugViewFallbackReason::None};
@@ -107,4 +109,3 @@ export namespace Extrinsic::Graphics
         std::unique_ptr<Impl> m_Impl;
     };
 }
-

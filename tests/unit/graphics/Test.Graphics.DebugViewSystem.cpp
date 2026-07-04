@@ -74,6 +74,8 @@ TEST(GraphicsDebugViewSystem, ResolvesValidSelectionWithoutFallback)
     EXPECT_TRUE(selection.Enabled);
     EXPECT_FALSE(selection.UsedFallback);
     EXPECT_EQ(selection.SelectedResourceName, "SceneNormal");
+    EXPECT_EQ(selection.SelectedResourceId,
+              Graphics::ToFrameResourceId(Graphics::FrameRecipeResourceKind::SceneNormal));
     EXPECT_EQ(selection.SelectedClass, Graphics::DebugViewResourceClass::Texture);
     EXPECT_EQ(debug.GetDiagnostics().LastFallbackReason, Graphics::DebugViewFallbackReason::None);
 }
@@ -89,6 +91,8 @@ TEST(GraphicsDebugViewSystem, MissingDisabledAndUnsupportedSelectionsFallbackDet
     EXPECT_TRUE(missing.Enabled);
     EXPECT_TRUE(missing.UsedFallback);
     EXPECT_EQ(missing.SelectedResourceName, "SceneColorLDR");
+    EXPECT_EQ(missing.SelectedResourceId,
+              Graphics::ToFrameResourceId(Graphics::FrameRecipeResourceKind::SceneColorLDR));
     EXPECT_EQ(missing.FallbackReason, Graphics::DebugViewFallbackReason::ResourceMissing);
     EXPECT_EQ(debug.GetDiagnostics().MissingResourceCount, 1u);
 
@@ -96,6 +100,8 @@ TEST(GraphicsDebugViewSystem, MissingDisabledAndUnsupportedSelectionsFallbackDet
     Graphics::DebugViewResolvedSelection disabled = debug.ResolveSelection(recipe);
     EXPECT_TRUE(disabled.Enabled);
     EXPECT_EQ(disabled.SelectedResourceName, "SceneColorLDR");
+    EXPECT_EQ(disabled.SelectedResourceId,
+              Graphics::ToFrameResourceId(Graphics::FrameRecipeResourceKind::SceneColorLDR));
     EXPECT_EQ(disabled.FallbackReason, Graphics::DebugViewFallbackReason::ResourceDisabled);
     EXPECT_EQ(debug.GetDiagnostics().DisabledResourceCount, 1u);
 
@@ -103,6 +109,8 @@ TEST(GraphicsDebugViewSystem, MissingDisabledAndUnsupportedSelectionsFallbackDet
     Graphics::DebugViewResolvedSelection unsupported = debug.ResolveSelection(recipe);
     EXPECT_TRUE(unsupported.Enabled);
     EXPECT_EQ(unsupported.SelectedResourceName, "SceneColorLDR");
+    EXPECT_EQ(unsupported.SelectedResourceId,
+              Graphics::ToFrameResourceId(Graphics::FrameRecipeResourceKind::SceneColorLDR));
     EXPECT_EQ(unsupported.FallbackReason, Graphics::DebugViewFallbackReason::UnsupportedResourceClass);
     EXPECT_EQ(debug.GetDiagnostics().UnsupportedResourceCount, 1u);
 }
@@ -132,4 +140,3 @@ TEST(GraphicsDebugViewSystem, InspectionDumpIsStableAndIncludesPreviewability)
     EXPECT_NE(dump.find("GpuWorld.SceneTable class=buffer enabled=true sampleable=false previewable=false"), std::string::npos);
     EXPECT_NE(dump.find("DebugViewRGBA class=texture enabled=false sampleable=false previewable=false"), std::string::npos);
 }
-

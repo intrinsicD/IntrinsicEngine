@@ -2,8 +2,18 @@
 id: GRAPHICS-116
 theme: B
 depends_on: []
+maturity_target: Operational
 ---
 # GRAPHICS-116 — Frame-recipe pass contribution seam and typed record-path resolution
+
+## Status
+- Status: in-progress.
+- Owner/agent: Codex.
+- Branch: `main`.
+- Last completed slice: Slice A — typed record-path resource resolution.
+- Next slice: Slice B — contribution descriptors and fail-closed validation.
+- Next verification step: contribution descriptor contract tests, then the
+  default CPU gate before retirement.
 
 ## Goal
 - Open the closed default frame recipe behind a validated contribution seam:
@@ -49,6 +59,29 @@ depends_on: []
   such a slot.
 - UI/Agent/CLI: recipe introspection (`DescribeDefaultFrameRecipe`) reports
   contributed passes so existing debug/validation surfaces stay truthful.
+
+## Slice plan
+- **Slice A (this slice).** Replace renderer record-path texture name scans
+  with typed `FrameResourceId` lookup helpers over the compiled graph and route
+  the SelectionOutline, DebugView, Present, and generic frame-sampled bindings
+  through those helpers. Preserve the existing hardcoded recipe shape and pass
+  ordering. Test with focused renderer lifecycle/debug-view/recipe contracts.
+  Defers the public contribution descriptor and overlay ownership conversion
+  to later slices.
+- **Slice B.** Add renderer-layer pass-contribution descriptors with typed
+  pass/resource IDs, feature gates, insertion anchors, and fail-closed
+  validation for unknown resources, fixed-core pass conflicts, duplicate IDs,
+  and invalid anchors. Keep the default recipe behavior unchanged while the
+  validator and introspection surface become contribution-aware.
+- **Slice C.** Convert SelectionOutline, DebugView, ImGui, and
+  VisualizationOverlay recipe entries into registered overlay contributions
+  with the same reads/writes, queue affinity, render-pass shape, and order as
+  the current default recipe. Default sandbox composition registers the overlay
+  family; an overlay-unregistered configuration compiles the core recipe
+  without those passes.
+- **Slice D.** Retire the task by proving byte-identical default composition
+  shape, a headless/null frame with the overlay family absent, docs sync, and
+  the full CPU-supported verification gate. This closes `Operational`.
 
 ## Required changes
 - [ ] Define a pass-contribution descriptor (typed `FramePassId`, queue

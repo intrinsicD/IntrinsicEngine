@@ -8,12 +8,11 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `GRAPHICS-116` — Frame-recipe pass contribution seam and typed record-path resolution (tasks/active/GRAPHICS-116-recipe-pass-contribution-seam.md)
 
 ## Theme B — Rendering modernization
 
 - blocked by `RUNTIME-129`: `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/backlog/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
-- unblocked: `GRAPHICS-116` — Frame-recipe pass contribution seam and typed record-path resolution (tasks/backlog/rendering/GRAPHICS-116-recipe-pass-contribution-seam.md)
 - unblocked: `GRAPHICS-117` — Render-graph compile caching and gated debug dump (tasks/backlog/rendering/GRAPHICS-117-render-graph-compile-cache.md)
 - unblocked: `GRAPHICS-118` — Placed transient resource allocation with real memory aliasing (tasks/backlog/rendering/GRAPHICS-118-placed-transient-memory-aliasing.md)
 - unblocked: `GRAPHICS-119` — Parallel render-pass command recording via the task scheduler (tasks/backlog/rendering/GRAPHICS-119-parallel-pass-command-recording.md)

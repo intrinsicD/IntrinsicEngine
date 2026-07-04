@@ -319,6 +319,9 @@ into graphics public contracts.
   construction path used by the null renderer. It emits passes without blanket
   previous-pass chaining; declared reads/writes own ordering wherever possible,
   and explicit pass dependencies are reserved for real side-effect constraints.
+  `CompiledRenderGraph` carries the recipe's typed texture/buffer resource IDs
+  alongside debug names so renderer record paths bind declared resources by
+  `FrameResourceId` rather than scanning per-frame resource-name strings.
 - `Graphics.RenderCommandRouter` owns the renderer command-recording dispatch
   seam. The renderer registers command recorders by `FramePassId`, command
   status records carry both `FramePassId` and the debug label, and unknown typed
@@ -1041,12 +1044,12 @@ Concretely:
   the matching getter are the public seam runtime / editor use to
   drive the requested resource (the `Enabled` field is driven
   per-frame from the world). On promoted Vulkan, the executor publishes
-  the selected debug-view texture through the slot-explicit
-  `ICommandContext::BindFrameSampledTextureAt(..., 1)` hook, while the
-  canonical `Present` pass publishes `FrameRecipe.PresentSource` at
-  descriptor slot 2 and `SelectionOutlinePass` publishes `EntityId` at
-  descriptor slot 3. The shader pair samples those reserved slots so the
-  fullscreen passes do not overwrite the same global sampled descriptor
+  the selected debug-view texture by its resolved `FrameResourceId` through
+  the slot-explicit `ICommandContext::BindFrameSampledTextureAt(..., 1)` hook,
+  while the canonical `Present` pass publishes `FrameRecipe.PresentSource` at
+  descriptor slot 2 and `SelectionOutlinePass` publishes the typed `EntityId`
+  resource at descriptor slot 3. The shader pair samples those reserved slots
+  so the fullscreen passes do not overwrite the same global sampled descriptor
   element before a single command-buffer submit; older postprocess bridges
   continue to use slot 0. The Slice B contract pin is
   `tests/contract/graphics/Test.DebugViewPass.cpp` (BindPipeline +
@@ -2139,7 +2142,9 @@ Concretely:
   debug-view resource selection. It resolves requested frame-recipe resources to
   enabled previewable texture/depth resources, reports missing/disabled/buffer
   selections through deterministic diagnostics, and falls back to the current
-  presentation source without platform/window ownership. Per `GRAPHICS-013BQ`,
+  presentation source without platform/window ownership. The resolved selection
+  preserves the canonical name for UI diagnostics and also carries the selected
+  `FrameResourceId` consumed by the renderer record path. Per `GRAPHICS-013BQ`,
   no retained graphics-owned debug-view textures or buffers exist;
   `DebugViewRGBA` is a frame-recipe transient owned by the framegraph and is
   deliberately non-selectable as a preview input

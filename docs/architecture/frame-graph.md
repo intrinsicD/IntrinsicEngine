@@ -20,7 +20,10 @@ services, and platform state do not enter the graphics frame graph directly.
   introspection data for tests, debug views, UI, and config validation.
 - `RenderGraph` owns the compiled pass/resource DAG and resource-state
   scheduling. It receives declarations from the recipe; it is not the authority
-  for deciding which gameplay or editor features are enabled.
+  for deciding which gameplay or editor features are enabled. The compiled graph
+  preserves the recipe's typed pass and resource identities beside diagnostic
+  names so renderer command routing and sampled-resource binding do not depend
+  on per-frame name scans.
 
 `FrameRecipe*` is therefore the authoritative live composition path. In this
 vocabulary, `FrameRecipe*` means the per-frame pass/resource graph driver, while

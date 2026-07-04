@@ -29,9 +29,10 @@ The canonical renderer recipe is built by
 framegraph stores those IDs on pass/resource declarations and rejects duplicate
 non-zero IDs at compile time. `FrameRecipeIntrospection` exposes helper lookups
 that map typed IDs to compiled pass/resource indices, and
-`CompiledRenderGraph::PassIds` preserves the typed pass identity beside
-`PassNames` for renderer command routing and diagnostics. Human-readable names
-remain stable diagnostics and debug dump labels, not the correctness contract.
+`CompiledRenderGraph::{PassIds,TextureResourceIds,BufferResourceIds}` preserve
+typed identities beside the human-readable names for renderer command routing,
+resource binding, and diagnostics. Human-readable names remain stable
+diagnostics and debug dump labels, not the correctness contract.
 The framegraph treats recipe declarations as the single source of truth for
 imported-resource write authorization, transient-resource lifetime,
 dependency-driven pass ordering, and final backbuffer presentation. Default

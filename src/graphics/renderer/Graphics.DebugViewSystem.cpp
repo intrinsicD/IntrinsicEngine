@@ -242,6 +242,7 @@ namespace Extrinsic::Graphics
             resolved.Enabled = true;
             resolved.SelectedResourceName = fallbackResource->Name;
             resolved.SelectedKind = fallbackResource->Kind;
+            resolved.SelectedResourceId = ToFrameResourceId(fallbackResource->Kind);
             resolved.SelectedClass = fallbackResource->ResourceClass;
         };
 
@@ -285,6 +286,7 @@ namespace Extrinsic::Graphics
         resolved.Enabled = true;
         resolved.SelectedResourceName = requested->Name;
         resolved.SelectedKind = requested->Kind;
+        resolved.SelectedResourceId = ToFrameResourceId(requested->Kind);
         resolved.SelectedClass = requested->ResourceClass;
         m_Impl->Resolved = resolved;
         return m_Impl->Resolved;

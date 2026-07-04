@@ -757,13 +757,13 @@ namespace Extrinsic::Graphics
 
     namespace
     {
-        [[nodiscard]] std::optional<std::uint32_t> FindCompiledNameIndex(
-            const std::vector<std::string>& names,
-            const std::string_view name)
+        [[nodiscard]] std::optional<std::uint32_t> FindCompiledResourceIdIndex(
+            const std::vector<FrameResourceId>& ids,
+            const FrameResourceId id)
         {
-            for (std::uint32_t index = 0; index < names.size(); ++index)
+            for (std::uint32_t index = 0; index < ids.size(); ++index)
             {
-                if (names[index] == name)
+                if (ids[index] == id)
                 {
                     return index;
                 }
@@ -801,7 +801,7 @@ namespace Extrinsic::Graphics
         {
             return std::nullopt;
         }
-        return FindCompiledNameIndex(compiled.TextureNames, recipe.Resources[*recipeIndex].Name);
+        return FindCompiledResourceIdIndex(compiled.TextureResourceIds, id);
     }
 
     std::optional<std::uint32_t> FindCompiledBufferIndexForRecipeId(
@@ -814,7 +814,7 @@ namespace Extrinsic::Graphics
         {
             return std::nullopt;
         }
-        return FindCompiledNameIndex(compiled.BufferNames, recipe.Resources[*recipeIndex].Name);
+        return FindCompiledResourceIdIndex(compiled.BufferResourceIds, id);
     }
 
     [[nodiscard]] RenderGraphValidationResult ValidateRecipeCompiledGraph(

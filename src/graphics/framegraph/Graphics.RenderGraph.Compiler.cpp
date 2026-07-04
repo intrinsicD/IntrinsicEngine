@@ -937,6 +937,8 @@ namespace Extrinsic::Graphics
         PassDeclarations = other.PassDeclarations;
         TextureNames = other.TextureNames;
         BufferNames = other.BufferNames;
+        TextureResourceIds = other.TextureResourceIds;
+        BufferResourceIds = other.BufferResourceIds;
         TextureLifetimes = other.TextureLifetimes;
         BufferLifetimes = other.BufferLifetimes;
         TextureInitialStates = other.TextureInitialStates;
@@ -985,6 +987,8 @@ namespace Extrinsic::Graphics
         PassDeclarations = std::move(other.PassDeclarations);
         TextureNames = std::move(other.TextureNames);
         BufferNames = std::move(other.BufferNames);
+        TextureResourceIds = std::move(other.TextureResourceIds);
+        BufferResourceIds = std::move(other.BufferResourceIds);
         TextureLifetimes = std::move(other.TextureLifetimes);
         BufferLifetimes = std::move(other.BufferLifetimes);
         TextureInitialStates = std::move(other.TextureInitialStates);
@@ -1317,6 +1321,8 @@ namespace Extrinsic::Graphics
             compiled.ResourceCount = resourceCount;
             compiled.TextureNames.resize(textures.size());
             compiled.BufferNames.resize(buffers.size());
+            compiled.TextureResourceIds.resize(textures.size());
+            compiled.BufferResourceIds.resize(buffers.size());
             compiled.TextureLifetimes.resize(textures.size());
             compiled.BufferLifetimes.resize(buffers.size());
             compiled.TextureInitialStates.resize(textures.size(), TextureState::Undefined);
@@ -1334,6 +1340,7 @@ namespace Extrinsic::Graphics
             for (std::uint32_t textureIndex = 0; textureIndex < textures.size(); ++textureIndex)
             {
                 compiled.TextureNames[textureIndex] = textures[textureIndex].Name;
+                compiled.TextureResourceIds[textureIndex] = textures[textureIndex].Id;
                 compiled.TextureInitialStates[textureIndex] = textures[textureIndex].InitialState;
                 compiled.TextureFinalStates[textureIndex] = textures[textureIndex].FinalState;
                 compiled.TextureImported[textureIndex] = textures[textureIndex].Imported;
@@ -1346,6 +1353,7 @@ namespace Extrinsic::Graphics
             for (std::uint32_t bufferIndex = 0; bufferIndex < buffers.size(); ++bufferIndex)
             {
                 compiled.BufferNames[bufferIndex] = buffers[bufferIndex].Name;
+                compiled.BufferResourceIds[bufferIndex] = buffers[bufferIndex].Id;
                 compiled.BufferInitialStates[bufferIndex] = buffers[bufferIndex].InitialState;
                 compiled.BufferFinalStates[bufferIndex] = buffers[bufferIndex].FinalState;
                 compiled.BufferImported[bufferIndex] = buffers[bufferIndex].Imported;
@@ -1369,6 +1377,8 @@ namespace Extrinsic::Graphics
         std::vector<bool> bufferImported(buffers.size(), false);
         std::vector<std::string> textureNames(textures.size());
         std::vector<std::string> bufferNames(buffers.size());
+        std::vector<FrameResourceId> textureResourceIds(textures.size());
+        std::vector<FrameResourceId> bufferResourceIds(buffers.size());
         std::vector<TextureState> textureInitialStates(textures.size(), TextureState::Undefined);
         std::vector<TextureState> textureFinalStates(textures.size(), TextureState::Undefined);
         std::vector<BufferState> bufferInitialStates(buffers.size(), BufferState::Undefined);
@@ -1394,6 +1404,7 @@ namespace Extrinsic::Graphics
         for (std::uint32_t textureIndex = 0; textureIndex < textures.size(); ++textureIndex)
         {
             textureNames[textureIndex] = textures[textureIndex].Name;
+            textureResourceIds[textureIndex] = textures[textureIndex].Id;
             textureInitialStates[textureIndex] = textures[textureIndex].InitialState;
             textureFinalStates[textureIndex] = textures[textureIndex].FinalState;
             textureIsBackbuffer[textureIndex] = textures[textureIndex].IsBackbuffer;
@@ -1406,6 +1417,7 @@ namespace Extrinsic::Graphics
         for (std::uint32_t bufferIndex = 0; bufferIndex < buffers.size(); ++bufferIndex)
         {
             bufferNames[bufferIndex] = buffers[bufferIndex].Name;
+            bufferResourceIds[bufferIndex] = buffers[bufferIndex].Id;
             bufferInitialStates[bufferIndex] = buffers[bufferIndex].InitialState;
             bufferFinalStates[bufferIndex] = buffers[bufferIndex].FinalState;
             if (buffers[bufferIndex].Imported)
@@ -2059,6 +2071,8 @@ namespace Extrinsic::Graphics
         compiled.PassDeclarations = std::move(passDeclarations);
         compiled.TextureNames = std::move(textureNames);
         compiled.BufferNames = std::move(bufferNames);
+        compiled.TextureResourceIds = std::move(textureResourceIds);
+        compiled.BufferResourceIds = std::move(bufferResourceIds);
         compiled.TextureLifetimes = std::move(textureLifetimes);
         compiled.BufferLifetimes = std::move(bufferLifetimes);
         compiled.TextureInitialStates = std::move(textureInitialStates);

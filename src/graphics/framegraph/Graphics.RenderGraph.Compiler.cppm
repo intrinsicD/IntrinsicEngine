@@ -196,6 +196,8 @@ namespace Extrinsic::Graphics
         std::vector<CompiledPassDeclarations> PassDeclarations{};
         std::vector<std::string> TextureNames{};
         std::vector<std::string> BufferNames{};
+        std::vector<FrameResourceId> TextureResourceIds{};
+        std::vector<FrameResourceId> BufferResourceIds{};
         std::vector<ResourceLifetime> TextureLifetimes{};
         std::vector<ResourceLifetime> BufferLifetimes{};
         std::vector<TextureState> TextureInitialStates{};
