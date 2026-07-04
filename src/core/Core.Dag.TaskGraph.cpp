@@ -649,6 +649,9 @@ namespace Extrinsic::Core::Dag
             std::mutex MainThreadQueueMutex{};
             std::atomic<std::uint32_t> NextInsertionOrder{0u};
             Core::Tasks::CounterEvent Done{};
+            std::function<void(const std::shared_ptr<ExecutionState>&, std::uint32_t)> OnTaskFinished{};
+            std::function<void(const std::shared_ptr<ExecutionState>&,
+                               const std::vector<std::uint32_t>&)> ScheduleReadyBatch{};
 
             explicit ExecutionState(std::uint32_t taskCount)
                 : RemainingDeps(taskCount),
@@ -907,16 +910,15 @@ uint32_t TaskGraph::AddPassInternal(std::string_view name,
         }
         else
         {
-            ExecutionState state(static_cast<std::uint32_t>(m_Impl->Passes.size()));
+            auto state = std::make_shared<ExecutionState>(static_cast<std::uint32_t>(m_Impl->Passes.size()));
             for (std::uint32_t i = 0; i < m_Impl->Passes.size(); ++i)
             {
-                state.RemainingDeps[i].store(m_Impl->InitialInDegree[i], std::memory_order_release);
-                state.Dispatched[i].store(0u, std::memory_order_release);
+                state->RemainingDeps[i].store(m_Impl->InitialInDegree[i], std::memory_order_release);
+                state->Dispatched[i].store(0u, std::memory_order_release);
             }
-            std::function<void(std::uint32_t)> onTaskFinished;
-            std::function<void(const std::vector<std::uint32_t>&)> scheduleReadyBatch;
 
-            scheduleReadyBatch = [&](const std::vector<std::uint32_t>& passIndices)
+            state->ScheduleReadyBatch = [this, canUseWorkers](const std::shared_ptr<ExecutionState>& state,
+                                                              const std::vector<std::uint32_t>& passIndices)
             {
                 std::vector<std::uint32_t> workerPasses{};
                 std::vector<ExecutionState::MainThreadReadyEntry> mainThreadPasses{};
@@ -928,10 +930,10 @@ uint32_t TaskGraph::AddPassInternal(std::string_view name,
                     if (passIndex >= m_Impl->Passes.size())
                         continue;
 
-                    if (state.Dispatched[passIndex].exchange(1u, std::memory_order_acq_rel) == 1u)
+                    if (state->Dispatched[passIndex].exchange(1u, std::memory_order_acq_rel) == 1u)
                         continue;
 
-                    state.Done.Add();
+                    state->Done.Add();
 
                     const auto& options = m_Impl->Passes[passIndex].Options;
                     const bool canRunOnWorker = options.AllowParallel && !options.MainThreadOnly && canUseWorkers;
@@ -944,7 +946,7 @@ uint32_t TaskGraph::AddPassInternal(std::string_view name,
                         mainThreadPasses.push_back(ExecutionState::MainThreadReadyEntry{
                             .Priority = static_cast<std::uint8_t>(options.Priority),
                             .EstimatedCost = options.EstimatedCost,
-                            .InsertionOrder = state.NextInsertionOrder.fetch_add(1u, std::memory_order_relaxed),
+                            .InsertionOrder = state->NextInsertionOrder.fetch_add(1u, std::memory_order_relaxed),
                             .PassIndex = passIndex,
                         });
                     }
@@ -952,26 +954,27 @@ uint32_t TaskGraph::AddPassInternal(std::string_view name,
 
                 if (!mainThreadPasses.empty())
                 {
-                    std::scoped_lock lock(state.MainThreadQueueMutex);
+                    std::scoped_lock lock(state->MainThreadQueueMutex);
                     for (const auto& entry : mainThreadPasses)
-                        state.MainThreadQueue.push(entry);
+                        state->MainThreadQueue.push(entry);
                 }
 
                 for (const auto passIndex : workerPasses)
                 {
-                    Tasks::Scheduler::Dispatch([this, passIndex, &onTaskFinished]()
+                    Tasks::Scheduler::Dispatch([this, passIndex, state]()
                     {
                         ExecutePass(passIndex);
-                        onTaskFinished(passIndex);
+                        state->OnTaskFinished(state, passIndex);
                     });
                 }
             };
 
-            onTaskFinished = [&](const std::uint32_t passIndex)
+            state->OnTaskFinished = [this](const std::shared_ptr<ExecutionState>& state,
+                                           const std::uint32_t passIndex)
             {
                 if (passIndex >= m_Impl->Passes.size())
                 {
-                    state.Done.Signal();
+                    state->Done.Signal();
                     return;
                 }
 
@@ -979,12 +982,12 @@ uint32_t TaskGraph::AddPassInternal(std::string_view name,
                 readySuccessors.reserve(m_Impl->Successors[passIndex].size());
                 for (const auto successor : m_Impl->Successors[passIndex])
                 {
-                    if (state.RemainingDeps[successor].fetch_sub(1u, std::memory_order_acq_rel) == 1u)
+                    if (state->RemainingDeps[successor].fetch_sub(1u, std::memory_order_acq_rel) == 1u)
                         readySuccessors.push_back(successor);
                 }
 
-                scheduleReadyBatch(readySuccessors);
-                state.Done.Signal();
+                state->ScheduleReadyBatch(state, readySuccessors);
+                state->Done.Signal();
             };
 
             std::vector<std::uint32_t> initialReady{};
@@ -994,24 +997,24 @@ uint32_t TaskGraph::AddPassInternal(std::string_view name,
                 if (m_Impl->InitialInDegree[i] == 0u)
                     initialReady.push_back(i);
             }
-            scheduleReadyBatch(initialReady);
+            state->ScheduleReadyBatch(state, initialReady);
 
-            while (!state.Done.IsReady())
+            while (!state->Done.IsReady())
             {
                 std::uint32_t passToRun = std::numeric_limits<std::uint32_t>::max();
                 {
-                    std::scoped_lock lock(state.MainThreadQueueMutex);
-                    if (!state.MainThreadQueue.empty())
+                    std::scoped_lock lock(state->MainThreadQueueMutex);
+                    if (!state->MainThreadQueue.empty())
                     {
-                        passToRun = state.MainThreadQueue.top().PassIndex;
-                        state.MainThreadQueue.pop();
+                        passToRun = state->MainThreadQueue.top().PassIndex;
+                        state->MainThreadQueue.pop();
                     }
                 }
 
                 if (passToRun != std::numeric_limits<std::uint32_t>::max())
                 {
                     ExecutePass(passToRun);
-                    onTaskFinished(passToRun);
+                    state->OnTaskFinished(state, passToRun);
                 }
                 else
                 {

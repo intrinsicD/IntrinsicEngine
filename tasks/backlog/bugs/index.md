@@ -5,21 +5,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-055` — TaskGraph::Execute / CounterEvent latch-destruction race](BUG-055-taskgraph-counterevent-latch-destruction-race.md).
-  A worker's final `state.Done.Signal()` CAS releases `TaskGraph::Execute`'s
-  waiting caller before `Signal` touches `this->m_Token`
-  (`src/core/Core.Tasks.CounterEvent.cpp:40-45`) and while the worker is
-  still inside the stack-captured completion lambda
-  (`src/core/Core.Dag.TaskGraph.cpp:970-1020`), so the stack-local
-  `ExecutionState` can be destroyed under a live signaler — a
-  use-after-free on every fixed-step tick and render-prep run. Fix plan:
-  shared ownership of execution state (or a signals-retired fence) plus a
-  TSan-verified stress regression. Origin:
-  `docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md` R1.
+- None currently.
 
 ---
 
 ## Verified / Closed
+
+- Closed 2026-07-04: [`BUG-055` — TaskGraph::Execute / CounterEvent latch-destruction race](../../done/BUG-055-taskgraph-counterevent-latch-destruction-race.md). Parallel `TaskGraph::Execute()` now keeps completion state alive through shared ownership by the caller and dispatched worker closures, stores completion callbacks on that state instead of stack captures, and hardens `CounterEvent::Signal()` so publishing zero is its last event-member access. The focused `CoreTaskGraph` repeat gate passed 50/50 under the sanitizer-enabled `ci` preset, and the default CPU gate passed 3476/3476.
 
 - Closed 2026-07-02: [`BUG-054` — Sandbox window close shutdown ordering](../../done/BUG-054-sandbox-window-close-shutdown.md). Sandbox window close requests now emit an `[INFO]` runtime breadcrumb, stop `Engine::Run()`, and keep runtime-owned K-Means GPU job resources alive until after the shutdown device-idle wait before renderer/device teardown.
 

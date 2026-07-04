@@ -29,7 +29,7 @@ the authoritative open/unblocked view.
 ## Theme F — Architecture/runtime/UI foundation seeds
 
 - unblocked: `ARCH-006` — Move Sandbox application editor content out of runtime (tasks/backlog/architecture/ARCH-006-sandbox-editor-content-out-of-runtime.md)
-- blocked by `BUG-055`: `CORE-005` — Non-blocking TaskGraph submission and completion API (tasks/backlog/architecture/CORE-005-nonblocking-taskgraph-submit-api.md)
+- unblocked: `CORE-005` — Non-blocking TaskGraph submission and completion API (tasks/backlog/architecture/CORE-005-nonblocking-taskgraph-submit-api.md)
 - unblocked: `CORE-006` — Domain-free core task/DAG vocabulary (tasks/backlog/architecture/CORE-006-domain-free-core-task-vocabulary.md)
 - unblocked: `CORE-007` — Scheduler priority, wait, and wake hardening (tasks/backlog/architecture/CORE-007-scheduler-priority-wait-wake-hardening.md)
 - unblocked: `CORE-008` — Compiled task-graph plan reuse across executions (tasks/backlog/architecture/CORE-008-compiled-taskgraph-plan-reuse.md)
@@ -49,10 +49,6 @@ the authoritative open/unblocked view.
 - blocked by `GEOM-055`: `UI-029` — Editor ICP registration panel + convergence visualization (tasks/backlog/ui/UI-029-editor-registration-convergence-visualization.md)
 - unblocked: `UI-030` — Sandbox EditorUI frame-pacing diagnostics (tasks/backlog/ui/UI-030-editor-frame-pacing-diagnostics.md)
 - blocked by `RUNTIME-138`: `UI-031` — Sandbox EditorUI domain-window reorganization (tasks/backlog/ui/UI-031-editor-domain-ui-reorganization.md)
-
-## Theme G — Active bugs
-
-- unblocked: `BUG-055` — TaskGraph::Execute / CounterEvent latch-destruction race (tasks/backlog/bugs/BUG-055-taskgraph-counterevent-latch-destruction-race.md)
 
 ## Theme H — Agentic workflow hardening
 

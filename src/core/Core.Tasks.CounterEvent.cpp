@@ -33,6 +33,7 @@ namespace Extrinsic::Core::Tasks
         if (value == 0)
             return;
 
+        const Scheduler::WaitToken token = m_Token;
         uint32_t observed = m_Count.load(std::memory_order_acquire);
         while (observed != 0)
         {
@@ -41,8 +42,10 @@ namespace Extrinsic::Core::Tasks
                                               std::memory_order_acq_rel,
                                               std::memory_order_acquire))
             {
+                // Publishing zero can release a waiter that destroys this event.
+                // Use only locals after the successful zero transition.
                 if (next == 0)
-                    Scheduler::UnparkReady(m_Token);
+                    Scheduler::UnparkReady(token);
                 return;
             }
         }

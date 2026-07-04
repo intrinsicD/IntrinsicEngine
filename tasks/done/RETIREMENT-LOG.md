@@ -8,6 +8,20 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+Backlog
+[`BUG-055`](BUG-055-taskgraph-counterevent-latch-destruction-race.md) —
+TaskGraph::Execute / CounterEvent latch-destruction race — retired on
+2026-07-04 at maturity `CPUContracted`. `TaskGraph::Execute()` now keeps its
+parallel completion state alive through shared ownership by the waiting caller
+and every dispatched worker closure, with completion callbacks stored on that
+state rather than stack-captured by worker lambdas. `CounterEvent::Signal()`
+captures the scheduler wait token before publishing zero and treats the
+zero-transition as the signaler's last event-member access. A new
+`unit;core` stress regression repeatedly executes small parallel graphs; the
+focused `CoreTaskGraph` repeat gate passed 50/50 under the sanitizer-enabled
+`ci` preset, and the default CPU-supported gate passed 3476/3476. `CORE-005`
+is now unblocked for the future nonblocking submit/completion-token API.
+
 Active
 [`GEOM-057`](GEOM-057-fast-uv-atlas-charting-and-packing.md) — Fast UV atlas
 charting and packing replacement path — retired on 2026-07-03 at maturity

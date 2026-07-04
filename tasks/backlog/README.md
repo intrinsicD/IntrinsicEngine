@@ -172,8 +172,8 @@ composition root: non-blocking frame-path fixes (`RUNTIME-140..142`),
 composition-root/abstractness seams (`RUNTIME-143`, `RUNTIME-144`,
 `CORE-006`, `CORE-009`, `ARCH-006`), scheduler/DAG capability and
 efficiency (`CORE-005`, `CORE-007`, `CORE-008`), and steady-state frame
-efficiency (`RUNTIME-145`). The correctness fix `BUG-055` (Theme G) gates
-`CORE-005`.
+efficiency (`RUNTIME-145`). The retired correctness fix `BUG-055` (Theme G)
+unblocks `CORE-005`.
 
 Open members:
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).

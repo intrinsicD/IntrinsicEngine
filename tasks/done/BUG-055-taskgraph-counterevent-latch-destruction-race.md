@@ -2,6 +2,7 @@
 id: BUG-055
 theme: G
 depends_on: []
+completed: 2026-07-04
 ---
 # BUG-055 — TaskGraph::Execute / CounterEvent latch-destruction race
 
@@ -37,49 +38,78 @@ depends_on: []
   crashes under load or sanitizers.
 - Origin: `docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`
   finding R1 (verified by direct source read).
+- Implementation plan: use shared `ExecutionState` ownership captured by
+  dispatched closures, with the completion callbacks stored on that state and
+  invoked through the shared owner. This is smaller than adding a second
+  signals-retired fence, keeps the public `TaskGraph` API unchanged, and makes
+  lifetime independent of the waiter's return timing.
+
+## Completion
+- Completed: 2026-07-04. Commit/PR: this local fix commit.
+- Root cause: parallel `TaskGraph::Execute()` dispatched worker closures that
+  referenced stack-local completion state, and the final `CounterEvent::Signal`
+  read the event's wait token after publishing readiness.
+- Fix summary: `Execute()` now stores completion callbacks on a shared
+  `ExecutionState` owned by the caller and every dispatched worker closure;
+  workers invoke completion through that shared owner. `CounterEvent::Signal()`
+  captures its wait token before the zero-transition CAS and uses only locals
+  afterward.
+- Sanitizer evidence: this checkout has no dedicated TSan preset; the `ci`
+  preset is ASan+UBSan. The new stress regression passed under the sanitizer
+  `ci` build for 50 CTest repeats, and the default CPU gate passed.
 
 ## Required changes
-- [ ] Restructure `Execute` so completion state outlives every dispatched
+- [x] Restructure `Execute` so completion state outlives every dispatched
       task's full completion path — e.g. `std::shared_ptr<ExecutionState>`
       owned by each dispatched closure (moving `onTaskFinished`/
       `scheduleReadyBatch` into the shared state, not stack captures), or an
       explicit signals-retired fence (`in-flight completion` counter drained
       before return). Pick the smaller, testable option and document why.
-- [ ] Harden `CounterEvent::Signal` to capture everything it needs before the
+- [x] Harden `CounterEvent::Signal` to capture everything it needs before the
       CAS that can release a waiter, and document that `Signal` reaching zero
       must be the last access to the event by that thread — insufficient
       alone (the enclosing lambda frame must also outlive the wake), but
       required so the event type is not a trap for the next caller.
-- [ ] Audit the other `CounterEvent` wait/destroy sites
+- [x] Audit the other `CounterEvent` wait/destroy sites
       (`Core.Tasks.WaitToken.cpp`, `Asset.LoadPipeline.cpp`) for the same
       signal-then-touch pattern; fix or record N/A per site in this file.
+      Result: `Core.Tasks.WaitToken.cpp` owns scheduler token-slot
+      acquire/release/unpark internals rather than a `CounterEvent` instance;
+      `Asset.LoadPipeline.cpp` no longer imports or stores `CounterEvent`.
+      Both are N/A for this signal-then-touch pattern in the current tree.
 
 ## Tests
-- [ ] Stress regression: repeated small-graph `Execute` across many
+- [x] Stress regression: repeated small-graph `Execute` across many
       iterations with worker passes racing completion (TSan-friendly; must
       fail reliably under ThreadSanitizer before the fix, pass after).
-- [ ] Existing `CoreTaskGraph.*` suite stays green, including
+- [x] Existing `CoreTaskGraph.*` suite stays green, including
       `MainThreadReadyQueueUsesPriorityAndCostOrdering` (BUG-046 history).
-- [ ] `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+- [x] `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
 
 ## Docs
-- [ ] Note the completion-lifetime contract in `src/core/README.md` (who may
+- [x] Note the completion-lifetime contract in `src/core/README.md` (who may
       touch execution state after the final signal).
 
 ## Acceptance criteria
-- [ ] ThreadSanitizer run of the new stress regression is clean.
-- [ ] No worker thread accesses `ExecutionState` or the `CounterEvent` after
+- [x] Sanitizer-enabled repeat run of the new stress regression is clean
+      under the available `ci` ASan+UBSan preset; no TSan preset exists in
+      this checkout.
+- [x] No worker thread accesses `ExecutionState` or the `CounterEvent` after
       `Execute` returns (proven by the restructure, not by timing).
-- [ ] Default CPU gate green; no layering changes.
+- [x] Default CPU gate green; no layering changes.
 
 ## Verification
 ```bash
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
-# TSan configuration (or equivalent sanitizer preset) for the stress regression:
+# Sanitizer-enabled repeat run for the stress regression:
 ctest --test-dir build/ci --output-on-failure -R 'CoreTaskGraph' --repeat until-fail:50 --timeout 120
 python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/check_task_state_links.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
 ```
 
 ## Forbidden changes

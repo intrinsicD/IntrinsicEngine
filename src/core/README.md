@@ -55,6 +55,10 @@ Core owns reusable graph/scheduling primitives, not domain-specific GPU policy.
     `DebugCategory`.
   - `Execute()` uses graph-local completion (no global scheduler drain), with a
     deterministic single-thread fallback when workers are unavailable.
+  - Parallel `Execute()` completion state is owned by the caller and by every
+    dispatched worker closure until each closure has retired its completion
+    path. The final `CounterEvent::Signal()` in a completion path is the last
+    access that path may make to graph-local execution state.
   - Main-thread-only passes are queued in deterministic ready order (priority,
     then estimated cost, then insertion order) while worker-ready passes keep
     running on scheduler workers.
@@ -99,6 +103,11 @@ Core owns reusable graph/scheduling primitives, not domain-specific GPU policy.
 - `Extrinsic.Core.Tasks.CounterEvent`
 - `Extrinsic.Core.Tasks.Internal`
 - `Extrinsic.Core.Tasks.LocalTask`
+
+`CounterEvent::Signal()` captures its scheduler wait token before publishing a
+zero count. A caller that observes readiness may destroy the event immediately,
+so a signaler that reaches zero must not read any event members after the
+successful zero transition.
 
 ## Engine config fields
 

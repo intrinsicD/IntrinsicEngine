@@ -572,6 +572,7 @@ set(_core_wrapper_unit_test_files
     Test.Core.ResourcePool.cpp
     Test.CoreStrongHandle.cpp
     Test.Core.TaskGraphLegacy.cpp
+    Test.Core.TaskGraphCompletionLifetime.cpp
     Test.CoreTasks.cpp
 )
 intrinsic_resolve_test_sources(_core_wrapper_unit_test_sources

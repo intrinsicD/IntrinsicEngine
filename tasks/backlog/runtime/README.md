@@ -114,10 +114,6 @@ compose with the rendering tasks listed in `tasks/backlog/rendering/README.md`.
 
 `RUNTIME-134` is retired at `CPUContracted`; the Sandbox now exposes the
 progressive-Poisson playground for selected point-cloud and mesh inputs.
-`RUNTIME-136` is retired at `CPUContracted`; the Sandbox now exposes CPU/GPU
-backend selectors for K-Means and Progressive Poisson, with requested-vs-actual
-backend readouts and fallback diagnostics. See
-[`RUNTIME-136`](../../done/RUNTIME-136-sandbox-method-backend-selectors.md).
 
 `RUNTIME-138` is the runtime-owned selected-entity responsiveness task. It
 makes the Sandbox editor path read cached selected-entity state, submit
@@ -154,6 +150,10 @@ split; narratives live in the retirement log.
   AoS GPU lane or selecting shader variants. Operational AoS storage/shaders,
   promote-on-edit behavior, and Vulkan parity remain owned by open follow-up
   `RUNTIME-139`.
+- [RUNTIME-136 — Sandbox method backend selectors](../../done/RUNTIME-136-sandbox-method-backend-selectors.md)
+  (done, 2026-07-02, `CPUContracted`): the Sandbox exposes CPU/GPU backend
+  selectors for K-Means and Progressive Poisson, with requested-vs-actual
+  backend readouts and fallback diagnostics.
 - [RUNTIME-135 — SpatialDebug closest-face picking via accelerated mesh query](../../done/RUNTIME-135-spatialdebug-closest-face-picking.md)
   (done, 2026-06-28, `CPUContracted`): runtime now has a data-only closest-face
   SpatialDebug overlay consumer that caches the GEOM-039 mesh closest-face
