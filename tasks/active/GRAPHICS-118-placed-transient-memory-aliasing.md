@@ -10,12 +10,12 @@ depends_on: []
 - Status: in-progress.
 - Owner/agent: Codex.
 - Branch/PR: local `main` stack, PR not opened.
-- Current slice: Slice A — CPU-provable placement planning, stats, and
-  alias-reuse hazard reporting only; implementation complete locally.
-- Next slice: Slice B — RHI placed-memory contract and Null backend
-  bookkeeping.
-- Next verification step: add focused RHI/Null placed-memory contract tests
-  before the Slice B CPU gate.
+- Current slice: Slice C — Vulkan placed allocation and binding behind the RHI
+  contract.
+- Last completed slice: Slice B — RHI placed-memory contract and Null backend
+  bookkeeping; CPU/null contract verified.
+- Next verification step: implement Vulkan placed allocation and run the
+  focused backend contract/smoke gates for Slice C.
 
 ## Slice plan
 
@@ -79,7 +79,7 @@ depends_on: []
       fixed graph; emit alias-reuse hazards (which pass first writes a
       reused range after its prior occupant's last read) into the barrier
       plan; expose planned peak bytes vs naive sum in stats.
-- [ ] Slice B: RHI contract for memory blocks + placed texture/buffer
+- [x] Slice B: RHI contract for memory blocks + placed texture/buffer
       creation with alignment/`memoryTypeBits` compatibility queries; Null
       backend bookkeeping implementation.
 - [ ] Slice C: Vulkan implementation (VMA block allocation, placed binds,
@@ -95,6 +95,10 @@ depends_on: []
       alias hazards emitted exactly where reuse occurs.
 - [x] CPU/null contract: planned peak bytes ≤ naive sum, and equals naive
       sum when aliasing is disabled.
+- [x] CPU/null contract: Null RHI memory requirements, memory block creation,
+      placed buffer/texture creation, placement introspection, compatibility
+      rejection, alignment rejection, range rejection, and memory-block slot
+      recycling.
 - [ ] Opt-in `gpu;vulkan` smoke: default sandbox recipe renders correctly
       with aliasing on (image compare vs aliasing off), reported transient
       memory drops, and validation layers are clean (no hazard errors).
@@ -103,6 +107,9 @@ depends_on: []
 - [x] Update `src/graphics/framegraph/README.md` and
       `docs/architecture/frame-graph.md` (what "transient aliasing" now
       means, fallback lane, stats).
+- [x] Update `src/graphics/rhi/README.md` and
+      `src/graphics/renderer/Backends/Null/README.md` for the Slice B
+      placed-memory contract and Null bookkeeping state.
 
 ## Acceptance criteria
 - [ ] Real measured transient memory reduction on the default sandbox
@@ -137,6 +144,33 @@ python3 tools/repo/check_root_hygiene.py --root .
 ```
 
 Operational Vulkan smoke remains owned by the closing adoption slice.
+
+Slice B local verification:
+
+All commands below passed locally on 2026-07-04. The `ci` configure emitted the
+existing promoted-Vulkan fallback warning. `check_root_hygiene` remains
+warning-mode and reported existing root entries `ara/` and `imgui.ini`.
+Clean-workshop manual rows: row 3 pass; rows 4-6 n/a; row 7 pass; row 8 pass;
+no follow-up findings.
+
+```bash
+rm -rf build/ci
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -R 'RHI(ResourceSlotRecycling|PlacedMemoryContract)' --timeout 60
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
+python3 tools/agents/generate_session_brief.py
+git diff --check
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/repo/check_pr_contract.py
+python3 tools/repo/check_root_hygiene.py --root .
+tools/ci/run_clean_workshop_review.sh . --strict
+```
 
 ## Forbidden changes
 - Passing `Vk*` types through RHI/renderer/framegraph public APIs.

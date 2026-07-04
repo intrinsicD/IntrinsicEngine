@@ -1,5 +1,6 @@
 module;
 
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -18,10 +19,54 @@ import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Profiler;
 import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.Device;
+import Extrinsic.RHI.TextureUpload;
 import Extrinsic.RHI.Types;
 
 namespace Extrinsic::Backends::Null
 {
+    namespace
+    {
+        constexpr std::uint32_t kDeviceLocalMemoryTypeBit = 1u << 0u;
+        constexpr std::uint32_t kHostVisibleMemoryTypeBit = 1u << 1u;
+        constexpr std::uint64_t kPlacedResourceAlignmentBytes = 256u;
+
+        [[nodiscard]] constexpr std::uint64_t AlignUp(std::uint64_t value, std::uint64_t alignment) noexcept
+        {
+            if (alignment == 0u)
+                return 0u;
+
+            const std::uint64_t remainder = value % alignment;
+            if (remainder == 0u)
+                return value;
+
+            const std::uint64_t padding = alignment - remainder;
+            const std::uint64_t aligned = value + padding;
+            return aligned < value ? 0u : aligned;
+        }
+
+        [[nodiscard]] constexpr bool IsAligned(std::uint64_t value, std::uint64_t alignment) noexcept
+        {
+            return alignment != 0u && (value % alignment) == 0u;
+        }
+
+        [[nodiscard]] constexpr std::uint32_t SelectLowestMemoryTypeBit(std::uint32_t bits) noexcept
+        {
+            for (std::uint32_t bit = 1u; bit != 0u; bit <<= 1u)
+            {
+                if ((bits & bit) != 0u)
+                    return bit;
+            }
+            return 0u;
+        }
+
+        [[nodiscard]] constexpr bool RangeFits(std::uint64_t offset,
+                                               std::uint64_t size,
+                                               std::uint64_t blockSize) noexcept
+        {
+            return offset <= blockSize && size <= (blockSize - offset);
+        }
+    }
+
     [[nodiscard]] std::unique_ptr<RHI::IBindlessHeap> CreateNullBindlessHeap();
     [[nodiscard]] std::unique_ptr<RHI::IProfiler> CreateNullProfiler(std::uint32_t framesInFlight);
     [[nodiscard]] std::unique_ptr<RHI::ITransferQueue> CreateNullTransferQueue();
@@ -31,6 +76,7 @@ namespace Extrinsic::Backends::Null
         std::uint64_t SizeBytes = 0;
         RHI::BufferUsage Usage = RHI::BufferUsage::None;
         bool HostVisible = false;
+        RHI::PlacedResourceInfo Placement{};
     };
 
     struct TextureEntry
@@ -40,6 +86,15 @@ namespace Extrinsic::Backends::Null
         std::uint32_t MipLevels = 1;
         RHI::Format Fmt = RHI::Format::Undefined;
         RHI::TextureLayout Layout = RHI::TextureLayout::Undefined;
+        RHI::PlacedResourceInfo Placement{};
+    };
+
+    struct MemoryBlockEntry
+    {
+        std::uint64_t SizeBytes = 0;
+        std::uint32_t MemoryTypeBits = 0;
+        std::uint32_t SelectedMemoryTypeBit = 0;
+        std::string DebugName;
     };
 
     struct SamplerEntry
@@ -121,6 +176,7 @@ namespace Extrinsic::Backends::Null
             [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"NullDevice::EndFrame", Extrinsic::Core::Telemetry::HashString("NullDevice::EndFrame")};
             m_Buffers.ProcessDeletions(m_FrameIndex);
             m_Textures.ProcessDeletions(m_FrameIndex);
+            m_MemoryBlocks.ProcessDeletions(m_FrameIndex);
             m_Samplers.ProcessDeletions(m_FrameIndex);
             m_Pipelines.ProcessDeletions(m_FrameIndex);
         }
@@ -167,6 +223,78 @@ namespace Extrinsic::Backends::Null
         void WriteBuffer(RHI::BufferHandle, const void*, std::uint64_t, std::uint64_t) override {}
         [[nodiscard]] std::uint64_t GetBufferDeviceAddress(RHI::BufferHandle) const override { return 0; }
 
+        [[nodiscard]] RHI::ResourceMemoryRequirements GetBufferMemoryRequirements(
+            const RHI::BufferDesc& desc) const noexcept override
+        {
+            if (desc.SizeBytes == 0u)
+                return {};
+
+            return RHI::ResourceMemoryRequirements{
+                .SizeBytes = AlignUp(desc.SizeBytes, kPlacedResourceAlignmentBytes),
+                .AlignmentBytes = kPlacedResourceAlignmentBytes,
+                .MemoryTypeBits = desc.HostVisible ? kHostVisibleMemoryTypeBit : kDeviceLocalMemoryTypeBit,
+                .DedicatedAllocationRequired = false,
+            };
+        }
+
+        [[nodiscard]] RHI::MemoryBlockHandle CreateMemoryBlock(const RHI::MemoryBlockDesc& desc) override
+        {
+            const std::uint32_t selectedBit = SelectLowestMemoryTypeBit(desc.MemoryTypeBits);
+            if (desc.SizeBytes == 0u || selectedBit == 0u)
+                return {};
+
+            return m_MemoryBlocks.Add(MemoryBlockEntry{
+                .SizeBytes = desc.SizeBytes,
+                .MemoryTypeBits = desc.MemoryTypeBits,
+                .SelectedMemoryTypeBit = selectedBit,
+                .DebugName = desc.DebugName ? desc.DebugName : "",
+            });
+        }
+
+        void DestroyMemoryBlock(RHI::MemoryBlockHandle handle) override
+        {
+            if (!handle.IsValid()) return;
+            m_MemoryBlocks.Remove(handle, m_FrameIndex);
+        }
+
+        [[nodiscard]] RHI::MemoryBlockInfo GetMemoryBlockInfo(RHI::MemoryBlockHandle handle) const noexcept override
+        {
+            const MemoryBlockEntry* block = m_MemoryBlocks.GetIfValid(handle);
+            if (block == nullptr)
+                return {};
+
+            return RHI::MemoryBlockInfo{
+                .SizeBytes = block->SizeBytes,
+                .MemoryTypeBits = block->MemoryTypeBits,
+                .SelectedMemoryTypeBit = block->SelectedMemoryTypeBit,
+                .IsValid = true,
+            };
+        }
+
+        [[nodiscard]] RHI::BufferHandle CreatePlacedBuffer(const RHI::PlacedBufferDesc& placedDesc) override
+        {
+            const RHI::ResourceMemoryRequirements requirements =
+                GetBufferMemoryRequirements(placedDesc.Desc);
+            const RHI::PlacedResourceInfo placement =
+                ValidatePlacedResource(placedDesc.Placement, requirements);
+            if (!placement.IsPlaced)
+                return {};
+
+            return m_Buffers.Add(BufferEntry{
+                .SizeBytes = placedDesc.Desc.SizeBytes,
+                .Usage = placedDesc.Desc.Usage,
+                .HostVisible = placedDesc.Desc.HostVisible,
+                .Placement = placement,
+            });
+        }
+
+        [[nodiscard]] RHI::PlacedResourceInfo GetBufferMemoryPlacement(
+            RHI::BufferHandle handle) const noexcept override
+        {
+            const BufferEntry* buffer = m_Buffers.GetIfValid(handle);
+            return buffer != nullptr ? buffer->Placement : RHI::PlacedResourceInfo{};
+        }
+
         [[nodiscard]] RHI::TextureHandle CreateTexture(const RHI::TextureDesc& desc) override
         {
             return m_Textures.Add(TextureEntry{
@@ -185,6 +313,48 @@ namespace Extrinsic::Backends::Null
         }
 
         void WriteTexture(RHI::TextureHandle, const void*, std::uint64_t, std::uint32_t, std::uint32_t) override {}
+
+        [[nodiscard]] RHI::ResourceMemoryRequirements GetTextureMemoryRequirements(
+            const RHI::TextureDesc& desc) const noexcept override
+        {
+            const std::uint64_t storageBytes = RHI::EstimateTextureStorageBytes(desc);
+            const std::uint64_t alignedBytes = AlignUp(storageBytes, kPlacedResourceAlignmentBytes);
+            if (alignedBytes == 0u)
+                return {};
+
+            return RHI::ResourceMemoryRequirements{
+                .SizeBytes = alignedBytes,
+                .AlignmentBytes = kPlacedResourceAlignmentBytes,
+                .MemoryTypeBits = kDeviceLocalMemoryTypeBit,
+                .DedicatedAllocationRequired = false,
+            };
+        }
+
+        [[nodiscard]] RHI::TextureHandle CreatePlacedTexture(const RHI::PlacedTextureDesc& placedDesc) override
+        {
+            const RHI::ResourceMemoryRequirements requirements =
+                GetTextureMemoryRequirements(placedDesc.Desc);
+            const RHI::PlacedResourceInfo placement =
+                ValidatePlacedResource(placedDesc.Placement, requirements);
+            if (!placement.IsPlaced)
+                return {};
+
+            return m_Textures.Add(TextureEntry{
+                .Width = placedDesc.Desc.Width,
+                .Height = placedDesc.Desc.Height,
+                .MipLevels = placedDesc.Desc.MipLevels,
+                .Fmt = placedDesc.Desc.Fmt,
+                .Layout = placedDesc.Desc.InitialLayout,
+                .Placement = placement,
+            });
+        }
+
+        [[nodiscard]] RHI::PlacedResourceInfo GetTextureMemoryPlacement(
+            RHI::TextureHandle handle) const noexcept override
+        {
+            const TextureEntry* texture = m_Textures.GetIfValid(handle);
+            return texture != nullptr ? texture->Placement : RHI::PlacedResourceInfo{};
+        }
 
         [[nodiscard]] RHI::SamplerHandle CreateSampler(const RHI::SamplerDesc& desc) override
         {
@@ -220,6 +390,33 @@ namespace Extrinsic::Backends::Null
     private:
         static constexpr std::uint32_t kFramesInFlight = 2;
 
+        [[nodiscard]] RHI::PlacedResourceInfo ValidatePlacedResource(
+            const RHI::PlacedResourceBinding& binding,
+            const RHI::ResourceMemoryRequirements& requirements) const noexcept
+        {
+            if (!binding.Block.IsValid() || !requirements.IsValid())
+                return {};
+
+            const MemoryBlockEntry* block = m_MemoryBlocks.GetIfValid(binding.Block);
+            if (block == nullptr)
+                return {};
+            if ((block->SelectedMemoryTypeBit & requirements.MemoryTypeBits) == 0u)
+                return {};
+            if (!IsAligned(binding.OffsetBytes, requirements.AlignmentBytes))
+                return {};
+            if (!RangeFits(binding.OffsetBytes, requirements.SizeBytes, block->SizeBytes))
+                return {};
+
+            return RHI::PlacedResourceInfo{
+                .Block = binding.Block,
+                .OffsetBytes = binding.OffsetBytes,
+                .SizeBytes = requirements.SizeBytes,
+                .AlignmentBytes = requirements.AlignmentBytes,
+                .MemoryTypeBit = block->SelectedMemoryTypeBit,
+                .IsPlaced = true,
+            };
+        }
+
         std::uint32_t m_FrameIndex{0};
         RHI::PresentMode m_PresentMode{RHI::PresentMode::VSync};
         Core::Extent2D m_BackbufferExtent{};
@@ -231,6 +428,7 @@ namespace Extrinsic::Backends::Null
 
         Core::ResourcePool<BufferEntry, RHI::BufferHandle, 0> m_Buffers;
         Core::ResourcePool<TextureEntry, RHI::TextureHandle, 0> m_Textures;
+        Core::ResourcePool<MemoryBlockEntry, RHI::MemoryBlockHandle, 0> m_MemoryBlocks;
         Core::ResourcePool<SamplerEntry, RHI::SamplerHandle, 0> m_Samplers;
         Core::ResourcePool<PipelineEntry, RHI::PipelineHandle, 0> m_Pipelines;
     };

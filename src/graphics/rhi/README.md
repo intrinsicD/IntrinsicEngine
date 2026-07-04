@@ -53,6 +53,26 @@ This directory contains the `RHI` module/files.
   `vkQueueSubmit2` timeline waits/signals without exposing native handles
   through RHI.
 
+## Placed resource memory
+
+- `RHI::MemoryBlockHandle` is the backend-neutral handle for placed resource
+  backing memory. The public `IDevice` seam exposes memory requirement queries
+  for buffers/textures, opaque memory-block creation/destruction, placed
+  buffer/texture creation, and placement introspection records. Requirements
+  report byte size, alignment, `MemoryTypeBits`, and whether a backend requires
+  a dedicated allocation.
+- Default `IDevice` implementations fail closed by returning invalid handles or
+  empty requirement/info records. This keeps capability-absent backends and CPU
+  mocks source-compatible until they implement real placement.
+- The Null backend implements the contract as CPU bookkeeping for
+  `GRAPHICS-118` Slice B: blocks select one compatible memory-type bit, placed
+  resources validate alignment/range/compatibility, and overlapping placements
+  are allowed because render-graph lifetime planning owns alias safety.
+- Vulkan placed allocation and renderer adoption are not implemented in this
+  slice. They remain deferred to `GRAPHICS-118` Slices C-D, where backend memory
+  blocks bind real buffers/images and the renderer consumes compiled transient
+  placements.
+
 ## Transfer uploads and readbacks
 
 - `RHI.TransferQueue.cppm` declares `ITransferQueue`, the async upload seam used

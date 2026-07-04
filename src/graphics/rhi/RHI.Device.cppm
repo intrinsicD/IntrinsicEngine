@@ -74,6 +74,62 @@ namespace Extrinsic::RHI
         std::span<const QueueSubmitBatchDesc> Batches{};
     };
 
+    export struct ResourceMemoryRequirements
+    {
+        std::uint64_t SizeBytes = 0;
+        std::uint64_t AlignmentBytes = 0;
+        std::uint32_t MemoryTypeBits = 0;
+        bool DedicatedAllocationRequired = false;
+
+        [[nodiscard]] constexpr bool IsValid() const noexcept
+        {
+            return SizeBytes != 0u && AlignmentBytes != 0u && MemoryTypeBits != 0u;
+        }
+    };
+
+    export struct MemoryBlockDesc
+    {
+        std::uint64_t SizeBytes = 0;
+        std::uint32_t MemoryTypeBits = 0;
+        const char* DebugName = nullptr;
+    };
+
+    export struct MemoryBlockInfo
+    {
+        std::uint64_t SizeBytes = 0;
+        std::uint32_t MemoryTypeBits = 0;
+        std::uint32_t SelectedMemoryTypeBit = 0;
+        bool IsValid = false;
+    };
+
+    export struct PlacedResourceBinding
+    {
+        MemoryBlockHandle Block{};
+        std::uint64_t OffsetBytes = 0;
+    };
+
+    export struct PlacedBufferDesc
+    {
+        BufferDesc Desc{};
+        PlacedResourceBinding Placement{};
+    };
+
+    export struct PlacedTextureDesc
+    {
+        TextureDesc Desc{};
+        PlacedResourceBinding Placement{};
+    };
+
+    export struct PlacedResourceInfo
+    {
+        MemoryBlockHandle Block{};
+        std::uint64_t OffsetBytes = 0;
+        std::uint64_t SizeBytes = 0;
+        std::uint64_t AlignmentBytes = 0;
+        std::uint32_t MemoryTypeBit = 0;
+        bool IsPlaced = false;
+    };
+
     export class IDevice
     {
     public:
@@ -227,6 +283,66 @@ namespace Extrinsic::RHI
         {
             (void)batchIndex;
             return GetQueueContext(affinity, frameIndex);
+        }
+
+        // ---- Placed resource memory ----------------------------------
+        // GRAPHICS-118 Slice B introduces the backend-neutral memory-block
+        // seam used by transient alias planning. Backends that have not yet
+        // implemented real binding fail closed by returning invalid handles or
+        // empty requirement/info records.
+        [[nodiscard]] virtual ResourceMemoryRequirements GetBufferMemoryRequirements(
+            const BufferDesc& desc) const noexcept
+        {
+            (void)desc;
+            return {};
+        }
+
+        [[nodiscard]] virtual ResourceMemoryRequirements GetTextureMemoryRequirements(
+            const TextureDesc& desc) const noexcept
+        {
+            (void)desc;
+            return {};
+        }
+
+        [[nodiscard]] virtual MemoryBlockHandle CreateMemoryBlock(const MemoryBlockDesc& desc)
+        {
+            (void)desc;
+            return {};
+        }
+
+        virtual void DestroyMemoryBlock(MemoryBlockHandle handle)
+        {
+            (void)handle;
+        }
+
+        [[nodiscard]] virtual MemoryBlockInfo GetMemoryBlockInfo(MemoryBlockHandle handle) const noexcept
+        {
+            (void)handle;
+            return {};
+        }
+
+        [[nodiscard]] virtual BufferHandle CreatePlacedBuffer(const PlacedBufferDesc& desc)
+        {
+            (void)desc;
+            return {};
+        }
+
+        [[nodiscard]] virtual TextureHandle CreatePlacedTexture(const PlacedTextureDesc& desc)
+        {
+            (void)desc;
+            return {};
+        }
+
+        [[nodiscard]] virtual PlacedResourceInfo GetBufferMemoryPlacement(BufferHandle handle) const noexcept
+        {
+            (void)handle;
+            return {};
+        }
+
+        [[nodiscard]] virtual PlacedResourceInfo GetTextureMemoryPlacement(TextureHandle handle) const noexcept
+        {
+            (void)handle;
+            return {};
         }
     };
 }

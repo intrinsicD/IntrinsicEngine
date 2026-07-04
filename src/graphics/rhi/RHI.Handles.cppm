@@ -15,6 +15,9 @@ export namespace Extrinsic::RHI
     struct BufferTag;
     using BufferHandle = Core::StrongHandle<BufferTag>;
 
+    struct MemoryBlockTag;
+    using MemoryBlockHandle = Core::StrongHandle<MemoryBlockTag>;
+
     struct TextureTag;
     using TextureHandle  = Core::StrongHandle<TextureTag>;
 
