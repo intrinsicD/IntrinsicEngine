@@ -73,10 +73,16 @@ the normal `BuildDefaultFrameRecipe(...)` call.
 
 Per `GRAPHICS-033E`, `Graphics.Renderer.cpp::ExecuteFrame()` publishes the
 recipe-aware validation outcome to the device via
-`RHI::IDevice::NoteRecipeGraphValidation(bool)` exactly once per recipe compile
-attempt. After a successful `RenderGraph::Compile()` the renderer calls
-`ValidateRecipeCompiledGraph(...)` on the active recipe's introspection and
-publishes `result.CountBySeverity(RenderGraphValidationSeverity::Error) == 0u`.
+`RHI::IDevice::NoteRecipeGraphValidation(bool)` after the current
+recipe/compiled-graph pair is available. `GRAPHICS-117` caches successful
+compiled graphs by a structural default-recipe key; cache misses run
+`RenderGraph::Compile()`, while cache hits reuse the compiled graph and matching
+recipe introspection. Before validation/execution, the renderer patches current
+imported handles (for example backbuffer and renderer-owned buffer leases) into
+the cached compiled graph and then binds frame-slot transient resources. Both
+paths call `ValidateRecipeCompiledGraph(...)` and publish
+`result.CountBySeverity(RenderGraphValidationSeverity::Error) == 0u` combined
+with per-frame resource readiness.
 The recipe-aware result is the sole source of truth because it carries the
 `ImportedResourceAuthorization` entries derived from the recipe; the bare
 compile-time `GetLastCompileValidationResult()` lacks that context and will
@@ -85,7 +91,11 @@ a non-side-effect pass (e.g. `CullingPass` writing `Cull.*` buffers), so it
 is not consulted by the published bool. A failed recipe build or a failed
 `Compile()` publishes `false` so the backend's operational gate cannot
 inherit a stale-clean state. Non-Vulkan backends inherit the default no-op
-implementation.
+implementation. `RenderGraphFrameStats::Compile` reports per-frame compile
+attempt, cache-hit, cache-miss, cache-reuse, and debug-dump generation state.
+The compiler debug dump is opt-in through
+`IRenderer::SetRenderGraphDebugDumpEnabled(...)`; default frames do not build
+the dump string.
 
 `Extrinsic.Graphics.RenderingContract` is the CPU-only public contract vocabulary
 for the renderer/snapshot/recipe architecture introduced by `GRAPHICS-099`.

@@ -99,17 +99,28 @@ On each frame, runtime drives the renderer through:
 2. Runtime extraction publishes a `RenderWorld` snapshot.
 3. The renderer derives default `FrameRecipeFeatures` from that snapshot.
 4. Any active `FrameRecipeOverride` is projected onto those features.
-5. The renderer registers the default overlay contribution family and calls
-   `BuildDefaultFrameRecipeWithContributions(...)` to declare the pass/resource
-   DAG. The compatibility `BuildDefaultFrameRecipe(...)` helper performs the
-   same default registration internally.
-6. `RenderGraph` compiles the DAG and the renderer records command bodies.
-7. `IRenderer::EndFrame(...)` publishes completion diagnostics.
+5. The renderer registers the default overlay contribution family and builds a
+   structural compile key from the post-override features, sizing, imported
+   resource availability/shape, AA/shadow/temporal options, and contribution
+   descriptors.
+6. If that key changed, the renderer calls
+   `BuildDefaultFrameRecipeWithContributions(...)` to redeclare the
+   pass/resource DAG and `RenderGraph::Compile()` to refresh the cached
+   `CompiledRenderGraph` plus matching recipe introspection. If the key is
+   unchanged, the renderer reuses the cached compiled graph.
+7. The renderer validates the active recipe/compiled pair, binds per-frame
+   transient resources and current imported handles for the current frame slot,
+   records command bodies, and submits the frame.
+8. `IRenderer::EndFrame(...)` publishes completion diagnostics.
 
 This means recipe-config activation changes the next frames by altering
 feature gates through the live `FrameRecipe*` driver. The default recipe is
-still rebuilt every frame from the current snapshot and renderer state; the
-active override is an overlay, not a replacement render graph.
+rebuilt on key-relevant change rather than unconditionally every frame; the
+active override is an overlay, not a replacement render graph. The renderer
+reports per-frame compile attempt/cache-hit counters through
+`RenderGraphFrameStats::Compile`. The multi-KB compiler debug dump is lazy:
+default frames leave `RenderGraphFrameStats::DebugDump` empty, and explicit
+renderer debug-dump enablement builds it from the current compiled graph.
 
 ## Boundaries
 

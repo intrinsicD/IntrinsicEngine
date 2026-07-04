@@ -24,7 +24,7 @@ without requiring them to read every file.
 
 ## Current open rendering leaves
 
-- [`GRAPHICS-117`](GRAPHICS-117-render-graph-compile-cache.md) —
+- [`GRAPHICS-117`](../../active/GRAPHICS-117-render-graph-compile-cache.md) —
   render-graph compile caching keyed on recipe features/sizing/imports and
   lazily built debug dump (2026-07-03 review R16/R17).
 - [`GRAPHICS-118`](GRAPHICS-118-placed-transient-memory-aliasing.md) —

@@ -11,7 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-- none
+- [`GRAPHICS-117`](GRAPHICS-117-render-graph-compile-cache.md) — in
+  progress on `main` by Codex. Slice A verified renderer compile-cache reuse
+  and lazy debug dump gating. Next slice: PR-fast declare/compile benchmark
+  evidence and retirement if the cache contract remains stable.
 
 ## History
 

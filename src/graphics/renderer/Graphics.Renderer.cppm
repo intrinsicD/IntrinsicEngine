@@ -87,6 +87,11 @@ namespace Extrinsic::Graphics
     export struct RenderGraphCompileStats
     {
         bool Succeeded = false;
+        std::uint32_t AttemptCount = 0;
+        std::uint32_t CacheHitCount = 0;
+        std::uint32_t CacheMissCount = 0;
+        bool ReusedCachedGraph = false;
+        bool DebugDumpGenerated = false;
         std::uint32_t PassCount = 0;
         std::uint32_t CulledPassCount = 0;
         std::uint32_t ResourceCount = 0;
@@ -481,6 +486,8 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual ShadowSystem&          GetShadowSystem()    = 0;
         [[nodiscard]] virtual HZBSystem&             GetHZBSystem()       = 0;
         [[nodiscard]] virtual const RenderGraphFrameStats& GetLastRenderGraphStats() const = 0;
+        virtual void SetRenderGraphDebugDumpEnabled(bool enabled) noexcept = 0;
+        [[nodiscard]] virtual bool GetRenderGraphDebugDumpEnabled() const noexcept = 0;
 
         // GRAPHICS-031A — accessor for the canonical missing-material fallback
         // pipeline. Returns the operational device-side handle when the

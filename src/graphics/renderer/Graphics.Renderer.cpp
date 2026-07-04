@@ -12,6 +12,7 @@ module;
 #include <span>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -146,6 +147,215 @@ namespace Extrinsic::Graphics
         constexpr std::uint32_t kFrameSampledDescriptorSlotPresent = 2u;
         constexpr std::uint32_t kFrameSampledDescriptorSlotSelectionOutline = 3u;
 
+        struct FrameRecipeContributionCacheKey
+        {
+            FrameRecipePassKind Kind{FrameRecipePassKind::Culling};
+            FramePassId Id{};
+            std::string Name{};
+            bool Enabled{false};
+            bool PreserveDisabledDeclaration{false};
+            bool FinalizesBackbuffer{false};
+            RenderQueue Queue{RenderQueue::Graphics};
+            FramePassId AnchorPassId{};
+            FrameRecipeContributionAnchorPlacement AnchorPlacement{
+                FrameRecipeContributionAnchorPlacement::After};
+            std::vector<FrameResourceId> Reads{};
+            std::vector<FrameResourceId> Writes{};
+
+            [[nodiscard]] bool operator==(const FrameRecipeContributionCacheKey&) const = default;
+        };
+
+        struct RenderGraphCompileCacheKey
+        {
+            FrameRecipeFeatures Features{};
+            FrameRecipeImports Imports{};
+            FrameRecipeSizing Sizing{};
+            FrameRecipeAAOptions AAOptions{};
+            FrameRecipeShadowSizing ShadowSizing{};
+            FrameRecipeTemporalOptions TemporalOptions{};
+            std::vector<FrameRecipeContributionCacheKey> Contributions{};
+        };
+
+        struct RenderGraphCompileCacheEntry
+        {
+            RenderGraphCompileCacheKey Key{};
+            CompiledRenderGraph Compiled{};
+            FrameRecipeIntrospection Recipe{};
+        };
+
+        [[nodiscard]] bool FrameRecipeFeaturesEqual(const FrameRecipeFeatures& lhs,
+                                                    const FrameRecipeFeatures& rhs) noexcept
+        {
+            return std::tie(lhs.LightingPath,
+                            lhs.EnableDepthPrepass,
+                            lhs.EnableHZBBuild,
+                            lhs.EnableClusterGridBuild,
+                            lhs.EnableClusterLightAssignment,
+                            lhs.EnablePicking,
+                            lhs.EnableShadows,
+                            lhs.EnableSelectionOutline,
+                            lhs.EnableDebugView,
+                            lhs.EnablePostProcess,
+                            lhs.EnableAntiAliasing,
+                            lhs.EnableImGui,
+                            lhs.EnableTransientDebugSurface,
+                            lhs.EnableVisualizationOverlay) ==
+                   std::tie(rhs.LightingPath,
+                            rhs.EnableDepthPrepass,
+                            rhs.EnableHZBBuild,
+                            rhs.EnableClusterGridBuild,
+                            rhs.EnableClusterLightAssignment,
+                            rhs.EnablePicking,
+                            rhs.EnableShadows,
+                            rhs.EnableSelectionOutline,
+                            rhs.EnableDebugView,
+                            rhs.EnablePostProcess,
+                            rhs.EnableAntiAliasing,
+                            rhs.EnableImGui,
+                            rhs.EnableTransientDebugSurface,
+                            rhs.EnableVisualizationOverlay);
+        }
+
+        [[nodiscard]] bool FrameRecipeImportsEqual(const FrameRecipeImports& lhs,
+                                                   const FrameRecipeImports& rhs) noexcept
+        {
+            return std::make_tuple(lhs.Backbuffer.IsValid(),
+                                   lhs.SceneTable.IsValid(),
+                                   lhs.InstanceStatic.IsValid(),
+                                   lhs.InstanceDynamic.IsValid(),
+                                   lhs.EntityConfig.IsValid(),
+                                   lhs.GeometryRecords.IsValid(),
+                                   lhs.Bounds.IsValid(),
+                                   lhs.Lights.IsValid(),
+                                   lhs.MaterialBuffer.IsValid(),
+                                   lhs.SurfaceOpaqueIndexedArgs.IsValid(),
+                                   lhs.SurfaceOpaqueCount.IsValid(),
+                                   lhs.LinesIndexedArgs.IsValid(),
+                                   lhs.LinesCount.IsValid(),
+                                   lhs.LineQuadsNonIndexedArgs.IsValid(),
+                                   lhs.LineQuadsCount.IsValid(),
+                                   lhs.PointsNonIndexedArgs.IsValid(),
+                                   lhs.PointsCount.IsValid(),
+                                   lhs.ShadowAtlas.IsValid(),
+                                   lhs.PickingReadback.IsValid(),
+                                   lhs.HistogramReadback.IsValid(),
+                                   lhs.HZBCurrent.IsValid(),
+                                   lhs.ClusterGridAABBs.IsValid(),
+                                   lhs.ClusterLightHeaders.IsValid(),
+                                   lhs.ClusterLightIndices.IsValid(),
+                                   lhs.ClusterLightCounter.IsValid()) ==
+                   std::make_tuple(rhs.Backbuffer.IsValid(),
+                                   rhs.SceneTable.IsValid(),
+                                   rhs.InstanceStatic.IsValid(),
+                                   rhs.InstanceDynamic.IsValid(),
+                                   rhs.EntityConfig.IsValid(),
+                                   rhs.GeometryRecords.IsValid(),
+                                   rhs.Bounds.IsValid(),
+                                   rhs.Lights.IsValid(),
+                                   rhs.MaterialBuffer.IsValid(),
+                                   rhs.SurfaceOpaqueIndexedArgs.IsValid(),
+                                   rhs.SurfaceOpaqueCount.IsValid(),
+                                   rhs.LinesIndexedArgs.IsValid(),
+                                   rhs.LinesCount.IsValid(),
+                                   rhs.LineQuadsNonIndexedArgs.IsValid(),
+                                   rhs.LineQuadsCount.IsValid(),
+                                   rhs.PointsNonIndexedArgs.IsValid(),
+                                   rhs.PointsCount.IsValid(),
+                                   rhs.ShadowAtlas.IsValid(),
+                                   rhs.PickingReadback.IsValid(),
+                                   rhs.HistogramReadback.IsValid(),
+                                   rhs.HZBCurrent.IsValid(),
+                                   rhs.ClusterGridAABBs.IsValid(),
+                                   rhs.ClusterLightHeaders.IsValid(),
+                                   rhs.ClusterLightIndices.IsValid(),
+                                   rhs.ClusterLightCounter.IsValid());
+        }
+
+        [[nodiscard]] bool FrameRecipeSizingEqual(const FrameRecipeSizing& lhs,
+                                                  const FrameRecipeSizing& rhs) noexcept
+        {
+            return std::tie(lhs.Width, lhs.Height, lhs.BackbufferFormat, lhs.DepthFormat) ==
+                   std::tie(rhs.Width, rhs.Height, rhs.BackbufferFormat, rhs.DepthFormat);
+        }
+
+        [[nodiscard]] bool FrameRecipeAAOptionsEqual(const FrameRecipeAAOptions& lhs,
+                                                     const FrameRecipeAAOptions& rhs) noexcept
+        {
+            return std::make_tuple(lhs.Mode,
+                                   lhs.InputWidth,
+                                   lhs.InputHeight,
+                                   lhs.ReconstructionHistoryPrevious.IsValid(),
+                                   lhs.ReconstructionHistoryCurrent.IsValid()) ==
+                   std::make_tuple(rhs.Mode,
+                                   rhs.InputWidth,
+                                   rhs.InputHeight,
+                                   rhs.ReconstructionHistoryPrevious.IsValid(),
+                                   rhs.ReconstructionHistoryCurrent.IsValid());
+        }
+
+        [[nodiscard]] bool FrameRecipeShadowSizingEqual(const FrameRecipeShadowSizing& lhs,
+                                                        const FrameRecipeShadowSizing& rhs) noexcept
+        {
+            return std::tie(lhs.AtlasResolution, lhs.CascadeCount) ==
+                   std::tie(rhs.AtlasResolution, rhs.CascadeCount);
+        }
+
+        [[nodiscard]] bool FrameRecipeTemporalOptionsEqual(const FrameRecipeTemporalOptions& lhs,
+                                                           const FrameRecipeTemporalOptions& rhs) noexcept
+        {
+            return std::tie(lhs.NoJitterNoHistory, lhs.EnableMotionVectors) ==
+                   std::tie(rhs.NoJitterNoHistory, rhs.EnableMotionVectors);
+        }
+
+        [[nodiscard]] bool RenderGraphCompileCacheKeyEqual(const RenderGraphCompileCacheKey& lhs,
+                                                           const RenderGraphCompileCacheKey& rhs)
+        {
+            return FrameRecipeFeaturesEqual(lhs.Features, rhs.Features) &&
+                   FrameRecipeImportsEqual(lhs.Imports, rhs.Imports) &&
+                   FrameRecipeSizingEqual(lhs.Sizing, rhs.Sizing) &&
+                   FrameRecipeAAOptionsEqual(lhs.AAOptions, rhs.AAOptions) &&
+                   FrameRecipeShadowSizingEqual(lhs.ShadowSizing, rhs.ShadowSizing) &&
+                   FrameRecipeTemporalOptionsEqual(lhs.TemporalOptions, rhs.TemporalOptions) &&
+                   lhs.Contributions == rhs.Contributions;
+        }
+
+        [[nodiscard]] RenderGraphCompileCacheKey BuildRenderGraphCompileCacheKey(
+            const FrameRecipeFeatures& features,
+            const FrameRecipeImports& imports,
+            const FrameRecipeSizing& sizing,
+            const FrameRecipeAAOptions& aaOptions,
+            const FrameRecipeShadowSizing& shadowSizing,
+            const FrameRecipeTemporalOptions temporalOptions,
+            const std::vector<FrameRecipePassContribution>& contributions)
+        {
+            RenderGraphCompileCacheKey key{
+                .Features = features,
+                .Imports = imports,
+                .Sizing = sizing,
+                .AAOptions = aaOptions,
+                .ShadowSizing = shadowSizing,
+                .TemporalOptions = temporalOptions,
+            };
+            key.Contributions.reserve(contributions.size());
+            for (const FrameRecipePassContribution& contribution : contributions)
+            {
+                key.Contributions.push_back(FrameRecipeContributionCacheKey{
+                    .Kind = contribution.Kind,
+                    .Id = contribution.Id,
+                    .Name = std::string{contribution.Name},
+                    .Enabled = contribution.Enabled,
+                    .PreserveDisabledDeclaration = contribution.PreserveDisabledDeclaration,
+                    .FinalizesBackbuffer = contribution.FinalizesBackbuffer,
+                    .Queue = contribution.Queue,
+                    .AnchorPassId = contribution.Anchor.PassId,
+                    .AnchorPlacement = contribution.Anchor.Placement,
+                    .Reads = contribution.Reads,
+                    .Writes = contribution.Writes,
+                });
+            }
+            return key;
+        }
+
         [[nodiscard]] std::optional<std::uint32_t> FindCompiledTextureIndexByResourceId(
             const CompiledRenderGraph& compiled,
             const FrameResourceId id) noexcept
@@ -163,6 +373,101 @@ namespace Extrinsic::Graphics
                 }
             }
             return std::nullopt;
+        }
+
+        [[nodiscard]] std::optional<std::uint32_t> FindCompiledBufferIndexByResourceId(
+            const CompiledRenderGraph& compiled,
+            const FrameResourceId id) noexcept
+        {
+            if (!id.IsValid())
+            {
+                return std::nullopt;
+            }
+
+            for (std::uint32_t index = 0u; index < compiled.BufferResourceIds.size(); ++index)
+            {
+                if (compiled.BufferResourceIds[index] == id)
+                {
+                    return index;
+                }
+            }
+            return std::nullopt;
+        }
+
+        void RebindCompiledGraphImports(CompiledRenderGraph& compiled,
+                                        const FrameRecipeImports& imports,
+                                        const FrameRecipeAAOptions& aaOptions)
+        {
+            auto bindTexture = [&compiled](const FrameRecipeResourceKind kind,
+                                           const RHI::TextureHandle handle)
+            {
+                const std::optional<std::uint32_t> index =
+                    FindCompiledTextureIndexByResourceId(compiled, ToFrameResourceId(kind));
+                if (!index.has_value() || *index >= compiled.TextureHandles.size() ||
+                    *index >= compiled.TextureImported.size() || !compiled.TextureImported[*index])
+                {
+                    return;
+                }
+                compiled.TextureHandles[*index] = handle;
+            };
+
+            auto bindBuffer = [&compiled](const FrameRecipeResourceKind kind,
+                                          const RHI::BufferHandle handle)
+            {
+                const std::optional<std::uint32_t> index =
+                    FindCompiledBufferIndexByResourceId(compiled, ToFrameResourceId(kind));
+                if (!index.has_value() || *index >= compiled.BufferHandles.size() ||
+                    *index >= compiled.BufferImported.size() || !compiled.BufferImported[*index])
+                {
+                    return;
+                }
+                compiled.BufferHandles[*index] = handle;
+            };
+
+            bindTexture(FrameRecipeResourceKind::Backbuffer, imports.Backbuffer);
+            bindTexture(FrameRecipeResourceKind::ShadowAtlas, imports.ShadowAtlas);
+            bindTexture(FrameRecipeResourceKind::HZBCurrent, imports.HZBCurrent);
+            bindTexture(FrameRecipeResourceKind::ReconstructionHistoryPrevious,
+                        aaOptions.ReconstructionHistoryPrevious);
+            bindTexture(FrameRecipeResourceKind::ReconstructionHistoryCurrent,
+                        aaOptions.ReconstructionHistoryCurrent);
+
+            bindBuffer(FrameRecipeResourceKind::SceneTable, imports.SceneTable);
+            bindBuffer(FrameRecipeResourceKind::InstanceStatic, imports.InstanceStatic);
+            bindBuffer(FrameRecipeResourceKind::InstanceDynamic, imports.InstanceDynamic);
+            bindBuffer(FrameRecipeResourceKind::EntityConfig, imports.EntityConfig);
+            bindBuffer(FrameRecipeResourceKind::GeometryRecords, imports.GeometryRecords);
+            bindBuffer(FrameRecipeResourceKind::Bounds, imports.Bounds);
+            bindBuffer(FrameRecipeResourceKind::Lights, imports.Lights);
+            bindBuffer(FrameRecipeResourceKind::MaterialBuffer, imports.MaterialBuffer);
+            bindBuffer(FrameRecipeResourceKind::SurfaceOpaqueIndexedArgs,
+                       imports.SurfaceOpaqueIndexedArgs);
+            bindBuffer(FrameRecipeResourceKind::SurfaceOpaqueCount,
+                       imports.SurfaceOpaqueCount);
+            bindBuffer(FrameRecipeResourceKind::LinesIndexedArgs,
+                       imports.LinesIndexedArgs);
+            bindBuffer(FrameRecipeResourceKind::LinesCount,
+                       imports.LinesCount);
+            bindBuffer(FrameRecipeResourceKind::LineQuadsNonIndexedArgs,
+                       imports.LineQuadsNonIndexedArgs);
+            bindBuffer(FrameRecipeResourceKind::LineQuadsCount,
+                       imports.LineQuadsCount);
+            bindBuffer(FrameRecipeResourceKind::PointsNonIndexedArgs,
+                       imports.PointsNonIndexedArgs);
+            bindBuffer(FrameRecipeResourceKind::PointsCount,
+                       imports.PointsCount);
+            bindBuffer(FrameRecipeResourceKind::PickingReadback,
+                       imports.PickingReadback);
+            bindBuffer(FrameRecipeResourceKind::HistogramReadback,
+                       imports.HistogramReadback);
+            bindBuffer(FrameRecipeResourceKind::ClusterGridAABBs,
+                       imports.ClusterGridAABBs);
+            bindBuffer(FrameRecipeResourceKind::ClusterLightHeaders,
+                       imports.ClusterLightHeaders);
+            bindBuffer(FrameRecipeResourceKind::ClusterLightIndices,
+                       imports.ClusterLightIndices);
+            bindBuffer(FrameRecipeResourceKind::ClusterLightCounter,
+                       imports.ClusterLightCounter);
         }
 
         [[nodiscard]] constexpr std::uint32_t FrameSampledDescriptorSlotForPass(
@@ -1285,6 +1590,7 @@ namespace Extrinsic::Graphics
 
             const bool passResourcesReady = InitializeOperationalPassResources(device);
             m_RenderGraph.Reset();
+            m_RenderGraphCompileCache.reset();
             m_LastRenderGraphStats.LifecycleDiagnostic = m_CullingOutputAvailable
                 ? std::string{}
                 : std::string{"Renderer operational-resource rebuild completed with culling unavailable."};
@@ -1520,12 +1826,15 @@ namespace Extrinsic::Graphics
             // renderer-owned upload helpers.
             m_ImGuiUploadHelper.reset();
             m_Subsystems.ResetStorage();
+            m_RenderGraph.Reset();
+            m_RenderGraphCompileCache.reset();
             m_CullingOutputAvailable = false;
         }
 
         void Resize(std::uint32_t, std::uint32_t) override
         {
             m_RenderGraph.Reset();
+            m_RenderGraphCompileCache.reset();
         }
 
         // ── Per-frame phases ──────────────────────────────────────────────
@@ -2256,7 +2565,6 @@ namespace Extrinsic::Graphics
                 Core::Log::Error("[Graphics] RenderGraph contract compatibility failed");
                 return;
             }
-            m_RenderGraph.Reset();
             const auto& surfaceOpaque = m_Subsystems.CullingSystemRegistry()->GetBucket(RHI::GpuDrawBucketKind::SurfaceOpaque);
             const auto& lines = m_Subsystems.CullingSystemRegistry()->GetBucket(RHI::GpuDrawBucketKind::Lines);
             const auto& lineQuads = m_Subsystems.CullingSystemRegistry()->GetBucket(RHI::GpuDrawBucketKind::LineQuads);
@@ -2469,59 +2777,100 @@ namespace Extrinsic::Graphics
                                                            defaultRecipeFeatures,
                                                            aaOptions,
                                                            temporalOptions);
-            const FrameRecipeBuildResult recipe =
-                BuildDefaultFrameRecipeWithContributions(m_RenderGraph,
-                                                         defaultRecipeFeatures,
-                                                         imports,
-                                                         sizing,
-                                                         aaOptions,
-                                                         shadowSizing,
-                                                         temporalOptions,
-                                                         frameRecipeContributions.Passes);
-            if (!recipe.Succeeded)
+            RenderGraphCompileCacheKey compileCacheKey =
+                BuildRenderGraphCompileCacheKey(defaultRecipeFeatures,
+                                                imports,
+                                                sizing,
+                                                aaOptions,
+                                                shadowSizing,
+                                                temporalOptions,
+                                                frameRecipeContributions.Passes);
+            CompiledRenderGraph* compiled = nullptr;
+            const FrameRecipeIntrospection* recipeIntrospection = nullptr;
+            const bool cacheHit =
+                m_RenderGraphCompileCache.has_value() &&
+                RenderGraphCompileCacheKeyEqual(m_RenderGraphCompileCache->Key, compileCacheKey);
+            if (cacheHit)
             {
-                m_LastRenderGraphStats.Diagnostic = recipe.Diagnostic;
-                Core::Log::Error("[Graphics] FrameRecipe build failed: diagnostic={}", recipe.Diagnostic);
-                // GRAPHICS-033E: a failed recipe build cannot satisfy gate 7;
-                // publish fail-closed so the operational gate sees the latest
-                // outcome before the next attempt.
-                m_Device->NoteRecipeGraphValidation(false);
-                return;
+                m_LastRenderGraphStats.Compile.CacheHitCount = 1u;
+                m_LastRenderGraphStats.Compile.ReusedCachedGraph = true;
+                compiled = &m_RenderGraphCompileCache->Compiled;
+                recipeIntrospection = &m_RenderGraphCompileCache->Recipe;
             }
-            const auto compileBegin = std::chrono::steady_clock::now();
-            auto compiled = m_RenderGraph.Compile();
-            const auto compileEnd = std::chrono::steady_clock::now();
-            m_LastRenderGraphStats.Compile.TimeMicros = static_cast<std::uint64_t>(
-                std::chrono::duration_cast<std::chrono::microseconds>(compileEnd - compileBegin).count());
-            if (!compiled.has_value())
+            else
             {
-                const auto& findings = m_RenderGraph.GetLastCompileValidationResult().Findings;
-                m_LastRenderGraphStats.Diagnostic = findings.empty() ? std::string{} : findings.front().Message;
-                Core::Log::Error("[Graphics] RenderGraph Compile() failed: error={} diagnostic={}",
-                                 static_cast<int>(compiled.error()),
-                                 m_LastRenderGraphStats.Diagnostic);
-                // GRAPHICS-033E: a failed compile cannot satisfy gate 7. Publish
-                // fail-closed exactly once per compile attempt so the operational
-                // gate cannot oscillate stale-clean while the next attempt rebuilds.
-                m_Device->NoteRecipeGraphValidation(false);
-                return;
+                m_LastRenderGraphStats.Compile.AttemptCount = 1u;
+                m_LastRenderGraphStats.Compile.CacheMissCount = 1u;
+                m_RenderGraph.Reset();
+                const FrameRecipeBuildResult recipe =
+                    BuildDefaultFrameRecipeWithContributions(m_RenderGraph,
+                                                             defaultRecipeFeatures,
+                                                             imports,
+                                                             sizing,
+                                                             aaOptions,
+                                                             shadowSizing,
+                                                             temporalOptions,
+                                                             frameRecipeContributions.Passes);
+                if (!recipe.Succeeded)
+                {
+                    m_RenderGraphCompileCache.reset();
+                    m_LastRenderGraphStats.Diagnostic = recipe.Diagnostic;
+                    Core::Log::Error("[Graphics] FrameRecipe build failed: diagnostic={}", recipe.Diagnostic);
+                    // GRAPHICS-033E: a failed recipe build cannot satisfy gate 7;
+                    // publish fail-closed so the operational gate sees the latest
+                    // outcome before the next attempt.
+                    m_Device->NoteRecipeGraphValidation(false);
+                    return;
+                }
+
+                const auto compileBegin = std::chrono::steady_clock::now();
+                auto compiledResult = m_RenderGraph.Compile();
+                const auto compileEnd = std::chrono::steady_clock::now();
+                m_LastRenderGraphStats.Compile.TimeMicros = static_cast<std::uint64_t>(
+                    std::chrono::duration_cast<std::chrono::microseconds>(compileEnd - compileBegin).count());
+                if (!compiledResult.has_value())
+                {
+                    m_RenderGraphCompileCache.reset();
+                    const auto& findings = m_RenderGraph.GetLastCompileValidationResult().Findings;
+                    m_LastRenderGraphStats.Diagnostic = findings.empty() ? std::string{} : findings.front().Message;
+                    Core::Log::Error("[Graphics] RenderGraph Compile() failed: error={} diagnostic={}",
+                                     static_cast<int>(compiledResult.error()),
+                                     m_LastRenderGraphStats.Diagnostic);
+                    // GRAPHICS-033E: a failed compile cannot satisfy gate 7. Publish
+                    // fail-closed exactly once per compile attempt so the operational
+                    // gate cannot oscillate stale-clean while the next attempt rebuilds.
+                    m_Device->NoteRecipeGraphValidation(false);
+                    return;
+                }
+
+                FrameRecipeContributionDescriptionResult recipeDescription =
+                    DescribeDefaultFrameRecipeWithContributions(defaultRecipeFeatures,
+                                                                aaOptions,
+                                                                temporalOptions,
+                                                                frameRecipeContributions.Passes);
+                if (!recipeDescription.Succeeded)
+                {
+                    m_RenderGraphCompileCache.reset();
+                    m_LastRenderGraphStats.Diagnostic = "FrameRecipe contribution description failed.";
+                    Core::Log::Error("[Graphics] FrameRecipe contribution description failed.");
+                    m_Device->NoteRecipeGraphValidation(false);
+                    return;
+                }
+
+                m_RenderGraphCompileCache = RenderGraphCompileCacheEntry{
+                    .Key = std::move(compileCacheKey),
+                    .Compiled = std::move(*compiledResult),
+                    .Recipe = std::move(recipeDescription.Recipe),
+                };
+                compiled = &m_RenderGraphCompileCache->Compiled;
+                recipeIntrospection = &m_RenderGraphCompileCache->Recipe;
             }
-            // GRAPHICS-033E: run the recipe-aware validation against the freshly
-            // compiled graph and publish a single boolean to the device exactly
-            // once per recipe compile. The recipe-aware validator supplies the
-            // `ImportedResourceAuthorization` entries that the bare
-            // compile-time validator lacks (the compile-time pass has no
-            // recipe context, so imported writes from non-side-effect passes
-            // such as `CullingPass` always trip
-            // `UnauthorizedImportedBufferWrite`). Gate 7
-            // (`BarrierValidationClean`) therefore flips to `true` when the
-            // recipe-aware validation reports zero `Error`-severity findings.
-            const FrameRecipeContributionDescriptionResult recipeDescription =
-                DescribeDefaultFrameRecipeWithContributions(defaultRecipeFeatures,
-                                                            aaOptions,
-                                                            temporalOptions,
-                                                            frameRecipeContributions.Passes);
-            const FrameRecipeIntrospection& recipeIntrospection = recipeDescription.Recipe;
+            RebindCompiledGraphImports(*compiled, imports, aaOptions);
+            // GRAPHICS-033E: run the recipe-aware validation against the
+            // current compiled graph and publish the boolean to the device for
+            // the frame. Cache hits reuse the compile product but still
+            // validate the recipe view and per-frame transient resource
+            // readiness before execution.
             // GRAPHICS-076 Slice B — drive the renderer-owned
             // `DebugViewSystem` from the current frame's world + recipe
             // declarations before the executor records the
@@ -2552,14 +2901,14 @@ namespace Extrinsic::Graphics
                 settings.Enabled = debugViewEnabled;
                 m_DebugViewSystem->SetSettings(settings);
                 const DebugViewResolvedSelection resolved =
-                    m_DebugViewSystem->ResolveSelection(recipeIntrospection);
+                    m_DebugViewSystem->ResolveSelection(*recipeIntrospection);
                 if (debugViewEnabled && resolved.UsedFallback)
                 {
                     ++m_LastRenderGraphStats.DebugViewFallbackInvocationCount;
                 }
             }
             const RenderGraphValidationResult recipeValidation =
-                ValidateRecipeCompiledGraph(recipeIntrospection, *compiled);
+                ValidateRecipeCompiledGraph(*recipeIntrospection, *compiled);
             const bool transientResourcesReady = AllocateFrameTransientResources(*compiled, frame.FrameIndex);
             const bool recipeValidationClean =
                 recipeValidation.CountBySeverity(RenderGraphValidationSeverity::Error) == 0u && transientResourcesReady;
@@ -2584,7 +2933,11 @@ namespace Extrinsic::Graphics
             m_LastRenderGraphStats.Compile.CrossQueueOwnershipTransferCount =
                 compiled->CrossQueueOwnershipTransferCount;
             m_LastRenderGraphStats.Compile.TransientMemoryEstimateBytes = compiled->TransientMemoryEstimateBytes;
-            m_LastRenderGraphStats.DebugDump = BuildRenderGraphDebugDump(*compiled);
+            if (m_RenderGraphDebugDumpEnabled)
+            {
+                m_LastRenderGraphStats.DebugDump = BuildRenderGraphDebugDump(*compiled);
+                m_LastRenderGraphStats.Compile.DebugDumpGenerated = true;
+            }
             m_LastRenderGraphStats.Execute.DeviceOperational = m_Device->IsOperational();
 
             const auto executeBegin = std::chrono::steady_clock::now();
@@ -3535,6 +3888,16 @@ namespace Extrinsic::Graphics
         ShadowSystem&          GetShadowSystem()    override { return *m_Subsystems.ShadowSystemRegistry();    }
         HZBSystem&             GetHZBSystem()       override { return *m_HZBSystem;       }
         const RenderGraphFrameStats& GetLastRenderGraphStats() const override { return m_LastRenderGraphStats; }
+
+        void SetRenderGraphDebugDumpEnabled(const bool enabled) noexcept override
+        {
+            m_RenderGraphDebugDumpEnabled = enabled;
+        }
+
+        [[nodiscard]] bool GetRenderGraphDebugDumpEnabled() const noexcept override
+        {
+            return m_RenderGraphDebugDumpEnabled;
+        }
 
     private:
         // GRAPHICS-031A — canonical default-debug-surface PipelineDesc.
@@ -7860,6 +8223,8 @@ namespace Extrinsic::Graphics
         ReferenceTAAReconstructor            m_ReferenceTAAReconstructor;
         RHI::IDevice*                        m_Device{nullptr};
         RenderGraph                          m_RenderGraph;
+        std::optional<RenderGraphCompileCacheEntry> m_RenderGraphCompileCache{};
+        bool                                 m_RenderGraphDebugDumpEnabled{false};
         RenderGraphExecutor                  m_RenderGraphExecutor;
         RenderCommandRouter                  m_CommandRouter;
         std::vector<std::vector<RHI::TextureHandle>> m_FrameTransientTextures{};
