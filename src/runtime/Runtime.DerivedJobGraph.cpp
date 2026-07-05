@@ -71,6 +71,57 @@ namespace Extrinsic::Runtime
             diagnostic += std::string{Core::Error::ToString(code)};
             return diagnostic;
         }
+
+        [[nodiscard]] std::uint64_t ElapsedNs(
+            const std::chrono::steady_clock::time_point start) noexcept
+        {
+            const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now() - start);
+            return elapsed.count() > 0
+                ? static_cast<std::uint64_t>(elapsed.count())
+                : 1u;
+        }
+
+        [[nodiscard]] std::uint64_t PositiveDelta(
+            const std::uint64_t after,
+            const std::uint64_t before) noexcept
+        {
+            return after > before ? after - before : 0u;
+        }
+
+        void AccumulateStatus(
+            DerivedJobQueueDiagnostics& diagnostics,
+            const DerivedJobStatus status) noexcept
+        {
+            ++diagnostics.TotalJobs;
+            switch (status)
+            {
+            case DerivedJobStatus::Blocked:
+                ++diagnostics.BlockedJobs;
+                break;
+            case DerivedJobStatus::Queued:
+                ++diagnostics.QueuedJobs;
+                break;
+            case DerivedJobStatus::Running:
+                ++diagnostics.RunningJobs;
+                break;
+            case DerivedJobStatus::Applying:
+                ++diagnostics.ApplyingJobs;
+                break;
+            case DerivedJobStatus::Complete:
+                ++diagnostics.CompleteJobs;
+                break;
+            case DerivedJobStatus::Failed:
+                ++diagnostics.FailedJobs;
+                break;
+            case DerivedJobStatus::Cancelled:
+                ++diagnostics.CancelledJobs;
+                break;
+            case DerivedJobStatus::StaleDiscarded:
+                ++diagnostics.StaleDiscardedJobs;
+                break;
+            }
+        }
     }
 
     struct DerivedJobRegistry::Impl
@@ -108,6 +159,16 @@ namespace Extrinsic::Runtime
         StreamingExecutor* Executor{nullptr};
         DerivedJobRegistry* Owner{nullptr};
         std::vector<Record> Records{};
+        std::uint64_t ApplyMainThreadCalls{0u};
+        std::uint64_t LastApplyMainThreadTimeNs{0u};
+        std::uint64_t LastApplyMainThreadCompletedJobs{0u};
+        std::uint64_t LastApplyMainThreadFailedJobs{0u};
+        std::uint64_t LastApplyMainThreadCancelledJobs{0u};
+        std::uint64_t LastApplyMainThreadStaleDiscardedJobs{0u};
+        std::uint64_t TotalApplyMainThreadCompletedJobs{0u};
+        std::uint64_t TotalApplyMainThreadFailedJobs{0u};
+        std::uint64_t TotalApplyMainThreadCancelledJobs{0u};
+        std::uint64_t TotalApplyMainThreadStaleDiscardedJobs{0u};
 
         [[nodiscard]] std::optional<std::uint32_t> Resolve(
             const DerivedJobHandle handle) const noexcept
@@ -223,6 +284,40 @@ namespace Extrinsic::Runtime
                     ++diagnostics.StaleOrCancelled;
                 }
             }
+            return diagnostics;
+        }
+
+        [[nodiscard]] DerivedJobQueueDiagnostics CountStatusesLocked() const
+        {
+            DerivedJobQueueDiagnostics diagnostics{};
+            for (const Record& record : Records)
+            {
+                AccumulateStatus(diagnostics, SnapshotStatusLocked(record));
+            }
+            return diagnostics;
+        }
+
+        [[nodiscard]] DerivedJobQueueDiagnostics BuildDiagnosticsLocked() const
+        {
+            DerivedJobQueueDiagnostics diagnostics = CountStatusesLocked();
+            diagnostics.ApplyMainThreadCalls = ApplyMainThreadCalls;
+            diagnostics.LastApplyMainThreadTimeNs = LastApplyMainThreadTimeNs;
+            diagnostics.LastApplyMainThreadCompletedJobs =
+                LastApplyMainThreadCompletedJobs;
+            diagnostics.LastApplyMainThreadFailedJobs =
+                LastApplyMainThreadFailedJobs;
+            diagnostics.LastApplyMainThreadCancelledJobs =
+                LastApplyMainThreadCancelledJobs;
+            diagnostics.LastApplyMainThreadStaleDiscardedJobs =
+                LastApplyMainThreadStaleDiscardedJobs;
+            diagnostics.TotalApplyMainThreadCompletedJobs =
+                TotalApplyMainThreadCompletedJobs;
+            diagnostics.TotalApplyMainThreadFailedJobs =
+                TotalApplyMainThreadFailedJobs;
+            diagnostics.TotalApplyMainThreadCancelledJobs =
+                TotalApplyMainThreadCancelledJobs;
+            diagnostics.TotalApplyMainThreadStaleDiscardedJobs =
+                TotalApplyMainThreadStaleDiscardedJobs;
             return diagnostics;
         }
 
@@ -741,10 +836,42 @@ namespace Extrinsic::Runtime
 
     void DerivedJobRegistry::ApplyMainThreadResults()
     {
-        if (m_Impl != nullptr && m_Impl->Executor != nullptr)
+        if (m_Impl == nullptr || m_Impl->Executor == nullptr)
         {
-            m_Impl->Executor->ApplyMainThreadResults();
+            return;
         }
+
+        DerivedJobQueueDiagnostics before{};
+        {
+            std::scoped_lock lock(m_Impl->Mutex);
+            before = m_Impl->CountStatusesLocked();
+        }
+
+        const auto applyBegin = std::chrono::steady_clock::now();
+        m_Impl->Executor->ApplyMainThreadResults();
+        const std::uint64_t elapsedNs = ElapsedNs(applyBegin);
+
+        std::scoped_lock lock(m_Impl->Mutex);
+        const DerivedJobQueueDiagnostics after = m_Impl->CountStatusesLocked();
+        const std::uint64_t completed =
+            PositiveDelta(after.CompleteJobs, before.CompleteJobs);
+        const std::uint64_t failed =
+            PositiveDelta(after.FailedJobs, before.FailedJobs);
+        const std::uint64_t cancelled =
+            PositiveDelta(after.CancelledJobs, before.CancelledJobs);
+        const std::uint64_t staleDiscarded =
+            PositiveDelta(after.StaleDiscardedJobs, before.StaleDiscardedJobs);
+
+        ++m_Impl->ApplyMainThreadCalls;
+        m_Impl->LastApplyMainThreadTimeNs = elapsedNs;
+        m_Impl->LastApplyMainThreadCompletedJobs = completed;
+        m_Impl->LastApplyMainThreadFailedJobs = failed;
+        m_Impl->LastApplyMainThreadCancelledJobs = cancelled;
+        m_Impl->LastApplyMainThreadStaleDiscardedJobs = staleDiscarded;
+        m_Impl->TotalApplyMainThreadCompletedJobs += completed;
+        m_Impl->TotalApplyMainThreadFailedJobs += failed;
+        m_Impl->TotalApplyMainThreadCancelledJobs += cancelled;
+        m_Impl->TotalApplyMainThreadStaleDiscardedJobs += staleDiscarded;
     }
 
     DerivedJobStatus DerivedJobRegistry::GetStatus(const DerivedJobHandle handle) const
@@ -790,6 +917,7 @@ namespace Extrinsic::Runtime
 
         std::scoped_lock lock(m_Impl->Mutex);
         snapshot.Readbacks = m_Impl->BuildReadbackDiagnosticsLocked();
+        snapshot.Diagnostics = m_Impl->BuildDiagnosticsLocked();
         snapshot.Entries.reserve(m_Impl->Records.size());
         for (std::uint32_t index = 0; index < m_Impl->Records.size(); ++index)
         {
@@ -812,6 +940,7 @@ namespace Extrinsic::Runtime
 
         std::scoped_lock lock(m_Impl->Mutex);
         snapshot.Readbacks = m_Impl->BuildReadbackDiagnosticsLocked();
+        snapshot.Diagnostics = m_Impl->BuildDiagnosticsLocked();
         for (std::uint32_t index = 0; index < m_Impl->Records.size(); ++index)
         {
             const auto& record = m_Impl->Records[index];

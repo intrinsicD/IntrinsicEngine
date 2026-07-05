@@ -112,6 +112,29 @@ export namespace Extrinsic::Runtime
         std::uint64_t StaleOrCancelled{0u};
     };
 
+    struct DerivedJobQueueDiagnostics
+    {
+        std::uint64_t TotalJobs{0u};
+        std::uint64_t BlockedJobs{0u};
+        std::uint64_t QueuedJobs{0u};
+        std::uint64_t RunningJobs{0u};
+        std::uint64_t ApplyingJobs{0u};
+        std::uint64_t CompleteJobs{0u};
+        std::uint64_t FailedJobs{0u};
+        std::uint64_t CancelledJobs{0u};
+        std::uint64_t StaleDiscardedJobs{0u};
+        std::uint64_t ApplyMainThreadCalls{0u};
+        std::uint64_t LastApplyMainThreadTimeNs{0u};
+        std::uint64_t LastApplyMainThreadCompletedJobs{0u};
+        std::uint64_t LastApplyMainThreadFailedJobs{0u};
+        std::uint64_t LastApplyMainThreadCancelledJobs{0u};
+        std::uint64_t LastApplyMainThreadStaleDiscardedJobs{0u};
+        std::uint64_t TotalApplyMainThreadCompletedJobs{0u};
+        std::uint64_t TotalApplyMainThreadFailedJobs{0u};
+        std::uint64_t TotalApplyMainThreadCancelledJobs{0u};
+        std::uint64_t TotalApplyMainThreadStaleDiscardedJobs{0u};
+    };
+
     struct DerivedJobSnapshot
     {
         DerivedJobHandle Handle{};
@@ -135,6 +158,7 @@ export namespace Extrinsic::Runtime
     {
         std::vector<DerivedJobSnapshot> Entries{};
         DerivedJobReadbackDiagnostics Readbacks{};
+        DerivedJobQueueDiagnostics Diagnostics{};
     };
 
     [[nodiscard]] std::string_view ToString(DerivedJobStatus value) noexcept;

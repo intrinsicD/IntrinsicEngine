@@ -232,3 +232,84 @@ TEST(RuntimeDerivedJobGraph, UnsupportedGpuDomainsFailClosed)
     EXPECT_EQ(snapshot->RequestedJobDomain, Runtime::ProgressiveJobDomain::GpuCompute);
     EXPECT_NE(snapshot->Diagnostic.find("GpuCompute"), std::string::npos);
 }
+
+TEST(RuntimeDerivedJobGraph, QueueDiagnosticsTrackStatusesAndApplyDeltas)
+{
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+
+    auto complete = MakeTokenJob(61u, "ready normal", 1u);
+
+    auto stale = MakeTokenJob(62u, "stale color", 2u);
+    stale.ValidateOnMainThread = []()
+    {
+        return Runtime::DerivedJobApplyValidation::StaleBindingGeneration;
+    };
+
+    auto failedApply = MakeTokenJob(63u, "failed apply", 3u);
+    failedApply.ApplyOnMainThread =
+        [](Runtime::DerivedJobApplyContext&) -> Core::Result
+    {
+        return std::unexpected(Core::ErrorCode::InvalidState);
+    };
+
+    auto unsupported = MakeTokenJob(64u, "gpu unsupported", 4u);
+    unsupported.RequestedJobDomain = Runtime::ProgressiveJobDomain::GpuCompute;
+
+    const Runtime::DerivedJobHandle completeHandle = jobs.Submit(std::move(complete));
+    const Runtime::DerivedJobHandle staleHandle = jobs.Submit(std::move(stale));
+    const Runtime::DerivedJobHandle failedApplyHandle =
+        jobs.Submit(std::move(failedApply));
+    const Runtime::DerivedJobHandle unsupportedHandle =
+        jobs.Submit(std::move(unsupported));
+    ASSERT_TRUE(completeHandle.IsValid());
+    ASSERT_TRUE(staleHandle.IsValid());
+    ASSERT_TRUE(failedApplyHandle.IsValid());
+    ASSERT_TRUE(unsupportedHandle.IsValid());
+
+    auto queued = jobs.SnapshotAll();
+    EXPECT_EQ(queued.Diagnostics.TotalJobs, 4u);
+    EXPECT_EQ(queued.Diagnostics.QueuedJobs, 3u);
+    EXPECT_EQ(queued.Diagnostics.FailedJobs, 1u);
+    EXPECT_EQ(queued.Diagnostics.ApplyMainThreadCalls, 0u);
+
+    jobs.Pump(3u);
+    jobs.DrainCompletions();
+
+    auto applying = jobs.SnapshotAll();
+    EXPECT_EQ(applying.Diagnostics.ApplyingJobs, 3u);
+    EXPECT_EQ(applying.Diagnostics.FailedJobs, 1u);
+
+    jobs.ApplyMainThreadResults();
+
+    auto applied = jobs.SnapshotAll();
+    EXPECT_EQ(applied.Diagnostics.CompleteJobs, 1u);
+    EXPECT_EQ(applied.Diagnostics.FailedJobs, 2u);
+    EXPECT_EQ(applied.Diagnostics.StaleDiscardedJobs, 1u);
+    EXPECT_EQ(applied.Diagnostics.ApplyMainThreadCalls, 1u);
+    EXPECT_GT(applied.Diagnostics.LastApplyMainThreadTimeNs, 0u);
+    EXPECT_EQ(applied.Diagnostics.LastApplyMainThreadCompletedJobs, 1u);
+    EXPECT_EQ(applied.Diagnostics.LastApplyMainThreadFailedJobs, 1u);
+    EXPECT_EQ(applied.Diagnostics.LastApplyMainThreadCancelledJobs, 0u);
+    EXPECT_EQ(applied.Diagnostics.LastApplyMainThreadStaleDiscardedJobs, 1u);
+    EXPECT_EQ(applied.Diagnostics.TotalApplyMainThreadCompletedJobs, 1u);
+    EXPECT_EQ(applied.Diagnostics.TotalApplyMainThreadFailedJobs, 1u);
+    EXPECT_EQ(applied.Diagnostics.TotalApplyMainThreadCancelledJobs, 0u);
+    EXPECT_EQ(applied.Diagnostics.TotalApplyMainThreadStaleDiscardedJobs, 1u);
+    EXPECT_EQ(jobs.GetStatus(completeHandle), Runtime::DerivedJobStatus::Complete);
+    EXPECT_EQ(jobs.GetStatus(staleHandle), Runtime::DerivedJobStatus::StaleDiscarded);
+    EXPECT_EQ(jobs.GetStatus(failedApplyHandle), Runtime::DerivedJobStatus::Failed);
+    EXPECT_EQ(jobs.GetStatus(unsupportedHandle), Runtime::DerivedJobStatus::Failed);
+
+    jobs.ApplyMainThreadResults();
+    auto idle = jobs.SnapshotAll();
+    EXPECT_EQ(idle.Diagnostics.ApplyMainThreadCalls, 2u);
+    EXPECT_EQ(idle.Diagnostics.LastApplyMainThreadCompletedJobs, 0u);
+    EXPECT_EQ(idle.Diagnostics.LastApplyMainThreadFailedJobs, 0u);
+    EXPECT_EQ(idle.Diagnostics.LastApplyMainThreadCancelledJobs, 0u);
+    EXPECT_EQ(idle.Diagnostics.LastApplyMainThreadStaleDiscardedJobs, 0u);
+    EXPECT_EQ(idle.Diagnostics.TotalApplyMainThreadCompletedJobs, 1u);
+    EXPECT_EQ(idle.Diagnostics.TotalApplyMainThreadFailedJobs, 1u);
+    EXPECT_EQ(idle.Diagnostics.TotalApplyMainThreadCancelledJobs, 0u);
+    EXPECT_EQ(idle.Diagnostics.TotalApplyMainThreadStaleDiscardedJobs, 1u);
+}
