@@ -2380,6 +2380,64 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnGeometryMetadataSignature)
     EXPECT_EQ(cacheStats.Entries, 1u);
 }
 
+TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnRenderHintSignature)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    auto& edges = registry.Raw().emplace<G::RenderEdges>(mesh);
+    edges.Domain = G::RenderEdges::SourceDomain::Edge;
+    edges.WidthSource = 1.0f;
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    Runtime::SandboxEditorSelectedModelCache cache{};
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.SelectedModelCache = &cache;
+
+    const Runtime::SandboxEditorPanelFrame first =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyInspectorModelBuildRequest());
+    ASSERT_TRUE(first.Inspector.HasEntity);
+    EXPECT_EQ(first.ModelBuildStats.SelectedAnalysisCacheMisses, 1u);
+    EXPECT_EQ(first.ModelBuildStats.BoundStateModelBuilds, 1u);
+
+    const Runtime::SandboxEditorPanelFrame cached =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyInspectorModelBuildRequest());
+    ASSERT_TRUE(cached.Inspector.HasEntity);
+    EXPECT_EQ(cached.ModelBuildStats.SelectedAnalysisCacheHits, 1u);
+    EXPECT_EQ(cached.ModelBuildStats.BoundStateModelBuilds, 0u);
+
+    registry.Raw().get<G::RenderEdges>(mesh).WidthSource = 3.5f;
+
+    const Runtime::SandboxEditorPanelFrame changed =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyInspectorModelBuildRequest());
+    ASSERT_TRUE(changed.Inspector.HasEntity);
+    EXPECT_EQ(changed.ModelBuildStats.SelectedAnalysisCacheMisses, 1u);
+    EXPECT_EQ(changed.ModelBuildStats.SelectedAnalysisCacheHits, 0u);
+    EXPECT_EQ(changed.ModelBuildStats.BoundStateModelBuilds, 1u);
+    const Runtime::SandboxEditorBoundRenderStateRow* edgeHint =
+        FindBoundRowLabel(
+            changed.Inspector.BoundState,
+            Runtime::SandboxEditorBoundRenderStateRowKind::RenderHint,
+            "Edge render hint");
+    ASSERT_NE(edgeHint, nullptr);
+    EXPECT_TRUE(edgeHint->Enabled);
+    EXPECT_EQ(edgeHint->SourceDescription, "uniform:3.500000");
+
+    const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
+        cache.Stats();
+    EXPECT_EQ(cacheStats.SelectedAnalysisCacheMisses, 2u);
+    EXPECT_EQ(cacheStats.SelectedAnalysisCacheHits, 1u);
+    EXPECT_EQ(cacheStats.Entries, 1u);
+}
+
 TEST(SandboxEditorUi, SelectedModelCacheReusesVisualizationModel)
 {
     ECS::Scene::Registry registry;

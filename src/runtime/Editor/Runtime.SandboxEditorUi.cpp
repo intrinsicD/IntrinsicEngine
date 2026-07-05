@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <bit>
 #include <chrono>
 #include <array>
 #include <cmath>
@@ -4248,6 +4249,80 @@ namespace Extrinsic::Runtime
             }
         }
 
+        void MixSignatureFloat(std::uint64_t& signature,
+                               const float value) noexcept
+        {
+            MixSignature(signature, std::bit_cast<std::uint32_t>(value));
+        }
+
+        void AppendRenderHintSourceSignature(
+            std::uint64_t& signature,
+            const std::variant<float, std::string>& source) noexcept
+        {
+            if (const auto* value = std::get_if<float>(&source))
+            {
+                MixSignature(signature, 1u);
+                MixSignatureFloat(signature, *value);
+                return;
+            }
+
+            const auto* name = std::get_if<std::string>(&source);
+            MixSignature(signature, 2u);
+            if (name != nullptr)
+                MixSignatureString(signature, *name);
+            else
+                MixSignatureString(signature, {});
+        }
+
+        [[nodiscard]] std::uint64_t RenderHintSignatureForEntity(
+            const entt::registry& raw,
+            const ECS::EntityHandle entity,
+            const SandboxEditorSelectedModelCacheSection section)
+        {
+            if (section !=
+                SandboxEditorSelectedModelCacheSection::SelectedAnalysis)
+            {
+                return 0u;
+            }
+
+            std::uint64_t signature = kSandboxEditorSignatureOffset;
+            if (const auto* surface = raw.try_get<G::RenderSurface>(entity))
+            {
+                MixSignature(signature, 1u);
+                MixSignature(signature,
+                             static_cast<std::uint64_t>(surface->Domain));
+            }
+            else
+            {
+                MixSignature(signature, 0u);
+            }
+
+            if (const auto* edges = raw.try_get<G::RenderEdges>(entity))
+            {
+                MixSignature(signature, 1u);
+                MixSignature(signature,
+                             static_cast<std::uint64_t>(edges->Domain));
+                AppendRenderHintSourceSignature(signature, edges->WidthSource);
+            }
+            else
+            {
+                MixSignature(signature, 0u);
+            }
+
+            if (const auto* points = raw.try_get<G::RenderPoints>(entity))
+            {
+                MixSignature(signature, 1u);
+                MixSignature(signature,
+                             static_cast<std::uint64_t>(points->Type));
+                AppendRenderHintSourceSignature(signature, points->SizeSource);
+            }
+            else
+            {
+                MixSignature(signature, 0u);
+            }
+            return signature;
+        }
+
         void AppendPropertySetMetadataSignature(
             std::uint64_t& signature,
             const std::uint64_t domainTag,
@@ -4361,6 +4436,8 @@ namespace Extrinsic::Runtime
                 .NodeCount = geometry.NodeCount,
                 .GeometryMetadataSignature =
                     GeometryMetadataSignatureForEntity(raw, entity),
+                .RenderHintSignature =
+                    RenderHintSignatureForEntity(raw, entity, section),
                 .BindingGeneration = VertexBindingGenerationForEntity(raw, entity),
                 .ProgressiveBindingGeneration =
                     ProgressiveBindingGenerationForEntity(raw, entity, section),

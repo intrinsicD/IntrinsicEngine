@@ -39,7 +39,7 @@ maturity_target: Operational
 - [x] Slice A: add a deterministic capture path or test seam that records selected-entity frame samples without requiring Vulkan, and document the Vulkan-host smoke procedure for the real sandbox.
 - [x] Slice B: make editor model construction visibility-gated so hidden panels and closed domain windows do not build selected-entity models; build only the visible model section requested by the current ImGui window/section.
 - [x] Slice B: prevent open domain windows from rebuilding shared selected-entity models independently; either share one per-frame cached model view or request section-specific cached submodels.
-- [x] Slice C partial: add a selected-entity editor model cache for steady selected inspector analysis and visualization models, keyed by stable selected ids, selection generation, refined-primitive generation for primitive-sensitive analysis, geometry domain/count shape, vertex-channel binding generation, geometry source/property metadata signature, progressive presentation binding generation for selected analysis, command-history revision, viewport, visualization target, visualization command availability, and visualization adapter binding revision for visualization model entries.
+- [x] Slice C partial: add a selected-entity editor model cache for steady selected inspector analysis and visualization models, keyed by stable selected ids, selection generation, refined-primitive generation for primitive-sensitive analysis, geometry domain/count shape, vertex-channel binding generation, geometry source/property metadata signature, selected render-lane hint signature for bound-state rows, progressive presentation binding generation for selected analysis, command-history revision, viewport, visualization target, visualization command availability, and visualization adapter binding revision for visualization model entries.
 - [ ] Slice C: extend the selected-entity editor model cache with remaining entity/source value/non-vertex binding generations, viewport/config revision where relevant, and the visible section/window key.
 - [ ] Slice C: ensure cache-hit frames reuse immutable model data and perform no selected geometry/property scans or scratch-buffer allocations.
 - [ ] Slice D: split cheap metadata queries from heavy derivations. Property catalogs may enumerate names/domains/counts/value kinds, but full normal/color resolver scans, scalar domain scans, color packing validation, and UV finite checks must not run for every candidate property every frame.
@@ -52,7 +52,7 @@ maturity_target: Operational
 
 ## Tests
 - [x] Add contract tests proving hidden inspector/domain sections do not build selected-entity property, progressive, texture-bake, or visualization models.
-- [x] Add contract tests proving steady selected cache-hit frames skip property-catalog, vertex-channel target, progressive, bound-state, UV diagnostics, texture-bake, and visualization model builders, and proving selection-generation, refined-primitive generation, geometry source/property metadata signature, progressive presentation binding generation, and visualization adapter binding revision changes invalidate matching same-entity cache entries.
+- [x] Add contract tests proving steady selected cache-hit frames skip property-catalog, vertex-channel target, progressive, bound-state, UV diagnostics, texture-bake, and visualization model builders, and proving selection-generation, refined-primitive generation, geometry source/property metadata signature, selected render-lane hint signature, progressive presentation binding generation, and visualization adapter binding revision changes invalidate matching same-entity cache entries.
 - [x] Add contract tests proving cache-hit selected frames do not rebuild property catalogs, do not call full vertex-channel resolvers, and do not allocate geometry-sized scratch buffers.
 - [x] Add contract tests proving cache-hit selected frames perform zero UV texcoord finite-check scans and zero texture-bake source-row enumeration.
 - [x] Add contract/integration tests proving scalar visualization adapters and render extraction report exact scalar value-scan counts for scalar and isoline paths.
@@ -116,15 +116,16 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'Sa
   selection controller's selected-set generation, the engine-owned
   refined-primitive generation for primitive-sensitive selected analysis, a
   runtime-computed metadata signature over selected geometry source/property
-  descriptors, and the runtime-owned progressive presentation binding
-  generation for selected inspector analysis; the visualization model cache key
-  also includes the runtime-owned visualization adapter binding revision.
+  descriptors, a selected render-lane hint signature for bound-state rows, and
+  the runtime-owned progressive presentation binding generation for selected
+  inspector analysis; the visualization model cache key also includes the
+  runtime-owned visualization adapter binding revision.
   Cache-hit/invalidation tests prove the cached frames skip the heavy
   selected-model builders listed above while same-entity reselection and
   same-entity primitive refinement, source/property metadata mutation,
-  progressive presentation binding mutation, or visualization adapter binding
-  mutation invalidate stale entries. Full generation stamps for source/property
-  values and remaining non-vertex binding revisions,
+  direct render-lane hint mutation, progressive presentation binding mutation,
+  or visualization adapter binding mutation invalidate stale entries. Full
+  generation stamps for source/property values and remaining non-vertex binding revisions,
   full timing/remaining selected-analysis scanned-element counters, async analysis jobs, bounded apply,
   selected-frame timing/copy diagnostics, and Vulkan responsiveness smoke remain
   open; this task is not ready to retire.
