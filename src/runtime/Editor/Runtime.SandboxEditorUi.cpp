@@ -4323,6 +4323,86 @@ namespace Extrinsic::Runtime
             return signature;
         }
 
+        void AppendVec4Signature(std::uint64_t& signature,
+                                 const glm::vec4& value) noexcept
+        {
+            MixSignatureFloat(signature, value.x);
+            MixSignatureFloat(signature, value.y);
+            MixSignatureFloat(signature, value.z);
+            MixSignatureFloat(signature, value.w);
+        }
+
+        void AppendVisualizationConfigSignature(
+            std::uint64_t& signature,
+            const std::optional<G::VisualizationConfig>& config)
+        {
+            if (!config.has_value())
+            {
+                MixSignature(signature, 0u);
+                return;
+            }
+
+            MixSignature(signature, 1u);
+            MixSignature(signature,
+                         static_cast<std::uint64_t>(config->Source));
+            AppendVec4Signature(signature, config->Color);
+            MixSignatureString(signature, config->ScalarFieldName);
+            MixSignature(signature,
+                         static_cast<std::uint64_t>(config->Scalar.Map));
+            MixSignature(signature,
+                         static_cast<std::uint64_t>(config->ScalarDomain));
+            MixSignatureString(signature, config->ColorBufferName);
+            MixSignature(signature, config->Scalar.AutoRange ? 1u : 0u);
+            MixSignatureFloat(signature, config->Scalar.RangeMin);
+            MixSignatureFloat(signature, config->Scalar.RangeMax);
+            MixSignature(signature,
+                         static_cast<std::uint64_t>(config->Scalar.BinCount));
+            MixSignature(signature,
+                         static_cast<std::uint64_t>(
+                             config->Scalar.Isolines.Num));
+            AppendVec4Signature(signature, config->Scalar.Isolines.Color);
+            MixSignatureFloat(signature, config->Scalar.Isolines.Width);
+        }
+
+        void AppendSpatialDebugBindingSignature(
+            std::uint64_t& signature,
+            const ECSC::SpatialDebugBinding* binding) noexcept
+        {
+            if (binding == nullptr)
+            {
+                MixSignature(signature, 0u);
+                return;
+            }
+
+            MixSignature(signature, 1u);
+            MixSignature(signature,
+                         static_cast<std::uint64_t>(binding->Kind));
+            MixSignature(signature, binding->RegistryKey);
+            MixSignature(signature, binding->LeafOnly ? 1u : 0u);
+            MixSignature(signature, binding->OccupancyOnly ? 1u : 0u);
+            MixSignature(signature,
+                         static_cast<std::uint64_t>(binding->MaxDepth));
+        }
+
+        [[nodiscard]] std::uint64_t VisualizationStateSignatureForEntity(
+            const entt::registry& raw,
+            const ECS::EntityHandle entity,
+            const SandboxEditorSelectedModelCacheSection section,
+            const SandboxEditorVisualizationTarget target)
+        {
+            if (section != SandboxEditorSelectedModelCacheSection::Visualization)
+                return 0u;
+
+            std::uint64_t signature = kSandboxEditorSignatureOffset;
+            AppendSpatialDebugBindingSignature(
+                signature,
+                raw.try_get<ECSC::SpatialDebugBinding>(entity));
+            AppendVisualizationConfigSignature(
+                signature,
+                EffectiveVisualizationConfigForTarget(raw, entity, target));
+            return signature;
+        }
+
         void AppendPropertySetMetadataSignature(
             std::uint64_t& signature,
             const std::uint64_t domainTag,
@@ -4438,6 +4518,12 @@ namespace Extrinsic::Runtime
                     GeometryMetadataSignatureForEntity(raw, entity),
                 .RenderHintSignature =
                     RenderHintSignatureForEntity(raw, entity, section),
+                .VisualizationStateSignature =
+                    VisualizationStateSignatureForEntity(
+                        raw,
+                        entity,
+                        section,
+                        visualizationTarget),
                 .BindingGeneration = VertexBindingGenerationForEntity(raw, entity),
                 .ProgressiveBindingGeneration =
                     ProgressiveBindingGenerationForEntity(raw, entity, section),

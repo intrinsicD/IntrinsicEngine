@@ -2543,6 +2543,211 @@ TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnGeometryMetadataSignat
     EXPECT_EQ(cacheStats.Entries, 1u);
 }
 
+TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnConfigSignature)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    Runtime::SandboxEditorSelectedModelCache cache{};
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.SelectedModelCache = &cache;
+    context.VisualizationCommandsAvailable = true;
+
+    const Runtime::SandboxEditorPanelFrame first =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyVisualizationModelBuildRequest());
+    ASSERT_TRUE(first.Visualization.HasSelectedEntity);
+    EXPECT_FALSE(first.Visualization.Visualization.HasConfig);
+    EXPECT_EQ(first.ModelBuildStats.VisualizationModelCacheMisses, 1u);
+    EXPECT_EQ(first.ModelBuildStats.VisualizationModelBuilds, 1u);
+
+    const Runtime::SandboxEditorPanelFrame cached =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyVisualizationModelBuildRequest());
+    ASSERT_TRUE(cached.Visualization.HasSelectedEntity);
+    EXPECT_EQ(cached.ModelBuildStats.VisualizationModelCacheHits, 1u);
+    EXPECT_EQ(cached.ModelBuildStats.VisualizationModelBuilds, 0u);
+
+    G::VisualizationConfig config{};
+    config.Source = G::VisualizationConfig::ColorSource::UniformColor;
+    config.Color = glm::vec4{0.125f, 0.5f, 0.875f, 1.0f};
+    config.ScalarFieldName = "curvature";
+    config.ScalarDomain = G::VisualizationConfig::Domain::Face;
+    config.Scalar.AutoRange = false;
+    config.Scalar.RangeMin = -1.0f;
+    config.Scalar.RangeMax = 2.0f;
+    config.Scalar.BinCount = 7u;
+    config.Scalar.Isolines.Num = 5u;
+    config.Scalar.Isolines.Width = 2.25f;
+    registry.Raw().emplace_or_replace<G::VisualizationConfig>(mesh, config);
+
+    const Runtime::SandboxEditorPanelFrame changed =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyVisualizationModelBuildRequest());
+    ASSERT_TRUE(changed.Visualization.HasSelectedEntity);
+    EXPECT_EQ(changed.ModelBuildStats.VisualizationModelCacheMisses, 1u);
+    EXPECT_EQ(changed.ModelBuildStats.VisualizationModelCacheHits, 0u);
+    EXPECT_EQ(changed.ModelBuildStats.VisualizationModelBuilds, 1u);
+    ASSERT_TRUE(changed.Visualization.Visualization.HasConfig);
+    EXPECT_EQ(changed.Visualization.Visualization.Source,
+              G::VisualizationConfig::ColorSource::UniformColor);
+    EXPECT_FLOAT_EQ(changed.Visualization.Visualization.Color.x, 0.125f);
+    EXPECT_FLOAT_EQ(changed.Visualization.Visualization.Color.y, 0.5f);
+    EXPECT_FLOAT_EQ(changed.Visualization.Visualization.Color.z, 0.875f);
+    EXPECT_EQ(changed.Visualization.Visualization.ScalarFieldName,
+              "curvature");
+    EXPECT_EQ(changed.Visualization.Visualization.ScalarDomain,
+              G::VisualizationConfig::Domain::Face);
+    EXPECT_FALSE(changed.Visualization.Visualization.ScalarAutoRange);
+    EXPECT_FLOAT_EQ(changed.Visualization.Visualization.ScalarRangeMin,
+                    -1.0f);
+    EXPECT_FLOAT_EQ(changed.Visualization.Visualization.ScalarRangeMax,
+                    2.0f);
+    EXPECT_EQ(changed.Visualization.Visualization.ScalarBinCount, 7u);
+    EXPECT_EQ(changed.Visualization.Visualization.IsolineCount, 5u);
+
+    const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
+        cache.Stats();
+    EXPECT_EQ(cacheStats.VisualizationModelCacheMisses, 2u);
+    EXPECT_EQ(cacheStats.VisualizationModelCacheHits, 1u);
+    EXPECT_EQ(cacheStats.Entries, 1u);
+}
+
+TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnLaneOverrideSignature)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    registry.Raw().emplace<G::RenderSurface>(mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    Runtime::SandboxEditorSelectedModelCache cache{};
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.SelectedModelCache = &cache;
+    context.VisualizationCommandsAvailable = true;
+
+    const Runtime::SandboxEditorDomainWindowModel first =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    ASSERT_TRUE(first.HasSelectedEntity);
+    EXPECT_EQ(first.Visualization.Target,
+              Runtime::SandboxEditorVisualizationTarget::Surface);
+    EXPECT_FALSE(first.Visualization.Visualization.HasConfig);
+
+    Runtime::SandboxEditorSelectedModelCacheStats cacheStats = cache.Stats();
+    EXPECT_EQ(cacheStats.VisualizationModelCacheMisses, 1u);
+    EXPECT_EQ(cacheStats.VisualizationModelCacheHits, 0u);
+
+    const Runtime::SandboxEditorDomainWindowModel cached =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    ASSERT_TRUE(cached.HasSelectedEntity);
+    EXPECT_FALSE(cached.Visualization.Visualization.HasConfig);
+    cacheStats = cache.Stats();
+    EXPECT_EQ(cacheStats.VisualizationModelCacheMisses, 1u);
+    EXPECT_EQ(cacheStats.VisualizationModelCacheHits, 1u);
+
+    G::VisualizationConfig surfaceConfig{};
+    surfaceConfig.Source = G::VisualizationConfig::ColorSource::UniformColor;
+    surfaceConfig.Color = glm::vec4{0.25f, 0.5f, 0.75f, 1.0f};
+    G::VisualizationLaneOverrides overrides{};
+    overrides.Surface = surfaceConfig;
+    registry.Raw().emplace_or_replace<G::VisualizationLaneOverrides>(
+        mesh,
+        overrides);
+
+    const Runtime::SandboxEditorDomainWindowModel changed =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    ASSERT_TRUE(changed.HasSelectedEntity);
+    ASSERT_TRUE(changed.Visualization.Visualization.HasConfig);
+    EXPECT_EQ(changed.Visualization.Visualization.Source,
+              G::VisualizationConfig::ColorSource::UniformColor);
+    EXPECT_FLOAT_EQ(changed.Visualization.Visualization.Color.x, 0.25f);
+    EXPECT_FLOAT_EQ(changed.Visualization.Visualization.Color.y, 0.5f);
+    EXPECT_FLOAT_EQ(changed.Visualization.Visualization.Color.z, 0.75f);
+
+    cacheStats = cache.Stats();
+    EXPECT_EQ(cacheStats.VisualizationModelCacheMisses, 2u);
+    EXPECT_EQ(cacheStats.VisualizationModelCacheHits, 1u);
+}
+
+TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnSpatialDebugSignature)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    Runtime::SandboxEditorSelectedModelCache cache{};
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.SelectedModelCache = &cache;
+    context.VisualizationCommandsAvailable = true;
+
+    const Runtime::SandboxEditorPanelFrame first =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyVisualizationModelBuildRequest());
+    ASSERT_TRUE(first.Visualization.HasSelectedEntity);
+    EXPECT_FALSE(first.Visualization.SpatialDebug.HasBinding);
+    EXPECT_EQ(first.ModelBuildStats.VisualizationModelCacheMisses, 1u);
+    EXPECT_EQ(first.ModelBuildStats.VisualizationModelBuilds, 1u);
+
+    const Runtime::SandboxEditorPanelFrame cached =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyVisualizationModelBuildRequest());
+    ASSERT_TRUE(cached.Visualization.HasSelectedEntity);
+    EXPECT_EQ(cached.ModelBuildStats.VisualizationModelCacheHits, 1u);
+    EXPECT_EQ(cached.ModelBuildStats.VisualizationModelBuilds, 0u);
+
+    registry.Raw().emplace_or_replace<ECSC::SpatialDebugBinding>(
+        mesh,
+        ECSC::SpatialDebugBinding{
+            .Kind = ECSC::SpatialDebugGeometryKind::Octree,
+            .RegistryKey = 0xBEEFu,
+            .LeafOnly = true,
+            .OccupancyOnly = true,
+            .MaxDepth = 12u,
+        });
+
+    const Runtime::SandboxEditorPanelFrame changed =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyVisualizationModelBuildRequest());
+    ASSERT_TRUE(changed.Visualization.HasSelectedEntity);
+    EXPECT_EQ(changed.ModelBuildStats.VisualizationModelCacheMisses, 1u);
+    EXPECT_EQ(changed.ModelBuildStats.VisualizationModelCacheHits, 0u);
+    EXPECT_EQ(changed.ModelBuildStats.VisualizationModelBuilds, 1u);
+    ASSERT_TRUE(changed.Visualization.SpatialDebug.HasBinding);
+    EXPECT_EQ(changed.Visualization.SpatialDebug.Kind,
+              ECSC::SpatialDebugGeometryKind::Octree);
+    EXPECT_EQ(changed.Visualization.SpatialDebug.RegistryKey, 0xBEEFu);
+    EXPECT_TRUE(changed.Visualization.SpatialDebug.LeafOnly);
+    EXPECT_TRUE(changed.Visualization.SpatialDebug.OccupancyOnly);
+    EXPECT_EQ(changed.Visualization.SpatialDebug.MaxDepth, 12u);
+
+    const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
+        cache.Stats();
+    EXPECT_EQ(cacheStats.VisualizationModelCacheMisses, 2u);
+    EXPECT_EQ(cacheStats.VisualizationModelCacheHits, 1u);
+    EXPECT_EQ(cacheStats.Entries, 1u);
+}
+
 TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnAdapterBindingRevision)
 {
     using Binding = Runtime::RenderExtractionCache::VisualizationAdapterBinding;

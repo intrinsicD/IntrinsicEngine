@@ -2087,6 +2087,7 @@ export namespace Extrinsic::Runtime
         std::size_t NodeCount{0u};
         std::uint64_t GeometryMetadataSignature{0u};
         std::uint64_t RenderHintSignature{0u};
+        std::uint64_t VisualizationStateSignature{0u};
         std::uint64_t BindingGeneration{0u};
         std::uint64_t ProgressiveBindingGeneration{0u};
         std::uint64_t CommandHistoryRevision{0u};
