@@ -5,6 +5,31 @@ depends_on: []
 ---
 # RUNTIME-141 — Async editor method-command lane (no heavy compute in the ImGui callback)
 
+## Status
+- Active on 2026-07-05; Slice A is implemented and verified. The parent task
+  remains active for the remaining heavyweight editor method conversions.
+- This task is intentionally sliced because it spans the shared runtime job
+  lane plus several method-specific snapshot/apply conversions.
+- Remaining open slices: Progressive Poisson CPU sampling, mesh
+  denoise/remesh/simplify, registration alignment, and the final heavy-button
+  inventory/state classification.
+
+## Slice plan
+- **Slice A (this slice).** Wire an engine-owned `DerivedJobRegistry` beside
+  `StreamingExecutor`, expose a sandbox editor derived-job submission surface,
+  and convert the CPU K-Means button path to queue a worker job from copied
+  point data with main-thread publication. Tests prove the ImGui command
+  returns `Pending` before the worker body runs, the result applies later, and
+  stale targets are discarded before mutation. Defers Progressive Poisson,
+  denoise/remesh/simplify, and registration conversions to later slices.
+- **Slice B.** Convert Progressive Poisson CPU sampling, including mesh-surface
+  sampling, to the shared editor method job lane.
+- **Slice C.** Convert mesh denoise/remesh/simplify command handlers to the
+  shared lane with copied mesh snapshots and generation/stale guards.
+- **Slice D.** Convert registration alignment and any remaining heavyweight
+  method buttons; update the inventory classification so every heavy button is
+  either queued or documented as lightweight/immediate.
+
 ## Goal
 - Editor-triggered heavy action buttons and method runs (CPU K-Means,
   Progressive Poisson, denoise, remesh, simplify, registration, and similar
@@ -61,9 +86,9 @@ depends_on: []
       `StreamingExecutor`/`DerivedJobRegistry`: snapshot inputs on the main
       thread, run compute on the worker lane, apply results on the main
       thread with generation checks and bounded per-frame apply budget.
-- [ ] Make converted button handlers return a queued/pending status and job id
+- [x] Make converted button handlers return a queued/pending status and job id
       or diagnostics immediately, without executing the heavy body inline.
-- [ ] Convert the CPU K-Means editor command to the helper (parity with the
+- [x] Convert the CPU K-Means editor command to the helper (parity with the
       existing GPU-queue UX: same published label/color properties).
 - [ ] Convert Progressive Poisson CPU runs to the helper.
 - [ ] Convert denoise/remesh/simplify (and registration alignment) commands
@@ -73,21 +98,21 @@ depends_on: []
       (document choice per panel).
 
 ## Tests
-- [ ] Contract: a representative converted UI button creates a pending job and
+- [x] Contract: a representative converted UI button creates a pending job and
       returns before the heavy compute body runs.
-- [ ] Contract: a submitted method job runs off the main thread, applies its
+- [x] Contract: a submitted method job runs off the main thread, applies its
       result on a later frame, and the applied output equals the previous
       synchronous output for a fixed seed/scene (per converted command).
-- [ ] Contract: a stale job (scene/geometry generation changed mid-run) is
+- [x] Contract: a stale job (scene/geometry generation changed mid-run) is
       discarded without mutating state.
 - [ ] Contract: the ImGui editor callback duration stays bounded while a
       heavy job runs (timing probe with a deliberately slow job).
 - [ ] Contract: render extraction/prepare can advance while an editor method
       job is pending.
-- [ ] Existing method/editor command suites stay green.
+- [x] Existing method/editor command suites stay green.
 
 ## Docs
-- [ ] Update `src/runtime/README.md` editor-command execution model.
+- [x] Update `src/runtime/README.md` editor-command execution model.
 
 ## Acceptance criteria
 - [ ] Heavy editor UI buttons create runtime jobs/tasks instead of executing
@@ -107,6 +132,26 @@ cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi|EditorMethodJob|DerivedJob|StreamingExecutor' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/agents/check_task_policy.py --root . --strict
+```
+
+Slice A verification completed on 2026-07-05:
+
+```bash
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='RuntimeDerivedJobEngineWiring.RunFrameAppliesSubmittedDerivedJob:RuntimeEngineLayering.StreamingHookAppliesMainThreadResultsWithFrameBudget:SandboxEditorUi.KMeansCpuRequestQueuesDerivedJobAndPublishesOnApply:SandboxEditorUi.KMeansCpuDerivedJobDiscardsStaleTargetBeforeApply:SandboxEditorUi.KMeansVulkanRequestQueuesGpuJobWhenSurfaceAccepts:SandboxEditorUi.KMeansVulkanRequestFallsBackToCpuReference:SandboxEditorUi.KMeansCommandPublishesMeshGraphAndPointCloudProperties'
+ctest --test-dir build/ci --output-on-failure -R 'RuntimeEngineLayering' --timeout 120
+ctest --test-dir build/ci --output-on-failure -R 'RuntimeEngineLayering|RuntimeDerivedJobEngineWiring|SandboxEditorUi|DerivedJob|StreamingExecutor|RuntimeSceneLifecycle' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+python3 tools/agents/validate_tasks.py --root tasks --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/repo/check_pr_contract.py
+git diff --check
+python3 tools/repo/check_root_hygiene.py --root .
 ```
 
 ## Forbidden changes

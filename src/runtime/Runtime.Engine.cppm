@@ -30,6 +30,7 @@ import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
+import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.ImGuiAdapter;
@@ -558,6 +559,9 @@ namespace Extrinsic::Runtime
             RuntimeKMeansGpuJobRequest request);
         [[nodiscard]] std::optional<RuntimeKMeansGpuJobResult>
             ConsumeCompletedKMeansGpuJob();
+        [[nodiscard]] DerivedJobHandle SubmitDerivedJob(DerivedJobDesc desc);
+        void CancelDerivedJob(DerivedJobHandle handle);
+        [[nodiscard]] DerivedJobQueueSnapshot GetDerivedJobQueueSnapshot() const;
 
         // ── RUNTIME-090 Slice B — Dear ImGui editor hook ──────────────────
         // Registers the per-frame editor callback invoked between the
@@ -676,6 +680,9 @@ namespace Extrinsic::Runtime
         std::unique_ptr<Core::FrameGraph>      m_FrameGraph;
         // Persistent streaming executor — cross-frame background work
         std::unique_ptr<StreamingExecutor>      m_StreamingExecutor;
+        // Runtime/editor derived jobs — submitted through the streaming
+        // executor and applied on the maintenance lane.
+        std::unique_ptr<DerivedJobRegistry>     m_DerivedJobRegistry;
         // Asset service — CPU payload authority
         std::unique_ptr<Assets::AssetService>  m_AssetService;
         // GPU-side asset cache — bridges AssetId to refcounted GPU resources.

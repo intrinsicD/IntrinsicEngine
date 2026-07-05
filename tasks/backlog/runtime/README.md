@@ -16,7 +16,8 @@ Blocking fixes first, then abstractness seams, then steady-state efficiency:
 - [`RUNTIME-140`](../../done/RUNTIME-140-remove-global-waitforall-from-import-apply.md)
   is retired; runtime import apply now uses per-asset completion and event
   flushes instead of a global `Scheduler::WaitForAll()` barrier.
-- [`RUNTIME-141`](RUNTIME-141-async-editor-method-command-lane.md) — async
+- [`RUNTIME-141`](../../active/RUNTIME-141-async-editor-method-command-lane.md)
+  is active — async
   editor method-command lane; no heavy solves inside the ImGui callback
   (GPU readback leg stays with `RUNTIME-137`/`METHOD-014`; selected-entity
   models stay with `RUNTIME-138`).

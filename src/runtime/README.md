@@ -67,6 +67,21 @@ wait is reserved for shutdown and explicit non-frame joins. Unrelated scheduler
 work must be allowed to continue while the current import result is
 materialized or reported.
 
+### Sandbox Editor Async Method Jobs
+
+Editor buttons that run heavyweight geometry or method work must submit copied
+main-thread input snapshots through the runtime-owned `DerivedJobRegistry`
+beside `StreamingExecutor`, then return a pending result to the ImGui frame.
+Workers never access live ECS or renderer state. The frame maintenance lane
+drains completed jobs with the same bounded apply budget as other streaming
+work, revalidates the selected target before mutation, and publishes results
+only from the main-thread apply callback.
+
+`RUNTIME-141` Slice A applies this model to the CPU K-Means path while preserving
+the existing immediate fallback for tests and callers without an engine job
+surface. Progressive Poisson, mesh processing commands, and registration remain
+owned by later `RUNTIME-141` slices.
+
 ### Sandbox Editor Startup Layout
 
 `UI-018` makes `Extrinsic.Runtime.SandboxEditorUi` menu-first on startup. The

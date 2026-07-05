@@ -7,6 +7,7 @@ module;
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -30,6 +31,7 @@ import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
+import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Component.MetaData;
@@ -5057,6 +5059,100 @@ namespace Extrinsic::Runtime
             return result;
         }
 
+        [[nodiscard]] ProgressiveGeometryDomain ToKMeansDerivedJobDomain(
+            const SandboxEditorGeometryProcessingDomain domain) noexcept
+        {
+            switch (domain)
+            {
+            case SandboxEditorGeometryProcessingDomain::MeshVertices:
+                return ProgressiveGeometryDomain::MeshVertex;
+            case SandboxEditorGeometryProcessingDomain::GraphVertices:
+                return ProgressiveGeometryDomain::GraphVertex;
+            case SandboxEditorGeometryProcessingDomain::PointCloudPoints:
+                return ProgressiveGeometryDomain::Point;
+            case SandboxEditorGeometryProcessingDomain::None:
+            case SandboxEditorGeometryProcessingDomain::MeshEdges:
+            case SandboxEditorGeometryProcessingDomain::MeshHalfedges:
+            case SandboxEditorGeometryProcessingDomain::MeshFaces:
+            case SandboxEditorGeometryProcessingDomain::GraphEdges:
+            case SandboxEditorGeometryProcessingDomain::GraphHalfedges:
+                return ProgressiveGeometryDomain::Unknown;
+            }
+            return ProgressiveGeometryDomain::Unknown;
+        }
+
+        [[nodiscard]] ProgressiveSlotSemantic ToKMeansDerivedJobSemantic(
+            const SandboxEditorGeometryProcessingDomain domain) noexcept
+        {
+            return domain == SandboxEditorGeometryProcessingDomain::PointCloudPoints
+                ? ProgressiveSlotSemantic::PointColor
+                : ProgressiveSlotSemantic::Albedo;
+        }
+
+        [[nodiscard]] bool SameKMeansInputPositions(
+            const std::vector<glm::vec3>& lhs,
+            const std::vector<glm::vec3>& rhs) noexcept
+        {
+            if (lhs.size() != rhs.size())
+                return false;
+            for (std::size_t i = 0u; i < lhs.size(); ++i)
+            {
+                if (lhs[i].x != rhs[i].x ||
+                    lhs[i].y != rhs[i].y ||
+                    lhs[i].z != rhs[i].z)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        [[nodiscard]] DerivedJobApplyValidation ValidateKMeansCpuJobApply(
+            const SandboxEditorContext& context,
+            const SandboxEditorKMeansCommand& command,
+            const std::vector<glm::vec3>& points)
+        {
+            if (context.Scene == nullptr)
+                return DerivedJobApplyValidation::MissingEntity;
+
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, command.StableEntityId);
+            if (!entity.has_value())
+                return DerivedJobApplyValidation::MissingEntity;
+
+            GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
+            if (!view.Valid() ||
+                !SourceViewSupportsKMeansDomain(view, command.Domain))
+            {
+                return DerivedJobApplyValidation::StaleGeometryGeneration;
+            }
+
+            Geometry::PropertySet* properties =
+                KMeansTargetProperties(view, command.Domain);
+            if (properties == nullptr)
+                return DerivedJobApplyValidation::StaleGeometryGeneration;
+
+            std::optional<std::vector<glm::vec3>> current =
+                CollectKMeansPositions(*properties);
+            if (!current.has_value() ||
+                !SameKMeansInputPositions(*current, points))
+            {
+                return DerivedJobApplyValidation::StaleSourcePropertyGeneration;
+            }
+
+            return DerivedJobApplyValidation::Current;
+        }
+
+        struct SandboxEditorKMeansCpuJobState
+        {
+            SandboxEditorKMeansCommand Command{};
+            std::vector<glm::vec3> Points{};
+            GK::KMeansParams Params{};
+            std::string BackendFallbackReason{};
+            std::optional<GK::KMeansResult> Clustered{};
+        };
+
         [[nodiscard]] SandboxEditorKMeansResult MakeCompletedKMeansResult(
             const SandboxEditorGeometryProcessingDomain domain,
             const GK::KMeansResult& clustered)
@@ -5168,6 +5264,176 @@ namespace Extrinsic::Runtime
             if (context.CommandHistory != nullptr)
                 (void)context.CommandHistory->MarkDirty("Run K-Means");
             return result;
+        }
+
+        [[nodiscard]] SandboxEditorKMeansResult MakePendingKMeansCpuJobResult(
+            const SandboxEditorKMeansCommand& command,
+            const DerivedJobHandle handle,
+            const std::uint32_t pointCount)
+        {
+            const SandboxEditorKMeansBackend actual =
+                SandboxEditorKMeansBackend::CpuReference;
+            SandboxEditorKMeansResult result{
+                .Status = SandboxEditorCommandStatus::Pending,
+                .Domain = command.Domain,
+                .LabelCount = pointCount,
+                .ClusterCount = std::min(command.ClusterCount, pointCount),
+                .RequestedBackend = command.Backend,
+                .ActualBackend = actual,
+                .RequestedBackendId = KMeansBackendId(command.Backend),
+                .RequestedBackendDisplayName =
+                    KMeansBackendDisplayName(command.Backend),
+                .BackendId = KMeansBackendId(actual),
+                .BackendDisplayName = KMeansBackendDisplayName(actual),
+                .FellBackToCpu =
+                    command.Backend ==
+                    SandboxEditorKMeansBackend::VulkanCompute,
+                .Error = Core::ErrorCode::Success,
+            };
+            result.Message = "K-Means CPU job queued";
+            if (handle.IsValid())
+            {
+                result.Message += " (job ";
+                result.Message += std::to_string(handle.Index);
+                result.Message += ":";
+                result.Message += std::to_string(handle.Generation);
+                result.Message += ")";
+            }
+            result.Message += ".";
+            return result;
+        }
+
+        [[nodiscard]] Core::Result PublishCompletedKMeansCpuJob(
+            const SandboxEditorContext& context,
+            const SandboxEditorKMeansCpuJobState& job)
+        {
+            if (!job.Clustered.has_value())
+                return Core::Err(Core::ErrorCode::Unknown);
+            if (context.Scene == nullptr)
+                return Core::Err(Core::ErrorCode::InvalidState);
+
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, job.Command.StableEntityId);
+            if (!entity.has_value())
+                return Core::Err(Core::ErrorCode::ResourceNotFound);
+
+            GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
+            if (!view.Valid() ||
+                !SourceViewSupportsKMeansDomain(view, job.Command.Domain))
+            {
+                return Core::Err(Core::ErrorCode::InvalidArgument);
+            }
+
+            Geometry::PropertySet* properties =
+                KMeansTargetProperties(view, job.Command.Domain);
+            if (properties == nullptr)
+                return Core::Err(Core::ErrorCode::InvalidArgument);
+
+            if (!PublishKMeansProperties(
+                    *properties,
+                    job.Command.Domain,
+                    *job.Clustered))
+            {
+                return Core::Err(Core::ErrorCode::TypeMismatch);
+            }
+
+            Dirty::MarkVertexAttributesDirty(raw, *entity);
+            SandboxEditorKMeansResult result =
+                MakeCompletedKMeansResult(job.Command.Domain, *job.Clustered);
+            result.BackendFallbackReason = job.BackendFallbackReason;
+            result.Message =
+                BuildKMeansSuccessMessage(job.Command.Domain, result);
+            if (context.CommandHistory != nullptr)
+                (void)context.CommandHistory->MarkDirty("Run K-Means");
+            InvalidateSelectedModelCache(context);
+            if (context.MethodResultSinks.KMeans)
+                context.MethodResultSinks.KMeans(std::move(result));
+            return Core::Ok();
+        }
+
+        [[nodiscard]] SandboxEditorKMeansResult SubmitKMeansCpuDerivedJob(
+            const SandboxEditorContext& context,
+            const SandboxEditorKMeansCommand& command,
+            std::vector<glm::vec3> points,
+            GK::KMeansParams params,
+            std::string backendFallbackReason)
+        {
+            auto state = std::make_shared<SandboxEditorKMeansCpuJobState>();
+            state->Command = command;
+            state->Points = std::move(points);
+            state->Params = params;
+            state->BackendFallbackReason = std::move(backendFallbackReason);
+
+            const std::uint32_t pointCount =
+                static_cast<std::uint32_t>(state->Points.size());
+            DerivedJobDesc desc{
+                .Key = DerivedJobKey{
+                    .EntityId = command.StableEntityId,
+                    .Domain = ToKMeansDerivedJobDomain(command.Domain),
+                    .OutputSemantic = ToKMeansDerivedJobSemantic(command.Domain),
+                    .OutputName = "kmeans_label",
+                },
+                .Name = "Sandbox.KMeans.CPU",
+                .RequestedJobDomain = ProgressiveJobDomain::Cpu,
+                .Kind = Core::Dag::TaskKind::GeometryProcess,
+                .Priority = Core::Dag::TaskPriority::Normal,
+                .EstimatedCost = std::max<std::uint32_t>(
+                    1u,
+                    static_cast<std::uint32_t>(
+                        (state->Points.size() + 1023u) / 1024u)),
+                .Execute =
+                    [state]() -> DerivedJobWorkerResult
+                    {
+                        std::optional<GK::KMeansResult> clustered =
+                            RunKMeansForSandbox(
+                                std::span<const glm::vec3>{
+                                    state->Points.data(),
+                                    state->Points.size()},
+                                state->Params,
+                                nullptr);
+                        if (!clustered.has_value())
+                            return std::unexpected(Core::ErrorCode::Unknown);
+
+                        state->Clustered = std::move(*clustered);
+                        return DerivedJobOutput{
+                            .PayloadToken = 0u,
+                            .NormalizedProgress = 1.0f,
+                            .ProgressDeterminate = true,
+                            .Diagnostic = "K-Means CPU result ready",
+                        };
+                    },
+                .ValidateOnMainThread =
+                    [context, state]()
+                    {
+                        return ValidateKMeansCpuJobApply(
+                            context,
+                            state->Command,
+                            state->Points);
+                    },
+                .ApplyOnMainThread =
+                    [context, state](DerivedJobApplyContext&) -> Core::Result
+                    {
+                        return PublishCompletedKMeansCpuJob(context, *state);
+                    },
+            };
+
+            const DerivedJobHandle handle =
+                context.DerivedJobCommands.Submit(std::move(desc));
+            if (!handle.IsValid())
+            {
+                return MakeKMeansResult(
+                    SandboxEditorCommandStatus::GeometryProcessingFailed,
+                    command.Domain,
+                    command.Backend,
+                    Core::ErrorCode::InvalidState,
+                    "K-Means CPU job submission was rejected by the runtime job lane.");
+            }
+
+            SandboxEditorKMeansResult pending =
+                MakePendingKMeansCpuJobResult(command, handle, pointCount);
+            pending.BackendFallbackReason = state->BackendFallbackReason;
+            return pending;
         }
 
         [[nodiscard]] std::string BuildKMeansFallbackReason(
@@ -8304,6 +8570,18 @@ namespace Extrinsic::Runtime
                         [&engine]()
                         {
                             return engine.ConsumeCompletedKMeansGpuJob();
+                        },
+                },
+                .DerivedJobCommands = SandboxEditorDerivedJobCommandSurface{
+                    .Submit =
+                        [&engine](DerivedJobDesc desc)
+                        {
+                            return engine.SubmitDerivedJob(std::move(desc));
+                        },
+                    .Cancel =
+                        [&engine](const DerivedJobHandle handle)
+                        {
+                            engine.CancelDerivedJob(handle);
                         },
                 },
                 .AssetImportQueue = engine.GetAssetImportQueueSnapshot(),
@@ -17086,6 +17364,16 @@ namespace Extrinsic::Runtime
                 : submission.Diagnostic + " Ran CPU reference.";
         }
 
+        if (context.DerivedJobCommands.Available())
+        {
+            return SubmitKMeansCpuDerivedJob(
+                context,
+                command,
+                std::move(*points),
+                params,
+                std::move(gpuQueueFallbackReason));
+        }
+
         const std::optional<GK::KMeansResult> clustered =
             RunKMeansForSandbox(
                 std::span<const glm::vec3>{points->data(), points->size()},
@@ -19097,6 +19385,8 @@ namespace Extrinsic::Runtime
 
     SandboxEditorUi::~SandboxEditorUi()
     {
+        if (m_ResultSinksAlive)
+            *m_ResultSinksAlive = false;
         Detach();
     }
 
@@ -19129,6 +19419,16 @@ namespace Extrinsic::Runtime
                             PublishCompletedKMeansGpuJob(context, *completed);
                     }
                 }
+                m_DerivedJobSnapshot =
+                    m_Engine->GetDerivedJobQueueSnapshot();
+                context.DerivedJobs = &m_DerivedJobSnapshot;
+                context.MethodResultSinks.KMeans =
+                    [alive = m_ResultSinksAlive, this](
+                        SandboxEditorKMeansResult result)
+                    {
+                        if (alive && *alive)
+                            m_LastKMeansResult = std::move(result);
+                    };
                 context.PendingAssetImportPath =
                     std::string(m_ImportPathBuffer.data());
                 context.PendingAssetImportPayloadKind =

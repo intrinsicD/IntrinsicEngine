@@ -4,6 +4,7 @@ module;
 #include <cstdint>
 #include <array>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -1900,6 +1901,22 @@ export namespace Extrinsic::Runtime
         }
     };
 
+    struct SandboxEditorDerivedJobCommandSurface
+    {
+        std::function<DerivedJobHandle(DerivedJobDesc)> Submit{};
+        std::function<void(DerivedJobHandle)> Cancel{};
+
+        [[nodiscard]] bool Available() const noexcept
+        {
+            return static_cast<bool>(Submit);
+        }
+    };
+
+    struct SandboxEditorMethodResultSinks
+    {
+        std::function<void(SandboxEditorKMeansResult)> KMeans{};
+    };
+
     struct SandboxEditorCameraRenderModel
     {
         bool CameraControlsAvailable{false};
@@ -2229,6 +2246,8 @@ export namespace Extrinsic::Runtime
         SandboxEditorVisualizationAdapterBindingCommandSurface VisualizationAdapterBindings{};
         std::uint64_t VisualizationAdapterBindingRevision{0u};
         SandboxEditorKMeansGpuCommandSurface KMeansGpuCommands{};
+        SandboxEditorDerivedJobCommandSurface DerivedJobCommands{};
+        SandboxEditorMethodResultSinks MethodResultSinks{};
         RuntimeAssetImportQueueSnapshot AssetImportQueue{};
         const DerivedJobQueueSnapshot* DerivedJobs{nullptr};
         std::string PendingAssetImportPath{};
@@ -2733,6 +2752,8 @@ export namespace Extrinsic::Runtime
             m_LastProgressivePoissonConfigResult{};
         std::optional<SandboxEditorRegistrationResult>
             m_LastRegistrationResult{};
+        DerivedJobQueueSnapshot m_DerivedJobSnapshot{};
+        std::shared_ptr<bool> m_ResultSinksAlive{std::make_shared<bool>(true)};
         Graphics::RenderRecipeConfigContext m_RenderRecipeContext{};
         SandboxEditorRenderRecipeEditorState m_RenderRecipeState{};
         RenderArtifactRegistry m_RenderArtifactRegistry{};

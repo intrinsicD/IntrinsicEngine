@@ -180,7 +180,7 @@ unblocks `CORE-005`.
 Open members:
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md`](runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md).
-- [`runtime/RUNTIME-141-async-editor-method-command-lane.md`](runtime/RUNTIME-141-async-editor-method-command-lane.md).
+- [`../active/RUNTIME-141-async-editor-method-command-lane.md`](../active/RUNTIME-141-async-editor-method-command-lane.md).
 - [`runtime/RUNTIME-142-async-modelscene-texture-scenefile-io.md`](runtime/RUNTIME-142-async-modelscene-texture-scenefile-io.md).
 - [`runtime/RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md`](runtime/RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md).
 - [`runtime/RUNTIME-144-post-import-processor-and-ux-policy-seam.md`](runtime/RUNTIME-144-post-import-processor-and-ux-policy-seam.md).

@@ -81,6 +81,7 @@ import Extrinsic.Runtime.SandboxEditorUi;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
+import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Graph.Vertex.Normals;
@@ -3482,6 +3483,157 @@ TEST(SandboxEditorUi, KMeansVulkanRequestQueuesGpuJobWhenSurfaceAccepts)
     EXPECT_FALSE(HasDiagnostic(
         model.Processing.Diagnostics,
         Runtime::SandboxEditorDiagnosticCode::GeometryProcessingFailed));
+}
+
+TEST(SandboxEditorUi, KMeansCpuRequestQueuesDerivedJobAndPublishesOnApply)
+{
+    using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
+
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+    context.DerivedJobCommands.Submit =
+        [&jobs](Runtime::DerivedJobDesc desc)
+        {
+            return jobs.Submit(std::move(desc));
+        };
+    std::optional<Runtime::SandboxEditorKMeansResult> completedResult{};
+    context.MethodResultSinks.KMeans =
+        [&completedResult](Runtime::SandboxEditorKMeansResult result)
+        {
+            completedResult = std::move(result);
+        };
+    context.DerivedJobs = nullptr;
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
+    AddPointCloudSource(registry, cloud, 4u);
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
+                 {
+                     {0.0f, 0.0f, 0.0f},
+                     {0.1f, 0.0f, 0.0f},
+                     {2.0f, 0.0f, 0.0f},
+                     {2.1f, 0.0f, 0.0f},
+                 });
+
+    const Runtime::SandboxEditorKMeansResult result =
+        Runtime::ApplySandboxEditorKMeansCommand(
+            context,
+            Runtime::SandboxEditorKMeansCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(cloud),
+                .Domain = Domain::PointCloudPoints,
+                .ClusterCount = 2u,
+                .MaxIterations = 8u,
+                .Seed = 13u,
+                .Backend =
+                    Runtime::SandboxEditorKMeansBackend::CpuReference,
+            });
+
+    EXPECT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_NE(result.Message.find("queued"), std::string::npos);
+    EXPECT_FALSE(registry.Raw()
+                     .get<GS::Vertices>(cloud)
+                     .Properties.Get<std::uint32_t>("p:kmeans_label"));
+
+    Runtime::DerivedJobQueueSnapshot queued = jobs.SnapshotAll();
+    ASSERT_EQ(queued.Entries.size(), 1u);
+    EXPECT_EQ(queued.Entries[0].Name, "Sandbox.KMeans.CPU");
+    EXPECT_EQ(queued.Entries[0].Status, Runtime::DerivedJobStatus::Queued);
+
+    jobs.Pump(1u);
+    jobs.DrainCompletions();
+    EXPECT_FALSE(registry.Raw()
+                     .get<GS::Vertices>(cloud)
+                     .Properties.Get<std::uint32_t>("p:kmeans_label"));
+
+    Runtime::DerivedJobQueueSnapshot ready = jobs.SnapshotAll();
+    ASSERT_EQ(ready.Entries.size(), 1u);
+    EXPECT_EQ(ready.Entries[0].Status, Runtime::DerivedJobStatus::Applying);
+
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    ASSERT_TRUE(completedResult.has_value());
+    EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
+    EXPECT_EQ(completedResult->LabelCount, 4u);
+    ExpectKMeansVertexProperties(
+        registry.Raw().get<GS::Vertices>(cloud).Properties,
+        4u,
+        true);
+}
+
+TEST(SandboxEditorUi, KMeansCpuDerivedJobDiscardsStaleTargetBeforeApply)
+{
+    using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
+
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+    context.DerivedJobCommands.Submit =
+        [&jobs](Runtime::DerivedJobDesc desc)
+        {
+            return jobs.Submit(std::move(desc));
+        };
+    bool completedSinkCalled = false;
+    context.MethodResultSinks.KMeans =
+        [&completedSinkCalled](Runtime::SandboxEditorKMeansResult)
+        {
+            completedSinkCalled = true;
+        };
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
+    AddPointCloudSource(registry, cloud, 4u);
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
+                 {
+                     {0.0f, 0.0f, 0.0f},
+                     {0.1f, 0.0f, 0.0f},
+                     {2.0f, 0.0f, 0.0f},
+                     {2.1f, 0.0f, 0.0f},
+                 });
+
+    const Runtime::SandboxEditorKMeansResult result =
+        Runtime::ApplySandboxEditorKMeansCommand(
+            context,
+            Runtime::SandboxEditorKMeansCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(cloud),
+                .Domain = Domain::PointCloudPoints,
+                .ClusterCount = 2u,
+                .MaxIterations = 8u,
+                .Seed = 13u,
+                .Backend =
+                    Runtime::SandboxEditorKMeansBackend::CpuReference,
+            });
+    ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
+                 {
+                     {10.0f, 0.0f, 0.0f},
+                     {11.0f, 0.0f, 0.0f},
+                     {12.0f, 0.0f, 0.0f},
+                     {13.0f, 0.0f, 0.0f},
+                 });
+
+    jobs.Pump(1u);
+    jobs.DrainCompletions();
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+
+    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].Status,
+              Runtime::DerivedJobStatus::StaleDiscarded);
+    EXPECT_NE(done.Entries[0].Diagnostic.find(
+                  "StaleSourcePropertyGeneration"),
+              std::string::npos);
+    EXPECT_FALSE(completedSinkCalled);
+    EXPECT_FALSE(registry.Raw()
+                     .get<GS::Vertices>(cloud)
+                     .Properties.Get<std::uint32_t>("p:kmeans_label"));
 }
 
 TEST(SandboxEditorUi, ProgressivePoissonCommandPublishesPointPropertiesAndVisualization)

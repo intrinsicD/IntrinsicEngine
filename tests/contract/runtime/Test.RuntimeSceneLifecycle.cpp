@@ -1,18 +1,26 @@
 #include <cstdint>
+#include <atomic>
 #include <memory>
+#include <utility>
 #include <variant>
 
 #include <gtest/gtest.h>
 
+import Extrinsic.Core.Dag.Scheduler;
+import Extrinsic.Core.Error;
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.Window;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Graphics.Component.RenderGeometry;
+import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
+import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SelectionController;
 
+namespace Core = Extrinsic::Core;
 namespace Runtime = Extrinsic::Runtime;
 namespace ECS = Extrinsic::ECS;
 namespace G = Extrinsic::Graphics::Components;
@@ -29,6 +37,61 @@ namespace
         void OnShutdown(Runtime::Engine&) override {}
     };
 
+    class DerivedJobFrameApplication final : public Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Runtime::Engine& engine) override
+        {
+            Runtime::DerivedJobDesc desc{
+                .Key = Runtime::DerivedJobKey{
+                    .EntityId = 77u,
+                    .Domain = Runtime::ProgressiveGeometryDomain::Point,
+                    .OutputSemantic = Runtime::ProgressiveSlotSemantic::PointColor,
+                    .OutputName = "engine_frame_probe",
+                },
+                .Name = "Engine.Frame.DerivedJob",
+                .Kind = Core::Dag::TaskKind::GeometryProcess,
+                .Priority = Core::Dag::TaskPriority::Normal,
+                .Execute =
+                    [this]() -> Runtime::DerivedJobWorkerResult
+                    {
+                        WorkerRuns.fetch_add(1u, std::memory_order_relaxed);
+                        return Runtime::DerivedJobOutput{
+                            .PayloadToken = 42u,
+                            .NormalizedProgress = 1.0f,
+                            .ProgressDeterminate = true,
+                            .Diagnostic = "ready",
+                        };
+                    },
+                .ApplyOnMainThread =
+                    [this](Runtime::DerivedJobApplyContext& context)
+                        -> Core::Result
+                    {
+                        EXPECT_EQ(context.Output.PayloadToken, 42u);
+                        ApplyRuns.fetch_add(1u, std::memory_order_relaxed);
+                        return Core::Ok();
+                    },
+            };
+            Handle = engine.SubmitDerivedJob(std::move(desc));
+        }
+
+        void OnSimTick(Runtime::Engine&, double) override {}
+
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            ++Frames;
+            if (ApplyRuns.load(std::memory_order_relaxed) > 0u || Frames >= 8u)
+                engine.RequestExit();
+        }
+
+        void OnShutdown(Runtime::Engine&) override {}
+
+        Runtime::DerivedJobHandle Handle{};
+        std::atomic<std::uint32_t> WorkerRuns{0u};
+        std::atomic<std::uint32_t> ApplyRuns{0u};
+        std::uint32_t Frames{0u};
+    };
+
     [[nodiscard]] Extrinsic::Core::Config::EngineConfig HeadlessConfig()
     {
         Extrinsic::Core::Config::EngineConfig config{};
@@ -36,6 +99,37 @@ namespace
         config.Camera.Enabled = false;
         return config;
     }
+
+    [[nodiscard]] Extrinsic::Core::Config::EngineConfig NullWindowHeadlessConfig()
+    {
+        Extrinsic::Core::Config::EngineConfig config = HeadlessConfig();
+        config.Window.Backend = Extrinsic::Core::Config::WindowBackend::Null;
+        return config;
+    }
+}
+
+TEST(RuntimeDerivedJobEngineWiring, RunFrameAppliesSubmittedDerivedJob)
+{
+    auto application = std::make_unique<DerivedJobFrameApplication>();
+    DerivedJobFrameApplication* app = application.get();
+    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
+    engine.Initialize();
+
+    EXPECT_TRUE(app->Handle.IsValid());
+    EXPECT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable";
+
+    engine.Run();
+
+    const Runtime::DerivedJobQueueSnapshot snapshot =
+        engine.GetDerivedJobQueueSnapshot();
+    ASSERT_EQ(snapshot.Entries.size(), 1u);
+    EXPECT_EQ(snapshot.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    EXPECT_EQ(app->WorkerRuns.load(std::memory_order_relaxed), 1u);
+    EXPECT_EQ(app->ApplyRuns.load(std::memory_order_relaxed), 1u);
+    EXPECT_GT(snapshot.Diagnostics.ApplyMainThreadCalls, 0u);
+
+    engine.Shutdown();
 }
 
 TEST(RuntimeRenderExtraction, VisualizationAdapterBindingRevisionTracksMutations)

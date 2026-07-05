@@ -67,6 +67,7 @@ import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.AssetModelTextureIO;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraFocusCommand;
+import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.ImGuiAdapter;
@@ -368,19 +369,44 @@ namespace Extrinsic::Runtime
             static constexpr std::uint32_t kApplyBudgetPerFrame = 8u;
 
             StreamingExecutor& Executor;
+            DerivedJobRegistry* DerivedJobs;
 
-            explicit StreamingHooks(StreamingExecutor& executor)
+            explicit StreamingHooks(StreamingExecutor& executor,
+                                    DerivedJobRegistry* derivedJobs)
                 : Executor(executor)
+                , DerivedJobs(derivedJobs)
             {
             }
 
-            void DrainCompletions() override { Executor.DrainCompletions(); }
+            void DrainCompletions() override
+            {
+                if (DerivedJobs != nullptr)
+                {
+                    DerivedJobs->DrainCompletions();
+                    DerivedJobs->DrainReadbacks();
+                    return;
+                }
+                Executor.DrainCompletions();
+            }
             void ApplyMainThreadResults() override
             {
+                if (DerivedJobs != nullptr)
+                {
+                    (void)DerivedJobs->ApplyMainThreadResults(kApplyBudgetPerFrame);
+                    return;
+                }
                 (void)Executor.ApplyMainThreadResults(kApplyBudgetPerFrame);
             }
             void SubmitFrameWork() override {}
-            void PumpBackground(std::uint32_t maxLaunches) override { Executor.PumpBackground(maxLaunches); }
+            void PumpBackground(std::uint32_t maxLaunches) override
+            {
+                if (DerivedJobs != nullptr)
+                {
+                    DerivedJobs->Pump(maxLaunches);
+                    return;
+                }
+                Executor.PumpBackground(maxLaunches);
+            }
         };
 
         struct AssetHooks final : Core::IAssetFrameHooks
@@ -2530,6 +2556,8 @@ namespace Extrinsic::Runtime
 
         // ── 4. Streaming executor (asset IO / geometry processing) ────────
         m_StreamingExecutor = std::make_unique<StreamingExecutor>();
+        m_DerivedJobRegistry =
+            std::make_unique<DerivedJobRegistry>(*m_StreamingExecutor);
 
         // ── 5. Asset service ──────────────────────────────────────────────
         m_AssetService = std::make_unique<Assets::AssetService>();
@@ -2682,6 +2710,7 @@ namespace Extrinsic::Runtime
             std::unique_ptr<Graphics::IRenderer>& Renderer;
             std::unique_ptr<Core::FrameGraph>& FrameGraph;
             std::unique_ptr<StreamingExecutor>& StreamingExecutorPtr;
+            std::unique_ptr<DerivedJobRegistry>& DerivedJobRegistryPtr;
             std::unique_ptr<Assets::AssetService>& AssetService;
             std::unique_ptr<Graphics::GpuAssetCache>& GpuAssetCache;
             std::unique_ptr<AssetModelTextureHandoff>& AssetModelTextureHandoffPtr;
@@ -2705,6 +2734,7 @@ namespace Extrinsic::Runtime
                           std::unique_ptr<Graphics::IRenderer>& renderer,
                           std::unique_ptr<Core::FrameGraph>& frameGraph,
                           std::unique_ptr<StreamingExecutor>& streamingExecutor,
+                          std::unique_ptr<DerivedJobRegistry>& derivedJobRegistry,
                           std::unique_ptr<Assets::AssetService>& assetService,
                           std::unique_ptr<Graphics::GpuAssetCache>& gpuAssetCache,
                           std::unique_ptr<AssetModelTextureHandoff>& assetModelTextureHandoff,
@@ -2727,6 +2757,7 @@ namespace Extrinsic::Runtime
                 , Renderer(renderer)
                 , FrameGraph(frameGraph)
                 , StreamingExecutorPtr(streamingExecutor)
+                , DerivedJobRegistryPtr(derivedJobRegistry)
                 , AssetService(assetService)
                 , GpuAssetCache(gpuAssetCache)
                 , AssetModelTextureHandoffPtr(assetModelTextureHandoff)
@@ -2802,6 +2833,7 @@ namespace Extrinsic::Runtime
             }
             void DestroyStreamingState() override
             {
+                DerivedJobRegistryPtr.reset();
                 StreamingExecutorPtr.reset();
             }
             void DestroyFrameGraph() override { FrameGraph.reset(); }
@@ -2841,6 +2873,7 @@ namespace Extrinsic::Runtime
                             m_Renderer,
                             m_FrameGraph,
                             m_StreamingExecutor,
+                            m_DerivedJobRegistry,
                             m_AssetService,
                             m_GpuAssetCache,
                             m_AssetModelTextureHandoff,
@@ -3149,7 +3182,8 @@ namespace Extrinsic::Runtime
 
         // ── Phase 10: Maintenance ─────────────────────────────────────────
         TransferHooks transferHooks(*m_Device);
-        StreamingHooks streamingHooks(*m_StreamingExecutor);
+        StreamingHooks streamingHooks(*m_StreamingExecutor,
+                                      m_DerivedJobRegistry.get());
         AssetHooks assetHooks(*m_AssetService,
                               m_GpuAssetCache.get(),
                               m_AssetModelSceneHandoff.get(),
@@ -4945,6 +4979,26 @@ namespace Extrinsic::Runtime
         if (!m_KMeansGpuJobs)
             return std::nullopt;
         return m_KMeansGpuJobs->ConsumeCompleted();
+    }
+
+    DerivedJobHandle Engine::SubmitDerivedJob(DerivedJobDesc desc)
+    {
+        if (!m_DerivedJobRegistry)
+            return {};
+        return m_DerivedJobRegistry->Submit(std::move(desc));
+    }
+
+    void Engine::CancelDerivedJob(const DerivedJobHandle handle)
+    {
+        if (m_DerivedJobRegistry)
+            m_DerivedJobRegistry->Cancel(handle);
+    }
+
+    DerivedJobQueueSnapshot Engine::GetDerivedJobQueueSnapshot() const
+    {
+        if (!m_DerivedJobRegistry)
+            return {};
+        return m_DerivedJobRegistry->SnapshotAll();
     }
 
     void Engine::SetImGuiEditorCallback(std::function<void()> callback)
