@@ -388,22 +388,24 @@ point positions, calls the runtime controller, and edits the source `Transform`.
 
 ### Sandbox Editor Appearance / Properties Reorganization
 
-`UI-031` (Slices B/D and part of A) reorganizes the per-domain windows so
-concern ownership is clear. The former `Render` window is renamed `Appearance`
+`UI-031` reorganizes the per-domain windows so concern ownership is clear. The
+former `Render` window is renamed `Appearance`
 (`Mesh/Graph/PointCloud / Appearance`, opened from the `Appearance` menu item)
-and now co-locates render hints, bound render-state inspection, property/
-attribute assignment (`DrawPropertyBindingTargets` +
+and now co-locates render hints, visualization controls (including uniform/lane
+color and visualization-property presets), bound render-state inspection,
+property/attribute assignment (`DrawPropertyBindingTargets` +
 `DrawVertexChannelBindingTargets`), and texture baking
 (`DrawTextureBakeControls`). The `Properties` window is now a pure property
 explorer — it lists every property and its value preview
 (`DrawPropertyCatalogRows`) plus diagnostics only, keeping
 internal/connectivity/generated rows visible, and no longer hosts render-hint,
-binding, or texture-bake controls. The underlying `DomainWindowSection::Render`
-enumerator name is unchanged; only the window title, menu label, and drawn
-content moved. Merging the separate `Visualization` window into `Appearance`
-and splitting the omnibus `Processing` window into per-leaf method windows are
-deferred follow-up slices that require restructuring the `DomainWindowSection`
-set and the coupled domain-window-open storage.
+visualization, binding, or texture-bake controls. Processing menu leaves open
+focused method windows such as `Mesh / Processing / Denoise`,
+`Mesh / Processing / Simplify`, `PointCloud / Processing / Remove Outliers`,
+and `Graph / Processing / Vertices / Normals`; the old omnibus per-domain
+`Processing` window is no longer the primary execution surface. The broader
+generation-keyed async selected-analysis cache/job pipeline remains owned by
+open `RUNTIME-138`.
 
 ### Sandbox Editor Vertex Channel Bindings
 

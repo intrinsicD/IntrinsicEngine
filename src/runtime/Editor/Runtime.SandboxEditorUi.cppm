@@ -59,6 +59,7 @@ import Extrinsic.Runtime.VertexChannelBindings;
 namespace Extrinsic::Runtime::Detail
 {
     inline constexpr std::size_t kSandboxEditorPanelWindowCount = 11u;
+    inline constexpr std::size_t kSandboxEditorDomainWindowCount = 42u;
 }
 
 export namespace Extrinsic::Runtime
@@ -2595,7 +2596,8 @@ export namespace Extrinsic::Runtime
         std::array<char, 1024>  m_ScenePathBuffer{};
         std::array<bool, Detail::kSandboxEditorPanelWindowCount>
             m_PanelWindowOpen{};
-        std::array<bool, 15>    m_DomainWindowOpen{};
+        std::array<bool, Detail::kSandboxEditorDomainWindowCount>
+            m_DomainWindowOpen{};
         Assets::AssetPayloadKind m_ImportPayloadKind{
             Assets::AssetPayloadKind::Unknown};
         std::uint64_t m_LastObservedRuntimeImportSequence{0};

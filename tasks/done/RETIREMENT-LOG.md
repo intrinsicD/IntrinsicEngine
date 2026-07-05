@@ -3380,3 +3380,15 @@ selected mesh `GeometrySources`, preserves UV seam inputs when texcoords are
 present, reports collapse/rejection/pin diagnostics, and leaves renderer
 synchronization to geometry dirty tags. Focused geometry/runtime CTest coverage
 passed, including the UV seam regression.
+
+[`UI-031`](UI-031-editor-domain-ui-reorganization.md) — Sandbox EditorUI
+domain-window reorganization retired to `tasks/done/` on 2026-07-05 at
+`CPUContracted`. Mesh, Graph, and PointCloud `Appearance` windows now co-locate
+render hints, visualization controls, uniform/lane color edits, property and
+vertex-channel binding, bound-state inspection, and texture baking; the
+corresponding `Properties` windows draw only property catalog rows and
+diagnostics. Domain processing menu leaves now open focused method windows for
+K-Means, denoise, curvature, remesh, subdivide, simplify, vertex normals,
+progressive Poisson, and point-cloud outlier removal instead of the old
+omnibus per-domain processing surface. The broader generation-keyed async
+selected-analysis cache/job pipeline remains owned by `RUNTIME-138`.

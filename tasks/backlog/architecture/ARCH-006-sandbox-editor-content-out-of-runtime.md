@@ -34,9 +34,10 @@ depends_on: []
 - The generic seams the panels use (`SetImGuiEditorCallback`, command
   surfaces, `DerivedJobRegistry`, config-control facade) already exist and
   stay in runtime; the move is about *content* ownership.
-- `UI-031` (domain-window reorganization) and `RUNTIME-138` (nonblocking
-  selected-entity pipeline) touch the same file; this task must slice around
-  them, not duplicate them.
+- Retired `UI-031` already normalized the domain-window information
+  architecture in the same file. Open `RUNTIME-138` (nonblocking selected-
+  entity pipeline) still touches the same file; this task must slice around
+  it, not duplicate it.
 - Origin: `docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`
   finding R5.
 

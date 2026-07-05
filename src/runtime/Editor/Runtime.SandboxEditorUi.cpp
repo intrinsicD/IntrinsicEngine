@@ -403,11 +403,24 @@ namespace Extrinsic::Runtime
         {
             Render = 0,
             Properties = 1,
-            Visualization = 2,
-            Selection = 3,
-            Processing = 4,
-            Count = 5,
+            Selection = 2,
+            ProcessingKMeans = 3,
+            ProcessingDenoise = 4,
+            ProcessingCurvature = 5,
+            ProcessingRemesh = 6,
+            ProcessingSubdivide = 7,
+            ProcessingSimplify = 8,
+            ProcessingMeshVertexNormals = 9,
+            ProcessingGraphVertexNormals = 10,
+            ProcessingPointCloudVertexNormals = 11,
+            ProcessingPointCloudOutlierRemoval = 12,
+            ProcessingProgressivePoisson = 13,
+            Count = 14,
         };
+
+        static_assert(
+            3u * static_cast<std::size_t>(DomainWindowSection::Count) ==
+            Detail::kSandboxEditorDomainWindowCount);
 
         enum class SandboxEditorPanelWindowKind : std::uint8_t
         {
@@ -553,9 +566,26 @@ namespace Extrinsic::Runtime
                 {
                 case DomainWindowSection::Render: return "Mesh / Appearance";
                 case DomainWindowSection::Properties: return "Mesh / Properties";
-                case DomainWindowSection::Visualization: return "Mesh / Visualization";
                 case DomainWindowSection::Selection: return "Mesh / Selection";
-                case DomainWindowSection::Processing: return "Mesh / Processing";
+                case DomainWindowSection::ProcessingKMeans:
+                    return "Mesh / Processing / K-Means";
+                case DomainWindowSection::ProcessingDenoise:
+                    return "Mesh / Processing / Denoise";
+                case DomainWindowSection::ProcessingCurvature:
+                    return "Mesh / Processing / Curvature";
+                case DomainWindowSection::ProcessingRemesh:
+                    return "Mesh / Processing / Remesh";
+                case DomainWindowSection::ProcessingSubdivide:
+                    return "Mesh / Processing / Subdivide";
+                case DomainWindowSection::ProcessingSimplify:
+                    return "Mesh / Processing / Simplify";
+                case DomainWindowSection::ProcessingMeshVertexNormals:
+                    return "Mesh / Processing / Vertices / Normals";
+                case DomainWindowSection::ProcessingProgressivePoisson:
+                    return "Mesh / Processing / Progressive Poisson";
+                case DomainWindowSection::ProcessingGraphVertexNormals:
+                case DomainWindowSection::ProcessingPointCloudVertexNormals:
+                case DomainWindowSection::ProcessingPointCloudOutlierRemoval:
                 case DomainWindowSection::Count: break;
                 }
                 break;
@@ -564,9 +594,20 @@ namespace Extrinsic::Runtime
                 {
                 case DomainWindowSection::Render: return "Graph / Appearance";
                 case DomainWindowSection::Properties: return "Graph / Properties";
-                case DomainWindowSection::Visualization: return "Graph / Visualization";
                 case DomainWindowSection::Selection: return "Graph / Selection";
-                case DomainWindowSection::Processing: return "Graph / Processing";
+                case DomainWindowSection::ProcessingKMeans:
+                    return "Graph / Processing / K-Means";
+                case DomainWindowSection::ProcessingGraphVertexNormals:
+                    return "Graph / Processing / Vertices / Normals";
+                case DomainWindowSection::ProcessingDenoise:
+                case DomainWindowSection::ProcessingCurvature:
+                case DomainWindowSection::ProcessingRemesh:
+                case DomainWindowSection::ProcessingSubdivide:
+                case DomainWindowSection::ProcessingSimplify:
+                case DomainWindowSection::ProcessingMeshVertexNormals:
+                case DomainWindowSection::ProcessingPointCloudVertexNormals:
+                case DomainWindowSection::ProcessingPointCloudOutlierRemoval:
+                case DomainWindowSection::ProcessingProgressivePoisson:
                 case DomainWindowSection::Count: break;
                 }
                 break;
@@ -575,9 +616,22 @@ namespace Extrinsic::Runtime
                 {
                 case DomainWindowSection::Render: return "PointCloud / Appearance";
                 case DomainWindowSection::Properties: return "PointCloud / Properties";
-                case DomainWindowSection::Visualization: return "PointCloud / Visualization";
                 case DomainWindowSection::Selection: return "PointCloud / Selection";
-                case DomainWindowSection::Processing: return "PointCloud / Processing";
+                case DomainWindowSection::ProcessingKMeans:
+                    return "PointCloud / Processing / K-Means";
+                case DomainWindowSection::ProcessingPointCloudVertexNormals:
+                    return "PointCloud / Processing / Vertices / Normals";
+                case DomainWindowSection::ProcessingPointCloudOutlierRemoval:
+                    return "PointCloud / Processing / Remove Outliers";
+                case DomainWindowSection::ProcessingProgressivePoisson:
+                    return "PointCloud / Processing / Progressive Poisson";
+                case DomainWindowSection::ProcessingDenoise:
+                case DomainWindowSection::ProcessingCurvature:
+                case DomainWindowSection::ProcessingRemesh:
+                case DomainWindowSection::ProcessingSubdivide:
+                case DomainWindowSection::ProcessingSimplify:
+                case DomainWindowSection::ProcessingMeshVertexNormals:
+                case DomainWindowSection::ProcessingGraphVertexNormals:
                 case DomainWindowSection::Count: break;
                 }
                 break;
@@ -7717,7 +7771,8 @@ namespace Extrinsic::Runtime
 
         void DrawDomainMenu(
             const SandboxEditorDomainWindowKind kind,
-            std::array<bool, 15>* domainWindowOpen)
+            std::array<bool, Detail::kSandboxEditorDomainWindowCount>*
+                domainWindowOpen)
         {
             if (!ImGui::BeginMenu(DebugNameForSandboxEditorDomainWindowKind(kind)))
                 return;
@@ -7740,22 +7795,24 @@ namespace Extrinsic::Runtime
                     nullptr,
                     &(*domainWindowOpen)[DomainWindowSlotIndex(kind, DomainWindowSection::Properties)]);
                 ImGui::MenuItem(
-                    "Visualization",
-                    nullptr,
-                    &(*domainWindowOpen)[DomainWindowSlotIndex(kind, DomainWindowSection::Visualization)]);
-                ImGui::MenuItem(
                     "Selection details",
                     nullptr,
                     &(*domainWindowOpen)[DomainWindowSlotIndex(kind, DomainWindowSection::Selection)]);
                 if (ImGui::BeginMenu("Processing"))
                 {
-                    bool& processingOpen =
-                        (*domainWindowOpen)[DomainWindowSlotIndex(
-                            kind,
-                            DomainWindowSection::Processing)];
+                    const auto openProcessing =
+                        [kind, domainWindowOpen](const DomainWindowSection section)
+                        {
+                            (*domainWindowOpen)[DomainWindowSlotIndex(kind, section)] =
+                                true;
+                        };
                     const std::vector<SandboxEditorGeometryProcessingMenuItem>
                         menuItems =
                             GetSandboxEditorGeometryProcessingMenuItems(kind);
+                    if (ImGui::MenuItem("K-Means"))
+                    {
+                        openProcessing(DomainWindowSection::ProcessingKMeans);
+                    }
                     const bool hasDenoiseLeaf =
                         std::any_of(
                             menuItems.begin(),
@@ -7766,7 +7823,7 @@ namespace Extrinsic::Runtime
                             });
                     if (hasDenoiseLeaf && ImGui::MenuItem("Denoise"))
                     {
-                        processingOpen = true;
+                        openProcessing(DomainWindowSection::ProcessingDenoise);
                     }
                     const bool hasCurvatureLeaf =
                         std::any_of(
@@ -7778,7 +7835,7 @@ namespace Extrinsic::Runtime
                             });
                     if (hasCurvatureLeaf && ImGui::MenuItem("Curvature"))
                     {
-                        processingOpen = true;
+                        openProcessing(DomainWindowSection::ProcessingCurvature);
                     }
                     const bool hasRemeshLeaf =
                         std::any_of(
@@ -7790,7 +7847,7 @@ namespace Extrinsic::Runtime
                             });
                     if (hasRemeshLeaf && ImGui::MenuItem("Remesh"))
                     {
-                        processingOpen = true;
+                        openProcessing(DomainWindowSection::ProcessingRemesh);
                     }
                     const bool hasSubdivideLeaf =
                         std::any_of(
@@ -7802,7 +7859,7 @@ namespace Extrinsic::Runtime
                             });
                     if (hasSubdivideLeaf && ImGui::MenuItem("Subdivide"))
                     {
-                        processingOpen = true;
+                        openProcessing(DomainWindowSection::ProcessingSubdivide);
                     }
                     const bool hasSimplifyLeaf =
                         std::any_of(
@@ -7814,7 +7871,21 @@ namespace Extrinsic::Runtime
                             });
                     if (hasSimplifyLeaf && ImGui::MenuItem("Simplify"))
                     {
-                        processingOpen = true;
+                        openProcessing(DomainWindowSection::ProcessingSimplify);
+                    }
+                    if (kind == SandboxEditorDomainWindowKind::PointCloud &&
+                        ImGui::MenuItem("Remove Outliers"))
+                    {
+                        openProcessing(
+                            DomainWindowSection::
+                                ProcessingPointCloudOutlierRemoval);
+                    }
+                    if ((kind == SandboxEditorDomainWindowKind::Mesh ||
+                         kind == SandboxEditorDomainWindowKind::PointCloud) &&
+                        ImGui::MenuItem("Progressive Poisson"))
+                    {
+                        openProcessing(
+                            DomainWindowSection::ProcessingProgressivePoisson);
                     }
                     for (const SandboxEditorGeometryProcessingMenuItem& item :
                          menuItems)
@@ -7826,14 +7897,27 @@ namespace Extrinsic::Runtime
                                 if (item.HasNormalsMethod &&
                                     ImGui::MenuItem("Normals"))
                                 {
-                                    processingOpen = true;
+                                    switch (kind)
+                                    {
+                                    case SandboxEditorDomainWindowKind::Mesh:
+                                        openProcessing(
+                                            DomainWindowSection::
+                                                ProcessingMeshVertexNormals);
+                                        break;
+                                    case SandboxEditorDomainWindowKind::Graph:
+                                        openProcessing(
+                                            DomainWindowSection::
+                                                ProcessingGraphVertexNormals);
+                                        break;
+                                    case SandboxEditorDomainWindowKind::PointCloud:
+                                        openProcessing(
+                                            DomainWindowSection::
+                                                ProcessingPointCloudVertexNormals);
+                                        break;
+                                    }
                                 }
                                 ImGui::EndMenu();
                             }
-                        }
-                        else if (ImGui::MenuItem(item.Label))
-                        {
-                            processingOpen = true;
                         }
                     }
                     ImGui::EndMenu();
@@ -7841,9 +7925,8 @@ namespace Extrinsic::Runtime
             }
             else
             {
-                (void)ImGui::MenuItem("Render hints", nullptr, false, false);
+                (void)ImGui::MenuItem("Appearance", nullptr, false, false);
                 (void)ImGui::MenuItem("Properties", nullptr, false, false);
-                (void)ImGui::MenuItem("Visualization", nullptr, false, false);
                 (void)ImGui::MenuItem("Selection details", nullptr, false, false);
                 if (ImGui::BeginMenu("Processing", false))
                     ImGui::EndMenu();
@@ -7896,7 +7979,8 @@ namespace Extrinsic::Runtime
         void DrawMainMenuBar(
             std::array<bool, Detail::kSandboxEditorPanelWindowCount>*
                 panelWindowOpen,
-            std::array<bool, 15>* domainWindowOpen)
+            std::array<bool, Detail::kSandboxEditorDomainWindowCount>*
+                domainWindowOpen)
         {
             if (!ImGui::BeginMainMenuBar())
                 return;
@@ -8896,10 +8980,14 @@ namespace Extrinsic::Runtime
             }
         }
 
+        void DrawDomainVisualizationControls(
+            const SandboxEditorDomainWindowModel& model,
+            const SandboxEditorContext& context);
+
         // UI-031 Slices A/B: the domain `Render` section renders as the
         // "Appearance" window and co-locates render hints, bound render-state
-        // inspection, property/attribute assignment, and texture baking (the
-        // last three relocated out of the Properties window).
+        // inspection, visualization controls, property/attribute assignment,
+        // and texture baking.
         void DrawDomainRenderWindow(const SandboxEditorDomainWindowModel& model,
                                     const SandboxEditorContext& context,
                                     TextureBakeUiState* textureBakeState)
@@ -8929,6 +9017,8 @@ namespace Extrinsic::Runtime
 
             if (DomainWindowReady(model))
             {
+                ImGui::SeparatorText("Visualization");
+                DrawDomainVisualizationControls(model, context);
                 ImGui::SeparatorText("Bound render state");
                 DrawBoundRenderStateRows(model.BoundState);
                 ImGui::SeparatorText("Property / attribute assignment");
@@ -8940,11 +9030,10 @@ namespace Extrinsic::Runtime
             }
         }
 
-        void DrawDomainVisualizationWindow(
+        void DrawDomainVisualizationControls(
             const SandboxEditorDomainWindowModel& model,
             const SandboxEditorContext& context)
         {
-            DrawDomainWindowHeader(model);
             const SandboxEditorVisualizationModel& visualization = model.Visualization;
 
             if (visualization.SpatialDebug.HasBinding)
@@ -9072,36 +9161,6 @@ namespace Extrinsic::Runtime
             DrawDomainWindowHeader(model);
             ImGui::SeparatorText("Primitive selection");
             DrawPrimitiveDetails(model.Primitive);
-        }
-
-        void DrawProcessingDomains(
-            const SandboxEditorGeometryProcessingDomain domains)
-        {
-            constexpr std::array<SandboxEditorGeometryProcessingDomain, 8>
-                kDisplayDomains{
-                    SandboxEditorGeometryProcessingDomain::MeshVertices,
-                    SandboxEditorGeometryProcessingDomain::MeshEdges,
-                    SandboxEditorGeometryProcessingDomain::MeshHalfedges,
-                    SandboxEditorGeometryProcessingDomain::MeshFaces,
-                    SandboxEditorGeometryProcessingDomain::GraphVertices,
-                    SandboxEditorGeometryProcessingDomain::GraphEdges,
-                    SandboxEditorGeometryProcessingDomain::GraphHalfedges,
-                    SandboxEditorGeometryProcessingDomain::PointCloudPoints,
-                };
-
-            bool any = false;
-            for (const SandboxEditorGeometryProcessingDomain domain :
-                 kDisplayDomains)
-            {
-                if (!HasAnySandboxEditorGeometryProcessingDomain(domains, domain))
-                    continue;
-                any = true;
-                ImGui::BulletText("%s",
-                                  DebugNameForSandboxEditorGeometryProcessingDomain(
-                                      domain));
-            }
-            if (!any)
-                ImGui::TextDisabled("No supported processing domains.");
         }
 
         [[nodiscard]] bool ContainsKMeansDomain(
@@ -11339,6 +11398,7 @@ namespace Extrinsic::Runtime
         void DrawDomainProcessingWindow(
             const SandboxEditorDomainWindowModel& model,
             const SandboxEditorContext& context,
+            const DomainWindowSection section,
             KMeansUiState* kmeansState,
             MeshDenoiseUiState* denoiseState,
             MeshCurvatureUiState* curvatureState,
@@ -11352,7 +11412,6 @@ namespace Extrinsic::Runtime
             ProgressivePoissonUiState* progressivePoissonState)
         {
             DrawDomainWindowHeader(model);
-            ImGui::SeparatorText("Processing capabilities");
 
             const SandboxEditorGeometryProcessingModel& processing =
                 model.Processing;
@@ -11363,106 +11422,86 @@ namespace Extrinsic::Runtime
                 return;
             }
 
-            ImGui::Text("Editable surface mesh: %s",
-                        processing.Capabilities.HasEditableSurfaceMesh ? "yes" : "no");
-            ImGui::SeparatorText("Source domains");
-            DrawProcessingDomains(processing.Capabilities.Domains);
-
-            ImGui::SeparatorText("K-Means sources");
-            if (processing.KMeansDomains.empty())
+            switch (section)
             {
-                ImGui::TextDisabled("K-Means is unavailable for this selection.");
-            }
-            else
-            {
-                for (const SandboxEditorGeometryProcessingDomain domain :
-                     processing.KMeansDomains)
-                {
-                    ImGui::BulletText(
-                        "%s",
-                        DebugNameForSandboxEditorGeometryProcessingDomain(domain));
-                }
-            }
-
-            ImGui::SeparatorText("Available operations");
-            if (processing.Entries.empty())
-            {
-                ImGui::TextDisabled("No processing operations match this selection.");
-            }
-            else
-            {
-                for (const SandboxEditorGeometryProcessingEntry& entry :
-                     processing.Entries)
-                {
-                    ImGui::BulletText(
-                        "%s",
-                        DebugNameForSandboxEditorGeometryProcessingAlgorithm(
-                            entry.Algorithm));
-                }
-            }
-            DrawKMeansExecutionControls(model, context, processing, kmeansState);
-            switch (model.Kind)
-            {
-            case SandboxEditorDomainWindowKind::Mesh:
+            case DomainWindowSection::ProcessingKMeans:
+                DrawKMeansExecutionControls(model, context, processing, kmeansState);
+                break;
+            case DomainWindowSection::ProcessingDenoise:
                 DrawMeshDenoiseControls(
                     model,
                     context,
                     processing,
                     denoiseState);
+                break;
+            case DomainWindowSection::ProcessingCurvature:
                 DrawMeshCurvatureControls(
                     model,
                     context,
                     processing,
                     curvatureState);
+                break;
+            case DomainWindowSection::ProcessingRemesh:
                 DrawMeshRemeshControls(
                     model,
                     context,
                     processing,
                     remeshState);
+                break;
+            case DomainWindowSection::ProcessingSubdivide:
                 DrawMeshSubdivideControls(
                     model,
                     context,
                     processing,
                     subdivideState);
+                break;
+            case DomainWindowSection::ProcessingSimplify:
                 DrawMeshSimplifyControls(
                     model,
                     context,
                     processing,
                     simplifyState);
+                break;
+            case DomainWindowSection::ProcessingMeshVertexNormals:
                 DrawMeshVertexNormalsControls(
                     model,
                     context,
                     processing,
                     meshNormalsState);
-                DrawProgressivePoissonControls(
-                    model,
-                    context,
-                    processing,
-                    progressivePoissonState);
                 break;
-            case SandboxEditorDomainWindowKind::Graph:
+            case DomainWindowSection::ProcessingGraphVertexNormals:
                 DrawGraphVertexNormalsControls(
                     model,
                     context,
                     processing,
                     graphNormalsState);
                 break;
-            case SandboxEditorDomainWindowKind::PointCloud:
+            case DomainWindowSection::ProcessingPointCloudVertexNormals:
                 DrawPointCloudVertexNormalsControls(
                     model,
                     context,
                     processing,
                     pointCloudNormalsState);
+                break;
+            case DomainWindowSection::ProcessingPointCloudOutlierRemoval:
                 DrawPointCloudOutlierRemovalControls(
                     model,
                     context,
                     processing,
                     pointCloudOutlierState);
+                break;
+            case DomainWindowSection::ProcessingProgressivePoisson:
                 DrawProgressivePoissonControls(
                     model,
                     context,
                     processing,
                     progressivePoissonState);
+                break;
+            case DomainWindowSection::Render:
+            case DomainWindowSection::Properties:
+            case DomainWindowSection::Selection:
+            case DomainWindowSection::Count:
+                ImGui::TextDisabled("No focused processing controls are available.");
                 break;
             }
         }
@@ -11471,7 +11510,8 @@ namespace Extrinsic::Runtime
             const SandboxEditorContext& context,
             const SandboxEditorDomainWindowKind kind,
             const DomainWindowSection section,
-            std::array<bool, 15>& domainWindowOpen,
+            std::array<bool, Detail::kSandboxEditorDomainWindowCount>&
+                domainWindowOpen,
             std::array<std::optional<SandboxEditorDomainWindowModel>, 3>& domainModelCache,
             KMeansUiState* kmeansState,
             MeshDenoiseUiState* denoiseState,
@@ -11512,16 +11552,24 @@ namespace Extrinsic::Runtime
                 case DomainWindowSection::Properties:
                     DrawDomainPropertyWindow(model);
                     break;
-                case DomainWindowSection::Visualization:
-                    DrawDomainVisualizationWindow(model, context);
-                    break;
                 case DomainWindowSection::Selection:
                     DrawDomainSelectionWindow(model);
                     break;
-                case DomainWindowSection::Processing:
+                case DomainWindowSection::ProcessingKMeans:
+                case DomainWindowSection::ProcessingDenoise:
+                case DomainWindowSection::ProcessingCurvature:
+                case DomainWindowSection::ProcessingRemesh:
+                case DomainWindowSection::ProcessingSubdivide:
+                case DomainWindowSection::ProcessingSimplify:
+                case DomainWindowSection::ProcessingMeshVertexNormals:
+                case DomainWindowSection::ProcessingGraphVertexNormals:
+                case DomainWindowSection::ProcessingPointCloudVertexNormals:
+                case DomainWindowSection::ProcessingPointCloudOutlierRemoval:
+                case DomainWindowSection::ProcessingProgressivePoisson:
                     DrawDomainProcessingWindow(
                         model,
                         context,
+                        section,
                         kmeansState,
                         denoiseState,
                         curvatureState,
@@ -11543,7 +11591,8 @@ namespace Extrinsic::Runtime
 
         void DrawDomainWindows(
             const SandboxEditorContext* context,
-            std::array<bool, 15>* domainWindowOpen,
+            std::array<bool, Detail::kSandboxEditorDomainWindowCount>*
+                domainWindowOpen,
             KMeansUiState* kmeansState,
             MeshDenoiseUiState* denoiseState,
             MeshCurvatureUiState* curvatureState,
@@ -11567,12 +11616,21 @@ namespace Extrinsic::Runtime
                 SandboxEditorDomainWindowKind::Graph,
                 SandboxEditorDomainWindowKind::Mesh,
             };
-            constexpr std::array<DomainWindowSection, 5> kSections{
+            constexpr std::array<DomainWindowSection, 14> kSections{
                 DomainWindowSection::Render,
                 DomainWindowSection::Properties,
-                DomainWindowSection::Visualization,
                 DomainWindowSection::Selection,
-                DomainWindowSection::Processing,
+                DomainWindowSection::ProcessingKMeans,
+                DomainWindowSection::ProcessingDenoise,
+                DomainWindowSection::ProcessingCurvature,
+                DomainWindowSection::ProcessingRemesh,
+                DomainWindowSection::ProcessingSubdivide,
+                DomainWindowSection::ProcessingSimplify,
+                DomainWindowSection::ProcessingMeshVertexNormals,
+                DomainWindowSection::ProcessingGraphVertexNormals,
+                DomainWindowSection::ProcessingPointCloudVertexNormals,
+                DomainWindowSection::ProcessingPointCloudOutlierRemoval,
+                DomainWindowSection::ProcessingProgressivePoisson,
             };
             for (const SandboxEditorDomainWindowKind kind : kKinds)
             {
@@ -11582,21 +11640,21 @@ namespace Extrinsic::Runtime
                         *context,
                         kind,
                         section,
-                    *domainWindowOpen,
-                    domainModelCache,
-                    kmeansState,
-                    denoiseState,
-                    curvatureState,
-                    remeshState,
-                    subdivideState,
-                    simplifyState,
-                    normalsState,
-                    graphNormalsState,
-                    pointCloudNormalsState,
-                    pointCloudOutlierState,
-                    progressivePoissonState,
-                    textureBakeState);
-            }
+                        *domainWindowOpen,
+                        domainModelCache,
+                        kmeansState,
+                        denoiseState,
+                        curvatureState,
+                        remeshState,
+                        subdivideState,
+                        simplifyState,
+                        normalsState,
+                        graphNormalsState,
+                        pointCloudNormalsState,
+                        pointCloudOutlierState,
+                        progressivePoissonState,
+                        textureBakeState);
+                }
             }
         }
 
@@ -12154,7 +12212,8 @@ namespace Extrinsic::Runtime
             std::optional<SandboxEditorSceneFileResult>* lastSceneFileResult,
             std::array<bool, Detail::kSandboxEditorPanelWindowCount>*
                 panelWindowOpen,
-            std::array<bool, 15>* domainWindowOpen,
+            std::array<bool, Detail::kSandboxEditorDomainWindowCount>*
+                domainWindowOpen,
             KMeansUiState* kmeansState,
             MeshDenoiseUiState* denoiseState,
             MeshCurvatureUiState* curvatureState,

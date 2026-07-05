@@ -16,12 +16,6 @@ map.
   `Runtime.RegistrationAlignment` to run ICP and scrub the convergence
   trajectory. The controller + its headless test land first; the editor panel is
   the remaining open work).
-- [UI-031 — Sandbox EditorUI domain-window reorganization](UI-031-editor-domain-ui-reorganization.md)
-  (depends on `RUNTIME-138`; reorganize Mesh/Graph/PointCloud UI so
-  `Properties` is a pure property explorer, render hints/visualization/property
-  assignment share one appearance window, texture baking moves under
-  rendering/appearance, and processing leaves open focused method windows).
-
 The runtime SpatialDebug closest-face picking consumer for `GEOM-039` is
 retired under the runtime backlog as `RUNTIME-135`.
 
@@ -44,13 +38,12 @@ retired under the runtime backlog as `RUNTIME-135`.
   default sandbox Vulkan validation-gate fallback to `BUG-056`. Source-level
   selected-entity findings remain tracked by `RUNTIME-138`, retired
   `GRAPHICS-113`, and retired `GRAPHICS-114`.
-- UI-031 is the information-architecture follow-up from the 2026-07-01
-  domain-UI review: it separates property exploration, appearance/rendering
-  controls, texture baking, and method execution into user-intent windows. Its
-  remaining slices are gated on `RUNTIME-138` so they build on visibility-gated
-  cached selected-entity models. `RUNTIME-138` has landed the visibility-gated
-  model-construction slice; UI-031 remains blocked on the broader async
-  selected-analysis cache/job slices.
+- UI-031 is retired as the information-architecture follow-up from the
+  2026-07-01 domain-UI review: `Properties` is now a pure data explorer,
+  `Appearance` owns render hints, visualization, binding, and texture-bake
+  controls, and domain processing leaves open focused method windows. The
+  broader generation-keyed async selected-analysis cache/job pipeline remains
+  owned by open `RUNTIME-138`.
 - UI-001 is retired as part of **Theme A — Working sandbox app path** and depends on
   `RUNTIME-090` + `GRAPHICS-079` for ImGui frame production/presentation plus
   runtime selection/geometry-residency tasks for live content. RUNTIME-095 closes
@@ -238,3 +231,10 @@ split; narratives live in the retirement log.
   present/fallback-frame-lifecycle dominated, rules out editor callback and
   ImGui draw-data copy work as dominant causes, and files `BUG-056` for the
   default sandbox Vulkan validation gate fallback.
+- [UI-031 — Sandbox EditorUI domain-window reorganization](../../done/UI-031-editor-domain-ui-reorganization.md)
+  (done, 2026-07-05, `CPUContracted`): Mesh/Graph/PointCloud domain
+  `Appearance` windows now co-locate render hints, visualization, uniform/lane
+  color, property/attribute binding, bound-state inspection, and texture-bake
+  controls; `Properties` windows are pure property explorers; and processing
+  menu leaves open focused method windows instead of the old omnibus processing
+  surface.

@@ -1202,6 +1202,20 @@ namespace
         });
         return count;
     }
+
+    [[nodiscard]] std::string_view SourceRange(
+        const std::string& source,
+        const std::string_view beginMarker,
+        const std::string_view endMarker)
+    {
+        const std::size_t begin = source.find(beginMarker);
+        if (begin == std::string::npos)
+            return {};
+        const std::size_t end = source.find(endMarker, begin + beginMarker.size());
+        if (end == std::string::npos || end <= begin)
+            return {};
+        return std::string_view{source.data() + begin, end - begin};
+    }
 }
 
 TEST(SandboxEditorUi, EmptyContextProducesDeterministicDisabledDiagnostics)
@@ -1239,7 +1253,7 @@ TEST(SandboxEditorUi, DefaultDrawStartsWithOnlyMenuBarVisible)
 
     EXPECT_TRUE(ImGuiWindowExists("##MainMenuBar"));
 
-    constexpr std::array<std::string_view, 25> kClosedByDefaultWindows{{
+    constexpr std::array<std::string_view, 33> kClosedByDefaultWindows{{
         "Sandbox Editor",
         "Scene Hierarchy",
         "Inspector",
@@ -1252,25 +1266,93 @@ TEST(SandboxEditorUi, DefaultDrawStartsWithOnlyMenuBarVisible)
         "ICP Registration",
         "PointCloud / Appearance",
         "PointCloud / Properties",
-        "PointCloud / Visualization",
         "PointCloud / Selection",
-        "PointCloud / Processing",
+        "PointCloud / Processing / K-Means",
+        "PointCloud / Processing / Vertices / Normals",
+        "PointCloud / Processing / Remove Outliers",
+        "PointCloud / Processing / Progressive Poisson",
         "Graph / Appearance",
         "Graph / Properties",
-        "Graph / Visualization",
         "Graph / Selection",
-        "Graph / Processing",
+        "Graph / Processing / K-Means",
+        "Graph / Processing / Vertices / Normals",
         "Mesh / Appearance",
         "Mesh / Properties",
-        "Mesh / Visualization",
         "Mesh / Selection",
-        "Mesh / Processing",
+        "Mesh / Processing / K-Means",
+        "Mesh / Processing / Denoise",
+        "Mesh / Processing / Curvature",
+        "Mesh / Processing / Remesh",
+        "Mesh / Processing / Subdivide",
+        "Mesh / Processing / Simplify",
+        "Mesh / Processing / Vertices / Normals",
+        "Mesh / Processing / Progressive Poisson",
     }};
 
     for (const std::string_view title : kClosedByDefaultWindows)
     {
         EXPECT_FALSE(ImGuiWindowExists(title)) << std::string(title);
     }
+}
+
+TEST(SandboxEditorUi, DomainMenusUseAppearanceAndFocusedProcessingWindows)
+{
+    const std::string editorSource =
+        ReadRepositoryTextFile("src/runtime/Editor/Runtime.SandboxEditorUi.cpp");
+    ASSERT_FALSE(editorSource.empty());
+
+    const std::string_view appearanceWindow = SourceRange(
+        editorSource,
+        "void DrawDomainRenderWindow(",
+        "void DrawDomainVisualizationControls(");
+    ASSERT_FALSE(appearanceWindow.empty());
+    EXPECT_NE(appearanceWindow.find("DrawDomainVisualizationControls(model, context);"),
+              std::string_view::npos);
+    EXPECT_NE(appearanceWindow.find("DrawPropertyBindingTargets"),
+              std::string_view::npos);
+    EXPECT_NE(appearanceWindow.find("DrawVertexChannelBindingTargets"),
+              std::string_view::npos);
+    EXPECT_NE(appearanceWindow.find("DrawTextureBakeControls"),
+              std::string_view::npos);
+
+    const std::string_view propertyWindow = SourceRange(
+        editorSource,
+        "void DrawDomainPropertyWindow(",
+        "void DrawRenderHintStatus(");
+    ASSERT_FALSE(propertyWindow.empty());
+    EXPECT_NE(propertyWindow.find("DrawPropertyCatalogRows"),
+              std::string_view::npos);
+    EXPECT_EQ(propertyWindow.find("DrawDomainVisualizationControls"),
+              std::string_view::npos);
+    EXPECT_EQ(propertyWindow.find("DrawPropertyBindingTargets"),
+              std::string_view::npos);
+    EXPECT_EQ(propertyWindow.find("DrawVertexChannelBindingTargets"),
+              std::string_view::npos);
+    EXPECT_EQ(propertyWindow.find("DrawTextureBakeControls"),
+              std::string_view::npos);
+    EXPECT_EQ(propertyWindow.find("DrawRenderHintStatus"),
+              std::string_view::npos);
+
+    EXPECT_EQ(editorSource.find("DomainWindowSection::Visualization"),
+              std::string::npos);
+    EXPECT_NE(editorSource.find("DrawDomainVisualizationControls(model, context);"),
+              std::string::npos);
+    EXPECT_NE(editorSource.find("ProcessingKMeans"), std::string::npos);
+    EXPECT_NE(editorSource.find("ProcessingDenoise"), std::string::npos);
+    EXPECT_NE(editorSource.find("ProcessingCurvature"), std::string::npos);
+    EXPECT_NE(editorSource.find("ProcessingRemesh"), std::string::npos);
+    EXPECT_NE(editorSource.find("ProcessingSubdivide"), std::string::npos);
+    EXPECT_NE(editorSource.find("ProcessingSimplify"), std::string::npos);
+    EXPECT_NE(editorSource.find("ProcessingMeshVertexNormals"),
+              std::string::npos);
+    EXPECT_NE(editorSource.find("ProcessingGraphVertexNormals"),
+              std::string::npos);
+    EXPECT_NE(editorSource.find("ProcessingPointCloudVertexNormals"),
+              std::string::npos);
+    EXPECT_NE(editorSource.find("ProcessingPointCloudOutlierRemoval"),
+              std::string::npos);
+    EXPECT_NE(editorSource.find("ProcessingProgressivePoisson"),
+              std::string::npos);
 }
 
 TEST(SandboxEditorUi, RenderGraphPanelModelCopiesRendererStats)
