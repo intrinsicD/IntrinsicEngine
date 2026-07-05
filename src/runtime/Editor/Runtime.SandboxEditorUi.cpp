@@ -4125,6 +4125,14 @@ namespace Extrinsic::Runtime
             return context.CommandHistory->Snapshot().Revision;
         }
 
+        [[nodiscard]] std::uint64_t CurrentSelectionGeneration(
+            const SandboxEditorContext& context)
+        {
+            if (context.Selection == nullptr)
+                return 0u;
+            return context.Selection->SelectionGeneration();
+        }
+
         [[nodiscard]] std::uint64_t VertexBindingGenerationForEntity(
             const entt::registry& raw,
             const ECS::EntityHandle entity)
@@ -4152,6 +4160,7 @@ namespace Extrinsic::Runtime
                 .PrimaryStableId = stableId,
                 .SelectedStableIds =
                     BuildSelectedStableIdsForCacheKey(context, stableId),
+                .SelectionGeneration = CurrentSelectionGeneration(context),
                 .SelectedDomain = geometry.Domain,
                 .VertexCount = geometry.VertexCount,
                 .EdgeCount = geometry.EdgeCount,

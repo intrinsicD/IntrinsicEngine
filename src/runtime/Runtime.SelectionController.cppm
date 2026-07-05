@@ -169,6 +169,7 @@ export namespace Extrinsic::Runtime
 
         // --- selection snapshot data (Slice B copies into RenderWorld.Selection) ---
         [[nodiscard]] std::span<const std::uint32_t> SelectedStableIds() const noexcept;
+        [[nodiscard]] std::uint64_t                  SelectionGeneration() const noexcept;
         [[nodiscard]] bool                           HasHovered() const noexcept;
         [[nodiscard]] std::uint32_t                  HoveredStableId() const noexcept;
 
@@ -250,6 +251,7 @@ export namespace Extrinsic::Runtime
         // mirrors it for the snapshot span and is rebuilt on every change.
         std::vector<EntityHandle>  m_Selected{};
         std::vector<std::uint32_t> m_SelectedStableIds{};
+        std::uint64_t              m_SelectionGeneration = 0u;
 
         EntityHandle m_Hovered    = Extrinsic::ECS::InvalidEntityHandle;
         bool         m_HasHovered = false;

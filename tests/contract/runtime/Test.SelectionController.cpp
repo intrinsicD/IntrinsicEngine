@@ -461,6 +461,36 @@ TEST(SelectionController, ProgrammaticSelectAndClear)
     EXPECT_FALSE(HasSelectedTag(registry, a));
 }
 
+TEST(SelectionController, SelectionGenerationTracksSelectedSetChanges)
+{
+    Registry           registry;
+    SelectionController controller;
+    const EntityHandle a = MakeSelectable(registry);
+
+    EXPECT_EQ(controller.SelectionGeneration(), 0u);
+
+    EXPECT_TRUE(controller.SetSelectedEntity(registry, a));
+    EXPECT_EQ(controller.SelectionGeneration(), 1u);
+
+    EXPECT_TRUE(controller.SetSelectedEntity(registry, a));
+    EXPECT_EQ(controller.SelectionGeneration(), 1u);
+
+    controller.RequestHoverPick(0u, 0u);
+    controller.ConsumePendingPick();
+    controller.ConsumeHit(registry, StableId(a));
+    EXPECT_TRUE(controller.HasHovered());
+    EXPECT_EQ(controller.SelectionGeneration(), 1u);
+
+    controller.ClearSelection(registry);
+    EXPECT_EQ(controller.SelectionGeneration(), 2u);
+
+    controller.ClearSelection(registry);
+    EXPECT_EQ(controller.SelectionGeneration(), 2u);
+
+    EXPECT_TRUE(controller.SetSelectedEntity(registry, a));
+    EXPECT_EQ(controller.SelectionGeneration(), 3u);
+}
+
 TEST(SelectionController, ProgrammaticSelectRejectsInvalidEntity)
 {
     Registry           registry;

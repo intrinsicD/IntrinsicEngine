@@ -2076,6 +2076,7 @@ export namespace Extrinsic::Runtime
             SandboxEditorVisualizationTarget::Entity};
         std::uint32_t PrimaryStableId{0u};
         std::vector<std::uint32_t> SelectedStableIds{};
+        std::uint64_t SelectionGeneration{0u};
         ECS::Components::GeometrySources::Domain SelectedDomain{
             ECS::Components::GeometrySources::Domain::None};
         std::size_t VertexCount{0u};

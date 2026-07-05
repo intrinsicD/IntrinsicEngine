@@ -2118,6 +2118,53 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesInspectorAnalysis)
     EXPECT_EQ(cacheStats.Entries, 1u);
 }
 
+TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnSelectionGeneration)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    Runtime::SandboxEditorSelectedModelCache cache{};
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.SelectedModelCache = &cache;
+
+    const Runtime::SandboxEditorPanelFrame first =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyInspectorModelBuildRequest());
+    ASSERT_TRUE(first.Inspector.HasEntity);
+    EXPECT_EQ(first.ModelBuildStats.SelectedAnalysisCacheMisses, 1u);
+
+    const Runtime::SandboxEditorPanelFrame cached =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyInspectorModelBuildRequest());
+    ASSERT_TRUE(cached.Inspector.HasEntity);
+    EXPECT_EQ(cached.ModelBuildStats.SelectedAnalysisCacheHits, 1u);
+    EXPECT_EQ(cached.ModelBuildStats.PropertyCatalogModelBuilds, 0u);
+
+    selection.ClearSelection(registry);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    const Runtime::SandboxEditorPanelFrame reselected =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyInspectorModelBuildRequest());
+    ASSERT_TRUE(reselected.Inspector.HasEntity);
+    EXPECT_EQ(reselected.ModelBuildStats.SelectedAnalysisCacheMisses, 1u);
+    EXPECT_EQ(reselected.ModelBuildStats.SelectedAnalysisCacheHits, 0u);
+    EXPECT_EQ(reselected.ModelBuildStats.PropertyCatalogModelBuilds, 1u);
+
+    const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
+        cache.Stats();
+    EXPECT_EQ(cacheStats.SelectedAnalysisCacheMisses, 2u);
+    EXPECT_EQ(cacheStats.SelectedAnalysisCacheHits, 1u);
+    EXPECT_EQ(cacheStats.Entries, 1u);
+}
+
 TEST(SandboxEditorUi, SelectedModelCacheReusesVisualizationModel)
 {
     ECS::Scene::Registry registry;

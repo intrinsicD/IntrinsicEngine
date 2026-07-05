@@ -224,6 +224,7 @@ namespace Extrinsic::Runtime
 
         m_Selected = desired;
         RebuildSnapshot();
+        ++m_SelectionGeneration;
         ++m_Diagnostics.SelectionChangesEmitted;
     }
 
@@ -392,6 +393,11 @@ namespace Extrinsic::Runtime
     std::span<const std::uint32_t> SelectionController::SelectedStableIds() const noexcept
     {
         return std::span<const std::uint32_t>(m_SelectedStableIds.data(), m_SelectedStableIds.size());
+    }
+
+    std::uint64_t SelectionController::SelectionGeneration() const noexcept
+    {
+        return m_SelectionGeneration;
     }
 
     bool SelectionController::HasHovered() const noexcept
