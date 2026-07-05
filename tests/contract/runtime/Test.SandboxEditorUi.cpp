@@ -6410,6 +6410,375 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWei
     EXPECT_EQ(model.Processing.LastMeshVertexNormalsResult->WrittenCount, 3u);
 }
 
+TEST(SandboxEditorUi, MeshVertexNormalsRequestQueuesDerivedJobAndPublishesOnApply)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+    AttachDerivedJobCommands(context, jobs);
+    std::optional<Runtime::SandboxEditorMeshVertexNormalsResult>
+        completedResult{};
+    context.MethodResultSinks.MeshVertexNormals =
+        [&completedResult](
+            Runtime::SandboxEditorMeshVertexNormalsResult result)
+        {
+            completedResult = std::move(result);
+        };
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "QueuedNormalsMesh");
+    AddTriangleMeshSource(registry, mesh);
+    auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
+    ASSERT_FALSE(properties.Exists(PN::kNormal));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    const Runtime::SandboxEditorMeshVertexNormalsResult result =
+        Runtime::ApplySandboxEditorMeshVertexNormalsCommand(
+            context,
+            Runtime::SandboxEditorMeshVertexNormalsCommand{
+                .StableEntityId = stableId,
+                .Weighting = GN::AveragingMode::AreaWeighted,
+            });
+
+    EXPECT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_EQ(result.VertexSlotCount, 3u);
+    EXPECT_NE(result.Message.find("queued"), std::string::npos);
+    EXPECT_FALSE(properties.Exists(PN::kNormal));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
+
+    Runtime::DerivedJobQueueSnapshot queued = jobs.SnapshotAll();
+    ASSERT_EQ(queued.Entries.size(), 1u);
+    EXPECT_EQ(queued.Entries[0].Name, "Sandbox.MeshVertexNormals.CPU");
+    EXPECT_EQ(queued.Entries[0].Status, Runtime::DerivedJobStatus::Queued);
+
+    jobs.Pump(1u);
+    jobs.DrainCompletions();
+    EXPECT_FALSE(completedResult.has_value());
+    EXPECT_FALSE(properties.Exists(PN::kNormal));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
+
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    ASSERT_TRUE(completedResult.has_value());
+    EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
+    EXPECT_EQ(completedResult->NormalStatus, GN::RecomputeStatus::Success);
+    EXPECT_EQ(completedResult->VertexSlotCount, 3u);
+    EXPECT_EQ(completedResult->WrittenCount, 3u);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+    EXPECT_TRUE(history.IsDirty());
+
+    auto normals = properties.Get<glm::vec3>(PN::kNormal);
+    ASSERT_TRUE(normals);
+    ASSERT_EQ(normals.Vector().size(), 3u);
+    for (const glm::vec3 normal : normals.Vector())
+    {
+        EXPECT_NEAR(normal.x, 0.0f, 1.0e-5f);
+        EXPECT_NEAR(normal.y, 0.0f, 1.0e-5f);
+        EXPECT_NEAR(normal.z, 1.0f, 1.0e-5f);
+    }
+}
+
+TEST(SandboxEditorUi,
+     GraphAndPointCloudVertexNormalsRequestsQueueDerivedJobsAndPublishOnApply)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+    AttachDerivedJobCommands(context, jobs);
+    std::optional<Runtime::SandboxEditorGraphVertexNormalsResult>
+        completedGraph{};
+    std::optional<Runtime::SandboxEditorPointCloudVertexNormalsResult>
+        completedCloud{};
+    context.MethodResultSinks.GraphVertexNormals =
+        [&completedGraph](
+            Runtime::SandboxEditorGraphVertexNormalsResult result)
+        {
+            completedGraph = std::move(result);
+        };
+    context.MethodResultSinks.PointCloudVertexNormals =
+        [&completedCloud](
+            Runtime::SandboxEditorPointCloudVertexNormalsResult result)
+        {
+            completedCloud = std::move(result);
+        };
+
+    const ECS::EntityHandle graph = MakeSelectable(registry, "QueuedGraphNormals");
+    AddPlanarCycleGraphSource(registry, graph);
+    auto& graphProperties = registry.Raw().get<GS::Nodes>(graph).Properties;
+    ASSERT_FALSE(graphProperties.Exists(PN::kNormal));
+
+    const Runtime::SandboxEditorGraphVertexNormalsResult graphResult =
+        Runtime::ApplySandboxEditorGraphVertexNormalsCommand(
+            context,
+            Runtime::SandboxEditorGraphVertexNormalsCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(graph),
+                .FallbackNormal = glm::vec3{0.0f, 0.0f, 1.0f},
+                .OrientTowardFallback = true,
+            });
+
+    EXPECT_EQ(graphResult.Status,
+              Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_EQ(graphResult.VertexSlotCount, 4u);
+    EXPECT_EQ(graphResult.EdgeSlotCount, 4u);
+    EXPECT_FALSE(graphProperties.Exists(PN::kNormal));
+
+    Runtime::DerivedJobQueueSnapshot queued = jobs.SnapshotAll();
+    ASSERT_EQ(queued.Entries.size(), 1u);
+    EXPECT_EQ(queued.Entries[0].Name, "Sandbox.GraphVertexNormals.CPU");
+    EXPECT_EQ(queued.Entries[0].Status, Runtime::DerivedJobStatus::Queued);
+
+    jobs.Pump(1u);
+    jobs.DrainCompletions();
+    EXPECT_FALSE(completedGraph.has_value());
+    EXPECT_FALSE(graphProperties.Exists(PN::kNormal));
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    ASSERT_TRUE(completedGraph.has_value());
+    EXPECT_TRUE(completedGraph->Succeeded()) << completedGraph->Message;
+    EXPECT_EQ(completedGraph->WrittenCount, 4u);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(graph));
+    auto graphNormals = graphProperties.Get<glm::vec3>(PN::kNormal);
+    ASSERT_TRUE(graphNormals);
+    ASSERT_EQ(graphNormals.Vector().size(), 4u);
+    for (const glm::vec3 normal : graphNormals.Vector())
+    {
+        ExpectFiniteUnitNormal(normal);
+        EXPECT_GT(normal.z, 0.9f);
+    }
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "QueuedCloudNormals");
+    AddPointCloudSource(registry, cloud, 9u);
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
+                 {
+                     {-1.0f, -1.0f, 0.0f},
+                     {0.0f, -1.0f, 0.0f},
+                     {1.0f, -1.0f, 0.0f},
+                     {-1.0f, 0.0f, 0.0f},
+                     {0.0f, 0.0f, 0.0f},
+                     {1.0f, 0.0f, 0.0f},
+                     {-1.0f, 1.0f, 0.0f},
+                     {0.0f, 1.0f, 0.0f},
+                     {1.0f, 1.0f, 0.0f},
+                 });
+    auto& cloudProperties = registry.Raw().get<GS::Vertices>(cloud).Properties;
+    ASSERT_FALSE(cloudProperties.Exists(PN::kNormal));
+
+    const Runtime::SandboxEditorPointCloudVertexNormalsResult cloudResult =
+        Runtime::ApplySandboxEditorPointCloudVertexNormalsCommand(
+            context,
+            Runtime::SandboxEditorPointCloudVertexNormalsCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(cloud),
+                .KNeighbors = 4u,
+                .MinimumNeighbors = 2u,
+                .UseRadiusSearch = false,
+                .Orientation = PCN::OrientationMode::MinimumSpanningTree,
+                .FallbackNormal = glm::vec3{0.0f, 0.0f, 1.0f},
+            });
+
+    EXPECT_EQ(cloudResult.Status,
+              Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_EQ(cloudResult.PointSlotCount, 9u);
+    EXPECT_FALSE(cloudProperties.Exists(PN::kNormal));
+
+    queued = jobs.SnapshotAll();
+    ASSERT_EQ(queued.Entries.size(), 2u);
+    EXPECT_EQ(queued.Entries[1].Name, "Sandbox.PointCloudVertexNormals.CPU");
+    EXPECT_EQ(queued.Entries[1].Status, Runtime::DerivedJobStatus::Queued);
+
+    jobs.Pump(1u);
+    jobs.DrainCompletions();
+    EXPECT_FALSE(completedCloud.has_value());
+    EXPECT_FALSE(cloudProperties.Exists(PN::kNormal));
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    ASSERT_TRUE(completedCloud.has_value());
+    EXPECT_TRUE(completedCloud->Succeeded()) << completedCloud->Message;
+    EXPECT_EQ(completedCloud->PointSlotCount, 9u);
+    EXPECT_EQ(completedCloud->WrittenCount, 9u);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(cloud));
+    auto cloudNormals = cloudProperties.Get<glm::vec3>(PN::kNormal);
+    ASSERT_TRUE(cloudNormals);
+    ASSERT_EQ(cloudNormals.Vector().size(), 9u);
+    for (const glm::vec3 normal : cloudNormals.Vector())
+    {
+        ExpectFiniteUnitNormal(normal);
+        EXPECT_GT(normal.z, 0.5f);
+    }
+    EXPECT_TRUE(history.IsDirty());
+}
+
+TEST(SandboxEditorUi, VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    {
+        Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+        Runtime::StreamingExecutor executor{};
+        Runtime::DerivedJobRegistry jobs{executor};
+        AttachDerivedJobCommands(context, jobs);
+        bool completedSinkCalled = false;
+        context.MethodResultSinks.MeshVertexNormals =
+            [&completedSinkCalled](
+                Runtime::SandboxEditorMeshVertexNormalsResult)
+            {
+                completedSinkCalled = true;
+            };
+
+        const ECS::EntityHandle mesh =
+            MakeSelectable(registry, "StaleMeshNormals");
+        AddTriangleMeshSource(registry, mesh);
+        const Runtime::SandboxEditorMeshVertexNormalsResult result =
+            Runtime::ApplySandboxEditorMeshVertexNormalsCommand(
+                context,
+                Runtime::SandboxEditorMeshVertexNormalsCommand{
+                    .StableEntityId =
+                        Runtime::SelectionController::ToStableEntityId(mesh),
+                });
+        ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+
+        SetPositions(registry.Raw().get<GS::Vertices>(mesh),
+                     {
+                         {10.0f, 0.0f, 0.0f},
+                         {11.0f, 0.0f, 0.0f},
+                         {12.0f, 0.0f, 0.0f},
+                     });
+
+        jobs.Pump(1u);
+        jobs.DrainCompletions();
+        EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+        Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+        ASSERT_EQ(done.Entries.size(), 1u);
+        EXPECT_EQ(done.Entries[0].Status,
+                  Runtime::DerivedJobStatus::StaleDiscarded);
+        EXPECT_NE(done.Entries[0].Diagnostic.find(
+                      "StaleSourcePropertyGeneration"),
+                  std::string::npos);
+        EXPECT_FALSE(completedSinkCalled);
+        EXPECT_FALSE(registry.Raw().get<GS::Vertices>(mesh)
+                         .Properties.Exists(PN::kNormal));
+        EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
+    }
+
+    {
+        Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+        Runtime::StreamingExecutor executor{};
+        Runtime::DerivedJobRegistry jobs{executor};
+        AttachDerivedJobCommands(context, jobs);
+        bool completedSinkCalled = false;
+        context.MethodResultSinks.GraphVertexNormals =
+            [&completedSinkCalled](
+                Runtime::SandboxEditorGraphVertexNormalsResult)
+            {
+                completedSinkCalled = true;
+            };
+
+        const ECS::EntityHandle graph =
+            MakeSelectable(registry, "StaleGraphNormals");
+        AddPlanarCycleGraphSource(registry, graph);
+        const Runtime::SandboxEditorGraphVertexNormalsResult result =
+            Runtime::ApplySandboxEditorGraphVertexNormalsCommand(
+                context,
+                Runtime::SandboxEditorGraphVertexNormalsCommand{
+                    .StableEntityId =
+                        Runtime::SelectionController::ToStableEntityId(graph),
+                });
+        ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+
+        SetNodePositions(registry.Raw().get<GS::Nodes>(graph),
+                         {
+                             {10.0f, 0.0f, 0.0f},
+                             {11.0f, 0.0f, 0.0f},
+                             {12.0f, 0.0f, 0.0f},
+                             {13.0f, 0.0f, 0.0f},
+                         });
+
+        jobs.Pump(1u);
+        jobs.DrainCompletions();
+        EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+        Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+        ASSERT_EQ(done.Entries.size(), 1u);
+        EXPECT_EQ(done.Entries[0].Status,
+                  Runtime::DerivedJobStatus::StaleDiscarded);
+        EXPECT_NE(done.Entries[0].Diagnostic.find(
+                      "StaleSourcePropertyGeneration"),
+                  std::string::npos);
+        EXPECT_FALSE(completedSinkCalled);
+        EXPECT_FALSE(registry.Raw().get<GS::Nodes>(graph)
+                         .Properties.Exists(PN::kNormal));
+        EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(graph));
+    }
+
+    {
+        Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+        Runtime::StreamingExecutor executor{};
+        Runtime::DerivedJobRegistry jobs{executor};
+        AttachDerivedJobCommands(context, jobs);
+        bool completedSinkCalled = false;
+        context.MethodResultSinks.PointCloudVertexNormals =
+            [&completedSinkCalled](
+                Runtime::SandboxEditorPointCloudVertexNormalsResult)
+            {
+                completedSinkCalled = true;
+            };
+
+        const ECS::EntityHandle cloud =
+            MakeSelectable(registry, "StaleCloudNormals");
+        AddPointCloudSource(registry, cloud, 4u);
+        SetPositions(registry.Raw().get<GS::Vertices>(cloud),
+                     {
+                         {0.0f, 0.0f, 0.0f},
+                         {1.0f, 0.0f, 0.0f},
+                         {0.0f, 1.0f, 0.0f},
+                         {1.0f, 1.0f, 0.0f},
+                     });
+        const Runtime::SandboxEditorPointCloudVertexNormalsResult result =
+            Runtime::ApplySandboxEditorPointCloudVertexNormalsCommand(
+                context,
+                Runtime::SandboxEditorPointCloudVertexNormalsCommand{
+                    .StableEntityId =
+                        Runtime::SelectionController::ToStableEntityId(cloud),
+                    .KNeighbors = 3u,
+                    .MinimumNeighbors = 2u,
+                });
+        ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+
+        SetPositions(registry.Raw().get<GS::Vertices>(cloud),
+                     {
+                         {10.0f, 0.0f, 0.0f},
+                         {11.0f, 0.0f, 0.0f},
+                         {12.0f, 0.0f, 0.0f},
+                         {13.0f, 0.0f, 0.0f},
+                     });
+
+        jobs.Pump(1u);
+        jobs.DrainCompletions();
+        EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+        Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+        ASSERT_EQ(done.Entries.size(), 1u);
+        EXPECT_EQ(done.Entries[0].Status,
+                  Runtime::DerivedJobStatus::StaleDiscarded);
+        EXPECT_NE(done.Entries[0].Diagnostic.find(
+                      "StaleSourcePropertyGeneration"),
+                  std::string::npos);
+        EXPECT_FALSE(completedSinkCalled);
+        EXPECT_FALSE(registry.Raw().get<GS::Vertices>(cloud)
+                         .Properties.Exists(PN::kNormal));
+        EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(cloud));
+    }
+}
+
 TEST(SandboxEditorUi, MeshVertexNormalsCommandSurvivesPendingDirectMeshPostProcess)
 {
     TmpFile meshFile(

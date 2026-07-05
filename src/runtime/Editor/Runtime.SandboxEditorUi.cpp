@@ -8189,6 +8189,922 @@ namespace Extrinsic::Runtime
                 : error;
         }
 
+        enum class SandboxEditorVertexNormalsCpuJobKind : std::uint8_t
+        {
+            Mesh,
+            Graph,
+            PointCloud,
+        };
+
+        [[nodiscard]] const char* VertexNormalsCpuJobName(
+            const SandboxEditorVertexNormalsCpuJobKind kind) noexcept
+        {
+            switch (kind)
+            {
+            case SandboxEditorVertexNormalsCpuJobKind::Mesh:
+                return "Sandbox.MeshVertexNormals.CPU";
+            case SandboxEditorVertexNormalsCpuJobKind::Graph:
+                return "Sandbox.GraphVertexNormals.CPU";
+            case SandboxEditorVertexNormalsCpuJobKind::PointCloud:
+                return "Sandbox.PointCloudVertexNormals.CPU";
+            }
+            return "Sandbox.VertexNormals.CPU";
+        }
+
+        [[nodiscard]] const char* VertexNormalsCpuJobOutputName(
+            const SandboxEditorVertexNormalsCpuJobKind kind) noexcept
+        {
+            switch (kind)
+            {
+            case SandboxEditorVertexNormalsCpuJobKind::Mesh:
+                return "mesh_vertex_normals";
+            case SandboxEditorVertexNormalsCpuJobKind::Graph:
+                return "graph_vertex_normals";
+            case SandboxEditorVertexNormalsCpuJobKind::PointCloud:
+                return "point_cloud_vertex_normals";
+            }
+            return "vertex_normals";
+        }
+
+        [[nodiscard]] ProgressiveGeometryDomain VertexNormalsCpuJobDomain(
+            const SandboxEditorVertexNormalsCpuJobKind kind) noexcept
+        {
+            switch (kind)
+            {
+            case SandboxEditorVertexNormalsCpuJobKind::Mesh:
+                return ProgressiveGeometryDomain::MeshVertex;
+            case SandboxEditorVertexNormalsCpuJobKind::Graph:
+                return ProgressiveGeometryDomain::GraphVertex;
+            case SandboxEditorVertexNormalsCpuJobKind::PointCloud:
+                return ProgressiveGeometryDomain::Point;
+            }
+            return ProgressiveGeometryDomain::Unknown;
+        }
+
+        [[nodiscard]] GS::Domain VertexNormalsExpectedSourceDomain(
+            const SandboxEditorVertexNormalsCpuJobKind kind) noexcept
+        {
+            switch (kind)
+            {
+            case SandboxEditorVertexNormalsCpuJobKind::Mesh:
+                return GS::Domain::Mesh;
+            case SandboxEditorVertexNormalsCpuJobKind::Graph:
+                return GS::Domain::Graph;
+            case SandboxEditorVertexNormalsCpuJobKind::PointCloud:
+                return GS::Domain::PointCloud;
+            }
+            return GS::Domain::None;
+        }
+
+        [[nodiscard]] SandboxEditorMeshVertexNormalsResult
+        MakePendingMeshVertexNormalsResult(
+            const SandboxEditorMeshVertexNormalsCommand& command,
+            const std::size_t vertexSlotCount,
+            const DerivedJobHandle handle)
+        {
+            SandboxEditorMeshVertexNormalsResult result =
+                MakeMeshNormalsResult(
+                    SandboxEditorCommandStatus::Pending,
+                    GN::RecomputeStatus::Success,
+                    command.Weighting,
+                    Core::ErrorCode::Success,
+                    "Mesh vertex-normal CPU job queued");
+            result.VertexSlotCount = vertexSlotCount;
+            AppendDerivedJobHandleToMessage(result.Message, handle);
+            result.Message += ".";
+            return result;
+        }
+
+        [[nodiscard]] SandboxEditorGraphVertexNormalsResult
+        MakePendingGraphVertexNormalsResult(
+            const SandboxEditorGraphVertexNormalsCommand& command,
+            const std::size_t vertexSlotCount,
+            const std::size_t edgeSlotCount,
+            const DerivedJobHandle handle)
+        {
+            SandboxEditorGraphVertexNormalsResult result =
+                MakeGraphNormalsResult(
+                    SandboxEditorCommandStatus::Pending,
+                    GraphNormals::RecomputeStatus::Success,
+                    command.OrientTowardFallback,
+                    Core::ErrorCode::Success,
+                    "Graph vertex-normal CPU job queued");
+            result.VertexSlotCount = vertexSlotCount;
+            result.EdgeSlotCount = edgeSlotCount;
+            AppendDerivedJobHandleToMessage(result.Message, handle);
+            result.Message += ".";
+            return result;
+        }
+
+        [[nodiscard]] SandboxEditorPointCloudVertexNormalsResult
+        MakePendingPointCloudVertexNormalsResult(
+            const SandboxEditorPointCloudVertexNormalsCommand& command,
+            const std::size_t pointSlotCount,
+            const DerivedJobHandle handle)
+        {
+            SandboxEditorPointCloudVertexNormalsResult result =
+                MakePointCloudNormalsResult(
+                    SandboxEditorCommandStatus::Pending,
+                    PointNormals::RecomputeStatus::Success,
+                    command,
+                    Core::ErrorCode::Success,
+                    "Point-cloud vertex-normal CPU job queued");
+            result.PointSlotCount = pointSlotCount;
+            AppendDerivedJobHandleToMessage(result.Message, handle);
+            result.Message += ".";
+            return result;
+        }
+
+        struct SandboxEditorVertexNormalsCpuJobState
+        {
+            SandboxEditorVertexNormalsCpuJobKind Kind{
+                SandboxEditorVertexNormalsCpuJobKind::Mesh};
+            std::uint32_t StableEntityId{0u};
+            std::uint64_t GeometryMetadataSignature{0u};
+            std::vector<glm::vec3> SnapshotPositions{};
+            std::vector<glm::vec3> Normals{};
+            Geometry::HalfedgeMesh::Mesh Mesh{};
+            Geometry::Vertices GraphNodes{};
+            Geometry::PropertySet GraphEdges{};
+            Geometry::Halfedges GraphHalfedges{};
+            std::size_t GraphEdgeSlotCount{0u};
+            Geometry::Vertices PointCloudPoints{};
+            SandboxEditorMeshVertexNormalsCommand MeshCommand{};
+            SandboxEditorGraphVertexNormalsCommand GraphCommand{};
+            SandboxEditorPointCloudVertexNormalsCommand PointCloudCommand{};
+            SandboxEditorMeshVertexNormalsResult MeshResult{};
+            SandboxEditorGraphVertexNormalsResult GraphResult{};
+            SandboxEditorPointCloudVertexNormalsResult PointCloudResult{};
+        };
+
+        [[nodiscard]] const Geometry::PropertySet*
+        VertexNormalsSourceProperties(
+            const GS::ConstSourceView& view,
+            const SandboxEditorVertexNormalsCpuJobKind kind) noexcept
+        {
+            switch (kind)
+            {
+            case SandboxEditorVertexNormalsCpuJobKind::Mesh:
+            case SandboxEditorVertexNormalsCpuJobKind::PointCloud:
+                return view.VertexSource != nullptr
+                    ? &view.VertexSource->Properties
+                    : nullptr;
+            case SandboxEditorVertexNormalsCpuJobKind::Graph:
+                return view.NodeSource != nullptr
+                    ? &view.NodeSource->Properties
+                    : nullptr;
+            }
+            return nullptr;
+        }
+
+        [[nodiscard]] Geometry::PropertySet* VertexNormalsTargetProperties(
+            GS::MutableSourceView& view,
+            const SandboxEditorVertexNormalsCpuJobKind kind) noexcept
+        {
+            switch (kind)
+            {
+            case SandboxEditorVertexNormalsCpuJobKind::Mesh:
+            case SandboxEditorVertexNormalsCpuJobKind::PointCloud:
+                return view.VertexSource != nullptr
+                    ? &view.VertexSource->Properties
+                    : nullptr;
+            case SandboxEditorVertexNormalsCpuJobKind::Graph:
+                return view.NodeSource != nullptr
+                    ? &view.NodeSource->Properties
+                    : nullptr;
+            }
+            return nullptr;
+        }
+
+        [[nodiscard]] DerivedJobApplyValidation ValidateVertexNormalsCpuJobApply(
+            const SandboxEditorContext& context,
+            const SandboxEditorVertexNormalsCpuJobState& job)
+        {
+            if (context.Scene == nullptr)
+                return DerivedJobApplyValidation::MissingEntity;
+
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, job.StableEntityId);
+            if (!entity.has_value())
+                return DerivedJobApplyValidation::MissingEntity;
+
+            const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
+            const GS::SourceAvailability availability =
+                GS::BuildSourceAvailability(view);
+            if (availability.ProvenanceDomain !=
+                VertexNormalsExpectedSourceDomain(job.Kind))
+            {
+                return DerivedJobApplyValidation::StaleGeometryGeneration;
+            }
+
+            if (GeometryMetadataSignatureForEntity(raw, *entity) !=
+                job.GeometryMetadataSignature)
+            {
+                return DerivedJobApplyValidation::StaleGeometryGeneration;
+            }
+
+            const Geometry::PropertySet* properties =
+                VertexNormalsSourceProperties(view, job.Kind);
+            if (properties == nullptr)
+                return DerivedJobApplyValidation::StaleGeometryGeneration;
+
+            std::optional<std::vector<glm::vec3>> current =
+                CollectKMeansPositions(*properties);
+            if (!current.has_value() ||
+                !SameKMeansInputPositions(*current, job.SnapshotPositions))
+            {
+                return DerivedJobApplyValidation::StaleSourcePropertyGeneration;
+            }
+
+            return DerivedJobApplyValidation::Current;
+        }
+
+        void PublishMeshVertexNormalsResultSink(
+            const SandboxEditorContext& context,
+            SandboxEditorMeshVertexNormalsResult result)
+        {
+            if (context.MethodResultSinks.MeshVertexNormals)
+                context.MethodResultSinks.MeshVertexNormals(std::move(result));
+        }
+
+        void PublishGraphVertexNormalsResultSink(
+            const SandboxEditorContext& context,
+            SandboxEditorGraphVertexNormalsResult result)
+        {
+            if (context.MethodResultSinks.GraphVertexNormals)
+                context.MethodResultSinks.GraphVertexNormals(std::move(result));
+        }
+
+        void PublishPointCloudVertexNormalsResultSink(
+            const SandboxEditorContext& context,
+            SandboxEditorPointCloudVertexNormalsResult result)
+        {
+            if (context.MethodResultSinks.PointCloudVertexNormals)
+            {
+                context.MethodResultSinks.PointCloudVertexNormals(
+                    std::move(result));
+            }
+        }
+
+        [[nodiscard]] DerivedJobWorkerResult RunMeshVertexNormalsCpuWorker(
+            const std::shared_ptr<SandboxEditorVertexNormalsCpuJobState>& state)
+        {
+            GN::Params params{};
+            params.Weighting = state->MeshCommand.Weighting;
+            params.OutputProperty = GN::kDefaultOutputProperty;
+            params.FallbackNormal = state->MeshCommand.FallbackNormal;
+            params.DegenerateNormalLengthEpsilon =
+                state->MeshCommand.DegenerateNormalLengthEpsilon;
+            params.SkipDeleted = true;
+
+            const GN::Result normalResult = GN::Recompute(state->Mesh, params);
+            SandboxEditorMeshVertexNormalsResult& result = state->MeshResult;
+            result.Status = normalResult.Status == GN::RecomputeStatus::Success
+                ? SandboxEditorCommandStatus::Applied
+                : SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Error = normalResult.Status == GN::RecomputeStatus::Success
+                ? Core::ErrorCode::Success
+                : Core::ErrorCode::Unknown;
+            CopyMeshNormalCounters(normalResult, result);
+
+            if (normalResult.Status != GN::RecomputeStatus::Success)
+            {
+                result.Message =
+                    "Geometry.HalfedgeMesh.Vertices.Normals failed with ";
+                result.Message += std::string(GN::DebugName(normalResult.Status));
+                result.Message += ".";
+                return DerivedJobOutput{
+                    .PayloadToken = 0u,
+                    .NormalizedProgress = 1.0f,
+                    .ProgressDeterminate = true,
+                    .Diagnostic = result.Message,
+                };
+            }
+
+            if (!normalResult.Normals.IsValid() ||
+                normalResult.Normals.Vector().size() !=
+                    state->SnapshotPositions.size())
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.NormalStatus = GN::RecomputeStatus::InvalidOutputProperty;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message =
+                    "Geometry.HalfedgeMesh.Vertices.Normals produced missing or count-mismatched normals.";
+                return DerivedJobOutput{
+                    .PayloadToken = 0u,
+                    .NormalizedProgress = 1.0f,
+                    .ProgressDeterminate = true,
+                    .Diagnostic = result.Message,
+                };
+            }
+
+            state->Normals = normalResult.Normals.Vector();
+            return DerivedJobOutput{
+                .PayloadToken = 0u,
+                .NormalizedProgress = 1.0f,
+                .ProgressDeterminate = true,
+                .Diagnostic = "Mesh vertex-normal CPU result ready",
+            };
+        }
+
+        [[nodiscard]] DerivedJobWorkerResult RunGraphVertexNormalsCpuWorker(
+            const std::shared_ptr<SandboxEditorVertexNormalsCpuJobState>& state)
+        {
+            GraphNormals::Params params{};
+            params.PositionProperty = GS::PropertyNames::kPosition;
+            params.OutputProperty = GraphNormals::kDefaultOutputProperty;
+            params.FallbackNormal = state->GraphCommand.FallbackNormal;
+            params.DegenerateNormalLengthEpsilon =
+                state->GraphCommand.DegenerateNormalLengthEpsilon;
+            params.CollinearEigenvalueRatioEpsilon =
+                state->GraphCommand.CollinearEigenvalueRatioEpsilon;
+            params.SkipDeleted = true;
+            params.OrientTowardFallback =
+                state->GraphCommand.OrientTowardFallback;
+
+            const GraphNormals::PropertySetResult normalResult =
+                GraphNormals::Recompute(
+                    state->GraphNodes,
+                    Geometry::ConstPropertySet(state->GraphNodes)
+                        .Get<glm::vec3>(GS::PropertyNames::kPosition),
+                    Geometry::ConstPropertySet(state->GraphHalfedges)
+                        .Get<Geometry::Graph::HalfedgeConnectivity>(
+                            "h:connectivity"),
+                    state->GraphEdgeSlotCount,
+                    params,
+                    Geometry::ConstPropertySet(state->GraphNodes)
+                        .Get<bool>("v:deleted"),
+                    Geometry::ConstPropertySet(state->GraphEdges)
+                        .Get<bool>("e:deleted"));
+
+            SandboxEditorGraphVertexNormalsResult& result =
+                state->GraphResult;
+            result.Status = normalResult.Status ==
+                    GraphNormals::RecomputeStatus::Success
+                ? SandboxEditorCommandStatus::Applied
+                : SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.NormalStatus = normalResult.Status;
+            result.OrientTowardFallback =
+                state->GraphCommand.OrientTowardFallback;
+            result.Error = ErrorForGraphNormalStatus(normalResult.Status);
+            CopyGraphNormalCounters(normalResult.Diagnostics, result);
+
+            if (normalResult.Status != GraphNormals::RecomputeStatus::Success)
+            {
+                result.Message = "Geometry.Graph.Vertex.Normals failed with ";
+                result.Message +=
+                    std::string(GraphNormals::DebugName(normalResult.Status));
+                result.Message += ".";
+                return DerivedJobOutput{
+                    .PayloadToken = 0u,
+                    .NormalizedProgress = 1.0f,
+                    .ProgressDeterminate = true,
+                    .Diagnostic = result.Message,
+                };
+            }
+
+            if (!normalResult.Normals.IsValid() ||
+                normalResult.Normals.Vector().size() !=
+                    state->SnapshotPositions.size())
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.NormalStatus =
+                    GraphNormals::RecomputeStatus::InvalidOutputProperty;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message =
+                    "Geometry.Graph.Vertex.Normals produced missing or count-mismatched normals.";
+                return DerivedJobOutput{
+                    .PayloadToken = 0u,
+                    .NormalizedProgress = 1.0f,
+                    .ProgressDeterminate = true,
+                    .Diagnostic = result.Message,
+                };
+            }
+
+            state->Normals = normalResult.Normals.Vector();
+            return DerivedJobOutput{
+                .PayloadToken = 0u,
+                .NormalizedProgress = 1.0f,
+                .ProgressDeterminate = true,
+                .Diagnostic = "Graph vertex-normal CPU result ready",
+            };
+        }
+
+        [[nodiscard]] DerivedJobWorkerResult
+        RunPointCloudVertexNormalsCpuWorker(
+            const std::shared_ptr<SandboxEditorVertexNormalsCpuJobState>& state)
+        {
+            Geometry::PointCloud::Cloud scratchCloud{state->PointCloudPoints};
+            PointNormals::Params params{};
+            params.PositionProperty = GS::PropertyNames::kPosition;
+            params.OutputProperty = PointNormals::kDefaultOutputProperty;
+            params.KNeighbors = state->PointCloudCommand.KNeighbors;
+            params.MinimumNeighbors = state->PointCloudCommand.MinimumNeighbors;
+            params.UseRadiusSearch = state->PointCloudCommand.UseRadiusSearch;
+            params.Radius = state->PointCloudCommand.Radius;
+            params.Orientation = state->PointCloudCommand.Orientation;
+            params.FallbackNormal = state->PointCloudCommand.FallbackNormal;
+            params.DegenerateNormalLengthEpsilon =
+                state->PointCloudCommand.DegenerateNormalLengthEpsilon;
+            params.CollinearEigenvalueRatioEpsilon =
+                state->PointCloudCommand.CollinearEigenvalueRatioEpsilon;
+            params.SkipDeleted = true;
+
+            const PointNormals::Result normalResult =
+                PointNormals::Recompute(scratchCloud, params);
+
+            SandboxEditorPointCloudVertexNormalsResult& result =
+                state->PointCloudResult;
+            result.Status = normalResult.Status ==
+                    PointNormals::RecomputeStatus::Success
+                ? SandboxEditorCommandStatus::Applied
+                : SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.NormalStatus = normalResult.Status;
+            result.Backend = normalResult.Backend;
+            result.Orientation = state->PointCloudCommand.Orientation;
+            result.KNeighbors = state->PointCloudCommand.KNeighbors;
+            result.MinimumNeighbors =
+                state->PointCloudCommand.MinimumNeighbors;
+            result.UseRadiusSearch = state->PointCloudCommand.UseRadiusSearch;
+            result.Radius = state->PointCloudCommand.Radius;
+            result.Error = ErrorForPointCloudNormalStatus(normalResult.Status);
+            CopyPointCloudNormalCounters(normalResult.Diagnostics, result);
+
+            if (normalResult.Status != PointNormals::RecomputeStatus::Success)
+            {
+                result.Message = "Geometry.PointCloud.Normals failed with ";
+                result.Message +=
+                    std::string(PointNormals::DebugName(normalResult.Status));
+                result.Message += ".";
+                return DerivedJobOutput{
+                    .PayloadToken = 0u,
+                    .NormalizedProgress = 1.0f,
+                    .ProgressDeterminate = true,
+                    .Diagnostic = result.Message,
+                };
+            }
+
+            if (!normalResult.Normals.IsValid() ||
+                normalResult.Normals.Vector().size() !=
+                    state->SnapshotPositions.size())
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.NormalStatus =
+                    PointNormals::RecomputeStatus::InvalidOutputProperty;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message =
+                    "Geometry.PointCloud.Normals produced missing or count-mismatched normals.";
+                return DerivedJobOutput{
+                    .PayloadToken = 0u,
+                    .NormalizedProgress = 1.0f,
+                    .ProgressDeterminate = true,
+                    .Diagnostic = result.Message,
+                };
+            }
+
+            state->Normals = normalResult.Normals.Vector();
+            return DerivedJobOutput{
+                .PayloadToken = 0u,
+                .NormalizedProgress = 1.0f,
+                .ProgressDeterminate = true,
+                .Diagnostic = "Point-cloud vertex-normal CPU result ready",
+            };
+        }
+
+        [[nodiscard]] DerivedJobWorkerResult RunVertexNormalsCpuWorker(
+            const std::shared_ptr<SandboxEditorVertexNormalsCpuJobState>& state)
+        {
+            switch (state->Kind)
+            {
+            case SandboxEditorVertexNormalsCpuJobKind::Mesh:
+                return RunMeshVertexNormalsCpuWorker(state);
+            case SandboxEditorVertexNormalsCpuJobKind::Graph:
+                return RunGraphVertexNormalsCpuWorker(state);
+            case SandboxEditorVertexNormalsCpuJobKind::PointCloud:
+                return RunPointCloudVertexNormalsCpuWorker(state);
+            }
+            return std::unexpected(Core::ErrorCode::InvalidArgument);
+        }
+
+        [[nodiscard]] Core::Result PublishMeshVertexNormalsCpuJob(
+            const SandboxEditorContext& context,
+            SandboxEditorVertexNormalsCpuJobState& job)
+        {
+            SandboxEditorMeshVertexNormalsResult result = job.MeshResult;
+            if (!result.Succeeded())
+            {
+                PublishMeshVertexNormalsResultSink(context, result);
+                return Core::Err(ResultErrorOrUnknown(result.Error));
+            }
+            if (context.Scene == nullptr)
+            {
+                result.Status = SandboxEditorCommandStatus::MissingScene;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "Scene registry is unavailable for mesh vertex-normal publication.";
+                PublishMeshVertexNormalsResultSink(context, result);
+                return Core::Err(result.Error);
+            }
+
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, job.StableEntityId);
+            if (!entity.has_value())
+            {
+                result.Status = SandboxEditorCommandStatus::StaleEntity;
+                result.Error = Core::ErrorCode::ResourceNotFound;
+                result.Message =
+                    "Mesh vertex-normal target entity is stale before publication.";
+                PublishMeshVertexNormalsResultSink(context, result);
+                return Core::Err(result.Error);
+            }
+
+            GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
+            Geometry::PropertySet* properties =
+                VertexNormalsTargetProperties(
+                    view,
+                    SandboxEditorVertexNormalsCpuJobKind::Mesh);
+            if (properties == nullptr ||
+                !PublishCanonicalVec3Normals(*properties, job.Normals))
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.NormalStatus = GN::RecomputeStatus::PropertyTypeConflict;
+                result.Error = Core::ErrorCode::TypeMismatch;
+                result.Message =
+                    "Mesh vertex-normal publication failed because v:normal has an incompatible type or size.";
+                PublishMeshVertexNormalsResultSink(context, result);
+                return Core::Err(result.Error);
+            }
+
+            Dirty::MarkVertexNormalsDirty(raw, *entity);
+            if (context.CommandHistory != nullptr)
+                (void)context.CommandHistory->MarkDirty(
+                    "Recompute mesh vertex normals");
+            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Error = Core::ErrorCode::Success;
+            result.Message = BuildMeshNormalsSuccessMessage(result);
+            InvalidateSelectedModelCache(context);
+            PublishMeshVertexNormalsResultSink(context, result);
+            return Core::Ok();
+        }
+
+        [[nodiscard]] Core::Result PublishGraphVertexNormalsCpuJob(
+            const SandboxEditorContext& context,
+            SandboxEditorVertexNormalsCpuJobState& job)
+        {
+            SandboxEditorGraphVertexNormalsResult result = job.GraphResult;
+            if (!result.Succeeded())
+            {
+                PublishGraphVertexNormalsResultSink(context, result);
+                return Core::Err(ResultErrorOrUnknown(result.Error));
+            }
+            if (context.Scene == nullptr)
+            {
+                result.Status = SandboxEditorCommandStatus::MissingScene;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "Scene registry is unavailable for graph vertex-normal publication.";
+                PublishGraphVertexNormalsResultSink(context, result);
+                return Core::Err(result.Error);
+            }
+
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, job.StableEntityId);
+            if (!entity.has_value())
+            {
+                result.Status = SandboxEditorCommandStatus::StaleEntity;
+                result.Error = Core::ErrorCode::ResourceNotFound;
+                result.Message =
+                    "Graph vertex-normal target entity is stale before publication.";
+                PublishGraphVertexNormalsResultSink(context, result);
+                return Core::Err(result.Error);
+            }
+
+            GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
+            Geometry::PropertySet* properties =
+                VertexNormalsTargetProperties(
+                    view,
+                    SandboxEditorVertexNormalsCpuJobKind::Graph);
+            if (properties == nullptr ||
+                !PublishCanonicalVec3Normals(*properties, job.Normals))
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.NormalStatus =
+                    GraphNormals::RecomputeStatus::PropertyTypeConflict;
+                result.Error = Core::ErrorCode::TypeMismatch;
+                result.Message =
+                    "Graph vertex-normal publication failed because v:normal has an incompatible type or size.";
+                PublishGraphVertexNormalsResultSink(context, result);
+                return Core::Err(result.Error);
+            }
+
+            Dirty::MarkVertexNormalsDirty(raw, *entity);
+            if (context.CommandHistory != nullptr)
+                (void)context.CommandHistory->MarkDirty(
+                    "Recompute graph vertex normals");
+            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Error = Core::ErrorCode::Success;
+            result.Message = BuildGraphNormalsSuccessMessage(result);
+            InvalidateSelectedModelCache(context);
+            PublishGraphVertexNormalsResultSink(context, result);
+            return Core::Ok();
+        }
+
+        [[nodiscard]] Core::Result PublishPointCloudVertexNormalsCpuJob(
+            const SandboxEditorContext& context,
+            SandboxEditorVertexNormalsCpuJobState& job)
+        {
+            SandboxEditorPointCloudVertexNormalsResult result =
+                job.PointCloudResult;
+            if (!result.Succeeded())
+            {
+                PublishPointCloudVertexNormalsResultSink(context, result);
+                return Core::Err(ResultErrorOrUnknown(result.Error));
+            }
+            if (context.Scene == nullptr)
+            {
+                result.Status = SandboxEditorCommandStatus::MissingScene;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "Scene registry is unavailable for point-cloud vertex-normal publication.";
+                PublishPointCloudVertexNormalsResultSink(context, result);
+                return Core::Err(result.Error);
+            }
+
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, job.StableEntityId);
+            if (!entity.has_value())
+            {
+                result.Status = SandboxEditorCommandStatus::StaleEntity;
+                result.Error = Core::ErrorCode::ResourceNotFound;
+                result.Message =
+                    "Point-cloud vertex-normal target entity is stale before publication.";
+                PublishPointCloudVertexNormalsResultSink(context, result);
+                return Core::Err(result.Error);
+            }
+
+            GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
+            Geometry::PropertySet* properties =
+                VertexNormalsTargetProperties(
+                    view,
+                    SandboxEditorVertexNormalsCpuJobKind::PointCloud);
+            if (properties == nullptr ||
+                !PublishCanonicalVec3Normals(*properties, job.Normals))
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.NormalStatus =
+                    PointNormals::RecomputeStatus::PropertyTypeConflict;
+                result.Error = Core::ErrorCode::TypeMismatch;
+                result.Message =
+                    "Point-cloud vertex-normal publication failed because v:normal has an incompatible type or size.";
+                PublishPointCloudVertexNormalsResultSink(context, result);
+                return Core::Err(result.Error);
+            }
+
+            Dirty::MarkVertexNormalsDirty(raw, *entity);
+            if (context.CommandHistory != nullptr)
+                (void)context.CommandHistory->MarkDirty(
+                    "Recompute point-cloud vertex normals");
+            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Error = Core::ErrorCode::Success;
+            result.Message = BuildPointCloudNormalsSuccessMessage(result);
+            InvalidateSelectedModelCache(context);
+            PublishPointCloudVertexNormalsResultSink(context, result);
+            return Core::Ok();
+        }
+
+        [[nodiscard]] Core::Result PublishVertexNormalsCpuJob(
+            const SandboxEditorContext& context,
+            SandboxEditorVertexNormalsCpuJobState& job)
+        {
+            switch (job.Kind)
+            {
+            case SandboxEditorVertexNormalsCpuJobKind::Mesh:
+                return PublishMeshVertexNormalsCpuJob(context, job);
+            case SandboxEditorVertexNormalsCpuJobKind::Graph:
+                return PublishGraphVertexNormalsCpuJob(context, job);
+            case SandboxEditorVertexNormalsCpuJobKind::PointCloud:
+                return PublishPointCloudVertexNormalsCpuJob(context, job);
+            }
+            return Core::Err(Core::ErrorCode::InvalidArgument);
+        }
+
+        [[nodiscard]] DerivedJobDesc MakeVertexNormalsCpuJobDesc(
+            const SandboxEditorContext& context,
+            const std::shared_ptr<SandboxEditorVertexNormalsCpuJobState>& state)
+        {
+            const std::uint32_t estimatedCost =
+                std::max<std::uint32_t>(
+                    1u,
+                    static_cast<std::uint32_t>(
+                        (std::max(state->SnapshotPositions.size(),
+                                  state->GraphEdgeSlotCount) +
+                         1023u) /
+                        1024u));
+            return DerivedJobDesc{
+                .Key = DerivedJobKey{
+                    .EntityId = state->StableEntityId,
+                    .Domain = VertexNormalsCpuJobDomain(state->Kind),
+                    .OutputSemantic = ProgressiveSlotSemantic::Normal,
+                    .SourcePropertyGeneration =
+                        state->GeometryMetadataSignature,
+                    .OutputName = VertexNormalsCpuJobOutputName(state->Kind),
+                },
+                .Name = VertexNormalsCpuJobName(state->Kind),
+                .RequestedJobDomain = ProgressiveJobDomain::Cpu,
+                .Kind = Core::Dag::TaskKind::GeometryProcess,
+                .Priority = Core::Dag::TaskPriority::Normal,
+                .EstimatedCost = estimatedCost,
+                .Execute =
+                    [state]() -> DerivedJobWorkerResult
+                    {
+                        return RunVertexNormalsCpuWorker(state);
+                    },
+                .ValidateOnMainThread =
+                    [context, state]()
+                    {
+                        return ValidateVertexNormalsCpuJobApply(
+                            context,
+                            *state);
+                    },
+                .ApplyOnMainThread =
+                    [context, state](DerivedJobApplyContext&) -> Core::Result
+                    {
+                        return PublishVertexNormalsCpuJob(context, *state);
+                    },
+            };
+        }
+
+        [[nodiscard]] SandboxEditorMeshVertexNormalsResult
+        SubmitMeshVertexNormalsCpuJob(
+            const SandboxEditorContext& context,
+            const SandboxEditorMeshVertexNormalsCommand& command,
+            Geometry::HalfedgeMesh::Mesh mesh,
+            const std::uint64_t geometryMetadataSignature)
+        {
+            auto state =
+                std::make_shared<SandboxEditorVertexNormalsCpuJobState>();
+            state->Kind = SandboxEditorVertexNormalsCpuJobKind::Mesh;
+            state->StableEntityId = command.StableEntityId;
+            state->GeometryMetadataSignature = geometryMetadataSignature;
+            state->SnapshotPositions = ExtractMeshPositions(mesh);
+            state->Mesh = std::move(mesh);
+            state->MeshCommand = command;
+            state->MeshResult = MakeMeshNormalsResult(
+                SandboxEditorCommandStatus::NoChange,
+                GN::RecomputeStatus::Success,
+                command.Weighting,
+                Core::ErrorCode::Success,
+                {});
+            state->MeshResult.VertexSlotCount =
+                state->SnapshotPositions.size();
+
+            DerivedJobDesc desc = MakeVertexNormalsCpuJobDesc(context, state);
+            const DerivedJobHandle handle =
+                context.DerivedJobCommands.Submit(std::move(desc));
+            if (!handle.IsValid())
+            {
+                return MakeMeshNormalsResult(
+                    SandboxEditorCommandStatus::GeometryProcessingFailed,
+                    GN::RecomputeStatus::InvalidOutputProperty,
+                    command.Weighting,
+                    Core::ErrorCode::InvalidState,
+                    "Mesh vertex-normal CPU job submission was rejected by the runtime job lane.");
+            }
+
+            return MakePendingMeshVertexNormalsResult(
+                command,
+                state->SnapshotPositions.size(),
+                handle);
+        }
+
+        [[nodiscard]] SandboxEditorGraphVertexNormalsResult
+        SubmitGraphVertexNormalsCpuJob(
+            const SandboxEditorContext& context,
+            const SandboxEditorGraphVertexNormalsCommand& command,
+            Geometry::Vertices nodes,
+            Geometry::PropertySet edges,
+            Geometry::Halfedges halfedges,
+            const std::size_t edgeSlotCount,
+            const std::uint64_t geometryMetadataSignature)
+        {
+            std::optional<std::vector<glm::vec3>> positions =
+                CollectKMeansPositions(nodes);
+            if (!positions.has_value())
+            {
+                return MakeGraphNormalsResult(
+                    SandboxEditorCommandStatus::InvalidProcessingParameters,
+                    GraphNormals::RecomputeStatus::InvalidPositionProperty,
+                    command.OrientTowardFallback,
+                    Core::ErrorCode::InvalidArgument,
+                    "selected graph requires count-matched finite v:position for normal recompute");
+            }
+
+            auto state =
+                std::make_shared<SandboxEditorVertexNormalsCpuJobState>();
+            state->Kind = SandboxEditorVertexNormalsCpuJobKind::Graph;
+            state->StableEntityId = command.StableEntityId;
+            state->GeometryMetadataSignature = geometryMetadataSignature;
+            state->SnapshotPositions = std::move(*positions);
+            state->GraphNodes = std::move(nodes);
+            state->GraphEdges = std::move(edges);
+            state->GraphHalfedges = std::move(halfedges);
+            state->GraphEdgeSlotCount = edgeSlotCount;
+            state->GraphCommand = command;
+            state->GraphResult = MakeGraphNormalsResult(
+                SandboxEditorCommandStatus::NoChange,
+                GraphNormals::RecomputeStatus::Success,
+                command.OrientTowardFallback,
+                Core::ErrorCode::Success,
+                {});
+            state->GraphResult.VertexSlotCount =
+                state->SnapshotPositions.size();
+            state->GraphResult.EdgeSlotCount = edgeSlotCount;
+
+            DerivedJobDesc desc = MakeVertexNormalsCpuJobDesc(context, state);
+            const DerivedJobHandle handle =
+                context.DerivedJobCommands.Submit(std::move(desc));
+            if (!handle.IsValid())
+            {
+                return MakeGraphNormalsResult(
+                    SandboxEditorCommandStatus::GeometryProcessingFailed,
+                    GraphNormals::RecomputeStatus::InvalidOutputProperty,
+                    command.OrientTowardFallback,
+                    Core::ErrorCode::InvalidState,
+                    "Graph vertex-normal CPU job submission was rejected by the runtime job lane.");
+            }
+
+            return MakePendingGraphVertexNormalsResult(
+                command,
+                state->SnapshotPositions.size(),
+                edgeSlotCount,
+                handle);
+        }
+
+        [[nodiscard]] SandboxEditorPointCloudVertexNormalsResult
+        SubmitPointCloudVertexNormalsCpuJob(
+            const SandboxEditorContext& context,
+            const SandboxEditorPointCloudVertexNormalsCommand& command,
+            Geometry::Vertices points,
+            const std::uint64_t geometryMetadataSignature)
+        {
+            std::optional<std::vector<glm::vec3>> positions =
+                CollectKMeansPositions(points);
+            if (!positions.has_value())
+            {
+                return MakePointCloudNormalsResult(
+                    SandboxEditorCommandStatus::InvalidProcessingParameters,
+                    PointNormals::RecomputeStatus::InvalidPositionProperty,
+                    command,
+                    Core::ErrorCode::InvalidArgument,
+                    "selected point-cloud requires count-matched finite v:position for normal recompute");
+            }
+
+            auto state =
+                std::make_shared<SandboxEditorVertexNormalsCpuJobState>();
+            state->Kind = SandboxEditorVertexNormalsCpuJobKind::PointCloud;
+            state->StableEntityId = command.StableEntityId;
+            state->GeometryMetadataSignature = geometryMetadataSignature;
+            state->SnapshotPositions = std::move(*positions);
+            state->PointCloudPoints = std::move(points);
+            state->PointCloudCommand = command;
+            state->PointCloudResult = MakePointCloudNormalsResult(
+                SandboxEditorCommandStatus::NoChange,
+                PointNormals::RecomputeStatus::Success,
+                command,
+                Core::ErrorCode::Success,
+                {});
+            state->PointCloudResult.PointSlotCount =
+                state->SnapshotPositions.size();
+
+            DerivedJobDesc desc = MakeVertexNormalsCpuJobDesc(context, state);
+            const DerivedJobHandle handle =
+                context.DerivedJobCommands.Submit(std::move(desc));
+            if (!handle.IsValid())
+            {
+                return MakePointCloudNormalsResult(
+                    SandboxEditorCommandStatus::GeometryProcessingFailed,
+                    PointNormals::RecomputeStatus::InvalidOutputProperty,
+                    command,
+                    Core::ErrorCode::InvalidState,
+                    "Point-cloud vertex-normal CPU job submission was rejected by the runtime job lane.");
+            }
+
+            return MakePendingPointCloudVertexNormalsResult(
+                command,
+                state->SnapshotPositions.size(),
+                handle);
+        }
+
         enum class SandboxEditorMeshCpuJobKind : std::uint8_t
         {
             Curvature,
@@ -21058,6 +21974,15 @@ namespace Extrinsic::Runtime
                 source.Diagnostic);
         }
 
+        if (context.DerivedJobCommands.Available())
+        {
+            return SubmitMeshVertexNormalsCpuJob(
+                context,
+                command,
+                source.Mesh,
+                GeometryMetadataSignatureForEntity(raw, *entity));
+        }
+
         Geometry::HalfedgeMesh::Mesh mesh = source.Mesh;
         GN::Params params{};
         params.Weighting = command.Weighting;
@@ -21154,6 +22079,18 @@ namespace Extrinsic::Runtime
                 command.OrientTowardFallback,
                 source.Error,
                 source.Diagnostic);
+        }
+
+        if (context.DerivedJobCommands.Available())
+        {
+            return SubmitGraphVertexNormalsCpuJob(
+                context,
+                command,
+                view.NodeSource->Properties,
+                view.EdgeSource->Properties,
+                source.Halfedges,
+                source.EdgeSlotCount,
+                GeometryMetadataSignatureForEntity(raw, *entity));
         }
 
         Geometry::Vertices scratchNodes = view.NodeSource->Properties;
@@ -21279,6 +22216,15 @@ namespace Extrinsic::Runtime
                 command,
                 Core::ErrorCode::InvalidArgument,
                 "Point-cloud vertex normals require selected point-cloud GeometrySources.");
+        }
+
+        if (context.DerivedJobCommands.Available())
+        {
+            return SubmitPointCloudVertexNormalsCpuJob(
+                context,
+                command,
+                view.VertexSource->Properties,
+                GeometryMetadataSignatureForEntity(raw, *entity));
         }
 
         Geometry::Vertices scratchPoints = view.VertexSource->Properties;
@@ -21896,6 +22842,30 @@ namespace Extrinsic::Runtime
                     {
                         if (alive && *alive)
                             m_LastMeshSimplifyResult = std::move(result);
+                    };
+                context.MethodResultSinks.MeshVertexNormals =
+                    [alive = m_ResultSinksAlive, this](
+                        SandboxEditorMeshVertexNormalsResult result)
+                    {
+                        if (alive && *alive)
+                            m_LastMeshVertexNormalsResult =
+                                std::move(result);
+                    };
+                context.MethodResultSinks.GraphVertexNormals =
+                    [alive = m_ResultSinksAlive, this](
+                        SandboxEditorGraphVertexNormalsResult result)
+                    {
+                        if (alive && *alive)
+                            m_LastGraphVertexNormalsResult =
+                                std::move(result);
+                    };
+                context.MethodResultSinks.PointCloudVertexNormals =
+                    [alive = m_ResultSinksAlive, this](
+                        SandboxEditorPointCloudVertexNormalsResult result)
+                    {
+                        if (alive && *alive)
+                            m_LastPointCloudVertexNormalsResult =
+                                std::move(result);
                     };
                 context.MethodResultSinks.Registration =
                     [alive = m_ResultSinksAlive, this](

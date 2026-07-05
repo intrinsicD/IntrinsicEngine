@@ -82,9 +82,9 @@ applies it to Progressive Poisson point-cloud and mesh-surface CPU sampling,
 Slice C applies it to mesh denoise/remesh/simplify commands, and Slice D
 applies it to ICP registration alignment while preserving the existing
 immediate fallback for tests and callers without an engine job surface. Slices
-E.1 and E.2 apply it to mesh curvature and mesh subdivision. The remaining
-synchronous geometry-processing buttons are tracked in the active
-`RUNTIME-141` inventory.
+E.1, E.2, and E.3 apply it to mesh curvature, mesh subdivision, and
+mesh/graph/point-cloud vertex-normal recompute. The remaining synchronous
+geometry-processing buttons are tracked in the active `RUNTIME-141` inventory.
 
 ### Sandbox Editor Startup Layout
 
@@ -197,18 +197,20 @@ exports per-domain command/result pairs:
 `SandboxEditorGraphVertexNormalsCommand`, and
 `SandboxEditorPointCloudVertexNormalsCommand`, with matching
 `ApplySandboxEditor*VertexNormalsCommand(...)` helpers. The commands validate a
-live selected `GeometrySources` entity, call the domain-owned geometry modules
+live selected `GeometrySources` entity, snapshot the domain-owned source data
+when `DerivedJobRegistry` is available, call the domain-owned geometry modules
 from `GEOM-026` (`Geometry.HalfedgeMesh.Vertices.Normals`,
-`Geometry.Graph.Vertex.Normals`, or `Geometry.PointCloud.Normals`), and publish
-count-matched `glm::vec3` normals to canonical `v:normal` only after the
-geometry result succeeds. Successful publication stamps the precise
-`DirtyVertexNormals` tag and marks editor history dirty; it does not call
-renderer/RHI upload APIs or stamp broad `GpuDirty`. Mesh, graph, and
-point-cloud residency extraction consume that dirty tag and perform deferred
-normal-channel reupload on the next extraction opportunity. If a direct mesh
-import's deferred materialization applies after an edit, runtime preserves
-count-matched current `v:normal` values so editor-authored normals remain the
-CPU authority.
+`Geometry.Graph.Vertex.Normals`, or `Geometry.PointCloud.Normals`) on the CPU
+worker lane, and publish count-matched `glm::vec3` normals to canonical
+`v:normal` only from the stale-checked main-thread apply. Tests and non-engine
+callers without an injected job surface keep the immediate compatibility path.
+Successful publication stamps the precise `DirtyVertexNormals` tag and marks
+editor history dirty; it does not call renderer/RHI upload APIs or stamp broad
+`GpuDirty`. Mesh, graph, and point-cloud residency extraction consume that dirty
+tag and perform deferred normal-channel reupload on the next extraction
+opportunity. If a direct mesh import's deferred materialization applies after an
+edit, runtime preserves count-matched current `v:normal` values so
+editor-authored normals remain the CPU authority.
 
 ### Sandbox Editor Mesh Denoise
 

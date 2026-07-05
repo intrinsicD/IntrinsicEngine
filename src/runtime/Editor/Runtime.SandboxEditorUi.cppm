@@ -1922,6 +1922,12 @@ export namespace Extrinsic::Runtime
         std::function<void(SandboxEditorMeshRemeshResult)> MeshRemesh{};
         std::function<void(SandboxEditorMeshSubdivideResult)> MeshSubdivide{};
         std::function<void(SandboxEditorMeshSimplifyResult)> MeshSimplify{};
+        std::function<void(SandboxEditorMeshVertexNormalsResult)>
+            MeshVertexNormals{};
+        std::function<void(SandboxEditorGraphVertexNormalsResult)>
+            GraphVertexNormals{};
+        std::function<void(SandboxEditorPointCloudVertexNormalsResult)>
+            PointCloudVertexNormals{};
         std::function<void(SandboxEditorRegistrationResult)> Registration{};
     };
 
