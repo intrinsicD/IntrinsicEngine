@@ -38,6 +38,7 @@ namespace Readback = Extrinsic::Tests::Support::MinimalTriangleReadback;
 namespace Counters = Extrinsic::Tests::Support::OperationalCounterStability;
 
 using Extrinsic::Backends::Vulkan::EvaluateVulkanDeviceOperationalStatus;
+using Extrinsic::Backends::Vulkan::GetVulkanBootstrapDiagnosticsSnapshot;
 using Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs;
 using Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot;
 using Extrinsic::Backends::Vulkan::ToString;
@@ -146,7 +147,8 @@ struct DefaultRecipeBootstrap
 
 [[nodiscard]] DefaultRecipeBootstrap BootstrapEngineForDefaultRecipe(
     const std::uint32_t targetFrames = 4u,
-    const char* const windowTitle = "Intrinsic Default-recipe gpu;vulkan smoke")
+    const char* const windowTitle = "Intrinsic Default-recipe gpu;vulkan smoke",
+    const bool enableValidation = false)
 {
     if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
     {
@@ -164,7 +166,7 @@ struct DefaultRecipeBootstrap
     config.Window.Width = Readback::kFramebufferWidth;
     config.Window.Height = Readback::kFramebufferHeight;
     config.Window.Resizable = false;
-    config.Render.EnableValidation = false;
+    config.Render.EnableValidation = enableValidation;
     config.Render.EnableVSync = false;
     auto enginePtr = std::make_unique<Engine>(
         config, std::make_unique<ExitAfterFramesApp>(targetFrames));
@@ -397,8 +399,65 @@ void ExpectMinimalHarnessReadbackSamples(
             << static_cast<int>(b2) << ","
             << static_cast<int>(b3) << ")"
             << " backbuffer format=" << static_cast<int>(backbufferFormat)
-            << " pass statuses=[" << BuildPassStatusSummary(stats) << "]";
+            << " pass statuses=[" << BuildPassStatusSummary(stats) << "]"
+            << "\nrender graph debug dump:\n" << stats.DebugDump;
     }
+}
+
+[[nodiscard]] std::vector<std::uint8_t> ReadBackbufferBytes(
+    Extrinsic::RHI::IDevice& device,
+    const Extrinsic::RHI::BufferHandle readbackBuffer,
+    const std::uint64_t readbackSize)
+{
+    std::vector<std::uint8_t> readbackBytes(static_cast<std::size_t>(readbackSize), 0u);
+    device.ReadBuffer(readbackBuffer, readbackBytes.data(), readbackSize, 0u);
+    return readbackBytes;
+}
+
+void ExpectReadbackImagesEqual(
+    const std::span<const std::uint8_t> fallbackBytes,
+    const std::span<const std::uint8_t> aliasBytes,
+    const std::uint32_t bytesPerPixel,
+    const std::string_view fallbackDebugDump,
+    const std::string_view aliasDebugDump)
+{
+    ASSERT_EQ(fallbackBytes.size(), aliasBytes.size());
+    for (std::size_t i = 0; i < fallbackBytes.size(); ++i)
+    {
+        if (fallbackBytes[i] == aliasBytes[i])
+        {
+            continue;
+        }
+        const std::size_t pixelIndex = bytesPerPixel == 0u ? 0u : i / bytesPerPixel;
+        ADD_FAILURE() << "Aliasing-on readback differs from aliasing-off readback at byte "
+                      << i << " (pixel index " << pixelIndex << ", channel "
+                      << (bytesPerPixel == 0u ? 0u : i % bytesPerPixel)
+                      << "): off=" << static_cast<int>(fallbackBytes[i])
+                      << " on=" << static_cast<int>(aliasBytes[i])
+                      << "\naliasing-off debug dump:\n" << fallbackDebugDump
+                      << "\naliasing-on debug dump:\n" << aliasDebugDump;
+        return;
+    }
+}
+
+void ExpectDefaultRecipeDebugViewReadbackRecorded(
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats)
+{
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.DeviceOperational);
+    EXPECT_EQ(FindPassStatus(stats, "DebugViewPass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(stats);
+    EXPECT_EQ(FindPassStatus(stats, "DepthPrepass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(stats);
+    EXPECT_EQ(FindPassStatus(stats, "SurfacePass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(stats);
+    EXPECT_EQ(FindPassStatus(stats, "TransientDebugSurfacePass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(stats);
+    EXPECT_EQ(FindPassStatus(stats, "Present"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(stats);
+    EXPECT_GE(stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
+        << "Default-recipe readback triplet did not record on any operational frame.";
 }
 } // namespace
 
@@ -560,6 +619,143 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ReferenceTriangleDebugViewReadbackMatchesMini
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
     device.DestroyBuffer(readbackBuffer);
 
+    engine.Shutdown();
+}
+
+TEST(DefaultRecipeSurfaceGpuSmoke, TransientAliasingMatchesFallbackReadbackAndReducesMemory)
+{
+    auto bootstrap = BootstrapEngineForDefaultRecipe(
+        4u,
+        "Intrinsic Default-recipe gpu;vulkan transient-aliasing smoke",
+        true);
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+    const auto bootstrapDiagnostics = GetVulkanBootstrapDiagnosticsSnapshot();
+    if (!bootstrapDiagnostics.ValidationEnabled || !bootstrapDiagnostics.DebugUtilsEnabled)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Vulkan validation layer/debug-utils is unavailable; transient-aliasing validation smoke is opt-in.";
+    }
+
+    const auto warmup = DriveDefaultRecipeAndCapture(engine);
+    if (!warmup.DeviceOperational)
+    {
+        engine.Shutdown();
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during transient-aliasing smoke warmup: status="
+                      << ToString(warmup.Status.Code) << " reason=" << ToString(warmup.Status.Reason)
+                      << ". Host capability checks passed, so this is a GRAPHICS-118 Slice D.2 regression, not a skip condition.";
+        return;
+    }
+
+    auto& renderer = engine.GetRenderer();
+    auto& device = engine.GetDevice();
+    const Extrinsic::RHI::Format backbufferFormat = device.GetBackbufferFormat();
+    const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(backbufferFormat);
+    if (bytesPerPixel == 0u)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Backbuffer format has no host-uploadable layout on this host; transient-aliasing smoke skipped.";
+    }
+
+    const std::uint64_t readbackSize =
+        static_cast<std::uint64_t>(bytesPerPixel) *
+        static_cast<std::uint64_t>(Readback::kFramebufferWidth) *
+        static_cast<std::uint64_t>(Readback::kFramebufferHeight);
+    Extrinsic::RHI::BufferHandle readbackBuffer = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+        .SizeBytes = readbackSize,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .DebugName = "DefaultRecipe.TransientAliasingReadback",
+    });
+    if (!readbackBuffer.IsValid())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan transient-aliasing smoke is opt-in.";
+    }
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbackBuffer);
+    renderer.SetRenderGraphDebugDumpEnabled(true);
+
+    renderer.SetTransientAliasingEnabled(false);
+    EXPECT_FALSE(renderer.IsTransientAliasingEnabled());
+    const auto fallbackRun = DriveDefaultRecipeDebugViewFrameAndCapture(engine, true);
+    if (!fallbackRun.DeviceOperational)
+    {
+        renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+        device.DestroyBuffer(readbackBuffer);
+        engine.Shutdown();
+        ADD_FAILURE() << "Promoted Vulkan operational gate dropped during aliasing-off baseline frame: status="
+                      << ToString(fallbackRun.Status.Code) << " reason=" << ToString(fallbackRun.Status.Reason);
+        return;
+    }
+    const auto& fallbackStats = fallbackRun.Stats;
+    ExpectDefaultRecipeDebugViewReadbackRecorded(fallbackStats);
+    RecordProperty("AliasingOffTransientMemoryBytes",
+                   fallbackStats.Compile.TransientMemoryEstimateBytes);
+    EXPECT_EQ(fallbackStats.Compile.TransientPlacedPeakMemoryEstimateBytes,
+              fallbackStats.Compile.TransientNaiveMemoryEstimateBytes);
+    EXPECT_EQ(fallbackStats.Compile.TransientMemoryEstimateBytes,
+              fallbackStats.Compile.TransientNaiveMemoryEstimateBytes);
+    EXPECT_TRUE(Counters::IsStable(fallbackRun.Before, fallbackRun.After))
+        << "Vulkan counters changed across aliasing-off baseline frame.";
+    ExpectMinimalHarnessReadbackSamples(device,
+                                        readbackBuffer,
+                                        readbackSize,
+                                        bytesPerPixel,
+                                        backbufferFormat,
+                                        fallbackStats);
+    const std::vector<std::uint8_t> fallbackBytes =
+        ReadBackbufferBytes(device, readbackBuffer, readbackSize);
+
+    renderer.SetTransientAliasingEnabled(true);
+    EXPECT_TRUE(renderer.IsTransientAliasingEnabled());
+    const auto aliasRun = DriveDefaultRecipeDebugViewFrameAndCapture(engine, true);
+    if (!aliasRun.DeviceOperational)
+    {
+        renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+        device.DestroyBuffer(readbackBuffer);
+        engine.Shutdown();
+        ADD_FAILURE() << "Promoted Vulkan operational gate dropped during aliasing-on frame: status="
+                      << ToString(aliasRun.Status.Code) << " reason=" << ToString(aliasRun.Status.Reason);
+        return;
+    }
+    const auto& aliasStats = aliasRun.Stats;
+    ExpectDefaultRecipeDebugViewReadbackRecorded(aliasStats);
+    RecordProperty("AliasingOnTransientMemoryBytes",
+                   aliasStats.Compile.TransientMemoryEstimateBytes);
+    RecordProperty("AliasingNaiveTransientMemoryBytes",
+                   aliasStats.Compile.TransientNaiveMemoryEstimateBytes);
+    RecordProperty("AliasingPlacedPeakTransientMemoryBytes",
+                   aliasStats.Compile.TransientPlacedPeakMemoryEstimateBytes);
+    EXPECT_LT(aliasStats.Compile.TransientPlacedPeakMemoryEstimateBytes,
+              aliasStats.Compile.TransientNaiveMemoryEstimateBytes);
+    EXPECT_EQ(aliasStats.Compile.TransientMemoryEstimateBytes,
+              aliasStats.Compile.TransientPlacedPeakMemoryEstimateBytes);
+    EXPECT_LT(aliasStats.Compile.TransientMemoryEstimateBytes,
+              fallbackStats.Compile.TransientMemoryEstimateBytes)
+        << "aliasing-off bytes=" << fallbackStats.Compile.TransientMemoryEstimateBytes
+        << " aliasing-on bytes=" << aliasStats.Compile.TransientMemoryEstimateBytes;
+    EXPECT_TRUE(Counters::IsStable(aliasRun.Before, aliasRun.After))
+        << "Vulkan fallback/validation counters changed across aliasing-on frame.";
+    ExpectMinimalHarnessReadbackSamples(device,
+                                        readbackBuffer,
+                                        readbackSize,
+                                        bytesPerPixel,
+                                        backbufferFormat,
+                                        aliasStats);
+    const std::vector<std::uint8_t> aliasBytes =
+        ReadBackbufferBytes(device, readbackBuffer, readbackSize);
+    ExpectReadbackImagesEqual(
+        fallbackBytes,
+        aliasBytes,
+        bytesPerPixel,
+        fallbackStats.DebugDump,
+        aliasStats.DebugDump);
+
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+    device.DestroyBuffer(readbackBuffer);
     engine.Shutdown();
 }
 

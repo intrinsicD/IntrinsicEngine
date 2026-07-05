@@ -93,7 +93,14 @@ TEST(RenderGraphDebugDump, GoldenSmallRenderPassGraphIncludesAttachmentsAndResou
         "    texture[0] name=\"SceneDepth\" used=true imported=false sharing=exclusive final_state=Undefined first_write_pass=0 last_read_pass=1 producer_count=1 consumer_count=1 first_use_pass=0 last_use_pass=1\n"
         "    texture[1] name=\"SceneColorHDR\" used=true imported=false sharing=exclusive final_state=Undefined first_write_pass=1 last_read_pass=2 producer_count=1 consumer_count=1 first_use_pass=1 last_use_pass=2\n"
         "    texture[2] name=\"Backbuffer\" used=true imported=true sharing=exclusive final_state=Present first_write_pass=2 last_read_pass=none producer_count=1 consumer_count=0 first_use_pass=2 last_use_pass=2\n"
-        "  buffers:\n";
+        "  buffers:\n"
+        "  texture_transient_placements:\n"
+        "    texture=0 name=\"SceneDepth\" block=0 offset_bytes=0 size_bytes=256 alignment_bytes=256 first_use_pass=0 last_use_pass=1\n"
+        "    texture=1 name=\"SceneColorHDR\" block=0 offset_bytes=256 size_bytes=256 alignment_bytes=256 first_use_pass=1 last_use_pass=2\n"
+        "  buffer_transient_placements:\n"
+        "    none\n"
+        "  alias_reuse_barriers:\n"
+        "    none\n";
 
     EXPECT_EQ(BuildRenderGraphDebugDump(*compiled), expected);
 }
@@ -119,4 +126,3 @@ TEST(RenderGraphDebugDump, ResourceOnlyGraphRetainsImportedStateMetadata)
     EXPECT_NE(dump.find("texture[0] name=\"HistoryColor\" used=false imported=true sharing=exclusive final_state=Present"),
               std::string::npos);
 }
-

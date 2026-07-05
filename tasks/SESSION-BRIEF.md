@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `GRAPHICS-118` — Placed transient resource allocation with real memory aliasing (tasks/active/GRAPHICS-118-placed-transient-memory-aliasing.md)
+- none
 
 ## Theme B — Rendering modernization
 

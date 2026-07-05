@@ -281,13 +281,15 @@ available through the Vulkan 1.2/1.3 feature chain.
   through the deferred deletion path. `CreatePlacedBuffer()` and
   `CreatePlacedTexture()` create raw Vulkan objects, bind them to the block at
   the requested offset with VMA binding helpers, and record placement
-  introspection without exposing `Vk*` types through RHI. Host-visible placed
-  buffers fail closed for now because transient aliasing only requires
-  device-local resources. Renderer transient allocation consumes this seam only
-  when renderer aliasing is explicitly enabled; the renderer default remains the
-  ordinary per-resource fallback lane until the `GRAPHICS-118` opt-in Vulkan
-  smoke is cited. It falls back to ordinary per-resource allocations if any
-  requirement, memory-block, or placed bind operation fails.
+  introspection without exposing `Vk*` types through RHI. Placed-image
+  requirement queries and placed image creation set `VK_IMAGE_CREATE_ALIAS_BIT`
+  so Vulkan permits compatible images to bind overlapping ranges in the same
+  block. Host-visible placed buffers fail closed for now because transient
+  aliasing only requires device-local resources. Renderer transient allocation
+  consumes this seam only when renderer aliasing is explicitly enabled and falls
+  back to ordinary per-resource allocations if any requirement, memory-block, or
+  placed bind operation fails. The `GRAPHICS-118` opt-in smoke cites the
+  operational placed-texture path.
 - Buffer, texture, sampler, and pipeline `IDevice` overrides are symbol-complete
   in `Backends.Vulkan.Device.cpp`. They guard null/non-live backend state and can
   be exercised directly after service-ready bootstrap while `IsOperational()`
@@ -654,7 +656,9 @@ breadcrumb call site in `Runtime::Engine::Initialize()` (one call per
 non-operational truth-table row per startup), and
 `NoteVulkanOperationalDeviceLostDrop()` is invoked from
 `VulkanDevice::NoteDeviceLostIfNeeded()` on the operational→non-operational
-device-lost transition. Counters are process-monotonic across
+device-lost transition. Validation-layer error callbacks also increment
+`VulkanValidationErrorCount` so opt-in validation smokes can assert the counter
+is stable across a frame. Counters are process-monotonic across
 `Initialize`/`Shutdown` cycles. Renderer code still gates only on
 `IDevice::IsOperational()` and backend-neutral render-graph stats.
 

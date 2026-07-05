@@ -804,11 +804,15 @@ namespace Extrinsic::Graphics
         auto emitTextureAliasReuseHazard =
             [&compiled](const std::uint32_t previousResourceIndex,
                         const std::uint32_t resourceIndex,
-                        const std::uint32_t passIndex,
+                        const std::uint32_t executionRank,
                         const std::uint32_t blockIndex,
                         const std::uint64_t offsetBytes,
                         const std::uint64_t sizeBytes)
         {
+            const std::uint32_t passIndex =
+                executionRank < compiled->TopologicalOrder.size()
+                    ? compiled->TopologicalOrder[executionRank]
+                    : executionRank;
             BarrierPacket& packet = FindOrCreateBarrierPacket(
                 compiled->BarrierPackets, passIndex, BarrierPacketStage::BeforePass);
             packet.TextureAliasReuseBarriers.push_back(TextureAliasReuseBarrierPacket{
@@ -823,11 +827,15 @@ namespace Extrinsic::Graphics
         auto emitBufferAliasReuseHazard =
             [&compiled](const std::uint32_t previousResourceIndex,
                         const std::uint32_t resourceIndex,
-                        const std::uint32_t passIndex,
+                        const std::uint32_t executionRank,
                         const std::uint32_t blockIndex,
                         const std::uint64_t offsetBytes,
                         const std::uint64_t sizeBytes)
         {
+            const std::uint32_t passIndex =
+                executionRank < compiled->TopologicalOrder.size()
+                    ? compiled->TopologicalOrder[executionRank]
+                    : executionRank;
             BarrierPacket& packet = FindOrCreateBarrierPacket(
                 compiled->BarrierPackets, passIndex, BarrierPacketStage::BeforePass);
             packet.BufferAliasReuseBarriers.push_back(BufferAliasReuseBarrierPacket{

@@ -61,10 +61,10 @@ backend-native handles.
 `RenderGraph::Compile()` computes a CPU-visible placement plan for every used
 non-imported transient texture and buffer. Each
 `TransientResourcePlacement` records the resource index, placement block, byte
-offset, aligned size, alignment, and first/last pass use. Texture and buffer
-placements use separate block domains; Slice A uses a deterministic 256-byte
-alignment and first-fit reuse of ranges whose prior occupant's lifetime ended
-before the new occupant's first use.
+offset, aligned size, alignment, and first/last use in topological execution
+rank. Texture and buffer placements use separate block domains; the compiler uses
+deterministic first-fit reuse of ranges whose prior occupant's execution lifetime
+ended before the new occupant's first use.
 
 The compiled graph reports both
 `TransientNaiveMemoryEstimateBytes` (sum of aligned transient sizes without
@@ -77,10 +77,16 @@ alias-reuse hazards are emitted.
 
 Alias reuse is represented in the barrier plan through
 `TextureAliasReuseBarrierPacket` / `BufferAliasReuseBarrierPacket` entries on a
-`BeforePass` packet for the first pass that uses the new occupant. These records
-are CPU-visible planning hazards for the RHI/Vulkan placed-allocation follow-up;
-the current renderer still binds per-resource frame-slot RHI allocations and
-does not lower alias-reuse hazards to backend commands yet.
+`BeforePass` packet for the first pass that uses the new occupant. Lifetimes are
+computed in execution-rank space, but barrier packets are keyed back to real pass
+indices before the renderer lowers them. With renderer transient aliasing enabled
+and compatible backend memory requirements, the renderer binds non-imported
+transients into placed memory blocks and submits those alias-reuse barriers before
+the first pass that reuses a range. With aliasing disabled or unsupported, the
+renderer clears alias barriers and uses per-resource frame-slot RHI allocations.
+The opt-in compiler debug dump includes texture/buffer transient placement
+tables plus alias-reuse barrier rows so backend smoke failures can cite the exact
+reuse plan.
 
 ## Queue Affinity Contract
 

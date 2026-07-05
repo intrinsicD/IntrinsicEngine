@@ -74,10 +74,10 @@ This directory contains the `RHI` module/files.
   and placed buffer/image binding. The renderer consumes the seam for
   non-imported frame transients only when renderer transient aliasing is
   explicitly enabled and compiled aliasing reports a lower peak than the naive
-  sum. Renderer aliasing currently defaults to the fallback lane until the
-  `GRAPHICS-118` opt-in Vulkan smoke is cited. The renderer falls back to
-  ordinary per-resource allocations when a backend reports unsupported
-  requirements, incompatible memory blocks, or a failed placed-resource bind.
+  sum. The `GRAPHICS-118` opt-in Vulkan smoke proves the operational path; the
+  renderer still falls back to ordinary per-resource allocations when a backend
+  reports unsupported requirements, incompatible memory blocks, or a failed
+  placed-resource bind.
 
 ## Transfer uploads and readbacks
 

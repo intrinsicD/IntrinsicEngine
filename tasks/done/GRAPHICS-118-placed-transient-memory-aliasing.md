@@ -2,21 +2,38 @@
 id: GRAPHICS-118
 theme: B
 depends_on: []
+maturity_target: Operational
+completed: 2026-07-04
 ---
 # GRAPHICS-118 — Placed transient resource allocation with real memory aliasing
 
+## Completion
+
+- Completed: 2026-07-04. Commit/PR: this retirement change.
+- Maturity: `Operational` on Vulkan-capable hosts; `CPUContracted` for the
+  placement planner and renderer fallback/retry path everywhere.
+- Summary: render-graph compilation now computes deterministic transient
+  placements and alias-reuse hazards, RHI exposes backend-neutral placed memory
+  blocks, Null implements CPU bookkeeping, Vulkan binds placed images/buffers
+  behind the RHI seam, and the renderer lowers compiled transient placements
+  when aliasing is explicitly enabled while preserving the per-resource fallback
+  lane.
+- Evidence: the opt-in Vulkan smoke
+  `DefaultRecipeSurfaceGpuSmoke.TransientAliasingMatchesFallbackReadbackAndReducesMemory`
+  passed with aliasing-off/naive `263168` bytes and aliasing-on/placed peak
+  `197632` bytes. The smoke compares aliasing-on readback against aliasing-off
+  output, asserts the placed peak is lower, and checks Vulkan counters remain
+  stable across the aliasing-on frame.
+
 ## Status
 
-- Status: in-progress.
+- Status: retired.
 - Owner/agent: Codex.
 - Branch/PR: local `main` stack, PR not opened.
-- Current slice: Slice D.2 — opt-in Vulkan smoke and measured memory
+- Current slice: complete.
+- Last completed slice: Slice D.2 — opt-in Vulkan smoke and measured memory
   evidence.
-- Last completed slice: Slice D.1 — renderer adoption of compiled transient
-  placements with CPU fallback/retry coverage.
-- Next verification step: run the opt-in GPU/Vulkan smoke with the default
-  sandbox recipe, image compare aliasing on/off, validation-layer-clean
-  evidence, and recorded before/after transient-memory bytes.
+- Next verification step: none.
 
 ## Slice plan
 
@@ -101,7 +118,7 @@ depends_on: []
       per-resource path as the default fallback/debug lane. The public
       renderer aliasing toggle gates real placed allocation until the
       operational Vulkan smoke is cited.
-- [ ] Slice D.2: operational Vulkan evidence — run the default sandbox recipe
+- [x] Slice D.2: operational Vulkan evidence — run the default sandbox recipe
       through an opt-in `gpu;vulkan` smoke with aliasing on/off image compare,
       validation layers clean, and measured before/after transient-memory
       bytes recorded below.
@@ -125,7 +142,7 @@ depends_on: []
       barriers, default-off per-resource fallback, fallback-to-naive stats
       on one-shot memory-block failure, retry after that failure, and stable
       unsupported-device fallback without compile-cache churn.
-- [ ] Opt-in `gpu;vulkan` smoke: default sandbox recipe renders correctly
+- [x] Opt-in `gpu;vulkan` smoke: default sandbox recipe renders correctly
       with aliasing on (image compare vs aliasing off), reported transient
       memory drops, and validation layers are clean (no hazard errors).
 
@@ -146,11 +163,17 @@ depends_on: []
       `docs/architecture/frame-graph.md` for Slice D.1 renderer adoption,
       alias-reuse barriers, default-off opt-in policy, and fallback/retry
       behavior.
+- [x] Update `src/graphics/framegraph/README.md`,
+      `docs/architecture/frame-graph.md`,
+      `src/graphics/renderer/README.md`, `src/graphics/rhi/README.md`, and
+      `src/graphics/vulkan/README.md` for Slice D.2 operational placement,
+      topological execution-rank lifetimes, DebugView sampled-resource reads,
+      and measured Vulkan evidence.
 
 ## Acceptance criteria
-- [ ] Real measured transient memory reduction on the default sandbox
+- [x] Real measured transient memory reduction on the default sandbox
       recipe recorded in this file (before/after bytes).
-- [ ] Validation-layer-clean Vulkan smoke cited as actually run.
+- [x] Validation-layer-clean Vulkan smoke cited as actually run.
 - [x] Aliasing-off fallback preserved and selectable; CPU gate green.
 
 ## Verification
@@ -259,6 +282,53 @@ ctest --test-dir build/ci --output-on-failure -R 'RendererFrameLifecycle|Transie
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 python3 tools/agents/generate_session_brief.py
 cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+git diff --check
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/repo/check_pr_contract.py
+python3 tools/repo/check_root_hygiene.py --root .
+tools/ci/run_clean_workshop_review.sh . --strict
+```
+
+Slice D.2 local verification:
+
+All commands below passed locally on 2026-07-04 unless explicitly noted. The
+direct gtest XML run first passed the test body and wrote the byte properties but
+returned nonzero because LeakSanitizer reported an existing Vulkan/driver-side
+process-exit leak; the evidence capture was rerun with
+`ASAN_OPTIONS=detect_leaks=0`. The authoritative opt-in smoke pass is the CTest
+run below.
+
+Final closure gates also passed locally on 2026-07-04. The first broad CPU
+CTest run exposed the intentionally extended render-graph debug-dump golden; the
+expected dump was updated and the individual golden test plus the full default
+CPU-supported gate passed afterward. `check_root_hygiene` remains warning-mode
+and reported existing root entries `ara/` and `imgui.ini`. Clean-workshop
+manual rows: row 3 pass; row 4 pass (renderer/debug-view read modeling keeps
+the new aliasing behavior within the renderer/frame-recipe seam); rows 5-6 n/a;
+row 7 pass; row 8 pass; no follow-up findings.
+
+Measured XML properties from
+`/tmp/graphics118-transient-aliasing.xml`:
+
+- `AliasingOffTransientMemoryBytes=263168`.
+- `AliasingOnTransientMemoryBytes=197632`.
+- `AliasingNaiveTransientMemoryBytes=263168`.
+- `AliasingPlacedPeakTransientMemoryBytes=197632`.
+
+```bash
+cmake --build --preset ci-vulkan --target IntrinsicRuntimeIntegrationTests
+cmake --build --preset ci-vulkan --target IntrinsicGraphicsVulkanSmokeTests
+ctest --test-dir build/ci-vulkan --output-on-failure -R '^GraphicsRenderGraph\.(TransientLifetimesUseTopologicalExecutionOrder|AliasReuseBarriersUseTopologicalPassIndex)$' --timeout 60
+ctest --test-dir build/ci-vulkan --output-on-failure -R '^DefaultRecipeSurfaceGpuSmoke\.TransientAliasingMatchesFallbackReadbackAndReducesMemory$' --timeout 120
+ASAN_OPTIONS=detect_leaks=0 build/ci-vulkan/bin/IntrinsicGraphicsVulkanSmokeTests --gtest_filter=DefaultRecipeSurfaceGpuSmoke.TransientAliasingMatchesFallbackReadbackAndReducesMemory --gtest_output=xml:/tmp/graphics118-transient-aliasing.xml
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -R '^RenderGraphDebugDump\.GoldenSmallRenderPassGraphIncludesAttachmentsAndResourceMaps$' --timeout 60
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 git diff --check
 python3 tools/agents/check_task_policy.py --root . --strict

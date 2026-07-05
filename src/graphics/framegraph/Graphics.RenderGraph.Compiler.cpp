@@ -280,6 +280,75 @@ namespace Extrinsic::Graphics
             lifetime.LastUsePass = std::max(lifetime.LastUsePass, passIndex);
         }
 
+        [[nodiscard]] std::vector<std::uint32_t> BuildExecutionRankByPass(
+            const std::span<const std::uint32_t> topologicalOrder,
+            const std::size_t passCount)
+        {
+            std::vector<std::uint32_t> rankByPass(
+                passCount,
+                std::numeric_limits<std::uint32_t>::max());
+            for (std::size_t orderIndex = 0u; orderIndex < topologicalOrder.size(); ++orderIndex)
+            {
+                const std::uint32_t passIndex = topologicalOrder[orderIndex];
+                if (passIndex < rankByPass.size())
+                {
+                    rankByPass[passIndex] = static_cast<std::uint32_t>(orderIndex);
+                }
+            }
+            return rankByPass;
+        }
+
+        void UpdateLifetimeByExecutionRank(
+            ResourceLifetime& lifetime,
+            const std::uint32_t passIndex,
+            const std::span<const std::uint32_t> executionRankByPass)
+        {
+            if (passIndex >= executionRankByPass.size())
+            {
+                return;
+            }
+            const std::uint32_t rank = executionRankByPass[passIndex];
+            if (rank == std::numeric_limits<std::uint32_t>::max())
+            {
+                return;
+            }
+            UpdateLifetime(lifetime, rank);
+        }
+
+        void RemapLifetimesToExecutionOrder(
+            std::vector<ResourceLifetime>& textureLifetimes,
+            std::vector<ResourceLifetime>& bufferLifetimes,
+            const std::span<const RenderPassRecord> passes,
+            const std::span<const std::uint32_t> executionRankByPass)
+        {
+            std::ranges::fill(textureLifetimes, ResourceLifetime{});
+            std::ranges::fill(bufferLifetimes, ResourceLifetime{});
+
+            for (std::uint32_t passIndex = 0u; passIndex < passes.size(); ++passIndex)
+            {
+                for (const TextureAccess& access : passes[passIndex].TextureAccesses)
+                {
+                    if (access.Ref.Index < textureLifetimes.size())
+                    {
+                        UpdateLifetimeByExecutionRank(
+                            textureLifetimes[access.Ref.Index],
+                            passIndex,
+                            executionRankByPass);
+                    }
+                }
+                for (const BufferAccess& access : passes[passIndex].BufferAccesses)
+                {
+                    if (access.Ref.Index < bufferLifetimes.size())
+                    {
+                        UpdateLifetimeByExecutionRank(
+                            bufferLifetimes[access.Ref.Index],
+                            passIndex,
+                            executionRankByPass);
+                    }
+                }
+            }
+        }
+
         [[nodiscard]] constexpr std::uint32_t InvalidValidationIndex()
         {
             return std::numeric_limits<std::uint32_t>::max();
@@ -1816,6 +1885,14 @@ namespace Extrinsic::Graphics
             return std::unexpected(Core::ErrorCode::InvalidState);
         }
 
+        const std::vector<std::uint32_t> executionRankByPass =
+            BuildExecutionRankByPass(order, passCount);
+        RemapLifetimesToExecutionOrder(
+            textureLifetimes,
+            bufferLifetimes,
+            passes,
+            executionRankByPass);
+
         std::uint32_t activeEdgeCount = 0;
         for (std::uint32_t from = 0; from < passCount; ++from)
         {
@@ -2346,6 +2423,84 @@ namespace Extrinsic::Graphics
                 out << " first_use_pass=" << lifetime.FirstUsePass << " last_use_pass=" << lifetime.LastUsePass;
             }
             out << '\n';
+        }
+
+        out << "  texture_transient_placements:\n";
+        if (compiled.TextureTransientPlacements.empty())
+        {
+            out << "    none\n";
+        }
+        else
+        {
+            for (const TransientResourcePlacement& placement : compiled.TextureTransientPlacements)
+            {
+                out << "    texture=" << placement.ResourceIndex;
+                if (placement.ResourceIndex < compiled.TextureNames.size() &&
+                    !compiled.TextureNames[placement.ResourceIndex].empty())
+                {
+                    out << " name=\"" << compiled.TextureNames[placement.ResourceIndex] << '"';
+                }
+                out << " block=" << placement.BlockIndex
+                    << " offset_bytes=" << placement.OffsetBytes
+                    << " size_bytes=" << placement.SizeBytes
+                    << " alignment_bytes=" << placement.AlignmentBytes
+                    << " first_use_pass=" << placement.FirstUsePass
+                    << " last_use_pass=" << placement.LastUsePass << '\n';
+            }
+        }
+
+        out << "  buffer_transient_placements:\n";
+        if (compiled.BufferTransientPlacements.empty())
+        {
+            out << "    none\n";
+        }
+        else
+        {
+            for (const TransientResourcePlacement& placement : compiled.BufferTransientPlacements)
+            {
+                out << "    buffer=" << placement.ResourceIndex;
+                if (placement.ResourceIndex < compiled.BufferNames.size() &&
+                    !compiled.BufferNames[placement.ResourceIndex].empty())
+                {
+                    out << " name=\"" << compiled.BufferNames[placement.ResourceIndex] << '"';
+                }
+                out << " block=" << placement.BlockIndex
+                    << " offset_bytes=" << placement.OffsetBytes
+                    << " size_bytes=" << placement.SizeBytes
+                    << " alignment_bytes=" << placement.AlignmentBytes
+                    << " first_use_pass=" << placement.FirstUsePass
+                    << " last_use_pass=" << placement.LastUsePass << '\n';
+            }
+        }
+
+        out << "  alias_reuse_barriers:\n";
+        bool wroteAliasReuseBarrier = false;
+        for (const BarrierPacket& packet : compiled.BarrierPackets)
+        {
+            for (const TextureAliasReuseBarrierPacket& barrier : packet.TextureAliasReuseBarriers)
+            {
+                wroteAliasReuseBarrier = true;
+                out << "    texture before_pass=" << packet.PassIndex
+                    << " previous=" << barrier.PreviousTextureIndex
+                    << " next=" << barrier.TextureIndex
+                    << " block=" << barrier.BlockIndex
+                    << " offset_bytes=" << barrier.OffsetBytes
+                    << " size_bytes=" << barrier.SizeBytes << '\n';
+            }
+            for (const BufferAliasReuseBarrierPacket& barrier : packet.BufferAliasReuseBarriers)
+            {
+                wroteAliasReuseBarrier = true;
+                out << "    buffer before_pass=" << packet.PassIndex
+                    << " previous=" << barrier.PreviousBufferIndex
+                    << " next=" << barrier.BufferIndex
+                    << " block=" << barrier.BlockIndex
+                    << " offset_bytes=" << barrier.OffsetBytes
+                    << " size_bytes=" << barrier.SizeBytes << '\n';
+            }
+        }
+        if (!wroteAliasReuseBarrier)
+        {
+            out << "    none\n";
         }
         return out.str();
     }

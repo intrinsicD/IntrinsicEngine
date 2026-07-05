@@ -28,7 +28,7 @@ and renderer/render-graph orchestration.
 - `Extrinsic.Graphics.RenderGraph:TransientAllocator`
 - `Extrinsic.Graphics.RenderGraph:Executor`
 
-`Extrinsic.Graphics.RenderGraph` executes barrier packets in pass order: packets tagged `BeforePass` run immediately before the matching pass callback, packets tagged `AfterPass` run immediately after it, and imported-resource final-state packets (the compiler's end-of-graph sentinel) are emitted after the last pass. The graph compiler's transient handles are logical scheduling handles only; before the concrete renderer lowers packets through `RHI::ICommandContext::SubmitBarriers`, it replaces non-imported used texture/buffer handles with real per-frame RHI resources. Renderer transient aliasing is explicitly opt-in through `IRenderer::SetTransientAliasingEnabled(true)` while the Vulkan smoke remains open. When enabled and compiled transient aliasing has savings, the renderer queries backend memory requirements, creates per-frame placed memory blocks, binds transient textures/buffers at the planned offsets, and submits alias-reuse memory barriers. If placement is disabled or any requirement/block/placed-resource operation fails, it clears alias-reuse barriers and falls back to descriptor-compatible per-resource allocations cached by frame slot. This keeps backend device handle spaces authoritative and prevents synthetic graph handles from colliding with live backend resources such as Vulkan swapchain images.
+`Extrinsic.Graphics.RenderGraph` executes barrier packets in pass order: packets tagged `BeforePass` run immediately before the matching pass callback, packets tagged `AfterPass` run immediately after it, and imported-resource final-state packets (the compiler's end-of-graph sentinel) are emitted after the last pass. The graph compiler's transient handles are logical scheduling handles only; before the concrete renderer lowers packets through `RHI::ICommandContext::SubmitBarriers`, it replaces non-imported used texture/buffer handles with real per-frame RHI resources. Renderer transient aliasing is explicitly opt-in through `IRenderer::SetTransientAliasingEnabled(true)`. When enabled and compiled transient aliasing has savings, the renderer queries backend memory requirements, creates per-frame placed memory blocks, binds transient textures/buffers at the planned offsets, and submits alias-reuse memory barriers. If placement is disabled or any requirement/block/placed-resource operation fails, it clears alias-reuse barriers and falls back to descriptor-compatible per-resource allocations cached by frame slot. This keeps backend device handle spaces authoritative and prevents synthetic graph handles from colliding with live backend resources such as Vulkan swapchain images.
 
 Render-graph diagnostics use `RenderGraphValidationResult` findings tagged by
 `RenderGraphValidationSeverity` and `RenderGraphValidationCode`. Bare compiled
@@ -1045,9 +1045,12 @@ Concretely:
   system reference) and `m_DebugViewPipelineLease`. Each frame,
   `ExecuteFrame()` drives
   `DebugViewSystem::SetSettings({.Enabled = world.DebugOverlayEnabled ||
-  world.DebugPrimitives.HasTransientDebug, ...})` and
-  `ResolveSelection(recipeIntrospection)` immediately after the recipe
-  introspection is built, mirroring the recipe-side
+  world.DebugPrimitives.HasTransientDebug, ...})`, describes the current
+  recipe, and resolves the requested DebugView resource before the compile-cache
+  lookup. The renderer writes the resolved `FrameResourceId` into the
+  `DebugViewPass` contribution's `Reads` vector, so the recipe, cache key, and
+  transient-placement lifetime model all see the actual sampled texture rather
+  than only the current present source. This mirrors the recipe-side
   `features.EnableDebugView` gate so the resolved selection's
   `Enabled` flag aligns with what the recipe declares. The DebugView
   pipeline lives in `BuildDebugViewPipelineDesc()`: it targets the new
@@ -2173,7 +2176,9 @@ Concretely:
   selections through deterministic diagnostics, and falls back to the current
   presentation source without platform/window ownership. The resolved selection
   preserves the canonical name for UI diagnostics and also carries the selected
-  `FrameResourceId` consumed by the renderer record path. Per `GRAPHICS-013BQ`,
+  `FrameResourceId` consumed by the renderer record path and by the
+  contribution read declared before render-graph compilation. Per
+  `GRAPHICS-013BQ`,
   no retained graphics-owned debug-view textures or buffers exist;
   `DebugViewRGBA` is a frame-recipe transient owned by the framegraph and is
   deliberately non-selectable as a preview input

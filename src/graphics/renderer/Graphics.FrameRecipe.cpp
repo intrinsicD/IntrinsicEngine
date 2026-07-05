@@ -2265,6 +2265,81 @@ namespace Extrinsic::Graphics
                 (features.EnableAntiAliasing && spatialAAActive) ? postProcessAATempResolved : ldr;
         }
 
+        auto textureForFrameResourceId = [&](const FrameResourceId id) -> TextureRef
+        {
+            if (!id.IsValid())
+            {
+                return TextureRef{};
+            }
+            if (id == FrameRecipePresentSourceResourceId())
+            {
+                return presentSource;
+            }
+
+            switch (static_cast<FrameRecipeResourceKind>(id.Value - 1u))
+            {
+            case FrameRecipeResourceKind::Backbuffer: return backbuffer;
+            case FrameRecipeResourceKind::SceneDepth: return depth;
+            case FrameRecipeResourceKind::EntityId: return entityId;
+            case FrameRecipeResourceKind::PrimitiveId: return primitiveId;
+            case FrameRecipeResourceKind::SceneNormal: return sceneNormal;
+            case FrameRecipeResourceKind::Albedo: return albedo;
+            case FrameRecipeResourceKind::Material0: return material0;
+            case FrameRecipeResourceKind::SceneColorHDR: return hdr;
+            case FrameRecipeResourceKind::ShadowAtlas: return shadowAtlas;
+            case FrameRecipeResourceKind::SceneColorLDR: return ldr;
+            case FrameRecipeResourceKind::DebugViewRGBA: return debugView;
+            case FrameRecipeResourceKind::PostProcessBloomScratch: return postProcessBloomScratch;
+            case FrameRecipeResourceKind::PostProcessAATempEdges: return postProcessAATempEdges;
+            case FrameRecipeResourceKind::PostProcessAATempWeights: return postProcessAATempWeights;
+            case FrameRecipeResourceKind::PostProcessAATempResolved: return postProcessAATempResolved;
+            case FrameRecipeResourceKind::HZBCurrent: return hzbCurrent;
+            case FrameRecipeResourceKind::MotionVectors: return motionVectors;
+            case FrameRecipeResourceKind::ReconstructionHistoryPrevious: return reconstructionHistoryPrevious;
+            case FrameRecipeResourceKind::ReconstructionHistoryCurrent: return reconstructionHistoryCurrent;
+            case FrameRecipeResourceKind::ReconstructionResolvedHDR: return reconstructionResolvedHDR;
+            case FrameRecipeResourceKind::SelectionOutline:
+            case FrameRecipeResourceKind::SceneTable:
+            case FrameRecipeResourceKind::InstanceStatic:
+            case FrameRecipeResourceKind::InstanceDynamic:
+            case FrameRecipeResourceKind::EntityConfig:
+            case FrameRecipeResourceKind::GeometryRecords:
+            case FrameRecipeResourceKind::Bounds:
+            case FrameRecipeResourceKind::Lights:
+            case FrameRecipeResourceKind::MaterialBuffer:
+            case FrameRecipeResourceKind::SurfaceOpaqueIndexedArgs:
+            case FrameRecipeResourceKind::SurfaceOpaqueCount:
+            case FrameRecipeResourceKind::LinesIndexedArgs:
+            case FrameRecipeResourceKind::LinesCount:
+            case FrameRecipeResourceKind::LineQuadsNonIndexedArgs:
+            case FrameRecipeResourceKind::LineQuadsCount:
+            case FrameRecipeResourceKind::PointsNonIndexedArgs:
+            case FrameRecipeResourceKind::PointsCount:
+            case FrameRecipeResourceKind::PickingReadback:
+            case FrameRecipeResourceKind::PostProcessHistogram:
+            case FrameRecipeResourceKind::HistogramReadback:
+            case FrameRecipeResourceKind::ClusterGridAABBs:
+            case FrameRecipeResourceKind::ClusterLightHeaders:
+            case FrameRecipeResourceKind::ClusterLightIndices:
+            case FrameRecipeResourceKind::ClusterLightCounter:
+                break;
+            }
+            return TextureRef{};
+        };
+
+        auto resolveDebugViewInput = [&](const FrameRecipePassContribution& contribution) -> TextureRef
+        {
+            for (const FrameResourceId id : contribution.Reads)
+            {
+                const TextureRef texture = textureForFrameResourceId(id);
+                if (texture.IsValid())
+                {
+                    return texture;
+                }
+            }
+            return presentSource;
+        };
+
         for (const FrameRecipePassContribution& contribution : contributions)
         {
             if (!contribution.Enabled)
@@ -2291,7 +2366,7 @@ namespace Extrinsic::Graphics
             }
             else if (contribution.Kind == FrameRecipePassKind::DebugView && debugViewActive)
             {
-                const TextureRef input = presentSource;
+                const TextureRef input = resolveDebugViewInput(contribution);
                 addRecipePassWithId(contribution.Id, std::string{contribution.Name}, [=](RenderGraphBuilder& builder) {
                     builder.Read(input, TextureUsage::ShaderRead);
                     builder.Write(debugView, TextureUsage::ColorAttachmentWrite);

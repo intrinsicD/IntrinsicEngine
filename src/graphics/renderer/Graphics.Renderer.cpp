@@ -357,6 +357,24 @@ namespace Extrinsic::Graphics
             return key;
         }
 
+        void ApplyResolvedDebugViewRead(std::vector<FrameRecipePassContribution>& contributions,
+                                        const DebugViewResolvedSelection& resolved)
+        {
+            if (!resolved.Enabled || !resolved.SelectedResourceId.IsValid())
+            {
+                return;
+            }
+
+            for (FrameRecipePassContribution& contribution : contributions)
+            {
+                if (contribution.Kind == FrameRecipePassKind::DebugView)
+                {
+                    contribution.Reads = {resolved.SelectedResourceId};
+                    return;
+                }
+            }
+        }
+
         [[nodiscard]] std::optional<std::uint32_t> FindCompiledTextureIndexByResourceId(
             const CompiledRenderGraph& compiled,
             const FrameResourceId id) noexcept
@@ -3084,6 +3102,38 @@ namespace Extrinsic::Graphics
                                                            defaultRecipeFeatures,
                                                            aaOptions,
                                                            temporalOptions);
+            if (m_DebugViewSystem.has_value())
+            {
+                const bool debugViewEnabled =
+                    renderWorld.DebugOverlayEnabled ||
+                    renderWorld.DebugPrimitives.HasTransientDebug;
+                DebugViewSettings settings = m_DebugViewSystem->GetSettings();
+                settings.Enabled = debugViewEnabled;
+                m_DebugViewSystem->SetSettings(settings);
+
+                const FrameRecipeContributionDescriptionResult debugViewRecipeDescription =
+                    DescribeDefaultFrameRecipeWithContributions(defaultRecipeFeatures,
+                                                                aaOptions,
+                                                                temporalOptions,
+                                                                frameRecipeContributions.Passes);
+                if (!debugViewRecipeDescription.Succeeded)
+                {
+                    m_RenderGraphCompileCache.reset();
+                    m_LastRenderGraphStats.Diagnostic =
+                        "FrameRecipe contribution description failed.";
+                    Core::Log::Error("[Graphics] FrameRecipe contribution description failed.");
+                    m_Device->NoteRecipeGraphValidation(false);
+                    return;
+                }
+
+                const DebugViewResolvedSelection resolved =
+                    m_DebugViewSystem->ResolveSelection(debugViewRecipeDescription.Recipe);
+                if (debugViewEnabled && resolved.UsedFallback)
+                {
+                    ++m_LastRenderGraphStats.DebugViewFallbackInvocationCount;
+                }
+                ApplyResolvedDebugViewRead(frameRecipeContributions.Passes, resolved);
+            }
             RenderGraphCompileCacheKey compileCacheKey =
                 BuildRenderGraphCompileCacheKey(defaultRecipeFeatures,
                                                 imports,
@@ -3178,42 +3228,6 @@ namespace Extrinsic::Graphics
             // the frame. Cache hits reuse the compile product but still
             // validate the recipe view and per-frame transient resource
             // readiness before execution.
-            // GRAPHICS-076 Slice B — drive the renderer-owned
-            // `DebugViewSystem` from the current frame's world + recipe
-            // declarations before the executor records the
-            // `"DebugViewPass"` branch. The recipe-side enablement
-            // (`features.EnableDebugView`) is derived from the same
-            // `world.DebugOverlayEnabled || world.DebugPrimitives.HasTransientDebug`
-            // condition; mirror it on the system side so the resolved
-            // selection's `Enabled` flag aligns with what the recipe
-            // exposes. `ResolveSelection` updates the cached selection +
-            // diagnostics and reports `UsedFallback = true` when the
-            // requested resource is missing/disabled/unsupported and the
-            // configured fallback resource was substituted; surface that
-            // diagnostic on the frame stats so contract tests can assert
-            // "no silent failure on invalid resource" without poking the
-            // system directly. The fallback counter only increments when
-            // debug view is actually requested (`debugViewEnabled`) so a
-            // baseline frame with the overlay off does not spuriously
-            // bump the diagnostic — `DebugViewSystem::ResolveSelection`
-            // also sets `UsedFallback = true` for the
-            // `DebugViewDisabled` reason which we treat as routine
-            // not-requested state.
-            if (m_DebugViewSystem.has_value())
-            {
-                const bool debugViewEnabled =
-                    renderWorld.DebugOverlayEnabled ||
-                    renderWorld.DebugPrimitives.HasTransientDebug;
-                DebugViewSettings settings = m_DebugViewSystem->GetSettings();
-                settings.Enabled = debugViewEnabled;
-                m_DebugViewSystem->SetSettings(settings);
-                const DebugViewResolvedSelection resolved =
-                    m_DebugViewSystem->ResolveSelection(*recipeIntrospection);
-                if (debugViewEnabled && resolved.UsedFallback)
-                {
-                    ++m_LastRenderGraphStats.DebugViewFallbackInvocationCount;
-                }
-            }
             const RenderGraphValidationResult recipeValidation =
                 ValidateRecipeCompiledGraph(*recipeIntrospection, *compiled);
             m_InvalidateRenderGraphCompileCacheAfterFrame = false;
@@ -7147,10 +7161,20 @@ namespace Extrinsic::Graphics
                 packet.BufferAliasReuseBarriers.clear();
             }
 
+            auto resolvePassIndexFromExecutionRank =
+                [&compiled](const std::uint32_t executionRank) noexcept
+            {
+                return executionRank < compiled.TopologicalOrder.size()
+                    ? compiled.TopologicalOrder[executionRank]
+                    : executionRank;
+            };
+
             for (const RendererTransientAliasReuseHazard& hazard : texturePlan.AliasReuseHazards)
             {
                 BarrierPacket& packet = FindOrCreateRendererBarrierPacket(
-                    compiled.BarrierPackets, hazard.PassIndex, BarrierPacketStage::BeforePass);
+                    compiled.BarrierPackets,
+                    resolvePassIndexFromExecutionRank(hazard.PassIndex),
+                    BarrierPacketStage::BeforePass);
                 packet.TextureAliasReuseBarriers.push_back(TextureAliasReuseBarrierPacket{
                     .PreviousTextureIndex = hazard.PreviousResourceIndex,
                     .TextureIndex = hazard.ResourceIndex,
@@ -7163,7 +7187,9 @@ namespace Extrinsic::Graphics
             for (const RendererTransientAliasReuseHazard& hazard : bufferPlan.AliasReuseHazards)
             {
                 BarrierPacket& packet = FindOrCreateRendererBarrierPacket(
-                    compiled.BarrierPackets, hazard.PassIndex, BarrierPacketStage::BeforePass);
+                    compiled.BarrierPackets,
+                    resolvePassIndexFromExecutionRank(hazard.PassIndex),
+                    BarrierPacketStage::BeforePass);
                 packet.BufferAliasReuseBarriers.push_back(BufferAliasReuseBarrierPacket{
                     .PreviousBufferIndex = hazard.PreviousResourceIndex,
                     .BufferIndex = hazard.ResourceIndex,

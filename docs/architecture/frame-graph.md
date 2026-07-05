@@ -137,23 +137,25 @@ single estimate and currently equals the planned peak.
 `SetTransientAliasingEnabled(false)` is the CPU and debug fallback lane: it
 keeps the placement records but disables range reuse, so planned peak equals the
 naive sum and alias-reuse hazard packets are absent. With aliasing enabled, a
-range can be reused only after the prior occupant's last use pass is strictly
-before the new occupant's first use pass. Reuse emits a
+range can be reused only after the prior occupant's last topological execution
+rank is strictly before the new occupant's first execution rank. Reuse emits a
 `TextureAliasReuseBarrierPacket` or `BufferAliasReuseBarrierPacket` on the
-new occupant's `BeforePass` barrier packet.
+new occupant's `BeforePass` barrier packet, keyed to the real pass index after
+the execution-rank placement pass is complete.
 
 The renderer lowers the compiled plan through the RHI placed-memory seam only
 when renderer transient aliasing is explicitly enabled and the device reports
-compatible requirements. Renderer aliasing defaults to the non-aliased fallback
-lane until the opt-in Vulkan smoke for `GRAPHICS-118` is cited. The renderer
-recomputes placements from backend requirements, creates per-frame memory
-blocks, binds transient textures/buffers at planned offsets, and submits
-alias-reuse memory barriers before the first pass that reuses a range. If
+compatible requirements. The renderer recomputes placements from backend
+requirements, creates per-frame memory blocks, binds transient textures/buffers
+at planned offsets, and submits alias-reuse memory barriers before the first pass
+that reuses a range. If
 aliasing is disabled or any requirement, memory-block, or placed-resource
 operation fails, the renderer clears alias-reuse barriers and uses the
 non-aliased fallback lane: concrete per-frame RHI textures and buffers cached per
-resource index. The opt-in Vulkan smoke with measured memory reduction remains
-the operational evidence for closing `GRAPHICS-118`.
+resource index. The opt-in Vulkan smoke for `GRAPHICS-118` is the operational
+evidence: aliasing-off/naive was 263168 bytes, aliasing-on/placed peak was
+197632 bytes, readback matched aliasing-off output, and validation counters were
+stable across the aliasing-on frame.
 
 ## Boundaries
 

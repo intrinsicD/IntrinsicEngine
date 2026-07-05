@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <iterator>
 #include <string>
+#include <utility>
 #include <vector>
 
 import Extrinsic.Graphics.RenderGraph;
@@ -475,6 +476,128 @@ TEST(GraphicsRenderGraph, DependencyCycleReportsPassNamesInDiagnostic)
     EXPECT_FALSE(findings.front().Message.empty());
     EXPECT_NE(findings.front().Message.find("PassA"), std::string::npos);
     EXPECT_NE(findings.front().Message.find("PassB"), std::string::npos);
+}
+
+TEST(GraphicsRenderGraph, TransientLifetimesUseTopologicalExecutionOrder)
+{
+    std::vector<TextureResourceDesc> textures{};
+    RHI::TextureDesc desc{};
+    desc.Width = 16u;
+    desc.Height = 16u;
+    desc.Fmt = RHI::Format::RGBA8_UNORM;
+    textures.push_back(TextureResourceDesc{
+        .Name = "LongLivedA",
+        .Desc = desc,
+        .Generation = 1u,
+    });
+    textures.push_back(TextureResourceDesc{
+        .Name = "MiddleB",
+        .Desc = desc,
+        .Generation = 1u,
+    });
+
+    std::vector<RenderPassRecord> passes{};
+    RenderPassRecord writeB{};
+    writeB.Name = "WriteB";
+    writeB.SideEffect = true;
+    writeB.TextureAccesses.push_back(TextureAccess{
+        .Ref = TextureRef{.Index = 1u, .Generation = 1u},
+        .Usage = TextureUsage::ColorAttachmentWrite,
+        .Write = true,
+    });
+    writeB.ExplicitDependencies.push_back(PassRef{.Index = 1u, .Generation = 1u});
+    passes.push_back(std::move(writeB));
+
+    RenderPassRecord writeA{};
+    writeA.Name = "WriteA";
+    writeA.TextureAccesses.push_back(TextureAccess{
+        .Ref = TextureRef{.Index = 0u, .Generation = 1u},
+        .Usage = TextureUsage::ColorAttachmentWrite,
+        .Write = true,
+    });
+    passes.push_back(std::move(writeA));
+
+    RenderPassRecord readA{};
+    readA.Name = "ReadA";
+    readA.SideEffect = true;
+    readA.TextureAccesses.push_back(TextureAccess{
+        .Ref = TextureRef{.Index = 0u, .Generation = 1u},
+        .Usage = TextureUsage::ShaderRead,
+        .Write = false,
+    });
+    passes.push_back(std::move(readA));
+
+    auto compiled = RenderGraphCompiler::Compile(passes, textures, {});
+    ASSERT_TRUE(compiled.has_value());
+    ASSERT_EQ(compiled->TopologicalOrder, (std::vector<std::uint32_t>{1u, 0u, 2u}));
+    ASSERT_EQ(compiled->TextureLifetimes.size(), 2u);
+
+    EXPECT_TRUE(compiled->TextureLifetimes[0u].HasUse);
+    EXPECT_EQ(compiled->TextureLifetimes[0u].FirstUsePass, 0u);
+    EXPECT_EQ(compiled->TextureLifetimes[0u].LastUsePass, 2u);
+    EXPECT_TRUE(compiled->TextureLifetimes[1u].HasUse);
+    EXPECT_EQ(compiled->TextureLifetimes[1u].FirstUsePass, 1u);
+    EXPECT_EQ(compiled->TextureLifetimes[1u].LastUsePass, 1u);
+    EXPECT_TRUE(LifetimesOverlap(compiled->TextureLifetimes[0u],
+                                 compiled->TextureLifetimes[1u]));
+}
+
+TEST(GraphicsRenderGraph, AliasReuseBarriersUseTopologicalPassIndex)
+{
+    RenderGraph graph;
+    RHI::TextureDesc desc{};
+    desc.Width = 16u;
+    desc.Height = 16u;
+    desc.Fmt = RHI::Format::RGBA8_UNORM;
+
+    const auto first = graph.CreateTexture("First", desc);
+    const auto second = graph.CreateTexture("Second", desc);
+
+    const PassRef writeSecond = graph.AddPass(
+        "WriteSecond",
+        [second](RenderGraphBuilder& builder) {
+            (void)builder.Write(second, TextureUsage::ColorAttachmentWrite);
+            builder.DependsOn(PassRef{.Index = 1u, .Generation = 1u});
+        },
+        true);
+
+    const PassRef writeFirst = graph.AddPass(
+        "WriteFirst",
+        [first](RenderGraphBuilder& builder) {
+            (void)builder.Write(first, TextureUsage::ColorAttachmentWrite);
+        },
+        true);
+
+    ASSERT_EQ(writeSecond.Index, 0u);
+    ASSERT_EQ(writeFirst.Index, 1u);
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    ASSERT_EQ(compiled->TopologicalOrder, (std::vector<std::uint32_t>{1u, 0u}));
+
+    const TransientResourcePlacement* firstPlacement = FindTexturePlacement(*compiled, first.Index);
+    const TransientResourcePlacement* secondPlacement = FindTexturePlacement(*compiled, second.Index);
+    ASSERT_NE(firstPlacement, nullptr);
+    ASSERT_NE(secondPlacement, nullptr);
+    EXPECT_EQ(firstPlacement->OffsetBytes, secondPlacement->OffsetBytes);
+    EXPECT_EQ(firstPlacement->FirstUsePass, 0u);
+    EXPECT_EQ(secondPlacement->FirstUsePass, 1u);
+
+    const BarrierPacket* aliasPacket = nullptr;
+    for (const BarrierPacket& packet : compiled->BarrierPackets)
+    {
+        if (!packet.TextureAliasReuseBarriers.empty())
+        {
+            aliasPacket = &packet;
+            break;
+        }
+    }
+    ASSERT_NE(aliasPacket, nullptr);
+    EXPECT_EQ(aliasPacket->PassIndex, writeSecond.Index);
+    EXPECT_EQ(aliasPacket->Stage, BarrierPacketStage::BeforePass);
+    ASSERT_EQ(aliasPacket->TextureAliasReuseBarriers.size(), 1u);
+    EXPECT_EQ(aliasPacket->TextureAliasReuseBarriers.front().PreviousTextureIndex, first.Index);
+    EXPECT_EQ(aliasPacket->TextureAliasReuseBarriers.front().TextureIndex, second.Index);
 }
 
 TEST(GraphicsRenderGraph, InvalidPresentTargetFailsValidation)

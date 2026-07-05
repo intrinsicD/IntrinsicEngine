@@ -524,9 +524,14 @@ namespace
     {
         const char* message = data && data->pMessage ? data->pMessage : "<null>";
         if ((severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) != 0)
+        {
+            g_VulkanValidationErrorCount.fetch_add(1, std::memory_order_relaxed);
             Core::Log::Error("[VulkanDevice::Bootstrap] validation: {}", message);
+        }
         else
+        {
             Core::Log::Warn("[VulkanDevice::Bootstrap] validation: {}", message);
+        }
         return VK_FALSE;
     }
 
@@ -3610,7 +3615,8 @@ namespace
     [[nodiscard]] VulkanImageCreateInfoBundle MakeVulkanImageCreateInfo(
         const RHI::TextureDesc& desc,
         const std::uint32_t graphicsFamily,
-        const std::uint32_t transferFamily)
+        const std::uint32_t transferFamily,
+        const bool aliasMemory = false)
     {
         VulkanImageCreateInfoBundle bundle{};
         bundle.Format = ToVkFormat(desc.Fmt);
@@ -3653,6 +3659,8 @@ namespace
         }
 
         info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        if (aliasMemory)
+            info.flags |= VK_IMAGE_CREATE_ALIAS_BIT;
         if (desc.Dimension == RHI::TextureDimension::TexCube)
             info.flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
 
@@ -4512,7 +4520,7 @@ RHI::ResourceMemoryRequirements VulkanDevice::GetTextureMemoryRequirements(
         return {};
 
     VulkanImageCreateInfoBundle imageInfoBundle =
-        MakeVulkanImageCreateInfo(desc, m_GraphicsFamily, m_TransferFamily);
+        MakeVulkanImageCreateInfo(desc, m_GraphicsFamily, m_TransferFamily, true);
     RebindVulkanImageCreateInfoPointers(imageInfoBundle);
     if (!imageInfoBundle.IsValid)
         return {};
@@ -4571,7 +4579,7 @@ RHI::TextureHandle VulkanDevice::CreatePlacedTexture(const RHI::PlacedTextureDes
         return {};
 
     VulkanImageCreateInfoBundle imageInfoBundle =
-        MakeVulkanImageCreateInfo(placedDesc.Desc, m_GraphicsFamily, m_TransferFamily);
+        MakeVulkanImageCreateInfo(placedDesc.Desc, m_GraphicsFamily, m_TransferFamily, true);
     RebindVulkanImageCreateInfoPointers(imageInfoBundle);
     if (!imageInfoBundle.IsValid)
         return {};

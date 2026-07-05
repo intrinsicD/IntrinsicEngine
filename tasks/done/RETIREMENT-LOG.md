@@ -3343,3 +3343,15 @@ rebinding on reuse, and lazy debug dumps; the PR-fast
 `rendering.frame_recipe_compile_cache.smoke` benchmark records the default
 1280x720 recipe rebuild declare+compile baseline and the cached steady-state
 compile-attempt contract.
+
+[`GRAPHICS-118`](GRAPHICS-118-placed-transient-memory-aliasing.md) —
+Placed transient resource allocation with real memory aliasing retired to
+`tasks/done/` on 2026-07-04 at `Operational` on Vulkan-capable hosts and
+`CPUContracted` for backend-neutral planning/fallback paths. The render-graph
+compiler now emits deterministic transient placements and alias-reuse hazards,
+the RHI seam exposes placed memory blocks, Null records CPU bookkeeping, Vulkan
+binds placed images/buffers behind the RHI contract, and the renderer lowers the
+plan only when transient aliasing is explicitly enabled. The closing Vulkan
+smoke compares aliasing-on readback against aliasing-off output, keeps validation
+counters stable across the aliasing-on frame, and records the default sandbox
+recipe reduction from 263168 bytes naive/fallback to 197632 bytes placed peak.
