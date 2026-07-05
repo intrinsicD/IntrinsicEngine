@@ -1,11 +1,13 @@
 #include <gtest/gtest.h>
 #include <atomic>
+#include <chrono>
 #include <cstdlib>
 #include <expected>
 #include <filesystem>
 #include <fstream>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
  
 import Extrinsic.Asset.Service;
@@ -13,10 +15,13 @@ import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.EventBus;
 import Extrinsic.Asset.PayloadStore;
 import Extrinsic.Core.Error;
+import Extrinsic.Core.Tasks;
  
 using namespace Extrinsic::Assets;
 using Extrinsic::Core::ErrorCode;
 using Extrinsic::Core::Expected;
+namespace Core = Extrinsic::Core;
+namespace Tasks = Extrinsic::Core::Tasks;
  
 namespace
 {
@@ -64,6 +69,46 @@ namespace
             return std::unexpected(err);
         };
     }
+
+    class SchedulerScope
+    {
+    public:
+        explicit SchedulerScope(const unsigned workerCount)
+        {
+            if (!Tasks::Scheduler::IsInitialized())
+            {
+                Tasks::Scheduler::Initialize(workerCount);
+                m_Owned = true;
+            }
+        }
+
+        ~SchedulerScope()
+        {
+            if (m_Owned)
+            {
+                Tasks::Scheduler::Shutdown();
+            }
+        }
+
+        SchedulerScope(const SchedulerScope&) = delete;
+        SchedulerScope& operator=(const SchedulerScope&) = delete;
+
+        [[nodiscard]] bool Owned() const noexcept { return m_Owned; }
+
+    private:
+        bool m_Owned{false};
+    };
+
+    void WaitUntilTrue(const std::atomic<bool>& flag)
+    {
+        const auto deadline =
+            std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (!flag.load(std::memory_order_acquire) &&
+               std::chrono::steady_clock::now() < deadline)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    }
 }
  
 // -----------------------------------------------------------------------------
@@ -86,6 +131,55 @@ TEST(AssetService, LoadReturnsValidIdOnSuccess)
     ASSERT_TRUE(r.has_value());
     EXPECT_TRUE(r->IsValid());
     EXPECT_TRUE(svc.IsAlive(*r));
+}
+
+TEST(AssetService, CompleteCpuLoadAndFlushEventIgnoresUnrelatedSchedulerWork)
+{
+    ASSERT_FALSE(Tasks::Scheduler::IsInitialized());
+    SchedulerScope scheduler(1u);
+    ASSERT_TRUE(scheduler.Owned());
+
+    std::atomic<bool> blockerStarted{false};
+    std::atomic<bool> blockerFinished{false};
+    Tasks::Scheduler::Dispatch([&]()
+    {
+        blockerStarted.store(true, std::memory_order_release);
+        std::this_thread::sleep_for(std::chrono::milliseconds(250));
+        blockerFinished.store(true, std::memory_order_release);
+    });
+    WaitUntilTrue(blockerStarted);
+    ASSERT_TRUE(blockerStarted.load(std::memory_order_acquire));
+
+    TmpFile f("svc_targeted_cpu_load_flush.bin");
+    AssetService svc;
+    std::vector<AssetEvent> events;
+    (void)svc.SubscribeAll([&](AssetId observed, AssetEvent event)
+    {
+        if (!events.empty())
+        {
+            return;
+        }
+        events.push_back(event);
+        EXPECT_TRUE(observed.IsValid());
+    });
+
+    auto id = svc.Load<Mesh>(f.path.string(), MeshLoader(10));
+    ASSERT_TRUE(id.has_value());
+
+    const auto before = std::chrono::steady_clock::now();
+    Core::Result completed = svc.CompleteCpuLoadAndFlushEvent(*id);
+    const auto after = std::chrono::steady_clock::now();
+
+    ASSERT_TRUE(completed.has_value());
+    EXPECT_EQ(svc.GetMeta(*id).value().state, AssetState::Ready);
+    EXPECT_EQ(svc.Read<Mesh>(*id).value()[0].triangles, 10);
+    ASSERT_EQ(events.size(), 1u);
+    EXPECT_EQ(events[0], AssetEvent::Ready);
+    EXPECT_FALSE(blockerFinished.load(std::memory_order_acquire));
+    EXPECT_LT(after - before, std::chrono::milliseconds(150));
+
+    WaitUntilTrue(blockerFinished);
+    EXPECT_TRUE(blockerFinished.load(std::memory_order_acquire));
 }
  
 TEST(AssetService, LoadSamePathReturnsSameId)

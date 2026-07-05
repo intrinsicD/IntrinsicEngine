@@ -116,7 +116,27 @@ TEST(AssetLoadPipeline, OnCpuDecodedForUnknownIdIsNotFound)
     ASSERT_FALSE(r.has_value());
     EXPECT_EQ(r.error(), ErrorCode::ResourceNotFound);
 }
- 
+
+TEST(AssetLoadPipeline, DuplicateCpuDecodeForGpuInFlightDoesNotDropUploadStage)
+{
+    PipelineFixture f;
+    auto id = f.NewAsset();
+    LoadRequest req{.id = id, .typeId = 0u, .path = "/tmp/a", .needsGpuUpload = true};
+    ASSERT_TRUE(f.pipeline.EnqueueIO(std::move(req)).has_value());
+    ASSERT_EQ(f.registry.GetState(id).value(), AssetState::QueuedGPU);
+    ASSERT_TRUE(f.pipeline.IsInFlight(id));
+
+    auto duplicate = f.pipeline.OnCpuDecoded(id);
+    ASSERT_FALSE(duplicate.has_value());
+    EXPECT_EQ(duplicate.error(), ErrorCode::InvalidState);
+    EXPECT_EQ(f.registry.GetState(id).value(), AssetState::QueuedGPU);
+    EXPECT_TRUE(f.pipeline.IsInFlight(id));
+
+    ASSERT_TRUE(f.pipeline.OnGpuUploaded(id).has_value());
+    EXPECT_EQ(f.registry.GetState(id).value(), AssetState::Ready);
+    EXPECT_FALSE(f.pipeline.IsInFlight(id));
+}
+
 TEST(AssetLoadPipeline, EventBusSeesReadyOnSuccess)
 {
     PipelineFixture f;

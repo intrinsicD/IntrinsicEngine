@@ -140,6 +140,10 @@ namespace Extrinsic::Assets
             {
                 return Core::Err(Core::ErrorCode::ResourceNotFound);
             }
+            if (it->second.decodeDone)
+            {
+                return Core::Err(Core::ErrorCode::InvalidState);
+            }
 
             registry = m_Registry;
             eventBus = m_EventBus;

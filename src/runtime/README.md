@@ -56,6 +56,17 @@ startup/shutdown.
 | `Extrinsic.Runtime.GizmoInteraction` | Runtime/editor-owned transform-gizmo interaction (`RUNTIME-084`). Exports `GizmoMode` (`Translate`/`Rotate`/`Scale`), `GizmoAxis`, `GizmoOrientation` (`Global`/`Local`), `GizmoModifier` flags (`Snap`/`Clone`), `PickRay`, `GizmoConfig` (pick radius, axis length, translate/rotate/scale snap and scale clamps), `GizmoHitResult`, full-transform `GizmoTransformEdit` records, `GizmoUndoStack`, `GizmoInteractionDiagnostics`, `GizmoInteraction`, and `TransformGizmoRenderPacketBuilder`. `HitTest(registry, CameraViewSnapshot, cursorPixel, viewport, selected)` projects each axis handle line to screen space and resolves the nearest handle within the pixel pick radius; empty/off-handle picks are a background no-hit. `BeginDrag`/`DragTick`/`DragCommit`/`DragCancel` apply axis-constrained translate/rotate/scale edits by projecting the world `PickRay` onto the locked axis line, mutate ECS authoring transforms in runtime only, stamp `Transform::IsDirtyTag`, latch mode at drag start, honor `Snap`, and emit one before/after position-rotation-scale edit per changed entity on commit. `Engine` owns the interaction, undo stack, packet builder, selected-entity scratch, and default input binding (left mouse drag, left shift snap); extraction forwards the builder's copied `TransformGizmoRenderPacket` span through `RuntimeRenderSnapshotBatch::TransformGizmos`. Graphics sees only the frozen render packet field set and never receives drag state, pointer pixels, modifier keys, undo data, or ECS handles. |
 | `Extrinsic.Runtime.StreamingExecutor` | Persistent background streaming task execution with dependency-aware launch, explicit completion draining, unbounded or count-limited main-thread apply drains, readback parking/resume, cancellation, and deterministic shutdown draining. |
 
+### Asset Import Apply Scheduling
+
+Runtime import materialization may synchronously complete the specific
+`AssetService` CPU load/reload it just issued, then flush only that asset's
+event so model-scene and texture handoffs observe the result in the same
+facade call. Import apply code reachable from `Engine::RunFrame()` must not use
+`Core::Tasks::Scheduler::WaitForAll()` as a frame-path fence; that scheduler
+wait is reserved for shutdown and explicit non-frame joins. Unrelated scheduler
+work must be allowed to continue while the current import result is
+materialized or reported.
+
 ### Sandbox Editor Startup Layout
 
 `UI-018` makes `Extrinsic.Runtime.SandboxEditorUi` menu-first on startup. The

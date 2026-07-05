@@ -169,7 +169,8 @@ for `PROC-011`.
 The 2026-07-03 main-loop/task-graph/render-graph review
 ([`docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`](../../docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md))
 seeded a Theme F set spanning the core task system and the runtime
-composition root: non-blocking frame-path fixes (`RUNTIME-140..142`),
+composition root: the retired non-blocking import-apply fix `RUNTIME-140`,
+remaining non-blocking frame-path fixes (`RUNTIME-141`, `RUNTIME-142`),
 composition-root/abstractness seams (`RUNTIME-143`, `RUNTIME-144`,
 `CORE-006`, `CORE-009`, `ARCH-006`), scheduler/DAG capability and
 efficiency (`CORE-005`, `CORE-007`, `CORE-008`), and steady-state frame
@@ -179,7 +180,6 @@ unblocks `CORE-005`.
 Open members:
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md`](runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md).
-- [`runtime/RUNTIME-140-remove-global-waitforall-from-import-apply.md`](runtime/RUNTIME-140-remove-global-waitforall-from-import-apply.md).
 - [`runtime/RUNTIME-141-async-editor-method-command-lane.md`](runtime/RUNTIME-141-async-editor-method-command-lane.md).
 - [`runtime/RUNTIME-142-async-modelscene-texture-scenefile-io.md`](runtime/RUNTIME-142-async-modelscene-texture-scenefile-io.md).
 - [`runtime/RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md`](runtime/RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md).

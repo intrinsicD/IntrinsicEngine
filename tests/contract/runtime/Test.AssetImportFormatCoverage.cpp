@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <cmath>
 #include <chrono>
 #include <cstddef>
@@ -27,6 +28,7 @@ import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
+import Extrinsic.Core.Tasks;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
@@ -52,6 +54,7 @@ namespace Sel = Extrinsic::ECS::Components::Selection;
 namespace G = Extrinsic::Graphics::Components;
 namespace Graphics = Extrinsic::Graphics;
 namespace Runtime = Extrinsic::Runtime;
+namespace Tasks = Extrinsic::Core::Tasks;
 
 namespace
 {
@@ -105,6 +108,17 @@ namespace
         config.Camera.Enabled = false;
         config.Window.Backend = Core::Config::WindowBackend::Null;
         return config;
+    }
+
+    void WaitUntilTrue(const std::atomic<bool>& flag)
+    {
+        const auto deadline =
+            std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (!flag.load(std::memory_order_acquire) &&
+               std::chrono::steady_clock::now() < deadline)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
     }
 
     class TempAssetFile final
@@ -644,6 +658,57 @@ TEST(RuntimeAssetImportFormatCoverage, ReimportExistingMeshReloadsAssetWithoutDu
     EXPECT_EQ(lastEvent->Result->Asset, imported->Asset);
 
     engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, ImportAssetFromPathDoesNotWaitForUnrelatedSchedulerWork)
+{
+    TempAssetFile meshFile(
+        "assetio101_import_without_global_scheduler_wait.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    Core::Config::EngineConfig config = HeadlessConfig();
+    config.Simulation.WorkerThreadCount = 1u;
+    Runtime::Engine engine(config, std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+
+    std::atomic<bool> blockerStarted{false};
+    std::atomic<bool> blockerFinished{false};
+    Tasks::Scheduler::Dispatch([&]()
+    {
+        blockerStarted.store(true, std::memory_order_release);
+        std::this_thread::sleep_for(std::chrono::milliseconds(250));
+        blockerFinished.store(true, std::memory_order_release);
+    });
+    WaitUntilTrue(blockerStarted);
+    if (!blockerStarted.load(std::memory_order_acquire))
+    {
+        engine.Shutdown();
+        FAIL() << "scheduler sentinel did not start";
+    }
+
+    const auto before = std::chrono::steady_clock::now();
+    auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+        .Path = meshFile.Path.string(),
+        .PayloadKind = Assets::AssetPayloadKind::Mesh,
+    });
+    const auto after = std::chrono::steady_clock::now();
+    const bool blockerFinishedBeforeImportReturned =
+        blockerFinished.load(std::memory_order_acquire);
+    const std::size_t meshEntityCount =
+        CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh);
+
+    WaitUntilTrue(blockerFinished);
+    engine.Shutdown();
+
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+    ASSERT_TRUE(imported->Asset.IsValid());
+    EXPECT_EQ(imported->PayloadKind, Assets::AssetPayloadKind::Mesh);
+    EXPECT_EQ(meshEntityCount, 1u);
+    EXPECT_FALSE(blockerFinishedBeforeImportReturned);
+    EXPECT_LT(after - before, std::chrono::milliseconds(150));
 }
 
 TEST(RuntimeAssetImportFormatCoverage, ReimportInvalidAssetReportsDeterministicIngestDiagnostic)

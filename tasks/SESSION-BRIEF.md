@@ -30,7 +30,6 @@ the authoritative open/unblocked view.
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RUNTIME-137` — Async GPU readback helper + pooled destination for compute backends (tasks/backlog/runtime/RUNTIME-137-async-gpu-readback-helper-for-compute-backends.md)
 - unblocked: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
-- unblocked: `RUNTIME-140` — Remove the global scheduler barrier from the import apply path (tasks/backlog/runtime/RUNTIME-140-remove-global-waitforall-from-import-apply.md)
 - unblocked: `RUNTIME-141` — Async editor method-command lane (no heavy compute in the ImGui callback) (tasks/backlog/runtime/RUNTIME-141-async-editor-method-command-lane.md)
 - unblocked: `RUNTIME-142` — Async model-scene/texture import and scene-file IO (tasks/backlog/runtime/RUNTIME-142-async-modelscene-texture-scenefile-io.md)
 - unblocked: `RUNTIME-143` — Multi-subscriber frame-command hook and K-Means decoupling from Engine (tasks/backlog/runtime/RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md)

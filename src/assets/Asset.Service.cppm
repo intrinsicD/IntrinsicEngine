@@ -70,6 +70,7 @@ export namespace Extrinsic::Assets
 
         Core::Result Destroy(AssetId id);
         void Tick();
+        Core::Result CompleteCpuLoadAndFlushEvent(AssetId id);
 
         template <class T>
         [[nodiscard]] static uint32_t TypeIdOf() noexcept;

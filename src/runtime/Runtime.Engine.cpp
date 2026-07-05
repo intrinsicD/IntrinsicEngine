@@ -911,13 +911,11 @@ namespace Extrinsic::Runtime
             return std::filesystem::is_regular_file(std::filesystem::path{path}, ec) && !ec;
         }
 
-        void DrainAssetImportEvents(Assets::AssetService& service)
+        [[nodiscard]] Core::Result DrainAssetImportEvents(
+            Assets::AssetService& service,
+            const Assets::AssetId asset)
         {
-            if (Core::Tasks::Scheduler::IsInitialized())
-            {
-                Core::Tasks::Scheduler::WaitForAll();
-            }
-            service.Tick();
+            return service.CompleteCpuLoadAndFlushEvent(asset);
         }
 
         [[nodiscard]] Core::ErrorCode NormalizeImportError(
@@ -1737,7 +1735,13 @@ namespace Extrinsic::Runtime
                             return Core::Err<MaterializedGeometryImport>(
                                 asset.error());
                         }
-                        DrainAssetImportEvents(assetService);
+                        if (Core::Result drained =
+                                DrainAssetImportEvents(assetService, *asset);
+                            !drained.has_value())
+                        {
+                            return Core::Err<MaterializedGeometryImport>(
+                                drained.error());
+                        }
 
                         auto rawMesh = BuildRuntimeHalfedgeMeshGeometryOnly(
                             payload.Payload,
@@ -1810,7 +1814,13 @@ namespace Extrinsic::Runtime
                             return Core::Err<MaterializedGeometryImport>(
                                 asset.error());
                         }
-                        DrainAssetImportEvents(assetService);
+                        if (Core::Result drained =
+                                DrainAssetImportEvents(assetService, *asset);
+                            !drained.has_value())
+                        {
+                            return Core::Err<MaterializedGeometryImport>(
+                                drained.error());
+                        }
 
                         Geometry::Graph::Graph graph = payload.Payload.Graph;
                         const std::optional<GeometryImportBounds> bounds =
@@ -1867,7 +1877,13 @@ namespace Extrinsic::Runtime
                             return Core::Err<MaterializedGeometryImport>(
                                 asset.error());
                         }
-                        DrainAssetImportEvents(assetService);
+                        if (Core::Result drained =
+                                DrainAssetImportEvents(assetService, *asset);
+                            !drained.has_value())
+                        {
+                            return Core::Err<MaterializedGeometryImport>(
+                                drained.error());
+                        }
 
                         Geometry::PointCloud::Cloud cloud = payload.Payload.Cloud;
                         const std::optional<GeometryImportBounds> bounds =
@@ -2015,7 +2031,12 @@ namespace Extrinsic::Runtime
                     reloadResult.error());
             }
 
-            DrainAssetImportEvents(assetService);
+            if (Core::Result drained =
+                    DrainAssetImportEvents(assetService, existingAsset);
+                !drained.has_value())
+            {
+                return Core::Err<RuntimeAssetImportResult>(drained.error());
+            }
             return RuntimeAssetImportResult{
                 .Asset = existingAsset,
                 .PayloadKind = decoded.PayloadKind,
@@ -4461,7 +4482,13 @@ namespace Extrinsic::Runtime
                         reloaded.error());
                 }
 
-                DrainAssetImportEvents(*m_AssetService);
+                if (Core::Result drained =
+                        DrainAssetImportEvents(*m_AssetService, existingAsset);
+                    !drained.has_value())
+                {
+                    return Core::Err<RuntimeAssetImportResult>(
+                        drained.error());
+                }
                 const AssetModelSceneHandoffDiagnostics after =
                     m_AssetModelSceneHandoff->GetDiagnostics();
                 if (after.ModelSceneMaterializeFailures >
@@ -4510,7 +4537,13 @@ namespace Extrinsic::Runtime
                 return Core::Err<RuntimeAssetImportResult>(asset.error());
             }
 
-            DrainAssetImportEvents(*m_AssetService);
+            if (Core::Result drained =
+                    DrainAssetImportEvents(*m_AssetService, *asset);
+                !drained.has_value())
+            {
+                return Core::Err<RuntimeAssetImportResult>(
+                    drained.error());
+            }
             if (m_AssetModelSceneHandoff->FindRecord(*asset) == nullptr)
             {
                 if (Core::Result materialized =
@@ -4585,7 +4618,13 @@ namespace Extrinsic::Runtime
                     reloaded.error());
             }
 
-            DrainAssetImportEvents(*m_AssetService);
+            if (Core::Result drained =
+                    DrainAssetImportEvents(*m_AssetService, existingAsset);
+                !drained.has_value())
+            {
+                return Core::Err<RuntimeAssetImportResult>(
+                    drained.error());
+            }
             const AssetModelTextureHandoffDiagnostics after =
                 m_AssetModelTextureHandoff->GetDiagnostics();
             if (after.TextureUploadFailures > before.TextureUploadFailures &&
@@ -4617,7 +4656,13 @@ namespace Extrinsic::Runtime
             return Core::Err<RuntimeAssetImportResult>(asset.error());
         }
 
-        DrainAssetImportEvents(*m_AssetService);
+        if (Core::Result drained =
+                DrainAssetImportEvents(*m_AssetService, *asset);
+            !drained.has_value())
+        {
+            return Core::Err<RuntimeAssetImportResult>(
+                drained.error());
+        }
         AssetModelTextureHandoffDiagnostics after =
             m_AssetModelTextureHandoff->GetDiagnostics();
         const bool uploadWasAlreadyHandled =

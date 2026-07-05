@@ -8,6 +8,7 @@ module;
 #include <type_traits>
 #include <unordered_map>
 #include <functional>
+#include <thread>
 
 module Extrinsic.Asset.Service;
 
@@ -76,6 +77,15 @@ namespace Extrinsic::Assets
               "AssetService must be non-copyable (CLAUDE.md subsystem contract).");
     static_assert(!std::is_move_constructible_v<AssetService>,
                   "AssetService must be non-movable; loader thunks capture 'this'.");
+
+    namespace
+    {
+        [[nodiscard]] bool IsBenignConcurrentCompletionError(const Core::ErrorCode error) noexcept
+        {
+            return error == Core::ErrorCode::ResourceNotFound ||
+                   error == Core::ErrorCode::InvalidState;
+        }
+    }
 
     AssetService::AssetService()
         : m_Impl(std::make_unique<Impl>())
@@ -382,6 +392,47 @@ namespace Extrinsic::Assets
     void AssetService::Tick()
     {
         m_Impl->eventBus.Flush();
+    }
+
+    Core::Result AssetService::CompleteCpuLoadAndFlushEvent(const AssetId id)
+    {
+        if (!m_Impl->registry.IsAlive(id))
+        {
+            return Core::Err(Core::ErrorCode::ResourceNotFound);
+        }
+
+        Core::Result completed = m_Impl->loadPipeline.OnCpuDecoded(id);
+        if (!completed.has_value())
+        {
+            if (!IsBenignConcurrentCompletionError(completed.error()))
+            {
+                return completed;
+            }
+
+            for (uint32_t attempts = 0; attempts < 1024u; ++attempts)
+            {
+                auto meta = m_Impl->registry.GetMeta(id);
+                if (!meta.has_value())
+                {
+                    return Core::Err(meta.error());
+                }
+                if (meta->state == AssetState::Ready)
+                {
+                    m_Impl->eventBus.Flush(id);
+                    return Core::Ok();
+                }
+                if (!m_Impl->loadPipeline.IsInFlight(id) ||
+                    meta->state == AssetState::Failed)
+                {
+                    return completed;
+                }
+                std::this_thread::yield();
+            }
+            return completed;
+        }
+
+        m_Impl->eventBus.Flush(id);
+        return Core::Ok();
     }
 
     bool AssetService::HasLoaderCallback(LoaderToken token) const

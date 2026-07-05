@@ -13,9 +13,9 @@ Opened from the main-loop/task-graph/render-graph review
 ([`docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`](../../../docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md)).
 Blocking fixes first, then abstractness seams, then steady-state efficiency:
 
-- [`RUNTIME-140`](RUNTIME-140-remove-global-waitforall-from-import-apply.md) —
-  remove the global `Scheduler::WaitForAll()` barrier from the asset-import
-  apply path (per-load waits only).
+- [`RUNTIME-140`](../../done/RUNTIME-140-remove-global-waitforall-from-import-apply.md)
+  is retired; runtime import apply now uses per-asset completion and event
+  flushes instead of a global `Scheduler::WaitForAll()` barrier.
 - [`RUNTIME-141`](RUNTIME-141-async-editor-method-command-lane.md) — async
   editor method-command lane; no heavy solves inside the ImGui callback
   (GPU readback leg stays with `RUNTIME-137`/`METHOD-014`; selected-entity
@@ -144,6 +144,11 @@ these as runtime work when scheduling and review:
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [RUNTIME-140 — Remove the global scheduler barrier from the import apply path](../../done/RUNTIME-140-remove-global-waitforall-from-import-apply.md)
+  (done, 2026-07-05, `CPUContracted`): runtime import materialization now
+  drains only the specific `AssetId` load/event through
+  `AssetService::CompleteCpuLoadAndFlushEvent(...)`; focused regressions prove
+  unrelated scheduler work stays in flight while import apply completes.
 - [RUNTIME-125 — Optional AoS fast lane for static geometry](../../done/RUNTIME-125-aos-static-fast-lane.md)
   (done, 2026-07-02, `CPUContracted`): PR-fast SoA/probe benchmark evidence and
   planning-only storage-lane/promotion contracts landed without allocating an

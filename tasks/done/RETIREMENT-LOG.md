@@ -3447,3 +3447,14 @@ missing prepared-config scalar range caused isoline shader config to operate on
 the wrong range. The regression now enables isolines and proves the prepared
 entity config receives the computed scalar range plus isoline count, width, and
 color.
+
+[`RUNTIME-140`](RUNTIME-140-remove-global-waitforall-from-import-apply.md) —
+Remove global scheduler barrier from import apply retired to `tasks/done/` on
+2026-07-05 at `CPUContracted`. `AssetService` now exposes a per-asset
+completion/flush primitive, and runtime import materialization uses it instead
+of `Core::Tasks::Scheduler::WaitForAll()`. `AssetLoadPipeline` also rejects
+duplicate in-flight CPU decode completion without dropping the pending upload
+stage. Focused regressions prove direct asset-service completion and
+`Engine::ImportAssetFromPath` both return while an unrelated scheduler sentinel
+remains in flight, with imported payloads and events still delivered exactly
+once.
