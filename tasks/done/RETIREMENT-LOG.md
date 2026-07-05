@@ -3355,3 +3355,12 @@ plan only when transient aliasing is explicitly enabled. The closing Vulkan
 smoke compares aliasing-on readback against aliasing-off output, keeps validation
 counters stable across the aliasing-on frame, and records the default sandbox
 recipe reduction from 263168 bytes naive/fallback to 197632 bytes placed peak.
+
+[`UI-028`](UI-028-editor-mesh-simplification-window.md) — Sandbox EditorUI mesh
+simplification retired to `tasks/done/` on 2026-07-05 at `CPUContracted`.
+`Mesh > Processing > Simplify` drives the `GEOM-014` classical QEM / FA-QEM
+simplification kernel through a runtime-owned undoable command, replaces the
+selected mesh `GeometrySources`, preserves UV seam inputs when texcoords are
+present, reports collapse/rejection/pin diagnostics, and leaves renderer
+synchronization to geometry dirty tags. Focused geometry/runtime CTest coverage
+passed, including the UV seam regression.

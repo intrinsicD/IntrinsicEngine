@@ -11,9 +11,6 @@ map.
 ## Tasks
 
 - [RORG-031F — UI integration backlog seed](RORG-031-ui-integration.md).
-- [UI-028 — Sandbox EditorUI mesh simplification window](UI-028-editor-mesh-simplification-window.md)
-  (depends on `GEOM-014`; the editor executor for feature-aware QEM
-  simplification, continuing the `bcg_code_base` processing-window port).
 - [UI-029 — Editor ICP registration panel + convergence visualization](UI-029-editor-registration-convergence-visualization.md)
   (depends on `GEOM-055`; consumes the runtime controller
   `Runtime.RegistrationAlignment` to run ICP and scrub the convergence
@@ -41,6 +38,11 @@ retired under the runtime backlog as `RUNTIME-135`.
 - UI-027 (retired) was the paired editor command/UI for the `GEOM-016`
   point-cloud outlier-removal operators under **Theme F**, continuing the
   `bcg_code_base` geometry-processing port into interactive Sandbox workflows.
+- UI-028 is retired as the mesh simplification method-window follow-up: `Mesh >
+  Processing > Simplify` drives the `GEOM-014` classical QEM / FA-QEM kernel
+  through a runtime-owned undoable command, preserves UV seams when texcoords
+  are present, and surfaces simplification diagnostics without UI owning engine
+  state.
 - UI-030 is the diagnostic follow-up from the 2026-07-01 editor-stutter review:
   it builds an evidence loop before blaming barriers, fences, present pacing, or
   editor CPU work. Source-level selected-entity findings are now tracked by
@@ -229,3 +231,8 @@ split; narratives live in the retirement log.
   Outliers` window drives the `GEOM-016` statistical/radius outlier-removal
   operators, rebuilds the entity's point `GeometrySources` via
   `PopulateFromCloud`, and is undoable through `EditorCommandHistory`.
+- [UI-028 — Sandbox EditorUI mesh simplification window](../../done/UI-028-editor-mesh-simplification-window.md)
+  (done, 2026-07-05, `CPUContracted`): `Mesh > Processing > Simplify` drives the
+  `GEOM-014` classical QEM / FA-QEM simplification kernel through an undoable
+  runtime command, preserves UV seam inputs, reports collapse/rejection/pin
+  diagnostics, and defers renderer synchronization through geometry dirty tags.

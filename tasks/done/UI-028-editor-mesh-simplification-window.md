@@ -2,16 +2,15 @@
 id: UI-028
 theme: F
 depends_on: [GEOM-014]
+completed: 2026-07-05
 ---
 # UI-028 — Sandbox EditorUI mesh simplification window
 
 ## Status
-- Implemented (2026-07-01) on branch `claude/ui-backlog-agentic-y3oap2`; the full
-  C++23-module build/`ctest` gate is deferred to CI because this sandbox cannot
-  bootstrap vcpkg (clang-18, no Clang 20 toolchain) — the same constraint under
-  which the `GEOM-014` kernel itself landed.
-- Landed as a single cohesive change mirroring the retired UI-024/025/026/027
-  seam pattern: `SandboxEditorMeshSimplifyMetric` (ClassicalQEM / FA_QEM),
+- Retired on 2026-07-05 at `CPUContracted`.
+- Branch/PR: local `main`; PR not opened.
+- The already-implemented editor seam mirrors the retired UI-024/025/026/027
+  pattern: `SandboxEditorMeshSimplifyMetric` (ClassicalQEM / FA_QEM),
   `SandboxEditorMeshSimplifyCommand` / `...Result`, and
   `ApplySandboxEditorMeshSimplifyCommand` drive
   `Geometry::Simplification::Simplify` on the selected mesh, replace its
@@ -20,20 +19,13 @@ depends_on: [GEOM-014]
   A `Mesh > Processing > Simplify` window exposes Metric, target face count,
   max error, boundary preservation, and the FA_QEM feature weights, and reads
   out the `Result` diagnostics (collapses, rejections, pins).
-- Verified in-session: `check_layering --strict` (the new
-  `runtime -> Geometry.Simplification` import edge is allowed),
-  `check_test_layout --strict`, `check_doc_links`, `validate_tasks --strict`,
-  and `check_task_policy --strict` all pass; adversarial diff review against the
-  kernel/editor ground truth.
-- Follow-up fix (2026-07-01, review feedback): the executor now forwards the
-  selected mesh's `v:texcoord` into the scratch halfedge mesh before simplifying.
-  `BuildHalfedgeMeshForTopologyEdit` (via `BuildMeshSoupFromGeometrySources`)
-  carries only positions + topology, so without this the FA_QEM `PreserveUvSeams`
-  default was silently ineffective and textured meshes could collapse across UV
-  seams while reporting zero pinned seam vertices. Added
-  `SandboxEditorUi.MeshSimplifyPreservesUvSeamsWhenTexcoordsPresent` (textured
-  grid plane → `SeamVerticesPinned > 0`).
-- Deferred to CI: `cmake --preset ci` + `ctest -R SandboxEditorUi`.
+- The 2026-07-01 review fix forwards the selected mesh's `v:texcoord` into the
+  scratch halfedge mesh before simplifying. Without this, the FA_QEM
+  `PreserveUvSeams` default was silently ineffective and textured meshes could
+  collapse across UV seams while reporting zero pinned seam vertices.
+- Closure verification on 2026-07-05 used the repository Clang/C++23 preset
+  build tree and the focused geometry/runtime CTest slice, including
+  `SandboxEditorUi.MeshSimplifyPreservesUvSeamsWhenTexcoordsPresent`.
 
 ## Goal
 - Add a `Mesh > Processing > Simplify` window to the promoted
@@ -59,7 +51,7 @@ depends_on: [GEOM-014]
   runtime command seams.
 - `GEOM-014` shipped the feature-aware `Metric` (default `FA_QEM`), feature/seam
   pin parameters, and `Result` diagnostics this window surfaces.
-- Cites [`tasks/backlog/ui/RORG-031-ui-integration.md`](RORG-031-ui-integration.md);
+- Cites [`tasks/backlog/ui/RORG-031-ui-integration.md`](../backlog/ui/RORG-031-ui-integration.md);
   continues the `bcg_code_base` geometry-processing port into interactive
   Sandbox workflows.
 
@@ -81,21 +73,25 @@ depends_on: [GEOM-014]
       to `tests/contract/runtime/Test.SandboxEditorUi.cpp` (run in CI).
 
 ## Docs
-- [ ] Add the UI-028 entry to [`tasks/backlog/ui/README.md`](README.md) on
+- [x] Add the UI-028 entry to [`tasks/backlog/ui/README.md`](../backlog/ui/README.md) on
       retirement and update `docs/migration/nonlegacy-parity-matrix.md` if the
       executor closes a deferred workflow.
 
 ## Acceptance criteria
-- [ ] The `Simplify` window executes the geometry kernel through a runtime
+- [x] The `Simplify` window executes the geometry kernel through a runtime
       command, is undoable, and surfaces the FA_QEM metric + diagnostics.
-- [ ] No UI ownership of renderer/asset/runtime/geometry state.
-- [ ] `python3 tools/agents/validate_tasks.py --root tasks --strict` passes.
+- [x] No UI ownership of renderer/asset/runtime/geometry state.
+- [x] `python3 tools/agents/validate_tasks.py --root tasks --strict` passes.
 
 ## Verification
 ```bash
-test -f tasks/backlog/ui/UI-028-editor-mesh-simplification-window.md
+cmake --build --preset ci --target IntrinsicGeometryTests IntrinsicRuntimeContractTests
+ctest --test-dir build/ci --output-on-failure -R 'Simplification|SandboxEditorUi\..*Simplify' --timeout 60
 python3 tools/agents/validate_tasks.py --root tasks --strict
+python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
 ```
 
 ## Forbidden changes

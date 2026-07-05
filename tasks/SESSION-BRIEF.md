@@ -37,7 +37,6 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-143` — Multi-subscriber frame-command hook and K-Means decoupling from Engine (tasks/backlog/runtime/RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md)
 - unblocked: `RUNTIME-144` — Post-import processor and import UX-policy seam (tasks/backlog/runtime/RUNTIME-144-post-import-processor-and-ux-policy-seam.md)
 - unblocked: `RUNTIME-145` — Runtime frame-path steady-state efficiency polish (tasks/backlog/runtime/RUNTIME-145-runtime-frame-path-efficiency-polish.md)
-- blocked by `GEOM-014`: `UI-028` — Sandbox EditorUI mesh simplification window (tasks/backlog/ui/UI-028-editor-mesh-simplification-window.md)
 - blocked by `GEOM-055`: `UI-029` — Editor ICP registration panel + convergence visualization (tasks/backlog/ui/UI-029-editor-registration-convergence-visualization.md)
 - unblocked: `UI-030` — Sandbox EditorUI frame-pacing diagnostics (tasks/backlog/ui/UI-030-editor-frame-pacing-diagnostics.md)
 - blocked by `RUNTIME-138`: `UI-031` — Sandbox EditorUI domain-window reorganization (tasks/backlog/ui/UI-031-editor-domain-ui-reorganization.md)
