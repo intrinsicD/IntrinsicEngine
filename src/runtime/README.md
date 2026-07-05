@@ -79,10 +79,11 @@ only from the main-thread apply callback.
 
 `RUNTIME-141` Slice A applies this model to the CPU K-Means path, Slice B
 applies it to Progressive Poisson point-cloud and mesh-surface CPU sampling,
-and Slice C applies it to mesh denoise/remesh/simplify commands while
-preserving the existing immediate fallback for tests and callers without an
-engine job surface. Registration alignment and the final heavy-button inventory
-remain owned by later `RUNTIME-141` slices.
+Slice C applies it to mesh denoise/remesh/simplify commands, and Slice D
+applies it to ICP registration alignment while preserving the existing
+immediate fallback for tests and callers without an engine job surface. The
+remaining synchronous geometry-processing buttons are tracked in the active
+`RUNTIME-141` inventory.
 
 ### Sandbox Editor Startup Layout
 

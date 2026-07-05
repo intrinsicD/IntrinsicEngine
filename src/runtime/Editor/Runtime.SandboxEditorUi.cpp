@@ -8851,6 +8851,428 @@ namespace Extrinsic::Runtime
             return glm::vec3(sum / static_cast<double>(points.size()));
         }
 
+        [[nodiscard]] SandboxEditorRegistrationResult
+        MakeRegistrationBaseResult(
+            const SandboxEditorRegistrationCommand& command)
+        {
+            return SandboxEditorRegistrationResult{
+                .Status = SandboxEditorCommandStatus::NoChange,
+                .Variant = command.Variant,
+                .Error = Core::ErrorCode::Success,
+            };
+        }
+
+        [[nodiscard]] SandboxEditorRegistrationResult
+        MakePendingRegistrationResult(
+            const SandboxEditorRegistrationCommand& command,
+            const std::size_t sourcePointCount,
+            const std::size_t targetPointCount,
+            const DerivedJobHandle handle)
+        {
+            SandboxEditorRegistrationResult result =
+                MakeRegistrationBaseResult(command);
+            result.Status = SandboxEditorCommandStatus::Pending;
+            result.SourcePointCount = sourcePointCount;
+            result.TargetPointCount = targetPointCount;
+            result.Message = "ICP registration CPU job queued";
+            AppendDerivedJobHandleToMessage(result.Message, handle);
+            result.Message += ".";
+            return result;
+        }
+
+        [[nodiscard]] bool SameTransformComponent(
+            const ECSC::Transform::Component& lhs,
+            const ECSC::Transform::Component& rhs) noexcept
+        {
+            return lhs.Position.x == rhs.Position.x &&
+                   lhs.Position.y == rhs.Position.y &&
+                   lhs.Position.z == rhs.Position.z &&
+                   lhs.Rotation.w == rhs.Rotation.w &&
+                   lhs.Rotation.x == rhs.Rotation.x &&
+                   lhs.Rotation.y == rhs.Rotation.y &&
+                   lhs.Rotation.z == rhs.Rotation.z &&
+                   lhs.Scale.x == rhs.Scale.x &&
+                   lhs.Scale.y == rhs.Scale.y &&
+                   lhs.Scale.z == rhs.Scale.z;
+        }
+
+        struct SandboxEditorRegistrationCpuJobState
+        {
+            std::uint32_t SourceStableEntityId{0u};
+            std::uint32_t TargetStableEntityId{0u};
+            std::uint64_t SourceGeometryMetadataSignature{0u};
+            std::uint64_t TargetGeometryMetadataSignature{0u};
+            SandboxEditorRegistrationCommand Command{};
+            std::vector<glm::vec3> SourceLocalPoints{};
+            std::vector<glm::vec3> TargetLocalPoints{};
+            ECSC::Transform::Component SourceBeforeTransform{};
+            bool TargetHadTransform{false};
+            ECSC::Transform::Component TargetBeforeTransform{};
+            SandboxEditorRegistrationResult Result{};
+            ECSC::Transform::Component SourceAfterTransform{};
+        };
+
+        [[nodiscard]] std::vector<glm::vec3> TransformPointsToWorld(
+            const std::vector<glm::vec3>& points,
+            const ECSC::Transform::Component& transform)
+        {
+            const glm::mat4 model = ModelMatrixFromTransform(transform);
+            std::vector<glm::vec3> world;
+            world.reserve(points.size());
+            for (const glm::vec3& point : points)
+                world.push_back(glm::vec3(model * glm::vec4(point, 1.0f)));
+            return world;
+        }
+
+        [[nodiscard]] DerivedJobApplyValidation
+        ValidateRegistrationCpuJobApply(
+            const SandboxEditorContext& context,
+            const SandboxEditorRegistrationCpuJobState& job)
+        {
+            if (context.Scene == nullptr)
+                return DerivedJobApplyValidation::MissingEntity;
+
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> sourceEntity =
+                ResolveStableEntity(raw, job.SourceStableEntityId);
+            const std::optional<ECS::EntityHandle> targetEntity =
+                ResolveStableEntity(raw, job.TargetStableEntityId);
+            if (!sourceEntity.has_value() || !targetEntity.has_value())
+                return DerivedJobApplyValidation::MissingEntity;
+
+            const GS::ConstSourceView sourceView =
+                GS::BuildConstView(raw, *sourceEntity);
+            const GS::ConstSourceView targetView =
+                GS::BuildConstView(raw, *targetEntity);
+            if (GS::BuildSourceAvailability(sourceView).ProvenanceDomain !=
+                    GS::Domain::PointCloud ||
+                GS::BuildSourceAvailability(targetView).ProvenanceDomain !=
+                    GS::Domain::PointCloud ||
+                sourceView.VertexSource == nullptr ||
+                targetView.VertexSource == nullptr)
+            {
+                return DerivedJobApplyValidation::StaleGeometryGeneration;
+            }
+
+            if (GeometryMetadataSignatureForEntity(raw, *sourceEntity) !=
+                    job.SourceGeometryMetadataSignature ||
+                GeometryMetadataSignatureForEntity(raw, *targetEntity) !=
+                    job.TargetGeometryMetadataSignature)
+            {
+                return DerivedJobApplyValidation::StaleGeometryGeneration;
+            }
+
+            const std::optional<std::vector<glm::vec3>> sourcePoints =
+                CollectKMeansPositions(sourceView.VertexSource->Properties);
+            const std::optional<std::vector<glm::vec3>> targetPoints =
+                CollectKMeansPositions(targetView.VertexSource->Properties);
+            if (!sourcePoints.has_value() || !targetPoints.has_value() ||
+                !SameKMeansInputPositions(*sourcePoints,
+                                          job.SourceLocalPoints) ||
+                !SameKMeansInputPositions(*targetPoints,
+                                          job.TargetLocalPoints))
+            {
+                return DerivedJobApplyValidation::StaleSourcePropertyGeneration;
+            }
+
+            const ECSC::Transform::Component* sourceTransform =
+                raw.try_get<ECSC::Transform::Component>(*sourceEntity);
+            if (sourceTransform == nullptr ||
+                !SameTransformComponent(*sourceTransform,
+                                        job.SourceBeforeTransform))
+            {
+                return DerivedJobApplyValidation::StaleSourcePropertyGeneration;
+            }
+
+            const ECSC::Transform::Component* targetTransform =
+                raw.try_get<ECSC::Transform::Component>(*targetEntity);
+            if (targetTransform == nullptr)
+                return job.TargetHadTransform
+                    ? DerivedJobApplyValidation::StaleSourcePropertyGeneration
+                    : DerivedJobApplyValidation::Current;
+            if (!job.TargetHadTransform ||
+                !SameTransformComponent(*targetTransform,
+                                        job.TargetBeforeTransform))
+            {
+                return DerivedJobApplyValidation::StaleSourcePropertyGeneration;
+            }
+
+            return DerivedJobApplyValidation::Current;
+        }
+
+        void PublishRegistrationResultSink(
+            const SandboxEditorContext& context,
+            SandboxEditorRegistrationResult result)
+        {
+            if (context.MethodResultSinks.Registration)
+                context.MethodResultSinks.Registration(std::move(result));
+        }
+
+        [[nodiscard]] DerivedJobWorkerResult RunRegistrationCpuWorker(
+            const std::shared_ptr<SandboxEditorRegistrationCpuJobState>& state)
+        {
+            SandboxEditorRegistrationResult& result = state->Result;
+            result.SourcePointCount = state->SourceLocalPoints.size();
+            result.TargetPointCount = state->TargetLocalPoints.size();
+
+            const std::vector<glm::vec3> sourceWorld =
+                TransformPointsToWorld(state->SourceLocalPoints,
+                                       state->SourceBeforeTransform);
+            const std::vector<glm::vec3> targetWorld =
+                state->TargetHadTransform
+                    ? TransformPointsToWorld(state->TargetLocalPoints,
+                                             state->TargetBeforeTransform)
+                    : state->TargetLocalPoints;
+
+            const glm::vec3 prealignDelta =
+                ComputePointCentroid(std::span<const glm::vec3>(targetWorld)) -
+                ComputePointCentroid(std::span<const glm::vec3>(sourceWorld));
+            std::vector<glm::vec3> prealignedSourceWorld = sourceWorld;
+            for (glm::vec3& point : prealignedSourceWorld)
+                point += prealignDelta;
+            glm::mat4 prealignPose(1.0f);
+            prealignPose[3] = glm::vec4(prealignDelta, 1.0f);
+
+            Reg::RegistrationParams params{};
+            params.Variant = ToGeometryICPVariant(state->Command.Variant);
+            params.MaxIterations = state->Command.MaxIterations;
+            params.MaxCorrespondenceDistance =
+                state->Command.MaxCorrespondenceDistance > 0.0
+                    ? state->Command.MaxCorrespondenceDistance
+                    : 1.0e6;
+            params.InlierRatio = state->Command.InlierRatio;
+
+            const RegistrationAlignmentOutcome outcome =
+                AlignPointClouds(prealignedSourceWorld, targetWorld, {}, params);
+            if (!outcome.HasResult)
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message =
+                    "ICP rejected the selected point clouds (fewer than 3 points or invalid parameters).";
+                return DerivedJobOutput{
+                    .PayloadToken = 0u,
+                    .NormalizedProgress = 1.0f,
+                    .ProgressDeterminate = true,
+                    .Diagnostic = result.Message,
+                };
+            }
+
+            result.HasResult = true;
+            result.IterationsPerformed = outcome.Result.IterationsPerformed;
+            result.TrajectoryLength = outcome.IterationCount();
+            result.FinalRMSE = outcome.Result.FinalRMSE;
+            result.Converged = outcome.Result.Converged;
+            result.FinalInlierCount = outcome.Result.FinalInlierCount;
+
+            const std::size_t step =
+                std::min(state->Command.TrajectoryStep,
+                         outcome.IterationCount());
+            result.AppliedStep = step;
+            const glm::mat4 pose =
+                step == 0u ? glm::mat4(1.0f)
+                           : TrajectoryPose(outcome, step) * prealignPose;
+
+            state->SourceAfterTransform = state->SourceBeforeTransform;
+            DecomposeModelToTransform(
+                pose * ModelMatrixFromTransform(state->SourceBeforeTransform),
+                state->SourceAfterTransform);
+
+            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Error = Core::ErrorCode::Success;
+            return DerivedJobOutput{
+                .PayloadToken = 0u,
+                .NormalizedProgress = 1.0f,
+                .ProgressDeterminate = true,
+                .Diagnostic = "ICP registration CPU result ready",
+            };
+        }
+
+        [[nodiscard]] Core::Result PublishRegistrationCpuJob(
+            const SandboxEditorContext& context,
+            SandboxEditorRegistrationCpuJobState& job)
+        {
+            SandboxEditorRegistrationResult result = job.Result;
+            if (!result.Succeeded())
+            {
+                PublishRegistrationResultSink(context, result);
+                return Core::Err(ResultErrorOrUnknown(result.Error));
+            }
+
+            if (context.Scene == nullptr)
+            {
+                result.Status = SandboxEditorCommandStatus::MissingScene;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message = "ICP registration requires an attached scene.";
+                PublishRegistrationResultSink(context, result);
+                return Core::Err(result.Error);
+            }
+
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> sourceEntity =
+                ResolveStableEntity(raw, job.SourceStableEntityId);
+            if (!sourceEntity.has_value())
+            {
+                result.Status = SandboxEditorCommandStatus::StaleEntity;
+                result.Error = Core::ErrorCode::ResourceNotFound;
+                result.Message =
+                    "ICP registration source entity is stale or no longer live.";
+                PublishRegistrationResultSink(context, result);
+                return Core::Err(result.Error);
+            }
+
+            ECSC::Transform::Component* transform =
+                raw.try_get<ECSC::Transform::Component>(*sourceEntity);
+            if (transform == nullptr)
+            {
+                result.Status = SandboxEditorCommandStatus::MissingTransform;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "ICP registration source entity has no Transform to drive.";
+                PublishRegistrationResultSink(context, result);
+                return Core::Err(result.Error);
+            }
+
+            if (context.CommandHistory != nullptr)
+            {
+                const EditorCommandHistoryResult history =
+                    context.CommandHistory->Execute(
+                        MakeTransformEditCommand(
+                            EditorTransformEditCommand{
+                                .Scene = context.Scene,
+                                .StableEntityId = job.SourceStableEntityId,
+                                .Before = job.SourceBeforeTransform,
+                                .After = job.SourceAfterTransform,
+                                .Label = "Align point clouds (ICP)",
+                            }));
+                result.Status = ToSandboxEditorCommandStatus(history.Status);
+            }
+            else
+            {
+                *transform = job.SourceAfterTransform;
+                raw.emplace_or_replace<ECSC::Transform::IsDirtyTag>(
+                    *sourceEntity);
+                result.Status = SandboxEditorCommandStatus::Applied;
+            }
+
+            if (result.Status != SandboxEditorCommandStatus::Applied)
+            {
+                result.Error = Core::ErrorCode::Unknown;
+                result.Message =
+                    "ICP registration pose failed during editor history commit.";
+                PublishRegistrationResultSink(context, result);
+                return Core::Err(result.Error);
+            }
+
+            result.Error = Core::ErrorCode::Success;
+            result.Message = BuildRegistrationSuccessMessage(result);
+            PublishRegistrationResultSink(context, result);
+            return Core::Ok();
+        }
+
+        [[nodiscard]] DerivedJobDesc MakeRegistrationCpuJobDesc(
+            const SandboxEditorContext& context,
+            const std::shared_ptr<SandboxEditorRegistrationCpuJobState>& state)
+        {
+            const std::uint32_t estimatedCost =
+                std::max<std::uint32_t>(
+                    1u,
+                    static_cast<std::uint32_t>(
+                        (std::max(state->SourceLocalPoints.size(),
+                                  state->TargetLocalPoints.size()) +
+                         1023u) /
+                        1024u));
+            return DerivedJobDesc{
+                .Key = DerivedJobKey{
+                    .EntityId = state->SourceStableEntityId,
+                    .Domain = ProgressiveGeometryDomain::Point,
+                    .OutputSemantic = ProgressiveSlotSemantic::Displacement,
+                    .SourcePropertyGeneration =
+                        state->SourceGeometryMetadataSignature,
+                    .BindingGeneration =
+                        state->TargetGeometryMetadataSignature,
+                    .OutputName = "registration_transform",
+                },
+                .Name = "Sandbox.RegistrationICP.CPU",
+                .RequestedJobDomain = ProgressiveJobDomain::Cpu,
+                .Kind = Core::Dag::TaskKind::GeometryProcess,
+                .Priority = Core::Dag::TaskPriority::Normal,
+                .EstimatedCost = estimatedCost,
+                .Execute =
+                    [state]() -> DerivedJobWorkerResult
+                    {
+                        return RunRegistrationCpuWorker(state);
+                    },
+                .ValidateOnMainThread =
+                    [context, state]()
+                    {
+                        return ValidateRegistrationCpuJobApply(context, *state);
+                    },
+                .ApplyOnMainThread =
+                    [context, state](DerivedJobApplyContext&) -> Core::Result
+                    {
+                        return PublishRegistrationCpuJob(context, *state);
+                    },
+            };
+        }
+
+        [[nodiscard]] SandboxEditorRegistrationResult
+        SubmitRegistrationCpuJob(
+            const SandboxEditorContext& context,
+            const SandboxEditorRegistrationCommand& command,
+            std::vector<glm::vec3> sourcePoints,
+            std::vector<glm::vec3> targetPoints,
+            const ECSC::Transform::Component& sourceTransform,
+            const ECSC::Transform::Component* targetTransform,
+            const std::uint64_t sourceGeometryMetadataSignature,
+            const std::uint64_t targetGeometryMetadataSignature)
+        {
+            auto state =
+                std::make_shared<SandboxEditorRegistrationCpuJobState>();
+            state->SourceStableEntityId = command.SourceStableEntityId;
+            state->TargetStableEntityId = command.TargetStableEntityId;
+            state->SourceGeometryMetadataSignature =
+                sourceGeometryMetadataSignature;
+            state->TargetGeometryMetadataSignature =
+                targetGeometryMetadataSignature;
+            state->Command = command;
+            state->SourceLocalPoints = std::move(sourcePoints);
+            state->TargetLocalPoints = std::move(targetPoints);
+            state->SourceBeforeTransform = sourceTransform;
+            if (targetTransform != nullptr)
+            {
+                state->TargetHadTransform = true;
+                state->TargetBeforeTransform = *targetTransform;
+            }
+            state->Result = MakeRegistrationBaseResult(command);
+            state->Result.SourcePointCount = state->SourceLocalPoints.size();
+            state->Result.TargetPointCount = state->TargetLocalPoints.size();
+
+            DerivedJobDesc desc = MakeRegistrationCpuJobDesc(context, state);
+            const DerivedJobHandle handle =
+                context.DerivedJobCommands.Submit(std::move(desc));
+            if (!handle.IsValid())
+            {
+                SandboxEditorRegistrationResult result =
+                    MakeRegistrationBaseResult(command);
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.SourcePointCount = state->SourceLocalPoints.size();
+                result.TargetPointCount = state->TargetLocalPoints.size();
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "ICP registration CPU job submission was rejected by the runtime job lane.";
+                return result;
+            }
+
+            return MakePendingRegistrationResult(
+                command,
+                state->SourceLocalPoints.size(),
+                state->TargetLocalPoints.size(),
+                handle);
+        }
+
         [[nodiscard]] SandboxEditorGeometryProcessingModel BuildGeometryProcessingModel(
             const SandboxEditorContext& context)
         {
@@ -20540,11 +20962,8 @@ namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorRegistrationCommand& command)
     {
-        SandboxEditorRegistrationResult result{
-            .Status = SandboxEditorCommandStatus::NoChange,
-            .Variant = command.Variant,
-            .Error = Core::ErrorCode::Success,
-        };
+        SandboxEditorRegistrationResult result =
+            MakeRegistrationBaseResult(command);
 
         if (context.Scene == nullptr)
         {
@@ -20651,6 +21070,22 @@ namespace Extrinsic::Runtime
             return result;
         }
 
+        const ECSC::Transform::Component* targetTransform =
+            raw.try_get<ECSC::Transform::Component>(*targetEntity);
+
+        if (context.DerivedJobCommands.Available())
+        {
+            return SubmitRegistrationCpuJob(
+                context,
+                command,
+                *sourcePoints,
+                *targetPoints,
+                *transform,
+                targetTransform,
+                GeometryMetadataSignatureForEntity(raw, *sourceEntity),
+                GeometryMetadataSignatureForEntity(raw, *targetEntity));
+        }
+
         // Register in world space: transform each cloud's local v:position by its
         // entity model matrix so a non-identity source/target Transform is
         // respected (identical local clouds with a translated target must still
@@ -20658,11 +21093,8 @@ namespace Extrinsic::Runtime
         // source model matrix before being written back as the source Transform.
         const glm::mat4 sourceModel = ModelMatrixFromTransform(*transform);
         glm::mat4 targetModel(1.0f);
-        if (const ECSC::Transform::Component* targetTransform =
-                raw.try_get<ECSC::Transform::Component>(*targetEntity))
-        {
+        if (targetTransform != nullptr)
             targetModel = ModelMatrixFromTransform(*targetTransform);
-        }
 
         std::vector<glm::vec3> sourceWorld;
         sourceWorld.reserve(sourcePoints->size());
@@ -20857,6 +21289,13 @@ namespace Extrinsic::Runtime
                     {
                         if (alive && *alive)
                             m_LastMeshSimplifyResult = std::move(result);
+                    };
+                context.MethodResultSinks.Registration =
+                    [alive = m_ResultSinksAlive, this](
+                        SandboxEditorRegistrationResult result)
+                    {
+                        if (alive && *alive)
+                            m_LastRegistrationResult = std::move(result);
                     };
                 context.PendingAssetImportPath =
                     std::string(m_ImportPathBuffer.data());

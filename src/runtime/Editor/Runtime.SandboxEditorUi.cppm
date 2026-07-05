@@ -1920,6 +1920,7 @@ export namespace Extrinsic::Runtime
         std::function<void(SandboxEditorMeshDenoiseResult)> MeshDenoise{};
         std::function<void(SandboxEditorMeshRemeshResult)> MeshRemesh{};
         std::function<void(SandboxEditorMeshSimplifyResult)> MeshSimplify{};
+        std::function<void(SandboxEditorRegistrationResult)> Registration{};
     };
 
     struct SandboxEditorCameraRenderModel

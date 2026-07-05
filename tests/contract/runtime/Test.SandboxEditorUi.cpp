@@ -10202,6 +10202,175 @@ TEST(SandboxEditorUi, RegistrationCommandAlignsSourceOntoTargetAndSupportsUndoRe
         -offset.x, 1.0e-2f);
 }
 
+TEST(SandboxEditorUi, RegistrationRequestQueuesDerivedJobAndPublishesOnApply)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+    AttachDerivedJobCommands(context, jobs);
+    std::optional<Runtime::SandboxEditorRegistrationResult> completedResult{};
+    context.MethodResultSinks.Registration =
+        [&completedResult](Runtime::SandboxEditorRegistrationResult result)
+        {
+            completedResult = std::move(result);
+        };
+
+    const std::vector<glm::vec3> target = MakeRegistrationCloud();
+    const glm::vec3 offset{0.05f, -0.03f, 0.02f};
+    std::vector<glm::vec3> sourcePoints{};
+    sourcePoints.reserve(target.size());
+    for (const glm::vec3& p : target)
+        sourcePoints.push_back(p + offset);
+
+    const ECS::EntityHandle source =
+        MakePointCloudEntity(registry, "Queued ICP Source", sourcePoints);
+    const ECS::EntityHandle targetEntity =
+        MakePointCloudEntity(registry, "Queued ICP Target", target);
+    const std::uint32_t sourceId =
+        Runtime::SelectionController::ToStableEntityId(source);
+    const std::uint32_t targetId =
+        Runtime::SelectionController::ToStableEntityId(targetEntity);
+    const ECSC::Transform::Component before =
+        registry.Raw().get<ECSC::Transform::Component>(source);
+
+    const Runtime::SandboxEditorRegistrationResult result =
+        Runtime::ApplySandboxEditorRegistrationCommand(
+            context,
+            Runtime::SandboxEditorRegistrationCommand{
+                .SourceStableEntityId = sourceId,
+                .TargetStableEntityId = targetId,
+                .Variant = Runtime::SandboxEditorICPVariant::PointToPoint,
+                .MaxIterations = 60u,
+                .InlierRatio = 1.0,
+                .TrajectoryStep = 1000u,
+            });
+
+    EXPECT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_EQ(result.SourcePointCount, sourcePoints.size());
+    EXPECT_EQ(result.TargetPointCount, target.size());
+    EXPECT_NE(result.Message.find("queued"), std::string::npos);
+    const ECSC::Transform::Component& pending =
+        registry.Raw().get<ECSC::Transform::Component>(source);
+    EXPECT_NEAR(pending.Position.x, before.Position.x, 1.0e-6f);
+    EXPECT_NEAR(pending.Position.y, before.Position.y, 1.0e-6f);
+    EXPECT_NEAR(pending.Position.z, before.Position.z, 1.0e-6f);
+    EXPECT_FALSE(registry.Raw().all_of<ECSC::Transform::IsDirtyTag>(source));
+
+    Runtime::DerivedJobQueueSnapshot queued = jobs.SnapshotAll();
+    ASSERT_EQ(queued.Entries.size(), 1u);
+    EXPECT_EQ(queued.Entries[0].Name, "Sandbox.RegistrationICP.CPU");
+    EXPECT_EQ(queued.Entries[0].Status, Runtime::DerivedJobStatus::Queued);
+
+    jobs.Pump(1u);
+    jobs.DrainCompletions();
+    EXPECT_FALSE(completedResult.has_value());
+    EXPECT_NEAR(
+        registry.Raw().get<ECSC::Transform::Component>(source).Position.x,
+        before.Position.x,
+        1.0e-6f);
+
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    ASSERT_TRUE(completedResult.has_value());
+    EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
+    EXPECT_TRUE(completedResult->HasResult);
+    EXPECT_GT(completedResult->IterationsPerformed, 0u);
+    EXPECT_EQ(completedResult->AppliedStep,
+              completedResult->TrajectoryLength);
+    EXPECT_LT(completedResult->FinalRMSE, 1.0e-3);
+
+    const ECSC::Transform::Component& aligned =
+        registry.Raw().get<ECSC::Transform::Component>(source);
+    EXPECT_NEAR(aligned.Position.x, -offset.x, 1.0e-2f);
+    EXPECT_NEAR(aligned.Position.y, -offset.y, 1.0e-2f);
+    EXPECT_NEAR(aligned.Position.z, -offset.z, 1.0e-2f);
+    EXPECT_TRUE(registry.Raw().all_of<ECSC::Transform::IsDirtyTag>(source));
+    EXPECT_TRUE(history.IsDirty());
+    ASSERT_TRUE(history.CanUndo());
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    const ECSC::Transform::Component& undone =
+        registry.Raw().get<ECSC::Transform::Component>(source);
+    EXPECT_NEAR(undone.Position.x, before.Position.x, 1.0e-6f);
+    EXPECT_NEAR(undone.Position.y, before.Position.y, 1.0e-6f);
+    EXPECT_NEAR(undone.Position.z, before.Position.z, 1.0e-6f);
+}
+
+TEST(SandboxEditorUi, RegistrationDerivedJobDiscardsStaleSourceBeforeApply)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+    AttachDerivedJobCommands(context, jobs);
+    bool completedSinkCalled = false;
+    context.MethodResultSinks.Registration =
+        [&completedSinkCalled](Runtime::SandboxEditorRegistrationResult)
+        {
+            completedSinkCalled = true;
+        };
+
+    const std::vector<glm::vec3> target = MakeRegistrationCloud();
+    const glm::vec3 offset{0.05f, -0.03f, 0.02f};
+    std::vector<glm::vec3> sourcePoints{};
+    sourcePoints.reserve(target.size());
+    for (const glm::vec3& p : target)
+        sourcePoints.push_back(p + offset);
+
+    const ECS::EntityHandle source =
+        MakePointCloudEntity(registry, "Stale ICP Source", sourcePoints);
+    const ECS::EntityHandle targetEntity =
+        MakePointCloudEntity(registry, "Stale ICP Target", target);
+    const std::uint32_t sourceId =
+        Runtime::SelectionController::ToStableEntityId(source);
+    const std::uint32_t targetId =
+        Runtime::SelectionController::ToStableEntityId(targetEntity);
+
+    const Runtime::SandboxEditorRegistrationResult result =
+        Runtime::ApplySandboxEditorRegistrationCommand(
+            context,
+            Runtime::SandboxEditorRegistrationCommand{
+                .SourceStableEntityId = sourceId,
+                .TargetStableEntityId = targetId,
+                .Variant = Runtime::SandboxEditorICPVariant::PointToPoint,
+                .MaxIterations = 60u,
+                .InlierRatio = 1.0,
+                .TrajectoryStep = 1000u,
+            });
+    ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+
+    std::vector<glm::vec3> staleSourcePoints = sourcePoints;
+    for (glm::vec3& point : staleSourcePoints)
+        point += glm::vec3{10.0f, 0.0f, 0.0f};
+    SetPositions(registry.Raw().get<GS::Vertices>(source), staleSourcePoints);
+
+    jobs.Pump(1u);
+    jobs.DrainCompletions();
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+
+    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].Status,
+              Runtime::DerivedJobStatus::StaleDiscarded);
+    EXPECT_NE(done.Entries[0].Diagnostic.find(
+                  "StaleSourcePropertyGeneration"),
+              std::string::npos);
+    EXPECT_FALSE(completedSinkCalled);
+    const ECSC::Transform::Component& transform =
+        registry.Raw().get<ECSC::Transform::Component>(source);
+    EXPECT_NEAR(transform.Position.x, 0.0f, 1.0e-6f);
+    EXPECT_NEAR(transform.Position.y, 0.0f, 1.0e-6f);
+    EXPECT_NEAR(transform.Position.z, 0.0f, 1.0e-6f);
+    EXPECT_FALSE(registry.Raw().all_of<ECSC::Transform::IsDirtyTag>(source));
+}
+
 TEST(SandboxEditorUi, RegistrationCommandFailsClosedForInvalidSelectionAndParameters)
 {
     ECS::Scene::Registry registry;

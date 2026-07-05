@@ -7,12 +7,12 @@ depends_on: []
 
 ## Status
 - Active on 2026-07-05; Slices A, B, and C are implemented and verified. The
-  parent task remains active for registration alignment plus the final
-  heavyweight editor method inventory/state classification.
+  parent task remains active for the remaining synchronous geometry-processing
+  commands identified by the Slice D inventory.
 - This task is intentionally sliced because it spans the shared runtime job
   lane plus several method-specific snapshot/apply conversions.
-- Remaining open slices: registration alignment and the final heavy-button
-  inventory/state classification.
+- Remaining open slices: mesh curvature, mesh subdivide, mesh/graph/point-cloud
+  vertex normals, point-cloud outlier removal, and UV regeneration.
 
 ## Slice plan
 - **Slice A (this slice).** Wire an engine-owned `DerivedJobRegistry` beside
@@ -27,9 +27,12 @@ depends_on: []
 - **Slice C (complete).** Convert mesh denoise/remesh/simplify command
   handlers to the shared lane with copied mesh snapshots and generation/stale
   guards.
-- **Slice D.** Convert registration alignment and any remaining heavyweight
-  method buttons; update the inventory classification so every heavy button is
-  either queued or documented as lightweight/immediate.
+- **Slice D (complete).** Convert registration alignment and update the
+  heavyweight editor button inventory.
+- **Slice E.** Convert or split the remaining synchronous geometry-processing
+  commands identified by the inventory: mesh curvature, mesh subdivide,
+  mesh/graph/point-cloud vertex normals, point-cloud outlier removal, and UV
+  regeneration.
 
 ## Goal
 - Editor-triggered heavy action buttons and method runs (CPU K-Means,
@@ -93,7 +96,7 @@ depends_on: []
       existing GPU-queue UX: same published label/color properties).
 - [x] Convert Progressive Poisson CPU runs to the helper.
 - [x] Convert denoise/remesh/simplify commands to the helper.
-- [ ] Convert registration alignment commands to the helper.
+- [x] Convert registration alignment commands to the helper.
 - [ ] Panels reflect job state instead of blocking; a second submit while
       one runs either queues or replaces per current UX expectations
       (document choice per panel).
@@ -174,6 +177,32 @@ ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi|DerivedJob|Str
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```
+
+Slice D verification completed on 2026-07-05:
+
+```bash
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='SandboxEditorUi.RegistrationRequestQueuesDerivedJobAndPublishesOnApply:SandboxEditorUi.RegistrationDerivedJobDiscardsStaleSourceBeforeApply:SandboxEditorUi.RegistrationCommandAlignsSourceOntoTargetAndSupportsUndoRedo:SandboxEditorUi.RegistrationCommandFailsClosedForInvalidSelectionAndParameters:SandboxEditorUi.RegistrationCommandAlignsAcrossEntityTransforms'
+ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi|DerivedJob|StreamingExecutor|RuntimeSceneLifecycle' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180
+```
+
+## Heavy Button Inventory
+- Queued through `DerivedJobRegistry` when an engine job surface is available:
+  CPU K-Means; Progressive Poisson CPU point-cloud and mesh-surface sampling;
+  mesh denoise/remesh/simplify; ICP registration alignment.
+- Already routed through another async runtime command surface: selected mesh
+  texture bake (`Extrinsic.Runtime.SelectedMeshTextureBake` schedules derived
+  CPU bake work and stale-checked main-thread apply).
+- Immediate/lightweight command surfaces: selection, camera-controller changes,
+  render-hint toggles, visualization config/property preset edits, spatial-debug
+  binding toggles, vertex-channel binding edits, progressive-slot binding edits,
+  render-recipe draft/preview state changes, and undo/redo/document state
+  controls that only mutate runtime-owned editor state.
+- Still synchronous geometry-processing commands and therefore open under Slice
+  E: mesh curvature, mesh subdivide, mesh/graph/point-cloud vertex normal
+  recompute, point-cloud outlier removal, and selected mesh UV regeneration.
+- File import and scene-file IO are outside this CPU method-command lane and are
+  tracked by `RUNTIME-142`.
 
 ## Forbidden changes
 - Adding a second ad hoc scheduler next to `StreamingExecutor`.
