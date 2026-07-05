@@ -4133,6 +4133,18 @@ namespace Extrinsic::Runtime
             return context.Selection->SelectionGeneration();
         }
 
+        [[nodiscard]] std::uint64_t CurrentPrimitiveSelectionGeneration(
+            const SandboxEditorContext& context,
+            const SandboxEditorSelectedModelCacheSection section)
+        {
+            if (section !=
+                SandboxEditorSelectedModelCacheSection::SelectedAnalysis)
+            {
+                return 0u;
+            }
+            return context.LastRefinedPrimitiveGeneration;
+        }
+
         [[nodiscard]] std::uint64_t VertexBindingGenerationForEntity(
             const entt::registry& raw,
             const ECS::EntityHandle entity)
@@ -4161,6 +4173,8 @@ namespace Extrinsic::Runtime
                 .SelectedStableIds =
                     BuildSelectedStableIdsForCacheKey(context, stableId),
                 .SelectionGeneration = CurrentSelectionGeneration(context),
+                .PrimitiveSelectionGeneration =
+                    CurrentPrimitiveSelectionGeneration(context, section),
                 .SelectedDomain = geometry.Domain,
                 .VertexCount = geometry.VertexCount,
                 .EdgeCount = geometry.EdgeCount,
@@ -7687,6 +7701,8 @@ namespace Extrinsic::Runtime
                 .Selection = &engine.GetSelectionController(),
                 .CommandHistory = &engine.GetEditorCommandHistory(),
                 .LastRefinedPrimitive = &engine.GetLastRefinedPrimitiveSelection(),
+                .LastRefinedPrimitiveGeneration =
+                    engine.GetLastRefinedPrimitiveSelectionGeneration(),
                 .CameraControllers = &engine.GetCameraControllerRegistry(),
                 .CameraViewport = Core::Extent2D{
                     engine.GetWindow().GetFramebufferExtent().Width,

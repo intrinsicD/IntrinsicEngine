@@ -2077,6 +2077,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t PrimaryStableId{0u};
         std::vector<std::uint32_t> SelectedStableIds{};
         std::uint64_t SelectionGeneration{0u};
+        std::uint64_t PrimitiveSelectionGeneration{0u};
         ECS::Components::GeometrySources::Domain SelectedDomain{
             ECS::Components::GeometrySources::Domain::None};
         std::size_t VertexCount{0u};
@@ -2198,6 +2199,7 @@ export namespace Extrinsic::Runtime
         EditorCommandHistory* CommandHistory{nullptr};
         Assets::AssetService* AssetService{nullptr};
         const std::optional<PrimitiveSelectionResult>* LastRefinedPrimitive{nullptr};
+        std::uint64_t LastRefinedPrimitiveGeneration{0u};
         CameraControllerRegistry* CameraControllers{nullptr};
         Core::Extent2D CameraViewport{};
         RHI::IDevice* Device{nullptr};

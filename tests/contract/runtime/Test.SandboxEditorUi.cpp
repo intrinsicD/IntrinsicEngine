@@ -2165,6 +2165,69 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnSelectionGeneration)
     EXPECT_EQ(cacheStats.Entries, 1u);
 }
 
+TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnPrimitiveGeneration)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    std::optional<Runtime::PrimitiveSelectionResult> primitive{
+        Runtime::PrimitiveSelectionResult{
+            .Status = Runtime::PrimitiveRefineStatus::Success,
+            .EntityId = stableId,
+            .StableId = stableId,
+            .Domain = GS::Domain::Mesh,
+            .Kind = Runtime::RefinedPrimitiveKind::Vertex,
+            .FaceId = Runtime::kInvalidPrimitiveIndex,
+            .EdgeId = Runtime::kInvalidPrimitiveIndex,
+            .VertexId = 0u,
+            .PointId = Runtime::kInvalidPrimitiveIndex,
+        }};
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    Runtime::SandboxEditorSelectedModelCache cache{};
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.SelectedModelCache = &cache;
+    context.LastRefinedPrimitive = &primitive;
+    context.LastRefinedPrimitiveGeneration = 1u;
+
+    const Runtime::SandboxEditorPanelFrame first =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyInspectorModelBuildRequest());
+    ASSERT_TRUE(first.Inspector.HasEntity);
+    EXPECT_EQ(first.ModelBuildStats.SelectedAnalysisCacheMisses, 1u);
+
+    const Runtime::SandboxEditorPanelFrame cached =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyInspectorModelBuildRequest());
+    ASSERT_TRUE(cached.Inspector.HasEntity);
+    EXPECT_EQ(cached.ModelBuildStats.SelectedAnalysisCacheHits, 1u);
+    EXPECT_EQ(cached.ModelBuildStats.PropertyCatalogModelBuilds, 0u);
+
+    primitive->VertexId = 1u;
+    context.LastRefinedPrimitiveGeneration = 2u;
+
+    const Runtime::SandboxEditorPanelFrame refined =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyInspectorModelBuildRequest());
+    ASSERT_TRUE(refined.Inspector.HasEntity);
+    EXPECT_EQ(refined.ModelBuildStats.SelectedAnalysisCacheMisses, 1u);
+    EXPECT_EQ(refined.ModelBuildStats.SelectedAnalysisCacheHits, 0u);
+    EXPECT_EQ(refined.ModelBuildStats.PropertyCatalogModelBuilds, 1u);
+
+    const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
+        cache.Stats();
+    EXPECT_EQ(cacheStats.SelectedAnalysisCacheMisses, 2u);
+    EXPECT_EQ(cacheStats.SelectedAnalysisCacheHits, 1u);
+    EXPECT_EQ(cacheStats.Entries, 1u);
+}
+
 TEST(SandboxEditorUi, SelectedModelCacheReusesVisualizationModel)
 {
     ECS::Scene::Registry registry;

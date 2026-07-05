@@ -552,7 +552,8 @@ namespace Extrinsic::Runtime
             ECS::Scene::Registry& scene,
             const Graphics::PickReadbackResult& result,
             auto& inFlightPickContexts,
-            std::optional<PrimitiveSelectionResult>& lastRefinedPrimitive)
+            std::optional<PrimitiveSelectionResult>& lastRefinedPrimitive,
+            std::uint64_t& lastRefinedPrimitiveGeneration)
         {
             const PickReadbackContext* pickContext = nullptr;
             auto contextIt = inFlightPickContexts.end();
@@ -569,6 +570,7 @@ namespace Extrinsic::Runtime
 
             lastRefinedPrimitive =
                 RefinePickReadbackResult(scene, result, pickContext);
+            ++lastRefinedPrimitiveGeneration;
             if (contextIt != inFlightPickContexts.end())
                 inFlightPickContexts.erase(contextIt);
         }
@@ -578,7 +580,8 @@ namespace Extrinsic::Runtime
             SelectionController& selection,
             ECS::Scene::Registry& scene,
             auto& inFlightPickContexts,
-            std::optional<PrimitiveSelectionResult>& lastRefinedPrimitive)
+            std::optional<PrimitiveSelectionResult>& lastRefinedPrimitive,
+            std::uint64_t& lastRefinedPrimitiveGeneration)
         {
             while (const std::optional<Graphics::PickReadbackResult> result =
                        selectionSystem.PopPickResult())
@@ -587,7 +590,8 @@ namespace Extrinsic::Runtime
                 RefineSelectionReadbackForFrame(scene,
                                                 *result,
                                                 inFlightPickContexts,
-                                                lastRefinedPrimitive);
+                                                lastRefinedPrimitive,
+                                                lastRefinedPrimitiveGeneration);
             }
         }
 
@@ -3135,7 +3139,8 @@ namespace Extrinsic::Runtime
                                                  m_SelectionController,
                                                  *m_Scene,
                                                  m_InFlightPickContexts,
-                                                 m_LastRefinedPrimitive);
+                                                 m_LastRefinedPrimitive,
+                                                 m_LastRefinedPrimitiveGeneration);
         pacing.SelectionReadbackMicros = ElapsedMicros(readbackBegin);
 
         // completedGpuValue is the renderer's per-frame timeline value.  The
@@ -4640,6 +4645,7 @@ namespace Extrinsic::Runtime
         if (m_Scene)
             m_SelectionController.ClearSceneState(*m_Scene);
         m_LastRefinedPrimitive.reset();
+        ++m_LastRefinedPrimitiveGeneration;
     }
 
     Core::Expected<SceneSerializationResult> Engine::SaveSceneToPath(
@@ -4707,6 +4713,11 @@ namespace Extrinsic::Runtime
     }
     const std::optional<PrimitiveSelectionResult>&
     Engine::GetLastRefinedPrimitiveSelection() const noexcept { return m_LastRefinedPrimitive; }
+    std::uint64_t
+    Engine::GetLastRefinedPrimitiveSelectionGeneration() const noexcept
+    {
+        return m_LastRefinedPrimitiveGeneration;
+    }
     Core::FrameGraph&     Engine::GetFrameGraph()    noexcept { return *m_FrameGraph;    }
 
     ReferenceSceneRegistry& Engine::GetReferenceSceneRegistry() noexcept

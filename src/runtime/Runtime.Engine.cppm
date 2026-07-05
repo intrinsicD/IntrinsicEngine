@@ -477,6 +477,8 @@ namespace Extrinsic::Runtime
         // pick resolves. Graphics never reads this — it only produced the hint.
         [[nodiscard]] const std::optional<PrimitiveSelectionResult>&
             GetLastRefinedPrimitiveSelection() const noexcept;
+        [[nodiscard]] std::uint64_t
+            GetLastRefinedPrimitiveSelectionGeneration() const noexcept;
         [[nodiscard]] Core::FrameGraph&       GetFrameGraph()    noexcept;
 
         // ── GRAPHICS-036C — pipelined-frames render-world pool ────────────
@@ -637,8 +639,11 @@ namespace Extrinsic::Runtime
         StableEntityLookup                    m_StableEntityLookup{};
         // RUNTIME-093 Slice B2 — editor-facing refined sub-primitive of the last
         // pick hit. Updated from the pick-readback drain in RunFrame; never read
-        // by graphics. Empty until the first pick resolves.
+        // by graphics. Empty until the first pick resolves. The generation bumps
+        // whenever this optional is replaced/cleared so editor caches can key
+        // primitive-sensitive selected analysis without owning pick state.
         std::optional<PrimitiveSelectionResult> m_LastRefinedPrimitive{};
+        std::uint64_t m_LastRefinedPrimitiveGeneration{0u};
         // BUG-026 — per-sequence pick context captured when RunFrame drains a
         // pending pick (issuing frame's inverse view-projection, viewport,
         // pick ray, pixel-radius scale). Replayed when the matching readback
