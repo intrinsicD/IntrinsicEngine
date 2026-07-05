@@ -818,9 +818,13 @@ frame, the frame index, total frame microseconds, and per-phase CPU timings for
 platform begin, resize/operational transitions, fixed-step work, ImGui begin/end,
 editor callback and draw-data copy, pre-render setup/transform flush, selection
 pick drain/readback drain, render contract phases, render-graph compile/execute,
-present, maintenance, and render-world pool release. It mirrors renderer-owned
-render-graph timing and ImGui adapter timing for diagnostics only; it is not a
-branching contract for runtime behavior.
+present, maintenance, and render-world pool release. It also mirrors the ImGui
+adapter's most recent draw-list/vertex/index/command counts, font-atlas
+copy/reuse counters, user-texture flag, and copied font/vertex/index/command
+payload byte counts so selected-editor captures can separate editor CPU time
+from ImGui producer-copy volume. Renderer-owned render-graph timing and ImGui
+adapter diagnostics are copied for observability only; they are not branching
+contracts for runtime behavior.
 
 Shutdown is also delegated through `Extrinsic.Core.FrameLoop`: runtime clears
 the platform listener, detaches and tears down the ImGui adapter while the window

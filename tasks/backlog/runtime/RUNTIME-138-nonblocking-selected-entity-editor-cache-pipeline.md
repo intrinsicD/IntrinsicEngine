@@ -37,6 +37,7 @@ maturity_target: Operational
 - [x] Slice A partial: expose deterministic selected-frame counters for UV texcoord finite-check element scans and texture-bake source-row enumeration.
 - [x] Slice A partial: expose scalar visualization adapter value-scan counters for scalar/isoline finite and range validation, folded into render-extraction frame stats.
 - [x] Slice A partial: expose nanosecond selected model-build timing diagnostics for panel frame, inspector, selected analysis, property catalog, vertex-channel validation, UV diagnostics, texture-bake, visualization, and domain-window construction.
+- [x] Slice A partial: mirror ImGui editor-frame draw-list counts, font-atlas copy/reuse counters, user-texture state, and copied font/vertex/index/command payload bytes into runtime frame-pacing diagnostics.
 - [x] Slice A: add a deterministic capture path or test seam that records selected-entity frame samples without requiring Vulkan, and document the Vulkan-host smoke procedure for the real sandbox.
 - [x] Slice B: make editor model construction visibility-gated so hidden panels and closed domain windows do not build selected-entity models; build only the visible model section requested by the current ImGui window/section.
 - [x] Slice B: prevent open domain windows from rebuilding shared selected-entity models independently; either share one per-frame cached model view or request section-specific cached submodels.
@@ -57,6 +58,7 @@ maturity_target: Operational
 - [x] Add contract tests proving cache-hit selected frames do not rebuild property catalogs, do not call full vertex-channel resolvers, and do not allocate geometry-sized scratch buffers.
 - [x] Add contract tests proving cache-hit selected frames perform zero UV texcoord finite-check scans and zero texture-bake source-row enumeration.
 - [x] Add contract tests proving selected model-build timing diagnostics are populated on visible cache-miss work and stay zero for hidden or cache-hit heavy submodels.
+- [x] Add contract tests proving runtime frame-pacing diagnostics mirror ImGui editor-frame copy/count diagnostics on the Null backend.
 - [x] Add contract/integration tests proving scalar visualization adapters and render extraction report exact scalar value-scan counts for scalar and isoline paths.
 - [ ] Add contract tests proving property option listing uses metadata compatibility only, while explicit active/requested validations use async job results.
 - [ ] Add tests proving async selected-analysis results apply only when the generation key is current and stale geometry/property/binding results are discarded.
@@ -132,7 +134,7 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'Sa
   direct render-lane hint mutation, progressive presentation binding mutation,
   effective visualization config/spatial-debug mutation, or visualization
   adapter binding mutation invalidate stale entries. Full
-  generation stamps for source/property values and remaining non-vertex binding revisions,
-  callback-wide timing, remaining selected-analysis scanned-element counters,
-  async analysis jobs, bounded apply, ImGui copy/upload diagnostics, and Vulkan
-  responsiveness smoke remain open; this task is not ready to retire.
+  generation stamps for source/property values and remaining non-vertex binding
+  revisions, remaining selected-analysis scanned-element counters, async
+  analysis jobs, bounded apply, renderer selected-outline cost diagnostics, and
+  Vulkan responsiveness smoke remain open; this task is not ready to retire.

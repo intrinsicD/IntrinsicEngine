@@ -29,6 +29,7 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.Graphics.CameraSnapshots;
+import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
@@ -380,8 +381,47 @@ TEST(ImGuiAdapterEngineWiring, FramePacingDiagnosticsPopulateOnNullBackend)
               imgui.LastEditorCallbackMicros);
     EXPECT_EQ(pacing.ImGuiDrawDataCopyMicros,
               imgui.LastDrawDataCopyMicros);
+    EXPECT_EQ(pacing.ImGuiDrawListCount, imgui.LastDrawListCount);
+    EXPECT_EQ(pacing.ImGuiVertexCount, imgui.LastVertexCount);
+    EXPECT_EQ(pacing.ImGuiIndexCount, imgui.LastIndexCount);
+    EXPECT_EQ(pacing.ImGuiCommandCount, imgui.LastCommandCount);
+    EXPECT_EQ(pacing.ImGuiFontAtlasCopyCount, imgui.FontAtlasCopyCount);
+    EXPECT_EQ(pacing.ImGuiFontAtlasReuseCount, imgui.FontAtlasReuseCount);
+    EXPECT_EQ(pacing.ImGuiFontAtlasCopied, imgui.LastFrameFontAtlasCopied);
+    EXPECT_EQ(pacing.ImGuiFrameUsedUserTexture,
+              imgui.LastFrameUsedUserTexture);
+    EXPECT_EQ(pacing.ImGuiFontAtlasByteCount, imgui.LastFontAtlasByteCount);
+    EXPECT_EQ(pacing.ImGuiFontAtlasCopyBytes,
+              imgui.LastFrameFontAtlasCopyBytes);
+    EXPECT_EQ(pacing.ImGuiVertexCopyBytes,
+              imgui.LastFrameVertexCopyBytes);
+    EXPECT_EQ(pacing.ImGuiIndexCopyBytes,
+              imgui.LastFrameIndexCopyBytes);
+    EXPECT_EQ(pacing.ImGuiCommandCopyBytes,
+              imgui.LastFrameCommandCopyBytes);
+    EXPECT_EQ(pacing.ImGuiOverlayCopyBytes,
+              imgui.LastFrameOverlayCopyBytes);
     EXPECT_GE(pacing.ImGuiEndMicros, pacing.ImGuiEditorCallbackMicros);
     EXPECT_GE(pacing.ImGuiEndMicros, pacing.ImGuiDrawDataCopyMicros);
+    EXPECT_GE(pacing.ImGuiDrawListCount, 1u);
+    EXPECT_GT(pacing.ImGuiVertexCount, 0u);
+    EXPECT_GT(pacing.ImGuiIndexCount, 0u);
+    EXPECT_GE(pacing.ImGuiCommandCount, 1u);
+    EXPECT_EQ(pacing.ImGuiVertexCopyBytes,
+              static_cast<std::uint64_t>(pacing.ImGuiVertexCount) *
+                  sizeof(Graphics::ImGuiOverlayVertex));
+    EXPECT_EQ(pacing.ImGuiIndexCopyBytes,
+              static_cast<std::uint64_t>(pacing.ImGuiIndexCount) *
+                  sizeof(std::uint32_t));
+    EXPECT_EQ(pacing.ImGuiCommandCopyBytes,
+              static_cast<std::uint64_t>(pacing.ImGuiCommandCount) *
+                  sizeof(Graphics::ImGuiOverlayDrawCommand));
+    EXPECT_EQ(pacing.ImGuiOverlayCopyBytes,
+              pacing.ImGuiFontAtlasCopyBytes +
+                  pacing.ImGuiVertexCopyBytes +
+                  pacing.ImGuiIndexCopyBytes +
+                  pacing.ImGuiCommandCopyBytes);
+    EXPECT_GT(pacing.ImGuiOverlayCopyBytes, 0u);
     EXPECT_EQ(pacing.RenderGraphCompileMicros, graph.Compile.TimeMicros);
     EXPECT_EQ(pacing.RenderGraphExecuteMicros, graph.Execute.TimeMicros);
     EXPECT_GT(imgui.LastFrameOverlayCopyBytes, 0u);
