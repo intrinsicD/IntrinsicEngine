@@ -2033,6 +2033,14 @@ TEST(SandboxEditorUi, HiddenPanelBuildRequestSkipsSelectedEntityModels)
     EXPECT_EQ(stats.TextureBakeModelBuilds, 0u);
     EXPECT_EQ(stats.TextureBakeSourceRowsEnumerated, 0u);
     EXPECT_EQ(stats.VisualizationModelBuilds, 0u);
+    EXPECT_EQ(stats.InspectorModelBuildTimeNs, 0u);
+    EXPECT_EQ(stats.SelectedAnalysisModelBuildTimeNs, 0u);
+    EXPECT_EQ(stats.PropertyCatalogModelBuildTimeNs, 0u);
+    EXPECT_EQ(stats.VertexChannelValidationTimeNs, 0u);
+    EXPECT_EQ(stats.UvDiagnosticsModelBuildTimeNs, 0u);
+    EXPECT_EQ(stats.TextureBakeModelBuildTimeNs, 0u);
+    EXPECT_EQ(stats.VisualizationModelBuildTimeNs, 0u);
+    EXPECT_EQ(stats.DomainWindowModelBuildTimeNs, 0u);
 }
 
 TEST(SandboxEditorUi, InspectorOnlyBuildRequestAvoidsSiblingPanelWork)
@@ -2072,6 +2080,44 @@ TEST(SandboxEditorUi, InspectorOnlyBuildRequestAvoidsSiblingPanelWork)
     EXPECT_EQ(stats.TextureBakeModelBuilds, 1u);
     EXPECT_GT(stats.TextureBakeSourceRowsEnumerated, 0u);
     EXPECT_EQ(stats.VisualizationModelBuilds, 0u);
+    EXPECT_GT(stats.PanelFrameModelBuildTimeNs, 0u);
+    EXPECT_GT(stats.InspectorModelBuildTimeNs, 0u);
+    EXPECT_GT(stats.SelectedAnalysisModelBuildTimeNs, 0u);
+    EXPECT_GT(stats.PropertyCatalogModelBuildTimeNs, 0u);
+    EXPECT_GT(stats.VertexChannelValidationTimeNs, 0u);
+    EXPECT_GT(stats.UvDiagnosticsModelBuildTimeNs, 0u);
+    EXPECT_GT(stats.TextureBakeModelBuildTimeNs, 0u);
+    EXPECT_EQ(stats.VisualizationModelBuildTimeNs, 0u);
+    EXPECT_EQ(stats.DomainWindowModelBuildTimeNs, 0u);
+}
+
+TEST(SandboxEditorUi, DomainWindowBuildReportsTimingDiagnostics)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    Runtime::SandboxEditorModelBuildStats stats{};
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.ModelBuildStats = &stats;
+    context.VisualizationCommandsAvailable = true;
+
+    const Runtime::SandboxEditorDomainWindowModel model =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+
+    ASSERT_TRUE(model.HasSelectedEntity);
+    EXPECT_EQ(stats.DomainWindowModelBuilds, 1u);
+    EXPECT_EQ(stats.PropertyCatalogModelBuilds, 1u);
+    EXPECT_EQ(stats.VisualizationModelBuilds, 1u);
+    EXPECT_GT(stats.DomainWindowModelBuildTimeNs, 0u);
+    EXPECT_GT(stats.SelectedAnalysisModelBuildTimeNs, 0u);
+    EXPECT_GT(stats.PropertyCatalogModelBuildTimeNs, 0u);
+    EXPECT_GT(stats.VisualizationModelBuildTimeNs, 0u);
 }
 
 TEST(SandboxEditorUi, SelectedModelCacheReusesInspectorAnalysis)
@@ -2107,6 +2153,12 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesInspectorAnalysis)
     EXPECT_GT(first.ModelBuildStats.UvDiagnosticsTexcoordElementsScanned, 0u);
     EXPECT_EQ(first.ModelBuildStats.TextureBakeModelBuilds, 1u);
     EXPECT_GT(first.ModelBuildStats.TextureBakeSourceRowsEnumerated, 0u);
+    EXPECT_GT(first.ModelBuildStats.InspectorModelBuildTimeNs, 0u);
+    EXPECT_GT(first.ModelBuildStats.SelectedAnalysisModelBuildTimeNs, 0u);
+    EXPECT_GT(first.ModelBuildStats.PropertyCatalogModelBuildTimeNs, 0u);
+    EXPECT_GT(first.ModelBuildStats.VertexChannelValidationTimeNs, 0u);
+    EXPECT_GT(first.ModelBuildStats.UvDiagnosticsModelBuildTimeNs, 0u);
+    EXPECT_GT(first.ModelBuildStats.TextureBakeModelBuildTimeNs, 0u);
 
     const Runtime::SandboxEditorPanelFrame second =
         Runtime::BuildSandboxEditorPanelFrame(
@@ -2128,6 +2180,12 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesInspectorAnalysis)
     EXPECT_EQ(second.ModelBuildStats.UvDiagnosticsTexcoordElementsScanned, 0u);
     EXPECT_EQ(second.ModelBuildStats.TextureBakeModelBuilds, 0u);
     EXPECT_EQ(second.ModelBuildStats.TextureBakeSourceRowsEnumerated, 0u);
+    EXPECT_GT(second.ModelBuildStats.InspectorModelBuildTimeNs, 0u);
+    EXPECT_EQ(second.ModelBuildStats.SelectedAnalysisModelBuildTimeNs, 0u);
+    EXPECT_EQ(second.ModelBuildStats.PropertyCatalogModelBuildTimeNs, 0u);
+    EXPECT_EQ(second.ModelBuildStats.VertexChannelValidationTimeNs, 0u);
+    EXPECT_EQ(second.ModelBuildStats.UvDiagnosticsModelBuildTimeNs, 0u);
+    EXPECT_EQ(second.ModelBuildStats.TextureBakeModelBuildTimeNs, 0u);
     EXPECT_EQ(second.Inspector.PropertyCatalog.Rows.size(),
               first.Inspector.PropertyCatalog.Rows.size());
 
@@ -2461,6 +2519,8 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesVisualizationModel)
     EXPECT_EQ(first.ModelBuildStats.VisualizationModelBuilds, 1u);
     EXPECT_EQ(first.ModelBuildStats.VisualizationModelCacheMisses, 1u);
     EXPECT_EQ(first.ModelBuildStats.VisualizationModelCacheHits, 0u);
+    EXPECT_GT(first.ModelBuildStats.PanelFrameModelBuildTimeNs, 0u);
+    EXPECT_GT(first.ModelBuildStats.VisualizationModelBuildTimeNs, 0u);
 
     const Runtime::SandboxEditorPanelFrame second =
         Runtime::BuildSandboxEditorPanelFrame(
@@ -2471,6 +2531,8 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesVisualizationModel)
     EXPECT_EQ(second.ModelBuildStats.VisualizationModelBuilds, 0u);
     EXPECT_EQ(second.ModelBuildStats.VisualizationModelCacheMisses, 0u);
     EXPECT_EQ(second.ModelBuildStats.VisualizationModelCacheHits, 1u);
+    EXPECT_GT(second.ModelBuildStats.PanelFrameModelBuildTimeNs, 0u);
+    EXPECT_EQ(second.ModelBuildStats.VisualizationModelBuildTimeNs, 0u);
     EXPECT_EQ(second.Visualization.Properties.size(),
               first.Visualization.Properties.size());
 

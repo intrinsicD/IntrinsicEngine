@@ -146,6 +146,47 @@ namespace Extrinsic::Runtime
         namespace Reg = Geometry::Registration;
         namespace PPR = Intrinsic::Methods::Geometry::ProgressivePoissonReference;
 
+        using SandboxEditorModelBuildClock = std::chrono::steady_clock;
+
+        [[nodiscard]] std::uint64_t SandboxEditorElapsedNs(
+            const SandboxEditorModelBuildClock::time_point start) noexcept
+        {
+            const auto elapsed =
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    SandboxEditorModelBuildClock::now() - start)
+                    .count();
+            return elapsed > 0
+                ? static_cast<std::uint64_t>(elapsed)
+                : 1u;
+        }
+
+        class ScopedSandboxEditorStatTimer final
+        {
+        public:
+            explicit ScopedSandboxEditorStatTimer(
+                std::uint64_t* target) noexcept
+                : m_Target(target)
+            {
+                if (m_Target != nullptr)
+                    m_Start = SandboxEditorModelBuildClock::now();
+            }
+
+            ScopedSandboxEditorStatTimer(
+                const ScopedSandboxEditorStatTimer&) = delete;
+            ScopedSandboxEditorStatTimer& operator=(
+                const ScopedSandboxEditorStatTimer&) = delete;
+
+            ~ScopedSandboxEditorStatTimer()
+            {
+                if (m_Target != nullptr)
+                    *m_Target += SandboxEditorElapsedNs(m_Start);
+            }
+
+        private:
+            std::uint64_t* m_Target{nullptr};
+            SandboxEditorModelBuildClock::time_point m_Start{};
+        };
+
         inline constexpr std::array<A::AssetPayloadKind, 6> kImportPayloadKinds{{
             A::AssetPayloadKind::Unknown,
             A::AssetPayloadKind::Mesh,
@@ -1910,6 +1951,10 @@ namespace Extrinsic::Runtime
             const std::size_t elementCount,
             SandboxEditorModelBuildStats* modelBuildStats)
         {
+            ScopedSandboxEditorStatTimer timer{
+                modelBuildStats != nullptr
+                    ? &modelBuildStats->VertexChannelValidationTimeNs
+                    : nullptr};
             if (propertyName.empty())
             {
                 return AttributeBindResult{
@@ -2197,6 +2242,10 @@ namespace Extrinsic::Runtime
             const entt::registry& raw,
             const ECS::EntityHandle entity)
         {
+            ScopedSandboxEditorStatTimer timer{
+                context.ModelBuildStats != nullptr
+                    ? &context.ModelBuildStats->PropertyCatalogModelBuildTimeNs
+                    : nullptr};
             if (context.ModelBuildStats != nullptr)
             {
                 ++context.ModelBuildStats->PropertyCatalogModelBuilds;
@@ -3961,6 +4010,10 @@ namespace Extrinsic::Runtime
             const SandboxEditorContext& context,
             const GS::ConstSourceView& view)
         {
+            ScopedSandboxEditorStatTimer timer{
+                context.ModelBuildStats != nullptr
+                    ? &context.ModelBuildStats->UvDiagnosticsModelBuildTimeNs
+                    : nullptr};
             if (context.ModelBuildStats != nullptr)
             {
                 ++context.ModelBuildStats->UvDiagnosticsModelBuilds;
@@ -4038,6 +4091,10 @@ namespace Extrinsic::Runtime
             const SandboxEditorPropertyCatalogModel& catalog,
             const std::uint32_t stableEntityId)
         {
+            ScopedSandboxEditorStatTimer timer{
+                context.ModelBuildStats != nullptr
+                    ? &context.ModelBuildStats->TextureBakeModelBuildTimeNs
+                    : nullptr};
             if (context.ModelBuildStats != nullptr)
             {
                 ++context.ModelBuildStats->TextureBakeModelBuilds;
@@ -4583,6 +4640,10 @@ namespace Extrinsic::Runtime
             const SandboxEditorGeometryDomainModel& geometry,
             const std::uint32_t stableId)
         {
+            ScopedSandboxEditorStatTimer timer{
+                context.ModelBuildStats != nullptr
+                    ? &context.ModelBuildStats->SelectedAnalysisModelBuildTimeNs
+                    : nullptr};
             SandboxEditorSelectedAnalysisModel model{};
             model.PropertyCatalog =
                 BuildPropertyCatalogModel(context, raw, entity);
@@ -7450,6 +7511,10 @@ namespace Extrinsic::Runtime
         [[nodiscard]] SandboxEditorInspectorModel BuildInspectorModel(
             const SandboxEditorContext& context)
         {
+            ScopedSandboxEditorStatTimer timer{
+                context.ModelBuildStats != nullptr
+                    ? &context.ModelBuildStats->InspectorModelBuildTimeNs
+                    : nullptr};
             if (context.ModelBuildStats != nullptr)
             {
                 ++context.ModelBuildStats->InspectorModelBuilds;
@@ -7897,6 +7962,10 @@ namespace Extrinsic::Runtime
             const SandboxEditorVisualizationTarget target =
                 SandboxEditorVisualizationTarget::Entity)
         {
+            ScopedSandboxEditorStatTimer timer{
+                context.ModelBuildStats != nullptr
+                    ? &context.ModelBuildStats->VisualizationModelBuildTimeNs
+                    : nullptr};
             if (context.ModelBuildStats != nullptr)
             {
                 ++context.ModelBuildStats->VisualizationModelBuilds;
@@ -15402,6 +15471,8 @@ namespace Extrinsic::Runtime
     {
         SandboxEditorPanelFrame frame{};
         SandboxEditorModelBuildStats stats{};
+        const SandboxEditorModelBuildClock::time_point frameBuildStart =
+            SandboxEditorModelBuildClock::now();
         SandboxEditorContext modelContext = context;
         modelContext.ModelBuildStats = &stats;
 
@@ -15484,6 +15555,8 @@ namespace Extrinsic::Runtime
         {
             frame.Visualization = BuildCachedVisualizationModel(modelContext);
         }
+        stats.PanelFrameModelBuildTimeNs +=
+            SandboxEditorElapsedNs(frameBuildStart);
         frame.ModelBuildStats = stats;
         return frame;
     }
@@ -15492,6 +15565,10 @@ namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorDomainWindowKind kind)
     {
+        ScopedSandboxEditorStatTimer timer{
+            context.ModelBuildStats != nullptr
+                ? &context.ModelBuildStats->DomainWindowModelBuildTimeNs
+                : nullptr};
         if (context.ModelBuildStats != nullptr)
         {
             ++context.ModelBuildStats->DomainWindowModelBuilds;

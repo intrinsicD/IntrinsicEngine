@@ -2183,6 +2183,15 @@ export namespace Extrinsic::Runtime
         std::uint32_t SelectedAnalysisCacheMisses{0u};
         std::uint32_t VisualizationModelCacheHits{0u};
         std::uint32_t VisualizationModelCacheMisses{0u};
+        std::uint64_t PanelFrameModelBuildTimeNs{0u};
+        std::uint64_t InspectorModelBuildTimeNs{0u};
+        std::uint64_t SelectedAnalysisModelBuildTimeNs{0u};
+        std::uint64_t PropertyCatalogModelBuildTimeNs{0u};
+        std::uint64_t VertexChannelValidationTimeNs{0u};
+        std::uint64_t UvDiagnosticsModelBuildTimeNs{0u};
+        std::uint64_t TextureBakeModelBuildTimeNs{0u};
+        std::uint64_t VisualizationModelBuildTimeNs{0u};
+        std::uint64_t DomainWindowModelBuildTimeNs{0u};
     };
 
     struct SandboxEditorPanelFrame

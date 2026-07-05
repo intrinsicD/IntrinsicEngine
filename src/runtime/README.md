@@ -76,10 +76,13 @@ models are still built so command/status continuity is preserved. Open domain
 windows build their `SandboxEditorDomainWindowModel` only after `ImGui::Begin()`
 confirms the window is visible, and all sections for the same domain share one
 per-frame domain-window model cache. `SandboxEditorPanelFrame::ModelBuildStats`
-reports per-frame model-build and cache-hit counters for deterministic tests and
-diagnostics, including full vertex-channel resolver scan counts and scratch
-allocation bytes, UV texcoord finite-check element counts, and texture-bake
-source-row enumeration counts for selected property-catalog builds.
+reports per-frame model-build and cache-hit counters plus nanosecond timing
+diagnostics for selected panel, inspector, selected-analysis, property-catalog,
+vertex-channel validation, UV diagnostics, texture-bake, visualization, and
+domain-window model construction. It also reports full vertex-channel resolver
+scan counts and scratch allocation bytes, UV texcoord finite-check element
+counts, and texture-bake source-row enumeration counts for selected
+property-catalog builds.
 `RuntimeRenderExtractionStats` also exposes scalar visualization adapter value
 scan counts for scalar/isoline finite and range validation. The
 selected-entity model cache now stores immutable inspector
