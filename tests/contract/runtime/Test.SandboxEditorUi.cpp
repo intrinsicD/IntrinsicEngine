@@ -2248,6 +2248,77 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnPrimitiveGeneration)
     EXPECT_EQ(cacheStats.Entries, 1u);
 }
 
+TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnProgressiveBindingGeneration)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "ProgressiveMesh");
+    AddTriangleMeshSource(registry, mesh);
+    registry.Raw().emplace<Runtime::ProgressivePresentationBindings>(
+        mesh,
+        MakeProgressiveMeshPresentationBindings());
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    Runtime::SandboxEditorSelectedModelCache cache{};
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.SelectedModelCache = &cache;
+
+    const Runtime::SandboxEditorPanelFrame first =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyInspectorModelBuildRequest());
+    ASSERT_TRUE(first.Inspector.HasEntity);
+    ASSERT_TRUE(first.Inspector.Progressive.HasBindings);
+    EXPECT_EQ(first.Inspector.Progressive.BindingGeneration, 7u);
+    EXPECT_EQ(first.ModelBuildStats.SelectedAnalysisCacheMisses, 1u);
+    EXPECT_EQ(first.ModelBuildStats.ProgressiveModelBuilds, 1u);
+
+    const Runtime::SandboxEditorPanelFrame cached =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyInspectorModelBuildRequest());
+    ASSERT_TRUE(cached.Inspector.HasEntity);
+    EXPECT_EQ(cached.ModelBuildStats.SelectedAnalysisCacheHits, 1u);
+    EXPECT_EQ(cached.ModelBuildStats.ProgressiveModelBuilds, 0u);
+    EXPECT_EQ(cached.Inspector.Progressive.BindingGeneration, 7u);
+
+    auto& bindings =
+        registry.Raw().get<Runtime::ProgressivePresentationBindings>(mesh);
+    bindings.BindingGeneration = 8u;
+    ASSERT_FALSE(bindings.Presentations.empty());
+    ASSERT_GE(bindings.Presentations.front().Slots.size(), 2u);
+    bindings.Presentations.front().Slots[1].Readiness =
+        Runtime::ProgressiveReadinessState::Failed;
+    bindings.Presentations.front().Slots[1].LastDiagnostic =
+        "binding generation changed";
+
+    const Runtime::SandboxEditorPanelFrame changed =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyInspectorModelBuildRequest());
+    ASSERT_TRUE(changed.Inspector.HasEntity);
+    ASSERT_TRUE(changed.Inspector.Progressive.HasBindings);
+    EXPECT_EQ(changed.ModelBuildStats.SelectedAnalysisCacheMisses, 1u);
+    EXPECT_EQ(changed.ModelBuildStats.SelectedAnalysisCacheHits, 0u);
+    EXPECT_EQ(changed.ModelBuildStats.ProgressiveModelBuilds, 1u);
+    EXPECT_EQ(changed.Inspector.Progressive.BindingGeneration, 8u);
+
+    const Runtime::SandboxEditorProgressiveSlotModel* normal =
+        FindProgressiveSlot(changed.Inspector.Progressive,
+                            Runtime::ProgressiveSlotSemantic::Normal);
+    ASSERT_NE(normal, nullptr);
+    EXPECT_EQ(normal->Readiness, Runtime::ProgressiveReadinessState::Failed);
+    EXPECT_NE(normal->Diagnostic.find("binding generation changed"),
+              std::string::npos);
+
+    const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
+        cache.Stats();
+    EXPECT_EQ(cacheStats.SelectedAnalysisCacheMisses, 2u);
+    EXPECT_EQ(cacheStats.SelectedAnalysisCacheHits, 1u);
+    EXPECT_EQ(cacheStats.Entries, 1u);
+}
+
 TEST(SandboxEditorUi, SelectedModelCacheReusesVisualizationModel)
 {
     ECS::Scene::Registry registry;

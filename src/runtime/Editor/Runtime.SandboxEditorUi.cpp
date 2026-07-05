@@ -4200,6 +4200,21 @@ namespace Extrinsic::Runtime
             return bindings != nullptr ? bindings->BindingGeneration : 0u;
         }
 
+        [[nodiscard]] std::uint64_t ProgressiveBindingGenerationForEntity(
+            const entt::registry& raw,
+            const ECS::EntityHandle entity,
+            const SandboxEditorSelectedModelCacheSection section)
+        {
+            if (section !=
+                SandboxEditorSelectedModelCacheSection::SelectedAnalysis)
+            {
+                return 0u;
+            }
+            const auto* bindings =
+                raw.try_get<ProgressivePresentationBindings>(entity);
+            return bindings != nullptr ? bindings->BindingGeneration : 0u;
+        }
+
         [[nodiscard]] SandboxEditorSelectedModelCacheKey
         BuildSelectedModelCacheKey(
             const SandboxEditorContext& context,
@@ -4228,6 +4243,8 @@ namespace Extrinsic::Runtime
                 .FaceCount = geometry.FaceCount,
                 .NodeCount = geometry.NodeCount,
                 .BindingGeneration = VertexBindingGenerationForEntity(raw, entity),
+                .ProgressiveBindingGeneration =
+                    ProgressiveBindingGenerationForEntity(raw, entity, section),
                 .CommandHistoryRevision = CurrentCommandHistoryRevision(context),
                 .VisualizationAdapterBindingRevision =
                     CurrentVisualizationAdapterBindingRevision(context, section),
