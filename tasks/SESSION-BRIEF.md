@@ -28,7 +28,6 @@ the authoritative open/unblocked view.
 - unblocked: `CORE-009` — App-owned config sections out of core EngineConfig (tasks/backlog/architecture/CORE-009-app-owned-config-sections.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
-- unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
 - unblocked: `RUNTIME-137` — Async GPU readback helper + pooled destination for compute backends (tasks/backlog/runtime/RUNTIME-137-async-gpu-readback-helper-for-compute-backends.md)
 - unblocked: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
 - unblocked: `RUNTIME-140` — Remove the global scheduler barrier from the import apply path (tasks/backlog/runtime/RUNTIME-140-remove-global-waitforall-from-import-apply.md)

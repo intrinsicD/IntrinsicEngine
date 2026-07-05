@@ -87,7 +87,8 @@ maturity_target: CPUContracted
 ## Docs
 - [x] Update `src/runtime/README.md` to describe render-component domain composition and mark the old mesh primitive-view control surface as compatibility-only.
 - [x] Update `src/graphics/renderer/README.md` only for renderer-facing point/line config facts, not runtime ECS ownership.
-- [x] Update `tasks/backlog/ui/RORG-031-ui-integration.md` and `tasks/backlog/ui/README.md` for the UI scope/status change.
+- [x] Update the now-retired `tasks/done/RORG-031F-ui-integration.md` and
+      `tasks/backlog/ui/README.md` for the UI scope/status change.
 - [x] Regenerate `tasks/SESSION-BRIEF.md` after opening/retiring this task.
 - [x] Regenerate `docs/api/generated/module_inventory.md` after module surface changes.
 

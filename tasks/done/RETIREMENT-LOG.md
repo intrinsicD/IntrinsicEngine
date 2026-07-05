@@ -3421,3 +3421,12 @@ source transform is updated through undoable runtime-owned commands while the
 trajectory step scrubs intermediate poses. Focused runtime unit and Sandbox UI
 contract tests cover degenerate input, trajectory capture/scrubbing, successful
 alignment, failure states, undo/redo, and transformed source/target entities.
+
+[`RORG-031F`](RORG-031F-ui-integration.md) — UI integration backlog seed retired
+to `tasks/done/` on 2026-07-05 at `Scaffolded`. The planning-only umbrella now
+records the promoted `SandboxEditorUi` inventory through retired `UI-031`, keeps
+the remaining deferred workflows reserved as prospective `UI-009..012` tasks
+with external triggers, and explicitly states that no `Operational` follow-up is
+owed for the seed itself. The UI backlog now has no concrete open UI task; future
+children open directly from their trigger and cite the retired seed or the UI
+backlog README.

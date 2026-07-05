@@ -51,7 +51,7 @@ completed: 2026-07-05
   runtime command seams.
 - `GEOM-014` shipped the feature-aware `Metric` (default `FA_QEM`), feature/seam
   pin parameters, and `Result` diagnostics this window surfaces.
-- Cites [`tasks/backlog/ui/RORG-031-ui-integration.md`](../backlog/ui/RORG-031-ui-integration.md);
+- Cites [`tasks/done/RORG-031F-ui-integration.md`](RORG-031F-ui-integration.md);
   continues the `bcg_code_base` geometry-processing port into interactive
   Sandbox workflows.
 

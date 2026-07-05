@@ -10,15 +10,17 @@ map.
 
 ## Tasks
 
-- [RORG-031F — UI integration backlog seed](RORG-031-ui-integration.md).
+- No concrete UI integration tasks are currently open. Future UI children open
+  from the deferred triggers recorded by the retired RORG-031F seed.
 
 The runtime SpatialDebug closest-face picking consumer for `GEOM-039` is
 retired under the runtime backlog as `RUNTIME-135`.
 
 ## Convergence
 
-- RORG-031F is part of
-  **Theme F — Architecture/runtime/UI foundation seeds**.
+- RORG-031F is retired as the Theme F planning seed that kept the promoted
+  `SandboxEditorUi` inventory and deferred-workflow trigger list aligned while
+  concrete UI children were opening and retiring independently.
 - UI-027 (retired) was the paired editor command/UI for the `GEOM-016`
   point-cloud outlier-removal operators under **Theme F**, continuing the
   `bcg_code_base` geometry-processing port into interactive Sandbox workflows.
@@ -144,6 +146,11 @@ retired under the runtime backlog as `RUNTIME-135`.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [RORG-031F — UI integration backlog seed](../../done/RORG-031F-ui-integration.md)
+  (done, 2026-07-05, `Scaffolded`): planning-only umbrella retired after
+  current UI children through `UI-031` were indexed, the remaining deferred
+  workflows kept reserved prospective IDs (`UI-009..012`) and external
+  triggers, and no concrete UI implementation task remained open.
 - [UI-001 — Sandbox editor shell and core panels](../../done/UI-001-sandbox-editor-shell-panels.md) (done, 2026-06-03, `CPUContracted`).
 - [UI-002 — Sandbox EditorUI domain menu windows](../../done/UI-002-editor-domain-menu-windows.md) (done, 2026-06-07, `CPUContracted`).
 - [UI-003 — Sandbox EditorUI geometry processing capabilities](../../done/UI-003-sandbox-editor-geometry-processing-capabilities.md) (done, 2026-06-07, `CPUContracted`).

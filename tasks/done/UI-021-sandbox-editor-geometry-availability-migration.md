@@ -52,7 +52,9 @@ maturity_target: CPUContracted
 - [x] Preserve existing UI-019/UI-020 uniform-color and lane-override behavior.
 
 ## Docs
-- [x] Update `tasks/backlog/ui/README.md` and `tasks/backlog/ui/RORG-031-ui-integration.md` with this child task and its trigger.
+- [x] Update `tasks/backlog/ui/README.md` and the now-retired
+      `tasks/done/RORG-031F-ui-integration.md` with this child task and its
+      trigger.
 - [x] Update `src/runtime/README.md` only if UI-facing resolver usage needs a runtime note beyond `RUNTIME-117`.
 - [x] Regenerate `tasks/SESSION-BRIEF.md` after opening this task.
 

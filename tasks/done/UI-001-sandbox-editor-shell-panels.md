@@ -69,7 +69,7 @@
 ## Context
 - Owner/layer: `ui` / runtime-editor integration. The app layer stays policy-light; sandbox UI should attach through runtime/editor hooks, not direct graphics ownership.
 - Upstream dependencies: `RUNTIME-090` must produce ImGui frames; `GRAPHICS-079` must render them; `RUNTIME-089` supplies selection state; retired `RUNTIME-083` supplies visualization adapter seams; retired `ASSETIO-001` supplies the promoted file/import routing, model/texture ingest, and runtime handoff seams that Slice D should compose.
-- Existing `tasks/backlog/ui/RORG-031-ui-integration.md` is a seed only. This task scopes the first concrete panel set needed for the working sandbox path.
+- Existing `tasks/done/RORG-031F-ui-integration.md` is a seed only. This task scopes the first concrete panel set needed for the working sandbox path.
 
 ## Required changes
 - [x] Add a promoted sandbox/editor UI module that registers a draw callback with the runtime ImGui adapter without adding app-layer graphics/runtime shortcuts.
