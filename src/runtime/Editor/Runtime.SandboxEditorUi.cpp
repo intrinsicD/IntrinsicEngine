@@ -7369,6 +7369,38 @@ namespace Extrinsic::Runtime
             std::vector<glm::vec3> Dir2{};
         };
 
+        [[nodiscard]] bool SameVec3PropertyValues(
+            const std::vector<glm::vec3>& lhs,
+            const std::vector<glm::vec3>& rhs) noexcept
+        {
+            if (lhs.size() != rhs.size())
+                return false;
+            for (std::size_t i = 0u; i < lhs.size(); ++i)
+            {
+                if (lhs[i].x != rhs[i].x ||
+                    lhs[i].y != rhs[i].y ||
+                    lhs[i].z != rhs[i].z)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        [[nodiscard]] bool SameMeshCurvaturePropertyState(
+            const MeshCurvaturePropertyState& lhs,
+            const MeshCurvaturePropertyState& rhs) noexcept
+        {
+            return lhs.HadMean == rhs.HadMean &&
+                   lhs.HadGaussian == rhs.HadGaussian &&
+                   lhs.HadDir1 == rhs.HadDir1 &&
+                   lhs.HadDir2 == rhs.HadDir2 &&
+                   lhs.Mean == rhs.Mean &&
+                   lhs.Gaussian == rhs.Gaussian &&
+                   SameVec3PropertyValues(lhs.Dir1, rhs.Dir1) &&
+                   SameVec3PropertyValues(lhs.Dir2, rhs.Dir2);
+        }
+
         template <typename T>
         [[nodiscard]] bool CaptureCurvatureProperty(
             Geometry::PropertySet& properties,
@@ -7975,6 +8007,22 @@ namespace Extrinsic::Runtime
             return message;
         }
 
+        [[nodiscard]] SandboxEditorMeshCurvatureResult
+        MakeMeshCurvatureBaseResult(
+            const SandboxEditorMeshCurvatureCommand& command,
+            const bool directionsAvailable)
+        {
+            return SandboxEditorMeshCurvatureResult{
+                .Status = SandboxEditorCommandStatus::NoChange,
+                .Output = command.Output,
+                .DirectionsRequested =
+                    command.PublishPrincipalDirections &&
+                    CurvatureOutputRequestsDirections(command.Output),
+                .DirectionsAvailable = directionsAvailable,
+                .Error = Core::ErrorCode::Success,
+            };
+        }
+
         [[nodiscard]] SandboxEditorMeshDenoiseResult MakeMeshDenoiseBaseResult(
             const SandboxEditorMeshDenoiseCommand& command)
         {
@@ -8029,6 +8077,23 @@ namespace Extrinsic::Runtime
             message += ":";
             message += std::to_string(handle.Generation);
             message += ")";
+        }
+
+        [[nodiscard]] SandboxEditorMeshCurvatureResult
+        MakePendingMeshCurvatureResult(
+            const SandboxEditorMeshCurvatureCommand& command,
+            const bool directionsAvailable,
+            const std::size_t vertexSlotCount,
+            const DerivedJobHandle handle)
+        {
+            SandboxEditorMeshCurvatureResult result =
+                MakeMeshCurvatureBaseResult(command, directionsAvailable);
+            result.Status = SandboxEditorCommandStatus::Pending;
+            result.VertexSlotCount = vertexSlotCount;
+            result.Message = "Mesh curvature CPU job queued";
+            AppendDerivedJobHandleToMessage(result.Message, handle);
+            result.Message += ".";
+            return result;
         }
 
         [[nodiscard]] SandboxEditorMeshDenoiseResult MakePendingMeshDenoiseResult(
@@ -8096,6 +8161,7 @@ namespace Extrinsic::Runtime
 
         enum class SandboxEditorMeshCpuJobKind : std::uint8_t
         {
+            Curvature,
             Denoise,
             Remesh,
             Simplify,
@@ -8106,6 +8172,8 @@ namespace Extrinsic::Runtime
         {
             switch (kind)
             {
+            case SandboxEditorMeshCpuJobKind::Curvature:
+                return "Sandbox.MeshCurvature.CPU";
             case SandboxEditorMeshCpuJobKind::Denoise:
                 return "Sandbox.MeshDenoise.CPU";
             case SandboxEditorMeshCpuJobKind::Remesh:
@@ -8121,6 +8189,8 @@ namespace Extrinsic::Runtime
         {
             switch (kind)
             {
+            case SandboxEditorMeshCpuJobKind::Curvature:
+                return "mesh_curvature_properties";
             case SandboxEditorMeshCpuJobKind::Denoise:
                 return "mesh_denoise_positions";
             case SandboxEditorMeshCpuJobKind::Remesh:
@@ -8129,6 +8199,21 @@ namespace Extrinsic::Runtime
                 return "mesh_simplify_topology";
             }
             return "mesh_processing";
+        }
+
+        [[nodiscard]] ProgressiveSlotSemantic MeshCpuJobOutputSemantic(
+            const SandboxEditorMeshCpuJobKind kind) noexcept
+        {
+            switch (kind)
+            {
+            case SandboxEditorMeshCpuJobKind::Curvature:
+                return ProgressiveSlotSemantic::ScalarField;
+            case SandboxEditorMeshCpuJobKind::Denoise:
+            case SandboxEditorMeshCpuJobKind::Remesh:
+            case SandboxEditorMeshCpuJobKind::Simplify:
+                return ProgressiveSlotSemantic::Displacement;
+            }
+            return ProgressiveSlotSemantic::Displacement;
         }
 
         void CopyMeshSimplifyAuxiliaryProperties(
@@ -8167,10 +8252,14 @@ namespace Extrinsic::Runtime
             std::vector<bool> DeletedVertices{};
             Geometry::HalfedgeMesh::Mesh BeforeMesh{};
             Geometry::HalfedgeMesh::Mesh Mesh{};
+            MeshCurvaturePropertyState CurvatureBefore{};
+            MeshCurvaturePropertyState CurvatureAfter{};
             std::vector<glm::vec3> DenoiseAfterPositions{};
+            SandboxEditorMeshCurvatureCommand CurvatureCommand{};
             SandboxEditorMeshDenoiseCommand DenoiseCommand{};
             SandboxEditorMeshRemeshCommand RemeshCommand{};
             SandboxEditorMeshSimplifyCommand SimplifyCommand{};
+            SandboxEditorMeshCurvatureResult CurvatureResult{};
             SandboxEditorMeshDenoiseResult DenoiseResult{};
             SandboxEditorMeshRemeshResult RemeshResult{};
             SandboxEditorMeshSimplifyResult SimplifyResult{};
@@ -8212,7 +8301,40 @@ namespace Extrinsic::Runtime
                 return DerivedJobApplyValidation::StaleSourcePropertyGeneration;
             }
 
+            if (job.Kind == SandboxEditorMeshCpuJobKind::Curvature)
+            {
+                GS::MutableSourceView mutableView =
+                    GS::BuildMutableView(raw, *entity);
+                if (!mutableView.Valid() ||
+                    mutableView.VertexSource == nullptr)
+                {
+                    return DerivedJobApplyValidation::StaleGeometryGeneration;
+                }
+
+                MeshCurvaturePropertyState currentCurvature{};
+                std::string diagnostic{};
+                if (!CaptureMeshCurvaturePropertyState(
+                        mutableView.VertexSource->Properties,
+                        job.SnapshotPositions.size(),
+                        currentCurvature,
+                        diagnostic) ||
+                    !SameMeshCurvaturePropertyState(
+                        currentCurvature,
+                        job.CurvatureBefore))
+                {
+                    return DerivedJobApplyValidation::StaleSourcePropertyGeneration;
+                }
+            }
+
             return DerivedJobApplyValidation::Current;
+        }
+
+        void PublishMeshCurvatureResultSink(
+            const SandboxEditorContext& context,
+            SandboxEditorMeshCurvatureResult result)
+        {
+            if (context.MethodResultSinks.MeshCurvature)
+                context.MethodResultSinks.MeshCurvature(std::move(result));
         }
 
         void PublishMeshDenoiseResultSink(
@@ -8237,6 +8359,134 @@ namespace Extrinsic::Runtime
         {
             if (context.MethodResultSinks.MeshSimplify)
                 context.MethodResultSinks.MeshSimplify(std::move(result));
+        }
+
+        [[nodiscard]] DerivedJobWorkerResult RunMeshCurvatureCpuWorker(
+            const std::shared_ptr<SandboxEditorMeshCpuJobState>& state)
+        {
+            SandboxEditorMeshCurvatureResult& result = state->CurvatureResult;
+            result.VertexSlotCount = state->SnapshotPositions.size();
+
+            Curv::CurvatureField curvature =
+                Curv::ComputeCurvature(state->Mesh);
+            if (!curvature.MeanCurvatureProperty ||
+                !curvature.GaussianCurvatureProperty ||
+                curvature.MeanCurvatureProperty.Vector().size() !=
+                    result.VertexSlotCount ||
+                curvature.GaussianCurvatureProperty.Vector().size() !=
+                    result.VertexSlotCount)
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message =
+                    "Geometry.Curvature produced missing or count-mismatched scalar properties.";
+                return DerivedJobOutput{
+                    .PayloadToken = 0u,
+                    .NormalizedProgress = 1.0f,
+                    .ProgressDeterminate = true,
+                    .Diagnostic = result.Message,
+                };
+            }
+
+            const std::vector<double>& mean =
+                curvature.MeanCurvatureProperty.Vector();
+            const std::vector<double>& gaussian =
+                curvature.GaussianCurvatureProperty.Vector();
+            result.NonFiniteScalarCount =
+                CountNonFiniteScalars(
+                    std::span<const double>{mean.data(), mean.size()}) +
+                CountNonFiniteScalars(
+                    std::span<const double>{gaussian.data(), gaussian.size()});
+            if (result.NonFiniteScalarCount != 0u)
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message =
+                    "Geometry.Curvature produced non-finite scalar curvature values.";
+                return DerivedJobOutput{
+                    .PayloadToken = 0u,
+                    .NormalizedProgress = 1.0f,
+                    .ProgressDeterminate = true,
+                    .Diagnostic = result.Message,
+                };
+            }
+
+            state->CurvatureAfter = state->CurvatureBefore;
+            state->CurvatureAfter.HadMean = true;
+            state->CurvatureAfter.Mean = mean;
+            state->CurvatureAfter.HadGaussian = true;
+            state->CurvatureAfter.Gaussian = gaussian;
+            result.ScalarPropertyCount = 2u;
+            result.ScalarWrittenCount = mean.size() + gaussian.size();
+
+            if (result.DirectionsRequested &&
+                result.DirectionsAvailable)
+            {
+                if (!curvature.PrincipalDir1Property ||
+                    !curvature.PrincipalDir2Property ||
+                    curvature.PrincipalDir1Property.Vector().size() !=
+                        result.VertexSlotCount ||
+                    curvature.PrincipalDir2Property.Vector().size() !=
+                        result.VertexSlotCount)
+                {
+                    result.Status =
+                        SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    result.Error = Core::ErrorCode::InvalidArgument;
+                    result.Message =
+                        "Geometry.Curvature produced missing or count-mismatched principal-direction properties.";
+                    return DerivedJobOutput{
+                        .PayloadToken = 0u,
+                        .NormalizedProgress = 1.0f,
+                        .ProgressDeterminate = true,
+                        .Diagnostic = result.Message,
+                    };
+                }
+
+                const std::vector<glm::vec3>& dir1 =
+                    curvature.PrincipalDir1Property.Vector();
+                const std::vector<glm::vec3>& dir2 =
+                    curvature.PrincipalDir2Property.Vector();
+                result.NonFiniteDirectionCount =
+                    CountNonFiniteVectors(
+                        std::span<const glm::vec3>{dir1.data(), dir1.size()}) +
+                    CountNonFiniteVectors(
+                        std::span<const glm::vec3>{dir2.data(), dir2.size()});
+                if (result.NonFiniteDirectionCount != 0u)
+                {
+                    result.Status =
+                        SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    result.Error = Core::ErrorCode::InvalidArgument;
+                    result.Message =
+                        "Geometry.Curvature produced non-finite principal directions.";
+                    return DerivedJobOutput{
+                        .PayloadToken = 0u,
+                        .NormalizedProgress = 1.0f,
+                        .ProgressDeterminate = true,
+                        .Diagnostic = result.Message,
+                    };
+                }
+
+                state->CurvatureAfter.HadDir1 = true;
+                state->CurvatureAfter.Dir1 = dir1;
+                state->CurvatureAfter.HadDir2 = true;
+                state->CurvatureAfter.Dir2 = dir2;
+                result.DirectionPropertyCount = 2u;
+                result.DirectionWrittenCount = dir1.size() + dir2.size();
+            }
+
+            result.Status = SandboxEditorCommandStatus::Applied;
+            result.DirectionsPublished =
+                result.DirectionPropertyCount == 2u &&
+                result.DirectionWrittenCount == result.VertexSlotCount * 2u;
+            result.Error = Core::ErrorCode::Success;
+            return DerivedJobOutput{
+                .PayloadToken = 0u,
+                .NormalizedProgress = 1.0f,
+                .ProgressDeterminate = true,
+                .Diagnostic = "Mesh curvature CPU result ready",
+            };
         }
 
         [[nodiscard]] DerivedJobWorkerResult RunMeshDenoiseCpuWorker(
@@ -8483,6 +8733,8 @@ namespace Extrinsic::Runtime
         {
             switch (state->Kind)
             {
+            case SandboxEditorMeshCpuJobKind::Curvature:
+                return RunMeshCurvatureCpuWorker(state);
             case SandboxEditorMeshCpuJobKind::Denoise:
                 return RunMeshDenoiseCpuWorker(state);
             case SandboxEditorMeshCpuJobKind::Remesh:
@@ -8525,6 +8777,44 @@ namespace Extrinsic::Runtime
             result.Message = BuildMeshDenoiseSuccessMessage(result);
             InvalidateSelectedModelCache(context);
             PublishMeshDenoiseResultSink(context, result);
+            return Core::Ok();
+        }
+
+        [[nodiscard]] Core::Result PublishMeshCurvatureCpuJob(
+            const SandboxEditorContext& context,
+            SandboxEditorMeshCpuJobState& job)
+        {
+            SandboxEditorMeshCurvatureResult result = job.CurvatureResult;
+            if (!result.Succeeded())
+            {
+                PublishMeshCurvatureResultSink(context, result);
+                return Core::Err(ResultErrorOrUnknown(result.Error));
+            }
+
+            const SandboxEditorCommandStatus commitStatus =
+                CommitMeshCurvatureProperties(
+                    context,
+                    job.StableEntityId,
+                    job.CurvatureBefore,
+                    job.CurvatureAfter);
+            if (commitStatus != SandboxEditorCommandStatus::Applied)
+            {
+                result.Status = commitStatus;
+                result.Error = Core::ErrorCode::Unknown;
+                result.Message =
+                    "Mesh curvature property publication failed during editor history commit.";
+                PublishMeshCurvatureResultSink(context, result);
+                return Core::Err(Core::ErrorCode::Unknown);
+            }
+
+            result.Status = SandboxEditorCommandStatus::Applied;
+            result.DirectionsPublished =
+                result.DirectionPropertyCount == 2u &&
+                result.DirectionWrittenCount == result.VertexSlotCount * 2u;
+            result.Error = Core::ErrorCode::Success;
+            result.Message = BuildMeshCurvatureSuccessMessage(result);
+            InvalidateSelectedModelCache(context);
+            PublishMeshCurvatureResultSink(context, result);
             return Core::Ok();
         }
 
@@ -8606,6 +8896,8 @@ namespace Extrinsic::Runtime
         {
             switch (job.Kind)
             {
+            case SandboxEditorMeshCpuJobKind::Curvature:
+                return PublishMeshCurvatureCpuJob(context, job);
             case SandboxEditorMeshCpuJobKind::Denoise:
                 return PublishMeshDenoiseCpuJob(context, job);
             case SandboxEditorMeshCpuJobKind::Remesh:
@@ -8632,7 +8924,7 @@ namespace Extrinsic::Runtime
                 .Key = DerivedJobKey{
                     .EntityId = state->StableEntityId,
                     .Domain = ProgressiveGeometryDomain::MeshSurface,
-                    .OutputSemantic = ProgressiveSlotSemantic::Displacement,
+                    .OutputSemantic = MeshCpuJobOutputSemantic(state->Kind),
                     .SourcePropertyGeneration =
                         state->GeometryMetadataSignature,
                     .OutputName = MeshCpuJobOutputName(state->Kind),
@@ -8656,8 +8948,56 @@ namespace Extrinsic::Runtime
                     [context, state](DerivedJobApplyContext&) -> Core::Result
                     {
                         return PublishMeshCpuJob(context, *state);
-                    },
+                },
             };
+        }
+
+        [[nodiscard]] SandboxEditorMeshCurvatureResult
+        SubmitMeshCurvatureCpuJob(
+            const SandboxEditorContext& context,
+            const SandboxEditorMeshCurvatureCommand& command,
+            MeshCurvatureSourceResult source,
+            MeshCurvaturePropertyState before,
+            const std::uint64_t geometryMetadataSignature)
+        {
+            auto state = std::make_shared<SandboxEditorMeshCpuJobState>();
+            state->Kind = SandboxEditorMeshCpuJobKind::Curvature;
+            state->StableEntityId = command.StableEntityId;
+            state->GeometryMetadataSignature = geometryMetadataSignature;
+            state->SnapshotPositions = ExtractMeshPositions(source.Mesh);
+            state->BeforeMesh = source.Mesh;
+            state->Mesh = std::move(source.Mesh);
+            state->CurvatureBefore = std::move(before);
+            state->CurvatureAfter = state->CurvatureBefore;
+            state->CurvatureCommand = command;
+            state->CurvatureResult = MakeMeshCurvatureBaseResult(
+                command,
+                context.MeshCurvatureDirectionsAvailable);
+            state->CurvatureResult.VertexSlotCount = source.VertexSlotCount;
+
+            DerivedJobDesc desc = MakeMeshCpuJobDesc(context, state);
+            const DerivedJobHandle handle =
+                context.DerivedJobCommands.Submit(std::move(desc));
+            if (!handle.IsValid())
+            {
+                SandboxEditorMeshCurvatureResult result =
+                    MakeMeshCurvatureBaseResult(
+                        command,
+                        context.MeshCurvatureDirectionsAvailable);
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.VertexSlotCount = source.VertexSlotCount;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "Mesh curvature CPU job submission was rejected by the runtime job lane.";
+                return result;
+            }
+
+            return MakePendingMeshCurvatureResult(
+                command,
+                context.MeshCurvatureDirectionsAvailable,
+                source.VertexSlotCount,
+                handle);
         }
 
         [[nodiscard]] SandboxEditorMeshDenoiseResult SubmitMeshDenoiseCpuJob(
@@ -19681,15 +20021,10 @@ namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorMeshCurvatureCommand& command)
     {
-        SandboxEditorMeshCurvatureResult result{
-            .Status = SandboxEditorCommandStatus::NoChange,
-            .Output = command.Output,
-            .DirectionsRequested =
-                command.PublishPrincipalDirections &&
-                CurvatureOutputRequestsDirections(command.Output),
-            .DirectionsAvailable = context.MeshCurvatureDirectionsAvailable,
-            .Error = Core::ErrorCode::Success,
-        };
+        SandboxEditorMeshCurvatureResult result =
+            MakeMeshCurvatureBaseResult(
+                command,
+                context.MeshCurvatureDirectionsAvailable);
 
         if (context.Scene == nullptr)
         {
@@ -19766,6 +20101,16 @@ namespace Extrinsic::Runtime
             result.Error = Core::ErrorCode::TypeMismatch;
             result.Message = captureDiagnostic;
             return result;
+        }
+
+        if (context.DerivedJobCommands.Available())
+        {
+            return SubmitMeshCurvatureCpuJob(
+                context,
+                command,
+                std::move(source),
+                std::move(before),
+                GeometryMetadataSignatureForEntity(raw, *entity));
         }
 
         Curv::CurvatureField curvature = Curv::ComputeCurvature(source.Mesh);
@@ -21268,6 +21613,13 @@ namespace Extrinsic::Runtime
                         if (alive && *alive)
                             m_LastProgressivePoissonResult =
                                 std::move(result);
+                    };
+                context.MethodResultSinks.MeshCurvature =
+                    [alive = m_ResultSinksAlive, this](
+                        SandboxEditorMeshCurvatureResult result)
+                    {
+                        if (alive && *alive)
+                            m_LastMeshCurvatureResult = std::move(result);
                     };
                 context.MethodResultSinks.MeshDenoise =
                     [alive = m_ResultSinksAlive, this](

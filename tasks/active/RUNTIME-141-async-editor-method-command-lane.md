@@ -6,13 +6,13 @@ depends_on: []
 # RUNTIME-141 — Async editor method-command lane (no heavy compute in the ImGui callback)
 
 ## Status
-- Active on 2026-07-05; Slices A, B, and C are implemented and verified. The
-  parent task remains active for the remaining synchronous geometry-processing
-  commands identified by the Slice D inventory.
+- Active on 2026-07-05; Slices A, B, C, D, and E.1 are implemented and
+  verified. The parent task remains active for the remaining synchronous
+  geometry-processing commands identified by the Slice D inventory.
 - This task is intentionally sliced because it spans the shared runtime job
   lane plus several method-specific snapshot/apply conversions.
-- Remaining open slices: mesh curvature, mesh subdivide, mesh/graph/point-cloud
-  vertex normals, point-cloud outlier removal, and UV regeneration.
+- Remaining open slices: mesh subdivide, mesh/graph/point-cloud vertex normals,
+  point-cloud outlier removal, and UV regeneration.
 
 ## Slice plan
 - **Slice A (this slice).** Wire an engine-owned `DerivedJobRegistry` beside
@@ -29,8 +29,10 @@ depends_on: []
   guards.
 - **Slice D (complete).** Convert registration alignment and update the
   heavyweight editor button inventory.
-- **Slice E.** Convert or split the remaining synchronous geometry-processing
-  commands identified by the inventory: mesh curvature, mesh subdivide,
+- **Slice E.1 (complete).** Convert mesh curvature to the shared lane with
+  copied mesh/property snapshots and stale property-state validation.
+- **Slice E.2+.** Convert or split the remaining synchronous
+  geometry-processing commands identified by the inventory: mesh subdivide,
   mesh/graph/point-cloud vertex normals, point-cloud outlier removal, and UV
   regeneration.
 
@@ -83,10 +85,10 @@ depends_on: []
 - Config: none new.
 
 ## Required changes
-- [ ] Inventory Sandbox editor action buttons and classify each heavyweight
+- [x] Inventory Sandbox editor action buttons and classify each heavyweight
       command as already queued, lightweight/immediate, or still synchronously
       expensive.
-- [ ] Introduce a shared "editor method/action job" submission helper over
+- [x] Introduce a shared "editor method/action job" submission helper over
       `StreamingExecutor`/`DerivedJobRegistry`: snapshot inputs on the main
       thread, run compute on the worker lane, apply results on the main
       thread with generation checks and bounded per-frame apply budget.
@@ -97,6 +99,7 @@ depends_on: []
 - [x] Convert Progressive Poisson CPU runs to the helper.
 - [x] Convert denoise/remesh/simplify commands to the helper.
 - [x] Convert registration alignment commands to the helper.
+- [x] Convert mesh curvature commands to the helper.
 - [ ] Panels reflect job state instead of blocking; a second submit while
       one runs either queues or replaces per current UX expectations
       (document choice per panel).
@@ -186,10 +189,17 @@ build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='SandboxEditorUi.Regis
 ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi|DerivedJob|StreamingExecutor|RuntimeSceneLifecycle' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180
 ```
 
+Slice E.1 verification completed on 2026-07-05:
+
+```bash
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='SandboxEditorUi.MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply:SandboxEditorUi.MeshCurvatureDerivedJobDiscardsStalePropertiesBeforeApply:SandboxEditorUi.MeshCurvatureCommandPublishesCanonicalPropertiesAndSupportsUndoRedo:SandboxEditorUi.MeshCurvatureCommandFallsBackToScalarOnlyWhenDirectionsUnavailable:SandboxEditorUi.MeshCurvatureCommandFailsClosedForInvalidTargetsAndConflicts'
+```
+
 ## Heavy Button Inventory
 - Queued through `DerivedJobRegistry` when an engine job surface is available:
   CPU K-Means; Progressive Poisson CPU point-cloud and mesh-surface sampling;
-  mesh denoise/remesh/simplify; ICP registration alignment.
+  mesh denoise/remesh/simplify; ICP registration alignment; mesh curvature.
 - Already routed through another async runtime command surface: selected mesh
   texture bake (`Extrinsic.Runtime.SelectedMeshTextureBake` schedules derived
   CPU bake work and stale-checked main-thread apply).
@@ -199,8 +209,8 @@ ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi|DerivedJob|Str
   render-recipe draft/preview state changes, and undo/redo/document state
   controls that only mutate runtime-owned editor state.
 - Still synchronous geometry-processing commands and therefore open under Slice
-  E: mesh curvature, mesh subdivide, mesh/graph/point-cloud vertex normal
-  recompute, point-cloud outlier removal, and selected mesh UV regeneration.
+  E: mesh subdivide, mesh/graph/point-cloud vertex normal recompute,
+  point-cloud outlier removal, and selected mesh UV regeneration.
 - File import and scene-file IO are outside this CPU method-command lane and are
   tracked by `RUNTIME-142`.
 

@@ -5288,6 +5288,152 @@ TEST(SandboxEditorUi, MeshCurvatureCommandPublishesCanonicalPropertiesAndSupport
     EXPECT_EQ(model.Processing.LastMeshCurvatureResult->ScalarWrittenCount, 8u);
 }
 
+TEST(SandboxEditorUi, MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+    AttachDerivedJobCommands(context, jobs);
+    std::optional<Runtime::SandboxEditorMeshCurvatureResult> completedResult{};
+    context.MethodResultSinks.MeshCurvature =
+        [&completedResult](Runtime::SandboxEditorMeshCurvatureResult result)
+        {
+            completedResult = std::move(result);
+        };
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "QueuedCurvature");
+    AddDenoiseTetraMeshSource(registry, mesh);
+    auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
+    ASSERT_FALSE(properties.Exists(PN::kMeanCurvature));
+    ASSERT_FALSE(properties.Exists(PN::kGaussianCurvature));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    const Runtime::SandboxEditorMeshCurvatureResult result =
+        Runtime::ApplySandboxEditorMeshCurvatureCommand(
+            context,
+            Runtime::SandboxEditorMeshCurvatureCommand{
+                .StableEntityId = stableId,
+                .Output = Runtime::SandboxEditorMeshCurvatureOutput::All,
+                .PublishPrincipalDirections = true,
+            });
+
+    EXPECT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_EQ(result.VertexSlotCount, 4u);
+    EXPECT_TRUE(result.DirectionsRequested);
+    EXPECT_TRUE(result.DirectionsAvailable);
+    EXPECT_NE(result.Message.find("queued"), std::string::npos);
+    EXPECT_FALSE(properties.Exists(PN::kMeanCurvature));
+    EXPECT_FALSE(properties.Exists(PN::kGaussianCurvature));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+
+    Runtime::DerivedJobQueueSnapshot queued = jobs.SnapshotAll();
+    ASSERT_EQ(queued.Entries.size(), 1u);
+    EXPECT_EQ(queued.Entries[0].Name, "Sandbox.MeshCurvature.CPU");
+    EXPECT_EQ(queued.Entries[0].Status, Runtime::DerivedJobStatus::Queued);
+
+    jobs.Pump(1u);
+    jobs.DrainCompletions();
+    EXPECT_FALSE(completedResult.has_value());
+    EXPECT_FALSE(properties.Exists(PN::kMeanCurvature));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    ASSERT_TRUE(completedResult.has_value());
+    EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
+    EXPECT_EQ(completedResult->VertexSlotCount, 4u);
+    EXPECT_EQ(completedResult->ScalarPropertyCount, 2u);
+    EXPECT_EQ(completedResult->ScalarWrittenCount, 8u);
+    EXPECT_EQ(completedResult->DirectionPropertyCount, 2u);
+    EXPECT_EQ(completedResult->DirectionWrittenCount, 8u);
+    EXPECT_TRUE(completedResult->DirectionsPublished);
+    EXPECT_TRUE(properties.Get<double>(PN::kMeanCurvature).IsValid());
+    EXPECT_TRUE(properties.Get<double>(PN::kGaussianCurvature).IsValid());
+    EXPECT_TRUE(properties.Get<glm::vec3>(PN::kPrincipalDir1).IsValid());
+    EXPECT_TRUE(properties.Get<glm::vec3>(PN::kPrincipalDir2).IsValid());
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+    EXPECT_TRUE(history.IsDirty());
+    ASSERT_TRUE(history.CanUndo());
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_FALSE(properties.Exists(PN::kMeanCurvature));
+    EXPECT_FALSE(properties.Exists(PN::kGaussianCurvature));
+    EXPECT_FALSE(properties.Exists(PN::kPrincipalDir1));
+    EXPECT_FALSE(properties.Exists(PN::kPrincipalDir2));
+}
+
+TEST(SandboxEditorUi, MeshCurvatureDerivedJobDiscardsStalePropertiesBeforeApply)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+    AttachDerivedJobCommands(context, jobs);
+    bool completedSinkCalled = false;
+    context.MethodResultSinks.MeshCurvature =
+        [&completedSinkCalled](Runtime::SandboxEditorMeshCurvatureResult)
+        {
+            completedSinkCalled = true;
+        };
+
+    const ECS::EntityHandle mesh =
+        MakeSelectable(registry, "StaleCurvatureProperties");
+    AddDenoiseTetraMeshSource(registry, mesh);
+    auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
+    auto mean = properties.GetOrAdd<double>(
+        std::string{PN::kMeanCurvature},
+        0.0);
+    ASSERT_TRUE(mean.IsValid());
+    ASSERT_EQ(mean.Vector().size(), 4u);
+    for (double& value : mean.Vector())
+        value = 1.0;
+
+    const Runtime::SandboxEditorMeshCurvatureResult result =
+        Runtime::ApplySandboxEditorMeshCurvatureCommand(
+            context,
+            Runtime::SandboxEditorMeshCurvatureCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+                .Output = Runtime::SandboxEditorMeshCurvatureOutput::All,
+                .PublishPrincipalDirections = true,
+            });
+    ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+
+    auto currentMean = properties.Get<double>(PN::kMeanCurvature);
+    ASSERT_TRUE(currentMean.IsValid());
+    for (double& value : currentMean.Vector())
+        value = 2.0;
+
+    jobs.Pump(1u);
+    jobs.DrainCompletions();
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+
+    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].Status,
+              Runtime::DerivedJobStatus::StaleDiscarded);
+    EXPECT_NE(done.Entries[0].Diagnostic.find(
+                  "StaleSourcePropertyGeneration"),
+              std::string::npos);
+    EXPECT_FALSE(completedSinkCalled);
+    currentMean = properties.Get<double>(PN::kMeanCurvature);
+    ASSERT_TRUE(currentMean.IsValid());
+    for (const double value : currentMean.Vector())
+        EXPECT_DOUBLE_EQ(value, 2.0);
+    EXPECT_FALSE(properties.Exists(PN::kGaussianCurvature));
+    EXPECT_FALSE(properties.Exists(PN::kPrincipalDir1));
+    EXPECT_FALSE(properties.Exists(PN::kPrincipalDir2));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+}
+
 TEST(SandboxEditorUi, MeshCurvatureCommandFallsBackToScalarOnlyWhenDirectionsUnavailable)
 {
     ECS::Scene::Registry registry;
