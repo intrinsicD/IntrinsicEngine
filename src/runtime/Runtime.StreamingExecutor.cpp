@@ -3,6 +3,7 @@ module;
 #include <algorithm>
 #include <chrono>
 #include <condition_variable>
+#include <cstddef>
 #include <cstdint>
 #include <deque>
 #include <functional>
@@ -388,16 +389,31 @@ namespace Extrinsic::Runtime
 
     void StreamingExecutor::ApplyMainThreadResults()
     {
+        (void)ApplyMainThreadResults(std::numeric_limits<std::uint32_t>::max());
+    }
+
+    std::uint32_t StreamingExecutor::ApplyMainThreadResults(
+        const std::uint32_t maxApplyCount)
+    {
         std::deque<std::uint32_t> ready{};
         {
             std::scoped_lock lock(m_Impl->Mutex);
-            ready.swap(m_Impl->ReadyForApply);
+            const auto count = std::min<std::size_t>(
+                maxApplyCount,
+                m_Impl->ReadyForApply.size());
+            for (std::size_t i = 0u; i < count; ++i)
+            {
+                ready.push_back(m_Impl->ReadyForApply.front());
+                m_Impl->ReadyForApply.pop_front();
+            }
         }
 
+        std::uint32_t applied = 0u;
         for (const auto index : ready)
         {
             std::move_only_function<void(StreamingResult&&)> apply{};
             StreamingResult result = std::unexpected(Core::ErrorCode::Unknown);
+            bool consumed = false;
             {
                 std::scoped_lock lock(m_Impl->Mutex);
                 if (index >= m_Impl->Tasks.size())
@@ -413,6 +429,7 @@ namespace Extrinsic::Runtime
 
                 apply = std::move(task.Desc.ApplyOnMainThread);
                 result = std::move(*task.Result);
+                consumed = true;
             }
 
             if (apply)
@@ -427,7 +444,12 @@ namespace Extrinsic::Runtime
                     m_Impl->FinalizeTaskLocked(index);
                 }
             }
+            if (consumed)
+            {
+                ++applied;
+            }
         }
+        return applied;
     }
 
     void StreamingExecutor::ShutdownAndDrain()

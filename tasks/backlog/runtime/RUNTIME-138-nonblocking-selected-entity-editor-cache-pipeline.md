@@ -49,6 +49,7 @@ maturity_target: Operational
 - [ ] Slice E: route heavy selected-entity derivations through `DerivedJobRegistry`/`StreamingExecutor` or a runtime editor-analysis registry with the same contract: immutable input snapshot, worker execution, generation validation, bounded main-thread apply, stale-result discard, previous-output retention, and observable pending/ready/failure state.
 - [ ] Slice E: add async jobs for active normal binding validation, active color binding validation, scalar min/max/domain analysis, isoline scalar domain analysis, UV diagnostics, color-buffer pack validation, and large property preview sampling where those results are actually visible or requested.
 - [ ] Slice F: move selected-entity job submission to a runtime frame-work seam (`IStreamingFrameHooks::SubmitFrameWork()` or equivalent) so `ImGuiAdapter::EndFrame()` only reads cached state and enqueues requests.
+- [x] Slice F partial: add count-limited `StreamingExecutor`/`DerivedJobRegistry` main-thread apply overloads and processed-count diagnostics; selecting the per-frame budget and wiring Engine/editor usage remain open.
 - [ ] Slice F: add an explicit per-frame apply budget for editor/derived completions, by count or elapsed time, so a burst of completed jobs cannot stall the main loop.
 - [ ] Slice F: keep transform/gizmo/selection commands that are required for same-frame render as cheap main-thread commands, and document which work remains frame-critical.
 - [x] File or update focused graphics follow-ups for selected outline GPU work and ImGui overlay copy/upload churn rather than expanding this runtime task into renderer implementation work.
@@ -65,6 +66,7 @@ maturity_target: Operational
 - [ ] Add contract tests proving property option listing uses metadata compatibility only, while explicit active/requested validations use async job results.
 - [ ] Add tests proving async selected-analysis results apply only when the generation key is current and stale geometry/property/binding results are discarded.
 - [ ] Add tests proving repeated selected frames enqueue at most one job per cache key while a matching job is pending or ready.
+- [x] Add contract tests proving count-limited `StreamingExecutor` and `DerivedJobRegistry` apply drains process only the requested number of ready completions while preserving queued ready work.
 - [ ] Add tests proving bounded main-thread apply processes a limited number/time of completions per frame.
 - [x] Run the default CPU-supported correctness gate after implementation.
 - [ ] On a Vulkan-capable host, run a sandbox responsiveness smoke with a large selected mesh/point cloud and record before/after selected-frame diagnostics.
@@ -121,7 +123,10 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'Sa
   visualization adapter value scans. The selected-model cache-hit tests can
   prove the selected-model counters stay at zero. Derived-job snapshots now
   expose aggregate queue/apply diagnostics for queued/applying/terminal/stale
-  counts and per-drain main-thread apply timing/result deltas. The cache key includes stable selected ids, the
+  counts and per-drain main-thread apply timing/result deltas. The streaming
+  and derived-job apply seams now expose count-limited main-thread drain
+  overloads with processed-count diagnostics, but Engine/editor selection of a
+  per-frame budget remains open. The cache key includes stable selected ids, the
   selection controller's selected-set generation, the engine-owned
   refined-primitive generation for primitive-sensitive selected analysis, a
   runtime-computed metadata signature over selected geometry source/property
@@ -140,5 +145,5 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'Sa
   adapter binding mutation invalidate stale entries. Full
   generation stamps for source/property values and remaining non-vertex binding
   revisions, remaining selected-analysis scanned-element counters, async
-  selected-analysis jobs, bounded apply behavior, renderer selected-outline cost diagnostics, and
+  selected-analysis jobs, Engine/editor bounded apply behavior, renderer selected-outline cost diagnostics, and
   Vulkan responsiveness smoke remain open; this task is not ready to retire.

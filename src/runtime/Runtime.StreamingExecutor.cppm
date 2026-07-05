@@ -81,6 +81,7 @@ export namespace Extrinsic::Runtime
         void DrainCompletions();
         [[nodiscard]] bool ResumeReadback(StreamingTaskHandle handle);
         void ApplyMainThreadResults();
+        [[nodiscard]] std::uint32_t ApplyMainThreadResults(std::uint32_t maxApplyCount);
         void ShutdownAndDrain();
 
         [[nodiscard]] StreamingTaskState GetState(StreamingTaskHandle handle) const;

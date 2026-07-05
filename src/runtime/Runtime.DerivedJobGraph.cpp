@@ -5,6 +5,7 @@ module;
 #include <cstdint>
 #include <expected>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -161,10 +162,12 @@ namespace Extrinsic::Runtime
         std::vector<Record> Records{};
         std::uint64_t ApplyMainThreadCalls{0u};
         std::uint64_t LastApplyMainThreadTimeNs{0u};
+        std::uint64_t LastApplyMainThreadProcessedJobs{0u};
         std::uint64_t LastApplyMainThreadCompletedJobs{0u};
         std::uint64_t LastApplyMainThreadFailedJobs{0u};
         std::uint64_t LastApplyMainThreadCancelledJobs{0u};
         std::uint64_t LastApplyMainThreadStaleDiscardedJobs{0u};
+        std::uint64_t TotalApplyMainThreadProcessedJobs{0u};
         std::uint64_t TotalApplyMainThreadCompletedJobs{0u};
         std::uint64_t TotalApplyMainThreadFailedJobs{0u};
         std::uint64_t TotalApplyMainThreadCancelledJobs{0u};
@@ -302,6 +305,8 @@ namespace Extrinsic::Runtime
             DerivedJobQueueDiagnostics diagnostics = CountStatusesLocked();
             diagnostics.ApplyMainThreadCalls = ApplyMainThreadCalls;
             diagnostics.LastApplyMainThreadTimeNs = LastApplyMainThreadTimeNs;
+            diagnostics.LastApplyMainThreadProcessedJobs =
+                LastApplyMainThreadProcessedJobs;
             diagnostics.LastApplyMainThreadCompletedJobs =
                 LastApplyMainThreadCompletedJobs;
             diagnostics.LastApplyMainThreadFailedJobs =
@@ -310,6 +315,8 @@ namespace Extrinsic::Runtime
                 LastApplyMainThreadCancelledJobs;
             diagnostics.LastApplyMainThreadStaleDiscardedJobs =
                 LastApplyMainThreadStaleDiscardedJobs;
+            diagnostics.TotalApplyMainThreadProcessedJobs =
+                TotalApplyMainThreadProcessedJobs;
             diagnostics.TotalApplyMainThreadCompletedJobs =
                 TotalApplyMainThreadCompletedJobs;
             diagnostics.TotalApplyMainThreadFailedJobs =
@@ -836,9 +843,15 @@ namespace Extrinsic::Runtime
 
     void DerivedJobRegistry::ApplyMainThreadResults()
     {
+        (void)ApplyMainThreadResults(std::numeric_limits<std::uint32_t>::max());
+    }
+
+    std::uint32_t DerivedJobRegistry::ApplyMainThreadResults(
+        const std::uint32_t maxApplyCount)
+    {
         if (m_Impl == nullptr || m_Impl->Executor == nullptr)
         {
-            return;
+            return 0u;
         }
 
         DerivedJobQueueDiagnostics before{};
@@ -848,7 +861,8 @@ namespace Extrinsic::Runtime
         }
 
         const auto applyBegin = std::chrono::steady_clock::now();
-        m_Impl->Executor->ApplyMainThreadResults();
+        const std::uint32_t processed =
+            m_Impl->Executor->ApplyMainThreadResults(maxApplyCount);
         const std::uint64_t elapsedNs = ElapsedNs(applyBegin);
 
         std::scoped_lock lock(m_Impl->Mutex);
@@ -864,14 +878,17 @@ namespace Extrinsic::Runtime
 
         ++m_Impl->ApplyMainThreadCalls;
         m_Impl->LastApplyMainThreadTimeNs = elapsedNs;
+        m_Impl->LastApplyMainThreadProcessedJobs = processed;
         m_Impl->LastApplyMainThreadCompletedJobs = completed;
         m_Impl->LastApplyMainThreadFailedJobs = failed;
         m_Impl->LastApplyMainThreadCancelledJobs = cancelled;
         m_Impl->LastApplyMainThreadStaleDiscardedJobs = staleDiscarded;
+        m_Impl->TotalApplyMainThreadProcessedJobs += processed;
         m_Impl->TotalApplyMainThreadCompletedJobs += completed;
         m_Impl->TotalApplyMainThreadFailedJobs += failed;
         m_Impl->TotalApplyMainThreadCancelledJobs += cancelled;
         m_Impl->TotalApplyMainThreadStaleDiscardedJobs += staleDiscarded;
+        return processed;
     }
 
     DerivedJobStatus DerivedJobRegistry::GetStatus(const DerivedJobHandle handle) const

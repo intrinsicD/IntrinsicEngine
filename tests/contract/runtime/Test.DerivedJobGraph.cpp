@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <expected>
 #include <string>
 #include <utility>
@@ -288,10 +289,12 @@ TEST(RuntimeDerivedJobGraph, QueueDiagnosticsTrackStatusesAndApplyDeltas)
     EXPECT_EQ(applied.Diagnostics.StaleDiscardedJobs, 1u);
     EXPECT_EQ(applied.Diagnostics.ApplyMainThreadCalls, 1u);
     EXPECT_GT(applied.Diagnostics.LastApplyMainThreadTimeNs, 0u);
+    EXPECT_EQ(applied.Diagnostics.LastApplyMainThreadProcessedJobs, 3u);
     EXPECT_EQ(applied.Diagnostics.LastApplyMainThreadCompletedJobs, 1u);
     EXPECT_EQ(applied.Diagnostics.LastApplyMainThreadFailedJobs, 1u);
     EXPECT_EQ(applied.Diagnostics.LastApplyMainThreadCancelledJobs, 0u);
     EXPECT_EQ(applied.Diagnostics.LastApplyMainThreadStaleDiscardedJobs, 1u);
+    EXPECT_EQ(applied.Diagnostics.TotalApplyMainThreadProcessedJobs, 3u);
     EXPECT_EQ(applied.Diagnostics.TotalApplyMainThreadCompletedJobs, 1u);
     EXPECT_EQ(applied.Diagnostics.TotalApplyMainThreadFailedJobs, 1u);
     EXPECT_EQ(applied.Diagnostics.TotalApplyMainThreadCancelledJobs, 0u);
@@ -304,12 +307,84 @@ TEST(RuntimeDerivedJobGraph, QueueDiagnosticsTrackStatusesAndApplyDeltas)
     jobs.ApplyMainThreadResults();
     auto idle = jobs.SnapshotAll();
     EXPECT_EQ(idle.Diagnostics.ApplyMainThreadCalls, 2u);
+    EXPECT_EQ(idle.Diagnostics.LastApplyMainThreadProcessedJobs, 0u);
     EXPECT_EQ(idle.Diagnostics.LastApplyMainThreadCompletedJobs, 0u);
     EXPECT_EQ(idle.Diagnostics.LastApplyMainThreadFailedJobs, 0u);
     EXPECT_EQ(idle.Diagnostics.LastApplyMainThreadCancelledJobs, 0u);
     EXPECT_EQ(idle.Diagnostics.LastApplyMainThreadStaleDiscardedJobs, 0u);
+    EXPECT_EQ(idle.Diagnostics.TotalApplyMainThreadProcessedJobs, 3u);
     EXPECT_EQ(idle.Diagnostics.TotalApplyMainThreadCompletedJobs, 1u);
     EXPECT_EQ(idle.Diagnostics.TotalApplyMainThreadFailedJobs, 1u);
     EXPECT_EQ(idle.Diagnostics.TotalApplyMainThreadCancelledJobs, 0u);
     EXPECT_EQ(idle.Diagnostics.TotalApplyMainThreadStaleDiscardedJobs, 1u);
+}
+
+TEST(RuntimeDerivedJobGraph, CountLimitedApplyKeepsReadyJobsQueued)
+{
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+    std::vector<std::uint64_t> applied{};
+    std::vector<Runtime::DerivedJobHandle> handles{};
+
+    for (std::uint32_t offset = 0u; offset < 3u; ++offset)
+    {
+        auto desc = MakeTokenJob(
+            70u + offset,
+            "budgeted apply",
+            static_cast<std::uint64_t>(offset + 1u));
+        desc.ApplyOnMainThread =
+            [&applied](Runtime::DerivedJobApplyContext& context) -> Core::Result
+        {
+            applied.push_back(context.Output.PayloadToken);
+            return Core::Ok();
+        };
+        handles.push_back(jobs.Submit(std::move(desc)));
+    }
+
+    jobs.Pump(3u);
+    jobs.DrainCompletions();
+
+    auto ready = jobs.SnapshotAll();
+    EXPECT_EQ(ready.Diagnostics.ApplyingJobs, 3u);
+
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    auto first = jobs.SnapshotAll();
+    ASSERT_EQ(applied.size(), 1u);
+    EXPECT_EQ(applied[0], 1u);
+    EXPECT_EQ(first.Diagnostics.ApplyMainThreadCalls, 1u);
+    EXPECT_EQ(first.Diagnostics.CompleteJobs, 1u);
+    EXPECT_EQ(first.Diagnostics.ApplyingJobs, 2u);
+    EXPECT_EQ(first.Diagnostics.LastApplyMainThreadProcessedJobs, 1u);
+    EXPECT_EQ(first.Diagnostics.LastApplyMainThreadCompletedJobs, 1u);
+    EXPECT_EQ(first.Diagnostics.TotalApplyMainThreadProcessedJobs, 1u);
+    EXPECT_EQ(first.Diagnostics.TotalApplyMainThreadCompletedJobs, 1u);
+    EXPECT_EQ(jobs.GetStatus(handles[0]), Runtime::DerivedJobStatus::Complete);
+    EXPECT_EQ(jobs.GetStatus(handles[1]), Runtime::DerivedJobStatus::Applying);
+    EXPECT_EQ(jobs.GetStatus(handles[2]), Runtime::DerivedJobStatus::Applying);
+
+    EXPECT_EQ(jobs.ApplyMainThreadResults(0u), 0u);
+    auto skipped = jobs.SnapshotAll();
+    EXPECT_EQ(skipped.Diagnostics.ApplyMainThreadCalls, 2u);
+    EXPECT_EQ(skipped.Diagnostics.CompleteJobs, 1u);
+    EXPECT_EQ(skipped.Diagnostics.ApplyingJobs, 2u);
+    EXPECT_EQ(skipped.Diagnostics.LastApplyMainThreadProcessedJobs, 0u);
+    EXPECT_EQ(skipped.Diagnostics.LastApplyMainThreadCompletedJobs, 0u);
+    EXPECT_EQ(skipped.Diagnostics.TotalApplyMainThreadProcessedJobs, 1u);
+    EXPECT_EQ(skipped.Diagnostics.TotalApplyMainThreadCompletedJobs, 1u);
+    EXPECT_EQ(applied.size(), 1u);
+
+    EXPECT_EQ(jobs.ApplyMainThreadResults(2u), 2u);
+    auto drained = jobs.SnapshotAll();
+    ASSERT_EQ(applied.size(), 3u);
+    EXPECT_EQ(applied[1], 2u);
+    EXPECT_EQ(applied[2], 3u);
+    EXPECT_EQ(drained.Diagnostics.ApplyMainThreadCalls, 3u);
+    EXPECT_EQ(drained.Diagnostics.CompleteJobs, 3u);
+    EXPECT_EQ(drained.Diagnostics.ApplyingJobs, 0u);
+    EXPECT_EQ(drained.Diagnostics.LastApplyMainThreadProcessedJobs, 2u);
+    EXPECT_EQ(drained.Diagnostics.LastApplyMainThreadCompletedJobs, 2u);
+    EXPECT_EQ(drained.Diagnostics.TotalApplyMainThreadProcessedJobs, 3u);
+    EXPECT_EQ(drained.Diagnostics.TotalApplyMainThreadCompletedJobs, 3u);
+    EXPECT_EQ(jobs.GetStatus(handles[1]), Runtime::DerivedJobStatus::Complete);
+    EXPECT_EQ(jobs.GetStatus(handles[2]), Runtime::DerivedJobStatus::Complete);
 }

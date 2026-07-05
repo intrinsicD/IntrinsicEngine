@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <expected>
 #include <thread>
 #include <variant>
@@ -167,6 +168,59 @@ TEST(RuntimeStreamingExecutor, ApplyRunsOnCallerThread)
 
     EXPECT_EQ(applyThread, callerId);
     EXPECT_EQ(executor.GetState(handle), StreamingTaskState::Complete);
+}
+
+TEST(RuntimeStreamingExecutor, ApplyMainThreadResultsHonorsCountBudget)
+{
+    StreamingExecutor executor{};
+    std::vector<std::uint64_t> applied{};
+    std::vector<StreamingTaskHandle> handles{};
+
+    for (std::uint64_t token = 1u; token <= 3u; ++token)
+    {
+        handles.push_back(executor.Submit(StreamingTaskDesc{
+            .Name = "BudgetedApply",
+            .Execute = [token]()
+            {
+                return StreamingResult{StreamingCpuPayloadReady{.PayloadToken = token}};
+            },
+            .ApplyOnMainThread = [&applied](StreamingResult&& result)
+            {
+                if (result.has_value() &&
+                    std::holds_alternative<StreamingCpuPayloadReady>(*result))
+                {
+                    applied.push_back(
+                        std::get<StreamingCpuPayloadReady>(*result).PayloadToken);
+                }
+            },
+        }));
+    }
+
+    executor.PumpBackground(3u);
+    executor.DrainCompletions();
+    ASSERT_EQ(handles.size(), 3u);
+    EXPECT_EQ(executor.GetState(handles[0]), StreamingTaskState::WaitingForMainThreadApply);
+    EXPECT_EQ(executor.GetState(handles[1]), StreamingTaskState::WaitingForMainThreadApply);
+    EXPECT_EQ(executor.GetState(handles[2]), StreamingTaskState::WaitingForMainThreadApply);
+
+    EXPECT_EQ(executor.ApplyMainThreadResults(1u), 1u);
+    ASSERT_EQ(applied.size(), 1u);
+    EXPECT_EQ(applied[0], 1u);
+    EXPECT_EQ(executor.GetState(handles[0]), StreamingTaskState::Complete);
+    EXPECT_EQ(executor.GetState(handles[1]), StreamingTaskState::WaitingForMainThreadApply);
+    EXPECT_EQ(executor.GetState(handles[2]), StreamingTaskState::WaitingForMainThreadApply);
+
+    EXPECT_EQ(executor.ApplyMainThreadResults(0u), 0u);
+    EXPECT_EQ(applied.size(), 1u);
+    EXPECT_EQ(executor.GetState(handles[1]), StreamingTaskState::WaitingForMainThreadApply);
+    EXPECT_EQ(executor.GetState(handles[2]), StreamingTaskState::WaitingForMainThreadApply);
+
+    EXPECT_EQ(executor.ApplyMainThreadResults(8u), 2u);
+    ASSERT_EQ(applied.size(), 3u);
+    EXPECT_EQ(applied[1], 2u);
+    EXPECT_EQ(applied[2], 3u);
+    EXPECT_EQ(executor.GetState(handles[1]), StreamingTaskState::Complete);
+    EXPECT_EQ(executor.GetState(handles[2]), StreamingTaskState::Complete);
 }
 
 TEST(RuntimeStreamingExecutor, CancelRunningTaskSuppressesApply)

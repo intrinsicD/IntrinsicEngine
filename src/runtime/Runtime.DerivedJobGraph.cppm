@@ -125,10 +125,12 @@ export namespace Extrinsic::Runtime
         std::uint64_t StaleDiscardedJobs{0u};
         std::uint64_t ApplyMainThreadCalls{0u};
         std::uint64_t LastApplyMainThreadTimeNs{0u};
+        std::uint64_t LastApplyMainThreadProcessedJobs{0u};
         std::uint64_t LastApplyMainThreadCompletedJobs{0u};
         std::uint64_t LastApplyMainThreadFailedJobs{0u};
         std::uint64_t LastApplyMainThreadCancelledJobs{0u};
         std::uint64_t LastApplyMainThreadStaleDiscardedJobs{0u};
+        std::uint64_t TotalApplyMainThreadProcessedJobs{0u};
         std::uint64_t TotalApplyMainThreadCompletedJobs{0u};
         std::uint64_t TotalApplyMainThreadFailedJobs{0u};
         std::uint64_t TotalApplyMainThreadCancelledJobs{0u};
@@ -185,6 +187,7 @@ export namespace Extrinsic::Runtime
         void DrainCompletions();
         void DrainReadbacks();
         void ApplyMainThreadResults();
+        [[nodiscard]] std::uint32_t ApplyMainThreadResults(std::uint32_t maxApplyCount);
 
         [[nodiscard]] DerivedJobStatus GetStatus(DerivedJobHandle handle) const;
         [[nodiscard]] std::optional<DerivedJobSnapshot> Snapshot(DerivedJobHandle handle) const;
