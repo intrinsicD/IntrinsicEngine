@@ -77,10 +77,11 @@ drains completed jobs with the same bounded apply budget as other streaming
 work, revalidates the selected target before mutation, and publishes results
 only from the main-thread apply callback.
 
-`RUNTIME-141` Slice A applies this model to the CPU K-Means path while preserving
-the existing immediate fallback for tests and callers without an engine job
-surface. Progressive Poisson, mesh processing commands, and registration remain
-owned by later `RUNTIME-141` slices.
+`RUNTIME-141` Slice A applies this model to the CPU K-Means path, and Slice B
+applies it to Progressive Poisson point-cloud and mesh-surface CPU sampling,
+while preserving the existing immediate fallback for tests and callers without
+an engine job surface. Mesh denoise/remesh/simplify commands and registration
+remain owned by later `RUNTIME-141` slices.
 
 ### Sandbox Editor Startup Layout
 
@@ -897,14 +898,13 @@ introduced.
 ## Streaming integration
 
 `Extrinsic.Runtime.StreamingExecutor` is the primary persistent async streaming
-execution path. Runtime-owned async asset IO and visualization/Htex baking
-callers submit persistent executor work directly; `Engine` no longer exposes a
-frame-recorded streaming `TaskGraph` bridge. Synchronous CPU K-Means remains the
-nonblocking default editor execution path, while Sandbox K-Means Vulkan requests
-route through the renderer frame-command hook owned by
-`Extrinsic.Runtime.KMeansGpuJobQueue`, so command recording and async readback
-ownership stay in runtime instead of the UI command helper and no extra
-swapchain present is created.
+execution path. Runtime-owned async asset IO, visualization/Htex baking, and
+heavy sandbox editor method commands submit persistent executor work directly
+or through `DerivedJobRegistry`; `Engine` no longer exposes a frame-recorded
+streaming `TaskGraph` bridge. Sandbox K-Means Vulkan requests route through the
+renderer frame-command hook owned by `Extrinsic.Runtime.KMeansGpuJobQueue`, so
+command recording and async readback ownership stay in runtime instead of the UI
+command helper and no extra swapchain present is created.
 `Extrinsic.Runtime.AssetIngestStateMachine` is the promoted ingest-state
 contract for manual, dropped-file, and reimport requests. `Engine` submits
 ingest records before route/decode/apply work, completes deferred geometry

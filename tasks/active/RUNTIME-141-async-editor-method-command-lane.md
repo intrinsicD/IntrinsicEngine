@@ -6,13 +6,13 @@ depends_on: []
 # RUNTIME-141 — Async editor method-command lane (no heavy compute in the ImGui callback)
 
 ## Status
-- Active on 2026-07-05; Slice A is implemented and verified. The parent task
-  remains active for the remaining heavyweight editor method conversions.
+- Active on 2026-07-05; Slices A and B are implemented and verified. The
+  parent task remains active for the remaining heavyweight editor method
+  conversions.
 - This task is intentionally sliced because it spans the shared runtime job
   lane plus several method-specific snapshot/apply conversions.
-- Remaining open slices: Progressive Poisson CPU sampling, mesh
-  denoise/remesh/simplify, registration alignment, and the final heavy-button
-  inventory/state classification.
+- Remaining open slices: mesh denoise/remesh/simplify, registration
+  alignment, and the final heavy-button inventory/state classification.
 
 ## Slice plan
 - **Slice A (this slice).** Wire an engine-owned `DerivedJobRegistry` beside
@@ -22,8 +22,8 @@ depends_on: []
   returns `Pending` before the worker body runs, the result applies later, and
   stale targets are discarded before mutation. Defers Progressive Poisson,
   denoise/remesh/simplify, and registration conversions to later slices.
-- **Slice B.** Convert Progressive Poisson CPU sampling, including mesh-surface
-  sampling, to the shared editor method job lane.
+- **Slice B (complete).** Convert Progressive Poisson CPU sampling, including
+  mesh-surface sampling, to the shared editor method job lane.
 - **Slice C.** Convert mesh denoise/remesh/simplify command handlers to the
   shared lane with copied mesh snapshots and generation/stale guards.
 - **Slice D.** Convert registration alignment and any remaining heavyweight
@@ -90,7 +90,7 @@ depends_on: []
       or diagnostics immediately, without executing the heavy body inline.
 - [x] Convert the CPU K-Means editor command to the helper (parity with the
       existing GPU-queue UX: same published label/color properties).
-- [ ] Convert Progressive Poisson CPU runs to the helper.
+- [x] Convert Progressive Poisson CPU runs to the helper.
 - [ ] Convert denoise/remesh/simplify (and registration alignment) commands
       to the helper.
 - [ ] Panels reflect job state instead of blocking; a second submit while
@@ -152,6 +152,16 @@ python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/repo/check_pr_contract.py
 git diff --check
 python3 tools/repo/check_root_hygiene.py --root .
+```
+
+Slice B verification completed on 2026-07-05:
+
+```bash
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='SandboxEditorUi.ProgressivePoissonCpuRequestQueuesDerivedJobAndPublishesOnApply:SandboxEditorUi.ProgressivePoissonCpuDerivedJobDiscardsStalePointCloudBeforeApply:SandboxEditorUi.ProgressivePoissonMeshCpuRequestQueuesDerivedJobAndPublishesOnApply:SandboxEditorUi.ProgressivePoissonCommandPublishesPointPropertiesAndVisualization:SandboxEditorUi.ProgressivePoissonCommandMatchesDirectMethodConfig:SandboxEditorUi.ProgressivePoissonCommandSamplesMeshSurfaceToPointCloud:SandboxEditorUi.KMeansCpuRequestQueuesDerivedJobAndPublishesOnApply:SandboxEditorUi.KMeansCpuDerivedJobDiscardsStaleTargetBeforeApply'
+ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi|DerivedJob|StreamingExecutor|RuntimeSceneLifecycle' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```
 
 ## Forbidden changes

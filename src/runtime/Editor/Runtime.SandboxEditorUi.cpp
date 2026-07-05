@@ -5761,22 +5761,18 @@ namespace Extrinsic::Runtime
             return resolved;
         }
 
-        [[nodiscard]] SandboxEditorProgressivePoissonResult
-        RunProgressivePoissonAndPublish(
-            const std::span<const glm::vec3> positions,
-            Geometry::PropertySet& properties,
-            const SandboxEditorProgressivePoissonConfig& config,
-            RHI::IDevice* device)
+        struct ProgressivePoissonComputedResult
         {
-            const ProgressivePoissonBackendResolution backend =
-                ResolveProgressivePoissonBackend(
-                    config.Backend,
-                    config,
-                    static_cast<std::uint32_t>(positions.size()),
-                    device);
-            const PPR::Config methodConfig =
-                ToProgressivePoissonReferenceConfig(config);
-            const PPR::Result method = PPR::Compute(positions, methodConfig);
+            PPR::Result Method{};
+            SandboxEditorProgressivePoissonResult Result{};
+        };
+
+        [[nodiscard]] SandboxEditorProgressivePoissonResult
+        BuildProgressivePoissonResultFromMethod(
+            const PPR::Result& method,
+            const SandboxEditorProgressivePoissonConfig& config,
+            const ProgressivePoissonBackendResolution& backend)
+        {
             SandboxEditorProgressivePoissonResult result{};
             result.Channel = config.Channel;
             result.InputCount = method.Diag.InputCount;
@@ -5820,6 +5816,38 @@ namespace Extrinsic::Runtime
             result.PrefixCount = ClampProgressivePoissonPrefix(
                 config.PrefixCount,
                 result.AcceptedCount);
+            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Error = Core::ErrorCode::Success;
+            return result;
+        }
+
+        [[nodiscard]] ProgressivePoissonComputedResult
+        ComputeProgressivePoissonCpuReference(
+            const std::span<const glm::vec3> positions,
+            const SandboxEditorProgressivePoissonConfig& config,
+            const ProgressivePoissonBackendResolution& backend)
+        {
+            const PPR::Config methodConfig =
+                ToProgressivePoissonReferenceConfig(config);
+            ProgressivePoissonComputedResult out{};
+            out.Method = PPR::Compute(positions, methodConfig);
+            out.Result = BuildProgressivePoissonResultFromMethod(
+                out.Method,
+                config,
+                backend);
+            return out;
+        }
+
+        [[nodiscard]] SandboxEditorProgressivePoissonResult
+        PublishProgressivePoissonComputedResult(
+            Geometry::PropertySet& properties,
+            const SandboxEditorProgressivePoissonConfig& config,
+            const PPR::Result& method,
+            SandboxEditorProgressivePoissonResult result)
+        {
+            if (!result.Succeeded())
+                return result;
+
             if (!PublishProgressivePoissonProperties(
                     properties,
                     method,
@@ -5837,6 +5865,28 @@ namespace Extrinsic::Runtime
             result.Status = SandboxEditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             return result;
+        }
+
+        [[nodiscard]] SandboxEditorProgressivePoissonResult
+        RunProgressivePoissonAndPublish(
+            const std::span<const glm::vec3> positions,
+            Geometry::PropertySet& properties,
+            const SandboxEditorProgressivePoissonConfig& config,
+            RHI::IDevice* device)
+        {
+            const ProgressivePoissonBackendResolution backend =
+                ResolveProgressivePoissonBackend(
+                    config.Backend,
+                    config,
+                    static_cast<std::uint32_t>(positions.size()),
+                    device);
+            ProgressivePoissonComputedResult computed =
+                ComputeProgressivePoissonCpuReference(positions, config, backend);
+            return PublishProgressivePoissonComputedResult(
+                properties,
+                config,
+                computed.Method,
+                std::move(computed.Result));
         }
 
         void AppendProgressivePoissonSuccessMessage(
@@ -5911,6 +5961,513 @@ namespace Extrinsic::Runtime
             config.Scalar.BinCount = 0u;
             config.Scalar.Isolines.Num = 0u;
             raw.emplace_or_replace<G::VisualizationConfig>(entity, config);
+        }
+
+        [[nodiscard]] EditorCommandHistoryStatus ApplyPointCloudPointState(
+            ECS::Scene::Registry* scene,
+            std::uint32_t stableEntityId,
+            const Geometry::PointCloud::Cloud& cloud);
+
+        enum class SandboxEditorProgressivePoissonCpuJobSource : std::uint8_t
+        {
+            PointCloud,
+            MeshSurface,
+        };
+
+        [[nodiscard]] ProgressiveGeometryDomain
+        ToProgressivePoissonDerivedJobDomain(
+            const SandboxEditorProgressivePoissonCpuJobSource source) noexcept
+        {
+            return source == SandboxEditorProgressivePoissonCpuJobSource::MeshSurface
+                ? ProgressiveGeometryDomain::MeshSurface
+                : ProgressiveGeometryDomain::Point;
+        }
+
+        [[nodiscard]] const char* ProgressivePoissonOutputName(
+            const SandboxEditorProgressivePoissonConfig& config) noexcept
+        {
+            return ProgressivePoissonChannelPropertyName(config.Channel);
+        }
+
+        [[nodiscard]] Core::ErrorCode ProgressivePoissonResultError(
+            const SandboxEditorProgressivePoissonResult& result) noexcept
+        {
+            return result.Error == Core::ErrorCode::Success
+                ? Core::ErrorCode::Unknown
+                : result.Error;
+        }
+
+        void SetProgressivePoissonMeshSurfaceStats(
+            SandboxEditorProgressivePoissonResult& result,
+            const SurfaceSampling::Diagnostics& info)
+        {
+            result.MeshSurfaceSamplingUsed = true;
+            result.MeshSurfaceSampleCount =
+                SaturatingUint32(info.WrittenSampleCount);
+            result.MeshSurfaceTotalFaceCount =
+                SaturatingUint32(info.TotalFaceCount);
+            result.MeshSurfaceAcceptedTriangleCount =
+                SaturatingUint32(info.AcceptedTriangleCount);
+            result.MeshSurfaceRejectedFaceCount = SaturatingUint32(
+                info.RejectedNonTriangleFaceCount +
+                info.RejectedDegenerateTriangleCount +
+                info.RejectedNonFiniteTriangleCount);
+            result.MeshSurfaceArea = info.TotalSurfaceArea;
+        }
+
+        [[nodiscard]] SandboxEditorProgressivePoissonResult
+        MakeProgressivePoissonMeshSurfaceSamplingResult(
+            const SandboxEditorProgressivePoissonConfig& config,
+            const ProgressivePoissonBackendResolution& backend,
+            const SurfaceSampling::Result& sampled)
+        {
+            SandboxEditorProgressivePoissonResult result{};
+            result.Channel = config.Channel;
+            result.RequestedBackend = backend.Requested;
+            result.ActualBackend = backend.Actual;
+            result.RequestedBackendId =
+                ProgressivePoissonBackendId(backend.Requested);
+            result.RequestedBackendDisplayName =
+                ProgressivePoissonBackendDisplayName(backend.Requested);
+            result.BackendId = ProgressivePoissonBackendId(backend.Actual);
+            result.BackendDisplayName =
+                ProgressivePoissonBackendDisplayName(backend.Actual);
+            result.FellBackToCpu =
+                backend.Requested != backend.Actual &&
+                backend.Actual ==
+                    SandboxEditorProgressivePoissonBackend::CpuReference;
+            result.BackendFallbackReason = backend.FallbackReason;
+            SetProgressivePoissonMeshSurfaceStats(result, sampled.Info);
+            if (sampled.Succeeded())
+                return result;
+
+            result.Status =
+                sampled.Status == SurfaceSampling::SurfaceSamplingStatus::InvalidSampleCount
+                    ? SandboxEditorCommandStatus::InvalidProcessingParameters
+                    : SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Error =
+                sampled.Status == SurfaceSampling::SurfaceSamplingStatus::InvalidSampleCount
+                    ? Core::ErrorCode::InvalidArgument
+                    : Core::ErrorCode::InvalidState;
+            result.Message =
+                "Progressive Poisson mesh surface sampling failed with ";
+            result.Message += std::string(SurfaceSampling::ToString(sampled.Status));
+            result.Message += ".";
+            return result;
+        }
+
+        [[nodiscard]] SandboxEditorProgressivePoissonResult
+        MakePendingProgressivePoissonCpuJobResult(
+            const SandboxEditorProgressivePoissonCommand& command,
+            const DerivedJobHandle handle,
+            const std::uint32_t inputCount,
+            const ProgressivePoissonBackendResolution& backend,
+            const SandboxEditorProgressivePoissonCpuJobSource source)
+        {
+            SandboxEditorProgressivePoissonResult result{};
+            result.Status = SandboxEditorCommandStatus::Pending;
+            result.Channel = command.Config.Channel;
+            result.InputCount = inputCount;
+            result.RequestedBackend = backend.Requested;
+            result.ActualBackend = backend.Actual;
+            result.RequestedBackendId =
+                ProgressivePoissonBackendId(backend.Requested);
+            result.RequestedBackendDisplayName =
+                ProgressivePoissonBackendDisplayName(backend.Requested);
+            result.BackendId = ProgressivePoissonBackendId(backend.Actual);
+            result.BackendDisplayName =
+                ProgressivePoissonBackendDisplayName(backend.Actual);
+            result.FellBackToCpu =
+                backend.Requested != backend.Actual &&
+                backend.Actual ==
+                    SandboxEditorProgressivePoissonBackend::CpuReference;
+            result.BackendFallbackReason = backend.FallbackReason;
+            result.Error = Core::ErrorCode::Success;
+            if (source == SandboxEditorProgressivePoissonCpuJobSource::MeshSurface)
+            {
+                result.MeshSurfaceSamplingUsed = true;
+                result.MeshSurfaceSampleCount =
+                    command.Config.MeshSurfaceSampleCount;
+            }
+            result.Message = source == SandboxEditorProgressivePoissonCpuJobSource::MeshSurface
+                ? "Progressive Poisson mesh CPU job queued"
+                : "Progressive Poisson CPU job queued";
+            if (handle.IsValid())
+            {
+                result.Message += " (job ";
+                result.Message += std::to_string(handle.Index);
+                result.Message += ":";
+                result.Message += std::to_string(handle.Generation);
+                result.Message += ")";
+            }
+            result.Message += ".";
+            return result;
+        }
+
+        void PublishProgressivePoissonResultSink(
+            const SandboxEditorContext& context,
+            SandboxEditorProgressivePoissonResult result)
+        {
+            if (context.MethodResultSinks.ProgressivePoisson)
+                context.MethodResultSinks.ProgressivePoisson(std::move(result));
+        }
+
+        struct SandboxEditorProgressivePoissonCpuJobState
+        {
+            SandboxEditorProgressivePoissonCommand Command{};
+            SandboxEditorProgressivePoissonCpuJobSource Source{
+                SandboxEditorProgressivePoissonCpuJobSource::PointCloud};
+            ProgressivePoissonBackendResolution Backend{};
+            std::vector<glm::vec3> SnapshotPositions{};
+            std::uint64_t GeometryMetadataSignature{0u};
+            Geometry::HalfedgeMesh::Mesh Mesh{};
+            std::optional<PPR::Result> Method{};
+            std::optional<SurfaceSampling::Result> Sampled{};
+            SandboxEditorProgressivePoissonResult Result{};
+        };
+
+        [[nodiscard]] DerivedJobApplyValidation
+        ValidateProgressivePoissonPointCloudApply(
+            const SandboxEditorContext& context,
+            const SandboxEditorProgressivePoissonCommand& command,
+            const std::vector<glm::vec3>& positions)
+        {
+            if (context.Scene == nullptr)
+                return DerivedJobApplyValidation::MissingEntity;
+
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, command.StableEntityId);
+            if (!entity.has_value())
+                return DerivedJobApplyValidation::MissingEntity;
+
+            GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
+            const GS::SourceAvailability availability =
+                GS::BuildSourceAvailability(view);
+            if (availability.ProvenanceDomain != GS::Domain::PointCloud ||
+                view.VertexSource == nullptr)
+            {
+                return DerivedJobApplyValidation::StaleGeometryGeneration;
+            }
+
+            std::optional<std::vector<glm::vec3>> current =
+                CollectKMeansPositions(view.VertexSource->Properties);
+            if (!current.has_value() ||
+                !SameKMeansInputPositions(*current, positions))
+            {
+                return DerivedJobApplyValidation::StaleSourcePropertyGeneration;
+            }
+
+            return DerivedJobApplyValidation::Current;
+        }
+
+        [[nodiscard]] DerivedJobApplyValidation
+        ValidateProgressivePoissonMeshSurfaceApply(
+            const SandboxEditorContext& context,
+            const SandboxEditorProgressivePoissonCpuJobState& job)
+        {
+            if (context.Scene == nullptr)
+                return DerivedJobApplyValidation::MissingEntity;
+
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, job.Command.StableEntityId);
+            if (!entity.has_value())
+                return DerivedJobApplyValidation::MissingEntity;
+
+            const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
+            const GS::SourceAvailability availability =
+                GS::BuildSourceAvailability(view);
+            if (availability.ProvenanceDomain != GS::Domain::Mesh)
+                return DerivedJobApplyValidation::StaleGeometryGeneration;
+
+            if (GeometryMetadataSignatureForEntity(raw, *entity) !=
+                job.GeometryMetadataSignature)
+            {
+                return DerivedJobApplyValidation::StaleGeometryGeneration;
+            }
+
+            if (view.VertexSource == nullptr)
+                return DerivedJobApplyValidation::StaleGeometryGeneration;
+
+            std::optional<std::vector<glm::vec3>> current =
+                CollectKMeansPositions(view.VertexSource->Properties);
+            if (!current.has_value() ||
+                !SameKMeansInputPositions(*current, job.SnapshotPositions))
+            {
+                return DerivedJobApplyValidation::StaleSourcePropertyGeneration;
+            }
+
+            return DerivedJobApplyValidation::Current;
+        }
+
+        [[nodiscard]] Core::Result PublishProgressivePoissonPointCloudCpuJob(
+            const SandboxEditorContext& context,
+            const SandboxEditorProgressivePoissonCpuJobState& job)
+        {
+            if (!job.Method.has_value())
+                return Core::Err(Core::ErrorCode::Unknown);
+            if (context.Scene == nullptr)
+                return Core::Err(Core::ErrorCode::InvalidState);
+
+            if (!job.Result.Succeeded())
+            {
+                PublishProgressivePoissonResultSink(context, job.Result);
+                return Core::Err(ProgressivePoissonResultError(job.Result));
+            }
+
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, job.Command.StableEntityId);
+            if (!entity.has_value())
+                return Core::Err(Core::ErrorCode::ResourceNotFound);
+
+            GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
+            if (view.VertexSource == nullptr)
+                return Core::Err(Core::ErrorCode::InvalidArgument);
+
+            SandboxEditorProgressivePoissonResult result =
+                PublishProgressivePoissonComputedResult(
+                    view.VertexSource->Properties,
+                    job.Command.Config,
+                    *job.Method,
+                    job.Result);
+            if (result.Succeeded())
+            {
+                ApplyProgressivePoissonVisualization(
+                    raw,
+                    *entity,
+                    job.Command.Config.Channel);
+                Dirty::MarkVertexAttributesDirty(raw, *entity);
+                if (context.CommandHistory != nullptr)
+                    (void)context.CommandHistory->MarkDirty(
+                        "Run progressive Poisson sampling");
+
+                AppendProgressivePoissonSuccessMessage(result);
+                InvalidateSelectedModelCache(context);
+            }
+
+            PublishProgressivePoissonResultSink(context, result);
+            return result.Succeeded()
+                ? Core::Ok()
+                : Core::Err(ProgressivePoissonResultError(result));
+        }
+
+        [[nodiscard]] Core::Result PublishProgressivePoissonMeshSurfaceCpuJob(
+            const SandboxEditorContext& context,
+            const SandboxEditorProgressivePoissonCpuJobState& job)
+        {
+            if (!job.Result.Succeeded())
+            {
+                PublishProgressivePoissonResultSink(context, job.Result);
+                return Core::Err(ProgressivePoissonResultError(job.Result));
+            }
+            if (!job.Sampled.has_value())
+                return Core::Err(Core::ErrorCode::Unknown);
+            if (context.Scene == nullptr)
+                return Core::Err(Core::ErrorCode::InvalidState);
+
+            const EditorCommandHistoryStatus publishStatus =
+                ApplyPointCloudPointState(
+                    context.Scene,
+                    job.Command.StableEntityId,
+                    job.Sampled->Cloud);
+            SandboxEditorProgressivePoissonResult result = job.Result;
+            if (publishStatus != EditorCommandHistoryStatus::Applied)
+            {
+                result.Status = ToSandboxEditorCommandStatus(publishStatus);
+                result.Error = Core::ErrorCode::Unknown;
+                result.Message =
+                    "Progressive Poisson mesh sample publication failed.";
+                PublishProgressivePoissonResultSink(context, result);
+                return Core::Err(Core::ErrorCode::Unknown);
+            }
+
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, job.Command.StableEntityId);
+            if (entity.has_value())
+            {
+                if (raw.all_of<G::RenderSurface>(*entity))
+                    raw.remove<G::RenderSurface>(*entity);
+                ApplyProgressivePoissonVisualization(
+                    raw,
+                    *entity,
+                    job.Command.Config.Channel);
+            }
+            if (context.CommandHistory != nullptr)
+                (void)context.CommandHistory->MarkDirty(
+                    "Run progressive Poisson mesh sampling");
+
+            AppendProgressivePoissonSuccessMessage(result);
+            InvalidateSelectedModelCache(context);
+            PublishProgressivePoissonResultSink(context, result);
+            return Core::Ok();
+        }
+
+        [[nodiscard]] DerivedJobWorkerResult
+        RunProgressivePoissonPointCloudCpuWorker(
+            const std::shared_ptr<SandboxEditorProgressivePoissonCpuJobState>& state)
+        {
+            ProgressivePoissonComputedResult computed =
+                ComputeProgressivePoissonCpuReference(
+                    std::span<const glm::vec3>{
+                        state->SnapshotPositions.data(),
+                        state->SnapshotPositions.size()},
+                    state->Command.Config,
+                    state->Backend);
+            state->Method = std::move(computed.Method);
+            state->Result = std::move(computed.Result);
+            return DerivedJobOutput{
+                .PayloadToken = 0u,
+                .NormalizedProgress = 1.0f,
+                .ProgressDeterminate = true,
+                .Diagnostic = state->Result.Succeeded()
+                    ? "Progressive Poisson CPU result ready"
+                    : state->Result.Message,
+            };
+        }
+
+        [[nodiscard]] DerivedJobWorkerResult
+        RunProgressivePoissonMeshSurfaceCpuWorker(
+            const std::shared_ptr<SandboxEditorProgressivePoissonCpuJobState>& state)
+        {
+            SurfaceSampling::Result sampled =
+                SurfaceSampling::SampleTriangleMeshSurface(
+                    state->Mesh,
+                    ToProgressivePoissonSurfaceParams(state->Command.Config));
+            state->Result = MakeProgressivePoissonMeshSurfaceSamplingResult(
+                state->Command.Config,
+                state->Backend,
+                sampled);
+            if (!sampled.Succeeded())
+            {
+                state->Sampled = std::move(sampled);
+                return DerivedJobOutput{
+                    .PayloadToken = 0u,
+                    .NormalizedProgress = 1.0f,
+                    .ProgressDeterminate = true,
+                    .Diagnostic = state->Result.Message,
+                };
+            }
+
+            const std::span<const glm::vec3> sampledPositions =
+                sampled.Cloud.Positions();
+            ProgressivePoissonComputedResult computed =
+                ComputeProgressivePoissonCpuReference(
+                    sampledPositions,
+                    state->Command.Config,
+                    state->Backend);
+            state->Method = std::move(computed.Method);
+            SandboxEditorProgressivePoissonResult result =
+                std::move(computed.Result);
+            SetProgressivePoissonMeshSurfaceStats(result, sampled.Info);
+            result = PublishProgressivePoissonComputedResult(
+                sampled.Cloud.PointProperties(),
+                state->Command.Config,
+                *state->Method,
+                std::move(result));
+            state->Result = std::move(result);
+            state->Sampled = std::move(sampled);
+            return DerivedJobOutput{
+                .PayloadToken = 0u,
+                .NormalizedProgress = 1.0f,
+                .ProgressDeterminate = true,
+                .Diagnostic = state->Result.Succeeded()
+                    ? "Progressive Poisson mesh CPU result ready"
+                    : state->Result.Message,
+            };
+        }
+
+        [[nodiscard]] SandboxEditorProgressivePoissonResult
+        SubmitProgressivePoissonCpuDerivedJob(
+            const SandboxEditorContext& context,
+            const SandboxEditorProgressivePoissonCommand& command,
+            const SandboxEditorProgressivePoissonCpuJobSource source,
+            std::vector<glm::vec3> snapshotPositions,
+            Geometry::HalfedgeMesh::Mesh mesh,
+            const std::uint64_t geometryMetadataSignature,
+            const std::uint32_t inputCount,
+            ProgressivePoissonBackendResolution backend)
+        {
+            auto state =
+                std::make_shared<SandboxEditorProgressivePoissonCpuJobState>();
+            state->Command = command;
+            state->Source = source;
+            state->Backend = std::move(backend);
+            state->SnapshotPositions = std::move(snapshotPositions);
+            state->GeometryMetadataSignature = geometryMetadataSignature;
+            state->Mesh = std::move(mesh);
+
+            DerivedJobDesc desc{
+                .Key = DerivedJobKey{
+                    .EntityId = command.StableEntityId,
+                    .Domain = ToProgressivePoissonDerivedJobDomain(source),
+                    .OutputSemantic = ProgressiveSlotSemantic::PointScalarField,
+                    .SourcePropertyGeneration = geometryMetadataSignature,
+                    .OutputName = ProgressivePoissonOutputName(command.Config),
+                },
+                .Name = source == SandboxEditorProgressivePoissonCpuJobSource::MeshSurface
+                    ? "Sandbox.ProgressivePoisson.MeshCPU"
+                    : "Sandbox.ProgressivePoisson.CPU",
+                .RequestedJobDomain = ProgressiveJobDomain::Cpu,
+                .Kind = Core::Dag::TaskKind::GeometryProcess,
+                .Priority = Core::Dag::TaskPriority::Normal,
+                .EstimatedCost = std::max<std::uint32_t>(
+                    1u,
+                    (inputCount + 1023u) / 1024u),
+                .Execute =
+                    [state]() -> DerivedJobWorkerResult
+                    {
+                        return state->Source ==
+                                   SandboxEditorProgressivePoissonCpuJobSource::MeshSurface
+                            ? RunProgressivePoissonMeshSurfaceCpuWorker(state)
+                            : RunProgressivePoissonPointCloudCpuWorker(state);
+                    },
+                .ValidateOnMainThread =
+                    [context, state]()
+                    {
+                        return state->Source ==
+                                   SandboxEditorProgressivePoissonCpuJobSource::MeshSurface
+                            ? ValidateProgressivePoissonMeshSurfaceApply(
+                                  context,
+                                  *state)
+                            : ValidateProgressivePoissonPointCloudApply(
+                                  context,
+                                  state->Command,
+                                  state->SnapshotPositions);
+                    },
+                .ApplyOnMainThread =
+                    [context, state](DerivedJobApplyContext&) -> Core::Result
+                    {
+                        return state->Source ==
+                                   SandboxEditorProgressivePoissonCpuJobSource::MeshSurface
+                            ? PublishProgressivePoissonMeshSurfaceCpuJob(
+                                  context,
+                                  *state)
+                            : PublishProgressivePoissonPointCloudCpuJob(
+                                  context,
+                                  *state);
+                    },
+            };
+
+            const DerivedJobHandle handle =
+                context.DerivedJobCommands.Submit(std::move(desc));
+            if (!handle.IsValid())
+            {
+                return MakeProgressivePoissonResult(
+                    SandboxEditorCommandStatus::GeometryProcessingFailed,
+                    command.Config.Channel,
+                    Core::ErrorCode::InvalidState,
+                    "Progressive Poisson CPU job submission was rejected by the runtime job lane.");
+            }
+
+            return MakePendingProgressivePoissonCpuJobResult(
+                command,
+                handle,
+                inputCount,
+                state->Backend,
+                source);
         }
 
         struct MeshForVertexNormalsResult
@@ -17482,6 +18039,27 @@ namespace Extrinsic::Runtime
                     "Progressive Poisson sampling requires a non-empty finite v:position property.");
             }
 
+            if (context.DerivedJobCommands.Available())
+            {
+                const std::uint32_t pointCount =
+                    static_cast<std::uint32_t>(positions->size());
+                const ProgressivePoissonBackendResolution backend =
+                    ResolveProgressivePoissonBackend(
+                        command.Config.Backend,
+                        command.Config,
+                        pointCount,
+                        context.Device);
+                return SubmitProgressivePoissonCpuDerivedJob(
+                    context,
+                    command,
+                    SandboxEditorProgressivePoissonCpuJobSource::PointCloud,
+                    std::move(*positions),
+                    Geometry::HalfedgeMesh::Mesh{},
+                    GeometryMetadataSignatureForEntity(raw, *entity),
+                    pointCount,
+                    backend);
+            }
+
             SandboxEditorProgressivePoissonResult result =
                 RunProgressivePoissonAndPublish(
                     std::span<const glm::vec3>{
@@ -17529,6 +18107,25 @@ namespace Extrinsic::Runtime
                 source.Diagnostic.empty()
                     ? "Progressive Poisson mesh sampling could not build selected mesh GeometrySources."
                     : source.Diagnostic);
+        }
+
+        if (context.DerivedJobCommands.Available())
+        {
+            const ProgressivePoissonBackendResolution backend =
+                ResolveProgressivePoissonBackend(
+                    command.Config.Backend,
+                    command.Config,
+                    command.Config.MeshSurfaceSampleCount,
+                    context.Device);
+            return SubmitProgressivePoissonCpuDerivedJob(
+                context,
+                command,
+                SandboxEditorProgressivePoissonCpuJobSource::MeshSurface,
+                std::move(source.BeforePositions),
+                std::move(source.Mesh),
+                GeometryMetadataSignatureForEntity(raw, *entity),
+                command.Config.MeshSurfaceSampleCount,
+                backend);
         }
 
         SurfaceSampling::Result sampled =
@@ -19428,6 +20025,14 @@ namespace Extrinsic::Runtime
                     {
                         if (alive && *alive)
                             m_LastKMeansResult = std::move(result);
+                    };
+                context.MethodResultSinks.ProgressivePoisson =
+                    [alive = m_ResultSinksAlive, this](
+                        SandboxEditorProgressivePoissonResult result)
+                    {
+                        if (alive && *alive)
+                            m_LastProgressivePoissonResult =
+                                std::move(result);
                     };
                 context.PendingAssetImportPath =
                     std::string(m_ImportPathBuffer.data());

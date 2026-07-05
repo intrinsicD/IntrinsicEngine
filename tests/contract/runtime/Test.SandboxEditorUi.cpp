@@ -3915,6 +3915,271 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandMatchesDirectMethodConfig)
     EXPECT_EQ(levels.Vector(), expectedLevels);
 }
 
+TEST(SandboxEditorUi, ProgressivePoissonCpuRequestQueuesDerivedJobAndPublishesOnApply)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+    context.DerivedJobCommands.Submit =
+        [&jobs](Runtime::DerivedJobDesc desc)
+        {
+            return jobs.Submit(std::move(desc));
+        };
+    std::optional<Runtime::SandboxEditorProgressivePoissonResult>
+        completedResult{};
+    context.MethodResultSinks.ProgressivePoisson =
+        [&completedResult](Runtime::SandboxEditorProgressivePoissonResult result)
+        {
+            completedResult = std::move(result);
+        };
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "PoissonCloud");
+    AddPointCloudSource(registry, cloud, 6u);
+    const std::vector<glm::vec3> positions{
+        {0.0f, 0.0f, 0.0f},
+        {0.25f, 0.0f, 0.0f},
+        {0.5f, 0.5f, 0.0f},
+        {1.0f, 0.0f, 0.0f},
+        {1.0f, 1.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+    };
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
+
+    const Runtime::SandboxEditorProgressivePoissonConfig config{
+        .Dimension = 2u,
+        .GridWidth = 3u,
+        .MaxLevels = 5u,
+        .HashLoadFactor = 0.75f,
+        .RadiusAlpha = 0.4f,
+        .RandomizeGridOrigin = true,
+        .GridOriginSeed = 19u,
+        .ShuffleWithinLevels = false,
+        .ShuffleSeed = 29u,
+        .PrefixCount = 3u,
+        .Channel = Runtime::SandboxEditorProgressivePoissonChannel::Phase,
+    };
+
+    const Runtime::SandboxEditorProgressivePoissonResult result =
+        Runtime::ApplySandboxEditorProgressivePoissonCommand(
+            context,
+            Runtime::SandboxEditorProgressivePoissonCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(cloud),
+                .Config = config,
+            });
+
+    EXPECT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_NE(result.Message.find("queued"), std::string::npos);
+    EXPECT_FALSE(registry.Raw()
+                     .get<GS::Vertices>(cloud)
+                     .Properties.Get<float>("p:poisson_phase"));
+
+    Runtime::DerivedJobQueueSnapshot queued = jobs.SnapshotAll();
+    ASSERT_EQ(queued.Entries.size(), 1u);
+    EXPECT_EQ(queued.Entries[0].Name, "Sandbox.ProgressivePoisson.CPU");
+    EXPECT_EQ(queued.Entries[0].Status, Runtime::DerivedJobStatus::Queued);
+
+    jobs.Pump(1u);
+    jobs.DrainCompletions();
+    EXPECT_FALSE(registry.Raw()
+                     .get<GS::Vertices>(cloud)
+                     .Properties.Get<float>("p:poisson_phase"));
+
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    ASSERT_TRUE(completedResult.has_value());
+    EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
+    EXPECT_EQ(completedResult->InputCount, positions.size());
+
+    PPR::Config directConfig{};
+    directConfig.Dimension = config.Dimension;
+    directConfig.GridWidth = config.GridWidth;
+    directConfig.MaxLevels = config.MaxLevels;
+    directConfig.HashLoadFactor = config.HashLoadFactor;
+    directConfig.RadiusAlpha = config.RadiusAlpha;
+    directConfig.RandomizeGridOrigin = config.RandomizeGridOrigin;
+    directConfig.GridOriginSeed = config.GridOriginSeed;
+    directConfig.ShuffleWithinLevels = config.ShuffleWithinLevels;
+    directConfig.ShuffleSeed = config.ShuffleSeed;
+    const PPR::Result direct = PPR::Compute(positions, directConfig);
+    ASSERT_EQ(direct.Diag.Code, PPR::ValidationCode::Valid);
+    EXPECT_EQ(completedResult->AcceptedCount, direct.Diag.AcceptedCount);
+    EXPECT_EQ(completedResult->LevelAcceptedCounts, direct.Diag.LevelCounts);
+
+    const auto phases =
+        registry.Raw()
+            .get<GS::Vertices>(cloud)
+            .Properties.Get<float>("p:poisson_phase");
+    ASSERT_TRUE(phases);
+    EXPECT_EQ(phases.Vector().size(), positions.size());
+}
+
+TEST(SandboxEditorUi, ProgressivePoissonCpuDerivedJobDiscardsStalePointCloudBeforeApply)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+    context.DerivedJobCommands.Submit =
+        [&jobs](Runtime::DerivedJobDesc desc)
+        {
+            return jobs.Submit(std::move(desc));
+        };
+    bool completedSinkCalled = false;
+    context.MethodResultSinks.ProgressivePoisson =
+        [&completedSinkCalled](Runtime::SandboxEditorProgressivePoissonResult)
+        {
+            completedSinkCalled = true;
+        };
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "PoissonCloud");
+    AddPointCloudSource(registry, cloud, 4u);
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
+                 {
+                     {0.0f, 0.0f, 0.0f},
+                     {0.25f, 0.0f, 0.0f},
+                     {1.0f, 0.0f, 0.0f},
+                     {1.0f, 1.0f, 0.0f},
+                 });
+
+    const Runtime::SandboxEditorProgressivePoissonResult result =
+        Runtime::ApplySandboxEditorProgressivePoissonCommand(
+            context,
+            Runtime::SandboxEditorProgressivePoissonCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(cloud),
+                .Config = Runtime::SandboxEditorProgressivePoissonConfig{
+                    .Dimension = 2u,
+                    .GridWidth = 3u,
+                    .MaxLevels = 5u,
+                    .HashLoadFactor = 0.75f,
+                    .RadiusAlpha = 0.4f,
+                    .RandomizeGridOrigin = false,
+                    .ShuffleWithinLevels = false,
+                    .PrefixCount = 0u,
+                },
+            });
+    ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
+                 {
+                     {10.0f, 0.0f, 0.0f},
+                     {11.0f, 0.0f, 0.0f},
+                     {12.0f, 0.0f, 0.0f},
+                     {13.0f, 0.0f, 0.0f},
+                 });
+
+    jobs.Pump(1u);
+    jobs.DrainCompletions();
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+
+    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].Status,
+              Runtime::DerivedJobStatus::StaleDiscarded);
+    EXPECT_NE(done.Entries[0].Diagnostic.find(
+                  "StaleSourcePropertyGeneration"),
+              std::string::npos);
+    EXPECT_FALSE(completedSinkCalled);
+    EXPECT_FALSE(registry.Raw()
+                     .get<GS::Vertices>(cloud)
+                     .Properties.Get<float>("p:poisson_level"));
+}
+
+TEST(SandboxEditorUi, ProgressivePoissonMeshCpuRequestQueuesDerivedJobAndPublishesOnApply)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+    context.DerivedJobCommands.Submit =
+        [&jobs](Runtime::DerivedJobDesc desc)
+        {
+            return jobs.Submit(std::move(desc));
+        };
+    std::optional<Runtime::SandboxEditorProgressivePoissonResult>
+        completedResult{};
+    context.MethodResultSinks.ProgressivePoisson =
+        [&completedResult](Runtime::SandboxEditorProgressivePoissonResult result)
+        {
+            completedResult = std::move(result);
+        };
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "PoissonMesh");
+    AddTriangleMeshSource(registry, mesh);
+    registry.Raw().emplace<G::RenderSurface>(mesh);
+
+    const Runtime::SandboxEditorProgressivePoissonConfig config{
+        .Dimension = 2u,
+        .GridWidth = 3u,
+        .MaxLevels = 5u,
+        .HashLoadFactor = 0.75f,
+        .RadiusAlpha = 0.4f,
+        .RandomizeGridOrigin = false,
+        .GridOriginSeed = 31u,
+        .ShuffleWithinLevels = true,
+        .ShuffleSeed = 37u,
+        .PrefixCount = 7u,
+        .Channel = Runtime::SandboxEditorProgressivePoissonChannel::Level,
+        .MeshSurfaceSampleCount = 24u,
+        .MeshSurfaceSampleSeed = 41u,
+        .MeshSurfaceMinTriangleArea = 1.0e-14,
+        .MeshSurfaceInterpolateNormals = true,
+    };
+
+    const Runtime::SandboxEditorProgressivePoissonResult result =
+        Runtime::ApplySandboxEditorProgressivePoissonCommand(
+            context,
+            Runtime::SandboxEditorProgressivePoissonCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+                .Config = config,
+            });
+
+    EXPECT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_TRUE(result.MeshSurfaceSamplingUsed);
+    EXPECT_TRUE(registry.Raw().all_of<G::RenderSurface>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<GS::Faces>(mesh));
+
+    jobs.Pump(1u);
+    jobs.DrainCompletions();
+    EXPECT_TRUE(registry.Raw().all_of<G::RenderSurface>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<GS::Faces>(mesh));
+
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    ASSERT_TRUE(completedResult.has_value());
+    EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
+    EXPECT_TRUE(completedResult->MeshSurfaceSamplingUsed);
+    EXPECT_EQ(completedResult->MeshSurfaceSampleCount, 24u);
+    EXPECT_EQ(completedResult->MeshSurfaceAcceptedTriangleCount, 1u);
+
+    const GS::ConstSourceView view = GS::BuildConstView(registry.Raw(), mesh);
+    const GS::SourceAvailability availability =
+        GS::BuildSourceAvailability(view);
+    EXPECT_EQ(availability.ProvenanceDomain, GS::Domain::PointCloud);
+    EXPECT_FALSE(registry.Raw().all_of<G::RenderSurface>(mesh));
+    ASSERT_NE(view.VertexSource, nullptr);
+    EXPECT_EQ(view.FaceSource, nullptr);
+
+    const auto positions =
+        view.VertexSource->Properties.Get<glm::vec3>(PN::kPosition);
+    const auto levels =
+        view.VertexSource->Properties.Get<float>("p:poisson_level");
+    ASSERT_TRUE(positions);
+    ASSERT_TRUE(levels);
+    EXPECT_EQ(positions.Vector().size(), 24u);
+    EXPECT_EQ(levels.Vector().size(), 24u);
+}
+
 TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigFacade)
 {
     Runtime::RuntimeEngineConfigControlState controlState{};

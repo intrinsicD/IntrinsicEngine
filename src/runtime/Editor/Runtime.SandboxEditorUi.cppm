@@ -1915,6 +1915,8 @@ export namespace Extrinsic::Runtime
     struct SandboxEditorMethodResultSinks
     {
         std::function<void(SandboxEditorKMeansResult)> KMeans{};
+        std::function<void(SandboxEditorProgressivePoissonResult)>
+            ProgressivePoisson{};
     };
 
     struct SandboxEditorCameraRenderModel
