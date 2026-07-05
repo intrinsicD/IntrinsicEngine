@@ -3430,3 +3430,20 @@ with external triggers, and explicitly states that no `Operational` follow-up is
 owed for the seed itself. The UI backlog now has no concrete open UI task; future
 children open directly from their trigger and cite the retired seed or the UI
 backlog README.
+
+[`BUG-057`](BUG-057-entity-scalar-properties-render-black.md) — Entity scalar
+properties rendering black retired to `tasks/done/` on 2026-07-05 at
+`CPUContracted`. Runtime scalar property-buffer extraction already produced a
+valid scalar packet, but renderer prep did not pass those packets into
+`VisualizationSyncSystem`; prepared entity configs kept the default scalar
+range instead of the computed auto range. Renderer prep now threads scalar
+packets through visualization sync so scalar-field entity configs receive the
+resolved BDA, element count, colormap ID, and computed range.
+
+[`BUG-058`](BUG-058-entity-isolines-render-black.md) — Entity isolines rendering
+black retired to `tasks/done/` on 2026-07-05 at `CPUContracted`. The editor
+Isoline preset rides the scalar-field `VisualizationConfig` path, so the same
+missing prepared-config scalar range caused isoline shader config to operate on
+the wrong range. The regression now enables isolines and proves the prepared
+entity config receives the computed scalar range plus isoline count, width, and
+color.

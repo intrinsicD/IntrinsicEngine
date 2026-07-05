@@ -2836,6 +2836,9 @@ namespace Extrinsic::Graphics
                 .VisualizationPropertyBufferAddresses =
                     std::span<const VisualizationPropertyBufferAddress>{
                         activeSnapshot->VisualizationPropertyBufferAddresses},
+                .VisualizationScalarPackets =
+                    std::span<const ScalarAttributePacket>{
+                        activeSnapshot->VisualizationScalars},
                 .TransformSyncRecords = std::span<const TransformSyncRecord>{activeSnapshot->TransformSyncRecords},
                 .LightSnapshots = std::span<const LightSnapshot>{activeSnapshot->LightSnapshots},
                 .EnsureClusterLightResources = [this, &renderWorld]

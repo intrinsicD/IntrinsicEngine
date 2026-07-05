@@ -93,7 +93,8 @@ namespace Extrinsic::Graphics
                                            *inputs.Materials,
                                            *inputs.Colormaps,
                                            *inputs.World,
-                                           inputs.VisualizationPropertyBufferAddresses);
+                                           inputs.VisualizationPropertyBufferAddresses,
+                                           inputs.VisualizationScalarPackets);
             RecordStep(result, inputs, RenderPrepStep::VisualizationSync);
         }
 

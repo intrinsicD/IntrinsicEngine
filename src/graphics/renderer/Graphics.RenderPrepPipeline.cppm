@@ -72,6 +72,7 @@ namespace Extrinsic::Graphics
 
         std::span<VisualizationSyncRecord> VisualizationSyncRecords{};
         std::span<const VisualizationPropertyBufferAddress> VisualizationPropertyBufferAddresses{};
+        std::span<const ScalarAttributePacket> VisualizationScalarPackets{};
         std::span<const TransformSyncRecord> TransformSyncRecords{};
         std::span<const LightSnapshot> LightSnapshots{};
 

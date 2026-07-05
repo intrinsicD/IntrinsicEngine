@@ -113,7 +113,8 @@ export namespace Extrinsic::Graphics
                   MaterialSystem& matSys,
                   ColormapSystem& colormapSys,
                   GpuWorld& gpuWorld,
-                  std::span<const VisualizationPropertyBufferAddress> propertyBufferAddresses = {});
+                  std::span<const VisualizationPropertyBufferAddress> propertyBufferAddresses = {},
+                  std::span<const ScalarAttributePacket> scalarPackets = {});
 
         // -----------------------------------------------------------------
         // Diagnostics

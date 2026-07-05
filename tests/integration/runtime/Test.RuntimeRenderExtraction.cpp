@@ -873,6 +873,68 @@ TEST(RuntimeRenderExtraction, PointCloudVisualizationPropertyBuffersUploadFromGe
     EXPECT_TRUE(world.Visualization.HasVisualizationPackets);
 }
 
+TEST(RuntimeRenderExtraction, MeshScalarPropertyBufferReachesPreparedEntityConfigWithAutoRange)
+{
+    namespace GS = ECS::Components::GeometrySources;
+    using ColorSource = Graphics::Components::VisualizationConfig::ColorSource;
+    using Domain = Graphics::Components::VisualizationConfig::Domain;
+
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+
+    const auto entity = scene.Create();
+    auto& registry = scene.Raw();
+    registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix =
+        glm::mat4{1.f};
+    registry.emplace<Graphics::Components::RenderSurface>(entity);
+    AttachTriangleMeshSources(scene, entity);
+
+    auto& vertexProperties = registry.get<GS::Vertices>(entity).Properties;
+    vertexProperties.GetOrAdd<float>("v:temperature", 0.0f).Vector() =
+        {-4.0f, 0.5f, 8.0f};
+
+    auto& visualization =
+        registry.emplace<Graphics::Components::VisualizationConfig>(entity);
+    visualization.Source = ColorSource::ScalarField;
+    visualization.ScalarFieldName = "v:temperature";
+    visualization.ScalarDomain = Domain::Vertex;
+    visualization.Scalar.AutoRange = true;
+    visualization.Scalar.Map = Graphics::Colormap::Type::Plasma;
+    visualization.Scalar.Isolines.Num = 6u;
+    visualization.Scalar.Isolines.Width = 2.5f;
+    visualization.Scalar.Isolines.Color = {0.25f, 0.75f, 1.0f, 1.0f};
+
+    const auto stats = fixture.Extract(scene);
+    Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
+    ASSERT_EQ(stats.MeshGeometryUploads, 1u);
+    ASSERT_EQ(stats.VisualizationScalarPacketCount, 1u);
+    ASSERT_EQ(world.Visualization.Scalars.size(), 1u);
+    EXPECT_FLOAT_EQ(world.Visualization.Scalars.front().RangeMin, -4.0f);
+    EXPECT_FLOAT_EQ(world.Visualization.Scalars.front().RangeMax, 8.0f);
+
+    fixture.Renderer->PrepareFrame(world);
+
+    const auto sidecar =
+        fixture.Extraction.FindRenderableSidecarForTest(StableId(entity));
+    ASSERT_TRUE(sidecar.has_value());
+    ASSERT_TRUE(sidecar->Instance.IsValid());
+
+    const RHI::GpuEntityConfig config =
+        fixture.Renderer->GetGpuWorld().GetEntityConfigForTest(sidecar->Instance);
+    EXPECT_EQ(config.ColorSourceMode, 2u);
+    EXPECT_NE(config.ScalarBDA, 0u);
+    EXPECT_NE(config.ColormapID, 0u);
+    EXPECT_EQ(config.ElementCount, 3u);
+    EXPECT_FLOAT_EQ(config.ScalarRangeMin, -4.0f);
+    EXPECT_FLOAT_EQ(config.ScalarRangeMax, 8.0f);
+    EXPECT_FLOAT_EQ(config.IsolineCount, 6.0f);
+    EXPECT_FLOAT_EQ(config.IsolineWidth, 2.5f);
+    EXPECT_FLOAT_EQ(config.IsolineColor.x, 0.25f);
+    EXPECT_FLOAT_EQ(config.IsolineColor.y, 0.75f);
+    EXPECT_FLOAT_EQ(config.IsolineColor.z, 1.0f);
+    EXPECT_FLOAT_EQ(config.IsolineColor.w, 1.0f);
+}
+
 TEST(RuntimeRenderExtraction, GraphVisualizationPropertyBuffersUploadFromNodeAndEdgeDomains)
 {
     namespace GS = ECS::Components::GeometrySources;

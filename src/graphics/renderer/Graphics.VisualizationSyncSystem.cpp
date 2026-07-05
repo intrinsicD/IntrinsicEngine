@@ -186,6 +186,42 @@ namespace Extrinsic::Graphics
             return nullptr;
         }
 
+        [[nodiscard]] static const ScalarAttributePacket*
+        FindScalarPacket(
+            std::span<const ScalarAttributePacket> packets,
+            const std::string_view explicitKey,
+            const std::string_view fallbackKey,
+            const VisualizationAttributeDomain domain) noexcept
+        {
+            const std::string_view key =
+                explicitKey.empty() ? fallbackKey : explicitKey;
+            if (key.empty())
+            {
+                return nullptr;
+            }
+
+            for (const ScalarAttributePacket& packet : packets)
+            {
+                if (packet.Domain != domain)
+                {
+                    continue;
+                }
+                if (!explicitKey.empty())
+                {
+                    if (packet.SourceBufferKey == key)
+                    {
+                        return &packet;
+                    }
+                    continue;
+                }
+                if (packet.SourceBufferKey == key || packet.Name == key)
+                {
+                    return &packet;
+                }
+            }
+            return nullptr;
+        }
+
         /// Build MaterialParams for the ScalarField override.
         MaterialParams BuildScalarFieldParams(
             const Components::VisualizationConfig& cfg,
@@ -296,7 +332,8 @@ namespace Extrinsic::Graphics
             const VisualizationSyncRecord& record,
             const Components::GpuSceneSlot&        gpuSlot,
             ColormapSystem&                        colormapSys,
-            std::span<const VisualizationPropertyBufferAddress> propertyBufferAddresses) const
+            std::span<const VisualizationPropertyBufferAddress> propertyBufferAddresses,
+            std::span<const ScalarAttributePacket> scalarPackets) const
         {
             const Components::VisualizationConfig* visCfg = record.Visualization;
             RHI::GpuEntityConfig cfg{};
@@ -391,7 +428,26 @@ namespace Extrinsic::Graphics
             else if (source == Components::VisualizationConfig::ColorSource::ScalarField)
             {
                 cfg.ColorSourceMode = kMode_ScalarField;
+                const VisualizationAttributeDomain scalarDomain =
+                    ToAttributeDomain(visCfg->ScalarDomain);
+                const ScalarAttributePacket* scalarPacket =
+                    FindScalarPacket(
+                        scalarPackets,
+                        record.ScalarPropertyBufferSourceKey,
+                        visCfg->ScalarFieldName,
+                        scalarDomain);
+                if (scalarPacket != nullptr && visCfg->Scalar.AutoRange)
+                {
+                    cfg.ScalarRangeMin = scalarPacket->RangeMin;
+                    cfg.ScalarRangeMax = scalarPacket->RangeMax;
+                }
                 setBdaAndCount(visCfg->ScalarFieldName, cfg.ScalarBDA);
+                if (cfg.ScalarBDA == 0u && scalarPacket != nullptr &&
+                    scalarPacket->ScalarBufferBDA != 0u)
+                {
+                    cfg.ScalarBDA = scalarPacket->ScalarBufferBDA;
+                    cfg.ElementCount = scalarPacket->ElementCount;
+                }
                 if (cfg.ScalarBDA == 0u)
                 {
                     const VisualizationPropertyBufferAddress* address =
@@ -399,7 +455,7 @@ namespace Extrinsic::Graphics
                             propertyBufferAddresses,
                             record.ScalarPropertyBufferSourceKey,
                             visCfg->ScalarFieldName,
-                            ToAttributeDomain(visCfg->ScalarDomain),
+                            scalarDomain,
                             [](const VisualizationValueType candidate)
                             {
                                 return candidate == VisualizationValueType::ScalarFloat ||
@@ -483,7 +539,8 @@ namespace Extrinsic::Graphics
                                        MaterialSystem& matSys,
                                        ColormapSystem& colormapSys,
                                        GpuWorld&       gpuWorld,
-                                       std::span<const VisualizationPropertyBufferAddress> propertyBufferAddresses)
+                                       std::span<const VisualizationPropertyBufferAddress> propertyBufferAddresses,
+                                       std::span<const ScalarAttributePacket> scalarPackets)
     {
         using namespace Components;
         using ColorSource = VisualizationConfig::ColorSource;
@@ -539,7 +596,8 @@ namespace Extrinsic::Graphics
                 gpuWorld.SetEntityConfig(
                     targetInstance,
                     m_Impl->BuildEntityConfig(record, gpuSlot, colormapSys,
-                                              propertyBufferAddresses));
+                                              propertyBufferAddresses,
+                                              scalarPackets));
             }
 
             if (matInst == nullptr)
