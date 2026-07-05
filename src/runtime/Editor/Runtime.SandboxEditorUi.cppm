@@ -2087,6 +2087,7 @@ export namespace Extrinsic::Runtime
         std::size_t NodeCount{0u};
         std::uint64_t BindingGeneration{0u};
         std::uint64_t CommandHistoryRevision{0u};
+        std::uint64_t VisualizationAdapterBindingRevision{0u};
         std::uint32_t ViewportWidth{0u};
         std::uint32_t ViewportHeight{0u};
         bool VisualizationCommandsAvailable{false};
@@ -2208,6 +2209,7 @@ export namespace Extrinsic::Runtime
         SandboxEditorSceneFileCommandSurface SceneFileCommands{};
         SandboxEditorPrimitiveViewCommandSurface PrimitiveViewCommands{};
         SandboxEditorVisualizationAdapterBindingCommandSurface VisualizationAdapterBindings{};
+        std::uint64_t VisualizationAdapterBindingRevision{0u};
         SandboxEditorKMeansGpuCommandSurface KMeansGpuCommands{};
         RuntimeAssetImportQueueSnapshot AssetImportQueue{};
         const DerivedJobQueueSnapshot* DerivedJobs{nullptr};

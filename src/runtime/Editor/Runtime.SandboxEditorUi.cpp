@@ -4145,6 +4145,18 @@ namespace Extrinsic::Runtime
             return context.LastRefinedPrimitiveGeneration;
         }
 
+        [[nodiscard]] std::uint64_t CurrentVisualizationAdapterBindingRevision(
+            const SandboxEditorContext& context,
+            const SandboxEditorSelectedModelCacheSection section)
+        {
+            if (section != SandboxEditorSelectedModelCacheSection::Visualization ||
+                !context.VisualizationAdapterBindings.Available())
+            {
+                return 0u;
+            }
+            return context.VisualizationAdapterBindingRevision;
+        }
+
         [[nodiscard]] std::uint64_t VertexBindingGenerationForEntity(
             const entt::registry& raw,
             const ECS::EntityHandle entity)
@@ -4183,6 +4195,8 @@ namespace Extrinsic::Runtime
                 .NodeCount = geometry.NodeCount,
                 .BindingGeneration = VertexBindingGenerationForEntity(raw, entity),
                 .CommandHistoryRevision = CurrentCommandHistoryRevision(context),
+                .VisualizationAdapterBindingRevision =
+                    CurrentVisualizationAdapterBindingRevision(context, section),
                 .ViewportWidth =
                     static_cast<std::uint32_t>(context.CameraViewport.Width),
                 .ViewportHeight =
@@ -7876,6 +7890,8 @@ namespace Extrinsic::Runtime
                             engine.ClearVisualizationAdapterBinding(stableEntityId);
                         },
                 },
+                .VisualizationAdapterBindingRevision =
+                    engine.GetVisualizationAdapterBindingRevision(),
                 .KMeansGpuCommands = SandboxEditorKMeansGpuCommandSurface{
                     .Submit =
                         [&engine](RuntimeKMeansGpuJobRequest request)

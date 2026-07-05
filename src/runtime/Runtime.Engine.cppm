@@ -532,6 +532,8 @@ namespace Extrinsic::Runtime
         void ClearVisualizationAdapterBinding(std::uint32_t stableEntityId) noexcept;
         [[nodiscard]] std::optional<RenderExtractionCache::VisualizationAdapterBinding>
             GetVisualizationAdapterBinding(std::uint32_t stableEntityId) const noexcept;
+        [[nodiscard]] std::uint64_t
+            GetVisualizationAdapterBindingRevision() const noexcept;
 
         // Runtime-owned operational K-Means GPU queue. The synchronous
         // `Runtime.KMeansBackend` overload remains a CPU fallback seam; editor

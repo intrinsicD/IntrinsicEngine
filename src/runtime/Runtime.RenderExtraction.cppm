@@ -604,6 +604,7 @@ export namespace Extrinsic::Runtime
         void ClearVisualizationAdapterBinding(std::uint32_t stableEntityId) noexcept;
         [[nodiscard]] std::optional<VisualizationAdapterBinding> GetVisualizationAdapterBinding(
             std::uint32_t stableEntityId) const noexcept;
+        [[nodiscard]] std::uint64_t GetVisualizationAdapterBindingRevision() const noexcept;
 
     private:
         struct RenderableSidecar

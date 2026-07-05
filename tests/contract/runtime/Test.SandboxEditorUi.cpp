@@ -2271,6 +2271,92 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesVisualizationModel)
     EXPECT_EQ(cacheStats.Entries, 1u);
 }
 
+TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnAdapterBindingRevision)
+{
+    using Binding = Runtime::RenderExtractionCache::VisualizationAdapterBinding;
+    using Kind = Runtime::RenderExtractionCache::VisualizationAdapterBindingKind;
+
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    std::optional<Binding> storedBinding{};
+    Runtime::SandboxEditorSelectedModelCache cache{};
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.SelectedModelCache = &cache;
+    context.VisualizationCommandsAvailable = true;
+    context.VisualizationAdapterBindings =
+        Runtime::SandboxEditorVisualizationAdapterBindingCommandSurface{
+            .GetBinding =
+                [&](const std::uint32_t queriedStableId) -> std::optional<Binding>
+                {
+                    if (queriedStableId != stableId)
+                        return std::nullopt;
+                    return storedBinding;
+                },
+            .SetBinding =
+                [&](std::uint32_t, Binding binding)
+                {
+                    storedBinding = std::move(binding);
+                },
+            .ClearBinding =
+                [&](std::uint32_t)
+                {
+                    storedBinding.reset();
+                },
+        };
+    context.VisualizationAdapterBindingRevision = 1u;
+
+    const Runtime::SandboxEditorPanelFrame first =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyVisualizationModelBuildRequest());
+    ASSERT_TRUE(first.Visualization.HasSelectedEntity);
+    EXPECT_EQ(first.ModelBuildStats.VisualizationModelCacheMisses, 1u);
+    EXPECT_EQ(first.ModelBuildStats.VisualizationModelBuilds, 1u);
+
+    const Runtime::SandboxEditorPanelFrame cached =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyVisualizationModelBuildRequest());
+    ASSERT_TRUE(cached.Visualization.HasSelectedEntity);
+    EXPECT_EQ(cached.ModelBuildStats.VisualizationModelCacheHits, 1u);
+    EXPECT_EQ(cached.ModelBuildStats.VisualizationModelBuilds, 0u);
+
+    Runtime::VisualizationAdapterOptions options{};
+    options.OutputName = "velocity_glyphs";
+    storedBinding = Binding{
+        .AdapterKey = 0xF00Du,
+        .BufferBDA = 0xAABB'2000u,
+        .Kind = Kind::VectorField,
+        .Options = options,
+    };
+    context.VisualizationAdapterBindingRevision = 2u;
+
+    const Runtime::SandboxEditorPanelFrame changed =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyVisualizationModelBuildRequest());
+    ASSERT_TRUE(changed.Visualization.HasSelectedEntity);
+    EXPECT_EQ(changed.ModelBuildStats.VisualizationModelCacheMisses, 1u);
+    EXPECT_EQ(changed.ModelBuildStats.VisualizationModelCacheHits, 0u);
+    EXPECT_EQ(changed.ModelBuildStats.VisualizationModelBuilds, 1u);
+    ASSERT_TRUE(changed.Visualization.AdapterBinding.HasBinding);
+    EXPECT_EQ(changed.Visualization.AdapterBinding.AdapterKey, 0xF00Du);
+    EXPECT_EQ(changed.Visualization.AdapterBinding.Options.OutputName,
+              "velocity_glyphs");
+
+    const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
+        cache.Stats();
+    EXPECT_EQ(cacheStats.VisualizationModelCacheMisses, 2u);
+    EXPECT_EQ(cacheStats.VisualizationModelCacheHits, 1u);
+}
+
 TEST(SandboxEditorUi, GeometryProcessingSupportedDomainsMatchPromotedEditorContract)
 {
     using Algorithm = Runtime::SandboxEditorGeometryProcessingAlgorithm;

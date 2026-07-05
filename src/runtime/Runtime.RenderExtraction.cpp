@@ -70,6 +70,7 @@ namespace Extrinsic::Runtime
         std::unordered_map<std::uint64_t, std::unique_ptr<IVisualizationAdapter>> Adapters{};
         VisualizationAdapterRegistry Registry{};
         std::unordered_map<std::uint32_t, VisualizationAdapterBinding> Bindings{};
+        std::uint64_t BindingRevision{0u};
         VisualizationAdapterBatch Batch{};
     };
 
@@ -328,13 +329,19 @@ namespace Extrinsic::Runtime
         const std::uint32_t stableEntityId,
         VisualizationAdapterBinding binding)
     {
-        m_VisualizationState->Bindings.insert_or_assign(stableEntityId, binding);
+        m_VisualizationState->Bindings.insert_or_assign(
+            stableEntityId,
+            std::move(binding));
+        ++m_VisualizationState->BindingRevision;
     }
 
     void RenderExtractionCache::ClearVisualizationAdapterBinding(
         const std::uint32_t stableEntityId) noexcept
     {
-        m_VisualizationState->Bindings.erase(stableEntityId);
+        if (m_VisualizationState->Bindings.erase(stableEntityId) != 0u)
+        {
+            ++m_VisualizationState->BindingRevision;
+        }
     }
 
     std::optional<RenderExtractionCache::VisualizationAdapterBinding>
@@ -347,6 +354,12 @@ namespace Extrinsic::Runtime
             return std::nullopt;
         }
         return it->second;
+    }
+
+    std::uint64_t
+    RenderExtractionCache::GetVisualizationAdapterBindingRevision() const noexcept
+    {
+        return m_VisualizationState->BindingRevision;
     }
 }
 
@@ -3405,6 +3418,10 @@ namespace Extrinsic::Runtime
         m_Lights.clear();
 
         m_SpatialDebugBatch.Clear();
+        if (!m_VisualizationState->Bindings.empty())
+        {
+            ++m_VisualizationState->BindingRevision;
+        }
         m_VisualizationState->Bindings.clear();
         m_VisualizationState->Batch.Clear();
 

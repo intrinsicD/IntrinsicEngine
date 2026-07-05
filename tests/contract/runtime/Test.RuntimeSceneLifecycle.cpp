@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <memory>
 #include <variant>
 
@@ -37,6 +38,38 @@ namespace
     }
 }
 
+TEST(RuntimeRenderExtraction, VisualizationAdapterBindingRevisionTracksMutations)
+{
+    Runtime::RenderExtractionCache cache{};
+
+    EXPECT_EQ(cache.GetVisualizationAdapterBindingRevision(), 0u);
+
+    cache.ClearVisualizationAdapterBinding(7u);
+    EXPECT_EQ(cache.GetVisualizationAdapterBindingRevision(), 0u);
+
+    cache.SetVisualizationAdapterBinding(
+        7u,
+        Runtime::RenderExtractionCache::VisualizationAdapterBinding{
+            .AdapterKey = 0xA11CEu,
+            .BufferBDA = 0xCAFE1000u,
+        });
+    EXPECT_EQ(cache.GetVisualizationAdapterBindingRevision(), 1u);
+
+    cache.SetVisualizationAdapterBinding(
+        7u,
+        Runtime::RenderExtractionCache::VisualizationAdapterBinding{
+            .AdapterKey = 0xB0Bu,
+            .BufferBDA = 0xCAFE2000u,
+        });
+    EXPECT_EQ(cache.GetVisualizationAdapterBindingRevision(), 2u);
+
+    cache.ClearVisualizationAdapterBinding(9u);
+    EXPECT_EQ(cache.GetVisualizationAdapterBindingRevision(), 2u);
+
+    cache.ClearVisualizationAdapterBinding(7u);
+    EXPECT_EQ(cache.GetVisualizationAdapterBindingRevision(), 3u);
+}
+
 TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSidecars)
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
@@ -68,6 +101,9 @@ TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSid
             .AdapterKey = 0x5CE11u,
             .BufferBDA = 0xCAFE1000u,
         });
+    const std::uint64_t bindingRevisionBeforeReset =
+        engine.GetVisualizationAdapterBindingRevision();
+    EXPECT_EQ(bindingRevisionBeforeReset, 1u);
     ASSERT_TRUE(engine.GetMeshPrimitiveViewSettings(stableId).AnyEnabled());
     ASSERT_TRUE(scene.Raw().all_of<G::RenderEdges>(entity));
     ASSERT_TRUE(scene.Raw().all_of<G::RenderPoints>(entity));
@@ -88,6 +124,8 @@ TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSid
     EXPECT_EQ(engine.GetSelectionController().InFlightPickCount(), 0u);
     EXPECT_FALSE(engine.GetMeshPrimitiveViewSettings(stableId).AnyEnabled());
     EXPECT_FALSE(engine.GetVisualizationAdapterBinding(stableId).has_value());
+    EXPECT_GT(engine.GetVisualizationAdapterBindingRevision(),
+              bindingRevisionBeforeReset);
 
     engine.Shutdown();
 }

@@ -4855,6 +4855,12 @@ namespace Extrinsic::Runtime
         return m_RenderExtraction.GetVisualizationAdapterBinding(stableEntityId);
     }
 
+    std::uint64_t
+    Engine::GetVisualizationAdapterBindingRevision() const noexcept
+    {
+        return m_RenderExtraction.GetVisualizationAdapterBindingRevision();
+    }
+
     RuntimeKMeansGpuJobSubmission Engine::SubmitKMeansGpuJob(
         RuntimeKMeansGpuJobRequest request)
     {
