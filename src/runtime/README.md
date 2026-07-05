@@ -82,9 +82,10 @@ applies it to Progressive Poisson point-cloud and mesh-surface CPU sampling,
 Slice C applies it to mesh denoise/remesh/simplify commands, and Slice D
 applies it to ICP registration alignment while preserving the existing
 immediate fallback for tests and callers without an engine job surface. Slices
-E.1, E.2, and E.3 apply it to mesh curvature, mesh subdivision, and
-mesh/graph/point-cloud vertex-normal recompute. The remaining synchronous
-geometry-processing buttons are tracked in the active `RUNTIME-141` inventory.
+E.1, E.2, E.3, and E.4 apply it to mesh curvature, mesh subdivision,
+mesh/graph/point-cloud vertex-normal recompute, and point-cloud outlier
+removal. The remaining synchronous geometry-processing buttons are tracked in
+the active `RUNTIME-141` inventory.
 
 ### Sandbox Editor Startup Layout
 
@@ -244,14 +245,18 @@ exports `SandboxEditorPointCloudOutlierMethod` (statistical or radius),
 `SandboxEditorPointCloudOutlierRemovalCommand`,
 `SandboxEditorPointCloudOutlierRemovalResult`, and
 `ApplySandboxEditorPointCloudOutlierRemovalCommand(...)`. Runtime validates the
-selected point-cloud `GeometrySources`, copies the point property set into a
-scratch `Geometry.PointCloud.Cloud` that binds the live deletion counter and is
-garbage-collected to live points first (so the operators — which iterate every
-slot — see only live points and report live-relative counts, never resurrecting
-dead slots), and calls the geometry-owned `GEOM-016` operators
+selected point-cloud `GeometrySources`, snapshots the full original point source
+for undo plus a live-only worker cloud, and queues the GEOM-016 removal through
+`DerivedJobRegistry` when an engine job surface is available. The worker calls
 `Geometry.PointCloud::RemoveStatisticalOutliers` /
-`RemoveRadiusOutliers`. The window exposes a method toggle plus the per-method
-parameters: statistical removal takes `KNeighbors` (1–512) and a
+`RemoveRadiusOutliers` on the copied cloud after garbage-collection to live
+points first (so the operators — which iterate every slot — see only live points
+and report live-relative counts, never resurrecting dead slots). The
+main-thread apply revalidates the selected entity's point-source metadata and
+positions before publishing; tests and non-engine callers without an injected
+job surface keep the immediate compatibility path. The window exposes a method
+toggle plus the per-method parameters: statistical removal takes `KNeighbors`
+(1–512) and a
 `StdDevMultiplier` (0–100, higher keeps more points); radius removal takes a
 positive `SearchRadius` and a `MinNeighbors` (0–512) threshold. It surfaces the
 `OutlierRemovalResult` diagnostics (kept/rejected/non-finite counts plus the
@@ -259,13 +264,13 @@ statistical mean/std-dev/threshold) and fails closed with
 `InvalidProcessingParameters` / `UnsupportedGeometryDomain` / `MissingScene`
 when the inputs or selection are invalid.
 
-Unlike the vertex-normal and denoise commands, outlier removal changes the
-point count, so it rebuilds the entity's point `GeometrySources` via
-`GeometrySources::PopulateFromCloud`. The published cloud is the full-property
-scratch cloud compacted to the kept points (the rejected slots are deleted and
-garbage-collected), so every surviving per-point attribute — normals, K-Means
-labels, visualization scalars — is preserved on the kept points rather than
-dropped to position-only. The publication is undoable through
+Unlike vertex-normal and denoise publication, outlier removal changes the point
+count, so the bounded main-thread apply rebuilds the entity's point
+`GeometrySources` via `GeometrySources::PopulateFromCloud`. The published cloud
+is the full-property scratch cloud compacted to the kept points (the rejected
+slots are deleted and garbage-collected), so every surviving per-point attribute
+— normals, K-Means labels, visualization scalars — is preserved on the kept
+points rather than dropped to position-only. The publication is undoable through
 `EditorCommandHistory::Execute`: undo republishes the original cloud (restored
 exactly, including any prior deleted slots) and redo reapplies the kept cloud.
 Because the count changed,

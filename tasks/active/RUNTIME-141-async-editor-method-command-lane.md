@@ -6,12 +6,13 @@ depends_on: []
 # RUNTIME-141 — Async editor method-command lane (no heavy compute in the ImGui callback)
 
 ## Status
-- Active on 2026-07-05; Slices A, B, C, D, E.1, E.2, and E.3 are implemented
-  and verified. The parent task remains active for the remaining synchronous
+- Active on 2026-07-05; Slices A, B, C, D, E.1, E.2, E.3, and E.4 are
+  implemented and verified. The parent task remains active for the remaining
+  synchronous
   geometry-processing commands identified by the Slice D inventory.
 - This task is intentionally sliced because it spans the shared runtime job
   lane plus several method-specific snapshot/apply conversions.
-- Remaining open slices: point-cloud outlier removal and UV regeneration.
+- Remaining open slice: UV regeneration.
 
 ## Slice plan
 - **Slice A (this slice).** Wire an engine-owned `DerivedJobRegistry` beside
@@ -35,9 +36,12 @@ depends_on: []
 - **Slice E.3 (complete).** Convert mesh/graph/point-cloud vertex-normal
   recompute to the shared lane with copied source snapshots and stale
   source-position validation.
-- **Slice E.4+.** Convert or split the remaining synchronous
-  geometry-processing commands identified by the inventory: point-cloud outlier
-  removal and UV regeneration.
+- **Slice E.4 (complete).** Convert point-cloud outlier removal to the shared
+  lane: snapshot the full original point source and live-only working cloud on
+  the main thread, run GEOM-016 removal on the worker copy, and publish the
+  undoable point-cloud replacement only after stale source validation.
+- **Slice E.5+.** Convert or split the remaining synchronous
+  geometry-processing command identified by the inventory: UV regeneration.
 
 ## Goal
 - Editor-triggered heavy action buttons and method runs (CPU K-Means,
@@ -106,6 +110,7 @@ depends_on: []
 - [x] Convert mesh subdivision commands to the helper.
 - [x] Convert mesh/graph/point-cloud vertex-normal recompute commands to the
       helper.
+- [x] Convert point-cloud outlier-removal commands to the helper.
 - [ ] Panels reflect job state instead of blocking; a second submit while
       one runs either queues or replaces per current UX expectations
       (document choice per panel).
@@ -232,11 +237,35 @@ python3 tools/repo/check_root_hygiene.py --root .
 `check_root_hygiene.py` completed in warning mode with the existing unexpected
 root entries `ara/` and `imgui.ini`.
 
+Slice E.4 verification completed on 2026-07-05:
+
+```bash
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='SandboxEditorUi.PointCloudOutlierRemovalRequestQueuesDerivedJobAndPublishesOnApply:SandboxEditorUi.PointCloudOutlierRemovalDerivedJobDiscardsStaleSource:SandboxEditorUi.PointCloudOutlierRemovalStatisticalPublishesKeptPointsWithUndoRedo:SandboxEditorUi.PointCloudOutlierRemovalRadiusPublishesAndFailsClosed:SandboxEditorUi.PointCloudOutlierRemovalPreservesSurvivingPointProperties:SandboxEditorUi.PointCloudOutlierRemovalRespectsDeletedSlots'
+ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi|DerivedJob|StreamingExecutor|RuntimeSceneLifecycle' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+python3 tools/agents/validate_tasks.py --root tasks --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/repo/check_pr_contract.py
+git diff --check
+python3 tools/repo/check_root_hygiene.py --root .
+```
+
+`check_root_hygiene.py` completed in warning mode with the existing unexpected
+root entries `ara/` and `imgui.ini`.
+
 ## Heavy Button Inventory
 - Queued through `DerivedJobRegistry` when an engine job surface is available:
   CPU K-Means; Progressive Poisson CPU point-cloud and mesh-surface sampling;
   mesh denoise/remesh/subdivide/simplify; ICP registration alignment; mesh
-  curvature; mesh/graph/point-cloud vertex normal recompute.
+  curvature; mesh/graph/point-cloud vertex normal recompute; point-cloud
+  outlier removal.
 - Already routed through another async runtime command surface: selected mesh
   texture bake (`Extrinsic.Runtime.SelectedMeshTextureBake` schedules derived
   CPU bake work and stale-checked main-thread apply).
@@ -246,7 +275,7 @@ root entries `ara/` and `imgui.ini`.
   render-recipe draft/preview state changes, and undo/redo/document state
   controls that only mutate runtime-owned editor state.
 - Still synchronous geometry-processing commands and therefore open under Slice
-  E: point-cloud outlier removal and selected mesh UV regeneration.
+  E: selected mesh UV regeneration.
 - File import and scene-file IO are outside this CPU method-command lane and are
   tracked by `RUNTIME-142`.
 

@@ -1928,6 +1928,8 @@ export namespace Extrinsic::Runtime
             GraphVertexNormals{};
         std::function<void(SandboxEditorPointCloudVertexNormalsResult)>
             PointCloudVertexNormals{};
+        std::function<void(SandboxEditorPointCloudOutlierRemovalResult)>
+            PointCloudOutlierRemoval{};
         std::function<void(SandboxEditorRegistrationResult)> Registration{};
     };
 

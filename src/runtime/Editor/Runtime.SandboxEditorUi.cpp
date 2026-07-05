@@ -8189,6 +8189,335 @@ namespace Extrinsic::Runtime
                 : error;
         }
 
+        [[nodiscard]] SandboxEditorPointCloudOutlierRemovalResult
+        MakePointCloudOutlierRemovalBaseResult(
+            const SandboxEditorPointCloudOutlierRemovalCommand& command)
+        {
+            return SandboxEditorPointCloudOutlierRemovalResult{
+                .Status = SandboxEditorCommandStatus::NoChange,
+                .Method = command.Method,
+                .GeometryStatus =
+                    Geometry::PointCloud::OutlierRemovalStatus::Success,
+                .Error = Core::ErrorCode::Success,
+            };
+        }
+
+        void CopyPointCloudOutlierRemovalCounters(
+            const Geometry::PointCloud::OutlierRemovalResult& source,
+            SandboxEditorPointCloudOutlierRemovalResult& target)
+        {
+            target.GeometryStatus = source.Status;
+            target.OriginalCount = source.OriginalCount;
+            target.KeptCount = source.KeptCount;
+            target.RejectedCount = source.RejectedCount;
+            target.NonFiniteCount = source.NonFiniteCount;
+            target.MeanDistance = source.MeanDistance;
+            target.StdDevDistance = source.StdDevDistance;
+            target.DistanceThreshold = source.DistanceThreshold;
+        }
+
+        [[nodiscard]] std::string BuildPointCloudOutlierRemovalSuccessMessage(
+            const SandboxEditorPointCloudOutlierRemovalResult& result)
+        {
+            std::string message = "Removed ";
+            message += std::to_string(result.RejectedCount);
+            message += " of ";
+            message += std::to_string(result.OriginalCount);
+            message += " points (kept ";
+            message += std::to_string(result.KeptCount);
+            if (result.NonFiniteCount > 0u)
+            {
+                message += ", non-finite ";
+                message += std::to_string(result.NonFiniteCount);
+            }
+            message += ").";
+            return message;
+        }
+
+        [[nodiscard]] SandboxEditorPointCloudOutlierRemovalResult
+        MakePendingPointCloudOutlierRemovalResult(
+            const SandboxEditorPointCloudOutlierRemovalCommand& command,
+            const std::size_t livePointCount,
+            const DerivedJobHandle handle)
+        {
+            SandboxEditorPointCloudOutlierRemovalResult result =
+                MakePointCloudOutlierRemovalBaseResult(command);
+            result.Status = SandboxEditorCommandStatus::Pending;
+            result.OriginalCount = livePointCount;
+            result.KeptCount = livePointCount;
+            result.Message = "Point-cloud outlier-removal CPU job queued";
+            AppendDerivedJobHandleToMessage(result.Message, handle);
+            result.Message += ".";
+            return result;
+        }
+
+        struct SandboxEditorPointCloudOutlierRemovalCpuJobState
+        {
+            std::uint32_t StableEntityId{0u};
+            std::uint64_t GeometryMetadataSignature{0u};
+            std::vector<glm::vec3> SnapshotPositions{};
+            Geometry::PointCloud::Cloud BeforeCloud{};
+            Geometry::PointCloud::Cloud WorkCloud{};
+            Geometry::PointCloud::Cloud AfterCloud{};
+            SandboxEditorPointCloudOutlierRemovalCommand Command{};
+            SandboxEditorPointCloudOutlierRemovalResult Result{};
+        };
+
+        [[nodiscard]] DerivedJobApplyValidation
+        ValidatePointCloudOutlierRemovalCpuJobApply(
+            const SandboxEditorContext& context,
+            const SandboxEditorPointCloudOutlierRemovalCpuJobState& job)
+        {
+            if (context.Scene == nullptr)
+                return DerivedJobApplyValidation::MissingEntity;
+
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, job.StableEntityId);
+            if (!entity.has_value())
+                return DerivedJobApplyValidation::MissingEntity;
+
+            const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
+            const GS::SourceAvailability availability =
+                GS::BuildSourceAvailability(view);
+            if (availability.ProvenanceDomain != GS::Domain::PointCloud ||
+                view.VertexSource == nullptr)
+            {
+                return DerivedJobApplyValidation::StaleGeometryGeneration;
+            }
+
+            if (GeometryMetadataSignatureForEntity(raw, *entity) !=
+                job.GeometryMetadataSignature)
+            {
+                return DerivedJobApplyValidation::StaleGeometryGeneration;
+            }
+
+            std::optional<std::vector<glm::vec3>> current =
+                CollectKMeansPositions(view.VertexSource->Properties);
+            if (!current.has_value() ||
+                !SameKMeansInputPositions(*current, job.SnapshotPositions))
+            {
+                return DerivedJobApplyValidation::StaleSourcePropertyGeneration;
+            }
+
+            return DerivedJobApplyValidation::Current;
+        }
+
+        void PublishPointCloudOutlierRemovalResultSink(
+            const SandboxEditorContext& context,
+            SandboxEditorPointCloudOutlierRemovalResult result)
+        {
+            if (context.MethodResultSinks.PointCloudOutlierRemoval)
+            {
+                context.MethodResultSinks.PointCloudOutlierRemoval(
+                    std::move(result));
+            }
+        }
+
+        [[nodiscard]] DerivedJobWorkerResult
+        RunPointCloudOutlierRemovalCpuWorker(
+            const std::shared_ptr<
+                SandboxEditorPointCloudOutlierRemovalCpuJobState>& state)
+        {
+            const bool statistical =
+                state->Command.Method ==
+                SandboxEditorPointCloudOutlierMethod::Statistical;
+            Geometry::PointCloud::OutlierRemovalResult removal{};
+            if (statistical)
+            {
+                Geometry::PointCloud::StatisticalOutlierRemovalParams params{};
+                params.KNeighbors = state->Command.KNeighbors;
+                params.StdDevMultiplier = state->Command.StdDevMultiplier;
+                removal =
+                    Geometry::PointCloud::RemoveStatisticalOutliers(
+                        state->WorkCloud,
+                        params);
+            }
+            else
+            {
+                Geometry::PointCloud::RadiusOutlierRemovalParams params{};
+                params.SearchRadius = state->Command.SearchRadius;
+                params.MinNeighbors = state->Command.MinNeighbors;
+                removal =
+                    Geometry::PointCloud::RemoveRadiusOutliers(
+                        state->WorkCloud,
+                        params);
+            }
+
+            SandboxEditorPointCloudOutlierRemovalResult& result =
+                state->Result;
+            CopyPointCloudOutlierRemovalCounters(removal, result);
+            if (removal.Status !=
+                Geometry::PointCloud::OutlierRemovalStatus::Success)
+            {
+                result.Status =
+                    removal.Status ==
+                            Geometry::PointCloud::OutlierRemovalStatus::InvalidParameters
+                        ? SandboxEditorCommandStatus::InvalidProcessingParameters
+                        : SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message =
+                    "Geometry.PointCloud outlier removal failed with ";
+                result.Message +=
+                    DebugNameForOutlierRemovalStatus(removal.Status);
+                result.Message += ".";
+                return DerivedJobOutput{
+                    .PayloadToken = 0u,
+                    .NormalizedProgress = 1.0f,
+                    .ProgressDeterminate = true,
+                    .Diagnostic = result.Message,
+                };
+            }
+
+            state->AfterCloud = state->WorkCloud;
+            for (const std::size_t rejected : removal.RejectedIndices)
+            {
+                state->AfterCloud.DeletePoint(
+                    Geometry::VertexHandle{
+                        static_cast<std::uint32_t>(rejected)});
+            }
+            state->AfterCloud.GarbageCollection();
+            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Error = Core::ErrorCode::Success;
+            return DerivedJobOutput{
+                .PayloadToken = 0u,
+                .NormalizedProgress = 1.0f,
+                .ProgressDeterminate = true,
+                .Diagnostic = "Point-cloud outlier-removal CPU result ready",
+            };
+        }
+
+        [[nodiscard]] Core::Result PublishPointCloudOutlierRemovalCpuJob(
+            const SandboxEditorContext& context,
+            SandboxEditorPointCloudOutlierRemovalCpuJobState& job)
+        {
+            SandboxEditorPointCloudOutlierRemovalResult result = job.Result;
+            if (!result.Succeeded())
+            {
+                PublishPointCloudOutlierRemovalResultSink(context, result);
+                return Core::Err(ResultErrorOrUnknown(result.Error));
+            }
+
+            const bool statistical =
+                job.Command.Method ==
+                SandboxEditorPointCloudOutlierMethod::Statistical;
+            const SandboxEditorCommandStatus commitStatus =
+                CommitPointCloudReplacement(
+                    context,
+                    job.StableEntityId,
+                    statistical
+                        ? "Remove statistical point-cloud outliers"
+                        : "Remove radius point-cloud outliers",
+                    job.BeforeCloud,
+                    job.AfterCloud);
+            if (commitStatus != SandboxEditorCommandStatus::Applied)
+            {
+                result.Status = commitStatus;
+                result.Error = Core::ErrorCode::Unknown;
+                result.Message =
+                    "Point-cloud outlier-removal publication failed during editor history commit.";
+                PublishPointCloudOutlierRemovalResultSink(context, result);
+                return Core::Err(Core::ErrorCode::Unknown);
+            }
+
+            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Error = Core::ErrorCode::Success;
+            result.Message =
+                BuildPointCloudOutlierRemovalSuccessMessage(result);
+            InvalidateSelectedModelCache(context);
+            PublishPointCloudOutlierRemovalResultSink(context, result);
+            return Core::Ok();
+        }
+
+        [[nodiscard]] DerivedJobDesc MakePointCloudOutlierRemovalCpuJobDesc(
+            const SandboxEditorContext& context,
+            const std::shared_ptr<
+                SandboxEditorPointCloudOutlierRemovalCpuJobState>& state)
+        {
+            return DerivedJobDesc{
+                .Key = DerivedJobKey{
+                    .EntityId = state->StableEntityId,
+                    .Domain = ProgressiveGeometryDomain::Point,
+                    .OutputSemantic = ProgressiveSlotSemantic::Displacement,
+                    .SourcePropertyGeneration =
+                        state->GeometryMetadataSignature,
+                    .OutputName = "point_cloud_outlier_removal",
+                },
+                .Name = "Sandbox.PointCloudOutlierRemoval.CPU",
+                .RequestedJobDomain = ProgressiveJobDomain::Cpu,
+                .Kind = Core::Dag::TaskKind::GeometryProcess,
+                .Priority = Core::Dag::TaskPriority::Normal,
+                .EstimatedCost = std::max<std::uint32_t>(
+                    1u,
+                    static_cast<std::uint32_t>(
+                        (state->WorkCloud.VertexCount() + 1023u) / 1024u)),
+                .Execute =
+                    [state]() -> DerivedJobWorkerResult
+                    {
+                        return RunPointCloudOutlierRemovalCpuWorker(state);
+                    },
+                .ValidateOnMainThread =
+                    [context, state]()
+                    {
+                        return ValidatePointCloudOutlierRemovalCpuJobApply(
+                            context,
+                            *state);
+                    },
+                .ApplyOnMainThread =
+                    [context, state](DerivedJobApplyContext&) -> Core::Result
+                    {
+                        return PublishPointCloudOutlierRemovalCpuJob(
+                            context,
+                            *state);
+                    },
+            };
+        }
+
+        [[nodiscard]] SandboxEditorPointCloudOutlierRemovalResult
+        SubmitPointCloudOutlierRemovalCpuJob(
+            const SandboxEditorContext& context,
+            const SandboxEditorPointCloudOutlierRemovalCommand& command,
+            Geometry::PointCloud::Cloud beforeCloud,
+            Geometry::PointCloud::Cloud workCloud,
+            std::vector<glm::vec3> snapshotPositions,
+            const std::uint64_t geometryMetadataSignature)
+        {
+            auto state = std::make_shared<
+                SandboxEditorPointCloudOutlierRemovalCpuJobState>();
+            state->StableEntityId = command.StableEntityId;
+            state->GeometryMetadataSignature = geometryMetadataSignature;
+            state->SnapshotPositions = std::move(snapshotPositions);
+            state->BeforeCloud = std::move(beforeCloud);
+            state->WorkCloud = std::move(workCloud);
+            state->Command = command;
+            state->Result = MakePointCloudOutlierRemovalBaseResult(command);
+            state->Result.OriginalCount = state->WorkCloud.VertexCount();
+            state->Result.KeptCount = state->WorkCloud.VertexCount();
+
+            DerivedJobDesc desc =
+                MakePointCloudOutlierRemovalCpuJobDesc(context, state);
+            const DerivedJobHandle handle =
+                context.DerivedJobCommands.Submit(std::move(desc));
+            if (!handle.IsValid())
+            {
+                SandboxEditorPointCloudOutlierRemovalResult result =
+                    MakePointCloudOutlierRemovalBaseResult(command);
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.GeometryStatus =
+                    Geometry::PointCloud::OutlierRemovalStatus::BuildFailed;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "Point-cloud outlier-removal CPU job submission was rejected by the runtime job lane.";
+                return result;
+            }
+
+            return MakePendingPointCloudOutlierRemovalResult(
+                command,
+                state->WorkCloud.VertexCount(),
+                handle);
+        }
+
         enum class SandboxEditorVertexNormalsCpuJobKind : std::uint8_t
         {
             Mesh,
@@ -22299,8 +22628,8 @@ namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorPointCloudOutlierRemovalCommand& command)
     {
-        SandboxEditorPointCloudOutlierRemovalResult result{};
-        result.Method = command.Method;
+        SandboxEditorPointCloudOutlierRemovalResult result =
+            MakePointCloudOutlierRemovalBaseResult(command);
 
         if (context.Scene == nullptr)
         {
@@ -22409,6 +22738,31 @@ namespace Extrinsic::Runtime
         if (workCloud.HasGarbage())
             workCloud.GarbageCollection();
 
+        std::optional<std::vector<glm::vec3>> snapshotPositions =
+            CollectKMeansPositions(view.VertexSource->Properties);
+        if (!snapshotPositions.has_value())
+        {
+            result.Status =
+                SandboxEditorCommandStatus::InvalidProcessingParameters;
+            result.GeometryStatus =
+                Geometry::PointCloud::OutlierRemovalStatus::InvalidParameters;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Point-cloud outlier removal requires a count-matched v:position property.";
+            return result;
+        }
+
+        if (context.DerivedJobCommands.Available())
+        {
+            return SubmitPointCloudOutlierRemovalCpuJob(
+                context,
+                command,
+                std::move(beforeCloud),
+                std::move(workCloud),
+                std::move(*snapshotPositions),
+                GeometryMetadataSignatureForEntity(raw, *entity));
+        }
+
         Geometry::PointCloud::OutlierRemovalResult removal{};
         if (statistical)
         {
@@ -22431,14 +22785,7 @@ namespace Extrinsic::Runtime
                     params);
         }
 
-        result.GeometryStatus = removal.Status;
-        result.OriginalCount = removal.OriginalCount;
-        result.KeptCount = removal.KeptCount;
-        result.RejectedCount = removal.RejectedCount;
-        result.NonFiniteCount = removal.NonFiniteCount;
-        result.MeanDistance = removal.MeanDistance;
-        result.StdDevDistance = removal.StdDevDistance;
-        result.DistanceThreshold = removal.DistanceThreshold;
+        CopyPointCloudOutlierRemovalCounters(removal, result);
 
         if (removal.Status !=
             Geometry::PointCloud::OutlierRemovalStatus::Success)
@@ -22484,15 +22831,7 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        result.Message = "Removed " + std::to_string(result.RejectedCount) +
-                         " of " + std::to_string(result.OriginalCount) +
-                         " points (kept " + std::to_string(result.KeptCount);
-        if (result.NonFiniteCount > 0u)
-        {
-            result.Message +=
-                ", non-finite " + std::to_string(result.NonFiniteCount);
-        }
-        result.Message += ").";
+        result.Message = BuildPointCloudOutlierRemovalSuccessMessage(result);
         InvalidateSelectedModelCache(context);
         return result;
     }
@@ -22865,6 +23204,14 @@ namespace Extrinsic::Runtime
                     {
                         if (alive && *alive)
                             m_LastPointCloudVertexNormalsResult =
+                                std::move(result);
+                    };
+                context.MethodResultSinks.PointCloudOutlierRemoval =
+                    [alive = m_ResultSinksAlive, this](
+                        SandboxEditorPointCloudOutlierRemovalResult result)
+                    {
+                        if (alive && *alive)
+                            m_LastPointCloudOutlierRemovalResult =
                                 std::move(result);
                     };
                 context.MethodResultSinks.Registration =

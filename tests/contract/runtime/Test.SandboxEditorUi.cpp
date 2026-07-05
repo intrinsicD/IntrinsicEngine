@@ -4943,6 +4943,147 @@ TEST(SandboxEditorUi, PointCloudOutlierRemovalStatisticalPublishesKeptPointsWith
         model.Processing.LastPointCloudOutlierRemovalResult->Succeeded());
 }
 
+TEST(SandboxEditorUi,
+     PointCloudOutlierRemovalRequestQueuesDerivedJobAndPublishesOnApply)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+    AttachDerivedJobCommands(context, jobs);
+    std::optional<Runtime::SandboxEditorPointCloudOutlierRemovalResult>
+        completedResult{};
+    context.MethodResultSinks.PointCloudOutlierRemoval =
+        [&completedResult](
+            Runtime::SandboxEditorPointCloudOutlierRemovalResult result)
+        {
+            completedResult = std::move(result);
+        };
+
+    const std::vector<glm::vec3> positions = MakeOutlierClusterPositions();
+    const std::size_t originalCount = positions.size();
+    const ECS::EntityHandle cloud =
+        MakeSelectable(registry, "QueuedOutlierCloud");
+    AddPointCloudSource(registry, cloud, originalCount);
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
+
+    const Runtime::SandboxEditorPointCloudOutlierRemovalResult queued =
+        Runtime::ApplySandboxEditorPointCloudOutlierRemovalCommand(
+            context,
+            Runtime::SandboxEditorPointCloudOutlierRemovalCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(cloud),
+                .Method =
+                    Runtime::SandboxEditorPointCloudOutlierMethod::Statistical,
+                .KNeighbors = 8u,
+                .StdDevMultiplier = 1.0f,
+            });
+
+    EXPECT_EQ(queued.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_EQ(queued.OriginalCount, originalCount);
+    EXPECT_EQ(queued.KeptCount, originalCount);
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud), originalCount);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(cloud));
+
+    Runtime::DerivedJobQueueSnapshot pending = jobs.SnapshotAll();
+    ASSERT_EQ(pending.Entries.size(), 1u);
+    EXPECT_EQ(pending.Entries[0].Name,
+              "Sandbox.PointCloudOutlierRemoval.CPU");
+    EXPECT_EQ(pending.Entries[0].Status, Runtime::DerivedJobStatus::Queued);
+
+    jobs.Pump(1u);
+    jobs.DrainCompletions();
+    EXPECT_FALSE(completedResult.has_value());
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud), originalCount);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(cloud));
+
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    ASSERT_TRUE(completedResult.has_value());
+    EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
+    EXPECT_EQ(completedResult->OriginalCount, originalCount);
+    EXPECT_GE(completedResult->RejectedCount, 2u);
+    EXPECT_EQ(completedResult->KeptCount + completedResult->RejectedCount,
+              originalCount);
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud),
+              completedResult->KeptCount);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::GpuDirty>(cloud));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(cloud));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(cloud));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(cloud));
+    EXPECT_TRUE(history.IsDirty());
+
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud), originalCount);
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud),
+              completedResult->KeptCount);
+}
+
+TEST(SandboxEditorUi, PointCloudOutlierRemovalDerivedJobDiscardsStaleSource)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+    AttachDerivedJobCommands(context, jobs);
+    bool completedSinkCalled = false;
+    context.MethodResultSinks.PointCloudOutlierRemoval =
+        [&completedSinkCalled](
+            Runtime::SandboxEditorPointCloudOutlierRemovalResult)
+        {
+            completedSinkCalled = true;
+        };
+
+    const std::vector<glm::vec3> positions = MakeOutlierClusterPositions();
+    const std::size_t originalCount = positions.size();
+    const ECS::EntityHandle cloud =
+        MakeSelectable(registry, "StaleOutlierCloud");
+    AddPointCloudSource(registry, cloud, originalCount);
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
+
+    const Runtime::SandboxEditorPointCloudOutlierRemovalResult queued =
+        Runtime::ApplySandboxEditorPointCloudOutlierRemovalCommand(
+            context,
+            Runtime::SandboxEditorPointCloudOutlierRemovalCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(cloud),
+                .Method =
+                    Runtime::SandboxEditorPointCloudOutlierMethod::Statistical,
+                .KNeighbors = 8u,
+                .StdDevMultiplier = 1.0f,
+            });
+    ASSERT_EQ(queued.Status, Runtime::SandboxEditorCommandStatus::Pending);
+
+    std::vector<glm::vec3> stalePositions = positions;
+    for (glm::vec3& position : stalePositions)
+        position.x += 100.0f;
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud), stalePositions);
+
+    jobs.Pump(1u);
+    jobs.DrainCompletions();
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].Status,
+              Runtime::DerivedJobStatus::StaleDiscarded);
+    EXPECT_NE(done.Entries[0].Diagnostic.find(
+                  "StaleSourcePropertyGeneration"),
+              std::string::npos);
+    EXPECT_FALSE(completedSinkCalled);
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud), originalCount);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(cloud));
+}
+
 TEST(SandboxEditorUi, PointCloudOutlierRemovalRadiusPublishesAndFailsClosed)
 {
     ECS::Scene::Registry registry;
