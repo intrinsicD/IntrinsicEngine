@@ -2,14 +2,16 @@
 id: UI-029
 theme: F
 depends_on: [GEOM-055]
+completed: 2026-07-05
 ---
 # UI-029 — Editor ICP registration panel + convergence visualization
 
 ## Status
-- Editor panel + command implemented (2026-07-01) on branch
-  `claude/ui-backlog-agentic-y3oap2`. The runtime controller
-  `Extrinsic.Runtime.RegistrationAlignment` and its headless test landed earlier;
-  this change adds the editor consumer.
+- Retired on 2026-07-05 at `Operational`.
+- Branch/PR: local `main`; PR not opened.
+- Implementation commits: `d3a839cf`, `433953e7`, and `2f1abf71`.
+- The runtime controller `Extrinsic.Runtime.RegistrationAlignment` and the
+  Sandbox editor panel + command are implemented.
 - `SandboxEditorRegistrationCommand` / `SandboxEditorRegistrationResult` +
   `ApplySandboxEditorRegistrationCommand` read the source + target point clouds
   from two selected entities, require `Domain::PointCloud`, run
@@ -34,15 +36,16 @@ depends_on: [GEOM-055]
   produced an identity pose and left the source at the origin. Added
   `SandboxEditorUi.RegistrationCommandAlignsAcrossEntityTransforms` (translated
   target → source driven onto it).
-- Deferred to CI (sandbox = clang-18, no vcpkg): `cmake --preset ci` +
-  `ctest -R 'SandboxEditorUi|RuntimeRegistrationAlignment'`.
+- Closure verification on 2026-07-05 rebuilt `IntrinsicRuntimeUnitTests` and
+  `IntrinsicRuntimeContractTests`, then passed all 6 focused
+  `RuntimeRegistrationAlignment` and `SandboxEditorUi.*Registration` tests.
 
 ## Goal
 - Let the Sandbox editor run ICP registration between two selected point-cloud
   entities and visualize the source shape converging onto the target, consuming
   the per-iteration observer seam from `GEOM-055` via the runtime controller
   `Extrinsic::Runtime::AlignPointClouds`. Realizes the observability payoff in
-  [`docs/architecture/geometry-pipeline-modularity.md`](../../../docs/architecture/geometry-pipeline-modularity.md)
+  [`docs/architecture/geometry-pipeline-modularity.md`](../../docs/architecture/geometry-pipeline-modularity.md)
   §3.4 and the editor-decoupling direction (roadmap §8).
 
 ## Non-goals
@@ -122,18 +125,24 @@ depends_on: [GEOM-055]
 ## Acceptance criteria
 - [x] The runtime controller runs ICP capturing the convergence trajectory and is
       covered by a headless CPU test (`runtime -> geometry`; no ECS/RHI).
-- [ ] Selecting a source + target point cloud and running the panel aligns the
+- [x] Selecting a source + target point cloud and running the panel aligns the
       source onto the target; the slider scrubs the intermediate poses.
 - [x] `python3 tools/repo/check_layering.py --root src --strict` passes.
-- [ ] Editor-command CPU test passes under the default gate (written; runs in
-      CI — the sandbox has clang-18 and cannot bootstrap vcpkg).
+- [x] Editor-command CPU tests pass under the default CPU-supported labels:
+      `SandboxEditorUi.RegistrationCommandAlignsSourceOntoTargetAndSupportsUndoRedo`,
+      `...FailsClosedForInvalidSelectionAndParameters`, and
+      `...AlignsAcrossEntityTransforms`.
 
 ## Verification
 ```bash
-cmake --preset ci
-cmake --build --preset ci --target IntrinsicTests
-ctest --test-dir build/ci --output-on-failure -R 'RuntimeRegistrationAlignment' --timeout 60
+cmake --build --preset ci --target IntrinsicRuntimeUnitTests IntrinsicRuntimeContractTests
+ctest --test-dir build/ci --output-on-failure -R 'RuntimeRegistrationAlignment|SandboxEditorUi.*Registration' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+python3 tools/agents/validate_tasks.py --root tasks --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main
 python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
 ```
 
 ## Forbidden changes
@@ -143,8 +152,9 @@ python3 tools/repo/check_layering.py --root src --strict
 - Mixing this UI slice with geometry-algorithm behavior changes.
 
 ## Maturity
-- Target: `Operational` — the runtime controller is `Operational` (headless CPU
-  test). The editor panel closes to `Operational` when the panel + its
-  command-level CPU test land and the source aligns onto the target in the editor.
-- This slice partially lands (`Runtime.RegistrationAlignment` + test); the editor
-  panel is the remaining open work owned by this task.
+- Target: `Operational`.
+- Closed at `Operational`: the runtime controller captures a convergence
+  trajectory, the editor command consumes it through the promoted Sandbox UI
+  seam, and focused CPU-supported runtime/contract tests cover successful
+  alignment, trajectory scrubbing, failure states, undo/redo, and transformed
+  source/target entities.

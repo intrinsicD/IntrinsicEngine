@@ -93,8 +93,8 @@ the runtime SpatialDebug closest-face consumer in `RUNTIME-135`.
 - GEOM-055 is retired as the registration-pipeline observability slice:
   `Geometry.Registration::AlignICP` accepts a null-default per-iteration
   observer and emits read-only transform/RMSE/inlier traces without changing the
-  serializable `RegistrationParams` config. This unblocks the editor ICP
-  convergence visualization task `UI-029`.
+  serializable `RegistrationParams` config. The editor ICP convergence
+  visualization consumer retired under `UI-029`.
 - RORG-031E is part of **Theme F — Architecture/runtime/UI foundation seeds**.
 - Future geometry algorithm packages should follow
   [`docs/agent/method-workflow.md`](../../../docs/agent/method-workflow.md):

@@ -11,11 +11,7 @@ map.
 ## Tasks
 
 - [RORG-031F — UI integration backlog seed](RORG-031-ui-integration.md).
-- [UI-029 — Editor ICP registration panel + convergence visualization](UI-029-editor-registration-convergence-visualization.md)
-  (depends on `GEOM-055`; consumes the runtime controller
-  `Runtime.RegistrationAlignment` to run ICP and scrub the convergence
-  trajectory. The controller + its headless test land first; the editor panel is
-  the remaining open work).
+
 The runtime SpatialDebug closest-face picking consumer for `GEOM-039` is
 retired under the runtime backlog as `RUNTIME-135`.
 
@@ -31,6 +27,11 @@ retired under the runtime backlog as `RUNTIME-135`.
   through a runtime-owned undoable command, preserves UV seams when texcoords
   are present, and surfaces simplification diagnostics without UI owning engine
   state.
+- UI-029 is retired as the ICP registration editor follow-up for the `GEOM-055`
+  observer seam: the top-level `ICP Registration` panel selects source and
+  target point-cloud entities, runs `Runtime.RegistrationAlignment`, stores the
+  convergence trajectory, and lets the user scrub intermediate poses through an
+  undoable runtime-owned transform command.
 - UI-030 is retired as the 2026-07-01 editor-stutter diagnostic follow-up. The
   bounded `ExtrinsicSandbox --frame-pacing-report` capture loop ranks the
   default run as present/fallback-frame-lifecycle dominated, rules out editor
@@ -224,6 +225,11 @@ split; narratives live in the retirement log.
   `GEOM-014` classical QEM / FA-QEM simplification kernel through an undoable
   runtime command, preserves UV seam inputs, reports collapse/rejection/pin
   diagnostics, and defers renderer synchronization through geometry dirty tags.
+- [UI-029 — Editor ICP registration panel + convergence visualization](../../done/UI-029-editor-registration-convergence-visualization.md)
+  (done, 2026-07-05, `Operational`): the top-level `ICP Registration` panel
+  consumes `Runtime.RegistrationAlignment` to align selected point-cloud
+  entities, records the per-iteration convergence trajectory, scrubs trajectory
+  poses, and routes transform writeback through undoable runtime commands.
 - [UI-030 — Sandbox EditorUI frame-pacing diagnostics](../../done/UI-030-editor-frame-pacing-diagnostics.md)
   (done, 2026-07-05, `Operational`): bounded sandbox captures now emit
   `intrinsic.frame_pacing.v1` JSON with runtime, ImGui producer, render-graph,

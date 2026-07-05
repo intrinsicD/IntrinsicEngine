@@ -37,7 +37,6 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-143` — Multi-subscriber frame-command hook and K-Means decoupling from Engine (tasks/backlog/runtime/RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md)
 - unblocked: `RUNTIME-144` — Post-import processor and import UX-policy seam (tasks/backlog/runtime/RUNTIME-144-post-import-processor-and-ux-policy-seam.md)
 - unblocked: `RUNTIME-145` — Runtime frame-path steady-state efficiency polish (tasks/backlog/runtime/RUNTIME-145-runtime-frame-path-efficiency-polish.md)
-- unblocked: `UI-029` — Editor ICP registration panel + convergence visualization (tasks/backlog/ui/UI-029-editor-registration-convergence-visualization.md)
 
 ## Theme G — Active bugs
 

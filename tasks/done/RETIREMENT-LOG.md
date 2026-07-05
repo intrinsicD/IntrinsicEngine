@@ -3410,3 +3410,14 @@ per-iteration observer retired to `tasks/done/` on 2026-07-05 at
 trace per completed iteration after the cumulative transform is updated.
 Contract tests prove observed and unobserved runs match exactly and trace
 indices/RMSE/final-transform invariants line up with `RegistrationResult`.
+
+[`UI-029`](UI-029-editor-registration-convergence-visualization.md) — Editor
+ICP registration panel and convergence visualization retired to `tasks/done/`
+on 2026-07-05 at `Operational`. The implementation landed in `d3a839cf`,
+`433953e7`, and `2f1abf71`: `Extrinsic.Runtime.RegistrationAlignment` runs
+ICP with the `GEOM-055` per-iteration observer, the Sandbox editor exposes a
+top-level `ICP Registration` panel for selected point-cloud entities, and the
+source transform is updated through undoable runtime-owned commands while the
+trajectory step scrubs intermediate poses. Focused runtime unit and Sandbox UI
+contract tests cover degenerate input, trajectory capture/scrubbing, successful
+alignment, failure states, undo/redo, and transformed source/target entities.

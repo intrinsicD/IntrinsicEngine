@@ -317,8 +317,7 @@ per-iteration trajectory, and `TrajectoryPose(outcome, index)` yields the
 renderer-facing `glm::mat4` to preview at each step (identity at step 0). The
 Sandbox editor panel that lets a user select two point clouds, run registration,
 and scrub the convergence with a slider is tracked by
-[`UI-029`](../../tasks/backlog/ui/UI-029-editor-registration-convergence-visualization.md);
-the controller and its headless test land ahead of the panel.
+[`UI-029`](../../tasks/done/UI-029-editor-registration-convergence-visualization.md).
 
 ## 4. How registration decomposes onto existing code
 
