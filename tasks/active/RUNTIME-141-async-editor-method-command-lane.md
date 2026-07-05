@@ -6,13 +6,13 @@ depends_on: []
 # RUNTIME-141 — Async editor method-command lane (no heavy compute in the ImGui callback)
 
 ## Status
-- Active on 2026-07-05; Slices A and B are implemented and verified. The
-  parent task remains active for the remaining heavyweight editor method
-  conversions.
+- Active on 2026-07-05; Slices A, B, and C are implemented and verified. The
+  parent task remains active for registration alignment plus the final
+  heavyweight editor method inventory/state classification.
 - This task is intentionally sliced because it spans the shared runtime job
   lane plus several method-specific snapshot/apply conversions.
-- Remaining open slices: mesh denoise/remesh/simplify, registration
-  alignment, and the final heavy-button inventory/state classification.
+- Remaining open slices: registration alignment and the final heavy-button
+  inventory/state classification.
 
 ## Slice plan
 - **Slice A (this slice).** Wire an engine-owned `DerivedJobRegistry` beside
@@ -24,8 +24,9 @@ depends_on: []
   denoise/remesh/simplify, and registration conversions to later slices.
 - **Slice B (complete).** Convert Progressive Poisson CPU sampling, including
   mesh-surface sampling, to the shared editor method job lane.
-- **Slice C.** Convert mesh denoise/remesh/simplify command handlers to the
-  shared lane with copied mesh snapshots and generation/stale guards.
+- **Slice C (complete).** Convert mesh denoise/remesh/simplify command
+  handlers to the shared lane with copied mesh snapshots and generation/stale
+  guards.
 - **Slice D.** Convert registration alignment and any remaining heavyweight
   method buttons; update the inventory classification so every heavy button is
   either queued or documented as lightweight/immediate.
@@ -91,8 +92,8 @@ depends_on: []
 - [x] Convert the CPU K-Means editor command to the helper (parity with the
       existing GPU-queue UX: same published label/color properties).
 - [x] Convert Progressive Poisson CPU runs to the helper.
-- [ ] Convert denoise/remesh/simplify (and registration alignment) commands
-      to the helper.
+- [x] Convert denoise/remesh/simplify commands to the helper.
+- [ ] Convert registration alignment commands to the helper.
 - [ ] Panels reflect job state instead of blocking; a second submit while
       one runs either queues or replaces per current UX expectations
       (document choice per panel).
@@ -159,6 +160,16 @@ Slice B verification completed on 2026-07-05:
 ```bash
 cmake --build --preset ci --target IntrinsicRuntimeContractTests
 build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='SandboxEditorUi.ProgressivePoissonCpuRequestQueuesDerivedJobAndPublishesOnApply:SandboxEditorUi.ProgressivePoissonCpuDerivedJobDiscardsStalePointCloudBeforeApply:SandboxEditorUi.ProgressivePoissonMeshCpuRequestQueuesDerivedJobAndPublishesOnApply:SandboxEditorUi.ProgressivePoissonCommandPublishesPointPropertiesAndVisualization:SandboxEditorUi.ProgressivePoissonCommandMatchesDirectMethodConfig:SandboxEditorUi.ProgressivePoissonCommandSamplesMeshSurfaceToPointCloud:SandboxEditorUi.KMeansCpuRequestQueuesDerivedJobAndPublishesOnApply:SandboxEditorUi.KMeansCpuDerivedJobDiscardsStaleTargetBeforeApply'
+ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi|DerivedJob|StreamingExecutor|RuntimeSceneLifecycle' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+```
+
+Slice C verification completed on 2026-07-05:
+
+```bash
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='SandboxEditorUi.MeshDenoiseRequestQueuesDerivedJobAndPublishesOnApply:SandboxEditorUi.MeshDenoiseDerivedJobDiscardsStaleMeshBeforeApply:SandboxEditorUi.MeshRemeshRequestQueuesDerivedJobAndPublishesOnApply:SandboxEditorUi.MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply:SandboxEditorUi.MeshDenoiseCommandPublishesPositionsAndSupportsUndoRedo:SandboxEditorUi.MeshRemeshCommandReplacesTopologyAndSupportsUndoRedo:SandboxEditorUi.MeshSimplifyCommandReducesFaceCountAndSupportsUndoRedo:SandboxEditorUi.MeshSimplifyPreservesUvSeamsWhenTexcoordsPresent'
 ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi|DerivedJob|StreamingExecutor|RuntimeSceneLifecycle' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60

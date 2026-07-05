@@ -77,10 +77,11 @@ drains completed jobs with the same bounded apply budget as other streaming
 work, revalidates the selected target before mutation, and publishes results
 only from the main-thread apply callback.
 
-`RUNTIME-141` Slice A applies this model to the CPU K-Means path, and Slice B
+`RUNTIME-141` Slice A applies this model to the CPU K-Means path, Slice B
 applies it to Progressive Poisson point-cloud and mesh-surface CPU sampling,
-while preserving the existing immediate fallback for tests and callers without
-an engine job surface. Mesh denoise/remesh/simplify commands and registration
+and Slice C applies it to mesh denoise/remesh/simplify commands while
+preserving the existing immediate fallback for tests and callers without an
+engine job surface. Registration alignment and the final heavy-button inventory
 remain owned by later `RUNTIME-141` slices.
 
 ### Sandbox Editor Startup Layout

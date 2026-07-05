@@ -921,6 +921,17 @@ namespace
         };
     }
 
+    void AttachDerivedJobCommands(
+        Runtime::SandboxEditorContext& context,
+        Runtime::DerivedJobRegistry& jobs)
+    {
+        context.DerivedJobCommands.Submit =
+            [&jobs](Runtime::DerivedJobDesc desc)
+            {
+                return jobs.Submit(std::move(desc));
+            };
+    }
+
     [[nodiscard]] Runtime::SandboxEditorModelBuildRequest
     MakeNoSandboxEditorModelBuildRequest()
     {
@@ -4711,6 +4722,129 @@ TEST(SandboxEditorUi, MeshDenoiseCommandPublishesPositionsAndSupportsUndoRedo)
     EXPECT_EQ(model.Processing.LastMeshDenoiseResult->WrittenCount, 4u);
 }
 
+TEST(SandboxEditorUi, MeshDenoiseRequestQueuesDerivedJobAndPublishesOnApply)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+    AttachDerivedJobCommands(context, jobs);
+    std::optional<Runtime::SandboxEditorMeshDenoiseResult> completedResult{};
+    context.MethodResultSinks.MeshDenoise =
+        [&completedResult](Runtime::SandboxEditorMeshDenoiseResult result)
+        {
+            completedResult = std::move(result);
+        };
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "DenoiseMesh");
+    AddDenoiseTetraMeshSource(registry, mesh);
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    const std::vector<glm::vec3> original =
+        MeshVertexPositions(registry, mesh);
+
+    const Runtime::SandboxEditorMeshDenoiseResult result =
+        Runtime::ApplySandboxEditorMeshDenoiseCommand(
+            context,
+            Runtime::SandboxEditorMeshDenoiseCommand{
+                .StableEntityId = stableId,
+                .NormalIterations = 2u,
+                .VertexIterations = 3u,
+                .SigmaSpatial = 0.0,
+                .SigmaRange = 0.0,
+                .PreserveBoundary = true,
+            });
+
+    EXPECT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_NE(result.Message.find("queued"), std::string::npos);
+    ExpectPositionsExactlyEqual(MeshVertexPositions(registry, mesh), original);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+
+    Runtime::DerivedJobQueueSnapshot queued = jobs.SnapshotAll();
+    ASSERT_EQ(queued.Entries.size(), 1u);
+    EXPECT_EQ(queued.Entries[0].Name, "Sandbox.MeshDenoise.CPU");
+    EXPECT_EQ(queued.Entries[0].Status, Runtime::DerivedJobStatus::Queued);
+
+    jobs.Pump(1u);
+    jobs.DrainCompletions();
+    ExpectPositionsExactlyEqual(MeshVertexPositions(registry, mesh), original);
+    EXPECT_FALSE(completedResult.has_value());
+
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    ASSERT_TRUE(completedResult.has_value());
+    EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
+    EXPECT_EQ(completedResult->DenoiseStatus, Smooth::DenoiseStatus::Success);
+    EXPECT_EQ(completedResult->VertexSlotCount, original.size());
+    EXPECT_GT(completedResult->MovedVertexCount, 0u);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+    EXPECT_TRUE(history.IsDirty());
+    EXPECT_TRUE(AnyPositionDiffers(original, MeshVertexPositions(registry, mesh)));
+}
+
+TEST(SandboxEditorUi, MeshDenoiseDerivedJobDiscardsStaleMeshBeforeApply)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+    AttachDerivedJobCommands(context, jobs);
+    bool completedSinkCalled = false;
+    context.MethodResultSinks.MeshDenoise =
+        [&completedSinkCalled](Runtime::SandboxEditorMeshDenoiseResult)
+        {
+            completedSinkCalled = true;
+        };
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "StaleDenoiseMesh");
+    AddDenoiseTetraMeshSource(registry, mesh);
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    const Runtime::SandboxEditorMeshDenoiseResult result =
+        Runtime::ApplySandboxEditorMeshDenoiseCommand(
+            context,
+            Runtime::SandboxEditorMeshDenoiseCommand{
+                .StableEntityId = stableId,
+                .NormalIterations = 2u,
+                .VertexIterations = 3u,
+                .SigmaSpatial = 0.0,
+                .SigmaRange = 0.0,
+                .PreserveBoundary = true,
+            });
+    ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+
+    SetPositions(registry.Raw().get<GS::Vertices>(mesh),
+                 {
+                     {10.0f, 0.0f, 0.0f},
+                     {11.0f, 0.0f, 0.0f},
+                     {12.0f, 0.0f, 0.0f},
+                     {13.0f, 0.0f, 0.0f},
+                 });
+
+    jobs.Pump(1u);
+    jobs.DrainCompletions();
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+
+    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].Status,
+              Runtime::DerivedJobStatus::StaleDiscarded);
+    EXPECT_NE(done.Entries[0].Diagnostic.find(
+                  "StaleSourcePropertyGeneration"),
+              std::string::npos);
+    EXPECT_FALSE(completedSinkCalled);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+}
+
 namespace
 {
     // Two dense 5x5 grid clusters plus three far isolated outliers (appended
@@ -5363,6 +5497,75 @@ TEST(SandboxEditorUi, MeshRemeshCommandReplacesTopologyAndSupportsUndoRedo)
     EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(adaptiveMesh));
 }
 
+TEST(SandboxEditorUi, MeshRemeshRequestQueuesDerivedJobAndPublishesOnApply)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+    AttachDerivedJobCommands(context, jobs);
+    std::optional<Runtime::SandboxEditorMeshRemeshResult> completedResult{};
+    context.MethodResultSinks.MeshRemesh =
+        [&completedResult](Runtime::SandboxEditorMeshRemeshResult result)
+        {
+            completedResult = std::move(result);
+        };
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "QueuedRemesh");
+    AddIcosahedronMeshSource(registry, mesh);
+    const MeshCounts before = SourceMeshCounts(registry, mesh);
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    const Runtime::SandboxEditorMeshRemeshResult result =
+        Runtime::ApplySandboxEditorMeshRemeshCommand(
+            context,
+            Runtime::SandboxEditorMeshRemeshCommand{
+                .StableEntityId = stableId,
+                .Mode = Runtime::SandboxEditorMeshRemeshMode::Uniform,
+                .SizingLaw =
+                    Runtime::SandboxEditorMeshRemeshSizingLaw::MeanCurvature,
+                .Iterations = 1u,
+                .TargetEdgeLength = 0.35,
+                .PreserveBoundary = false,
+                .ProjectToSurface = false,
+            });
+
+    EXPECT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_EQ(result.InputVertexCount, before.Vertices);
+    EXPECT_EQ(result.InputFaceCount, before.Faces);
+    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
+
+    Runtime::DerivedJobQueueSnapshot queued = jobs.SnapshotAll();
+    ASSERT_EQ(queued.Entries.size(), 1u);
+    EXPECT_EQ(queued.Entries[0].Name, "Sandbox.MeshRemesh.CPU");
+    EXPECT_EQ(queued.Entries[0].Status, Runtime::DerivedJobStatus::Queued);
+
+    jobs.Pump(1u);
+    jobs.DrainCompletions();
+    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
+    EXPECT_FALSE(completedResult.has_value());
+
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    ASSERT_TRUE(completedResult.has_value());
+    EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
+    EXPECT_EQ(completedResult->InputFaceCount, before.Faces);
+    EXPECT_GT(completedResult->OutputFaceCount, before.Faces);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
+    EXPECT_TRUE(history.IsDirty());
+    EXPECT_EQ(SourceMeshCounts(registry, mesh).Faces,
+              completedResult->OutputFaceCount);
+}
+
 TEST(SandboxEditorUi, MeshSubdivideCommandReplacesTopologyForAllOperatorsAndSupportsUndoRedo)
 {
     ECS::Scene::Registry registry;
@@ -5546,6 +5749,73 @@ TEST(SandboxEditorUi, MeshSimplifyCommandReducesFaceCountAndSupportsUndoRedo)
     EXPECT_LT(classical.OutputFaceCount, before.Faces);
     EXPECT_EQ(classical.SharpFeatureVerticesPinned, 0u);
     EXPECT_EQ(classical.SeamVerticesPinned, 0u);
+}
+
+TEST(SandboxEditorUi, MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+    AttachDerivedJobCommands(context, jobs);
+    std::optional<Runtime::SandboxEditorMeshSimplifyResult> completedResult{};
+    context.MethodResultSinks.MeshSimplify =
+        [&completedResult](Runtime::SandboxEditorMeshSimplifyResult result)
+        {
+            completedResult = std::move(result);
+        };
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "QueuedSimplify");
+    AddIcosahedronMeshSource(registry, mesh);
+    const MeshCounts before = SourceMeshCounts(registry, mesh);
+    ASSERT_GT(before.Faces, 12u);
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    const Runtime::SandboxEditorMeshSimplifyResult result =
+        Runtime::ApplySandboxEditorMeshSimplifyCommand(
+            context,
+            Runtime::SandboxEditorMeshSimplifyCommand{
+                .StableEntityId = stableId,
+                .Metric = Runtime::SandboxEditorMeshSimplifyMetric::FA_QEM,
+                .TargetFaces = 12u,
+                .PreserveBoundary = false,
+            });
+
+    EXPECT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_EQ(result.InputVertexCount, before.Vertices);
+    EXPECT_EQ(result.InputFaceCount, before.Faces);
+    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
+
+    Runtime::DerivedJobQueueSnapshot queued = jobs.SnapshotAll();
+    ASSERT_EQ(queued.Entries.size(), 1u);
+    EXPECT_EQ(queued.Entries[0].Name, "Sandbox.MeshSimplify.CPU");
+    EXPECT_EQ(queued.Entries[0].Status, Runtime::DerivedJobStatus::Queued);
+
+    jobs.Pump(1u);
+    jobs.DrainCompletions();
+    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
+    EXPECT_FALSE(completedResult.has_value());
+
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    ASSERT_TRUE(completedResult.has_value());
+    EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
+    EXPECT_EQ(completedResult->InputFaceCount, before.Faces);
+    EXPECT_LT(completedResult->OutputFaceCount, before.Faces);
+    EXPECT_GT(completedResult->CollapseCount, 0u);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
+    EXPECT_TRUE(history.IsDirty());
+    EXPECT_EQ(SourceMeshCounts(registry, mesh).Faces,
+              completedResult->OutputFaceCount);
 }
 
 TEST(SandboxEditorUi, MeshSimplifyCommandFailsClosedForInvalidTargetsAndUnavailableKernel)

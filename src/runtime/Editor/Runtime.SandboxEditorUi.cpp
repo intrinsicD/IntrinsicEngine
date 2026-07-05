@@ -7975,6 +7975,819 @@ namespace Extrinsic::Runtime
             return message;
         }
 
+        [[nodiscard]] SandboxEditorMeshDenoiseResult MakeMeshDenoiseBaseResult(
+            const SandboxEditorMeshDenoiseCommand& command)
+        {
+            return SandboxEditorMeshDenoiseResult{
+                .Status = SandboxEditorCommandStatus::NoChange,
+                .DenoiseStatus = Smooth::DenoiseStatus::Success,
+                .Stage = command.Stage,
+                .NormalIterations = command.NormalIterations,
+                .VertexIterations = command.VertexIterations,
+                .SigmaSpatial = command.SigmaSpatial,
+                .SigmaRange = command.SigmaRange,
+                .PreserveBoundary = command.PreserveBoundary,
+                .Error = Core::ErrorCode::Success,
+            };
+        }
+
+        [[nodiscard]] SandboxEditorMeshRemeshResult MakeMeshRemeshBaseResult(
+            const SandboxEditorMeshRemeshCommand& command)
+        {
+            return SandboxEditorMeshRemeshResult{
+                .Status = SandboxEditorCommandStatus::NoChange,
+                .Mode = command.Mode,
+                .SizingLaw = command.SizingLaw,
+                .IterationsRequested = command.Iterations,
+                .TargetEdgeLength = command.TargetEdgeLength,
+                .ProjectToSurface = command.ProjectToSurface,
+                .Error = Core::ErrorCode::Success,
+            };
+        }
+
+        [[nodiscard]] SandboxEditorMeshSimplifyResult MakeMeshSimplifyBaseResult(
+            const SandboxEditorMeshSimplifyCommand& command)
+        {
+            return SandboxEditorMeshSimplifyResult{
+                .Status = SandboxEditorCommandStatus::NoChange,
+                .Metric = command.Metric,
+                .TargetFaces = command.TargetFaces,
+                .MaxError = command.MaxError,
+                .Error = Core::ErrorCode::Success,
+            };
+        }
+
+        void AppendDerivedJobHandleToMessage(
+            std::string& message,
+            const DerivedJobHandle handle)
+        {
+            if (!handle.IsValid())
+                return;
+
+            message += " (job ";
+            message += std::to_string(handle.Index);
+            message += ":";
+            message += std::to_string(handle.Generation);
+            message += ")";
+        }
+
+        [[nodiscard]] SandboxEditorMeshDenoiseResult MakePendingMeshDenoiseResult(
+            const SandboxEditorMeshDenoiseCommand& command,
+            const MeshDenoiseSourceResult& source,
+            const DerivedJobHandle handle)
+        {
+            SandboxEditorMeshDenoiseResult result =
+                MakeMeshDenoiseBaseResult(command);
+            result.Status = SandboxEditorCommandStatus::Pending;
+            result.VertexSlotCount = source.BeforePositions.size();
+            result.SkippedDeletedVertexCount =
+                static_cast<std::size_t>(
+                    std::count(source.DeletedVertices.begin(),
+                               source.DeletedVertices.end(),
+                               true));
+            result.WrittenCount =
+                result.VertexSlotCount - result.SkippedDeletedVertexCount;
+            result.Message = "Mesh denoise CPU job queued";
+            AppendDerivedJobHandleToMessage(result.Message, handle);
+            result.Message += ".";
+            return result;
+        }
+
+        [[nodiscard]] SandboxEditorMeshRemeshResult MakePendingMeshRemeshResult(
+            const SandboxEditorMeshRemeshCommand& command,
+            const Geometry::HalfedgeMesh::Mesh& mesh,
+            const DerivedJobHandle handle)
+        {
+            SandboxEditorMeshRemeshResult result =
+                MakeMeshRemeshBaseResult(command);
+            result.Status = SandboxEditorCommandStatus::Pending;
+            result.InputVertexCount = mesh.VertexCount();
+            result.InputFaceCount = mesh.FaceCount();
+            result.Message = "Mesh remesh CPU job queued";
+            AppendDerivedJobHandleToMessage(result.Message, handle);
+            result.Message += ".";
+            return result;
+        }
+
+        [[nodiscard]] SandboxEditorMeshSimplifyResult
+        MakePendingMeshSimplifyResult(
+            const SandboxEditorMeshSimplifyCommand& command,
+            const Geometry::HalfedgeMesh::Mesh& mesh,
+            const DerivedJobHandle handle)
+        {
+            SandboxEditorMeshSimplifyResult result =
+                MakeMeshSimplifyBaseResult(command);
+            result.Status = SandboxEditorCommandStatus::Pending;
+            result.InputVertexCount = mesh.VertexCount();
+            result.InputFaceCount = mesh.FaceCount();
+            result.Message = "Mesh simplify CPU job queued";
+            AppendDerivedJobHandleToMessage(result.Message, handle);
+            result.Message += ".";
+            return result;
+        }
+
+        [[nodiscard]] Core::ErrorCode ResultErrorOrUnknown(
+            const Core::ErrorCode error) noexcept
+        {
+            return error == Core::ErrorCode::Success
+                ? Core::ErrorCode::Unknown
+                : error;
+        }
+
+        enum class SandboxEditorMeshCpuJobKind : std::uint8_t
+        {
+            Denoise,
+            Remesh,
+            Simplify,
+        };
+
+        [[nodiscard]] const char* MeshCpuJobName(
+            const SandboxEditorMeshCpuJobKind kind) noexcept
+        {
+            switch (kind)
+            {
+            case SandboxEditorMeshCpuJobKind::Denoise:
+                return "Sandbox.MeshDenoise.CPU";
+            case SandboxEditorMeshCpuJobKind::Remesh:
+                return "Sandbox.MeshRemesh.CPU";
+            case SandboxEditorMeshCpuJobKind::Simplify:
+                return "Sandbox.MeshSimplify.CPU";
+            }
+            return "Sandbox.MeshProcessing.CPU";
+        }
+
+        [[nodiscard]] const char* MeshCpuJobOutputName(
+            const SandboxEditorMeshCpuJobKind kind) noexcept
+        {
+            switch (kind)
+            {
+            case SandboxEditorMeshCpuJobKind::Denoise:
+                return "mesh_denoise_positions";
+            case SandboxEditorMeshCpuJobKind::Remesh:
+                return "mesh_remesh_topology";
+            case SandboxEditorMeshCpuJobKind::Simplify:
+                return "mesh_simplify_topology";
+            }
+            return "mesh_processing";
+        }
+
+        void CopyMeshSimplifyAuxiliaryProperties(
+            const GS::ConstSourceView& view,
+            Geometry::HalfedgeMesh::Mesh& mesh)
+        {
+            if (view.VertexSource == nullptr)
+                return;
+
+            const auto sourceTexcoords =
+                view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+            if (!sourceTexcoords ||
+                sourceTexcoords.Vector().size() != mesh.VerticesSize())
+            {
+                return;
+            }
+
+            auto meshTexcoords = mesh.VertexProperties().GetOrAdd<glm::vec2>(
+                "v:texcoord",
+                glm::vec2{0.0f});
+            for (std::size_t i = 0u;
+                 i < sourceTexcoords.Vector().size();
+                 ++i)
+            {
+                meshTexcoords[i] = sourceTexcoords.Vector()[i];
+            }
+        }
+
+        struct SandboxEditorMeshCpuJobState
+        {
+            SandboxEditorMeshCpuJobKind Kind{
+                SandboxEditorMeshCpuJobKind::Denoise};
+            std::uint32_t StableEntityId{0u};
+            std::uint64_t GeometryMetadataSignature{0u};
+            std::vector<glm::vec3> SnapshotPositions{};
+            std::vector<bool> DeletedVertices{};
+            Geometry::HalfedgeMesh::Mesh BeforeMesh{};
+            Geometry::HalfedgeMesh::Mesh Mesh{};
+            std::vector<glm::vec3> DenoiseAfterPositions{};
+            SandboxEditorMeshDenoiseCommand DenoiseCommand{};
+            SandboxEditorMeshRemeshCommand RemeshCommand{};
+            SandboxEditorMeshSimplifyCommand SimplifyCommand{};
+            SandboxEditorMeshDenoiseResult DenoiseResult{};
+            SandboxEditorMeshRemeshResult RemeshResult{};
+            SandboxEditorMeshSimplifyResult SimplifyResult{};
+        };
+
+        [[nodiscard]] DerivedJobApplyValidation ValidateMeshCpuJobApply(
+            const SandboxEditorContext& context,
+            const SandboxEditorMeshCpuJobState& job)
+        {
+            if (context.Scene == nullptr)
+                return DerivedJobApplyValidation::MissingEntity;
+
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, job.StableEntityId);
+            if (!entity.has_value())
+                return DerivedJobApplyValidation::MissingEntity;
+
+            const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
+            const GS::SourceAvailability availability =
+                GS::BuildSourceAvailability(view);
+            if (availability.ProvenanceDomain != GS::Domain::Mesh)
+                return DerivedJobApplyValidation::StaleGeometryGeneration;
+
+            if (GeometryMetadataSignatureForEntity(raw, *entity) !=
+                job.GeometryMetadataSignature)
+            {
+                return DerivedJobApplyValidation::StaleGeometryGeneration;
+            }
+
+            if (view.VertexSource == nullptr)
+                return DerivedJobApplyValidation::StaleGeometryGeneration;
+
+            std::optional<std::vector<glm::vec3>> current =
+                CollectKMeansPositions(view.VertexSource->Properties);
+            if (!current.has_value() ||
+                !SameKMeansInputPositions(*current, job.SnapshotPositions))
+            {
+                return DerivedJobApplyValidation::StaleSourcePropertyGeneration;
+            }
+
+            return DerivedJobApplyValidation::Current;
+        }
+
+        void PublishMeshDenoiseResultSink(
+            const SandboxEditorContext& context,
+            SandboxEditorMeshDenoiseResult result)
+        {
+            if (context.MethodResultSinks.MeshDenoise)
+                context.MethodResultSinks.MeshDenoise(std::move(result));
+        }
+
+        void PublishMeshRemeshResultSink(
+            const SandboxEditorContext& context,
+            SandboxEditorMeshRemeshResult result)
+        {
+            if (context.MethodResultSinks.MeshRemesh)
+                context.MethodResultSinks.MeshRemesh(std::move(result));
+        }
+
+        void PublishMeshSimplifyResultSink(
+            const SandboxEditorContext& context,
+            SandboxEditorMeshSimplifyResult result)
+        {
+            if (context.MethodResultSinks.MeshSimplify)
+                context.MethodResultSinks.MeshSimplify(std::move(result));
+        }
+
+        [[nodiscard]] DerivedJobWorkerResult RunMeshDenoiseCpuWorker(
+            const std::shared_ptr<SandboxEditorMeshCpuJobState>& state)
+        {
+            Smooth::BilateralDenoiseParams params{};
+            params.NormalIterations = state->DenoiseCommand.NormalIterations;
+            params.VertexIterations = state->DenoiseCommand.VertexIterations;
+            params.SigmaSpatial = state->DenoiseCommand.SigmaSpatial;
+            params.SigmaRange = state->DenoiseCommand.SigmaRange;
+            params.PreserveBoundary = state->DenoiseCommand.PreserveBoundary;
+            params.DegenerateNormalLengthEpsilon =
+                state->DenoiseCommand.DegenerateNormalLengthEpsilon;
+
+            const Smooth::BilateralDenoiseResult denoise =
+                Smooth::DenoiseBilateral(state->Mesh, params);
+            SandboxEditorMeshDenoiseResult& result = state->DenoiseResult;
+            result.DenoiseStatus = denoise.Status;
+            result.Error = ErrorForDenoiseStatus(denoise.Status);
+            CopyMeshDenoiseCounters(denoise, result);
+            result.VertexSlotCount = state->SnapshotPositions.size();
+            result.SkippedDeletedVertexCount =
+                static_cast<std::size_t>(
+                    std::count(state->DeletedVertices.begin(),
+                               state->DeletedVertices.end(),
+                               true));
+            result.WrittenCount =
+                result.VertexSlotCount - result.SkippedDeletedVertexCount;
+
+            if (denoise.Status != Smooth::DenoiseStatus::Success)
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.Message = "Geometry.Smoothing denoise failed with ";
+                result.Message += std::string(Smooth::DebugName(denoise.Status));
+                result.Message += ".";
+                return DerivedJobOutput{
+                    .PayloadToken = 0u,
+                    .NormalizedProgress = 1.0f,
+                    .ProgressDeterminate = true,
+                    .Diagnostic = result.Message,
+                };
+            }
+
+            std::vector<glm::vec3> afterPositions =
+                ExtractMeshPositions(state->Mesh);
+            if (afterPositions.size() != state->SnapshotPositions.size() ||
+                !AllFiniteVec3(std::span<const glm::vec3>{
+                    afterPositions.data(),
+                    afterPositions.size()}))
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.DenoiseStatus = Smooth::DenoiseStatus::NonFiniteInput;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message =
+                    "Geometry.Smoothing denoise produced invalid or count-mismatched positions.";
+                return DerivedJobOutput{
+                    .PayloadToken = 0u,
+                    .NormalizedProgress = 1.0f,
+                    .ProgressDeterminate = true,
+                    .Diagnostic = result.Message,
+                };
+            }
+
+            std::size_t movedPublishedVertices = 0u;
+            for (std::size_t i = 0u; i < afterPositions.size(); ++i)
+            {
+                if (i < state->DeletedVertices.size() &&
+                    state->DeletedVertices[i])
+                {
+                    afterPositions[i] = state->SnapshotPositions[i];
+                    continue;
+                }
+                if (afterPositions[i] != state->SnapshotPositions[i])
+                    ++movedPublishedVertices;
+            }
+            result.MovedVertexCount = movedPublishedVertices;
+            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Error = Core::ErrorCode::Success;
+            state->DenoiseAfterPositions = std::move(afterPositions);
+            return DerivedJobOutput{
+                .PayloadToken = 0u,
+                .NormalizedProgress = 1.0f,
+                .ProgressDeterminate = true,
+                .Diagnostic = "Mesh denoise CPU result ready",
+            };
+        }
+
+        [[nodiscard]] DerivedJobWorkerResult RunMeshRemeshCpuWorker(
+            const std::shared_ptr<SandboxEditorMeshCpuJobState>& state)
+        {
+            SandboxEditorMeshRemeshResult& result = state->RemeshResult;
+            result.InputVertexCount = state->Mesh.VertexCount();
+            result.InputFaceCount = state->Mesh.FaceCount();
+
+            std::optional<Geometry::RemeshingOperationResult> remeshResult{};
+            if (state->RemeshCommand.Mode == SandboxEditorMeshRemeshMode::Uniform)
+            {
+                Remesh::RemeshingParams params{};
+                params.TargetLength = state->RemeshCommand.TargetEdgeLength;
+                params.Iterations = state->RemeshCommand.Iterations;
+                params.Lambda = state->RemeshCommand.Lambda;
+                params.PreserveBoundary =
+                    state->RemeshCommand.PreserveBoundary;
+                params.ProjectToSurface =
+                    state->RemeshCommand.ProjectToSurface;
+                params.ReferenceProjectionK =
+                    state->RemeshCommand.ReferenceProjectionK;
+                params.MaxReferenceProjectionDistance =
+                    state->RemeshCommand.MaxReferenceProjectionDistance;
+                remeshResult = Remesh::Remesh(state->Mesh, params);
+            }
+            else
+            {
+                AdaptiveRemesh::AdaptiveRemeshingParams params{};
+                if (state->RemeshCommand.TargetEdgeLength > 0.0)
+                {
+                    params.MinEdgeLength =
+                        state->RemeshCommand.TargetEdgeLength * 0.5;
+                    params.MaxEdgeLength =
+                        state->RemeshCommand.TargetEdgeLength * 2.0;
+                }
+                params.CurvatureAdaptation =
+                    state->RemeshCommand.CurvatureAdaptation;
+                params.Sizing =
+                    ToAdaptiveSizingLaw(state->RemeshCommand.SizingLaw);
+                params.ApproximationError =
+                    state->RemeshCommand.ApproximationError;
+                params.Iterations = state->RemeshCommand.Iterations;
+                params.Lambda = state->RemeshCommand.Lambda;
+                params.PreserveBoundary =
+                    state->RemeshCommand.PreserveBoundary;
+                params.EnableReferenceProjection =
+                    state->RemeshCommand.ProjectToSurface;
+                params.ReferenceProjectionK =
+                    state->RemeshCommand.ReferenceProjectionK;
+                params.MaxReferenceProjectionDistance =
+                    state->RemeshCommand.MaxReferenceProjectionDistance;
+                remeshResult = AdaptiveRemesh::AdaptiveRemesh(state->Mesh, params);
+            }
+
+            if (!remeshResult.has_value())
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message =
+                    "Geometry remeshing failed for the selected mesh and parameters.";
+                return DerivedJobOutput{
+                    .PayloadToken = 0u,
+                    .NormalizedProgress = 1.0f,
+                    .ProgressDeterminate = true,
+                    .Diagnostic = result.Message,
+                };
+            }
+
+            if (state->Mesh.HasGarbage())
+                state->Mesh.GarbageCollection();
+            CopyRemeshCounters(*remeshResult, result);
+            result.OutputVertexCount = state->Mesh.VertexCount();
+            result.OutputFaceCount = state->Mesh.FaceCount();
+            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Error = Core::ErrorCode::Success;
+            return DerivedJobOutput{
+                .PayloadToken = 0u,
+                .NormalizedProgress = 1.0f,
+                .ProgressDeterminate = true,
+                .Diagnostic = "Mesh remesh CPU result ready",
+            };
+        }
+
+        [[nodiscard]] DerivedJobWorkerResult RunMeshSimplifyCpuWorker(
+            const std::shared_ptr<SandboxEditorMeshCpuJobState>& state)
+        {
+            SandboxEditorMeshSimplifyResult& result = state->SimplifyResult;
+            result.InputVertexCount = state->Mesh.VertexCount();
+            result.InputFaceCount = state->Mesh.FaceCount();
+
+            Simpl::Params params{};
+            params.Metric =
+                state->SimplifyCommand.Metric ==
+                        SandboxEditorMeshSimplifyMetric::FA_QEM
+                    ? Simpl::Metric::FA_QEM
+                    : Simpl::Metric::ClassicalQEM;
+            params.TargetFaces = state->SimplifyCommand.TargetFaces;
+            params.MaxError = state->SimplifyCommand.MaxError > 0.0
+                ? state->SimplifyCommand.MaxError
+                : 1.0e30;
+            params.PreserveBoundary =
+                state->SimplifyCommand.PreserveBoundary;
+            params.FeatureAngleThresholdDegrees =
+                state->SimplifyCommand.FeatureAngleThresholdDegrees;
+            params.NormalWeight = state->SimplifyCommand.NormalWeight;
+            params.BoundaryWeight = state->SimplifyCommand.BoundaryWeight;
+            params.CurvatureWeight = state->SimplifyCommand.CurvatureWeight;
+            params.PreserveSharpFeatures =
+                state->SimplifyCommand.PreserveSharpFeatures;
+            params.PreserveUvSeams =
+                state->SimplifyCommand.PreserveUvSeams;
+
+            const std::optional<Simpl::Result> simplification =
+                Simpl::Simplify(state->Mesh, params);
+            if (!simplification.has_value())
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message =
+                    "Geometry.Simplification failed for the selected mesh and parameters.";
+                return DerivedJobOutput{
+                    .PayloadToken = 0u,
+                    .NormalizedProgress = 1.0f,
+                    .ProgressDeterminate = true,
+                    .Diagnostic = result.Message,
+                };
+            }
+
+            if (state->Mesh.HasGarbage())
+                state->Mesh.GarbageCollection();
+            result.OutputVertexCount = state->Mesh.VertexCount();
+            result.OutputFaceCount = state->Mesh.FaceCount();
+            result.CollapseCount = simplification->CollapseCount;
+            result.MaxCollapseError = simplification->MaxCollapseError;
+            result.CollapsesRejectedTopology =
+                simplification->CollapsesRejectedTopology;
+            result.CollapsesRejectedQuality =
+                simplification->CollapsesRejectedQuality;
+            result.SharpFeatureVerticesPinned =
+                simplification->SharpFeatureVerticesPinned;
+            result.SeamVerticesPinned = simplification->SeamVerticesPinned;
+            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Error = Core::ErrorCode::Success;
+            return DerivedJobOutput{
+                .PayloadToken = 0u,
+                .NormalizedProgress = 1.0f,
+                .ProgressDeterminate = true,
+                .Diagnostic = "Mesh simplify CPU result ready",
+            };
+        }
+
+        [[nodiscard]] DerivedJobWorkerResult RunMeshCpuWorker(
+            const std::shared_ptr<SandboxEditorMeshCpuJobState>& state)
+        {
+            switch (state->Kind)
+            {
+            case SandboxEditorMeshCpuJobKind::Denoise:
+                return RunMeshDenoiseCpuWorker(state);
+            case SandboxEditorMeshCpuJobKind::Remesh:
+                return RunMeshRemeshCpuWorker(state);
+            case SandboxEditorMeshCpuJobKind::Simplify:
+                return RunMeshSimplifyCpuWorker(state);
+            }
+            return std::unexpected(Core::ErrorCode::InvalidArgument);
+        }
+
+        [[nodiscard]] Core::Result PublishMeshDenoiseCpuJob(
+            const SandboxEditorContext& context,
+            SandboxEditorMeshCpuJobState& job)
+        {
+            SandboxEditorMeshDenoiseResult result = job.DenoiseResult;
+            if (!result.Succeeded())
+            {
+                PublishMeshDenoiseResultSink(context, result);
+                return Core::Err(ResultErrorOrUnknown(result.Error));
+            }
+
+            const SandboxEditorCommandStatus commitStatus =
+                CommitMeshDenoisePositions(
+                    context,
+                    job.StableEntityId,
+                    job.SnapshotPositions,
+                    job.DenoiseAfterPositions);
+            if (commitStatus != SandboxEditorCommandStatus::Applied)
+            {
+                result.Status = commitStatus;
+                result.Error = Core::ErrorCode::Unknown;
+                result.Message =
+                    "Mesh denoise position publication failed during editor history commit.";
+                PublishMeshDenoiseResultSink(context, result);
+                return Core::Err(Core::ErrorCode::Unknown);
+            }
+
+            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Error = Core::ErrorCode::Success;
+            result.Message = BuildMeshDenoiseSuccessMessage(result);
+            InvalidateSelectedModelCache(context);
+            PublishMeshDenoiseResultSink(context, result);
+            return Core::Ok();
+        }
+
+        [[nodiscard]] Core::Result PublishMeshRemeshCpuJob(
+            const SandboxEditorContext& context,
+            SandboxEditorMeshCpuJobState& job)
+        {
+            SandboxEditorMeshRemeshResult result = job.RemeshResult;
+            if (!result.Succeeded())
+            {
+                PublishMeshRemeshResultSink(context, result);
+                return Core::Err(ResultErrorOrUnknown(result.Error));
+            }
+
+            const SandboxEditorCommandStatus commitStatus =
+                CommitMeshTopologyReplacement(
+                    context,
+                    job.StableEntityId,
+                    "Remesh mesh",
+                    job.BeforeMesh,
+                    job.Mesh);
+            if (commitStatus != SandboxEditorCommandStatus::Applied)
+            {
+                result.Status = commitStatus;
+                result.Error = Core::ErrorCode::Unknown;
+                result.Message =
+                    "Mesh remesh publication failed during editor history commit.";
+                PublishMeshRemeshResultSink(context, result);
+                return Core::Err(Core::ErrorCode::Unknown);
+            }
+
+            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Error = Core::ErrorCode::Success;
+            result.Message = BuildMeshRemeshSuccessMessage(result);
+            InvalidateSelectedModelCache(context);
+            PublishMeshRemeshResultSink(context, result);
+            return Core::Ok();
+        }
+
+        [[nodiscard]] Core::Result PublishMeshSimplifyCpuJob(
+            const SandboxEditorContext& context,
+            SandboxEditorMeshCpuJobState& job)
+        {
+            SandboxEditorMeshSimplifyResult result = job.SimplifyResult;
+            if (!result.Succeeded())
+            {
+                PublishMeshSimplifyResultSink(context, result);
+                return Core::Err(ResultErrorOrUnknown(result.Error));
+            }
+
+            const SandboxEditorCommandStatus commitStatus =
+                CommitMeshTopologyReplacement(
+                    context,
+                    job.StableEntityId,
+                    "Simplify mesh",
+                    job.BeforeMesh,
+                    job.Mesh);
+            if (commitStatus != SandboxEditorCommandStatus::Applied)
+            {
+                result.Status = commitStatus;
+                result.Error = Core::ErrorCode::Unknown;
+                result.Message =
+                    "Mesh simplify publication failed during editor history commit.";
+                PublishMeshSimplifyResultSink(context, result);
+                return Core::Err(Core::ErrorCode::Unknown);
+            }
+
+            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Error = Core::ErrorCode::Success;
+            result.Message = BuildMeshSimplifySuccessMessage(result);
+            InvalidateSelectedModelCache(context);
+            PublishMeshSimplifyResultSink(context, result);
+            return Core::Ok();
+        }
+
+        [[nodiscard]] Core::Result PublishMeshCpuJob(
+            const SandboxEditorContext& context,
+            SandboxEditorMeshCpuJobState& job)
+        {
+            switch (job.Kind)
+            {
+            case SandboxEditorMeshCpuJobKind::Denoise:
+                return PublishMeshDenoiseCpuJob(context, job);
+            case SandboxEditorMeshCpuJobKind::Remesh:
+                return PublishMeshRemeshCpuJob(context, job);
+            case SandboxEditorMeshCpuJobKind::Simplify:
+                return PublishMeshSimplifyCpuJob(context, job);
+            }
+            return Core::Err(Core::ErrorCode::InvalidArgument);
+        }
+
+        [[nodiscard]] DerivedJobDesc MakeMeshCpuJobDesc(
+            const SandboxEditorContext& context,
+            const std::shared_ptr<SandboxEditorMeshCpuJobState>& state)
+        {
+            const std::uint32_t estimatedCost =
+                std::max<std::uint32_t>(
+                    1u,
+                    static_cast<std::uint32_t>(
+                        (std::max(state->SnapshotPositions.size(),
+                                  state->BeforeMesh.FaceCount()) +
+                         1023u) /
+                        1024u));
+            return DerivedJobDesc{
+                .Key = DerivedJobKey{
+                    .EntityId = state->StableEntityId,
+                    .Domain = ProgressiveGeometryDomain::MeshSurface,
+                    .OutputSemantic = ProgressiveSlotSemantic::Displacement,
+                    .SourcePropertyGeneration =
+                        state->GeometryMetadataSignature,
+                    .OutputName = MeshCpuJobOutputName(state->Kind),
+                },
+                .Name = MeshCpuJobName(state->Kind),
+                .RequestedJobDomain = ProgressiveJobDomain::Cpu,
+                .Kind = Core::Dag::TaskKind::GeometryProcess,
+                .Priority = Core::Dag::TaskPriority::Normal,
+                .EstimatedCost = estimatedCost,
+                .Execute =
+                    [state]() -> DerivedJobWorkerResult
+                    {
+                        return RunMeshCpuWorker(state);
+                    },
+                .ValidateOnMainThread =
+                    [context, state]()
+                    {
+                        return ValidateMeshCpuJobApply(context, *state);
+                    },
+                .ApplyOnMainThread =
+                    [context, state](DerivedJobApplyContext&) -> Core::Result
+                    {
+                        return PublishMeshCpuJob(context, *state);
+                    },
+            };
+        }
+
+        [[nodiscard]] SandboxEditorMeshDenoiseResult SubmitMeshDenoiseCpuJob(
+            const SandboxEditorContext& context,
+            const SandboxEditorMeshDenoiseCommand& command,
+            MeshDenoiseSourceResult source,
+            const std::uint64_t geometryMetadataSignature)
+        {
+            auto state = std::make_shared<SandboxEditorMeshCpuJobState>();
+            state->Kind = SandboxEditorMeshCpuJobKind::Denoise;
+            state->StableEntityId = command.StableEntityId;
+            state->GeometryMetadataSignature = geometryMetadataSignature;
+            state->SnapshotPositions = std::move(source.BeforePositions);
+            state->DeletedVertices = source.DeletedVertices;
+            state->Mesh = std::move(source.Mesh);
+            state->DenoiseCommand = command;
+            state->DenoiseResult = MakeMeshDenoiseBaseResult(command);
+            state->DenoiseResult.VertexSlotCount =
+                state->SnapshotPositions.size();
+            state->DenoiseResult.SkippedDeletedVertexCount =
+                static_cast<std::size_t>(
+                    std::count(state->DeletedVertices.begin(),
+                               state->DeletedVertices.end(),
+                               true));
+            state->DenoiseResult.WrittenCount =
+                state->DenoiseResult.VertexSlotCount -
+                state->DenoiseResult.SkippedDeletedVertexCount;
+
+            DerivedJobDesc desc = MakeMeshCpuJobDesc(context, state);
+            const DerivedJobHandle handle =
+                context.DerivedJobCommands.Submit(std::move(desc));
+            if (!handle.IsValid())
+            {
+                SandboxEditorMeshDenoiseResult result =
+                    MakeMeshDenoiseBaseResult(command);
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.DenoiseStatus = Smooth::DenoiseStatus::InvalidParams;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "Mesh denoise CPU job submission was rejected by the runtime job lane.";
+                return result;
+            }
+
+            MeshDenoiseSourceResult pendingSource{};
+            pendingSource.BeforePositions = state->SnapshotPositions;
+            pendingSource.DeletedVertices = state->DeletedVertices;
+            return MakePendingMeshDenoiseResult(
+                command,
+                pendingSource,
+                handle);
+        }
+
+        [[nodiscard]] SandboxEditorMeshRemeshResult SubmitMeshRemeshCpuJob(
+            const SandboxEditorContext& context,
+            const SandboxEditorMeshRemeshCommand& command,
+            MeshTopologySourceResult source,
+            const std::uint64_t geometryMetadataSignature)
+        {
+            auto state = std::make_shared<SandboxEditorMeshCpuJobState>();
+            state->Kind = SandboxEditorMeshCpuJobKind::Remesh;
+            state->StableEntityId = command.StableEntityId;
+            state->GeometryMetadataSignature = geometryMetadataSignature;
+            state->SnapshotPositions = ExtractMeshPositions(source.Mesh);
+            state->BeforeMesh = source.Mesh;
+            state->Mesh = std::move(source.Mesh);
+            state->RemeshCommand = command;
+            state->RemeshResult = MakeMeshRemeshBaseResult(command);
+            state->RemeshResult.InputVertexCount =
+                state->BeforeMesh.VertexCount();
+            state->RemeshResult.InputFaceCount = state->BeforeMesh.FaceCount();
+
+            DerivedJobDesc desc = MakeMeshCpuJobDesc(context, state);
+            const DerivedJobHandle handle =
+                context.DerivedJobCommands.Submit(std::move(desc));
+            if (!handle.IsValid())
+            {
+                SandboxEditorMeshRemeshResult result =
+                    MakeMeshRemeshBaseResult(command);
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "Mesh remesh CPU job submission was rejected by the runtime job lane.";
+                return result;
+            }
+
+            return MakePendingMeshRemeshResult(command, state->BeforeMesh, handle);
+        }
+
+        [[nodiscard]] SandboxEditorMeshSimplifyResult SubmitMeshSimplifyCpuJob(
+            const SandboxEditorContext& context,
+            const SandboxEditorMeshSimplifyCommand& command,
+            MeshTopologySourceResult source,
+            const std::uint64_t geometryMetadataSignature)
+        {
+            auto state = std::make_shared<SandboxEditorMeshCpuJobState>();
+            state->Kind = SandboxEditorMeshCpuJobKind::Simplify;
+            state->StableEntityId = command.StableEntityId;
+            state->GeometryMetadataSignature = geometryMetadataSignature;
+            state->SnapshotPositions = ExtractMeshPositions(source.Mesh);
+            state->BeforeMesh = source.Mesh;
+            state->Mesh = std::move(source.Mesh);
+            state->SimplifyCommand = command;
+            state->SimplifyResult = MakeMeshSimplifyBaseResult(command);
+            state->SimplifyResult.InputVertexCount =
+                state->BeforeMesh.VertexCount();
+            state->SimplifyResult.InputFaceCount = state->BeforeMesh.FaceCount();
+
+            DerivedJobDesc desc = MakeMeshCpuJobDesc(context, state);
+            const DerivedJobHandle handle =
+                context.DerivedJobCommands.Submit(std::move(desc));
+            if (!handle.IsValid())
+            {
+                SandboxEditorMeshSimplifyResult result =
+                    MakeMeshSimplifyBaseResult(command);
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "Mesh simplify CPU job submission was rejected by the runtime job lane.";
+                return result;
+            }
+
+            return MakePendingMeshSimplifyResult(
+                command,
+                state->BeforeMesh,
+                handle);
+        }
+
         [[nodiscard]] std::string BuildRegistrationSuccessMessage(
             const SandboxEditorRegistrationResult& result)
         {
@@ -18276,17 +19089,8 @@ namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorMeshDenoiseCommand& command)
     {
-        SandboxEditorMeshDenoiseResult result{
-            .Status = SandboxEditorCommandStatus::NoChange,
-            .DenoiseStatus = Smooth::DenoiseStatus::Success,
-            .Stage = command.Stage,
-            .NormalIterations = command.NormalIterations,
-            .VertexIterations = command.VertexIterations,
-            .SigmaSpatial = command.SigmaSpatial,
-            .SigmaRange = command.SigmaRange,
-            .PreserveBoundary = command.PreserveBoundary,
-            .Error = Core::ErrorCode::Success,
-        };
+        SandboxEditorMeshDenoiseResult result =
+            MakeMeshDenoiseBaseResult(command);
 
         if (context.Scene == nullptr)
         {
@@ -18363,6 +19167,15 @@ namespace Extrinsic::Runtime
             result.Error = source.Error;
             result.Message = source.Diagnostic;
             return result;
+        }
+
+        if (context.DerivedJobCommands.Available())
+        {
+            return SubmitMeshDenoiseCpuJob(
+                context,
+                command,
+                std::move(source),
+                GeometryMetadataSignatureForEntity(raw, *entity));
         }
 
         Smooth::BilateralDenoiseParams params{};
@@ -18648,15 +19461,8 @@ namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorMeshRemeshCommand& command)
     {
-        SandboxEditorMeshRemeshResult result{
-            .Status = SandboxEditorCommandStatus::NoChange,
-            .Mode = command.Mode,
-            .SizingLaw = command.SizingLaw,
-            .IterationsRequested = command.Iterations,
-            .TargetEdgeLength = command.TargetEdgeLength,
-            .ProjectToSurface = command.ProjectToSurface,
-            .Error = Core::ErrorCode::Success,
-        };
+        SandboxEditorMeshRemeshResult result =
+            MakeMeshRemeshBaseResult(command);
 
         if (context.Scene == nullptr)
         {
@@ -18746,6 +19552,15 @@ namespace Extrinsic::Runtime
             result.Error = source.Error;
             result.Message = source.Diagnostic;
             return result;
+        }
+
+        if (context.DerivedJobCommands.Available())
+        {
+            return SubmitMeshRemeshCpuJob(
+                context,
+                command,
+                std::move(source),
+                GeometryMetadataSignatureForEntity(raw, *entity));
         }
 
         result.InputVertexCount = source.Mesh.VertexCount();
@@ -19033,13 +19848,8 @@ namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorMeshSimplifyCommand& command)
     {
-        SandboxEditorMeshSimplifyResult result{
-            .Status = SandboxEditorCommandStatus::NoChange,
-            .Metric = command.Metric,
-            .TargetFaces = command.TargetFaces,
-            .MaxError = command.MaxError,
-            .Error = Core::ErrorCode::Success,
-        };
+        SandboxEditorMeshSimplifyResult result =
+            MakeMeshSimplifyBaseResult(command);
 
         if (context.Scene == nullptr)
         {
@@ -19102,22 +19912,15 @@ namespace Extrinsic::Runtime
         // does. Copy it in (the builder guarantees a 1:1 source->halfedge vertex
         // mapping) so FA_QEM's PreserveUvSeams can actually pin UV-seam vertices
         // instead of silently no-opping when the halfedge mesh lacks texcoords.
-        if (view.VertexSource != nullptr)
+        CopyMeshSimplifyAuxiliaryProperties(view, source.Mesh);
+
+        if (context.DerivedJobCommands.Available())
         {
-            const auto sourceTexcoords =
-                view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
-            if (sourceTexcoords &&
-                sourceTexcoords.Vector().size() == source.Mesh.VerticesSize())
-            {
-                auto meshTexcoords =
-                    source.Mesh.VertexProperties().GetOrAdd<glm::vec2>(
-                        "v:texcoord", glm::vec2{0.0f});
-                for (std::size_t i = 0u;
-                     i < sourceTexcoords.Vector().size(); ++i)
-                {
-                    meshTexcoords[i] = sourceTexcoords.Vector()[i];
-                }
-            }
+            return SubmitMeshSimplifyCpuJob(
+                context,
+                command,
+                std::move(source),
+                GeometryMetadataSignatureForEntity(raw, *entity));
         }
 
         result.InputVertexCount = source.Mesh.VertexCount();
@@ -20033,6 +20836,27 @@ namespace Extrinsic::Runtime
                         if (alive && *alive)
                             m_LastProgressivePoissonResult =
                                 std::move(result);
+                    };
+                context.MethodResultSinks.MeshDenoise =
+                    [alive = m_ResultSinksAlive, this](
+                        SandboxEditorMeshDenoiseResult result)
+                    {
+                        if (alive && *alive)
+                            m_LastMeshDenoiseResult = std::move(result);
+                    };
+                context.MethodResultSinks.MeshRemesh =
+                    [alive = m_ResultSinksAlive, this](
+                        SandboxEditorMeshRemeshResult result)
+                    {
+                        if (alive && *alive)
+                            m_LastMeshRemeshResult = std::move(result);
+                    };
+                context.MethodResultSinks.MeshSimplify =
+                    [alive = m_ResultSinksAlive, this](
+                        SandboxEditorMeshSimplifyResult result)
+                    {
+                        if (alive && *alive)
+                            m_LastMeshSimplifyResult = std::move(result);
                     };
                 context.PendingAssetImportPath =
                     std::string(m_ImportPathBuffer.data());
