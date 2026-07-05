@@ -81,9 +81,10 @@ only from the main-thread apply callback.
 applies it to Progressive Poisson point-cloud and mesh-surface CPU sampling,
 Slice C applies it to mesh denoise/remesh/simplify commands, and Slice D
 applies it to ICP registration alignment while preserving the existing
-immediate fallback for tests and callers without an engine job surface. Slice
-E.1 applies it to mesh curvature. The remaining synchronous
-geometry-processing buttons are tracked in the active `RUNTIME-141` inventory.
+immediate fallback for tests and callers without an engine job surface. Slices
+E.1 and E.2 apply it to mesh curvature and mesh subdivision. The remaining
+synchronous geometry-processing buttons are tracked in the active
+`RUNTIME-141` inventory.
 
 ### Sandbox Editor Startup Layout
 

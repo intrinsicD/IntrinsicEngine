@@ -8053,6 +8053,19 @@ namespace Extrinsic::Runtime
             };
         }
 
+        [[nodiscard]] SandboxEditorMeshSubdivideResult
+        MakeMeshSubdivideBaseResult(
+            const SandboxEditorMeshSubdivideCommand& command)
+        {
+            return SandboxEditorMeshSubdivideResult{
+                .Status = SandboxEditorCommandStatus::NoChange,
+                .Operator = command.Operator,
+                .IterationsRequested = command.Iterations,
+                .PreserveLoopFeatureEdges = command.PreserveLoopFeatureEdges,
+                .Error = Core::ErrorCode::Success,
+            };
+        }
+
         [[nodiscard]] SandboxEditorMeshSimplifyResult MakeMeshSimplifyBaseResult(
             const SandboxEditorMeshSimplifyCommand& command)
         {
@@ -8134,6 +8147,23 @@ namespace Extrinsic::Runtime
             return result;
         }
 
+        [[nodiscard]] SandboxEditorMeshSubdivideResult
+        MakePendingMeshSubdivideResult(
+            const SandboxEditorMeshSubdivideCommand& command,
+            const Geometry::HalfedgeMesh::Mesh& mesh,
+            const DerivedJobHandle handle)
+        {
+            SandboxEditorMeshSubdivideResult result =
+                MakeMeshSubdivideBaseResult(command);
+            result.Status = SandboxEditorCommandStatus::Pending;
+            result.InputVertexCount = mesh.VertexCount();
+            result.InputFaceCount = mesh.FaceCount();
+            result.Message = "Mesh subdivide CPU job queued";
+            AppendDerivedJobHandleToMessage(result.Message, handle);
+            result.Message += ".";
+            return result;
+        }
+
         [[nodiscard]] SandboxEditorMeshSimplifyResult
         MakePendingMeshSimplifyResult(
             const SandboxEditorMeshSimplifyCommand& command,
@@ -8164,6 +8194,7 @@ namespace Extrinsic::Runtime
             Curvature,
             Denoise,
             Remesh,
+            Subdivide,
             Simplify,
         };
 
@@ -8178,6 +8209,8 @@ namespace Extrinsic::Runtime
                 return "Sandbox.MeshDenoise.CPU";
             case SandboxEditorMeshCpuJobKind::Remesh:
                 return "Sandbox.MeshRemesh.CPU";
+            case SandboxEditorMeshCpuJobKind::Subdivide:
+                return "Sandbox.MeshSubdivide.CPU";
             case SandboxEditorMeshCpuJobKind::Simplify:
                 return "Sandbox.MeshSimplify.CPU";
             }
@@ -8195,6 +8228,8 @@ namespace Extrinsic::Runtime
                 return "mesh_denoise_positions";
             case SandboxEditorMeshCpuJobKind::Remesh:
                 return "mesh_remesh_topology";
+            case SandboxEditorMeshCpuJobKind::Subdivide:
+                return "mesh_subdivide_topology";
             case SandboxEditorMeshCpuJobKind::Simplify:
                 return "mesh_simplify_topology";
             }
@@ -8210,6 +8245,7 @@ namespace Extrinsic::Runtime
                 return ProgressiveSlotSemantic::ScalarField;
             case SandboxEditorMeshCpuJobKind::Denoise:
             case SandboxEditorMeshCpuJobKind::Remesh:
+            case SandboxEditorMeshCpuJobKind::Subdivide:
             case SandboxEditorMeshCpuJobKind::Simplify:
                 return ProgressiveSlotSemantic::Displacement;
             }
@@ -8258,10 +8294,12 @@ namespace Extrinsic::Runtime
             SandboxEditorMeshCurvatureCommand CurvatureCommand{};
             SandboxEditorMeshDenoiseCommand DenoiseCommand{};
             SandboxEditorMeshRemeshCommand RemeshCommand{};
+            SandboxEditorMeshSubdivideCommand SubdivideCommand{};
             SandboxEditorMeshSimplifyCommand SimplifyCommand{};
             SandboxEditorMeshCurvatureResult CurvatureResult{};
             SandboxEditorMeshDenoiseResult DenoiseResult{};
             SandboxEditorMeshRemeshResult RemeshResult{};
+            SandboxEditorMeshSubdivideResult SubdivideResult{};
             SandboxEditorMeshSimplifyResult SimplifyResult{};
         };
 
@@ -8351,6 +8389,14 @@ namespace Extrinsic::Runtime
         {
             if (context.MethodResultSinks.MeshRemesh)
                 context.MethodResultSinks.MeshRemesh(std::move(result));
+        }
+
+        void PublishMeshSubdivideResultSink(
+            const SandboxEditorContext& context,
+            SandboxEditorMeshSubdivideResult result)
+        {
+            if (context.MethodResultSinks.MeshSubdivide)
+                context.MethodResultSinks.MeshSubdivide(std::move(result));
         }
 
         void PublishMeshSimplifyResultSink(
@@ -8659,6 +8705,122 @@ namespace Extrinsic::Runtime
             };
         }
 
+        [[nodiscard]] DerivedJobWorkerResult RunMeshSubdivideCpuWorker(
+            const std::shared_ptr<SandboxEditorMeshCpuJobState>& state)
+        {
+            SandboxEditorMeshSubdivideResult& result =
+                state->SubdivideResult;
+            result.InputVertexCount = state->Mesh.VertexCount();
+            result.InputFaceCount = state->Mesh.FaceCount();
+
+            Geometry::HalfedgeMesh::Mesh output{};
+            if (state->SubdivideCommand.Operator ==
+                SandboxEditorMeshSubdivideOperator::Loop)
+            {
+                LoopSubdivide::SubdivisionParams params{};
+                params.Iterations = state->SubdivideCommand.Iterations;
+                params.MaxOutputFaces =
+                    state->SubdivideCommand.MaxOutputFaces;
+                params.PreserveFeatureEdges =
+                    state->SubdivideCommand.PreserveLoopFeatureEdges;
+                params.FeatureEdgePropertyName =
+                    state->SubdivideCommand.FeatureEdgePropertyName;
+                const std::optional<LoopSubdivide::SubdivisionResult>
+                    subdivision =
+                        LoopSubdivide::Subdivide(state->Mesh, output, params);
+                if (!subdivision.has_value())
+                {
+                    result.Status =
+                        SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    result.Error = Core::ErrorCode::InvalidArgument;
+                    result.Message =
+                        "Geometry.Subdivision Loop subdivision failed for the selected mesh and parameters.";
+                    return DerivedJobOutput{
+                        .PayloadToken = 0u,
+                        .NormalizedProgress = 1.0f,
+                        .ProgressDeterminate = true,
+                        .Diagnostic = result.Message,
+                    };
+                }
+                result.IterationsPerformed =
+                    static_cast<std::uint32_t>(
+                        subdivision->IterationsPerformed);
+                result.OutputVertexCount = subdivision->FinalVertexCount;
+                result.OutputFaceCount = subdivision->FinalFaceCount;
+            }
+            else if (state->SubdivideCommand.Operator ==
+                     SandboxEditorMeshSubdivideOperator::CatmullClark)
+            {
+                CatmullClark::SubdivisionParams params{};
+                params.Iterations = state->SubdivideCommand.Iterations;
+                const std::optional<CatmullClark::SubdivisionResult>
+                    subdivision =
+                        CatmullClark::Subdivide(state->Mesh, output, params);
+                if (!subdivision.has_value())
+                {
+                    result.Status =
+                        SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    result.Error = Core::ErrorCode::InvalidArgument;
+                    result.Message =
+                        "Geometry.CatmullClark subdivision failed for the selected mesh and parameters.";
+                    return DerivedJobOutput{
+                        .PayloadToken = 0u,
+                        .NormalizedProgress = 1.0f,
+                        .ProgressDeterminate = true,
+                        .Diagnostic = result.Message,
+                    };
+                }
+                result.IterationsPerformed =
+                    static_cast<std::uint32_t>(
+                        subdivision->IterationsPerformed);
+                result.OutputVertexCount = subdivision->FinalVertexCount;
+                result.OutputFaceCount = subdivision->FinalFaceCount;
+            }
+            else
+            {
+                Sqrt3Subdivide::Sqrt3Params params{};
+                params.Iterations = state->SubdivideCommand.Iterations;
+                params.MaxOutputFaces =
+                    state->SubdivideCommand.MaxOutputFaces;
+                const std::optional<Sqrt3Subdivide::Sqrt3Result>
+                    subdivision =
+                        Sqrt3Subdivide::Subdivide(state->Mesh, output, params);
+                if (!subdivision.has_value())
+                {
+                    result.Status =
+                        SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    result.Error = Core::ErrorCode::InvalidArgument;
+                    result.Message =
+                        "Geometry.HalfedgeMesh.SubdivisionSqrt3 failed for the selected mesh and parameters.";
+                    return DerivedJobOutput{
+                        .PayloadToken = 0u,
+                        .NormalizedProgress = 1.0f,
+                        .ProgressDeterminate = true,
+                        .Diagnostic = result.Message,
+                    };
+                }
+                result.IterationsPerformed =
+                    static_cast<std::uint32_t>(
+                        subdivision->IterationsPerformed);
+                result.OutputVertexCount = subdivision->FinalVertexCount;
+                result.OutputFaceCount = subdivision->FinalFaceCount;
+            }
+
+            if (output.HasGarbage())
+                output.GarbageCollection();
+            result.OutputVertexCount = output.VertexCount();
+            result.OutputFaceCount = output.FaceCount();
+            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Error = Core::ErrorCode::Success;
+            state->Mesh = std::move(output);
+            return DerivedJobOutput{
+                .PayloadToken = 0u,
+                .NormalizedProgress = 1.0f,
+                .ProgressDeterminate = true,
+                .Diagnostic = "Mesh subdivide CPU result ready",
+            };
+        }
+
         [[nodiscard]] DerivedJobWorkerResult RunMeshSimplifyCpuWorker(
             const std::shared_ptr<SandboxEditorMeshCpuJobState>& state)
         {
@@ -8739,6 +8901,8 @@ namespace Extrinsic::Runtime
                 return RunMeshDenoiseCpuWorker(state);
             case SandboxEditorMeshCpuJobKind::Remesh:
                 return RunMeshRemeshCpuWorker(state);
+            case SandboxEditorMeshCpuJobKind::Subdivide:
+                return RunMeshSubdivideCpuWorker(state);
             case SandboxEditorMeshCpuJobKind::Simplify:
                 return RunMeshSimplifyCpuWorker(state);
             }
@@ -8854,6 +9018,42 @@ namespace Extrinsic::Runtime
             return Core::Ok();
         }
 
+        [[nodiscard]] Core::Result PublishMeshSubdivideCpuJob(
+            const SandboxEditorContext& context,
+            SandboxEditorMeshCpuJobState& job)
+        {
+            SandboxEditorMeshSubdivideResult result = job.SubdivideResult;
+            if (!result.Succeeded())
+            {
+                PublishMeshSubdivideResultSink(context, result);
+                return Core::Err(ResultErrorOrUnknown(result.Error));
+            }
+
+            const SandboxEditorCommandStatus commitStatus =
+                CommitMeshTopologyReplacement(
+                    context,
+                    job.StableEntityId,
+                    "Subdivide mesh",
+                    job.BeforeMesh,
+                    job.Mesh);
+            if (commitStatus != SandboxEditorCommandStatus::Applied)
+            {
+                result.Status = commitStatus;
+                result.Error = Core::ErrorCode::Unknown;
+                result.Message =
+                    "Mesh subdivide publication failed during editor history commit.";
+                PublishMeshSubdivideResultSink(context, result);
+                return Core::Err(Core::ErrorCode::Unknown);
+            }
+
+            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Error = Core::ErrorCode::Success;
+            result.Message = BuildMeshSubdivideSuccessMessage(result);
+            InvalidateSelectedModelCache(context);
+            PublishMeshSubdivideResultSink(context, result);
+            return Core::Ok();
+        }
+
         [[nodiscard]] Core::Result PublishMeshSimplifyCpuJob(
             const SandboxEditorContext& context,
             SandboxEditorMeshCpuJobState& job)
@@ -8902,6 +9102,8 @@ namespace Extrinsic::Runtime
                 return PublishMeshDenoiseCpuJob(context, job);
             case SandboxEditorMeshCpuJobKind::Remesh:
                 return PublishMeshRemeshCpuJob(context, job);
+            case SandboxEditorMeshCpuJobKind::Subdivide:
+                return PublishMeshSubdivideCpuJob(context, job);
             case SandboxEditorMeshCpuJobKind::Simplify:
                 return PublishMeshSimplifyCpuJob(context, job);
             }
@@ -9086,6 +9288,48 @@ namespace Extrinsic::Runtime
             }
 
             return MakePendingMeshRemeshResult(command, state->BeforeMesh, handle);
+        }
+
+        [[nodiscard]] SandboxEditorMeshSubdivideResult
+        SubmitMeshSubdivideCpuJob(
+            const SandboxEditorContext& context,
+            const SandboxEditorMeshSubdivideCommand& command,
+            MeshTopologySourceResult source,
+            const std::uint64_t geometryMetadataSignature)
+        {
+            auto state = std::make_shared<SandboxEditorMeshCpuJobState>();
+            state->Kind = SandboxEditorMeshCpuJobKind::Subdivide;
+            state->StableEntityId = command.StableEntityId;
+            state->GeometryMetadataSignature = geometryMetadataSignature;
+            state->SnapshotPositions = ExtractMeshPositions(source.Mesh);
+            state->BeforeMesh = source.Mesh;
+            state->Mesh = std::move(source.Mesh);
+            state->SubdivideCommand = command;
+            state->SubdivideResult = MakeMeshSubdivideBaseResult(command);
+            state->SubdivideResult.InputVertexCount =
+                state->BeforeMesh.VertexCount();
+            state->SubdivideResult.InputFaceCount =
+                state->BeforeMesh.FaceCount();
+
+            DerivedJobDesc desc = MakeMeshCpuJobDesc(context, state);
+            const DerivedJobHandle handle =
+                context.DerivedJobCommands.Submit(std::move(desc));
+            if (!handle.IsValid())
+            {
+                SandboxEditorMeshSubdivideResult result =
+                    MakeMeshSubdivideBaseResult(command);
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "Mesh subdivide CPU job submission was rejected by the runtime job lane.";
+                return result;
+            }
+
+            return MakePendingMeshSubdivideResult(
+                command,
+                state->BeforeMesh,
+                handle);
         }
 
         [[nodiscard]] SandboxEditorMeshSimplifyResult SubmitMeshSimplifyCpuJob(
@@ -20411,13 +20655,8 @@ namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorMeshSubdivideCommand& command)
     {
-        SandboxEditorMeshSubdivideResult result{
-            .Status = SandboxEditorCommandStatus::NoChange,
-            .Operator = command.Operator,
-            .IterationsRequested = command.Iterations,
-            .PreserveLoopFeatureEdges = command.PreserveLoopFeatureEdges,
-            .Error = Core::ErrorCode::Success,
-        };
+        SandboxEditorMeshSubdivideResult result =
+            MakeMeshSubdivideBaseResult(command);
 
         if (context.Scene == nullptr)
         {
@@ -20507,6 +20746,15 @@ namespace Extrinsic::Runtime
             result.Error = source.Error;
             result.Message = source.Diagnostic;
             return result;
+        }
+
+        if (context.DerivedJobCommands.Available())
+        {
+            return SubmitMeshSubdivideCpuJob(
+                context,
+                command,
+                std::move(source),
+                GeometryMetadataSignatureForEntity(raw, *entity));
         }
 
         result.InputVertexCount = source.Mesh.VertexCount();
@@ -21634,6 +21882,13 @@ namespace Extrinsic::Runtime
                     {
                         if (alive && *alive)
                             m_LastMeshRemeshResult = std::move(result);
+                    };
+                context.MethodResultSinks.MeshSubdivide =
+                    [alive = m_ResultSinksAlive, this](
+                        SandboxEditorMeshSubdivideResult result)
+                    {
+                        if (alive && *alive)
+                            m_LastMeshSubdivideResult = std::move(result);
                     };
                 context.MethodResultSinks.MeshSimplify =
                     [alive = m_ResultSinksAlive, this](
