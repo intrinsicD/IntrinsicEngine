@@ -3,21 +3,34 @@ id: UI-030
 theme: F
 depends_on: []
 maturity_target: Operational
+completed: 2026-07-05
 ---
 # UI-030 — Sandbox EditorUI frame-pacing diagnostics
 
 ## Status
-- In progress (2026-07-05) on local `main`; PR not opened.
+- Retired on 2026-07-05 at `Operational` for the diagnostic loop on local
+  `main`; PR not opened.
+- PR/commit: this retirement commit.
 - Slice landed locally as `CPUContracted`: `Engine::RunFrame` publishes
   `RuntimeFramePacingDiagnostics`, `ImGuiAdapterDiagnostics` records producer
   CPU timings, and promoted Vulkan lifecycle diagnostics record wait/acquire/
   submit/present microsecond fields without exporting Vulkan-native types.
   Focused Null/backend-neutral contract coverage passes for the runtime capture
-  surface. The `Operational` report remains open because no evidence-backed
-  bottleneck ranking has been produced from a bounded sandbox run.
-- Opt-in `ci-vulkan` lifecycle/sandbox smoke also passes on this Vulkan-capable
-  host for the selected GPU/Vulkan subset. Next verification step: add the
-  bounded diagnostic harness/report that ranks measured frame-pacing causes.
+  surface.
+- `ExtrinsicSandbox --frame-pacing-report <path> --frame-pacing-frames <N>`
+  provides the bounded machine-readable capture mode. The JSON schema is
+  `intrinsic.frame_pacing.v1` and is validated by the opt-in
+  `ExtrinsicSandbox.FramePacingDiagnosticCapture` CTest under `ci-vulkan`.
+- The measured report is
+  [`docs/reports/2026-07-05-ui-030-frame-pacing-diagnostics.md`](../../docs/reports/2026-07-05-ui-030-frame-pacing-diagnostics.md).
+  The default capture ranked `present_micros` highest and ruled out editor
+  callback work, ImGui draw-data copy, render-graph compile/execute, selection
+  readback, and fixed-step simulation as dominant causes for that run.
+- The default capture also logged
+  `VulkanRequestedButNotOperational status=RequestedButIncompleteGate
+  reason=BarrierValidationFailed` from shader-interface validation warnings.
+  That cleanup is split to `BUG-056`; UI-030 does not claim an operational
+  Vulkan present/acquire/fence bottleneck from the fallback capture.
 - Completed audit finding: `Extrinsic.Graphics.ImGuiUploadHelper`
   (`src/graphics/renderer/Graphics.ImGuiUploadHelper.cpp`) owns exactly one
   growing host-visible vertex buffer and one growing host-visible index buffer,
@@ -31,12 +44,14 @@ maturity_target: Operational
   gates slot `N mod F`, i.e. frame `N-F`, not frame `N-1`, and the single buffer
   is shared across all slots). Per the acceptance criterion this is now tracked
   by a named follow-up rather than fixed in this diagnostic task.
-- Follow-up filed: `GRAPHICS-110` — per-frame/ring ImGui upload buffers for
-  in-flight safety
-  (`tasks/done/GRAPHICS-110-imgui-upload-buffer-in-flight-safety.md`).
-- Follow-ups filed from the selected-entity source diagnosis: `RUNTIME-138`
+- Follow-up filed: [`GRAPHICS-110`](GRAPHICS-110-imgui-upload-buffer-in-flight-safety.md)
+  — per-frame/ring ImGui upload buffers for in-flight safety.
+- Follow-ups filed from the selected-entity source diagnosis:
+  [`RUNTIME-138`](../backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
   owns the nonblocking selected-entity editor/cache/job pipeline,
-  `GRAPHICS-113` retired selected-outline ID work pruning, and `GRAPHICS-114`
+  [`GRAPHICS-113`](GRAPHICS-113-selection-outline-id-work-pruning.md) retired
+  selected-outline ID work pruning, and
+  [`GRAPHICS-114`](GRAPHICS-114-retained-imgui-overlay-copy-upload-path.md)
   retired retained ImGui overlay copy/upload cleanup after `GRAPHICS-110`.
 
 ## Goal
@@ -64,28 +79,28 @@ maturity_target: Operational
 - [x] Add Vulkan frame lifecycle timing for `vkWaitForFences`, `vkAcquireNextImageKHR`, queue submit, and `vkQueuePresentKHR`, exposed through existing renderer/runtime diagnostics without lower layers importing runtime/UI.
 - [x] Add ImGui overlay diagnostics for per-frame copied font-atlas bytes, draw-list bytes, vertex/index counts, command count, CPU flatten/copy time, GPU buffer write bytes, buffer allocation count, and whether font-atlas upload actually queued.
 - [x] Audit `ImGuiUploadHelper` transient buffer ownership and either prove it is safe for the current frames-in-flight model or file a named follow-up task for per-frame/ring upload buffers. Audit complete (see Status); the single-shared-host-visible-buffer overwrite pattern is not provably in-flight-safe, so `GRAPHICS-110` was filed for per-frame/ring upload buffers.
-- [ ] Add a reproducible local diagnostic mode or test harness that runs the sandbox/editor frame loop for a bounded frame count and emits machine-readable frame timing samples.
-- [ ] Write a short report under `docs/reports/` summarizing the measured bottleneck ranking, ruled-out hypotheses, backend/present-mode conditions, and the follow-up task IDs for fixes.
-- [ ] If the investigation finds a specific bug or missing synchronization contract beyond open `RUNTIME-138` or the retired `GRAPHICS-110`/`GRAPHICS-113`/`GRAPHICS-114` fixes, open a scoped follow-up task under `tasks/backlog/bugs/`, `tasks/backlog/rendering/`, `tasks/backlog/runtime/`, or `tasks/backlog/ui/` rather than expanding this task into the fix.
+- [x] Add a reproducible local diagnostic mode or test harness that runs the sandbox/editor frame loop for a bounded frame count and emits machine-readable frame timing samples.
+- [x] Write a short report under `docs/reports/` summarizing the measured bottleneck ranking, ruled-out hypotheses, backend/present-mode conditions, and the follow-up task IDs for fixes.
+- [x] If the investigation finds a specific bug or missing synchronization contract beyond open `RUNTIME-138` or the retired `GRAPHICS-110`/`GRAPHICS-113`/`GRAPHICS-114` fixes, open a scoped follow-up task under `tasks/backlog/bugs/`, `tasks/backlog/rendering/`, `tasks/backlog/runtime/`, or `tasks/backlog/ui/` rather than expanding this task into the fix. Filed `BUG-056` for the default sandbox Vulkan validation-gate fallback.
 
 ## Tests
 - [x] Add or update contract tests proving the new diagnostics are populated in the Null backend path without requiring GPU/Vulkan.
 - [x] Add opt-in `gpu;vulkan` verification notes or tests for the Vulkan lifecycle timers when a Vulkan-capable host is available.
 - [x] Run focused runtime/graphics contract tests covering `SandboxEditorUi`, `ImGuiPass`, and renderer frame lifecycle diagnostics.
-- [ ] Validate any emitted JSON/report schema if a machine-readable diagnostic artifact is added.
+- [x] Validate any emitted JSON/report schema if a machine-readable diagnostic artifact is added.
 
 ## Docs
 - [x] Update `tasks/backlog/ui/README.md` to keep the open UI backlog current.
-- [ ] Add the measured frame-pacing report under `docs/reports/` and link every follow-up task it creates.
+- [x] Add the measured frame-pacing report under `docs/reports/` and link every follow-up task it creates.
 - [x] If a new diagnostics panel/control is exposed, update `src/runtime/README.md` or the relevant renderer README to document the factual current state.
 
 ## Acceptance criteria
-- [ ] A user can capture frame-pacing data that separates CPU editor cost from GPU/frame lifecycle stalls.
-- [ ] The investigation reports whether stutter correlates with editor model rebuilds, ImGui copy/upload, frame-slot fence waits, acquire/present stalls, render-graph compile/execute spikes, synchronous upload/readback, or another measured cause.
+- [x] A user can capture frame-pacing data that separates CPU editor cost from GPU/frame lifecycle stalls.
+- [x] The investigation reports whether stutter correlates with editor model rebuilds, ImGui copy/upload, frame-slot fence waits, acquire/present stalls, render-graph compile/execute spikes, synchronous upload/readback, or another measured cause.
 - [x] `ImGuiUploadHelper` in-flight buffer safety is either proven by code/test evidence or tracked by a follow-up task with a concrete owner. Tracked by `GRAPHICS-110`.
-- [ ] Follow-up implementation tasks exist for every measured fix candidate that should not be completed inside this diagnostic task.
-- [ ] Selected-entity main-loop responsiveness fixes remain owned by open `RUNTIME-138`; retired renderer/upload evidence remains in `GRAPHICS-113`/`GRAPHICS-114`; this task stays an evidence loop and report.
-- [ ] The report does not claim a performance improvement unless it cites before/after measurements and the exact verification commands.
+- [x] Follow-up implementation tasks exist for every measured fix candidate that should not be completed inside this diagnostic task.
+- [x] Selected-entity main-loop responsiveness fixes remain owned by open `RUNTIME-138`; retired renderer/upload evidence remains in `GRAPHICS-113`/`GRAPHICS-114`; this task stays an evidence loop and report.
+- [x] The report does not claim a performance improvement unless it cites before/after measurements and the exact verification commands.
 
 ## Verification
 ```bash
@@ -94,6 +109,9 @@ ctest --test-dir build/ci --output-on-failure -R 'ImGuiAdapter|ImGuiAdapterEngin
 cmake --preset ci-vulkan
 cmake --build --preset ci-vulkan --target IntrinsicGraphicsVulkanSmokeTests IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests IntrinsicGraphicsVulkanContractTests IntrinsicRuntimeContractTests
 ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'VulkanBootstrap|ImGuiSurface|RuntimeSandboxAcceptance|FrameLifecycle|ImGuiAdapterEngineWiring' --timeout 180
+cmake --build --preset ci-vulkan --target ExtrinsicSandbox
+ctest --test-dir build/ci-vulkan --output-on-failure -R 'ExtrinsicSandbox.FramePacingDiagnosticCapture' -L 'gpu' -L 'vulkan' --timeout 180
+LSAN_OPTIONS='suppressions=/home/alex/Documents/IntrinsicEngine/lsan.supp:fast_unwind_on_malloc=0:detect_leaks=0' ASAN_OPTIONS='symbolize=1:detect_leaks=0:fast_unwind_on_malloc=0' timeout 60s build/ci-vulkan/bin/ExtrinsicSandbox --frame-pacing-report /tmp/ui030-frame-pacing.json --frame-pacing-frames 16
 python3 tools/agents/validate_tasks.py --root tasks --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi|ImGuiPass|RendererFrameLifecycle' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
@@ -109,5 +127,8 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'Sa
 - Introducing unrelated feature work.
 
 ## Maturity
-- Target: `Operational` on Vulkan-capable hosts; `CPUContracted` for the Null/backend-neutral diagnostics contract.
-- This task may retire only after it provides an evidence-backed bottleneck ranking. Any actual performance fix is owned by follow-up tasks created from the report.
+- Retired at `Operational` for the diagnostic capture/report loop on
+  Vulkan-capable hosts; `CPUContracted` for the Null/backend-neutral
+  diagnostics contract.
+- Any actual performance fix is owned by follow-up tasks created from the
+  report, including `BUG-056` for the default sandbox Vulkan validation gate.

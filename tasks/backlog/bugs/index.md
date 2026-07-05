@@ -5,7 +5,7 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- None currently.
+- [`BUG-056` — ExtrinsicSandbox default Vulkan validation gate fallback](BUG-056-extrinsic-sandbox-default-vulkan-validation-gate.md).
 
 ---
 

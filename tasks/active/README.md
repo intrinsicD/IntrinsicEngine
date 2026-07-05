@@ -11,12 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [UI-030 — Sandbox EditorUI frame-pacing diagnostics](UI-030-editor-frame-pacing-diagnostics.md)
-  is in progress at `CPUContracted`: runtime, ImGui producer, and Vulkan
-  lifecycle timing diagnostics are instrumented and covered by focused
-  CPU/null contract tests plus a selected opt-in `gpu;vulkan` smoke on this
-  host. Next verification: add the bounded diagnostic harness/report required
-  for `Operational` retirement.
+- None currently.
 
 ## History
 

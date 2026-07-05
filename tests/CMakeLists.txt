@@ -1055,6 +1055,24 @@ if(TARGET RuntimeKMeansGpuSmokeTestObjs)
     intrinsic_add_glsl_shaders(IntrinsicRuntimeKMeansGpuSmokeTests)
 endif()
 
+if(TARGET ExtrinsicSandbox
+   AND INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN
+   AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
+    add_test(NAME ExtrinsicSandbox.FramePacingDiagnosticCapture
+        COMMAND ${CMAKE_COMMAND}
+            -DSANDBOX_EXE=$<TARGET_FILE:ExtrinsicSandbox>
+            -DREPORT_PATH=${CMAKE_BINARY_DIR}/Testing/Temporary/extrinsic_sandbox_frame_pacing.json
+            -DFRAME_COUNT=8
+            -DMIN_SAMPLES=2
+            -P ${CMAKE_SOURCE_DIR}/tools/diagnostics/validate_frame_pacing_capture.cmake
+    )
+    set_tests_properties(ExtrinsicSandbox.FramePacingDiagnosticCapture PROPERTIES
+        ENVIRONMENT "${_intrinsic_test_env}"
+        LABELS "gpu;vulkan;integration;runtime;graphics"
+        TIMEOUT 180
+    )
+endif()
+
 intrinsic_test_executable(IntrinsicGraphicsUnitTests
     OBJECTS GraphicsUnitTestObjs
     LINK_LIBS ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform

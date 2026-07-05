@@ -37,15 +37,13 @@ retired under the runtime backlog as `RUNTIME-135`.
   through a runtime-owned undoable command, preserves UV seams when texcoords
   are present, and surfaces simplification diagnostics without UI owning engine
   state.
-- UI-030 is active as the diagnostic follow-up from the 2026-07-01
-  editor-stutter review. The `CPUContracted` instrumentation slice exposes
-  runtime, ImGui producer, and Vulkan lifecycle timings; the open `Operational`
-  work is the bounded capture/report that ranks measured causes before blaming
-  barriers, fences, present pacing, or editor CPU work. Source-level
-  selected-entity findings are tracked by `RUNTIME-138` for the nonblocking
-  runtime/editor cache-job pipeline, retired `GRAPHICS-113` for selected-outline
-  ID work pruning, and retired `GRAPHICS-114` for retained ImGui overlay
-  copy/upload cleanup.
+- UI-030 is retired as the 2026-07-01 editor-stutter diagnostic follow-up. The
+  bounded `ExtrinsicSandbox --frame-pacing-report` capture loop ranks the
+  default run as present/fallback-frame-lifecycle dominated, rules out editor
+  callback work and ImGui draw-data copying as dominant causes, and splits the
+  default sandbox Vulkan validation-gate fallback to `BUG-056`. Source-level
+  selected-entity findings remain tracked by `RUNTIME-138`, retired
+  `GRAPHICS-113`, and retired `GRAPHICS-114`.
 - UI-031 is the information-architecture follow-up from the 2026-07-01
   domain-UI review: it separates property exploration, appearance/rendering
   controls, texture baking, and method execution into user-intent windows. Its
@@ -233,3 +231,10 @@ split; narratives live in the retirement log.
   `GEOM-014` classical QEM / FA-QEM simplification kernel through an undoable
   runtime command, preserves UV seam inputs, reports collapse/rejection/pin
   diagnostics, and defers renderer synchronization through geometry dirty tags.
+- [UI-030 — Sandbox EditorUI frame-pacing diagnostics](../../done/UI-030-editor-frame-pacing-diagnostics.md)
+  (done, 2026-07-05, `Operational`): bounded sandbox captures now emit
+  `intrinsic.frame_pacing.v1` JSON with runtime, ImGui producer, render-graph,
+  and Vulkan lifecycle timing buckets. The report ranks the default capture as
+  present/fallback-frame-lifecycle dominated, rules out editor callback and
+  ImGui draw-data copy work as dominant causes, and files `BUG-056` for the
+  default sandbox Vulkan validation gate fallback.

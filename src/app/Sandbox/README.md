@@ -99,6 +99,25 @@ This acceptance does not claim every asset format, KTX decode, post-upload
 material re-resolution, advanced PBR, transparent selection, Gaussian splats, or
 scene serialization parity.
 
+## Frame-Pacing Diagnostics
+
+`UI-030` adds an explicit bounded capture mode to `ExtrinsicSandbox`:
+
+```bash
+build/ci-vulkan/bin/ExtrinsicSandbox \
+  --frame-pacing-report /tmp/intrinsic-frame-pacing.json \
+  --frame-pacing-frames 120
+```
+
+The report is JSON (`intrinsic.frame_pacing.v1`) containing one sample per
+completed frame, plus aggregate phase totals and the highest-total phase. The
+capture wrapper stops the app after the requested frame count, reads
+`Engine::GetLastFramePacingDiagnostics()`, and writes only copied runtime
+diagnostics; the sandbox app still imports runtime only and does not branch on
+Vulkan backend internals. The opt-in CTest
+`ExtrinsicSandbox.FramePacingDiagnosticCapture` validates this mode in the
+`ci-vulkan` preset.
+
 ## Contents
 
 - `CMakeLists.txt`

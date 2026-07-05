@@ -8,6 +8,22 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+Active
+[`UI-030`](UI-030-editor-frame-pacing-diagnostics.md) — Sandbox EditorUI
+frame-pacing diagnostics — retired on 2026-07-05 at maturity `Operational`.
+`Engine::RunFrame()` now publishes bounded phase timings, ImGui producer
+diagnostics include editor callback and draw-data copy timings, promoted Vulkan
+lifecycle diagnostics expose wait/acquire/submit/present microseconds, and
+`ExtrinsicSandbox --frame-pacing-report` writes validated
+`intrinsic.frame_pacing.v1` JSON for bounded local captures. The measured
+default capture ranked present/fallback-frame-lifecycle time highest while
+ruling out editor callback rebuilds, ImGui draw-data copying, render-graph
+compile/execute work, selected-entity readback, and fixed-step simulation as
+dominant causes. The default sandbox run also exposed a promoted Vulkan
+validation-gate fallback (`BarrierValidationFailed` from shader-interface
+warnings), now split to open `BUG-056` rather than folded into the diagnostic
+task.
+
 Backlog
 [`GRAPHICS-115`](GRAPHICS-115-object-space-normal-gpu-dilation.md) —
 Object-space normal GPU dilation pass — retired on 2026-07-04 at maturity
