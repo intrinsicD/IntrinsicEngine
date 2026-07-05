@@ -447,7 +447,7 @@ deferred "future robust/global registration method packages" edge.
 | Slice | Goal | Behavior change | Task |
 |-------|------|-----------------|------|
 | 0 | Extract the four helpers into a named internal stage sequence (internal convergence helper; no public `.cppm` change) | **none** (bit-for-bit) | [`GEOM-054`](../../tasks/done/GEOM-054-registration-pipeline-stage-extraction.md) |
-| 0-obs | Optional per-iteration observer seam (`IterationTrace`), null by default — zero cost when off; the renderer applies each trace's transform to show the shape under the current solution (§3.4) | additive | [`GEOM-055`](../../tasks/backlog/geometry/GEOM-055-registration-iteration-observer.md) |
+| 0-obs | Optional per-iteration observer seam (`IterationTrace`), null by default — zero cost when off; the renderer applies each trace's transform to show the shape under the current solution (§3.4) | additive | [`GEOM-055`](../../tasks/done/GEOM-055-registration-iteration-observer.md) |
 | 1 | Swappable `CorrespondenceKind` + `RejectorChain` vector + surface existing `Geometry.Robust` kernels in params | defaults reproduce today exactly | (future) |
 | 2 | Public `ConvergenceCriteria` struct + `TransformKind` enum + `RegistrationResult` backend telemetry + convergence oscillation guard | additive | (future) |
 | 3 | Global/coarse glue: `RegisterCoarse(...)` running the `Features` pipeline + `init` pose param on the fine path | new capability | (future) |
@@ -456,9 +456,9 @@ deferred "future robust/global registration method packages" edge.
 | 6 | First **non-rigid method** (CPD or Amberg N-ICP) under `methods/geometry` with deformation-model + regularizer + annealing-schedule seams | new method (method contract) | (future, `METHOD-*` citing GEOM-017) |
 | 7 | Extract the shared `Stage`/`Schedule`/`Diagnostics` contract onto a second family (smoothing or parameterization) | refactor | (future; gated on a real second consumer) |
 
-Slice 0 is retired (`GEOM-054`). Slice 0-obs is open as `GEOM-055`; later slices
-are opened when the prior slice lands and the next is the priority. A new
-`GEOM-0NN` is allocated per slice (the `GRAPHICS-072/073/074` series pattern).
+Slice 0 (`GEOM-054`) and Slice 0-obs (`GEOM-055`) are retired. Later slices are
+opened when the prior slice lands and the next is the priority. A new `GEOM-0NN`
+is allocated per slice (the `GRAPHICS-072/073/074` series pattern).
 
 ## 9. Risks
 

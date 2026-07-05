@@ -2,8 +2,22 @@
 id: GEOM-055
 theme: none
 depends_on: [GEOM-054]
+completed: 2026-07-05
 ---
 # GEOM-055 — Registration: optional per-iteration observer (zero cost when off)
+
+## Status
+- Retired on 2026-07-05 at `Operational`.
+- Implementation commit: `811a1677` (`Add optional per-iteration observer to Geometry.Registration (GEOM-055)`).
+- PR/commit for task retirement: this retirement commit.
+- `Geometry.Registration` now exports `IterationTrace` and
+  `IterationObserver`, and `AlignICP` accepts a trailing null-default observer
+  argument. `RunIcpLoop` emits one trace per completed iteration after the
+  cumulative transform/result fields are updated and before convergence
+  termination.
+- The observer remains separate from `RegistrationParams`, so the serializable
+  config stays a pure value. The no-observer path pays one branch per
+  iteration, never per point.
 
 ## Goal
 - Add an optional, null-by-default `IterationObserver` seam to
@@ -11,7 +25,7 @@ depends_on: [GEOM-054]
   solution each iteration (e.g. render the shape under the current estimate),
   with **zero overhead when no observer is supplied**. This is the observability
   slice ("0-obs") of the
-  [geometry-pipeline-modularity](../../../docs/architecture/geometry-pipeline-modularity.md)
+  [geometry-pipeline-modularity](../../docs/architecture/geometry-pipeline-modularity.md)
   roadmap (§3.4).
 
 ## Non-goals
@@ -49,59 +63,60 @@ depends_on: [GEOM-054]
 - Backend axis: not applicable to this slice (CPU reference path only).
 
 ## Required changes
-- [ ] `src/geometry/Geometry.Registration.cppm`: export an `IterationTrace`
+- [x] `src/geometry/Geometry.Registration.cppm`: export an `IterationTrace`
       record (`Iteration`, `Transform` = cumulative estimate after the iteration,
       `RMSE`, `InlierCount`) and an `IterationObserver =
       std::function<void(const IterationTrace&)>` alias; add `<functional>` to the
       module's global module fragment.
-- [ ] Add a trailing `const IterationObserver& observer = {}` parameter to
+- [x] Add a trailing `const IterationObserver& observer = {}` parameter to
       `AlignICP` (source-compatible: all existing calls omit it).
-- [ ] `src/geometry/Geometry.Registration.cpp`: thread the observer into
+- [x] `src/geometry/Geometry.Registration.cpp`: thread the observer into
       `RunIcpLoop` and invoke it once per completed iteration under an
       `if (observer)` guard, after the cumulative transform and result fields are
       updated and before the convergence break. Add `<functional>` to the GMF.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` (public surface
+- [x] Regenerate `docs/api/generated/module_inventory.md` (public surface
       changed).
 
 ## Tests
-- [ ] `tests/unit/geometry/Test_Registration.cpp` — `ObserverDoesNotChangeResult`:
+- [x] `tests/unit/geometry/Test_Registration.cpp` — `ObserverDoesNotChangeResult`:
       run the same rigid-recovery case with and without a recording observer;
       assert `Transform`, `FinalRMSE`, `IterationsPerformed`, `Converged`, and
       `RMSEHistory` are identical.
-- [ ] `ObserverReceivesPerIterationTraces`: with a recording observer, assert the
+- [x] `ObserverReceivesPerIterationTraces`: with a recording observer, assert the
       trace count equals `IterationsPerformed`, iteration indices are `0..n-1` in
       order, each trace `RMSE == RMSEHistory[Iteration]`, and the last trace
       `Transform` equals `result.Transform`.
-- [ ] Run the default CPU correctness gate for the touched scope.
+- [x] Run the default CPU correctness gate for the touched scope.
 
 ## Docs
-- [ ] `docs/architecture/geometry-pipeline-modularity.md` §3.4 documents the seam
+- [x] `docs/architecture/geometry-pipeline-modularity.md` §3.4 documents the seam
       (added with this roadmap; keep consistent with the shipped API).
-- [ ] Refresh `docs/api/generated/module_inventory.md`.
+- [x] Refresh `docs/api/generated/module_inventory.md`.
 
 ## Acceptance criteria
-- [ ] Observed and unobserved runs produce identical `RegistrationResult`.
-- [ ] With no observer, the ICP inner loops are unchanged (guard is one branch
+- [x] Observed and unobserved runs produce identical `RegistrationResult`.
+- [x] With no observer, the ICP inner loops are unchanged (guard is one branch
       per iteration; no per-point cost, no allocation).
-- [ ] Trace invariants hold (count == `IterationsPerformed`; ordered indices;
+- [x] Trace invariants hold (count == `IterationsPerformed`; ordered indices;
       `RMSE == RMSEHistory[Iteration]`; final `Transform` == `result.Transform`).
-- [ ] `python3 tools/repo/check_layering.py --root src --strict` passes
+- [x] `python3 tools/repo/check_layering.py --root src --strict` passes
       (`IterationTrace` introduces no dependency edge beyond `geometry -> core`).
-- [ ] Module inventory regenerated and committed.
-- [ ] `python3 tools/agents/validate_tasks.py --root tasks --strict` and
+- [x] Module inventory regenerated and committed.
+- [x] `python3 tools/agents/validate_tasks.py --root tasks --strict` and
       `python3 tools/agents/check_task_policy.py --root . --strict` pass.
 
 ## Verification
 ```bash
-cmake --preset ci
-cmake --build --preset ci --target IntrinsicTests
-ctest --test-dir build/ci --output-on-failure -R 'Registration_ICP' --timeout 60
+cmake --build --preset ci --target IntrinsicGeometryTests
+ctest --test-dir build/ci --output-on-failure -R 'Registration_ICP' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
+git diff --exit-code docs/api/generated/module_inventory.md
 python3 tools/agents/validate_tasks.py --root tasks --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main
 ```
 
 ## Forbidden changes

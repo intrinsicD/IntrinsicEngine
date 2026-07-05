@@ -15,9 +15,6 @@ map.
 - [GEOM-024 — Sparse symmetric generalized eigensolver seam](GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
   (gates `methods/METHOD-006` variant B; depends on `GEOM-020`; promote when
   METHOD-006 is the next-priority method).
-- [GEOM-055 — Registration: optional per-iteration observer (zero cost when off)](GEOM-055-registration-iteration-observer.md)
-  (observability slice of the registration-pipeline modularity roadmap; depends
-  on retired `GEOM-054`).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ### bcg_code_base geometry-processing port gaps (seeded 2026-06-26)
@@ -93,6 +90,11 @@ the runtime SpatialDebug closest-face consumer in `RUNTIME-135`.
   schedule, non-rigid *method* packages, and the schema-driven editor decoupling)
   open as each becomes the priority; named-paper stages follow retired GEOM-017's
   deferred method-package edge.
+- GEOM-055 is retired as the registration-pipeline observability slice:
+  `Geometry.Registration::AlignICP` accepts a null-default per-iteration
+  observer and emits read-only transform/RMSE/inlier traces without changing the
+  serializable `RegistrationParams` config. This unblocks the editor ICP
+  convergence visualization task `UI-029`.
 - RORG-031E is part of **Theme F — Architecture/runtime/UI foundation seeds**.
 - Future geometry algorithm packages should follow
   [`docs/agent/method-workflow.md`](../../../docs/agent/method-workflow.md):
@@ -141,6 +143,11 @@ split; narratives live in the retirement log.
   runs through an internal `RunIcpLoop` stage sequence for correspondence,
   rejection, optional robust weighting, transform solve, and convergence, with
   no GEOM-054 public surface change.
+- [GEOM-055 — Registration per-iteration observer](../../done/GEOM-055-registration-iteration-observer.md)
+  (done, 2026-07-05, `Operational`): `Geometry::Registration::AlignICP` now
+  accepts a trailing null-default `IterationObserver` and emits an
+  `IterationTrace` once per completed iteration; observed and unobserved runs
+  remain numerically identical.
 - [GEOM-040 — Mesh curvature tensor and principal directions](../../done/GEOM-040-curvature-tensor-principal-directions.md) (done).
 - [GEOM-041 — FEM Laplacian mass/stiffness variants and edge-weight modes](../../done/GEOM-041-fem-laplacian-mass-stiffness-variants.md) (done).
 - [GEOM-042 — Mesh normal-based bilateral denoiser](../../done/GEOM-042-mesh-normal-bilateral-denoiser.md) (done).

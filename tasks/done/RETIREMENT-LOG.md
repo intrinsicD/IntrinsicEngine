@@ -3399,5 +3399,14 @@ Registration pipeline named ICP stage extraction retired to `tasks/done/` on
 restructures `Geometry::Registration::AlignICP` behind an internal
 `RunIcpLoop` driver with explicit correspondence, rejection, optional robust
 weighting, transform-solve, and convergence stages. GEOM-054 introduces no
-public `Geometry.Registration` surface change; the later observer seam remains
-tracked by `GEOM-055`.
+public `Geometry.Registration` surface change; the later observer seam retired
+under `GEOM-055`.
+
+[`GEOM-055`](GEOM-055-registration-iteration-observer.md) — Registration
+per-iteration observer retired to `tasks/done/` on 2026-07-05 at
+`Operational`. The implementation landed in `811a1677` and exports
+`IterationTrace` plus `IterationObserver` from `Geometry.Registration`;
+`AlignICP` accepts a trailing null-default observer, and `RunIcpLoop` emits one
+trace per completed iteration after the cumulative transform is updated.
+Contract tests prove observed and unobserved runs match exactly and trace
+indices/RMSE/final-transform invariants line up with `RegistrationResult`.
