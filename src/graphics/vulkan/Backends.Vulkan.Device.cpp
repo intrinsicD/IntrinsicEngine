@@ -4,6 +4,7 @@ module;
 #include <array>
 #include <cassert>
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -64,6 +65,14 @@ namespace
     std::atomic<std::uint64_t> g_SuccessfulPipelineCreations{0};
 
     constexpr const char* kValidationLayerName = "VK_LAYER_KHRONOS_validation";
+
+    [[nodiscard]] std::uint64_t ElapsedMicros(
+        const std::chrono::steady_clock::time_point start) noexcept
+    {
+        return static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::steady_clock::now() - start).count());
+    }
 
     struct QueueFamilyProbe
     {
@@ -2445,6 +2454,7 @@ void VulkanDevice::WaitIdle()
 
 bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
 {
+    const auto beginFrameBegin = std::chrono::steady_clock::now();
     outFrame = {};
 
     const bool lifecycleReady = !m_DeviceLost && m_Device != VK_NULL_HANDLE && m_Swapchain != VK_NULL_HANDLE &&
@@ -2459,7 +2469,7 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
     if (!lifecycleReady)
     {
         const std::uint64_t count = NoteFallbackBeginFrameAttempt();
-        MutateFrameLifecycleDiagnostics([this](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        MutateFrameLifecycleDiagnostics([this, beginFrameBegin](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
         {
             snapshot.BeginStatus = (m_Device == VK_NULL_HANDLE || m_DeviceLost)
                 ? VulkanFrameBeginStatus::SkippedNotOperational
@@ -2474,6 +2484,9 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
             snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
             snapshot.DeviceLost = m_DeviceLost;
             snapshot.ResizePending = m_HasPendingResize;
+            snapshot.LastBeginFrameMicros = ElapsedMicros(beginFrameBegin);
+            snapshot.LastFenceWaitMicros = 0;
+            snapshot.LastAcquireNextImageMicros = 0;
         });
         if (count == 1)
             Core::Log::Warn("[VulkanDevice::BeginFrame] device non-operational; returning fail-closed (no frame produced)");
@@ -2484,7 +2497,7 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
     PerFrame& frame = m_Frames[m_FrameSlot];
     if (frame.ImageAcquiredForFrame)
     {
-        MutateFrameLifecycleDiagnostics([this, &frame](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        MutateFrameLifecycleDiagnostics([this, &frame, beginFrameBegin](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
         {
             snapshot.BeginStatus = VulkanFrameBeginStatus::FailedAcquire;
             snapshot.LastVkResult = static_cast<std::int32_t>(VK_NOT_READY);
@@ -2493,6 +2506,9 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
             snapshot.DeviceOperational = m_Operational;
             snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
             snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+            snapshot.LastBeginFrameMicros = ElapsedMicros(beginFrameBegin);
+            snapshot.LastFenceWaitMicros = 0;
+            snapshot.LastAcquireNextImageMicros = 0;
         });
         Core::Log::Warn("[VulkanDevice::BeginFrame] previous guarded Vulkan frame is still in flight; acquire skipped");
         return false;
@@ -2507,15 +2523,17 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
     {
         frameFences.push_back(frame.TransferFence);
     }
+    const auto fenceWaitBegin = std::chrono::steady_clock::now();
     VkResult result = vkWaitForFences(m_Device,
                                       static_cast<std::uint32_t>(frameFences.size()),
                                       frameFences.data(),
                                       VK_TRUE,
                                       UINT64_MAX);
+    const std::uint64_t fenceWaitMicros = ElapsedMicros(fenceWaitBegin);
     if (result != VK_SUCCESS)
     {
         NoteDeviceLostIfNeeded(result);
-        MutateFrameLifecycleDiagnostics([this, result](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        MutateFrameLifecycleDiagnostics([this, result, beginFrameBegin, fenceWaitMicros](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
         {
             snapshot.BeginStatus = VulkanFrameBeginStatus::FailedAcquire;
             snapshot.LastVkResult = static_cast<std::int32_t>(result);
@@ -2524,6 +2542,9 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
             snapshot.DeviceOperational = m_Operational;
             snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
             snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+            snapshot.LastBeginFrameMicros = ElapsedMicros(beginFrameBegin);
+            snapshot.LastFenceWaitMicros = fenceWaitMicros;
+            snapshot.LastAcquireNextImageMicros = 0;
         });
         Core::Log::Error("[VulkanDevice::BeginFrame] vkWaitForFences failed; guarded Vulkan frame acquire skipped");
         return false;
@@ -2570,7 +2591,7 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
     if (result != VK_SUCCESS)
     {
         NoteDeviceLostIfNeeded(result);
-        MutateFrameLifecycleDiagnostics([this, result](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        MutateFrameLifecycleDiagnostics([this, result, beginFrameBegin, fenceWaitMicros](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
         {
             snapshot.BeginStatus = VulkanFrameBeginStatus::FailedAcquire;
             snapshot.LastVkResult = static_cast<std::int32_t>(result);
@@ -2579,6 +2600,9 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
             snapshot.DeviceOperational = m_Operational;
             snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
             snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+            snapshot.LastBeginFrameMicros = ElapsedMicros(beginFrameBegin);
+            snapshot.LastFenceWaitMicros = fenceWaitMicros;
+            snapshot.LastAcquireNextImageMicros = 0;
         });
         Core::Log::Error("[VulkanDevice::BeginFrame] vkResetCommandPool failed before acquire; guarded frame skipped");
         return false;
@@ -2589,7 +2613,7 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
         if (result != VK_SUCCESS)
         {
             NoteDeviceLostIfNeeded(result);
-            MutateFrameLifecycleDiagnostics([this, result](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+            MutateFrameLifecycleDiagnostics([this, result, beginFrameBegin, fenceWaitMicros](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
             {
                 snapshot.BeginStatus = VulkanFrameBeginStatus::FailedAcquire;
                 snapshot.LastVkResult = static_cast<std::int32_t>(result);
@@ -2598,6 +2622,9 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
                 snapshot.DeviceOperational = m_Operational;
                 snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
                 snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+                snapshot.LastBeginFrameMicros = ElapsedMicros(beginFrameBegin);
+                snapshot.LastFenceWaitMicros = fenceWaitMicros;
+                snapshot.LastAcquireNextImageMicros = 0;
             });
             Core::Log::Error("[VulkanDevice::BeginFrame] vkResetCommandPool failed for async-compute queue before acquire; guarded frame skipped");
             return false;
@@ -2609,7 +2636,7 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
         if (result != VK_SUCCESS)
         {
             NoteDeviceLostIfNeeded(result);
-            MutateFrameLifecycleDiagnostics([this, result](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+            MutateFrameLifecycleDiagnostics([this, result, beginFrameBegin, fenceWaitMicros](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
             {
                 snapshot.BeginStatus = VulkanFrameBeginStatus::FailedAcquire;
                 snapshot.LastVkResult = static_cast<std::int32_t>(result);
@@ -2618,6 +2645,9 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
                 snapshot.DeviceOperational = m_Operational;
                 snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
                 snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+                snapshot.LastBeginFrameMicros = ElapsedMicros(beginFrameBegin);
+                snapshot.LastFenceWaitMicros = fenceWaitMicros;
+                snapshot.LastAcquireNextImageMicros = 0;
             });
             Core::Log::Error("[VulkanDevice::BeginFrame] vkResetCommandPool failed for transfer queue before acquire; guarded frame skipped");
             return false;
@@ -2625,17 +2655,19 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
     }
 
     std::uint32_t imageIndex = 0;
+    const auto acquireBegin = std::chrono::steady_clock::now();
     result = vkAcquireNextImageKHR(m_Device,
                                    m_Swapchain,
                                    UINT64_MAX,
                                    frame.ImageAcquired,
                                    VK_NULL_HANDLE,
                                    &imageIndex);
+    const std::uint64_t acquireMicros = ElapsedMicros(acquireBegin);
     if (result == VK_ERROR_OUT_OF_DATE_KHR)
     {
         m_HasPendingResize = true;
         m_PendingResizeExtent = m_SwapchainExtent;
-        MutateFrameLifecycleDiagnostics([this, result](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        MutateFrameLifecycleDiagnostics([this, result, beginFrameBegin, fenceWaitMicros, acquireMicros](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
         {
             snapshot.BeginStatus = VulkanFrameBeginStatus::OutOfDate;
             snapshot.LastVkResult = static_cast<std::int32_t>(result);
@@ -2646,6 +2678,9 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
             snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
             snapshot.DeviceLost = m_DeviceLost;
             snapshot.ResizePending = m_HasPendingResize;
+            snapshot.LastBeginFrameMicros = ElapsedMicros(beginFrameBegin);
+            snapshot.LastFenceWaitMicros = fenceWaitMicros;
+            snapshot.LastAcquireNextImageMicros = acquireMicros;
         });
         Core::Log::Warn("[VulkanDevice::BeginFrame] vkAcquireNextImageKHR reported out-of-date swapchain; guarded frame skipped");
         return false;
@@ -2653,7 +2688,7 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
     if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
     {
         NoteDeviceLostIfNeeded(result);
-        MutateFrameLifecycleDiagnostics([this, result](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        MutateFrameLifecycleDiagnostics([this, result, beginFrameBegin, fenceWaitMicros, acquireMicros](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
         {
             snapshot.BeginStatus = VulkanFrameBeginStatus::FailedAcquire;
             snapshot.LastVkResult = static_cast<std::int32_t>(result);
@@ -2662,13 +2697,16 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
             snapshot.DeviceOperational = m_Operational;
             snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
             snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+            snapshot.LastBeginFrameMicros = ElapsedMicros(beginFrameBegin);
+            snapshot.LastFenceWaitMicros = fenceWaitMicros;
+            snapshot.LastAcquireNextImageMicros = acquireMicros;
         });
         Core::Log::Error("[VulkanDevice::BeginFrame] vkAcquireNextImageKHR failed; guarded frame skipped");
         return false;
     }
     if (imageIndex >= m_SwapchainHandles.size())
     {
-        MutateFrameLifecycleDiagnostics([this, imageIndex](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        MutateFrameLifecycleDiagnostics([this, imageIndex, beginFrameBegin, fenceWaitMicros, acquireMicros](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
         {
             snapshot.BeginStatus = VulkanFrameBeginStatus::FailedAcquire;
             snapshot.LastVkResult = static_cast<std::int32_t>(VK_ERROR_INITIALIZATION_FAILED);
@@ -2677,6 +2715,9 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
             snapshot.DeviceOperational = m_Operational;
             snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
             snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+            snapshot.LastBeginFrameMicros = ElapsedMicros(beginFrameBegin);
+            snapshot.LastFenceWaitMicros = fenceWaitMicros;
+            snapshot.LastAcquireNextImageMicros = acquireMicros;
         });
         Core::Log::Error("[VulkanDevice::BeginFrame] acquired swapchain image index is outside registered handle range; guarded frame skipped");
         return false;
@@ -2704,7 +2745,7 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
 
     outFrame.FrameIndex = m_FrameSlot;
     outFrame.SwapchainImageIndex = imageIndex;
-    MutateFrameLifecycleDiagnostics([this, &outFrame, result](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+    MutateFrameLifecycleDiagnostics([this, &outFrame, result, beginFrameBegin, fenceWaitMicros, acquireMicros](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
     {
         snapshot.BeginStatus = result == VK_SUBOPTIMAL_KHR
             ? VulkanFrameBeginStatus::Suboptimal
@@ -2715,19 +2756,24 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
         snapshot.DeviceOperational = m_Operational;
         snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
         snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+        snapshot.LastBeginFrameMicros = ElapsedMicros(beginFrameBegin);
+        snapshot.LastFenceWaitMicros = fenceWaitMicros;
+        snapshot.LastAcquireNextImageMicros = acquireMicros;
     });
     return true;
 }
 
 void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
 {
+    const auto endFrameBegin = std::chrono::steady_clock::now();
+    std::uint64_t queueSubmitMicros = 0;
     const bool lifecycleReady = !m_DeviceLost && m_Device != VK_NULL_HANDLE && m_GraphicsQueue != VK_NULL_HANDLE &&
         frame.FrameIndex < kMaxFramesInFlight;
 
     if (!lifecycleReady)
     {
         const std::uint64_t count = NoteFallbackEndFrameAttempt();
-        MutateFrameLifecycleDiagnostics([this, &frame](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        MutateFrameLifecycleDiagnostics([this, &frame, endFrameBegin](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
         {
             snapshot.EndStatus = VulkanFrameEndStatus::SkippedNotOperational;
             snapshot.LastVkResult = 0;
@@ -2738,6 +2784,8 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
             snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
             snapshot.DeviceLost = m_DeviceLost;
             snapshot.ResizePending = m_HasPendingResize;
+            snapshot.LastEndFrameMicros = ElapsedMicros(endFrameBegin);
+            snapshot.LastQueueSubmitMicros = 0;
         });
         if (count == 1)
             Core::Log::Warn("[VulkanDevice::EndFrame] device non-operational; ignoring frame end (no rotation)");
@@ -2749,7 +2797,7 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
         perFrame.ImageAcquired == VK_NULL_HANDLE || perFrame.RenderDone == VK_NULL_HANDLE ||
         perFrame.Fence == VK_NULL_HANDLE)
     {
-        MutateFrameLifecycleDiagnostics([this, &frame](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        MutateFrameLifecycleDiagnostics([this, &frame, endFrameBegin](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
         {
             snapshot.EndStatus = VulkanFrameEndStatus::FailedSubmit;
             snapshot.LastVkResult = static_cast<std::int32_t>(VK_NOT_READY);
@@ -2758,6 +2806,8 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
             snapshot.DeviceOperational = m_Operational;
             snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
             snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+            snapshot.LastEndFrameMicros = ElapsedMicros(endFrameBegin);
+            snapshot.LastQueueSubmitMicros = 0;
         });
         Core::Log::Warn("[VulkanDevice::EndFrame] guarded Vulkan frame has no acquired image or command buffer; submit skipped");
         ProcessResourcePoolDeletions();
@@ -2768,7 +2818,7 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
     if (result != VK_SUCCESS)
     {
         NoteDeviceLostIfNeeded(result);
-        MutateFrameLifecycleDiagnostics([this, &frame, result](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        MutateFrameLifecycleDiagnostics([this, &frame, result, endFrameBegin](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
         {
             snapshot.EndStatus = VulkanFrameEndStatus::FailedSubmit;
             snapshot.LastVkResult = static_cast<std::int32_t>(result);
@@ -2777,6 +2827,8 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
             snapshot.DeviceOperational = m_Operational;
             snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
             snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+            snapshot.LastEndFrameMicros = ElapsedMicros(endFrameBegin);
+            snapshot.LastQueueSubmitMicros = 0;
         });
         Core::Log::Error("[VulkanDevice::EndFrame] vkResetFences failed; guarded submit skipped");
         ProcessResourcePoolDeletions();
@@ -2850,7 +2902,7 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
             if (result != VK_SUCCESS)
             {
                 NoteDeviceLostIfNeeded(result);
-                MutateFrameLifecycleDiagnostics([this, &frame, result](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+                MutateFrameLifecycleDiagnostics([this, &frame, result, endFrameBegin](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
                 {
                     snapshot.EndStatus = VulkanFrameEndStatus::FailedSubmit;
                     snapshot.LastVkResult = static_cast<std::int32_t>(result);
@@ -2859,6 +2911,8 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
                     snapshot.DeviceOperational = m_Operational;
                     snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
                     snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+                    snapshot.LastEndFrameMicros = ElapsedMicros(endFrameBegin);
+                    snapshot.LastQueueSubmitMicros = 0;
                 });
                 Core::Log::Error("[VulkanDevice::EndFrame] vkResetFences failed for optional queue submit fences; guarded submit skipped");
                 ProcessResourcePoolDeletions();
@@ -2977,7 +3031,9 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
 
             {
                 std::scoped_lock lock{m_QueueMutex};
+                const auto submitBegin = std::chrono::steady_clock::now();
                 result = vkQueueSubmit2(queue, 1u, &submitInfo, submitFence);
+                queueSubmitMicros += ElapsedMicros(submitBegin);
             }
             if (result != VK_SUCCESS)
             {
@@ -2989,7 +3045,7 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
         {
             NoteDeviceLostIfNeeded(result);
             perFrame.SubmittedForPresent = false;
-            MutateFrameLifecycleDiagnostics([this, &frame, result](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+            MutateFrameLifecycleDiagnostics([this, &frame, result, endFrameBegin, queueSubmitMicros](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
             {
                 snapshot.EndStatus = VulkanFrameEndStatus::FailedSubmit;
                 snapshot.LastVkResult = static_cast<std::int32_t>(result);
@@ -2998,6 +3054,8 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
                 snapshot.DeviceOperational = m_Operational;
                 snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
                 snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+                snapshot.LastEndFrameMicros = ElapsedMicros(endFrameBegin);
+                snapshot.LastQueueSubmitMicros = queueSubmitMicros;
             });
             Core::Log::Error("[VulkanDevice::EndFrame] vkQueueSubmit2 failed for guarded multi-queue Vulkan frame");
             ProcessResourcePoolDeletions();
@@ -3012,7 +3070,7 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
         perFrame.SubmittedForPresent = true;
         m_FrameSlot = (frame.FrameIndex + 1u) % kMaxFramesInFlight;
         ++m_GlobalFrameNumber;
-        MutateFrameLifecycleDiagnostics([this, &frame](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        MutateFrameLifecycleDiagnostics([this, &frame, endFrameBegin, queueSubmitMicros](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
         {
             snapshot.EndStatus = VulkanFrameEndStatus::Submitted;
             snapshot.LastVkResult = 0;
@@ -3021,6 +3079,8 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
             snapshot.DeviceOperational = m_Operational;
             snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
             snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+            snapshot.LastEndFrameMicros = ElapsedMicros(endFrameBegin);
+            snapshot.LastQueueSubmitMicros = queueSubmitMicros;
         });
         ProcessResourcePoolDeletions();
         return;
@@ -3039,13 +3099,15 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
 
     {
         std::scoped_lock lock{m_QueueMutex};
+        const auto submitBegin = std::chrono::steady_clock::now();
         result = vkQueueSubmit(m_GraphicsQueue, 1u, &submitInfo, perFrame.Fence);
+        queueSubmitMicros += ElapsedMicros(submitBegin);
     }
     if (result != VK_SUCCESS)
     {
         NoteDeviceLostIfNeeded(result);
         perFrame.SubmittedForPresent = false;
-        MutateFrameLifecycleDiagnostics([this, &frame, result](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        MutateFrameLifecycleDiagnostics([this, &frame, result, endFrameBegin, queueSubmitMicros](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
         {
             snapshot.EndStatus = VulkanFrameEndStatus::FailedSubmit;
             snapshot.LastVkResult = static_cast<std::int32_t>(result);
@@ -3054,6 +3116,8 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
             snapshot.DeviceOperational = m_Operational;
             snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
             snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+            snapshot.LastEndFrameMicros = ElapsedMicros(endFrameBegin);
+            snapshot.LastQueueSubmitMicros = queueSubmitMicros;
         });
         Core::Log::Error("[VulkanDevice::EndFrame] vkQueueSubmit failed for guarded Vulkan frame");
         ProcessResourcePoolDeletions();
@@ -3066,7 +3130,7 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
     // code.
     m_FrameSlot = (frame.FrameIndex + 1u) % kMaxFramesInFlight;
     ++m_GlobalFrameNumber;
-    MutateFrameLifecycleDiagnostics([this, &frame](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+    MutateFrameLifecycleDiagnostics([this, &frame, endFrameBegin, queueSubmitMicros](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
     {
         snapshot.EndStatus = VulkanFrameEndStatus::Submitted;
         snapshot.LastVkResult = 0;
@@ -3075,11 +3139,14 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
         snapshot.DeviceOperational = m_Operational;
         snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
         snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+        snapshot.LastEndFrameMicros = ElapsedMicros(endFrameBegin);
+        snapshot.LastQueueSubmitMicros = queueSubmitMicros;
     });
 }
 
 void VulkanDevice::Present(const RHI::FrameHandle& frame)
 {
+    const auto presentBegin = std::chrono::steady_clock::now();
     const bool lifecycleReady = !m_DeviceLost && m_Device != VK_NULL_HANDLE && m_PresentQueue != VK_NULL_HANDLE &&
         m_Swapchain != VK_NULL_HANDLE && frame.FrameIndex < kMaxFramesInFlight;
 
@@ -3099,6 +3166,7 @@ void VulkanDevice::Present(const RHI::FrameHandle& frame)
             snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
             snapshot.DeviceLost = m_DeviceLost;
             snapshot.ResizePending = m_HasPendingResize;
+            snapshot.LastPresentMicros = 0;
         });
         if (count == 1)
             Core::Log::Warn("[VulkanDevice::Present] device or swapchain non-operational; skipping presentation");
@@ -3118,6 +3186,7 @@ void VulkanDevice::Present(const RHI::FrameHandle& frame)
             snapshot.DeviceOperational = m_Operational;
             snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
             snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+            snapshot.LastPresentMicros = 0;
         });
         Core::Log::Warn("[VulkanDevice::Present] guarded Vulkan frame was not submitted or has an invalid image index; present skipped");
         return;
@@ -3136,6 +3205,7 @@ void VulkanDevice::Present(const RHI::FrameHandle& frame)
         std::scoped_lock lock{m_QueueMutex};
         result = vkQueuePresentKHR(m_PresentQueue, &presentInfo);
     }
+    const std::uint64_t presentMicros = ElapsedMicros(presentBegin);
 
     perFrame.ImageAcquiredForFrame = false;
     perFrame.SubmittedForPresent = false;
@@ -3159,7 +3229,7 @@ void VulkanDevice::Present(const RHI::FrameHandle& frame)
         NoteDeviceLostIfNeeded(result);
     }
 
-    MutateFrameLifecycleDiagnostics([this, &frame, result, presentStatus](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+    MutateFrameLifecycleDiagnostics([this, &frame, result, presentStatus, presentMicros](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
     {
         snapshot.PresentStatus = presentStatus;
         snapshot.LastVkResult = static_cast<std::int32_t>(result);
@@ -3170,6 +3240,7 @@ void VulkanDevice::Present(const RHI::FrameHandle& frame)
         snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
         snapshot.DeviceLost = m_DeviceLost;
         snapshot.ResizePending = m_HasPendingResize;
+        snapshot.LastPresentMicros = presentMicros;
     });
 
     if (presentStatus == VulkanFramePresentStatus::FailedPresent)

@@ -4,6 +4,7 @@ module;
 #include <cstdint>
 #include <cstring>
 #include <algorithm>
+#include <chrono>
 #include <filesystem>
 #include <functional>
 #include <limits>
@@ -153,6 +154,14 @@ namespace Extrinsic::Runtime
                    atlas.BytesPerPixel == bytesPerPixel &&
                    atlas.UseColors == useColors;
         }
+
+        [[nodiscard]] std::uint64_t ElapsedMicros(
+            const std::chrono::steady_clock::time_point start) noexcept
+        {
+            return static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    std::chrono::steady_clock::now() - start).count());
+        }
     }
 
     ImGuiAdapter::ImGuiAdapter(Platform::IWindow& window, Graphics::ImGuiOverlaySystem& overlaySystem)
@@ -214,6 +223,7 @@ namespace Extrinsic::Runtime
         if (m_Context == nullptr)
             return;
 
+        const auto begin = std::chrono::steady_clock::now();
         ImGui::SetCurrentContext(m_Context);
         ImGuiIO& io = ImGui::GetIO();
         // Refresh from the window first; queued resize events pumped below win.
@@ -224,6 +234,7 @@ namespace Extrinsic::Runtime
 
         ImGui::NewFrame();
         m_FrameStarted = true;
+        m_Diagnostics.LastBeginFrameMicros = ElapsedMicros(begin);
     }
 
     void ImGuiAdapter::PumpEvents()
@@ -280,14 +291,25 @@ namespace Extrinsic::Runtime
         if (m_Context == nullptr || !m_FrameStarted)
             return;
 
+        const auto endFrameBegin = std::chrono::steady_clock::now();
+        m_Diagnostics.LastEditorCallbackMicros = 0u;
+        m_Diagnostics.LastImGuiRenderMicros = 0u;
+        m_Diagnostics.LastDrawDataCopyMicros = 0u;
+        m_Diagnostics.LastEndFrameMicros = 0u;
+
         ImGui::SetCurrentContext(m_Context);
         if (m_EditorCallback)
         {
+            const auto callbackBegin = std::chrono::steady_clock::now();
             m_EditorCallback();
+            m_Diagnostics.LastEditorCallbackMicros = ElapsedMicros(callbackBegin);
             ++m_Diagnostics.EditorCallbackInvocations;
         }
 
+        const auto renderBegin = std::chrono::steady_clock::now();
         ImGui::Render();
+        m_Diagnostics.LastImGuiRenderMicros = ElapsedMicros(renderBegin);
+        const auto copyBegin = std::chrono::steady_clock::now();
         const ImDrawData* drawData = ImGui::GetDrawData();
         unsigned char* fontPixels = nullptr;
         int fontWidth = 0;
@@ -475,6 +497,8 @@ namespace Extrinsic::Runtime
             m_Diagnostics.LastFrameVertexCopyBytes +
             m_Diagnostics.LastFrameIndexCopyBytes +
             m_Diagnostics.LastFrameCommandCopyBytes;
+        m_Diagnostics.LastDrawDataCopyMicros = ElapsedMicros(copyBegin);
+        m_Diagnostics.LastEndFrameMicros = ElapsedMicros(endFrameBegin);
         m_FrameStarted = false;
     }
 

@@ -251,6 +251,12 @@ namespace Extrinsic::Backends::Vulkan
         std::uint64_t EndFrameAttempts = 0;
         std::uint64_t PresentAttempts = 0;
         std::uint64_t ResizeAttempts = 0;
+        std::uint64_t LastBeginFrameMicros = 0;
+        std::uint64_t LastFenceWaitMicros = 0;
+        std::uint64_t LastAcquireNextImageMicros = 0;
+        std::uint64_t LastEndFrameMicros = 0;
+        std::uint64_t LastQueueSubmitMicros = 0;
+        std::uint64_t LastPresentMicros = 0;
         bool DeviceOperational = false;
         bool SwapchainAvailable = false;
         bool SwapchainImagesAvailable = false;

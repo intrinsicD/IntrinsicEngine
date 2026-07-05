@@ -7,15 +7,17 @@ maturity_target: Operational
 # UI-030 — Sandbox EditorUI frame-pacing diagnostics
 
 ## Status
-- Partial (2026-07-01) on branch `claude/ui-backlog-agentic-y3oap2`. Only the
-  `ImGuiUploadHelper` buffer-ownership audit landed; the timing instrumentation
-  and the measured bottleneck ranking are **not** landed here because they
-  require a working C++23-module build (this sandbox has clang-18 and cannot
-  bootstrap vcpkg) and, for the GPU/Vulkan lifecycle timers plus the measured
-  ranking, a Vulkan-capable host. Neither is available in this environment, and
-  the task explicitly forbids claiming a performance finding without
-  measurement, so the evidence-backed ranking remains open for a build/Vulkan
-  session.
+- In progress (2026-07-05) on local `main`; PR not opened.
+- Slice landed locally as `CPUContracted`: `Engine::RunFrame` publishes
+  `RuntimeFramePacingDiagnostics`, `ImGuiAdapterDiagnostics` records producer
+  CPU timings, and promoted Vulkan lifecycle diagnostics record wait/acquire/
+  submit/present microsecond fields without exporting Vulkan-native types.
+  Focused Null/backend-neutral contract coverage passes for the runtime capture
+  surface. The `Operational` report remains open because no evidence-backed
+  bottleneck ranking has been produced from a bounded sandbox run.
+- Opt-in `ci-vulkan` lifecycle/sandbox smoke also passes on this Vulkan-capable
+  host for the selected GPU/Vulkan subset. Next verification step: add the
+  bounded diagnostic harness/report that ranks measured frame-pacing causes.
 - Completed audit finding: `Extrinsic.Graphics.ImGuiUploadHelper`
   (`src/graphics/renderer/Graphics.ImGuiUploadHelper.cpp`) owns exactly one
   growing host-visible vertex buffer and one growing host-visible index buffer,
@@ -58,24 +60,24 @@ maturity_target: Operational
 - `RUNTIME-138` is the implementation follow-up for the architectural rule that the main loop should read cached selected-entity state and submit commands/jobs rather than synchronously deriving inspector data.
 
 ## Required changes
-- [ ] Add focused, low-overhead timing probes for `Engine::RunFrame` phases that can distinguish editor callback time, ImGui draw-data copy time, render snapshot/extraction time, frame-graph compile time, execute/record/submit time, present time, and maintenance time.
-- [ ] Add Vulkan frame lifecycle timing for `vkWaitForFences`, `vkAcquireNextImageKHR`, queue submit, and `vkQueuePresentKHR`, exposed through existing renderer/runtime diagnostics without lower layers importing runtime/UI.
-- [ ] Add ImGui overlay diagnostics for per-frame copied font-atlas bytes, draw-list bytes, vertex/index counts, command count, CPU flatten/copy time, GPU buffer write bytes, buffer allocation count, and whether font-atlas upload actually queued.
+- [x] Add focused, low-overhead timing probes for `Engine::RunFrame` phases that can distinguish editor callback time, ImGui draw-data copy time, render snapshot/extraction time, frame-graph compile time, execute/record/submit time, present time, and maintenance time.
+- [x] Add Vulkan frame lifecycle timing for `vkWaitForFences`, `vkAcquireNextImageKHR`, queue submit, and `vkQueuePresentKHR`, exposed through existing renderer/runtime diagnostics without lower layers importing runtime/UI.
+- [x] Add ImGui overlay diagnostics for per-frame copied font-atlas bytes, draw-list bytes, vertex/index counts, command count, CPU flatten/copy time, GPU buffer write bytes, buffer allocation count, and whether font-atlas upload actually queued.
 - [x] Audit `ImGuiUploadHelper` transient buffer ownership and either prove it is safe for the current frames-in-flight model or file a named follow-up task for per-frame/ring upload buffers. Audit complete (see Status); the single-shared-host-visible-buffer overwrite pattern is not provably in-flight-safe, so `GRAPHICS-110` was filed for per-frame/ring upload buffers.
 - [ ] Add a reproducible local diagnostic mode or test harness that runs the sandbox/editor frame loop for a bounded frame count and emits machine-readable frame timing samples.
 - [ ] Write a short report under `docs/reports/` summarizing the measured bottleneck ranking, ruled-out hypotheses, backend/present-mode conditions, and the follow-up task IDs for fixes.
 - [ ] If the investigation finds a specific bug or missing synchronization contract beyond open `RUNTIME-138` or the retired `GRAPHICS-110`/`GRAPHICS-113`/`GRAPHICS-114` fixes, open a scoped follow-up task under `tasks/backlog/bugs/`, `tasks/backlog/rendering/`, `tasks/backlog/runtime/`, or `tasks/backlog/ui/` rather than expanding this task into the fix.
 
 ## Tests
-- [ ] Add or update contract tests proving the new diagnostics are populated in the Null backend path without requiring GPU/Vulkan.
-- [ ] Add opt-in `gpu;vulkan` verification notes or tests for the Vulkan lifecycle timers when a Vulkan-capable host is available.
-- [ ] Run focused runtime/graphics contract tests covering `SandboxEditorUi`, `ImGuiPass`, and renderer frame lifecycle diagnostics.
+- [x] Add or update contract tests proving the new diagnostics are populated in the Null backend path without requiring GPU/Vulkan.
+- [x] Add opt-in `gpu;vulkan` verification notes or tests for the Vulkan lifecycle timers when a Vulkan-capable host is available.
+- [x] Run focused runtime/graphics contract tests covering `SandboxEditorUi`, `ImGuiPass`, and renderer frame lifecycle diagnostics.
 - [ ] Validate any emitted JSON/report schema if a machine-readable diagnostic artifact is added.
 
 ## Docs
-- [ ] Update `tasks/backlog/ui/README.md` to keep the open UI backlog current.
+- [x] Update `tasks/backlog/ui/README.md` to keep the open UI backlog current.
 - [ ] Add the measured frame-pacing report under `docs/reports/` and link every follow-up task it creates.
-- [ ] If a new diagnostics panel/control is exposed, update `src/runtime/README.md` or the relevant renderer README to document the factual current state.
+- [x] If a new diagnostics panel/control is exposed, update `src/runtime/README.md` or the relevant renderer README to document the factual current state.
 
 ## Acceptance criteria
 - [ ] A user can capture frame-pacing data that separates CPU editor cost from GPU/frame lifecycle stalls.
@@ -87,6 +89,11 @@ maturity_target: Operational
 
 ## Verification
 ```bash
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicGraphicsContractTests IntrinsicGraphicsVulkanContractTests
+ctest --test-dir build/ci --output-on-failure -R 'ImGuiAdapter|ImGuiAdapterEngineWiring|VulkanFailClosedContract.*FrameLifecycle|RendererFrameLifecycle|ImGuiPass' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target IntrinsicGraphicsVulkanSmokeTests IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests IntrinsicGraphicsVulkanContractTests IntrinsicRuntimeContractTests
+ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'VulkanBootstrap|ImGuiSurface|RuntimeSandboxAcceptance|FrameLifecycle|ImGuiAdapterEngineWiring' --timeout 180
 python3 tools/agents/validate_tasks.py --root tasks --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi|ImGuiPass|RendererFrameLifecycle' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120

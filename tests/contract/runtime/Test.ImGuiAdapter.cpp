@@ -257,6 +257,9 @@ TEST(ImGuiAdapter, EditorPanelDrawProducesNonEmptyDrawList)
                   diag.LastFrameVertexCopyBytes +
                   diag.LastFrameIndexCopyBytes +
                   diag.LastFrameCommandCopyBytes);
+    EXPECT_GE(diag.LastEndFrameMicros, diag.LastEditorCallbackMicros);
+    EXPECT_GE(diag.LastEndFrameMicros, diag.LastImGuiRenderMicros);
+    EXPECT_GE(diag.LastEndFrameMicros, diag.LastDrawDataCopyMicros);
 }
 
 TEST(ImGuiAdapter, ImageDrawPreservesUserTextureBindlessCommand)

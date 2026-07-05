@@ -16,12 +16,6 @@ map.
   `Runtime.RegistrationAlignment` to run ICP and scrub the convergence
   trajectory. The controller + its headless test land first; the editor panel is
   the remaining open work).
-- [UI-030 — Sandbox EditorUI frame-pacing diagnostics](UI-030-editor-frame-pacing-diagnostics.md)
-  (diagnose editor stutter with phase timing across the editor callback, ImGui
-  copy/upload, frame-graph execution, Vulkan frame lifecycle waits, present
-  pacing, and synchronous upload/readback paths; selected-entity implementation
-  fixes are tracked by open `RUNTIME-138` plus retired `GRAPHICS-113` and
-  `GRAPHICS-114` evidence).
 - [UI-031 — Sandbox EditorUI domain-window reorganization](UI-031-editor-domain-ui-reorganization.md)
   (depends on `RUNTIME-138`; reorganize Mesh/Graph/PointCloud UI so
   `Properties` is a pure property explorer, render hints/visualization/property
@@ -43,12 +37,15 @@ retired under the runtime backlog as `RUNTIME-135`.
   through a runtime-owned undoable command, preserves UV seams when texcoords
   are present, and surfaces simplification diagnostics without UI owning engine
   state.
-- UI-030 is the diagnostic follow-up from the 2026-07-01 editor-stutter review:
-  it builds an evidence loop before blaming barriers, fences, present pacing, or
-  editor CPU work. Source-level selected-entity findings are now tracked by
-  `RUNTIME-138` for the nonblocking runtime/editor cache-job pipeline, retired
-  `GRAPHICS-113` for selected-outline ID work pruning, and retired
-  `GRAPHICS-114` for retained ImGui overlay copy/upload cleanup.
+- UI-030 is active as the diagnostic follow-up from the 2026-07-01
+  editor-stutter review. The `CPUContracted` instrumentation slice exposes
+  runtime, ImGui producer, and Vulkan lifecycle timings; the open `Operational`
+  work is the bounded capture/report that ranks measured causes before blaming
+  barriers, fences, present pacing, or editor CPU work. Source-level
+  selected-entity findings are tracked by `RUNTIME-138` for the nonblocking
+  runtime/editor cache-job pipeline, retired `GRAPHICS-113` for selected-outline
+  ID work pruning, and retired `GRAPHICS-114` for retained ImGui overlay
+  copy/upload cleanup.
 - UI-031 is the information-architecture follow-up from the 2026-07-01
   domain-UI review: it separates property exploration, appearance/rendering
   controls, texture baking, and method execution into user-intent windows. Its

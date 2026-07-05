@@ -786,6 +786,17 @@ execution should request `Core::Config::WindowBackend::Null` explicitly.
 delta sampling and post-sleep resampling; runtime owns the phase orchestration,
 not the reusable clock value type.
 
+`UI-030` adds `Engine::GetLastFramePacingDiagnostics()` as a copied runtime
+frame-pacing sample for the most recent `RunFrame()` attempt. The sample reports
+whether platform polling continued, whether the renderer began/completed the
+frame, the frame index, total frame microseconds, and per-phase CPU timings for
+platform begin, resize/operational transitions, fixed-step work, ImGui begin/end,
+editor callback and draw-data copy, pre-render setup/transform flush, selection
+pick drain/readback drain, render contract phases, render-graph compile/execute,
+present, maintenance, and render-world pool release. It mirrors renderer-owned
+render-graph timing and ImGui adapter timing for diagnostics only; it is not a
+branching contract for runtime behavior.
+
 Shutdown is also delegated through `Extrinsic.Core.FrameLoop`: runtime clears
 the platform listener, detaches and tears down the ImGui adapter while the window
 and overlay system are live, then executes `ExecuteShutdownContract` in this
@@ -1335,7 +1346,10 @@ is non-zero only when the atlas bytes are recopied into an overlay frame, while
 `LastFrameCommandCopyBytes`, and `LastFrameOverlayCopyBytes` report the POD
 vertex/index/command payload copied for the current submitted frame. These
 counters are runtime-side observability only; graphics still owns retained atlas
-resources and upload buffers.
+resources and upload buffers. UI-030 extends the same diagnostics with
+microsecond timings for `BeginFrame`, the editor callback, `ImGui::Render()`,
+draw-data/font/list copying, and total `EndFrame()` so runtime frame-pacing
+samples can separate editor CPU work from ImGui producer-copy cost.
 
 Runtime owns camera motion, input-to-pick-request translation, gizmo hit testing,
 and transform application. Graphics receives only immutable `CameraViewInput`,

@@ -26,6 +26,7 @@
 #include <imgui.h>
 
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Renderer;
@@ -220,6 +221,13 @@ namespace
         return config;
     }
 
+    [[nodiscard]] Extrinsic::Core::Config::EngineConfig NullWindowHeadlessConfig()
+    {
+        Extrinsic::Core::Config::EngineConfig config = HeadlessConfig();
+        config.Window.Backend = Extrinsic::Core::Config::WindowBackend::Null;
+        return config;
+    }
+
     [[nodiscard]] const Extrinsic::Graphics::RenderGraphCommandPassStats* FindCommandPass(
         const Extrinsic::Graphics::RenderGraphFrameStats& stats,
         const std::string& name)
@@ -326,6 +334,57 @@ TEST(ImGuiAdapterEngineWiring, EditorHookInvokedOncePerFrameAndProducesDrawLists
     ASSERT_NE(imguiPass, nullptr);
     EXPECT_EQ(imguiPass->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::SkippedNonOperational);
+
+    engine.Shutdown();
+}
+
+TEST(ImGuiAdapterEngineWiring, FramePacingDiagnosticsPopulateOnNullBackend)
+{
+    constexpr std::uint32_t kFrames = 2u;
+    Engine engine(NullWindowHeadlessConfig(),
+                  std::make_unique<BoundedRunApplication>(kFrames));
+    engine.Initialize();
+
+    std::uint32_t editorCalls = 0u;
+    engine.SetImGuiEditorCallback(
+        [&editorCalls]
+        {
+            ++editorCalls;
+            ImGui::SetNextWindowPos(ImVec2(10.0f, 10.0f));
+            ImGui::SetNextWindowSize(ImVec2(220.0f, 120.0f));
+            ImGui::Begin("UI-030 Frame Pacing Panel");
+            ImGui::Text("frame pacing diagnostics");
+            ImGui::End();
+        });
+
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+
+    engine.Run();
+
+    const Runtime::RuntimeFramePacingDiagnostics& pacing =
+        engine.GetLastFramePacingDiagnostics();
+    const Runtime::ImGuiAdapterDiagnostics& imgui =
+        engine.GetImGuiAdapter().GetDiagnostics();
+    const Graphics::RenderGraphFrameStats& graph =
+        engine.GetRenderer().GetLastRenderGraphStats();
+
+    EXPECT_EQ(editorCalls, kFrames);
+    EXPECT_EQ(imgui.FramesProduced, kFrames);
+    EXPECT_TRUE(pacing.Valid);
+    EXPECT_TRUE(pacing.PlatformContinueFrame);
+    EXPECT_TRUE(pacing.RendererBeganFrame);
+    EXPECT_TRUE(pacing.RendererCompletedFrame);
+    EXPECT_EQ(pacing.FrameIndex, kFrames - 1u);
+    EXPECT_EQ(pacing.ImGuiEditorCallbackMicros,
+              imgui.LastEditorCallbackMicros);
+    EXPECT_EQ(pacing.ImGuiDrawDataCopyMicros,
+              imgui.LastDrawDataCopyMicros);
+    EXPECT_GE(pacing.ImGuiEndMicros, pacing.ImGuiEditorCallbackMicros);
+    EXPECT_GE(pacing.ImGuiEndMicros, pacing.ImGuiDrawDataCopyMicros);
+    EXPECT_EQ(pacing.RenderGraphCompileMicros, graph.Compile.TimeMicros);
+    EXPECT_EQ(pacing.RenderGraphExecuteMicros, graph.Execute.TimeMicros);
+    EXPECT_GT(imgui.LastFrameOverlayCopyBytes, 0u);
 
     engine.Shutdown();
 }

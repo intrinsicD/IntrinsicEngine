@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `UI-030` — Sandbox EditorUI frame-pacing diagnostics (tasks/active/UI-030-editor-frame-pacing-diagnostics.md)
 
 ## Theme B — Rendering modernization
 
@@ -38,7 +38,6 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-144` — Post-import processor and import UX-policy seam (tasks/backlog/runtime/RUNTIME-144-post-import-processor-and-ux-policy-seam.md)
 - unblocked: `RUNTIME-145` — Runtime frame-path steady-state efficiency polish (tasks/backlog/runtime/RUNTIME-145-runtime-frame-path-efficiency-polish.md)
 - blocked by `GEOM-055`: `UI-029` — Editor ICP registration panel + convergence visualization (tasks/backlog/ui/UI-029-editor-registration-convergence-visualization.md)
-- unblocked: `UI-030` — Sandbox EditorUI frame-pacing diagnostics (tasks/backlog/ui/UI-030-editor-frame-pacing-diagnostics.md)
 - blocked by `RUNTIME-138`: `UI-031` — Sandbox EditorUI domain-window reorganization (tasks/backlog/ui/UI-031-editor-domain-ui-reorganization.md)
 
 ## Theme H — Agentic workflow hardening

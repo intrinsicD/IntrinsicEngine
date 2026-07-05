@@ -223,6 +223,11 @@ available through the Vulkan 1.2/1.3 feature chain.
   carries the last frame/image indices, requested resize extent, availability
   booleans, pending-resize/device-lost flags, last Vulkan result code, and the
   same process-monotonic lifecycle counters exposed by `FallbackDiagnosticsSnapshot`.
+  UI-030 adds backend-local microsecond timings to the same snapshot for total
+  begin-frame, fence wait, acquire-next-image, total end-frame, queue submit,
+  and present calls. Fail-closed paths keep call-specific timings at zero when
+  no Vulkan call was issued, so CPU diagnostics can distinguish real waits from
+  skipped lifecycle work.
   The snapshot is backend-specific diagnostics only; it does not expose
   Vulkan-native types and must not become a renderer/RHI branching seam.
   CPU contract coverage in `Test.VulkanFailClosedContract.cpp`

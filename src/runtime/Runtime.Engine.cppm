@@ -318,6 +318,40 @@ namespace Extrinsic::Runtime
     //   EndFrame(clock)
     // ============================================================
 
+    export struct RuntimeFramePacingDiagnostics
+    {
+        bool Valid{false};
+        bool PlatformContinueFrame{false};
+        bool RendererBeganFrame{false};
+        bool RendererCompletedFrame{false};
+        std::uint64_t FrameIndex{0u};
+        std::uint64_t TotalMicros{0u};
+        std::uint64_t PlatformBeginMicros{0u};
+        std::uint64_t ResizeMicros{0u};
+        std::uint64_t OperationalTransitionMicros{0u};
+        std::uint64_t FixedStepMicros{0u};
+        std::uint64_t ImGuiBeginMicros{0u};
+        std::uint64_t VariableTickMicros{0u};
+        std::uint64_t ImGuiEndMicros{0u};
+        std::uint64_t ImGuiEditorCallbackMicros{0u};
+        std::uint64_t ImGuiDrawDataCopyMicros{0u};
+        std::uint64_t PreRenderSetupMicros{0u};
+        std::uint64_t PreRenderTransformFlushMicros{0u};
+        std::uint64_t SelectionPickDrainMicros{0u};
+        std::uint64_t RenderContractMicros{0u};
+        std::uint64_t RenderBeginFrameMicros{0u};
+        std::uint64_t RenderExtractionMicros{0u};
+        std::uint64_t RenderPrepareMicros{0u};
+        std::uint64_t RenderExecuteMicros{0u};
+        std::uint64_t RenderEndFrameMicros{0u};
+        std::uint64_t RenderGraphCompileMicros{0u};
+        std::uint64_t RenderGraphExecuteMicros{0u};
+        std::uint64_t PresentMicros{0u};
+        std::uint64_t MaintenanceMicros{0u};
+        std::uint64_t SelectionReadbackMicros{0u};
+        std::uint64_t ReleaseRenderWorldMicros{0u};
+    };
+
     export class Engine
     {
     public:
@@ -519,6 +553,11 @@ namespace Extrinsic::Runtime
         // Initialize()). Exposes the produce-path diagnostics for tests; the
         // Engine owns the BeginFrame/EndFrame cadence.
         [[nodiscard]] const ImGuiAdapter& GetImGuiAdapter() const noexcept;
+        // UI-030 — last frame-loop pacing sample. Runtime owns the cross-layer
+        // phase boundaries; renderer/backend-specific diagnostics remain on
+        // their owning surfaces and are mirrored here only as copied counters.
+        [[nodiscard]] const RuntimeFramePacingDiagnostics&
+            GetLastFramePacingDiagnostics() const noexcept;
 
     private:
         void RunFrame();      // executes one full frame — called by Run()
@@ -666,5 +705,6 @@ namespace Extrinsic::Runtime
         bool m_Running{false};
         bool m_RendererOperational{false};
         bool m_WindowCloseLogged{false};
+        RuntimeFramePacingDiagnostics m_LastFramePacingDiagnostics{};
     };
 }

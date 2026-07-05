@@ -44,6 +44,11 @@ export namespace Extrinsic::Runtime
         std::uint64_t LastFrameCommandCopyBytes{0u};
         std::uint64_t LastFrameOverlayCopyBytes{0u};
         bool          LastFrameFontAtlasCopied{false};
+        std::uint64_t LastBeginFrameMicros{0u};
+        std::uint64_t LastEditorCallbackMicros{0u};
+        std::uint64_t LastImGuiRenderMicros{0u};
+        std::uint64_t LastDrawDataCopyMicros{0u};
+        std::uint64_t LastEndFrameMicros{0u};
     };
 
     // Runtime-side Dear ImGui platform/renderer adapter (RUNTIME-090, the

@@ -2,6 +2,7 @@ module;
 
 #include <array>
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -116,6 +117,14 @@ namespace Extrinsic::Runtime
         constexpr int kGizmoMouseButton = 0;
         constexpr int kSelectionMouseButton = 0;
 
+        [[nodiscard]] std::uint64_t ElapsedMicros(
+            const std::chrono::steady_clock::time_point start) noexcept
+        {
+            return static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    std::chrono::steady_clock::now() - start).count());
+        }
+
         struct RuntimeFrameContext
         {
             double FrameDeltaSeconds{0.0};
@@ -212,6 +221,7 @@ namespace Extrinsic::Runtime
             const Graphics::RenderFrameInput& Input;
             std::span<const Graphics::TransformGizmoRenderPacket> TransformGizmos;
             Graphics::RenderWorld& World;
+            RuntimeFramePacingDiagnostics* Pacing;
 
             RuntimeRenderFrameHooks(Graphics::IRenderer& renderer,
                                     ECS::Scene::Registry& scene,
@@ -226,7 +236,8 @@ namespace Extrinsic::Runtime
                                     RHI::FrameHandle& frame,
                                     const Graphics::RenderFrameInput& input,
                                     std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos,
-                                    Graphics::RenderWorld& world)
+                                    Graphics::RenderWorld& world,
+                                    RuntimeFramePacingDiagnostics* pacing)
                 : Renderer(renderer)
                 , Scene(scene)
                 , Extraction(extraction)
@@ -241,15 +252,23 @@ namespace Extrinsic::Runtime
                 , Input(input)
                 , TransformGizmos(transformGizmos)
                 , World(world)
+                , Pacing(pacing)
             {
             }
 
             bool BeginFrame() override
             {
-                return Renderer.BeginFrame(Frame);
+                const auto begin = std::chrono::steady_clock::now();
+                const bool result = Renderer.BeginFrame(Frame);
+                if (Pacing != nullptr)
+                {
+                    Pacing->RenderBeginFrameMicros = ElapsedMicros(begin);
+                }
+                return result;
             }
             void ExtractRenderWorld() override
             {
+                const auto begin = std::chrono::steady_clock::now();
                 // GRAPHICS-036C — producer half: acquire a back slot, write the
                 // snapshot into it via ExtractAndSubmit, then publish it as the
                 // front. AcquireBack only fails closed (kInvalidSlot) when the
@@ -293,10 +312,39 @@ namespace Extrinsic::Runtime
                 // GRAPHICS-036B — surface the pool's three counters on the
                 // extraction stats for editor overlays / tests.
                 MirrorRenderWorldPoolDiagnostics(Pool, Stats);
+                if (Pacing != nullptr)
+                {
+                    Pacing->RenderExtractionMicros = ElapsedMicros(begin);
+                }
             }
-            void PrepareFrame() override { Renderer.PrepareFrame(World); }
-            void ExecuteFrame() override { Renderer.ExecuteFrame(Frame, World); }
-            std::uint64_t EndFrame() override { return Renderer.EndFrame(Frame); }
+            void PrepareFrame() override
+            {
+                const auto begin = std::chrono::steady_clock::now();
+                Renderer.PrepareFrame(World);
+                if (Pacing != nullptr)
+                {
+                    Pacing->RenderPrepareMicros = ElapsedMicros(begin);
+                }
+            }
+            void ExecuteFrame() override
+            {
+                const auto begin = std::chrono::steady_clock::now();
+                Renderer.ExecuteFrame(Frame, World);
+                if (Pacing != nullptr)
+                {
+                    Pacing->RenderExecuteMicros = ElapsedMicros(begin);
+                }
+            }
+            std::uint64_t EndFrame() override
+            {
+                const auto begin = std::chrono::steady_clock::now();
+                const std::uint64_t result = Renderer.EndFrame(Frame);
+                if (Pacing != nullptr)
+                {
+                    Pacing->RenderEndFrameMicros = ElapsedMicros(begin);
+                }
+                return result;
+            }
         };
 
         struct TransferHooks final : Core::ITransferFrameHooks
@@ -2793,19 +2841,46 @@ namespace Extrinsic::Runtime
     void Engine::RunFrame()
     {
         RuntimeFrameContext frameContext{};
+        RuntimeFramePacingDiagnostics pacing{};
+        pacing.Valid = true;
+        pacing.FrameIndex = m_FrameIndex;
+        const auto framePacingBegin = std::chrono::steady_clock::now();
+        const auto publishPacingSample = [&]()
+        {
+            if (m_ImGuiAdapter)
+            {
+                const ImGuiAdapterDiagnostics& imgui = m_ImGuiAdapter->GetDiagnostics();
+                pacing.ImGuiEditorCallbackMicros = imgui.LastEditorCallbackMicros;
+                pacing.ImGuiDrawDataCopyMicros = imgui.LastDrawDataCopyMicros;
+            }
+            if (m_Renderer)
+            {
+                const Graphics::RenderGraphFrameStats& stats =
+                    m_Renderer->GetLastRenderGraphStats();
+                pacing.RenderGraphCompileMicros = stats.Compile.TimeMicros;
+                pacing.RenderGraphExecuteMicros = stats.Execute.TimeMicros;
+            }
+            pacing.TotalMicros = ElapsedMicros(framePacingBegin);
+            m_LastFramePacingDiagnostics = pacing;
+        };
 
         // ── Phase 1: Platform ─────────────────────────────────────────────
         PlatformFrameHooks platformHooks{*m_Window};
+        const auto platformBegin = std::chrono::steady_clock::now();
         const Core::PlatformFrameResult platformResult =
             Core::ExecutePlatformBeginFrameContract(platformHooks,
                                                     kIdleSleepSeconds);
+        pacing.PlatformBeginMicros = ElapsedMicros(platformBegin);
+        pacing.PlatformContinueFrame = platformResult.ContinueFrame;
         if (platformResult.ShouldClose)
         {
             RequestExitFromWindowClose("platform-poll");
+            publishPacingSample();
             return;
         }
         if (!m_Running)
         {
+            publishPacingSample();
             return;
         }
 
@@ -2814,10 +2889,12 @@ namespace Extrinsic::Runtime
         if (!platformResult.ContinueFrame)
         {
             m_FrameClock.Resample();
+            publishPacingSample();
             return;
         }
 
         // Swapchain resize: drain GPU, resize resources, then proceed normally.
+        const auto resizeBegin = std::chrono::steady_clock::now();
         if (m_Window->WasResized())
         {
             const auto extent = m_Window->GetFramebufferExtent();
@@ -2831,9 +2908,12 @@ namespace Extrinsic::Runtime
             }
             m_Window->AcknowledgeResize();
         }
+        pacing.ResizeMicros = ElapsedMicros(resizeBegin);
 
         OperationalTransitionHooks operationalHooks(*m_Device, *m_Renderer, m_RendererOperational);
+        const auto operationalBegin = std::chrono::steady_clock::now();
         (void)Core::ExecuteOperationalTransitionContract(operationalHooks);
+        pacing.OperationalTransitionMicros = ElapsedMicros(operationalBegin);
 
         // ── Phase 2: Fixed-step simulation + CPU task graph ───────────────
         // Each tick: app adds FrameGraph passes → Engine compiles and executes
@@ -2843,6 +2923,7 @@ namespace Extrinsic::Runtime
         frameContext.FrameDeltaSeconds = frameDt;
         m_Accumulator += frameDt;
 
+        const auto fixedStepBegin = std::chrono::steady_clock::now();
         RunFixedStepSimulationTicks(*this,
                                     *m_Application,
                                     *m_FrameGraph,
@@ -2850,6 +2931,7 @@ namespace Extrinsic::Runtime
                                     m_Accumulator,
                                     m_FixedDt,
                                     m_MaxSubSteps);
+        pacing.FixedStepMicros = ElapsedMicros(fixedStepBegin);
 
         const double alpha = m_Accumulator / m_FixedDt;
         frameContext.FixedStepAlpha = alpha;
@@ -2861,11 +2943,15 @@ namespace Extrinsic::Runtime
         // run inside the NewFrame()/Render() scope. Minimized frames return
         // before this point, so a NewFrame is never left without a matching
         // Render() in EndFrame.
+        const auto imguiBegin = std::chrono::steady_clock::now();
         if (m_ImGuiAdapter)
             m_ImGuiAdapter->BeginFrame(frameDt);
+        pacing.ImGuiBeginMicros = ElapsedMicros(imguiBegin);
 
         // ── Phase 3: Variable tick ────────────────────────────────────────
+        const auto variableTickBegin = std::chrono::steady_clock::now();
         m_Application->OnVariableTick(*this, alpha, frameDt);
+        pacing.VariableTickMicros = ElapsedMicros(variableTickBegin);
 
         // ── RUNTIME-090 Slice B: close the Dear ImGui frame ───────────────
         // EndFrame runs after the variable tick and before the render
@@ -2875,8 +2961,10 @@ namespace Extrinsic::Runtime
         // renderer consumer is attached in Initialize(); graphics-side
         // draw upload + recorded Pass.ImGui execution remain later GRAPHICS-079
         // slices.
+        const auto imguiEnd = std::chrono::steady_clock::now();
         if (m_ImGuiAdapter)
             m_ImGuiAdapter->EndFrame();
+        pacing.ImGuiEndMicros = ElapsedMicros(imguiEnd);
 
         const bool imguiCapturesMouse =
             m_ImGuiAdapter != nullptr && m_ImGuiAdapter->WantsMouseCapture();
@@ -2885,6 +2973,7 @@ namespace Extrinsic::Runtime
         const bool imguiCapturesInput = imguiCapturesMouse || imguiCapturesKeyboard;
 
         // ── Phase 4: Build render snapshot ────────────────────────────────
+        const auto preRenderSetupBegin = std::chrono::steady_clock::now();
         const Platform::Extent2D viewport = m_Window->GetFramebufferExtent();
         frameContext.RenderInput = Graphics::RenderFrameInput{
             .Alpha    = alpha,
@@ -2911,6 +3000,7 @@ namespace Extrinsic::Runtime
                                             imguiCapturesMouse,
                                             m_GizmoSelectedEntities,
                                             renderInput.Camera);
+        pacing.PreRenderSetupMicros += ElapsedMicros(preRenderSetupBegin);
 
         // ── BUG-024: pre-render transform flush ───────────────────────────
         // Local-transform mutations made after the fixed-step ECS bundle —
@@ -2924,7 +3014,10 @@ namespace Extrinsic::Runtime
         // ExtractRenderWorld observes the scene, so the rendered model
         // matrix and the gizmo packets agree with the authored transform in
         // the same frame.
+        const auto preRenderFlushBegin = std::chrono::steady_clock::now();
         (void)FlushPreRenderTransformState(*m_Scene);
+        pacing.PreRenderTransformFlushMicros =
+            ElapsedMicros(preRenderFlushBegin);
 
         // RUNTIME-116: `F` (focus) reframes the Main camera on the current
         // selection so the selected object(s) are centered and fully visible.
@@ -2935,6 +3028,7 @@ namespace Extrinsic::Runtime
         // the keyboard (e.g. typing in a field). On a successful reframe the
         // camera view is rebuilt so the snapped camera reaches the transform-
         // gizmo packets and render extraction this same frame.
+        const auto postFlushSetupBegin = std::chrono::steady_clock::now();
         FocusMainCameraOnSelectionForFrame(m_Config,
                                            m_CameraControllers,
                                            m_SelectionController,
@@ -2950,13 +3044,17 @@ namespace Extrinsic::Runtime
                                        m_GizmoInteraction.Mode(),
                                        m_GizmoInteraction.Orientation(),
                                        m_GizmoInteraction.Config().AxisLength);
+        pacing.PreRenderSetupMicros += ElapsedMicros(postFlushSetupBegin);
 
         // ── RUNTIME-089 / BUG-026: drain coalesced selection pick ─────────
+        const auto selectionPickDrainBegin = std::chrono::steady_clock::now();
         DrainPendingSelectionPickForFrame(m_SelectionController,
                                           m_Renderer->GetSelectionSystem(),
                                           m_InFlightPickContexts,
                                           viewport,
                                           renderInput);
+        pacing.SelectionPickDrainMicros =
+            ElapsedMicros(selectionPickDrainBegin);
 
         // ── Phases 5–9: promoted render-frame contract ───────────────────
         RHI::FrameHandle frame{};
@@ -2982,20 +3080,28 @@ namespace Extrinsic::Runtime
                                             frame,
                                             renderInput,
                                             transformGizmos,
-                                            renderWorld);
+                                            renderWorld,
+                                            &pacing);
 
+        const auto renderContractBegin = std::chrono::steady_clock::now();
         const Core::RenderFrameResult renderResult = Core::ExecuteRenderFrameContract(renderHooks);
+        pacing.RenderContractMicros = ElapsedMicros(renderContractBegin);
+        pacing.RendererBeganFrame = renderResult.BeganFrame;
+        pacing.RendererCompletedFrame = renderResult.CompletedFrame;
         m_LastExtractionStats = frameContext.ExtractionStats;
         if (!renderResult.BeganFrame)
         {
             // BeginFrame failed before extraction ran, so no slot was acquired
             // (PooledFrontSlot stays kInvalidSlot) — nothing to release.
             m_FrameClock.EndFrame();
+            publishPacingSample();
             return;
         }
 
         const std::uint64_t completedGpuValue = renderResult.CompletedGpuValue;
+        const auto presentBegin = std::chrono::steady_clock::now();
         m_Device->Present(frame);
+        pacing.PresentMicros = ElapsedMicros(presentBegin);
 
         // ── Phase 10: Maintenance ─────────────────────────────────────────
         TransferHooks transferHooks(*m_Device);
@@ -3006,9 +3112,11 @@ namespace Extrinsic::Runtime
                               *m_Device,
                               m_RenderExtraction,
                               *m_Renderer);
+        const auto maintenanceBegin = std::chrono::steady_clock::now();
         Core::ExecuteMaintenanceContract(transferHooks, streamingHooks, assetHooks, 8);
         if (m_KMeansGpuJobs)
             m_KMeansGpuJobs->DrainCompletedTransfers();
+        pacing.MaintenanceMicros = ElapsedMicros(maintenanceBegin);
 
         // ── RUNTIME-092 Slice B: refresh the stable-entity lookup ──────────
         // Rebuild the runtime-owned StableId winner-map from the live registry
@@ -3019,6 +3127,7 @@ namespace Extrinsic::Runtime
         // registry directly and does not depend on the map, so a recycled slot
         // is rejected regardless; the rebuild keeps the durable map coherent for
         // the other consumers and is the single per-frame maintenance point.
+        const auto readbackBegin = std::chrono::steady_clock::now();
         m_StableEntityLookup.Rebuild(*m_Scene);
 
         // ── RUNTIME-089 / RUNTIME-093 / BUG-026: completed pick readbacks ──
@@ -3027,6 +3136,7 @@ namespace Extrinsic::Runtime
                                                  *m_Scene,
                                                  m_InFlightPickContexts,
                                                  m_LastRefinedPrimitive);
+        pacing.SelectionReadbackMicros = ElapsedMicros(readbackBegin);
 
         // completedGpuValue is the renderer's per-frame timeline value.  The
         // GpuAssetCache currently retires on the CPU frame counter (which is
@@ -3039,11 +3149,14 @@ namespace Extrinsic::Runtime
         // recorded by ExecuteFrame above). Synchronous mode releases the current
         // front; pipelined mode releases the previous front consumed by render-N
         // after extraction-N has already published the new front.
+        const auto releaseFrontBegin = std::chrono::steady_clock::now();
         if (frameContext.PooledFrontSlot != RenderWorldPool::kInvalidSlot)
             m_RenderWorldPool->ReleaseFront(frameContext.PooledFrontSlot);
+        pacing.ReleaseRenderWorldMicros = ElapsedMicros(releaseFrontBegin);
 
         // ── Phase 11: Clock EndFrame ──────────────────────────────────────
         m_FrameClock.EndFrame();
+        publishPacingSample();
     }
 
     // ── Query / control ───────────────────────────────────────────────────
@@ -3362,6 +3475,12 @@ namespace Extrinsic::Runtime
     const RuntimeRenderExtractionStats& Engine::GetLastRenderExtractionStats() const noexcept
     {
         return m_LastExtractionStats;
+    }
+
+    const RuntimeFramePacingDiagnostics&
+    Engine::GetLastFramePacingDiagnostics() const noexcept
+    {
+        return m_LastFramePacingDiagnostics;
     }
 
     std::optional<Graphics::MaterialTextureAssetBindings>
