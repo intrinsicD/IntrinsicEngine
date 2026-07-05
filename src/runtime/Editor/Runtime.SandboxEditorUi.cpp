@@ -99,6 +99,28 @@ import Geometry.UvAtlas;
 
 namespace Extrinsic::Runtime
 {
+    void SandboxEditorSelectedModelCache::Clear() noexcept
+    {
+        SelectedAnalysis.Valid = false;
+        for (SandboxEditorVisualizationModelCacheEntry& entry : Visualization)
+            entry.Valid = false;
+        ++Counters.Invalidations;
+    }
+
+    SandboxEditorSelectedModelCacheStats SandboxEditorSelectedModelCache::Stats()
+        const noexcept
+    {
+        SandboxEditorSelectedModelCacheStats stats = Counters;
+        stats.Entries = SelectedAnalysis.Valid ? 1u : 0u;
+        for (const SandboxEditorVisualizationModelCacheEntry& entry :
+             Visualization)
+        {
+            if (entry.Valid)
+                ++stats.Entries;
+        }
+        return stats;
+    }
+
     namespace
     {
         namespace ECSC = Extrinsic::ECS::Components;
@@ -4065,6 +4087,208 @@ namespace Extrinsic::Runtime
             return std::nullopt;
         }
 
+        void InvalidateSelectedModelCache(const SandboxEditorContext& context)
+        {
+            if (context.SelectedModelCache != nullptr)
+                context.SelectedModelCache->Clear();
+        }
+
+        [[nodiscard]] SandboxEditorCommandStatus InvalidateSelectedModelCacheIfApplied(
+            const SandboxEditorContext& context,
+            const SandboxEditorCommandStatus status)
+        {
+            if (status == SandboxEditorCommandStatus::Applied)
+                InvalidateSelectedModelCache(context);
+            return status;
+        }
+
+        [[nodiscard]] std::vector<std::uint32_t> BuildSelectedStableIdsForCacheKey(
+            const SandboxEditorContext& context,
+            const std::uint32_t fallbackStableId)
+        {
+            std::vector<std::uint32_t> selectedIds{};
+            if (context.Selection != nullptr)
+            {
+                const auto selected = context.Selection->SelectedStableIds();
+                selectedIds.assign(selected.begin(), selected.end());
+            }
+            if (selectedIds.empty() && fallbackStableId != 0u)
+                selectedIds.push_back(fallbackStableId);
+            return selectedIds;
+        }
+
+        [[nodiscard]] std::uint64_t CurrentCommandHistoryRevision(
+            const SandboxEditorContext& context)
+        {
+            if (context.CommandHistory == nullptr)
+                return 0u;
+            return context.CommandHistory->Snapshot().Revision;
+        }
+
+        [[nodiscard]] std::uint64_t VertexBindingGenerationForEntity(
+            const entt::registry& raw,
+            const ECS::EntityHandle entity)
+        {
+            const auto* bindings =
+                raw.try_get<VertexChannelBindingSet>(entity);
+            return bindings != nullptr ? bindings->BindingGeneration : 0u;
+        }
+
+        [[nodiscard]] SandboxEditorSelectedModelCacheKey
+        BuildSelectedModelCacheKey(
+            const SandboxEditorContext& context,
+            const entt::registry& raw,
+            const ECS::EntityHandle entity,
+            const SandboxEditorGeometryDomainModel& geometry,
+            const SandboxEditorSelectedModelCacheSection section,
+            const SandboxEditorVisualizationTarget visualizationTarget =
+                SandboxEditorVisualizationTarget::Entity)
+        {
+            const std::uint32_t stableId =
+                SelectionController::ToStableEntityId(entity);
+            return SandboxEditorSelectedModelCacheKey{
+                .Section = section,
+                .VisualizationTarget = visualizationTarget,
+                .PrimaryStableId = stableId,
+                .SelectedStableIds =
+                    BuildSelectedStableIdsForCacheKey(context, stableId),
+                .SelectedDomain = geometry.Domain,
+                .VertexCount = geometry.VertexCount,
+                .EdgeCount = geometry.EdgeCount,
+                .HalfedgeCount = geometry.HalfedgeCount,
+                .FaceCount = geometry.FaceCount,
+                .NodeCount = geometry.NodeCount,
+                .BindingGeneration = VertexBindingGenerationForEntity(raw, entity),
+                .CommandHistoryRevision = CurrentCommandHistoryRevision(context),
+                .ViewportWidth =
+                    static_cast<std::uint32_t>(context.CameraViewport.Width),
+                .ViewportHeight =
+                    static_cast<std::uint32_t>(context.CameraViewport.Height),
+                .VisualizationCommandsAvailable =
+                    context.VisualizationCommandsAvailable,
+                .VisualizationAdapterBindingsAvailable =
+                    context.VisualizationAdapterBindings.Available(),
+            };
+        }
+
+        void RecordSelectedAnalysisCacheHit(const SandboxEditorContext& context)
+        {
+            if (context.SelectedModelCache != nullptr)
+                ++context.SelectedModelCache->Counters.SelectedAnalysisCacheHits;
+            if (context.ModelBuildStats != nullptr)
+                ++context.ModelBuildStats->SelectedAnalysisCacheHits;
+        }
+
+        void RecordSelectedAnalysisCacheMiss(const SandboxEditorContext& context)
+        {
+            if (context.SelectedModelCache != nullptr)
+                ++context.SelectedModelCache->Counters.SelectedAnalysisCacheMisses;
+            if (context.ModelBuildStats != nullptr)
+                ++context.ModelBuildStats->SelectedAnalysisCacheMisses;
+        }
+
+        void RecordVisualizationCacheHit(const SandboxEditorContext& context)
+        {
+            if (context.SelectedModelCache != nullptr)
+                ++context.SelectedModelCache->Counters.VisualizationModelCacheHits;
+            if (context.ModelBuildStats != nullptr)
+                ++context.ModelBuildStats->VisualizationModelCacheHits;
+        }
+
+        void RecordVisualizationCacheMiss(const SandboxEditorContext& context)
+        {
+            if (context.SelectedModelCache != nullptr)
+                ++context.SelectedModelCache->Counters.VisualizationModelCacheMisses;
+            if (context.ModelBuildStats != nullptr)
+                ++context.ModelBuildStats->VisualizationModelCacheMisses;
+        }
+
+        [[nodiscard]] SandboxEditorSelectedAnalysisModel
+        BuildSelectedAnalysisModelUncached(
+            const SandboxEditorContext& context,
+            const entt::registry& raw,
+            const ECS::EntityHandle entity,
+            const GS::ConstSourceView& sourceView,
+            const SandboxEditorRenderHintModel& renderHints,
+            const SandboxEditorGeometryDomainModel& geometry,
+            const std::uint32_t stableId)
+        {
+            SandboxEditorSelectedAnalysisModel model{};
+            model.PropertyCatalog =
+                BuildPropertyCatalogModel(context, raw, entity);
+            model.Progressive =
+                BuildProgressiveRenderDataModel(context, raw, entity);
+            model.BoundState =
+                BuildBoundRenderStateModel(
+                    context,
+                    model.PropertyCatalog,
+                    model.Progressive,
+                    renderHints,
+                    geometry,
+                    stableId);
+            model.TextureBake =
+                BuildTextureBakeControlsModel(
+                    context,
+                    sourceView,
+                    model.PropertyCatalog,
+                    stableId);
+            return model;
+        }
+
+        [[nodiscard]] SandboxEditorSelectedAnalysisModel BuildSelectedAnalysisModel(
+            const SandboxEditorContext& context,
+            const entt::registry& raw,
+            const ECS::EntityHandle entity,
+            const GS::ConstSourceView& sourceView,
+            const SandboxEditorRenderHintModel& renderHints,
+            const SandboxEditorGeometryDomainModel& geometry,
+            const std::uint32_t stableId)
+        {
+            SandboxEditorSelectedModelCache* cache = context.SelectedModelCache;
+            if (cache == nullptr)
+            {
+                return BuildSelectedAnalysisModelUncached(
+                    context,
+                    raw,
+                    entity,
+                    sourceView,
+                    renderHints,
+                    geometry,
+                    stableId);
+            }
+
+            const SandboxEditorSelectedModelCacheKey key =
+                BuildSelectedModelCacheKey(
+                    context,
+                    raw,
+                    entity,
+                    geometry,
+                    SandboxEditorSelectedModelCacheSection::SelectedAnalysis);
+            if (cache->SelectedAnalysis.Valid &&
+                cache->SelectedAnalysis.Key == key)
+            {
+                RecordSelectedAnalysisCacheHit(context);
+                return cache->SelectedAnalysis.Model;
+            }
+
+            RecordSelectedAnalysisCacheMiss(context);
+            SandboxEditorSelectedAnalysisModel model =
+                BuildSelectedAnalysisModelUncached(
+                    context,
+                    raw,
+                    entity,
+                    sourceView,
+                    renderHints,
+                    geometry,
+                    stableId);
+            cache->SelectedAnalysis = SandboxEditorSelectedAnalysisCacheEntry{
+                .Valid = true,
+                .Key = key,
+                .Model = model,
+            };
+            return model;
+        }
+
         [[nodiscard]] const char* KMeansBackendId(
             SandboxEditorKMeansBackend backend) noexcept;
 
@@ -6885,24 +7109,19 @@ namespace Extrinsic::Runtime
             model.Transform = BuildTransformModel(raw, *selected);
             model.RenderHints = BuildRenderHintModel(raw, *selected);
             model.Geometry = BuildGeometryDomainModel(raw, *selected);
-            model.PropertyCatalog =
-                BuildPropertyCatalogModel(context, raw, *selected);
-            model.Progressive =
-                BuildProgressiveRenderDataModel(context, raw, *selected);
-            model.BoundState =
-                BuildBoundRenderStateModel(
+            SandboxEditorSelectedAnalysisModel selectedAnalysis =
+                BuildSelectedAnalysisModel(
                     context,
-                    model.PropertyCatalog,
-                    model.Progressive,
+                    raw,
+                    *selected,
+                    GS::BuildConstView(raw, *selected),
                     model.RenderHints,
                     model.Geometry,
                     model.Entity.StableEntityId);
-            model.TextureBake =
-                BuildTextureBakeControlsModel(
-                    context,
-                    GS::BuildConstView(raw, *selected),
-                    model.PropertyCatalog,
-                    model.Entity.StableEntityId);
+            model.PropertyCatalog = std::move(selectedAnalysis.PropertyCatalog);
+            model.Progressive = std::move(selectedAnalysis.Progressive);
+            model.BoundState = std::move(selectedAnalysis.BoundState);
+            model.TextureBake = std::move(selectedAnalysis.TextureBake);
             model.Processing =
                 GetSandboxEditorGeometryProcessingCapabilities(
                     *context.Scene,
@@ -7387,6 +7606,68 @@ namespace Extrinsic::Runtime
                         FromVisualizationAdapterBinding(*binding);
                 }
             }
+            return model;
+        }
+
+        [[nodiscard]] SandboxEditorVisualizationModelCacheEntry*
+        ResolveVisualizationCacheEntry(
+            SandboxEditorSelectedModelCache& cache,
+            const SandboxEditorVisualizationTarget target)
+        {
+            const std::size_t index = static_cast<std::size_t>(target);
+            return index < cache.Visualization.size()
+                ? &cache.Visualization[index]
+                : nullptr;
+        }
+
+        [[nodiscard]] SandboxEditorVisualizationModel BuildCachedVisualizationModel(
+            const SandboxEditorContext& context,
+            const SandboxEditorVisualizationTarget target =
+                SandboxEditorVisualizationTarget::Entity)
+        {
+            SandboxEditorSelectedModelCache* cache = context.SelectedModelCache;
+            if (cache == nullptr || !context.VisualizationCommandsAvailable ||
+                context.Scene == nullptr)
+            {
+                return BuildVisualizationModel(context, target);
+            }
+
+            const std::optional<ECS::EntityHandle> selected =
+                ResolveFirstSelectedEntity(context);
+            if (!selected.has_value())
+                return BuildVisualizationModel(context, target);
+
+            SandboxEditorVisualizationModelCacheEntry* entry =
+                ResolveVisualizationCacheEntry(*cache, target);
+            if (entry == nullptr)
+                return BuildVisualizationModel(context, target);
+
+            const entt::registry& raw = context.Scene->Raw();
+            const SandboxEditorGeometryDomainModel geometry =
+                BuildGeometryDomainModel(raw, *selected);
+            const SandboxEditorSelectedModelCacheKey key =
+                BuildSelectedModelCacheKey(
+                    context,
+                    raw,
+                    *selected,
+                    geometry,
+                    SandboxEditorSelectedModelCacheSection::Visualization,
+                    target);
+
+            if (entry->Valid && entry->Key == key)
+            {
+                RecordVisualizationCacheHit(context);
+                return entry->Model;
+            }
+
+            RecordVisualizationCacheMiss(context);
+            SandboxEditorVisualizationModel model =
+                BuildVisualizationModel(context, target);
+            *entry = SandboxEditorVisualizationModelCacheEntry{
+                .Valid = true,
+                .Key = key,
+                .Model = model,
+            };
             return model;
         }
 
@@ -14827,7 +15108,7 @@ namespace Extrinsic::Runtime
         }
         if (request.Visualization)
         {
-            frame.Visualization = BuildVisualizationModel(modelContext);
+            frame.Visualization = BuildCachedVisualizationModel(modelContext);
         }
         frame.ModelBuildStats = stats;
         return frame;
@@ -14892,26 +15173,20 @@ namespace Extrinsic::Runtime
             VisualizationTargetAvailableForView(
                 availability,
                 model.VisualizationTarget);
-        model.PropertyCatalog =
-            BuildPropertyCatalogModel(context, raw, *selected);
         const SandboxEditorGeometryDomainModel geometry =
             BuildGeometryDomainModel(raw, *selected);
-        const SandboxEditorProgressiveRenderDataModel progressive =
-            BuildProgressiveRenderDataModel(context, raw, *selected);
-        model.BoundState =
-            BuildBoundRenderStateModel(
+        SandboxEditorSelectedAnalysisModel selectedAnalysis =
+            BuildSelectedAnalysisModel(
                 context,
-                model.PropertyCatalog,
-                progressive,
+                raw,
+                *selected,
+                sourceView,
                 model.RenderHints,
                 geometry,
                 model.SelectedStableId);
-        model.TextureBake =
-            BuildTextureBakeControlsModel(
-                context,
-                GS::BuildConstView(raw, *selected),
-                model.PropertyCatalog,
-                model.SelectedStableId);
+        model.PropertyCatalog = std::move(selectedAnalysis.PropertyCatalog);
+        model.BoundState = std::move(selectedAnalysis.BoundState);
+        model.TextureBake = std::move(selectedAnalysis.TextureBake);
         if (model.DomainMatches)
         {
             model.Processing = BuildGeometryProcessingModel(context);
@@ -14941,7 +15216,7 @@ namespace Extrinsic::Runtime
         else
         {
             model.Visualization =
-                BuildVisualizationModel(context, model.VisualizationTarget);
+                BuildCachedVisualizationModel(context, model.VisualizationTarget);
             AppendDiagnostics(model.Diagnostics, model.Visualization.Diagnostics);
         }
 
@@ -14972,9 +15247,15 @@ namespace Extrinsic::Runtime
             if (selected.size() == 1u)
                 before = selected.front();
             else if (!selected.empty())
-                return context.Selection->SetSelectedByStableEntityId(
-                    *context.Scene,
-                    stableEntityId);
+            {
+                const bool changed =
+                    context.Selection->SetSelectedByStableEntityId(
+                        *context.Scene,
+                        stableEntityId);
+                if (changed)
+                    InvalidateSelectedModelCache(context);
+                return changed;
+            }
 
             const EditorCommandHistoryResult result =
                 context.CommandHistory->Execute(
@@ -14986,10 +15267,16 @@ namespace Extrinsic::Runtime
                             .AfterStableEntityId = stableEntityId,
                             .Label = "Select Entity",
                         }));
+            if (result.Succeeded())
+                InvalidateSelectedModelCache(context);
             return result.Succeeded();
         }
-        return context.Selection->SetSelectedByStableEntityId(*context.Scene,
-                                                              stableEntityId);
+        const bool changed =
+            context.Selection->SetSelectedByStableEntityId(*context.Scene,
+                                                           stableEntityId);
+        if (changed)
+            InvalidateSelectedModelCache(context);
+        return changed;
     }
 
     SandboxEditorFileImportResult ApplySandboxEditorFileImportCommand(
@@ -15022,6 +15309,7 @@ namespace Extrinsic::Runtime
             if (result.Message.empty())
                 result.Message = BuildImportSuccessMessage(command, result);
             result.Error = Core::ErrorCode::Success;
+            InvalidateSelectedModelCache(context);
         }
         else if (result.Message.empty())
         {
@@ -15062,6 +15350,7 @@ namespace Extrinsic::Runtime
             if (result.Message.empty())
                 result.Message = BuildSceneFileSuccessMessage(command, result);
             result.Error = Core::ErrorCode::Success;
+            InvalidateSelectedModelCache(context);
         }
         else if (result.Message.empty())
         {
@@ -15102,6 +15391,7 @@ namespace Extrinsic::Runtime
             if (result.Message.empty())
                 result.Message = BuildSceneFileSuccessMessage(command, result);
             result.Error = Core::ErrorCode::Success;
+            InvalidateSelectedModelCache(context);
         }
         else if (result.Message.empty())
         {
@@ -15130,6 +15420,7 @@ namespace Extrinsic::Runtime
             if (result.Message.empty())
                 result.Message = BuildSceneFileSuccessMessage({}, result);
             result.Error = Core::ErrorCode::Success;
+            InvalidateSelectedModelCache(context);
         }
         else if (result.Message.empty())
         {
@@ -15159,6 +15450,7 @@ namespace Extrinsic::Runtime
             if (result.Message.empty())
                 result.Message = BuildSceneFileSuccessMessage({}, result);
             result.Error = Core::ErrorCode::Success;
+            InvalidateSelectedModelCache(context);
         }
         else if (result.Message.empty())
         {
@@ -15356,10 +15648,14 @@ namespace Extrinsic::Runtime
                                     scene, stableEntityId, before);
                             },
                     });
-            return ToSandboxEditorCommandStatus(result.Status);
+            return InvalidateSelectedModelCacheIfApplied(
+                context,
+                ToSandboxEditorCommandStatus(result.Status));
         }
-        return ToSandboxEditorCommandStatus(
-            ApplyRenderHintState(context.Scene, command.StableEntityId, after));
+        return InvalidateSelectedModelCacheIfApplied(
+            context,
+            ToSandboxEditorCommandStatus(
+                ApplyRenderHintState(context.Scene, command.StableEntityId, after)));
     }
 
     SandboxEditorCommandStatus ApplySandboxEditorRenderHintCommand(
@@ -15418,11 +15714,15 @@ namespace Extrinsic::Runtime
                             },
                         .Dirtying = true,
                     });
-            return ToSandboxEditorCommandStatus(result.Status);
+            return InvalidateSelectedModelCacheIfApplied(
+                context,
+                ToSandboxEditorCommandStatus(result.Status));
         }
 
-        return ToSandboxEditorCommandStatus(
-            ApplyRenderHintState(context.Scene, command.StableEntityId, after));
+        return InvalidateSelectedModelCacheIfApplied(
+            context,
+            ToSandboxEditorCommandStatus(
+                ApplyRenderHintState(context.Scene, command.StableEntityId, after)));
     }
 
     SandboxEditorCommandStatus ApplySandboxEditorSpatialDebugBindingCommand(
@@ -15473,13 +15773,16 @@ namespace Extrinsic::Runtime
                             .After = after,
                             .Label = "Change Spatial Debug Binding",
                         }));
-            return ToSandboxEditorCommandStatus(result.Status);
+            return InvalidateSelectedModelCacheIfApplied(
+                context,
+                ToSandboxEditorCommandStatus(result.Status));
         }
 
         if (after.has_value())
             raw.emplace_or_replace<ECSC::SpatialDebugBinding>(entity, *after);
         else
             raw.remove<ECSC::SpatialDebugBinding>(entity);
+        InvalidateSelectedModelCache(context);
         return SandboxEditorCommandStatus::Applied;
     }
 
@@ -15544,15 +15847,19 @@ namespace Extrinsic::Runtime
                           "Change Visualization");
             const EditorCommandHistoryResult result =
                 context.CommandHistory->Execute(record);
-            return ToSandboxEditorCommandStatus(result.Status);
+            return InvalidateSelectedModelCacheIfApplied(
+                context,
+                ToSandboxEditorCommandStatus(result.Status));
         }
 
-        return ToSandboxEditorCommandStatus(
-            ApplyVisualizationConfigTarget(
-                context.Scene,
-                command.StableEntityId,
-                command.Target,
-                after));
+        return InvalidateSelectedModelCacheIfApplied(
+            context,
+            ToSandboxEditorCommandStatus(
+                ApplyVisualizationConfigTarget(
+                    context.Scene,
+                    command.StableEntityId,
+                    command.Target,
+                    after)));
     }
 
     SandboxEditorCommandStatus ApplySandboxEditorVisualizationPropertyCommand(
@@ -15677,6 +15984,7 @@ namespace Extrinsic::Runtime
             if (!current.has_value())
                 return SandboxEditorCommandStatus::NoChange;
             context.VisualizationAdapterBindings.ClearBinding(command.StableEntityId);
+            InvalidateSelectedModelCache(context);
             return SandboxEditorCommandStatus::Applied;
         }
 
@@ -15689,6 +15997,7 @@ namespace Extrinsic::Runtime
         context.VisualizationAdapterBindings.SetBinding(
             command.StableEntityId,
             next);
+        InvalidateSelectedModelCache(context);
         return SandboxEditorCommandStatus::Applied;
     }
 
@@ -15746,6 +16055,7 @@ namespace Extrinsic::Runtime
             if (context.CommandHistory != nullptr)
                 (void)context.CommandHistory->MarkDirty(
                     "Change vertex channel binding");
+            InvalidateSelectedModelCache(context);
             return SandboxEditorCommandStatus::Applied;
         }
 
@@ -15788,6 +16098,7 @@ namespace Extrinsic::Runtime
         if (context.CommandHistory != nullptr)
             (void)context.CommandHistory->MarkDirty(
                 "Change vertex channel binding");
+        InvalidateSelectedModelCache(context);
         return SandboxEditorCommandStatus::Applied;
     }
 
@@ -15841,11 +16152,13 @@ namespace Extrinsic::Runtime
         slot.Enabled = command.Enabled;
         ++after.BindingGeneration;
 
-        return CommitProgressiveBindingsChange(
+        return InvalidateSelectedModelCacheIfApplied(
             context,
-            command.StableEntityId,
-            std::move(before),
-            std::move(after));
+            CommitProgressiveBindingsChange(
+                context,
+                command.StableEntityId,
+                std::move(before),
+                std::move(after)));
     }
 
     SandboxEditorCommandStatus ApplySandboxEditorProgressiveSlotPropertyCommand(
@@ -15924,11 +16237,13 @@ namespace Extrinsic::Runtime
         slot.Enabled = true;
         ++after.BindingGeneration;
 
-        return CommitProgressiveBindingsChange(
+        return InvalidateSelectedModelCacheIfApplied(
             context,
-            command.StableEntityId,
-            std::move(before),
-            std::move(after));
+            CommitProgressiveBindingsChange(
+                context,
+                command.StableEntityId,
+                std::move(before),
+                std::move(after)));
     }
 
     SandboxEditorTextureBakeCommandResult ApplySandboxEditorTextureBakeCommand(
@@ -16040,7 +16355,7 @@ namespace Extrinsic::Runtime
             }
         }
 
-        return SandboxEditorTextureBakeCommandResult{
+        SandboxEditorTextureBakeCommandResult result{
             .Status = status,
             .BakeStatus = bake.Status,
             .GeneratedTexture = bake.GeneratedTexture,
@@ -16050,6 +16365,9 @@ namespace Extrinsic::Runtime
             .GeneratedAssetPath = bake.GeneratedAssetPath,
             .Diagnostic = bake.Diagnostic,
         };
+        if (result.Status == SandboxEditorCommandStatus::Applied)
+            InvalidateSelectedModelCache(context);
+        return result;
     }
 
     SandboxEditorUvRegenerationCommandResult ApplySandboxEditorUvRegenerationCommand(
@@ -16180,6 +16498,7 @@ namespace Extrinsic::Runtime
         Dirty::MarkGpuDirty(raw, *entity);
         if (context.CommandHistory != nullptr)
             (void)context.CommandHistory->MarkDirty("Regenerate UVs");
+        InvalidateSelectedModelCache(context);
 
         return SandboxEditorUvRegenerationCommandResult{
             .Status = SandboxEditorCommandStatus::Applied,
@@ -16350,6 +16669,7 @@ namespace Extrinsic::Runtime
         result.Message = BuildKMeansSuccessMessage(command.Domain, result);
         if (context.CommandHistory != nullptr)
             (void)context.CommandHistory->MarkDirty("Run K-Means");
+        InvalidateSelectedModelCache(context);
         return result;
     }
 
@@ -16443,6 +16763,7 @@ namespace Extrinsic::Runtime
                     "Run progressive Poisson sampling");
 
             AppendProgressivePoissonSuccessMessage(result);
+            InvalidateSelectedModelCache(context);
             return result;
         }
 
@@ -16552,6 +16873,7 @@ namespace Extrinsic::Runtime
                 "Run progressive Poisson mesh sampling");
 
         AppendProgressivePoissonSuccessMessage(result);
+        InvalidateSelectedModelCache(context);
         return result;
     }
 
@@ -16779,6 +17101,7 @@ namespace Extrinsic::Runtime
         result.Status = SandboxEditorCommandStatus::Applied;
         result.Error = Core::ErrorCode::Success;
         result.Message = BuildMeshDenoiseSuccessMessage(result);
+        InvalidateSelectedModelCache(context);
         return result;
     }
 
@@ -16980,6 +17303,7 @@ namespace Extrinsic::Runtime
             result.DirectionWrittenCount == result.VertexSlotCount * 2u;
         result.Error = Core::ErrorCode::Success;
         result.Message = BuildMeshCurvatureSuccessMessage(result);
+        InvalidateSelectedModelCache(context);
         return result;
     }
 
@@ -17160,6 +17484,7 @@ namespace Extrinsic::Runtime
         result.Status = SandboxEditorCommandStatus::Applied;
         result.Error = Core::ErrorCode::Success;
         result.Message = BuildMeshRemeshSuccessMessage(result);
+        InvalidateSelectedModelCache(context);
         return result;
     }
 
@@ -17363,6 +17688,7 @@ namespace Extrinsic::Runtime
         result.Status = SandboxEditorCommandStatus::Applied;
         result.Error = Core::ErrorCode::Success;
         result.Message = BuildMeshSubdivideSuccessMessage(result);
+        InvalidateSelectedModelCache(context);
         return result;
     }
 
@@ -17522,6 +17848,7 @@ namespace Extrinsic::Runtime
         result.Status = SandboxEditorCommandStatus::Applied;
         result.Error = Core::ErrorCode::Success;
         result.Message = BuildMeshSimplifySuccessMessage(result);
+        InvalidateSelectedModelCache(context);
         return result;
     }
 
@@ -17619,6 +17946,7 @@ namespace Extrinsic::Runtime
         if (context.CommandHistory != nullptr)
             (void)context.CommandHistory->MarkDirty("Recompute mesh vertex normals");
         result.Message = BuildMeshNormalsSuccessMessage(result);
+        InvalidateSelectedModelCache(context);
         return result;
     }
 
@@ -17738,6 +18066,7 @@ namespace Extrinsic::Runtime
             (void)context.CommandHistory->MarkDirty(
                 "Recompute graph vertex normals");
         result.Message = BuildGraphNormalsSuccessMessage(result);
+        InvalidateSelectedModelCache(context);
         return result;
     }
 
@@ -17860,6 +18189,7 @@ namespace Extrinsic::Runtime
             (void)context.CommandHistory->MarkDirty(
                 "Recompute point-cloud vertex normals");
         result.Message = BuildPointCloudNormalsSuccessMessage(result);
+        InvalidateSelectedModelCache(context);
         return result;
     }
 
@@ -18062,6 +18392,7 @@ namespace Extrinsic::Runtime
                 ", non-finite " + std::to_string(result.NonFiniteCount);
         }
         result.Message += ").";
+        InvalidateSelectedModelCache(context);
         return result;
     }
 
@@ -18336,6 +18667,7 @@ namespace Extrinsic::Runtime
                     m_LastObservedRuntimeImportSequence = runtimeImport->Sequence;
                 }
                 SandboxEditorContext context = BuildContextFromEngine(*m_Engine);
+                context.SelectedModelCache = &m_SelectedModelCache;
                 if (context.KMeansGpuCommands.Available())
                 {
                     while (std::optional<RuntimeKMeansGpuJobResult> completed =
@@ -18611,5 +18943,6 @@ namespace Extrinsic::Runtime
             m_Engine->SetImGuiEditorCallback({});
             m_Engine = nullptr;
         }
+        m_SelectedModelCache.Clear();
     }
 }

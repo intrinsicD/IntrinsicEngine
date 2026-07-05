@@ -2062,6 +2062,82 @@ export namespace Extrinsic::Runtime
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
+    enum class SandboxEditorSelectedModelCacheSection : std::uint8_t
+    {
+        SelectedAnalysis,
+        Visualization,
+    };
+
+    struct SandboxEditorSelectedModelCacheKey
+    {
+        SandboxEditorSelectedModelCacheSection Section{
+            SandboxEditorSelectedModelCacheSection::SelectedAnalysis};
+        SandboxEditorVisualizationTarget VisualizationTarget{
+            SandboxEditorVisualizationTarget::Entity};
+        std::uint32_t PrimaryStableId{0u};
+        std::vector<std::uint32_t> SelectedStableIds{};
+        ECS::Components::GeometrySources::Domain SelectedDomain{
+            ECS::Components::GeometrySources::Domain::None};
+        std::size_t VertexCount{0u};
+        std::size_t EdgeCount{0u};
+        std::size_t HalfedgeCount{0u};
+        std::size_t FaceCount{0u};
+        std::size_t NodeCount{0u};
+        std::uint64_t BindingGeneration{0u};
+        std::uint64_t CommandHistoryRevision{0u};
+        std::uint32_t ViewportWidth{0u};
+        std::uint32_t ViewportHeight{0u};
+        bool VisualizationCommandsAvailable{false};
+        bool VisualizationAdapterBindingsAvailable{false};
+
+        friend bool operator==(
+            const SandboxEditorSelectedModelCacheKey&,
+            const SandboxEditorSelectedModelCacheKey&) = default;
+    };
+
+    struct SandboxEditorSelectedAnalysisModel
+    {
+        SandboxEditorPropertyCatalogModel PropertyCatalog{};
+        SandboxEditorProgressiveRenderDataModel Progressive{};
+        SandboxEditorBoundRenderStateModel BoundState{};
+        SandboxEditorTextureBakeControlsModel TextureBake{};
+    };
+
+    struct SandboxEditorSelectedAnalysisCacheEntry
+    {
+        bool Valid{false};
+        SandboxEditorSelectedModelCacheKey Key{};
+        SandboxEditorSelectedAnalysisModel Model{};
+    };
+
+    struct SandboxEditorVisualizationModelCacheEntry
+    {
+        bool Valid{false};
+        SandboxEditorSelectedModelCacheKey Key{};
+        SandboxEditorVisualizationModel Model{};
+    };
+
+    struct SandboxEditorSelectedModelCacheStats
+    {
+        std::uint32_t SelectedAnalysisCacheHits{0u};
+        std::uint32_t SelectedAnalysisCacheMisses{0u};
+        std::uint32_t VisualizationModelCacheHits{0u};
+        std::uint32_t VisualizationModelCacheMisses{0u};
+        std::uint32_t Invalidations{0u};
+        std::uint32_t Entries{0u};
+    };
+
+    struct SandboxEditorSelectedModelCache
+    {
+        SandboxEditorSelectedAnalysisCacheEntry SelectedAnalysis{};
+        std::array<SandboxEditorVisualizationModelCacheEntry, 4u>
+            Visualization{};
+        SandboxEditorSelectedModelCacheStats Counters{};
+
+        void Clear() noexcept;
+        [[nodiscard]] SandboxEditorSelectedModelCacheStats Stats() const noexcept;
+    };
+
     struct SandboxEditorModelBuildRequest
     {
         bool Hierarchy{true};
@@ -2091,6 +2167,10 @@ export namespace Extrinsic::Runtime
         std::uint32_t VisualizationModelBuilds{0u};
         std::uint32_t DomainWindowModelBuilds{0u};
         std::uint32_t DomainWindowModelCacheHits{0u};
+        std::uint32_t SelectedAnalysisCacheHits{0u};
+        std::uint32_t SelectedAnalysisCacheMisses{0u};
+        std::uint32_t VisualizationModelCacheHits{0u};
+        std::uint32_t VisualizationModelCacheMisses{0u};
     };
 
     struct SandboxEditorPanelFrame
@@ -2163,6 +2243,7 @@ export namespace Extrinsic::Runtime
         const RuntimeRenderRecipeState* RenderRecipeRuntimeState{nullptr};
         const RuntimeEngineConfigControlState* EngineConfigControlState{nullptr};
         SandboxEditorModelBuildStats* ModelBuildStats{nullptr};
+        SandboxEditorSelectedModelCache* SelectedModelCache{nullptr};
         std::function<Graphics::RenderRecipeConfigLoadResult(
             const std::string&,
             const std::string&)>
@@ -2592,6 +2673,7 @@ export namespace Extrinsic::Runtime
     private:
         Engine*                 m_Engine{nullptr};
         SandboxEditorPanelFrame m_LastFrame{};
+        SandboxEditorSelectedModelCache m_SelectedModelCache{};
         std::array<char, 1024>  m_ImportPathBuffer{};
         std::array<char, 1024>  m_ScenePathBuffer{};
         std::array<bool, Detail::kSandboxEditorPanelWindowCount>

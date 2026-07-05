@@ -947,6 +947,15 @@ namespace
         return request;
     }
 
+    [[nodiscard]] Runtime::SandboxEditorModelBuildRequest
+    MakeOnlyVisualizationModelBuildRequest()
+    {
+        Runtime::SandboxEditorModelBuildRequest request =
+            MakeNoSandboxEditorModelBuildRequest();
+        request.Visualization = true;
+        return request;
+    }
+
     class FakeWindow final : public Plat::IWindow
     {
     public:
@@ -2053,6 +2062,103 @@ TEST(SandboxEditorUi, InspectorOnlyBuildRequestAvoidsSiblingPanelWork)
     EXPECT_EQ(stats.UvDiagnosticsModelBuilds, 1u);
     EXPECT_EQ(stats.TextureBakeModelBuilds, 1u);
     EXPECT_EQ(stats.VisualizationModelBuilds, 0u);
+}
+
+TEST(SandboxEditorUi, SelectedModelCacheReusesInspectorAnalysis)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    Runtime::SandboxEditorSelectedModelCache cache{};
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.SelectedModelCache = &cache;
+
+    const Runtime::SandboxEditorPanelFrame first =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyInspectorModelBuildRequest());
+
+    ASSERT_TRUE(first.Inspector.HasEntity);
+    EXPECT_EQ(first.ModelBuildStats.InspectorModelBuilds, 1u);
+    EXPECT_EQ(first.ModelBuildStats.SelectedAnalysisCacheMisses, 1u);
+    EXPECT_EQ(first.ModelBuildStats.SelectedAnalysisCacheHits, 0u);
+    EXPECT_EQ(first.ModelBuildStats.PropertyCatalogModelBuilds, 1u);
+    EXPECT_EQ(first.ModelBuildStats.VertexChannelTargetBuilds, 2u);
+    EXPECT_EQ(first.ModelBuildStats.ProgressiveModelBuilds, 1u);
+    EXPECT_EQ(first.ModelBuildStats.BoundStateModelBuilds, 1u);
+    EXPECT_EQ(first.ModelBuildStats.UvDiagnosticsModelBuilds, 1u);
+    EXPECT_EQ(first.ModelBuildStats.TextureBakeModelBuilds, 1u);
+
+    const Runtime::SandboxEditorPanelFrame second =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyInspectorModelBuildRequest());
+
+    ASSERT_TRUE(second.Inspector.HasEntity);
+    EXPECT_EQ(second.ModelBuildStats.InspectorModelBuilds, 1u);
+    EXPECT_EQ(second.ModelBuildStats.SelectedAnalysisCacheMisses, 0u);
+    EXPECT_EQ(second.ModelBuildStats.SelectedAnalysisCacheHits, 1u);
+    EXPECT_EQ(second.ModelBuildStats.PropertyCatalogModelBuilds, 0u);
+    EXPECT_EQ(second.ModelBuildStats.VertexChannelTargetBuilds, 0u);
+    EXPECT_EQ(second.ModelBuildStats.ProgressiveModelBuilds, 0u);
+    EXPECT_EQ(second.ModelBuildStats.BoundStateModelBuilds, 0u);
+    EXPECT_EQ(second.ModelBuildStats.UvDiagnosticsModelBuilds, 0u);
+    EXPECT_EQ(second.ModelBuildStats.TextureBakeModelBuilds, 0u);
+    EXPECT_EQ(second.Inspector.PropertyCatalog.Rows.size(),
+              first.Inspector.PropertyCatalog.Rows.size());
+
+    const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
+        cache.Stats();
+    EXPECT_EQ(cacheStats.SelectedAnalysisCacheMisses, 1u);
+    EXPECT_EQ(cacheStats.SelectedAnalysisCacheHits, 1u);
+    EXPECT_EQ(cacheStats.Entries, 1u);
+}
+
+TEST(SandboxEditorUi, SelectedModelCacheReusesVisualizationModel)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    Runtime::SandboxEditorSelectedModelCache cache{};
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.SelectedModelCache = &cache;
+    context.VisualizationCommandsAvailable = true;
+
+    const Runtime::SandboxEditorPanelFrame first =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyVisualizationModelBuildRequest());
+
+    ASSERT_TRUE(first.Visualization.HasSelectedEntity);
+    EXPECT_EQ(first.ModelBuildStats.VisualizationModelBuilds, 1u);
+    EXPECT_EQ(first.ModelBuildStats.VisualizationModelCacheMisses, 1u);
+    EXPECT_EQ(first.ModelBuildStats.VisualizationModelCacheHits, 0u);
+
+    const Runtime::SandboxEditorPanelFrame second =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyVisualizationModelBuildRequest());
+
+    ASSERT_TRUE(second.Visualization.HasSelectedEntity);
+    EXPECT_EQ(second.ModelBuildStats.VisualizationModelBuilds, 0u);
+    EXPECT_EQ(second.ModelBuildStats.VisualizationModelCacheMisses, 0u);
+    EXPECT_EQ(second.ModelBuildStats.VisualizationModelCacheHits, 1u);
+    EXPECT_EQ(second.Visualization.Properties.size(),
+              first.Visualization.Properties.size());
+
+    const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
+        cache.Stats();
+    EXPECT_EQ(cacheStats.VisualizationModelCacheMisses, 1u);
+    EXPECT_EQ(cacheStats.VisualizationModelCacheHits, 1u);
+    EXPECT_EQ(cacheStats.Entries, 1u);
 }
 
 TEST(SandboxEditorUi, GeometryProcessingSupportedDomainsMatchPromotedEditorContract)

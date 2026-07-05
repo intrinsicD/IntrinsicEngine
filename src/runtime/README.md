@@ -77,8 +77,15 @@ windows build their `SandboxEditorDomainWindowModel` only after `ImGui::Begin()`
 confirms the window is visible, and all sections for the same domain share one
 per-frame domain-window model cache. `SandboxEditorPanelFrame::ModelBuildStats`
 reports per-frame model-build and cache-hit counters for deterministic tests and
-diagnostics. The broader generation-keyed async selected-analysis cache/job
-pipeline remains owned by the open `RUNTIME-138` slices.
+diagnostics. The selected-entity model cache now stores immutable inspector
+analysis submodels (property catalog, progressive presentation, bound render
+state, and texture-bake/UV controls) plus visualization models across steady
+selected frames. Cache keys cover stable selection ids, the selected geometry
+domain/count shape, vertex-channel binding generation, command-history
+revision, viewport, visualization target, and visualization command availability;
+editor commands that mutate those selected inputs explicitly invalidate the cache.
+The broader async selected-analysis job pipeline and fuller generation stamps
+remain owned by the open `RUNTIME-138` slices.
 
 `GRAPHICS-114` updates the runtime ImGui producer side so `ImGuiAdapter` keeps a
 font-atlas cache and revision. `EndFrame()` copies atlas bytes into
