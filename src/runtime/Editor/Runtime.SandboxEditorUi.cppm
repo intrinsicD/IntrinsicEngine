@@ -2163,6 +2163,9 @@ export namespace Extrinsic::Runtime
         std::uint32_t SelectionModelBuilds{0u};
         std::uint32_t PropertyCatalogModelBuilds{0u};
         std::uint32_t VertexChannelTargetBuilds{0u};
+        std::uint32_t VertexChannelResolverScans{0u};
+        std::uint32_t VertexChannelScratchAllocations{0u};
+        std::uint64_t VertexChannelScratchBytes{0u};
         std::uint32_t ProgressiveModelBuilds{0u};
         std::uint32_t BoundStateModelBuilds{0u};
         std::uint32_t UvDiagnosticsModelBuilds{0u};

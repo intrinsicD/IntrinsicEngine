@@ -2023,6 +2023,9 @@ TEST(SandboxEditorUi, HiddenPanelBuildRequestSkipsSelectedEntityModels)
     EXPECT_EQ(stats.SelectionModelBuilds, 0u);
     EXPECT_EQ(stats.PropertyCatalogModelBuilds, 0u);
     EXPECT_EQ(stats.VertexChannelTargetBuilds, 0u);
+    EXPECT_EQ(stats.VertexChannelResolverScans, 0u);
+    EXPECT_EQ(stats.VertexChannelScratchAllocations, 0u);
+    EXPECT_EQ(stats.VertexChannelScratchBytes, 0u);
     EXPECT_EQ(stats.ProgressiveModelBuilds, 0u);
     EXPECT_EQ(stats.BoundStateModelBuilds, 0u);
     EXPECT_EQ(stats.UvDiagnosticsModelBuilds, 0u);
@@ -2057,6 +2060,9 @@ TEST(SandboxEditorUi, InspectorOnlyBuildRequestAvoidsSiblingPanelWork)
     EXPECT_EQ(stats.SelectionModelBuilds, 0u);
     EXPECT_EQ(stats.PropertyCatalogModelBuilds, 1u);
     EXPECT_EQ(stats.VertexChannelTargetBuilds, 2u);
+    EXPECT_GT(stats.VertexChannelResolverScans, 0u);
+    EXPECT_GT(stats.VertexChannelScratchAllocations, 0u);
+    EXPECT_GT(stats.VertexChannelScratchBytes, 0u);
     EXPECT_EQ(stats.ProgressiveModelBuilds, 1u);
     EXPECT_EQ(stats.BoundStateModelBuilds, 1u);
     EXPECT_EQ(stats.UvDiagnosticsModelBuilds, 1u);
@@ -2088,6 +2094,9 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesInspectorAnalysis)
     EXPECT_EQ(first.ModelBuildStats.SelectedAnalysisCacheHits, 0u);
     EXPECT_EQ(first.ModelBuildStats.PropertyCatalogModelBuilds, 1u);
     EXPECT_EQ(first.ModelBuildStats.VertexChannelTargetBuilds, 2u);
+    EXPECT_GT(first.ModelBuildStats.VertexChannelResolverScans, 0u);
+    EXPECT_GT(first.ModelBuildStats.VertexChannelScratchAllocations, 0u);
+    EXPECT_GT(first.ModelBuildStats.VertexChannelScratchBytes, 0u);
     EXPECT_EQ(first.ModelBuildStats.ProgressiveModelBuilds, 1u);
     EXPECT_EQ(first.ModelBuildStats.BoundStateModelBuilds, 1u);
     EXPECT_EQ(first.ModelBuildStats.UvDiagnosticsModelBuilds, 1u);
@@ -2104,6 +2113,9 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesInspectorAnalysis)
     EXPECT_EQ(second.ModelBuildStats.SelectedAnalysisCacheHits, 1u);
     EXPECT_EQ(second.ModelBuildStats.PropertyCatalogModelBuilds, 0u);
     EXPECT_EQ(second.ModelBuildStats.VertexChannelTargetBuilds, 0u);
+    EXPECT_EQ(second.ModelBuildStats.VertexChannelResolverScans, 0u);
+    EXPECT_EQ(second.ModelBuildStats.VertexChannelScratchAllocations, 0u);
+    EXPECT_EQ(second.ModelBuildStats.VertexChannelScratchBytes, 0u);
     EXPECT_EQ(second.ModelBuildStats.ProgressiveModelBuilds, 0u);
     EXPECT_EQ(second.ModelBuildStats.BoundStateModelBuilds, 0u);
     EXPECT_EQ(second.ModelBuildStats.UvDiagnosticsModelBuilds, 0u);

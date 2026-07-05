@@ -1888,12 +1888,26 @@ namespace Extrinsic::Runtime
             return "unsupported vertex channel";
         }
 
+        void RecordVertexChannelResolverScratch(
+            SandboxEditorModelBuildStats* stats,
+            const std::size_t byteCount)
+        {
+            if (stats == nullptr)
+                return;
+
+            ++stats->VertexChannelResolverScans;
+            ++stats->VertexChannelScratchAllocations;
+            stats->VertexChannelScratchBytes +=
+                static_cast<std::uint64_t>(byteCount);
+        }
+
         [[nodiscard]] AttributeBindResult EvaluateVertexChannelBinding(
             const Geometry::PropertySet& properties,
             const VertexChannel channel,
             const std::string_view propertyName,
             const AttributeSourceType sourceType,
-            const std::size_t elementCount)
+            const std::size_t elementCount,
+            SandboxEditorModelBuildStats* modelBuildStats)
         {
             if (propertyName.empty())
             {
@@ -1932,11 +1946,17 @@ namespace Extrinsic::Runtime
 
             if (channel == VertexChannel::Normal)
             {
+                RecordVertexChannelResolverScratch(
+                    modelBuildStats,
+                    elementCount * sizeof(glm::vec3));
                 std::vector<glm::vec3> scratch(elementCount);
                 return ResolveVec3Channel(properties, binding, count, scratch);
             }
             if (channel == VertexChannel::Color)
             {
+                RecordVertexChannelResolverScratch(
+                    modelBuildStats,
+                    elementCount * sizeof(std::uint32_t));
                 std::vector<std::uint32_t> scratch(elementCount);
                 return ResolveColorChannelPackedUnorm8(
                     properties,
@@ -2054,7 +2074,8 @@ namespace Extrinsic::Runtime
             const GS::ConstSourceView& view,
             const std::vector<SandboxEditorPropertyCatalogRow>& rows,
             const SandboxEditorPropertyCatalogDomain domain,
-            const VertexChannel channel)
+            const VertexChannel channel,
+            SandboxEditorModelBuildStats* modelBuildStats)
         {
             SandboxEditorVertexChannelBindingTargetModel model{
                 .Channel = channel,
@@ -2078,7 +2099,8 @@ namespace Extrinsic::Runtime
                     channel,
                     binding->SourceProperty,
                     binding->SourceType,
-                    expectedCount);
+                    expectedCount,
+                    modelBuildStats);
                 model.Diagnostic =
                     BuildVertexChannelResolverDiagnostic(model.Resolver);
             }
@@ -2115,7 +2137,8 @@ namespace Extrinsic::Runtime
                     channel,
                     row.Name,
                     *sourceType,
-                    expectedCount);
+                    expectedCount,
+                    modelBuildStats);
                 option.Compatible =
                     SourceTypeAllowedForVertexChannel(channel, *sourceType) &&
                     option.Resolver.Ok();
@@ -2155,7 +2178,8 @@ namespace Extrinsic::Runtime
                     view,
                     model.Rows,
                     *domain,
-                    VertexChannel::Normal));
+                    VertexChannel::Normal,
+                    context.ModelBuildStats));
             model.VertexChannelTargets.push_back(
                 BuildVertexChannelBindingTargetModel(
                     raw,
@@ -2163,7 +2187,8 @@ namespace Extrinsic::Runtime
                     view,
                     model.Rows,
                     *domain,
-                    VertexChannel::Color));
+                    VertexChannel::Color,
+                    context.ModelBuildStats));
         }
 
         [[nodiscard]] SandboxEditorPropertyCatalogModel BuildPropertyCatalogModel(
@@ -16117,7 +16142,8 @@ namespace Extrinsic::Runtime
                 command.Channel,
                 command.PropertyName,
                 *sourceType,
-                properties->Size());
+                properties->Size(),
+                context.ModelBuildStats);
         if (!resolver.Ok())
             return SandboxEditorCommandStatus::InvalidVertexChannelBinding;
 
