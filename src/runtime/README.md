@@ -100,6 +100,9 @@ visualization-config/spatial-debug signature, plus the
 runtime-owned visualization adapter binding revision for visualization model
 entries;
 editor commands that mutate those selected inputs explicitly invalidate the cache.
+The frame maintenance hook drains ready `StreamingExecutor` main-thread apply
+callbacks through the count-limited overload so a completed-work burst cannot
+consume the whole maintenance phase by default.
 The broader async selected-analysis job pipeline and fuller generation stamps
 remain owned by the open `RUNTIME-138` slices.
 

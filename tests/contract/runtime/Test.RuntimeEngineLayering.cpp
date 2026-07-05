@@ -96,6 +96,17 @@ TEST(RuntimeEngineLayering, RunFrameDelegatesToPromotedContractsInDocumentedBroa
     EXPECT_LT(maintenance, clockEnd);
 }
 
+TEST(RuntimeEngineLayering, StreamingHookAppliesMainThreadResultsWithFrameBudget)
+{
+    const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+
+    EXPECT_NE(content.find("static constexpr std::uint32_t kApplyBudgetPerFrame = 8u;"),
+              std::string::npos);
+    EXPECT_NE(content.find("Executor.ApplyMainThreadResults(kApplyBudgetPerFrame)"),
+              std::string::npos);
+    EXPECT_EQ(content.find("Executor.ApplyMainThreadResults();"), std::string::npos);
+}
+
 TEST(RuntimeEngineLayering, RunFrameStopsAfterPlatformCloseBeforeRendererContract)
 {
     const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");

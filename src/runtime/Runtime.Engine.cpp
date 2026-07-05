@@ -365,6 +365,8 @@ namespace Extrinsic::Runtime
 
         struct StreamingHooks final : Core::IStreamingFrameHooks
         {
+            static constexpr std::uint32_t kApplyBudgetPerFrame = 8u;
+
             StreamingExecutor& Executor;
 
             explicit StreamingHooks(StreamingExecutor& executor)
@@ -373,7 +375,10 @@ namespace Extrinsic::Runtime
             }
 
             void DrainCompletions() override { Executor.DrainCompletions(); }
-            void ApplyMainThreadResults() override { Executor.ApplyMainThreadResults(); }
+            void ApplyMainThreadResults() override
+            {
+                (void)Executor.ApplyMainThreadResults(kApplyBudgetPerFrame);
+            }
             void SubmitFrameWork() override {}
             void PumpBackground(std::uint32_t maxLaunches) override { Executor.PumpBackground(maxLaunches); }
         };
