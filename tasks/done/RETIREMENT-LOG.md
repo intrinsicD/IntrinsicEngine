@@ -3392,3 +3392,12 @@ K-Means, denoise, curvature, remesh, subdivide, simplify, vertex normals,
 progressive Poisson, and point-cloud outlier removal instead of the old
 omnibus per-domain processing surface. The broader generation-keyed async
 selected-analysis cache/job pipeline remains owned by `RUNTIME-138`.
+
+[`GEOM-054`](GEOM-054-registration-pipeline-stage-extraction.md) —
+Registration pipeline named ICP stage extraction retired to `tasks/done/` on
+2026-07-05 at `Operational`. The implementation landed in `335e05b7` and
+restructures `Geometry::Registration::AlignICP` behind an internal
+`RunIcpLoop` driver with explicit correspondence, rejection, optional robust
+weighting, transform-solve, and convergence stages. GEOM-054 introduces no
+public `Geometry.Registration` surface change; the later observer seam remains
+tracked by `GEOM-055`.

@@ -15,11 +15,9 @@ map.
 - [GEOM-024 — Sparse symmetric generalized eigensolver seam](GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
   (gates `methods/METHOD-006` variant B; depends on `GEOM-020`; promote when
   METHOD-006 is the next-priority method).
-- [GEOM-054 — Registration pipeline: extract named ICP stages (zero behavior change)](GEOM-054-registration-pipeline-stage-extraction.md)
-  (Slice 0 of the registration-pipeline modularity roadmap;
-  [`docs/architecture/geometry-pipeline-modularity.md`](../../../docs/architecture/geometry-pipeline-modularity.md)).
 - [GEOM-055 — Registration: optional per-iteration observer (zero cost when off)](GEOM-055-registration-iteration-observer.md)
-  (observability slice of the same roadmap; depends on `GEOM-054`).
+  (observability slice of the registration-pipeline modularity roadmap; depends
+  on retired `GEOM-054`).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ### bcg_code_base geometry-processing port gaps (seeded 2026-06-26)
@@ -87,7 +85,7 @@ the runtime SpatialDebug closest-face consumer in `RUNTIME-135`.
   for GEOM-013, FA-QEM for GEOM-014). GEOM-013 (dual contouring) is a
   peer of the existing `Geometry.MarchingCubes`; GEOM-014 (FA-QEM) is an in-place
   extension of `Geometry.HalfedgeMesh.Simplification`.
-- GEOM-054 is Slice 0 of the registration-pipeline modularity roadmap in
+- GEOM-054 is retired as Slice 0 of the registration-pipeline modularity roadmap in
   [`docs/architecture/geometry-pipeline-modularity.md`](../../../docs/architecture/geometry-pipeline-modularity.md):
   a behavior-preserving refactor of `Geometry.Registration::AlignICP` into named
   swappable stages, reusing the Algorithm-Variant-Dispatch idiom. Later slices
@@ -138,6 +136,11 @@ split; narratives live in the retirement log.
 - [GEOM-037 — SO(3) rotation primitives (Lie machinery)](../../done/GEOM-037-so3-rotation-primitives.md) (done).
 - [GEOM-038 — Rotation averaging: SO(3) means and medians](../../done/GEOM-038-rotation-averaging-means-medians.md) (done).
 - [GEOM-039 — Accelerated mesh closest-face query and consumer adoption](../../done/GEOM-039-accelerated-mesh-closest-face-query.md) (done).
+- [GEOM-054 — Registration pipeline: extract named ICP stages](../../done/GEOM-054-registration-pipeline-stage-extraction.md)
+  (done, 2026-07-05, `Operational`): `Geometry::Registration::AlignICP` now
+  runs through an internal `RunIcpLoop` stage sequence for correspondence,
+  rejection, optional robust weighting, transform solve, and convergence, with
+  no GEOM-054 public surface change.
 - [GEOM-040 — Mesh curvature tensor and principal directions](../../done/GEOM-040-curvature-tensor-principal-directions.md) (done).
 - [GEOM-041 — FEM Laplacian mass/stiffness variants and edge-weight modes](../../done/GEOM-041-fem-laplacian-mass-stiffness-variants.md) (done).
 - [GEOM-042 — Mesh normal-based bilateral denoiser](../../done/GEOM-042-mesh-normal-bilateral-denoiser.md) (done).
