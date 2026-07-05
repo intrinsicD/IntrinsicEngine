@@ -2169,7 +2169,9 @@ export namespace Extrinsic::Runtime
         std::uint32_t ProgressiveModelBuilds{0u};
         std::uint32_t BoundStateModelBuilds{0u};
         std::uint32_t UvDiagnosticsModelBuilds{0u};
+        std::uint64_t UvDiagnosticsTexcoordElementsScanned{0u};
         std::uint32_t TextureBakeModelBuilds{0u};
+        std::uint64_t TextureBakeSourceRowsEnumerated{0u};
         std::uint32_t VisualizationModelBuilds{0u};
         std::uint32_t DomainWindowModelBuilds{0u};
         std::uint32_t DomainWindowModelCacheHits{0u};

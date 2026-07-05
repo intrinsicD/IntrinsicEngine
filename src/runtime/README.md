@@ -78,8 +78,9 @@ confirms the window is visible, and all sections for the same domain share one
 per-frame domain-window model cache. `SandboxEditorPanelFrame::ModelBuildStats`
 reports per-frame model-build and cache-hit counters for deterministic tests and
 diagnostics, including full vertex-channel resolver scan counts and scratch
-allocation bytes for selected property-catalog builds. The selected-entity model
-cache now stores immutable inspector
+allocation bytes, UV texcoord finite-check element counts, and texture-bake
+source-row enumeration counts for selected property-catalog builds. The
+selected-entity model cache now stores immutable inspector
 analysis submodels (property catalog, progressive presentation, bound render
 state, and texture-bake/UV controls) plus visualization models across steady
 selected frames. Cache keys cover stable selection ids,

@@ -2029,7 +2029,9 @@ TEST(SandboxEditorUi, HiddenPanelBuildRequestSkipsSelectedEntityModels)
     EXPECT_EQ(stats.ProgressiveModelBuilds, 0u);
     EXPECT_EQ(stats.BoundStateModelBuilds, 0u);
     EXPECT_EQ(stats.UvDiagnosticsModelBuilds, 0u);
+    EXPECT_EQ(stats.UvDiagnosticsTexcoordElementsScanned, 0u);
     EXPECT_EQ(stats.TextureBakeModelBuilds, 0u);
+    EXPECT_EQ(stats.TextureBakeSourceRowsEnumerated, 0u);
     EXPECT_EQ(stats.VisualizationModelBuilds, 0u);
 }
 
@@ -2066,7 +2068,9 @@ TEST(SandboxEditorUi, InspectorOnlyBuildRequestAvoidsSiblingPanelWork)
     EXPECT_EQ(stats.ProgressiveModelBuilds, 1u);
     EXPECT_EQ(stats.BoundStateModelBuilds, 1u);
     EXPECT_EQ(stats.UvDiagnosticsModelBuilds, 1u);
+    EXPECT_GT(stats.UvDiagnosticsTexcoordElementsScanned, 0u);
     EXPECT_EQ(stats.TextureBakeModelBuilds, 1u);
+    EXPECT_GT(stats.TextureBakeSourceRowsEnumerated, 0u);
     EXPECT_EQ(stats.VisualizationModelBuilds, 0u);
 }
 
@@ -2100,7 +2104,9 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesInspectorAnalysis)
     EXPECT_EQ(first.ModelBuildStats.ProgressiveModelBuilds, 1u);
     EXPECT_EQ(first.ModelBuildStats.BoundStateModelBuilds, 1u);
     EXPECT_EQ(first.ModelBuildStats.UvDiagnosticsModelBuilds, 1u);
+    EXPECT_GT(first.ModelBuildStats.UvDiagnosticsTexcoordElementsScanned, 0u);
     EXPECT_EQ(first.ModelBuildStats.TextureBakeModelBuilds, 1u);
+    EXPECT_GT(first.ModelBuildStats.TextureBakeSourceRowsEnumerated, 0u);
 
     const Runtime::SandboxEditorPanelFrame second =
         Runtime::BuildSandboxEditorPanelFrame(
@@ -2119,7 +2125,9 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesInspectorAnalysis)
     EXPECT_EQ(second.ModelBuildStats.ProgressiveModelBuilds, 0u);
     EXPECT_EQ(second.ModelBuildStats.BoundStateModelBuilds, 0u);
     EXPECT_EQ(second.ModelBuildStats.UvDiagnosticsModelBuilds, 0u);
+    EXPECT_EQ(second.ModelBuildStats.UvDiagnosticsTexcoordElementsScanned, 0u);
     EXPECT_EQ(second.ModelBuildStats.TextureBakeModelBuilds, 0u);
+    EXPECT_EQ(second.ModelBuildStats.TextureBakeSourceRowsEnumerated, 0u);
     EXPECT_EQ(second.Inspector.PropertyCatalog.Rows.size(),
               first.Inspector.PropertyCatalog.Rows.size());
 

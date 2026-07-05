@@ -34,6 +34,7 @@ maturity_target: Operational
 ## Required changes
 - [ ] Slice A: add low-overhead selected-entity timing/counter diagnostics for editor callback time, panel/model build time, inspector/property catalog time, vertex-channel validation time, UV diagnostics time, visualization model time, ImGui copy/upload counts, scanned element counts, scratch allocation bytes, cache hit/miss counts, queued job counts, stale-discard counts, and bounded apply time.
 - [x] Slice A partial: expose deterministic selected-frame counters for full vertex-channel resolver scans and their scratch-buffer allocation bytes.
+- [x] Slice A partial: expose deterministic selected-frame counters for UV texcoord finite-check element scans and texture-bake source-row enumeration.
 - [x] Slice A: add a deterministic capture path or test seam that records selected-entity frame samples without requiring Vulkan, and document the Vulkan-host smoke procedure for the real sandbox.
 - [x] Slice B: make editor model construction visibility-gated so hidden panels and closed domain windows do not build selected-entity models; build only the visible model section requested by the current ImGui window/section.
 - [x] Slice B: prevent open domain windows from rebuilding shared selected-entity models independently; either share one per-frame cached model view or request section-specific cached submodels.
@@ -52,6 +53,7 @@ maturity_target: Operational
 - [x] Add contract tests proving hidden inspector/domain sections do not build selected-entity property, progressive, texture-bake, or visualization models.
 - [x] Add contract tests proving steady selected cache-hit frames skip property-catalog, vertex-channel target, progressive, bound-state, UV diagnostics, texture-bake, and visualization model builders, and proving selection-generation, refined-primitive generation, and visualization adapter binding revision changes invalidate matching same-entity cache entries.
 - [x] Add contract tests proving cache-hit selected frames do not rebuild property catalogs, do not call full vertex-channel resolvers, and do not allocate geometry-sized scratch buffers.
+- [x] Add contract tests proving cache-hit selected frames perform zero UV texcoord finite-check scans and zero texture-bake source-row enumeration.
 - [ ] Add contract tests proving property option listing uses metadata compatibility only, while explicit active/requested validations use async job results.
 - [ ] Add tests proving async selected-analysis results apply only when the generation key is current and stale geometry/property/binding results are discarded.
 - [ ] Add tests proving repeated selected frames enqueue at most one job per cache key while a matching job is pending or ready.
@@ -105,7 +107,8 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'Sa
   domain-window models, exposes deterministic model-build/cache counters, and
   now keeps a persistent selected-model cache for steady inspector analysis and
   visualization frames. Frame stats count full vertex-channel resolver scans
-  and scratch-buffer allocation bytes so cache-hit tests can prove they stay
+  and scratch-buffer allocation bytes, UV texcoord finite-check element scans,
+  and texture-bake source-row enumeration so cache-hit tests can prove they stay
   at zero. The cache key includes stable selected ids, the
   selection controller's selected-set generation, and the engine-owned
   refined-primitive generation for primitive-sensitive selected analysis; the
@@ -116,6 +119,6 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'Sa
   same-entity primitive refinement or visualization adapter binding mutation
   invalidate stale entries. Full generation stamps for property/source and
   non-vertex binding revisions,
-  full timing/scanned-element counters, async analysis jobs, bounded apply,
+  full timing/scalar scanned-element counters, async analysis jobs, bounded apply,
   selected-frame timing/copy diagnostics, and Vulkan responsiveness smoke remain
   open; this task is not ready to retire.

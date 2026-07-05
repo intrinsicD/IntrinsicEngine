@@ -4010,8 +4010,12 @@ namespace Extrinsic::Runtime
                 else
                 {
                     model.TexcoordsFinite = true;
+                    SandboxEditorModelBuildStats* stats =
+                        context.ModelBuildStats;
                     for (const glm::vec2 uv : texcoords.Vector())
                     {
+                        if (stats != nullptr)
+                            ++stats->UvDiagnosticsTexcoordElementsScanned;
                         if (!std::isfinite(uv.x) || !std::isfinite(uv.y))
                         {
                             model.TexcoordsFinite = false;
@@ -4051,8 +4055,13 @@ namespace Extrinsic::Runtime
             model.Uv = BuildUvDiagnosticsModel(context, view);
 
             model.Sources.reserve(catalog.Rows.size());
+            SandboxEditorModelBuildStats* stats = context.ModelBuildStats;
             for (const SandboxEditorPropertyCatalogRow& row : catalog.Rows)
+            {
+                if (stats != nullptr)
+                    ++stats->TextureBakeSourceRowsEnumerated;
                 model.Sources.push_back(BuildTextureBakeSourceRow(row));
+            }
 
             const bool hasBakeableSource =
                 std::any_of(
