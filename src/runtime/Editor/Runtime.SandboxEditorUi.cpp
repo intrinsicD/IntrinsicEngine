@@ -4215,6 +4215,123 @@ namespace Extrinsic::Runtime
             return bindings != nullptr ? bindings->BindingGeneration : 0u;
         }
 
+        constexpr std::uint64_t kSandboxEditorSignatureOffset =
+            1469598103934665603ull;
+        constexpr std::uint64_t kSandboxEditorSignaturePrime =
+            1099511628211ull;
+
+        void MixSignatureByte(std::uint64_t& signature,
+                              const std::uint8_t value) noexcept
+        {
+            signature ^= value;
+            signature *= kSandboxEditorSignaturePrime;
+        }
+
+        void MixSignature(std::uint64_t& signature,
+                          std::uint64_t value) noexcept
+        {
+            for (std::uint32_t i = 0u; i < 8u; ++i)
+            {
+                MixSignatureByte(
+                    signature,
+                    static_cast<std::uint8_t>((value >> (i * 8u)) & 0xffu));
+            }
+        }
+
+        void MixSignatureString(std::uint64_t& signature,
+                                const std::string_view value) noexcept
+        {
+            MixSignature(signature, static_cast<std::uint64_t>(value.size()));
+            for (const char c : value)
+            {
+                MixSignatureByte(signature, static_cast<std::uint8_t>(c));
+            }
+        }
+
+        void AppendPropertySetMetadataSignature(
+            std::uint64_t& signature,
+            const std::uint64_t domainTag,
+            const Geometry::PropertySet* properties,
+            const std::size_t deletedCount)
+        {
+            MixSignature(signature, domainTag);
+            if (properties == nullptr)
+            {
+                MixSignature(signature, 0u);
+                return;
+            }
+
+            MixSignature(signature, static_cast<std::uint64_t>(properties->Size()));
+            MixSignature(signature, static_cast<std::uint64_t>(deletedCount));
+            const std::vector<Geometry::PropertyDescriptor> descriptors =
+                properties->Registry().Descriptors(false);
+            MixSignature(signature, static_cast<std::uint64_t>(descriptors.size()));
+            std::uint64_t order = 0u;
+            for (const Geometry::PropertyDescriptor& descriptor : descriptors)
+            {
+                MixSignature(signature, order++);
+                MixSignatureString(signature, descriptor.Name);
+                MixSignature(signature,
+                             static_cast<std::uint64_t>(
+                                 descriptor.ValueKind));
+                MixSignature(signature,
+                             static_cast<std::uint64_t>(
+                                 descriptor.ElementCount));
+                MixSignature(signature,
+                             descriptor.SupportsContiguousSpan ? 1u : 0u);
+                MixSignature(signature, descriptor.SupportsRawData ? 1u : 0u);
+            }
+        }
+
+        [[nodiscard]] std::uint64_t GeometryMetadataSignatureForEntity(
+            const entt::registry& raw,
+            const ECS::EntityHandle entity)
+        {
+            const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+            std::uint64_t signature = kSandboxEditorSignatureOffset;
+            MixSignature(signature,
+                         static_cast<std::uint64_t>(view.ActiveDomain));
+            MixSignature(signature, view.HasMeshTopologyMarker ? 1u : 0u);
+            MixSignature(signature, view.HasGraphTopologyMarker ? 1u : 0u);
+            AppendPropertySetMetadataSignature(
+                signature,
+                1u,
+                view.VertexSource != nullptr
+                    ? &view.VertexSource->Properties
+                    : nullptr,
+                view.VertexSource != nullptr ? view.VertexSource->NumDeleted
+                                             : 0u);
+            AppendPropertySetMetadataSignature(
+                signature,
+                2u,
+                view.EdgeSource != nullptr ? &view.EdgeSource->Properties
+                                           : nullptr,
+                view.EdgeSource != nullptr ? view.EdgeSource->NumDeleted
+                                           : 0u);
+            AppendPropertySetMetadataSignature(
+                signature,
+                3u,
+                view.HalfedgeSource != nullptr
+                    ? &view.HalfedgeSource->Properties
+                    : nullptr,
+                0u);
+            AppendPropertySetMetadataSignature(
+                signature,
+                4u,
+                view.FaceSource != nullptr ? &view.FaceSource->Properties
+                                           : nullptr,
+                view.FaceSource != nullptr ? view.FaceSource->NumDeleted
+                                           : 0u);
+            AppendPropertySetMetadataSignature(
+                signature,
+                5u,
+                view.NodeSource != nullptr ? &view.NodeSource->Properties
+                                           : nullptr,
+                view.NodeSource != nullptr ? view.NodeSource->NumDeleted
+                                           : 0u);
+            return signature;
+        }
+
         [[nodiscard]] SandboxEditorSelectedModelCacheKey
         BuildSelectedModelCacheKey(
             const SandboxEditorContext& context,
@@ -4242,6 +4359,8 @@ namespace Extrinsic::Runtime
                 .HalfedgeCount = geometry.HalfedgeCount,
                 .FaceCount = geometry.FaceCount,
                 .NodeCount = geometry.NodeCount,
+                .GeometryMetadataSignature =
+                    GeometryMetadataSignatureForEntity(raw, entity),
                 .BindingGeneration = VertexBindingGenerationForEntity(raw, entity),
                 .ProgressiveBindingGeneration =
                     ProgressiveBindingGenerationForEntity(raw, entity, section),

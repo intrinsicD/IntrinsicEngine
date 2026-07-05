@@ -89,10 +89,11 @@ selected frames. Cache keys cover stable selection ids,
 `SelectionController::SelectionGeneration()`,
 `Engine::GetLastRefinedPrimitiveSelectionGeneration()` for primitive-sensitive
 analysis, the selected geometry domain/count shape, vertex-channel binding
-generation, progressive presentation binding generation for inspector analysis,
-command-history revision, viewport, visualization target, and visualization
-command availability, plus the runtime-owned visualization adapter binding
-revision for visualization model entries;
+generation, a metadata signature over selected geometry source/property
+descriptors, progressive presentation binding generation for inspector
+analysis, command-history revision, viewport, visualization target, and
+visualization command availability, plus the runtime-owned visualization
+adapter binding revision for visualization model entries;
 editor commands that mutate those selected inputs explicitly invalidate the cache.
 The broader async selected-analysis job pipeline and fuller generation stamps
 remain owned by the open `RUNTIME-138` slices.

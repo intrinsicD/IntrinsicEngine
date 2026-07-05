@@ -2319,6 +2319,67 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnProgressiveBindingGeneratio
     EXPECT_EQ(cacheStats.Entries, 1u);
 }
 
+TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnGeometryMetadataSignature)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    Runtime::SandboxEditorSelectedModelCache cache{};
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.SelectedModelCache = &cache;
+
+    const Runtime::SandboxEditorPanelFrame first =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyInspectorModelBuildRequest());
+    ASSERT_TRUE(first.Inspector.HasEntity);
+    EXPECT_EQ(first.ModelBuildStats.SelectedAnalysisCacheMisses, 1u);
+    EXPECT_EQ(first.ModelBuildStats.PropertyCatalogModelBuilds, 1u);
+    EXPECT_EQ(FindCatalogProperty(first.Inspector.PropertyCatalog,
+                                  Runtime::SandboxEditorPropertyCatalogDomain::
+                                      MeshVertices,
+                                  "v:temperature"),
+              nullptr);
+
+    const Runtime::SandboxEditorPanelFrame cached =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyInspectorModelBuildRequest());
+    ASSERT_TRUE(cached.Inspector.HasEntity);
+    EXPECT_EQ(cached.ModelBuildStats.SelectedAnalysisCacheHits, 1u);
+    EXPECT_EQ(cached.ModelBuildStats.PropertyCatalogModelBuilds, 0u);
+
+    auto& vertices = registry.Raw().get<GS::Vertices>(mesh);
+    auto temperature =
+        vertices.Properties.GetOrAdd<float>("v:temperature", 0.0f);
+    ASSERT_EQ(temperature.Vector().size(), 3u);
+    temperature.Vector()[1] = 42.0f;
+
+    const Runtime::SandboxEditorPanelFrame changed =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyInspectorModelBuildRequest());
+    ASSERT_TRUE(changed.Inspector.HasEntity);
+    EXPECT_EQ(changed.ModelBuildStats.SelectedAnalysisCacheMisses, 1u);
+    EXPECT_EQ(changed.ModelBuildStats.SelectedAnalysisCacheHits, 0u);
+    EXPECT_EQ(changed.ModelBuildStats.PropertyCatalogModelBuilds, 1u);
+    EXPECT_NE(FindCatalogProperty(changed.Inspector.PropertyCatalog,
+                                  Runtime::SandboxEditorPropertyCatalogDomain::
+                                      MeshVertices,
+                                  "v:temperature"),
+              nullptr);
+
+    const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
+        cache.Stats();
+    EXPECT_EQ(cacheStats.SelectedAnalysisCacheMisses, 2u);
+    EXPECT_EQ(cacheStats.SelectedAnalysisCacheHits, 1u);
+    EXPECT_EQ(cacheStats.Entries, 1u);
+}
+
 TEST(SandboxEditorUi, SelectedModelCacheReusesVisualizationModel)
 {
     ECS::Scene::Registry registry;
@@ -2358,6 +2419,68 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesVisualizationModel)
     const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
         cache.Stats();
     EXPECT_EQ(cacheStats.VisualizationModelCacheMisses, 1u);
+    EXPECT_EQ(cacheStats.VisualizationModelCacheHits, 1u);
+    EXPECT_EQ(cacheStats.Entries, 1u);
+}
+
+TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnGeometryMetadataSignature)
+{
+    using Domain = Runtime::SandboxEditorVisualizationPropertyDomain;
+
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    Runtime::SandboxEditorSelectedModelCache cache{};
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.SelectedModelCache = &cache;
+    context.VisualizationCommandsAvailable = true;
+
+    const Runtime::SandboxEditorPanelFrame first =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyVisualizationModelBuildRequest());
+    ASSERT_TRUE(first.Visualization.HasSelectedEntity);
+    EXPECT_EQ(first.ModelBuildStats.VisualizationModelCacheMisses, 1u);
+    EXPECT_EQ(first.ModelBuildStats.VisualizationModelBuilds, 1u);
+    EXPECT_EQ(FindVisualizationProperty(first.Visualization.Properties,
+                                        Domain::MeshVertices,
+                                        "v:temperature"),
+              nullptr);
+
+    const Runtime::SandboxEditorPanelFrame cached =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyVisualizationModelBuildRequest());
+    ASSERT_TRUE(cached.Visualization.HasSelectedEntity);
+    EXPECT_EQ(cached.ModelBuildStats.VisualizationModelCacheHits, 1u);
+    EXPECT_EQ(cached.ModelBuildStats.VisualizationModelBuilds, 0u);
+
+    auto& vertices = registry.Raw().get<GS::Vertices>(mesh);
+    auto temperature =
+        vertices.Properties.GetOrAdd<float>("v:temperature", 0.0f);
+    ASSERT_EQ(temperature.Vector().size(), 3u);
+    temperature.Vector()[2] = 7.0f;
+
+    const Runtime::SandboxEditorPanelFrame changed =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyVisualizationModelBuildRequest());
+    ASSERT_TRUE(changed.Visualization.HasSelectedEntity);
+    EXPECT_EQ(changed.ModelBuildStats.VisualizationModelCacheMisses, 1u);
+    EXPECT_EQ(changed.ModelBuildStats.VisualizationModelCacheHits, 0u);
+    EXPECT_EQ(changed.ModelBuildStats.VisualizationModelBuilds, 1u);
+    EXPECT_NE(FindVisualizationProperty(changed.Visualization.Properties,
+                                        Domain::MeshVertices,
+                                        "v:temperature"),
+              nullptr);
+
+    const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
+        cache.Stats();
+    EXPECT_EQ(cacheStats.VisualizationModelCacheMisses, 2u);
     EXPECT_EQ(cacheStats.VisualizationModelCacheHits, 1u);
     EXPECT_EQ(cacheStats.Entries, 1u);
 }

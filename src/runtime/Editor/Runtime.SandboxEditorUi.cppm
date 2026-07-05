@@ -2085,6 +2085,7 @@ export namespace Extrinsic::Runtime
         std::size_t HalfedgeCount{0u};
         std::size_t FaceCount{0u};
         std::size_t NodeCount{0u};
+        std::uint64_t GeometryMetadataSignature{0u};
         std::uint64_t BindingGeneration{0u};
         std::uint64_t ProgressiveBindingGeneration{0u};
         std::uint64_t CommandHistoryRevision{0u};
