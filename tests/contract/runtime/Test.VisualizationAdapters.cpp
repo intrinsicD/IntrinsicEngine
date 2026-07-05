@@ -124,6 +124,7 @@ TEST(VisualizationAdapters, PropertyScalarAdapterAppendsFloatScalarPacket)
     EXPECT_EQ(stats.PacketAppendCount, 1u);
     EXPECT_EQ(stats.MissingSourceCount, 0u);
     EXPECT_EQ(stats.InvalidRangeCount, 0u);
+    EXPECT_EQ(stats.ScalarValueScanCount, 4u);
 
     const G::VisualizationDiagnostics diagnostics =
         G::ValidateVisualizationPackets(batch.AsPacketBatch(
@@ -161,6 +162,7 @@ TEST(VisualizationAdapters, PropertyScalarAdapterSupportsDoubleAndManualRange)
     EXPECT_FLOAT_EQ(batch.Scalars.front().RangeMax, 20.0f);
     EXPECT_EQ(stats.ManualRangeCount, 1u);
     EXPECT_EQ(stats.PacketAppendCount, 1u);
+    EXPECT_EQ(stats.ScalarValueScanCount, 4u);
 }
 
 TEST(VisualizationAdapters, PropertyScalarAdapterExpandsFlatAutoRange)
@@ -188,6 +190,7 @@ TEST(VisualizationAdapters, PropertyScalarAdapterExpandsFlatAutoRange)
     EXPECT_FLOAT_EQ(batch.Scalars.front().RangeMin, 3.5f);
     EXPECT_FLOAT_EQ(batch.Scalars.front().RangeMax, 4.5f);
     EXPECT_EQ(stats.FlatAutoRangeExpandedCount, 1u);
+    EXPECT_EQ(stats.ScalarValueScanCount, 3u);
 }
 
 TEST(VisualizationAdapters, PropertyScalarAdapterRejectsInvalidSources)
@@ -675,6 +678,7 @@ TEST(VisualizationAdapters, IsolineAdapterAppendsIsolinePacket)
     EXPECT_FALSE(packet.DepthTested);
     EXPECT_EQ(stats.AdapterInvocationCount, 1u);
     EXPECT_EQ(stats.PacketAppendCount, 1u);
+    EXPECT_EQ(stats.ScalarValueScanCount, 8u);
     ASSERT_EQ(batch.PropertyBuffers.size(), 1u);
     EXPECT_EQ(batch.PropertyBuffers.front().SourceKey, "curvature_isolines");
     EXPECT_EQ(batch.PropertyBuffers.front().ValueType,
@@ -753,6 +757,7 @@ TEST(VisualizationAdapters, IsolineAdapterRejectsInvalidSources)
     EXPECT_EQ(stats.InvalidRangeCount, 3u);
     EXPECT_EQ(stats.NonFiniteValueCount, 1u);
     EXPECT_EQ(stats.PacketAppendCount, 0u);
+    EXPECT_EQ(stats.ScalarValueScanCount, 14u);
 }
 
 TEST(VisualizationAdapters, HtexMetadataAdapterAppendsPreviewAndUvBakePackets)

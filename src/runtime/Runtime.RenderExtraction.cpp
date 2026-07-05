@@ -691,6 +691,7 @@ namespace Extrinsic::Runtime
             stats.VisualizationAdapterElementCountOverflowCount += perAdapter.ElementCountOverflowCount;
             stats.VisualizationAdapterManualRangeCount += perAdapter.ManualRangeCount;
             stats.VisualizationAdapterFlatAutoRangeExpandedCount += perAdapter.FlatAutoRangeExpandedCount;
+            stats.VisualizationAdapterScalarValueScanCount += perAdapter.ScalarValueScanCount;
         }
 
         void AppendColorVisualizationPropertyBuffer(
@@ -2049,6 +2050,7 @@ namespace Extrinsic::Runtime
         stats.VisualizationAdapterElementCountOverflowCount += perAdapter.ElementCountOverflowCount;
         stats.VisualizationAdapterManualRangeCount += perAdapter.ManualRangeCount;
         stats.VisualizationAdapterFlatAutoRangeExpandedCount += perAdapter.FlatAutoRangeExpandedCount;
+        stats.VisualizationAdapterScalarValueScanCount += perAdapter.ScalarValueScanCount;
     }
 
     bool RenderExtractionCache::ReconcileMeshPrimitiveView(

@@ -125,6 +125,7 @@ namespace Extrinsic::Runtime
             }
 
             float first = 0.0f;
+            ++stats.ScalarValueScanCount;
             if (!ToFiniteFloat(values.front(), first))
             {
                 ++stats.NonFiniteValueCount;
@@ -136,6 +137,7 @@ namespace Extrinsic::Runtime
             for (const T value : values.subspan(1u))
             {
                 float converted = 0.0f;
+                ++stats.ScalarValueScanCount;
                 if (!ToFiniteFloat(value, converted))
                 {
                     ++stats.NonFiniteValueCount;
@@ -200,6 +202,7 @@ namespace Extrinsic::Runtime
                 for (const T value : values)
                 {
                     float converted = 0.0f;
+                    ++stats.ScalarValueScanCount;
                     if (!ToFiniteFloat(value, converted))
                     {
                         ++stats.NonFiniteValueCount;
@@ -283,6 +286,7 @@ namespace Extrinsic::Runtime
             for (const T value : values)
             {
                 float converted = 0.0f;
+                ++stats.ScalarValueScanCount;
                 if (!ToFiniteFloat(value, converted))
                 {
                     ++stats.NonFiniteValueCount;

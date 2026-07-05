@@ -648,6 +648,7 @@ TEST(RuntimeRenderExtraction, VisualizationScalarAdapterBindingReachesRenderWorl
     EXPECT_EQ(stats.VisualizationAdapterPacketAppendCount, 1u);
     EXPECT_EQ(stats.VisualizationScalarPacketCount, 1u);
     EXPECT_EQ(stats.VisualizationAdapterInvalidBufferCount, 0u);
+    EXPECT_EQ(stats.VisualizationAdapterScalarValueScanCount, 3u);
 
     ASSERT_EQ(world.Visualization.Scalars.size(), 1u);
     const Graphics::ScalarAttributePacket& packet = world.Visualization.Scalars.front();
@@ -713,6 +714,7 @@ TEST(RuntimeRenderExtraction, VisualizationScalarAdapterMissingBdaUploadsPropert
     EXPECT_EQ(stats.VisualizationAdapterInvalidBufferCount, 0u);
     EXPECT_EQ(stats.VisualizationAdapterPacketAppendCount, 1u);
     EXPECT_EQ(stats.VisualizationScalarPacketCount, 1u);
+    EXPECT_EQ(stats.VisualizationAdapterScalarValueScanCount, 3u);
     ASSERT_EQ(world.Visualization.Scalars.size(), 1u);
     EXPECT_NE(world.Visualization.Scalars.front().ScalarBufferBDA, 0u);
     EXPECT_EQ(world.Visualization.Scalars.front().SourceBufferKey,
@@ -1231,6 +1233,7 @@ TEST(RuntimeRenderExtraction, VisualizationNonScalarAdapterBindingsReachRenderWo
     EXPECT_EQ(stats.VisualizationIsolinePacketCount, 1u);
     EXPECT_EQ(stats.VisualizationHtexAtlasPacketCount, 1u);
     EXPECT_EQ(stats.VisualizationFragmentBakeAtlasPacketCount, 1u);
+    EXPECT_EQ(stats.VisualizationAdapterScalarValueScanCount, 6u);
 
     ASSERT_EQ(world.Visualization.Colors.size(), 1u);
     EXPECT_EQ(world.Visualization.Colors.front().Name, "v:kmeans_color");

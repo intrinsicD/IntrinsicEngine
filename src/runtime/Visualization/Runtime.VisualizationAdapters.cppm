@@ -102,6 +102,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t ElementCountOverflowCount{0u};
         std::uint32_t ManualRangeCount{0u};
         std::uint32_t FlatAutoRangeExpandedCount{0u};
+        std::uint64_t ScalarValueScanCount{0u};
         std::uint32_t HtexRecreateScheduledCount{0u};
         StreamingTaskHandle LastHtexRecreateTask{};
     };
