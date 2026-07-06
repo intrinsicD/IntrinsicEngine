@@ -89,6 +89,12 @@ synchronous compatibility APIs outside the frame-driven UI/drop routes.
 `Engine::SetModelTextureImportIOBackendFactoryForTest(...)` is a contract-test
 seam for injecting slow or fake model/texture IO backends into queued imports;
 production queued imports fall back to `Core::IO::FileIOBackend`.
+Geometry decode results are held as shared immutable mesh/graph/point-cloud
+payloads until main-thread apply. `AssetService` publication still takes its
+own payload copy, and graph/point-cloud materialization still makes the mutable
+local copy required by `PopulateFromGraph` / `PopulateFromCloud`, but the
+worker-to-apply handoff and reload lambdas no longer copy the whole decoded
+payload.
 
 Geometry materialization invokes an ordered post-import processor registry after
 each created entity is populated from its decoded payload. Processors receive

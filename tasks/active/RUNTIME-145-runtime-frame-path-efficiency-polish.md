@@ -7,14 +7,15 @@ depends_on: []
 
 ## Status
 - Active on local `main`.
-- Slices A-D are implemented and locally verified. Slice A removed the
+- Slices A-E are implemented and locally verified. Slice A removed the
   steady-state `StableEntityLookup` rebuild; Slice B bounds
   `StreamingExecutor` record storage with recycled slots, replaces the
   full-vector ready scan with priority ready queues, and batches import-queue
   streaming state reads through one executor snapshot; Slice C gates the
   pre-render transform flush on pending post-sim transform work; Slice D reuses
-  render extraction's live-key scratch storage. Later slices own import payload
-  moves and the final default CPU gate.
+  render extraction's live-key scratch storage; Slice E keeps decoded geometry
+  payloads shared across the worker-to-apply handoff and reload captures. The
+  final slice owns the default CPU gate and task retirement.
 
 ## Slice plan
 - Slice A: wire `StableEntityLookup` to scene `StableId` component events,
@@ -27,6 +28,7 @@ depends_on: []
 - Slice D: reuse live renderable key storage during extraction. Implemented
   2026-07-06.
 - Slice E: move/share import payload handoff data where ownership allows.
+  Implemented 2026-07-06.
 - Slice F: run the default CPU gate, retire the task, and append the
   retirement log entry.
 
@@ -84,7 +86,7 @@ depends_on: []
       `OnVariableTick` transform writes); BUG-024's read-fresh-bounds
       guarantee must hold whenever the bit is set.
 - [x] Reuse a member container for `liveRenderableKeys`.
-- [ ] Convert import payload handoff to moves/`shared_ptr` where the payload
+- [x] Convert import payload handoff to moves/`shared_ptr` where the payload
       is not mutated after handoff.
 
 ## Tests
@@ -98,12 +100,16 @@ depends_on: []
       skips the redundant flush (counter probe).
 - [x] Existing extraction suite stays green after live-key scratch reuse.
 - [x] Existing import suites stay green.
+- [x] Existing import suite stays green after shared decoded geometry payload
+      handoff.
 
 ## Docs
 - [x] Update `src/runtime/README.md` for the lookup lifecycle change.
 - [x] Update `src/runtime/README.md` for the executor lifecycle change.
 - [x] Update `src/runtime/README.md` for the extraction live-key scratch
       reuse.
+- [x] Update `src/runtime/README.md` for the decoded geometry payload handoff
+      change.
 
 ## Acceptance criteria
 - [ ] Steady-state idle frame performs no stable-lookup rebuild, no
@@ -144,6 +150,13 @@ cmake --build --preset ci --target IntrinsicRuntimeContractTests
 build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='AssetImportFormatCoverage.*:MeshGeometryExtraction.*:GraphGeometryExtraction.*:PointCloudGeometryExtraction.*:MeshPrimitiveViewExtraction.*:ProceduralGeometryExtraction.*'
 build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='RuntimeAssetImportFormatCoverage.*'
 ctest --test-dir build/ci --output-on-failure -R 'RuntimeRenderExtraction|RuntimeAssetImportFormatCoverage|MeshGeometryExtraction|GraphGeometryExtraction|PointCloudGeometryExtraction|MeshPrimitiveViewExtraction|ProceduralGeometryExtraction' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 90
+```
+
+Slice E focused verification run locally (2026-07-06):
+```bash
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='RuntimeAssetImportFormatCoverage.*'
+ctest --test-dir build/ci --output-on-failure -R 'RuntimeAssetImportFormatCoverage' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 90
 ```
 
 ## Forbidden changes

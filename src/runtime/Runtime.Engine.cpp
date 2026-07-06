@@ -1302,17 +1302,17 @@ namespace Extrinsic::Runtime
 
         struct DecodedMeshImport
         {
-            Geometry::MeshIO::MeshIOResult Payload{};
+            std::shared_ptr<const Geometry::MeshIO::MeshIOResult> Payload{};
         };
 
         struct DecodedGraphImport
         {
-            Geometry::GraphIO::GraphIOResult Payload{};
+            std::shared_ptr<const Geometry::GraphIO::GraphIOResult> Payload{};
         };
 
         struct DecodedPointCloudImport
         {
-            Geometry::PointCloudIO::PointCloudIOResult Payload{};
+            std::shared_ptr<const Geometry::PointCloudIO::PointCloudIOResult> Payload{};
         };
 
         using DecodedGeometryImportPayload =
@@ -2058,7 +2058,7 @@ namespace Extrinsic::Runtime
                     .Path = request.Path,
                     .PayloadKind = route->PayloadKind,
                     .Payload = DecodedMeshImport{
-                        .Payload = **meshPayload,
+                        .Payload = *meshPayload,
                     },
                 };
             }
@@ -2075,7 +2075,7 @@ namespace Extrinsic::Runtime
                 return DecodedGeometryImport{
                     .Path = request.Path,
                     .PayloadKind = route->PayloadKind,
-                    .Payload = DecodedGraphImport{.Payload = **graphPayload},
+                    .Payload = DecodedGraphImport{.Payload = *graphPayload},
                 };
             }
             case Assets::AssetPayloadKind::PointCloud:
@@ -2091,7 +2091,7 @@ namespace Extrinsic::Runtime
                 return DecodedGeometryImport{
                     .Path = request.Path,
                     .PayloadKind = route->PayloadKind,
-                    .Payload = DecodedPointCloudImport{.Payload = **cloudPayload},
+                    .Payload = DecodedPointCloudImport{.Payload = *cloudPayload},
                 };
             }
             default:
@@ -2131,14 +2131,25 @@ namespace Extrinsic::Runtime
                     using PayloadT = std::decay_t<decltype(payload)>;
                     if constexpr (std::is_same_v<PayloadT, DecodedMeshImport>)
                     {
+                        if (payload.Payload == nullptr)
+                        {
+                            return Core::Err<MaterializedGeometryImport>(
+                                Core::ErrorCode::AssetInvalidData);
+                        }
+                        const auto meshPayload = payload.Payload;
                         auto asset =
                             assetService.Load<Geometry::MeshIO::MeshIOResult>(
                                 decoded.Path,
-                                [&payload](std::string_view,
-                                           Assets::AssetId)
+                                [meshPayload](std::string_view,
+                                              Assets::AssetId)
                                     -> Core::Expected<Geometry::MeshIO::MeshIOResult>
                                 {
-                                    return payload.Payload;
+                                    if (meshPayload == nullptr)
+                                    {
+                                        return Core::Err<Geometry::MeshIO::MeshIOResult>(
+                                            Core::ErrorCode::AssetInvalidData);
+                                    }
+                                    return *meshPayload;
                                 });
                         if (!asset.has_value())
                         {
@@ -2154,7 +2165,7 @@ namespace Extrinsic::Runtime
                         }
 
                         auto rawMesh = BuildRuntimeHalfedgeMeshGeometryOnly(
-                            payload.Payload,
+                            *meshPayload,
                             RuntimeMeshGeometryOnlyOptions{
                                 .AllowDisconnectedRenderableFallback = true,
                             });
@@ -2193,7 +2204,7 @@ namespace Extrinsic::Runtime
                                 .Path = decoded.Path,
                                 .PayloadKind = decoded.PayloadKind,
                                 .Entity = entity,
-                                .MeshPayload = &payload.Payload,
+                                .MeshPayload = meshPayload.get(),
                             },
                             postImportServices);
 
@@ -2209,14 +2220,25 @@ namespace Extrinsic::Runtime
                     }
                     else if constexpr (std::is_same_v<PayloadT, DecodedGraphImport>)
                     {
+                        if (payload.Payload == nullptr)
+                        {
+                            return Core::Err<MaterializedGeometryImport>(
+                                Core::ErrorCode::AssetInvalidData);
+                        }
+                        const auto graphPayload = payload.Payload;
                         auto asset =
                             assetService.Load<Geometry::GraphIO::GraphIOResult>(
                                 decoded.Path,
-                                [&payload](std::string_view,
-                                           Assets::AssetId)
+                                [graphPayload](std::string_view,
+                                               Assets::AssetId)
                                     -> Core::Expected<Geometry::GraphIO::GraphIOResult>
                                 {
-                                    return payload.Payload;
+                                    if (graphPayload == nullptr)
+                                    {
+                                        return Core::Err<Geometry::GraphIO::GraphIOResult>(
+                                            Core::ErrorCode::AssetInvalidData);
+                                    }
+                                    return *graphPayload;
                                 });
                         if (!asset.has_value())
                         {
@@ -2231,7 +2253,7 @@ namespace Extrinsic::Runtime
                                 drained.error());
                         }
 
-                        Geometry::Graph::Graph graph = payload.Payload.Graph;
+                        Geometry::Graph::Graph graph = graphPayload->Graph;
                         const std::optional<GeometryImportBounds> bounds =
                             BoundsFromGraph(graph);
                         const ECS::EntityHandle entity =
@@ -2276,14 +2298,25 @@ namespace Extrinsic::Runtime
                     }
                     else
                     {
+                        if (payload.Payload == nullptr)
+                        {
+                            return Core::Err<MaterializedGeometryImport>(
+                                Core::ErrorCode::AssetInvalidData);
+                        }
+                        const auto cloudPayload = payload.Payload;
                         auto asset =
                             assetService.Load<Geometry::PointCloudIO::PointCloudIOResult>(
                                 decoded.Path,
-                                [&payload](std::string_view,
-                                           Assets::AssetId)
+                                [cloudPayload](std::string_view,
+                                               Assets::AssetId)
                                     -> Core::Expected<Geometry::PointCloudIO::PointCloudIOResult>
                                 {
-                                    return payload.Payload;
+                                    if (cloudPayload == nullptr)
+                                    {
+                                        return Core::Err<Geometry::PointCloudIO::PointCloudIOResult>(
+                                            Core::ErrorCode::AssetInvalidData);
+                                    }
+                                    return *cloudPayload;
                                 });
                         if (!asset.has_value())
                         {
@@ -2298,7 +2331,7 @@ namespace Extrinsic::Runtime
                                 drained.error());
                         }
 
-                        Geometry::PointCloud::Cloud cloud = payload.Payload.Cloud;
+                        Geometry::PointCloud::Cloud cloud = cloudPayload->Cloud;
                         const std::optional<GeometryImportBounds> bounds =
                             BoundsFromCloud(cloud);
                         const ECS::EntityHandle entity =
@@ -2404,8 +2437,11 @@ namespace Extrinsic::Runtime
                     using PayloadT = std::decay_t<decltype(payload)>;
                     if constexpr (std::is_same_v<PayloadT, DecodedMeshImport>)
                     {
-                        const Geometry::MeshIO::MeshIOResult storedPayload =
-                            payload.Payload;
+                        if (payload.Payload == nullptr)
+                        {
+                            return Core::Err(Core::ErrorCode::AssetInvalidData);
+                        }
+                        const auto storedPayload = payload.Payload;
                         return assetService.Reload<
                             Geometry::MeshIO::MeshIOResult>(
                             existingAsset,
@@ -2413,13 +2449,21 @@ namespace Extrinsic::Runtime
                                             Assets::AssetId)
                                 -> Core::Expected<Geometry::MeshIO::MeshIOResult>
                             {
-                                return storedPayload;
+                                if (storedPayload == nullptr)
+                                {
+                                    return Core::Err<Geometry::MeshIO::MeshIOResult>(
+                                        Core::ErrorCode::AssetInvalidData);
+                                }
+                                return *storedPayload;
                             });
                     }
                     else if constexpr (std::is_same_v<PayloadT, DecodedGraphImport>)
                     {
-                        const Geometry::GraphIO::GraphIOResult storedPayload =
-                            payload.Payload;
+                        if (payload.Payload == nullptr)
+                        {
+                            return Core::Err(Core::ErrorCode::AssetInvalidData);
+                        }
+                        const auto storedPayload = payload.Payload;
                         return assetService.Reload<
                             Geometry::GraphIO::GraphIOResult>(
                             existingAsset,
@@ -2427,13 +2471,21 @@ namespace Extrinsic::Runtime
                                             Assets::AssetId)
                                 -> Core::Expected<Geometry::GraphIO::GraphIOResult>
                             {
-                                return storedPayload;
+                                if (storedPayload == nullptr)
+                                {
+                                    return Core::Err<Geometry::GraphIO::GraphIOResult>(
+                                        Core::ErrorCode::AssetInvalidData);
+                                }
+                                return *storedPayload;
                             });
                     }
                     else
                     {
-                        const Geometry::PointCloudIO::PointCloudIOResult storedPayload =
-                            payload.Payload;
+                        if (payload.Payload == nullptr)
+                        {
+                            return Core::Err(Core::ErrorCode::AssetInvalidData);
+                        }
+                        const auto storedPayload = payload.Payload;
                         return assetService.Reload<
                             Geometry::PointCloudIO::PointCloudIOResult>(
                             existingAsset,
@@ -2441,7 +2493,12 @@ namespace Extrinsic::Runtime
                                             Assets::AssetId)
                                 -> Core::Expected<Geometry::PointCloudIO::PointCloudIOResult>
                             {
-                                return storedPayload;
+                                if (storedPayload == nullptr)
+                                {
+                                    return Core::Err<Geometry::PointCloudIO::PointCloudIOResult>(
+                                        Core::ErrorCode::AssetInvalidData);
+                                }
+                                return *storedPayload;
                             });
                     }
                 },

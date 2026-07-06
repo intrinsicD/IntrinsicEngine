@@ -17,8 +17,8 @@ Each active task should include:
   CPU gate plus the manual Vulkan sandbox Scalar/Isolines preset check.
 - [`RUNTIME-145`](RUNTIME-145-runtime-frame-path-efficiency-polish.md) —
   runtime frame-path steady-state efficiency polish. Status: in-progress after
-  Slice D (render-extraction live-key scratch reuse). Next implementation
-  slice: move/share import payload handoff data where ownership allows.
+  Slice E (decoded geometry payload handoff sharing). Next verification slice:
+  run the default CPU gate, retire the task, and append the retirement log.
 
 ## History
 
