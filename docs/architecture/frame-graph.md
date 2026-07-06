@@ -178,14 +178,19 @@ barriers, post-graph readbacks, and runtime frame hooks remain on the primary
 graphics context. This proves the RHI acquisition and deterministic submit
 contract without racing renderer-owned pass state.
 
+`RenderGraphFrameStats::Execute` reports whether the executor used scheduler
+workers. The current renderer path pins that flag false: pass callbacks still
+mutate renderer-owned command-record stats, dynamic upload helpers, readback
+counters, and shared pass helper state. A later `GRAPHICS-119` slice must
+isolate or synchronize those surfaces before enabling `Core::Tasks` fan-out.
+
 Null provides CPU bookkeeping contexts for this contract. Vulkan accepts the
 current graphics-queue plan shape with backend-local secondary command buffers
 and records `vkCmdExecuteCommands(...)` into the primary context at each serial
 submit callback; the secondary buffers are retained until the frame-slot fence
 has retired and are freed on the next `BeginFrame`. Non-graphics queue fan-out,
-worker fan-out through `Core::Tasks`, the pass-state thread-safety audit,
-benchmark evidence, and opt-in `gpu;vulkan` smoke coverage remain later
-`GRAPHICS-119` slices.
+worker fan-out through `Core::Tasks`, benchmark evidence, and opt-in
+`gpu;vulkan` smoke coverage remain later `GRAPHICS-119` slices.
 
 ## Boundaries
 

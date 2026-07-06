@@ -147,6 +147,11 @@ namespace Extrinsic::Graphics
         constexpr std::uint32_t kFrameSampledDescriptorSlotDebugView = 1u;
         constexpr std::uint32_t kFrameSampledDescriptorSlotPresent = 2u;
         constexpr std::uint32_t kFrameSampledDescriptorSlotSelectionOutline = 3u;
+        // GRAPHICS-119 Slice C.2 audit gate: renderer pass callbacks still
+        // mutate renderer-owned stats, upload helpers, readback counters, and
+        // shared pass helper state. Keep worker fan-out disabled until those
+        // surfaces are isolated or synchronized by a later slice.
+        constexpr bool kRenderGraphParallelRecordWorkerFanOutEnabled = false;
 
         struct FrameRecipeContributionCacheKey
         {
@@ -3647,6 +3652,8 @@ namespace Extrinsic::Graphics
                 RHI::ICommandContext& primaryContext = m_Device->GetGraphicsContext(frame.FrameIndex);
                 primaryContext.Begin();
                 ParallelRecordStats parallelRecordStats{};
+                m_LastRenderGraphStats.Execute.ParallelRecordUsedScheduler =
+                    kRenderGraphParallelRecordWorkerFanOutEnabled;
                 Core::Result result = m_RenderGraphExecutor.ExecuteParallelRecordJoin(
                     *compiled,
                     [&](const std::uint32_t passIndex,
@@ -3695,9 +3702,17 @@ namespace Extrinsic::Graphics
                         submitBarriersForContext(primaryContext, packet);
                     },
                     &parallelRecordStats,
-                    ParallelRecordOptions{.UseScheduler = false});
+                    ParallelRecordOptions{
+                        .UseScheduler = kRenderGraphParallelRecordWorkerFanOutEnabled,
+                    });
                 m_LastRenderGraphStats.Execute.ParallelRecordedPassCount =
                     parallelRecordStats.ScheduledPassCount;
+                m_LastRenderGraphStats.Execute.ParallelRecordUsedScheduler =
+                    parallelRecordStats.UsedScheduler;
+                m_LastRenderGraphStats.Execute.ParallelRecordWorkerTaskCount =
+                    parallelRecordStats.WorkerTaskCount;
+                m_LastRenderGraphStats.Execute.ParallelRecordCallerRecordCount =
+                    parallelRecordStats.CallerRecordCount;
                 recordPostGraphReadbacks(primaryContext, result.has_value());
                 if (result.has_value())
                 {

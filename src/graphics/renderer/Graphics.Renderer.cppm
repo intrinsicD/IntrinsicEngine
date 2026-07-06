@@ -126,6 +126,9 @@ namespace Extrinsic::Graphics
         bool SerialFallbackUsed = false;
         std::uint32_t ParallelCommandContextCount = 0;
         std::uint32_t ParallelRecordedPassCount = 0;
+        bool ParallelRecordUsedScheduler = false;
+        std::uint32_t ParallelRecordWorkerTaskCount = 0;
+        std::uint32_t ParallelRecordCallerRecordCount = 0;
         std::uint64_t TimeMicros = 0;
     };
 

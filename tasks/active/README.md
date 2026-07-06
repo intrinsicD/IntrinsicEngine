@@ -17,9 +17,11 @@ Each active task should include:
   record/join contract, RHI has a per-pass command-context acquisition seam,
   Null/Mock provide CPU bookkeeping, and the renderer exposes a debug selector
   with serial fallback stats. Slice C.1 adds Vulkan backend-local secondary
-  command buffers for accepted graphics-queue parallel context plans. Next work
-  is Slice C.2: pass-recording state and command-pool synchronization audit
-  before worker fan-out is enabled. Benchmark evidence and the `gpu;vulkan`
+  command buffers for accepted graphics-queue parallel context plans. Slice C.2
+  exposes the renderer worker fan-out stats and keeps scheduler dispatch
+  disabled because command-record stats, dynamic upload helpers, readback
+  counters, shared pass helper state, and Vulkan command-pool ownership still
+  need isolation or synchronization. Benchmark evidence and the `gpu;vulkan`
   smoke remain later slices.
 
 ## History

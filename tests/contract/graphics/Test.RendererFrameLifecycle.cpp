@@ -1234,6 +1234,9 @@ TEST(RendererFrameLifecycle, ParallelRecordingFlagFallsBackWhenDeviceDeclinesCon
     EXPECT_FALSE(stats.Execute.ParallelRecordingAccepted);
     EXPECT_TRUE(stats.Execute.SerialFallbackUsed);
     EXPECT_EQ(stats.Execute.ParallelCommandContextCount, 0u);
+    EXPECT_FALSE(stats.Execute.ParallelRecordUsedScheduler);
+    EXPECT_EQ(stats.Execute.ParallelRecordWorkerTaskCount, 0u);
+    EXPECT_EQ(stats.Execute.ParallelRecordCallerRecordCount, 0u);
     EXPECT_TRUE(device.RecordedParallelCommandContextPlan.empty());
     EXPECT_GE(device.CommandContext.BeginCalls, 1);
     EXPECT_GE(device.CommandContext.EndCalls, 1);
@@ -1273,6 +1276,10 @@ TEST(RendererFrameLifecycle, ParallelRecordingUsesAcceptedContextPlanInSerialSub
               device.RecordedParallelCommandContextPlan.size());
     EXPECT_EQ(stats.Execute.ParallelRecordedPassCount,
               device.RecordedParallelCommandContextPlan.size());
+    EXPECT_FALSE(stats.Execute.ParallelRecordUsedScheduler);
+    EXPECT_EQ(stats.Execute.ParallelRecordWorkerTaskCount, 0u);
+    EXPECT_EQ(stats.Execute.ParallelRecordCallerRecordCount,
+              stats.Execute.ParallelRecordedPassCount);
     EXPECT_EQ(device.ParallelCommandContextRequests.size(),
               device.RecordedParallelCommandContextPlan.size());
     EXPECT_EQ(device.SubmittedParallelCommandContexts.size(),

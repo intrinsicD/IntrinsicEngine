@@ -110,7 +110,10 @@ single-threaded to keep renderer-owned pass state deterministic while proving
 the RHI/null/Vulkan acquisition and submit-order contract. Vulkan accepts the
 graphics-queue plan with backend-local secondary command buffers; non-graphics
 queue support and worker fan-out remain later `GRAPHICS-119` slices after
-pass-state and command-pool synchronization are audited.
+pass-state and command-pool synchronization are fixed. The C.2 audit keeps
+`RenderGraphFrameStats::Execute.ParallelRecordUsedScheduler` false because
+pass callbacks still mutate command-record stats, dynamic upload helpers,
+readback counters, and shared pass helper state.
 
 `Extrinsic.Graphics.RenderingContract` is the CPU-only public contract vocabulary
 for the renderer/snapshot/recipe architecture introduced by `GRAPHICS-099`.

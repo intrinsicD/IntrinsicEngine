@@ -8,10 +8,11 @@ depends_on: []
 ## Status
 - In progress on local `main`; PR not opened.
 - Owner/agent: Codex.
-- Current slice: Slice C.1 (Vulkan secondary command-context acquisition)
-  completed and verified locally.
-- Next implementation step: Slice C.2 — audit pass-recording shared state and
-  command-pool synchronization before enabling worker fan-out behind the
+- Current slice: Slice C.2 (renderer worker fan-out audit gate) completed and
+  verified locally.
+- Next implementation step: Slice C.3 — isolate or synchronize command-record
+  stats, dynamic upload helpers, readback counters, shared pass helper state,
+  and Vulkan command-pool ownership before enabling worker fan-out behind the
   fallback flag.
 
 ## Goal
@@ -80,6 +81,9 @@ depends_on: []
 - [x] Slice C.1: Vulkan accepts graphics-queue parallel command-context plans
       with backend-local secondary command buffers and executes them from the
       primary context in compiled submit order.
+- [x] Slice C.2: renderer exposes worker fan-out stats and pins the accepted
+      parallel-context path to caller-thread recording until shared pass state
+      is isolated or synchronized.
 - [ ] RHI contract for parallel recording: acquire per-thread/per-batch
       command contexts, record independently, submit in compiled order;
       Null + Vulkan implementations.
@@ -108,6 +112,8 @@ depends_on: []
 - [x] Slice C.1 Vulkan fail-closed contract: non-operational Vulkan declines
       parallel context plans and routes acquisition back to the graphics
       context.
+- [x] Slice C.2 renderer contract: accepted parallel context plans report no
+      scheduler worker tasks and record every pass on the caller thread.
 - [ ] CPU/null contract: parallel recording produces the same
       pass-execution/barrier submission order as serial (bookkeeping
       comparison over randomized graphs).
@@ -126,6 +132,8 @@ depends_on: []
 - [x] Slice C.1: document Vulkan secondary command-buffer acquisition,
       graphics-queue primary-context execution, frame-slot lifetime, and
       deferred non-graphics queue / worker fan-out scope.
+- [x] Slice C.2: document the worker fan-out audit finding and the mutable
+      renderer surfaces that keep `Core::Tasks` dispatch disabled.
 - [x] Update `docs/architecture/frame-graph.md` and
       `src/graphics/renderer/README.md` (threading model, fallback flag).
 
@@ -193,6 +201,23 @@ ctest --test-dir build/ci --output-on-failure -R 'VulkanFailClosedContract\..*Pa
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+git diff --check
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/validate_tasks.py --root tasks --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --strict
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+```
+
+Slice C.2 verification run locally on 2026-07-06:
+
+```bash
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
+python3 tools/agents/generate_session_brief.py
+cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure -R 'RendererFrameLifecycle\..*ParallelRecording|GraphicsQueueAffinity\..*ParallelCommand|RenderGraphParallelRecording' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+ctest --test-dir build/ci --output-on-failure -R 'RendererFrameLifecycle|RenderGraphParallelRecording|GraphicsQueueAffinity|RenderGraphValidation' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
 git diff --check
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/agents/validate_tasks.py --root tasks --strict
