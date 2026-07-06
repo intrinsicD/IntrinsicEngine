@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstdint>
 #include <expected>
+#include <span>
 #include <thread>
 #include <variant>
 #include <vector>
@@ -75,6 +76,155 @@ TEST(RuntimeStreamingExecutor, DependencyChainSpansPumps)
     EXPECT_EQ(order[0], 1);
     EXPECT_EQ(order[1], 2);
     EXPECT_EQ(executor.GetState(second), StreamingTaskState::Complete);
+}
+
+TEST(RuntimeStreamingExecutor, CompletedSlotsAreRecycledAcrossSequentialSubmitCycles)
+{
+    StreamingExecutor executor{};
+
+    StreamingTaskHandle previous{};
+    for (std::uint32_t cycle = 0u; cycle < 64u; ++cycle)
+    {
+        const auto handle = executor.Submit(StreamingTaskDesc{
+            .Name = "ReusableSlot",
+            .Execute = []()
+            {
+                return StreamingResult{};
+            },
+        });
+
+        ASSERT_TRUE(handle.IsValid());
+        if (previous.IsValid())
+        {
+            EXPECT_EQ(handle.Index, previous.Index);
+            EXPECT_GT(handle.Generation, previous.Generation);
+            EXPECT_EQ(executor.GetState(previous), StreamingTaskState::Cancelled);
+        }
+
+        StreamingExecutorDiagnostics submitted = executor.GetDiagnostics();
+        EXPECT_EQ(submitted.SlotCount, 1u);
+        EXPECT_EQ(submitted.ActiveSlotCount, 1u);
+        EXPECT_EQ(submitted.FreeSlotCount, 0u);
+        EXPECT_EQ(submitted.ReadyTaskCount, 1u);
+
+        executor.PumpBackground(1);
+        executor.DrainCompletions();
+
+        EXPECT_EQ(executor.GetState(handle), StreamingTaskState::Complete);
+        StreamingExecutorDiagnostics completed = executor.GetDiagnostics();
+        EXPECT_EQ(completed.SlotCount, 1u);
+        EXPECT_EQ(completed.ActiveSlotCount, 0u);
+        EXPECT_EQ(completed.FreeSlotCount, 1u);
+        EXPECT_EQ(completed.ReadyTaskCount, 0u);
+
+        previous = handle;
+    }
+}
+
+TEST(RuntimeStreamingExecutor, RecycledDependentSlotDoesNotReceiveStaleParentRelease)
+{
+    StreamingExecutor executor{};
+
+    std::vector<int> order{};
+    const auto parent = executor.Submit(StreamingTaskDesc{
+        .Name = "Parent",
+        .Priority = Extrinsic::Core::Dag::TaskPriority::High,
+        .Execute = [&order]()
+        {
+            order.push_back(1);
+            return StreamingResult{};
+        },
+    });
+    const auto blocker = executor.Submit(StreamingTaskDesc{
+        .Name = "Blocker",
+        .Priority = Extrinsic::Core::Dag::TaskPriority::Low,
+        .Execute = [&order]()
+        {
+            order.push_back(9);
+            return StreamingResult{};
+        },
+    });
+    const auto cancelled = executor.Submit(StreamingTaskDesc{
+        .Name = "CancelledDependent",
+        .DependsOn = {parent},
+        .Execute = [&order]()
+        {
+            order.push_back(-1);
+            return StreamingResult{};
+        },
+    });
+
+    executor.Cancel(cancelled);
+    ASSERT_EQ(executor.GetState(cancelled), StreamingTaskState::Cancelled);
+
+    const auto replacement = executor.Submit(StreamingTaskDesc{
+        .Name = "ReplacementDependent",
+        .Priority = Extrinsic::Core::Dag::TaskPriority::Normal,
+        .DependsOn = {blocker},
+        .Execute = [&order]()
+        {
+            order.push_back(2);
+            return StreamingResult{};
+        },
+    });
+
+    ASSERT_TRUE(replacement.IsValid());
+    EXPECT_EQ(replacement.Index, cancelled.Index);
+    EXPECT_GT(replacement.Generation, cancelled.Generation);
+
+    executor.PumpBackground(1);
+    executor.DrainCompletions();
+    ASSERT_EQ(order.size(), 1u);
+    EXPECT_EQ(order[0], 1);
+    EXPECT_EQ(executor.GetState(replacement), StreamingTaskState::Pending);
+
+    executor.PumpBackground(1);
+    executor.DrainCompletions();
+    ASSERT_EQ(order.size(), 2u);
+    EXPECT_EQ(order[1], 9);
+    EXPECT_EQ(executor.GetState(replacement), StreamingTaskState::Pending);
+
+    executor.PumpBackground(1);
+    executor.DrainCompletions();
+    ASSERT_EQ(order.size(), 3u);
+    EXPECT_EQ(order[2], 2);
+    EXPECT_EQ(executor.GetState(replacement), StreamingTaskState::Complete);
+}
+
+TEST(RuntimeStreamingExecutor, BatchStateSnapshotMatchesSingleHandleQueries)
+{
+    StreamingExecutor executor{};
+
+    const auto pending = executor.Submit(StreamingTaskDesc{
+        .Name = "Pending",
+        .Execute = []()
+        {
+            return StreamingResult{};
+        },
+    });
+    const auto cancelled = executor.Submit(StreamingTaskDesc{
+        .Name = "Cancelled",
+        .Execute = []()
+        {
+            return StreamingResult{};
+        },
+    });
+    executor.Cancel(cancelled);
+
+    const std::vector<StreamingTaskHandle> handles{
+        pending,
+        cancelled,
+        StreamingTaskHandle{},
+    };
+    const std::vector<StreamingTaskState> states =
+        executor.GetStates(std::span<const StreamingTaskHandle>(
+            handles.data(),
+            handles.size()));
+
+    ASSERT_EQ(states.size(), handles.size());
+    EXPECT_EQ(states[0], executor.GetState(pending));
+    EXPECT_EQ(states[1], StreamingTaskState::Cancelled);
+    EXPECT_EQ(states[2], StreamingTaskState::Cancelled);
 }
 
 TEST(RuntimeStreamingExecutor, HigherPriorityTaskLaunchesFirst)

@@ -4201,8 +4201,20 @@ namespace Extrinsic::Runtime
         RuntimeAssetImportQueueSnapshot snapshot =
             m_AssetIngestStateMachine.SnapshotQueue();
 
-        for (RuntimeAssetImportQueueEntry& entry : snapshot.Entries)
+        struct PendingStreamingStateQuery
         {
+            std::size_t EntryIndex = 0u;
+            StreamingTaskHandle Streaming{};
+        };
+
+        std::vector<PendingStreamingStateQuery> pendingStreamingQueries{};
+        pendingStreamingQueries.reserve(snapshot.Entries.size());
+
+        for (std::size_t entryIndex = 0u;
+             entryIndex < snapshot.Entries.size();
+             ++entryIndex)
+        {
+            RuntimeAssetImportQueueEntry& entry = snapshot.Entries[entryIndex];
             if (entry.TerminalStatus != RuntimeAssetImportQueueTerminalStatus::None)
             {
                 entry.CanCancel = false;
@@ -4229,8 +4241,34 @@ namespace Extrinsic::Runtime
                 continue;
             }
 
+            pendingStreamingQueries.push_back(PendingStreamingStateQuery{
+                .EntryIndex = entryIndex,
+                .Streaming = taskIt->Streaming,
+            });
+        }
+
+        std::vector<StreamingTaskHandle> streamingHandles{};
+        streamingHandles.reserve(pendingStreamingQueries.size());
+        for (const PendingStreamingStateQuery& query : pendingStreamingQueries)
+        {
+            streamingHandles.push_back(query.Streaming);
+        }
+
+        const std::vector<StreamingTaskState> streamingStates =
+            m_StreamingExecutor && !streamingHandles.empty()
+                ? m_StreamingExecutor->GetStates(streamingHandles)
+                : std::vector<StreamingTaskState>{};
+
+        for (std::size_t queryIndex = 0u;
+             queryIndex < pendingStreamingQueries.size();
+             ++queryIndex)
+        {
+            RuntimeAssetImportQueueEntry& entry =
+                snapshot.Entries[pendingStreamingQueries[queryIndex].EntryIndex];
             const StreamingTaskState streamingState =
-                m_StreamingExecutor->GetState(taskIt->Streaming);
+                queryIndex < streamingStates.size()
+                    ? streamingStates[queryIndex]
+                    : StreamingTaskState::Cancelled;
             entry.CanCancel =
                 QueueStageCanUseStreamingCancellation(entry.Stage) &&
                 StreamingTaskStateCanCancel(streamingState);

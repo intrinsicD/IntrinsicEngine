@@ -11,11 +11,15 @@ Each active task should include:
 
 ## Currently active
 
+- [`BUG-060`](BUG-060-scalar-colormap-lut-1d-view-black-on-gpu.md) —
+  scalar/isoline colormap LUT GPU black-output fix. Status: implemented;
+  verification owed before retirement. Next verification: run the default
+  CPU gate plus the manual Vulkan sandbox Scalar/Isolines preset check.
 - [`RUNTIME-145`](RUNTIME-145-runtime-frame-path-efficiency-polish.md) —
-  runtime frame-path steady-state efficiency polish. Status: in-progress
-  Slice A (`StableEntityLookup` event-driven maintenance). Next verification:
-  build `IntrinsicRuntimeContractTests` and run the focused
-  `SelectionStableLookupComposition` tests.
+  runtime frame-path steady-state efficiency polish. Status: in-progress after
+  Slice B (`StreamingExecutor` slot recycling, priority ready queues, and
+  batch import-queue state reads). Next implementation slice: conservative
+  pre-render transform dirty gating.
 
 ## History
 

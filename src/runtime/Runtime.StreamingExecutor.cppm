@@ -3,6 +3,7 @@ module;
 #include <cstdint>
 #include <expected>
 #include <functional>
+#include <span>
 #include <string>
 #include <vector>
 #include <variant>
@@ -66,6 +67,16 @@ export namespace Extrinsic::Runtime
         std::move_only_function<void(StreamingResult&&)> ApplyOnMainThread{};
     };
 
+    struct StreamingExecutorDiagnostics
+    {
+        std::uint32_t SlotCount = 0;
+        std::uint32_t ActiveSlotCount = 0;
+        std::uint32_t FreeSlotCount = 0;
+        std::uint32_t ReadyTaskCount = 0;
+        std::uint32_t ReadyForApplyCount = 0;
+        std::uint32_t RunningCount = 0;
+    };
+
     class StreamingExecutor
     {
     public:
@@ -85,6 +96,9 @@ export namespace Extrinsic::Runtime
         void ShutdownAndDrain();
 
         [[nodiscard]] StreamingTaskState GetState(StreamingTaskHandle handle) const;
+        [[nodiscard]] std::vector<StreamingTaskState>
+            GetStates(std::span<const StreamingTaskHandle> handles) const;
+        [[nodiscard]] StreamingExecutorDiagnostics GetDiagnostics() const;
 
     private:
         struct Impl;

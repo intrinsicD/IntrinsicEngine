@@ -7,17 +7,20 @@ depends_on: []
 
 ## Status
 - Active on local `main`.
-- Slice A is implemented and locally verified. It is intentionally limited to
-  the `StableEntityLookup` frame-path
-  rebuild removal. Later slices own `StreamingExecutor`, pre-render transform
-  dirty gating, extraction container reuse, and import payload moves.
+- Slices A-B are implemented and locally verified. Slice A removed the
+  steady-state `StableEntityLookup` rebuild; Slice B bounds
+  `StreamingExecutor` record storage with recycled slots, replaces the
+  full-vector ready scan with priority ready queues, and batches import-queue
+  streaming state reads through one executor snapshot. Later slices own
+  pre-render transform dirty gating, extraction container reuse, import payload
+  moves, and the final default CPU gate.
 
 ## Slice plan
 - Slice A: wire `StableEntityLookup` to scene `StableId` component events,
   keep full rebuilds only at whole-scene replacement boundaries, and prove
   `RunFrame` no longer rebuilds the lookup in steady state.
 - Slice B: recycle `StreamingExecutor` records, add an O(1) ready queue, and
-  batch queue snapshot state reads.
+  batch queue snapshot state reads. Implemented 2026-07-06.
 - Slice C: add a conservative pre-render transform dirty bit and skip idle
   transform re-sweeps.
 - Slice D: reuse live renderable key storage during extraction.
@@ -71,7 +74,7 @@ depends_on: []
       on entity create/destroy/stable-id change + the existing lazy
       self-heal; delete the per-frame `Rebuild` call (keep `Rebuild` for
       scene replacement only).
-- [ ] Add slot recycling + a ready queue to `StreamingExecutor` (free-list
+- [x] Add slot recycling + a ready queue to `StreamingExecutor` (free-list
       reuse of completed records; O(1) ready pop); batch
       `GetAssetImportQueueSnapshot` state reads under one lock.
 - [ ] Guard `FlushPreRenderTransformState` with a needs-flush dirty bit set
@@ -86,7 +89,7 @@ depends_on: []
 - [x] Contract: entity create/destroy/stable-id-change keeps
       `ResolveByStableId` correct without per-frame rebuilds (including the
       scene-replacement path).
-- [ ] Contract: `StreamingExecutor` record count stays bounded across many
+- [x] Contract: `StreamingExecutor` record count stays bounded across many
       submit/complete cycles; ordering/dependency semantics unchanged.
 - [ ] Contract: a post-sim transform edit still reaches extraction the same
       frame (camera-focus/BUG-024 regression stays green); an idle frame
@@ -95,7 +98,7 @@ depends_on: []
 
 ## Docs
 - [x] Update `src/runtime/README.md` for the lookup lifecycle change.
-- [ ] Update `src/runtime/README.md` for the executor lifecycle change.
+- [x] Update `src/runtime/README.md` for the executor lifecycle change.
 
 ## Acceptance criteria
 - [ ] Steady-state idle frame performs no stable-lookup rebuild, no
@@ -110,6 +113,13 @@ cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/agents/check_task_policy.py --root . --strict
+```
+
+Slice B focused verification run locally (2026-07-06):
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeIntegrationTests
+build/ci/bin/IntrinsicRuntimeIntegrationTests --gtest_filter='RuntimeStreamingExecutor.*'
 ```
 
 ## Forbidden changes

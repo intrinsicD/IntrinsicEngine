@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
@@ -32,6 +33,29 @@ namespace Extrinsic::Runtime
             return static_cast<int>(priority);
         }
 
+        constexpr std::size_t kPriorityQueueCount =
+            static_cast<std::size_t>(Core::Dag::TaskPriority::Background) + 1u;
+
+        [[nodiscard]] std::size_t PriorityQueueIndex(
+            const Core::Dag::TaskPriority priority)
+        {
+            const int rank = PriorityRank(priority);
+            if (rank <= 0)
+            {
+                return 0u;
+            }
+
+            return std::min<std::size_t>(
+                static_cast<std::size_t>(rank),
+                kPriorityQueueCount - 1u);
+        }
+
+        [[nodiscard]] std::uint32_t NextGeneration(std::uint32_t generation) noexcept
+        {
+            ++generation;
+            return generation == 0u ? 1u : generation;
+        }
+
         [[nodiscard]] StreamingResult CancelledResult()
         {
             return std::unexpected(Core::ErrorCode::InvalidState);
@@ -57,9 +81,12 @@ namespace Extrinsic::Runtime
             std::uint64_t CancellationGeneration = 0;
             StreamingTaskState State = StreamingTaskState::Pending;
             StreamingTaskDesc Desc{};
-            std::vector<std::uint32_t> Dependents{};
+            std::vector<StreamingTaskHandle> Dependents{};
             std::optional<StreamingResult> Result{};
             bool Launched = false;
+            bool QueuedReady = false;
+            bool Finalized = false;
+            bool Reusable = false;
         };
 
         struct Completion
@@ -70,12 +97,20 @@ namespace Extrinsic::Runtime
             StreamingResult Result{};
         };
 
+        struct ReadyEntry
+        {
+            std::uint32_t Index = kInvalidIndex;
+            std::uint32_t Generation = 0;
+        };
+
         mutable std::mutex Mutex{};
         std::condition_variable CompletionCv{};
         std::vector<TaskRecord> Tasks{};
         std::unordered_map<std::uint64_t, std::uint32_t> HandleToIndex{};
+        std::vector<std::uint32_t> FreeList{};
         std::deque<Completion> Completions{};
-        std::deque<std::uint32_t> ReadyForApply{};
+        std::array<std::deque<ReadyEntry>, kPriorityQueueCount> ReadyQueues{};
+        std::deque<ReadyEntry> ReadyForApply{};
         std::uint32_t RunningCount = 0;
         bool IsShutdown = false;
 
@@ -91,42 +126,116 @@ namespace Extrinsic::Runtime
             {
                 return std::nullopt;
             }
-            return it->second;
+
+            const std::uint32_t index = it->second;
+            if (index >= Tasks.size() ||
+                Tasks[index].Generation != handle.Generation)
+            {
+                return std::nullopt;
+            }
+            return index;
         }
 
-        [[nodiscard]] std::optional<std::uint32_t> FindNextReadyIndex() const
+        void EnqueueReadyLocked(const std::uint32_t index)
         {
-            std::optional<std::uint32_t> best{};
-
-            for (std::uint32_t index = 0; index < Tasks.size(); ++index)
+            if (index >= Tasks.size())
             {
-                const auto& task = Tasks[index];
-                if (task.State != StreamingTaskState::Pending || task.Launched || task.RemainingDeps != 0)
-                {
-                    continue;
-                }
+                return;
+            }
 
-                if (!best.has_value())
-                {
-                    best = index;
-                    continue;
-                }
+            TaskRecord& task = Tasks[index];
+            if (task.Reusable ||
+                task.Finalized ||
+                task.QueuedReady ||
+                task.State != StreamingTaskState::Pending ||
+                task.Launched ||
+                task.RemainingDeps != 0u)
+            {
+                return;
+            }
 
-                const auto& currentBest = Tasks[*best];
-                const auto rank = PriorityRank(task.Desc.Priority);
-                const auto bestRank = PriorityRank(currentBest.Desc.Priority);
-                if (rank < bestRank)
+            task.QueuedReady = true;
+            ReadyQueues[PriorityQueueIndex(task.Desc.Priority)].push_back(
+                ReadyEntry{.Index = index, .Generation = task.Generation});
+        }
+
+        [[nodiscard]] std::optional<std::uint32_t> PopNextReadyIndexLocked()
+        {
+            for (auto& queue : ReadyQueues)
+            {
+                while (!queue.empty())
                 {
-                    best = index;
+                    const ReadyEntry ready = queue.front();
+                    queue.pop_front();
+
+                    if (ready.Index >= Tasks.size())
+                    {
+                        continue;
+                    }
+
+                    TaskRecord& task = Tasks[ready.Index];
+                    if (task.Generation != ready.Generation)
+                    {
+                        continue;
+                    }
+
+                    task.QueuedReady = false;
+                    if (task.Reusable ||
+                        task.Finalized ||
+                        task.State != StreamingTaskState::Pending ||
+                        task.Launched ||
+                        task.RemainingDeps != 0u)
+                    {
+                        continue;
+                    }
+
+                    return ready.Index;
                 }
             }
 
-            return best;
+            return std::nullopt;
+        }
+
+        void ReleaseReusableSlotLocked(const std::uint32_t index)
+        {
+            if (index >= Tasks.size())
+            {
+                return;
+            }
+
+            TaskRecord& task = Tasks[index];
+            if (task.Reusable || task.Launched)
+            {
+                return;
+            }
+
+            task.Desc = StreamingTaskDesc{};
+            task.Dependents.clear();
+            task.Result.reset();
+            task.RemainingDeps = 0u;
+            task.CancellationGeneration = 0u;
+            task.QueuedReady = false;
+            task.Reusable = true;
+            FreeList.push_back(index);
         }
 
         void FinalizeTaskLocked(const std::uint32_t index)
         {
+            if (index >= Tasks.size())
+            {
+                return;
+            }
+
             auto& task = Tasks[index];
+            if (task.Finalized)
+            {
+                if (!task.Launched)
+                {
+                    ReleaseReusableSlotLocked(index);
+                }
+                return;
+            }
+
             if (task.Result.has_value() && !task.Result->has_value())
             {
                 task.State = (task.State == StreamingTaskState::Cancelled)
@@ -142,12 +251,59 @@ namespace Extrinsic::Runtime
 
             for (const auto dependentIndex : task.Dependents)
             {
-                auto& dependent = Tasks[dependentIndex];
+                if (dependentIndex.Index >= Tasks.size())
+                {
+                    continue;
+                }
+
+                auto& dependent = Tasks[dependentIndex.Index];
+                if (dependent.Generation != dependentIndex.Generation ||
+                    dependent.Finalized ||
+                    dependent.Reusable)
+                {
+                    continue;
+                }
+
                 if (dependent.RemainingDeps > 0)
                 {
                     --dependent.RemainingDeps;
+                    if (dependent.RemainingDeps == 0u)
+                    {
+                        EnqueueReadyLocked(dependentIndex.Index);
+                    }
                 }
             }
+
+            task.Dependents.clear();
+            task.Finalized = true;
+            if (!task.Launched)
+            {
+                ReleaseReusableSlotLocked(index);
+            }
+        }
+
+        [[nodiscard]] std::uint32_t AllocateSlotLocked(TaskRecord& record)
+        {
+            if (FreeList.empty())
+            {
+                const std::uint32_t index =
+                    static_cast<std::uint32_t>(Tasks.size());
+                record.Generation = 1u;
+                Tasks.push_back(std::move(record));
+                return index;
+            }
+
+            const std::uint32_t index = FreeList.back();
+            FreeList.pop_back();
+            TaskRecord& slot = Tasks[index];
+            HandleToIndex.erase(HandleKey(StreamingTaskHandle{
+                index,
+                slot.Generation,
+            }));
+
+            record.Generation = NextGeneration(slot.Generation);
+            slot = std::move(record);
+            return index;
         }
     };
 
@@ -176,11 +332,18 @@ namespace Extrinsic::Runtime
             return {};
         }
 
-        const std::uint32_t index = static_cast<std::uint32_t>(m_Impl->Tasks.size());
         Impl::TaskRecord record{};
         record.Desc = std::move(desc);
         record.Desc.EstimatedCost = std::max<std::uint32_t>(1u, record.Desc.EstimatedCost);
         record.CancellationGeneration = record.Desc.CancellationGeneration;
+
+        const std::uint32_t index = m_Impl->FreeList.empty()
+            ? static_cast<std::uint32_t>(m_Impl->Tasks.size())
+            : m_Impl->FreeList.back();
+        record.Generation = m_Impl->FreeList.empty()
+            ? 1u
+            : NextGeneration(m_Impl->Tasks[index].Generation);
+        const StreamingTaskHandle handle{index, record.Generation};
 
         for (const auto dependency : record.Desc.DependsOn)
         {
@@ -191,16 +354,18 @@ namespace Extrinsic::Runtime
                     parent.State != StreamingTaskState::Cancelled)
                 {
                     ++record.RemainingDeps;
-                    parent.Dependents.push_back(index);
+                    parent.Dependents.push_back(handle);
                 }
             }
         }
 
-        const auto generation = record.Generation;
-        m_Impl->Tasks.push_back(std::move(record));
-
-        StreamingTaskHandle handle{index, generation};
+        const std::uint32_t allocatedIndex = m_Impl->AllocateSlotLocked(record);
+        if (allocatedIndex != index)
+        {
+            return {};
+        }
         m_Impl->HandleToIndex.emplace(Impl::HandleKey(handle), index);
+        m_Impl->EnqueueReadyLocked(index);
         return handle;
     }
 
@@ -244,7 +409,7 @@ namespace Extrinsic::Runtime
                     return;
                 }
 
-                const auto next = m_Impl->FindNextReadyIndex();
+                const auto next = m_Impl->PopNextReadyIndexLocked();
                 if (!next.has_value())
                 {
                     return;
@@ -308,22 +473,32 @@ namespace Extrinsic::Runtime
             std::scoped_lock lock(m_Impl->Mutex);
             if (completion.Index >= m_Impl->Tasks.size())
             {
+                if (m_Impl->RunningCount > 0)
+                {
+                    --m_Impl->RunningCount;
+                }
                 continue;
             }
 
             auto& task = m_Impl->Tasks[completion.Index];
-            if (task.Generation != completion.Generation)
-            {
-                continue;
-            }
-
             if (m_Impl->RunningCount > 0)
             {
                 --m_Impl->RunningCount;
             }
 
+            if (task.Generation != completion.Generation)
+            {
+                continue;
+            }
+
+            task.Launched = false;
+
             if (task.CancellationGeneration != completion.CancellationGeneration)
             {
+                if (task.Finalized)
+                {
+                    m_Impl->ReleaseReusableSlotLocked(completion.Index);
+                }
                 continue;
             }
 
@@ -355,7 +530,10 @@ namespace Extrinsic::Runtime
                     task.State = IsUploadRequest(*task.Result)
                         ? StreamingTaskState::WaitingForGpuUpload
                         : StreamingTaskState::WaitingForMainThreadApply;
-                    m_Impl->ReadyForApply.push_back(completion.Index);
+                    m_Impl->ReadyForApply.push_back(Impl::ReadyEntry{
+                        .Index = completion.Index,
+                        .Generation = task.Generation,
+                    });
                 }
             }
             else
@@ -383,7 +561,10 @@ namespace Extrinsic::Runtime
         }
 
         task.State = StreamingTaskState::WaitingForMainThreadApply;
-        m_Impl->ReadyForApply.push_back(*index);
+        m_Impl->ReadyForApply.push_back(Impl::ReadyEntry{
+            .Index = *index,
+            .Generation = task.Generation,
+        });
         return true;
     }
 
@@ -395,7 +576,7 @@ namespace Extrinsic::Runtime
     std::uint32_t StreamingExecutor::ApplyMainThreadResults(
         const std::uint32_t maxApplyCount)
     {
-        std::deque<std::uint32_t> ready{};
+        std::deque<Impl::ReadyEntry> ready{};
         {
             std::scoped_lock lock(m_Impl->Mutex);
             const auto count = std::min<std::size_t>(
@@ -409,20 +590,23 @@ namespace Extrinsic::Runtime
         }
 
         std::uint32_t applied = 0u;
-        for (const auto index : ready)
+        for (const auto entry : ready)
         {
             std::move_only_function<void(StreamingResult&&)> apply{};
             StreamingResult result = std::unexpected(Core::ErrorCode::Unknown);
             bool consumed = false;
             {
                 std::scoped_lock lock(m_Impl->Mutex);
-                if (index >= m_Impl->Tasks.size())
+                if (entry.Index >= m_Impl->Tasks.size())
                 {
                     continue;
                 }
 
-                auto& task = m_Impl->Tasks[index];
-                if (!task.Result.has_value())
+                auto& task = m_Impl->Tasks[entry.Index];
+                if (task.Generation != entry.Generation ||
+                    task.Finalized ||
+                    task.Reusable ||
+                    !task.Result.has_value())
                 {
                     continue;
                 }
@@ -439,9 +623,10 @@ namespace Extrinsic::Runtime
 
             {
                 std::scoped_lock lock(m_Impl->Mutex);
-                if (index < m_Impl->Tasks.size())
+                if (entry.Index < m_Impl->Tasks.size() &&
+                    m_Impl->Tasks[entry.Index].Generation == entry.Generation)
                 {
-                    m_Impl->FinalizeTaskLocked(index);
+                    m_Impl->FinalizeTaskLocked(entry.Index);
                 }
             }
             if (consumed)
@@ -467,12 +652,16 @@ namespace Extrinsic::Runtime
             }
             m_Impl->IsShutdown = true;
 
-            for (auto& task : m_Impl->Tasks)
+            for (std::uint32_t index = 0u;
+                 index < static_cast<std::uint32_t>(m_Impl->Tasks.size());
+                 ++index)
             {
+                auto& task = m_Impl->Tasks[index];
                 if (task.State == StreamingTaskState::Pending)
                 {
                     task.State = StreamingTaskState::Cancelled;
                     task.Result = CancelledResult();
+                    m_Impl->FinalizeTaskLocked(index);
                 }
             }
         }
@@ -501,5 +690,50 @@ namespace Extrinsic::Runtime
         }
 
         return m_Impl->Tasks[*index].State;
+    }
+
+    std::vector<StreamingTaskState> StreamingExecutor::GetStates(
+        const std::span<const StreamingTaskHandle> handles) const
+    {
+        std::vector<StreamingTaskState> states{};
+        states.reserve(handles.size());
+
+        std::scoped_lock lock(m_Impl->Mutex);
+        for (const StreamingTaskHandle handle : handles)
+        {
+            const auto index = m_Impl->Resolve(handle);
+            states.push_back(index.has_value()
+                ? m_Impl->Tasks[*index].State
+                : StreamingTaskState::Cancelled);
+        }
+        return states;
+    }
+
+    StreamingExecutorDiagnostics StreamingExecutor::GetDiagnostics() const
+    {
+        std::scoped_lock lock(m_Impl->Mutex);
+
+        StreamingExecutorDiagnostics diagnostics{};
+        diagnostics.SlotCount =
+            static_cast<std::uint32_t>(m_Impl->Tasks.size());
+        diagnostics.FreeSlotCount =
+            static_cast<std::uint32_t>(m_Impl->FreeList.size());
+        diagnostics.RunningCount = m_Impl->RunningCount;
+        diagnostics.ReadyForApplyCount =
+            static_cast<std::uint32_t>(m_Impl->ReadyForApply.size());
+
+        for (const auto& task : m_Impl->Tasks)
+        {
+            if (!task.Reusable)
+            {
+                ++diagnostics.ActiveSlotCount;
+            }
+            if (task.QueuedReady)
+            {
+                ++diagnostics.ReadyTaskCount;
+            }
+        }
+
+        return diagnostics;
     }
 }
