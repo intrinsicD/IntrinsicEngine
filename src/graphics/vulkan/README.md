@@ -88,8 +88,11 @@ available through the Vulkan 1.2/1.3 feature chain.
   initialized; otherwise it records on the caller thread. Dynamic upload helpers,
   postprocess helpers, frame-sampled descriptor bridge updates, command-record
   diagnostics, and readback issue metadata are routed through guarded renderer
-  helpers. Non-graphics queue support, benchmark evidence, and opt-in
-  `gpu;vulkan` smoke coverage remain later `GRAPHICS-119` slices.
+  helpers. The opt-in
+  `DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation`
+  fixture exercises the graphics-queue secondary path on promoted Vulkan with
+  validation enabled and compares serial/parallel backbuffer readback bytes.
+  Non-graphics queue support remains later `GRAPHICS-119` backend scope.
 - `GetVulkanServiceDiagnosticsSnapshot()` reports guarded post-bootstrap service
   handoff: bindless heap creation, global pipeline-layout creation, transfer
   queue/staging creation, command-context rebinding, bindless capacity, clean
@@ -583,6 +586,15 @@ fixture is labeled `gpu;vulkan;graphics`, skips when the host lacks GLFW,
 operational Vulkan, or async-compute support, and otherwise asserts
 `RenderGraphFrameStats::AsyncComputeUtilizedFrames >= 1` plus the existing
 four-sample readback parity.
+
+GRAPHICS-119 adds
+`DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation`.
+The fixture requests validation, disables the postprocess extension to keep the
+current Vulkan parallel-command plan graphics-only, captures serial and parallel
+default-recipe debug-view readback bytes, and asserts
+`RenderGraphFrameStats::Execute.ParallelRecordingAccepted` with no serial
+fallback or validation-counter increment. Non-graphics secondary command buffers
+for async-compute queue plans remain deferred backend work.
 
 GRAPHICS-077 and GRAPHICS-078 extend the same operational proof to the default
 recipe's post-lit overlay band. The opt-in `gpu;vulkan;graphics` fixtures

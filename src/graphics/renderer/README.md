@@ -112,9 +112,13 @@ same worker fan-out seam and joins them back through each
 waits/signals, and barriers remain unchanged. The current path is
 worker-dispatched when `Core::Tasks::Scheduler` is initialized, and records on
 the caller thread when no scheduler is live. Vulkan accepts the graphics-queue
-plan with backend-local secondary command buffers; Vulkan non-graphics secondary
-execution, benchmark evidence, and opt-in Vulkan smoke remain later
-`GRAPHICS-119` slices.
+plan with backend-local secondary command buffers. The opt-in
+`gpu;vulkan;graphics` fixture
+`DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation`
+compares serial and parallel default-recipe readback bytes under validation and
+asserts the accepted graphics-only parallel path did not fall back to serial.
+Vulkan non-graphics secondary execution remains later `GRAPHICS-119` backend
+scope.
 `RenderGraphFrameStats::Execute.ParallelRecordUsedScheduler` reports whether the
 executor dispatched worker tasks. Transient-debug, visualization-overlay, and
 ImGui dynamic upload helpers serialize per-frame reset plus upload/execute

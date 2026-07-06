@@ -8,10 +8,10 @@ depends_on: []
 ## Status
 - In progress on local `main`; PR not opened.
 - Owner/agent: Codex.
-- Current slice: Slice C.9 (PR-fast benchmark evidence) completed and
+- Current slice: Slice C.10 (opt-in Vulkan graphics-queue smoke) completed and
   verified locally.
 - Next implementation step: cover remaining Vulkan non-graphics secondary
-  execution / opt-in Vulkan smoke scope.
+  execution scope.
 
 ## Goal
 - Record render-graph pass command buffers in parallel: independent passes
@@ -110,6 +110,11 @@ depends_on: []
       recording vs scheduler-backed parallel record/join on a deterministic
       pass-heavy CPU/null graph, emitting machine-readable baseline/probe
       metrics with no performance-win adoption claim.
+- [x] Slice C.10: add opt-in promoted Vulkan smoke coverage that compares
+      serial and accepted graphics-queue parallel readback bytes under
+      validation, with postprocess disabled so the current Vulkan secondary
+      command implementation is not forced through the deferred non-graphics
+      plan.
 - [x] RHI contract for parallel recording: acquire per-thread/per-batch
       command contexts, record independently, submit in compiled order;
       Null + Vulkan implementations.
@@ -174,8 +179,11 @@ depends_on: []
       comparison over randomized graphs).
 - [x] CPU/null contract: recording work actually distributes across workers
       (probe), with the join deterministic.
-- [ ] Opt-in `gpu;vulkan` smoke: default sandbox recipe image-identical
-      serial vs parallel; validation layers clean under parallel recording.
+- [x] Opt-in `gpu;vulkan` smoke: default recipe graphics-queue plan
+      image-identical serial vs parallel; validation layers clean under
+      parallel recording. The smoke disables postprocess to keep the plan
+      graphics-only; Vulkan non-graphics secondary execution remains later
+      backend scope.
 - [x] PR-fast benchmark: recording CPU ms/frame serial vs parallel on a
       pass-heavy synthetic recipe.
 
@@ -209,15 +217,18 @@ depends_on: []
 - [x] Slice C.9: document the render-graph parallel-recording smoke benchmark
       and record that it is benchmark evidence, not a renderer-wide performance
       win claim.
+- [x] Slice C.10: document the opt-in
+      `DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation`
+      Vulkan smoke and the remaining non-graphics secondary-execution scope.
 - [x] Update `docs/architecture/frame-graph.md` and
       `src/graphics/renderer/README.md` (threading model, fallback flag).
 
 ## Acceptance criteria
-- [ ] Deterministic submission order proven by contract tests; identical
+- [x] Deterministic submission order proven by contract tests; identical
       Vulkan frame output cited from an actually-run smoke.
 - [x] Benchmark evidence recorded (or an honest "no win at current pass
       counts, kept behind flag" conclusion).
-- [ ] Serial fallback intact; CPU gate green; layering gate green.
+- [x] Serial fallback intact; CPU gate green; layering gate green.
 
 ## Verification
 ```bash
@@ -501,14 +512,46 @@ adoption_claim: false
 Conclusion: checksum parity holds and scheduler fan-out is exercised, but this
 PR-fast CPU smoke does not show a win at the current synthetic pass count/work
 shape. The parallel renderer path remains behind the debug selector until the
-remaining opt-in Vulkan smoke evidence exists.
+remaining non-graphics Vulkan secondary-execution evidence exists.
+
+Slice C.10 focused verification run locally on 2026-07-07:
+
+```bash
+cmake --build --preset ci --target IntrinsicGraphicsVulkanSmokeTests
+ctest --test-dir build/ci --output-on-failure -R 'DefaultRecipeSurfaceGpuSmoke\.ParallelRecordingMatchesSerialReadbackWithValidation' -L 'gpu' -L 'vulkan' --timeout 120
+```
+
+Slice C.10 opt-in Vulkan smoke result: 1/1 tests passed. The smoke requested
+validation, disabled the postprocess extension to keep the current Vulkan plan
+graphics-only, compared serial and parallel default-recipe debug-view readback
+bytes, asserted `ParallelRecordingAccepted == true`, and observed no
+fallback/validation counter increment across the parallel frame.
+
+Slice C.10 final verification run locally on 2026-07-07:
+
+```bash
+python3 tools/agents/generate_session_brief.py
+git diff --check
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/validate_tasks.py --root tasks --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --strict
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+```
+
+Slice C.10 full CPU-supported gate result: 3596/3596 tests passed.
 
 ## Forbidden changes
 - Nondeterministic submission order or frame output.
 - Passing `Vk*` types through RHI/renderer/framegraph public APIs.
-- Making the parallel path the only path before the Vulkan smoke is cited.
+- Making the parallel path the only path before non-graphics Vulkan secondary
+  execution is covered or explicitly deferred.
 
 ## Maturity
 - Target: `Operational` on Vulkan-capable hosts; `CPUContracted` for the
-  determinism/distribution contracts on Null. The closing slice owns the
-  `gpu;vulkan` smoke citation.
+  determinism/distribution contracts on Null. The graphics-queue Vulkan
+  secondary path has opt-in `gpu;vulkan` smoke evidence; non-graphics Vulkan
+  secondary execution remains later backend scope.

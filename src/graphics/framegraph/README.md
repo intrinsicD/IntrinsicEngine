@@ -127,8 +127,13 @@ error before emitting serial submit callbacks. The renderer uses the same
 record/join primitive for accepted single-queue frames and for accepted CPU/null
 multi-queue submit plans; multi-queue joins emit each recorded context through
 the existing queue-submit batches so timeline waits/signals and barriers keep
-their serial placement. Vulkan non-graphics secondary execution, benchmark
-evidence, and operational GPU smoke coverage remain `GRAPHICS-119` later scope.
+their serial placement. The PR-fast
+`rendering.rendergraph_parallel_recording.smoke` benchmark records checksum
+parity plus serial/parallel CPU timings without making an adoption claim, and
+`DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation`
+is the opt-in `gpu;vulkan` proof for the implemented graphics-queue secondary
+command path. Vulkan non-graphics secondary execution remains `GRAPHICS-119`
+later scope.
 
 ## Transient Placement Contract
 
@@ -236,3 +241,8 @@ queue support. On promoted Vulkan hosts with async compute, the
 `DefaultRecipeSurfaceGpuSmoke.AsyncComputeHistogramQueueReadbackMatchesMinimalHarnessSamples`
 fixture asserts that `RenderGraphFrameStats::AsyncComputeUtilizedFrames >= 1`
 and that the same four-sample backbuffer-readback parity harness still matches.
+`DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation`
+disables the postprocess extension to keep the current Vulkan plan graphics-only,
+then captures serial and parallel readback bytes with validation enabled and
+asserts that the parallel frame accepted secondary command contexts without a
+serial fallback.

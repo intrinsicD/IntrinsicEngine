@@ -74,6 +74,11 @@ helpers and the renderer wiring (default-disabled state, configured-handle
 triplet against MockDevice, non-operational skip path) run inside the default gate via
 `IntrinsicGraphicsContractCpuTests` (`MinimalTriangleReadbackHarness`,
 `OperationalCounterStability`, `DefaultRecipeBackbufferReadbackContract`).
+`DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation`
+is the GRAPHICS-119 opt-in Vulkan check: it runs serial and parallel
+default-recipe frames with validation enabled, compares the captured readback
+bytes, and asserts the graphics-only parallel context plan was accepted without
+falling back to the serial path.
 
 The opt-in `IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests` executable (labels
 `gpu;vulkan;integration;runtime;graphics`, RUNTIME-095 Slice 3) drives

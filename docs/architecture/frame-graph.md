@@ -203,17 +203,18 @@ dispatch because promoted Vulkan updates shared descriptor-set state. Accepted
 CPU/null multi-queue submit plans use the same per-pass parallel contexts and
 join them back through each queue-submit batch so submission order, timeline
 waits/signals, and barriers remain unchanged. Remaining `GRAPHICS-119` scope is
-Vulkan non-graphics secondary execution, benchmark evidence, and opt-in Vulkan
-smoke coverage.
+Vulkan non-graphics secondary execution.
 
 Null provides CPU bookkeeping contexts for this contract. Vulkan accepts the
 current graphics-queue plan shape with backend-local secondary command buffers
 and records `vkCmdExecuteCommands(...)` into the primary context at each serial
 submit callback; each accepted context owns a frame-scoped command pool, and the
 pool plus secondary buffer are retained until the frame-slot fence has retired
-and are destroyed on the next `BeginFrame`. Vulkan non-graphics secondary
-execution, benchmark evidence, and opt-in `gpu;vulkan` smoke coverage remain
-later `GRAPHICS-119` slices.
+and are destroyed on the next `BeginFrame`. The opt-in `gpu;vulkan` smoke
+`DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation`
+forces the default recipe onto a graphics-only pass plan, compares serial and
+parallel backbuffer readback bytes, and asserts validation counters stay stable.
+Vulkan non-graphics secondary execution remains later backend scope.
 
 ## Boundaries
 
