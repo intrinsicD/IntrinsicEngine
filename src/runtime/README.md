@@ -87,10 +87,13 @@ mesh/graph/point-cloud vertex-normal recompute, point-cloud outlier removal,
 and selected-mesh UV regeneration. Slice F.1 starts the panel-state follow-up:
 the selected-mesh UV panel reads the existing derived-job snapshot, invalidates
 the selected-analysis cache when per-entity job status changes, and keeps the
-last pending/completed UV result visible through the attached editor sink. The
-remaining `RUNTIME-141` work is broader panel job-state/timing/render-advance
-contract coverage rather than another identified synchronous geometry-processing
-command.
+last pending/completed UV result visible through the attached editor sink. Slice
+F.2 pins the frame-loop behavior with a deliberately slow derived job on the
+Null-window engine path: the ImGui editor callback must stay bounded while the
+worker job is running, and render begin/extract/prepare/execute/end must still
+complete for a frame that entered rendering while the job was pending/running.
+Any remaining `RUNTIME-141` work is narrower panel duplicate-submit/cancel UX
+coverage rather than another identified synchronous geometry-processing command.
 
 ### Sandbox Editor Startup Layout
 

@@ -7,13 +7,13 @@ depends_on: []
 
 ## Status
 - Active on 2026-07-05; Slices A, B, C, D, E.1, E.2, E.3, E.4, E.5, and
-  F.1 are implemented. The parent task remains active for the remaining
-  panel job-state, timing, and render-advance contracts after the identified
+  F.1 and F.2 are implemented. The parent task remains active only for any
+  remaining per-panel duplicate-submit/cancel UX review after the identified
   synchronous geometry-processing command conversions.
 - This task is intentionally sliced because it spans the shared runtime job
   lane plus several method-specific snapshot/apply conversions.
-- Remaining open slice: general panel job-state, timing, and render-advance
-  contracts.
+- Remaining open slice: confirm or close any per-panel duplicate-submit/cancel
+  UX gaps.
 
 ## Slice plan
 - **Slice A (this slice).** Wire an engine-owned `DerivedJobRegistry` beside
@@ -50,6 +50,11 @@ depends_on: []
   its pending/completed result through the attached editor UI sink, and pin the
   panel model contract before generalizing the remaining panel-state/timing
   checks.
+- **Slice F.2 (complete).** Add a Null-window engine/frame-loop contract with
+  a deliberately slow derived job. The test proves the ImGui editor callback
+  remains bounded while the worker job is running and a render frame completes
+  while the job is still pending/running. Defers broader per-panel duplicate
+  submit/cancel UX to a follow-up slice only if active panel gaps remain.
 
 ## Goal
 - Editor-triggered heavy action buttons and method runs (CPU K-Means,
@@ -125,6 +130,9 @@ depends_on: []
       (document choice per panel).
   - [x] Slice F.1: texture-bake/UV panel reports the matching UV regeneration
         derived job state and keeps the last pending/completed result visible.
+  - [x] Slice F.2: engine-level timing/render contracts prove the editor
+        callback and render frame advance while a deliberately slow derived job
+        is running.
 
 ## Tests
 - [x] Contract: a representative converted UI button creates a pending job and
@@ -134,9 +142,9 @@ depends_on: []
       synchronous output for a fixed seed/scene (per converted command).
 - [x] Contract: a stale job (scene/geometry generation changed mid-run) is
       discarded without mutating state.
-- [ ] Contract: the ImGui editor callback duration stays bounded while a
+- [x] Contract: the ImGui editor callback duration stays bounded while a
       heavy job runs (timing probe with a deliberately slow job).
-- [ ] Contract: render extraction/prepare can advance while an editor method
+- [x] Contract: render extraction/prepare can advance while an editor method
       job is pending.
 - [x] Contract: the selected-mesh UV panel model reports queued/applying/complete
       UV regeneration job state through the selected-analysis cache.
@@ -148,13 +156,13 @@ depends_on: []
 ## Acceptance criteria
 - [ ] Heavy editor UI buttons create runtime jobs/tasks instead of executing
       solves or blocking IO inside the ImGui callback.
-- [ ] No editor method command executes its solve inside the ImGui callback
+- [x] No editor method command executes its solve inside the ImGui callback
       (verified per converted command by the queued-status and timing
       contracts).
-- [ ] Rendering remains advanceable while converted jobs are pending; only the
+- [x] Rendering remains advanceable while converted jobs are pending; only the
       bounded main-thread apply phase may mutate committed state.
 - [ ] Method outputs unchanged for deterministic fixtures.
-- [ ] Default CPU gate green.
+- [x] Default CPU gate green.
 
 ## Verification
 ```bash
@@ -304,6 +312,28 @@ cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 python3 tools/agents/generate_session_brief.py
+python3 tools/agents/validate_tasks.py --root tasks --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/repo/check_pr_contract.py
+git diff --check
+python3 tools/repo/check_root_hygiene.py --root .
+```
+
+`check_root_hygiene.py` completed in warning mode with the existing unexpected
+root entries `ara/` and `imgui.ini`.
+
+Slice F.2 verification completed on 2026-07-05:
+
+```bash
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='ImGuiAdapterEngineWiring.EditorCallbackStaysBoundedAndRenderAdvancesWhileDerivedJobRuns:ImGuiAdapterEngineWiring.FramePacingDiagnosticsPopulateOnNullBackend:RuntimeDerivedJobEngineWiring.RunFrameAppliesSubmittedDerivedJob:RuntimeEngineLayering.StreamingHookAppliesMainThreadResultsWithFrameBudget'
+ctest --test-dir build/ci --output-on-failure -R 'ImGuiAdapterEngineWiring|RuntimeDerivedJobEngineWiring|RuntimeEngineLayering|DerivedJob|StreamingExecutor|SandboxEditorUi' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/agents/validate_tasks.py --root tasks --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/repo/check_layering.py --root src --strict

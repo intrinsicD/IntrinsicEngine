@@ -17,9 +17,14 @@
 // `Test.ImGuiAdapter.cpp` contract. `imgui.h` is included only to synthesize a
 // real panel draw in the editor-hook case.
 
+#include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <thread>
+#include <utility>
 
 #include <gtest/gtest.h>
 #include <glm/glm.hpp>
@@ -27,6 +32,7 @@
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
+import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
@@ -34,9 +40,11 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.ImGuiAdapter;
+import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.SelectionController;
 
 using Extrinsic::Runtime::Engine;
@@ -86,6 +94,118 @@ namespace
     private:
         std::uint32_t m_TargetFrames{0u};
         std::uint32_t m_VariableTicks{0u};
+    };
+
+    [[nodiscard]] bool IsWorkerRunningStatus(
+        const Runtime::DerivedJobStatus status) noexcept
+    {
+        return status == Runtime::DerivedJobStatus::Running;
+    }
+
+    class SlowDerivedJobApplication final : public Runtime::IApplication
+    {
+    public:
+        static constexpr std::uint32_t kMaxFrames = 512u;
+        static constexpr auto kWorkerSleep = std::chrono::milliseconds(250);
+        static constexpr auto kVariableTickDelay = std::chrono::milliseconds(1);
+
+        void OnInitialize(Engine& engine) override
+        {
+            Runtime::DerivedJobDesc desc{
+                .Key = Runtime::DerivedJobKey{
+                    .EntityId = 141u,
+                    .Domain = Runtime::ProgressiveGeometryDomain::Point,
+                    .OutputSemantic =
+                        Runtime::ProgressiveSlotSemantic::PointColor,
+                    .OutputName = "runtime_141_slow_job_probe",
+                },
+                .Name = "RUNTIME-141 slow editor method job",
+                .Execute =
+                    [this]() -> Runtime::DerivedJobWorkerResult
+                    {
+                        WorkerRuns.fetch_add(1u, std::memory_order_relaxed);
+                        std::this_thread::sleep_for(kWorkerSleep);
+                        return Runtime::DerivedJobOutput{
+                            .PayloadToken = 141u,
+                            .NormalizedProgress = 1.0f,
+                            .ProgressDeterminate = true,
+                            .Diagnostic = "slow probe complete",
+                        };
+                    },
+                .ApplyOnMainThread =
+                    [this](Runtime::DerivedJobApplyContext& context)
+                        -> Core::Result
+                    {
+                        EXPECT_EQ(context.Output.PayloadToken, 141u);
+                        ApplyRuns.fetch_add(1u, std::memory_order_relaxed);
+                        return Core::Ok();
+                    },
+            };
+            Handle = engine.SubmitDerivedJob(std::move(desc));
+        }
+
+        void OnSimTick(Engine&, double) override {}
+
+        void OnVariableTick(Engine& engine, double, double) override
+        {
+            ++VariableTicks;
+
+            if (PreviousTickEnteredRenderWithRunningJob)
+            {
+                const Runtime::RuntimeFramePacingDiagnostics& pacing =
+                    engine.GetLastFramePacingDiagnostics();
+                if (pacing.Valid &&
+                    pacing.RendererBeganFrame &&
+                    pacing.RendererCompletedFrame)
+                {
+                    ObservedRenderAdvanceWhileWorkerRunning = true;
+                }
+            }
+
+            const Runtime::DerivedJobStatus status = CurrentStatus(engine);
+            const bool workerRunning = IsWorkerRunningStatus(status);
+            if (workerRunning)
+            {
+                ++VariableTicksWhileWorkerRunning;
+            }
+            PreviousTickEnteredRenderWithRunningJob = workerRunning;
+
+            if (ApplyRuns.load(std::memory_order_relaxed) > 0u ||
+                VariableTicks >= kMaxFrames)
+            {
+                engine.RequestExit();
+                return;
+            }
+
+            std::this_thread::sleep_for(kVariableTickDelay);
+        }
+
+        void OnShutdown(Engine&) override {}
+
+        Runtime::DerivedJobHandle Handle{};
+        std::atomic<std::uint32_t> WorkerRuns{0u};
+        std::atomic<std::uint32_t> ApplyRuns{0u};
+        std::uint32_t VariableTicks{0u};
+        std::uint32_t VariableTicksWhileWorkerRunning{0u};
+        bool ObservedRenderAdvanceWhileWorkerRunning{false};
+
+    private:
+        [[nodiscard]] Runtime::DerivedJobStatus CurrentStatus(
+            Engine& engine) const
+        {
+            const Runtime::DerivedJobQueueSnapshot snapshot =
+                engine.GetDerivedJobQueueSnapshot();
+            for (const Runtime::DerivedJobSnapshot& entry : snapshot.Entries)
+            {
+                if (entry.Handle == Handle)
+                {
+                    return entry.Status;
+                }
+            }
+            return Runtime::DerivedJobStatus::Cancelled;
+        }
+
+        bool PreviousTickEnteredRenderWithRunningJob{false};
     };
 
     class RecordingCameraController final : public Runtime::ICameraController
@@ -425,6 +545,61 @@ TEST(ImGuiAdapterEngineWiring, FramePacingDiagnosticsPopulateOnNullBackend)
     EXPECT_EQ(pacing.RenderGraphCompileMicros, graph.Compile.TimeMicros);
     EXPECT_EQ(pacing.RenderGraphExecuteMicros, graph.Execute.TimeMicros);
     EXPECT_GT(imgui.LastFrameOverlayCopyBytes, 0u);
+
+    engine.Shutdown();
+}
+
+TEST(ImGuiAdapterEngineWiring,
+     EditorCallbackStaysBoundedAndRenderAdvancesWhileDerivedJobRuns)
+{
+    auto app = std::make_unique<SlowDerivedJobApplication>();
+    SlowDerivedJobApplication* appPtr = app.get();
+    Engine engine(NullWindowHeadlessConfig(), std::move(app));
+    engine.Initialize();
+
+    std::uint32_t callbacksWhileWorkerRunning = 0u;
+    std::uint64_t maxCallbackMicros = 0u;
+    engine.SetImGuiEditorCallback(
+        [appPtr, &callbacksWhileWorkerRunning, &maxCallbackMicros]
+        {
+            const auto begin = std::chrono::steady_clock::now();
+            if (appPtr->WorkerRuns.load(std::memory_order_relaxed) > 0u &&
+                appPtr->ApplyRuns.load(std::memory_order_relaxed) == 0u)
+            {
+                ++callbacksWhileWorkerRunning;
+            }
+
+            ImGui::SetNextWindowPos(ImVec2(10.0f, 10.0f));
+            ImGui::SetNextWindowSize(ImVec2(240.0f, 96.0f));
+            ImGui::Begin("RUNTIME-141 Async Job Probe");
+            ImGui::TextUnformatted("async method job pending");
+            ImGui::End();
+
+            const auto elapsed =
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    std::chrono::steady_clock::now() - begin);
+            maxCallbackMicros = std::max<std::uint64_t>(
+                maxCallbackMicros,
+                static_cast<std::uint64_t>(elapsed.count()));
+        });
+
+    ASSERT_TRUE(appPtr->Handle.IsValid());
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+
+    engine.Run();
+
+    const Runtime::DerivedJobQueueSnapshot jobs =
+        engine.GetDerivedJobQueueSnapshot();
+    ASSERT_EQ(jobs.Entries.size(), 1u);
+    EXPECT_EQ(jobs.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    EXPECT_EQ(appPtr->WorkerRuns.load(std::memory_order_relaxed), 1u);
+    EXPECT_EQ(appPtr->ApplyRuns.load(std::memory_order_relaxed), 1u);
+    EXPECT_GT(appPtr->VariableTicks, 1u);
+    EXPECT_GE(appPtr->VariableTicksWhileWorkerRunning, 1u);
+    EXPECT_TRUE(appPtr->ObservedRenderAdvanceWhileWorkerRunning);
+    EXPECT_GE(callbacksWhileWorkerRunning, 1u);
+    EXPECT_LT(maxCallbackMicros, 100'000u);
 
     engine.Shutdown();
 }
