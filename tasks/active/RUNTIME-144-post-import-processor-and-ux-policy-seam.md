@@ -2,8 +2,37 @@
 id: RUNTIME-144
 theme: F
 depends_on: []
+maturity_target: Operational
 ---
 # RUNTIME-144 — Post-import processor and import UX-policy seam
+
+## Status
+- In progress on local `main`.
+- Slice A implemented the behavior-preserving post-import processor registry,
+  invokes it from geometry materialization, and routes direct-mesh
+  generated-normal work through that registry. The default generated-normal
+  registration still lives in `Engine` until a later slice moves feature/app
+  ownership.
+- Later slices move sandbox import UX/default authoring policy and the `F`
+  focus command behind registered seams before retirement.
+
+## Slice plan
+
+- **Slice A — post-import processor registry.** Add ordered post-import
+  processor registration to `Engine`, invoke it from geometry materialization,
+  and register the existing direct-mesh generated-normal processor through the
+  new registry. Behavior remains unchanged; `Engine` may still own the default
+  registration in this slice so the seam can land independently.
+- **Slice B — import UX/default authoring policy.** Move focus-on-import,
+  auto-select, and default render/selection/visualization components behind
+  registered sandbox policy callbacks. Add no-registration tests for minimal
+  materialization.
+- **Slice C — input-action command seam.** Route the existing `F` focus
+  command through a registered input action while keeping RunFrame responsible
+  only for generic dispatch.
+- **Slice D — retirement.** Remove remaining method-specific/default policy
+  hardcoding from `Runtime.Engine`, update docs, run the default CPU gate, and
+  retire the task.
 
 ## Goal
 - Add an extension point to the import pipeline so post-import processing
@@ -42,7 +71,7 @@ depends_on: []
   findings R4, R8.
 
 ## Required changes
-- [ ] Add a post-import processor registry: ordered processors registered
+- [x] Add a post-import processor registry: ordered processors registered
       per geometry family, invoked from the materialization path with the
       decoded payload/entity, executing over the existing
       `StreamingExecutor` deferral (the current post-process already runs
@@ -64,11 +93,11 @@ depends_on: []
       pinned against existing BUG-044/BUG-048/BUG-050 regressions.
 - [ ] Contract: with no registrations, an import materializes geometry with
       no bake, no focus/selection mutation, and minimal authoring defaults.
-- [ ] Contract: processor ordering is deterministic and a failing processor
+- [x] Contract: processor ordering is deterministic and a failing processor
       fail-closes its own step without corrupting the import.
 
 ## Docs
-- [ ] Update `src/runtime/README.md` import-pipeline extension contract.
+- [x] Update `src/runtime/README.md` import-pipeline extension contract.
 - [ ] Update `docs/architecture/runtime.md` (frame-order step 4 wording for
       the focus command becomes "dispatch registered input actions").
 
@@ -85,6 +114,21 @@ cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/agents/check_task_policy.py --root . --strict
+```
+
+Slice A local verification (passed):
+```bash
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='RuntimeAssetImportFormatCoverage.PostImportProcessorsRunInOrderAndCanUnregister:RuntimeAssetImportFormatCoverage.DirectObjImportBakesGeneratedNormalTextureFromAuthoredVertexNormals:RuntimeAssetImportFormatCoverage.DirectObjImportComputesAndBakesGeneratedNormalTextureWhenMissingNormals'
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+python3 tools/agents/validate_tasks.py --root tasks --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main
+python3 tools/repo/check_test_layout.py --root . --strict
+git diff --check
 ```
 
 ## Forbidden changes

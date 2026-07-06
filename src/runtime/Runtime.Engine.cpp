@@ -1512,6 +1512,34 @@ namespace Extrinsic::Runtime
                    result.GeneratedTextureUploadRequests > 0u;
         }
 
+        void RunPostImportProcessors(
+            const std::span<const RuntimePostImportProcessorRecord> processors,
+            const RuntimePostImportProcessorContext& context,
+            RuntimePostImportProcessorServices& services)
+        {
+            for (const RuntimePostImportProcessorRecord& processor : processors)
+            {
+                const bool payloadMatches =
+                    processor.Desc.PayloadKind == Assets::AssetPayloadKind::Unknown ||
+                    processor.Desc.PayloadKind == context.PayloadKind;
+                if (!payloadMatches || !processor.Desc.Process)
+                    continue;
+
+                Core::Result result =
+                    processor.Desc.Process(context, services);
+                if (!result.has_value())
+                {
+                    Core::Log::Warn(
+                        "[Runtime] Post-import processor '{}' failed: path='{}' error={}",
+                        processor.Desc.DebugName.empty()
+                            ? "<unnamed>"
+                            : processor.Desc.DebugName,
+                        context.Path,
+                        Core::Error::ToString(result.error()));
+                }
+            }
+        }
+
         [[nodiscard]] bool IsModelTextureImportPayload(
             const Assets::AssetPayloadKind payloadKind) noexcept
         {
@@ -2291,8 +2319,17 @@ namespace Extrinsic::Runtime
             RenderExtractionCache& extraction,
             ECS::Scene::Registry& scene,
             StreamingExecutor* streamingExecutor,
+            const std::span<const RuntimePostImportProcessorRecord> postImportProcessors,
             const DecodedGeometryImport& decoded)
         {
+            RuntimePostImportProcessorServices postImportServices{
+                .Streaming = streamingExecutor,
+                .AssetService = &assetService,
+                .GpuAssetCache = &gpuAssetCache,
+                .RenderExtraction = &extraction,
+                .Scene = &scene,
+            };
+
             return std::visit(
                 [&](const auto& payload) -> Core::Expected<MaterializedGeometryImport>
                 {
@@ -2356,15 +2393,15 @@ namespace Extrinsic::Runtime
                             raw,
                             entity,
                             *rawMesh);
-                        QueueDirectMeshPostProcess(
-                            streamingExecutor,
-                            assetService,
-                            gpuAssetCache,
-                            extraction,
-                            scene,
-                            decoded.Path,
-                            payload.Payload,
-                            entity);
+                        RunPostImportProcessors(
+                            postImportProcessors,
+                            RuntimePostImportProcessorContext{
+                                .Path = decoded.Path,
+                                .PayloadKind = decoded.PayloadKind,
+                                .Entity = entity,
+                                .MeshPayload = &payload.Payload,
+                            },
+                            postImportServices);
 
                         return MaterializedGeometryImport{
                             .Result = RuntimeAssetImportResult{
@@ -2428,6 +2465,14 @@ namespace Extrinsic::Runtime
                             raw,
                             entity,
                             graph);
+                        RunPostImportProcessors(
+                            postImportProcessors,
+                            RuntimePostImportProcessorContext{
+                                .Path = decoded.Path,
+                                .PayloadKind = decoded.PayloadKind,
+                                .Entity = entity,
+                            },
+                            postImportServices);
 
                         return MaterializedGeometryImport{
                             .Result = RuntimeAssetImportResult{
@@ -2486,6 +2531,14 @@ namespace Extrinsic::Runtime
                             raw,
                             entity,
                             cloud);
+                        RunPostImportProcessors(
+                            postImportProcessors,
+                            RuntimePostImportProcessorContext{
+                                .Path = decoded.Path,
+                                .PayloadKind = decoded.PayloadKind,
+                                .Entity = entity,
+                            },
+                            postImportServices);
 
                         return MaterializedGeometryImport{
                             .Result = RuntimeAssetImportResult{
@@ -3174,6 +3227,7 @@ namespace Extrinsic::Runtime
             *m_GpuAssetCache,
             *m_Scene,
             *m_Renderer);
+        RegisterDefaultPostImportProcessors();
 
         // RUNTIME-092 Slice B — attach the runtime-owned stable-entity lookup
         // to the selection authority so render-id resolution flows through the
@@ -4112,6 +4166,73 @@ namespace Extrinsic::Runtime
         return m_RenderExtraction.GetMaterialTextureAssetBindings(stableEntityId);
     }
 
+    RuntimePostImportProcessorHandle Engine::RegisterPostImportProcessor(
+        RuntimePostImportProcessorDesc desc)
+    {
+        if (!desc.Process)
+            return {};
+
+        RuntimePostImportProcessorRecord processor{};
+        processor.Handle = RuntimePostImportProcessorHandle{
+            m_NextPostImportProcessorHandle++};
+        processor.Desc = std::move(desc);
+        m_PostImportProcessors.push_back(std::move(processor));
+        return m_PostImportProcessors.back().Handle;
+    }
+
+    void Engine::UnregisterPostImportProcessor(
+        const RuntimePostImportProcessorHandle handle)
+    {
+        if (!handle.IsValid())
+            return;
+
+        std::erase_if(
+            m_PostImportProcessors,
+            [handle](const RuntimePostImportProcessorRecord& processor) noexcept
+            {
+                return processor.Handle == handle;
+            });
+    }
+
+    void Engine::RegisterDefaultPostImportProcessors()
+    {
+        if (m_DefaultPostImportProcessorsRegistered)
+            return;
+
+        const RuntimePostImportProcessorHandle handle =
+            RegisterPostImportProcessor(RuntimePostImportProcessorDesc{
+                .DebugName = "Runtime.DirectMeshGeneratedNormal",
+                .PayloadKind = Assets::AssetPayloadKind::Mesh,
+                .Process =
+                    [](const RuntimePostImportProcessorContext& context,
+                       RuntimePostImportProcessorServices& services)
+                    {
+                        if (context.MeshPayload == nullptr)
+                            return Core::Ok();
+                        if (services.Streaming == nullptr ||
+                            services.AssetService == nullptr ||
+                            services.GpuAssetCache == nullptr ||
+                            services.RenderExtraction == nullptr ||
+                            services.Scene == nullptr)
+                        {
+                            return Core::Err(Core::ErrorCode::InvalidState);
+                        }
+
+                        QueueDirectMeshPostProcess(
+                            services.Streaming,
+                            *services.AssetService,
+                            *services.GpuAssetCache,
+                            *services.RenderExtraction,
+                            *services.Scene,
+                            std::string{context.Path},
+                            *context.MeshPayload,
+                            context.Entity);
+                        return Core::Ok();
+                    },
+            });
+        m_DefaultPostImportProcessorsRegistered = handle.IsValid();
+    }
+
     Core::Expected<RuntimeAssetImportResult> Engine::ImportAssetFromPath(
         RuntimeAssetImportRequest request)
     {
@@ -4627,6 +4748,7 @@ namespace Extrinsic::Runtime
                         m_RenderExtraction,
                         *m_Scene,
                         m_StreamingExecutor.get(),
+                        m_PostImportProcessors,
                         *state->Decoded);
                     if (materialized.has_value())
                     {
@@ -5451,6 +5573,7 @@ namespace Extrinsic::Runtime
                 m_RenderExtraction,
                 *m_Scene,
                 m_StreamingExecutor.get(),
+                m_PostImportProcessors,
                 *decoded);
             if (!materialized.has_value())
             {

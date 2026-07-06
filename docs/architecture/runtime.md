@@ -77,6 +77,10 @@ scene-replacement lifecycle from the same main-thread apply drain. The apply
 step is the only place that mutates `AssetService`, ECS scene state,
 texture/model-scene handoffs, selection/focus state, stable entity lookup, or
 editor document history.
+After a geometry payload creates an entity, runtime invokes ordered
+post-import processors with the decoded payload context; those processors may
+enqueue deferred work through `StreamingExecutor`, but the main-thread apply
+boundary remains the only place that mutates imported ECS or asset state.
 
 ### Camera focus command
 

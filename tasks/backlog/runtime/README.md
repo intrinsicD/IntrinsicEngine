@@ -29,9 +29,9 @@ Blocking fixes first, then abstractness seams, then steady-state efficiency:
   multi-subscriber registry, `Engine` owns a generic runtime GPU participant
   seam, and Sandbox editor K-Means GPU execution owns its queue outside
   `Engine`.
-- [`RUNTIME-144`](RUNTIME-144-post-import-processor-and-ux-policy-seam.md) —
-  post-import processor + import UX-policy seam (normal-bake registration,
-  focus/auto-select policy, `F`-key routing; coordinates with
+- [`RUNTIME-144`](../../active/RUNTIME-144-post-import-processor-and-ux-policy-seam.md)
+  is active; post-import processor + import UX-policy seam (normal-bake
+  registration, focus/auto-select policy, `F`-key routing; coordinates with
   `RUNTIME-129`).
 - [`RUNTIME-145`](RUNTIME-145-runtime-frame-path-efficiency-polish.md) —
   steady-state frame-path efficiency polish (incremental

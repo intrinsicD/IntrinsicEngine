@@ -19,6 +19,7 @@ import Extrinsic.Core.FrameClock;
 import Extrinsic.Core.FrameGraph;
 import Extrinsic.Core.IOBackend;
 import Extrinsic.ECS.Scene.Handle;
+import Geometry.HalfedgeMesh.IO;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Device;
 import Extrinsic.Platform.Window;
@@ -93,6 +94,48 @@ namespace Extrinsic::Runtime
         std::function<void()> DrainCompletedTransfers{};
         std::function<bool()> HasInFlightWork{};
         std::function<void()> ShutdownAfterDeviceIdle{};
+    };
+
+    export struct RuntimePostImportProcessorHandle
+    {
+        std::uint64_t Value{0};
+
+        [[nodiscard]] bool IsValid() const noexcept { return Value != 0; }
+        [[nodiscard]] friend bool operator==(
+            RuntimePostImportProcessorHandle,
+            RuntimePostImportProcessorHandle) noexcept = default;
+    };
+
+    export struct RuntimePostImportProcessorContext
+    {
+        std::string_view Path{};
+        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
+        ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
+        const Geometry::MeshIO::MeshIOResult* MeshPayload{};
+    };
+
+    export struct RuntimePostImportProcessorServices
+    {
+        StreamingExecutor* Streaming{};
+        Assets::AssetService* AssetService{};
+        Graphics::GpuAssetCache* GpuAssetCache{};
+        RenderExtractionCache* RenderExtraction{};
+        ECS::Scene::Registry* Scene{};
+    };
+
+    export struct RuntimePostImportProcessorDesc
+    {
+        std::string DebugName{};
+        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
+        std::function<Core::Result(
+            const RuntimePostImportProcessorContext&,
+            RuntimePostImportProcessorServices&)> Process{};
+    };
+
+    struct RuntimePostImportProcessorRecord
+    {
+        RuntimePostImportProcessorHandle Handle{};
+        RuntimePostImportProcessorDesc Desc{};
     };
 
     export struct RuntimeAssetImportResult
@@ -503,6 +546,10 @@ namespace Extrinsic::Runtime
             RuntimeAssetImportRequest request);
         [[nodiscard]] Core::Expected<RuntimeAssetImportResult> ReimportAsset(
             RuntimeAssetReimportRequest request);
+        [[nodiscard]] RuntimePostImportProcessorHandle RegisterPostImportProcessor(
+            RuntimePostImportProcessorDesc desc);
+        void UnregisterPostImportProcessor(
+            RuntimePostImportProcessorHandle handle);
         [[nodiscard]] const std::optional<RuntimeAssetImportEvent>&
             GetLastAssetImportEvent() const noexcept;
         [[nodiscard]] std::vector<RuntimeAssetIngestRecord>
@@ -664,6 +711,7 @@ namespace Extrinsic::Runtime
         void QueueDroppedModelTextureImport(
             std::string path,
             Assets::AssetPayloadKind payloadKind);
+        void RegisterDefaultPostImportProcessors();
         [[nodiscard]] Core::Expected<RuntimeAssetImportResult> ImportAssetFromPathWithIngest(
             RuntimeAssetImportRequest request,
             RuntimeAssetIngestSource source,
@@ -779,6 +827,9 @@ namespace Extrinsic::Runtime
         std::unique_ptr<AssetModelTextureHandoff> m_AssetModelTextureHandoff;
         std::unique_ptr<AssetModelSceneHandoff>   m_AssetModelSceneHandoff;
         RuntimeAssetIngestStateMachine             m_AssetIngestStateMachine{};
+        std::vector<RuntimePostImportProcessorRecord> m_PostImportProcessors{};
+        std::uint64_t m_NextPostImportProcessorHandle{1u};
+        bool m_DefaultPostImportProcessorsRegistered{false};
         struct RuntimeAssetImportStreamingTask
         {
             RuntimeAssetIngestHandle Ingest{};

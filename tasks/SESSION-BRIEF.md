@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `RUNTIME-144` — Post-import processor and import UX-policy seam (tasks/active/RUNTIME-144-post-import-processor-and-ux-policy-seam.md)
 
 ## Theme B — Rendering modernization
 
@@ -30,7 +30,6 @@ the authoritative open/unblocked view.
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RUNTIME-137` — Async GPU readback helper + pooled destination for compute backends (tasks/backlog/runtime/RUNTIME-137-async-gpu-readback-helper-for-compute-backends.md)
 - unblocked: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
-- unblocked: `RUNTIME-144` — Post-import processor and import UX-policy seam (tasks/backlog/runtime/RUNTIME-144-post-import-processor-and-ux-policy-seam.md)
 - unblocked: `RUNTIME-145` — Runtime frame-path steady-state efficiency polish (tasks/backlog/runtime/RUNTIME-145-runtime-frame-path-efficiency-polish.md)
 
 ## Theme G — Active bugs

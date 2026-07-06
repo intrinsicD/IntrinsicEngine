@@ -89,6 +89,14 @@ synchronous compatibility APIs outside the frame-driven UI/drop routes.
 seam for injecting slow or fake model/texture IO backends into queued imports;
 production queued imports fall back to `Core::IO::FileIOBackend`.
 
+Geometry materialization invokes an ordered post-import processor registry after
+each created entity is populated from its decoded payload. Processors receive
+the source path, payload kind, entity handle, optional mesh payload view, and
+the runtime services they need to enqueue deferred work; individual processor
+failures are logged and do not fail the already-materialized import. Direct mesh
+generated-normal texture work is currently registered through this seam, keeping
+its existing `StreamingExecutor` deferral and main-thread apply behavior.
+
 ### Sandbox Editor Async Method Jobs
 
 Editor buttons that run heavyweight geometry or method work must submit copied

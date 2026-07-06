@@ -692,6 +692,127 @@ TEST(RuntimeAssetImportFormatCoverage, DirectImportCompletesIngestStateMachineRe
     engine.Shutdown();
 }
 
+TEST(RuntimeAssetImportFormatCoverage, PostImportProcessorsRunInOrderAndCanUnregister)
+{
+    TempAssetFile meshFileA(
+        "assetio144_post_import_registry_mesh_a.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+    TempAssetFile meshFileB(
+        "assetio144_post_import_registry_mesh_b.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+    TempAssetFile meshFileC(
+        "assetio144_post_import_registry_mesh_c.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+    TempAssetFile graphFile(
+        "assetio144_post_import_registry_graph.tgf",
+        "1 0 0 0 first\n"
+        "2 1 0 0 second\n"
+        "#\n"
+        "1 2 1.0 edge\n");
+
+    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+
+    std::vector<int> observedOrder{};
+    const Runtime::RuntimePostImportProcessorHandle first =
+        engine.RegisterPostImportProcessor(Runtime::RuntimePostImportProcessorDesc{
+            .DebugName = "test.first",
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+            .Process =
+                [&observedOrder](
+                    const Runtime::RuntimePostImportProcessorContext& context,
+                    Runtime::RuntimePostImportProcessorServices& services)
+                {
+                    observedOrder.push_back(1);
+                    EXPECT_EQ(context.PayloadKind, Assets::AssetPayloadKind::Mesh);
+                    EXPECT_NE(context.Entity, ECS::InvalidEntityHandle);
+                    EXPECT_NE(context.MeshPayload, nullptr);
+                    if (context.MeshPayload != nullptr)
+                        EXPECT_GT(context.MeshPayload->Vertices.Size(), 0u);
+                    EXPECT_NE(services.Streaming, nullptr);
+                    EXPECT_NE(services.AssetService, nullptr);
+                    EXPECT_NE(services.GpuAssetCache, nullptr);
+                    EXPECT_NE(services.RenderExtraction, nullptr);
+                    EXPECT_NE(services.Scene, nullptr);
+                    return Core::Ok();
+                },
+        });
+    ASSERT_TRUE(first.IsValid());
+    const Runtime::RuntimePostImportProcessorHandle failing =
+        engine.RegisterPostImportProcessor(Runtime::RuntimePostImportProcessorDesc{
+            .DebugName = "test.failing",
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+            .Process =
+                [&observedOrder](
+                    const Runtime::RuntimePostImportProcessorContext&,
+                    Runtime::RuntimePostImportProcessorServices&)
+                {
+                    observedOrder.push_back(9);
+                    return Core::Err(Core::ErrorCode::InvalidState);
+                },
+        });
+    ASSERT_TRUE(failing.IsValid());
+    const Runtime::RuntimePostImportProcessorHandle second =
+        engine.RegisterPostImportProcessor(Runtime::RuntimePostImportProcessorDesc{
+            .DebugName = "test.second",
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+            .Process =
+                [&observedOrder](
+                    const Runtime::RuntimePostImportProcessorContext&,
+                    Runtime::RuntimePostImportProcessorServices&)
+                {
+                    observedOrder.push_back(2);
+                    return Core::Ok();
+                },
+        });
+    ASSERT_TRUE(second.IsValid());
+
+    auto meshA = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+        .Path = meshFileA.Path.string(),
+        .PayloadKind = Assets::AssetPayloadKind::Mesh,
+    });
+    ASSERT_TRUE(meshA.has_value()) << static_cast<int>(meshA.error());
+    EXPECT_EQ(observedOrder, (std::vector<int>{1, 9, 2}));
+
+    observedOrder.clear();
+    auto graph = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+        .Path = graphFile.Path.string(),
+        .PayloadKind = Assets::AssetPayloadKind::Graph,
+    });
+    ASSERT_TRUE(graph.has_value()) << static_cast<int>(graph.error());
+    EXPECT_TRUE(observedOrder.empty());
+
+    engine.UnregisterPostImportProcessor(first);
+    observedOrder.clear();
+    auto meshB = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+        .Path = meshFileB.Path.string(),
+        .PayloadKind = Assets::AssetPayloadKind::Mesh,
+    });
+    ASSERT_TRUE(meshB.has_value()) << static_cast<int>(meshB.error());
+    EXPECT_EQ(observedOrder, (std::vector<int>{9, 2}));
+
+    engine.UnregisterPostImportProcessor(failing);
+    engine.UnregisterPostImportProcessor(second);
+    observedOrder.clear();
+    auto meshC = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+        .Path = meshFileC.Path.string(),
+        .PayloadKind = Assets::AssetPayloadKind::Mesh,
+    });
+    ASSERT_TRUE(meshC.has_value()) << static_cast<int>(meshC.error());
+    EXPECT_TRUE(observedOrder.empty());
+
+    engine.Shutdown();
+}
+
 TEST(RuntimeAssetImportFormatCoverage, ReimportExistingMeshReloadsAssetWithoutDuplicatingSceneEntities)
 {
     TempAssetFile meshFile(
