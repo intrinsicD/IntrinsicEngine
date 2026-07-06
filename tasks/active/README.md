@@ -15,10 +15,6 @@ Each active task should include:
   scalar/isoline colormap LUT GPU black-output fix. Status: implemented;
   verification owed before retirement. Next verification: run the default
   CPU gate plus the manual Vulkan sandbox Scalar/Isolines preset check.
-- [`RUNTIME-145`](RUNTIME-145-runtime-frame-path-efficiency-polish.md) —
-  runtime frame-path steady-state efficiency polish. Status: in-progress after
-  Slice E (decoded geometry payload handoff sharing). Next verification slice:
-  run the default CPU gate, retire the task, and append the retirement log.
 
 ## History
 

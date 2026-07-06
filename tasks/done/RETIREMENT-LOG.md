@@ -3548,3 +3548,15 @@ command/model surface, `ScalarFieldConfig`, scene serialization,
 `VisualizationSyncSystem` plumb the new fields end to end with fail-closed
 validation, locked by editor-command, extraction, and serialization
 regressions.
+
+[`RUNTIME-145`](RUNTIME-145-runtime-frame-path-efficiency-polish.md) —
+Runtime frame-path steady-state efficiency polish retired to `tasks/done/` on
+2026-07-06 at `Operational`. The runtime now maintains `StableEntityLookup`
+incrementally instead of rebuilding it every steady-state frame, recycles
+`StreamingExecutor` records with priority ready queues and batched queue
+snapshot reads, gates the pre-render transform flush behind a conservative
+post-sim dirty bit, reuses render-extraction live-key scratch storage, and keeps
+decoded geometry import payloads shared across worker-to-apply and reload
+captures. Focused runtime regressions plus the full default CPU gate prove the
+covered frame-path behavior remains unchanged while the recurring idle-frame
+work is removed.

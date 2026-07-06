@@ -2,20 +2,24 @@
 id: RUNTIME-145
 theme: F
 depends_on: []
+maturity_target: Operational
+completed: 2026-07-06
 ---
 # RUNTIME-145 — Runtime frame-path steady-state efficiency polish
 
 ## Status
-- Active on local `main`.
-- Slices A-E are implemented and locally verified. Slice A removed the
+- Retired on 2026-07-06 at `Operational` on local `main`; PR not opened.
+- PR/commit: implementation commits `ec4c63e2`, `4d490810`, `46d8de71`,
+  `fb4c2bdf`, and `3fd23f2c`; this retirement commit records closure.
+- Slices A-F are implemented and locally verified. Slice A removed the
   steady-state `StableEntityLookup` rebuild; Slice B bounds
   `StreamingExecutor` record storage with recycled slots, replaces the
   full-vector ready scan with priority ready queues, and batches import-queue
   streaming state reads through one executor snapshot; Slice C gates the
   pre-render transform flush on pending post-sim transform work; Slice D reuses
   render extraction's live-key scratch storage; Slice E keeps decoded geometry
-  payloads shared across the worker-to-apply handoff and reload captures. The
-  final slice owns the default CPU gate and task retirement.
+  payloads shared across the worker-to-apply handoff and reload captures; Slice
+  F ran the full default CPU gate and retired the task.
 
 ## Slice plan
 - Slice A: wire `StableEntityLookup` to scene `StableId` component events,
@@ -30,7 +34,7 @@ depends_on: []
 - Slice E: move/share import payload handoff data where ownership allows.
   Implemented 2026-07-06.
 - Slice F: run the default CPU gate, retire the task, and append the
-  retirement log entry.
+  retirement log entry. Implemented 2026-07-06.
 
 ## Goal
 - Remove the recurring per-frame waste in the runtime frame path: full
@@ -112,11 +116,11 @@ depends_on: []
       change.
 
 ## Acceptance criteria
-- [ ] Steady-state idle frame performs no stable-lookup rebuild, no
+- [x] Steady-state idle frame performs no stable-lookup rebuild, no
       transform re-sweep, and no unbounded executor scans (counter probes in
       contract tests).
-- [ ] No observable behavior change in any covered path.
-- [ ] Default CPU gate green.
+- [x] No observable behavior change in any covered path.
+- [x] Default CPU gate green.
 
 ## Verification
 ```bash
@@ -157,6 +161,12 @@ Slice E focused verification run locally (2026-07-06):
 cmake --build --preset ci --target IntrinsicRuntimeContractTests
 build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='RuntimeAssetImportFormatCoverage.*'
 ctest --test-dir build/ci --output-on-failure -R 'RuntimeAssetImportFormatCoverage' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 90
+```
+
+Final verification run locally (2026-07-06):
+```bash
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```
 
 ## Forbidden changes

@@ -175,9 +175,10 @@ non-blocking frame-path fixes `RUNTIME-142`, the retired frame-hook/K-Means
 decoupling seam `RUNTIME-143`, the retired post-import/import-UX/input-action
 composition seam `RUNTIME-144`, remaining composition-root/abstractness seams
 (`CORE-006`, `CORE-009`, `ARCH-006`), scheduler/DAG capability and efficiency
-(`CORE-005`, `CORE-007`, `CORE-008`). Steady-state frame efficiency
-(`RUNTIME-145`) is active under `tasks/active/`. The retired correctness fix
-`BUG-055` (Theme G) unblocks `CORE-005`.
+(`CORE-005`, `CORE-007`, `CORE-008`). The retired steady-state frame
+efficiency polish `RUNTIME-145` removed the recurring runtime frame-path waste
+called out by the review. The retired correctness fix `BUG-055` (Theme G)
+unblocks `CORE-005`.
 
 Open members:
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
