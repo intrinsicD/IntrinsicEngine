@@ -691,6 +691,7 @@ namespace Extrinsic::Runtime
             stats.VisualizationAdapterElementCountOverflowCount += perAdapter.ElementCountOverflowCount;
             stats.VisualizationAdapterManualRangeCount += perAdapter.ManualRangeCount;
             stats.VisualizationAdapterFlatAutoRangeExpandedCount += perAdapter.FlatAutoRangeExpandedCount;
+            stats.VisualizationAdapterRobustAutoRangeClampedCount += perAdapter.RobustAutoRangeClampedCount;
             stats.VisualizationAdapterScalarValueScanCount += perAdapter.ScalarValueScanCount;
         }
 
@@ -2050,6 +2051,7 @@ namespace Extrinsic::Runtime
         stats.VisualizationAdapterElementCountOverflowCount += perAdapter.ElementCountOverflowCount;
         stats.VisualizationAdapterManualRangeCount += perAdapter.ManualRangeCount;
         stats.VisualizationAdapterFlatAutoRangeExpandedCount += perAdapter.FlatAutoRangeExpandedCount;
+        stats.VisualizationAdapterRobustAutoRangeClampedCount += perAdapter.RobustAutoRangeClampedCount;
         stats.VisualizationAdapterScalarValueScanCount += perAdapter.ScalarValueScanCount;
     }
 

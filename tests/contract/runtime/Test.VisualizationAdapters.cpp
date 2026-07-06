@@ -193,6 +193,68 @@ TEST(VisualizationAdapters, PropertyScalarAdapterExpandsFlatAutoRange)
     EXPECT_EQ(stats.ScalarValueScanCount, 3u);
 }
 
+// BUG-059 — heavy-tailed fields (curvature spikes at degenerate slivers) must
+// not stretch the auto range so far that the surface bulk normalizes into the
+// colormap's darkest bin; large sample counts clamp to the [2%, 98%]
+// quantiles while outliers saturate at the colormap ends.
+TEST(VisualizationAdapters, PropertyScalarAdapterClampsHeavyTailedAutoRange)
+{
+    constexpr std::size_t kCount = 200u;
+    Geometry::PropertySet properties;
+    properties.Resize(kCount);
+    auto curvature = properties.Add<double>("v:mean_curvature", 0.0);
+    for (std::size_t i = 0u; i < kCount; ++i)
+    {
+        curvature[i] =
+            static_cast<double>(i) / static_cast<double>(kCount - 1u);
+    }
+    curvature[10] = -1.0e6;
+    curvature[20] = 1.0e6;
+
+    const R::PropertyScalarAdapter adapter{
+        Geometry::ConstPropertySet{properties}};
+    R::VisualizationAdapterBatch batch{};
+    R::VisualizationAdapterStats stats{};
+
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = "v:mean_curvature",
+                       .BufferBDA = 0x5000u,
+                   },
+                   stats);
+
+    ASSERT_EQ(batch.Scalars.size(), 1u);
+    EXPECT_EQ(stats.RobustAutoRangeClampedCount, 1u);
+    EXPECT_EQ(stats.PacketAppendCount, 1u);
+    const G::ScalarAttributePacket& packet = batch.Scalars.front();
+    EXPECT_GT(packet.RangeMin, -100.0f);
+    EXPECT_LT(packet.RangeMax, 100.0f);
+    EXPECT_LT(packet.RangeMin, packet.RangeMax);
+}
+
+// BUG-059 — small fields keep exact min/max extremes: quantile clamping only
+// engages above the robust-range sample threshold.
+TEST(VisualizationAdapters, PropertyScalarAdapterKeepsExactAutoRangeForSmallFields)
+{
+    Geometry::PropertySet properties = MakeScalarProperties();
+    const R::PropertyScalarAdapter adapter{
+        Geometry::ConstPropertySet{properties}};
+
+    R::VisualizationAdapterBatch batch{};
+    R::VisualizationAdapterStats stats{};
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = "heat",
+                       .BufferBDA = 0x5100u,
+                   },
+                   stats);
+
+    ASSERT_EQ(batch.Scalars.size(), 1u);
+    EXPECT_EQ(stats.RobustAutoRangeClampedCount, 0u);
+    EXPECT_FLOAT_EQ(batch.Scalars.front().RangeMin, 10.0f);
+    EXPECT_FLOAT_EQ(batch.Scalars.front().RangeMax, 13.0f);
+}
+
 TEST(VisualizationAdapters, PropertyScalarAdapterRejectsInvalidSources)
 {
     Geometry::PropertySet properties = MakeScalarProperties();

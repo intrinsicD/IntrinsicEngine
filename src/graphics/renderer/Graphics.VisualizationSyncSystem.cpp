@@ -3,6 +3,7 @@ module;
 #include <bit>
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <memory>
 #include <span>
@@ -389,6 +390,28 @@ namespace Extrinsic::Graphics
             cfg.IsolineCount = static_cast<float>(visCfg->Scalar.Isolines.Num);
             cfg.IsolineWidth = visCfg->Scalar.Isolines.Width;
             cfg.IsolineColor = visCfg->Scalar.Isolines.Color;
+            // UI-032 — bounded explicit highlight isovalues; non-finite
+            // entries are skipped fail-closed so the shader only sees
+            // renderable values.
+            {
+                const auto& isolines = visCfg->Scalar.Isolines;
+                const std::uint32_t requested = std::min<std::uint32_t>(
+                    isolines.ValueCount,
+                    Components::ScalarFieldConfig::kMaxIsolineValues);
+                std::uint32_t written = 0u;
+                for (std::uint32_t i = 0u; i < requested; ++i)
+                {
+                    const float value = isolines.Values[i];
+                    if (!std::isfinite(value))
+                        continue;
+                    if (written < 4u)
+                        cfg.IsoValuesA[static_cast<int>(written)] = value;
+                    else
+                        cfg.IsoValuesB[static_cast<int>(written - 4u)] = value;
+                    ++written;
+                }
+                cfg.IsoValueCount = written;
+            }
             cfg.VisualizationAlpha = 1.f;
             cfg.VisDomain = IsColorBufferSource(visCfg->Source)
                 ? ToVisDomain(visCfg->Source)
@@ -440,6 +463,31 @@ namespace Extrinsic::Graphics
                 {
                     cfg.ScalarRangeMin = scalarPacket->RangeMin;
                     cfg.ScalarRangeMax = scalarPacket->RangeMax;
+                }
+                // BUG-059 — a degenerate or non-finite range would normalize
+                // every fragment to t=0 (the shader's flat-range guard) and
+                // render the colormap's darkest bin everywhere. The adapters
+                // reject such packets, but the component range reaches this
+                // config directly; fall back to the validated packet range,
+                // else expand around the requested value like the adapters'
+                // flat-auto-range expansion.
+                if (!(std::isfinite(cfg.ScalarRangeMin) &&
+                      std::isfinite(cfg.ScalarRangeMax) &&
+                      cfg.ScalarRangeMin < cfg.ScalarRangeMax))
+                {
+                    if (scalarPacket != nullptr)
+                    {
+                        cfg.ScalarRangeMin = scalarPacket->RangeMin;
+                        cfg.ScalarRangeMax = scalarPacket->RangeMax;
+                    }
+                    else
+                    {
+                        const float center = std::isfinite(cfg.ScalarRangeMin)
+                            ? cfg.ScalarRangeMin
+                            : 0.f;
+                        cfg.ScalarRangeMin = center - 0.5f;
+                        cfg.ScalarRangeMax = center + 0.5f;
+                    }
                 }
                 setBdaAndCount(visCfg->ScalarFieldName, cfg.ScalarBDA);
                 if (cfg.ScalarBDA == 0u && scalarPacket != nullptr &&

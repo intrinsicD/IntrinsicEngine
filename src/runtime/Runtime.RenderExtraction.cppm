@@ -291,6 +291,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t VisualizationAdapterElementCountOverflowCount{0};
         std::uint32_t VisualizationAdapterManualRangeCount{0};
         std::uint32_t VisualizationAdapterFlatAutoRangeExpandedCount{0};
+        std::uint32_t VisualizationAdapterRobustAutoRangeClampedCount{0};
         std::uint64_t VisualizationAdapterScalarValueScanCount{0};
         std::uint32_t VisualizationAttributeBufferPacketCount{0};
         std::uint32_t VisualizationScalarPacketCount{0};
