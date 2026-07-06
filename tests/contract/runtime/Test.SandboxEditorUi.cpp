@@ -8057,6 +8057,70 @@ TEST(SandboxEditorUi, UvRegenerationDerivedJobDiscardsStaleSource)
     EXPECT_FALSE(std::isfinite(staleTexcoords[1].x));
 }
 
+TEST(SandboxEditorUi, UvRegenerationPanelModelTracksDerivedJobStateThroughCache)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorSelectedModelCache cache{};
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.SelectedModelCache = &cache;
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+    AttachDerivedJobCommands(context, jobs);
+
+    const ECS::EntityHandle mesh =
+        MakeSelectable(registry, "CachedUvJobMesh");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    ASSERT_TRUE(frame.Inspector.HasEntity);
+    EXPECT_FALSE(frame.Inspector.TextureBake.Uv.UvRegenerationJob.has_value());
+
+    const Runtime::SandboxEditorUvRegenerationCommandResult result =
+        Runtime::ApplySandboxEditorUvRegenerationCommand(
+            context,
+            Runtime::SandboxEditorUvRegenerationCommand{
+                .StableEntityId = stableId,
+                .Resolution = 64u,
+                .Padding = 2u,
+            });
+    ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+
+    Runtime::DerivedJobQueueSnapshot queued = jobs.SnapshotAll();
+    context.DerivedJobs = &queued;
+    frame = Runtime::BuildSandboxEditorPanelFrame(context);
+    ASSERT_TRUE(frame.Inspector.TextureBake.Uv.UvRegenerationJob.has_value());
+    EXPECT_EQ(frame.Inspector.TextureBake.Uv.UvRegenerationJob->Status,
+              Runtime::DerivedJobStatus::Queued);
+    EXPECT_EQ(frame.Inspector.TextureBake.Uv.UvRegenerationJob->Key.OutputName,
+              "uv_regeneration");
+
+    jobs.Pump(1u);
+    jobs.DrainCompletions();
+    Runtime::DerivedJobQueueSnapshot applying = jobs.SnapshotAll();
+    context.DerivedJobs = &applying;
+    frame = Runtime::BuildSandboxEditorPanelFrame(context);
+    ASSERT_TRUE(frame.Inspector.TextureBake.Uv.UvRegenerationJob.has_value());
+    EXPECT_EQ(frame.Inspector.TextureBake.Uv.UvRegenerationJob->Status,
+              Runtime::DerivedJobStatus::Applying);
+
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    Runtime::DerivedJobQueueSnapshot complete = jobs.SnapshotAll();
+    context.DerivedJobs = &complete;
+    frame = Runtime::BuildSandboxEditorPanelFrame(context);
+    ASSERT_TRUE(frame.Inspector.TextureBake.Uv.UvRegenerationJob.has_value());
+    EXPECT_EQ(frame.Inspector.TextureBake.Uv.UvRegenerationJob->Status,
+              Runtime::DerivedJobStatus::Complete);
+    EXPECT_TRUE(frame.Inspector.TextureBake.Uv.TexcoordsFinite);
+
+    const Runtime::SandboxEditorSelectedModelCacheStats stats = cache.Stats();
+    EXPECT_GE(stats.SelectedAnalysisCacheMisses, 4u);
+}
+
 TEST(SandboxEditorUi, TextureBakeControlsReportUvSourcesAndRouteCommand)
 {
     ECS::Scene::Registry registry;

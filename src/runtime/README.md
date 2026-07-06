@@ -84,9 +84,13 @@ applies it to ICP registration alignment while preserving the existing
 immediate fallback for tests and callers without an engine job surface. Slices
 E.1, E.2, E.3, E.4, and E.5 apply it to mesh curvature, mesh subdivision,
 mesh/graph/point-cloud vertex-normal recompute, point-cloud outlier removal,
-and selected-mesh UV regeneration. The remaining `RUNTIME-141` work is panel
-job-state/timing/render-advance contract coverage rather than another
-identified synchronous geometry-processing command.
+and selected-mesh UV regeneration. Slice F.1 starts the panel-state follow-up:
+the selected-mesh UV panel reads the existing derived-job snapshot, invalidates
+the selected-analysis cache when per-entity job status changes, and keeps the
+last pending/completed UV result visible through the attached editor sink. The
+remaining `RUNTIME-141` work is broader panel job-state/timing/render-advance
+contract coverage rather than another identified synchronous geometry-processing
+command.
 
 ### Sandbox Editor Startup Layout
 
@@ -563,10 +567,13 @@ UV, and topology snapshots; the main-thread apply phase revalidates the live
 mesh generation/source snapshot, copies remapped known vertex/face properties
 back to the regenerated halfedge mesh, repopulates `GeometrySources`, stamps
 geometry and GPU dirty tags, and records an undoable `EditorCommandHistory`
-entry. Callers without a job surface still use the same worker/commit path
-synchronously for compatibility. Texture baking consumes the property catalog,
-lists mesh vertex/face bakeable sources separately from internal, connectivity,
-unsupported, graph, and point-cloud rows, and calls
+entry. The panel reports the matching `uv_regeneration` derived job status from
+the runtime queue snapshot and stores the immediate `Pending` result until the
+main-thread apply sink publishes the completed result. Callers without a job
+surface still use the same worker/commit path synchronously for compatibility.
+Texture baking consumes the property catalog, lists mesh vertex/face bakeable
+sources separately from internal, connectivity, unsupported, graph, and
+point-cloud rows, and calls
 `Extrinsic.Runtime.SelectedMeshTextureBake`; UI code never runs the texture
 baker, mutates `AssetService`, or touches graphics/RHI residency directly.
 

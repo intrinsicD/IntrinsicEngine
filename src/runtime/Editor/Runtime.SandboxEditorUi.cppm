@@ -1368,6 +1368,7 @@ export namespace Extrinsic::Runtime
         bool CheckerPreviewAvailable{false};
         bool UvRegenerationAvailable{false};
         std::string UvRegenerationDisabledReason{};
+        std::optional<SandboxEditorProgressiveJobModel> UvRegenerationJob{};
     };
 
     struct SandboxEditorTextureBakeControlsModel
@@ -2127,6 +2128,7 @@ export namespace Extrinsic::Runtime
         std::uint64_t VisualizationStateSignature{0u};
         std::uint64_t BindingGeneration{0u};
         std::uint64_t ProgressiveBindingGeneration{0u};
+        std::uint64_t DerivedJobStateSignature{0u};
         std::uint64_t CommandHistoryRevision{0u};
         std::uint64_t VisualizationAdapterBindingRevision{0u};
         std::uint32_t ViewportWidth{0u};
@@ -2770,6 +2772,8 @@ export namespace Extrinsic::Runtime
             m_LastProgressivePoissonResult{};
         std::optional<SandboxEditorProgressivePoissonConfigResult>
             m_LastProgressivePoissonConfigResult{};
+        std::optional<SandboxEditorUvRegenerationCommandResult>
+            m_LastUvRegenerationResult{};
         std::optional<SandboxEditorRegistrationResult>
             m_LastRegistrationResult{};
         DerivedJobQueueSnapshot m_DerivedJobSnapshot{};

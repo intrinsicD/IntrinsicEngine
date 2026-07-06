@@ -453,6 +453,8 @@ namespace Extrinsic::Runtime
 
         struct TextureBakeUiState
         {
+            std::optional<SandboxEditorUvRegenerationCommandResult>*
+                LastUvRegenerationResult{nullptr};
             std::int32_t* SourceIndex{nullptr};
             std::int32_t* TargetSemanticIndex{nullptr};
             std::int32_t* EncoderIndex{nullptr};
@@ -2703,6 +2705,9 @@ namespace Extrinsic::Runtime
                    status == DerivedJobStatus::StaleDiscarded;
         }
 
+        constexpr std::string_view kUvRegenerationJobOutputName{
+            "uv_regeneration"};
+
         [[nodiscard]] ProgressivePropertyValueKind DefaultExpectedValueKindForSlot(
             const ProgressiveSlotSemantic semantic) noexcept
         {
@@ -2808,6 +2813,42 @@ namespace Extrinsic::Runtime
                 model.Dependencies.push_back(
                     ToProgressiveJobDependencyModel(dependency));
             return model;
+        }
+
+        [[nodiscard]] std::optional<SandboxEditorProgressiveJobModel>
+        FindDerivedJobModelForOutput(
+            const DerivedJobQueueSnapshot* jobs,
+            const std::uint32_t stableEntityId,
+            const std::string_view outputName)
+        {
+            if (jobs == nullptr)
+                return std::nullopt;
+
+            const DerivedJobSnapshot* selected = nullptr;
+            for (const DerivedJobSnapshot& job : jobs->Entries)
+            {
+                if (job.Key.EntityId != stableEntityId ||
+                    std::string_view{job.Key.OutputName} != outputName)
+                {
+                    continue;
+                }
+
+                if (selected == nullptr)
+                {
+                    selected = &job;
+                    continue;
+                }
+
+                const bool jobActive = IsActiveDerivedJobStatus(job.Status);
+                const bool selectedActive =
+                    IsActiveDerivedJobStatus(selected->Status);
+                if (jobActive || !selectedActive)
+                    selected = &job;
+            }
+
+            if (selected == nullptr)
+                return std::nullopt;
+            return ToProgressiveJobModel(*selected);
         }
 
         [[nodiscard]] EditorCommandHistoryStatus ApplyProgressiveBindingsState(
@@ -4114,6 +4155,10 @@ namespace Extrinsic::Runtime
                 availability.Has(GS::SourceCapability::Faces);
             model.HasRuntimeBakeCommand = context.AssetService != nullptr;
             model.Uv = BuildUvDiagnosticsModel(context, view);
+            model.Uv.UvRegenerationJob = FindDerivedJobModelForOutput(
+                context.DerivedJobs,
+                stableEntityId,
+                kUvRegenerationJobOutputName);
 
             model.Sources.reserve(catalog.Rows.size());
             SandboxEditorModelBuildStats* stats = context.ModelBuildStats;
@@ -4547,6 +4592,49 @@ namespace Extrinsic::Runtime
             return signature;
         }
 
+        [[nodiscard]] std::uint64_t DerivedJobStateSignatureForEntity(
+            const DerivedJobQueueSnapshot* jobs,
+            const std::uint32_t stableEntityId,
+            const SandboxEditorSelectedModelCacheSection section)
+        {
+            if (section != SandboxEditorSelectedModelCacheSection::SelectedAnalysis ||
+                jobs == nullptr)
+            {
+                return 0u;
+            }
+
+            std::uint64_t signature = kSandboxEditorSignatureOffset;
+            std::uint64_t order = 0u;
+            for (const DerivedJobSnapshot& job : jobs->Entries)
+            {
+                if (job.Key.EntityId != stableEntityId)
+                    continue;
+
+                MixSignature(signature, order++);
+                MixSignature(signature, job.Handle.Index);
+                MixSignature(signature, job.Handle.Generation);
+                MixSignature(signature, static_cast<std::uint64_t>(job.Status));
+                MixSignatureFloat(signature, job.NormalizedProgress);
+                MixSignature(signature,
+                             static_cast<std::uint64_t>(
+                                 job.RequestedJobDomain));
+                MixSignature(signature,
+                             static_cast<std::uint64_t>(
+                                 job.ResolvedJobDomain));
+                MixSignature(signature,
+                             static_cast<std::uint64_t>(job.Key.Domain));
+                MixSignature(signature,
+                             static_cast<std::uint64_t>(
+                                 job.Key.OutputSemantic));
+                MixSignatureString(signature, job.Key.OutputName);
+                MixSignature(signature, job.PayloadToken);
+                MixSignature(signature, job.PreviousOutputRetained ? 1u : 0u);
+                MixSignatureString(signature, job.Diagnostic);
+            }
+            MixSignature(signature, order);
+            return order == 0u ? 0u : signature;
+        }
+
         [[nodiscard]] SandboxEditorSelectedModelCacheKey
         BuildSelectedModelCacheKey(
             const SandboxEditorContext& context,
@@ -4587,6 +4675,10 @@ namespace Extrinsic::Runtime
                 .BindingGeneration = VertexBindingGenerationForEntity(raw, entity),
                 .ProgressiveBindingGeneration =
                     ProgressiveBindingGenerationForEntity(raw, entity, section),
+                .DerivedJobStateSignature = DerivedJobStateSignatureForEntity(
+                    context.DerivedJobs,
+                    stableId,
+                    section),
                 .CommandHistoryRevision = CurrentCommandHistoryRevision(context),
                 .VisualizationAdapterBindingRevision =
                     CurrentVisualizationAdapterBindingRevision(context, section),
@@ -12997,11 +13089,50 @@ namespace Extrinsic::Runtime
             DrawDiagnostics(bound.Diagnostics);
         }
 
+        void DrawUvRegenerationStatus(
+            const SandboxEditorUvDiagnosticsModel& uv,
+            const std::optional<SandboxEditorUvRegenerationCommandResult>&
+                lastResult)
+        {
+            if (uv.UvRegenerationJob.has_value())
+            {
+                const SandboxEditorProgressiveJobModel& job =
+                    *uv.UvRegenerationJob;
+                ImGui::Text("UV job: %s %.0f%%",
+                            std::string(ToString(job.Status)).c_str(),
+                            job.NormalizedProgress * 100.0f);
+                if (!job.Diagnostic.empty())
+                    ImGui::TextWrapped("%s", job.Diagnostic.c_str());
+            }
+
+            if (!lastResult.has_value())
+            {
+                ImGui::TextDisabled("Last UV regeneration: none");
+                return;
+            }
+
+            const SandboxEditorUvRegenerationCommandResult& result =
+                *lastResult;
+            ImGui::Text("Last UV regeneration: %s",
+                        DebugNameForSandboxEditorCommandStatus(result.Status));
+            ImGui::Text("Atlas: %s / %s  %ux%u  charts=%u  splits=%zu",
+                        Geometry::UvAtlas::ToString(result.UvStatus),
+                        Geometry::UvAtlas::ToString(result.Provenance),
+                        result.AtlasWidth,
+                        result.AtlasHeight,
+                        result.ChartCount,
+                        result.SeamSplitVertexCount);
+            if (!result.Diagnostic.empty())
+                ImGui::TextWrapped("%s", result.Diagnostic.c_str());
+        }
+
         void DrawTextureBakeControls(
             const SandboxEditorTextureBakeControlsModel& model,
             const SandboxEditorContext* context,
             TextureBakeUiState* state)
         {
+            std::optional<SandboxEditorUvRegenerationCommandResult>
+                fallbackUvRegenerationResult{};
             std::int32_t fallbackSourceIndex{0};
             std::int32_t fallbackSemanticIndex{0};
             std::int32_t fallbackEncoderIndex{0};
@@ -13015,6 +13146,11 @@ namespace Extrinsic::Runtime
             bool fallbackUvForceRegenerate{true};
             bool fallbackUvPreserveAuthored{false};
 
+            auto* lastUvRegenerationResult =
+                state != nullptr &&
+                        state->LastUvRegenerationResult != nullptr
+                    ? state->LastUvRegenerationResult
+                    : &fallbackUvRegenerationResult;
             std::int32_t& sourceIndex =
                 state != nullptr && state->SourceIndex != nullptr
                     ? *state->SourceIndex
@@ -13102,7 +13238,8 @@ namespace Extrinsic::Runtime
                 ImGui::BeginDisabled();
             if (ImGui::Button("Regenerate UVs") && canRegenerateUvs)
             {
-                (void)ApplySandboxEditorUvRegenerationCommand(
+                *lastUvRegenerationResult =
+                    ApplySandboxEditorUvRegenerationCommand(
                     *context,
                     SandboxEditorUvRegenerationCommand{
                         .StableEntityId = model.SelectedStableId,
@@ -13115,6 +13252,7 @@ namespace Extrinsic::Runtime
             }
             if (!canRegenerateUvs)
                 ImGui::EndDisabled();
+            DrawUvRegenerationStatus(model.Uv, *lastUvRegenerationResult);
 
             std::vector<std::size_t> bakeableIndices;
             bakeableIndices.reserve(model.Sources.size());
@@ -21094,7 +21232,7 @@ namespace Extrinsic::Runtime
                 .OutputSemantic = ProgressiveSlotSemantic::Albedo,
                 .SourcePropertyGeneration =
                     state->GeometryMetadataSignature,
-                .OutputName = "uv_regeneration",
+                .OutputName = std::string{kUvRegenerationJobOutputName},
             },
             .Name = "Sandbox.UvRegeneration.CPU",
             .RequestedJobDomain = ProgressiveJobDomain::Cpu,
@@ -23539,6 +23677,13 @@ namespace Extrinsic::Runtime
                             m_LastProgressivePoissonResult =
                                 std::move(result);
                     };
+                context.MethodResultSinks.UvRegeneration =
+                    [alive = m_ResultSinksAlive, this](
+                        SandboxEditorUvRegenerationCommandResult result)
+                    {
+                        if (alive && *alive)
+                            m_LastUvRegenerationResult = std::move(result);
+                    };
                 context.MethodResultSinks.MeshCurvature =
                     [alive = m_ResultSinksAlive, this](
                         SandboxEditorMeshCurvatureResult result)
@@ -23824,6 +23969,8 @@ namespace Extrinsic::Runtime
                         &m_ProgressivePoissonPendingStableEntityId,
                 };
                 TextureBakeUiState textureBakeState{
+                    .LastUvRegenerationResult =
+                        &m_LastUvRegenerationResult,
                     .SourceIndex = &m_TextureBakeSourceIndex,
                     .TargetSemanticIndex = &m_TextureBakeTargetSemanticIndex,
                     .EncoderIndex = &m_TextureBakeEncoderIndex,
