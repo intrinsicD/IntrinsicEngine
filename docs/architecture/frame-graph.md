@@ -185,11 +185,12 @@ record/join completion. Picking and histogram readback issue metadata now route
 through guarded renderer helpers before the render-thread `BeginFrame()` drains
 consume it. Transient-debug, visualization-overlay, and ImGui dynamic upload
 helpers serialize per-frame reset plus pass-body upload/execute sections behind
-a shared renderer guard. The current renderer path still pins scheduler use
-false because pass callbacks still mutate shared pass helper state and the
-Vulkan backend still allocates accepted secondary buffers from externally
-synchronized frame command pools. Later `GRAPHICS-119` slices must isolate or
-synchronize those remaining surfaces before enabling `Core::Tasks` fan-out.
+a shared renderer guard. Postprocess pass helpers also serialize per-frame
+bloom scratch, histogram viewport/buffer, and AA stage pass-object recording.
+The current renderer path still pins scheduler use false because the Vulkan
+backend still allocates accepted secondary buffers from externally synchronized
+frame command pools. Later `GRAPHICS-119` slices must isolate that remaining
+surface before enabling `Core::Tasks` fan-out.
 
 Null provides CPU bookkeeping contexts for this contract. Vulkan accepts the
 current graphics-queue plan shape with backend-local secondary command buffers

@@ -114,8 +114,10 @@ pass-state and command-pool synchronization are fixed. The current audit keeps
 `RenderGraphFrameStats::Execute.ParallelRecordUsedScheduler` false even though
 transient-debug, visualization-overlay, and ImGui dynamic upload helpers now
 serialize per-frame reset plus upload/execute sections behind a shared renderer
-guard; shared pass helper state and Vulkan command-pool ownership still need
-isolation before worker fan-out can be enabled.
+guard, and postprocess pass helpers serialize per-frame bloom scratch,
+histogram viewport/buffer, and AA stage pass-object recording. Vulkan
+command-pool ownership still needs isolation before worker fan-out can be
+enabled.
 Command-record diagnostics accumulate through a guarded frame-local accumulator
 and publish to `RenderGraphFrameStats::CommandRecords` after the record/join
 path completes. Picking and histogram readback issue counters plus per-slot

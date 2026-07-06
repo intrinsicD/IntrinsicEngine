@@ -8,11 +8,10 @@ depends_on: []
 ## Status
 - In progress on local `main`; PR not opened.
 - Owner/agent: Codex.
-- Current slice: Slice C.5a (dynamic upload helper serialization) completed and
+- Current slice: Slice C.5b (shared postprocess pass-state serialization) completed and
   verified locally.
-- Next implementation step: Slice C.5b — isolate or synchronize shared pass
-  helper state and Vulkan command-pool ownership before enabling worker fan-out
-  behind the fallback flag.
+- Next implementation step: Slice C.5c — isolate Vulkan command-pool ownership
+  before enabling worker fan-out behind the fallback flag.
 
 ## Goal
 - Record render-graph pass command buffers in parallel: independent passes
@@ -91,6 +90,10 @@ depends_on: []
       upload helpers serialize per-frame reset plus pass-body upload/execute
       sections behind a shared renderer guard while parallel contexts remain on
       the caller thread.
+- [x] Slice C.5b: postprocess pass helpers serialize per-frame bloom scratch,
+      histogram viewport/buffer, and AA stage pass-object recording behind a
+      shared renderer guard while parallel contexts remain on the caller
+      thread.
 - [ ] RHI contract for parallel recording: acquire per-thread/per-batch
       command contexts, record independently, submit in compiled order;
       Null + Vulkan implementations.
@@ -131,6 +134,9 @@ depends_on: []
 - [x] Slice C.5a renderer contract: accepted parallel context plans record the
       transient-debug, visualization-overlay, and ImGui dynamic upload routes
       with the existing per-helper diagnostics intact.
+- [x] Slice C.5b renderer contract: accepted parallel context plans still
+      record the postprocess umbrella and histogram routes after guarding the
+      shared postprocess pass helper state.
 - [ ] CPU/null contract: parallel recording produces the same
       pass-execution/barrier submission order as serial (bookkeeping
       comparison over randomized graphs).
@@ -157,6 +163,8 @@ depends_on: []
       upload/helper/command-pool blockers.
 - [x] Slice C.5a: document dynamic upload helper serialization and the
       remaining shared pass helper state / Vulkan command-pool blockers.
+- [x] Slice C.5b: document shared postprocess pass helper serialization and
+      the remaining Vulkan command-pool blocker.
 - [x] Update `docs/architecture/frame-graph.md` and
       `src/graphics/renderer/README.md` (threading model, fallback flag).
 
@@ -304,6 +312,29 @@ Clean-workshop manual scorecard for Slice C.5a: row 3 `n/a` (no public
 by the GRAPHICS-119 dynamic-upload synchronization seam and is not a new
 subsystem), row 5 `n/a` (no new frame-graph pass), row 6 `n/a` (no recipe edge
 changes). Findings: none; no follow-up task ID required.
+
+Slice C.5b verification run locally on 2026-07-07:
+
+```bash
+cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure -R 'RendererFrameLifecycle\.(ParallelRecording|PostProcess)|PostProcessChainContract|RenderGraphParallelRecording' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+git diff --check
+ctest --test-dir build/ci --output-on-failure -R 'RendererFrameLifecycle|RenderGraphParallelRecording|GraphicsQueueAffinity|RenderGraphValidation|PostProcessChainContract' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+python3 tools/agents/generate_session_brief.py
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/validate_tasks.py --root tasks --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --strict
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+tools/ci/run_clean_workshop_review.sh . --strict
+```
+
+Clean-workshop manual scorecard for Slice C.5b: row 3 `n/a` (no public
+`.cppm` API surface changed), row 4 `pass` (one renderer guard member is owned
+by the GRAPHICS-119 postprocess pass-state synchronization seam and is not a
+new subsystem), row 5 `n/a` (no new frame-graph pass), row 6 `n/a` (no recipe
+edge changes). Findings: none; no follow-up task ID required.
 
 ## Forbidden changes
 - Nondeterministic submission order or frame output.

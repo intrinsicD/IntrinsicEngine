@@ -84,12 +84,12 @@ available through the Vulkan 1.2/1.3 feature chain.
   serial order. Secondary command-buffer handles stay alive until the frame-slot
   fence retires and are freed on the next `BeginFrame`. The current renderer
   route remains single-threaded: dynamic upload helpers now serialize
-  per-frame reset plus upload/execute sections behind a renderer guard, but
-  non-graphics queue support and true worker fan-out still require isolating
-  shared pass helper state and command-pool synchronization because Vulkan
-  command pools are externally synchronized. Command-record diagnostics and
-  readback issue metadata are already routed through guarded renderer
-  accumulators/helpers.
+  per-frame reset plus upload/execute sections behind a renderer guard, and
+  postprocess pass helpers serialize per-frame bloom/histogram/AA helper state.
+  Non-graphics queue support and true worker fan-out still require isolating
+  command-pool synchronization because Vulkan command pools are externally
+  synchronized. Command-record diagnostics and readback issue metadata are
+  already routed through guarded renderer accumulators/helpers.
 - `GetVulkanServiceDiagnosticsSnapshot()` reports guarded post-bootstrap service
   handoff: bindless heap creation, global pipeline-layout creation, transfer
   queue/staging creation, command-context rebinding, bindless capacity, clean

@@ -1326,6 +1326,16 @@ TEST(RendererFrameLifecycle, ParallelRecordingUsesAcceptedContextPlanInSerialSub
     ASSERT_NE(presentPass, nullptr);
     EXPECT_EQ(presentPass->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    const Extrinsic::Graphics::RenderGraphCommandPassStats* postProcessPass =
+        FindCommandPass(stats, "PostProcessPass");
+    ASSERT_NE(postProcessPass, nullptr);
+    EXPECT_EQ(postProcessPass->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    const Extrinsic::Graphics::RenderGraphCommandPassStats* histogramPass =
+        FindCommandPass(stats, "PostProcessHistogramPass");
+    ASSERT_NE(histogramPass, nullptr);
+    EXPECT_EQ(histogramPass->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     EXPECT_EQ(device.ParallelCommandContextRequests.size(),
               device.RecordedParallelCommandContextPlan.size());
     EXPECT_EQ(device.SubmittedParallelCommandContexts.size(),

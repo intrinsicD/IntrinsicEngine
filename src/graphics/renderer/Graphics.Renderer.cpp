@@ -9635,6 +9635,11 @@ namespace Extrinsic::Graphics
         // per-frame reset plus Upload/Execute sections that touch BufferManager
         // leases, helper-owned slots, bindless flushes, and upload diagnostics.
         std::mutex m_DynamicUploadMutex;
+        // GRAPHICS-119 Slice C.5b: postprocess pass helpers cache per-frame
+        // handles/settings (`SetBloomScratch`, histogram viewport/buffer) and
+        // share PostProcessSystem-backed pass objects. Serialize their setter
+        // + Execute sections until worker fan-out can use per-context state.
+        std::mutex m_PostProcessPassMutex;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardSurfacePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardLinePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardPointPipelineLease;
@@ -9960,40 +9965,43 @@ namespace Extrinsic::Graphics
     {
         const RHI::CameraUBO& camera = *context.Camera;
         const CompiledRenderGraph& compiled = *context.Compiled;
+        RenderCommandPassStatus bloomStatus = RenderCommandPassStatus::SkippedUnavailable;
+        RenderCommandPassStatus toneMapStatus = RenderCommandPassStatus::SkippedUnavailable;
 
-        if (m_PostProcessBloomPass.has_value())
         {
-            RHI::TextureHandle bloomScratchHandle{};
-            for (std::size_t i = 0; i < compiled.TextureNames.size(); ++i)
+            std::lock_guard<std::mutex> postProcessLock(m_PostProcessPassMutex);
+            if (m_PostProcessBloomPass.has_value())
             {
-                if (i >= compiled.TextureHandles.size())
+                RHI::TextureHandle bloomScratchHandle{};
+                for (std::size_t i = 0; i < compiled.TextureNames.size(); ++i)
                 {
-                    break;
+                    if (i >= compiled.TextureHandles.size())
+                    {
+                        break;
+                    }
+                    if (compiled.TextureNames[i] == std::string_view{"PostProcess.BloomScratch"})
+                    {
+                        bloomScratchHandle = compiled.TextureHandles[i];
+                        break;
+                    }
                 }
-                if (compiled.TextureNames[i] == std::string_view{"PostProcess.BloomScratch"})
-                {
-                    bloomScratchHandle = compiled.TextureHandles[i];
-                    break;
-                }
+                const Core::Extent2D bloomExtent = m_Device != nullptr
+                    ? m_Device->GetBackbufferExtent()
+                    : Core::Extent2D{.Width = 1, .Height = 1};
+                const std::uint32_t bloomWidth = bloomExtent.Width > 0
+                    ? static_cast<std::uint32_t>(bloomExtent.Width)
+                    : 1u;
+                const std::uint32_t bloomHeight = bloomExtent.Height > 0
+                    ? static_cast<std::uint32_t>(bloomExtent.Height)
+                    : 1u;
+                const std::uint32_t bloomMipLevels =
+                    ComputeBloomMipChainLevels(bloomWidth, bloomHeight);
+                m_PostProcessBloomPass->SetBloomScratch(bloomScratchHandle, bloomMipLevels);
             }
-            const Core::Extent2D bloomExtent = m_Device != nullptr
-                ? m_Device->GetBackbufferExtent()
-                : Core::Extent2D{.Width = 1, .Height = 1};
-            const std::uint32_t bloomWidth = bloomExtent.Width > 0
-                ? static_cast<std::uint32_t>(bloomExtent.Width)
-                : 1u;
-            const std::uint32_t bloomHeight = bloomExtent.Height > 0
-                ? static_cast<std::uint32_t>(bloomExtent.Height)
-                : 1u;
-            const std::uint32_t bloomMipLevels =
-                ComputeBloomMipChainLevels(bloomWidth, bloomHeight);
-            m_PostProcessBloomPass->SetBloomScratch(bloomScratchHandle, bloomMipLevels);
+            bloomStatus = RecordPostProcessBloomPass(cmd, camera);
+            toneMapStatus = RecordPostProcessToneMapPass(cmd, camera);
         }
-        const RenderCommandPassStatus bloomStatus =
-            RecordPostProcessBloomPass(cmd, camera);
         AccumulateCommandRecordStatus(route.DebugName, route.PassId, bloomStatus);
-        const RenderCommandPassStatus toneMapStatus =
-            RecordPostProcessToneMapPass(cmd, camera);
         AccumulateCommandRecordStatus(route.DebugName, route.PassId, toneMapStatus);
     }
 
@@ -10018,22 +10026,25 @@ namespace Extrinsic::Graphics
                 break;
             }
         }
-        if (m_PostProcessHistogramPass.has_value())
+        RenderCommandPassStatus status = RenderCommandPassStatus::SkippedUnavailable;
         {
-            const Core::Extent2D histogramExtent = m_Device != nullptr
-                ? m_Device->GetBackbufferExtent()
-                : Core::Extent2D{.Width = 1, .Height = 1};
-            const std::uint32_t histogramWidth = histogramExtent.Width > 0
-                ? static_cast<std::uint32_t>(histogramExtent.Width)
-                : 1u;
-            const std::uint32_t histogramHeight = histogramExtent.Height > 0
-                ? static_cast<std::uint32_t>(histogramExtent.Height)
-                : 1u;
-            m_PostProcessHistogramPass->SetViewport(histogramWidth, histogramHeight);
-            m_PostProcessHistogramPass->SetHistogramBuffer(histogramHandle);
+            std::lock_guard<std::mutex> postProcessLock(m_PostProcessPassMutex);
+            if (m_PostProcessHistogramPass.has_value())
+            {
+                const Core::Extent2D histogramExtent = m_Device != nullptr
+                    ? m_Device->GetBackbufferExtent()
+                    : Core::Extent2D{.Width = 1, .Height = 1};
+                const std::uint32_t histogramWidth = histogramExtent.Width > 0
+                    ? static_cast<std::uint32_t>(histogramExtent.Width)
+                    : 1u;
+                const std::uint32_t histogramHeight = histogramExtent.Height > 0
+                    ? static_cast<std::uint32_t>(histogramExtent.Height)
+                    : 1u;
+                m_PostProcessHistogramPass->SetViewport(histogramWidth, histogramHeight);
+                m_PostProcessHistogramPass->SetHistogramBuffer(histogramHandle);
+            }
+            status = RecordPostProcessHistogramPass(cmd, camera);
         }
-        const RenderCommandPassStatus status =
-            RecordPostProcessHistogramPass(cmd, camera);
         AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
 
         const bool histogramStageLive =
@@ -10188,24 +10199,33 @@ namespace Extrinsic::Graphics
         m_CommandRouter.Register(id(FrameRecipePassKind::PostProcessAAEdge),
             [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void* contextPointer) {
                 RenderCommandRouteContext& context = RouteContextFrom(contextPointer);
-                const RenderCommandPassStatus status =
-                    RecordPostProcessAAEdgePass(cmd, *context.Camera);
+                RenderCommandPassStatus status = RenderCommandPassStatus::SkippedUnavailable;
+                {
+                    std::lock_guard<std::mutex> postProcessLock(m_PostProcessPassMutex);
+                    status = RecordPostProcessAAEdgePass(cmd, *context.Camera);
+                }
                 AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
             });
 
         m_CommandRouter.Register(id(FrameRecipePassKind::PostProcessAABlend),
             [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void* contextPointer) {
                 RenderCommandRouteContext& context = RouteContextFrom(contextPointer);
-                const RenderCommandPassStatus status =
-                    RecordPostProcessAABlendPass(cmd, *context.Camera);
+                RenderCommandPassStatus status = RenderCommandPassStatus::SkippedUnavailable;
+                {
+                    std::lock_guard<std::mutex> postProcessLock(m_PostProcessPassMutex);
+                    status = RecordPostProcessAABlendPass(cmd, *context.Camera);
+                }
                 AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
             });
 
         m_CommandRouter.Register(id(FrameRecipePassKind::PostProcessAAResolve),
             [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void* contextPointer) {
                 RenderCommandRouteContext& context = RouteContextFrom(contextPointer);
-                const RenderCommandPassStatus status =
-                    RecordPostProcessAAResolvePass(cmd, *context.Camera);
+                RenderCommandPassStatus status = RenderCommandPassStatus::SkippedUnavailable;
+                {
+                    std::lock_guard<std::mutex> postProcessLock(m_PostProcessPassMutex);
+                    status = RecordPostProcessAAResolvePass(cmd, *context.Camera);
+                }
                 AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
             });
 
