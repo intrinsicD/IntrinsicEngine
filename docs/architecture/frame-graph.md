@@ -187,18 +187,17 @@ consume it. Transient-debug, visualization-overlay, and ImGui dynamic upload
 helpers serialize per-frame reset plus pass-body upload/execute sections behind
 a shared renderer guard. Postprocess pass helpers also serialize per-frame
 bloom scratch, histogram viewport/buffer, and AA stage pass-object recording.
-The current renderer path still pins scheduler use false because the Vulkan
-backend still allocates accepted secondary buffers from externally synchronized
-frame command pools. Later `GRAPHICS-119` slices must isolate that remaining
-surface before enabling `Core::Tasks` fan-out.
+The current renderer path still pins scheduler use false while the remaining
+worker fan-out audit, benchmark evidence, and opt-in Vulkan smoke are completed.
 
 Null provides CPU bookkeeping contexts for this contract. Vulkan accepts the
 current graphics-queue plan shape with backend-local secondary command buffers
 and records `vkCmdExecuteCommands(...)` into the primary context at each serial
-submit callback; the secondary buffers are retained until the frame-slot fence
-has retired and are freed on the next `BeginFrame`. Non-graphics queue fan-out,
-worker fan-out through `Core::Tasks`, benchmark evidence, and opt-in
-`gpu;vulkan` smoke coverage remain later `GRAPHICS-119` slices.
+submit callback; each accepted context owns a frame-scoped command pool, and the
+pool plus secondary buffer are retained until the frame-slot fence has retired
+and are destroyed on the next `BeginFrame`. Non-graphics queue fan-out, worker
+fan-out through `Core::Tasks`, benchmark evidence, and opt-in `gpu;vulkan`
+smoke coverage remain later `GRAPHICS-119` slices.
 
 ## Boundaries
 

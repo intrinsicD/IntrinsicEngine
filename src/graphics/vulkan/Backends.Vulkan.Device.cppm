@@ -265,6 +265,7 @@ namespace Extrinsic::Backends::Vulkan
         struct PendingParallelCommandContext
         {
             RHI::QueueAffinity Queue = RHI::QueueAffinity::Graphics;
+            VkCommandPool CommandPool = VK_NULL_HANDLE;
             VkCommandBuffer CommandBuffer = VK_NULL_HANDLE;
         };
 

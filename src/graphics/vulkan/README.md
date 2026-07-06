@@ -77,19 +77,20 @@ available through the Vulkan 1.2/1.3 feature chain.
 - `GRAPHICS-119` parallel render-graph recording uses backend-local secondary
   command buffers for accepted graphics-queue
   `RHI::ParallelCommandContextPlanDesc` frames.
-  `BeginFrameParallelCommandContexts(...)` allocates one secondary buffer per
-  live pass from the graphics per-frame command pool, `GetParallelCommandContext`
-  records the pass body, and `SubmitParallelCommandContext(...)` emits
-  `vkCmdExecuteCommands(...)` into the primary graphics context in compiled
-  serial order. Secondary command-buffer handles stay alive until the frame-slot
-  fence retires and are freed on the next `BeginFrame`. The current renderer
-  route remains single-threaded: dynamic upload helpers now serialize
-  per-frame reset plus upload/execute sections behind a renderer guard, and
-  postprocess pass helpers serialize per-frame bloom/histogram/AA helper state.
-  Non-graphics queue support and true worker fan-out still require isolating
-  command-pool synchronization because Vulkan command pools are externally
-  synchronized. Command-record diagnostics and readback issue metadata are
-  already routed through guarded renderer accumulators/helpers.
+  `BeginFrameParallelCommandContexts(...)` creates one frame-scoped command
+  pool per accepted live pass and allocates that pass's secondary buffer from
+  the owned pool. `GetParallelCommandContext` records the pass body, and
+  `SubmitParallelCommandContext(...)` emits `vkCmdExecuteCommands(...)` into
+  the primary graphics context in compiled serial order. Secondary command
+  buffers and their command pools stay alive until the frame-slot fence retires
+  and are destroyed on the next `BeginFrame`. The current renderer route remains
+  single-threaded: dynamic upload helpers now serialize per-frame reset plus
+  upload/execute sections behind a renderer guard, and postprocess pass helpers
+  serialize per-frame bloom/histogram/AA helper state. Non-graphics queue
+  support, true worker fan-out, benchmark evidence, and opt-in `gpu;vulkan`
+  smoke coverage remain later `GRAPHICS-119` slices. Command-record diagnostics
+  and readback issue metadata are already routed through guarded renderer
+  accumulators/helpers.
 - `GetVulkanServiceDiagnosticsSnapshot()` reports guarded post-bootstrap service
   handoff: bindless heap creation, global pipeline-layout creation, transfer
   queue/staging creation, command-context rebinding, bindless capacity, clean

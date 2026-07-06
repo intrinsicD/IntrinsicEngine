@@ -109,15 +109,15 @@ order through `IDevice::SubmitParallelCommandContext(...)`. The current path is
 single-threaded to keep renderer-owned pass state deterministic while proving
 the RHI/null/Vulkan acquisition and submit-order contract. Vulkan accepts the
 graphics-queue plan with backend-local secondary command buffers; non-graphics
-queue support and worker fan-out remain later `GRAPHICS-119` slices after
-pass-state and command-pool synchronization are fixed. The current audit keeps
+queue support and worker fan-out remain later `GRAPHICS-119` slices after the
+final fan-out audit, benchmark evidence, and opt-in Vulkan smoke. The current
+audit keeps
 `RenderGraphFrameStats::Execute.ParallelRecordUsedScheduler` false even though
 transient-debug, visualization-overlay, and ImGui dynamic upload helpers now
 serialize per-frame reset plus upload/execute sections behind a shared renderer
 guard, and postprocess pass helpers serialize per-frame bloom scratch,
-histogram viewport/buffer, and AA stage pass-object recording. Vulkan
-command-pool ownership still needs isolation before worker fan-out can be
-enabled.
+histogram viewport/buffer, and AA stage pass-object recording. Vulkan accepted
+parallel contexts own frame-scoped command pools for their secondary buffers.
 Command-record diagnostics accumulate through a guarded frame-local accumulator
 and publish to `RenderGraphFrameStats::CommandRecords` after the record/join
 path completes. Picking and histogram readback issue counters plus per-slot

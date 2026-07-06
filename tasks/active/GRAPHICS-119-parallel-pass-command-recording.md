@@ -8,10 +8,10 @@ depends_on: []
 ## Status
 - In progress on local `main`; PR not opened.
 - Owner/agent: Codex.
-- Current slice: Slice C.5b (shared postprocess pass-state serialization) completed and
-  verified locally.
-- Next implementation step: Slice C.5c — isolate Vulkan command-pool ownership
-  before enabling worker fan-out behind the fallback flag.
+- Current slice: Slice C.5c (Vulkan parallel command-pool ownership)
+  completed and verified locally.
+- Next implementation step: Slice C.6 — enable renderer worker fan-out behind
+  the fallback flag once the remaining audit is clean.
 
 ## Goal
 - Record render-graph pass command buffers in parallel: independent passes
@@ -94,6 +94,9 @@ depends_on: []
       histogram viewport/buffer, and AA stage pass-object recording behind a
       shared renderer guard while parallel contexts remain on the caller
       thread.
+- [x] Slice C.5c: Vulkan accepted parallel command contexts allocate and own
+      frame-scoped command pools for their secondary command buffers so future
+      worker recording does not borrow externally synchronized frame pools.
 - [ ] RHI contract for parallel recording: acquire per-thread/per-batch
       command contexts, record independently, submit in compiled order;
       Null + Vulkan implementations.
@@ -137,6 +140,9 @@ depends_on: []
 - [x] Slice C.5b renderer contract: accepted parallel context plans still
       record the postprocess umbrella and histogram routes after guarding the
       shared postprocess pass helper state.
+- [x] Slice C.5c Vulkan fail-closed/build contract: non-operational Vulkan
+      still declines parallel contexts, and the Vulkan backend builds with
+      per-context command-pool ownership for accepted graphics-queue plans.
 - [ ] CPU/null contract: parallel recording produces the same
       pass-execution/barrier submission order as serial (bookkeeping
       comparison over randomized graphs).
@@ -165,6 +171,8 @@ depends_on: []
       remaining shared pass helper state / Vulkan command-pool blockers.
 - [x] Slice C.5b: document shared postprocess pass helper serialization and
       the remaining Vulkan command-pool blocker.
+- [x] Slice C.5c: document per-context Vulkan command-pool ownership and the
+      remaining worker fan-out, benchmark, and opt-in Vulkan smoke scope.
 - [x] Update `docs/architecture/frame-graph.md` and
       `src/graphics/renderer/README.md` (threading model, fallback flag).
 
@@ -335,6 +343,32 @@ Clean-workshop manual scorecard for Slice C.5b: row 3 `n/a` (no public
 by the GRAPHICS-119 postprocess pass-state synchronization seam and is not a
 new subsystem), row 5 `n/a` (no new frame-graph pass), row 6 `n/a` (no recipe
 edge changes). Findings: none; no follow-up task ID required.
+
+Slice C.5c verification run locally on 2026-07-07:
+
+```bash
+cmake --build --preset ci --target ExtrinsicBackendsVulkan
+cmake --build --preset ci --target IntrinsicGraphicsVulkanContractTests IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure -R 'VulkanFailClosedContract\..*ParallelCommand|VulkanFailClosedContract|GraphicsQueueAffinity\..*ParallelCommand|RenderGraphParallelRecording|RendererFrameLifecycle\..*ParallelRecording' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+ctest --test-dir build/ci --output-on-failure -R 'VulkanFailClosedContract|RendererFrameLifecycle|RenderGraphParallelRecording|GraphicsQueueAffinity|RenderGraphValidation' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
+python3 tools/agents/generate_session_brief.py
+git diff --check
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/validate_tasks.py --root tasks --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --strict
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+tools/ci/run_clean_workshop_review.sh . --strict
+```
+
+Clean-workshop manual scorecard for Slice C.5c: row 3 `n/a` (backend-internal
+`.cppm` storage only; no public RHI/renderer API shape changed), row 4 `pass`
+(per-context Vulkan command-pool ownership is owned by the GRAPHICS-119 backend
+parallel-command-context seam and is not a new subsystem), row 5 `n/a` (no new
+frame-graph pass), row 6 `n/a` (no recipe edge changes). Findings: none; no
+follow-up task ID required.
 
 ## Forbidden changes
 - Nondeterministic submission order or frame output.

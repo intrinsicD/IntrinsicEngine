@@ -2402,6 +2402,16 @@ void VulkanDevice::Shutdown()
                                       RHI::SamplerHandle{});
         m_QueueSubmitContexts[frameSlot].clear();
         m_QueueSubmitBatches[frameSlot].clear();
+        if (device != VK_NULL_HANDLE)
+        {
+            for (const PendingParallelCommandContext& context : m_ParallelCommandBuffers[frameSlot])
+            {
+                if (context.CommandPool != VK_NULL_HANDLE)
+                {
+                    vkDestroyCommandPool(device, context.CommandPool, nullptr);
+                }
+            }
+        }
         m_ParallelCommandContexts[frameSlot].clear();
         m_ParallelCommandBuffers[frameSlot].clear();
     }
@@ -2588,14 +2598,9 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
     frame.QueueSubmitCmdBuffers.clear();
     for (const PendingParallelCommandContext& context : m_ParallelCommandBuffers[m_FrameSlot])
     {
-        if (context.CommandBuffer != VK_NULL_HANDLE)
+        if (context.CommandPool != VK_NULL_HANDLE)
         {
-            VkCommandPool pool = commandPoolForQueue(context.Queue);
-            if (pool != VK_NULL_HANDLE)
-            {
-                VkCommandBuffer commandBuffer = context.CommandBuffer;
-                vkFreeCommandBuffers(m_Device, pool, 1u, &commandBuffer);
-            }
+            vkDestroyCommandPool(m_Device, context.CommandPool, nullptr);
         }
     }
     m_ParallelCommandBuffers[m_FrameSlot].clear();
@@ -3592,7 +3597,6 @@ bool VulkanDevice::BeginFrameParallelCommandContexts(
         return false;
     }
 
-    PerFrame& perFrame = m_Frames[frame.FrameIndex];
     std::vector<VulkanCommandContext>& contexts = m_ParallelCommandContexts[frame.FrameIndex];
     std::vector<PendingParallelCommandContext>& commandBuffers =
         m_ParallelCommandBuffers[frame.FrameIndex];
@@ -3608,33 +3612,13 @@ bool VulkanDevice::BeginFrameParallelCommandContexts(
     commandBuffers.clear();
     commandBuffers.reserve(plan.Requests.size());
 
-    const auto commandPoolForQueue = [&perFrame](const RHI::QueueAffinity queue) noexcept
-    {
-        switch (queue)
-        {
-        case RHI::QueueAffinity::AsyncCompute:
-            return perFrame.AsyncComputeCmdPool != VK_NULL_HANDLE ? perFrame.AsyncComputeCmdPool : perFrame.CmdPool;
-        case RHI::QueueAffinity::Transfer:
-            return perFrame.TransferCmdPool != VK_NULL_HANDLE ? perFrame.TransferCmdPool : perFrame.CmdPool;
-        case RHI::QueueAffinity::Graphics:
-            return perFrame.CmdPool;
-        }
-        return perFrame.CmdPool;
-    };
-
-    const auto releaseCommandBuffers = [&]() noexcept
+    const auto releaseParallelCommandPools = [&]() noexcept
     {
         for (const PendingParallelCommandContext& context : commandBuffers)
         {
-            if (context.CommandBuffer == VK_NULL_HANDLE)
+            if (context.CommandPool != VK_NULL_HANDLE)
             {
-                continue;
-            }
-            VkCommandPool pool = commandPoolForQueue(context.Queue);
-            if (pool != VK_NULL_HANDLE)
-            {
-                VkCommandBuffer commandBuffer = context.CommandBuffer;
-                vkFreeCommandBuffers(m_Device, pool, 1u, &commandBuffer);
+                vkDestroyCommandPool(m_Device, context.CommandPool, nullptr);
             }
         }
         commandBuffers.clear();
@@ -3654,21 +3638,34 @@ bool VulkanDevice::BeginFrameParallelCommandContexts(
         const RHI::ParallelCommandContextRequest& request = plan.Requests[requestIndex];
         if (request.ContextIndex != requestIndex)
         {
-            releaseCommandBuffers();
+            releaseParallelCommandPools();
             Core::Log::Warn("[VulkanDevice::BeginFrameParallelCommandContexts] rejected non-contiguous context plan");
             return false;
         }
         if (request.Queue != RHI::QueueAffinity::Graphics)
         {
-            releaseCommandBuffers();
+            releaseParallelCommandPools();
             Core::Log::Warn("[VulkanDevice::BeginFrameParallelCommandContexts] rejected non-graphics context plan; falling back to serial recording");
             return false;
         }
 
-        VkCommandPool pool = commandPoolForQueue(request.Queue);
-        if (pool == VK_NULL_HANDLE)
+        VkCommandPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT |
+                         VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+        poolInfo.queueFamilyIndex = m_GraphicsFamily;
+
+        VkCommandPool pool = VK_NULL_HANDLE;
+        VkResult result = vkCreateCommandPool(m_Device, &poolInfo, nullptr, &pool);
+        if (result != VK_SUCCESS || pool == VK_NULL_HANDLE)
         {
-            releaseCommandBuffers();
+            NoteDeviceLostIfNeeded(result);
+            if (pool != VK_NULL_HANDLE)
+            {
+                vkDestroyCommandPool(m_Device, pool, nullptr);
+            }
+            releaseParallelCommandPools();
+            Core::Log::Error("[VulkanDevice::BeginFrameParallelCommandContexts] vkCreateCommandPool failed; falling back to serial recording");
             return false;
         }
 
@@ -3679,21 +3676,19 @@ bool VulkanDevice::BeginFrameParallelCommandContexts(
         allocateInfo.commandBufferCount = 1u;
 
         VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
-        const VkResult result = vkAllocateCommandBuffers(m_Device, &allocateInfo, &commandBuffer);
+        result = vkAllocateCommandBuffers(m_Device, &allocateInfo, &commandBuffer);
         if (result != VK_SUCCESS || commandBuffer == VK_NULL_HANDLE)
         {
             NoteDeviceLostIfNeeded(result);
-            if (commandBuffer != VK_NULL_HANDLE)
-            {
-                vkFreeCommandBuffers(m_Device, pool, 1u, &commandBuffer);
-            }
-            releaseCommandBuffers();
+            vkDestroyCommandPool(m_Device, pool, nullptr);
+            releaseParallelCommandPools();
             Core::Log::Error("[VulkanDevice::BeginFrameParallelCommandContexts] vkAllocateCommandBuffers failed; falling back to serial recording");
             return false;
         }
 
         commandBuffers.push_back(PendingParallelCommandContext{
             .Queue = request.Queue,
+            .CommandPool = pool,
             .CommandBuffer = commandBuffer,
         });
         contexts[requestIndex].Bind(m_Device,
