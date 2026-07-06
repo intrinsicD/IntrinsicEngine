@@ -28,6 +28,11 @@ workload measurements.
   cache contract's steady-state compile attempts as `0`; the result keeps
   `adoption_claim=false` because it is compile-stage evidence, not a
   renderer-wide frame-time claim.
+- `rendering.rendergraph_parallel_recording.smoke` is the `GRAPHICS-119`
+  baseline/probe for CPU/null render-graph pass recording. It compares serial
+  executor recording against scheduler-backed parallel record/join on the same
+  deterministic pass-heavy graph, reports checksum parity, and records
+  `adoption_claim=false` until opt-in Vulkan smoke evidence exists.
 - `rendering.vertex_fetch_layout.smoke` is the `RUNTIME-125` benchmark gate for
   the optional AoS static-geometry fast lane. It measures the current uniform
   SoA vertex-fetch shape and an interleaved AoS probe over the same

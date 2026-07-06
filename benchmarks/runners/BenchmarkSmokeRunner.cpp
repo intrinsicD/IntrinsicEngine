@@ -28,6 +28,7 @@
 #include "../rendering/Bench.FramegraphCompilerIndexingSmoke.hpp"
 #include "../rendering/Bench.FramegraphScratchReuseSmoke.hpp"
 #include "../rendering/Bench.FrameRecipeCompileCacheSmoke.hpp"
+#include "../rendering/Bench.RenderGraphParallelRecordingSmoke.hpp"
 #include "../rendering/Bench.VertexFetchLayoutSmoke.hpp"
 
 #include <cstdlib>
@@ -975,6 +976,66 @@ auto EmitFrameRecipeCompileCacheSmoke(const std::string &commit)
                           metrics.Succeeded};
 }
 
+auto EmitRenderGraphParallelRecordingSmoke(const std::string &commit)
+    -> EmittedBenchmark {
+  using namespace Intrinsic::Bench::Rendering;
+
+  const auto metrics = RunRenderGraphParallelRecordingSmoke();
+
+  std::ostringstream out;
+  out.setf(std::ios::fixed);
+  out.precision(6);
+  out << "{\n"
+      << "  \"benchmark_id\": \""
+      << EscapeJson(kRenderGraphParallelRecordingSmokeBenchmarkId) << "\",\n"
+      << "  \"method\": \""
+      << EscapeJson(kRenderGraphParallelRecordingSmokeMethod) << "\",\n"
+      << "  \"backend\": \"cpu_reference\",\n"
+      << "  \"dataset\": \""
+      << EscapeJson(kRenderGraphParallelRecordingSmokeDataset) << "\",\n"
+      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
+      << "  \"metrics\": {\n"
+      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
+      << "  },\n"
+      << "  \"diagnostics\": {\n"
+      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+      << "    \"mode\": \"smoke\",\n"
+      << "    \"warmup_iterations\": " << metrics.WarmupIterations << ",\n"
+      << "    \"measured_iterations\": " << metrics.MeasuredIterations << ",\n"
+      << "    \"baseline_mode\": \"serial_execute_recording\",\n"
+      << "    \"probe_mode\": \"scheduler_parallel_record_join\",\n"
+      << "    \"adoption_claim\": false,\n"
+      << "    \"serial_record_ms\": " << metrics.SerialRecordMilliseconds
+      << ",\n"
+      << "    \"parallel_record_ms\": "
+      << metrics.ParallelRecordMilliseconds << ",\n"
+      << "    \"parallel_to_serial_runtime_ratio\": "
+      << metrics.ParallelToSerialRuntimeRatio << ",\n"
+      << "    \"pass_count\": " << metrics.PassCount << ",\n"
+      << "    \"scheduler_worker_count\": " << metrics.SchedulerWorkerCount
+      << ",\n"
+      << "    \"record_ops_per_pass\": " << metrics.RecordOpsPerPass
+      << ",\n"
+      << "    \"parallel_layer_count\": " << metrics.ParallelLayerCount
+      << ",\n"
+      << "    \"parallel_max_layer_width\": "
+      << metrics.ParallelMaxLayerWidth << ",\n"
+      << "    \"parallel_worker_task_count\": "
+      << metrics.ParallelWorkerTaskCount << ",\n"
+      << "    \"parallel_caller_record_count\": "
+      << metrics.ParallelCallerRecordCount << ",\n"
+      << "    \"serial_checksum\": " << metrics.SerialChecksum << ",\n"
+      << "    \"parallel_checksum\": " << metrics.ParallelChecksum << "\n"
+      << "  },\n"
+      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
+      << "\"\n"
+      << "}\n";
+
+  return EmittedBenchmark{kRenderGraphParallelRecordingSmokeBenchmarkId,
+                          out.str(), metrics.Succeeded};
+}
+
 auto WriteFile(const std::filesystem::path &path, std::string_view payload)
     -> bool {
   std::error_code ec;
@@ -1016,6 +1077,7 @@ auto main(int argc, char **argv) -> int {
   emitted.push_back(EmitFramegraphCompilerIndexingSmoke(commit));
   emitted.push_back(EmitFramegraphScratchReuseSmoke(commit));
   emitted.push_back(EmitFrameRecipeCompileCacheSmoke(commit));
+  emitted.push_back(EmitRenderGraphParallelRecordingSmoke(commit));
   emitted.push_back(EmitVertexFetchLayoutSmoke(commit));
 
   // Output target: an existing directory or a path with no extension (or no

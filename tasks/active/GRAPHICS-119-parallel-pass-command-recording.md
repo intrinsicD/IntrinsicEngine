@@ -8,10 +8,10 @@ depends_on: []
 ## Status
 - In progress on local `main`; PR not opened.
 - Owner/agent: Codex.
-- Current slice: Slice C.8 (CPU/null multi-queue fan-out) completed
-  and verified locally.
+- Current slice: Slice C.9 (PR-fast benchmark evidence) completed and
+  verified locally.
 - Next implementation step: cover remaining Vulkan non-graphics secondary
-  execution / benchmark / opt-in Vulkan smoke scope.
+  execution / opt-in Vulkan smoke scope.
 
 ## Goal
 - Record render-graph pass command buffers in parallel: independent passes
@@ -106,6 +106,10 @@ depends_on: []
       workers when available, and joins submitted contexts back through each
       queue-submit batch without changing queue order, timeline waits/signals,
       or barrier placement.
+- [x] Slice C.9: add PR-fast benchmark smoke coverage for serial executor
+      recording vs scheduler-backed parallel record/join on a deterministic
+      pass-heavy CPU/null graph, emitting machine-readable baseline/probe
+      metrics with no performance-win adoption claim.
 - [x] RHI contract for parallel recording: acquire per-thread/per-batch
       command contexts, record independently, submit in compiled order;
       Null + Vulkan implementations.
@@ -162,6 +166,9 @@ depends_on: []
       request and submit non-graphics parallel command contexts, dispatch pass
       recording through scheduler workers, and preserve the existing
       queue-submit context usage.
+- [x] Slice C.9 benchmark contract: manifest validates, runner emits result
+      JSON with serial/parallel runtime diagnostics plus checksum parity, and
+      result JSON validates under the benchmark schema.
 - [x] CPU/null contract: parallel recording produces the same
       pass-execution/barrier submission order as serial (bookkeeping
       comparison over randomized graphs).
@@ -169,7 +176,7 @@ depends_on: []
       (probe), with the join deterministic.
 - [ ] Opt-in `gpu;vulkan` smoke: default sandbox recipe image-identical
       serial vs parallel; validation layers clean under parallel recording.
-- [ ] PR-fast benchmark: recording CPU ms/frame serial vs parallel on a
+- [x] PR-fast benchmark: recording CPU ms/frame serial vs parallel on a
       pass-heavy synthetic recipe.
 
 ## Docs
@@ -199,13 +206,16 @@ depends_on: []
       no architecture docs changed.
 - [x] Slice C.8: document accepted CPU/null multi-queue fan-out and the
       remaining Vulkan non-graphics secondary-execution scope.
+- [x] Slice C.9: document the render-graph parallel-recording smoke benchmark
+      and record that it is benchmark evidence, not a renderer-wide performance
+      win claim.
 - [x] Update `docs/architecture/frame-graph.md` and
       `src/graphics/renderer/README.md` (threading model, fallback flag).
 
 ## Acceptance criteria
 - [ ] Deterministic submission order proven by contract tests; identical
       Vulkan frame output cited from an actually-run smoke.
-- [ ] Benchmark evidence recorded (or an honest "no win at current pass
+- [x] Benchmark evidence recorded (or an honest "no win at current pass
       counts, kept behind flag" conclusion).
 - [ ] Serial fallback intact; CPU gate green; layering gate green.
 
@@ -462,6 +472,36 @@ Clean-workshop manual scorecard for Slice C.8: row 3 `n/a` (no public
 owned by the existing GRAPHICS-119 renderer/RHI command-context seam and is not
 a new subsystem), row 5 `n/a` (no new frame-graph pass), row 6 `n/a` (no recipe
 edge changes). Findings: none; no follow-up task ID required.
+
+Slice C.9 verification run locally on 2026-07-07:
+
+```bash
+cmake --build --preset ci --target IntrinsicBenchmarkSmoke
+build/ci/bin/IntrinsicBenchmarkSmoke /tmp/graphics119-c9-benchmark
+python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
+python3 tools/benchmark/validate_benchmark_results.py --root /tmp/graphics119-c9-benchmark --strict
+ctest --test-dir build/ci --output-on-failure -R 'IntrinsicBenchmarkSmoke\.(Run|Validate)' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+```
+
+Slice C.9 benchmark result:
+
+```text
+benchmark_id: rendering.rendergraph_parallel_recording.smoke
+backend: cpu_reference
+dataset: builtin.synthetic_parallel_recording.256_independent_passes
+serial_record_ms: 0.310376
+parallel_record_ms: 0.438259
+parallel_to_serial_runtime_ratio: 1.412027
+quality_error_l2: 0.0
+parallel_worker_task_count: 256
+parallel_caller_record_count: 0
+adoption_claim: false
+```
+
+Conclusion: checksum parity holds and scheduler fan-out is exercised, but this
+PR-fast CPU smoke does not show a win at the current synthetic pass count/work
+shape. The parallel renderer path remains behind the debug selector until the
+remaining opt-in Vulkan smoke evidence exists.
 
 ## Forbidden changes
 - Nondeterministic submission order or frame output.

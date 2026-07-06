@@ -1,0 +1,25 @@
+# GRAPHICS-119 - render-graph parallel recording baseline/probe.
+#
+# This smoke benchmark compares serial executor pass recording against
+# scheduler-backed parallel record/join over the same deterministic synthetic
+# pass-heavy CPU/null graph. It records measurement evidence only; Vulkan
+# smoke remains the operational gate before claiming renderer-wide adoption.
+
+benchmark_id: rendering.rendergraph_parallel_recording.smoke
+method: rendering.rendergraph_parallel_recording
+dataset: builtin.synthetic_parallel_recording.256_independent_passes
+params:
+  intent: smoke
+  pass_count: 256
+  warmup_iterations: 4
+  measured_iterations: 64
+  scheduler_worker_count: 2
+  record_ops_per_pass: 256
+  baseline_mode: serial_execute_recording
+  probe_mode: scheduler_parallel_record_join
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 250
+  quality_error_l2_max: 0.0

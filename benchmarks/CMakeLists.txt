@@ -36,6 +36,7 @@ add_executable(IntrinsicBenchmarkSmoke
     rendering/Bench_FramegraphCompilerIndexingSmoke.cpp
     rendering/Bench_FramegraphScratchReuseSmoke.cpp
     rendering/Bench_FrameRecipeCompileCacheSmoke.cpp
+    rendering/Bench_RenderGraphParallelRecordingSmoke.cpp
     rendering/Bench_VertexFetchLayoutSmoke.cpp
     ${CMAKE_SOURCE_DIR}/methods/physics/rigid_body_reference/src/RigidBodyReference.cpp
     ${CMAKE_SOURCE_DIR}/methods/physics/particle_spring_reference/src/ParticleSpringReference.cpp
