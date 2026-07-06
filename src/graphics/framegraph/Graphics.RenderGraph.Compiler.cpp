@@ -35,7 +35,7 @@ namespace Extrinsic::Graphics
         {
             switch (usage)
             {
-            case TextureUsage::ColorAttachmentRead:
+            case TextureUsage::ColorAttachmentRead: return TextureBarrierState::ColorAttachmentRead;
             case TextureUsage::ColorAttachmentWrite: return TextureBarrierState::ColorAttachmentWrite;
             case TextureUsage::DepthRead: return TextureBarrierState::DepthRead;
             case TextureUsage::DepthWrite: return TextureBarrierState::DepthWrite;

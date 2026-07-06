@@ -535,3 +535,58 @@ TEST(RenderGraphValidation, FindingsUseDeterministicSeverityCodePassResourceOrde
     ASSERT_EQ(loadFindings.size(), 1u);
     EXPECT_EQ(loadFindings.front().ResourceName, "LoadedColor");
 }
+
+TEST(RenderGraphValidation, ColorAttachmentReadUsesReadStateAndSkipsConsecutiveReadBarrier)
+{
+    RenderGraph graph;
+    const TextureRef lighting = graph.CreateTexture("Lighting", RHI::TextureDesc{});
+
+    (void)graph.AddPass("LightingWrite", [lighting](RenderGraphBuilder& builder) {
+        (void)builder.Write(lighting, TextureUsage::ColorAttachmentWrite);
+    });
+    (void)graph.AddPass("LightingRead0", [lighting](RenderGraphBuilder& builder) {
+        (void)builder.Read(lighting, TextureUsage::ColorAttachmentRead);
+        builder.SideEffect();
+    });
+    (void)graph.AddPass("LightingRead1", [lighting](RenderGraphBuilder& builder) {
+        (void)builder.Read(lighting, TextureUsage::ColorAttachmentRead);
+        builder.SideEffect();
+    });
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    ASSERT_FALSE(compiled->BarrierPackets.empty());
+
+    std::uint32_t writeToReadBarriers = 0u;
+    std::uint32_t readToReadBarriers = 0u;
+    std::uint32_t readPassWriteBarriers = 0u;
+    for (const BarrierPacket& packet : compiled->BarrierPackets)
+    {
+        for (const TextureBarrierPacket& barrier : packet.TextureBarriers)
+        {
+            if (barrier.TextureIndex != lighting.Index)
+            {
+                continue;
+            }
+            if (barrier.Before == TextureBarrierState::ColorAttachmentWrite &&
+                barrier.After == TextureBarrierState::ColorAttachmentRead)
+            {
+                ++writeToReadBarriers;
+            }
+            if (barrier.Before == TextureBarrierState::ColorAttachmentRead &&
+                barrier.After == TextureBarrierState::ColorAttachmentRead)
+            {
+                ++readToReadBarriers;
+            }
+            if (barrier.Before == TextureBarrierState::ColorAttachmentRead &&
+                barrier.After == TextureBarrierState::ColorAttachmentWrite)
+            {
+                ++readPassWriteBarriers;
+            }
+        }
+    }
+
+    EXPECT_EQ(writeToReadBarriers, 1u);
+    EXPECT_EQ(readToReadBarriers, 0u);
+    EXPECT_EQ(readPassWriteBarriers, 0u);
+}

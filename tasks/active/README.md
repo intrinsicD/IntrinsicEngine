@@ -11,8 +11,11 @@ Each active task should include:
 
 ## Currently active
 
-No active tasks. Consult [`tasks/SESSION-BRIEF.md`](../SESSION-BRIEF.md) for
-the next unblocked backlog candidates.
+- [`GRAPHICS-120`](GRAPHICS-120-framegraph-compiler-executor-efficiency.md) —
+  framegraph compiler/executor efficiency and hygiene polish. Slice A is
+  complete locally: `TextureUsage::ColorAttachmentRead` uses a read-only
+  barrier state with a focused CPU render-graph regression. Broader
+  efficiency/hygiene work remains in the active task file.
 
 ## History
 

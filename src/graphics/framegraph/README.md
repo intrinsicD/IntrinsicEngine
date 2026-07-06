@@ -50,6 +50,10 @@ the canonical `Present` declaration writes the imported `Backbuffer`. The
 post-pass `ColorAttachmentWrite -> Present` transition is emitted from
 `RenderGraph::ImportBackbuffer`'s final-state contract; there is no recipe-local
 barrier annotation or special backbuffer-write exception.
+Read-only color attachment uses (`TextureUsage::ColorAttachmentRead`) compile to
+a dedicated read barrier state that lowers to color-attachment layout with
+`ColorAttachmentRead` access, so consecutive read-only color attachment accesses
+do not emit artificial write-state transitions.
 
 Tests should assert compiled graph/resource properties by typed recipe identity
 where available, and may assert pass/resource names only for diagnostics and

@@ -5,6 +5,15 @@ depends_on: []
 ---
 # GRAPHICS-120 — Framegraph compiler/executor efficiency and hygiene polish
 
+## Status
+- In progress on local `main`; PR not opened.
+- Owner/agent: Codex.
+- Current slice: Slice A completed locally; `TextureUsage::ColorAttachmentRead`
+  now uses a read-only barrier state and the focused CPU contract regression
+  passes.
+- Next verification step: continue with Slice B (RHI-backed format sizing for
+  transient memory estimates) or Slice C (validation-result plumbing).
+
 ## Goal
 - Remove the per-compile/per-execute waste and small contract hazards inside
   `src/graphics/framegraph/`: allocation churn, quadratic scans, the
@@ -49,6 +58,21 @@ depends_on: []
     (`Graphics.RenderGraph.cpp:414-440`); a stale recipe reference lives in
     framegraph doc text (`Compiler.cppm:98-101`).
 
+## Slice plan
+- **Slice A (this slice).** Add a read-only color attachment barrier state,
+  map `TextureUsage::ColorAttachmentRead` to it, lower it to
+  `ColorAttachment` layout + `ColorAttachmentRead` access in the renderer, and
+  pin consecutive read-only color attachment accesses with a CPU contract
+  regression. Defers compiler scratch reuse, linear barrier emission,
+  validation-result plumbing, format sizing, and benchmark evidence to later
+  slices.
+- **Slice B.** Move framegraph transient format sizing to the RHI format helper
+  and pin BC block-compressed estimates.
+- **Slice C.** Replace the `thread_local` validation side channel with an
+  explicit return/out-param path and update docs.
+- **Slice D.** Tackle allocation churn and linear barrier emission with a
+  benchmarked before/after report.
+
 ## Required changes
 - [ ] Persistent compiler scratch: reuse compile-scoped containers across
       compiles (member scratch or arena); intern names as
@@ -61,7 +85,7 @@ depends_on: []
 - [ ] Replace the `thread_local` validation side channel: return the
       validation result in the `Compile()` `Expected` payload (or a caller
       out-param); make `Compile` non-`const` or move its mutations out.
-- [ ] Map `ColorAttachmentRead` to a read barrier state with read-read
+- [x] Slice A: map `ColorAttachmentRead` to a read barrier state with read-read
       transition skipping; pin with a barrier-plan test.
 - [ ] Move format sizing to an RHI helper with correct block-compressed
       math; delete the local table; fix the estimate; scrub the recipe
@@ -70,7 +94,7 @@ depends_on: []
 ## Tests
 - [ ] Golden: compiled output (edges, order, barriers) unchanged for a
       fixture graph across the churn/scan changes.
-- [ ] Contract: `ColorAttachmentRead` no longer emits a write-state
+- [x] Slice A contract: `ColorAttachmentRead` no longer emits a write-state
       transition between consecutive readers.
 - [ ] Contract: BC-format transient estimate matches block math.
 - [ ] Existing framegraph suites stay green.
@@ -78,7 +102,9 @@ depends_on: []
       pass-heavy synthetic graph.
 
 ## Docs
-- [ ] Update `src/graphics/framegraph/README.md` where contracts change
+- [x] Slice A: update `src/graphics/framegraph/README.md` for the read-only
+      color attachment barrier state.
+- [ ] Update `src/graphics/framegraph/README.md` where remaining contracts change
       (validation result plumbing, format sizing source).
 
 ## Acceptance criteria
@@ -97,7 +123,26 @@ python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/repo/check_layering.py --root src --strict
 ```
 
+Slice A verification run locally on 2026-07-06:
+
+```bash
+cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure -R 'RenderGraphValidation.ColorAttachmentReadUsesReadStateAndSkipsConsecutiveReadBarrier' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+ctest --test-dir build/ci --output-on-failure -R 'RenderGraphValidation|FrameRecipeContract.DefaultRecipeBarriersRespectTextureUsageCapabilities|FrameRecipeContract.DependencyDrivenDefaultRecipeKeepsBarrierPacketsTopological' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+ctest --test-dir build/ci --output-on-failure -R 'RenderGraphValidation|FrameRecipeContract|RendererFrameLifecycle|OwnershipTransferBarriers|CrossQueueTimeline' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+```
+
 ## Forbidden changes
 - Changing compiled-graph semantics beyond the two pinned defect fixes.
 - Perf claims without benchmark numbers.
 - Introducing renderer/recipe knowledge into the framegraph module.
+
+## Maturity
+- Target: `CPUContracted` for the two defect fixes and hygiene refactors, with
+  PR-fast benchmark evidence before the task retires; no `Operational`
+  follow-up is owed because this framegraph/compiler slice is backend-neutral
+  and lowers through existing renderer lifecycle coverage.
+- Slice A closes only the color-attachment-read defect at `CPUContracted`; no
+  performance claim is made in this slice.
