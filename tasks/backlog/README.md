@@ -171,18 +171,17 @@ The 2026-07-03 main-loop/task-graph/render-graph review
 seeded a Theme F set spanning the core task system and the runtime
 composition root: the retired non-blocking import-apply fix `RUNTIME-140`,
 the retired async editor method-command lane `RUNTIME-141`, the retired
-non-blocking frame-path fixes `RUNTIME-142`,
-the retired frame-hook/K-Means decoupling seam `RUNTIME-143`,
-composition-root/abstractness seams (`RUNTIME-144`,
-`CORE-006`, `CORE-009`, `ARCH-006`), scheduler/DAG capability and
-efficiency (`CORE-005`, `CORE-007`, `CORE-008`), and steady-state frame
-efficiency (`RUNTIME-145`). The retired correctness fix `BUG-055` (Theme G)
-unblocks `CORE-005`.
+non-blocking frame-path fixes `RUNTIME-142`, the retired frame-hook/K-Means
+decoupling seam `RUNTIME-143`, the retired post-import/import-UX/input-action
+composition seam `RUNTIME-144`, remaining composition-root/abstractness seams
+(`CORE-006`, `CORE-009`, `ARCH-006`), scheduler/DAG capability and efficiency
+(`CORE-005`, `CORE-007`, `CORE-008`), and steady-state frame efficiency
+(`RUNTIME-145`). The retired correctness fix `BUG-055` (Theme G) unblocks
+`CORE-005`.
 
 Open members:
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md`](runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md).
-- [`../active/RUNTIME-144-post-import-processor-and-ux-policy-seam.md`](../active/RUNTIME-144-post-import-processor-and-ux-policy-seam.md).
 - [`runtime/RUNTIME-145-runtime-frame-path-efficiency-polish.md`](runtime/RUNTIME-145-runtime-frame-path-efficiency-polish.md).
 - [`architecture/CORE-005-nonblocking-taskgraph-submit-api.md`](architecture/CORE-005-nonblocking-taskgraph-submit-api.md).
 - [`architecture/CORE-006-domain-free-core-task-vocabulary.md`](architecture/CORE-006-domain-free-core-task-vocabulary.md).

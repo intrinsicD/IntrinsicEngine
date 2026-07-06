@@ -9,6 +9,21 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`RUNTIME-144`](RUNTIME-144-post-import-processor-and-ux-policy-seam.md) —
+Post-import processor and import UX-policy seam — retired on 2026-07-06 at
+maturity `Operational`. `Runtime.Engine` now owns generic post-import
+processor, import-authoring, import-completed, input-action, and runtime GPU
+participant registries/dispatch only. The sandbox/default composition helper
+`Extrinsic.Runtime.SandboxDefaultPolicies` installs the standard direct-mesh
+generated-normal post-import processor, import authoring defaults, focus and
+auto-select import completion UX, and `F` focus-on-selection action; the
+sandbox app explicitly registers and unregisters that bundle. Bare-engine
+contracts now prove imports and `RunFrame` remain minimal with no default
+bundle installed, while sandbox fixture coverage preserves the prior default
+behavior. GPU re-domaining of the generated-normal bake remains owned by
+`GRAPHICS-104`/`RUNTIME-129`.
+
+Active
 [`RUNTIME-141`](RUNTIME-141-async-editor-method-command-lane.md) — Async
 editor method-command lane — retired on 2026-07-05 at maturity `Operational`.
 The Sandbox editor CPU method buttons for K-Means, Progressive Poisson,

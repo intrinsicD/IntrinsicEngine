@@ -77,6 +77,7 @@ import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SandboxEditorUi;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
@@ -119,6 +120,11 @@ namespace
 {
     constexpr std::uint32_t kInvalidIndex =
         std::numeric_limits<std::uint32_t>::max();
+
+    void InstallSandboxDefaultRuntimePolicies(Runtime::Engine& engine)
+    {
+        (void)Runtime::RegisterSandboxDefaultRuntimePolicies(engine);
+    }
 
     [[nodiscard]] bool ImGuiWindowExists(const std::string_view name)
     {
@@ -7166,6 +7172,7 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandSurvivesPendingDirectMeshPostProce
             },
             128u));
     engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
 
     auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
@@ -10337,6 +10344,7 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesStandaloneGeometryDomains)
 
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
     engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
 
     auto mesh = engine.ImportAssetFromPath(
         Runtime::RuntimeAssetImportRequest{
@@ -10454,6 +10462,7 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesNonManifoldObjAsRenderableMe
                     DirectMeshPostProcessReady(runningEngine, *meshEntity);
             }));
     engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
 
     auto mesh = engine.ImportAssetFromPath(
         Runtime::RuntimeAssetImportRequest{
@@ -10520,6 +10529,7 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesObjWithoutAuthoredTexcoordsA
                     DirectMeshPostProcessReady(runningEngine, *meshEntity);
             }));
     engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
 
     auto mesh = engine.ImportAssetFromPath(
         Runtime::RuntimeAssetImportRequest{
@@ -10590,6 +10600,7 @@ TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacad
         HeadlessConfig(),
         std::make_unique<WaitForAssetImportEventApplication>(128u));
     engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
 
     Runtime::SandboxEditorUi ui;
     ui.Attach(engine);
@@ -10636,6 +10647,7 @@ TEST(SandboxEditorUi, DuplicateDroppedGeometryImportUsesSingleIngestRecord)
         HeadlessConfig(),
         std::make_unique<FixedFrameApplication>(128u));
     engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
 
     const std::vector<std::string> droppedPaths{
         meshFile.Path.string(),
@@ -10698,6 +10710,7 @@ TEST(SandboxEditorUi, DroppedFileQueuePreservesOrderDiagnosticsAndClearCompleted
         HeadlessConfig(),
         std::make_unique<FixedFrameApplication>(128u));
     engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
 
     const std::vector<std::string> droppedPaths{
         meshFile.Path.string(),
@@ -10793,6 +10806,7 @@ TEST(SandboxEditorUi, DroppedGeometryAssetReimportReloadsSameAssetWithoutDuplica
         HeadlessConfig(),
         std::make_unique<WaitForAssetImportEventApplication>(128u));
     engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
 
     const std::vector<std::string> droppedPaths{meshFile.Path.string()};
     engine.ImportDroppedFilePaths(droppedPaths);
@@ -10879,6 +10893,7 @@ TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesRenderCo
         HeadlessConfig(),
         std::make_unique<WaitForAssetImportEventApplication>(128u));
     engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
 
     Runtime::SandboxEditorUi ui;
     ui.Attach(engine);
@@ -10970,6 +10985,7 @@ TEST(SandboxEditorUi, PlatformDropNoUvObjUploadsRawSurfaceBeforeDeferredPostProc
         HeadlessConfig(),
         std::make_unique<WaitForAssetImportEventApplication>(128u));
     engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
 
     engine.DispatchPlatformEventForTest(Plat::WindowDropEvent{
         .Paths = {meshFile.Path.string()},
@@ -11065,6 +11081,7 @@ TEST(SandboxEditorUi, PlatformDropEventImportsOffMesh)
         HeadlessConfig(),
         std::make_unique<WaitForAssetImportEventApplication>(128u));
     engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
 
     engine.DispatchPlatformEventForTest(Plat::WindowDropEvent{
         .Paths = {meshFile.Path.string()},

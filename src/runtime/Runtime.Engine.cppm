@@ -695,11 +695,9 @@ namespace Extrinsic::Runtime
             RegisterImportCompletedHandler(RuntimeImportCompletedHandlerDesc desc);
         void UnregisterImportCompletedHandler(
             RuntimeImportCompletedHandlerHandle handle);
-        void UnregisterDefaultImportPolicies();
         [[nodiscard]] RuntimeInputActionHandle RegisterInputAction(
             RuntimeInputActionDesc desc);
         void UnregisterInputAction(RuntimeInputActionHandle handle);
-        void UnregisterDefaultInputActions();
         [[nodiscard]] const std::optional<RuntimeAssetImportEvent>&
             GetLastAssetImportEvent() const noexcept;
         [[nodiscard]] std::vector<RuntimeAssetIngestRecord>
@@ -861,8 +859,6 @@ namespace Extrinsic::Runtime
         void QueueDroppedModelTextureImport(
             std::string path,
             Assets::AssetPayloadKind payloadKind);
-        void RegisterDefaultImportPolicies();
-        void RegisterDefaultInputActions();
         [[nodiscard]] Core::Expected<RuntimeAssetImportResult> ImportAssetFromPathWithIngest(
             RuntimeAssetImportRequest request,
             RuntimeAssetIngestSource source,
@@ -980,24 +976,14 @@ namespace Extrinsic::Runtime
         RuntimeAssetIngestStateMachine             m_AssetIngestStateMachine{};
         std::vector<RuntimePostImportProcessorRecord> m_PostImportProcessors{};
         std::uint64_t m_NextPostImportProcessorHandle{1u};
-        std::vector<RuntimePostImportProcessorHandle> m_DefaultPostImportProcessors{};
-        bool m_DefaultPostImportProcessorsRegistered{false};
         std::vector<RuntimeImportEntityAuthoringPolicyRecord>
             m_ImportEntityAuthoringPolicies{};
         std::uint64_t m_NextImportEntityAuthoringPolicyHandle{1u};
-        std::vector<RuntimeImportEntityAuthoringPolicyHandle>
-            m_DefaultImportEntityAuthoringPolicies{};
-        bool m_DefaultImportEntityAuthoringPoliciesRegistered{false};
         std::vector<RuntimeImportCompletedHandlerRecord>
             m_ImportCompletedHandlers{};
         std::uint64_t m_NextImportCompletedHandlerHandle{1u};
-        std::vector<RuntimeImportCompletedHandlerHandle>
-            m_DefaultImportCompletedHandlers{};
-        bool m_DefaultImportCompletedHandlersRegistered{false};
         std::vector<RuntimeInputActionRecord> m_InputActions{};
         std::uint64_t m_NextInputActionHandle{1u};
-        std::vector<RuntimeInputActionHandle> m_DefaultInputActions{};
-        bool m_DefaultInputActionsRegistered{false};
         struct RuntimeAssetImportStreamingTask
         {
             RuntimeAssetIngestHandle Ingest{};

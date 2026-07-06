@@ -1,5 +1,5 @@
-// RUNTIME-144 Slice C — Engine input actions route frame-loop commands through
-// registered callbacks. The default `F` focus binding is exercised through the
+// RUNTIME-144 — registered input actions route frame-loop commands through
+// callbacks. The sandbox default `F` focus binding is exercised through the
 // real Null-window RunFrame path so the test covers input edge detection,
 // post-flush dispatch, selection lookup, and same-frame camera focus.
 
@@ -20,6 +20,7 @@ import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SelectionController;
 
 namespace
@@ -132,6 +133,7 @@ TEST(RuntimeInputActions, DefaultFocusKeyDispatchesRegisteredAction)
     auto* appPtr = app.get();
     Runtime::Engine engine(InputActionConfig(), std::move(app));
     engine.Initialize();
+    (void)Runtime::RegisterSandboxDefaultRuntimePolicies(engine);
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
         << "Null window backend should keep Engine::Run() drivable";
@@ -152,13 +154,12 @@ TEST(RuntimeInputActions, DefaultFocusKeyDispatchesRegisteredAction)
     engine.Shutdown();
 }
 
-TEST(RuntimeInputActions, UnregisteredDefaultInputActionsLeaveFocusKeyNoOp)
+TEST(RuntimeInputActions, NoDefaultInputActionsLeaveFocusKeyNoOp)
 {
     auto app = std::make_unique<PressFocusKeyApplication>();
     auto* appPtr = app.get();
     Runtime::Engine engine(InputActionConfig(), std::move(app));
     engine.Initialize();
-    engine.UnregisterDefaultInputActions();
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
         << "Null window backend should keep Engine::Run() drivable";

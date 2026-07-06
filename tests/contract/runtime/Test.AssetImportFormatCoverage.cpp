@@ -45,6 +45,7 @@ import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.HalfedgeMesh.IO;
@@ -577,6 +578,11 @@ namespace
         extraction.Shutdown(engine.GetRenderer());
     }
 
+    void InstallSandboxDefaultRuntimePolicies(Runtime::Engine& engine)
+    {
+        (void)Runtime::RegisterSandboxDefaultRuntimePolicies(engine);
+    }
+
 }
 
 TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGeometrySources)
@@ -601,6 +607,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGe
                     DirectMeshPostProcessReady(runningEngine, *meshEntity);
             }));
     engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
 
     auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
@@ -660,6 +667,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportDefaultsToMaterialDrivenSh
         HeadlessConfig(),
         std::make_unique<OneFrameApplication>());
     engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
 
     auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
@@ -703,6 +711,7 @@ TEST(RuntimeAssetImportFormatCoverage, DefaultImportPoliciesApplyAuthoringUxAndP
             },
             256u));
     engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
 
     auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
@@ -764,7 +773,6 @@ TEST(RuntimeAssetImportFormatCoverage, UnregisteredImportPoliciesMaterializeMini
             },
             64u));
     engine.Initialize();
-    engine.UnregisterDefaultImportPolicies();
 
     auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
@@ -1144,6 +1152,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportBakesGeneratedNormalTextur
                     DirectMeshPostProcessReady(runningEngine, *meshEntity);
             }));
     engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
 
     auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
@@ -1194,6 +1203,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesVertexNormalsWhenM
                     DirectMeshPostProcessReady(runningEngine, *meshEntity);
             }));
     engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
 
     auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
@@ -1258,6 +1268,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesAndBakesGeneratedN
                     DirectMeshPostProcessReady(runningEngine, *meshEntity);
             }));
     engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
 
     auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
@@ -1336,6 +1347,7 @@ TEST(RuntimeAssetImportFormatCoverage, RepresentativePromotedFormatsMaterializeD
 
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
     engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
 
     auto mesh = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),

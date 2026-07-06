@@ -82,8 +82,11 @@ post-import processors with the decoded payload context. Processors may enqueue
 deferred work through `StreamingExecutor`, but the main-thread apply boundary
 remains the only place that mutates imported ECS or asset state. Once the import
 is materialized, ordered import-completed handlers receive the created entity
-span plus an optional focus target; the default compatibility handler applies
-the current focus-on-import and auto-select behavior.
+span plus an optional focus target. Sandbox/default composition installs the
+current direct-mesh generated-normal processor, import authoring defaults,
+focus-on-import handler, and auto-select behavior through
+`Extrinsic.Runtime.SandboxDefaultPolicies`; a bare `Engine` with no
+registrations still materializes geometry without those policies.
 
 ### Camera focus command
 
@@ -98,11 +101,12 @@ set; `FocusCameraOnSelection(...)` focuses the current `SelectionController`
 selection. Phase 4 of `RunFrame` dispatches registered input actions after the
 pre-render transform/bounds flush (`FlushPreRenderTransformState`, BUG-024), so
 focus actions read `World::Bounds` already refreshed for this frame's transform
-edits. The default compatibility action binds the `F` ("focus") key edge to the
-selection wrapper for the `Main` slot, suppresses it while Dear ImGui owns the
-keyboard, and rebuilds the render camera after a successful focus so the
-reframed view reaches extraction the same frame. The per-controller framing
-distance math is unchanged and remains owned by the controllers
+edits. The sandbox default action binds the `F` ("focus") key edge to the
+selection wrapper for the `Main` slot when installed by sandbox/default
+composition, suppresses it while Dear ImGui owns the keyboard, and rebuilds the
+render camera after a successful focus so the reframed view reaches extraction
+the same frame. The per-controller framing distance math is unchanged and
+remains owned by the controllers
 (`Extrinsic.Runtime.CameraControllers`).
 
 Operational promotion is gated on `RHI::IDevice::IsOperational()` and renderer

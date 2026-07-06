@@ -5,6 +5,7 @@ module;
 export module Extrinsic.Sandbox;
 
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SandboxEditorUi;
 
 namespace Extrinsic::Sandbox
@@ -14,6 +15,8 @@ namespace Extrinsic::Sandbox
     public:
         void OnInitialize(Runtime::Engine& engine) override
         {
+            m_DefaultPolicies =
+                Runtime::RegisterSandboxDefaultRuntimePolicies(engine);
             m_EditorUi.Attach(engine);
         }
 
@@ -33,12 +36,15 @@ namespace Extrinsic::Sandbox
 
         void OnShutdown(Runtime::Engine& engine) override
         {
-            (void)engine;
             m_EditorUi.Detach();
+            Runtime::UnregisterSandboxDefaultRuntimePolicies(
+                engine,
+                m_DefaultPolicies);
         }
 
     private:
         Runtime::SandboxEditorUi m_EditorUi{};
+        Runtime::RuntimeSandboxDefaultPolicyRegistration m_DefaultPolicies{};
     };
 }
 

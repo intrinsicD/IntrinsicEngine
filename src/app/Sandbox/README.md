@@ -10,19 +10,22 @@ belong in `Runtime` or lower engine layers. The executable obtains its default
 configuration through `Runtime` and should not import lower layers directly.
 
 The sandbox app attaches the promoted runtime-owned `SandboxEditorUi` shell
-through application lifecycle hooks. It remains a runtime-only consumer:
-the editor shell registers with `Engine::SetImGuiEditorCallback`, reads scene
-and selection state through runtime APIs, emits selection and local-transform
-edit commands through runtime-owned seams, replaces runtime camera-controller
-slots through the engine-owned registry, toggles mesh edge/vertex primitive
-views through runtime extraction-cache settings, routes selected-entity
-spatial-debug options through `SpatialDebugBinding`, routes material/scalar/color
-visualization choices through `VisualizationConfig`, routes visualization
-adapter bindings through runtime extraction-cache state, and submits file/import
-path commands through `Engine::ImportAssetFromPath(...)`. Asset routing,
-decoding, `AssetService` mutation, model-scene materialization, and
-texture-upload requests remain runtime/asset owned; the sandbox app
-implementation does not special-case asset authority.
+through application lifecycle hooks and installs the sandbox default runtime
+policy bundle through `Runtime::RegisterSandboxDefaultRuntimePolicies(engine)`.
+It unregisters the returned handles during shutdown before the engine tears down.
+The app remains a runtime-only consumer: the editor shell registers with
+`Engine::SetImGuiEditorCallback`, reads scene and selection state through
+runtime APIs, emits selection and local-transform edit commands through
+runtime-owned seams, replaces runtime camera-controller slots through the
+engine-owned registry, toggles mesh edge/vertex primitive views through runtime
+extraction-cache settings, routes selected-entity spatial-debug options through
+`SpatialDebugBinding`, routes material/scalar/color visualization choices
+through `VisualizationConfig`, routes visualization adapter bindings through
+runtime extraction-cache state, and submits file/import path commands through
+`Engine::ImportAssetFromPath(...)`. Asset routing, decoding, `AssetService`
+mutation, model-scene materialization, texture-upload requests, and default
+import/input policy implementation remain runtime/asset owned; the sandbox app
+implementation only composes the runtime-provided defaults.
 
 The `File / Import` editor window also polls
 `Engine::GetAssetImportQueueSnapshot()` for the runtime-owned AssetIO queue.

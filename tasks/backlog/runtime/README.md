@@ -29,10 +29,11 @@ Blocking fixes first, then abstractness seams, then steady-state efficiency:
   multi-subscriber registry, `Engine` owns a generic runtime GPU participant
   seam, and Sandbox editor K-Means GPU execution owns its queue outside
   `Engine`.
-- [`RUNTIME-144`](../../active/RUNTIME-144-post-import-processor-and-ux-policy-seam.md)
-  is active; post-import processor + import UX-policy seam (normal-bake
-  registration, focus/auto-select policy, `F`-key routing; coordinates with
-  `RUNTIME-129`).
+- [`RUNTIME-144`](../../done/RUNTIME-144-post-import-processor-and-ux-policy-seam.md)
+  is retired; post-import processors, import authoring/default UX, and the
+  `F` focus action now register through runtime seams while sandbox/default
+  composition owns the default bundle (normal-bake registration coordinates
+  with `RUNTIME-129`/`GRAPHICS-104`).
 - [`RUNTIME-145`](RUNTIME-145-runtime-frame-path-efficiency-polish.md) —
   steady-state frame-path efficiency polish (incremental
   `StableEntityLookup`, `StreamingExecutor` slot recycling, dirty-gated
@@ -165,6 +166,13 @@ split; narratives live in the retirement log.
   generic runtime GPU participant seam for command recording, maintenance
   drains, in-flight checks, and post-idle teardown, and `SandboxEditorUi` owns
   the concrete `RuntimeKMeansGpuJobQueue` while attached.
+- [RUNTIME-144 — Post-import processor and import UX-policy seam](../../done/RUNTIME-144-post-import-processor-and-ux-policy-seam.md)
+  (done, 2026-07-06, `Operational`): `Engine` now owns generic post-import
+  processor, import-authoring, import-completed, and input-action dispatch
+  registries only; `Extrinsic.Runtime.SandboxDefaultPolicies` installs the
+  sandbox default direct-mesh generated-normal processor, authoring defaults,
+  focus/auto-select import UX, and `F` focus action from the app composition
+  side.
 - [RUNTIME-125 — Optional AoS fast lane for static geometry](../../done/RUNTIME-125-aos-static-fast-lane.md)
   (done, 2026-07-02, `CPUContracted`): PR-fast SoA/probe benchmark evidence and
   planning-only storage-lane/promotion contracts landed without allocating an
