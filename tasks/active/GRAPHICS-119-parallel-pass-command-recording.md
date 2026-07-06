@@ -8,8 +8,8 @@ depends_on: []
 ## Status
 - In progress on local `main`; PR not opened.
 - Owner/agent: Codex.
-- Current slice: Slice C.6 (renderer worker fan-out) completed and verified
-  locally.
+- Current slice: Slice C.7 (seeded CPU/null determinism coverage) completed
+  and verified locally.
 - Next implementation step: cover remaining non-graphics queue fan-out /
   benchmark / opt-in Vulkan smoke scope.
 
@@ -150,7 +150,10 @@ depends_on: []
 - [x] Slice C.6 renderer contract: accepted parallel context plans dispatch
       pass recording through scheduler worker tasks when the scheduler is
       initialized and keep compiled serial submit order.
-- [ ] CPU/null contract: parallel recording produces the same
+- [x] Slice C.7 CPU/null contract: seeded DAG graph shapes preserve the exact
+      serial barrier/pass event stream under scheduler-backed parallel
+      record/join.
+- [x] CPU/null contract: parallel recording produces the same
       pass-execution/barrier submission order as serial (bookkeeping
       comparison over randomized graphs).
 - [x] CPU/null contract: recording work actually distributes across workers
@@ -183,6 +186,8 @@ depends_on: []
 - [x] Slice C.6: document scheduler-backed renderer worker fan-out, the guarded
       frame-sampled descriptor bridge, and the remaining non-graphics queue /
       benchmark / opt-in Vulkan smoke scope.
+- [x] Slice C.7: task record documents seeded CPU/null determinism coverage;
+      no architecture docs changed.
 - [x] Update `docs/architecture/frame-graph.md` and
       `src/graphics/renderer/README.md` (threading model, fallback flag).
 
@@ -403,6 +408,22 @@ API surface changed), row 4 `pass` (the renderer descriptor guard and mock
 request guard are owned by the GRAPHICS-119 worker-recording seam and are not a
 new subsystem), row 5 `n/a` (no new frame-graph pass), row 6 `n/a` (no recipe
 edge changes). Findings: none; no follow-up task ID required.
+
+Slice C.7 verification run locally on 2026-07-07:
+
+```bash
+cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure -R 'RenderGraphParallelRecording\.SeededDagsPreserveSerialSubmitOrder' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+ctest --test-dir build/ci --output-on-failure -R 'RenderGraphParallelRecording' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+python3 tools/agents/generate_session_brief.py
+git diff --check
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/validate_tasks.py --root tasks --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --strict
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+```
 
 ## Forbidden changes
 - Nondeterministic submission order or frame output.

@@ -105,6 +105,64 @@ namespace
         return compiled.value_or(CompiledRenderGraph{});
     }
 
+    [[nodiscard]] std::uint32_t NextRandom(std::uint32_t& state) noexcept
+    {
+        state = state * 1664525u + 1013904223u;
+        return state;
+    }
+
+    [[nodiscard]] CompiledRenderGraph CompileSeededDag(const std::uint32_t seed,
+                                                       const std::uint32_t passCount,
+                                                       const std::uint32_t textureCount)
+    {
+        RenderGraph graph;
+        std::vector<TextureRef> textures{};
+        textures.reserve(textureCount);
+        for (std::uint32_t textureIndex = 0u; textureIndex < textureCount; ++textureIndex)
+        {
+            textures.push_back(
+                graph.CreateTexture("SeededTexture" + std::to_string(textureIndex), RHI::TextureDesc{}));
+        }
+
+        std::vector<bool> hasWriter(textureCount, false);
+        std::uint32_t state = seed;
+        for (std::uint32_t passIndex = 0u; passIndex < passCount; ++passIndex)
+        {
+            const std::uint32_t writeIndex = NextRandom(state) % textureCount;
+            const std::uint32_t readBudget = NextRandom(state) % 3u;
+            std::vector<std::uint32_t> readIndices{};
+            readIndices.reserve(readBudget);
+            for (std::uint32_t attempt = 0u;
+                 attempt < textureCount * 2u && readIndices.size() < readBudget;
+                 ++attempt)
+            {
+                const std::uint32_t readIndex = NextRandom(state) % textureCount;
+                if (readIndex == writeIndex || !hasWriter[readIndex] ||
+                    std::find(readIndices.begin(), readIndices.end(), readIndex) != readIndices.end())
+                {
+                    continue;
+                }
+                readIndices.push_back(readIndex);
+            }
+
+            (void)graph.AddPass(
+                "SeededPass" + std::to_string(seed) + "." + std::to_string(passIndex),
+                [textures, readIndices, writeIndex](RenderGraphBuilder& builder) {
+                    for (const std::uint32_t readIndex : readIndices)
+                    {
+                        (void)builder.Read(textures[readIndex], TextureUsage::ShaderRead);
+                    }
+                    (void)builder.Write(textures[writeIndex], TextureUsage::ColorAttachmentWrite);
+                },
+                true);
+            hasWriter[writeIndex] = true;
+        }
+
+        auto compiled = graph.Compile();
+        EXPECT_TRUE(compiled.has_value()) << "seed=" << seed;
+        return compiled.value_or(CompiledRenderGraph{});
+    }
+
     void RaiseMax(std::atomic<int>& maxValue, const int candidate)
     {
         int observed = maxValue.load(std::memory_order_relaxed);
@@ -150,6 +208,46 @@ TEST(RenderGraphParallelRecording, ParallelRecordJoinPreservesSerialSubmitOrder)
     EXPECT_EQ(stats.ScheduledPassCount, compiled.TopologicalOrder.size());
     EXPECT_EQ(stats.CallerRecordCount, compiled.TopologicalOrder.size());
     EXPECT_FALSE(stats.UsedScheduler);
+}
+
+TEST(RenderGraphParallelRecording, SeededDagsPreserveSerialSubmitOrder)
+{
+    SchedulerScope scheduler{4u};
+    RenderGraphExecutor executor;
+    for (std::uint32_t seed = 1u; seed <= 16u; ++seed)
+    {
+        const CompiledRenderGraph compiled = CompileSeededDag(seed, 12u, 5u);
+        ASSERT_EQ(compiled.TopologicalOrder.size(), 12u) << "seed=" << seed;
+
+        const std::vector<std::string> serialEvents = ExecuteSerialEvents(compiled);
+        std::atomic<std::uint32_t> recordCount{0u};
+        std::vector<std::string> parallelEvents{};
+        ParallelRecordStats stats{};
+
+        const auto result = executor.ExecuteParallelRecordJoin(
+            compiled,
+            [&recordCount](const std::uint32_t, const std::uint32_t) {
+                recordCount.fetch_add(1u, std::memory_order_acq_rel);
+                return Extrinsic::Core::Ok();
+            },
+            [&parallelEvents](const std::uint32_t passIndex) {
+                parallelEvents.push_back("pass(" + std::to_string(passIndex) + ")");
+            },
+            [&parallelEvents](const BarrierPacket& packet) {
+                parallelEvents.push_back(BarrierEvent(packet));
+            },
+            &stats,
+            ParallelRecordOptions{.UseScheduler = true, .MinWorkerPassCount = 1u});
+
+        ASSERT_TRUE(result.has_value()) << "seed=" << seed;
+        EXPECT_EQ(parallelEvents, serialEvents) << "seed=" << seed;
+        EXPECT_EQ(recordCount.load(std::memory_order_acquire),
+                  static_cast<std::uint32_t>(compiled.TopologicalOrder.size())) << "seed=" << seed;
+        EXPECT_EQ(stats.ScheduledPassCount, compiled.TopologicalOrder.size()) << "seed=" << seed;
+        EXPECT_EQ(stats.WorkerTaskCount, compiled.TopologicalOrder.size()) << "seed=" << seed;
+        EXPECT_EQ(stats.CallerRecordCount, 0u) << "seed=" << seed;
+        EXPECT_TRUE(stats.UsedScheduler) << "seed=" << seed;
+    }
 }
 
 TEST(RenderGraphParallelRecording, IndependentLayerRecordsOnWorkers)
