@@ -2842,6 +2842,64 @@ namespace Extrinsic::Runtime
             Shutdown();
     }
 
+    void Engine::ConnectStableEntityLookupTracking()
+    {
+        if (!m_Scene)
+            return;
+
+        auto& raw = m_Scene->Raw();
+        m_StableIdConstructConnection =
+            raw.on_construct<ECS::Components::StableId>()
+                .connect<&Engine::OnStableIdConstruct>(*this);
+        m_StableIdUpdateConnection =
+            raw.on_update<ECS::Components::StableId>()
+                .connect<&Engine::OnStableIdUpdate>(*this);
+        m_StableIdDestroyConnection =
+            raw.on_destroy<ECS::Components::StableId>()
+                .connect<&Engine::OnStableIdDestroy>(*this);
+    }
+
+    void Engine::DisconnectStableEntityLookupTracking() noexcept
+    {
+        m_StableIdConstructConnection.release();
+        m_StableIdUpdateConnection.release();
+        m_StableIdDestroyConnection.release();
+    }
+
+    void Engine::RebuildStableEntityLookupAfterSceneReplacement()
+    {
+        DisconnectStableEntityLookupTracking();
+        if (!m_Scene)
+        {
+            m_StableEntityLookup.Clear();
+            return;
+        }
+
+        ConnectStableEntityLookupTracking();
+        m_StableEntityLookup.Rebuild(*m_Scene);
+    }
+
+    void Engine::OnStableIdConstruct(entt::registry& registry, entt::entity entity)
+    {
+        if (!m_Scene || &registry != &m_Scene->Raw())
+            return;
+        (void)m_StableEntityLookup.Track(*m_Scene, entity);
+    }
+
+    void Engine::OnStableIdUpdate(entt::registry& registry, entt::entity entity)
+    {
+        if (!m_Scene || &registry != &m_Scene->Raw())
+            return;
+        (void)m_StableEntityLookup.Track(*m_Scene, entity);
+    }
+
+    void Engine::OnStableIdDestroy(entt::registry& registry, entt::entity entity)
+    {
+        if (!m_Scene || &registry != &m_Scene->Raw())
+            return;
+        m_StableEntityLookup.Forget(entity);
+    }
+
     // ── Lifecycle ─────────────────────────────────────────────────────────
 
     void Engine::Initialize()
@@ -2993,6 +3051,7 @@ namespace Extrinsic::Runtime
             });
         // ── 6. ECS scene ──────────────────────────────────────────────────
         m_Scene = std::make_unique<ECS::Scene::Registry>();
+        ConnectStableEntityLookupTracking();
 
         m_AssetModelTextureHandoff = std::make_unique<AssetModelTextureHandoff>(
             *m_AssetService,
@@ -3006,8 +3065,8 @@ namespace Extrinsic::Runtime
         // RUNTIME-092 Slice B — attach the runtime-owned stable-entity lookup
         // to the selection authority so render-id resolution flows through the
         // single runtime sidecar (which decodes + validates against the
-        // registry) rather than a bare cast. The lookup is rebuilt each frame
-        // in RunFrame before the pick-readback drain.
+        // registry) rather than a bare cast. The durable-id winner map is
+        // maintained incrementally from StableId component events.
         m_SelectionController.SetStableEntityLookup(&m_StableEntityLookup);
 
         // ── 6b. Reference scene bootstrap (GRAPHICS-029A/B) ───────────────
@@ -3159,6 +3218,9 @@ namespace Extrinsic::Runtime
             }
             void DestroyScene() override
             {
+                Owner.DisconnectStableEntityLookupTracking();
+                Owner.m_StableEntityLookup.Clear();
+
                 // The model-scene handoff borrows the scene and renderer, so
                 // detach it before provider teardown or wholesale scene reset.
                 AssetModelSceneHandoffPtr.reset();
@@ -3568,17 +3630,12 @@ namespace Extrinsic::Runtime
         }
         pacing.MaintenanceMicros = ElapsedMicros(maintenanceBegin);
 
-        // ── RUNTIME-092 Slice B: refresh the stable-entity lookup ──────────
-        // Rebuild the runtime-owned StableId winner-map from the live registry
-        // before consuming pick readbacks, so durable-id resolution and the
-        // editor/serialization-facing ResolveByStableId/ResolveSelected APIs
-        // observe this frame's entity set. Render-id resolution (the path the
-        // controller takes for a pick hit) decodes + validates against the live
-        // registry directly and does not depend on the map, so a recycled slot
-        // is rejected regardless; the rebuild keeps the durable map coherent for
-        // the other consumers and is the single per-frame maintenance point.
+        // ── RUNTIME-092 / RUNTIME-145: completed selection readbacks ───────
+        // The durable StableId winner-map is maintained incrementally from
+        // scene StableId component events; this frame phase only drains pick
+        // readbacks. Render-id resolution still decodes + validates against the
+        // live registry through the attached runtime-owned lookup.
         const auto readbackBegin = std::chrono::steady_clock::now();
-        m_StableEntityLookup.Rebuild(*m_Scene);
 
         // ── RUNTIME-089 / RUNTIME-093 / BUG-026: completed pick readbacks ──
         DrainCompletedSelectionReadbacksForFrame(m_Renderer->GetSelectionSystem(),
@@ -5617,9 +5674,10 @@ namespace Extrinsic::Runtime
             return Core::Err<SceneDeserializationResult>(loaded.error());
 
         ClearSceneRuntimeState();
+        DisconnectStableEntityLookupTracking();
         m_Scene->Clear();
         m_Scene->Raw() = std::move(loadedScene.Raw());
-        m_StableEntityLookup.Rebuild(*m_Scene);
+        RebuildStableEntityLookupAfterSceneReplacement();
         m_EditorCommandHistory.ResetDocument(path);
         return loaded;
     }
@@ -5685,9 +5743,10 @@ namespace Extrinsic::Runtime
                         {
                             loaded = *state->Result;
                             ClearSceneRuntimeState();
+                            DisconnectStableEntityLookupTracking();
                             m_Scene->Clear();
                             m_Scene->Raw() = std::move(state->LoadedScene.Raw());
-                            m_StableEntityLookup.Rebuild(*m_Scene);
+                            RebuildStableEntityLookupAfterSceneReplacement();
                             m_EditorCommandHistory.ResetDocument(state->Path);
                         }
                     }
@@ -5736,8 +5795,10 @@ namespace Extrinsic::Runtime
             return Core::Err(Core::ErrorCode::InvalidState);
 
         ClearSceneRuntimeState();
+        DisconnectStableEntityLookupTracking();
         m_Scene->Clear();
         m_StableEntityLookup.Clear();
+        ConnectStableEntityLookupTracking();
         m_EditorCommandHistory.ResetDocument();
         return Core::Ok();
     }
@@ -5748,6 +5809,18 @@ namespace Extrinsic::Runtime
     }
 
     SelectionController&  Engine::GetSelectionController() noexcept { return m_SelectionController; }
+    std::optional<ECS::EntityHandle>
+    Engine::ResolveEntityByStableId(ECS::Components::StableId id)
+    {
+        if (!m_Scene)
+            return std::nullopt;
+        return m_StableEntityLookup.ResolveByStableId(*m_Scene, id);
+    }
+    const StableEntityLookupDiagnostics&
+    Engine::GetStableEntityLookupDiagnostics() const noexcept
+    {
+        return m_StableEntityLookup.GetDiagnostics();
+    }
     EditorCommandHistory& Engine::GetEditorCommandHistory() noexcept
     {
         return m_EditorCommandHistory;

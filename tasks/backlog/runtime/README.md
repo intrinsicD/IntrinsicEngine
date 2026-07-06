@@ -34,8 +34,8 @@ Blocking fixes first, then abstractness seams, then steady-state efficiency:
   `F` focus action now register through runtime seams while sandbox/default
   composition owns the default bundle (normal-bake registration coordinates
   with `RUNTIME-129`/`GRAPHICS-104`).
-- [`RUNTIME-145`](RUNTIME-145-runtime-frame-path-efficiency-polish.md) —
-  steady-state frame-path efficiency polish (incremental
+- [`RUNTIME-145`](../../active/RUNTIME-145-runtime-frame-path-efficiency-polish.md)
+  is active; it owns steady-state frame-path efficiency polish (incremental
   `StableEntityLookup`, `StreamingExecutor` slot recycling, dirty-gated
   pre-render flush, extraction/import allocation cleanup).
 

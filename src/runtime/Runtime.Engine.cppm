@@ -9,6 +9,9 @@ module;
 #include <string_view>
 #include <vector>
 
+#include <entt/entity/registry.hpp>
+#include <entt/signal/sigh.hpp>
+
 export module Extrinsic.Runtime.Engine;
 
 import Extrinsic.Core.Config.Engine;
@@ -52,6 +55,7 @@ import Extrinsic.Asset.EventBus;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
+import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Scene.Registry;
 
 namespace Extrinsic::Runtime
@@ -734,6 +738,14 @@ namespace Extrinsic::Runtime
         // extraction, consumes the readback after present, and mirrors the
         // controller snapshot into RenderWorld::Selection.
         [[nodiscard]] SelectionController&    GetSelectionController() noexcept;
+        // RUNTIME-145 Slice A — expose the engine-owned durable-id lookup for
+        // editor/runtime consumers and contract tests. The lookup itself stays
+        // owned by Engine; this API resolves through the maintained sidecar and
+        // updates lookup diagnostics in the same way direct sidecar use does.
+        [[nodiscard]] std::optional<ECS::EntityHandle>
+            ResolveEntityByStableId(ECS::Components::StableId id);
+        [[nodiscard]] const StableEntityLookupDiagnostics&
+            GetStableEntityLookupDiagnostics() const noexcept;
         [[nodiscard]] EditorCommandHistory&   GetEditorCommandHistory() noexcept;
         [[nodiscard]] const EditorCommandHistory&
             GetEditorCommandHistory() const noexcept;
@@ -931,9 +943,11 @@ namespace Extrinsic::Runtime
         TransformGizmoRenderPacketBuilder     m_GizmoPacketBuilder{};
         std::vector<ECS::EntityHandle>        m_GizmoSelectedEntities{};
         // RUNTIME-092 Slice B — runtime-owned StableId/render-id lookup sidecar.
-        // Rebuilt each frame before readback consumption and attached to the
-        // controller in Initialize() so selection resolves durable ids through
-        // the single runtime authority (ECS/graphics hold no lookup state).
+        // Maintained incrementally from StableId component construct/update/
+        // destroy events and attached to the controller in Initialize() so
+        // selection resolves durable ids through the single runtime authority
+        // (ECS/graphics hold no lookup state). Whole-scene replacement still
+        // uses Rebuild() once at the replacement boundary.
         StableEntityLookup                    m_StableEntityLookup{};
         // RUNTIME-093 Slice B2 — editor-facing refined sub-primitive of the last
         // pick hit. Updated from the pick-readback drain in RunFrame; never read
@@ -996,6 +1010,11 @@ namespace Extrinsic::Runtime
         std::uint64_t                              m_SceneFileEventSequence{0};
         // ECS scene registry
         std::unique_ptr<ECS::Scene::Registry>  m_Scene;
+        // Declared after m_Scene so scoped disconnection runs before the
+        // registry is destroyed during fallback/destructor unwinding.
+        entt::scoped_connection m_StableIdConstructConnection{};
+        entt::scoped_connection m_StableIdUpdateConnection{};
+        entt::scoped_connection m_StableIdDestroyConnection{};
 
         // Reference-scene seam (GRAPHICS-029A/B): the registry is
         // constructed empty so tests/impl-B can Register() before
@@ -1037,5 +1056,11 @@ namespace Extrinsic::Runtime
         void UninstallRuntimeGpuJobParticipantFrameHook(
             RuntimeGpuJobParticipantRecord& participant) noexcept;
         void ShutdownRuntimeGpuJobParticipants();
+        void ConnectStableEntityLookupTracking();
+        void DisconnectStableEntityLookupTracking() noexcept;
+        void RebuildStableEntityLookupAfterSceneReplacement();
+        void OnStableIdConstruct(entt::registry& registry, entt::entity entity);
+        void OnStableIdUpdate(entt::registry& registry, entt::entity entity);
+        void OnStableIdDestroy(entt::registry& registry, entt::entity entity);
     };
 }

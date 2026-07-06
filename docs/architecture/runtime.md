@@ -53,8 +53,9 @@ The frame order is:
 7. execute maintenance: transfer retirement, streaming drain/apply/submit/pump,
    asset-service tick, GPU asset cache tick, material texture re-resolution, and
    render-extraction deferred-retire ticks;
-8. rebuild stable-entity lookup, drain completed pick readbacks, release the
-   consumed `RenderWorldPool` slot, and finalize the frame clock.
+8. drain completed pick readbacks through the incrementally maintained
+   stable-entity lookup, release the consumed `RenderWorldPool` slot, and
+   finalize the frame clock.
 
 The internal `RuntimeFrameContext` record carries the data that must survive
 between those phases: frame delta, fixed-step interpolation alpha, render frame
@@ -129,9 +130,11 @@ Scene load/new/close operations are runtime-owned lifecycle transitions.
 `ECS::Scene::Registry`; only a successful parse reaches the live scene. Before
 replacement, runtime drains scene-local sidecars through
 `RenderExtractionCache::ClearSceneState(...)`, clears selected/hovered/pending
-pick state through `SelectionController::ClearSceneState(...)`, and resets the
-refined-primitive cache. Load then swaps in the parsed registry and rebuilds
-`StableEntityLookup`; new/close clear the live registry and lookup.
+pick state through `SelectionController::ClearSceneState(...)`, disconnects the
+stable-entity component-event hooks, and resets the refined-primitive cache.
+Load then swaps in the parsed registry, reconnects the hooks, and rebuilds
+`StableEntityLookup` once at the replacement boundary; new/close clear the live
+registry and lookup before reconnecting hooks on the empty registry.
 
 Scene JSON remains backend-neutral. Supported persistence is limited to current
 sandbox-authoring CPU state: metadata names, stable ids, transforms, hierarchy,

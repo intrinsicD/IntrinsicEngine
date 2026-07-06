@@ -11,7 +11,11 @@ Each active task should include:
 
 ## Currently active
 
-No active tasks.
+- [`RUNTIME-145`](RUNTIME-145-runtime-frame-path-efficiency-polish.md) —
+  runtime frame-path steady-state efficiency polish. Status: in-progress
+  Slice A (`StableEntityLookup` event-driven maintenance). Next verification:
+  build `IntrinsicRuntimeContractTests` and run the focused
+  `SelectionStableLookupComposition` tests.
 
 ## History
 

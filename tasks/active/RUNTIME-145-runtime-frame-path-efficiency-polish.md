@@ -5,6 +5,26 @@ depends_on: []
 ---
 # RUNTIME-145 — Runtime frame-path steady-state efficiency polish
 
+## Status
+- Active on local `main`.
+- Slice A is implemented and locally verified. It is intentionally limited to
+  the `StableEntityLookup` frame-path
+  rebuild removal. Later slices own `StreamingExecutor`, pre-render transform
+  dirty gating, extraction container reuse, and import payload moves.
+
+## Slice plan
+- Slice A: wire `StableEntityLookup` to scene `StableId` component events,
+  keep full rebuilds only at whole-scene replacement boundaries, and prove
+  `RunFrame` no longer rebuilds the lookup in steady state.
+- Slice B: recycle `StreamingExecutor` records, add an O(1) ready queue, and
+  batch queue snapshot state reads.
+- Slice C: add a conservative pre-render transform dirty bit and skip idle
+  transform re-sweeps.
+- Slice D: reuse live renderable key storage during extraction.
+- Slice E: move/share import payload handoff data where ownership allows.
+- Slice F: run the default CPU gate, retire the task, and append the
+  retirement log entry.
+
 ## Goal
 - Remove the recurring per-frame waste in the runtime frame path: full
   `StableEntityLookup` rebuilds, unbounded `StreamingExecutor` task-record
@@ -47,7 +67,7 @@ depends_on: []
     fixable with moves/shared payload handoff.
 
 ## Required changes
-- [ ] Make `StableEntityLookup` event-driven: incremental `Track`/`Forget`
+- [x] Make `StableEntityLookup` event-driven: incremental `Track`/`Forget`
       on entity create/destroy/stable-id change + the existing lazy
       self-heal; delete the per-frame `Rebuild` call (keep `Rebuild` for
       scene replacement only).
@@ -63,7 +83,7 @@ depends_on: []
       is not mutated after handoff.
 
 ## Tests
-- [ ] Contract: entity create/destroy/stable-id-change keeps
+- [x] Contract: entity create/destroy/stable-id-change keeps
       `ResolveByStableId` correct without per-frame rebuilds (including the
       scene-replacement path).
 - [ ] Contract: `StreamingExecutor` record count stays bounded across many
@@ -74,8 +94,8 @@ depends_on: []
 - [ ] Existing extraction/import suites stay green.
 
 ## Docs
-- [ ] Update `src/runtime/README.md` for the lookup and executor lifecycle
-      changes.
+- [x] Update `src/runtime/README.md` for the lookup lifecycle change.
+- [ ] Update `src/runtime/README.md` for the executor lifecycle change.
 
 ## Acceptance criteria
 - [ ] Steady-state idle frame performs no stable-lookup rebuild, no

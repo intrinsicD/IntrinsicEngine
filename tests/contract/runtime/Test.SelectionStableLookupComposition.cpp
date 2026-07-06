@@ -2,36 +2,44 @@
 // the runtime-owned StableEntityLookup sidecar.
 //
 // Slice B wires `StableEntityLookup` into the runtime frame path: `Engine`
-// rebuilds the lookup each frame before the pick-readback drain and attaches it
-// to the `SelectionController` so render-id resolution flows through the single
-// runtime authority (which decodes the `entt::entity` handle *and* validates it
-// against the live registry) rather than a bare `static_cast`. The key property
-// the wiring buys is recycling safety: a durable/stale render id that names a
-// slot now occupied by a *different* entity must be rejected, never resolve to
-// the recycled occupant.
+// attaches the lookup to the `SelectionController` so render-id resolution flows
+// through the single runtime authority (which decodes the `entt::entity` handle
+// *and* validates it against the live registry) rather than a bare
+// `static_cast`. RUNTIME-145 Slice A keeps the durable StableId map coherent
+// from ECS component events, so RunFrame no longer rebuilds the whole lookup on
+// every pick-readback drain. The key property the wiring buys is recycling
+// safety: a durable/stale render id that names a slot now occupied by a
+// *different* entity must be rejected, never resolve to the recycled occupant.
 //
 // These tests drive the controller + lookup + SelectionSystem directly,
-// mirroring the Engine::RunFrame maintenance-phase sequence (Rebuild lookup,
-// then drain readbacks by Sequence), so they exercise the composition on a pure
-// CPU path without a live GPU picking pass.
+// mirroring the Engine::RunFrame readback-drain sequence, so they exercise the
+// composition on a pure CPU path without a live GPU picking pass.
 
 #include <cstdint>
+#include <filesystem>
+#include <memory>
 #include <optional>
+#include <system_error>
 
 #include <gtest/gtest.h>
 #include <entt/entity/registry.hpp>
 
+import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.Window;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.SelectionSystem;
+import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StableEntityLookup;
 
+namespace CoreConfig = Extrinsic::Core::Config;
 using Extrinsic::ECS::EntityHandle;
 using Extrinsic::ECS::Scene::Registry;
 using Extrinsic::ECS::Components::StableId;
+using Extrinsic::Runtime::Engine;
 using Extrinsic::Runtime::SelectionController;
 using Extrinsic::Runtime::StableEntityLookup;
 
@@ -40,6 +48,54 @@ namespace G   = Extrinsic::Graphics;
 
 namespace
 {
+    class StubApplication final : public Extrinsic::Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Engine& /*engine*/) override {}
+        void OnSimTick(Engine& /*engine*/, double /*fixedDt*/) override {}
+        void OnVariableTick(Engine& /*engine*/, double /*alpha*/, double /*dt*/) override {}
+        void OnShutdown(Engine& /*engine*/) override {}
+    };
+
+    class ExitAfterOneFrameApplication final : public Extrinsic::Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Engine& /*engine*/) override {}
+        void OnSimTick(Engine& /*engine*/, double /*fixedDt*/) override {}
+        void OnVariableTick(Engine& engine, double /*alpha*/, double /*dt*/) override
+        {
+            engine.RequestExit();
+        }
+        void OnShutdown(Engine& /*engine*/) override {}
+    };
+
+    struct TempSceneFile
+    {
+        explicit TempSceneFile(const char* fileName)
+            : Path(std::filesystem::temp_directory_path() / fileName)
+        {
+            std::error_code ignored{};
+            std::filesystem::remove(Path, ignored);
+        }
+
+        ~TempSceneFile()
+        {
+            std::error_code ignored{};
+            std::filesystem::remove(Path, ignored);
+        }
+
+        std::filesystem::path Path;
+    };
+
+    [[nodiscard]] CoreConfig::EngineConfig HeadlessConfig()
+    {
+        CoreConfig::EngineConfig config{};
+        config.ReferenceScene.Enabled = false;
+        config.Camera.Enabled = false;
+        config.Window.Backend = CoreConfig::WindowBackend::Null;
+        return config;
+    }
+
     [[nodiscard]] EntityHandle MakeSelectable(Registry& registry)
     {
         const EntityHandle entity = registry.Create();
@@ -62,15 +118,12 @@ namespace
         });
     }
 
-    // Mirror Engine::RunFrame's maintenance phase: rebuild the lookup from the
-    // live registry, then drain every completed readback FIFO and resolve each
-    // by its Sequence.
+    // Mirror Engine::RunFrame's readback drain: the lookup has already been
+    // maintained from scene component events by the time readbacks are consumed.
     void RunFrameDrain(G::SelectionSystem& system,
                        SelectionController& controller,
-                       StableEntityLookup&  lookup,
                        Registry&            registry)
     {
-        lookup.Rebuild(registry);
         while (const std::optional<G::PickReadbackResult> result = system.PopPickResult())
         {
             if (result->Sequence != 0u)
@@ -113,7 +166,7 @@ TEST(SelectionStableLookupComposition, HitResolvesThroughAttachedLookupAndSelect
     ASSERT_TRUE(pick.has_value());
 
     PublishHit(system, RenderId(target), pick->Sequence);
-    RunFrameDrain(system, controller, lookup, registry);
+    RunFrameDrain(system, controller, registry);
 
     EXPECT_TRUE(controller.IsSelected(target));
     EXPECT_TRUE(registry.Raw().all_of<Sel::SelectedTag>(target));
@@ -156,7 +209,7 @@ TEST(SelectionStableLookupComposition, RecycledSlotRenderIdRejectedAsStaleNotMis
     ASSERT_TRUE(pick.has_value());
 
     PublishHit(system, staleRenderId, pick->Sequence);
-    RunFrameDrain(system, controller, lookup, registry);
+    RunFrameDrain(system, controller, registry);
 
     // Nothing is selected: the stale id is rejected, and it is NOT mis-applied
     // to the entity that now occupies the recycled slot.
@@ -221,11 +274,12 @@ TEST(SelectionStableLookupComposition, NoAttachedLookupFallsBackToBareDecode)
     system.Shutdown();
 }
 
-// The per-frame Rebuild keeps the durable StableId map coherent across entity
-// recycling: after a durable id is re-emplaced on a fresh entity and the lookup
-// is rebuilt (as RunFrame does each frame), ResolveByStableId names the current
-// occupant — the editor/serialization-facing path the sidecar exists for.
-TEST(SelectionStableLookupComposition, RebuiltDurableMapTracksRecycledStableIdOwner)
+// Incremental maintenance keeps the durable StableId map coherent across entity
+// recycling without a frame rebuild: after a durable id is re-emplaced on a
+// fresh entity and the lookup receives the matching Track/Forget events,
+// ResolveByStableId names the current occupant — the editor/serialization-facing
+// path the sidecar exists for.
+TEST(SelectionStableLookupComposition, IncrementalDurableMapTracksRecycledStableIdOwner)
 {
     Registry           registry;
     StableEntityLookup lookup;
@@ -240,15 +294,87 @@ TEST(SelectionStableLookupComposition, RebuiltDurableMapTracksRecycledStableIdOw
     EXPECT_EQ(*beforeRecycle, first);
 
     // The durable owner is destroyed and a new entity adopts the same durable
-    // id (e.g. reload of a serialized scene). A fresh Rebuild — the per-frame
-    // maintenance point — re-derives the winner against the live registry.
+    // id (e.g. reload of a serialized scene). Incremental Forget/Track updates
+    // the winner against the live registry.
+    lookup.Forget(first);
     registry.Destroy(first);
     const EntityHandle second = registry.Create();
     registry.Raw().emplace<StableId>(second, durable);
-    lookup.Rebuild(registry);
+    lookup.Track(registry, second);
 
     const std::optional<EntityHandle> afterRecycle = lookup.ResolveByStableId(registry, durable);
     ASSERT_TRUE(afterRecycle.has_value());
     EXPECT_EQ(*afterRecycle, second);
     EXPECT_EQ(lookup.StableIdCount(), 1u);
+}
+
+TEST(SelectionStableLookupComposition, EngineTracksStableIdEventsWithoutRunFrameRebuild)
+{
+    Engine engine(HeadlessConfig(), std::make_unique<ExitAfterOneFrameApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    const StableId firstId{0x145u, 0xA001u};
+    const StableId secondId{0x145u, 0xA002u};
+    const EntityHandle entity = scene.Create();
+
+    scene.Raw().emplace<StableId>(entity, firstId);
+    std::optional<EntityHandle> resolved = engine.ResolveEntityByStableId(firstId);
+    ASSERT_TRUE(resolved.has_value());
+    EXPECT_EQ(*resolved, entity);
+    EXPECT_EQ(engine.GetStableEntityLookupDiagnostics().IncrementalTracks, 1u);
+    EXPECT_EQ(engine.GetStableEntityLookupDiagnostics().Rebuilds, 0u);
+
+    scene.Raw().emplace_or_replace<StableId>(entity, secondId);
+    EXPECT_FALSE(engine.ResolveEntityByStableId(firstId).has_value());
+    resolved = engine.ResolveEntityByStableId(secondId);
+    ASSERT_TRUE(resolved.has_value());
+    EXPECT_EQ(*resolved, entity);
+    EXPECT_EQ(engine.GetStableEntityLookupDiagnostics().IncrementalTracks, 2u);
+    EXPECT_EQ(engine.GetStableEntityLookupDiagnostics().Rebuilds, 0u);
+
+    const std::uint32_t rebuildsBeforeFrame =
+        engine.GetStableEntityLookupDiagnostics().Rebuilds;
+    engine.Run();
+    EXPECT_EQ(engine.GetStableEntityLookupDiagnostics().Rebuilds,
+              rebuildsBeforeFrame);
+
+    scene.Destroy(entity);
+    EXPECT_FALSE(engine.ResolveEntityByStableId(secondId).has_value());
+    EXPECT_EQ(engine.GetStableEntityLookupDiagnostics().IncrementalForgets, 1u);
+    EXPECT_EQ(engine.GetStableEntityLookupDiagnostics().Rebuilds,
+              rebuildsBeforeFrame);
+
+    engine.Shutdown();
+}
+
+TEST(SelectionStableLookupComposition, SceneLoadRebuildsStableLookupAtReplacementBoundary)
+{
+    TempSceneFile sceneFile("intrinsic-runtime145-stable-lookup-scene.json");
+    Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    const StableId durable{0x145u, 0xBEEF1u};
+    const EntityHandle entity = scene.Create();
+    scene.Raw().emplace<StableId>(entity, durable);
+
+    const auto saved = engine.SaveSceneToPath(sceneFile.Path.string());
+    ASSERT_TRUE(saved.has_value()) << static_cast<int>(saved.error());
+    ASSERT_TRUE(engine.NewSceneDocument().has_value());
+    EXPECT_FALSE(engine.ResolveEntityByStableId(durable).has_value());
+
+    const std::uint32_t rebuildsBeforeLoad =
+        engine.GetStableEntityLookupDiagnostics().Rebuilds;
+    const auto loaded = engine.LoadSceneFromPath(sceneFile.Path.string());
+    ASSERT_TRUE(loaded.has_value()) << static_cast<int>(loaded.error());
+    EXPECT_EQ(engine.GetStableEntityLookupDiagnostics().Rebuilds,
+              rebuildsBeforeLoad + 1u);
+
+    const std::optional<EntityHandle> loadedEntity =
+        engine.ResolveEntityByStableId(durable);
+    ASSERT_TRUE(loadedEntity.has_value());
+    EXPECT_TRUE(engine.GetScene().IsValid(*loadedEntity));
+
+    engine.Shutdown();
 }
