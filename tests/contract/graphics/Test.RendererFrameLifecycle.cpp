@@ -1913,6 +1913,11 @@ TEST(RendererFrameLifecycle, ForwardSurfacePipelineSurvivesOperationalRebuild)
     // data-driven via the material's per-channel source, in both promoted paths.
     EXPECT_NE(surfaceFragment.find("GpuMaterialChannelSource"), std::string::npos);
     EXPECT_NE(promotedGBufferFragment.find("GpuMaterialChannelSource"), std::string::npos);
+    EXPECT_NE(defaultGBufferFragment.find("fragConfigSlot"), std::string::npos);
+    EXPECT_NE(defaultGBufferFragment.find("fragVisualizationScalar"), std::string::npos);
+    EXPECT_NE(defaultGBufferFragment.find("fragVisualizationColor"), std::string::npos);
+    EXPECT_NE(defaultGBufferFragment.find("fragInstanceSlot"), std::string::npos);
+    EXPECT_NE(defaultGBufferFragment.find("GpuResolveVisualizationColorWithColormap"), std::string::npos);
 
     Extrinsic::Tests::MockDevice device;
     device.Operational = true;

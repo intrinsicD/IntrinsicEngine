@@ -113,8 +113,9 @@ build/ci-vulkan/bin/ExtrinsicSandbox \
 ```
 
 The report is JSON (`intrinsic.frame_pacing.v1`) containing one sample per
-completed frame, plus aggregate phase totals and the highest-total phase. The
-capture wrapper stops the app after the requested frame count, reads
+completed frame, aggregate phase totals, the highest-total phase, and the final
+`IDevice::IsOperational()` result observed by the capture wrapper. The capture
+wrapper stops the app after the requested frame count, reads
 `Engine::GetLastFramePacingDiagnostics()`, and writes only copied runtime
 diagnostics; the sandbox app still imports runtime only and does not branch on
 Vulkan backend internals. The opt-in CTest

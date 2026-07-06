@@ -9,11 +9,10 @@
 // Pairs with `forward/default_debug_surface.vert` so the deferred GBuffer
 // pipeline reuses the same GpuScene-aware vertex stage as the forward
 // default-debug-surface pipeline. The vertex shader forwards
-// `fragMaterialSlot` at location 0 and an optional packed vertex color at
-// locations 6/7; this fragment reads the material slot from
-// `GpuScenePushConstants::SceneTableBDA -> scene.MaterialBDA` and writes three
-// GBuffer color attachments matching the recipe's deferred resource
-// declarations:
+// `fragMaterialSlot`, `fragConfigSlot`, visualization values, packed vertex
+// color, and `fragInstanceSlot`; this fragment consumes that full interface so
+// Vulkan pipeline-interface validation stays clean, then writes three GBuffer
+// color attachments matching the recipe's deferred resource declarations:
 //   - location 0 -> SceneNormal (RGBA16F): packed vertex normal.
 //   - location 1 -> Albedo (RGBA8): material BaseColorFactor multiplied by a
 //     bound albedo texture when present.
@@ -42,8 +41,12 @@ layout(push_constant, scalar) uniform ScenePC {
 layout(location = 0) flat in uint fragMaterialSlot;
 layout(location = 1) in vec2 fragUv;
 layout(location = 2) in vec3 fragWorldNormal;
+layout(location = 3) flat in uint fragConfigSlot;
+layout(location = 4) in float fragVisualizationScalar;
+layout(location = 5) in vec4 fragVisualizationColor;
 layout(location = 6) in vec4 fragVertexColor;
 layout(location = 7) flat in uint fragHasVertexColor;
+layout(location = 8) flat in uint fragInstanceSlot;
 
 layout(location = 0) out vec4 SceneNormal;
 layout(location = 1) out vec4 Albedo;
@@ -68,7 +71,16 @@ vec2 ResolveMetallicRoughness(GpuMaterialSlot mat, vec2 uv)
 
 void main() {
     const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;
-    const GpuMaterialSlot mat = GpuMaterialSlotRef(scene.MaterialBDA).Data[fragMaterialSlot];
+    const GpuInstanceStatic inst =
+        GpuInstanceStaticRef(scene.InstanceStaticBDA).Data[fragInstanceSlot];
+    const uint materialSlot = fragMaterialSlot != 0xFFFFFFFFu
+        ? fragMaterialSlot
+        : inst.MaterialSlot;
+    const uint configSlot = fragConfigSlot != 0xFFFFFFFFu
+        ? fragConfigSlot
+        : inst.ConfigSlot;
+    const GpuMaterialSlot mat = GpuMaterialSlotRef(scene.MaterialBDA).Data[materialSlot];
+    const GpuEntityConfig cfg = GpuEntityConfigRef(scene.EntityConfigBDA).Data[configSlot];
 
     vec3 n = vec3(0.0, 0.0, 1.0);
     const float vertexNormalLen = length(fragWorldNormal);
@@ -83,9 +95,28 @@ void main() {
     if (fragHasVertexColor != 0u) {
         baseColor = fragVertexColor;
     }
+    float visualizationScalar = fragVisualizationScalar;
+    vec4 visualizationColor = fragVisualizationColor;
+    if (cfg.VisDomain == GpuVisualizationDomain_Face) {
+        const uint faceId = uint(gl_PrimitiveID);
+        visualizationScalar = GpuVisualizationReadScalar(cfg, faceId, cfg.ScalarRangeMin);
+        visualizationColor = GpuVisualizationReadColor(cfg, faceId, baseColor);
+    }
+    baseColor = (cfg.ColorSourceMode == GpuColorSource_ScalarField &&
+                 GpuVisualizationHasValidBindless(cfg.ColormapID))
+        ? GpuResolveVisualizationColorWithColormap(
+            cfg,
+            visualizationScalar,
+            visualizationColor,
+            baseColor,
+            globalTextures[nonuniformEXT(cfg.ColormapID)])
+        : GpuResolveVisualizationColorFallback(
+            cfg,
+            visualizationColor,
+            baseColor);
 
     SceneNormal = vec4(n, 0.0);
     Albedo = baseColor;
     const vec2 roughnessMetallic = ResolveMetallicRoughness(mat, fragUv);
-    Material0 = vec4(roughnessMetallic.x, roughnessMetallic.y, 0.0, 0.0);
+    Material0 = vec4(roughnessMetallic.x, roughnessMetallic.y, float(cfg.ColorSourceMode), 0.0);
 }

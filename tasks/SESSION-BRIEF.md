@@ -31,10 +31,6 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-137` — Async GPU readback helper + pooled destination for compute backends (tasks/backlog/runtime/RUNTIME-137-async-gpu-readback-helper-for-compute-backends.md)
 - unblocked: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
 
-## Theme G — Active bugs
-
-- unblocked: `BUG-056` — ExtrinsicSandbox default Vulkan validation gate fallback (tasks/backlog/bugs/BUG-056-extrinsic-sandbox-default-vulkan-validation-gate.md)
-
 ## Theme H — Agentic workflow hardening
 
 - unblocked: `PROC-010` — Encode P1/P3/P5 research-engine invariants in AGENTS.md + review checklist (tasks/backlog/process/PROC-010-encode-research-engine-invariants-in-contract.md)

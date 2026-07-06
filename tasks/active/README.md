@@ -11,7 +11,8 @@ Each active task should include:
 
 ## Currently active
 
-No active tasks.
+No active tasks. Consult [`tasks/SESSION-BRIEF.md`](../SESSION-BRIEF.md) for
+the next unblocked backlog candidates.
 
 ## History
 

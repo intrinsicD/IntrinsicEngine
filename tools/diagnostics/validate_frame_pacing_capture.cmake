@@ -30,6 +30,19 @@ if(NOT _result EQUAL 0)
         "stderr:\n${_stderr}")
 endif()
 
+set(_combined_output "${_stdout}\n${_stderr}")
+if(_combined_output MATCHES "VulkanRequestedButNotOperational[^\n]*reason=BarrierValidationFailed")
+    set(_barrier_validation_fallback TRUE)
+else()
+    set(_barrier_validation_fallback FALSE)
+endif()
+if(_combined_output MATCHES "SPIR-V Interface[^\n]*not an Input declared")
+    message(FATAL_ERROR
+        "Frame-pacing capture emitted shader-interface validation warnings.\n"
+        "stdout:\n${_stdout}\n"
+        "stderr:\n${_stderr}")
+endif()
+
 if(NOT EXISTS "${REPORT_PATH}")
     message(FATAL_ERROR "Frame-pacing report was not created: ${REPORT_PATH}")
 endif()
@@ -72,6 +85,30 @@ endif()
 string(JSON _top_phase ERROR_VARIABLE _top_phase_error GET "${_json}" summary top_phase_by_total)
 if(_top_phase_error OR _top_phase STREQUAL "")
     message(FATAL_ERROR "Missing summary top_phase_by_total: ${_top_phase_error}")
+endif()
+
+string(JSON _final_device_operational ERROR_VARIABLE _final_device_operational_error
+    GET "${_json}" summary final_device_operational)
+if(_final_device_operational_error)
+    message(FATAL_ERROR
+        "Missing summary final_device_operational: ${_final_device_operational_error}")
+endif()
+if(_barrier_validation_fallback AND NOT _final_device_operational)
+    message(FATAL_ERROR
+        "Frame-pacing capture hit the BUG-056 Vulkan validation fallback and never reached operational Vulkan.\n"
+        "stdout:\n${_stdout}\n"
+        "stderr:\n${_stderr}")
+endif()
+if(NOT _final_device_operational)
+    if(_combined_output MATCHES "VulkanRequestedButNotOperational[^\n]*reason=(MissingInstance|MissingSurface|NoSuitablePhysicalDevice|MissingRequiredExtension|MissingRequiredFeature)")
+        message(STATUS
+            "Frame-pacing capture did not reach operational Vulkan for an environment capability reason.")
+    else()
+        message(FATAL_ERROR
+            "Frame-pacing capture did not reach operational Vulkan and did not report an environment capability reason.\n"
+            "stdout:\n${_stdout}\n"
+            "stderr:\n${_stderr}")
+    endif()
 endif()
 
 string(JSON _phase_total ERROR_VARIABLE _phase_total_error GET "${_json}" summary top_phase_total_micros)

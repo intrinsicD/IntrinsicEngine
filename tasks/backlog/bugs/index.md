@@ -5,11 +5,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-056` — ExtrinsicSandbox default Vulkan validation gate fallback](BUG-056-extrinsic-sandbox-default-vulkan-validation-gate.md).
+None.
 
 ---
 
 ## Verified / Closed
+
+- Closed 2026-07-06: [`BUG-056` — ExtrinsicSandbox default Vulkan validation gate fallback](../../done/BUG-056-extrinsic-sandbox-default-vulkan-validation-gate.md). The default deferred GBuffer fragment now consumes the full `default_debug_surface.vert` interface and resolves visualization color from the shared config stream, eliminating the SPIR-V interface warnings that blocked promoted Vulkan readiness. The frame-pacing report now records final `IDevice::IsOperational()`, and the validator fails shader-interface warnings or a non-operational `BarrierValidationFailed` result while still allowing documented environment capability skips. The selected promoted Vulkan sandbox/ImGui/frame-pacing envelope passes 18/18.
 
 - Closed 2026-07-04: [`BUG-055` — TaskGraph::Execute / CounterEvent latch-destruction race](../../done/BUG-055-taskgraph-counterevent-latch-destruction-race.md). Parallel `TaskGraph::Execute()` now keeps completion state alive through shared ownership by the caller and dispatched worker closures, stores completion callbacks on that state instead of stack captures, and hardens `CounterEvent::Signal()` so publishing zero is its last event-member access. The focused `CoreTaskGraph` repeat gate passed 50/50 under the sanitizer-enabled `ci` preset, and the default CPU gate passed 3476/3476.
 

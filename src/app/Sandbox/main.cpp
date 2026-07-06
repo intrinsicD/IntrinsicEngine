@@ -168,8 +168,9 @@ namespace
             }
         }
 
-        void CaptureLatest(const Extrinsic::Runtime::Engine& engine)
+        void CaptureLatest(Extrinsic::Runtime::Engine& engine)
         {
+            m_FinalDeviceOperational = engine.GetDevice().IsOperational();
             const Extrinsic::Runtime::RuntimeFramePacingDiagnostics& sample =
                 engine.GetLastFramePacingDiagnostics();
             if (!sample.Valid)
@@ -192,10 +193,16 @@ namespace
             return m_Samples;
         }
 
+        [[nodiscard]] bool FinalDeviceOperational() const noexcept
+        {
+            return m_FinalDeviceOperational;
+        }
+
     private:
         std::unique_ptr<Extrinsic::Runtime::IApplication> m_Inner{};
         std::uint32_t m_TargetFrames{1u};
         std::uint32_t m_Frames{0u};
+        bool m_FinalDeviceOperational{false};
         std::optional<std::uint64_t> m_LastCapturedFrame{};
         std::vector<Extrinsic::Runtime::RuntimeFramePacingDiagnostics> m_Samples{};
     };
@@ -280,6 +287,7 @@ namespace
     [[nodiscard]] bool WriteFramePacingReport(
         const std::filesystem::path& path,
         const std::uint32_t requestedFrames,
+        const bool finalDeviceOperational,
         const std::vector<Extrinsic::Runtime::RuntimeFramePacingDiagnostics>& samples)
     {
         if (const std::filesystem::path parent = path.parent_path(); !parent.empty())
@@ -324,6 +332,9 @@ namespace
         out << "    \"total_micros\": " << totalMicros << ",\n";
         out << "    \"mean_total_micros\": " << meanTotalMicros << ",\n";
         out << "    \"max_total_micros\": " << maxTotalMicros << ",\n";
+        out << "    \"final_device_operational\": ";
+        WriteBool(out, finalDeviceOperational);
+        out << ",\n";
         out << "    \"top_phase_by_total\": \"" << topPhase.Name << "\",\n";
         out << "    \"top_phase_total_micros\": " << topPhaseTotal << ",\n";
         out << "    \"phase_totals\": {\n";
@@ -424,6 +435,7 @@ int main(int argc, char** argv)
         }
         if (!WriteFramePacingReport(cli.Capture.ReportPath,
                                     cli.Capture.TargetFrames,
+                                    capture->FinalDeviceOperational(),
                                     samples))
         {
             return 3;

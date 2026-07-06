@@ -107,8 +107,8 @@ Sandbox EditorUI CPU work.
 - Retired
   [`GRAPHICS-114`](../../tasks/done/GRAPHICS-114-retained-imgui-overlay-copy-upload-path.md)
   owns retained ImGui overlay copy/upload cleanup.
-- Open
-  [`BUG-056`](../../tasks/backlog/bugs/BUG-056-extrinsic-sandbox-default-vulkan-validation-gate.md)
+- Retired
+  [`BUG-056`](../../tasks/done/BUG-056-extrinsic-sandbox-default-vulkan-validation-gate.md)
   owns the default `ExtrinsicSandbox` Vulkan validation-gate fallback found by
   this capture.
 

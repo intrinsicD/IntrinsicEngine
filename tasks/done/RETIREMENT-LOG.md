@@ -3571,3 +3571,16 @@ The retirement adds a promoted-Vulkan sandbox readback smoke for the
 surface-lane Scalar/Isolines preset-equivalent state, alongside the existing
 line/point scalar LUT smoke, so the operational check is deterministic rather
 than a manual UI click.
+
+[`BUG-056`](BUG-056-extrinsic-sandbox-default-vulkan-validation-gate.md) —
+ExtrinsicSandbox default Vulkan validation gate fallback retired to
+`tasks/done/` on 2026-07-06 at `Operational`. The default deferred GBuffer
+fragment now consumes the full shared default-debug-surface vertex interface,
+including config, visualization, and instance slots, and applies the same
+visualization color resolve helpers used by the forward path. Frame-pacing
+captures now include final `IDevice::IsOperational()` state, and the CTest
+validator fails shader-interface validation warnings or a final
+non-operational `BarrierValidationFailed` path. The selected promoted Vulkan
+sandbox/ImGui/frame-pacing envelope passes 18/18, and the default sandbox
+fixture now installs the same runtime default policy bundle as the production
+`ExtrinsicSandbox` app before custom smoke apps run.

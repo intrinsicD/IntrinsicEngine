@@ -80,6 +80,7 @@ import Extrinsic.Runtime.ProgressivePresentationExtraction;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SandboxEditorUi;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.Properties;
@@ -165,6 +166,56 @@ private:
     Extrinsic::Runtime::SandboxEditorUi m_EditorUi{};
     std::uint32_t m_TargetFrames{1u};
     std::uint32_t m_Frames{0u};
+};
+
+class SandboxDefaultPolicyApp final : public IApplication
+{
+public:
+    explicit SandboxDefaultPolicyApp(std::unique_ptr<IApplication> inner) noexcept
+        : m_Inner(std::move(inner))
+    {
+    }
+
+    void OnInitialize(Engine& engine) override
+    {
+        m_DefaultPolicies =
+            Extrinsic::Runtime::RegisterSandboxDefaultRuntimePolicies(engine);
+        if (m_Inner)
+        {
+            m_Inner->OnInitialize(engine);
+        }
+    }
+
+    void OnSimTick(Engine& engine, double fixedDt) override
+    {
+        if (m_Inner)
+        {
+            m_Inner->OnSimTick(engine, fixedDt);
+        }
+    }
+
+    void OnVariableTick(Engine& engine, double alpha, double dt) override
+    {
+        if (m_Inner)
+        {
+            m_Inner->OnVariableTick(engine, alpha, dt);
+        }
+    }
+
+    void OnShutdown(Engine& engine) override
+    {
+        if (m_Inner)
+        {
+            m_Inner->OnShutdown(engine);
+        }
+        Extrinsic::Runtime::UnregisterSandboxDefaultRuntimePolicies(
+            engine,
+            m_DefaultPolicies);
+    }
+
+private:
+    std::unique_ptr<IApplication> m_Inner{};
+    Extrinsic::Runtime::RuntimeSandboxDefaultPolicyRegistration m_DefaultPolicies{};
 };
 
 Counters::Snapshot ToCounterSnapshot(
@@ -707,7 +758,9 @@ struct AcceptanceBootstrap
     }
 
     auto config = Extrinsic::Runtime::CreateReferenceEngineConfig();
-    auto enginePtr = std::make_unique<Engine>(config, std::move(app));
+    auto enginePtr = std::make_unique<Engine>(
+        config,
+        std::make_unique<SandboxDefaultPolicyApp>(std::move(app)));
     enginePtr->Initialize();
 
     const auto initInputs = GetVulkanDeviceOperationalInputs(&enginePtr->GetDevice());
