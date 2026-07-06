@@ -100,6 +100,12 @@ namespace Extrinsic::Runtime
         }
     };
 
+    export struct RuntimeQueuedAssetImport
+    {
+        RuntimeAssetIngestHandle Operation{};
+        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
+    };
+
     export [[nodiscard]] RuntimeDeviceSelection SelectRuntimeDeviceBackend(
         const Core::Config::RenderConfig& config,
         bool promotedVulkanAvailable) noexcept;
@@ -441,6 +447,8 @@ namespace Extrinsic::Runtime
         // handoffs. Platform drop events route through the same facade.
         [[nodiscard]] Core::Expected<RuntimeAssetImportResult> ImportAssetFromPath(
             RuntimeAssetImportRequest request);
+        [[nodiscard]] Core::Expected<RuntimeQueuedAssetImport> QueueModelTextureImport(
+            RuntimeAssetImportRequest request);
         [[nodiscard]] Core::Expected<RuntimeAssetImportResult> ReimportAsset(
             RuntimeAssetReimportRequest request);
         [[nodiscard]] const std::optional<RuntimeAssetImportEvent>&
@@ -589,6 +597,11 @@ namespace Extrinsic::Runtime
         void QueueDroppedGeometryImport(
             std::string path,
             std::vector<Assets::AssetPayloadKind> payloadKinds);
+        [[nodiscard]] Core::Expected<RuntimeQueuedAssetImport>
+            QueueModelTextureImportWithIngest(
+                RuntimeAssetImportRequest request,
+                RuntimeAssetIngestSource source,
+                Assets::AssetId existingAsset = {});
         void QueueDroppedModelTextureImport(
             std::string path,
             Assets::AssetPayloadKind payloadKind);

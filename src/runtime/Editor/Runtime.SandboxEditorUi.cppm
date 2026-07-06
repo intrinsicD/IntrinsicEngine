@@ -1517,6 +1517,7 @@ export namespace Extrinsic::Runtime
     struct SandboxEditorFileImportResult
     {
         SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
+        RuntimeAssetIngestHandle Operation{};
         Assets::AssetId Asset{};
         Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
         Core::ErrorCode Error{Core::ErrorCode::Success};

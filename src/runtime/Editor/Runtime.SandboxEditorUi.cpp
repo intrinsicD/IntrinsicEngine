@@ -198,6 +198,13 @@ namespace Extrinsic::Runtime
             A::AssetPayloadKind::Texture2D,
         }};
 
+        [[nodiscard]] bool IsModelTextureImportPayload(
+            const A::AssetPayloadKind payloadKind) noexcept
+        {
+            return payloadKind == A::AssetPayloadKind::ModelScene ||
+                   payloadKind == A::AssetPayloadKind::Texture2D;
+        }
+
         inline constexpr std::array<ProgressiveSlotSemantic, 6> kTextureBakeTargetSemantics{{
             ProgressiveSlotSemantic::Albedo,
             ProgressiveSlotSemantic::Normal,
@@ -729,6 +736,22 @@ namespace Extrinsic::Runtime
             std::string message = "Imported ";
             message += A::DebugNameForAssetPayloadKind(result.PayloadKind);
             message += " asset";
+            if (!command.Path.empty())
+            {
+                message += " from ";
+                message += command.Path;
+            }
+            message += ".";
+            return message;
+        }
+
+        [[nodiscard]] std::string BuildImportPendingMessage(
+            const SandboxEditorFileImportCommand& command,
+            const A::AssetPayloadKind payloadKind)
+        {
+            std::string message = "Queued ";
+            message += A::DebugNameForAssetPayloadKind(payloadKind);
+            message += " asset import";
             if (!command.Path.empty())
             {
                 message += " from ";
@@ -12015,7 +12038,9 @@ namespace Extrinsic::Runtime
                 {
                     model.StatusText = context.LastAssetImportResult->Message;
                 }
-                if (!context.LastAssetImportResult->Succeeded())
+                if (!context.LastAssetImportResult->Succeeded() &&
+                    context.LastAssetImportResult->Status !=
+                        SandboxEditorCommandStatus::Pending)
                 {
                     AddDiagnostic(model.Diagnostics,
                                   SandboxEditorDiagnosticCode::AssetImportFailed,
@@ -12396,6 +12421,41 @@ namespace Extrinsic::Runtime
                     .Import =
                         [&engine](const SandboxEditorFileImportCommand& command)
                         {
+                            auto route = Assets::ResolveAssetImportRoute(
+                                command.Path,
+                                Assets::AssetRouteOperation::Import,
+                                Assets::AssetImportHint{
+                                    .PayloadKind = command.PayloadKind,
+                                });
+                            if (route.has_value() &&
+                                IsModelTextureImportPayload(route->PayloadKind))
+                            {
+                                auto queued = engine.QueueModelTextureImport(
+                                    RuntimeAssetImportRequest{
+                                        .Path = command.Path,
+                                        .PayloadKind = route->PayloadKind,
+                                    });
+                                if (!queued.has_value())
+                                {
+                                    return SandboxEditorFileImportResult{
+                                        .Status = SandboxEditorCommandStatus::AssetImportFailed,
+                                        .PayloadKind = route->PayloadKind,
+                                        .Error = queued.error(),
+                                        .Message = BuildImportFailureMessage(queued.error()),
+                                    };
+                                }
+
+                                return SandboxEditorFileImportResult{
+                                    .Status = SandboxEditorCommandStatus::Pending,
+                                    .Operation = queued->Operation,
+                                    .PayloadKind = queued->PayloadKind,
+                                    .Error = Core::ErrorCode::Success,
+                                    .Message = BuildImportPendingMessage(
+                                        command,
+                                        queued->PayloadKind),
+                                };
+                            }
+
                             auto imported = engine.ImportAssetFromPath(
                                 RuntimeAssetImportRequest{
                                     .Path = command.Path,
@@ -20087,6 +20147,12 @@ namespace Extrinsic::Runtime
                 result.Message = BuildImportSuccessMessage(command, result);
             result.Error = Core::ErrorCode::Success;
             InvalidateSelectedModelCache(context);
+        }
+        else if (result.Status == SandboxEditorCommandStatus::Pending)
+        {
+            if (result.Message.empty())
+                result.Message = BuildImportPendingMessage(command, result.PayloadKind);
+            result.Error = Core::ErrorCode::Success;
         }
         else if (result.Message.empty())
         {

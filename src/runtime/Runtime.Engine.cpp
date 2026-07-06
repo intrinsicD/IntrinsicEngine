@@ -1244,6 +1244,13 @@ namespace Extrinsic::Runtime
                    result.GeneratedTextureUploadRequests > 0u;
         }
 
+        [[nodiscard]] bool IsModelTextureImportPayload(
+            const Assets::AssetPayloadKind payloadKind) noexcept
+        {
+            return payloadKind == Assets::AssetPayloadKind::ModelScene ||
+                   payloadKind == Assets::AssetPayloadKind::Texture2D;
+        }
+
         [[nodiscard]] Core::Expected<RuntimeAssetImportResult>
         MaterializeDecodedModelSceneImport(
             Assets::AssetService& assetService,
@@ -3860,6 +3867,15 @@ namespace Extrinsic::Runtime
         return result;
     }
 
+    Core::Expected<RuntimeQueuedAssetImport> Engine::QueueModelTextureImport(
+        RuntimeAssetImportRequest request)
+    {
+        return QueueModelTextureImportWithIngest(
+            std::move(request),
+            RuntimeAssetIngestSource::ManualImport,
+            {});
+    }
+
     Core::Expected<RuntimeAssetImportResult> Engine::ReimportAsset(
         RuntimeAssetReimportRequest request)
     {
@@ -4443,23 +4459,43 @@ namespace Extrinsic::Runtime
             candidateCount);
     }
 
-    void Engine::QueueDroppedModelTextureImport(
-        std::string path,
-        const Assets::AssetPayloadKind payloadKind)
+    Core::Expected<RuntimeQueuedAssetImport>
+    Engine::QueueModelTextureImportWithIngest(
+        RuntimeAssetImportRequest request,
+        const RuntimeAssetIngestSource source,
+        const Assets::AssetId existingAsset)
     {
-        RuntimeAssetImportRequest request{
-            .Path = path,
-            .PayloadKind = payloadKind,
-        };
+        auto route = Assets::ResolveAssetImportRoute(
+            request.Path,
+            Assets::AssetRouteOperation::Import,
+            Assets::AssetImportHint{.PayloadKind = request.PayloadKind});
+        if (!route.has_value())
+        {
+            return Core::Err<RuntimeQueuedAssetImport>(route.error());
+        }
+        if (!IsModelTextureImportPayload(route->PayloadKind))
+        {
+            return Core::Err<RuntimeQueuedAssetImport>(
+                Core::ErrorCode::AssetTypeMismatch);
+        }
+        request.PayloadKind = route->PayloadKind;
+
+        const Assets::AssetRouteDiagnostic routeDiagnostic =
+            Assets::DiagnoseAssetImportRoute(
+                request.Path,
+                Assets::AssetRouteOperation::Import,
+                Assets::AssetImportHint{.PayloadKind = request.PayloadKind});
         RuntimeAssetIngestTransition submit =
             m_AssetIngestStateMachine.Submit(
                 MakeRuntimeAssetIngestRequest(
                     request,
-                    RuntimeAssetIngestSource::DroppedFile));
+                    source,
+                    existingAsset));
         if (!submit.Succeeded())
         {
             Core::Log::Warn(
-                "[Runtime] Dropped model/texture import rejected by ingest state machine: path='{}' payload={} diagnostic={} error={}",
+                "[Runtime] Model/texture import rejected by ingest state machine: source={} path='{}' payload={} diagnostic={} error={}",
+                DebugNameForRuntimeAssetIngestSource(source),
                 request.Path,
                 Assets::DebugNameForAssetPayloadKind(request.PayloadKind),
                 DebugNameForRuntimeAssetIngestDiagnostic(submit.Diagnostic),
@@ -4469,7 +4505,8 @@ namespace Extrinsic::Runtime
                 Core::Err<RuntimeAssetImportResult>(
                     ErrorFromIngestTransition(submit)),
                 submit.Diagnostic);
-            return;
+            return Core::Err<RuntimeQueuedAssetImport>(
+                ErrorFromIngestTransition(submit));
         }
 
         if (!m_Initialized ||
@@ -4479,16 +4516,16 @@ namespace Extrinsic::Runtime
             !m_AssetModelTextureHandoff ||
             !m_AssetModelSceneHandoff ||
             !m_Scene ||
-            path.empty() ||
-            (payloadKind != Assets::AssetPayloadKind::ModelScene &&
-             payloadKind != Assets::AssetPayloadKind::Texture2D))
+            request.Path.empty() ||
+            !IsModelTextureImportPayload(request.PayloadKind))
         {
             RuntimeAssetIngestTransition failed =
                 m_AssetIngestStateMachine.FailCallback(
                     submit.Handle,
                     Core::ErrorCode::InvalidState);
             Core::Log::Warn(
-                "[Runtime] Dropped model/texture import rejected before queueing: path='{}' payload={} error={}",
+                "[Runtime] Model/texture import rejected before queueing: source={} path='{}' payload={} error={}",
+                DebugNameForRuntimeAssetIngestSource(source),
                 request.Path,
                 Assets::DebugNameForAssetPayloadKind(request.PayloadKind),
                 Core::Error::ToString(Core::ErrorCode::InvalidState));
@@ -4496,14 +4533,10 @@ namespace Extrinsic::Runtime
                 request,
                 Core::Err<RuntimeAssetImportResult>(Core::ErrorCode::InvalidState),
                 failed.Diagnostic);
-            return;
+            return Core::Err<RuntimeQueuedAssetImport>(
+                Core::ErrorCode::InvalidState);
         }
 
-        const Assets::AssetRouteDiagnostic routeDiagnostic =
-            Assets::DiagnoseAssetImportRoute(
-                path,
-                Assets::AssetRouteOperation::Import,
-                Assets::AssetImportHint{.PayloadKind = request.PayloadKind});
         RuntimeAssetIngestTransition routeResolved =
             m_AssetIngestStateMachine.ResolveRoute(
                 submit.Handle,
@@ -4515,7 +4548,8 @@ namespace Extrinsic::Runtime
                 Core::Err<RuntimeAssetImportResult>(
                     ErrorFromIngestTransition(routeResolved)),
                 routeResolved.Diagnostic);
-            return;
+            return Core::Err<RuntimeQueuedAssetImport>(
+                ErrorFromIngestTransition(routeResolved));
         }
 
         RuntimeAssetIngestTransition decodeQueued =
@@ -4527,7 +4561,8 @@ namespace Extrinsic::Runtime
                 Core::Err<RuntimeAssetImportResult>(
                     ErrorFromIngestTransition(decodeQueued)),
                 decodeQueued.Diagnostic);
-            return;
+            return Core::Err<RuntimeQueuedAssetImport>(
+                ErrorFromIngestTransition(decodeQueued));
         }
 
         RuntimeAssetIngestTransition decoding =
@@ -4539,7 +4574,8 @@ namespace Extrinsic::Runtime
                 Core::Err<RuntimeAssetImportResult>(
                     ErrorFromIngestTransition(decoding)),
                 decoding.Diagnostic);
-            return;
+            return Core::Err<RuntimeQueuedAssetImport>(
+                ErrorFromIngestTransition(decoding));
         }
 
         auto state = std::make_shared<DroppedModelTextureImportState>();
@@ -4548,15 +4584,15 @@ namespace Extrinsic::Runtime
 
         const StreamingTaskHandle handle = m_StreamingExecutor->Submit(
             StreamingTaskDesc{
-                .Name = "Runtime.ImportDroppedModelTexture." +
-                    FileNameFromPath(path),
+                .Name = "Runtime.ImportModelTexture." +
+                    FileNameFromPath(request.Path),
                 .Kind = Core::Dag::TaskKind::AssetDecode,
                 .Priority = Core::Dag::TaskPriority::Normal,
                 .EstimatedCost = 4u,
                 .Execute = [
                     state,
-                    path = std::move(path),
-                    payloadKind]() mutable -> StreamingResult
+                    path = request.Path,
+                    payloadKind = request.PayloadKind]() mutable -> StreamingResult
                 {
                     Assets::AssetModelTextureIOBridge bridge;
                     if (Core::Result registered =
@@ -4606,7 +4642,7 @@ namespace Extrinsic::Runtime
                     return StreamingResult{
                         StreamingCpuPayloadReady{.PayloadToken = 0u}};
                 },
-                .ApplyOnMainThread = [this, state](StreamingResult&& streamingResult) mutable
+                .ApplyOnMainThread = [this, state, existingAsset](StreamingResult&& streamingResult) mutable
                 {
                     Core::Expected<RuntimeAssetImportResult> result =
                         Core::Err<RuntimeAssetImportResult>(
@@ -4680,7 +4716,7 @@ namespace Extrinsic::Runtime
                             *m_AssetService,
                             *m_AssetModelSceneHandoff,
                             state->Request,
-                            {},
+                            existingAsset,
                             std::move(std::get<Assets::AssetModelScenePayload>(
                                 state->Decoded->Payload)));
                     }
@@ -4691,7 +4727,7 @@ namespace Extrinsic::Runtime
                             *m_GpuAssetCache,
                             *m_AssetModelTextureHandoff,
                             state->Request,
-                            {},
+                            existingAsset,
                             std::move(std::get<Assets::AssetTexture2DPayload>(
                                 state->Decoded->Payload)));
                     }
@@ -4756,7 +4792,8 @@ namespace Extrinsic::Runtime
                 .PayloadKind = state->Request.PayloadKind,
             };
             Core::Log::Warn(
-                "[Runtime] Dropped model/texture import queue submission failed: path='{}' payload={} error={}",
+                "[Runtime] Model/texture import queue submission failed: source={} path='{}' payload={} error={}",
+                DebugNameForRuntimeAssetIngestSource(source),
                 queuedRequest.Path,
                 Assets::DebugNameForAssetPayloadKind(queuedRequest.PayloadKind),
                 Core::Error::ToString(Core::ErrorCode::InvalidState));
@@ -4768,7 +4805,8 @@ namespace Extrinsic::Runtime
                 queuedRequest,
                 Core::Err<RuntimeAssetImportResult>(Core::ErrorCode::InvalidState),
                 failed.Diagnostic);
-            return;
+            return Core::Err<RuntimeQueuedAssetImport>(
+                Core::ErrorCode::InvalidState);
         }
 
         m_AssetImportStreamingTasks.push_back(RuntimeAssetImportStreamingTask{
@@ -4777,9 +4815,28 @@ namespace Extrinsic::Runtime
         });
 
         Core::Log::Info(
-            "[Runtime] Queued dropped model/texture import: path='{}' payload={}",
+            "[Runtime] Queued model/texture import: source={} path='{}' payload={}",
+            DebugNameForRuntimeAssetIngestSource(source),
             state->Request.Path,
             Assets::DebugNameForAssetPayloadKind(state->Request.PayloadKind));
+
+        return RuntimeQueuedAssetImport{
+            .Operation = state->IngestHandle,
+            .PayloadKind = state->Request.PayloadKind,
+        };
+    }
+
+    void Engine::QueueDroppedModelTextureImport(
+        std::string path,
+        const Assets::AssetPayloadKind payloadKind)
+    {
+        (void)QueueModelTextureImportWithIngest(
+            RuntimeAssetImportRequest{
+                .Path = std::move(path),
+                .PayloadKind = payloadKind,
+            },
+            RuntimeAssetIngestSource::DroppedFile,
+            {});
     }
 
     Core::Expected<RuntimeAssetImportResult>

@@ -1561,6 +1561,53 @@ TEST(SandboxEditorUi, FileImportCommandRoutesThroughRuntimeOwnedSurface)
         Runtime::SandboxEditorDiagnosticCode::AssetImportFailed));
 }
 
+TEST(SandboxEditorUi, FileImportCommandTreatsAsyncPendingAsNonFailure)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    const Runtime::RuntimeAssetIngestHandle queuedHandle{42u, 7u};
+    context.AssetImportCommands =
+        Runtime::SandboxEditorAssetImportCommandSurface{
+            .Import =
+                [queuedHandle](const Runtime::SandboxEditorFileImportCommand&)
+                {
+                    return Runtime::SandboxEditorFileImportResult{
+                        .Status = Runtime::SandboxEditorCommandStatus::Pending,
+                        .Operation = queuedHandle,
+                        .PayloadKind = Assets::AssetPayloadKind::Texture2D,
+                    };
+                },
+        };
+
+    const Runtime::SandboxEditorFileImportResult result =
+        Runtime::ApplySandboxEditorFileImportCommand(
+            context,
+            Runtime::SandboxEditorFileImportCommand{
+                .Path = "assets/textures/albedo.png",
+                .PayloadKind = Assets::AssetPayloadKind::Unknown,
+            });
+
+    EXPECT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_FALSE(result.Succeeded());
+    EXPECT_EQ(result.Operation, queuedHandle);
+    EXPECT_EQ(result.Error, Core::ErrorCode::Success);
+    EXPECT_EQ(result.PayloadKind, Assets::AssetPayloadKind::Texture2D);
+    EXPECT_NE(result.Message.find("Queued"), std::string::npos);
+
+    context.LastAssetImportResult = &result;
+    Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    ASSERT_TRUE(frame.FileImport.LastResult.has_value());
+    EXPECT_EQ(frame.FileImport.LastResult->Status,
+              Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_EQ(frame.FileImport.StatusText, result.Message);
+    EXPECT_FALSE(HasDiagnostic(
+        frame.FileImport.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::AssetImportFailed));
+}
+
 TEST(SandboxEditorUi, AssetImportQueueModelCopiesRowsProgressAndCommands)
 {
     ECS::Scene::Registry registry;

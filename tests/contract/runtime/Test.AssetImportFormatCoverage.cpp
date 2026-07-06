@@ -1157,3 +1157,139 @@ TEST(RuntimeAssetImportFormatCoverage, DroppedModelSceneAndTextureImportThroughS
 
     engine.Shutdown();
 }
+
+TEST(RuntimeAssetImportFormatCoverage, ManualModelSceneAndTextureImportQueueCompletesThroughStreaming)
+{
+    const std::vector<std::byte> pngBytes = TinyPngBytes();
+    const std::vector<std::byte> binBytes = TriangleBufferBytes();
+
+    TempAssetFile modelBin(
+        "assetio004_triangle.bin",
+        std::span<const std::byte>(binBytes.data(), binBytes.size()));
+    TempAssetFile modelFile(
+        "assetio142_manual_triangle.gltf",
+        TriangleGltfJson());
+    TempAssetFile textureFile(
+        "assetio142_manual_albedo.png",
+        std::span<const std::byte>(pngBytes.data(), pngBytes.size()));
+
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForConditionApplication>(
+            [](Runtime::Engine& runningEngine)
+            {
+                const Runtime::RuntimeAssetImportQueueSnapshot queue =
+                    runningEngine.GetAssetImportQueueSnapshot();
+                return queue.Entries.size() == 2u &&
+                    queue.ActiveCount == 0u &&
+                    queue.TerminalCount == 2u;
+            },
+            256u));
+    engine.Initialize();
+
+    auto modelQueued = engine.QueueModelTextureImport(
+        Runtime::RuntimeAssetImportRequest{
+            .Path = modelFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Unknown,
+        });
+    ASSERT_TRUE(modelQueued.has_value()) << static_cast<int>(modelQueued.error());
+    EXPECT_TRUE(modelQueued->Operation.IsValid());
+    EXPECT_EQ(modelQueued->PayloadKind, Assets::AssetPayloadKind::ModelScene);
+
+    auto textureQueued = engine.QueueModelTextureImport(
+        Runtime::RuntimeAssetImportRequest{
+            .Path = textureFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Unknown,
+        });
+    ASSERT_TRUE(textureQueued.has_value()) << static_cast<int>(textureQueued.error());
+    EXPECT_TRUE(textureQueued->Operation.IsValid());
+    EXPECT_EQ(textureQueued->PayloadKind, Assets::AssetPayloadKind::Texture2D);
+
+    EXPECT_FALSE(engine.GetLastAssetImportEvent().has_value());
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 0u);
+
+    Runtime::RuntimeAssetImportQueueSnapshot queue =
+        engine.GetAssetImportQueueSnapshot();
+    ASSERT_EQ(queue.Entries.size(), 2u);
+    EXPECT_EQ(queue.ActiveCount, 2u);
+    EXPECT_EQ(queue.Entries[0].Operation, modelQueued->Operation);
+    EXPECT_EQ(queue.Entries[0].Source,
+              Runtime::RuntimeAssetIngestSource::ManualImport);
+    EXPECT_EQ(queue.Entries[0].PayloadKind, Assets::AssetPayloadKind::ModelScene);
+    EXPECT_EQ(queue.Entries[0].Stage,
+              Runtime::RuntimeAssetImportQueueStage::Decoding);
+    EXPECT_TRUE(queue.Entries[0].CanCancel);
+    EXPECT_EQ(queue.Entries[1].Operation, textureQueued->Operation);
+    EXPECT_EQ(queue.Entries[1].Source,
+              Runtime::RuntimeAssetIngestSource::ManualImport);
+    EXPECT_EQ(queue.Entries[1].PayloadKind, Assets::AssetPayloadKind::Texture2D);
+    EXPECT_EQ(queue.Entries[1].Stage,
+              Runtime::RuntimeAssetImportQueueStage::Decoding);
+    EXPECT_TRUE(queue.Entries[1].CanCancel);
+
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+    engine.Run();
+
+    queue = engine.GetAssetImportQueueSnapshot();
+    ASSERT_EQ(queue.Entries.size(), 2u);
+    EXPECT_EQ(queue.ActiveCount, 0u);
+    EXPECT_EQ(queue.TerminalCount, 2u);
+    EXPECT_EQ(queue.Entries[0].TerminalStatus,
+              Runtime::RuntimeAssetImportQueueTerminalStatus::Complete);
+    EXPECT_EQ(queue.Entries[1].TerminalStatus,
+              Runtime::RuntimeAssetImportQueueTerminalStatus::Complete);
+
+    const std::vector<Runtime::RuntimeAssetIngestRecord> records =
+        engine.GetAssetIngestRecordsForTest();
+    ASSERT_EQ(records.size(), 2u);
+
+    const auto modelRecord = std::find_if(
+        records.begin(),
+        records.end(),
+        [&](const Runtime::RuntimeAssetIngestRecord& record)
+        {
+            return record.Handle == modelQueued->Operation;
+        });
+    ASSERT_NE(modelRecord, records.end());
+    EXPECT_EQ(modelRecord->Request.Source,
+              Runtime::RuntimeAssetIngestSource::ManualImport);
+    EXPECT_EQ(modelRecord->Request.PayloadKind,
+              Assets::AssetPayloadKind::ModelScene);
+    EXPECT_EQ(modelRecord->Phase, Runtime::RuntimeAssetIngestPhase::Complete);
+    EXPECT_EQ(modelRecord->Diagnostic,
+              Runtime::RuntimeAssetIngestDiagnostic::None);
+    ASSERT_TRUE(modelRecord->Result.has_value());
+    EXPECT_EQ(modelRecord->Result->PayloadKind,
+              Assets::AssetPayloadKind::ModelScene);
+    EXPECT_TRUE(modelRecord->Result->MaterializedModelScene);
+    EXPECT_EQ(modelRecord->Result->PrimitiveEntitiesCreated, 1u);
+
+    const auto textureRecord = std::find_if(
+        records.begin(),
+        records.end(),
+        [&](const Runtime::RuntimeAssetIngestRecord& record)
+        {
+            return record.Handle == textureQueued->Operation;
+        });
+    ASSERT_NE(textureRecord, records.end());
+    EXPECT_EQ(textureRecord->Request.Source,
+              Runtime::RuntimeAssetIngestSource::ManualImport);
+    EXPECT_EQ(textureRecord->Request.PayloadKind,
+              Assets::AssetPayloadKind::Texture2D);
+    EXPECT_EQ(textureRecord->Phase, Runtime::RuntimeAssetIngestPhase::Complete);
+    EXPECT_EQ(textureRecord->Diagnostic,
+              Runtime::RuntimeAssetIngestDiagnostic::None);
+    ASSERT_TRUE(textureRecord->Result.has_value());
+    EXPECT_EQ(textureRecord->Result->PayloadKind,
+              Assets::AssetPayloadKind::Texture2D);
+    EXPECT_TRUE(textureRecord->Result->Asset.IsValid());
+
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+    const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
+        engine.GetLastAssetImportEvent();
+    ASSERT_TRUE(lastEvent.has_value());
+    EXPECT_TRUE(lastEvent->Succeeded());
+
+    engine.Shutdown();
+}

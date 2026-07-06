@@ -38,7 +38,7 @@ depends_on: []
       `StreamingExecutor`: file read + decode on the worker lane, existing
       handoff/materialization on the main-thread apply, preserving current
       event/diagnostic semantics (BUG-038 logging contract).
-- [ ] Route model-scene and texture editor-menu/manual imports through
+- [x] Route model-scene and texture editor-menu/manual imports through
       `StreamingExecutor` while preserving the current command-result surface
       or replacing it with an explicit pending operation contract.
 - [ ] Route scene load through the same shape: parse into the temporary
@@ -55,8 +55,9 @@ depends_on: []
 - [x] Contract: dropped model-scene and texture imports queue immediately,
       complete through the streaming apply lane, and materialize fixture
       assets with the same result counters as the synchronous path.
-- [ ] Contract: editor-menu/manual model-scene and texture imports complete
-      through the async route with unchanged observable results.
+- [x] Contract: editor-menu/manual model-scene and texture imports return a
+      pending operation, enter the runtime import queue, and complete through
+      the async route with unchanged observable results.
 - [ ] Contract: scene load with an invalid document leaves the live scene
       untouched (existing guarantee preserved through the async route).
 - [ ] Contract: frame does not block during a large import (timing probe
@@ -66,8 +67,10 @@ depends_on: []
 ## Docs
 - [x] Update `src/runtime/README.md` and
       `docs/architecture/runtime.md` dropped asset-import notes.
-- [ ] Update scene-replacement/import notes again when scene save/load and
-      manual import routing move off the frame path.
+- [x] Update runtime import notes for dropped and editor-menu/manual
+      model-scene/texture queued imports.
+- [ ] Update scene-replacement/import notes again when scene save/load moves
+      off the frame path.
 
 ## Acceptance criteria
 - [ ] No synchronous file IO or asset decode reachable from
@@ -85,11 +88,23 @@ depends_on: []
   same decoded model-scene/texture materialization helpers used by
   `ImportAssetFromPathImpl(...)`, completes the ingest state machine, and marks
   document history dirty only after successful scene-changing apply.
-- Remaining synchronous audited call sites after this slice:
+- Remaining synchronous audited call sites after the dropped-file slice:
   `Engine::ImportAssetFromPath(...)` / `Engine::ReimportAsset(...)` still call
   `ImportAssetFromPathWithIngest(...)` -> `ImportAssetFromPathImpl(...)`, where
   model-scene/texture direct imports still construct `Core::IO::FileIOBackend`
   and decode inline. `Engine::SaveSceneToPath(...)` and
+  `Engine::LoadSceneFromPath(...)` still serialize/parse scene documents inline.
+- 2026-07-05: Sandbox editor model-scene/texture import commands now route
+  through `Engine::QueueModelTextureImport(...)`. The command surface returns
+  `SandboxEditorCommandStatus::Pending` plus the ingest handle immediately; the
+  existing runtime import event and queue snapshot publish completion. The
+  queued worker/apply path is shared with dropped model-scene/texture imports
+  and accepts `Unknown` hints by resolving the effective `.gltf`/texture payload
+  before submission.
+- Remaining synchronous audited call sites after this slice:
+  direct programmatic `Engine::ImportAssetFromPath(...)` /
+  `Engine::ReimportAsset(...)` compatibility calls can still decode
+  model-scene/texture payloads inline. `Engine::SaveSceneToPath(...)` and
   `Engine::LoadSceneFromPath(...)` still serialize/parse scene documents inline.
 
 ## Verification
