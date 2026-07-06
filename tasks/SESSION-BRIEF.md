@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `RUNTIME-141` — Async editor method-command lane (no heavy compute in the ImGui callback) (tasks/active/RUNTIME-141-async-editor-method-command-lane.md)
+- none
 
 ## Theme B — Rendering modernization
 

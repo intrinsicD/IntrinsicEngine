@@ -9,6 +9,23 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`RUNTIME-141`](RUNTIME-141-async-editor-method-command-lane.md) — Async
+editor method-command lane — retired on 2026-07-05 at maturity `Operational`.
+The Sandbox editor CPU method buttons for K-Means, Progressive Poisson,
+mesh denoise/remesh/subdivide/simplify, ICP registration, mesh curvature,
+mesh/graph/point-cloud vertex-normal recompute, point-cloud outlier removal,
+and selected mesh UV regeneration now submit runtime-owned derived jobs with
+main-thread snapshot/apply validation instead of running heavy solves inside
+the ImGui callback. The selected-mesh UV panel reports queued/applying/complete
+job state, a Null-window frame-loop contract proves render frames continue
+while a deliberately slow editor job runs, and duplicate active
+same-entity/same-domain/same-output submits return the existing pending handle
+instead of enqueueing duplicate work. GPU readback adoption remains owned by
+`RUNTIME-137`/`METHOD-014`, selected-entity derived-model caching remains owned
+by `RUNTIME-138`, and model/texture/scene-file IO remains owned by
+`RUNTIME-142`.
+
+Active
 [`UI-030`](UI-030-editor-frame-pacing-diagnostics.md) — Sandbox EditorUI
 frame-pacing diagnostics — retired on 2026-07-05 at maturity `Operational`.
 `Engine::RunFrame()` now publishes bounded phase timings, ImGui producer

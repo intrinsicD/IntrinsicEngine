@@ -3576,6 +3576,70 @@ TEST(SandboxEditorUi, KMeansCpuRequestQueuesDerivedJobAndPublishesOnApply)
         true);
 }
 
+TEST(SandboxEditorUi, KMeansCpuDuplicateSubmitUsesExistingActiveJob)
+{
+    using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
+
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+    AttachDerivedJobCommands(context, jobs);
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
+    AddPointCloudSource(registry, cloud, 4u);
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
+                 {
+                     {0.0f, 0.0f, 0.0f},
+                     {0.1f, 0.0f, 0.0f},
+                     {2.0f, 0.0f, 0.0f},
+                     {2.1f, 0.0f, 0.0f},
+                 });
+
+    const Runtime::SandboxEditorKMeansCommand command{
+        .StableEntityId =
+            Runtime::SelectionController::ToStableEntityId(cloud),
+        .Domain = Domain::PointCloudPoints,
+        .ClusterCount = 2u,
+        .MaxIterations = 8u,
+        .Seed = 13u,
+        .Backend = Runtime::SandboxEditorKMeansBackend::CpuReference,
+    };
+
+    const Runtime::SandboxEditorKMeansResult first =
+        Runtime::ApplySandboxEditorKMeansCommand(context, command);
+    ASSERT_EQ(first.Status, Runtime::SandboxEditorCommandStatus::Pending);
+
+    Runtime::DerivedJobQueueSnapshot queued = jobs.SnapshotAll();
+    ASSERT_EQ(queued.Entries.size(), 1u);
+    context.DerivedJobs = &queued;
+
+    const Runtime::SandboxEditorKMeansResult duplicate =
+        Runtime::ApplySandboxEditorKMeansCommand(context, command);
+    EXPECT_EQ(duplicate.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_NE(duplicate.Message.find("already has an active"),
+              std::string::npos);
+    EXPECT_NE(duplicate.Message.find("job 0:1"), std::string::npos);
+    EXPECT_EQ(jobs.SnapshotAll().Entries.size(), 1u);
+
+    jobs.Pump(1u);
+    jobs.DrainCompletions();
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+
+    Runtime::DerivedJobQueueSnapshot complete = jobs.SnapshotAll();
+    ASSERT_EQ(complete.Entries.size(), 1u);
+    EXPECT_EQ(complete.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    context.DerivedJobs = &complete;
+
+    const Runtime::SandboxEditorKMeansResult rerun =
+        Runtime::ApplySandboxEditorKMeansCommand(context, command);
+    EXPECT_EQ(rerun.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    Runtime::DerivedJobQueueSnapshot afterRerun = jobs.SnapshotAll();
+    ASSERT_EQ(afterRerun.Entries.size(), 2u);
+    EXPECT_EQ(afterRerun.Entries[1].Status, Runtime::DerivedJobStatus::Queued);
+}
+
 TEST(SandboxEditorUi, KMeansCpuDerivedJobDiscardsStaleTargetBeforeApply)
 {
     using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
@@ -7982,6 +8046,66 @@ TEST(SandboxEditorUi, UvRegenerationRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_EQ(history.Redo().Status,
               Runtime::EditorCommandHistoryStatus::Redone);
     EXPECT_TRUE(texcoordsFinite());
+}
+
+TEST(SandboxEditorUi, UvRegenerationDuplicateSubmitUsesExistingActiveJob)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+    AttachDerivedJobCommands(context, jobs);
+
+    const ECS::EntityHandle mesh =
+        MakeSelectable(registry, "QueuedUvDuplicateMesh");
+    AddTriangleMeshSource(registry, mesh);
+    auto& vertices = registry.Raw().get<GS::Vertices>(mesh);
+    auto texcoords = vertices.Properties.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(texcoords);
+    texcoords[1] = glm::vec2{
+        std::numeric_limits<float>::quiet_NaN(),
+        0.0f,
+    };
+
+    const Runtime::SandboxEditorUvRegenerationCommand command{
+        .StableEntityId =
+            Runtime::SelectionController::ToStableEntityId(mesh),
+        .Resolution = 64u,
+        .Padding = 2u,
+    };
+
+    const Runtime::SandboxEditorUvRegenerationCommandResult first =
+        Runtime::ApplySandboxEditorUvRegenerationCommand(context, command);
+    ASSERT_EQ(first.Status, Runtime::SandboxEditorCommandStatus::Pending);
+
+    Runtime::DerivedJobQueueSnapshot queued = jobs.SnapshotAll();
+    ASSERT_EQ(queued.Entries.size(), 1u);
+    context.DerivedJobs = &queued;
+
+    const Runtime::SandboxEditorUvRegenerationCommandResult duplicate =
+        Runtime::ApplySandboxEditorUvRegenerationCommand(context, command);
+    EXPECT_EQ(duplicate.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_NE(duplicate.Diagnostic.find("already has an active"),
+              std::string::npos);
+    EXPECT_NE(duplicate.Diagnostic.find("job 0:1"), std::string::npos);
+    EXPECT_EQ(jobs.SnapshotAll().Entries.size(), 1u);
+
+    jobs.Pump(1u);
+    jobs.DrainCompletions();
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+
+    Runtime::DerivedJobQueueSnapshot complete = jobs.SnapshotAll();
+    ASSERT_EQ(complete.Entries.size(), 1u);
+    EXPECT_EQ(complete.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    context.DerivedJobs = &complete;
+
+    const Runtime::SandboxEditorUvRegenerationCommandResult rerun =
+        Runtime::ApplySandboxEditorUvRegenerationCommand(context, command);
+    EXPECT_EQ(rerun.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    Runtime::DerivedJobQueueSnapshot afterRerun = jobs.SnapshotAll();
+    ASSERT_EQ(afterRerun.Entries.size(), 2u);
+    EXPECT_EQ(afterRerun.Entries[1].Status, Runtime::DerivedJobStatus::Queued);
 }
 
 TEST(SandboxEditorUi, UvRegenerationDerivedJobDiscardsStaleSource)

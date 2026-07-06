@@ -92,8 +92,12 @@ F.2 pins the frame-loop behavior with a deliberately slow derived job on the
 Null-window engine path: the ImGui editor callback must stay bounded while the
 worker job is running, and render begin/extract/prepare/execute/end must still
 complete for a frame that entered rendering while the job was pending/running.
-Any remaining `RUNTIME-141` work is narrower panel duplicate-submit/cancel UX
-coverage rather than another identified synchronous geometry-processing command.
+Slice F.3 closes duplicate-submit UX with a shared active-job guard: converted
+editor CPU commands suppress same-entity/same-domain/same-output submissions
+while an existing job is blocked, queued, running, or applying, returning the
+existing pending handle instead of enqueueing duplicate work. Terminal jobs do
+not block an explicit re-run. The current panels do not expose a cross-command
+cancel button; cancel remains a lower-level registry command surface.
 
 ### Sandbox Editor Startup Layout
 

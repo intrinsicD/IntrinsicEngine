@@ -16,11 +16,10 @@ Blocking fixes first, then abstractness seams, then steady-state efficiency:
 - [`RUNTIME-140`](../../done/RUNTIME-140-remove-global-waitforall-from-import-apply.md)
   is retired; runtime import apply now uses per-asset completion and event
   flushes instead of a global `Scheduler::WaitForAll()` barrier.
-- [`RUNTIME-141`](../../active/RUNTIME-141-async-editor-method-command-lane.md)
-  is active — async
-  editor method-command lane; no heavy solves inside the ImGui callback
-  (GPU readback leg stays with `RUNTIME-137`/`METHOD-014`; selected-entity
-  models stay with `RUNTIME-138`).
+- [`RUNTIME-141`](../../done/RUNTIME-141-async-editor-method-command-lane.md)
+  is retired; heavy Sandbox editor CPU method commands now queue runtime
+  derived jobs, keep rendering advanceable while jobs run, and suppress
+  duplicate active same-output submits instead of blocking the ImGui callback.
 - [`RUNTIME-142`](RUNTIME-142-async-modelscene-texture-scenefile-io.md) —
   async model-scene/texture import and scene save/load (extends the
   deferred-geometry streaming shape).
