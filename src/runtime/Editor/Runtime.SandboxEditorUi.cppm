@@ -1912,11 +1912,15 @@ export namespace Extrinsic::Runtime
         }
     };
 
+    struct SandboxEditorUvRegenerationCommandResult;
+
     struct SandboxEditorMethodResultSinks
     {
         std::function<void(SandboxEditorKMeansResult)> KMeans{};
         std::function<void(SandboxEditorProgressivePoissonResult)>
             ProgressivePoisson{};
+        std::function<void(SandboxEditorUvRegenerationCommandResult)>
+            UvRegeneration{};
         std::function<void(SandboxEditorMeshCurvatureResult)> MeshCurvature{};
         std::function<void(SandboxEditorMeshDenoiseResult)> MeshDenoise{};
         std::function<void(SandboxEditorMeshRemeshResult)> MeshRemesh{};

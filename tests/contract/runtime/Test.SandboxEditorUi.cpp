@@ -7877,6 +7877,186 @@ TEST(SandboxEditorUi, UvRegenerationCommandRepairsSelectedMeshTexcoords)
     EXPECT_TRUE(after.Inspector.TextureBake.Uv.CheckerPreviewAvailable);
 }
 
+TEST(SandboxEditorUi, UvRegenerationRequestQueuesDerivedJobAndPublishesOnApply)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+    AttachDerivedJobCommands(context, jobs);
+    std::optional<Runtime::SandboxEditorUvRegenerationCommandResult>
+        completedResult{};
+    context.MethodResultSinks.UvRegeneration =
+        [&completedResult](
+            Runtime::SandboxEditorUvRegenerationCommandResult result)
+        {
+            completedResult = std::move(result);
+        };
+
+    const ECS::EntityHandle mesh =
+        MakeSelectable(registry, "QueuedUvRepairMesh");
+    AddTriangleMeshSource(registry, mesh);
+    auto& vertices = registry.Raw().get<GS::Vertices>(mesh);
+    auto texcoords = vertices.Properties.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(texcoords);
+    texcoords[1] = glm::vec2{
+        std::numeric_limits<float>::quiet_NaN(),
+        0.0f,
+    };
+
+    const auto texcoordsFinite =
+        [&registry, mesh]()
+        {
+            const GS::ConstSourceView view =
+                GS::BuildConstView(registry.Raw(), mesh);
+            if (view.VertexSource == nullptr)
+                return false;
+            const auto uv =
+                view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+            if (!uv)
+                return false;
+            for (const glm::vec2 value : uv.Vector())
+            {
+                if (!std::isfinite(value.x) || !std::isfinite(value.y))
+                    return false;
+            }
+            return true;
+        };
+
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    const Runtime::SandboxEditorUvRegenerationCommandResult result =
+        Runtime::ApplySandboxEditorUvRegenerationCommand(
+            context,
+            Runtime::SandboxEditorUvRegenerationCommand{
+                .StableEntityId = stableId,
+                .Resolution = 64u,
+                .Padding = 2u,
+            });
+
+    EXPECT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_NE(result.Diagnostic.find("queued"), std::string::npos);
+    EXPECT_FALSE(texcoordsFinite());
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
+
+    Runtime::DerivedJobQueueSnapshot queued = jobs.SnapshotAll();
+    ASSERT_EQ(queued.Entries.size(), 1u);
+    EXPECT_EQ(queued.Entries[0].Name, "Sandbox.UvRegeneration.CPU");
+    EXPECT_EQ(queued.Entries[0].Status, Runtime::DerivedJobStatus::Queued);
+
+    jobs.Pump(1u);
+    jobs.DrainCompletions();
+    EXPECT_FALSE(completedResult.has_value());
+    EXPECT_FALSE(texcoordsFinite());
+
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    ASSERT_TRUE(completedResult.has_value());
+    EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Diagnostic;
+    EXPECT_EQ(completedResult->UvStatus,
+              Geometry::UvAtlas::UvAtlasStatus::Success);
+    EXPECT_EQ(completedResult->Provenance,
+              Geometry::UvAtlas::UvAtlasProvenance::Generated);
+    EXPECT_TRUE(texcoordsFinite());
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
+    EXPECT_TRUE(history.IsDirty());
+
+    ASSERT_TRUE(history.CanUndo());
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_FALSE(texcoordsFinite());
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_TRUE(texcoordsFinite());
+}
+
+TEST(SandboxEditorUi, UvRegenerationDerivedJobDiscardsStaleSource)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+    AttachDerivedJobCommands(context, jobs);
+    bool completedSinkCalled = false;
+    context.MethodResultSinks.UvRegeneration =
+        [&completedSinkCalled](
+            Runtime::SandboxEditorUvRegenerationCommandResult)
+        {
+            completedSinkCalled = true;
+        };
+
+    const ECS::EntityHandle mesh =
+        MakeSelectable(registry, "StaleUvRepairMesh");
+    AddTriangleMeshSource(registry, mesh);
+    auto& vertices = registry.Raw().get<GS::Vertices>(mesh);
+    auto texcoords = vertices.Properties.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(texcoords);
+    texcoords[1] = glm::vec2{
+        std::numeric_limits<float>::quiet_NaN(),
+        0.0f,
+    };
+
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    const Runtime::SandboxEditorUvRegenerationCommandResult result =
+        Runtime::ApplySandboxEditorUvRegenerationCommand(
+            context,
+            Runtime::SandboxEditorUvRegenerationCommand{
+                .StableEntityId = stableId,
+                .Resolution = 64u,
+                .Padding = 2u,
+            });
+    ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+
+    SetPositions(vertices,
+                 {
+                     {0.0f, 0.0f, 0.0f},
+                     {1.25f, 0.0f, 0.0f},
+                     {0.0f, 1.0f, 0.0f},
+                 });
+
+    jobs.Pump(1u);
+    jobs.DrainCompletions();
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+
+    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].Status,
+              Runtime::DerivedJobStatus::StaleDiscarded);
+    EXPECT_NE(done.Entries[0].Diagnostic.find(
+                  "StaleSourcePropertyGeneration"),
+              std::string::npos);
+    EXPECT_FALSE(completedSinkCalled);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
+
+    const GS::ConstSourceView stale = GS::BuildConstView(registry.Raw(), mesh);
+    ASSERT_NE(stale.VertexSource, nullptr);
+    const auto staleTexcoords =
+        stale.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(staleTexcoords);
+    ASSERT_GT(staleTexcoords.Vector().size(), 1u);
+    EXPECT_FALSE(std::isfinite(staleTexcoords[1].x));
+}
+
 TEST(SandboxEditorUi, TextureBakeControlsReportUvSourcesAndRouteCommand)
 {
     ECS::Scene::Registry registry;

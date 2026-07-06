@@ -3912,7 +3912,8 @@ namespace Extrinsic::Runtime
         }
 
         void CopyUvOutputPropertiesToHalfedgeMesh(
-            const GS::ConstSourceView& source,
+            const Geometry::ConstPropertySet& sourceFaceProperties,
+            const bool hasSourceFaceProperties,
             const MeshSoupFromGeometrySourcesResult& soup,
             Geometry::UvAtlas::UvAtlasResult& atlas,
             Geometry::HalfedgeMesh::Mesh& mesh)
@@ -3927,7 +3928,7 @@ namespace Extrinsic::Runtime
                 sourceVertexForOutputVertex,
                 mesh.VertexProperties());
 
-            if (source.FaceSource == nullptr)
+            if (!hasSourceFaceProperties)
                 return;
 
             std::vector<std::uint32_t> sourceFaceForOutputFace;
@@ -3941,7 +3942,7 @@ namespace Extrinsic::Runtime
             }
 
             CopyKnownPropertiesByXref(
-                Geometry::ConstPropertySet(source.FaceSource->Properties),
+                sourceFaceProperties,
                 sourceFaceForOutputFace,
                 mesh.FaceProperties());
         }
@@ -7810,6 +7811,71 @@ namespace Extrinsic::Runtime
 
             return ToSandboxEditorCommandStatus(
                 ApplyMeshTopologyState(
+                    context.Scene,
+                    stableEntityId,
+                    after));
+        }
+
+        [[nodiscard]] EditorCommandHistoryStatus ApplyUvMeshTopologyState(
+            ECS::Scene::Registry* scene,
+            const std::uint32_t stableEntityId,
+            const Geometry::HalfedgeMesh::Mesh& mesh)
+        {
+            if (scene == nullptr)
+                return EditorCommandHistoryStatus::MissingScene;
+
+            entt::registry& raw = scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, stableEntityId);
+            if (!entity.has_value())
+                return EditorCommandHistoryStatus::StaleEntity;
+
+            Geometry::HalfedgeMesh::Mesh published = mesh;
+            if (published.HasGarbage())
+                published.GarbageCollection();
+            GS::PopulateFromMesh(raw, *entity, published);
+            MarkMeshTopologyReplacementDirty(raw, *entity);
+            Dirty::MarkGpuDirty(raw, *entity);
+            return EditorCommandHistoryStatus::Applied;
+        }
+
+        [[nodiscard]] SandboxEditorCommandStatus CommitUvMeshTopologyReplacement(
+            const SandboxEditorContext& context,
+            const std::uint32_t stableEntityId,
+            const char* label,
+            Geometry::HalfedgeMesh::Mesh before,
+            Geometry::HalfedgeMesh::Mesh after)
+        {
+            if (context.CommandHistory != nullptr)
+            {
+                ECS::Scene::Registry* scene = context.Scene;
+                const EditorCommandHistoryResult history =
+                    context.CommandHistory->Execute(
+                        EditorCommandRecord{
+                            .Label = label,
+                            .Redo =
+                                [scene, stableEntityId, after]()
+                                {
+                                    return ApplyUvMeshTopologyState(
+                                        scene,
+                                        stableEntityId,
+                                        after);
+                                },
+                            .Undo =
+                                [scene, stableEntityId, before]()
+                                {
+                                    return ApplyUvMeshTopologyState(
+                                        scene,
+                                        stableEntityId,
+                                        before);
+                                },
+                            .Dirtying = true,
+                        });
+                return ToSandboxEditorCommandStatus(history.Status);
+            }
+
+            return ToSandboxEditorCommandStatus(
+                ApplyUvMeshTopologyState(
                     context.Scene,
                     stableEntityId,
                     after));
@@ -20721,33 +20787,389 @@ namespace Extrinsic::Runtime
         return result;
     }
 
+    struct SandboxEditorUvRegenerationSourceSnapshot
+    {
+        std::vector<glm::vec3> Positions{};
+        std::vector<std::uint32_t> HalfedgeToVertex{};
+        std::vector<std::uint32_t> HalfedgeNext{};
+        std::vector<std::uint32_t> HalfedgeFace{};
+        std::vector<std::uint32_t> FaceHalfedge{};
+    };
+
+    [[nodiscard]] std::optional<std::vector<std::uint32_t>> CopyU32Property(
+        const Geometry::PropertySet& properties,
+        const std::string_view name)
+    {
+        const auto property = properties.Get<std::uint32_t>(name);
+        if (!property || property.Vector().size() != properties.Size())
+            return std::nullopt;
+        return property.Vector();
+    }
+
+    [[nodiscard]] bool CaptureUvRegenerationSourceSnapshot(
+        const GS::ConstSourceView& view,
+        SandboxEditorUvRegenerationSourceSnapshot& out)
+    {
+        if (view.VertexSource == nullptr ||
+            view.HalfedgeSource == nullptr ||
+            view.FaceSource == nullptr)
+        {
+            return false;
+        }
+
+        std::optional<std::vector<glm::vec3>> positions =
+            CollectKMeansPositions(view.VertexSource->Properties);
+        std::optional<std::vector<std::uint32_t>> halfedgeToVertex =
+            CopyU32Property(view.HalfedgeSource->Properties,
+                            GS::PropertyNames::kHalfedgeToVertex);
+        std::optional<std::vector<std::uint32_t>> halfedgeNext =
+            CopyU32Property(view.HalfedgeSource->Properties,
+                            GS::PropertyNames::kHalfedgeNext);
+        std::optional<std::vector<std::uint32_t>> halfedgeFace =
+            CopyU32Property(view.HalfedgeSource->Properties,
+                            GS::PropertyNames::kHalfedgeFace);
+        std::optional<std::vector<std::uint32_t>> faceHalfedge =
+            CopyU32Property(view.FaceSource->Properties,
+                            GS::PropertyNames::kFaceHalfedge);
+        if (!positions.has_value() ||
+            !halfedgeToVertex.has_value() ||
+            !halfedgeNext.has_value() ||
+            !halfedgeFace.has_value() ||
+            !faceHalfedge.has_value())
+        {
+            return false;
+        }
+
+        out.Positions = std::move(*positions);
+        out.HalfedgeToVertex = std::move(*halfedgeToVertex);
+        out.HalfedgeNext = std::move(*halfedgeNext);
+        out.HalfedgeFace = std::move(*halfedgeFace);
+        out.FaceHalfedge = std::move(*faceHalfedge);
+        return true;
+    }
+
+    [[nodiscard]] bool SameUvRegenerationSourceSnapshot(
+        const SandboxEditorUvRegenerationSourceSnapshot& lhs,
+        const SandboxEditorUvRegenerationSourceSnapshot& rhs) noexcept
+    {
+        return SameKMeansInputPositions(lhs.Positions, rhs.Positions) &&
+               lhs.HalfedgeToVertex == rhs.HalfedgeToVertex &&
+               lhs.HalfedgeNext == rhs.HalfedgeNext &&
+               lhs.HalfedgeFace == rhs.HalfedgeFace &&
+               lhs.FaceHalfedge == rhs.FaceHalfedge;
+    }
+
+    [[nodiscard]] SandboxEditorUvRegenerationCommandResult
+    MakeUvRegenerationResult(
+        const SandboxEditorCommandStatus status,
+        const Geometry::UvAtlas::UvAtlasStatus uvStatus,
+        std::string diagnostic)
+    {
+        return SandboxEditorUvRegenerationCommandResult{
+            .Status = status,
+            .UvStatus = uvStatus,
+            .Diagnostic = std::move(diagnostic),
+        };
+    }
+
+    void CopyUvAtlasCounters(
+        const Geometry::UvAtlas::UvAtlasResult& atlas,
+        SandboxEditorUvRegenerationCommandResult& result)
+    {
+        result.UvStatus = atlas.Status;
+        result.Provenance = atlas.Provenance;
+        result.AtlasWidth = atlas.Diagnostics.AtlasWidth;
+        result.AtlasHeight = atlas.Diagnostics.AtlasHeight;
+        result.ChartCount = atlas.Diagnostics.ChartCount;
+        result.SeamSplitVertexCount =
+            atlas.Diagnostics.OutputVertexCount >
+                    atlas.Diagnostics.InputVertexCount
+                ? atlas.Diagnostics.OutputVertexCount -
+                      atlas.Diagnostics.InputVertexCount
+                : 0u;
+    }
+
+    [[nodiscard]] SandboxEditorUvRegenerationCommandResult
+    MakePendingUvRegenerationResult(
+        const DerivedJobHandle handle)
+    {
+        SandboxEditorUvRegenerationCommandResult result{};
+        result.Status = SandboxEditorCommandStatus::Pending;
+        result.Diagnostic = "UV regeneration CPU job queued";
+        AppendDerivedJobHandleToMessage(result.Diagnostic, handle);
+        result.Diagnostic += ".";
+        return result;
+    }
+
+    struct SandboxEditorUvRegenerationCpuJobState
+    {
+        std::uint32_t StableEntityId{0u};
+        std::uint64_t GeometryMetadataSignature{0u};
+        SandboxEditorUvRegenerationSourceSnapshot Snapshot{};
+        MeshSoupFromGeometrySourcesResult Soup{};
+        Geometry::PropertySet SourceVertexProperties{};
+        bool HasSourceVertexProperties{false};
+        Geometry::PropertySet SourceFaceProperties{};
+        bool HasSourceFaceProperties{false};
+        std::vector<glm::vec2> AuthoredTexcoords{};
+        Geometry::HalfedgeMesh::Mesh BeforeMesh{};
+        Geometry::HalfedgeMesh::Mesh AfterMesh{};
+        SandboxEditorUvRegenerationCommand Command{};
+        SandboxEditorUvRegenerationCommandResult Result{};
+    };
+
+    [[nodiscard]] DerivedJobApplyValidation
+    ValidateUvRegenerationCpuJobApply(
+        const SandboxEditorContext& context,
+        const SandboxEditorUvRegenerationCpuJobState& job)
+    {
+        if (context.Scene == nullptr)
+            return DerivedJobApplyValidation::MissingEntity;
+
+        entt::registry& raw = context.Scene->Raw();
+        const std::optional<ECS::EntityHandle> entity =
+            ResolveStableEntity(raw, job.StableEntityId);
+        if (!entity.has_value())
+            return DerivedJobApplyValidation::MissingEntity;
+
+        const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
+        const GS::SourceAvailability availability =
+            GS::BuildSourceAvailability(view);
+        if (availability.ProvenanceDomain != GS::Domain::Mesh)
+            return DerivedJobApplyValidation::StaleGeometryGeneration;
+
+        if (GeometryMetadataSignatureForEntity(raw, *entity) !=
+            job.GeometryMetadataSignature)
+        {
+            return DerivedJobApplyValidation::StaleGeometryGeneration;
+        }
+
+        SandboxEditorUvRegenerationSourceSnapshot current{};
+        if (!CaptureUvRegenerationSourceSnapshot(view, current))
+            return DerivedJobApplyValidation::StaleGeometryGeneration;
+        if (!SameUvRegenerationSourceSnapshot(current, job.Snapshot))
+            return DerivedJobApplyValidation::StaleSourcePropertyGeneration;
+
+        return DerivedJobApplyValidation::Current;
+    }
+
+    void PublishUvRegenerationResultSink(
+        const SandboxEditorContext& context,
+        SandboxEditorUvRegenerationCommandResult result)
+    {
+        if (context.MethodResultSinks.UvRegeneration)
+            context.MethodResultSinks.UvRegeneration(std::move(result));
+    }
+
+    [[nodiscard]] DerivedJobWorkerResult RunUvRegenerationCpuWorker(
+        const std::shared_ptr<SandboxEditorUvRegenerationCpuJobState>& state)
+    {
+        Geometry::UvAtlas::UvAtlasOptions options{};
+        options.PreserveValidAuthoredUvs =
+            state->Command.PreserveValidAuthoredUvs;
+        options.ForceRegenerate = state->Command.ForceRegenerate;
+        options.Resolution = state->Command.Resolution;
+        options.Padding = state->Command.Padding;
+        options.TexelsPerUnit = state->Command.TexelsPerUnit;
+        options.BackendName = "xatlas";
+
+        Geometry::UvAtlas::UvAtlasInput input{};
+        input.Positions = state->Soup.Mesh.Positions();
+        input.Faces = state->Soup.Mesh.Faces();
+        input.AuthoredTexcoords = state->AuthoredTexcoords;
+        input.VertexProperties = state->HasSourceVertexProperties
+            ? Geometry::ConstPropertySet(state->SourceVertexProperties)
+            : Geometry::ConstPropertySet{};
+        input.HasVertexProperties = state->HasSourceVertexProperties;
+
+        Geometry::UvAtlas::UvAtlasResult atlas =
+            Geometry::UvAtlas::ResolveUvAtlas(input, options, nullptr);
+        CopyUvAtlasCounters(atlas, state->Result);
+
+        if (!atlas.Succeeded())
+        {
+            const bool backendFailure =
+                atlas.Status ==
+                    Geometry::UvAtlas::UvAtlasStatus::BackendUnavailable ||
+                atlas.Status ==
+                    Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput ||
+                atlas.Status ==
+                    Geometry::UvAtlas::UvAtlasStatus::BackendFailed;
+            state->Result.Status = backendFailure
+                ? SandboxEditorCommandStatus::GeometryProcessingFailed
+                : SandboxEditorCommandStatus::InvalidProcessingParameters;
+            state->Result.Diagnostic =
+                atlas.Diagnostics.BackendDetail.empty()
+                    ? std::string{Geometry::UvAtlas::ToString(atlas.Status)}
+                    : atlas.Diagnostics.BackendDetail;
+            return DerivedJobOutput{
+                .PayloadToken = 0u,
+                .NormalizedProgress = 1.0f,
+                .ProgressDeterminate = true,
+                .Diagnostic = state->Result.Diagnostic,
+            };
+        }
+
+        auto converted =
+            Geometry::Mesh::Conversion::ToHalfedgeMesh(atlas.OutputMesh);
+        if (!converted.Succeeded())
+        {
+            state->Result.Status =
+                SandboxEditorCommandStatus::GeometryProcessingFailed;
+            state->Result.Diagnostic =
+                "generated UV mesh could not be converted back to halfedge topology";
+            return DerivedJobOutput{
+                .PayloadToken = 0u,
+                .NormalizedProgress = 1.0f,
+                .ProgressDeterminate = true,
+                .Diagnostic = state->Result.Diagnostic,
+            };
+        }
+
+        CopyUvOutputPropertiesToHalfedgeMesh(
+            Geometry::ConstPropertySet(state->SourceFaceProperties),
+            state->HasSourceFaceProperties,
+            state->Soup,
+            atlas,
+            converted.Mesh);
+        state->AfterMesh = std::move(converted.Mesh);
+        state->Result.Status = SandboxEditorCommandStatus::Applied;
+        state->Result.Diagnostic = atlas.Diagnostics.BackendDetail;
+        return DerivedJobOutput{
+            .PayloadToken = 0u,
+            .NormalizedProgress = 1.0f,
+            .ProgressDeterminate = true,
+            .Diagnostic = "UV regeneration CPU result ready",
+        };
+    }
+
+    [[nodiscard]] SandboxEditorUvRegenerationCommandResult
+    CommitUvRegenerationCpuJobResult(
+        const SandboxEditorContext& context,
+        SandboxEditorUvRegenerationCpuJobState& job)
+    {
+        SandboxEditorUvRegenerationCommandResult result = job.Result;
+        if (!result.Succeeded())
+            return result;
+
+        const SandboxEditorCommandStatus commitStatus =
+            CommitUvMeshTopologyReplacement(
+                context,
+                job.StableEntityId,
+                "Regenerate UVs",
+                job.BeforeMesh,
+                job.AfterMesh);
+        if (commitStatus != SandboxEditorCommandStatus::Applied)
+        {
+            result.Status = commitStatus;
+            result.Diagnostic =
+                "UV regeneration publication failed during editor history commit.";
+            return result;
+        }
+
+        result.Status = SandboxEditorCommandStatus::Applied;
+        InvalidateSelectedModelCache(context);
+        return result;
+    }
+
+    [[nodiscard]] Core::Result PublishUvRegenerationCpuJob(
+        const SandboxEditorContext& context,
+        SandboxEditorUvRegenerationCpuJobState& job)
+    {
+        SandboxEditorUvRegenerationCommandResult result =
+            CommitUvRegenerationCpuJobResult(context, job);
+        const bool succeeded = result.Succeeded();
+        PublishUvRegenerationResultSink(context, std::move(result));
+        return succeeded ? Core::Ok() : Core::Err(Core::ErrorCode::Unknown);
+    }
+
+    [[nodiscard]] DerivedJobDesc MakeUvRegenerationCpuJobDesc(
+        const SandboxEditorContext& context,
+        const std::shared_ptr<SandboxEditorUvRegenerationCpuJobState>& state)
+    {
+        return DerivedJobDesc{
+            .Key = DerivedJobKey{
+                .EntityId = state->StableEntityId,
+                .Domain = ProgressiveGeometryDomain::MeshSurface,
+                .OutputSemantic = ProgressiveSlotSemantic::Albedo,
+                .SourcePropertyGeneration =
+                    state->GeometryMetadataSignature,
+                .OutputName = "uv_regeneration",
+            },
+            .Name = "Sandbox.UvRegeneration.CPU",
+            .RequestedJobDomain = ProgressiveJobDomain::Cpu,
+            .Kind = Core::Dag::TaskKind::GeometryProcess,
+            .Priority = Core::Dag::TaskPriority::Normal,
+            .EstimatedCost = std::max<std::uint32_t>(
+                1u,
+                static_cast<std::uint32_t>(
+                    (std::max(state->Soup.Mesh.VertexCount(),
+                              state->Soup.Mesh.FaceCount()) +
+                     1023u) /
+                    1024u)),
+            .Execute =
+                [state]() -> DerivedJobWorkerResult
+                {
+                    return RunUvRegenerationCpuWorker(state);
+                },
+            .ValidateOnMainThread =
+                [context, state]()
+                {
+                    return ValidateUvRegenerationCpuJobApply(
+                        context,
+                        *state);
+                },
+            .ApplyOnMainThread =
+                [context, state](DerivedJobApplyContext&) -> Core::Result
+                {
+                    return PublishUvRegenerationCpuJob(context, *state);
+                },
+        };
+    }
+
+    [[nodiscard]] SandboxEditorUvRegenerationCommandResult
+    SubmitUvRegenerationCpuJob(
+        const SandboxEditorContext& context,
+        const std::shared_ptr<SandboxEditorUvRegenerationCpuJobState>& state)
+    {
+        DerivedJobDesc desc = MakeUvRegenerationCpuJobDesc(context, state);
+        const DerivedJobHandle handle =
+            context.DerivedJobCommands.Submit(std::move(desc));
+        if (!handle.IsValid())
+        {
+            return MakeUvRegenerationResult(
+                SandboxEditorCommandStatus::GeometryProcessingFailed,
+                Geometry::UvAtlas::UvAtlasStatus::BackendFailed,
+                "UV regeneration CPU job submission was rejected by the runtime job lane.");
+        }
+
+        return MakePendingUvRegenerationResult(handle);
+    }
+
     SandboxEditorUvRegenerationCommandResult ApplySandboxEditorUvRegenerationCommand(
         const SandboxEditorContext& context,
         const SandboxEditorUvRegenerationCommand& command)
     {
         if (context.Scene == nullptr)
         {
-            return SandboxEditorUvRegenerationCommandResult{
-                .Status = SandboxEditorCommandStatus::MissingScene,
-                .UvStatus = Geometry::UvAtlas::UvAtlasStatus::EmptyInput,
-                .Diagnostic = "Scene registry is unavailable.",
-            };
+            return MakeUvRegenerationResult(
+                SandboxEditorCommandStatus::MissingScene,
+                Geometry::UvAtlas::UvAtlasStatus::EmptyInput,
+                "Scene registry is unavailable.");
         }
         if (command.Resolution == 0u || command.Padding >= command.Resolution)
         {
-            return SandboxEditorUvRegenerationCommandResult{
-                .Status = SandboxEditorCommandStatus::InvalidProcessingParameters,
-                .UvStatus = Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput,
-                .Diagnostic = "UV regeneration requires a positive resolution and padding smaller than the atlas.",
-            };
+            return MakeUvRegenerationResult(
+                SandboxEditorCommandStatus::InvalidProcessingParameters,
+                Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput,
+                "UV regeneration requires a positive resolution and padding smaller than the atlas.");
         }
         if (!command.BackendName.empty() && command.BackendName != "xatlas")
         {
-            return SandboxEditorUvRegenerationCommandResult{
-                .Status = SandboxEditorCommandStatus::InvalidProcessingParameters,
-                .UvStatus = Geometry::UvAtlas::UvAtlasStatus::BackendUnavailable,
-                .Diagnostic = "Only the promoted xatlas UV backend is available.",
-            };
+            return MakeUvRegenerationResult(
+                SandboxEditorCommandStatus::InvalidProcessingParameters,
+                Geometry::UvAtlas::UvAtlasStatus::BackendUnavailable,
+                "Only the promoted xatlas UV backend is available.");
         }
 
         entt::registry& raw = context.Scene->Raw();
@@ -20755,11 +21177,10 @@ namespace Extrinsic::Runtime
             ResolveStableEntity(raw, command.StableEntityId);
         if (!entity.has_value())
         {
-            return SandboxEditorUvRegenerationCommandResult{
-                .Status = SandboxEditorCommandStatus::StaleEntity,
-                .UvStatus = Geometry::UvAtlas::UvAtlasStatus::EmptyInput,
-                .Diagnostic = "UV regeneration target entity is stale or no longer live.",
-            };
+            return MakeUvRegenerationResult(
+                SandboxEditorCommandStatus::StaleEntity,
+                Geometry::UvAtlas::UvAtlasStatus::EmptyInput,
+                "UV regeneration target entity is stale or no longer live.");
         }
 
         const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
@@ -20767,11 +21188,29 @@ namespace Extrinsic::Runtime
             BuildMeshSoupFromGeometrySources(view);
         if (!soup.Succeeded())
         {
-            return SandboxEditorUvRegenerationCommandResult{
-                .Status = soup.Status,
-                .UvStatus = Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput,
-                .Diagnostic = soup.Diagnostic,
-            };
+            return MakeUvRegenerationResult(
+                soup.Status,
+                Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput,
+                soup.Diagnostic);
+        }
+
+        MeshTopologySourceResult topology =
+            BuildHalfedgeMeshForTopologyEdit(view, "UV regeneration");
+        if (!topology.Succeeded())
+        {
+            return MakeUvRegenerationResult(
+                topology.Status,
+                Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput,
+                topology.Diagnostic);
+        }
+
+        SandboxEditorUvRegenerationSourceSnapshot snapshot{};
+        if (!CaptureUvRegenerationSourceSnapshot(view, snapshot))
+        {
+            return MakeUvRegenerationResult(
+                SandboxEditorCommandStatus::InvalidProcessingParameters,
+                Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput,
+                "UV regeneration requires count-matched mesh position and halfedge topology properties.");
         }
 
         std::vector<glm::vec2> authoredTexcoords;
@@ -20783,88 +21222,41 @@ namespace Extrinsic::Runtime
                 authoredTexcoords = texcoords.Vector();
         }
 
-        Geometry::UvAtlas::UvAtlasOptions options{};
-        options.PreserveValidAuthoredUvs = command.PreserveValidAuthoredUvs;
-        options.ForceRegenerate = command.ForceRegenerate;
-        options.Resolution = command.Resolution;
-        options.Padding = command.Padding;
-        options.TexelsPerUnit = command.TexelsPerUnit;
-        options.BackendName = "xatlas";
-
-        Geometry::UvAtlas::UvAtlasInput input{};
-        input.Positions = soup.Mesh.Positions();
-        input.Faces = soup.Mesh.Faces();
-        input.AuthoredTexcoords = authoredTexcoords;
-        input.VertexProperties =
-            view.VertexSource != nullptr
-                ? Geometry::ConstPropertySet(view.VertexSource->Properties)
-                : Geometry::ConstPropertySet{};
-        input.HasVertexProperties = view.VertexSource != nullptr;
-
-        Geometry::UvAtlas::UvAtlasResult atlas =
-            Geometry::UvAtlas::ResolveUvAtlas(input, options, nullptr);
-        if (!atlas.Succeeded())
+        auto state =
+            std::make_shared<SandboxEditorUvRegenerationCpuJobState>();
+        state->StableEntityId = command.StableEntityId;
+        state->GeometryMetadataSignature =
+            GeometryMetadataSignatureForEntity(raw, *entity);
+        state->Snapshot = std::move(snapshot);
+        state->Soup = std::move(soup);
+        state->BeforeMesh = std::move(topology.Mesh);
+        state->Command = command;
+        state->AuthoredTexcoords = std::move(authoredTexcoords);
+        if (view.VertexSource != nullptr)
         {
-            const bool backendFailure =
-                atlas.Status == Geometry::UvAtlas::UvAtlasStatus::BackendUnavailable ||
-                atlas.Status == Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput ||
-                atlas.Status == Geometry::UvAtlas::UvAtlasStatus::BackendFailed;
-            return SandboxEditorUvRegenerationCommandResult{
-                .Status = backendFailure
-                    ? SandboxEditorCommandStatus::GeometryProcessingFailed
-                    : SandboxEditorCommandStatus::InvalidProcessingParameters,
-                .UvStatus = atlas.Status,
-                .Provenance = atlas.Provenance,
-                .AtlasWidth = atlas.Diagnostics.AtlasWidth,
-                .AtlasHeight = atlas.Diagnostics.AtlasHeight,
-                .ChartCount = atlas.Diagnostics.ChartCount,
-                .SeamSplitVertexCount = atlas.Diagnostics.OutputVertexCount >
-                                                atlas.Diagnostics.InputVertexCount
-                                            ? atlas.Diagnostics.OutputVertexCount -
-                                                  atlas.Diagnostics.InputVertexCount
-                                            : 0u,
-                .Diagnostic = atlas.Diagnostics.BackendDetail.empty()
-                    ? std::string{Geometry::UvAtlas::ToString(atlas.Status)}
-                    : atlas.Diagnostics.BackendDetail,
-            };
+            state->SourceVertexProperties = view.VertexSource->Properties;
+            state->HasSourceVertexProperties = true;
+        }
+        if (view.FaceSource != nullptr)
+        {
+            state->SourceFaceProperties = view.FaceSource->Properties;
+            state->HasSourceFaceProperties = true;
         }
 
-        auto converted = Geometry::Mesh::Conversion::ToHalfedgeMesh(atlas.OutputMesh);
-        if (!converted.Succeeded())
+        if (context.DerivedJobCommands.Available())
+            return SubmitUvRegenerationCpuJob(context, state);
+
+        const DerivedJobWorkerResult worker =
+            RunUvRegenerationCpuWorker(state);
+        if (!worker.has_value())
         {
-            return SandboxEditorUvRegenerationCommandResult{
-                .Status = SandboxEditorCommandStatus::GeometryProcessingFailed,
-                .UvStatus = atlas.Status,
-                .Provenance = atlas.Provenance,
-                .Diagnostic = "generated UV mesh could not be converted back to halfedge topology",
-            };
+            return MakeUvRegenerationResult(
+                SandboxEditorCommandStatus::GeometryProcessingFailed,
+                Geometry::UvAtlas::UvAtlasStatus::BackendFailed,
+                "UV regeneration CPU worker failed.");
         }
 
-        CopyUvOutputPropertiesToHalfedgeMesh(view, soup, atlas, converted.Mesh);
-        GS::PopulateFromMesh(raw, *entity, converted.Mesh);
-        Dirty::MarkVertexPositionsDirty(raw, *entity);
-        Dirty::MarkVertexAttributesDirty(raw, *entity);
-        Dirty::MarkEdgeTopologyDirty(raw, *entity);
-        Dirty::MarkFaceTopologyDirty(raw, *entity);
-        Dirty::MarkGpuDirty(raw, *entity);
-        if (context.CommandHistory != nullptr)
-            (void)context.CommandHistory->MarkDirty("Regenerate UVs");
-        InvalidateSelectedModelCache(context);
-
-        return SandboxEditorUvRegenerationCommandResult{
-            .Status = SandboxEditorCommandStatus::Applied,
-            .UvStatus = atlas.Status,
-            .Provenance = atlas.Provenance,
-            .AtlasWidth = atlas.Diagnostics.AtlasWidth,
-            .AtlasHeight = atlas.Diagnostics.AtlasHeight,
-            .ChartCount = atlas.Diagnostics.ChartCount,
-            .SeamSplitVertexCount = atlas.Diagnostics.OutputVertexCount >
-                                            atlas.Diagnostics.InputVertexCount
-                                        ? atlas.Diagnostics.OutputVertexCount -
-                                              atlas.Diagnostics.InputVertexCount
-                                        : 0u,
-            .Diagnostic = atlas.Diagnostics.BackendDetail,
-        };
+        return CommitUvRegenerationCpuJobResult(context, *state);
     }
 
     SandboxEditorKMeansResult ApplySandboxEditorKMeansCommand(

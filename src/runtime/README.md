@@ -82,10 +82,11 @@ applies it to Progressive Poisson point-cloud and mesh-surface CPU sampling,
 Slice C applies it to mesh denoise/remesh/simplify commands, and Slice D
 applies it to ICP registration alignment while preserving the existing
 immediate fallback for tests and callers without an engine job surface. Slices
-E.1, E.2, E.3, and E.4 apply it to mesh curvature, mesh subdivision,
-mesh/graph/point-cloud vertex-normal recompute, and point-cloud outlier
-removal. The remaining synchronous geometry-processing buttons are tracked in
-the active `RUNTIME-141` inventory.
+E.1, E.2, E.3, E.4, and E.5 apply it to mesh curvature, mesh subdivision,
+mesh/graph/point-cloud vertex-normal recompute, point-cloud outlier removal,
+and selected-mesh UV regeneration. The remaining `RUNTIME-141` work is panel
+job-state/timing/render-advance contract coverage rather than another
+identified synchronous geometry-processing command.
 
 ### Sandbox Editor Startup Layout
 
@@ -555,13 +556,17 @@ handles, GPU buffer addresses, or live `AssetService` state.
 The UV/texture-bake panel reports selected-mesh `v:texcoord` availability,
 count matching, finite-value diagnostics, checker-preview availability, the
 promoted fast-staged backend, and mesh UV regeneration command availability. The
-UV regeneration command triangulates the selected mesh `GeometrySources`, runs
-`Geometry.UvAtlas` with explicit user parameters, copies remapped known
-vertex/face properties back to the regenerated halfedge mesh, repopulates
-`GeometrySources`, stamps geometry dirty tags, and marks document dirty through
-`EditorCommandHistory` when available. Texture baking consumes the property
-catalog, lists mesh vertex/face bakeable sources separately from internal,
-connectivity, unsupported, graph, and point-cloud rows, and calls
+UV regeneration command triangulates the selected mesh `GeometrySources`, then
+queues `Geometry.UvAtlas` through the runtime `DerivedJobRegistry` when that job
+surface is available. The worker runs from copied mesh soup, property, authored
+UV, and topology snapshots; the main-thread apply phase revalidates the live
+mesh generation/source snapshot, copies remapped known vertex/face properties
+back to the regenerated halfedge mesh, repopulates `GeometrySources`, stamps
+geometry and GPU dirty tags, and records an undoable `EditorCommandHistory`
+entry. Callers without a job surface still use the same worker/commit path
+synchronously for compatibility. Texture baking consumes the property catalog,
+lists mesh vertex/face bakeable sources separately from internal, connectivity,
+unsupported, graph, and point-cloud rows, and calls
 `Extrinsic.Runtime.SelectedMeshTextureBake`; UI code never runs the texture
 baker, mutates `AssetService`, or touches graphics/RHI residency directly.
 
