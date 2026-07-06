@@ -183,9 +183,12 @@ workers. Command-record diagnostics now accumulate through a guarded frame-local
 renderer accumulator and publish to `RenderGraphFrameStats::CommandRecords` after
 record/join completion. Picking and histogram readback issue metadata now route
 through guarded renderer helpers before the render-thread `BeginFrame()` drains
-consume it. The current renderer path still pins scheduler use false because
-pass callbacks still mutate dynamic upload helpers, shared pass helper state,
-and backend command-pool ownership. Later `GRAPHICS-119` slices must isolate or
+consume it. Transient-debug, visualization-overlay, and ImGui dynamic upload
+helpers serialize per-frame reset plus pass-body upload/execute sections behind
+a shared renderer guard. The current renderer path still pins scheduler use
+false because pass callbacks still mutate shared pass helper state and the
+Vulkan backend still allocates accepted secondary buffers from externally
+synchronized frame command pools. Later `GRAPHICS-119` slices must isolate or
 synchronize those remaining surfaces before enabling `Core::Tasks` fan-out.
 
 Null provides CPU bookkeeping contexts for this contract. Vulkan accepts the

@@ -110,9 +110,12 @@ single-threaded to keep renderer-owned pass state deterministic while proving
 the RHI/null/Vulkan acquisition and submit-order contract. Vulkan accepts the
 graphics-queue plan with backend-local secondary command buffers; non-graphics
 queue support and worker fan-out remain later `GRAPHICS-119` slices after
-pass-state and command-pool synchronization are fixed. The C.2 audit keeps
-`RenderGraphFrameStats::Execute.ParallelRecordUsedScheduler` false because
-pass callbacks still mutate dynamic upload helpers and shared pass helper state.
+pass-state and command-pool synchronization are fixed. The current audit keeps
+`RenderGraphFrameStats::Execute.ParallelRecordUsedScheduler` false even though
+transient-debug, visualization-overlay, and ImGui dynamic upload helpers now
+serialize per-frame reset plus upload/execute sections behind a shared renderer
+guard; shared pass helper state and Vulkan command-pool ownership still need
+isolation before worker fan-out can be enabled.
 Command-record diagnostics accumulate through a guarded frame-local accumulator
 and publish to `RenderGraphFrameStats::CommandRecords` after the record/join
 path completes. Picking and histogram readback issue counters plus per-slot

@@ -24,6 +24,7 @@ import Extrinsic.Graphics.CurrentRendererContractAdapter;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.HZB;
+import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Graphics.LightClusters;
 import Extrinsic.Graphics.Pass.PostProcess.Bloom;
 import Extrinsic.Graphics.Pass.PostProcess.FXAA;
@@ -36,6 +37,7 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.Graphics.ShadowSystem;
+import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
@@ -96,6 +98,40 @@ namespace
     {
         return static_cast<std::size_t>(
             std::ranges::count(context.PushConstantSizes, size));
+    }
+
+    [[nodiscard]] Extrinsic::Graphics::ImGuiOverlayFrame MakeOverlayFrameWithWork()
+    {
+        Extrinsic::Graphics::ImGuiOverlayFrame frame{};
+        frame.Enabled = true;
+        frame.DisplayWidth = 256u;
+        frame.DisplayHeight = 144u;
+
+        Extrinsic::Graphics::ImGuiOverlayDrawList drawList{};
+        drawList.CommandCount = 1u;
+        drawList.VertexCount = 3u;
+        drawList.IndexCount = 3u;
+        drawList.UsesUserTexture = false;
+        drawList.Vertices = {
+            Extrinsic::Graphics::ImGuiOverlayVertex{
+                .Position = {0.0f, 0.0f},
+                .UV = {0.0f, 0.0f},
+                .Color = 0xffffffffu,
+            },
+            Extrinsic::Graphics::ImGuiOverlayVertex{
+                .Position = {1.0f, 0.0f},
+                .UV = {1.0f, 0.0f},
+                .Color = 0xffffffffu,
+            },
+            Extrinsic::Graphics::ImGuiOverlayVertex{
+                .Position = {0.0f, 1.0f},
+                .UV = {0.0f, 1.0f},
+                .Color = 0xffffffffu,
+            },
+        };
+        drawList.Indices = {0u, 1u, 2u};
+        frame.DrawLists.push_back(std::move(drawList));
+        return frame;
     }
 
     [[nodiscard]] Extrinsic::RHI::TextureHandle FindCreatedTextureByDebugName(
@@ -1302,6 +1338,121 @@ TEST(RendererFrameLifecycle, ParallelRecordingUsesAcceptedContextPlanInSerialSub
         EXPECT_EQ(device.SubmittedParallelCommandContexts[i].ContextIndex,
                   device.RecordedParallelCommandContextPlan[i].ContextIndex);
     }
+
+    renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle, ParallelRecordingRecordsDynamicUploadPassesThroughAcceptedContexts)
+{
+    static const std::array<Extrinsic::Graphics::DebugTrianglePacket, 1> kTriangles{{
+        Extrinsic::Graphics::DebugTrianglePacket{
+            .A = glm::vec3{0.0f, 0.5f, 0.0f},
+            .B = glm::vec3{-0.5f, -0.5f, 0.0f},
+            .C = glm::vec3{0.5f, -0.5f, 0.0f},
+            .Color = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f},
+            .DepthTested = true,
+        },
+    }};
+    static const std::array<Extrinsic::Graphics::VectorFieldOverlayPacket, 1> kVectorFields{{
+        Extrinsic::Graphics::VectorFieldOverlayPacket{
+            .Name = "ParallelRecording.VectorField",
+            .Domain = Extrinsic::Graphics::VisualizationAttributeDomain::Vertex,
+            .ElementCount = 1u,
+            .Scale = 1.0f,
+            .Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+            .DepthTested = true,
+        },
+    }};
+    static const std::array<Extrinsic::Graphics::IsolineOverlayPacket, 1> kIsolines{{
+        Extrinsic::Graphics::IsolineOverlayPacket{
+            .SourceScalarName = "ParallelRecording.Isoline",
+            .Domain = Extrinsic::Graphics::VisualizationAttributeDomain::Face,
+            .IsoValueCount = 1u,
+            .RangeMin = 0.0f,
+            .RangeMax = 1.0f,
+            .LineWidth = 1.0f,
+            .Color = glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
+            .DepthTested = true,
+        },
+    }};
+
+    Extrinsic::Tests::MockDevice device;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{78u, 3u};
+    device.ParallelCommandContextsAvailable = true;
+    device.AcceptParallelCommandContextPlans = true;
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+    renderer->SetParallelRenderGraphRecordingEnabled(true);
+
+    Extrinsic::Graphics::ImGuiOverlaySystem overlay;
+    overlay.Initialize();
+    overlay.SubmitFrame(MakeOverlayFrameWithWork());
+    renderer->SetImGuiOverlaySystem(&overlay);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    renderer->SubmitRuntimeSnapshots(Extrinsic::Graphics::RuntimeRenderSnapshotBatch{
+        .VisualizationVectorFields =
+            std::span<const Extrinsic::Graphics::VectorFieldOverlayPacket>{
+                kVectorFields.data(), kVectorFields.size()},
+        .VisualizationIsolines =
+            std::span<const Extrinsic::Graphics::IsolineOverlayPacket>{
+                kIsolines.data(), kIsolines.size()},
+        .DebugTriangles =
+            std::span<const Extrinsic::Graphics::DebugTrianglePacket>{
+                kTriangles.data(), kTriangles.size()},
+    });
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240},
+        .DebugOverlayEnabled = true,
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.ParallelRecordingRequested);
+    EXPECT_TRUE(stats.Execute.ParallelRecordingAccepted);
+    EXPECT_FALSE(stats.Execute.SerialFallbackUsed);
+    EXPECT_FALSE(stats.Execute.ParallelRecordUsedScheduler);
+    EXPECT_EQ(stats.Execute.ParallelRecordCallerRecordCount,
+              stats.Execute.ParallelRecordedPassCount);
+
+    const Extrinsic::Graphics::RenderGraphCommandPassStats* transientPass =
+        FindCommandPass(stats, "TransientDebugSurfacePass");
+    ASSERT_NE(transientPass, nullptr);
+    EXPECT_EQ(transientPass->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    EXPECT_EQ(stats.TransientDebugUpload.TriangleRecordsSubmitted, 1u);
+    EXPECT_EQ(stats.TransientDebugUpload.TriangleRecordsRecorded, 1u);
+    EXPECT_EQ(stats.TransientDebugUpload.MissingPipelineSkipCount, 0u);
+
+    const Extrinsic::Graphics::RenderGraphCommandPassStats* visualizationPass =
+        FindCommandPass(stats, "VisualizationOverlayPass");
+    ASSERT_NE(visualizationPass, nullptr);
+    EXPECT_EQ(visualizationPass->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsSubmitted, 1u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsRecorded, 1u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.IsolineRecordsSubmitted, 1u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.IsolineRecordsRecorded, 1u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.MissingPipelineSkipCount, 0u);
+
+    const Extrinsic::Graphics::RenderGraphCommandPassStats* imguiPass =
+        FindCommandPass(stats, "ImGuiPass");
+    ASSERT_NE(imguiPass, nullptr);
+    EXPECT_EQ(imguiPass->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    EXPECT_GT(overlay.GetDiagnostics().DrawCalls, 0u);
+
+    EXPECT_EQ(device.ParallelCommandContextRequests.size(),
+              device.RecordedParallelCommandContextPlan.size());
+    EXPECT_EQ(device.SubmittedParallelCommandContexts.size(),
+              device.RecordedParallelCommandContextPlan.size());
 
     renderer->Shutdown();
 }

@@ -2213,6 +2213,7 @@ namespace Extrinsic::Graphics
                 const std::uint32_t framesInFlight = m_Device->GetFramesInFlight() == 0u
                     ? 1u
                     : m_Device->GetFramesInFlight();
+                std::lock_guard<std::mutex> uploadLock(m_DynamicUploadMutex);
                 if (m_TransientDebugUploadHelper)
                 {
                     m_TransientDebugUploadHelper->BeginFrame(outFrame.FrameIndex, framesInFlight);
@@ -8952,6 +8953,7 @@ namespace Extrinsic::Graphics
             }
             const RHI::PipelineHandle imguiPipeline =
                 ResolveImGuiPipelineForFormat(activeColorFormat);
+            std::lock_guard<std::mutex> uploadLock(m_DynamicUploadMutex);
             if (activeColorFormat == RHI::Format::Undefined ||
                 !m_ImGuiPass.has_value() ||
                 m_ImGuiOverlaySystem == nullptr ||
@@ -9061,6 +9063,7 @@ namespace Extrinsic::Graphics
             {
                 return RenderCommandPassStatus::SkippedNonOperational;
             }
+            std::lock_guard<std::mutex> uploadLock(m_DynamicUploadMutex);
 
             // The helper is constructed alongside `m_Subsystems.BufferManager()` in
             // `Initialize(...)`; on a successful operational gate it
@@ -9223,6 +9226,7 @@ namespace Extrinsic::Graphics
             {
                 return RenderCommandPassStatus::SkippedNonOperational;
             }
+            std::lock_guard<std::mutex> uploadLock(m_DynamicUploadMutex);
 
             // The helper is constructed alongside `m_Subsystems.BufferManager()` in
             // `Initialize(...)`; on a successful operational gate it
@@ -9626,6 +9630,11 @@ namespace Extrinsic::Graphics
         // Held as an interface pointer for parity with the transient-debug and
         // visualization-overlay helpers and reset before BufferManager teardown.
         std::unique_ptr<IImGuiUploadHelper> m_ImGuiUploadHelper;
+        // GRAPHICS-119 Slice C.5: pass recording can eventually run on worker
+        // threads, so renderer-owned dynamic upload helpers share one guard for
+        // per-frame reset plus Upload/Execute sections that touch BufferManager
+        // leases, helper-owned slots, bindless flushes, and upload diagnostics.
+        std::mutex m_DynamicUploadMutex;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardSurfacePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardLinePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardPointPipelineLease;
