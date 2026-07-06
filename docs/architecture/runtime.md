@@ -46,8 +46,7 @@ The frame order is:
 2. fixed-step simulation and CPU `FrameGraph` execution;
 3. ImGui begin-frame, variable application tick, and ImGui end-frame;
 4. build `Graphics::RenderFrameInput`, update the active camera controller,
-   apply the `F`-key focus-on-selection command, and drain one coalesced
-   selection pick;
+   dispatch registered input actions, and drain one coalesced selection pick;
 5. execute the render-frame contract: begin frame, runtime render extraction,
    renderer world extraction, prepare, execute, and end frame;
 6. present the completed frame;
@@ -96,12 +95,13 @@ largest enclosing extent `max_i(|C − Cᵢ| + Rᵢ)`, so every target is contai
 then routes it to a controller slot via `ICameraController::Focus(...)` and marks
 an explicit camera transition. `FocusCameraOnEntities(...)` focuses any object
 set; `FocusCameraOnSelection(...)` focuses the current `SelectionController`
-selection. Phase 4 of `RunFrame` invokes the selection wrapper on the `F`
-("focus") key edge for the `Main` slot, suppressed while Dear ImGui owns the
-keyboard. It runs *after* the pre-render transform/bounds flush
-(`FlushPreRenderTransformState`, BUG-024) so it reads `World::Bounds` already
-refreshed for this frame's transform edits, then rebuilds the render camera so
-the reframed view reaches extraction the same frame. The per-controller framing
+selection. Phase 4 of `RunFrame` dispatches registered input actions after the
+pre-render transform/bounds flush (`FlushPreRenderTransformState`, BUG-024), so
+focus actions read `World::Bounds` already refreshed for this frame's transform
+edits. The default compatibility action binds the `F` ("focus") key edge to the
+selection wrapper for the `Main` slot, suppresses it while Dear ImGui owns the
+keyboard, and rebuilds the render camera after a successful focus so the
+reframed view reaches extraction the same frame. The per-controller framing
 distance math is unchanged and remains owned by the controllers
 (`Extrinsic.Runtime.CameraControllers`).
 

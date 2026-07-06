@@ -870,7 +870,11 @@ execution should request `Core::Config::WindowBackend::Null` explicitly.
    mutations, and `GizmoInteraction` drags — refresh `Transform::WorldMatrix`,
    world bounds, and `DirtyTags::DirtyTransform` before transform-gizmo packets
    are built and before render extraction observes the scene. The runtime then
-   drains the
+   dispatches registered input actions; the default focus action binds the `F`
+   key edge to `FocusCameraOnSelection(...)` after the bounds flush, suppresses
+   it while ImGui owns the keyboard, and refreshes `RenderFrameInput::Camera`
+   after a successful focus so the snapped view reaches extraction the same
+   frame. The runtime then drains the
    coalesced `SelectionController` pick (RUNTIME-089 Slice B): the survivor —
    carrying its correlation `Sequence` — is written into
    `RenderFrameInput::Pick`/`HasPendingPick` (the `Sequence` is threaded on to
@@ -1502,6 +1506,8 @@ right- or middle-mouse drag rotates orbit/fly/free-look cameras, `WASD` moves or
 pans according to the active controller, `Shift` accelerates movement, and mouse
 wheel zooms orbit/top-down cameras. The sandbox `Camera / Render` window mirrors
 these bindings so controller replacement buttons are not the only visible UI.
+The default `F` focus-on-selection binding is installed as a runtime input
+action rather than a direct `RunFrame` key branch.
 Viewport left-click selection is routed from the runtime input context into `SelectionController::RequestClickPick(...)`; it is suppressed while ImGui or an active gizmo owns the mouse. The production input context is updated by the active `Platform::IWindow` backend before runtime selection routing runs.
 
 Camera-controller registration and replacement are one-shot camera-transition

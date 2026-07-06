@@ -743,32 +743,76 @@ namespace Extrinsic::Runtime
                                                  gizmoInteraction.IsDragging());
         }
 
-        void FocusMainCameraOnSelectionForFrame(
+        [[nodiscard]] bool RuntimeInputActionTriggered(
+            const RuntimeInputActionDesc& desc,
+            const Platform::Input::Context& input,
+            const bool imguiCapturesKeyboard) noexcept
+        {
+            if (desc.Binding.SuppressWhenImGuiCapturesKeyboard &&
+                imguiCapturesKeyboard)
+            {
+                return false;
+            }
+
+            switch (desc.Binding.Trigger)
+            {
+            case RuntimeInputActionTrigger::KeyJustPressed:
+                return input.IsKeyJustPressed(desc.Binding.KeyCode);
+            }
+            return false;
+        }
+
+        void DispatchRuntimeInputActionsForFrame(
+            const std::span<const RuntimeInputActionRecord> actions,
             const Core::Config::EngineConfig& config,
             CameraControllerRegistry& cameras,
             SelectionController& selection,
             ECS::Scene::Registry& scene,
-            const Platform::IWindow& window,
+            const Platform::Input::Context& input,
             const Platform::Extent2D& viewport,
             const bool imguiCapturesKeyboard,
+            const double frameDt,
+            const std::uint64_t frameIndex,
             Graphics::RenderFrameInput& renderInput)
         {
-            if (!config.Camera.Enabled || imguiCapturesKeyboard ||
-                !window.GetInput().IsKeyJustPressed(Platform::Input::Key::F) ||
-                !FocusCameraOnSelection(cameras,
-                                        selection,
-                                        scene,
-                                        CameraControllerSlot::Main))
-            {
-                return;
-            }
+            RuntimeInputActionServices services{
+                .Scene = &scene,
+                .CameraControllers = &cameras,
+                .Selection = &selection,
+                .RenderInput = &renderInput,
+                .Config = &config,
+            };
 
-            if (ICameraController* focused =
-                    cameras.ResolveOrNull(CameraControllerSlot::Main))
+            for (const RuntimeInputActionRecord& action : actions)
             {
-                renderInput.Camera = focused->GetView(viewport);
-                renderInput.Camera.ExplicitCameraTransition =
-                    cameras.ConsumeCameraTransition(CameraControllerSlot::Main);
+                if (!action.Desc.Execute ||
+                    !RuntimeInputActionTriggered(
+                        action.Desc,
+                        input,
+                        imguiCapturesKeyboard))
+                {
+                    continue;
+                }
+
+                Core::Result result = action.Desc.Execute(
+                    RuntimeInputActionContext{
+                        .Binding = action.Desc.Binding,
+                        .Viewport = viewport,
+                        .FrameDeltaSeconds = frameDt,
+                        .FrameIndex = frameIndex,
+                        .ImGuiCapturesKeyboard = imguiCapturesKeyboard,
+                    },
+                    services);
+                if (!result.has_value())
+                {
+                    Core::Log::Warn(
+                        "[Runtime] Input action '{}' failed: key={} error={}",
+                        action.Desc.DebugName.empty()
+                            ? "<unnamed>"
+                            : action.Desc.DebugName,
+                        action.Desc.Binding.KeyCode,
+                        Core::Error::ToString(result.error()));
+                }
             }
         }
 
@@ -3291,6 +3335,7 @@ namespace Extrinsic::Runtime
             *m_Scene,
             *m_Renderer);
         RegisterDefaultImportPolicies();
+        RegisterDefaultInputActions();
 
         // RUNTIME-092 Slice B — attach the runtime-owned stable-entity lookup
         // to the selection authority so render-id resolution flows through the
@@ -3752,24 +3797,25 @@ namespace Extrinsic::Runtime
         pacing.PreRenderTransformFlushMicros =
             ElapsedMicros(preRenderFlushBegin);
 
-        // RUNTIME-116: `F` (focus) reframes the Main camera on the current
-        // selection so the selected object(s) are centered and fully visible.
-        // It runs *after* the pre-render flush above (BUG-024) so it gathers
-        // refreshed `World::Bounds` that already reflect this frame's
-        // OnVariableTick / editor-hook / gizmo transform edits, not the stale
-        // pre-flush bounds. Edge-triggered and suppressed while Dear ImGui owns
-        // the keyboard (e.g. typing in a field). On a successful reframe the
-        // camera view is rebuilt so the snapped camera reaches the transform-
-        // gizmo packets and render extraction this same frame.
+        // Registered input actions run after the pre-render flush above so
+        // camera commands gather refreshed `World::Bounds` that already reflect
+        // this frame's OnVariableTick / editor-hook / gizmo transform edits.
+        // The default `F` focus action is edge-triggered and suppressed while
+        // Dear ImGui owns the keyboard; successful camera actions rebuild the
+        // render camera so the snapped view reaches transform-gizmo packet
+        // building and render extraction this same frame.
         const auto postFlushSetupBegin = std::chrono::steady_clock::now();
-        FocusMainCameraOnSelectionForFrame(m_Config,
-                                           m_CameraControllers,
-                                           m_SelectionController,
-                                           *m_Scene,
-                                           inputWindow,
-                                           viewport,
-                                           imguiCapturesKeyboard,
-                                           renderInput);
+        DispatchRuntimeInputActionsForFrame(m_InputActions,
+                                            m_Config,
+                                            m_CameraControllers,
+                                            m_SelectionController,
+                                            *m_Scene,
+                                            inputWindow.GetInput(),
+                                            viewport,
+                                            imguiCapturesKeyboard,
+                                            frameDt,
+                                            frameContext.FrameIndex,
+                                            renderInput);
 
         const std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos =
             m_GizmoPacketBuilder.Build(*m_Scene,
@@ -4315,6 +4361,32 @@ namespace Extrinsic::Runtime
             });
     }
 
+    RuntimeInputActionHandle Engine::RegisterInputAction(
+        RuntimeInputActionDesc desc)
+    {
+        if (!desc.Execute || desc.Binding.KeyCode < 0)
+            return {};
+
+        RuntimeInputActionRecord action{};
+        action.Handle = RuntimeInputActionHandle{m_NextInputActionHandle++};
+        action.Desc = std::move(desc);
+        m_InputActions.push_back(std::move(action));
+        return m_InputActions.back().Handle;
+    }
+
+    void Engine::UnregisterInputAction(const RuntimeInputActionHandle handle)
+    {
+        if (!handle.IsValid())
+            return;
+
+        std::erase_if(
+            m_InputActions,
+            [handle](const RuntimeInputActionRecord& action) noexcept
+            {
+                return action.Handle == handle;
+            });
+    }
+
     void Engine::UnregisterDefaultImportPolicies()
     {
         for (const RuntimePostImportProcessorHandle handle :
@@ -4340,6 +4412,16 @@ namespace Extrinsic::Runtime
         }
         m_DefaultImportCompletedHandlers.clear();
         m_DefaultImportCompletedHandlersRegistered = false;
+    }
+
+    void Engine::UnregisterDefaultInputActions()
+    {
+        for (const RuntimeInputActionHandle handle : m_DefaultInputActions)
+        {
+            UnregisterInputAction(handle);
+        }
+        m_DefaultInputActions.clear();
+        m_DefaultInputActionsRegistered = false;
     }
 
     void Engine::RegisterDefaultImportPolicies()
@@ -4535,6 +4617,65 @@ namespace Extrinsic::Runtime
                 m_DefaultPostImportProcessors.push_back(handle);
             m_DefaultPostImportProcessorsRegistered = handle.IsValid();
         }
+    }
+
+    void Engine::RegisterDefaultInputActions()
+    {
+        if (m_DefaultInputActionsRegistered)
+            return;
+
+        const RuntimeInputActionHandle handle = RegisterInputAction(
+            RuntimeInputActionDesc{
+                .DebugName = "Runtime.DefaultFocusCameraOnSelection",
+                .Binding =
+                    RuntimeInputActionBinding{
+                        .KeyCode = Platform::Input::Key::F,
+                        .Trigger = RuntimeInputActionTrigger::KeyJustPressed,
+                        .SuppressWhenImGuiCapturesKeyboard = true,
+                    },
+                .Execute =
+                    [](const RuntimeInputActionContext& context,
+                       RuntimeInputActionServices& services)
+                    {
+                        if (services.Scene == nullptr ||
+                            services.CameraControllers == nullptr ||
+                            services.Selection == nullptr ||
+                            services.RenderInput == nullptr ||
+                            services.Config == nullptr)
+                        {
+                            return Core::Err(Core::ErrorCode::InvalidState);
+                        }
+
+                        if (!services.Config->Camera.Enabled)
+                            return Core::Ok();
+
+                        if (!FocusCameraOnSelection(
+                                *services.CameraControllers,
+                                *services.Selection,
+                                *services.Scene,
+                                CameraControllerSlot::Main))
+                        {
+                            return Core::Ok();
+                        }
+
+                        if (ICameraController* focused =
+                                services.CameraControllers->ResolveOrNull(
+                                    CameraControllerSlot::Main))
+                        {
+                            services.RenderInput->Camera =
+                                focused->GetView(context.Viewport);
+                            services.RenderInput->Camera
+                                .ExplicitCameraTransition =
+                                services.CameraControllers
+                                    ->ConsumeCameraTransition(
+                                        CameraControllerSlot::Main);
+                        }
+                        return Core::Ok();
+                    },
+            });
+        if (handle.IsValid())
+            m_DefaultInputActions.push_back(handle);
+        m_DefaultInputActionsRegistered = handle.IsValid();
     }
 
     Core::Expected<RuntimeAssetImportResult> Engine::ImportAssetFromPath(

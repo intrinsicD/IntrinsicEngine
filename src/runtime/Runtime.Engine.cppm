@@ -17,6 +17,7 @@ import Extrinsic.Core.Config.Render;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameClock;
 import Extrinsic.Core.FrameGraph;
+import Extrinsic.Core.Geometry2D;
 import Extrinsic.Core.IOBackend;
 import Extrinsic.ECS.Scene.Handle;
 import Geometry.HalfedgeMesh.IO;
@@ -28,6 +29,7 @@ import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.RenderRecipeConfig;
+import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.AssetIngestStateMachine;
@@ -214,6 +216,62 @@ namespace Extrinsic::Runtime
     {
         RuntimeImportCompletedHandlerHandle Handle{};
         RuntimeImportCompletedHandlerDesc Desc{};
+    };
+
+    export enum class RuntimeInputActionTrigger : std::uint8_t
+    {
+        KeyJustPressed = 0,
+    };
+
+    export struct RuntimeInputActionBinding
+    {
+        int KeyCode{-1};
+        RuntimeInputActionTrigger Trigger{
+            RuntimeInputActionTrigger::KeyJustPressed};
+        bool SuppressWhenImGuiCapturesKeyboard{true};
+    };
+
+    export struct RuntimeInputActionHandle
+    {
+        std::uint64_t Value{0};
+
+        [[nodiscard]] bool IsValid() const noexcept { return Value != 0; }
+        [[nodiscard]] friend bool operator==(
+            RuntimeInputActionHandle,
+            RuntimeInputActionHandle) noexcept = default;
+    };
+
+    export struct RuntimeInputActionContext
+    {
+        RuntimeInputActionBinding Binding{};
+        Core::Extent2D Viewport{};
+        double FrameDeltaSeconds{0.0};
+        std::uint64_t FrameIndex{0};
+        bool ImGuiCapturesKeyboard{false};
+    };
+
+    export struct RuntimeInputActionServices
+    {
+        ECS::Scene::Registry* Scene{};
+        CameraControllerRegistry* CameraControllers{};
+        SelectionController* Selection{};
+        Graphics::RenderFrameInput* RenderInput{};
+        const Core::Config::EngineConfig* Config{};
+    };
+
+    export struct RuntimeInputActionDesc
+    {
+        std::string DebugName{};
+        RuntimeInputActionBinding Binding{};
+        std::function<Core::Result(
+            const RuntimeInputActionContext&,
+            RuntimeInputActionServices&)> Execute{};
+    };
+
+    struct RuntimeInputActionRecord
+    {
+        RuntimeInputActionHandle Handle{};
+        RuntimeInputActionDesc Desc{};
     };
 
     export struct RuntimeAssetImportResult
@@ -638,6 +696,10 @@ namespace Extrinsic::Runtime
         void UnregisterImportCompletedHandler(
             RuntimeImportCompletedHandlerHandle handle);
         void UnregisterDefaultImportPolicies();
+        [[nodiscard]] RuntimeInputActionHandle RegisterInputAction(
+            RuntimeInputActionDesc desc);
+        void UnregisterInputAction(RuntimeInputActionHandle handle);
+        void UnregisterDefaultInputActions();
         [[nodiscard]] const std::optional<RuntimeAssetImportEvent>&
             GetLastAssetImportEvent() const noexcept;
         [[nodiscard]] std::vector<RuntimeAssetIngestRecord>
@@ -800,6 +862,7 @@ namespace Extrinsic::Runtime
             std::string path,
             Assets::AssetPayloadKind payloadKind);
         void RegisterDefaultImportPolicies();
+        void RegisterDefaultInputActions();
         [[nodiscard]] Core::Expected<RuntimeAssetImportResult> ImportAssetFromPathWithIngest(
             RuntimeAssetImportRequest request,
             RuntimeAssetIngestSource source,
@@ -931,6 +994,10 @@ namespace Extrinsic::Runtime
         std::vector<RuntimeImportCompletedHandlerHandle>
             m_DefaultImportCompletedHandlers{};
         bool m_DefaultImportCompletedHandlersRegistered{false};
+        std::vector<RuntimeInputActionRecord> m_InputActions{};
+        std::uint64_t m_NextInputActionHandle{1u};
+        std::vector<RuntimeInputActionHandle> m_DefaultInputActions{};
+        bool m_DefaultInputActionsRegistered{false};
         struct RuntimeAssetImportStreamingTask
         {
             RuntimeAssetIngestHandle Ingest{};

@@ -22,6 +22,10 @@ maturity_target: Operational
 - Slice B implemented the import-authoring policy registry, import-completed
   handler registry, grouped default-policy unregister seam, default behavior
   preservation test, and no-registration minimal-materialization test.
+- Slice C implemented the runtime input-action registry, routed the default
+  `F` focus-on-selection command through that registry, added
+  `UnregisterDefaultInputActions()` for no-default contract coverage, and kept
+  `Engine` as the temporary default registrant until Slice D.
 
 ## Slice plan
 
@@ -94,9 +98,10 @@ maturity_target: Operational
 - [ ] Move the default generated-normal, import-authoring, and
       import-completed policy registrations out of `Engine` into the
       sandbox/default composition owner.
-- [ ] Route the `F` focus command through a registered input-action/command
+- [x] Route the `F` focus command through a registered input-action/command
       binding (sandbox registers `F` → `FocusCameraOnSelection`); `RunFrame`
-      keeps only the generic dispatch.
+      keeps only the generic dispatch. `Engine` remains the temporary default
+      registrant until Slice D moves ownership to sandbox/default composition.
 
 ## Tests
 - [x] Contract: with default registrations, import behavior is unchanged
@@ -106,11 +111,14 @@ maturity_target: Operational
       no bake, no focus/selection mutation, and minimal authoring defaults.
 - [x] Contract: processor ordering is deterministic and a failing processor
       fail-closes its own step without corrupting the import.
+- [x] Contract: with default input actions, pressing `F` through the Null-window
+      `RunFrame` path focuses the selected entity; unregistering the default
+      input actions leaves the same key edge as a no-op.
 
 ## Docs
 - [x] Update `src/runtime/README.md` import-pipeline extension contract.
 - [x] Update `docs/architecture/runtime.md` import apply policy ordering.
-- [ ] Update `docs/architecture/runtime.md` (frame-order step 4 wording for
+- [x] Update `docs/architecture/runtime.md` (frame-order step 4 wording for
       the focus command becomes "dispatch registered input actions").
 
 ## Acceptance criteria
@@ -147,6 +155,12 @@ Slice B focused verification (passed):
 ```bash
 cmake --build --preset ci --target IntrinsicRuntimeContractTests
 build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='RuntimeAssetImportFormatCoverage.DefaultImportPoliciesApplyAuthoringUxAndPostProcess:RuntimeAssetImportFormatCoverage.UnregisteredImportPoliciesMaterializeMinimalGeometry:RuntimeAssetImportFormatCoverage.PostImportProcessorsRunInOrderAndCanUnregister:RuntimeAssetImportFormatCoverage.DirectObjImportBakesGeneratedNormalTextureFromAuthoredVertexNormals:RuntimeAssetImportFormatCoverage.DirectObjImportComputesAndBakesGeneratedNormalTextureWhenMissingNormals:RuntimeAssetImportFormatCoverage.RepresentativePromotedFormatsMaterializeDeterministically'
+```
+
+Slice C focused verification (passed):
+```bash
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='RuntimeInputActions.*:RuntimeCameraFocusCommand.*:ImGuiAdapterEngineWiring.UiCaptureSuppressesRuntimeInputConsumers'
 ```
 
 ## Forbidden changes
