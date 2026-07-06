@@ -8,12 +8,11 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `GRAPHICS-119` — Parallel render-pass command recording via the task scheduler (tasks/active/GRAPHICS-119-parallel-pass-command-recording.md)
 
 ## Theme B — Rendering modernization
 
 - blocked by `RUNTIME-129`: `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/backlog/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
-- unblocked: `GRAPHICS-119` — Parallel render-pass command recording via the task scheduler (tasks/backlog/rendering/GRAPHICS-119-parallel-pass-command-recording.md)
 - unblocked: `RUNTIME-129` — Schedule GPU object-space normal bake jobs after import (tasks/backlog/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
 - unblocked: `RUNTIME-139` — Static AoS storage and shader operational path (tasks/backlog/runtime/RUNTIME-139-static-aos-storage-shader-operational.md)
 

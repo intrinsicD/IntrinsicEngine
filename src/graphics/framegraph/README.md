@@ -109,6 +109,24 @@ Renderer-side alias-reuse injection may add or remove packets after compile; it
 must re-sort the packet list before execution so the shared range lookup remains
 valid.
 
+## Parallel Record/Join Contract
+
+`RenderGraphExecutor::ExecuteParallelRecordJoin(...)` is the backend-neutral
+CPU/null contract for parallel command recording. It groups live passes by
+`CompiledRenderGraph::TopologicalLayerByPass`, records each layer through the
+caller-provided record callback, and optionally dispatches same-layer records
+onto `Core::Tasks` workers when the scheduler is initialized. The record
+callback may run concurrently and must only touch pass-local state or
+caller-provided synchronization.
+
+After every record callback in a layer joins, the executor emits barrier and
+submit callbacks in the same serial topological order as `Execute(...)`; GPU
+visible submission order is unchanged. If any record callback fails, all
+scheduled callbacks in that layer still join and the executor returns the first
+error before emitting serial submit callbacks. Backend command-context
+allocation, Vulkan secondary command buffers, renderer fallback selection, and
+operational GPU smoke coverage are owned by `GRAPHICS-119` later slices.
+
 ## Transient Placement Contract
 
 `RenderGraph::Compile()` computes a CPU-visible placement plan for every used

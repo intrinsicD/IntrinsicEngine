@@ -5,6 +5,15 @@ depends_on: []
 ---
 # GRAPHICS-119 — Parallel render-pass command recording via the task scheduler
 
+## Status
+- In progress on local `main`; PR not opened.
+- Owner/agent: Codex.
+- Current slice: Slice A (CPU/null executor scheduling contract) completed
+  locally.
+- Next implementation step: Slice B — add the RHI/null parallel command-context
+  acquisition contract and renderer serial-fallback/debug selection. Vulkan
+  secondary command contexts remain deferred.
+
 ## Goal
 - Record render-graph pass command buffers in parallel: independent passes
   (by compiled topology) record into per-pass/per-batch secondary command
@@ -44,7 +53,26 @@ depends_on: []
   batch) behind an RHI contract; Null device provides a recording-order
   bookkeeping implementation so determinism is CPU-provable.
 
+## Slice plan
+- **Slice A (this slice).** Add a backend-neutral `RenderGraphExecutor`
+  layer-parallel record/join path that uses `TopologicalLayerByPass` to record
+  independent pass work through `Core::Tasks` workers, then emits barriers and
+  submit callbacks in the existing serial topological order. Pin deterministic
+  submit order, worker distribution, and fail-closed error propagation with
+  CPU/null graphics contract tests. Defers RHI command-context allocation,
+  renderer route integration, Vulkan secondary command buffers, GPU smoke, and
+  benchmark evidence to later slices.
+- **Slice B.** Add the RHI/null parallel command-context acquisition contract
+  and wire renderer serial fallback/debug selection without changing Vulkan
+  default behavior.
+- **Slice C.** Add Vulkan secondary/parallel command-context implementation and
+  route framegraph pass recording through it behind the fallback flag.
+- **Slice D.** Record benchmark evidence and cite an actually-run opt-in
+  `gpu;vulkan` smoke before retiring the task.
+
 ## Required changes
+- [x] Slice A: executor layer-parallel record/join API with deterministic
+      serial submit callbacks and `Core::Tasks` worker dispatch when available.
 - [ ] RHI contract for parallel recording: acquire per-thread/per-batch
       command contexts, record independently, submit in compiled order;
       Null + Vulkan implementations.
@@ -59,6 +87,12 @@ depends_on: []
       and determinism reference.
 
 ## Tests
+- [x] Slice A CPU/null contract: layer-parallel recording emits the same
+      barrier/pass submit order as serial execution.
+- [x] Slice A CPU/null contract: worker recording distributes independent
+      passes across `Core::Tasks` workers and reports deterministic stats.
+- [x] Slice A CPU/null contract: failed parallel record callbacks join all
+      scheduled work and fail closed before serial submit.
 - [ ] CPU/null contract: parallel recording produces the same
       pass-execution/barrier submission order as serial (bookkeeping
       comparison over randomized graphs).
@@ -70,6 +104,8 @@ depends_on: []
       pass-heavy synthetic recipe.
 
 ## Docs
+- [x] Slice A: document executor layer-parallel record/join semantics and
+      callback thread-safety expectations.
 - [ ] Update `docs/architecture/frame-graph.md` and
       `src/graphics/renderer/README.md` (threading model, fallback flag).
 
@@ -89,6 +125,24 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 ctest --test-dir build/ci --output-on-failure -L 'gpu' --timeout 120
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/agents/check_task_policy.py --root . --strict
+```
+
+Slice A verification run locally on 2026-07-06:
+
+```bash
+cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure -R 'RenderGraphParallelRecording|GraphicsOwnershipTransferBarriers|GraphicsRenderGraph.Execute' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
+ctest --test-dir build/ci --output-on-failure -R 'RenderGraphParallelRecording|RenderGraphValidation|CrossQueueTimeline|FrameRecipeContract|RendererFrameLifecycle|OwnershipTransferBarriers|QueueAffinity' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+git diff --check
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/validate_tasks.py --root tasks --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --strict
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
 ```
 
 ## Forbidden changes

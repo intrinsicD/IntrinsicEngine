@@ -11,7 +11,14 @@ Each active task should include:
 
 ## Currently active
 
-- None at this time.
+- [`GRAPHICS-119`](GRAPHICS-119-parallel-pass-command-recording.md) —
+  parallel render-pass command recording via the task scheduler. Slice A is
+  complete locally: `RenderGraphExecutor` now has a backend-neutral
+  layer-parallel record/join contract with CPU/null determinism, worker
+  distribution, and fail-closed tests. Next work is Slice B: RHI/null
+  command-context acquisition and renderer serial-fallback/debug selection.
+  Vulkan secondary command buffers, benchmark evidence, and the `gpu;vulkan`
+  smoke remain later slices.
 
 ## History
 

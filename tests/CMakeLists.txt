@@ -832,6 +832,7 @@ set(_graphics_contract_cpu_test_files
     Test.RenderSubsystemRegistry.cpp
     Test.RendererFrameLifecycle.cpp
     Test.RenderWorldContract.cpp
+    Test.RenderGraphParallelRecording.cpp
     Test.RenderGraphValidation.cpp
     Test.SharedRenderRecipeExecution.cpp
     Test.SelectionPassContracts.cpp
