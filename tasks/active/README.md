@@ -17,9 +17,8 @@ Each active task should include:
   CPU gate plus the manual Vulkan sandbox Scalar/Isolines preset check.
 - [`RUNTIME-145`](RUNTIME-145-runtime-frame-path-efficiency-polish.md) —
   runtime frame-path steady-state efficiency polish. Status: in-progress after
-  Slice B (`StreamingExecutor` slot recycling, priority ready queues, and
-  batch import-queue state reads). Next implementation slice: conservative
-  pre-render transform dirty gating.
+  Slice C (conservative pre-render transform dirty gating). Next implementation
+  slice: reuse the render-extraction live-key container.
 
 ## History
 

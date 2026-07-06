@@ -93,6 +93,18 @@ namespace
         void OnShutdown(Runtime::Engine&) override {}
     };
 
+    class IdleFrameAndExitApplication final : public Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            engine.RequestExit();
+        }
+        void OnShutdown(Runtime::Engine&) override {}
+    };
+
     [[nodiscard]] Core::Config::EngineConfig HeadlessConfig()
     {
         Core::Config::EngineConfig config{};
@@ -435,6 +447,29 @@ TEST(RuntimeSandboxAcceptance, ViewportLeftClickSubmitsSelectionPick)
     engine.Shutdown();
 }
 
+TEST(RuntimeSandboxAcceptance, IdleFrameSkipsPreRenderTransformFlush)
+{
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<IdleFrameAndExitApplication>());
+    engine.Initialize();
+
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+
+    engine.Run();
+
+    const Runtime::RuntimeFramePacingDiagnostics& pacing =
+        engine.GetLastFramePacingDiagnostics();
+    EXPECT_TRUE(pacing.Valid);
+    EXPECT_FALSE(pacing.PreRenderTransformFlushRan);
+    EXPECT_EQ(pacing.PreRenderTransformWorldUpdatedObserved, 0u);
+    EXPECT_EQ(pacing.PreRenderTransformDirtyTransformStamped, 0u);
+    EXPECT_EQ(pacing.PreRenderTransformWorldUpdatedCleared, 0u);
+
+    engine.Shutdown();
+}
+
 // --- BUG-024: inspector transform edit reaches render state same-frame ------
 
 namespace
@@ -508,6 +543,11 @@ TEST(RuntimeSandboxAcceptance, InspectorTransformEditFlushedToRenderStateSameFra
     EXPECT_FLOAT_EQ(world[3].z, kBug024EditedPosition.z);
     EXPECT_FALSE(raw.any_of<ECSC::Transform::IsDirtyTag>(entity));
     EXPECT_FALSE(raw.any_of<ECSC::DirtyTags::DirtyTransform>(entity));
+
+    const Runtime::RuntimeFramePacingDiagnostics& pacing =
+        engine.GetLastFramePacingDiagnostics();
+    EXPECT_TRUE(pacing.PreRenderTransformFlushRan);
+    EXPECT_EQ(pacing.PreRenderTransformDirtyTransformStamped, 1u);
 
     engine.Shutdown();
 }

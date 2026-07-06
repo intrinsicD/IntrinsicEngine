@@ -593,6 +593,10 @@ namespace Extrinsic::Runtime
         std::uint64_t ImGuiOverlayCopyBytes{0u};
         std::uint64_t PreRenderSetupMicros{0u};
         std::uint64_t PreRenderTransformFlushMicros{0u};
+        bool          PreRenderTransformFlushRan{false};
+        std::uint32_t PreRenderTransformWorldUpdatedObserved{0u};
+        std::uint32_t PreRenderTransformDirtyTransformStamped{0u};
+        std::uint32_t PreRenderTransformWorldUpdatedCleared{0u};
         std::uint64_t SelectionPickDrainMicros{0u};
         std::uint64_t RenderContractMicros{0u};
         std::uint64_t RenderBeginFrameMicros{0u};

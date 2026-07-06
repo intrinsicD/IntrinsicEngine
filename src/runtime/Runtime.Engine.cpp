@@ -520,6 +520,22 @@ namespace Extrinsic::Runtime
             return context;
         }
 
+        [[nodiscard]] bool HasPendingPreRenderTransformFlush(
+            const ECS::Scene::Registry& scene)
+        {
+            const entt::registry& raw = scene.Raw();
+            const auto dirtyTransforms =
+                raw.view<ECS::Components::Transform::IsDirtyTag>();
+            if (dirtyTransforms.begin() != dirtyTransforms.end())
+            {
+                return true;
+            }
+
+            const auto worldUpdated =
+                raw.view<ECS::Components::Transform::WorldUpdatedTag>();
+            return worldUpdated.begin() != worldUpdated.end();
+        }
+
         void RememberPickReadbackContextForFrame(
             auto& inFlightPickContexts,
             const std::uint64_t sequence,
@@ -3441,6 +3457,8 @@ namespace Extrinsic::Runtime
 
         const double alpha = m_Accumulator / m_FixedDt;
         frameContext.FixedStepAlpha = alpha;
+        bool preRenderTransformFlushNeeded =
+            HasPendingPreRenderTransformFlush(*m_Scene);
 
         // ── RUNTIME-090 Slice B: open the Dear ImGui frame ────────────────
         // BeginFrame runs after Window::PollEvents (Phase 1) and the
@@ -3458,6 +3476,9 @@ namespace Extrinsic::Runtime
         const auto variableTickBegin = std::chrono::steady_clock::now();
         m_Application->OnVariableTick(*this, alpha, frameDt);
         pacing.VariableTickMicros = ElapsedMicros(variableTickBegin);
+        preRenderTransformFlushNeeded =
+            preRenderTransformFlushNeeded ||
+            HasPendingPreRenderTransformFlush(*m_Scene);
 
         // ── RUNTIME-090 Slice B: close the Dear ImGui frame ───────────────
         // EndFrame runs after the variable tick and before the render
@@ -3471,6 +3492,9 @@ namespace Extrinsic::Runtime
         if (m_ImGuiAdapter)
             m_ImGuiAdapter->EndFrame();
         pacing.ImGuiEndMicros = ElapsedMicros(imguiEnd);
+        preRenderTransformFlushNeeded =
+            preRenderTransformFlushNeeded ||
+            HasPendingPreRenderTransformFlush(*m_Scene);
 
         const bool imguiCapturesMouse =
             m_ImGuiAdapter != nullptr && m_ImGuiAdapter->WantsMouseCapture();
@@ -3506,9 +3530,12 @@ namespace Extrinsic::Runtime
                                             imguiCapturesMouse,
                                             m_GizmoSelectedEntities,
                                             renderInput.Camera);
+        preRenderTransformFlushNeeded =
+            preRenderTransformFlushNeeded ||
+            HasPendingPreRenderTransformFlush(*m_Scene);
         pacing.PreRenderSetupMicros += ElapsedMicros(preRenderSetupBegin);
 
-        // ── BUG-024: pre-render transform flush ───────────────────────────
+        // ── BUG-024/RUNTIME-145: pre-render transform flush ───────────────
         // Local-transform mutations made after the fixed-step ECS bundle —
         // Sandbox Editor UI inspector edits (applied inside the ImGui editor
         // hook during EndFrame above), OnVariableTick app mutations, and the
@@ -3521,7 +3548,18 @@ namespace Extrinsic::Runtime
         // matrix and the gizmo packets agree with the authored transform in
         // the same frame.
         const auto preRenderFlushBegin = std::chrono::steady_clock::now();
-        (void)FlushPreRenderTransformState(*m_Scene);
+        if (preRenderTransformFlushNeeded)
+        {
+            const PreRenderTransformFlushStats preRenderFlush =
+                FlushPreRenderTransformState(*m_Scene);
+            pacing.PreRenderTransformFlushRan = true;
+            pacing.PreRenderTransformWorldUpdatedObserved =
+                preRenderFlush.WorldUpdatedObserved;
+            pacing.PreRenderTransformDirtyTransformStamped =
+                preRenderFlush.DirtyTransformStamped;
+            pacing.PreRenderTransformWorldUpdatedCleared =
+                preRenderFlush.WorldUpdatedCleared;
+        }
         pacing.PreRenderTransformFlushMicros =
             ElapsedMicros(preRenderFlushBegin);
 
