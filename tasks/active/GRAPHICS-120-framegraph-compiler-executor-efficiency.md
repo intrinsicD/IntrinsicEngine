@@ -8,11 +8,13 @@ depends_on: []
 ## Status
 - In progress on local `main`; PR not opened.
 - Owner/agent: Codex.
-- Current slices: Slice A and Slice B completed locally. `TextureUsage::ColorAttachmentRead`
-  now uses a read-only barrier state, and transient texture memory estimates are
-  pinned to RHI block-compressed storage sizing through CPU contract regressions.
-- Next implementation step: continue with Slice C (validation-result plumbing)
-  or Slice D (allocation/barrier-emission efficiency with benchmark evidence).
+- Current slices: Slice A, Slice B, and Slice C completed locally.
+  `TextureUsage::ColorAttachmentRead` now uses a read-only barrier state,
+  transient texture memory estimates are pinned to RHI block-compressed storage
+  sizing, and compiler validation diagnostics flow through explicit out-params
+  instead of `thread_local` state.
+- Next implementation step: continue with Slice D (allocation/barrier-emission
+  efficiency with benchmark evidence).
 
 ## Goal
 - Remove the per-compile/per-execute waste and small contract hazards inside
@@ -68,7 +70,8 @@ depends_on: []
 - **Slice B.** Confirm framegraph transient format sizing uses the RHI format
   helper and pin BC block-compressed estimates.
 - **Slice C.** Replace the `thread_local` validation side channel with an
-  explicit return/out-param path and update docs.
+  explicit out-param path, make stateful graph compilation non-`const`, and
+  update docs.
 - **Slice D.** Tackle allocation churn and linear barrier emission with a
   benchmarked before/after report.
 
@@ -81,7 +84,7 @@ depends_on: []
       both the executor and the renderer's duplicated path (dedupe into one
       shared helper while there); make packet insertion amortized O(1);
       sort-or-hash `ValidateUniquePassIds`.
-- [ ] Replace the `thread_local` validation side channel: return the
+- [x] Slice C: replace the `thread_local` validation side channel: return the
       validation result in the `Compile()` `Expected` payload (or a caller
       out-param); make `Compile` non-`const` or move its mutations out.
 - [x] Slice A: map `ColorAttachmentRead` to a read barrier state with read-read
@@ -96,7 +99,9 @@ depends_on: []
 - [x] Slice A contract: `ColorAttachmentRead` no longer emits a write-state
       transition between consecutive readers.
 - [x] Slice B contract: BC-format transient estimate matches RHI block math.
-- [ ] Existing framegraph suites stay green.
+- [x] Slice C contract: static compiler diagnostics publish through explicit
+      `RenderGraphValidationResult` out-params on success and failure.
+- [x] Existing framegraph suites stay green.
 - [ ] PR-fast benchmark: compile + emission CPU time before/after on a
       pass-heavy synthetic graph.
 
@@ -105,15 +110,15 @@ depends_on: []
       color attachment barrier state.
 - [x] Slice B: document `RHI::EstimateTextureStorageBytes` as the framegraph
       transient texture sizing source.
-- [ ] Update `src/graphics/framegraph/README.md` where remaining contracts change
-      (validation result plumbing).
+- [x] Slice C: document explicit compile validation result plumbing and
+      non-`const` stateful graph compilation.
 
 ## Acceptance criteria
-- [ ] Zero `thread_local` compile state; validation results flow through
-      the return path.
+- [x] Zero `thread_local` compile state; validation results flow through
+      explicit out-param paths.
 - [ ] Benchmark evidence recorded; steady-state per-frame allocations in
       compile/emit measurably reduced (counter or allocator probe).
-- [ ] Both defect fixes pinned by tests; CPU gate green.
+- [x] Both defect fixes pinned by tests; CPU gate green.
 
 ## Verification
 ```bash
@@ -145,6 +150,18 @@ cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```
 
+Slice C verification run locally on 2026-07-06:
+
+```bash
+cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure -R 'RenderGraphValidation|CrossQueueTimeline' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+cmake --build --preset ci --target IntrinsicRuntimeIntegrationTests
+ctest --test-dir build/ci --output-on-failure -R '^GraphicsRenderGraph.DependencyCycleReportsPassNamesInDiagnostic$' --timeout 120
+ctest --test-dir build/ci --output-on-failure -R 'RenderGraphValidation|CrossQueueTimeline|FrameRecipeContract|RendererFrameLifecycle|PostProcessChainContract|DebugViewContract|ImGuiPresentContract|OwnershipTransferBarriers|QueueAffinity' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+```
+
 ## Forbidden changes
 - Changing compiled-graph semantics beyond the two pinned defect fixes.
 - Perf claims without benchmark numbers.
@@ -158,4 +175,6 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 - Slice A closes only the color-attachment-read defect at `CPUContracted`; no
   performance claim is made in this slice.
 - Slice B closes the block-compressed transient-estimate defect at
+  `CPUContracted`; no performance claim is made in this slice.
+- Slice C closes the compile-validation side-channel hygiene item at
   `CPUContracted`; no performance claim is made in this slice.

@@ -290,8 +290,8 @@ namespace Extrinsic::Graphics
         [[nodiscard]] static Core::Expected<CompiledRenderGraph> Compile(
             std::span<const RenderPassRecord> passes,
             std::span<const TextureResourceDesc> textures,
-            std::span<const BufferResourceDesc> buffers);
-        [[nodiscard]] static const RenderGraphValidationResult& GetLastCompileValidationResult();
+            std::span<const BufferResourceDesc> buffers,
+            RenderGraphValidationResult* validationOut = nullptr);
     };
 
     export [[nodiscard]] std::string BuildRenderGraphDebugDump(const CompiledRenderGraph& compiled);

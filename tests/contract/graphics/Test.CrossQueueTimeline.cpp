@@ -215,11 +215,11 @@ TEST(GraphicsCrossQueueTimeline, CrossQueueCycleReportsStructuredFinding)
         },
     };
 
-    const auto compiled = RenderGraphCompiler::Compile(passes, textures, {});
+    RenderGraphValidationResult result{};
+    const auto compiled = RenderGraphCompiler::Compile(passes, textures, {}, &result);
 
     ASSERT_FALSE(compiled.has_value());
     EXPECT_EQ(compiled.error(), Extrinsic::Core::ErrorCode::InvalidState);
-    const RenderGraphValidationResult& result = RenderGraphCompiler::GetLastCompileValidationResult();
     ASSERT_EQ(result.Findings.size(), 2u);
     EXPECT_EQ(result.Findings[0].Code, RenderGraphValidationCode::CrossQueueCycle);
     EXPECT_EQ(result.Findings[1].Code, RenderGraphValidationCode::CrossQueueCycle);

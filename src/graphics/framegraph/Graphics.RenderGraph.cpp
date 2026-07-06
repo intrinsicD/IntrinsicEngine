@@ -574,7 +574,7 @@ namespace Extrinsic::Graphics
         return BufferRef{.Index = index, .Generation = m_Impl->Generation};
     }
 
-    Core::Expected<CompiledRenderGraph> RenderGraph::Compile() const
+    Core::Expected<CompiledRenderGraph> RenderGraph::Compile()
     {
         if (!m_Impl)
         {
@@ -628,10 +628,13 @@ namespace Extrinsic::Graphics
             return std::unexpected(Core::ErrorCode::InvalidArgument);
         }
 
-        auto compiled = RenderGraphCompiler::Compile(m_Impl->Passes, m_Impl->Textures, m_Impl->Buffers);
+        auto compiled = RenderGraphCompiler::Compile(
+            m_Impl->Passes,
+            m_Impl->Textures,
+            m_Impl->Buffers,
+            &m_Impl->LastCompileValidationResult);
         if (!compiled.has_value())
         {
-            m_Impl->LastCompileValidationResult = RenderGraphCompiler::GetLastCompileValidationResult();
             return compiled;
         }
 

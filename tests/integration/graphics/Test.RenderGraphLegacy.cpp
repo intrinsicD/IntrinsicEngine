@@ -469,9 +469,10 @@ TEST(GraphicsRenderGraph, DependencyCycleReportsPassNamesInDiagnostic)
     passB.ExplicitDependencies.push_back(PassRef{.Index = 0u, .Generation = 1u});
     passes.push_back(passB);
 
-    auto compiled = RenderGraphCompiler::Compile(passes, {}, {});
+    RenderGraphValidationResult validation{};
+    auto compiled = RenderGraphCompiler::Compile(passes, {}, {}, &validation);
     ASSERT_FALSE(compiled.has_value());
-    const auto& findings = RenderGraphCompiler::GetLastCompileValidationResult().Findings;
+    const auto& findings = validation.Findings;
     ASSERT_FALSE(findings.empty());
     EXPECT_FALSE(findings.front().Message.empty());
     EXPECT_NE(findings.front().Message.find("PassA"), std::string::npos);

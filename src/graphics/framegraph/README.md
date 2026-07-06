@@ -60,6 +60,21 @@ where available, and may assert pass/resource names only for diagnostics and
 debug dump stability. Tests must not depend on transient allocation IDs or
 backend-native handles.
 
+## Validation Result Contract
+
+`RenderGraphCompiler::Compile(...)` reports structured compile diagnostics
+through its optional `RenderGraphValidationResult*` out-param. Successful
+compiles also copy the same findings into `CompiledRenderGraph::ValidationFindings`
+so callers that only need the compiled payload can inspect warnings and
+non-fatal errors without a separate side channel. Failed compiles publish their
+diagnostics through the out-param before returning an error.
+
+`RenderGraph::Compile()` is intentionally non-`const`: it updates graph-owned
+last-compile diagnostics and transient allocation state. Callers using the
+stateful `RenderGraph` wrapper can inspect diagnostics through
+`RenderGraph::GetLastCompileValidationResult()`. The static compiler API has no
+process-global or `thread_local` "last result" state.
+
 ## Transient Placement Contract
 
 `RenderGraph::Compile()` computes a CPU-visible placement plan for every used

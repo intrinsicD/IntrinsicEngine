@@ -303,11 +303,11 @@ TEST(RenderGraphValidation, CompileInvalidExplicitDependencyReportsStructuredFin
         RenderPassRecord{.Name = "InvalidDependency", .SideEffect = true, .ExplicitDependencies = {PassRef{.Index = 42u, .Generation = 1u}}},
     };
 
-    const auto compiled = RenderGraphCompiler::Compile(passes, {}, {});
+    RenderGraphValidationResult result{};
+    const auto compiled = RenderGraphCompiler::Compile(passes, {}, {}, &result);
 
     ASSERT_FALSE(compiled.has_value());
     EXPECT_EQ(compiled.error(), Extrinsic::Core::ErrorCode::InvalidArgument);
-    const RenderGraphValidationResult& result = RenderGraphCompiler::GetLastCompileValidationResult();
     const std::vector<RenderGraphValidationFinding> findings = FindingsByCode(result, RenderGraphValidationCode::InvalidExplicitDependency);
     ASSERT_EQ(findings.size(), 1u);
     EXPECT_EQ(findings.front().Severity, RenderGraphValidationSeverity::Error);
@@ -327,10 +327,10 @@ TEST(RenderGraphValidation, CompileInvalidResourceAccessReportsStructuredFinding
             },
         };
 
-        const auto compiled = RenderGraphCompiler::Compile(passes, {}, {});
+        RenderGraphValidationResult result{};
+        const auto compiled = RenderGraphCompiler::Compile(passes, {}, {}, &result);
 
         ASSERT_FALSE(compiled.has_value());
-        const RenderGraphValidationResult& result = RenderGraphCompiler::GetLastCompileValidationResult();
         const std::vector<RenderGraphValidationFinding> findings = FindingsByCode(result, RenderGraphValidationCode::InvalidTextureAccess);
         ASSERT_EQ(findings.size(), 1u);
         EXPECT_EQ(findings.front().PassName, "InvalidTexture");
@@ -347,10 +347,10 @@ TEST(RenderGraphValidation, CompileInvalidResourceAccessReportsStructuredFinding
             },
         };
 
-        const auto compiled = RenderGraphCompiler::Compile(passes, {}, {});
+        RenderGraphValidationResult result{};
+        const auto compiled = RenderGraphCompiler::Compile(passes, {}, {}, &result);
 
         ASSERT_FALSE(compiled.has_value());
-        const RenderGraphValidationResult& result = RenderGraphCompiler::GetLastCompileValidationResult();
         const std::vector<RenderGraphValidationFinding> findings = FindingsByCode(result, RenderGraphValidationCode::InvalidBufferAccess);
         ASSERT_EQ(findings.size(), 1u);
         EXPECT_EQ(findings.front().PassName, "InvalidBuffer");
@@ -374,10 +374,10 @@ TEST(RenderGraphValidation, CompileRenderPassAttachmentMismatchesReportStructure
             RenderPassRecord{.Name = "ColorMissingWrite", .SideEffect = true, .HasRenderPassDesc = true, .RenderPass = renderPass},
         };
 
-        const auto compiled = RenderGraphCompiler::Compile(passes, textures, {});
+        RenderGraphValidationResult result{};
+        const auto compiled = RenderGraphCompiler::Compile(passes, textures, {}, &result);
 
         ASSERT_FALSE(compiled.has_value());
-        const RenderGraphValidationResult& result = RenderGraphCompiler::GetLastCompileValidationResult();
         const std::vector<RenderGraphValidationFinding> findings = FindingsByCode(result, RenderGraphValidationCode::RenderPassColorWriteMissing);
         ASSERT_EQ(findings.size(), 1u);
         EXPECT_EQ(findings.front().PassName, "ColorMissingWrite");
@@ -390,10 +390,10 @@ TEST(RenderGraphValidation, CompileRenderPassAttachmentMismatchesReportStructure
             RenderPassRecord{.Name = "DepthMissingUsage", .SideEffect = true, .HasRenderPassDesc = true, .RenderPass = renderPass},
         };
 
-        const auto compiled = RenderGraphCompiler::Compile(passes, textures, {});
+        RenderGraphValidationResult result{};
+        const auto compiled = RenderGraphCompiler::Compile(passes, textures, {}, &result);
 
         ASSERT_FALSE(compiled.has_value());
-        const RenderGraphValidationResult& result = RenderGraphCompiler::GetLastCompileValidationResult();
         const std::vector<RenderGraphValidationFinding> findings = FindingsByCode(result, RenderGraphValidationCode::RenderPassDepthAccessMissing);
         ASSERT_EQ(findings.size(), 1u);
         EXPECT_EQ(findings.front().PassName, "DepthMissingUsage");
@@ -407,11 +407,11 @@ TEST(RenderGraphValidation, CompileCycleReportsStructuredFinding)
         RenderPassRecord{.Name = "CycleB", .ExplicitDependencies = {PassRef{.Index = 0u, .Generation = 1u}}},
     };
 
-    const auto compiled = RenderGraphCompiler::Compile(passes, {}, {});
+    RenderGraphValidationResult result{};
+    const auto compiled = RenderGraphCompiler::Compile(passes, {}, {}, &result);
 
     ASSERT_FALSE(compiled.has_value());
     EXPECT_EQ(compiled.error(), Extrinsic::Core::ErrorCode::InvalidState);
-    const RenderGraphValidationResult& result = RenderGraphCompiler::GetLastCompileValidationResult();
     const std::vector<RenderGraphValidationFinding> findings = FindingsByCode(result, RenderGraphValidationCode::CycleDetected);
     ASSERT_EQ(findings.size(), 2u);
     EXPECT_EQ(findings[0].PassName, "CycleA");
@@ -453,9 +453,9 @@ TEST(RenderGraphValidation, CompileBackbufferWrittenByNonFinalizerReportsStructu
         },
     };
 
-    const auto compiled = RenderGraphCompiler::Compile(passes, textures, {});
+    RenderGraphValidationResult compileResult{};
+    const auto compiled = RenderGraphCompiler::Compile(passes, textures, {}, &compileResult);
 
-    const RenderGraphValidationResult& compileResult = RenderGraphCompiler::GetLastCompileValidationResult();
     ASSERT_TRUE(compiled.has_value())
         << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
 
@@ -475,11 +475,10 @@ TEST(RenderGraphValidation, CompileBackbufferWrittenByNonFinalizerReportsStructu
         EXPECT_NE(finding.PassName, "Present");
     }
 
-    // `GetLastCompileValidationResult()` mirrors the compiled-graph findings
-    // so renderer/runtime diagnostics observe the same payload as direct
-    // validator callers (parity with `SuccessfulCompileStoresValidationFindings`).
-    EXPECT_EQ(RenderGraphCompiler::GetLastCompileValidationResult().Findings.size(),
-              compiled->ValidationFindings.size());
+    // The explicit compile validation out-param mirrors the compiled-graph
+    // findings so renderer/runtime diagnostics observe the same payload as
+    // direct validator callers (parity with `SuccessfulCompileStoresValidationFindings`).
+    EXPECT_EQ(compileResult.Findings.size(), compiled->ValidationFindings.size());
 }
 
 TEST(RenderGraphValidation, SuccessfulCompileStoresValidationFindings)
@@ -502,9 +501,9 @@ TEST(RenderGraphValidation, SuccessfulCompileStoresValidationFindings)
         },
     };
 
-    const auto compiled = RenderGraphCompiler::Compile(passes, textures, {});
+    RenderGraphValidationResult compileResult{};
+    const auto compiled = RenderGraphCompiler::Compile(passes, textures, {}, &compileResult);
 
-    const auto& compileResult = RenderGraphCompiler::GetLastCompileValidationResult();
     ASSERT_TRUE(compiled.has_value())
         << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
     const std::vector<RenderGraphValidationFinding> findings = FindingsByCode(
@@ -513,7 +512,7 @@ TEST(RenderGraphValidation, SuccessfulCompileStoresValidationFindings)
     ASSERT_EQ(findings.size(), 1u);
     EXPECT_EQ(findings.front().Severity, RenderGraphValidationSeverity::Warning);
     EXPECT_EQ(findings.front().PassName, "LoadWithoutWriter");
-    EXPECT_EQ(RenderGraphCompiler::GetLastCompileValidationResult().Findings.size(), compiled->ValidationFindings.size());
+    EXPECT_EQ(compileResult.Findings.size(), compiled->ValidationFindings.size());
 }
 
 TEST(RenderGraphValidation, FindingsUseDeterministicSeverityCodePassResourceOrdering)

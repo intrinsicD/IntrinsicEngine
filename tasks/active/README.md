@@ -12,10 +12,12 @@ Each active task should include:
 ## Currently active
 
 - [`GRAPHICS-120`](GRAPHICS-120-framegraph-compiler-executor-efficiency.md) —
-  framegraph compiler/executor efficiency and hygiene polish. Slice A is
-  complete locally: `TextureUsage::ColorAttachmentRead` uses a read-only
-  barrier state with a focused CPU render-graph regression. Broader
-  efficiency/hygiene work remains in the active task file.
+  framegraph compiler/executor efficiency and hygiene polish. Slices A through
+  C are complete locally: color attachment reads use a read-only barrier state,
+  transient texture estimates are pinned to RHI block-compressed storage sizing,
+  and compile validation diagnostics no longer use a `thread_local` side
+  channel. The allocation/barrier-emission efficiency slice remains in the
+  active task file.
 
 ## History
 
