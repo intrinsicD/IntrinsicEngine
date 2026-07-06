@@ -404,13 +404,21 @@ float GpuVisualizationNormalizedScalar(GpuEntityConfig cfg, float scalarValue)
     return t;
 }
 
-vec4 GpuVisualizationApplyIsolines(GpuEntityConfig cfg, float t, vec4 color)
+// BUG-060 — evenly spaced isolines take the *un-binned* normalized scalar
+// (rawT): binned t is piecewise constant, so contour tests against it paint
+// whole bins instead of lines (and the entire surface when BinCount matches
+// IsolineCount). Contour levels sit at the interior boundaries
+// t = k / (N + 1), k = 1..N, matching the proven framework24 placement:
+// N contours strictly inside the range, none pinned to min/max.
+vec4 GpuVisualizationApplyIsolines(GpuEntityConfig cfg, float rawT, vec4 color)
 {
     if (cfg.IsolineCount <= 0.0 || cfg.IsolineWidth <= 0.0) {
         return color;
     }
 
-    const float phase = abs(fract(t * cfg.IsolineCount) - 0.5);
+    const float param = rawT * (cfg.IsolineCount + 1.0);
+    const float nearestLevel = clamp(round(param), 1.0, cfg.IsolineCount);
+    const float phase = abs(param - nearestLevel);
     const float width = clamp(cfg.IsolineWidth / 128.0, 0.001, 0.5);
     const float lineMix = 1.0 - smoothstep(0.0, width, phase);
     color.rgb = mix(color.rgb, cfg.IsolineColor.rgb, lineMix * cfg.IsolineColor.a);
@@ -478,13 +486,11 @@ vec4 GpuResolveVisualizationColorWithColormap(GpuEntityConfig cfg,
     }
 
     const float t = GpuVisualizationNormalizedScalar(cfg, scalarValue);
+    const float rawT = GpuVisualizationNormalizedScalarRaw(cfg, scalarValue);
     vec4 color = texture(colormapLut, vec2(t, 0.5));
     color.a = 1.0;
-    color = GpuVisualizationApplyIsolines(cfg, t, color);
-    color = GpuVisualizationApplyExplicitIsoValues(
-        cfg,
-        GpuVisualizationNormalizedScalarRaw(cfg, scalarValue),
-        color);
+    color = GpuVisualizationApplyIsolines(cfg, rawT, color);
+    color = GpuVisualizationApplyExplicitIsoValues(cfg, rawT, color);
     color.a *= cfg.VisualizationAlpha;
     return color;
 }

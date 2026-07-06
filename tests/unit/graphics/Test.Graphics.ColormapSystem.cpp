@@ -45,6 +45,19 @@ TEST(GraphicsColormapSystem, InitializeSubmitsLutUploadsThroughTransferQueue)
     ASSERT_EQ(device.TransferQueue.TextureUploads.size(), kExpectedColormapCount);
     ASSERT_EQ(device.TransferQueue.Issued.size(), kExpectedColormapCount);
 
+    // BUG-060 — every consumer samples the LUT through the bindless
+    // `sampler2D globalTextures[]` heap, so the LUT must be created as a
+    // 256x1 Tex2D. A Tex1D view sampled through a 2D sampler is undefined
+    // in Vulkan (VUID-vkCmdDraw-viewType-07752) and read back as zero on
+    // common drivers, rendering scalar-field surfaces black.
+    ASSERT_EQ(device.CreatedTextureDescs.size(), kExpectedColormapCount);
+    for (const auto& desc : device.CreatedTextureDescs)
+    {
+        EXPECT_EQ(desc.Dimension, RHI::TextureDimension::Tex2D);
+        EXPECT_EQ(desc.Width, 256u);
+        EXPECT_EQ(desc.Height, 1u);
+    }
+
     for (const auto& upload : device.TransferQueue.TextureUploads)
     {
         EXPECT_TRUE(upload.Texture.IsValid());

@@ -223,12 +223,19 @@ namespace Extrinsic::Graphics
         {
             auto& entry = m_Impl->Entries[i];
 
+            // BUG-060: the LUT must be a 256x1 Tex2D, not Tex1D. Every
+            // consumer samples it through the bindless heap declared as
+            // `sampler2D globalTextures[]`, and Vulkan leaves sampling a
+            // VK_IMAGE_VIEW_TYPE_1D view through a 2D sampler undefined
+            // (VUID-vkCmdDraw-viewType-07752) — it reads back as zero on
+            // common drivers, which rendered every scalar-field surface
+            // black.
             const RHI::TextureDesc texDesc {
                 .Width     = 256,
                 .Height    = 1,
                 .MipLevels = 1,
                 .Fmt       = RHI::Format::RGBA8_UNORM,
-                .Dimension = RHI::TextureDimension::Tex1D,
+                .Dimension = RHI::TextureDimension::Tex2D,
                 .Usage     = RHI::TextureUsage::Sampled | RHI::TextureUsage::TransferDst,
                 .DebugName = "ColormapLut",
             };
