@@ -49,9 +49,11 @@ This directory contains the `RHI` module/files.
   bookkeeping contexts; Vulkan implements backend-local secondary command
   buffers for graphics-queue plans and executes them from the primary context
   without exposing `Vk*` handles through RHI. The renderer can dispatch accepted
-  recording work through `Core::Tasks` workers when the scheduler is live.
-  Non-graphics queue support and the opt-in Vulkan smoke remain later
-  `GRAPHICS-119` slices.
+  recording work through `Core::Tasks` workers when the scheduler is live and
+  can join accepted non-graphics CPU/null contexts back through
+  `GetQueueSubmitContext(...)` batches. Vulkan still declines non-graphics
+  parallel context plans; Vulkan non-graphics secondary execution and the
+  opt-in Vulkan smoke remain later `GRAPHICS-119` slices.
 
 ## Timeline semaphores
 

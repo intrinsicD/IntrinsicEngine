@@ -105,11 +105,16 @@ frame. Devices that decline the plan keep the historical serial
 `GetGraphicsContext(...)` path and report
 `RenderGraphFrameStats::Execute.SerialFallbackUsed`; devices that accept record
 pass bodies into per-pass contexts and submit those contexts in compiled serial
-order through `IDevice::SubmitParallelCommandContext(...)`. The current path is
+order through `IDevice::SubmitParallelCommandContext(...)`. For accepted
+multi-queue submit plans, the renderer records the per-pass contexts through the
+same worker fan-out seam and joins them back through each
+`GetQueueSubmitContext(...)` batch so queue submission order, timeline
+waits/signals, and barriers remain unchanged. The current path is
 worker-dispatched when `Core::Tasks::Scheduler` is initialized, and records on
 the caller thread when no scheduler is live. Vulkan accepts the graphics-queue
-plan with backend-local secondary command buffers; non-graphics queue support,
-benchmark evidence, and opt-in Vulkan smoke remain later `GRAPHICS-119` slices.
+plan with backend-local secondary command buffers; Vulkan non-graphics secondary
+execution, benchmark evidence, and opt-in Vulkan smoke remain later
+`GRAPHICS-119` slices.
 `RenderGraphFrameStats::Execute.ParallelRecordUsedScheduler` reports whether the
 executor dispatched worker tasks. Transient-debug, visualization-overlay, and
 ImGui dynamic upload helpers serialize per-frame reset plus upload/execute

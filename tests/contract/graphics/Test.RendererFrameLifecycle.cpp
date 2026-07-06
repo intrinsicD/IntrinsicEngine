@@ -1434,6 +1434,93 @@ TEST(RendererFrameLifecycle, ParallelRecordingUsesSchedulerWorkersWhenAvailable)
     renderer->Shutdown();
 }
 
+TEST(RendererFrameLifecycle, ParallelRecordingUsesAcceptedContextsForAsyncComputeQueuePlan)
+{
+    SchedulerScope scheduler{4u};
+
+    Extrinsic::Tests::MockDevice device;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{81u, 3u};
+    device.AsyncComputeQueueAvailable = true;
+    device.AcceptQueueSubmitPlans = true;
+    device.ParallelCommandContextsAvailable = true;
+    device.AcceptParallelCommandContextPlans = true;
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+    renderer->SetParallelRenderGraphRecordingEnabled(true);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_EQ(stats.AsyncComputeUtilizedFrames, 1u);
+    EXPECT_TRUE(stats.Execute.ParallelRecordingRequested);
+    EXPECT_TRUE(stats.Execute.ParallelRecordingAccepted);
+    EXPECT_FALSE(stats.Execute.SerialFallbackUsed);
+    EXPECT_TRUE(stats.Execute.ParallelRecordUsedScheduler);
+    EXPECT_GT(stats.Execute.ParallelRecordWorkerTaskCount, 0u);
+    EXPECT_EQ(stats.Execute.ParallelRecordWorkerTaskCount,
+              stats.Execute.ParallelRecordedPassCount);
+    EXPECT_EQ(stats.Execute.ParallelRecordCallerRecordCount, 0u);
+    EXPECT_EQ(stats.Execute.ParallelCommandContextCount,
+              device.RecordedParallelCommandContextPlan.size());
+    EXPECT_EQ(device.ParallelCommandContextRequests.size(),
+              device.RecordedParallelCommandContextPlan.size());
+    EXPECT_EQ(device.SubmittedParallelCommandContexts.size(),
+              device.RecordedParallelCommandContextPlan.size());
+
+    const auto hasAsyncBatch = std::ranges::any_of(
+        device.RecordedQueueSubmitPlan,
+        [](const Extrinsic::Tests::MockDevice::RecordedQueueSubmitBatch& batch) {
+            return batch.Queue == Extrinsic::RHI::QueueAffinity::AsyncCompute;
+        });
+    EXPECT_TRUE(hasAsyncBatch);
+
+    const auto requestedAsyncContext = std::ranges::any_of(
+        device.QueueSubmitContextRequests,
+        [](const Extrinsic::Tests::MockDevice::QueueSubmitContextRequest& request) {
+            return request.Affinity == Extrinsic::RHI::QueueAffinity::AsyncCompute;
+        });
+    EXPECT_TRUE(requestedAsyncContext);
+    EXPECT_GE(device.AsyncComputeContext.BeginCalls, 1);
+    EXPECT_GE(device.AsyncComputeContext.EndCalls, 1);
+
+    const auto recordedAsyncParallelContext = std::ranges::any_of(
+        device.RecordedParallelCommandContextPlan,
+        [](const Extrinsic::RHI::ParallelCommandContextRequest& request) {
+            return request.Queue == Extrinsic::RHI::QueueAffinity::AsyncCompute;
+        });
+    EXPECT_TRUE(recordedAsyncParallelContext);
+
+    const auto submittedAsyncParallelContext = std::ranges::any_of(
+        device.SubmittedParallelCommandContexts,
+        [](const Extrinsic::RHI::ParallelCommandContextRequest& request) {
+            return request.Queue == Extrinsic::RHI::QueueAffinity::AsyncCompute;
+        });
+    EXPECT_TRUE(submittedAsyncParallelContext);
+
+    for (std::size_t i = 0; i < device.RecordedParallelCommandContextPlan.size(); ++i)
+    {
+        EXPECT_EQ(device.SubmittedParallelCommandContexts[i].Queue,
+                  device.RecordedParallelCommandContextPlan[i].Queue);
+        EXPECT_EQ(device.SubmittedParallelCommandContexts[i].PassIndex,
+                  device.RecordedParallelCommandContextPlan[i].PassIndex);
+        EXPECT_EQ(device.SubmittedParallelCommandContexts[i].ContextIndex,
+                  device.RecordedParallelCommandContextPlan[i].ContextIndex);
+    }
+
+    renderer->Shutdown();
+}
+
 TEST(RendererFrameLifecycle, ParallelRecordingRecordsDynamicUploadPassesThroughAcceptedContexts)
 {
     static const std::array<Extrinsic::Graphics::DebugTrianglePacket, 1> kTriangles{{

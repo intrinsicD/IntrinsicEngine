@@ -123,9 +123,12 @@ After every record callback in a layer joins, the executor emits barrier and
 submit callbacks in the same serial topological order as `Execute(...)`; GPU
 visible submission order is unchanged. If any record callback fails, all
 scheduled callbacks in that layer still join and the executor returns the first
-error before emitting serial submit callbacks. Backend command-context
-allocation, Vulkan secondary command buffers, renderer fallback selection, and
-operational GPU smoke coverage are owned by `GRAPHICS-119` later slices.
+error before emitting serial submit callbacks. The renderer uses the same
+record/join primitive for accepted single-queue frames and for accepted CPU/null
+multi-queue submit plans; multi-queue joins emit each recorded context through
+the existing queue-submit batches so timeline waits/signals and barriers keep
+their serial placement. Vulkan non-graphics secondary execution, benchmark
+evidence, and operational GPU smoke coverage remain `GRAPHICS-119` later scope.
 
 ## Transient Placement Contract
 

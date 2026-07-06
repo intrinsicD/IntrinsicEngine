@@ -170,15 +170,24 @@ When enabled on a single-queue frame, the renderer asks
 `RHI::IDevice::BeginFrameParallelCommandContexts(...)` for a frame-scoped
 per-pass command-context plan. If the device declines or does not support
 parallel command contexts, `RenderGraphFrameStats::Execute.SerialFallbackUsed`
-is set and the renderer records through the serial graphics context. If the
-device accepts, the renderer records each pass into its acquired context through
-`RenderGraphExecutor::ExecuteParallelRecordJoin(...)`; when
+is set and the renderer records through the serial graphics context. On
+accepted single-queue frames, the renderer records each pass into its acquired
+context through `RenderGraphExecutor::ExecuteParallelRecordJoin(...)`; when
 `Core::Tasks::Scheduler` is initialized, pass bodies are dispatched to scheduler
 workers, otherwise the executor records on the caller thread. The renderer then
 calls `IDevice::SubmitParallelCommandContext(...)` in compiled serial order while
 barriers, post-graph readbacks, and runtime frame hooks remain on the primary
-graphics context. This preserves deterministic GPU-visible order while allowing
-CPU-side pass recording to fan out.
+graphics context.
+
+When the compiled frame uses an accepted multi-queue submit plan, the renderer
+uses the same parallel command-context plan for CPU/null pass-body fan-out and
+then joins those contexts back through each `GetQueueSubmitContext(...)` batch in
+the existing queue-submit order. Backend-visible queue submission, timeline
+wait/signal placement, barriers, post-graph readbacks, and runtime frame hooks
+stay on the existing submit-plan path. This preserves deterministic GPU-visible
+order while allowing CPU-side pass recording to fan out; Vulkan currently
+declines non-graphics parallel command-context plans, so operational
+non-graphics secondary execution remains later `GRAPHICS-119` backend scope.
 
 `RenderGraphFrameStats::Execute` reports whether the executor used scheduler
 workers. Command-record diagnostics now accumulate through a guarded frame-local
@@ -190,18 +199,21 @@ helpers serialize per-frame reset plus pass-body upload/execute sections behind
 a shared renderer guard. Postprocess pass helpers also serialize per-frame
 bloom scratch, histogram viewport/buffer, and AA stage pass-object recording.
 Frame-sampled bridge descriptor updates are also serialized before route
-dispatch because promoted Vulkan updates shared descriptor-set state. Remaining
-`GRAPHICS-119` scope is non-graphics queue fan-out, benchmark evidence, and
-opt-in Vulkan smoke coverage.
+dispatch because promoted Vulkan updates shared descriptor-set state. Accepted
+CPU/null multi-queue submit plans use the same per-pass parallel contexts and
+join them back through each queue-submit batch so submission order, timeline
+waits/signals, and barriers remain unchanged. Remaining `GRAPHICS-119` scope is
+Vulkan non-graphics secondary execution, benchmark evidence, and opt-in Vulkan
+smoke coverage.
 
 Null provides CPU bookkeeping contexts for this contract. Vulkan accepts the
 current graphics-queue plan shape with backend-local secondary command buffers
 and records `vkCmdExecuteCommands(...)` into the primary context at each serial
 submit callback; each accepted context owns a frame-scoped command pool, and the
 pool plus secondary buffer are retained until the frame-slot fence has retired
-and are destroyed on the next `BeginFrame`. Non-graphics queue fan-out,
-benchmark evidence, and opt-in `gpu;vulkan` smoke coverage remain later
-`GRAPHICS-119` slices.
+and are destroyed on the next `BeginFrame`. Vulkan non-graphics secondary
+execution, benchmark evidence, and opt-in `gpu;vulkan` smoke coverage remain
+later `GRAPHICS-119` slices.
 
 ## Boundaries
 

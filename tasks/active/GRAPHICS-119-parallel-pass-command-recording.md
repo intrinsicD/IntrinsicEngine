@@ -8,10 +8,10 @@ depends_on: []
 ## Status
 - In progress on local `main`; PR not opened.
 - Owner/agent: Codex.
-- Current slice: Slice C.7 (seeded CPU/null determinism coverage) completed
+- Current slice: Slice C.8 (CPU/null multi-queue fan-out) completed
   and verified locally.
-- Next implementation step: cover remaining non-graphics queue fan-out /
-  benchmark / opt-in Vulkan smoke scope.
+- Next implementation step: cover remaining Vulkan non-graphics secondary
+  execution / benchmark / opt-in Vulkan smoke scope.
 
 ## Goal
 - Record render-graph pass command buffers in parallel: independent passes
@@ -101,6 +101,11 @@ depends_on: []
       single-queue parallel context plans when `Core::Tasks::Scheduler` is
       initialized; frame-sampled descriptor bridge updates and mock-device
       request bookkeeping are guarded for worker recording.
+- [x] Slice C.8: renderer uses accepted parallel command-context plans for
+      CPU/null multi-queue submit frames, records pass bodies through scheduler
+      workers when available, and joins submitted contexts back through each
+      queue-submit batch without changing queue order, timeline waits/signals,
+      or barrier placement.
 - [x] RHI contract for parallel recording: acquire per-thread/per-batch
       command contexts, record independently, submit in compiled order;
       Null + Vulkan implementations.
@@ -153,6 +158,10 @@ depends_on: []
 - [x] Slice C.7 CPU/null contract: seeded DAG graph shapes preserve the exact
       serial barrier/pass event stream under scheduler-backed parallel
       record/join.
+- [x] Slice C.8 renderer contract: accepted async-compute queue-submit plans
+      request and submit non-graphics parallel command contexts, dispatch pass
+      recording through scheduler workers, and preserve the existing
+      queue-submit context usage.
 - [x] CPU/null contract: parallel recording produces the same
       pass-execution/barrier submission order as serial (bookkeeping
       comparison over randomized graphs).
@@ -188,6 +197,8 @@ depends_on: []
       benchmark / opt-in Vulkan smoke scope.
 - [x] Slice C.7: task record documents seeded CPU/null determinism coverage;
       no architecture docs changed.
+- [x] Slice C.8: document accepted CPU/null multi-queue fan-out and the
+      remaining Vulkan non-graphics secondary-execution scope.
 - [x] Update `docs/architecture/frame-graph.md` and
       `src/graphics/renderer/README.md` (threading model, fallback flag).
 
@@ -424,6 +435,33 @@ python3 tools/docs/check_docs_sync.py --root . --strict
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict
 ```
+
+Slice C.8 verification run locally on 2026-07-07:
+
+```bash
+cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure -R 'RendererFrameLifecycle\.(ParallelRecordingUsesAcceptedContextsForAsyncComputeQueuePlan|ParallelRecordingUsesSchedulerWorkersWhenAvailable|ParallelRecordingUsesAcceptedContextPlanInSerialSubmitOrder|AsyncComputeQueuePlanIncrementsUtilizationStat)' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+ctest --test-dir build/ci --output-on-failure -R 'RendererFrameLifecycle|RenderGraphParallelRecording|GraphicsQueueAffinity|RenderGraphValidation|CrossQueueTimeline' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+python3 tools/agents/generate_session_brief.py
+git diff --check
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/validate_tasks.py --root tasks --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --strict
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+tools/ci/run_clean_workshop_review.sh . --strict
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+```
+
+Slice C.8 full CPU-supported gate result: 3596/3596 tests passed.
+
+Clean-workshop manual scorecard for Slice C.8: row 3 `n/a` (no public
+`.cppm` API surface changed), row 4 `pass` (the queue-submit parallel join is
+owned by the existing GRAPHICS-119 renderer/RHI command-context seam and is not
+a new subsystem), row 5 `n/a` (no new frame-graph pass), row 6 `n/a` (no recipe
+edge changes). Findings: none; no follow-up task ID required.
 
 ## Forbidden changes
 - Nondeterministic submission order or frame output.

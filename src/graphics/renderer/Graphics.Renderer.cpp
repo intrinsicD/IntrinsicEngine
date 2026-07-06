@@ -3548,6 +3548,72 @@ namespace Extrinsic::Graphics
                     });
                 }
             };
+            const auto beginParallelCommandContextPlan = [&]() -> bool
+            {
+                if (!m_Device->SupportsParallelCommandContexts())
+                {
+                    return false;
+                }
+
+                buildParallelContextRequests();
+                return !parallelContextRequests.empty() &&
+                       m_Device->BeginFrameParallelCommandContexts(
+                           frame,
+                           RHI::ParallelCommandContextPlanDesc{.Requests = parallelContextRequests});
+            };
+            const auto executeParallelRecordJoin =
+                [&](RenderGraphExecutor::PassObserver onSubmit,
+                    RenderGraphExecutor::BarrierObserver onBarriers,
+                    ParallelRecordStats& parallelRecordStats) -> Core::Result
+                {
+                    return m_RenderGraphExecutor.ExecuteParallelRecordJoin(
+                        *compiled,
+                        [&](const std::uint32_t passIndex,
+                            const std::uint32_t layerIndex) -> Core::Result
+                        {
+                            if (passIndex >= parallelContextIndexByPass.size())
+                            {
+                                return Core::Err(Core::ErrorCode::OutOfRange);
+                            }
+                            const std::uint32_t contextIndex = parallelContextIndexByPass[passIndex];
+                            if (contextIndex >= parallelContextRequests.size())
+                            {
+                                return Core::Err(Core::ErrorCode::InvalidState);
+                            }
+                            const RHI::ParallelCommandContextRequest& request =
+                                parallelContextRequests[contextIndex];
+                            if (request.TopologicalLayer != layerIndex)
+                            {
+                                return Core::Err(Core::ErrorCode::InvalidState);
+                            }
+
+                            RHI::ICommandContext& passContext =
+                                m_Device->GetParallelCommandContext(request);
+                            passContext.Begin();
+                            recordPass(passContext, passIndex);
+                            passContext.End();
+                            return Core::Ok();
+                        },
+                        std::move(onSubmit),
+                        std::move(onBarriers),
+                        &parallelRecordStats,
+                        ParallelRecordOptions{
+                            .UseScheduler = kRenderGraphParallelRecordWorkerFanOutEnabled,
+                            .MinWorkerPassCount = 1u,
+                        });
+                };
+            const auto publishParallelRecordStats =
+                [&](const ParallelRecordStats& parallelRecordStats)
+                {
+                    m_LastRenderGraphStats.Execute.ParallelRecordedPassCount =
+                        parallelRecordStats.ScheduledPassCount;
+                    m_LastRenderGraphStats.Execute.ParallelRecordUsedScheduler =
+                        parallelRecordStats.UsedScheduler;
+                    m_LastRenderGraphStats.Execute.ParallelRecordWorkerTaskCount =
+                        parallelRecordStats.WorkerTaskCount;
+                    m_LastRenderGraphStats.Execute.ParallelRecordCallerRecordCount =
+                        parallelRecordStats.CallerRecordCount;
+                };
 
             const auto recordPostGraphReadbacks =
                 [&](RHI::ICommandContext& graphicsContext, const bool graphExecuted)
@@ -3633,17 +3699,7 @@ namespace Extrinsic::Graphics
             const auto executeParallelSingleQueueOrFallback = [&]() -> Core::Result
             {
                 m_LastRenderGraphStats.Execute.ParallelRecordingRequested = true;
-                if (!m_Device->SupportsParallelCommandContexts())
-                {
-                    m_LastRenderGraphStats.Execute.SerialFallbackUsed = true;
-                    return executeSingleQueue();
-                }
-
-                buildParallelContextRequests();
-                if (parallelContextRequests.empty() ||
-                    !m_Device->BeginFrameParallelCommandContexts(
-                        frame,
-                        RHI::ParallelCommandContextPlanDesc{.Requests = parallelContextRequests}))
+                if (!beginParallelCommandContextPlan())
                 {
                     m_LastRenderGraphStats.Execute.SerialFallbackUsed = true;
                     return executeSingleQueue();
@@ -3656,36 +3712,7 @@ namespace Extrinsic::Graphics
                 RHI::ICommandContext& primaryContext = m_Device->GetGraphicsContext(frame.FrameIndex);
                 primaryContext.Begin();
                 ParallelRecordStats parallelRecordStats{};
-                m_LastRenderGraphStats.Execute.ParallelRecordUsedScheduler =
-                    kRenderGraphParallelRecordWorkerFanOutEnabled;
-                Core::Result result = m_RenderGraphExecutor.ExecuteParallelRecordJoin(
-                    *compiled,
-                    [&](const std::uint32_t passIndex,
-                        const std::uint32_t layerIndex) -> Core::Result
-                    {
-                        if (passIndex >= parallelContextIndexByPass.size())
-                        {
-                            return Core::Err(Core::ErrorCode::OutOfRange);
-                        }
-                        const std::uint32_t contextIndex = parallelContextIndexByPass[passIndex];
-                        if (contextIndex >= parallelContextRequests.size())
-                        {
-                            return Core::Err(Core::ErrorCode::InvalidState);
-                        }
-                        const RHI::ParallelCommandContextRequest& request =
-                            parallelContextRequests[contextIndex];
-                        if (request.TopologicalLayer != layerIndex)
-                        {
-                            return Core::Err(Core::ErrorCode::InvalidState);
-                        }
-
-                        RHI::ICommandContext& passContext =
-                            m_Device->GetParallelCommandContext(request);
-                        passContext.Begin();
-                        recordPass(passContext, passIndex);
-                        passContext.End();
-                        return Core::Ok();
-                    },
+                Core::Result result = executeParallelRecordJoin(
                     [&](const std::uint32_t passIndex)
                     {
                         if (passIndex >= parallelContextIndexByPass.size())
@@ -3705,19 +3732,8 @@ namespace Extrinsic::Graphics
                     {
                         submitBarriersForContext(primaryContext, packet);
                     },
-                    &parallelRecordStats,
-                    ParallelRecordOptions{
-                        .UseScheduler = kRenderGraphParallelRecordWorkerFanOutEnabled,
-                        .MinWorkerPassCount = 1u,
-                    });
-                m_LastRenderGraphStats.Execute.ParallelRecordedPassCount =
-                    parallelRecordStats.ScheduledPassCount;
-                m_LastRenderGraphStats.Execute.ParallelRecordUsedScheduler =
-                    parallelRecordStats.UsedScheduler;
-                m_LastRenderGraphStats.Execute.ParallelRecordWorkerTaskCount =
-                    parallelRecordStats.WorkerTaskCount;
-                m_LastRenderGraphStats.Execute.ParallelRecordCallerRecordCount =
-                    parallelRecordStats.CallerRecordCount;
+                    parallelRecordStats);
+                publishParallelRecordStats(parallelRecordStats);
                 recordPostGraphReadbacks(primaryContext, result.has_value());
                 if (result.has_value())
                 {
@@ -3812,9 +3828,124 @@ namespace Extrinsic::Graphics
                 return Core::Ok();
             };
 
+            const auto executeParallelSubmitPlanOrFallback = [&]() -> Core::Result
+            {
+                m_LastRenderGraphStats.Execute.ParallelRecordingRequested = true;
+                if (!beginParallelCommandContextPlan())
+                {
+                    m_LastRenderGraphStats.Execute.SerialFallbackUsed = true;
+                    return executeSubmitPlan();
+                }
+
+                m_LastRenderGraphStats.Execute.ParallelRecordingAccepted = true;
+                m_LastRenderGraphStats.Execute.ParallelCommandContextCount =
+                    static_cast<std::uint32_t>(parallelContextRequests.size());
+
+                ParallelRecordStats parallelRecordStats{};
+                Core::Result recordResult = executeParallelRecordJoin(
+                    RenderGraphExecutor::PassObserver{},
+                    RenderGraphExecutor::BarrierObserver{},
+                    parallelRecordStats);
+                publishParallelRecordStats(parallelRecordStats);
+                if (!recordResult.has_value())
+                {
+                    m_Device->EndFrameParallelCommandContexts(frame);
+                    return recordResult;
+                }
+
+                if (!AreBarrierPacketsSortedByPassAndStage(compiled->BarrierPackets))
+                {
+                    m_Device->EndFrameParallelCommandContexts(frame);
+                    return Core::Err(Core::ErrorCode::InvalidState);
+                }
+                Core::Result barrierBounds = ValidateBarrierPacketBounds(*compiled);
+                if (!barrierBounds.has_value())
+                {
+                    m_Device->EndFrameParallelCommandContexts(frame);
+                    return barrierBounds;
+                }
+
+                for (std::size_t batchIndex = 0; batchIndex < queueSubmitPlan.Batches.size(); ++batchIndex)
+                {
+                    const QueueSubmitBatch& batch = queueSubmitPlan.Batches[batchIndex];
+                    RHI::ICommandContext& context =
+                        m_Device->GetQueueSubmitContext(batch.Queue,
+                                                        frame.FrameIndex,
+                                                        static_cast<std::uint32_t>(batchIndex));
+                    context.Begin();
+                    for (const std::uint32_t passIndex : batch.PassIndices)
+                    {
+                        if (passIndex >= compiled->PassDeclarations.size() ||
+                            passIndex >= parallelContextIndexByPass.size())
+                        {
+                            context.End();
+                            m_Device->EndFrameParallelCommandContexts(frame);
+                            return Core::Err(Core::ErrorCode::OutOfRange);
+                        }
+                        const CompiledPassDeclarations& declarations =
+                            compiled->PassDeclarations[passIndex];
+                        if (declarations.PassIndex != passIndex)
+                        {
+                            context.End();
+                            m_Device->EndFrameParallelCommandContexts(frame);
+                            return Core::Err(Core::ErrorCode::InvalidState);
+                        }
+                        Core::Result before =
+                            emitBarriersForPass(context, passIndex, BarrierPacketStage::BeforePass);
+                        if (!before.has_value())
+                        {
+                            context.End();
+                            m_Device->EndFrameParallelCommandContexts(frame);
+                            return before;
+                        }
+
+                        const std::uint32_t contextIndex = parallelContextIndexByPass[passIndex];
+                        if (contextIndex >= parallelContextRequests.size())
+                        {
+                            context.End();
+                            m_Device->EndFrameParallelCommandContexts(frame);
+                            return Core::Err(Core::ErrorCode::InvalidState);
+                        }
+                        m_Device->SubmitParallelCommandContext(
+                            parallelContextRequests[contextIndex],
+                            context);
+
+                        Core::Result after =
+                            emitBarriersForPass(context, passIndex, BarrierPacketStage::AfterPass);
+                        if (!after.has_value())
+                        {
+                            context.End();
+                            m_Device->EndFrameParallelCommandContexts(frame);
+                            return after;
+                        }
+                    }
+                    if (batchIndex + 1u == queueSubmitPlan.Batches.size())
+                    {
+                        Core::Result finalBarriers = emitBarriersForPass(
+                            context,
+                            static_cast<std::uint32_t>(compiled->PassDeclarations.size()),
+                            BarrierPacketStage::BeforePass);
+                        if (!finalBarriers.has_value())
+                        {
+                            context.End();
+                            m_Device->EndFrameParallelCommandContexts(frame);
+                            return finalBarriers;
+                        }
+                        recordPostGraphReadbacks(context, true);
+                        InvokeRuntimeFrameCommandHooks(context);
+                    }
+                    context.End();
+                }
+
+                m_Device->EndFrameParallelCommandContexts(frame);
+                return Core::Ok();
+            };
+
             const Core::Result executeResult =
                 useQueueSubmitPlan
-                    ? executeSubmitPlan()
+                    ? (m_ParallelRenderGraphRecordingEnabled
+                           ? executeParallelSubmitPlanOrFallback()
+                           : executeSubmitPlan())
                     : (m_ParallelRenderGraphRecordingEnabled
                            ? executeParallelSingleQueueOrFallback()
                            : executeSingleQueue());
