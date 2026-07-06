@@ -75,6 +75,20 @@ stateful `RenderGraph` wrapper can inspect diagnostics through
 `RenderGraph::GetLastCompileValidationResult()`. The static compiler API has no
 process-global or `thread_local` "last result" state.
 
+## Barrier Packet Traversal Contract
+
+Compiled barrier packets are sorted by `(PassIndex, Stage)` using
+`BarrierPacketStageSortKey`, where `BeforePass` precedes `AfterPass` for a pass.
+Emitters use `FindBarrierPacketRange(...)` to visit only packets matching the
+current pass/stage instead of rescanning the full packet list. Before emission,
+`ValidateBarrierPacketBounds(...)` checks the full packet list against the
+compiled graph's pass/resource handle counts so both the executor and renderer
+preserve fail-closed behavior for malformed packet streams.
+
+Renderer-side alias-reuse injection may add or remove packets after compile; it
+must re-sort the packet list before execution so the shared range lookup remains
+valid.
+
 ## Transient Placement Contract
 
 `RenderGraph::Compile()` computes a CPU-visible placement plan for every used

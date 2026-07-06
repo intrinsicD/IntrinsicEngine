@@ -1,0 +1,25 @@
+# GRAPHICS-120 - framegraph barrier emission traversal baseline/probe.
+#
+# This smoke benchmark compares the legacy per-pass full-scan traversal shape
+# against the shared indexed range lookup over the same deterministic synthetic
+# barrier packet set. It is CPU traversal evidence only and does not claim
+# renderer-wide frame-time adoption benefit.
+
+benchmark_id: rendering.framegraph_barrier_emission.smoke
+method: rendering.framegraph_barrier_emission
+dataset: builtin.synthetic_framegraph_barriers.256_passes
+params:
+  intent: smoke
+  pass_count: 256
+  texture_count: 64
+  buffer_count: 64
+  warmup_iterations: 4
+  measured_iterations: 128
+  baseline_mode: legacy_full_scan
+  probe_mode: indexed_range_lookup
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 250
+  quality_error_l2_max: 0.0

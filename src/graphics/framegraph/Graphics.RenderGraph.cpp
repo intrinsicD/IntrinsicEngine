@@ -74,23 +74,11 @@ namespace Extrinsic::Graphics
             return sizeBytes == 0u ? 0u : AlignUp(sizeBytes, alignmentBytes);
         }
 
-        [[nodiscard]] constexpr std::uint8_t BarrierStageSortKey(const BarrierPacketStage stage) noexcept
-        {
-            switch (stage)
-            {
-            case BarrierPacketStage::BeforePass:
-                return 0u;
-            case BarrierPacketStage::AfterPass:
-                return 1u;
-            }
-            return 0u;
-        }
-
         void SortBarrierPacketsByPass(std::vector<BarrierPacket>& packets)
         {
             std::ranges::stable_sort(packets, [](const BarrierPacket& lhs, const BarrierPacket& rhs) {
-                return std::tuple{lhs.PassIndex, BarrierStageSortKey(lhs.Stage)} <
-                       std::tuple{rhs.PassIndex, BarrierStageSortKey(rhs.Stage)};
+                return std::tuple{lhs.PassIndex, BarrierPacketStageSortKey(lhs.Stage)} <
+                       std::tuple{rhs.PassIndex, BarrierPacketStageSortKey(rhs.Stage)};
             });
         }
 

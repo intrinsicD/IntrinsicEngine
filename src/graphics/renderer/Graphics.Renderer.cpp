@@ -1265,11 +1265,8 @@ namespace Extrinsic::Graphics
         void SortRendererBarrierPackets(std::vector<BarrierPacket>& packets)
         {
             std::ranges::sort(packets, [](const BarrierPacket& lhs, const BarrierPacket& rhs) {
-                const auto stageKey = [](const BarrierPacketStage stage) {
-                    return stage == BarrierPacketStage::BeforePass ? 0u : 1u;
-                };
-                return std::tuple{lhs.PassIndex, stageKey(lhs.Stage)} <
-                       std::tuple{rhs.PassIndex, stageKey(rhs.Stage)};
+                return std::tuple{lhs.PassIndex, BarrierPacketStageSortKey(lhs.Stage)} <
+                       std::tuple{rhs.PassIndex, BarrierPacketStageSortKey(rhs.Stage)};
             });
         }
 
@@ -3592,48 +3589,11 @@ namespace Extrinsic::Graphics
                     const std::uint32_t passIndex,
                     const BarrierPacketStage stage) -> Core::Result
                 {
-                    const std::uint32_t finalPassIndex =
-                        static_cast<std::uint32_t>(compiled->PassDeclarations.size());
-                    for (const BarrierPacket& packet : compiled->BarrierPackets)
+                    const BarrierPacketRange range =
+                        FindBarrierPacketRange(compiled->BarrierPackets, passIndex, stage);
+                    for (std::size_t packetIndex = range.Begin; packetIndex < range.End; ++packetIndex)
                     {
-                        if (packet.PassIndex != passIndex || packet.Stage != stage)
-                        {
-                            continue;
-                        }
-                        if (packet.PassIndex > finalPassIndex)
-                        {
-                            return Core::Err(Core::ErrorCode::OutOfRange);
-                        }
-                        for (const TextureBarrierPacket& textureBarrier : packet.TextureBarriers)
-                        {
-                            if (textureBarrier.TextureIndex >= compiled->TextureHandles.size())
-                            {
-                                return Core::Err(Core::ErrorCode::OutOfRange);
-                            }
-                        }
-                        for (const BufferBarrierPacket& bufferBarrier : packet.BufferBarriers)
-                        {
-                            if (bufferBarrier.BufferIndex >= compiled->BufferHandles.size())
-                            {
-                                return Core::Err(Core::ErrorCode::OutOfRange);
-                            }
-                        }
-                        for (const TextureAliasReuseBarrierPacket& aliasBarrier : packet.TextureAliasReuseBarriers)
-                        {
-                            if (aliasBarrier.PreviousTextureIndex >= compiled->TextureHandles.size() ||
-                                aliasBarrier.TextureIndex >= compiled->TextureHandles.size())
-                            {
-                                return Core::Err(Core::ErrorCode::OutOfRange);
-                            }
-                        }
-                        for (const BufferAliasReuseBarrierPacket& aliasBarrier : packet.BufferAliasReuseBarriers)
-                        {
-                            if (aliasBarrier.PreviousBufferIndex >= compiled->BufferHandles.size() ||
-                                aliasBarrier.BufferIndex >= compiled->BufferHandles.size())
-                            {
-                                return Core::Err(Core::ErrorCode::OutOfRange);
-                            }
-                        }
+                        const BarrierPacket& packet = compiled->BarrierPackets[packetIndex];
                         submitBarriersForContext(context, packet);
                     }
                     return Core::Ok();
@@ -3641,6 +3601,16 @@ namespace Extrinsic::Graphics
 
             const auto executeSubmitPlan = [&]() -> Core::Result
             {
+                if (!AreBarrierPacketsSortedByPassAndStage(compiled->BarrierPackets))
+                {
+                    return Core::Err(Core::ErrorCode::InvalidState);
+                }
+                Core::Result barrierBounds = ValidateBarrierPacketBounds(*compiled);
+                if (!barrierBounds.has_value())
+                {
+                    return barrierBounds;
+                }
+
                 for (std::size_t batchIndex = 0; batchIndex < queueSubmitPlan.Batches.size(); ++batchIndex)
                 {
                     const QueueSubmitBatch& batch = queueSubmitPlan.Batches[batchIndex];

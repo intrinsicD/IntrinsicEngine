@@ -14,6 +14,7 @@ target_sources(${target_name}
         Graphics.RenderGraph.Executor.cppm
         PRIVATE
         Graphics.RenderGraph.cpp
+        Graphics.RenderGraph.Barriers.cpp
         Graphics.RenderGraph.Compiler.cpp
         Graphics.RenderGraph.TransientAllocator.cpp
         Graphics.RenderGraph.Executor.cpp

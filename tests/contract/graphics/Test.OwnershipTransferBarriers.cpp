@@ -74,6 +74,55 @@ namespace
     }
 }
 
+TEST(GraphicsOwnershipTransferBarriers, BarrierPacketRangeUsesSortedPassStageWindow)
+{
+    const std::vector<BarrierPacket> packets{
+        BarrierPacket{.PassIndex = 0u, .Stage = BarrierPacketStage::BeforePass},
+        BarrierPacket{.PassIndex = 0u, .Stage = BarrierPacketStage::AfterPass},
+        BarrierPacket{.PassIndex = 2u, .Stage = BarrierPacketStage::BeforePass},
+        BarrierPacket{.PassIndex = 2u, .Stage = BarrierPacketStage::BeforePass},
+        BarrierPacket{.PassIndex = 2u, .Stage = BarrierPacketStage::AfterPass},
+        BarrierPacket{.PassIndex = 5u, .Stage = BarrierPacketStage::BeforePass},
+    };
+
+    ASSERT_TRUE(AreBarrierPacketsSortedByPassAndStage(packets));
+
+    const BarrierPacketRange beforeRange =
+        FindBarrierPacketRange(packets, 2u, BarrierPacketStage::BeforePass);
+    EXPECT_EQ(beforeRange.Begin, 2u);
+    EXPECT_EQ(beforeRange.End, 4u);
+
+    const BarrierPacketRange afterRange =
+        FindBarrierPacketRange(packets, 2u, BarrierPacketStage::AfterPass);
+    EXPECT_EQ(afterRange.Begin, 4u);
+    EXPECT_EQ(afterRange.End, 5u);
+
+    const BarrierPacketRange missingRange =
+        FindBarrierPacketRange(packets, 4u, BarrierPacketStage::BeforePass);
+    EXPECT_TRUE(missingRange.Empty());
+}
+
+TEST(GraphicsOwnershipTransferBarriers, ExecutorRejectsUnsortedBarrierPackets)
+{
+    CompiledRenderGraph compiled{};
+    compiled.TopologicalOrder = {0u, 1u};
+    compiled.PassDeclarations.resize(2u);
+    compiled.PassDeclarations[0].PassIndex = 0u;
+    compiled.PassDeclarations[1].PassIndex = 1u;
+    compiled.BarrierPackets = {
+        BarrierPacket{.PassIndex = 1u, .Stage = BarrierPacketStage::BeforePass},
+        BarrierPacket{.PassIndex = 0u, .Stage = BarrierPacketStage::BeforePass},
+    };
+
+    ASSERT_FALSE(AreBarrierPacketsSortedByPassAndStage(compiled.BarrierPackets));
+
+    RenderGraphExecutor executor;
+    const auto result = executor.Execute(compiled);
+
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Extrinsic::Core::ErrorCode::InvalidState);
+}
+
 TEST(GraphicsOwnershipTransferBarriers, ImportedTextureCrossQueueEmitsReleaseAcquirePair)
 {
     RenderGraph graph;

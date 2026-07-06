@@ -5,6 +5,12 @@ workload measurements.
 
 ## Smoke Benchmarks
 
+- `rendering.framegraph_barrier_emission.smoke` is the `GRAPHICS-120`
+  baseline/probe for CPU-side framegraph barrier packet traversal. It compares
+  the legacy full-scan emission shape against the shared indexed range lookup
+  on the same deterministic synthetic packet set and records
+  `adoption_claim=false` because it is traversal evidence, not renderer-wide
+  frame-time evidence.
 - `rendering.frame_recipe_compile_cache.smoke` is the `GRAPHICS-117`
   baseline/probe for the default frame recipe's CPU declare+compile stage. It
   measures rebuild-each-frame declare+compile time and records the renderer

@@ -1,6 +1,7 @@
 module;
 
 #include <cstdint>
+#include <cstddef>
 #include <utility>
 #include <vector>
 
@@ -14,6 +15,54 @@ import :Compiler;
 
 namespace Extrinsic::Graphics
 {
+    Core::Result ValidateBarrierPacketBounds(const CompiledRenderGraph& graph)
+    {
+        const std::uint32_t finalPassIndex = static_cast<std::uint32_t>(graph.PassDeclarations.size());
+        for (const BarrierPacket& packet : graph.BarrierPackets)
+        {
+            if (packet.PassIndex > finalPassIndex)
+            {
+                return Core::Err(Core::ErrorCode::OutOfRange);
+            }
+
+            for (const TextureBarrierPacket& textureBarrier : packet.TextureBarriers)
+            {
+                if (textureBarrier.TextureIndex >= graph.TextureHandles.size())
+                {
+                    return Core::Err(Core::ErrorCode::OutOfRange);
+                }
+            }
+
+            for (const BufferBarrierPacket& bufferBarrier : packet.BufferBarriers)
+            {
+                if (bufferBarrier.BufferIndex >= graph.BufferHandles.size())
+                {
+                    return Core::Err(Core::ErrorCode::OutOfRange);
+                }
+            }
+
+            for (const TextureAliasReuseBarrierPacket& aliasBarrier : packet.TextureAliasReuseBarriers)
+            {
+                if (aliasBarrier.PreviousTextureIndex >= graph.TextureHandles.size() ||
+                    aliasBarrier.TextureIndex >= graph.TextureHandles.size())
+                {
+                    return Core::Err(Core::ErrorCode::OutOfRange);
+                }
+            }
+
+            for (const BufferAliasReuseBarrierPacket& aliasBarrier : packet.BufferAliasReuseBarriers)
+            {
+                if (aliasBarrier.PreviousBufferIndex >= graph.BufferHandles.size() ||
+                    aliasBarrier.BufferIndex >= graph.BufferHandles.size())
+                {
+                    return Core::Err(Core::ErrorCode::OutOfRange);
+                }
+            }
+        }
+
+        return Core::Ok();
+    }
+
     Core::Result RenderGraphExecutor::Execute(const CompiledRenderGraph& graph,
                                               PassObserver onPass,
                                               BarrierObserver onBarriers) const
@@ -27,58 +76,23 @@ namespace Extrinsic::Graphics
                                               BarrierObserver onBarriers) const
     {
         const std::uint32_t finalPassIndex = static_cast<std::uint32_t>(graph.PassDeclarations.size());
-
-        for (const BarrierPacket& packet : graph.BarrierPackets)
+        if (!AreBarrierPacketsSortedByPassAndStage(graph.BarrierPackets))
         {
-            if (packet.PassIndex > finalPassIndex)
-            {
-                return Core::Err(Core::ErrorCode::OutOfRange);
-            }
+            return Core::Err(Core::ErrorCode::InvalidState);
+        }
+
+        Core::Result boundsResult = ValidateBarrierPacketBounds(graph);
+        if (!boundsResult.has_value())
+        {
+            return boundsResult;
         }
 
         const auto emitBarriersForPass = [&](const std::uint32_t passIndex,
                                              const BarrierPacketStage stage) -> Core::Result {
-            for (const BarrierPacket& packet : graph.BarrierPackets)
+            const BarrierPacketRange range = FindBarrierPacketRange(graph.BarrierPackets, passIndex, stage);
+            for (std::size_t packetIndex = range.Begin; packetIndex < range.End; ++packetIndex)
             {
-                if (packet.PassIndex != passIndex || packet.Stage != stage)
-                {
-                    continue;
-                }
-
-                for (const TextureBarrierPacket& textureBarrier : packet.TextureBarriers)
-                {
-                    if (textureBarrier.TextureIndex >= graph.TextureHandles.size())
-                    {
-                        return Core::Err(Core::ErrorCode::OutOfRange);
-                    }
-                }
-
-                for (const BufferBarrierPacket& bufferBarrier : packet.BufferBarriers)
-                {
-                    if (bufferBarrier.BufferIndex >= graph.BufferHandles.size())
-                    {
-                        return Core::Err(Core::ErrorCode::OutOfRange);
-                    }
-                }
-
-                for (const TextureAliasReuseBarrierPacket& aliasBarrier : packet.TextureAliasReuseBarriers)
-                {
-                    if (aliasBarrier.PreviousTextureIndex >= graph.TextureHandles.size() ||
-                        aliasBarrier.TextureIndex >= graph.TextureHandles.size())
-                    {
-                        return Core::Err(Core::ErrorCode::OutOfRange);
-                    }
-                }
-
-                for (const BufferAliasReuseBarrierPacket& aliasBarrier : packet.BufferAliasReuseBarriers)
-                {
-                    if (aliasBarrier.PreviousBufferIndex >= graph.BufferHandles.size() ||
-                        aliasBarrier.BufferIndex >= graph.BufferHandles.size())
-                    {
-                        return Core::Err(Core::ErrorCode::OutOfRange);
-                    }
-                }
-
+                const BarrierPacket& packet = graph.BarrierPackets[packetIndex];
                 if (onBarriers)
                 {
                     onBarriers(packet);

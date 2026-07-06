@@ -1,7 +1,9 @@
 module;
 
 #include <cstdint>
+#include <cstddef>
 #include <limits>
+#include <span>
 #include <vector>
 
 export module Extrinsic.Graphics.RenderGraph:Barriers;
@@ -23,6 +25,19 @@ namespace Extrinsic::Graphics
         BeforePass = 0,
         AfterPass,
     };
+
+    export [[nodiscard]] constexpr std::uint8_t BarrierPacketStageSortKey(
+        const BarrierPacketStage stage) noexcept
+    {
+        switch (stage)
+        {
+        case BarrierPacketStage::BeforePass:
+            return 0u;
+        case BarrierPacketStage::AfterPass:
+            return 1u;
+        }
+        return 0u;
+    }
 
     export enum class QueueSharingMode : std::uint8_t
     {
@@ -147,4 +162,23 @@ namespace Extrinsic::Graphics
         std::vector<TextureAliasReuseBarrierPacket> TextureAliasReuseBarriers{};
         std::vector<BufferAliasReuseBarrierPacket> BufferAliasReuseBarriers{};
     };
+
+    export struct BarrierPacketRange
+    {
+        std::size_t Begin = 0u;
+        std::size_t End = 0u;
+
+        [[nodiscard]] constexpr bool Empty() const noexcept
+        {
+            return Begin == End;
+        }
+    };
+
+    export [[nodiscard]] BarrierPacketRange FindBarrierPacketRange(
+        std::span<const BarrierPacket> packets,
+        std::uint32_t passIndex,
+        BarrierPacketStage stage) noexcept;
+
+    export [[nodiscard]] bool AreBarrierPacketsSortedByPassAndStage(
+        std::span<const BarrierPacket> packets) noexcept;
 }

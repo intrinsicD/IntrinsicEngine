@@ -11,6 +11,8 @@ import :Compiler;
 
 namespace Extrinsic::Graphics
 {
+    export [[nodiscard]] Core::Result ValidateBarrierPacketBounds(const CompiledRenderGraph& graph);
+
     export class RenderGraphExecutor final
     {
     public:
