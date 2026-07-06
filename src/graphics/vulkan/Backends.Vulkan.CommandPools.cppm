@@ -18,6 +18,12 @@ export import :Sync;
 
 namespace Extrinsic::Backends::Vulkan
 {
+    export enum class VulkanCommandBufferLevel : std::uint8_t
+    {
+        Primary,
+        Secondary,
+    };
+
     export class VulkanCommandContext final : public RHI::ICommandContext
     {
     public:
@@ -35,7 +41,8 @@ namespace Extrinsic::Backends::Vulkan
                   uint32_t graphicsQueueFamily = VK_QUEUE_FAMILY_IGNORED,
                   uint32_t asyncComputeQueueFamily = VK_QUEUE_FAMILY_IGNORED,
                   uint32_t presentQueueFamily  = VK_QUEUE_FAMILY_IGNORED,
-                  uint32_t transferQueueFamily = VK_QUEUE_FAMILY_IGNORED);
+                  uint32_t transferQueueFamily = VK_QUEUE_FAMILY_IGNORED,
+                  VulkanCommandBufferLevel commandBufferLevel = VulkanCommandBufferLevel::Primary);
 
         // GRAPHICS-033F: backend-local readiness predicate consumed by the
         // gate-8 (`PublicServiceReconciled`) precondition check. Returns true
@@ -53,6 +60,7 @@ namespace Extrinsic::Backends::Vulkan
 
         void Begin() override;
         void End()   override;
+        void ExecuteSecondary(VulkanCommandContext& secondary);
 
         void BeginRenderPass(const RHI::RenderPassDesc& desc) override;
         void EndRenderPass() override;
@@ -118,6 +126,8 @@ namespace Extrinsic::Backends::Vulkan
         VkDescriptorSet  m_BindlessSet   = VK_NULL_HANDLE;
         VkPipelineBindPoint m_BindPoint  = VK_PIPELINE_BIND_POINT_GRAPHICS;
         bool             m_Recording     = false;
+        bool             m_CommandBufferExecutable = false;
+        VulkanCommandBufferLevel m_CommandBufferLevel = VulkanCommandBufferLevel::Primary;
 
         Core::ResourcePool<VulkanBuffer,   RHI::BufferHandle,   kMaxFramesInFlight>* m_Buffers   = nullptr;
         Core::ResourcePool<VulkanImage,    RHI::TextureHandle,  kMaxFramesInFlight>* m_Images    = nullptr;

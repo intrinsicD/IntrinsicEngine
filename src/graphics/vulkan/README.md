@@ -74,6 +74,19 @@ available through the Vulkan 1.2/1.3 feature chain.
   through RHI managers. GRAPHICS-076E adds opt-in `gpu;vulkan` coverage for the
   canonical default recipe's visible-triangle/readback path; default CPU/null
   gates still skip Vulkan execution by label.
+- `GRAPHICS-119` parallel render-graph recording uses backend-local secondary
+  command buffers for accepted graphics-queue
+  `RHI::ParallelCommandContextPlanDesc` frames.
+  `BeginFrameParallelCommandContexts(...)` allocates one secondary buffer per
+  live pass from the graphics per-frame command pool, `GetParallelCommandContext`
+  records the pass body, and `SubmitParallelCommandContext(...)` emits
+  `vkCmdExecuteCommands(...)` into the primary graphics context in compiled
+  serial order. Secondary command-buffer handles stay alive until the frame-slot
+  fence retires and are freed on the next `BeginFrame`. The current renderer
+  route remains single-threaded: non-graphics queue support and true worker
+  fan-out require a follow-up audit of renderer-owned pass state and command-
+  pool synchronization, because Vulkan command pools are externally
+  synchronized.
 - `GetVulkanServiceDiagnosticsSnapshot()` reports guarded post-bootstrap service
   handoff: bindless heap creation, global pipeline-layout creation, transfer
   queue/staging creation, command-context rebinding, bindless capacity, clean

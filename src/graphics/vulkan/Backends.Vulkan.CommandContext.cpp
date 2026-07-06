@@ -45,7 +45,8 @@ void VulkanCommandContext::Bind(VkDevice device, VkCommandBuffer cmd,
                                  uint32_t graphicsQueueFamily,
                                  uint32_t asyncComputeQueueFamily,
                                  uint32_t presentQueueFamily,
-                                 uint32_t transferQueueFamily)
+                                 uint32_t transferQueueFamily,
+                                 VulkanCommandBufferLevel commandBufferLevel)
 {
     m_Device        = device;
     m_Cmd           = cmd;
@@ -62,6 +63,8 @@ void VulkanCommandContext::Bind(VkDevice device, VkCommandBuffer cmd,
     m_TransferQueueFamily = transferQueueFamily;
     m_BindPoint     = VK_PIPELINE_BIND_POINT_GRAPHICS;
     m_Recording     = false;
+    m_CommandBufferExecutable = false;
+    m_CommandBufferLevel = commandBufferLevel;
 }
 
 bool VulkanCommandContext::CanBegin() const
@@ -138,6 +141,7 @@ void VulkanCommandContext::UpdateFrameSampledDescriptor(RHI::TextureHandle textu
 void VulkanCommandContext::Begin()
 {
     [[maybe_unused]] Core::Telemetry::ScopedTimer timer{"VulkanCommandContext::Begin", Extrinsic::Core::Telemetry::HashString("VulkanCommandContext::Begin")};
+    m_CommandBufferExecutable = false;
     if (!CanBegin())
         return;
 
@@ -153,6 +157,14 @@ void VulkanCommandContext::Begin()
     VkCommandBufferBeginInfo ci{};
     ci.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     ci.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    VkCommandBufferInheritanceInfo inheritanceInfo{};
+    if (m_CommandBufferLevel == VulkanCommandBufferLevel::Secondary)
+    {
+        inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
+        ci.pInheritanceInfo = &inheritanceInfo;
+    }
+
     result = vkBeginCommandBuffer(m_Cmd, &ci);
     if (result != VK_SUCCESS)
     {
@@ -179,6 +191,29 @@ void VulkanCommandContext::End()
         return;
     }
     m_Recording = false;
+    m_CommandBufferExecutable = true;
+}
+
+void VulkanCommandContext::ExecuteSecondary(VulkanCommandContext& secondary)
+{
+    if (!CanRecord("[VulkanCommandContext] ExecuteSecondary skipped; primary command context is not recording"))
+    {
+        return;
+    }
+    if (m_CommandBufferLevel != VulkanCommandBufferLevel::Primary ||
+        secondary.m_CommandBufferLevel != VulkanCommandBufferLevel::Secondary ||
+        secondary.m_Cmd == VK_NULL_HANDLE ||
+        secondary.m_Recording ||
+        !secondary.m_CommandBufferExecutable)
+    {
+        NoteFallbackCommandRecordingAttempt();
+        Core::Log::Warn("[VulkanCommandContext] ExecuteSecondary skipped; command context levels or recording state are invalid");
+        return;
+    }
+
+    VkCommandBuffer commandBuffer = secondary.m_Cmd;
+    vkCmdExecuteCommands(m_Cmd, 1u, &commandBuffer);
+    secondary.m_CommandBufferExecutable = false;
 }
 
 void VulkanCommandContext::BeginRenderPass(const RHI::RenderPassDesc& desc)

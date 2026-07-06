@@ -93,6 +93,15 @@ namespace Extrinsic::Backends::Vulkan
         [[nodiscard]] RHI::ICommandContext& GetQueueSubmitContext(RHI::QueueAffinity affinity,
                                                                   uint32_t frameIndex,
                                                                   uint32_t batchIndex) override;
+        [[nodiscard]] bool SupportsParallelCommandContexts() const noexcept override;
+        [[nodiscard]] bool BeginFrameParallelCommandContexts(
+            const RHI::FrameHandle& frame,
+            const RHI::ParallelCommandContextPlanDesc& plan) override;
+        [[nodiscard]] RHI::ICommandContext& GetParallelCommandContext(
+            const RHI::ParallelCommandContextRequest& request) override;
+        void SubmitParallelCommandContext(const RHI::ParallelCommandContextRequest& request,
+                                          RHI::ICommandContext& submitContext) override;
+        void EndFrameParallelCommandContexts(const RHI::FrameHandle& frame) override;
 
         [[nodiscard]] RHI::BufferHandle CreateBuffer(const RHI::BufferDesc& desc) override;
         void DestroyBuffer(RHI::BufferHandle handle) override;
@@ -253,6 +262,12 @@ namespace Extrinsic::Backends::Vulkan
             VkCommandBuffer CommandBuffer = VK_NULL_HANDLE;
         };
 
+        struct PendingParallelCommandContext
+        {
+            RHI::QueueAffinity Queue = RHI::QueueAffinity::Graphics;
+            VkCommandBuffer CommandBuffer = VK_NULL_HANDLE;
+        };
+
         // BeginOneShot/EndOneShot submit to the graphics queue and wait for it
         // to become idle. These helpers are init/load-time only; runtime
         // uploads must use IDevice::GetTransferQueue() / ITransferQueue.
@@ -310,6 +325,8 @@ namespace Extrinsic::Backends::Vulkan
         std::array<VulkanCommandContext, kMaxFramesInFlight> m_CmdContexts;
         std::array<std::vector<VulkanCommandContext>, kMaxFramesInFlight> m_QueueSubmitContexts;
         std::array<std::vector<PendingQueueSubmitBatch>, kMaxFramesInFlight> m_QueueSubmitBatches;
+        std::array<std::vector<VulkanCommandContext>, kMaxFramesInFlight> m_ParallelCommandContexts;
+        std::array<std::vector<PendingParallelCommandContext>, kMaxFramesInFlight> m_ParallelCommandBuffers;
         VkCommandPool   m_OneShotCmdPool   = VK_NULL_HANDLE;
         VkCommandBuffer m_OneShotCmdBuffer = VK_NULL_HANDLE;
         bool            m_OneShotRecording = false;

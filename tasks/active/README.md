@@ -16,9 +16,11 @@ Each active task should include:
   are complete locally: the executor has a backend-neutral layer-parallel
   record/join contract, RHI has a per-pass command-context acquisition seam,
   Null/Mock provide CPU bookkeeping, and the renderer exposes a debug selector
-  with serial fallback stats. Next work is Slice C: Vulkan secondary/parallel
-  command contexts and worker fan-out after pass-recording state is audited.
-  Benchmark evidence and the `gpu;vulkan` smoke remain later slices.
+  with serial fallback stats. Slice C.1 adds Vulkan backend-local secondary
+  command buffers for accepted graphics-queue parallel context plans. Next work
+  is Slice C.2: pass-recording state and command-pool synchronization audit
+  before worker fan-out is enabled. Benchmark evidence and the `gpu;vulkan`
+  smoke remain later slices.
 
 ## History
 

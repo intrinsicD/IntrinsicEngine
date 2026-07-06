@@ -2402,6 +2402,8 @@ void VulkanDevice::Shutdown()
                                       RHI::SamplerHandle{});
         m_QueueSubmitContexts[frameSlot].clear();
         m_QueueSubmitBatches[frameSlot].clear();
+        m_ParallelCommandContexts[frameSlot].clear();
+        m_ParallelCommandBuffers[frameSlot].clear();
     }
 
     if (m_Vma != VK_NULL_HANDLE)
@@ -2584,6 +2586,20 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
     m_QueueSubmitBatches[m_FrameSlot].clear();
     m_QueueSubmitContexts[m_FrameSlot].clear();
     frame.QueueSubmitCmdBuffers.clear();
+    for (const PendingParallelCommandContext& context : m_ParallelCommandBuffers[m_FrameSlot])
+    {
+        if (context.CommandBuffer != VK_NULL_HANDLE)
+        {
+            VkCommandPool pool = commandPoolForQueue(context.Queue);
+            if (pool != VK_NULL_HANDLE)
+            {
+                VkCommandBuffer commandBuffer = context.CommandBuffer;
+                vkFreeCommandBuffers(m_Device, pool, 1u, &commandBuffer);
+            }
+        }
+    }
+    m_ParallelCommandBuffers[m_FrameSlot].clear();
+    m_ParallelCommandContexts[m_FrameSlot].clear();
 
     FlushDeletionQueue(m_FrameSlot);
 
@@ -3558,6 +3574,181 @@ RHI::ICommandContext& VulkanDevice::GetQueueSubmitContext(const RHI::QueueAffini
     }
 
     return GetQueueContext(affinity, frameIndex);
+}
+
+bool VulkanDevice::SupportsParallelCommandContexts() const noexcept
+{
+    return HasLiveOperationalPrerequisites();
+}
+
+bool VulkanDevice::BeginFrameParallelCommandContexts(
+    const RHI::FrameHandle& frame,
+    const RHI::ParallelCommandContextPlanDesc& plan)
+{
+    if (frame.FrameIndex >= kMaxFramesInFlight ||
+        plan.Requests.empty() ||
+        !HasLiveOperationalPrerequisites())
+    {
+        return false;
+    }
+
+    PerFrame& perFrame = m_Frames[frame.FrameIndex];
+    std::vector<VulkanCommandContext>& contexts = m_ParallelCommandContexts[frame.FrameIndex];
+    std::vector<PendingParallelCommandContext>& commandBuffers =
+        m_ParallelCommandBuffers[frame.FrameIndex];
+
+    if (!commandBuffers.empty())
+    {
+        Core::Log::Warn("[VulkanDevice::BeginFrameParallelCommandContexts] parallel command buffers already exist for this frame; falling back to serial recording");
+        return false;
+    }
+
+    contexts.clear();
+    contexts.resize(plan.Requests.size());
+    commandBuffers.clear();
+    commandBuffers.reserve(plan.Requests.size());
+
+    const auto commandPoolForQueue = [&perFrame](const RHI::QueueAffinity queue) noexcept
+    {
+        switch (queue)
+        {
+        case RHI::QueueAffinity::AsyncCompute:
+            return perFrame.AsyncComputeCmdPool != VK_NULL_HANDLE ? perFrame.AsyncComputeCmdPool : perFrame.CmdPool;
+        case RHI::QueueAffinity::Transfer:
+            return perFrame.TransferCmdPool != VK_NULL_HANDLE ? perFrame.TransferCmdPool : perFrame.CmdPool;
+        case RHI::QueueAffinity::Graphics:
+            return perFrame.CmdPool;
+        }
+        return perFrame.CmdPool;
+    };
+
+    const auto releaseCommandBuffers = [&]() noexcept
+    {
+        for (const PendingParallelCommandContext& context : commandBuffers)
+        {
+            if (context.CommandBuffer == VK_NULL_HANDLE)
+            {
+                continue;
+            }
+            VkCommandPool pool = commandPoolForQueue(context.Queue);
+            if (pool != VK_NULL_HANDLE)
+            {
+                VkCommandBuffer commandBuffer = context.CommandBuffer;
+                vkFreeCommandBuffers(m_Device, pool, 1u, &commandBuffer);
+            }
+        }
+        commandBuffers.clear();
+        contexts.clear();
+    };
+
+    const VulkanFrameGraphBarrierQueueFamilies barrierFamilies =
+        ResolveFrameGraphBarrierQueueFamilies(
+            m_GraphicsFamily,
+            m_AsyncComputeQueue != VK_NULL_HANDLE ? m_AsyncComputeFamily : VK_QUEUE_FAMILY_IGNORED,
+            m_TransferVkQueue != VK_NULL_HANDLE ? m_TransferFamily : VK_QUEUE_FAMILY_IGNORED,
+            m_PresentFamily,
+            GetQueueCapabilityProfile());
+
+    for (std::size_t requestIndex = 0; requestIndex < plan.Requests.size(); ++requestIndex)
+    {
+        const RHI::ParallelCommandContextRequest& request = plan.Requests[requestIndex];
+        if (request.ContextIndex != requestIndex)
+        {
+            releaseCommandBuffers();
+            Core::Log::Warn("[VulkanDevice::BeginFrameParallelCommandContexts] rejected non-contiguous context plan");
+            return false;
+        }
+        if (request.Queue != RHI::QueueAffinity::Graphics)
+        {
+            releaseCommandBuffers();
+            Core::Log::Warn("[VulkanDevice::BeginFrameParallelCommandContexts] rejected non-graphics context plan; falling back to serial recording");
+            return false;
+        }
+
+        VkCommandPool pool = commandPoolForQueue(request.Queue);
+        if (pool == VK_NULL_HANDLE)
+        {
+            releaseCommandBuffers();
+            return false;
+        }
+
+        VkCommandBufferAllocateInfo allocateInfo{};
+        allocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocateInfo.commandPool = pool;
+        allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
+        allocateInfo.commandBufferCount = 1u;
+
+        VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+        const VkResult result = vkAllocateCommandBuffers(m_Device, &allocateInfo, &commandBuffer);
+        if (result != VK_SUCCESS || commandBuffer == VK_NULL_HANDLE)
+        {
+            NoteDeviceLostIfNeeded(result);
+            if (commandBuffer != VK_NULL_HANDLE)
+            {
+                vkFreeCommandBuffers(m_Device, pool, 1u, &commandBuffer);
+            }
+            releaseCommandBuffers();
+            Core::Log::Error("[VulkanDevice::BeginFrameParallelCommandContexts] vkAllocateCommandBuffers failed; falling back to serial recording");
+            return false;
+        }
+
+        commandBuffers.push_back(PendingParallelCommandContext{
+            .Queue = request.Queue,
+            .CommandBuffer = commandBuffer,
+        });
+        contexts[requestIndex].Bind(m_Device,
+                                    commandBuffer,
+                                    m_GlobalPipelineLayout,
+                                    m_BindlessHeap ? m_BindlessHeap->GetSet() : VK_NULL_HANDLE,
+                                    &m_Buffers,
+                                    &m_Images,
+                                    &m_Samplers,
+                                    &m_Pipelines,
+                                    m_DefaultSamplerHandle,
+                                    barrierFamilies.Graphics,
+                                    barrierFamilies.AsyncCompute,
+                                    barrierFamilies.Present,
+                                    barrierFamilies.Transfer,
+                                    VulkanCommandBufferLevel::Secondary);
+    }
+
+    return commandBuffers.size() == plan.Requests.size();
+}
+
+RHI::ICommandContext& VulkanDevice::GetParallelCommandContext(
+    const RHI::ParallelCommandContextRequest& request)
+{
+    if (request.FrameIndex < kMaxFramesInFlight &&
+        request.ContextIndex < m_ParallelCommandContexts[request.FrameIndex].size())
+    {
+        return m_ParallelCommandContexts[request.FrameIndex][request.ContextIndex];
+    }
+
+    return GetQueueContext(request.Queue, request.FrameIndex);
+}
+
+void VulkanDevice::SubmitParallelCommandContext(const RHI::ParallelCommandContextRequest& request,
+                                                RHI::ICommandContext& submitContext)
+{
+    (void)submitContext;
+    if (request.FrameIndex >= kMaxFramesInFlight ||
+        request.ContextIndex >= m_ParallelCommandContexts[request.FrameIndex].size())
+    {
+        return;
+    }
+
+    VulkanCommandContext& primaryContext = m_CmdContexts[request.FrameIndex];
+    primaryContext.ExecuteSecondary(m_ParallelCommandContexts[request.FrameIndex][request.ContextIndex]);
+}
+
+void VulkanDevice::EndFrameParallelCommandContexts(const RHI::FrameHandle& frame)
+{
+    if (frame.FrameIndex >= kMaxFramesInFlight)
+    {
+        return;
+    }
+
+    m_ParallelCommandContexts[frame.FrameIndex].clear();
 }
 
 // =============================================================================

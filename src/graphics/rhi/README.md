@@ -46,8 +46,10 @@ This directory contains the `RHI` module/files.
   `SubmitParallelCommandContext(...)` in compiled submit order against the
   primary context. The default `IDevice` implementation reports unsupported and
   declines the plan, preserving serial fallback. Null implements CPU
-  bookkeeping contexts; Vulkan secondary command buffers remain deferred to
-  `GRAPHICS-119` later slices.
+  bookkeeping contexts; Vulkan implements backend-local secondary command
+  buffers for graphics-queue plans and executes them from the primary context
+  without exposing `Vk*` handles through RHI. Non-graphics queue support, worker
+  fan-out, and the opt-in Vulkan smoke remain later `GRAPHICS-119` slices.
 
 ## Timeline semaphores
 

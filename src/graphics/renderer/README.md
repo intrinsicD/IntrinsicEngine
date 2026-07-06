@@ -107,8 +107,10 @@ frame. Devices that decline the plan keep the historical serial
 pass bodies into per-pass contexts and submit those contexts in compiled serial
 order through `IDevice::SubmitParallelCommandContext(...)`. The current path is
 single-threaded to keep renderer-owned pass state deterministic while proving
-the RHI/null acquisition and submit-order contract. Vulkan secondary command
-buffers and worker fan-out remain later `GRAPHICS-119` slices.
+the RHI/null/Vulkan acquisition and submit-order contract. Vulkan accepts the
+graphics-queue plan with backend-local secondary command buffers; non-graphics
+queue support and worker fan-out remain later `GRAPHICS-119` slices after
+pass-state and command-pool synchronization are audited.
 
 `Extrinsic.Graphics.RenderingContract` is the CPU-only public contract vocabulary
 for the renderer/snapshot/recipe architecture introduced by `GRAPHICS-099`.

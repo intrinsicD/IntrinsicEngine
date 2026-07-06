@@ -428,6 +428,38 @@ TEST(VulkanFailClosedContract, UnboundGraphicsContextRecordingIncrementsAttemptC
               before + 4u);
 }
 
+TEST(VulkanFailClosedContract, ParallelCommandContextsDeclineBeforeOperationalBringup)
+{
+    std::unique_ptr<Extrinsic::RHI::IDevice> device = Extrinsic::Backends::Vulkan::CreateVulkanDevice();
+    ASSERT_NE(device, nullptr);
+    ASSERT_FALSE(device->IsOperational());
+    EXPECT_FALSE(device->SupportsParallelCommandContexts());
+
+    const Extrinsic::RHI::FrameHandle frame{.FrameIndex = 0u, .SwapchainImageIndex = 0u};
+    const Extrinsic::RHI::ParallelCommandContextRequest requests[]{
+        Extrinsic::RHI::ParallelCommandContextRequest{
+            .Queue = Extrinsic::RHI::QueueAffinity::Graphics,
+            .FrameIndex = frame.FrameIndex,
+            .PassIndex = 0u,
+            .TopologicalLayer = 0u,
+            .ContextIndex = 0u,
+        },
+    };
+
+    EXPECT_FALSE(device->BeginFrameParallelCommandContexts(
+        frame,
+        Extrinsic::RHI::ParallelCommandContextPlanDesc{
+            .Requests = std::span<const Extrinsic::RHI::ParallelCommandContextRequest>{requests},
+        }));
+
+    Extrinsic::RHI::ICommandContext& graphics = device->GetGraphicsContext(frame.FrameIndex);
+    Extrinsic::RHI::ICommandContext& fallback = device->GetParallelCommandContext(requests[0]);
+    EXPECT_EQ(&fallback, &graphics);
+
+    device->SubmitParallelCommandContext(requests[0], graphics);
+    device->EndFrameParallelCommandContexts(frame);
+}
+
 TEST(VulkanFailClosedContract, BeginFrameOnNonOperationalDeviceIncrementsAttemptCounter)
 {
     // GRAPHICS-018 fail-closed contract: VulkanDevice::BeginFrame must return

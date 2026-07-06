@@ -171,16 +171,20 @@ When enabled on a single-queue frame, the renderer asks
 per-pass command-context plan. If the device declines or does not support
 parallel command contexts, `RenderGraphFrameStats::Execute.SerialFallbackUsed`
 is set and the renderer records through the serial graphics context. If the
-device accepts, the current Slice B path records each pass into its acquired
-context without worker fan-out, then calls
+device accepts, the current path records each pass into its acquired context
+without worker fan-out, then calls
 `IDevice::SubmitParallelCommandContext(...)` in compiled serial order while
 barriers, post-graph readbacks, and runtime frame hooks remain on the primary
-graphics context. This proves the RHI/null acquisition and deterministic submit
+graphics context. This proves the RHI acquisition and deterministic submit
 contract without racing renderer-owned pass state.
 
-Null provides CPU bookkeeping contexts for this contract. Vulkan secondary
-command buffers, worker fan-out through `Core::Tasks`, pass-state thread-safety
-audit, benchmark evidence, and opt-in `gpu;vulkan` smoke coverage remain later
+Null provides CPU bookkeeping contexts for this contract. Vulkan accepts the
+current graphics-queue plan shape with backend-local secondary command buffers
+and records `vkCmdExecuteCommands(...)` into the primary context at each serial
+submit callback; the secondary buffers are retained until the frame-slot fence
+has retired and are freed on the next `BeginFrame`. Non-graphics queue fan-out,
+worker fan-out through `Core::Tasks`, the pass-state thread-safety audit,
+benchmark evidence, and opt-in `gpu;vulkan` smoke coverage remain later
 `GRAPHICS-119` slices.
 
 ## Boundaries
