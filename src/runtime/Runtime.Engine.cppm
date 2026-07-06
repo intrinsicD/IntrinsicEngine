@@ -17,6 +17,7 @@ import Extrinsic.Core.Config.Render;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameClock;
 import Extrinsic.Core.FrameGraph;
+import Extrinsic.Core.IOBackend;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.RHI.Device;
 import Extrinsic.Platform.Window;
@@ -71,6 +72,9 @@ namespace Extrinsic::Runtime
         Assets::AssetId Asset{};
         Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
     };
+
+    export using RuntimeIOBackendFactory =
+        std::function<std::unique_ptr<Core::IO::IIOBackend>()>;
 
     export struct RuntimeAssetImportResult
     {
@@ -484,6 +488,8 @@ namespace Extrinsic::Runtime
             GetLastAssetImportEvent() const noexcept;
         [[nodiscard]] std::vector<RuntimeAssetIngestRecord>
             GetAssetIngestRecordsForTest() const;
+        void SetModelTextureImportIOBackendFactoryForTest(
+            RuntimeIOBackendFactory factory);
         [[nodiscard]] RuntimeAssetImportQueueSnapshot
             GetAssetImportQueueSnapshot() const;
         [[nodiscard]] std::size_t ClearCompletedAssetImports();
@@ -732,6 +738,7 @@ namespace Extrinsic::Runtime
         std::unique_ptr<Core::FrameGraph>      m_FrameGraph;
         // Persistent streaming executor — cross-frame background work
         std::unique_ptr<StreamingExecutor>      m_StreamingExecutor;
+        RuntimeIOBackendFactory                 m_ModelTextureImportIOBackendFactoryForTest{};
         // Runtime/editor derived jobs — submitted through the streaming
         // executor and applied on the maintenance lane.
         std::unique_ptr<DerivedJobRegistry>     m_DerivedJobRegistry;

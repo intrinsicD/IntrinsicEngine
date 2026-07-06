@@ -84,7 +84,10 @@ worker lane, and publish completion through `Engine::GetLastSceneFileEvent()`
 after the main-thread scene replacement lifecycle succeeds or fails closed.
 Direct `ImportAssetFromPath(...)` / `ReimportAsset(...)` /
 `SaveSceneToPath(...)` / `LoadSceneFromPath(...)` compatibility calls are still
-synchronous and remain under open `RUNTIME-142` follow-up slices.
+synchronous compatibility APIs outside the frame-driven UI/drop routes.
+`Engine::SetModelTextureImportIOBackendFactoryForTest(...)` is a contract-test
+seam for injecting slow or fake model/texture IO backends into queued imports;
+production queued imports fall back to `Core::IO::FileIOBackend`.
 
 ### Sandbox Editor Async Method Jobs
 

@@ -4203,6 +4203,12 @@ namespace Extrinsic::Runtime
         return m_AssetIngestStateMachine.SnapshotAll();
     }
 
+    void Engine::SetModelTextureImportIOBackendFactoryForTest(
+        RuntimeIOBackendFactory factory)
+    {
+        m_ModelTextureImportIOBackendFactoryForTest = std::move(factory);
+    }
+
     RuntimeAssetImportQueueSnapshot Engine::GetAssetImportQueueSnapshot() const
     {
         RuntimeAssetImportQueueSnapshot snapshot =
@@ -4851,6 +4857,8 @@ namespace Extrinsic::Runtime
         auto state = std::make_shared<DroppedModelTextureImportState>();
         state->IngestHandle = submit.Handle;
         state->Request = request;
+        RuntimeIOBackendFactory ioBackendFactory =
+            m_ModelTextureImportIOBackendFactoryForTest;
 
         const StreamingTaskHandle handle = m_StreamingExecutor->Submit(
             StreamingTaskDesc{
@@ -4861,6 +4869,7 @@ namespace Extrinsic::Runtime
                 .EstimatedCost = 4u,
                 .Execute = [
                     state,
+                    ioBackendFactory = std::move(ioBackendFactory),
                     path = request.Path,
                     payloadKind = request.PayloadKind]() mutable -> StreamingResult
                 {
@@ -4874,10 +4883,20 @@ namespace Extrinsic::Runtime
                             StreamingCpuPayloadReady{.PayloadToken = 0u}};
                     }
 
-                    Core::IO::FileIOBackend backend;
+                    std::unique_ptr<Core::IO::IIOBackend> backend =
+                        ioBackendFactory
+                            ? ioBackendFactory()
+                            : std::make_unique<Core::IO::FileIOBackend>();
+                    if (!backend)
+                    {
+                        state->Error = Core::ErrorCode::InvalidState;
+                        return StreamingResult{
+                            StreamingCpuPayloadReady{.PayloadToken = 0u}};
+                    }
+
                     if (payloadKind == Assets::AssetPayloadKind::ModelScene)
                     {
-                        auto decoded = bridge.ImportModelScene(path, backend);
+                        auto decoded = bridge.ImportModelScene(path, *backend);
                         if (!decoded.has_value())
                         {
                             state->Error = decoded.error();
@@ -4893,7 +4912,7 @@ namespace Extrinsic::Runtime
                     }
                     else
                     {
-                        auto decoded = bridge.ImportTexture2D(path, backend);
+                        auto decoded = bridge.ImportTexture2D(path, *backend);
                         if (!decoded.has_value())
                         {
                             state->Error = decoded.error();

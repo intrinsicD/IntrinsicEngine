@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `RUNTIME-142` — Async model-scene/texture import and scene-file IO (tasks/active/RUNTIME-142-async-modelscene-texture-scenefile-io.md)
+- none
 
 ## Theme B — Rendering modernization
 

@@ -28,6 +28,7 @@ import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
+import Extrinsic.Core.IOBackend;
 import Extrinsic.Core.Tasks;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.Selection;
@@ -110,16 +111,126 @@ namespace
         return config;
     }
 
-    void WaitUntilTrue(const std::atomic<bool>& flag)
+    void WaitUntilTrueFor(const std::atomic<bool>& flag,
+                          const std::chrono::milliseconds timeout)
     {
-        const auto deadline =
-            std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
         while (!flag.load(std::memory_order_acquire) &&
                std::chrono::steady_clock::now() < deadline)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
     }
+
+    void WaitUntilTrue(const std::atomic<bool>& flag)
+    {
+        WaitUntilTrueFor(flag, std::chrono::seconds(2));
+    }
+
+    struct BlockingReadBackendState
+    {
+        std::atomic<bool> ReadStarted{false};
+        std::atomic<bool> ReleaseRead{false};
+        std::atomic<bool> ReadFinished{false};
+    };
+
+    class BlockingReadIOBackend final : public Core::IO::IIOBackend
+    {
+    public:
+        explicit BlockingReadIOBackend(
+            std::shared_ptr<BlockingReadBackendState> state)
+            : m_State(std::move(state))
+        {
+        }
+
+        Core::Expected<Core::IO::IOReadResult> Read(
+            const Core::IO::IORequest& request) override
+        {
+            m_State->ReadStarted.store(true, std::memory_order_release);
+            const auto deadline =
+                std::chrono::steady_clock::now() + std::chrono::seconds(2);
+            while (!m_State->ReleaseRead.load(std::memory_order_acquire) &&
+                   std::chrono::steady_clock::now() < deadline)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+
+            auto result = m_File.Read(request);
+            m_State->ReadFinished.store(true, std::memory_order_release);
+            return result;
+        }
+
+        Core::Result Write(const Core::IO::IORequest& request,
+                           std::span<const std::byte> data) override
+        {
+            return m_File.Write(request, data);
+        }
+
+    private:
+        std::shared_ptr<BlockingReadBackendState> m_State;
+        Core::IO::FileIOBackend m_File{};
+    };
+
+    class SlowImportProbeApplication final : public Runtime::IApplication
+    {
+    public:
+        explicit SlowImportProbeApplication(
+            std::shared_ptr<BlockingReadBackendState> state)
+            : m_State(std::move(state))
+        {
+        }
+
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            ++m_Frames;
+            if (!m_ReleasedRead && engine.GetLastAssetImportEvent().has_value())
+                m_EventArrivedBeforeRelease = true;
+
+            if (!m_ReleasedRead &&
+                m_State->ReadStarted.load(std::memory_order_acquire) &&
+                !m_State->ReadFinished.load(std::memory_order_acquire))
+            {
+                m_FrameAdvancedWhileReadBlocked = true;
+                m_State->ReleaseRead.store(true, std::memory_order_release);
+                m_ReleasedRead = true;
+            }
+
+            if (m_ReleasedRead && engine.GetLastAssetImportEvent().has_value())
+            {
+                engine.RequestExit();
+                return;
+            }
+
+            if (m_Frames >= 256u)
+            {
+                m_TimedOut = true;
+                m_State->ReleaseRead.store(true, std::memory_order_release);
+                engine.RequestExit();
+            }
+        }
+        void OnShutdown(Runtime::Engine&) override {}
+
+        [[nodiscard]] bool FrameAdvancedWhileReadBlocked() const noexcept
+        {
+            return m_FrameAdvancedWhileReadBlocked;
+        }
+        [[nodiscard]] bool EventArrivedBeforeRelease() const noexcept
+        {
+            return m_EventArrivedBeforeRelease;
+        }
+        [[nodiscard]] bool TimedOut() const noexcept { return m_TimedOut; }
+        [[nodiscard]] std::uint32_t Frames() const noexcept { return m_Frames; }
+
+    private:
+        std::shared_ptr<BlockingReadBackendState> m_State;
+        std::uint32_t m_Frames{0u};
+        bool m_FrameAdvancedWhileReadBlocked{false};
+        bool m_EventArrivedBeforeRelease{false};
+        bool m_ReleasedRead{false};
+        bool m_TimedOut{false};
+    };
 
     class TempAssetFile final
     {
@@ -1290,6 +1401,67 @@ TEST(RuntimeAssetImportFormatCoverage, ManualModelSceneAndTextureImportQueueComp
         engine.GetLastAssetImportEvent();
     ASSERT_TRUE(lastEvent.has_value());
     EXPECT_TRUE(lastEvent->Succeeded());
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, SlowQueuedTextureReadDoesNotBlockRunFrame)
+{
+    const std::vector<std::byte> pngBytes = TinyPngBytes();
+    TempAssetFile textureFile(
+        "assetio142_slow_albedo.png",
+        std::span<const std::byte>(pngBytes.data(), pngBytes.size()));
+
+    auto readState = std::make_shared<BlockingReadBackendState>();
+    auto application = std::make_unique<SlowImportProbeApplication>(readState);
+    SlowImportProbeApplication* app = application.get();
+    Runtime::Engine engine(HeadlessConfig(), std::move(application));
+    engine.Initialize();
+    engine.SetModelTextureImportIOBackendFactoryForTest(
+        [readState]()
+        {
+            return std::make_unique<BlockingReadIOBackend>(readState);
+        });
+
+    const auto queueBegin = std::chrono::steady_clock::now();
+    auto queued = engine.QueueModelTextureImport(
+        Runtime::RuntimeAssetImportRequest{
+            .Path = textureFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Texture2D,
+        });
+    const auto queueElapsed =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - queueBegin);
+    ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
+    EXPECT_LT(queueElapsed.count(), 500);
+    EXPECT_FALSE(readState->ReadStarted.load(std::memory_order_acquire));
+
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+    engine.Run();
+
+    EXPECT_FALSE(app->TimedOut()) << "frames observed: " << app->Frames();
+    EXPECT_TRUE(app->FrameAdvancedWhileReadBlocked())
+        << "The frame loop must advance while queued texture IO is blocked.";
+    EXPECT_FALSE(app->EventArrivedBeforeRelease())
+        << "Import apply must not complete before the blocked worker read is released.";
+    EXPECT_TRUE(readState->ReadStarted.load(std::memory_order_acquire));
+    EXPECT_TRUE(readState->ReadFinished.load(std::memory_order_acquire));
+    const std::optional<Runtime::RuntimeAssetImportEvent>& event =
+        engine.GetLastAssetImportEvent();
+    ASSERT_TRUE(event.has_value());
+    EXPECT_TRUE(event->Succeeded());
+    ASSERT_TRUE(event->Result.has_value());
+    EXPECT_EQ(event->Result->PayloadKind, Assets::AssetPayloadKind::Texture2D);
+    EXPECT_TRUE(event->Result->Asset.IsValid());
+
+    Runtime::RuntimeAssetImportQueueSnapshot queue =
+        engine.GetAssetImportQueueSnapshot();
+    ASSERT_EQ(queue.Entries.size(), 1u);
+    EXPECT_EQ(queue.ActiveCount, 0u);
+    EXPECT_EQ(queue.TerminalCount, 1u);
+    EXPECT_EQ(queue.Entries[0].TerminalStatus,
+              Runtime::RuntimeAssetImportQueueTerminalStatus::Complete);
 
     engine.Shutdown();
 }

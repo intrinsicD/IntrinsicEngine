@@ -3475,3 +3475,12 @@ stage. Focused regressions prove direct asset-service completion and
 `Engine::ImportAssetFromPath` both return while an unrelated scheduler sentinel
 remains in flight, with imported payloads and events still delivered exactly
 once.
+
+[`RUNTIME-142`](RUNTIME-142-async-modelscene-texture-scenefile-io.md) — Async
+model-scene/texture import and scene-file IO retired to `tasks/done/` on
+2026-07-05 at `Operational`. Dropped model-scene/texture imports, Sandbox
+editor model-scene/texture imports, and Sandbox editor scene save/load now
+queue `StreamingExecutor` work, keep file IO and decode/parse/serialize work
+off the frame callback path, and apply results on the bounded main-thread
+drain. A slow fake IO backend regression proves the frame loop advances while
+queued texture reads remain blocked.

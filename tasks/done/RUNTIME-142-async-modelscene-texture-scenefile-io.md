@@ -2,8 +2,17 @@
 id: RUNTIME-142
 theme: F
 depends_on: []
+maturity_target: Operational
+completed: 2026-07-05
 ---
 # RUNTIME-142 — Async model-scene/texture import and scene-file IO
+
+## Status
+- Retired on 2026-07-05 at `Operational` on local `main`; PR not opened.
+- PR/commit: this retirement commit.
+- Dropped model-scene/texture imports, Sandbox editor model-scene/texture
+  imports, Sandbox editor scene open/save, and their frame-loop responsiveness
+  contracts now run through runtime-owned async work lanes.
 
 ## Goal
 - Extend the deferred streaming-import path (already used by dropped
@@ -63,7 +72,7 @@ depends_on: []
 - [x] Contract: queued scene save writes the queued scene snapshot, reports
       completion through the scene-file event, and marks the editor document
       saved only after the main-thread completion callback.
-- [ ] Contract: frame does not block during a large import (timing probe
+- [x] Contract: frame does not block during a large import (timing probe
       with a slow-IO fake backend).
 - [x] Existing drop/import/scene-serialization suites stay green.
 
@@ -77,10 +86,10 @@ depends_on: []
       the frame path.
 
 ## Acceptance criteria
-- [ ] No synchronous file IO or asset decode reachable from
+- [x] No synchronous file IO or asset decode reachable from
       `Engine::RunFrame()` for model-scene/texture/scene-document routes
       (audited call-site list recorded in this file).
-- [ ] Import/save/load observable behavior unchanged apart from latency now
+- [x] Import/save/load observable behavior unchanged apart from latency now
       spanning frames.
 - [x] Default CPU gate green.
 
@@ -138,6 +147,22 @@ depends_on: []
   model-scene/texture payloads inline. Direct `Engine::SaveSceneToPath(...)`
   and `Engine::LoadSceneFromPath(...)` remain synchronous compatibility
   facades.
+- 2026-07-05: Added a slow-IO model/texture import probe with a blocking
+  `Core::IO::IIOBackend` injected through
+  `Engine::SetModelTextureImportIOBackendFactoryForTest(...)`. The contract
+  drives `Engine::Run()` with a queued texture import, observes a later frame
+  advance while the worker read is still blocked, and only then releases the
+  backend so the import can complete.
+- Final synchronous audited call sites:
+  dropped model-scene/texture imports, Sandbox editor model-scene/texture
+  imports, Sandbox editor scene open, and Sandbox editor scene save are no
+  longer synchronous from `Engine::RunFrame()`; each queues `StreamingExecutor`
+  work and applies results from the bounded main-thread apply drain. Direct
+  programmatic `Engine::ImportAssetFromPath(...)`,
+  `Engine::ReimportAsset(...)`, `Engine::SaveSceneToPath(...)`, and
+  `Engine::LoadSceneFromPath(...)` remain synchronous compatibility APIs
+  outside the frame-driven UI/drop routes and are excluded from this task's
+  `RunFrame()` acceptance gate.
 
 ## Verification
 ```bash

@@ -20,9 +20,10 @@ Blocking fixes first, then abstractness seams, then steady-state efficiency:
   is retired; heavy Sandbox editor CPU method commands now queue runtime
   derived jobs, keep rendering advanceable while jobs run, and suppress
   duplicate active same-output submits instead of blocking the ImGui callback.
-- [`RUNTIME-142`](../../active/RUNTIME-142-async-modelscene-texture-scenefile-io.md)
-  is active; async model-scene/texture import and scene save/load extends the
-  deferred-geometry streaming shape).
+- [`RUNTIME-142`](../../done/RUNTIME-142-async-modelscene-texture-scenefile-io.md)
+  is retired; dropped/editor model-scene and texture imports plus editor
+  scene save/load now use the runtime streaming lane instead of blocking the
+  frame path.
 - [`RUNTIME-143`](RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md) —
   multi-subscriber renderer frame-command hook; K-Means GPU queue decoupled
   from `Engine` internals and public API.
@@ -149,6 +150,13 @@ split; narratives live in the retirement log.
   drains only the specific `AssetId` load/event through
   `AssetService::CompleteCpuLoadAndFlushEvent(...)`; focused regressions prove
   unrelated scheduler work stays in flight while import apply completes.
+- [RUNTIME-142 — Async model-scene/texture import and scene-file IO](../../done/RUNTIME-142-async-modelscene-texture-scenefile-io.md)
+  (done, 2026-07-05, `Operational`): dropped model-scene/texture imports,
+  Sandbox editor model-scene/texture imports, and Sandbox editor scene
+  save/load now queue `StreamingExecutor` work, keep file IO and decode/parse/
+  serialize work off the frame callback path, and apply results on the bounded
+  main-thread drain. A slow fake IO backend regression proves the frame loop
+  advances while queued texture reads remain blocked.
 - [RUNTIME-125 — Optional AoS fast lane for static geometry](../../done/RUNTIME-125-aos-static-fast-lane.md)
   (done, 2026-07-02, `CPUContracted`): PR-fast SoA/probe benchmark evidence and
   planning-only storage-lane/promotion contracts landed without allocating an

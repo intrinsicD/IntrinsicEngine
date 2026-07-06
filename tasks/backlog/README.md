@@ -170,8 +170,8 @@ The 2026-07-03 main-loop/task-graph/render-graph review
 ([`docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`](../../docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md))
 seeded a Theme F set spanning the core task system and the runtime
 composition root: the retired non-blocking import-apply fix `RUNTIME-140`,
-the retired async editor method-command lane `RUNTIME-141`, remaining
-non-blocking frame-path fixes (`RUNTIME-142`),
+the retired async editor method-command lane `RUNTIME-141`, the retired
+non-blocking frame-path fixes `RUNTIME-142`,
 composition-root/abstractness seams (`RUNTIME-143`, `RUNTIME-144`,
 `CORE-006`, `CORE-009`, `ARCH-006`), scheduler/DAG capability and
 efficiency (`CORE-005`, `CORE-007`, `CORE-008`), and steady-state frame
@@ -181,7 +181,6 @@ unblocks `CORE-005`.
 Open members:
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md`](runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md).
-- [`active/RUNTIME-142-async-modelscene-texture-scenefile-io.md`](../active/RUNTIME-142-async-modelscene-texture-scenefile-io.md).
 - [`runtime/RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md`](runtime/RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md).
 - [`runtime/RUNTIME-144-post-import-processor-and-ux-policy-seam.md`](runtime/RUNTIME-144-post-import-processor-and-ux-policy-seam.md).
 - [`runtime/RUNTIME-145-runtime-frame-path-efficiency-polish.md`](runtime/RUNTIME-145-runtime-frame-path-efficiency-polish.md).
