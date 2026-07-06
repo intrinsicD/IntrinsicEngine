@@ -1044,6 +1044,26 @@ namespace Extrinsic::Runtime
             Core::ErrorCode Error{Core::ErrorCode::Unknown};
         };
 
+        using DecodedModelTextureImportPayload =
+            std::variant<Assets::AssetModelScenePayload,
+                         Assets::AssetTexture2DPayload>;
+
+        struct DecodedModelTextureImport
+        {
+            std::string Path{};
+            Assets::AssetPayloadKind PayloadKind{
+                Assets::AssetPayloadKind::Unknown};
+            DecodedModelTextureImportPayload Payload{};
+        };
+
+        struct DroppedModelTextureImportState
+        {
+            RuntimeAssetIngestHandle IngestHandle{};
+            RuntimeAssetImportRequest Request{};
+            std::optional<DecodedModelTextureImport> Decoded{};
+            Core::ErrorCode Error{Core::ErrorCode::Unknown};
+        };
+
         struct GeometryImportBounds
         {
             glm::vec3 Min{0.0f};
@@ -1222,6 +1242,263 @@ namespace Extrinsic::Runtime
             return result.RequestedTextureUpload ||
                    result.TextureUploadRequests > 0u ||
                    result.GeneratedTextureUploadRequests > 0u;
+        }
+
+        [[nodiscard]] Core::Expected<RuntimeAssetImportResult>
+        MaterializeDecodedModelSceneImport(
+            Assets::AssetService& assetService,
+            AssetModelSceneHandoff& handoff,
+            const RuntimeAssetImportRequest& request,
+            const Assets::AssetId existingAsset,
+            Assets::AssetModelScenePayload decoded)
+        {
+            auto payload =
+                std::make_shared<Assets::AssetModelScenePayload>(
+                    std::move(decoded));
+            const AssetModelSceneHandoffDiagnostics before =
+                handoff.GetDiagnostics();
+            if (existingAsset.IsValid())
+            {
+                Core::Result reloaded =
+                    assetService.Reload<Assets::AssetModelScenePayload>(
+                        existingAsset,
+                        [payload](std::string_view,
+                                  Assets::AssetId)
+                            -> Core::Expected<Assets::AssetModelScenePayload>
+                        {
+                            return *payload;
+                        });
+                if (!reloaded.has_value())
+                {
+                    return Core::Err<RuntimeAssetImportResult>(
+                        reloaded.error());
+                }
+
+                if (Core::Result drained =
+                        DrainAssetImportEvents(assetService, existingAsset);
+                    !drained.has_value())
+                {
+                    return Core::Err<RuntimeAssetImportResult>(
+                        drained.error());
+                }
+                const AssetModelSceneHandoffDiagnostics after =
+                    handoff.GetDiagnostics();
+                if (after.ModelSceneMaterializeFailures >
+                        before.ModelSceneMaterializeFailures &&
+                    after.LastFailedAsset == existingAsset)
+                {
+                    return Core::Err<RuntimeAssetImportResult>(
+                        NormalizeImportError(after.LastError));
+                }
+
+                return RuntimeAssetImportResult{
+                    .Asset = existingAsset,
+                    .PayloadKind = Assets::AssetPayloadKind::ModelScene,
+                    .PrimitiveEntitiesCreated =
+                        Delta(after.PrimitiveEntitiesCreated,
+                              before.PrimitiveEntitiesCreated),
+                    .EmbeddedTextureAssetsCreated =
+                        Delta(after.EmbeddedTextureAssetsCreated,
+                              before.EmbeddedTextureAssetsCreated),
+                    .GeneratedTextureAssetsCreated =
+                        Delta(after.GeneratedTextureAssetsCreated,
+                              before.GeneratedTextureAssetsCreated),
+                    .TextureUploadRequests =
+                        Delta(after.EmbeddedTextureUploadRequests,
+                              before.EmbeddedTextureUploadRequests) +
+                        Delta(after.GeneratedTextureUploadRequests,
+                              before.GeneratedTextureUploadRequests),
+                    .GeneratedTextureUploadRequests =
+                        Delta(after.GeneratedTextureUploadRequests,
+                              before.GeneratedTextureUploadRequests),
+                    .MaterializedModelScene =
+                        after.ModelSceneMaterializeSuccesses >
+                            before.ModelSceneMaterializeSuccesses,
+                };
+            }
+
+            auto asset = assetService.Load<Assets::AssetModelScenePayload>(
+                request.Path,
+                [payload](std::string_view,
+                          Assets::AssetId)
+                    -> Core::Expected<Assets::AssetModelScenePayload>
+                {
+                    return *payload;
+                });
+            if (!asset.has_value())
+            {
+                return Core::Err<RuntimeAssetImportResult>(asset.error());
+            }
+
+            if (Core::Result drained =
+                    DrainAssetImportEvents(assetService, *asset);
+                !drained.has_value())
+            {
+                return Core::Err<RuntimeAssetImportResult>(drained.error());
+            }
+            if (handoff.FindRecord(*asset) == nullptr)
+            {
+                if (Core::Result materialized =
+                        handoff.MaterializeReadyModelScene(*asset);
+                    !materialized.has_value())
+                {
+                    return Core::Err<RuntimeAssetImportResult>(
+                        materialized.error());
+                }
+            }
+
+            const AssetModelSceneHandoffDiagnostics after =
+                handoff.GetDiagnostics();
+            if (after.ModelSceneMaterializeFailures >
+                    before.ModelSceneMaterializeFailures &&
+                after.LastFailedAsset == *asset)
+            {
+                return Core::Err<RuntimeAssetImportResult>(
+                    NormalizeImportError(after.LastError));
+            }
+
+            return RuntimeAssetImportResult{
+                .Asset = *asset,
+                .PayloadKind = Assets::AssetPayloadKind::ModelScene,
+                .PrimitiveEntitiesCreated =
+                    Delta(after.PrimitiveEntitiesCreated,
+                          before.PrimitiveEntitiesCreated),
+                .EmbeddedTextureAssetsCreated =
+                    Delta(after.EmbeddedTextureAssetsCreated,
+                          before.EmbeddedTextureAssetsCreated),
+                .GeneratedTextureAssetsCreated =
+                    Delta(after.GeneratedTextureAssetsCreated,
+                          before.GeneratedTextureAssetsCreated),
+                .TextureUploadRequests =
+                    Delta(after.EmbeddedTextureUploadRequests,
+                          before.EmbeddedTextureUploadRequests) +
+                    Delta(after.GeneratedTextureUploadRequests,
+                          before.GeneratedTextureUploadRequests),
+                .GeneratedTextureUploadRequests =
+                    Delta(after.GeneratedTextureUploadRequests,
+                          before.GeneratedTextureUploadRequests),
+                .MaterializedModelScene =
+                    after.ModelSceneMaterializeSuccesses >
+                        before.ModelSceneMaterializeSuccesses,
+            };
+        }
+
+        [[nodiscard]] Core::Expected<RuntimeAssetImportResult>
+        MaterializeDecodedTextureImport(
+            Assets::AssetService& assetService,
+            Graphics::GpuAssetCache& gpuAssetCache,
+            AssetModelTextureHandoff& handoff,
+            const RuntimeAssetImportRequest& request,
+            const Assets::AssetId existingAsset,
+            Assets::AssetTexture2DPayload decoded)
+        {
+            auto payload =
+                std::make_shared<Assets::AssetTexture2DPayload>(
+                    std::move(decoded));
+            const AssetModelTextureHandoffDiagnostics before =
+                handoff.GetDiagnostics();
+            if (existingAsset.IsValid())
+            {
+                Core::Result reloaded =
+                    assetService.Reload<Assets::AssetTexture2DPayload>(
+                        existingAsset,
+                        [payload](std::string_view,
+                                  Assets::AssetId)
+                            -> Core::Expected<Assets::AssetTexture2DPayload>
+                        {
+                            return *payload;
+                        });
+                if (!reloaded.has_value())
+                {
+                    return Core::Err<RuntimeAssetImportResult>(
+                        reloaded.error());
+                }
+
+                if (Core::Result drained =
+                        DrainAssetImportEvents(assetService, existingAsset);
+                    !drained.has_value())
+                {
+                    return Core::Err<RuntimeAssetImportResult>(
+                        drained.error());
+                }
+                const AssetModelTextureHandoffDiagnostics after =
+                    handoff.GetDiagnostics();
+                if (after.TextureUploadFailures > before.TextureUploadFailures &&
+                    after.LastFailedAsset == existingAsset)
+                {
+                    return Core::Err<RuntimeAssetImportResult>(
+                        NormalizeImportError(after.LastError));
+                }
+
+                return RuntimeAssetImportResult{
+                    .Asset = existingAsset,
+                    .PayloadKind = Assets::AssetPayloadKind::Texture2D,
+                    .TextureUploadRequests =
+                        Delta(after.TextureUploadRequests,
+                              before.TextureUploadRequests),
+                    .RequestedTextureUpload =
+                        after.TextureUploadRequests > before.TextureUploadRequests,
+                };
+            }
+
+            auto asset = assetService.Load<Assets::AssetTexture2DPayload>(
+                request.Path,
+                [payload](std::string_view,
+                          Assets::AssetId)
+                    -> Core::Expected<Assets::AssetTexture2DPayload>
+                {
+                    return *payload;
+                });
+            if (!asset.has_value())
+            {
+                return Core::Err<RuntimeAssetImportResult>(asset.error());
+            }
+
+            if (Core::Result drained =
+                    DrainAssetImportEvents(assetService, *asset);
+                !drained.has_value())
+            {
+                return Core::Err<RuntimeAssetImportResult>(drained.error());
+            }
+            AssetModelTextureHandoffDiagnostics after =
+                handoff.GetDiagnostics();
+            const bool uploadWasAlreadyHandled =
+                after.TextureUploadRequests > before.TextureUploadRequests ||
+                after.TextureUploadDeferrals > before.TextureUploadDeferrals ||
+                after.TextureUploadFailures > before.TextureUploadFailures;
+
+            if (!uploadWasAlreadyHandled &&
+                gpuAssetCache.GetState(*asset) ==
+                    Graphics::GpuAssetState::NotRequested)
+            {
+                if (Core::Result uploaded = handoff.UploadReadyTexture(*asset);
+                    !uploaded.has_value())
+                {
+                    if (!IsTextureUploadDeferral(uploaded.error()))
+                    {
+                        return Core::Err<RuntimeAssetImportResult>(
+                            uploaded.error());
+                    }
+                }
+            }
+
+            after = handoff.GetDiagnostics();
+            if (after.TextureUploadFailures > before.TextureUploadFailures &&
+                after.LastFailedAsset == *asset)
+            {
+                return Core::Err<RuntimeAssetImportResult>(
+                    NormalizeImportError(after.LastError));
+            }
+
+            return RuntimeAssetImportResult{
+                .Asset = *asset,
+                .PayloadKind = Assets::AssetPayloadKind::Texture2D,
+                .TextureUploadRequests =
+                    Delta(after.TextureUploadRequests,
+                          before.TextureUploadRequests),
+                .RequestedTextureUpload =
+                    after.TextureUploadRequests > before.TextureUploadRequests,
+            };
         }
 
         [[nodiscard]] bool IsFinitePosition(const glm::vec3& position) noexcept
@@ -3839,6 +4116,17 @@ namespace Extrinsic::Runtime
                 QueueDroppedGeometryImport(path, {route->PayloadKind});
                 continue;
             }
+            if (route.has_value() &&
+                (route->PayloadKind == Assets::AssetPayloadKind::ModelScene ||
+                 route->PayloadKind == Assets::AssetPayloadKind::Texture2D))
+            {
+                Core::Log::Info(
+                    "[Runtime] Dropped model/texture file routed to deferred import: path='{}' payload={}",
+                    path,
+                    Assets::DebugNameForAssetPayloadKind(route->PayloadKind));
+                QueueDroppedModelTextureImport(path, route->PayloadKind);
+                continue;
+            }
 
             Core::Log::Info(
                 "[Runtime] Dropped file routed to synchronous import: path='{}' route_status={} route_error={}",
@@ -4153,6 +4441,345 @@ namespace Extrinsic::Runtime
             state->Request.Path,
             Assets::DebugNameForAssetPayloadKind(state->Request.PayloadKind),
             candidateCount);
+    }
+
+    void Engine::QueueDroppedModelTextureImport(
+        std::string path,
+        const Assets::AssetPayloadKind payloadKind)
+    {
+        RuntimeAssetImportRequest request{
+            .Path = path,
+            .PayloadKind = payloadKind,
+        };
+        RuntimeAssetIngestTransition submit =
+            m_AssetIngestStateMachine.Submit(
+                MakeRuntimeAssetIngestRequest(
+                    request,
+                    RuntimeAssetIngestSource::DroppedFile));
+        if (!submit.Succeeded())
+        {
+            Core::Log::Warn(
+                "[Runtime] Dropped model/texture import rejected by ingest state machine: path='{}' payload={} diagnostic={} error={}",
+                request.Path,
+                Assets::DebugNameForAssetPayloadKind(request.PayloadKind),
+                DebugNameForRuntimeAssetIngestDiagnostic(submit.Diagnostic),
+                Core::Error::ToString(ErrorFromIngestTransition(submit)));
+            RecordAssetImportEvent(
+                request,
+                Core::Err<RuntimeAssetImportResult>(
+                    ErrorFromIngestTransition(submit)),
+                submit.Diagnostic);
+            return;
+        }
+
+        if (!m_Initialized ||
+            !m_StreamingExecutor ||
+            !m_AssetService ||
+            !m_GpuAssetCache ||
+            !m_AssetModelTextureHandoff ||
+            !m_AssetModelSceneHandoff ||
+            !m_Scene ||
+            path.empty() ||
+            (payloadKind != Assets::AssetPayloadKind::ModelScene &&
+             payloadKind != Assets::AssetPayloadKind::Texture2D))
+        {
+            RuntimeAssetIngestTransition failed =
+                m_AssetIngestStateMachine.FailCallback(
+                    submit.Handle,
+                    Core::ErrorCode::InvalidState);
+            Core::Log::Warn(
+                "[Runtime] Dropped model/texture import rejected before queueing: path='{}' payload={} error={}",
+                request.Path,
+                Assets::DebugNameForAssetPayloadKind(request.PayloadKind),
+                Core::Error::ToString(Core::ErrorCode::InvalidState));
+            RecordAssetImportEvent(
+                request,
+                Core::Err<RuntimeAssetImportResult>(Core::ErrorCode::InvalidState),
+                failed.Diagnostic);
+            return;
+        }
+
+        const Assets::AssetRouteDiagnostic routeDiagnostic =
+            Assets::DiagnoseAssetImportRoute(
+                path,
+                Assets::AssetRouteOperation::Import,
+                Assets::AssetImportHint{.PayloadKind = request.PayloadKind});
+        RuntimeAssetIngestTransition routeResolved =
+            m_AssetIngestStateMachine.ResolveRoute(
+                submit.Handle,
+                routeDiagnostic);
+        if (!routeResolved.Succeeded())
+        {
+            RecordAssetImportEvent(
+                request,
+                Core::Err<RuntimeAssetImportResult>(
+                    ErrorFromIngestTransition(routeResolved)),
+                routeResolved.Diagnostic);
+            return;
+        }
+
+        RuntimeAssetIngestTransition decodeQueued =
+            m_AssetIngestStateMachine.QueueDecode(submit.Handle);
+        if (!decodeQueued.Succeeded())
+        {
+            RecordAssetImportEvent(
+                request,
+                Core::Err<RuntimeAssetImportResult>(
+                    ErrorFromIngestTransition(decodeQueued)),
+                decodeQueued.Diagnostic);
+            return;
+        }
+
+        RuntimeAssetIngestTransition decoding =
+            m_AssetIngestStateMachine.MarkDecoding(submit.Handle);
+        if (!decoding.Succeeded())
+        {
+            RecordAssetImportEvent(
+                request,
+                Core::Err<RuntimeAssetImportResult>(
+                    ErrorFromIngestTransition(decoding)),
+                decoding.Diagnostic);
+            return;
+        }
+
+        auto state = std::make_shared<DroppedModelTextureImportState>();
+        state->IngestHandle = submit.Handle;
+        state->Request = request;
+
+        const StreamingTaskHandle handle = m_StreamingExecutor->Submit(
+            StreamingTaskDesc{
+                .Name = "Runtime.ImportDroppedModelTexture." +
+                    FileNameFromPath(path),
+                .Kind = Core::Dag::TaskKind::AssetDecode,
+                .Priority = Core::Dag::TaskPriority::Normal,
+                .EstimatedCost = 4u,
+                .Execute = [
+                    state,
+                    path = std::move(path),
+                    payloadKind]() mutable -> StreamingResult
+                {
+                    Assets::AssetModelTextureIOBridge bridge;
+                    if (Core::Result registered =
+                            RegisterPromotedModelTextureIOCallbacks(bridge);
+                        !registered.has_value())
+                    {
+                        state->Error = registered.error();
+                        return StreamingResult{
+                            StreamingCpuPayloadReady{.PayloadToken = 0u}};
+                    }
+
+                    Core::IO::FileIOBackend backend;
+                    if (payloadKind == Assets::AssetPayloadKind::ModelScene)
+                    {
+                        auto decoded = bridge.ImportModelScene(path, backend);
+                        if (!decoded.has_value())
+                        {
+                            state->Error = decoded.error();
+                            return StreamingResult{
+                                StreamingCpuPayloadReady{.PayloadToken = 0u}};
+                        }
+
+                        state->Decoded = DecodedModelTextureImport{
+                            .Path = path,
+                            .PayloadKind = payloadKind,
+                            .Payload = std::move(*decoded),
+                        };
+                    }
+                    else
+                    {
+                        auto decoded = bridge.ImportTexture2D(path, backend);
+                        if (!decoded.has_value())
+                        {
+                            state->Error = decoded.error();
+                            return StreamingResult{
+                                StreamingCpuPayloadReady{.PayloadToken = 0u}};
+                        }
+
+                        state->Decoded = DecodedModelTextureImport{
+                            .Path = path,
+                            .PayloadKind = payloadKind,
+                            .Payload = std::move(*decoded),
+                        };
+                    }
+
+                    state->Error = Core::ErrorCode::Success;
+                    return StreamingResult{
+                        StreamingCpuPayloadReady{.PayloadToken = 0u}};
+                },
+                .ApplyOnMainThread = [this, state](StreamingResult&& streamingResult) mutable
+                {
+                    Core::Expected<RuntimeAssetImportResult> result =
+                        Core::Err<RuntimeAssetImportResult>(
+                            streamingResult.has_value()
+                                ? state->Error
+                                : streamingResult.error());
+                    RuntimeAssetIngestDiagnostic eventDiagnostic =
+                        DiagnosticForImportError(result.error());
+
+                    if (!streamingResult.has_value() || !state->Decoded.has_value())
+                    {
+                        RuntimeAssetIngestTransition failed{};
+                        if (result.error() == Core::ErrorCode::FileNotFound)
+                        {
+                            failed = m_AssetIngestStateMachine.MarkMissingFile(
+                                state->IngestHandle);
+                        }
+                        else if (result.error() == Core::ErrorCode::AssetLoaderMissing)
+                        {
+                            failed = m_AssetIngestStateMachine.FailCallback(
+                                state->IngestHandle,
+                                result.error());
+                        }
+                        else
+                        {
+                            failed = m_AssetIngestStateMachine.FailDecode(
+                                state->IngestHandle,
+                                state->IngestHandle.Generation,
+                                result.error());
+                        }
+                        eventDiagnostic = failed.Diagnostic;
+                        RecordAssetImportEvent(
+                            state->Request,
+                            result,
+                            eventDiagnostic);
+                        return;
+                    }
+
+                    RuntimeAssetIngestTransition decodeComplete =
+                        m_AssetIngestStateMachine.CompleteDecode(
+                            state->IngestHandle,
+                            state->IngestHandle.Generation);
+                    if (!decodeComplete.Succeeded())
+                    {
+                        result = Core::Err<RuntimeAssetImportResult>(
+                            ErrorFromIngestTransition(decodeComplete));
+                        RecordAssetImportEvent(
+                            state->Request,
+                            result,
+                            decodeComplete.Diagnostic);
+                        return;
+                    }
+
+                    RuntimeAssetIngestTransition applying =
+                        m_AssetIngestStateMachine.BeginApply(state->IngestHandle);
+                    if (!applying.Succeeded())
+                    {
+                        result = Core::Err<RuntimeAssetImportResult>(
+                            ErrorFromIngestTransition(applying));
+                        RecordAssetImportEvent(
+                            state->Request,
+                            result,
+                            applying.Diagnostic);
+                        return;
+                    }
+
+                    if (state->Decoded->PayloadKind ==
+                        Assets::AssetPayloadKind::ModelScene)
+                    {
+                        result = MaterializeDecodedModelSceneImport(
+                            *m_AssetService,
+                            *m_AssetModelSceneHandoff,
+                            state->Request,
+                            {},
+                            std::move(std::get<Assets::AssetModelScenePayload>(
+                                state->Decoded->Payload)));
+                    }
+                    else
+                    {
+                        result = MaterializeDecodedTextureImport(
+                            *m_AssetService,
+                            *m_GpuAssetCache,
+                            *m_AssetModelTextureHandoff,
+                            state->Request,
+                            {},
+                            std::move(std::get<Assets::AssetTexture2DPayload>(
+                                state->Decoded->Payload)));
+                    }
+
+                    if (result.has_value())
+                    {
+                        if (RequestsGpuUpload(*result))
+                        {
+                            RuntimeAssetIngestTransition upload =
+                                m_AssetIngestStateMachine.BeginGpuUpload(
+                                    state->IngestHandle);
+                            eventDiagnostic = upload.Diagnostic;
+                            if (!upload.Succeeded())
+                            {
+                                result = Core::Err<RuntimeAssetImportResult>(
+                                    ErrorFromIngestTransition(upload));
+                            }
+                        }
+
+                        RuntimeAssetIngestTransition complete =
+                            result.has_value()
+                                ? m_AssetIngestStateMachine.CompleteApply(
+                                      state->IngestHandle,
+                                      state->IngestHandle.Generation,
+                                      ToRuntimeAssetIngestResult(*result))
+                                : RuntimeAssetIngestTransition{};
+                        if (result.has_value())
+                        {
+                            eventDiagnostic = complete.Diagnostic;
+                            if (!complete.Succeeded())
+                            {
+                                result = Core::Err<RuntimeAssetImportResult>(
+                                    ErrorFromIngestTransition(complete));
+                            }
+                            else if (CreatesOrChangesScene(*result))
+                            {
+                                (void)m_EditorCommandHistory.MarkDirty("Import Asset");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        RuntimeAssetIngestTransition failed =
+                            m_AssetIngestStateMachine.FailApply(
+                                state->IngestHandle,
+                                state->IngestHandle.Generation,
+                                result.error());
+                        eventDiagnostic = failed.Diagnostic;
+                    }
+
+                    RecordAssetImportEvent(
+                        state->Request,
+                        result,
+                        eventDiagnostic);
+                },
+            });
+
+        if (!handle.IsValid())
+        {
+            RuntimeAssetImportRequest queuedRequest{
+                .Path = state->Request.Path,
+                .PayloadKind = state->Request.PayloadKind,
+            };
+            Core::Log::Warn(
+                "[Runtime] Dropped model/texture import queue submission failed: path='{}' payload={} error={}",
+                queuedRequest.Path,
+                Assets::DebugNameForAssetPayloadKind(queuedRequest.PayloadKind),
+                Core::Error::ToString(Core::ErrorCode::InvalidState));
+            RuntimeAssetIngestTransition failed =
+                m_AssetIngestStateMachine.FailCallback(
+                    state->IngestHandle,
+                    Core::ErrorCode::InvalidState);
+            RecordAssetImportEvent(
+                queuedRequest,
+                Core::Err<RuntimeAssetImportResult>(Core::ErrorCode::InvalidState),
+                failed.Diagnostic);
+            return;
+        }
+
+        m_AssetImportStreamingTasks.push_back(RuntimeAssetImportStreamingTask{
+            .Ingest = state->IngestHandle,
+            .Streaming = handle,
+        });
+
+        Core::Log::Info(
+            "[Runtime] Queued dropped model/texture import: path='{}' payload={}",
+            state->Request.Path,
+            Assets::DebugNameForAssetPayloadKind(state->Request.PayloadKind));
     }
 
     Core::Expected<RuntimeAssetImportResult>
@@ -4494,135 +5121,12 @@ namespace Extrinsic::Runtime
                 return Core::Err<RuntimeAssetImportResult>(decoded.error());
             }
 
-            auto payload =
-                std::make_shared<Assets::AssetModelScenePayload>(
-                    std::move(*decoded));
-            const AssetModelSceneHandoffDiagnostics before =
-                m_AssetModelSceneHandoff->GetDiagnostics();
-            if (existingAsset.IsValid())
-            {
-                Core::Result reloaded =
-                    m_AssetService->Reload<Assets::AssetModelScenePayload>(
-                        existingAsset,
-                        [payload](std::string_view,
-                                  Assets::AssetId)
-                            -> Core::Expected<Assets::AssetModelScenePayload>
-                        {
-                            return *payload;
-                        });
-                if (!reloaded.has_value())
-                {
-                    return Core::Err<RuntimeAssetImportResult>(
-                        reloaded.error());
-                }
-
-                if (Core::Result drained =
-                        DrainAssetImportEvents(*m_AssetService, existingAsset);
-                    !drained.has_value())
-                {
-                    return Core::Err<RuntimeAssetImportResult>(
-                        drained.error());
-                }
-                const AssetModelSceneHandoffDiagnostics after =
-                    m_AssetModelSceneHandoff->GetDiagnostics();
-                if (after.ModelSceneMaterializeFailures >
-                        before.ModelSceneMaterializeFailures &&
-                    after.LastFailedAsset == existingAsset)
-                {
-                    return Core::Err<RuntimeAssetImportResult>(
-                        NormalizeImportError(after.LastError));
-                }
-
-                return RuntimeAssetImportResult{
-                    .Asset = existingAsset,
-                    .PayloadKind = route->PayloadKind,
-                    .PrimitiveEntitiesCreated =
-                        Delta(after.PrimitiveEntitiesCreated,
-                              before.PrimitiveEntitiesCreated),
-                    .EmbeddedTextureAssetsCreated =
-                        Delta(after.EmbeddedTextureAssetsCreated,
-                              before.EmbeddedTextureAssetsCreated),
-                    .GeneratedTextureAssetsCreated =
-                        Delta(after.GeneratedTextureAssetsCreated,
-                              before.GeneratedTextureAssetsCreated),
-                    .TextureUploadRequests =
-                        Delta(after.EmbeddedTextureUploadRequests,
-                              before.EmbeddedTextureUploadRequests) +
-                        Delta(after.GeneratedTextureUploadRequests,
-                              before.GeneratedTextureUploadRequests),
-                    .GeneratedTextureUploadRequests =
-                        Delta(after.GeneratedTextureUploadRequests,
-                              before.GeneratedTextureUploadRequests),
-                    .MaterializedModelScene =
-                        after.ModelSceneMaterializeSuccesses >
-                            before.ModelSceneMaterializeSuccesses,
-                };
-            }
-
-            auto asset = m_AssetService->Load<Assets::AssetModelScenePayload>(
-                request.Path,
-                [payload](std::string_view,
-                          Assets::AssetId) -> Core::Expected<Assets::AssetModelScenePayload>
-                {
-                    return *payload;
-                });
-            if (!asset.has_value())
-            {
-                return Core::Err<RuntimeAssetImportResult>(asset.error());
-            }
-
-            if (Core::Result drained =
-                    DrainAssetImportEvents(*m_AssetService, *asset);
-                !drained.has_value())
-            {
-                return Core::Err<RuntimeAssetImportResult>(
-                    drained.error());
-            }
-            if (m_AssetModelSceneHandoff->FindRecord(*asset) == nullptr)
-            {
-                if (Core::Result materialized =
-                        m_AssetModelSceneHandoff->MaterializeReadyModelScene(*asset);
-                    !materialized.has_value())
-                {
-                    return Core::Err<RuntimeAssetImportResult>(
-                        materialized.error());
-                }
-            }
-
-            const AssetModelSceneHandoffDiagnostics after =
-                m_AssetModelSceneHandoff->GetDiagnostics();
-            if (after.ModelSceneMaterializeFailures >
-                    before.ModelSceneMaterializeFailures &&
-                after.LastFailedAsset == *asset)
-            {
-                return Core::Err<RuntimeAssetImportResult>(
-                    NormalizeImportError(after.LastError));
-            }
-
-            return RuntimeAssetImportResult{
-                .Asset = *asset,
-                .PayloadKind = route->PayloadKind,
-                .PrimitiveEntitiesCreated =
-                    Delta(after.PrimitiveEntitiesCreated,
-                          before.PrimitiveEntitiesCreated),
-                .EmbeddedTextureAssetsCreated =
-                    Delta(after.EmbeddedTextureAssetsCreated,
-                          before.EmbeddedTextureAssetsCreated),
-                .GeneratedTextureAssetsCreated =
-                    Delta(after.GeneratedTextureAssetsCreated,
-                          before.GeneratedTextureAssetsCreated),
-                .TextureUploadRequests =
-                    Delta(after.EmbeddedTextureUploadRequests,
-                          before.EmbeddedTextureUploadRequests) +
-                    Delta(after.GeneratedTextureUploadRequests,
-                          before.GeneratedTextureUploadRequests),
-                .GeneratedTextureUploadRequests =
-                    Delta(after.GeneratedTextureUploadRequests,
-                          before.GeneratedTextureUploadRequests),
-                .MaterializedModelScene =
-                    after.ModelSceneMaterializeSuccesses >
-                        before.ModelSceneMaterializeSuccesses,
-            };
+            return MaterializeDecodedModelSceneImport(
+                *m_AssetService,
+                *m_AssetModelSceneHandoff,
+                request,
+                existingAsset,
+                std::move(*decoded));
         }
 
         auto decoded = bridge.ImportTexture2D(request.Path, backend);
@@ -4631,109 +5135,13 @@ namespace Extrinsic::Runtime
             return Core::Err<RuntimeAssetImportResult>(decoded.error());
         }
 
-        auto payload =
-            std::make_shared<Assets::AssetTexture2DPayload>(std::move(*decoded));
-        const AssetModelTextureHandoffDiagnostics before =
-            m_AssetModelTextureHandoff->GetDiagnostics();
-        if (existingAsset.IsValid())
-        {
-            Core::Result reloaded =
-                m_AssetService->Reload<Assets::AssetTexture2DPayload>(
-                    existingAsset,
-                    [payload](std::string_view,
-                              Assets::AssetId)
-                        -> Core::Expected<Assets::AssetTexture2DPayload>
-                    {
-                        return *payload;
-                    });
-            if (!reloaded.has_value())
-            {
-                return Core::Err<RuntimeAssetImportResult>(
-                    reloaded.error());
-            }
-
-            if (Core::Result drained =
-                    DrainAssetImportEvents(*m_AssetService, existingAsset);
-                !drained.has_value())
-            {
-                return Core::Err<RuntimeAssetImportResult>(
-                    drained.error());
-            }
-            const AssetModelTextureHandoffDiagnostics after =
-                m_AssetModelTextureHandoff->GetDiagnostics();
-            if (after.TextureUploadFailures > before.TextureUploadFailures &&
-                after.LastFailedAsset == existingAsset)
-            {
-                return Core::Err<RuntimeAssetImportResult>(
-                    NormalizeImportError(after.LastError));
-            }
-
-            return RuntimeAssetImportResult{
-                .Asset = existingAsset,
-                .PayloadKind = route->PayloadKind,
-                .TextureUploadRequests =
-                    Delta(after.TextureUploadRequests, before.TextureUploadRequests),
-                .RequestedTextureUpload =
-                    after.TextureUploadRequests > before.TextureUploadRequests,
-            };
-        }
-
-        auto asset = m_AssetService->Load<Assets::AssetTexture2DPayload>(
-            request.Path,
-            [payload](std::string_view,
-                      Assets::AssetId) -> Core::Expected<Assets::AssetTexture2DPayload>
-            {
-                return *payload;
-            });
-        if (!asset.has_value())
-        {
-            return Core::Err<RuntimeAssetImportResult>(asset.error());
-        }
-
-        if (Core::Result drained =
-                DrainAssetImportEvents(*m_AssetService, *asset);
-            !drained.has_value())
-        {
-            return Core::Err<RuntimeAssetImportResult>(
-                drained.error());
-        }
-        AssetModelTextureHandoffDiagnostics after =
-            m_AssetModelTextureHandoff->GetDiagnostics();
-        const bool uploadWasAlreadyHandled =
-            after.TextureUploadRequests > before.TextureUploadRequests ||
-            after.TextureUploadDeferrals > before.TextureUploadDeferrals ||
-            after.TextureUploadFailures > before.TextureUploadFailures;
-
-        if (!uploadWasAlreadyHandled &&
-            m_GpuAssetCache->GetState(*asset) == Graphics::GpuAssetState::NotRequested)
-        {
-            if (Core::Result uploaded =
-                    m_AssetModelTextureHandoff->UploadReadyTexture(*asset);
-                !uploaded.has_value())
-            {
-                if (!IsTextureUploadDeferral(uploaded.error()))
-                {
-                    return Core::Err<RuntimeAssetImportResult>(uploaded.error());
-                }
-            }
-        }
-
-        after = m_AssetModelTextureHandoff->GetDiagnostics();
-        if (after.TextureUploadFailures > before.TextureUploadFailures &&
-            after.LastFailedAsset == *asset)
-        {
-            return Core::Err<RuntimeAssetImportResult>(
-                NormalizeImportError(after.LastError));
-        }
-
-        return RuntimeAssetImportResult{
-            .Asset = *asset,
-            .PayloadKind = route->PayloadKind,
-            .TextureUploadRequests =
-                Delta(after.TextureUploadRequests, before.TextureUploadRequests),
-            .RequestedTextureUpload =
-                after.TextureUploadRequests > before.TextureUploadRequests,
-        };
+        return MaterializeDecodedTextureImport(
+            *m_AssetService,
+            *m_GpuAssetCache,
+            *m_AssetModelTextureHandoff,
+            request,
+            existingAsset,
+            std::move(*decoded));
     }
 
     void Engine::ClearSceneRuntimeState()

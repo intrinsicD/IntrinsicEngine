@@ -20,8 +20,8 @@ Blocking fixes first, then abstractness seams, then steady-state efficiency:
   is retired; heavy Sandbox editor CPU method commands now queue runtime
   derived jobs, keep rendering advanceable while jobs run, and suppress
   duplicate active same-output submits instead of blocking the ImGui callback.
-- [`RUNTIME-142`](RUNTIME-142-async-modelscene-texture-scenefile-io.md) —
-  async model-scene/texture import and scene save/load (extends the
+- [`RUNTIME-142`](../../active/RUNTIME-142-async-modelscene-texture-scenefile-io.md)
+  is active; async model-scene/texture import and scene save/load extends the
   deferred-geometry streaming shape).
 - [`RUNTIME-143`](RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md) —
   multi-subscriber renderer frame-command hook; K-Means GPU queue decoupled

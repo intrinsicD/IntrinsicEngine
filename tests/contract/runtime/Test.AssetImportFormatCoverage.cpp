@@ -1036,3 +1036,124 @@ TEST(RuntimeAssetImportFormatCoverage, RepresentativePromotedFormatsMaterializeD
 
     engine.Shutdown();
 }
+
+TEST(RuntimeAssetImportFormatCoverage, DroppedModelSceneAndTextureImportThroughStreamingQueue)
+{
+    const std::vector<std::byte> pngBytes = TinyPngBytes();
+    const std::vector<std::byte> binBytes = TriangleBufferBytes();
+
+    TempAssetFile modelBin(
+        "assetio004_triangle.bin",
+        std::span<const std::byte>(binBytes.data(), binBytes.size()));
+    TempAssetFile modelFile(
+        "assetio142_drop_triangle.gltf",
+        TriangleGltfJson());
+    TempAssetFile textureFile(
+        "assetio142_drop_albedo.png",
+        std::span<const std::byte>(pngBytes.data(), pngBytes.size()));
+
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForConditionApplication>(
+            [](Runtime::Engine& runningEngine)
+            {
+                const Runtime::RuntimeAssetImportQueueSnapshot queue =
+                    runningEngine.GetAssetImportQueueSnapshot();
+                return queue.Entries.size() == 2u &&
+                    queue.ActiveCount == 0u &&
+                    queue.TerminalCount == 2u;
+            },
+            256u));
+    engine.Initialize();
+
+    const std::vector<std::string> droppedPaths{
+        modelFile.Path.string(),
+        textureFile.Path.string(),
+    };
+    engine.ImportDroppedFilePaths(droppedPaths);
+
+    EXPECT_FALSE(engine.GetLastAssetImportEvent().has_value());
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 0u);
+
+    Runtime::RuntimeAssetImportQueueSnapshot queue =
+        engine.GetAssetImportQueueSnapshot();
+    ASSERT_EQ(queue.Entries.size(), 2u);
+    EXPECT_EQ(queue.ActiveCount, 2u);
+    EXPECT_EQ(queue.Entries[0].SourcePath, modelFile.Path.string());
+    EXPECT_EQ(queue.Entries[0].PayloadKind, Assets::AssetPayloadKind::ModelScene);
+    EXPECT_EQ(queue.Entries[0].Stage,
+              Runtime::RuntimeAssetImportQueueStage::Decoding);
+    EXPECT_TRUE(queue.Entries[0].CanCancel);
+    EXPECT_EQ(queue.Entries[1].SourcePath, textureFile.Path.string());
+    EXPECT_EQ(queue.Entries[1].PayloadKind, Assets::AssetPayloadKind::Texture2D);
+    EXPECT_EQ(queue.Entries[1].Stage,
+              Runtime::RuntimeAssetImportQueueStage::Decoding);
+    EXPECT_TRUE(queue.Entries[1].CanCancel);
+
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+    engine.Run();
+
+    queue = engine.GetAssetImportQueueSnapshot();
+    ASSERT_EQ(queue.Entries.size(), 2u);
+    EXPECT_EQ(queue.ActiveCount, 0u);
+    EXPECT_EQ(queue.TerminalCount, 2u);
+    EXPECT_EQ(queue.Entries[0].TerminalStatus,
+              Runtime::RuntimeAssetImportQueueTerminalStatus::Complete);
+    EXPECT_EQ(queue.Entries[1].TerminalStatus,
+              Runtime::RuntimeAssetImportQueueTerminalStatus::Complete);
+
+    const std::vector<Runtime::RuntimeAssetIngestRecord> records =
+        engine.GetAssetIngestRecordsForTest();
+    ASSERT_EQ(records.size(), 2u);
+
+    const auto modelRecord = std::find_if(
+        records.begin(),
+        records.end(),
+        [&](const Runtime::RuntimeAssetIngestRecord& record)
+        {
+            return record.Request.Path == modelFile.Path.string();
+        });
+    ASSERT_NE(modelRecord, records.end());
+    EXPECT_EQ(modelRecord->Request.Source,
+              Runtime::RuntimeAssetIngestSource::DroppedFile);
+    EXPECT_EQ(modelRecord->Request.PayloadKind,
+              Assets::AssetPayloadKind::ModelScene);
+    EXPECT_EQ(modelRecord->Phase, Runtime::RuntimeAssetIngestPhase::Complete);
+    EXPECT_EQ(modelRecord->Diagnostic,
+              Runtime::RuntimeAssetIngestDiagnostic::None);
+    ASSERT_TRUE(modelRecord->Result.has_value());
+    EXPECT_EQ(modelRecord->Result->PayloadKind,
+              Assets::AssetPayloadKind::ModelScene);
+    EXPECT_TRUE(modelRecord->Result->MaterializedModelScene);
+    EXPECT_EQ(modelRecord->Result->PrimitiveEntitiesCreated, 1u);
+
+    const auto textureRecord = std::find_if(
+        records.begin(),
+        records.end(),
+        [&](const Runtime::RuntimeAssetIngestRecord& record)
+        {
+            return record.Request.Path == textureFile.Path.string();
+        });
+    ASSERT_NE(textureRecord, records.end());
+    EXPECT_EQ(textureRecord->Request.Source,
+              Runtime::RuntimeAssetIngestSource::DroppedFile);
+    EXPECT_EQ(textureRecord->Request.PayloadKind,
+              Assets::AssetPayloadKind::Texture2D);
+    EXPECT_EQ(textureRecord->Phase, Runtime::RuntimeAssetIngestPhase::Complete);
+    EXPECT_EQ(textureRecord->Diagnostic,
+              Runtime::RuntimeAssetIngestDiagnostic::None);
+    ASSERT_TRUE(textureRecord->Result.has_value());
+    EXPECT_EQ(textureRecord->Result->PayloadKind,
+              Assets::AssetPayloadKind::Texture2D);
+    EXPECT_TRUE(textureRecord->Result->Asset.IsValid());
+
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+    EXPECT_TRUE(engine.GetAssetService().PathIndexContains(textureFile.Path.string()));
+    const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
+        engine.GetLastAssetImportEvent();
+    ASSERT_TRUE(lastEvent.has_value());
+    EXPECT_TRUE(lastEvent->Succeeded());
+
+    engine.Shutdown();
+}

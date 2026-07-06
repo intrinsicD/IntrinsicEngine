@@ -34,10 +34,13 @@ depends_on: []
   finding R11.
 
 ## Required changes
-- [ ] Route model-scene and texture drop/menu imports through
+- [x] Route model-scene and texture dropped-file imports through
       `StreamingExecutor`: file read + decode on the worker lane, existing
       handoff/materialization on the main-thread apply, preserving current
       event/diagnostic semantics (BUG-038 logging contract).
+- [ ] Route model-scene and texture editor-menu/manual imports through
+      `StreamingExecutor` while preserving the current command-result surface
+      or replacing it with an explicit pending operation contract.
 - [ ] Route scene load through the same shape: parse into the temporary
       registry off-thread; keep the swap-in (registry replacement, sidecar
       drains, `StableEntityLookup` rebuild) on the main thread per the
@@ -49,8 +52,11 @@ depends_on: []
       touches the live scene).
 
 ## Tests
-- [ ] Contract: model-scene and texture imports complete with identical
-      materialized results to the synchronous path for fixture assets.
+- [x] Contract: dropped model-scene and texture imports queue immediately,
+      complete through the streaming apply lane, and materialize fixture
+      assets with the same result counters as the synchronous path.
+- [ ] Contract: editor-menu/manual model-scene and texture imports complete
+      through the async route with unchanged observable results.
 - [ ] Contract: scene load with an invalid document leaves the live scene
       untouched (existing guarantee preserved through the async route).
 - [ ] Contract: frame does not block during a large import (timing probe
@@ -58,8 +64,10 @@ depends_on: []
 - [ ] Existing drop/import/scene-serialization suites stay green.
 
 ## Docs
-- [ ] Update `src/runtime/README.md` and
-      `docs/architecture/runtime.md` scene-replacement/import notes.
+- [x] Update `src/runtime/README.md` and
+      `docs/architecture/runtime.md` dropped asset-import notes.
+- [ ] Update scene-replacement/import notes again when scene save/load and
+      manual import routing move off the frame path.
 
 ## Acceptance criteria
 - [ ] No synchronous file IO or asset decode reachable from
@@ -68,6 +76,21 @@ depends_on: []
 - [ ] Import/save/load observable behavior unchanged apart from latency now
       spanning frames.
 - [ ] Default CPU gate green.
+
+## Slice log
+- 2026-07-05: Dropped model-scene and texture imports now use
+  `Engine::QueueDroppedModelTextureImport(...)`. The worker callback builds the
+  promoted ASSETIO bridge and runs `ImportModelScene(...)` / `ImportTexture2D(...)`
+  with `Core::IO::FileIOBackend`; the main-thread apply callback shares the
+  same decoded model-scene/texture materialization helpers used by
+  `ImportAssetFromPathImpl(...)`, completes the ingest state machine, and marks
+  document history dirty only after successful scene-changing apply.
+- Remaining synchronous audited call sites after this slice:
+  `Engine::ImportAssetFromPath(...)` / `Engine::ReimportAsset(...)` still call
+  `ImportAssetFromPathWithIngest(...)` -> `ImportAssetFromPathImpl(...)`, where
+  model-scene/texture direct imports still construct `Core::IO::FileIOBackend`
+  and decode inline. `Engine::SaveSceneToPath(...)` and
+  `Engine::LoadSceneFromPath(...)` still serialize/parse scene documents inline.
 
 ## Verification
 ```bash

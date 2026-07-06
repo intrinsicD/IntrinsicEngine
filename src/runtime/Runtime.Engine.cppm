@@ -589,6 +589,9 @@ namespace Extrinsic::Runtime
         void QueueDroppedGeometryImport(
             std::string path,
             std::vector<Assets::AssetPayloadKind> payloadKinds);
+        void QueueDroppedModelTextureImport(
+            std::string path,
+            Assets::AssetPayloadKind payloadKind);
         [[nodiscard]] Core::Expected<RuntimeAssetImportResult> ImportAssetFromPathWithIngest(
             RuntimeAssetImportRequest request,
             RuntimeAssetIngestSource source,
