@@ -43,6 +43,44 @@ Related core-layer work from the same review lives in
 [`tasks/backlog/architecture/`](../architecture/README.md) (`BUG-055`,
 `CORE-005..009`, `ARCH-006`).
 
+### Runtime.Engine decomposition (seeded 2026-07-06)
+
+`Runtime.Engine.{cppm,cpp}` (~1,070 / ~6,260 lines) accreted one public
+facade per landed task and is now the runtime layer's dominant god-module
+and compile hotspot. This series keeps `Engine` as the concrete composition
+root (lifecycle, ownership, explicit frame skeleton) and relocates domain
+facades into engine-owned subsystem objects, following the existing
+`SelectionController`/`EditorCommandHistory`/`GizmoInteraction` accessor
+pattern. `RUNTIME-146..150` are mechanical, mutually order-independent
+moves; `RUNTIME-151` is the single semantic slice and must land last.
+
+- [`RUNTIME-146`](RUNTIME-146-extract-engine-config-boot-module.md) —
+  extract boot-time config resolution (`ResolveEngineConfigForBoot`,
+  `CreateReferenceEngineConfig`, `EngineConfigBoot*`) into a free-standing
+  `Extrinsic.Runtime.EngineConfigBoot` module.
+- [`RUNTIME-147`](RUNTIME-147-extract-asset-import-pipeline-subsystem.md) —
+  extract the asset-import facade (import/queue/reimport/cancel, ingest
+  wiring, event log, `RUNTIME-144` registries, decode/materialize helpers)
+  into `Extrinsic.Runtime.AssetImportPipeline` behind
+  `Engine::GetAssetImportPipeline()`. Two slices: mechanical extraction
+  with delegation, then call-site migration.
+- [`RUNTIME-148`](RUNTIME-148-extract-scene-document-subsystem.md) —
+  extract the scene persistence facade (save/load/queue, new/close,
+  scene-file event log, snapshot helpers) into
+  `Extrinsic.Runtime.SceneDocument` behind `Engine::GetSceneDocument()`.
+- [`RUNTIME-149`](RUNTIME-149-extract-engine-config-control-subsystem.md) —
+  extract render-recipe activation and the engine-config hot-subset apply
+  path into `Extrinsic.Runtime.EngineConfigControl` behind
+  `Engine::GetConfigControl()`.
+- [`RUNTIME-150`](RUNTIME-150-split-engine-frame-loop-implementation-unit.md) —
+  split the `Core.FrameLoop` hook adapters and `RunFrame()`-only helpers
+  out of `Runtime.Engine.cpp` into a non-exported
+  `Extrinsic.Runtime.Engine:FrameLoop` partition.
+- [`RUNTIME-151`](RUNTIME-151-slim-engine-interface-and-remove-entt-leak.md)
+  (depends on 146–150) — remove the `entt` include leak from
+  `Runtime.Engine.cppm` via a `StableEntityLookup` scene-binding type and
+  re-audit the interface import list.
+
 ### bcg geometry-processing port integration (seeded 2026-06-26)
 
 Core/runtime work paired with the `bcg_code_base` geometry port gaps tracked in
