@@ -467,6 +467,7 @@ export namespace Extrinsic::Runtime
 
         [[nodiscard]] const RuntimeRenderExtractionStats& GetLastStats() const noexcept;
         [[nodiscard]] std::uint32_t GetTrackedRenderableCount() const noexcept;
+        [[nodiscard]] std::size_t GetLiveRenderableKeyScratchBucketCountForTest() const noexcept;
 
         struct RenderableSidecarView
         {
@@ -788,6 +789,7 @@ export namespace Extrinsic::Runtime
         void EnqueueMeshPrimitiveViewRetire(Graphics::GpuGeometryHandle handle);
 
         std::unordered_map<std::uint32_t, RenderableSidecar> m_Renderables{};
+        std::unordered_set<std::uint32_t> m_LiveRenderableKeys{};
         std::vector<Graphics::TransformSyncRecord> m_Transforms{};
         std::vector<Graphics::VisualizationSyncRecord> m_Visualizations{};
         std::vector<Graphics::LightSnapshot> m_Lights{};

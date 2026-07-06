@@ -91,6 +91,11 @@ namespace Extrinsic::Runtime
         return static_cast<std::uint32_t>(m_Renderables.size());
     }
 
+    std::size_t RenderExtractionCache::GetLiveRenderableKeyScratchBucketCountForTest() const noexcept
+    {
+        return m_LiveRenderableKeys.bucket_count();
+    }
+
     std::optional<RenderExtractionCache::RenderableSidecarView> RenderExtractionCache::FindRenderableSidecarForTest(
         std::uint32_t stableEntityId) const noexcept
     {
@@ -2319,7 +2324,7 @@ namespace Extrinsic::Runtime
     {
         RuntimeRenderExtractionStats stats{};
         auto& registry = scene.Raw();
-        std::unordered_set<std::uint32_t> liveRenderableKeys{};
+        m_LiveRenderableKeys.clear();
 
         m_Transforms.clear();
         m_Visualizations.clear();
@@ -2357,7 +2362,7 @@ namespace Extrinsic::Runtime
 
             ++stats.CandidateRenderableCount;
             const std::uint32_t stableId = StableEntityId(entity);
-            liveRenderableKeys.insert(stableId);
+            m_LiveRenderableKeys.insert(stableId);
 
             RenderableSidecar* sidecar = EnsureRenderable(stableId, renderer, stats);
             if (!sidecar)
@@ -2982,7 +2987,7 @@ namespace Extrinsic::Runtime
             }
         }
 
-        RetireMissingRenderables(liveRenderableKeys, renderer, stats);
+        RetireMissingRenderables(m_LiveRenderableKeys, renderer, stats);
 
         // RUNTIME-082 Slice D — spatial-debug adapter pump. Iterated
         // independently of `HasRenderableHint`: a SpatialDebugBinding may
@@ -3352,6 +3357,7 @@ namespace Extrinsic::Runtime
             ++stats.FreedInstanceCount;
         }
         m_Renderables.clear();
+        m_LiveRenderableKeys.clear();
 
         // Scene replacement is a hard boundary. Collapse procedural deferred
         // retirement immediately so no previous-scene handles or retire deltas

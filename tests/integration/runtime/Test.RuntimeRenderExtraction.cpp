@@ -586,6 +586,50 @@ TEST(RuntimeRenderExtraction, RetiresDestroyedRenderableSidecar)
     EXPECT_EQ(fixture.Renderer->GetGpuWorld().GetLiveInstanceCount(), 0u);
 }
 
+TEST(RuntimeRenderExtraction, ReusesLiveRenderableKeyScratchAcrossExtractions)
+{
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+    auto& registry = scene.Raw();
+
+    constexpr std::uint32_t kRenderableCount = 64u;
+    std::vector<entt::entity> entities;
+    entities.reserve(kRenderableCount);
+
+    for (std::uint32_t i = 0u; i < kRenderableCount; ++i)
+    {
+        const auto entity = scene.Create();
+        registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
+        registry.emplace<Graphics::Components::RenderEdges>(entity);
+        entities.push_back(entity);
+    }
+
+    auto stats = fixture.Extract(scene);
+    ASSERT_EQ(stats.CandidateRenderableCount, kRenderableCount);
+    EXPECT_EQ(stats.AllocatedInstanceCount, kRenderableCount);
+    const std::size_t firstBucketCount =
+        fixture.Extraction.GetLiveRenderableKeyScratchBucketCountForTest();
+    ASSERT_GT(firstBucketCount, std::size_t{0});
+
+    stats = fixture.Extract(scene);
+    EXPECT_EQ(stats.CandidateRenderableCount, kRenderableCount);
+    EXPECT_EQ(stats.AllocatedInstanceCount, 0u);
+    EXPECT_EQ(fixture.Extraction.GetLiveRenderableKeyScratchBucketCountForTest(),
+              firstBucketCount);
+
+    for (const entt::entity entity : entities)
+    {
+        scene.Destroy(entity);
+    }
+
+    stats = fixture.Extract(scene);
+    EXPECT_EQ(stats.CandidateRenderableCount, 0u);
+    EXPECT_EQ(stats.FreedInstanceCount, kRenderableCount);
+    EXPECT_EQ(fixture.Extraction.GetTrackedRenderableCount(), 0u);
+    EXPECT_EQ(fixture.Extraction.GetLiveRenderableKeyScratchBucketCountForTest(),
+              firstBucketCount);
+}
+
 TEST(RuntimeRenderExtraction, ExtractsVisualizationAndLightsWithoutRenderableOwnership)
 {
     RendererFixture fixture;

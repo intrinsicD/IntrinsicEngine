@@ -7,14 +7,14 @@ depends_on: []
 
 ## Status
 - Active on local `main`.
-- Slices A-C are implemented and locally verified. Slice A removed the
+- Slices A-D are implemented and locally verified. Slice A removed the
   steady-state `StableEntityLookup` rebuild; Slice B bounds
   `StreamingExecutor` record storage with recycled slots, replaces the
   full-vector ready scan with priority ready queues, and batches import-queue
   streaming state reads through one executor snapshot; Slice C gates the
-  pre-render transform flush on pending post-sim transform work. Later slices
-  own extraction container reuse, import payload moves, and the final default
-  CPU gate.
+  pre-render transform flush on pending post-sim transform work; Slice D reuses
+  render extraction's live-key scratch storage. Later slices own import payload
+  moves and the final default CPU gate.
 
 ## Slice plan
 - Slice A: wire `StableEntityLookup` to scene `StableId` component events,
@@ -24,7 +24,8 @@ depends_on: []
   batch queue snapshot state reads. Implemented 2026-07-06.
 - Slice C: add a conservative pre-render transform dirty bit and skip idle
   transform re-sweeps. Implemented 2026-07-06.
-- Slice D: reuse live renderable key storage during extraction.
+- Slice D: reuse live renderable key storage during extraction. Implemented
+  2026-07-06.
 - Slice E: move/share import payload handoff data where ownership allows.
 - Slice F: run the default CPU gate, retire the task, and append the
   retirement log entry.
@@ -82,7 +83,7 @@ depends_on: []
       by post-sim mutation sources (gizmo drag, inspector edits,
       `OnVariableTick` transform writes); BUG-024's read-fresh-bounds
       guarantee must hold whenever the bit is set.
-- [ ] Reuse a member container for `liveRenderableKeys`.
+- [x] Reuse a member container for `liveRenderableKeys`.
 - [ ] Convert import payload handoff to moves/`shared_ptr` where the payload
       is not mutated after handoff.
 
@@ -95,11 +96,14 @@ depends_on: []
 - [x] Contract: a post-sim transform edit still reaches extraction the same
       frame (camera-focus/BUG-024 regression stays green); an idle frame
       skips the redundant flush (counter probe).
-- [ ] Existing extraction/import suites stay green.
+- [x] Existing extraction suite stays green after live-key scratch reuse.
+- [x] Existing import suites stay green.
 
 ## Docs
 - [x] Update `src/runtime/README.md` for the lookup lifecycle change.
 - [x] Update `src/runtime/README.md` for the executor lifecycle change.
+- [x] Update `src/runtime/README.md` for the extraction live-key scratch
+      reuse.
 
 ## Acceptance criteria
 - [ ] Steady-state idle frame performs no stable-lookup rebuild, no
@@ -129,6 +133,17 @@ cmake --build --preset ci --target IntrinsicRuntimeGraphicsCpuTests
 build/ci/bin/IntrinsicRuntimeGraphicsCpuTests --gtest_filter='RuntimeSandboxAcceptance.IdleFrameSkipsPreRenderTransformFlush:RuntimeSandboxAcceptance.InspectorTransformEditFlushedToRenderStateSameFrame'
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -R 'RuntimeSandboxAcceptance|RuntimeRenderExtraction|RuntimeEcsSystemBundle' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 90
+```
+
+Slice D focused verification run locally (2026-07-06):
+```bash
+cmake --build --preset ci --target IntrinsicRuntimeGraphicsCpuTests
+build/ci/bin/IntrinsicRuntimeGraphicsCpuTests --gtest_filter='RuntimeRenderExtraction.ReusesLiveRenderableKeyScratchAcrossExtractions'
+build/ci/bin/IntrinsicRuntimeGraphicsCpuTests --gtest_filter='RuntimeRenderExtraction.*'
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='AssetImportFormatCoverage.*:MeshGeometryExtraction.*:GraphGeometryExtraction.*:PointCloudGeometryExtraction.*:MeshPrimitiveViewExtraction.*:ProceduralGeometryExtraction.*'
+build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='RuntimeAssetImportFormatCoverage.*'
+ctest --test-dir build/ci --output-on-failure -R 'RuntimeRenderExtraction|RuntimeAssetImportFormatCoverage|MeshGeometryExtraction|GraphGeometryExtraction|PointCloudGeometryExtraction|MeshPrimitiveViewExtraction|ProceduralGeometryExtraction' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 90
 ```
 
 ## Forbidden changes
