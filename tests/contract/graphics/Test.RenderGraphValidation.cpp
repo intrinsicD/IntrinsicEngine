@@ -12,6 +12,7 @@ import Extrinsic.Core.Error;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.TextureUpload;
 
 namespace
 {
@@ -62,6 +63,14 @@ namespace
             }
         }
         return matches;
+    }
+
+    [[nodiscard]] constexpr std::uint64_t AlignUpForTransientPlacement(
+        const std::uint64_t value,
+        const std::uint64_t alignment) noexcept
+    {
+        const std::uint64_t remainder = value % alignment;
+        return remainder == 0u ? value : value + (alignment - remainder);
     }
 }
 
@@ -589,4 +598,35 @@ TEST(RenderGraphValidation, ColorAttachmentReadUsesReadStateAndSkipsConsecutiveR
     EXPECT_EQ(writeToReadBarriers, 1u);
     EXPECT_EQ(readToReadBarriers, 0u);
     EXPECT_EQ(readPassWriteBarriers, 0u);
+}
+
+TEST(RenderGraphValidation, TransientMemoryEstimateUsesRhiBlockCompressedStorageSize)
+{
+    RenderGraph graph;
+    RHI::TextureDesc compressedDesc{};
+    compressedDesc.Width = 65u;
+    compressedDesc.Height = 65u;
+    compressedDesc.Fmt = RHI::Format::BC1_UNORM;
+    compressedDesc.Usage = RHI::TextureUsage::Storage;
+
+    const TextureRef compressed = graph.CreateTexture("CompressedScratch", compressedDesc);
+    (void)graph.AddPass("WriteCompressed", [compressed](RenderGraphBuilder& builder) {
+        (void)builder.Write(compressed, TextureUsage::ShaderWrite);
+        builder.SideEffect();
+    });
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+
+    const std::uint64_t expectedBytes =
+        AlignUpForTransientPlacement(RHI::EstimateTextureStorageBytes(compressedDesc), 256u);
+    EXPECT_EQ(expectedBytes, 2560u)
+        << "BC1 65x65 storage should use ceil(65 / 4)^2 * 8 bytes before transient alignment";
+    EXPECT_EQ(compiled->TransientNaiveMemoryEstimateBytes, expectedBytes);
+    EXPECT_EQ(compiled->TransientPlacedPeakMemoryEstimateBytes, expectedBytes);
+    EXPECT_EQ(compiled->TransientMemoryEstimateBytes, expectedBytes);
+
+    ASSERT_EQ(compiled->TextureTransientPlacements.size(), 1u);
+    EXPECT_EQ(compiled->TextureTransientPlacements.front().ResourceIndex, compressed.Index);
+    EXPECT_EQ(compiled->TextureTransientPlacements.front().SizeBytes, expectedBytes);
 }

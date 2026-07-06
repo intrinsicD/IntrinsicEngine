@@ -8,11 +8,11 @@ depends_on: []
 ## Status
 - In progress on local `main`; PR not opened.
 - Owner/agent: Codex.
-- Current slice: Slice A completed locally; `TextureUsage::ColorAttachmentRead`
-  now uses a read-only barrier state and the focused CPU contract regression
-  passes.
-- Next verification step: continue with Slice B (RHI-backed format sizing for
-  transient memory estimates) or Slice C (validation-result plumbing).
+- Current slices: Slice A and Slice B completed locally. `TextureUsage::ColorAttachmentRead`
+  now uses a read-only barrier state, and transient texture memory estimates are
+  pinned to RHI block-compressed storage sizing through CPU contract regressions.
+- Next implementation step: continue with Slice C (validation-result plumbing)
+  or Slice D (allocation/barrier-emission efficiency with benchmark evidence).
 
 ## Goal
 - Remove the per-compile/per-execute waste and small contract hazards inside
@@ -52,11 +52,10 @@ depends_on: []
   - Defect: `TextureUsage::ColorAttachmentRead` maps to
     `TextureBarrierState::ColorAttachmentWrite` (`Compiler.cpp:38-39`) —
     read-only color access over-synchronizes as a write state.
-  - Defect: local `BytesPerPixel` duplicates RHI format knowledge and
-    returns 4 for BC-compressed formats, so
-    `TransientMemoryEstimateBytes` overestimates 4–8×
-    (`Graphics.RenderGraph.cpp:414-440`); a stale recipe reference lives in
-    framegraph doc text (`Compiler.cppm:98-101`).
+  - Defect target: framegraph transient texture byte sizing must stay routed
+    through `RHI::EstimateTextureStorageBytes`; a local bytes-per-pixel table
+    would overestimate BC-compressed formats 4–8×. A stale recipe reference
+    also lives in framegraph doc text (`Compiler.cppm:98-101`).
 
 ## Slice plan
 - **Slice A (this slice).** Add a read-only color attachment barrier state,
@@ -66,8 +65,8 @@ depends_on: []
   regression. Defers compiler scratch reuse, linear barrier emission,
   validation-result plumbing, format sizing, and benchmark evidence to later
   slices.
-- **Slice B.** Move framegraph transient format sizing to the RHI format helper
-  and pin BC block-compressed estimates.
+- **Slice B.** Confirm framegraph transient format sizing uses the RHI format
+  helper and pin BC block-compressed estimates.
 - **Slice C.** Replace the `thread_local` validation side channel with an
   explicit return/out-param path and update docs.
 - **Slice D.** Tackle allocation churn and linear barrier emission with a
@@ -87,16 +86,16 @@ depends_on: []
       out-param); make `Compile` non-`const` or move its mutations out.
 - [x] Slice A: map `ColorAttachmentRead` to a read barrier state with read-read
       transition skipping; pin with a barrier-plan test.
-- [ ] Move format sizing to an RHI helper with correct block-compressed
-      math; delete the local table; fix the estimate; scrub the recipe
-      reference from framegraph comments.
+- [x] Slice B: pin transient sizing to the RHI helper with correct
+      block-compressed math; verify no local table remains; scrub the stale
+      recipe reference from framegraph comments.
 
 ## Tests
 - [ ] Golden: compiled output (edges, order, barriers) unchanged for a
       fixture graph across the churn/scan changes.
 - [x] Slice A contract: `ColorAttachmentRead` no longer emits a write-state
       transition between consecutive readers.
-- [ ] Contract: BC-format transient estimate matches block math.
+- [x] Slice B contract: BC-format transient estimate matches RHI block math.
 - [ ] Existing framegraph suites stay green.
 - [ ] PR-fast benchmark: compile + emission CPU time before/after on a
       pass-heavy synthetic graph.
@@ -104,8 +103,10 @@ depends_on: []
 ## Docs
 - [x] Slice A: update `src/graphics/framegraph/README.md` for the read-only
       color attachment barrier state.
+- [x] Slice B: document `RHI::EstimateTextureStorageBytes` as the framegraph
+      transient texture sizing source.
 - [ ] Update `src/graphics/framegraph/README.md` where remaining contracts change
-      (validation result plumbing, format sizing source).
+      (validation result plumbing).
 
 ## Acceptance criteria
 - [ ] Zero `thread_local` compile state; validation results flow through
@@ -134,6 +135,16 @@ cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```
 
+Slice B verification run locally on 2026-07-06:
+
+```bash
+cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure -R 'RenderGraphValidation.TransientMemoryEstimateUsesRhiBlockCompressedStorageSize' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+ctest --test-dir build/ci --output-on-failure -R 'RenderGraphValidation|TextureUpload' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+```
+
 ## Forbidden changes
 - Changing compiled-graph semantics beyond the two pinned defect fixes.
 - Perf claims without benchmark numbers.
@@ -146,3 +157,5 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
   and lowers through existing renderer lifecycle coverage.
 - Slice A closes only the color-attachment-read defect at `CPUContracted`; no
   performance claim is made in this slice.
+- Slice B closes the block-compressed transient-estimate defect at
+  `CPUContracted`; no performance claim is made in this slice.

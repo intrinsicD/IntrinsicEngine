@@ -78,6 +78,10 @@ planned peak so existing diagnostics keep a single useful estimate. When
 `SetTransientAliasingEnabled(false)` is selected, placement stays deterministic
 but does not reuse ranges: planned peak equals the naive estimate and no
 alias-reuse hazards are emitted.
+Texture transient byte estimates come from
+`RHI::EstimateTextureStorageBytes`, so block-compressed formats use the same
+texel-block sizing as RHI upload/storage helpers instead of a framegraph-local
+bytes-per-pixel table.
 
 Alias reuse is represented in the barrier plan through
 `TextureAliasReuseBarrierPacket` / `BufferAliasReuseBarrierPacket` entries on a
