@@ -498,6 +498,8 @@ namespace Extrinsic::Runtime
         // runtime sidecar cleanup while the serializer stays backend-neutral.
         [[nodiscard]] Core::Expected<SceneSerializationResult> SaveSceneToPath(
             std::string path);
+        [[nodiscard]] Core::Expected<RuntimeQueuedSceneFileOperation>
+            QueueSceneSaveToPath(std::string path);
         [[nodiscard]] Core::Expected<SceneDeserializationResult> LoadSceneFromPath(
             std::string path);
         [[nodiscard]] Core::Expected<RuntimeQueuedSceneFileOperation>

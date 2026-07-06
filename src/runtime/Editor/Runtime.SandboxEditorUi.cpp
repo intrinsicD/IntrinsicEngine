@@ -12623,24 +12623,27 @@ namespace Extrinsic::Runtime
                     .Save =
                         [&engine](const SandboxEditorSceneFileCommand& command)
                         {
-                            auto saved = engine.SaveSceneToPath(command.Path);
-                            if (!saved.has_value())
+                            auto queued = engine.QueueSceneSaveToPath(command.Path);
+                            if (!queued.has_value())
                             {
                                 return SandboxEditorSceneFileResult{
                                     .Status = SandboxEditorCommandStatus::SceneSaveFailed,
                                     .Operation = SandboxEditorSceneFileOperation::Save,
-                                    .Error = saved.error(),
+                                    .Error = queued.error(),
                                     .Message = BuildSceneFileFailureMessage(
                                         SandboxEditorSceneFileOperation::Save,
-                                        saved.error()),
+                                        queued.error()),
                                 };
                             }
                             SandboxEditorSceneFileResult result{
-                                .Status = SandboxEditorCommandStatus::Applied,
+                                .Status = SandboxEditorCommandStatus::Pending,
                                 .Operation = SandboxEditorSceneFileOperation::Save,
-                                .Stats = saved->Stats,
+                                .Task = queued->Task,
+                                .Error = Core::ErrorCode::Success,
                             };
-                            result.Message = BuildSceneFileSuccessMessage(command, result);
+                            result.Message = BuildSceneFilePendingMessage(
+                                command,
+                                result.Operation);
                             return result;
                         },
                     .Load =

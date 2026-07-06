@@ -13,16 +13,19 @@ import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
+import Extrinsic.Core.IOBackend;
 import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Runtime.DerivedJobGraph;
+import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 
 namespace Core = Extrinsic::Core;
@@ -289,6 +292,80 @@ TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSid
     EXPECT_FALSE(engine.GetVisualizationAdapterBinding(stableId).has_value());
     EXPECT_GT(engine.GetVisualizationAdapterBindingRevision(),
               bindingRevisionBeforeReset);
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeSceneLifecycle, QueuedSceneSaveWritesSnapshotAndMarksHistoryOnCompletion)
+{
+    TempSceneFile savedScene("runtime142_async_saved_scene.json", "");
+    auto application = std::make_unique<WaitForConditionApplication>(
+        [](Runtime::Engine& runningEngine)
+        {
+            const std::optional<Runtime::RuntimeSceneFileEvent>& event =
+                runningEngine.GetLastSceneFileEvent();
+            return event.has_value() &&
+                   event->Operation == Runtime::RuntimeSceneFileOperation::Save;
+        });
+    WaitForConditionApplication* app = application.get();
+    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    const ECS::EntityHandle saved = scene.Create();
+    scene.Raw().emplace<ECSC::MetaData>(
+        saved,
+        ECSC::MetaData{.EntityName = "Saved Scene Entity"});
+    scene.Raw().emplace<Sel::SelectableTag>(saved);
+    const Runtime::EditorCommandHistoryResult dirty =
+        engine.GetEditorCommandHistory().MarkDirty("Edit Scene");
+    EXPECT_TRUE(dirty.Succeeded());
+    EXPECT_TRUE(engine.GetEditorCommandHistory().Snapshot().Dirty);
+
+    auto queued = engine.QueueSceneSaveToPath(savedScene.Path.string());
+    ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
+    EXPECT_TRUE(queued->Task.IsValid());
+    EXPECT_EQ(queued->Operation, Runtime::RuntimeSceneFileOperation::Save);
+    EXPECT_FALSE(engine.GetLastSceneFileEvent().has_value());
+
+    scene.Raw().get<ECSC::MetaData>(saved).EntityName = "Mutated After Queue";
+    const ECS::EntityHandle late = scene.Create();
+    scene.Raw().emplace<ECSC::MetaData>(
+        late,
+        ECSC::MetaData{.EntityName = "Late Scene Entity"});
+
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable";
+    engine.Run();
+
+    EXPECT_LT(app->Frames(), 256u);
+    const std::optional<Runtime::RuntimeSceneFileEvent>& event =
+        engine.GetLastSceneFileEvent();
+    ASSERT_TRUE(event.has_value());
+    EXPECT_EQ(event->Operation, Runtime::RuntimeSceneFileOperation::Save);
+    EXPECT_EQ(event->Task, queued->Task);
+    EXPECT_EQ(event->Path, savedScene.Path.string());
+    EXPECT_TRUE(event->Succeeded());
+    ASSERT_TRUE(event->SaveResult.has_value());
+    EXPECT_EQ(event->SaveResult->Stats.Entities, 1u);
+    EXPECT_EQ(event->SaveResult->Stats.SelectableEntities, 1u);
+
+    const Runtime::EditorCommandHistorySnapshot history =
+        engine.GetEditorCommandHistory().Snapshot();
+    EXPECT_TRUE(history.HasActivePath);
+    EXPECT_EQ(history.ActivePath, savedScene.Path.string());
+    EXPECT_FALSE(history.Dirty);
+
+    Core::IO::FileIOBackend backend;
+    ECS::Scene::Registry loaded;
+    auto loadedResult =
+        Runtime::LoadSceneDocument(loaded, savedScene.Path.string(), backend);
+    ASSERT_TRUE(loadedResult.has_value())
+        << static_cast<int>(loadedResult.error());
+    EXPECT_EQ(loadedResult->Stats.Entities, 1u);
+    EXPECT_TRUE(SceneContainsNamedEntity(loaded, "Saved Scene Entity"));
+    EXPECT_FALSE(SceneContainsNamedEntity(loaded, "Mutated After Queue"));
+    EXPECT_FALSE(SceneContainsNamedEntity(loaded, "Late Scene Entity"));
 
     engine.Shutdown();
 }

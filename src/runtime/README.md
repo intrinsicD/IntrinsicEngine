@@ -75,13 +75,16 @@ handoff, selection, and document-history mutation. Sandbox editor model-scene
 and texture import commands use `Engine::QueueModelTextureImport(...)`, return
 `Pending` with an ingest handle to the ImGui callback, and publish completion
 through the existing runtime import event plus queue snapshot. Sandbox editor
-scene open commands use `Engine::QueueSceneLoadFromPath(...)`, parse into a
-temporary registry on the worker lane, and publish completion through
-`Engine::GetLastSceneFileEvent()` after the main-thread scene replacement
-lifecycle succeeds or fails closed. Direct `ImportAssetFromPath(...)` /
-`ReimportAsset(...)` / `LoadSceneFromPath(...)` compatibility calls and
-scene-document save are still synchronous and remain under open `RUNTIME-142`
-follow-up slices.
+scene save commands use `Engine::QueueSceneSaveToPath(...)`, snapshot persisted
+ECS state on the frame thread, serialize/write that snapshot on the worker
+lane, and mark the editor document saved only from the main-thread completion
+callback. Sandbox editor scene open commands use
+`Engine::QueueSceneLoadFromPath(...)`, parse into a temporary registry on the
+worker lane, and publish completion through `Engine::GetLastSceneFileEvent()`
+after the main-thread scene replacement lifecycle succeeds or fails closed.
+Direct `ImportAssetFromPath(...)` / `ReimportAsset(...)` /
+`SaveSceneToPath(...)` / `LoadSceneFromPath(...)` compatibility calls are still
+synchronous and remain under open `RUNTIME-142` follow-up slices.
 
 ### Sandbox Editor Async Method Jobs
 

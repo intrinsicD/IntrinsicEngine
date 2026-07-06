@@ -1931,6 +1931,59 @@ TEST(SandboxEditorUi, SceneLoadCommandTreatsAsyncPendingAsNonFailure)
         Runtime::SandboxEditorDiagnosticCode::SceneFileFailed));
 }
 
+TEST(SandboxEditorUi, SceneSaveCommandTreatsAsyncPendingAsNonFailure)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    const Runtime::StreamingTaskHandle queuedTask{43u, 7u};
+    context.SceneFileCommands = Runtime::SandboxEditorSceneFileCommandSurface{
+        .Save =
+            [queuedTask](const Runtime::SandboxEditorSceneFileCommand&)
+            {
+                return Runtime::SandboxEditorSceneFileResult{
+                    .Status = Runtime::SandboxEditorCommandStatus::Pending,
+                    .Operation = Runtime::SandboxEditorSceneFileOperation::Save,
+                    .Task = queuedTask,
+                };
+            },
+        .Load =
+            [](const Runtime::SandboxEditorSceneFileCommand&)
+            {
+                return Runtime::SandboxEditorSceneFileResult{
+                    .Status = Runtime::SandboxEditorCommandStatus::Applied,
+                    .Operation = Runtime::SandboxEditorSceneFileOperation::Load,
+                };
+            },
+    };
+
+    const Runtime::SandboxEditorSceneFileResult result =
+        Runtime::ApplySandboxEditorSceneSaveCommand(
+            context,
+            Runtime::SandboxEditorSceneFileCommand{
+                .Path = "scene.extrinsic.json",
+            });
+
+    EXPECT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_FALSE(result.Succeeded());
+    EXPECT_EQ(result.Operation, Runtime::SandboxEditorSceneFileOperation::Save);
+    EXPECT_EQ(result.Task, queuedTask);
+    EXPECT_EQ(result.Error, Core::ErrorCode::Success);
+    EXPECT_NE(result.Message.find("Queued scene save"), std::string::npos);
+
+    context.LastSceneFileResult = &result;
+    Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    ASSERT_TRUE(frame.SceneFile.LastResult.has_value());
+    EXPECT_EQ(frame.SceneFile.LastResult->Status,
+              Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_EQ(frame.SceneFile.StatusText, result.Message);
+    EXPECT_FALSE(HasDiagnostic(
+        frame.SceneFile.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::SceneFileFailed));
+}
+
 TEST(SandboxEditorUi, DocumentModelReportsRuntimeHistoryDirtyState)
 {
     ECS::Scene::Registry registry;

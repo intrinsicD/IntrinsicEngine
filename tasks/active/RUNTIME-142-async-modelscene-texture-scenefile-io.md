@@ -45,7 +45,7 @@ depends_on: []
       registry off-thread; keep the swap-in (registry replacement, sidecar
       drains, `StableEntityLookup` rebuild) on the main thread per the
       documented scene-replacement lifecycle.
-- [ ] Route scene save off-thread: snapshot serializable state on the main
+- [x] Route scene save off-thread: snapshot serializable state on the main
       thread, serialize + write on the worker lane, report completion via
       the existing import/editor event surface.
 - [x] Keep failure behavior fail-closed and identical (a bad parse never
@@ -60,9 +60,12 @@ depends_on: []
       the async route with unchanged observable results.
 - [x] Contract: scene load with an invalid document leaves the live scene
       untouched (existing guarantee preserved through the async route).
+- [x] Contract: queued scene save writes the queued scene snapshot, reports
+      completion through the scene-file event, and marks the editor document
+      saved only after the main-thread completion callback.
 - [ ] Contract: frame does not block during a large import (timing probe
       with a slow-IO fake backend).
-- [ ] Existing drop/import/scene-serialization suites stay green.
+- [x] Existing drop/import/scene-serialization suites stay green.
 
 ## Docs
 - [x] Update `src/runtime/README.md` and
@@ -70,7 +73,7 @@ depends_on: []
 - [x] Update runtime import notes for dropped and editor-menu/manual
       model-scene/texture queued imports.
 - [x] Update scene-replacement/import notes for async scene-load routing.
-- [ ] Update scene-replacement/import notes again when scene save moves off
+- [x] Update scene-replacement/import notes again when scene save moves off
       the frame path.
 
 ## Acceptance criteria
@@ -79,7 +82,7 @@ depends_on: []
       (audited call-site list recorded in this file).
 - [ ] Import/save/load observable behavior unchanged apart from latency now
       spanning frames.
-- [ ] Default CPU gate green.
+- [x] Default CPU gate green.
 
 ## Slice log
 - 2026-07-05: Dropped model-scene and texture imports now use
@@ -123,6 +126,18 @@ depends_on: []
   remains a synchronous compatibility facade. Sandbox editor save commands and
   direct `Engine::SaveSceneToPath(...)` still serialize/write scene documents
   inline.
+- 2026-07-05: Sandbox editor scene-save commands now route through
+  `Engine::QueueSceneSaveToPath(...)`. The frame thread snapshots the persisted
+  scene surface into a temporary registry, the worker lane serializes and writes
+  that snapshot with `Core::IO::FileIOBackend`, and the main-thread completion
+  callback marks `EditorCommandHistory` saved and publishes
+  `Engine::GetLastSceneFileEvent()`.
+- Remaining synchronous audited call sites after the scene-save slice:
+  direct programmatic `Engine::ImportAssetFromPath(...)` /
+  `Engine::ReimportAsset(...)` compatibility calls can still decode
+  model-scene/texture payloads inline. Direct `Engine::SaveSceneToPath(...)`
+  and `Engine::LoadSceneFromPath(...)` remain synchronous compatibility
+  facades.
 
 ## Verification
 ```bash
