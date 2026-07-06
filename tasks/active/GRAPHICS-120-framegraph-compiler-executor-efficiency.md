@@ -8,7 +8,8 @@ depends_on: []
 ## Status
 - In progress on local `main`; PR not opened.
 - Owner/agent: Codex.
-- Current slices: Slice A, Slice B, Slice C, Slice D1, Slice D2a, and Slice D2b
+- Current slices: Slice A, Slice B, Slice C, Slice D1, Slice D2a, Slice D2b,
+  and Slice D2c
   completed locally.
   `TextureUsage::ColorAttachmentRead` now uses a read-only barrier state,
   transient texture memory estimates are pinned to RHI block-compressed storage
@@ -20,9 +21,10 @@ depends_on: []
   validation uses a sorted scan that preserves earliest-duplicate diagnostics.
   `RenderGraph::Reset()` now recycles pass records so steady-state
   redeclaration preserves per-pass access/dependency vector capacity, with
-  allocation-counter smoke evidence.
-- Next implementation step: continue with Slice D2c (compile-scoped scratch and
-  name-storage churn audit).
+  allocation-counter smoke evidence. Stateful `RenderGraph::Compile()` now
+  reuses private compiler scratch for graph-analysis temporaries while keeping
+  `CompiledRenderGraph` output names value-owned.
+- Next implementation step: retire the task.
 
 ## Goal
 - Remove the per-compile/per-execute waste and small contract hazards inside
@@ -99,7 +101,7 @@ depends_on: []
 - [x] Persistent declaration scratch: keep `RenderPassRecord` access and
       explicit-dependency vector capacity across `Reset()` while clearing stale
       pass metadata before reuse.
-- [ ] Persistent compiler scratch: reuse compile-scoped containers across
+- [x] Persistent compiler scratch: reuse compile-scoped containers across
       compiles (member scratch or arena) and audit whether pass/resource name
       copies can safely become `string_view`s into graph-owned storage without
       changing compiled-graph lifetime semantics.
@@ -111,7 +113,7 @@ depends_on: []
       diagnostics.
 - [x] Slice D2b: pass-record scratch reuse; finish redeclare + compile
       allocation reduction evidence with a counter probe.
-- [ ] Slice D2c: compile-scoped scratch and name-storage churn audit.
+- [x] Slice D2c: compile-scoped scratch and name-storage churn audit.
 - [x] Slice C: replace the `thread_local` validation side channel: return the
       validation result in the `Compile()` `Expected` payload (or a caller
       out-param); make `Compile` non-`const` or move its mutations out.
@@ -122,7 +124,7 @@ depends_on: []
       recipe reference from framegraph comments.
 
 ## Tests
-- [ ] Golden: compiled output (edges, order, barriers) unchanged for a
+- [x] Golden: compiled output (edges, order, barriers) unchanged for a
       fixture graph across the churn/scan changes.
 - [x] Slice A contract: `ColorAttachmentRead` no longer emits a write-state
       transition between consecutive readers.
@@ -136,6 +138,8 @@ depends_on: []
       barrier packet insertion baseline/probe on synthetic compiler work.
 - [x] Slice D2b PR-fast benchmark: compile + allocation counter evidence on a
       pass-heavy synthetic graph.
+- [x] Slice D2c PR-fast benchmark: reused compiler scratch allocation-counter
+      evidence on the same pass-heavy synthetic graph.
 
 ## Docs
 - [x] Slice A: update `src/graphics/framegraph/README.md` for the read-only
@@ -149,6 +153,8 @@ depends_on: []
 - [x] Slice D2a: document compiler indexing smoke benchmark scope.
 - [x] Slice D2b: document reset/redeclare scratch reuse and the allocation
       counter smoke benchmark scope.
+- [x] Slice D2c: document private compiler scratch reuse and the value-owned
+      compiled-name decision.
 
 ## Acceptance criteria
 - [x] Zero `thread_local` compile state; validation results flow through
@@ -266,6 +272,37 @@ Slice D2b benchmark result (`rendering.framegraph_scratch_reuse.smoke`,
 `reused_declare_compile_allocations=190304`,
 `quality_error_l2=0.0`.
 
+Slice D2c verification run locally on 2026-07-06:
+
+```bash
+cmake --build --preset ci --target ExtrinsicGraphicsRenderGraph
+cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure -R 'RenderGraphValidation.ResetReusedCompilerScratchKeepsCompiledOutputStable|RenderGraphValidation.ResetReusedPassRecordClearsStaleDeclarations|RenderGraphValidation.ColorAttachmentReadUsesReadStateAndSkipsConsecutiveReadBarrier|RenderGraphValidation.TransientMemoryEstimateUsesRhiBlockCompressedStorageSize' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+cmake --build --preset ci --target IntrinsicBenchmarkSmoke
+build/ci/bin/IntrinsicBenchmarkSmoke build/ci/benchmark-graphics120-d2c
+python3 tools/benchmark/validate_benchmark_results.py --root build/ci/benchmark-graphics120-d2c --strict
+ctest --test-dir build/ci --output-on-failure -R 'IntrinsicBenchmarkSmoke|RenderGraphValidation|CrossQueueTimeline|FrameRecipeContract|RendererFrameLifecycle|OwnershipTransferBarriers|QueueAffinity' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/validate_tasks.py --root tasks --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --strict
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+```
+
+Slice D2c benchmark result (`rendering.framegraph_scratch_reuse.smoke`,
+`cpu_reference`, `builtin.synthetic_framegraph_scratch_reuse.192_passes`):
+`fresh_declare_compile_ms=11.299405`,
+`reused_declare_compile_ms=9.633318`,
+`fresh_declare_allocations=38592`,
+`reused_declare_allocations=1216`,
+`fresh_declare_compile_allocations=221600`,
+`reused_declare_compile_allocations=122016`,
+`quality_error_l2=0.0`.
+
 ## Forbidden changes
 - Changing compiled-graph semantics beyond the two pinned defect fixes.
 - Perf claims without benchmark numbers.
@@ -292,3 +329,7 @@ Slice D2b benchmark result (`rendering.framegraph_scratch_reuse.smoke`,
 - Slice D2b closes the reset/redeclare pass-record scratch item at
   `CPUContracted` with scoped allocation-counter evidence; deeper
   compile-scoped scratch/name-storage churn remains in D2c.
+- Slice D2c closes the compile-scoped scratch item at `CPUContracted` with
+  scoped allocation-counter evidence and a compiled-output stability contract.
+  Compiled pass/resource names remain value-owned because `CompiledRenderGraph`
+  can outlive graph-owned storage; no `Operational` follow-up is owed.

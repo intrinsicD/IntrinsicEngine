@@ -86,6 +86,15 @@ reallocating per-pass access storage while preserving the visible reset contract
 new compiles must not inherit stale pass names, dependencies, render-pass
 metadata, resource accesses, or validation state from the prior frame.
 
+Stateful `RenderGraph::Compile()` also owns private compiler scratch for
+graph-analysis temporaries such as resource states, adjacency lists, live-pass
+queues, queue handoff dedup sets, timeline synthesis scratch, and barrier-state
+tracking. The static `RenderGraphCompiler::Compile(...)` API remains
+self-contained and uses local scratch for one-shot callers. `CompiledRenderGraph`
+continues to own its pass/resource names and output vectors by value; it must
+not hold `string_view`s into mutable graph storage because compiled results can
+outlive the `RenderGraph` instance or its next `Reset()`.
+
 ## Barrier Packet Traversal Contract
 
 Compiled barrier packets are sorted by `(PassIndex, Stage)` using

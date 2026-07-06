@@ -18,10 +18,10 @@ workload measurements.
   `adoption_claim=false` because it is algorithm evidence, not renderer-wide
   frame-time evidence.
 - `rendering.framegraph_scratch_reuse.smoke` is the `GRAPHICS-120`
-  baseline/probe for steady-state `RenderGraph::Reset()` redeclaration
-  allocation churn. It compares fresh graph rebuilds against reset/redeclare
-  reuse on the same deterministic pass-heavy graph and reports scoped
-  allocation-counter diagnostics with `adoption_claim=false`.
+  baseline/probe for steady-state `RenderGraph::Reset()` redeclaration and
+  stateful compiler-scratch allocation churn. It compares fresh graph rebuilds
+  against reset/redeclare reuse on the same deterministic pass-heavy graph and
+  reports scoped allocation-counter diagnostics with `adoption_claim=false`.
 - `rendering.frame_recipe_compile_cache.smoke` is the `GRAPHICS-117`
   baseline/probe for the default frame recipe's CPU declare+compile stage. It
   measures rebuild-each-frame declare+compile time and records the renderer

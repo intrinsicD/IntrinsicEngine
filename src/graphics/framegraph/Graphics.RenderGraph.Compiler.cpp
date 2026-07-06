@@ -6,7 +6,6 @@ module;
 #include <expected>
 #include <limits>
 #include <sstream>
-#include <stack>
 #include <ranges>
 #include <string>
 #include <tuple>
@@ -774,6 +773,107 @@ namespace Extrinsic::Graphics
             std::uint64_t Value = 0;
         };
 
+        void ResetResourceStates(std::vector<ResourceState>& states, const std::size_t count)
+        {
+            if (states.size() < count)
+            {
+                states.resize(count);
+            }
+            for (std::size_t i = 0u; i < states.size(); ++i)
+            {
+                states[i].LastWriter = -1;
+                states[i].Readers.clear();
+                states[i].LastAccessor = -1;
+                states[i].LastAccessorQueue = RenderQueue::Graphics;
+            }
+            states.resize(count);
+        }
+
+        void ResetAdjacencyLists(std::vector<std::vector<std::uint32_t>>& lists,
+                                 const std::size_t count)
+        {
+            if (lists.size() < count)
+            {
+                lists.resize(count);
+            }
+            for (std::vector<std::uint32_t>& list : lists)
+            {
+                list.clear();
+            }
+            lists.resize(count);
+        }
+
+        template <typename T>
+        void ResetVector(std::vector<T>& values, const std::size_t count, const T& value = T{})
+        {
+            values.assign(count, value);
+        }
+
+        template <typename T>
+        void ClearAndReserve(std::vector<T>& values, const std::size_t reserveCount)
+        {
+            values.clear();
+            values.reserve(reserveCount);
+        }
+
+        struct RenderGraphCompilerScratchStorage
+        {
+            std::vector<ResourceState> TextureStates{};
+            std::vector<ResourceState> BufferStates{};
+            std::vector<std::vector<std::uint32_t>> Adjacency{};
+            std::vector<std::vector<std::uint32_t>> ReverseAdjacency{};
+            std::vector<std::uint32_t> Indegree{};
+            std::unordered_set<std::uint64_t> EdgeDedup{};
+            std::vector<QueueHandoffDependency> QueueHandoffs{};
+            std::vector<ResourceQueueHandoff> ResourceHandoffs{};
+            std::vector<bool> Live{};
+            std::vector<std::uint32_t> RootStack{};
+            std::vector<std::uint32_t> LiveIndegree{};
+            std::vector<std::uint32_t> Ready{};
+            std::vector<std::uint32_t> NewlyReady{};
+            std::vector<std::uint32_t> LayerMaxPred{};
+            std::unordered_set<std::uint64_t> ActiveQueueHandoffDedup{};
+            std::vector<QueueHandoffDependency> ActiveTimelineHandoffs{};
+            std::vector<TimelineSignalAssignment> TimelineSignalAssignments{};
+            std::vector<TextureBarrierState> TextureBarrierStates{};
+            std::vector<BufferBarrierState> BufferBarrierStates{};
+            std::vector<std::int32_t> TextureLastAccessors{};
+            std::vector<std::int32_t> BufferLastAccessors{};
+            std::vector<RenderQueue> TextureQueues{};
+            std::vector<RenderQueue> BufferQueues{};
+
+            void Reset(const std::size_t passCount,
+                       const std::size_t textureCount,
+                       const std::size_t bufferCount)
+            {
+                ResetResourceStates(TextureStates, textureCount);
+                ResetResourceStates(BufferStates, bufferCount);
+                ResetAdjacencyLists(Adjacency, passCount);
+                ResetAdjacencyLists(ReverseAdjacency, passCount);
+                ResetVector(Indegree, passCount, 0u);
+                EdgeDedup.clear();
+                EdgeDedup.reserve(passCount * 4u);
+                ClearAndReserve(QueueHandoffs, passCount);
+                ClearAndReserve(ResourceHandoffs, textureCount + bufferCount);
+                ResetVector(Live, passCount, false);
+                ClearAndReserve(RootStack, passCount);
+                ResetVector(LiveIndegree, passCount, 0u);
+                ClearAndReserve(Ready, passCount);
+                ClearAndReserve(NewlyReady, passCount);
+                ResetVector(LayerMaxPred, passCount, 0u);
+                ActiveQueueHandoffDedup.clear();
+                ActiveQueueHandoffDedup.reserve(passCount);
+                ClearAndReserve(ActiveTimelineHandoffs, passCount);
+                ClearAndReserve(TimelineSignalAssignments, passCount);
+                ResetVector(TextureBarrierStates, textureCount, TextureBarrierState::Undefined);
+                ResetVector(BufferBarrierStates, bufferCount, BufferBarrierState::Undefined);
+                ResetVector(TextureLastAccessors, textureCount, -1);
+                ResetVector(BufferLastAccessors, bufferCount, -1);
+                ResetVector(TextureQueues, textureCount, RenderQueue::Graphics);
+                ResetVector(BufferQueues, bufferCount, RenderQueue::Graphics);
+            }
+        };
+
         [[nodiscard]] std::uint64_t FindTimelineSignalValue(const std::vector<TimelineSignalAssignment>& assignments,
                                                             const std::uint32_t passIndex,
                                                             const RenderQueue queue)
@@ -789,9 +889,11 @@ namespace Extrinsic::Graphics
                                           const std::vector<std::uint32_t>& topologicalRankByPass,
                                           std::vector<CrossQueueTimelineSignal>& signals,
                                           std::vector<CrossQueueTimelineWait>& waits,
-                                          std::vector<CrossQueueTimelineEdge>& edges)
+                                          std::vector<CrossQueueTimelineEdge>& edges,
+                                          std::vector<QueueHandoffDependency>& activeHandoffs,
+                                          std::vector<TimelineSignalAssignment>& assignments)
         {
-            std::vector<QueueHandoffDependency> activeHandoffs{};
+            activeHandoffs.clear();
             activeHandoffs.reserve(queueHandoffs.size());
             for (const QueueHandoffDependency& handoff : queueHandoffs)
             {
@@ -810,10 +912,10 @@ namespace Extrinsic::Graphics
                                              activeHandoffs.end(),
                                              [](const QueueHandoffDependency& lhs, const QueueHandoffDependency& rhs) {
                                                  return lhs.From == rhs.From && lhs.To == rhs.To;
-                                             }),
+                                            }),
                                  activeHandoffs.end());
 
-            std::vector<TimelineSignalAssignment> assignments{};
+            assignments.clear();
             assignments.reserve(activeHandoffs.size());
             std::array<std::uint64_t, 3u> nextValueByQueue{};
 
@@ -988,6 +1090,21 @@ namespace Extrinsic::Graphics
                        std::tuple{rhs.PassIndex, BarrierPacketStageSortKey(rhs.Stage)};
             });
         }
+    }
+
+    struct RenderGraphCompilerScratch
+    {
+        RenderGraphCompilerScratchStorage Storage{};
+    };
+
+    RenderGraphCompilerScratch* CreateRenderGraphCompilerScratch()
+    {
+        return new RenderGraphCompilerScratch{};
+    }
+
+    void DestroyRenderGraphCompilerScratch(RenderGraphCompilerScratch* scratch) noexcept
+    {
+        delete scratch;
     }
 
     CompiledPassDeclarations::CompiledPassDeclarations() = default;
@@ -1447,12 +1564,16 @@ namespace Extrinsic::Graphics
         return DeclaresBufferWrite(ref) ? Core::Ok() : Core::Err(Core::ErrorCode::InvalidArgument);
     }
 
-    Core::Expected<CompiledRenderGraph> RenderGraphCompiler::Compile(
+    Core::Expected<CompiledRenderGraph> CompileRenderGraphWithScratch(
         const std::span<const RenderPassRecord> passes,
         const std::span<const TextureResourceDesc> textures,
         const std::span<const BufferResourceDesc> buffers,
+        RenderGraphCompilerScratch& compilerScratch,
         RenderGraphValidationResult* validationOut)
     {
+        RenderGraphCompilerScratchStorage& scratch = compilerScratch.Storage;
+        scratch.Reset(passes.size(), textures.size(), buffers.size());
+
         RenderGraphValidationResult validation{};
         auto publishValidation = [validationOut](RenderGraphValidationResult result) {
             if (validationOut)
@@ -1522,8 +1643,8 @@ namespace Extrinsic::Graphics
             return compiled;
         }
 
-        std::vector<ResourceState> textureStates(textures.size());
-        std::vector<ResourceState> bufferStates(buffers.size());
+        auto& textureStates = scratch.TextureStates;
+        auto& bufferStates = scratch.BufferStates;
         std::vector<RHI::TextureHandle> textureHandles(textures.size());
         std::vector<RHI::BufferHandle> bufferHandles(buffers.size());
         std::vector<bool> textureImported(textures.size(), false);
@@ -1544,15 +1665,14 @@ namespace Extrinsic::Graphics
         std::vector<CompiledRenderPassAttachment> renderPassAttachments{};
         std::vector<ResourceLifetime> textureLifetimes(textures.size());
         std::vector<ResourceLifetime> bufferLifetimes(buffers.size());
-        std::vector<std::vector<std::uint32_t>> adjacency(passCount);
-        std::vector<std::vector<std::uint32_t>> reverseAdjacency(passCount);
-        std::vector<std::uint32_t> indegree(passCount, 0u);
+        auto& adjacency = scratch.Adjacency;
+        auto& reverseAdjacency = scratch.ReverseAdjacency;
+        auto& indegree = scratch.Indegree;
         std::vector<CompiledPassDeclarations> passDeclarations{};
         passDeclarations.resize(static_cast<std::size_t>(passCount));
-        std::unordered_set<std::uint64_t> dedup{};
-        dedup.reserve(static_cast<std::size_t>(passCount) * 4u);
-        std::vector<QueueHandoffDependency> queueHandoffs{};
-        std::vector<ResourceQueueHandoff> resourceHandoffs{};
+        auto& dedup = scratch.EdgeDedup;
+        auto& queueHandoffs = scratch.QueueHandoffs;
+        auto& resourceHandoffs = scratch.ResourceHandoffs;
         std::uint32_t queueHandoffEdgeCount = 0;
 
         for (std::uint32_t textureIndex = 0; textureIndex < textures.size(); ++textureIndex)
@@ -1802,8 +1922,8 @@ namespace Extrinsic::Graphics
             }
         }
 
-        std::vector<bool> live(passCount, false);
-        std::stack<std::uint32_t> rootStack{};
+        auto& live = scratch.Live;
+        auto& rootStack = scratch.RootStack;
         for (std::uint32_t passIndex = 0; passIndex < passCount; ++passIndex)
         {
             const RenderPassRecord& pass = passes[passIndex];
@@ -1818,7 +1938,7 @@ namespace Extrinsic::Graphics
 
             if (pass.SideEffect || hasPresentUse || writesImportedTexture || writesImportedBuffer)
             {
-                rootStack.push(passIndex);
+                rootStack.push_back(passIndex);
             }
         }
 
@@ -1828,22 +1948,22 @@ namespace Extrinsic::Graphics
             {
                 if (adjacency[passIndex].empty() && !reverseAdjacency[passIndex].empty())
                 {
-                    rootStack.push(passIndex);
+                    rootStack.push_back(passIndex);
                 }
             }
             if (rootStack.empty())
             {
                 for (std::uint32_t passIndex = 0; passIndex < passCount; ++passIndex)
                 {
-                    rootStack.push(passIndex);
+                    rootStack.push_back(passIndex);
                 }
             }
         }
 
         while (!rootStack.empty())
         {
-            const std::uint32_t node = rootStack.top();
-            rootStack.pop();
+            const std::uint32_t node = rootStack.back();
+            rootStack.pop_back();
             if (live[node])
             {
                 continue;
@@ -1851,11 +1971,12 @@ namespace Extrinsic::Graphics
             live[node] = true;
             for (const std::uint32_t predecessor : reverseAdjacency[node])
             {
-                rootStack.push(predecessor);
+                rootStack.push_back(predecessor);
             }
         }
 
-        std::vector<std::uint32_t> liveIndegree = indegree;
+        auto& liveIndegree = scratch.LiveIndegree;
+        liveIndegree = indegree;
         std::uint32_t livePassCount = 0;
         for (std::uint32_t passIndex = 0; passIndex < passCount; ++passIndex)
         {
@@ -1874,7 +1995,8 @@ namespace Extrinsic::Graphics
             }
         }
 
-        std::vector<std::uint32_t> ready{};
+        auto& ready = scratch.Ready;
+        ready.clear();
         ready.reserve(livePassCount);
         for (std::uint32_t i = 0; i < passCount; ++i)
         {
@@ -1888,7 +2010,7 @@ namespace Extrinsic::Graphics
         std::vector<std::uint32_t> order{};
         order.reserve(livePassCount);
         std::vector<std::uint32_t> layerByPass(passCount, 0u);
-        std::vector<std::uint32_t> layerMaxPred(passCount, 0u);
+        auto& layerMaxPred = scratch.LayerMaxPred;
 
         while (!ready.empty())
         {
@@ -1896,7 +2018,8 @@ namespace Extrinsic::Graphics
             ready.erase(ready.begin());
             order.push_back(node);
 
-            std::vector<std::uint32_t> newlyReady{};
+            auto& newlyReady = scratch.NewlyReady;
+            newlyReady.clear();
             for (const std::uint32_t succ : adjacency[node])
             {
                 if (!live[succ])
@@ -1998,7 +2121,8 @@ namespace Extrinsic::Graphics
         }
 
         std::uint32_t activeQueueHandoffEdgeCount = 0;
-        std::unordered_set<std::uint64_t> activeQueueHandoffDedup{};
+        auto& activeQueueHandoffDedup = scratch.ActiveQueueHandoffDedup;
+        activeQueueHandoffDedup.clear();
         activeQueueHandoffDedup.reserve(queueHandoffs.size());
         for (const QueueHandoffDependency& handoff : queueHandoffs)
         {
@@ -2019,7 +2143,9 @@ namespace Extrinsic::Graphics
                                      layerByPass,
                                      crossQueueTimelineSignals,
                                      crossQueueTimelineWaits,
-                                     crossQueueTimelineEdges);
+                                     crossQueueTimelineEdges,
+                                     scratch.ActiveTimelineHandoffs,
+                                     scratch.TimelineSignalAssignments);
 
         std::vector<QueueSharingMode> textureQueueSharingModes(textures.size(), QueueSharingMode::Exclusive);
         std::vector<QueueSharingMode> bufferQueueSharingModes(buffers.size(), QueueSharingMode::Exclusive);
@@ -2033,12 +2159,12 @@ namespace Extrinsic::Graphics
         BarrierPacketBuilder barrierPackets(
             passCount,
             order.size() + resourceHandoffs.size() + 1u);
-        std::vector<TextureBarrierState> textureStateByRef(textures.size(), TextureBarrierState::Undefined);
-        std::vector<BufferBarrierState> bufferStateByRef(buffers.size(), BufferBarrierState::Undefined);
-        std::vector<std::int32_t> textureLastAccessorByRef(textures.size(), -1);
-        std::vector<std::int32_t> bufferLastAccessorByRef(buffers.size(), -1);
-        std::vector<RenderQueue> textureQueueByRef(textures.size(), RenderQueue::Graphics);
-        std::vector<RenderQueue> bufferQueueByRef(buffers.size(), RenderQueue::Graphics);
+        auto& textureStateByRef = scratch.TextureBarrierStates;
+        auto& bufferStateByRef = scratch.BufferBarrierStates;
+        auto& textureLastAccessorByRef = scratch.TextureLastAccessors;
+        auto& bufferLastAccessorByRef = scratch.BufferLastAccessors;
+        auto& textureQueueByRef = scratch.TextureQueues;
+        auto& bufferQueueByRef = scratch.BufferQueues;
         std::uint32_t crossQueueOwnershipTransferCount = 0;
 
         for (std::uint32_t i = 0; i < textures.size(); ++i)
@@ -2270,6 +2396,16 @@ namespace Extrinsic::Graphics
         compiled.ValidationFindings = validation.Findings;
         publishValidation(std::move(validation));
         return compiled;
+    }
+
+    Core::Expected<CompiledRenderGraph> RenderGraphCompiler::Compile(
+        const std::span<const RenderPassRecord> passes,
+        const std::span<const TextureResourceDesc> textures,
+        const std::span<const BufferResourceDesc> buffers,
+        RenderGraphValidationResult* validationOut)
+    {
+        RenderGraphCompilerScratch scratch{};
+        return CompileRenderGraphWithScratch(passes, textures, buffers, scratch, validationOut);
     }
 
     std::string BuildRenderGraphDebugDump(const CompiledRenderGraph& compiled)

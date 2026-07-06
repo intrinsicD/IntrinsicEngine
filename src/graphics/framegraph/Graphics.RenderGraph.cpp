@@ -28,6 +28,18 @@ import Extrinsic.RHI.TextureUpload;
 
 namespace Extrinsic::Graphics
 {
+    struct RenderGraphCompilerScratch;
+    using RenderGraphCompilerScratchDeleter = void (*)(RenderGraphCompilerScratch*) noexcept;
+
+    [[nodiscard]] RenderGraphCompilerScratch* CreateRenderGraphCompilerScratch();
+    void DestroyRenderGraphCompilerScratch(RenderGraphCompilerScratch* scratch) noexcept;
+    [[nodiscard]] Core::Expected<CompiledRenderGraph> CompileRenderGraphWithScratch(
+        std::span<const RenderPassRecord> passes,
+        std::span<const TextureResourceDesc> textures,
+        std::span<const BufferResourceDesc> buffers,
+        RenderGraphCompilerScratch& scratch,
+        RenderGraphValidationResult* validationOut = nullptr);
+
     namespace
     {
         [[nodiscard]] constexpr bool TextureUsageIsWrite(const TextureUsage usage)
@@ -276,6 +288,9 @@ namespace Extrinsic::Graphics
         bool TransientAliasingEnabled = true;
         std::uint32_t Generation = 1;
         RenderGraphValidationResult LastCompileValidationResult{};
+        std::unique_ptr<RenderGraphCompilerScratch, RenderGraphCompilerScratchDeleter> CompileScratch{
+            nullptr,
+            DestroyRenderGraphCompilerScratch};
     };
 
     void ResetPassRecordForReuse(RenderPassRecord& record)
@@ -643,10 +658,16 @@ namespace Extrinsic::Graphics
             return std::unexpected(Core::ErrorCode::InvalidArgument);
         }
 
-        auto compiled = RenderGraphCompiler::Compile(
+        if (!m_Impl->CompileScratch)
+        {
+            m_Impl->CompileScratch.reset(CreateRenderGraphCompilerScratch());
+        }
+
+        auto compiled = CompileRenderGraphWithScratch(
             m_Impl->Passes,
             m_Impl->Textures,
             m_Impl->Buffers,
+            *m_Impl->CompileScratch,
             &m_Impl->LastCompileValidationResult);
         if (!compiled.has_value())
         {

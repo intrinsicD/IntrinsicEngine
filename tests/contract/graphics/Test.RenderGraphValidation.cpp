@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <expected>
 #include <span>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -18,6 +19,10 @@ namespace
 {
     using namespace Extrinsic::Graphics;
     namespace RHI = Extrinsic::RHI;
+
+    inline constexpr std::array<RHI::ColorAttachment, 1u> kCompilerScratchColorAttachments{
+        RHI::ColorAttachment{.Load = RHI::LoadOp::Load, .Store = RHI::StoreOp::Store},
+    };
 
     [[nodiscard]] CompiledRenderGraph MakeCompiled(std::uint32_t passCount,
                                                    std::uint32_t textureCount,
@@ -71,6 +76,142 @@ namespace
     {
         const std::uint64_t remainder = value % alignment;
         return remainder == 0u ? value : value + (alignment - remainder);
+    }
+
+    void DeclareCompilerScratchFixture(RenderGraph& graph)
+    {
+        RHI::TextureDesc textureDesc{};
+        textureDesc.Width = 128u;
+        textureDesc.Height = 64u;
+        textureDesc.Usage = RHI::TextureUsage::Sampled |
+                            RHI::TextureUsage::Storage |
+                            RHI::TextureUsage::ColorTarget;
+
+        RHI::BufferDesc bufferDesc{};
+        bufferDesc.SizeBytes = 4096u;
+        bufferDesc.Usage = RHI::BufferUsage::Storage |
+                           RHI::BufferUsage::TransferSrc |
+                           RHI::BufferUsage::TransferDst;
+
+        const TextureRef scene = graph.CreateTexture("Scene", textureDesc);
+        const TextureRef intermediate = graph.CreateTexture("Intermediate", textureDesc);
+        const BufferRef scratch = graph.CreateBuffer("Scratch", bufferDesc);
+
+        const PassRef seed = graph.AddPass("Seed", [scene, scratch](RenderGraphBuilder& builder) {
+            (void)builder.Write(scene, TextureUsage::ShaderWrite);
+            (void)builder.Write(scratch, BufferUsage::TransferDst);
+            builder.SideEffect();
+        });
+
+        const PassRef async = graph.AddPass("AsyncFilter", [seed, scene, intermediate](RenderGraphBuilder& builder) {
+            builder.SetQueue(RenderQueue::AsyncCompute);
+            builder.DependsOn(seed);
+            (void)builder.Read(scene, TextureUsage::ShaderRead);
+            (void)builder.Write(intermediate, TextureUsage::ShaderWrite);
+        });
+
+        const PassRef transfer = graph.AddPass("TransferReadback", [seed, scratch](RenderGraphBuilder& builder) {
+            builder.SetQueue(RenderQueue::Transfer);
+            builder.DependsOn(seed);
+            (void)builder.Read(scratch, BufferUsage::TransferSrc);
+            builder.SideEffect();
+        });
+
+        (void)graph.AddPass("Composite", [async, transfer, scene, intermediate](RenderGraphBuilder& builder) {
+            builder.DependsOn(async);
+            builder.DependsOn(transfer);
+            (void)builder.Read(intermediate, TextureUsage::ShaderRead);
+            (void)builder.Write(scene, TextureUsage::ColorAttachmentWrite);
+            builder.SideEffect();
+
+            RHI::RenderPassDesc desc{};
+            desc.ColorTargets = kCompilerScratchColorAttachments;
+            builder.SetRenderPass(desc);
+        });
+    }
+
+    [[nodiscard]] std::string CompiledGraphSignature(const CompiledRenderGraph& compiled)
+    {
+        std::ostringstream out;
+        out << "counts " << compiled.PassCount << ' ' << compiled.CulledPassCount << ' '
+            << compiled.ResourceCount << ' ' << compiled.EdgeCount << ' '
+            << compiled.QueueHandoffEdgeCount << ' ' << compiled.CrossQueueTimelineEdgeCount << ' '
+            << compiled.CrossQueueOwnershipTransferCount << '\n';
+
+        for (std::size_t i = 0u; i < compiled.TopologicalOrder.size(); ++i)
+        {
+            out << "order " << i << ' ' << compiled.TopologicalOrder[i] << '\n';
+        }
+        for (std::size_t i = 0u; i < compiled.TopologicalLayerByPass.size(); ++i)
+        {
+            out << "layer " << i << ' ' << compiled.TopologicalLayerByPass[i] << '\n';
+        }
+        for (std::size_t i = 0u; i < compiled.PassNames.size(); ++i)
+        {
+            out << "pass " << i << ' ' << compiled.PassNames[i] << ' '
+                << static_cast<int>(compiled.PassQueues[i]) << ' '
+                << compiled.PassSideEffects[i] << '\n';
+        }
+        for (const CompiledPassDeclarations& declaration : compiled.PassDeclarations)
+        {
+            out << "decl " << declaration.PassIndex;
+            for (const std::uint32_t pass : declaration.ExplicitDependencyPasses)
+            {
+                out << " dep=" << pass;
+            }
+            for (const std::uint32_t texture : declaration.ReadTextures)
+            {
+                out << " rt=" << texture;
+            }
+            for (const std::uint32_t texture : declaration.WriteTextures)
+            {
+                out << " wt=" << texture;
+            }
+            for (const std::uint32_t buffer : declaration.ReadBuffers)
+            {
+                out << " rb=" << buffer;
+            }
+            for (const std::uint32_t buffer : declaration.WriteBuffers)
+            {
+                out << " wb=" << buffer;
+            }
+            out << '\n';
+        }
+        for (const CompiledRenderPassAttachment& attachment : compiled.RenderPassAttachments)
+        {
+            out << "attachment " << attachment.PassIndex << ' ' << attachment.ResourceIndex << ' '
+                << attachment.AttachmentIndex << ' ' << attachment.IsDepthAttachment << ' '
+                << static_cast<int>(attachment.Load) << ' ' << static_cast<int>(attachment.Store) << ' '
+                << static_cast<int>(attachment.Format) << '\n';
+        }
+        for (const BarrierPacket& packet : compiled.BarrierPackets)
+        {
+            out << "packet " << static_cast<int>(packet.Kind) << ' ' << packet.PassIndex << ' '
+                << static_cast<int>(packet.Stage) << '\n';
+            for (const TextureBarrierPacket& barrier : packet.TextureBarriers)
+            {
+                out << " tb " << barrier.TextureIndex << ' ' << static_cast<int>(barrier.Before) << ' '
+                    << static_cast<int>(barrier.After) << ' ' << static_cast<int>(barrier.SharingMode) << ' '
+                    << static_cast<int>(barrier.OwnershipTransfer.Kind) << ' '
+                    << static_cast<int>(barrier.OwnershipTransfer.SourceQueue) << ' '
+                    << static_cast<int>(barrier.OwnershipTransfer.DestinationQueue) << '\n';
+            }
+            for (const BufferBarrierPacket& barrier : packet.BufferBarriers)
+            {
+                out << " bb " << barrier.BufferIndex << ' ' << static_cast<int>(barrier.Before) << ' '
+                    << static_cast<int>(barrier.After) << ' ' << static_cast<int>(barrier.SharingMode) << ' '
+                    << static_cast<int>(barrier.OwnershipTransfer.Kind) << ' '
+                    << static_cast<int>(barrier.OwnershipTransfer.SourceQueue) << ' '
+                    << static_cast<int>(barrier.OwnershipTransfer.DestinationQueue) << '\n';
+            }
+        }
+        for (const CrossQueueTimelineEdge& edge : compiled.CrossQueueTimelineEdges)
+        {
+            out << "timeline " << edge.SignalPassIndex << ' ' << edge.WaitPassIndex << ' '
+                << static_cast<int>(edge.SignalQueue) << ' ' << static_cast<int>(edge.WaitQueue) << ' '
+                << edge.Value << '\n';
+        }
+        return out.str();
     }
 }
 
@@ -657,4 +798,27 @@ TEST(RenderGraphValidation, ResetReusedPassRecordClearsStaleDeclarations)
     EXPECT_TRUE(compiled->PassDeclarations.front().WriteBuffers.empty());
     EXPECT_TRUE(compiled->RenderPassAttachments.empty());
     EXPECT_TRUE(compiled->BarrierPackets.empty());
+}
+
+TEST(RenderGraphValidation, ResetReusedCompilerScratchKeepsCompiledOutputStable)
+{
+    RenderGraph fresh;
+    DeclareCompilerScratchFixture(fresh);
+    const auto freshCompiled = fresh.Compile();
+    ASSERT_TRUE(freshCompiled.has_value());
+
+    RenderGraph reused;
+    DeclareCompilerScratchFixture(reused);
+    const auto firstReusedCompiled = reused.Compile();
+    ASSERT_TRUE(firstReusedCompiled.has_value());
+
+    reused.Reset();
+    DeclareCompilerScratchFixture(reused);
+    const auto secondReusedCompiled = reused.Compile();
+    ASSERT_TRUE(secondReusedCompiled.has_value());
+
+    const std::string freshSignature = CompiledGraphSignature(*freshCompiled);
+    EXPECT_EQ(CompiledGraphSignature(*firstReusedCompiled), freshSignature);
+    EXPECT_EQ(CompiledGraphSignature(*secondReusedCompiled), freshSignature);
+    EXPECT_TRUE(reused.GetLastCompileValidationResult().Findings.empty());
 }
