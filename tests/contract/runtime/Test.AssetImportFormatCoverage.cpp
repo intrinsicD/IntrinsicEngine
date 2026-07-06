@@ -42,8 +42,10 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.VisualizationSyncSystem;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
+import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.HalfedgeMesh.IO;
 
@@ -386,6 +388,27 @@ namespace
         return found;
     }
 
+    [[nodiscard]] std::optional<ECS::EntityHandle> FindFirstEntityWithDomainAny(
+        ECS::Scene::Registry& registry,
+        const GS::Domain domain)
+    {
+        std::optional<ECS::EntityHandle> found{};
+        auto& raw = registry.Raw();
+        raw.view<entt::entity>().each([&](const ECS::EntityHandle entity)
+        {
+            if (found.has_value())
+            {
+                return;
+            }
+            const GS::ConstSourceView source = GS::BuildConstView(raw, entity);
+            if (source.ActiveDomain == domain)
+            {
+                found = entity;
+            }
+        });
+        return found;
+    }
+
     void ExpectMeshVertexNormals(
         ECS::Scene::Registry& registry,
         const ECS::EntityHandle entity,
@@ -648,6 +671,128 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportDefaultsToMaterialDrivenSh
         FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
     ExpectMaterialDrivenImportedSurface(engine, *meshEntity);
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, DefaultImportPoliciesApplyAuthoringUxAndPostProcess)
+{
+    TempAssetFile meshFile(
+        "assetio144_default_import_policy.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "vt 0 0\n"
+        "vt 1 0\n"
+        "vt 0 1\n"
+        "vn 0 0 1\n"
+        "vn 0 0 1\n"
+        "vn 0 0 1\n"
+        "f 1/1/1 2/2/2 3/3/3\n");
+
+    std::optional<ECS::EntityHandle> meshEntity{};
+    Core::Config::EngineConfig config = HeadlessConfig();
+    config.Camera.Enabled = true;
+    Runtime::Engine engine(
+        config,
+        std::make_unique<WaitForConditionApplication>(
+            [&meshEntity](Runtime::Engine& runningEngine)
+            {
+                return meshEntity.has_value() &&
+                    DirectMeshPostProcessReady(runningEngine, *meshEntity);
+            },
+            256u));
+    engine.Initialize();
+
+    auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+        .Path = meshFile.Path.string(),
+        .PayloadKind = Assets::AssetPayloadKind::Mesh,
+    });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+    ASSERT_EQ(imported->PrimitiveEntitiesCreated, 1u);
+
+    meshEntity = FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+    auto& raw = engine.GetScene().Raw();
+    EXPECT_TRUE(raw.all_of<Sel::SelectableTag>(*meshEntity));
+    EXPECT_TRUE(raw.all_of<G::RenderSurface>(*meshEntity));
+    ASSERT_TRUE(raw.all_of<G::VisualizationConfig>(*meshEntity));
+    EXPECT_EQ(raw.get<G::VisualizationConfig>(*meshEntity).Source,
+              G::VisualizationConfig::ColorSource::Material);
+    EXPECT_TRUE(engine.GetSelectionController().IsSelected(*meshEntity));
+    EXPECT_EQ(engine.GetSelectionController().SelectedCount(), 1u);
+    EXPECT_NE(engine.GetCameraControllerRegistry().ResolveOrNull(
+                  Runtime::CameraControllerSlot::Main),
+              nullptr);
+    EXPECT_TRUE(engine.GetCameraControllerRegistry().ConsumeCameraTransition(
+        Runtime::CameraControllerSlot::Main));
+    EXPECT_FALSE(HasGeneratedNormalTextureBinding(engine, *meshEntity));
+
+    engine.Run();
+
+    ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity));
+    ExpectGeneratedNormalTextureBinding(engine, *meshEntity, meshFile.Path.string());
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, UnregisteredImportPoliciesMaterializeMinimalGeometry)
+{
+    TempAssetFile meshFile(
+        "assetio144_minimal_import_policy.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "vt 0 0\n"
+        "vt 1 0\n"
+        "vt 0 1\n"
+        "vn 0 0 1\n"
+        "vn 0 0 1\n"
+        "vn 0 0 1\n"
+        "f 1/1/1 2/2/2 3/3/3\n");
+
+    std::optional<ECS::EntityHandle> meshEntity{};
+    Core::Config::EngineConfig config = HeadlessConfig();
+    config.Camera.Enabled = true;
+    Runtime::Engine engine(
+        config,
+        std::make_unique<WaitForConditionApplication>(
+            [&meshEntity](Runtime::Engine& runningEngine)
+            {
+                return meshEntity.has_value() &&
+                    HasGeneratedNormalTextureBinding(runningEngine, *meshEntity);
+            },
+            64u));
+    engine.Initialize();
+    engine.UnregisterDefaultImportPolicies();
+
+    auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+        .Path = meshFile.Path.string(),
+        .PayloadKind = Assets::AssetPayloadKind::Mesh,
+    });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+    EXPECT_EQ(imported->PayloadKind, Assets::AssetPayloadKind::Mesh);
+    EXPECT_EQ(imported->PrimitiveEntitiesCreated, 1u);
+
+    meshEntity = FindFirstEntityWithDomainAny(engine.GetScene(), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+    auto& raw = engine.GetScene().Raw();
+    EXPECT_FALSE(raw.all_of<Sel::SelectableTag>(*meshEntity));
+    EXPECT_FALSE(raw.all_of<G::RenderSurface>(*meshEntity));
+    EXPECT_FALSE(raw.all_of<G::RenderEdges>(*meshEntity));
+    EXPECT_FALSE(raw.all_of<G::RenderPoints>(*meshEntity));
+    EXPECT_FALSE(raw.all_of<G::VisualizationConfig>(*meshEntity));
+    EXPECT_FALSE(engine.GetSelectionController().IsSelected(*meshEntity));
+    EXPECT_EQ(engine.GetSelectionController().SelectedCount(), 0u);
+    EXPECT_EQ(engine.GetCameraControllerRegistry().ResolveOrNull(
+                  Runtime::CameraControllerSlot::Main),
+              nullptr);
+    EXPECT_FALSE(HasGeneratedNormalTextureBinding(engine, *meshEntity));
+
+    engine.Run();
+
+    EXPECT_TRUE(engine.GetScene().IsValid(*meshEntity));
+    EXPECT_FALSE(HasGeneratedNormalTextureBinding(engine, *meshEntity));
 
     engine.Shutdown();
 }

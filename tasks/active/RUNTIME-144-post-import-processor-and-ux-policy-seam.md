@@ -15,6 +15,13 @@ maturity_target: Operational
   ownership.
 - Later slices move sandbox import UX/default authoring policy and the `F`
   focus command behind registered seams before retirement.
+- Slice B is landing the import authoring/default-UX registries and the
+  no-registration contract. `Engine` remains the temporary default registrant
+  until the final retirement slice moves ownership to the sandbox/default
+  composition side.
+- Slice B implemented the import-authoring policy registry, import-completed
+  handler registry, grouped default-policy unregister seam, default behavior
+  preservation test, and no-registration minimal-materialization test.
 
 ## Slice plan
 
@@ -25,8 +32,9 @@ maturity_target: Operational
   registration in this slice so the seam can land independently.
 - **Slice B — import UX/default authoring policy.** Move focus-on-import,
   auto-select, and default render/selection/visualization components behind
-  registered sandbox policy callbacks. Add no-registration tests for minimal
-  materialization.
+  registered policy callbacks. Add no-registration tests for minimal
+  materialization; `Engine` remains the temporary default registrant until
+  Slice D moves ownership to sandbox/default composition.
 - **Slice C — input-action command seam.** Route the existing `F` focus
   command through a registered input action while keeping RunFrame responsible
   only for generic dispatch.
@@ -79,25 +87,29 @@ maturity_target: Operational
 - [ ] Move the direct-mesh generated-normal step into a registered
       processor owned by the feature; default sandbox composition registers
       it so behavior is unchanged.
-- [ ] Add an import-completed event/callback carrying the created entities;
-      move camera-focus/auto-select into a sandbox-registered handler;
-      make authoring defaults a registrable policy with the current values
-      as sandbox defaults.
+- [x] Add an import-completed event/callback carrying the created entities;
+      move camera-focus/auto-select into a registered handler; make authoring
+      defaults a registrable policy with the current values as default policy
+      registrations.
+- [ ] Move the default generated-normal, import-authoring, and
+      import-completed policy registrations out of `Engine` into the
+      sandbox/default composition owner.
 - [ ] Route the `F` focus command through a registered input-action/command
       binding (sandbox registers `F` → `FocusCameraOnSelection`); `RunFrame`
       keeps only the generic dispatch.
 
 ## Tests
-- [ ] Contract: with sandbox registrations, import behavior is unchanged
+- [x] Contract: with default registrations, import behavior is unchanged
       (normal bake queued, focus/selection applied, defaults present) —
       pinned against existing BUG-044/BUG-048/BUG-050 regressions.
-- [ ] Contract: with no registrations, an import materializes geometry with
+- [x] Contract: with no registrations, an import materializes geometry with
       no bake, no focus/selection mutation, and minimal authoring defaults.
 - [x] Contract: processor ordering is deterministic and a failing processor
       fail-closes its own step without corrupting the import.
 
 ## Docs
 - [x] Update `src/runtime/README.md` import-pipeline extension contract.
+- [x] Update `docs/architecture/runtime.md` import apply policy ordering.
 - [ ] Update `docs/architecture/runtime.md` (frame-order step 4 wording for
       the focus command becomes "dispatch registered input actions").
 
@@ -129,6 +141,12 @@ python3 tools/docs/check_doc_links.py --root .
 python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main
 python3 tools/repo/check_test_layout.py --root . --strict
 git diff --check
+```
+
+Slice B focused verification (passed):
+```bash
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='RuntimeAssetImportFormatCoverage.DefaultImportPoliciesApplyAuthoringUxAndPostProcess:RuntimeAssetImportFormatCoverage.UnregisteredImportPoliciesMaterializeMinimalGeometry:RuntimeAssetImportFormatCoverage.PostImportProcessorsRunInOrderAndCanUnregister:RuntimeAssetImportFormatCoverage.DirectObjImportBakesGeneratedNormalTextureFromAuthoredVertexNormals:RuntimeAssetImportFormatCoverage.DirectObjImportComputesAndBakesGeneratedNormalTextureWhenMissingNormals:RuntimeAssetImportFormatCoverage.RepresentativePromotedFormatsMaterializeDeterministically'
 ```
 
 ## Forbidden changes

@@ -78,9 +78,13 @@ step is the only place that mutates `AssetService`, ECS scene state,
 texture/model-scene handoffs, selection/focus state, stable entity lookup, or
 editor document history.
 After a geometry payload creates an entity, runtime invokes ordered
-post-import processors with the decoded payload context; those processors may
-enqueue deferred work through `StreamingExecutor`, but the main-thread apply
-boundary remains the only place that mutates imported ECS or asset state.
+import-authoring policies, populates the decoded geometry, then invokes ordered
+post-import processors with the decoded payload context. Processors may enqueue
+deferred work through `StreamingExecutor`, but the main-thread apply boundary
+remains the only place that mutates imported ECS or asset state. Once the import
+is materialized, ordered import-completed handlers receive the created entity
+span plus an optional focus target; the default compatibility handler applies
+the current focus-on-import and auto-select behavior.
 
 ### Camera focus command
 

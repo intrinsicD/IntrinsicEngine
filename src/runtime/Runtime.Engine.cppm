@@ -138,6 +138,84 @@ namespace Extrinsic::Runtime
         RuntimePostImportProcessorDesc Desc{};
     };
 
+    export struct RuntimeImportEntityAuthoringPolicyHandle
+    {
+        std::uint64_t Value{0};
+
+        [[nodiscard]] bool IsValid() const noexcept { return Value != 0; }
+        [[nodiscard]] friend bool operator==(
+            RuntimeImportEntityAuthoringPolicyHandle,
+            RuntimeImportEntityAuthoringPolicyHandle) noexcept = default;
+    };
+
+    export struct RuntimeImportEntityAuthoringPolicyContext
+    {
+        std::string_view Path{};
+        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
+        ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
+    };
+
+    export struct RuntimeImportEntityAuthoringPolicyServices
+    {
+        ECS::Scene::Registry* Scene{};
+    };
+
+    export struct RuntimeImportEntityAuthoringPolicyDesc
+    {
+        std::string DebugName{};
+        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
+        std::function<Core::Result(
+            const RuntimeImportEntityAuthoringPolicyContext&,
+            RuntimeImportEntityAuthoringPolicyServices&)> Apply{};
+    };
+
+    struct RuntimeImportEntityAuthoringPolicyRecord
+    {
+        RuntimeImportEntityAuthoringPolicyHandle Handle{};
+        RuntimeImportEntityAuthoringPolicyDesc Desc{};
+    };
+
+    export struct RuntimeImportCompletedHandlerHandle
+    {
+        std::uint64_t Value{0};
+
+        [[nodiscard]] bool IsValid() const noexcept { return Value != 0; }
+        [[nodiscard]] friend bool operator==(
+            RuntimeImportCompletedHandlerHandle,
+            RuntimeImportCompletedHandlerHandle) noexcept = default;
+    };
+
+    export struct RuntimeImportCompletedContext
+    {
+        std::string_view Path{};
+        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
+        std::span<const ECS::EntityHandle> CreatedEntities{};
+        std::optional<CameraFocusTarget> FocusTarget{};
+    };
+
+    export struct RuntimeImportCompletedServices
+    {
+        ECS::Scene::Registry* Scene{};
+        CameraControllerRegistry* CameraControllers{};
+        SelectionController* Selection{};
+        const Core::Config::EngineConfig* Config{};
+    };
+
+    export struct RuntimeImportCompletedHandlerDesc
+    {
+        std::string DebugName{};
+        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
+        std::function<Core::Result(
+            const RuntimeImportCompletedContext&,
+            RuntimeImportCompletedServices&)> Handle{};
+    };
+
+    struct RuntimeImportCompletedHandlerRecord
+    {
+        RuntimeImportCompletedHandlerHandle Handle{};
+        RuntimeImportCompletedHandlerDesc Desc{};
+    };
+
     export struct RuntimeAssetImportResult
     {
         Assets::AssetId Asset{};
@@ -550,6 +628,16 @@ namespace Extrinsic::Runtime
             RuntimePostImportProcessorDesc desc);
         void UnregisterPostImportProcessor(
             RuntimePostImportProcessorHandle handle);
+        [[nodiscard]] RuntimeImportEntityAuthoringPolicyHandle
+            RegisterImportEntityAuthoringPolicy(
+                RuntimeImportEntityAuthoringPolicyDesc desc);
+        void UnregisterImportEntityAuthoringPolicy(
+            RuntimeImportEntityAuthoringPolicyHandle handle);
+        [[nodiscard]] RuntimeImportCompletedHandlerHandle
+            RegisterImportCompletedHandler(RuntimeImportCompletedHandlerDesc desc);
+        void UnregisterImportCompletedHandler(
+            RuntimeImportCompletedHandlerHandle handle);
+        void UnregisterDefaultImportPolicies();
         [[nodiscard]] const std::optional<RuntimeAssetImportEvent>&
             GetLastAssetImportEvent() const noexcept;
         [[nodiscard]] std::vector<RuntimeAssetIngestRecord>
@@ -711,7 +799,7 @@ namespace Extrinsic::Runtime
         void QueueDroppedModelTextureImport(
             std::string path,
             Assets::AssetPayloadKind payloadKind);
-        void RegisterDefaultPostImportProcessors();
+        void RegisterDefaultImportPolicies();
         [[nodiscard]] Core::Expected<RuntimeAssetImportResult> ImportAssetFromPathWithIngest(
             RuntimeAssetImportRequest request,
             RuntimeAssetIngestSource source,
@@ -829,7 +917,20 @@ namespace Extrinsic::Runtime
         RuntimeAssetIngestStateMachine             m_AssetIngestStateMachine{};
         std::vector<RuntimePostImportProcessorRecord> m_PostImportProcessors{};
         std::uint64_t m_NextPostImportProcessorHandle{1u};
+        std::vector<RuntimePostImportProcessorHandle> m_DefaultPostImportProcessors{};
         bool m_DefaultPostImportProcessorsRegistered{false};
+        std::vector<RuntimeImportEntityAuthoringPolicyRecord>
+            m_ImportEntityAuthoringPolicies{};
+        std::uint64_t m_NextImportEntityAuthoringPolicyHandle{1u};
+        std::vector<RuntimeImportEntityAuthoringPolicyHandle>
+            m_DefaultImportEntityAuthoringPolicies{};
+        bool m_DefaultImportEntityAuthoringPoliciesRegistered{false};
+        std::vector<RuntimeImportCompletedHandlerRecord>
+            m_ImportCompletedHandlers{};
+        std::uint64_t m_NextImportCompletedHandlerHandle{1u};
+        std::vector<RuntimeImportCompletedHandlerHandle>
+            m_DefaultImportCompletedHandlers{};
+        bool m_DefaultImportCompletedHandlersRegistered{false};
         struct RuntimeAssetImportStreamingTask
         {
             RuntimeAssetIngestHandle Ingest{};

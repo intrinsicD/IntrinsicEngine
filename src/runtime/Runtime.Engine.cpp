@@ -1342,7 +1342,7 @@ namespace Extrinsic::Runtime
         struct MaterializedGeometryImport
         {
             RuntimeAssetImportResult Result{};
-            std::optional<GeometryImportBounds> Bounds{};
+            std::optional<CameraFocusTarget> FocusTarget{};
             ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
         };
 
@@ -1534,6 +1534,60 @@ namespace Extrinsic::Runtime
                         processor.Desc.DebugName.empty()
                             ? "<unnamed>"
                             : processor.Desc.DebugName,
+                        context.Path,
+                        Core::Error::ToString(result.error()));
+                }
+            }
+        }
+
+        void RunImportEntityAuthoringPolicies(
+            const std::span<const RuntimeImportEntityAuthoringPolicyRecord> policies,
+            const RuntimeImportEntityAuthoringPolicyContext& context,
+            RuntimeImportEntityAuthoringPolicyServices& services)
+        {
+            for (const RuntimeImportEntityAuthoringPolicyRecord& policy : policies)
+            {
+                const bool payloadMatches =
+                    policy.Desc.PayloadKind == Assets::AssetPayloadKind::Unknown ||
+                    policy.Desc.PayloadKind == context.PayloadKind;
+                if (!payloadMatches || !policy.Desc.Apply)
+                    continue;
+
+                Core::Result result = policy.Desc.Apply(context, services);
+                if (!result.has_value())
+                {
+                    Core::Log::Warn(
+                        "[Runtime] Import authoring policy '{}' failed: path='{}' error={}",
+                        policy.Desc.DebugName.empty()
+                            ? "<unnamed>"
+                            : policy.Desc.DebugName,
+                        context.Path,
+                        Core::Error::ToString(result.error()));
+                }
+            }
+        }
+
+        void RunImportCompletedHandlers(
+            const std::span<const RuntimeImportCompletedHandlerRecord> handlers,
+            const RuntimeImportCompletedContext& context,
+            RuntimeImportCompletedServices& services)
+        {
+            for (const RuntimeImportCompletedHandlerRecord& handler : handlers)
+            {
+                const bool payloadMatches =
+                    handler.Desc.PayloadKind == Assets::AssetPayloadKind::Unknown ||
+                    handler.Desc.PayloadKind == context.PayloadKind;
+                if (!payloadMatches || !handler.Desc.Handle)
+                    continue;
+
+                Core::Result result = handler.Desc.Handle(context, services);
+                if (!result.has_value())
+                {
+                    Core::Log::Warn(
+                        "[Runtime] Import completed handler '{}' failed: path='{}' error={}",
+                        handler.Desc.DebugName.empty()
+                            ? "<unnamed>"
+                            : handler.Desc.DebugName,
                         context.Path,
                         Core::Error::ToString(result.error()));
                 }
@@ -1895,6 +1949,14 @@ namespace Extrinsic::Runtime
             };
         }
 
+        [[nodiscard]] std::optional<CameraFocusTarget> ToOptionalCameraFocusTarget(
+            const std::optional<GeometryImportBounds>& bounds) noexcept
+        {
+            if (!bounds.has_value() || !bounds->Valid)
+                return std::nullopt;
+            return ToCameraFocusTarget(*bounds);
+        }
+
         void AttachGeometryBounds(entt::registry& raw,
                                   const ECS::EntityHandle entity,
                                   const GeometryImportBounds& bounds)
@@ -1926,13 +1988,13 @@ namespace Extrinsic::Runtime
                 world);
         }
 
-        void FocusMainCameraOnImportedGeometry(
+        void FocusMainCameraOnImportTarget(
             CameraControllerRegistry& cameraControllers,
             const Core::Config::CameraControllerKind controllerKind,
             const bool cameraEnabled,
-            const std::optional<GeometryImportBounds>& bounds)
+            const std::optional<CameraFocusTarget>& target)
         {
-            if (!cameraEnabled || !bounds.has_value() || !bounds->Valid)
+            if (!cameraEnabled || !target.has_value())
                 return;
 
             ICameraController* controller =
@@ -1947,7 +2009,7 @@ namespace Extrinsic::Runtime
             if (controller == nullptr)
                 return;
 
-            controller->Focus(ToCameraFocusTarget(*bounds));
+            controller->Focus(*target);
             cameraControllers.MarkCameraTransition(CameraControllerSlot::Main);
         }
 
@@ -2319,9 +2381,14 @@ namespace Extrinsic::Runtime
             RenderExtractionCache& extraction,
             ECS::Scene::Registry& scene,
             StreamingExecutor* streamingExecutor,
+            const std::span<const RuntimeImportEntityAuthoringPolicyRecord>
+                importEntityPolicies,
             const std::span<const RuntimePostImportProcessorRecord> postImportProcessors,
             const DecodedGeometryImport& decoded)
         {
+            RuntimeImportEntityAuthoringPolicyServices authoringServices{
+                .Scene = &scene,
+            };
             RuntimePostImportProcessorServices postImportServices{
                 .Streaming = streamingExecutor,
                 .AssetService = &assetService,
@@ -2374,15 +2441,14 @@ namespace Extrinsic::Runtime
                                 scene,
                                 GeometryEntityName(decoded.Path, decoded.PayloadKind));
                         auto& raw = scene.Raw();
-                        raw.emplace<ECS::Components::Selection::SelectableTag>(entity);
-                        raw.emplace<Graphics::Components::RenderSurface>(
-                            entity,
-                            Graphics::Components::RenderSurface{
-                                .Domain = Graphics::Components::RenderSurface::SourceDomain::Vertex,
-                            });
-                        raw.emplace<Graphics::Components::VisualizationConfig>(
-                            entity,
-                            ImportedMeshVisualization());
+                        RunImportEntityAuthoringPolicies(
+                            importEntityPolicies,
+                            RuntimeImportEntityAuthoringPolicyContext{
+                                .Path = decoded.Path,
+                                .PayloadKind = decoded.PayloadKind,
+                                .Entity = entity,
+                            },
+                            authoringServices);
                         const std::optional<GeometryImportBounds> bounds =
                             BoundsFromHalfedgeMesh(*rawMesh);
                         if (bounds.has_value())
@@ -2409,7 +2475,7 @@ namespace Extrinsic::Runtime
                                 .PayloadKind = decoded.PayloadKind,
                                 .PrimitiveEntitiesCreated = 1u,
                             },
-                            .Bounds = bounds,
+                            .FocusTarget = ToOptionalCameraFocusTarget(bounds),
                             .Entity = entity,
                         };
                     }
@@ -2445,18 +2511,14 @@ namespace Extrinsic::Runtime
                                 scene,
                                 GeometryEntityName(decoded.Path, decoded.PayloadKind));
                         auto& raw = scene.Raw();
-                        raw.emplace<ECS::Components::Selection::SelectableTag>(entity);
-                        raw.emplace<Graphics::Components::RenderEdges>(
-                            entity,
-                            Graphics::Components::RenderEdges{
-                                .Domain = Graphics::Components::RenderEdges::SourceDomain::Vertex,
-                            });
-                        raw.emplace<Graphics::Components::RenderPoints>(
-                            entity,
-                            Graphics::Components::RenderPoints{});
-                        raw.emplace<Graphics::Components::VisualizationConfig>(
-                            entity,
-                            ImportedGeometryVisualization());
+                        RunImportEntityAuthoringPolicies(
+                            importEntityPolicies,
+                            RuntimeImportEntityAuthoringPolicyContext{
+                                .Path = decoded.Path,
+                                .PayloadKind = decoded.PayloadKind,
+                                .Entity = entity,
+                            },
+                            authoringServices);
                         if (bounds.has_value())
                         {
                             AttachGeometryBounds(raw, entity, *bounds);
@@ -2480,7 +2542,7 @@ namespace Extrinsic::Runtime
                                 .PayloadKind = decoded.PayloadKind,
                                 .PrimitiveEntitiesCreated = 1u,
                             },
-                            .Bounds = bounds,
+                            .FocusTarget = ToOptionalCameraFocusTarget(bounds),
                             .Entity = entity,
                         };
                     }
@@ -2516,13 +2578,14 @@ namespace Extrinsic::Runtime
                                 scene,
                                 GeometryEntityName(decoded.Path, decoded.PayloadKind));
                         auto& raw = scene.Raw();
-                        raw.emplace<ECS::Components::Selection::SelectableTag>(entity);
-                        raw.emplace<Graphics::Components::RenderPoints>(
-                            entity,
-                            Graphics::Components::RenderPoints{});
-                        raw.emplace<Graphics::Components::VisualizationConfig>(
-                            entity,
-                            ImportedGeometryVisualization());
+                        RunImportEntityAuthoringPolicies(
+                            importEntityPolicies,
+                            RuntimeImportEntityAuthoringPolicyContext{
+                                .Path = decoded.Path,
+                                .PayloadKind = decoded.PayloadKind,
+                                .Entity = entity,
+                            },
+                            authoringServices);
                         if (bounds.has_value())
                         {
                             AttachGeometryBounds(raw, entity, *bounds);
@@ -2546,7 +2609,7 @@ namespace Extrinsic::Runtime
                                 .PayloadKind = decoded.PayloadKind,
                                 .PrimitiveEntitiesCreated = 1u,
                             },
-                            .Bounds = bounds,
+                            .FocusTarget = ToOptionalCameraFocusTarget(bounds),
                             .Entity = entity,
                         };
                     }
@@ -3227,7 +3290,7 @@ namespace Extrinsic::Runtime
             *m_GpuAssetCache,
             *m_Scene,
             *m_Renderer);
-        RegisterDefaultPostImportProcessors();
+        RegisterDefaultImportPolicies();
 
         // RUNTIME-092 Slice B — attach the runtime-owned stable-entity lookup
         // to the selection authority so render-id resolution flows through the
@@ -4194,43 +4257,284 @@ namespace Extrinsic::Runtime
             });
     }
 
-    void Engine::RegisterDefaultPostImportProcessors()
+    RuntimeImportEntityAuthoringPolicyHandle
+    Engine::RegisterImportEntityAuthoringPolicy(
+        RuntimeImportEntityAuthoringPolicyDesc desc)
     {
-        if (m_DefaultPostImportProcessorsRegistered)
+        if (!desc.Apply)
+            return {};
+
+        RuntimeImportEntityAuthoringPolicyRecord policy{};
+        policy.Handle = RuntimeImportEntityAuthoringPolicyHandle{
+            m_NextImportEntityAuthoringPolicyHandle++};
+        policy.Desc = std::move(desc);
+        m_ImportEntityAuthoringPolicies.push_back(std::move(policy));
+        return m_ImportEntityAuthoringPolicies.back().Handle;
+    }
+
+    void Engine::UnregisterImportEntityAuthoringPolicy(
+        const RuntimeImportEntityAuthoringPolicyHandle handle)
+    {
+        if (!handle.IsValid())
             return;
 
-        const RuntimePostImportProcessorHandle handle =
-            RegisterPostImportProcessor(RuntimePostImportProcessorDesc{
-                .DebugName = "Runtime.DirectMeshGeneratedNormal",
+        std::erase_if(
+            m_ImportEntityAuthoringPolicies,
+            [handle](
+                const RuntimeImportEntityAuthoringPolicyRecord& policy) noexcept
+            {
+                return policy.Handle == handle;
+            });
+    }
+
+    RuntimeImportCompletedHandlerHandle Engine::RegisterImportCompletedHandler(
+        RuntimeImportCompletedHandlerDesc desc)
+    {
+        if (!desc.Handle)
+            return {};
+
+        RuntimeImportCompletedHandlerRecord handler{};
+        handler.Handle = RuntimeImportCompletedHandlerHandle{
+            m_NextImportCompletedHandlerHandle++};
+        handler.Desc = std::move(desc);
+        m_ImportCompletedHandlers.push_back(std::move(handler));
+        return m_ImportCompletedHandlers.back().Handle;
+    }
+
+    void Engine::UnregisterImportCompletedHandler(
+        const RuntimeImportCompletedHandlerHandle handle)
+    {
+        if (!handle.IsValid())
+            return;
+
+        std::erase_if(
+            m_ImportCompletedHandlers,
+            [handle](const RuntimeImportCompletedHandlerRecord& handler) noexcept
+            {
+                return handler.Handle == handle;
+            });
+    }
+
+    void Engine::UnregisterDefaultImportPolicies()
+    {
+        for (const RuntimePostImportProcessorHandle handle :
+             m_DefaultPostImportProcessors)
+        {
+            UnregisterPostImportProcessor(handle);
+        }
+        m_DefaultPostImportProcessors.clear();
+        m_DefaultPostImportProcessorsRegistered = false;
+
+        for (const RuntimeImportEntityAuthoringPolicyHandle handle :
+             m_DefaultImportEntityAuthoringPolicies)
+        {
+            UnregisterImportEntityAuthoringPolicy(handle);
+        }
+        m_DefaultImportEntityAuthoringPolicies.clear();
+        m_DefaultImportEntityAuthoringPoliciesRegistered = false;
+
+        for (const RuntimeImportCompletedHandlerHandle handle :
+             m_DefaultImportCompletedHandlers)
+        {
+            UnregisterImportCompletedHandler(handle);
+        }
+        m_DefaultImportCompletedHandlers.clear();
+        m_DefaultImportCompletedHandlersRegistered = false;
+    }
+
+    void Engine::RegisterDefaultImportPolicies()
+    {
+        if (!m_DefaultImportEntityAuthoringPoliciesRegistered)
+        {
+            const auto registerAuthoringPolicy =
+                [this](RuntimeImportEntityAuthoringPolicyDesc desc)
+            {
+                const RuntimeImportEntityAuthoringPolicyHandle handle =
+                    RegisterImportEntityAuthoringPolicy(std::move(desc));
+                if (handle.IsValid())
+                    m_DefaultImportEntityAuthoringPolicies.push_back(handle);
+            };
+
+            registerAuthoringPolicy(RuntimeImportEntityAuthoringPolicyDesc{
+                .DebugName = "Runtime.DefaultMeshImportAuthoring",
                 .PayloadKind = Assets::AssetPayloadKind::Mesh,
-                .Process =
-                    [](const RuntimePostImportProcessorContext& context,
-                       RuntimePostImportProcessorServices& services)
+                .Apply =
+                    [](const RuntimeImportEntityAuthoringPolicyContext& context,
+                       RuntimeImportEntityAuthoringPolicyServices& services)
                     {
-                        if (context.MeshPayload == nullptr)
-                            return Core::Ok();
-                        if (services.Streaming == nullptr ||
-                            services.AssetService == nullptr ||
-                            services.GpuAssetCache == nullptr ||
-                            services.RenderExtraction == nullptr ||
-                            services.Scene == nullptr)
+                        if (services.Scene == nullptr ||
+                            context.Entity == ECS::InvalidEntityHandle ||
+                            !services.Scene->IsValid(context.Entity))
                         {
                             return Core::Err(Core::ErrorCode::InvalidState);
                         }
 
-                        QueueDirectMeshPostProcess(
-                            services.Streaming,
-                            *services.AssetService,
-                            *services.GpuAssetCache,
-                            *services.RenderExtraction,
-                            *services.Scene,
-                            std::string{context.Path},
-                            *context.MeshPayload,
-                            context.Entity);
+                        auto& raw = services.Scene->Raw();
+                        raw.emplace_or_replace<
+                            ECS::Components::Selection::SelectableTag>(
+                                context.Entity);
+                        raw.emplace_or_replace<
+                            Graphics::Components::RenderSurface>(
+                                context.Entity,
+                                Graphics::Components::RenderSurface{
+                                    .Domain = Graphics::Components::RenderSurface::
+                                        SourceDomain::Vertex,
+                                });
+                        raw.emplace_or_replace<
+                            Graphics::Components::VisualizationConfig>(
+                                context.Entity,
+                                ImportedMeshVisualization());
                         return Core::Ok();
                     },
             });
-        m_DefaultPostImportProcessorsRegistered = handle.IsValid();
+
+            registerAuthoringPolicy(RuntimeImportEntityAuthoringPolicyDesc{
+                .DebugName = "Runtime.DefaultGraphImportAuthoring",
+                .PayloadKind = Assets::AssetPayloadKind::Graph,
+                .Apply =
+                    [](const RuntimeImportEntityAuthoringPolicyContext& context,
+                       RuntimeImportEntityAuthoringPolicyServices& services)
+                    {
+                        if (services.Scene == nullptr ||
+                            context.Entity == ECS::InvalidEntityHandle ||
+                            !services.Scene->IsValid(context.Entity))
+                        {
+                            return Core::Err(Core::ErrorCode::InvalidState);
+                        }
+
+                        auto& raw = services.Scene->Raw();
+                        raw.emplace_or_replace<
+                            ECS::Components::Selection::SelectableTag>(
+                                context.Entity);
+                        raw.emplace_or_replace<Graphics::Components::RenderEdges>(
+                            context.Entity,
+                            Graphics::Components::RenderEdges{
+                                .Domain = Graphics::Components::RenderEdges::
+                                    SourceDomain::Vertex,
+                            });
+                        raw.emplace_or_replace<Graphics::Components::RenderPoints>(
+                            context.Entity,
+                            Graphics::Components::RenderPoints{});
+                        raw.emplace_or_replace<
+                            Graphics::Components::VisualizationConfig>(
+                                context.Entity,
+                                ImportedGeometryVisualization());
+                        return Core::Ok();
+                    },
+            });
+
+            registerAuthoringPolicy(RuntimeImportEntityAuthoringPolicyDesc{
+                .DebugName = "Runtime.DefaultPointCloudImportAuthoring",
+                .PayloadKind = Assets::AssetPayloadKind::PointCloud,
+                .Apply =
+                    [](const RuntimeImportEntityAuthoringPolicyContext& context,
+                       RuntimeImportEntityAuthoringPolicyServices& services)
+                    {
+                        if (services.Scene == nullptr ||
+                            context.Entity == ECS::InvalidEntityHandle ||
+                            !services.Scene->IsValid(context.Entity))
+                        {
+                            return Core::Err(Core::ErrorCode::InvalidState);
+                        }
+
+                        auto& raw = services.Scene->Raw();
+                        raw.emplace_or_replace<
+                            ECS::Components::Selection::SelectableTag>(
+                                context.Entity);
+                        raw.emplace_or_replace<Graphics::Components::RenderPoints>(
+                            context.Entity,
+                            Graphics::Components::RenderPoints{});
+                        raw.emplace_or_replace<
+                            Graphics::Components::VisualizationConfig>(
+                                context.Entity,
+                                ImportedGeometryVisualization());
+                        return Core::Ok();
+                    },
+            });
+
+            m_DefaultImportEntityAuthoringPoliciesRegistered =
+                !m_DefaultImportEntityAuthoringPolicies.empty();
+        }
+
+        if (!m_DefaultImportCompletedHandlersRegistered)
+        {
+            const RuntimeImportCompletedHandlerHandle handle =
+                RegisterImportCompletedHandler(RuntimeImportCompletedHandlerDesc{
+                    .DebugName = "Runtime.DefaultImportCompletedUx",
+                    .PayloadKind = Assets::AssetPayloadKind::Unknown,
+                    .Handle =
+                        [](const RuntimeImportCompletedContext& context,
+                           RuntimeImportCompletedServices& services)
+                        {
+                            if (services.Scene == nullptr ||
+                                services.CameraControllers == nullptr ||
+                                services.Selection == nullptr ||
+                                services.Config == nullptr)
+                            {
+                                return Core::Err(Core::ErrorCode::InvalidState);
+                            }
+
+                            FocusMainCameraOnImportTarget(
+                                *services.CameraControllers,
+                                services.Config->Camera.Controller,
+                                services.Config->Camera.Enabled,
+                                context.FocusTarget);
+
+                            for (const ECS::EntityHandle entity :
+                                 context.CreatedEntities)
+                            {
+                                if (!services.Scene->IsValid(entity))
+                                    continue;
+                                (void)services.Selection->SetSelectedEntity(
+                                    *services.Scene,
+                                    entity);
+                                break;
+                            }
+                            return Core::Ok();
+                        },
+                });
+            if (handle.IsValid())
+                m_DefaultImportCompletedHandlers.push_back(handle);
+            m_DefaultImportCompletedHandlersRegistered = handle.IsValid();
+        }
+
+        if (!m_DefaultPostImportProcessorsRegistered)
+        {
+            const RuntimePostImportProcessorHandle handle =
+                RegisterPostImportProcessor(RuntimePostImportProcessorDesc{
+                    .DebugName = "Runtime.DirectMeshGeneratedNormal",
+                    .PayloadKind = Assets::AssetPayloadKind::Mesh,
+                    .Process =
+                        [](const RuntimePostImportProcessorContext& context,
+                           RuntimePostImportProcessorServices& services)
+                        {
+                            if (context.MeshPayload == nullptr)
+                                return Core::Ok();
+                            if (services.Streaming == nullptr ||
+                                services.AssetService == nullptr ||
+                                services.GpuAssetCache == nullptr ||
+                                services.RenderExtraction == nullptr ||
+                                services.Scene == nullptr)
+                            {
+                                return Core::Err(Core::ErrorCode::InvalidState);
+                            }
+
+                            QueueDirectMeshPostProcess(
+                                services.Streaming,
+                                *services.AssetService,
+                                *services.GpuAssetCache,
+                                *services.RenderExtraction,
+                                *services.Scene,
+                                std::string{context.Path},
+                                *context.MeshPayload,
+                                context.Entity);
+                            return Core::Ok();
+                        },
+                });
+            if (handle.IsValid())
+                m_DefaultPostImportProcessors.push_back(handle);
+            m_DefaultPostImportProcessorsRegistered = handle.IsValid();
+        }
     }
 
     Core::Expected<RuntimeAssetImportResult> Engine::ImportAssetFromPath(
@@ -4748,18 +5052,31 @@ namespace Extrinsic::Runtime
                         m_RenderExtraction,
                         *m_Scene,
                         m_StreamingExecutor.get(),
+                        m_ImportEntityAuthoringPolicies,
                         m_PostImportProcessors,
                         *state->Decoded);
                     if (materialized.has_value())
                     {
-                        FocusMainCameraOnImportedGeometry(
-                            m_CameraControllers,
-                            m_Config.Camera.Controller,
-                            m_Config.Camera.Enabled,
-                            materialized->Bounds);
-                        (void)m_SelectionController.SetSelectedEntity(
-                            *m_Scene,
-                            materialized->Entity);
+                        const ECS::EntityHandle createdEntity =
+                            materialized->Entity;
+                        RuntimeImportCompletedServices completedServices{
+                            .Scene = m_Scene.get(),
+                            .CameraControllers = &m_CameraControllers,
+                            .Selection = &m_SelectionController,
+                            .Config = &m_Config,
+                        };
+                        RunImportCompletedHandlers(
+                            m_ImportCompletedHandlers,
+                            RuntimeImportCompletedContext{
+                                .Path = state->Decoded->Path,
+                                .PayloadKind = state->Decoded->PayloadKind,
+                                .CreatedEntities =
+                                    std::span<const ECS::EntityHandle>(
+                                        &createdEntity,
+                                        1u),
+                                .FocusTarget = materialized->FocusTarget,
+                            },
+                            completedServices);
                         result = materialized->Result;
                         if (RequestsGpuUpload(*result))
                         {
@@ -5573,6 +5890,7 @@ namespace Extrinsic::Runtime
                 m_RenderExtraction,
                 *m_Scene,
                 m_StreamingExecutor.get(),
+                m_ImportEntityAuthoringPolicies,
                 m_PostImportProcessors,
                 *decoded);
             if (!materialized.has_value())
@@ -5580,13 +5898,23 @@ namespace Extrinsic::Runtime
                 return Core::Err<RuntimeAssetImportResult>(
                     materialized.error());
             }
-            FocusMainCameraOnImportedGeometry(
-                m_CameraControllers,
-                m_Config.Camera.Controller,
-                m_Config.Camera.Enabled,
-                materialized->Bounds);
-            (void)m_SelectionController.SetSelectedEntity(*m_Scene,
-                                                          materialized->Entity);
+            const ECS::EntityHandle createdEntity = materialized->Entity;
+            RuntimeImportCompletedServices completedServices{
+                .Scene = m_Scene.get(),
+                .CameraControllers = &m_CameraControllers,
+                .Selection = &m_SelectionController,
+                .Config = &m_Config,
+            };
+            RunImportCompletedHandlers(
+                m_ImportCompletedHandlers,
+                RuntimeImportCompletedContext{
+                    .Path = decoded->Path,
+                    .PayloadKind = decoded->PayloadKind,
+                    .CreatedEntities =
+                        std::span<const ECS::EntityHandle>(&createdEntity, 1u),
+                    .FocusTarget = materialized->FocusTarget,
+                },
+                completedServices);
             return materialized->Result;
         }
         if (route->PayloadKind != Assets::AssetPayloadKind::ModelScene &&
