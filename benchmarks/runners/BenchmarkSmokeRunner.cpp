@@ -26,6 +26,7 @@
 #include "../physics/Bench.XpbdClothReferenceSmoke.hpp"
 #include "../rendering/Bench.FramegraphBarrierEmissionSmoke.hpp"
 #include "../rendering/Bench.FramegraphCompilerIndexingSmoke.hpp"
+#include "../rendering/Bench.FramegraphScratchReuseSmoke.hpp"
 #include "../rendering/Bench.FrameRecipeCompileCacheSmoke.hpp"
 #include "../rendering/Bench.VertexFetchLayoutSmoke.hpp"
 
@@ -857,6 +858,69 @@ auto EmitFramegraphCompilerIndexingSmoke(const std::string &commit)
                           out.str(), metrics.Succeeded};
 }
 
+auto EmitFramegraphScratchReuseSmoke(const std::string &commit)
+    -> EmittedBenchmark {
+  using namespace Intrinsic::Bench::Rendering;
+
+  const auto metrics = RunFramegraphScratchReuseSmoke();
+
+  std::ostringstream out;
+  out.setf(std::ios::fixed);
+  out.precision(6);
+  out << "{\n"
+      << "  \"benchmark_id\": \""
+      << EscapeJson(kFramegraphScratchReuseSmokeBenchmarkId) << "\",\n"
+      << "  \"method\": \""
+      << EscapeJson(kFramegraphScratchReuseSmokeMethod) << "\",\n"
+      << "  \"backend\": \"cpu_reference\",\n"
+      << "  \"dataset\": \""
+      << EscapeJson(kFramegraphScratchReuseSmokeDataset) << "\",\n"
+      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
+      << "  \"metrics\": {\n"
+      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
+      << "  },\n"
+      << "  \"diagnostics\": {\n"
+      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+      << "    \"mode\": \"smoke\",\n"
+      << "    \"warmup_iterations\": " << metrics.WarmupIterations << ",\n"
+      << "    \"measured_iterations\": " << metrics.MeasuredIterations << ",\n"
+      << "    \"baseline_mode\": \"fresh_graph_rebuild\",\n"
+      << "    \"probe_mode\": \"reset_redeclare_reuse\",\n"
+      << "    \"adoption_claim\": false,\n"
+      << "    \"fresh_declare_compile_ms\": "
+      << metrics.FreshDeclareCompileMilliseconds << ",\n"
+      << "    \"reused_declare_compile_ms\": "
+      << metrics.ReusedDeclareCompileMilliseconds << ",\n"
+      << "    \"pass_count\": " << metrics.PassCount << ",\n"
+      << "    \"resource_count\": " << metrics.ResourceCount << ",\n"
+      << "    \"barrier_packet_count\": " << metrics.BarrierPacketCount
+      << ",\n"
+      << "    \"fresh_declare_allocations\": "
+      << metrics.FreshDeclareAllocations << ",\n"
+      << "    \"reused_declare_allocations\": "
+      << metrics.ReusedDeclareAllocations << ",\n"
+      << "    \"fresh_declare_bytes\": " << metrics.FreshDeclareBytes
+      << ",\n"
+      << "    \"reused_declare_bytes\": " << metrics.ReusedDeclareBytes
+      << ",\n"
+      << "    \"fresh_declare_compile_allocations\": "
+      << metrics.FreshDeclareCompileAllocations << ",\n"
+      << "    \"reused_declare_compile_allocations\": "
+      << metrics.ReusedDeclareCompileAllocations << ",\n"
+      << "    \"fresh_declare_compile_bytes\": "
+      << metrics.FreshDeclareCompileBytes << ",\n"
+      << "    \"reused_declare_compile_bytes\": "
+      << metrics.ReusedDeclareCompileBytes << "\n"
+      << "  },\n"
+      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
+      << "\"\n"
+      << "}\n";
+
+  return EmittedBenchmark{kFramegraphScratchReuseSmokeBenchmarkId, out.str(),
+                          metrics.Succeeded};
+}
+
 auto EmitFrameRecipeCompileCacheSmoke(const std::string &commit)
     -> EmittedBenchmark {
   using namespace Intrinsic::Bench::Rendering;
@@ -950,6 +1014,7 @@ auto main(int argc, char **argv) -> int {
   emitted.push_back(EmitSphFluidReferenceSmoke(commit));
   emitted.push_back(EmitFramegraphBarrierEmissionSmoke(commit));
   emitted.push_back(EmitFramegraphCompilerIndexingSmoke(commit));
+  emitted.push_back(EmitFramegraphScratchReuseSmoke(commit));
   emitted.push_back(EmitFrameRecipeCompileCacheSmoke(commit));
   emitted.push_back(EmitVertexFetchLayoutSmoke(commit));
 

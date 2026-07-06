@@ -13,13 +13,14 @@ Each active task should include:
 
 - [`GRAPHICS-120`](GRAPHICS-120-framegraph-compiler-executor-efficiency.md) —
   framegraph compiler/executor efficiency and hygiene polish. Slices A through
-  D2a are complete locally: color attachment reads use a read-only barrier
+  D2b are complete locally: color attachment reads use a read-only barrier
   state, transient texture estimates are pinned to RHI block-compressed storage
   sizing, compile validation diagnostics no longer use a `thread_local` side
-  channel, barrier emission uses shared sorted-packet range lookup, and compiler
-  packet insertion / duplicate pass-id validation use indexed/sorted paths with
-  PR-fast smoke benchmark evidence. Persistent compiler scratch and remaining
-  allocation efficiency work remain in the active task file.
+  channel, barrier emission uses shared sorted-packet range lookup, compiler
+  packet insertion / duplicate pass-id validation use indexed/sorted paths, and
+  reset/redeclare pass records are recycled with PR-fast allocation-counter
+  evidence. Compile-scoped scratch and name-storage churn remain in the active
+  task file.
 
 ## History
 

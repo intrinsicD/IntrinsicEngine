@@ -8,7 +8,7 @@ depends_on: []
 ## Status
 - In progress on local `main`; PR not opened.
 - Owner/agent: Codex.
-- Current slices: Slice A, Slice B, Slice C, Slice D1, and Slice D2a
+- Current slices: Slice A, Slice B, Slice C, Slice D1, Slice D2a, and Slice D2b
   completed locally.
   `TextureUsage::ColorAttachmentRead` now uses a read-only barrier state,
   transient texture memory estimates are pinned to RHI block-compressed storage
@@ -18,8 +18,11 @@ depends_on: []
   multi-queue path, with PR-fast smoke benchmark evidence. Compiler barrier
   packet insertion now uses a pass/stage index, and duplicate typed pass-id
   validation uses a sorted scan that preserves earliest-duplicate diagnostics.
-- Next implementation step: continue with Slice D2b (persistent compiler scratch
-  and allocation-counter evidence).
+  `RenderGraph::Reset()` now recycles pass records so steady-state
+  redeclaration preserves per-pass access/dependency vector capacity, with
+  allocation-counter smoke evidence.
+- Next implementation step: continue with Slice D2c (compile-scoped scratch and
+  name-storage churn audit).
 
 ## Goal
 - Remove the per-compile/per-execute waste and small contract hazards inside
@@ -83,22 +86,32 @@ depends_on: []
 - **Slice D2a.** Replace compiler barrier packet insertion scans with an
   indexed pass/stage builder, replace duplicate pass-id O(n^2) validation with
   sorted duplicate detection, and record PR-fast smoke benchmark evidence.
-- **Slice D2b.** Tackle persistent compiler scratch and remaining allocation
-  churn with allocator/counter evidence.
+- **Slice D2b.** Recycle graph-owned pass records across `RenderGraph::Reset()`
+  so redeclaration keeps per-pass access/dependency vector capacity, pin stale
+  declaration cleanup with a contract test, and record allocation-counter smoke
+  evidence for fresh rebuild versus reset/redeclare reuse.
+- **Slice D2c.** Audit the remaining compile-local allocation churn:
+  compile-scoped containers and pass/resource name copies. Add an internal
+  scratch path or split a follow-up if name interning would require changing
+  compiled graph ownership/lifetime semantics.
 
 ## Required changes
+- [x] Persistent declaration scratch: keep `RenderPassRecord` access and
+      explicit-dependency vector capacity across `Reset()` while clearing stale
+      pass metadata before reuse.
 - [ ] Persistent compiler scratch: reuse compile-scoped containers across
-      compiles (member scratch or arena); intern names as
-      `string_view`s into graph-owned storage; keep `RenderPassRecord`
-      access vectors' capacity across `Reset()`.
+      compiles (member scratch or arena) and audit whether pass/resource name
+      copies can safely become `string_view`s into graph-owned storage without
+      changing compiled-graph lifetime semantics.
 - [x] Slice D1: shared indexed barrier emission over sorted packet ranges in
       both the executor and renderer multi-queue path; one-time packet bounds
       validation preserves fail-closed behavior.
 - [x] Slice D2a: make compiler packet insertion indexed by pass/stage and make
       `ValidateUniquePassIds` sort-based while preserving deterministic
       diagnostics.
-- [ ] Slice D2b: persistent compiler scratch; finish compile/emit allocation
-      reduction with counter evidence.
+- [x] Slice D2b: pass-record scratch reuse; finish redeclare + compile
+      allocation reduction evidence with a counter probe.
+- [ ] Slice D2c: compile-scoped scratch and name-storage churn audit.
 - [x] Slice C: replace the `thread_local` validation side channel: return the
       validation result in the `Compile()` `Expected` payload (or a caller
       out-param); make `Compile` non-`const` or move its mutations out.
@@ -121,7 +134,7 @@ depends_on: []
       a pass-heavy synthetic graph.
 - [x] Slice D2a PR-fast benchmark: duplicate pass-id validation and compiler
       barrier packet insertion baseline/probe on synthetic compiler work.
-- [ ] Slice D2b PR-fast benchmark: compile + allocation counter evidence on a
+- [x] Slice D2b PR-fast benchmark: compile + allocation counter evidence on a
       pass-heavy synthetic graph.
 
 ## Docs
@@ -134,13 +147,15 @@ depends_on: []
 - [x] Slice D1: document sorted barrier packet traversal and indexed range
       lookup contract.
 - [x] Slice D2a: document compiler indexing smoke benchmark scope.
+- [x] Slice D2b: document reset/redeclare scratch reuse and the allocation
+      counter smoke benchmark scope.
 
 ## Acceptance criteria
 - [x] Zero `thread_local` compile state; validation results flow through
       explicit out-param paths.
 - [x] Barrier-emission and compiler-indexing benchmark evidence recorded with
       baseline comparison.
-- [ ] Steady-state per-frame allocations in
+- [x] Steady-state per-frame allocations in
       compile/emit measurably reduced (counter or allocator probe).
 - [x] Both defect fixes pinned by tests; CPU gate green.
 
@@ -229,6 +244,28 @@ Slice D2a benchmark result
 `legacy_packet_comparisons=433998`, `indexed_packet_lookups=1270`,
 `quality_error_l2=0.0`.
 
+Slice D2b verification run locally on 2026-07-06:
+
+```bash
+cmake --build --preset ci --target ExtrinsicGraphicsRenderGraph
+python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
+cmake --build --preset ci --target IntrinsicBenchmarkSmoke
+build/ci/bin/IntrinsicBenchmarkSmoke build/ci/benchmark-graphics120-d2b
+python3 tools/benchmark/validate_benchmark_results.py --root build/ci/benchmark-graphics120-d2b --strict
+cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure -R 'RenderGraphValidation.ResetReusedPassRecordClearsStaleDeclarations|IntrinsicBenchmarkSmoke' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+```
+
+Slice D2b benchmark result (`rendering.framegraph_scratch_reuse.smoke`,
+`cpu_reference`, `builtin.synthetic_framegraph_scratch_reuse.192_passes`):
+`fresh_declare_compile_ms=11.250236`,
+`reused_declare_compile_ms=10.775952`,
+`fresh_declare_allocations=38592`,
+`reused_declare_allocations=1216`,
+`fresh_declare_compile_allocations=228096`,
+`reused_declare_compile_allocations=190304`,
+`quality_error_l2=0.0`.
+
 ## Forbidden changes
 - Changing compiled-graph semantics beyond the two pinned defect fixes.
 - Perf claims without benchmark numbers.
@@ -250,4 +287,8 @@ Slice D2a benchmark result
   allocation-counter evidence remain in Slice D2.
 - Slice D2a closes the compiler packet-insertion and duplicate-pass-id scan
   items at `CPUContracted` with PR-fast synthetic compiler indexing evidence;
-  persistent compiler scratch and allocation-counter evidence remain in D2b.
+  reset/redeclare pass-record scratch remains in D2b and deeper compile-scoped
+  scratch remains in D2c.
+- Slice D2b closes the reset/redeclare pass-record scratch item at
+  `CPUContracted` with scoped allocation-counter evidence; deeper
+  compile-scoped scratch/name-storage churn remains in D2c.

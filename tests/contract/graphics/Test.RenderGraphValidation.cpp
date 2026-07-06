@@ -629,3 +629,32 @@ TEST(RenderGraphValidation, TransientMemoryEstimateUsesRhiBlockCompressedStorage
     EXPECT_EQ(compiled->TextureTransientPlacements.front().ResourceIndex, compressed.Index);
     EXPECT_EQ(compiled->TextureTransientPlacements.front().SizeBytes, expectedBytes);
 }
+
+TEST(RenderGraphValidation, ResetReusedPassRecordClearsStaleDeclarations)
+{
+    RenderGraph graph;
+    const TextureRef history = graph.CreateTexture("History", RHI::TextureDesc{});
+    const BufferRef scratch = graph.CreateBuffer("Scratch", RHI::BufferDesc{.SizeBytes = 4096u, .Usage = RHI::BufferUsage::Storage});
+
+    (void)graph.AddPass("PopulateScratch", [history, scratch](RenderGraphBuilder& builder) {
+        (void)builder.Write(history, TextureUsage::ShaderWrite);
+        (void)builder.Write(scratch, BufferUsage::ShaderWrite);
+        builder.SideEffect();
+    });
+
+    graph.Reset();
+    (void)graph.AddPass("StandaloneSideEffect", true);
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    ASSERT_EQ(compiled->PassDeclarations.size(), 1u);
+
+    EXPECT_EQ(compiled->PassCount, 1u);
+    EXPECT_EQ(compiled->ResourceCount, 0u);
+    EXPECT_TRUE(compiled->PassDeclarations.front().ReadTextures.empty());
+    EXPECT_TRUE(compiled->PassDeclarations.front().WriteTextures.empty());
+    EXPECT_TRUE(compiled->PassDeclarations.front().ReadBuffers.empty());
+    EXPECT_TRUE(compiled->PassDeclarations.front().WriteBuffers.empty());
+    EXPECT_TRUE(compiled->RenderPassAttachments.empty());
+    EXPECT_TRUE(compiled->BarrierPackets.empty());
+}

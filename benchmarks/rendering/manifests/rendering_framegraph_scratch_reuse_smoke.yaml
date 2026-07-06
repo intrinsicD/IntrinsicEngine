@@ -1,0 +1,25 @@
+# GRAPHICS-120 - framegraph reset/redeclare allocation baseline/probe.
+#
+# This smoke benchmark compares fresh RenderGraph rebuilds against the
+# steady-state Reset()/redeclare path on the same deterministic pass-heavy
+# graph. It records allocation-counter diagnostics for the declaration-only and
+# declare+compile windows; it does not claim renderer-wide frame-time adoption.
+
+benchmark_id: rendering.framegraph_scratch_reuse.smoke
+method: rendering.framegraph_scratch_reuse
+dataset: builtin.synthetic_framegraph_scratch_reuse.192_passes
+params:
+  intent: smoke
+  pass_count: 192
+  texture_count: 48
+  buffer_count: 32
+  warmup_iterations: 3
+  measured_iterations: 32
+  baseline_mode: fresh_graph_rebuild
+  probe_mode: reset_redeclare_reuse
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 250
+  quality_error_l2_max: 0.0

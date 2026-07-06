@@ -269,6 +269,7 @@ namespace Extrinsic::Graphics
     struct RenderGraph::Impl
     {
         std::vector<RenderPassRecord> Passes{};
+        std::vector<RenderPassRecord> RecycledPasses{};
         std::vector<TextureResourceDesc> Textures{};
         std::vector<BufferResourceDesc> Buffers{};
         TransientAllocator Transients{};
@@ -276,6 +277,20 @@ namespace Extrinsic::Graphics
         std::uint32_t Generation = 1;
         RenderGraphValidationResult LastCompileValidationResult{};
     };
+
+    void ResetPassRecordForReuse(RenderPassRecord& record)
+    {
+        record.Name.clear();
+        record.Id = {};
+        record.SideEffect = false;
+        record.Queue = RenderQueue::Graphics;
+        record.TextureAccesses.clear();
+        record.BufferAccesses.clear();
+        record.ExplicitDependencies.clear();
+        record.HasRenderPassDesc = false;
+        record.RenderPass = {};
+        record.HasValidationError = false;
+    }
 
     RenderGraphBuilder::RenderGraphBuilder(
         RenderPassRecord& record,
@@ -377,7 +392,19 @@ namespace Extrinsic::Graphics
         }
 
         const auto index = static_cast<std::uint32_t>(m_Impl->Passes.size());
-        m_Impl->Passes.push_back(RenderPassRecord{.Name = std::move(name), .SideEffect = sideEffect});
+        if (!m_Impl->RecycledPasses.empty())
+        {
+            RenderPassRecord record = std::move(m_Impl->RecycledPasses.back());
+            m_Impl->RecycledPasses.pop_back();
+            ResetPassRecordForReuse(record);
+            record.Name = std::move(name);
+            record.SideEffect = sideEffect;
+            m_Impl->Passes.push_back(std::move(record));
+        }
+        else
+        {
+            m_Impl->Passes.push_back(RenderPassRecord{.Name = std::move(name), .SideEffect = sideEffect});
+        }
         return PassRef{.Index = index, .Generation = m_Impl->Generation};
     }
 
@@ -972,6 +999,12 @@ namespace Extrinsic::Graphics
             return;
         }
 
+        m_Impl->RecycledPasses.reserve(m_Impl->RecycledPasses.size() + m_Impl->Passes.size());
+        for (auto passIt = m_Impl->Passes.rbegin(); passIt != m_Impl->Passes.rend(); ++passIt)
+        {
+            ResetPassRecordForReuse(*passIt);
+            m_Impl->RecycledPasses.push_back(std::move(*passIt));
+        }
         m_Impl->Passes.clear();
         m_Impl->Textures.clear();
         m_Impl->Buffers.clear();

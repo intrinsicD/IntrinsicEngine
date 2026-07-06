@@ -75,6 +75,17 @@ stateful `RenderGraph` wrapper can inspect diagnostics through
 `RenderGraph::GetLastCompileValidationResult()`. The static compiler API has no
 process-global or `thread_local` "last result" state.
 
+## Reset/Redeclare Scratch Contract
+
+`RenderGraph::Reset()` invalidates pass/resource handles by advancing the graph
+generation, clears declared resources, and recycles pass records for the next
+declaration pass. Recycled `RenderPassRecord` instances are reset before reuse
+while retaining the capacity of their texture access, buffer access, and
+explicit-dependency vectors. This keeps steady-state recipe redeclaration from
+reallocating per-pass access storage while preserving the visible reset contract:
+new compiles must not inherit stale pass names, dependencies, render-pass
+metadata, resource accesses, or validation state from the prior frame.
+
 ## Barrier Packet Traversal Contract
 
 Compiled barrier packets are sorted by `(PassIndex, Stage)` using
