@@ -8,6 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
+- `BUG-060` — Scalar/isoline surfaces render black on GPU: colormap LUT created as Tex1D but sampled as sampler2D (tasks/active/BUG-060-scalar-colormap-lut-1d-view-black-on-gpu.md)
 - `RUNTIME-145` — Runtime frame-path steady-state efficiency polish (tasks/active/RUNTIME-145-runtime-frame-path-efficiency-polish.md)
 
 ## Theme B — Rendering modernization
