@@ -9,6 +9,19 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`BUG-061`](BUG-061-texture-bake-gpu-gate-and-service-context.md) —
+Texture bake UI misses service context and GPU availability gate — retired on
+2026-07-06 at maturity `CPUContracted`. Live sandbox editor contexts now pass
+`Engine::GetAssetService()` into `SandboxEditorContext`, so selected-mesh
+texture baking is no longer disabled solely because the runtime generated-texture
+service is absent from the attached UI context. The bake controls and command
+execution now also require an operational `RHI::IDevice`, keeping texture baking
+disabled/refused on Null or fail-closed graphics backends so the CPU-backed
+compatibility baker is not used from the default headless path. Focused
+SandboxEditorUi coverage locks the service/device wiring, operational-device
+success path, and non-operational refusal diagnostics.
+
+Active
 [`RUNTIME-144`](RUNTIME-144-post-import-processor-and-ux-policy-seam.md) —
 Post-import processor and import UX-policy seam — retired on 2026-07-06 at
 maturity `Operational`. `Runtime.Engine` now owns generic post-import

@@ -8412,6 +8412,8 @@ TEST(SandboxEditorUi, TextureBakeControlsReportUvSourcesAndRouteCommand)
     Runtime::SelectionController selection;
     Runtime::EditorCommandHistory history;
     Assets::AssetService assets;
+    Tests::MockDevice device;
+    device.Operational = true;
 
     const ECS::EntityHandle mesh = MakeSelectable(registry, "TextureBakeMesh");
     AddTriangleMeshSource(registry, mesh);
@@ -8427,7 +8429,8 @@ TEST(SandboxEditorUi, TextureBakeControlsReportUvSourcesAndRouteCommand)
         MakeProgressiveMeshPresentationBindings());
 
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::SandboxEditorContext context =
+        MakeContext(registry, selection, true, nullptr, &device);
     context.CommandHistory = &history;
     context.AssetService = &assets;
 
@@ -8504,6 +8507,88 @@ TEST(SandboxEditorUi, TextureBakeControlsReportUvSourcesAndRouteCommand)
     EXPECT_EQ(albedo->SourceKind,
               Runtime::ProgressiveSlotSourceKind::GeneratedTextureAsset);
     EXPECT_EQ(albedo->GeneratedTexture, result.GeneratedTexture);
+}
+
+TEST(SandboxEditorUi, AttachedEngineContextWiresTextureBakeServiceAndDevice)
+{
+    const std::string editorSource =
+        ReadRepositoryTextFile("src/runtime/Editor/Runtime.SandboxEditorUi.cpp");
+    ASSERT_FALSE(editorSource.empty());
+
+    const std::string_view contextBuilder = SourceRange(
+        editorSource,
+        "[[nodiscard]] SandboxEditorContext BuildContextFromEngine(Engine& engine)",
+        "[[nodiscard]] std::string ProgressOverlayText(");
+    ASSERT_FALSE(contextBuilder.empty());
+    EXPECT_NE(contextBuilder.find(".AssetService = &engine.GetAssetService(),"),
+              std::string_view::npos);
+    EXPECT_NE(contextBuilder.find(".Device = &engine.GetDevice(),"),
+              std::string_view::npos);
+}
+
+TEST(SandboxEditorUi, TextureBakeRequiresOperationalGpuBackend)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Assets::AssetService assets;
+    Tests::MockDevice device;
+    device.Operational = false;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "TextureBakeMesh");
+    AddTriangleMeshSource(registry, mesh);
+    auto& vertices = registry.Raw().get<GS::Vertices>(mesh);
+    vertices.Properties.GetOrAdd<glm::vec4>("v:paint", glm::vec4{1.0f})
+        .Vector() = {
+            glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+            glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
+            glm::vec4{0.0f, 0.0f, 1.0f, 1.0f},
+        };
+    registry.Raw().emplace<Runtime::ProgressivePresentationBindings>(
+        mesh,
+        MakeProgressiveMeshPresentationBindings());
+
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    Runtime::SandboxEditorContext context =
+        MakeContext(registry, selection, true, nullptr, &device);
+    context.AssetService = &assets;
+
+    const Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    const Runtime::SandboxEditorTextureBakeControlsModel& bake =
+        frame.Inspector.TextureBake;
+    ASSERT_TRUE(bake.HasSelectedEntity);
+    EXPECT_TRUE(bake.IsMesh);
+    EXPECT_TRUE(bake.HasRuntimeBakeCommand);
+    EXPECT_TRUE(bake.Uv.HasTexcoords);
+    EXPECT_TRUE(bake.Uv.TexcoordsFinite);
+    EXPECT_FALSE(bake.CanBake);
+    EXPECT_EQ(bake.DisabledReason,
+              "texture baking requires an operational GPU backend");
+
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    const Runtime::SandboxEditorTextureBakeCommandResult result =
+        Runtime::ApplySandboxEditorTextureBakeCommand(
+            context,
+            Runtime::SandboxEditorTextureBakeCommand{
+                .StableEntityId = stableId,
+                .PresentationKey = "mesh.surface",
+                .TargetSemantic = Runtime::ProgressiveSlotSemantic::Albedo,
+                .SourceDomain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+                .ExpectedValueKind = Runtime::ProgressivePropertyValueKind::Vec4,
+                .PropertyName = "v:paint",
+                .Encoder = Runtime::MeshAttributeTextureBakeEncoder::RgbaColor,
+                .Width = 4u,
+                .Height = 4u,
+                .GeneratedKey = "paint",
+                .BindGeneratedTexture = true,
+            });
+
+    EXPECT_EQ(result.Status,
+              Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty);
+    EXPECT_EQ(result.BakeStatus,
+              Runtime::SelectedMeshTextureBakeStatus::CommandFailed);
+    EXPECT_NE(result.Diagnostic.find("operational GPU"), std::string::npos);
 }
 
 // UI-032 — preset buttons switch the scalar source but must preserve styling

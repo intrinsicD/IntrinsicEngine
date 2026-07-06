@@ -4324,6 +4324,8 @@ namespace Extrinsic::Runtime
                 availability.Has(GS::SourceCapability::Halfedges) &&
                 availability.Has(GS::SourceCapability::Faces);
             model.HasRuntimeBakeCommand = context.AssetService != nullptr;
+            const bool hasOperationalGpu =
+                context.Device != nullptr && context.Device->IsOperational();
             model.Uv = BuildUvDiagnosticsModel(context, view);
             model.Uv.UvRegenerationJob = FindDerivedJobModelForOutput(
                 context.DerivedJobs,
@@ -4350,12 +4352,15 @@ namespace Extrinsic::Runtime
 
             model.CanBake = model.IsMesh &&
                             model.HasRuntimeBakeCommand &&
+                            hasOperationalGpu &&
                             model.Uv.HasTexcoords &&
                             model.Uv.TexcoordCountMatchesVertices &&
                             model.Uv.TexcoordsFinite &&
                             hasBakeableSource;
             if (!model.IsMesh)
                 model.DisabledReason = "texture baking requires a selected mesh";
+            else if (!hasOperationalGpu)
+                model.DisabledReason = "texture baking requires an operational GPU backend";
             else if (!model.HasRuntimeBakeCommand)
                 model.DisabledReason = "runtime selected-mesh bake command is unavailable";
             else if (!model.Uv.HasTexcoords)
@@ -12558,6 +12563,7 @@ namespace Extrinsic::Runtime
                 .Scene = &engine.GetScene(),
                 .Selection = &engine.GetSelectionController(),
                 .CommandHistory = &engine.GetEditorCommandHistory(),
+                .AssetService = &engine.GetAssetService(),
                 .LastRefinedPrimitive = &engine.GetLastRefinedPrimitiveSelection(),
                 .LastRefinedPrimitiveGeneration =
                     engine.GetLastRefinedPrimitiveSelectionGeneration(),
@@ -21473,6 +21479,14 @@ namespace Extrinsic::Runtime
                 .Status = SandboxEditorCommandStatus::AssetImportFailed,
                 .BakeStatus = SelectedMeshTextureBakeStatus::MissingAssetService,
                 .Diagnostic = "Asset service is unavailable for generated texture payloads.",
+            };
+        }
+        if (context.Device == nullptr || !context.Device->IsOperational())
+        {
+            return SandboxEditorTextureBakeCommandResult{
+                .Status = SandboxEditorCommandStatus::InvalidVisualizationProperty,
+                .BakeStatus = SelectedMeshTextureBakeStatus::CommandFailed,
+                .Diagnostic = "Texture baking requires an operational GPU backend.",
             };
         }
         if (command.PropertyName.empty() ||

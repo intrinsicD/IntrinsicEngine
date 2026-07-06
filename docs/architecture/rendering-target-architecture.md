@@ -471,7 +471,7 @@ struct GpuEntityConfig {
     // ---- Visualization config ----
     float  ScalarRangeMin;
     float  ScalarRangeMax;
-    uint   ColormapID;          // bindless 1D LUT texture index
+    uint   ColormapID;          // bindless 256x1 Tex2D LUT texture index
     uint   BinCount;            // 0 = continuous, >0 = quantize into k bins
 
     float  IsolineCount;        // 0 = disabled
@@ -649,10 +649,12 @@ This is **Option B** for all geometry types (meshes, graphs, point clouds). No U
 float s = fetch_scalar(domain, vertex_id_or_prim_id);
 float t = clamp((s - ScalarRangeMin) / (ScalarRangeMax - ScalarRangeMin), 0.0, 1.0);
 if (BinCount > 0) t = floor(t * float(BinCount)) / float(BinCount);
-vec3 color = texture(colormapLUT[ColormapID], t).rgb;
+vec3 color = texture(globalTextures[ColormapID], vec2(t, 0.5)).rgb;
 ```
 
-**Colormaps:** Pre-uploaded 256×1 `R8G8B8A8_UNORM` 1D textures for Viridis, Jet, Coolwarm, Plasma, Inferno, Turbo, Grayscale. Registered in the bindless array at startup.
+**Colormaps:** Pre-uploaded 256x1 `R8G8B8A8_UNORM` Tex2D textures for Viridis, Inferno, Plasma, Jet,
+Coolwarm, and Heat. They are conceptually one-dimensional LUTs, but are allocated as Tex2D so the same
+images can be sampled through the engine-wide `sampler2D globalTextures[]` bindless heap.
 
 #### 9.2.1 Isolines (Fragment Shader, Mesh-Only)
 

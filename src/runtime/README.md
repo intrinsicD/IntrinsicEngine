@@ -624,7 +624,11 @@ Texture baking consumes the property catalog, lists mesh vertex/face bakeable
 sources separately from internal, connectivity, unsupported, graph, and
 point-cloud rows, and calls
 `Extrinsic.Runtime.SelectedMeshTextureBake`; UI code never runs the texture
-baker, mutates `AssetService`, or touches graphics/RHI residency directly.
+baker, mutates `AssetService`, or touches graphics/RHI residency directly. The
+selected-mesh bake action is additionally gated on an operational
+`RHI::IDevice`; Null or fail-closed graphics backends keep the command disabled
+so the CPU-backed compatibility baker is not used from the default headless
+path.
 
 ### Point And Primitive View Payloads
 

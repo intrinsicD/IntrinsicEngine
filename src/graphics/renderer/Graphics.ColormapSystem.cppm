@@ -16,10 +16,11 @@ import Extrinsic.RHI.Transfer;
 // ============================================================
 // ColormapSystem — GPU colourmap LUT owner.
 //
-// Allocates one 256×1 RGBA8_UNORM 1-D texture per Colormap::Type,
+// Allocates one 256x1 RGBA8_UNORM Tex2D texture per Colormap::Type,
 // submits its initial bytes through ITransferQueue at Initialize(),
-// and registers each in the bindless descriptor heap.  Shaders sample the LUT at the
-// normalised scalar value t ∈ [0,1] to obtain the mapped colour.
+// and registers each in the bindless descriptor heap. The LUT is conceptually
+// one-dimensional, but it must be allocated as Tex2D because shaders sample it
+// from the global sampler2D bindless heap at vec2(t, 0.5).
 //
 // Also provides a CPU-side SampleCpu() path for tests/tools that need a
 // reference colourmap lookup. Retained surface, line, and point renderables
@@ -72,7 +73,7 @@ export namespace Extrinsic::Graphics
         // GPU query
         // -----------------------------------------------------------------
 
-        /// Bindless slot index for the given colourmap's 1-D LUT texture.
+        /// Bindless slot index for the given colourmap's 256x1 Tex2D LUT texture.
         /// Returns kInvalidBindlessIndex before Initialize(), before IsReady(),
         /// or for Colormap::Type::Count (the sentinel value).
         [[nodiscard]] RHI::BindlessIndex GetBindlessIndex(Colormap::Type t) const noexcept;
