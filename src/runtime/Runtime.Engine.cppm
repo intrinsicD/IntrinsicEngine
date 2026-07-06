@@ -106,6 +106,35 @@ namespace Extrinsic::Runtime
         Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
     };
 
+    export enum class RuntimeSceneFileOperation : std::uint8_t
+    {
+        None,
+        Save,
+        Load,
+    };
+
+    export struct RuntimeQueuedSceneFileOperation
+    {
+        StreamingTaskHandle Task{};
+        RuntimeSceneFileOperation Operation{RuntimeSceneFileOperation::None};
+    };
+
+    export struct RuntimeSceneFileEvent
+    {
+        std::uint64_t Sequence{0};
+        RuntimeSceneFileOperation Operation{RuntimeSceneFileOperation::None};
+        StreamingTaskHandle Task{};
+        std::string Path{};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        std::optional<SceneSerializationResult> SaveResult{};
+        std::optional<SceneDeserializationResult> LoadResult{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Error == Core::ErrorCode::Success;
+        }
+    };
+
     export [[nodiscard]] RuntimeDeviceSelection SelectRuntimeDeviceBackend(
         const Core::Config::RenderConfig& config,
         bool promotedVulkanAvailable) noexcept;
@@ -471,6 +500,10 @@ namespace Extrinsic::Runtime
             std::string path);
         [[nodiscard]] Core::Expected<SceneDeserializationResult> LoadSceneFromPath(
             std::string path);
+        [[nodiscard]] Core::Expected<RuntimeQueuedSceneFileOperation>
+            QueueSceneLoadFromPath(std::string path);
+        [[nodiscard]] const std::optional<RuntimeSceneFileEvent>&
+            GetLastSceneFileEvent() const noexcept;
         [[nodiscard]] Core::Result NewSceneDocument();
         [[nodiscard]] Core::Result CloseSceneDocument();
         // RUNTIME-089 Slice B — runtime/editor-owned selection authority.
@@ -616,6 +649,7 @@ namespace Extrinsic::Runtime
             const RuntimeAssetImportRequest& request,
             const Core::Expected<RuntimeAssetImportResult>& result,
             RuntimeAssetIngestDiagnostic ingestDiagnostic);
+        void RecordSceneFileEvent(RuntimeSceneFileEvent event);
         void ClearSceneRuntimeState();
 
         Core::Config::EngineConfig           m_Config;
@@ -719,6 +753,8 @@ namespace Extrinsic::Runtime
         std::vector<RuntimeAssetImportStreamingTask> m_AssetImportStreamingTasks{};
         std::optional<RuntimeAssetImportEvent>     m_LastAssetImportEvent{};
         std::uint64_t                              m_AssetImportEventSequence{0};
+        std::optional<RuntimeSceneFileEvent>       m_LastSceneFileEvent{};
+        std::uint64_t                              m_SceneFileEventSequence{0};
         // ECS scene registry
         std::unique_ptr<ECS::Scene::Registry>  m_Scene;
 

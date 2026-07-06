@@ -41,14 +41,14 @@ depends_on: []
 - [x] Route model-scene and texture editor-menu/manual imports through
       `StreamingExecutor` while preserving the current command-result surface
       or replacing it with an explicit pending operation contract.
-- [ ] Route scene load through the same shape: parse into the temporary
+- [x] Route scene load through the same shape: parse into the temporary
       registry off-thread; keep the swap-in (registry replacement, sidecar
       drains, `StableEntityLookup` rebuild) on the main thread per the
       documented scene-replacement lifecycle.
 - [ ] Route scene save off-thread: snapshot serializable state on the main
       thread, serialize + write on the worker lane, report completion via
       the existing import/editor event surface.
-- [ ] Keep failure behavior fail-closed and identical (a bad parse never
+- [x] Keep failure behavior fail-closed and identical (a bad parse never
       touches the live scene).
 
 ## Tests
@@ -58,7 +58,7 @@ depends_on: []
 - [x] Contract: editor-menu/manual model-scene and texture imports return a
       pending operation, enter the runtime import queue, and complete through
       the async route with unchanged observable results.
-- [ ] Contract: scene load with an invalid document leaves the live scene
+- [x] Contract: scene load with an invalid document leaves the live scene
       untouched (existing guarantee preserved through the async route).
 - [ ] Contract: frame does not block during a large import (timing probe
       with a slow-IO fake backend).
@@ -69,8 +69,9 @@ depends_on: []
       `docs/architecture/runtime.md` dropped asset-import notes.
 - [x] Update runtime import notes for dropped and editor-menu/manual
       model-scene/texture queued imports.
-- [ ] Update scene-replacement/import notes again when scene save/load moves
-      off the frame path.
+- [x] Update scene-replacement/import notes for async scene-load routing.
+- [ ] Update scene-replacement/import notes again when scene save moves off
+      the frame path.
 
 ## Acceptance criteria
 - [ ] No synchronous file IO or asset decode reachable from
@@ -106,6 +107,22 @@ depends_on: []
   `Engine::ReimportAsset(...)` compatibility calls can still decode
   model-scene/texture payloads inline. `Engine::SaveSceneToPath(...)` and
   `Engine::LoadSceneFromPath(...)` still serialize/parse scene documents inline.
+- 2026-07-05: Sandbox editor scene-open commands now route through
+  `Engine::QueueSceneLoadFromPath(...)`. The worker lane reads and parses the
+  scene document into a temporary registry, then the main-thread apply callback
+  runs the existing scene-replacement lifecycle (`ClearSceneRuntimeState()`,
+  registry clear/swap, `StableEntityLookup` rebuild, document-history reset).
+  Completion is published through `Engine::GetLastSceneFileEvent()` so the
+  editor's pending load result is replaced by a success/failure result on a
+  later frame. Invalid documents now fail closed through the async route and do
+  not touch the live scene.
+- Remaining synchronous audited call sites after the scene-load slice:
+  direct programmatic `Engine::ImportAssetFromPath(...)` /
+  `Engine::ReimportAsset(...)` compatibility calls can still decode
+  model-scene/texture payloads inline. Direct `Engine::LoadSceneFromPath(...)`
+  remains a synchronous compatibility facade. Sandbox editor save commands and
+  direct `Engine::SaveSceneToPath(...)` still serialize/write scene documents
+  inline.
 
 ## Verification
 ```bash

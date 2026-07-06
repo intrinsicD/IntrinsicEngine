@@ -1,5 +1,8 @@
 #include <cstdint>
 #include <atomic>
+#include <filesystem>
+#include <fstream>
+#include <functional>
 #include <memory>
 #include <utility>
 #include <variant>
@@ -10,8 +13,10 @@ import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
+import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
+import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.Engine;
@@ -23,6 +28,7 @@ import Extrinsic.Runtime.SelectionController;
 namespace Core = Extrinsic::Core;
 namespace Runtime = Extrinsic::Runtime;
 namespace ECS = Extrinsic::ECS;
+namespace ECSC = Extrinsic::ECS::Components;
 namespace G = Extrinsic::Graphics::Components;
 namespace Sel = Extrinsic::ECS::Components::Selection;
 
@@ -92,6 +98,55 @@ namespace
         std::uint32_t Frames{0u};
     };
 
+    class WaitForConditionApplication final : public Runtime::IApplication
+    {
+    public:
+        using Predicate = std::function<bool(Runtime::Engine&)>;
+
+        explicit WaitForConditionApplication(Predicate predicate,
+                                             std::uint32_t maxFrames = 256u)
+            : m_Predicate(std::move(predicate))
+            , m_MaxFrames(maxFrames)
+        {
+        }
+
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            ++m_Frames;
+            if ((m_Predicate && m_Predicate(engine)) || m_Frames >= m_MaxFrames)
+                engine.RequestExit();
+        }
+        void OnShutdown(Runtime::Engine&) override {}
+
+        std::uint32_t Frames() const noexcept { return m_Frames; }
+
+    private:
+        Predicate m_Predicate{};
+        std::uint32_t m_MaxFrames{0u};
+        std::uint32_t m_Frames{0u};
+    };
+
+    class TempSceneFile final
+    {
+    public:
+        TempSceneFile(std::string_view name, std::string_view contents)
+            : Path(std::filesystem::temp_directory_path() / name)
+        {
+            std::ofstream out(Path, std::ios::binary | std::ios::trunc);
+            out << contents;
+        }
+
+        ~TempSceneFile()
+        {
+            std::error_code ignored{};
+            std::filesystem::remove(Path, ignored);
+        }
+
+        std::filesystem::path Path;
+    };
+
     [[nodiscard]] Extrinsic::Core::Config::EngineConfig HeadlessConfig()
     {
         Extrinsic::Core::Config::EngineConfig config{};
@@ -105,6 +160,20 @@ namespace
         Extrinsic::Core::Config::EngineConfig config = HeadlessConfig();
         config.Window.Backend = Extrinsic::Core::Config::WindowBackend::Null;
         return config;
+    }
+
+    [[nodiscard]] bool SceneContainsNamedEntity(
+        const ECS::Scene::Registry& scene,
+        const std::string_view name)
+    {
+        bool found = false;
+        scene.Raw().view<const ECSC::MetaData>().each(
+            [&](const ECS::EntityHandle, const ECSC::MetaData& meta)
+            {
+                if (meta.EntityName == name)
+                    found = true;
+            });
+        return found;
     }
 }
 
@@ -220,6 +289,98 @@ TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSid
     EXPECT_FALSE(engine.GetVisualizationAdapterBinding(stableId).has_value());
     EXPECT_GT(engine.GetVisualizationAdapterBindingRevision(),
               bindingRevisionBeforeReset);
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeSceneLifecycle, QueuedSceneLoadInvalidDocumentFailsClosed)
+{
+    TempSceneFile invalidScene("runtime142_invalid_scene.json", "not json");
+    auto application = std::make_unique<WaitForConditionApplication>(
+        [](Runtime::Engine& runningEngine)
+        {
+            return runningEngine.GetLastSceneFileEvent().has_value();
+        });
+    WaitForConditionApplication* app = application.get();
+    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    const ECS::EntityHandle original = scene.Create();
+    scene.Raw().emplace<Sel::SelectableTag>(original);
+    engine.GetSelectionController().SetSelectedEntity(scene, original);
+
+    auto queued = engine.QueueSceneLoadFromPath(invalidScene.Path.string());
+    ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
+    EXPECT_TRUE(queued->Task.IsValid());
+    EXPECT_EQ(queued->Operation, Runtime::RuntimeSceneFileOperation::Load);
+    EXPECT_FALSE(engine.GetLastSceneFileEvent().has_value());
+
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable";
+    engine.Run();
+
+    EXPECT_LT(app->Frames(), 256u);
+    const std::optional<Runtime::RuntimeSceneFileEvent>& event =
+        engine.GetLastSceneFileEvent();
+    ASSERT_TRUE(event.has_value());
+    EXPECT_EQ(event->Operation, Runtime::RuntimeSceneFileOperation::Load);
+    EXPECT_EQ(event->Task, queued->Task);
+    EXPECT_EQ(event->Path, invalidScene.Path.string());
+    EXPECT_FALSE(event->Succeeded());
+    EXPECT_EQ(event->Error, Core::ErrorCode::InvalidFormat);
+    EXPECT_FALSE(event->LoadResult.has_value());
+
+    EXPECT_TRUE(scene.Raw().valid(original));
+    EXPECT_EQ(engine.GetSelectionController().SelectedCount(), 1u);
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeSceneLifecycle, QueuedSceneLoadAppliesParsedSceneOnMainThread)
+{
+    TempSceneFile validScene(
+        "runtime142_valid_scene.json",
+        R"({"version":1,"entities":[{"id":0,"name":"Loaded Scene Entity"}]})");
+    auto application = std::make_unique<WaitForConditionApplication>(
+        [](Runtime::Engine& runningEngine)
+        {
+            const std::optional<Runtime::RuntimeSceneFileEvent>& event =
+                runningEngine.GetLastSceneFileEvent();
+            return event.has_value() && event->Succeeded();
+        });
+    WaitForConditionApplication* app = application.get();
+    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    const ECS::EntityHandle original = scene.Create();
+    scene.Raw().emplace<ECSC::MetaData>(
+        original,
+        ECSC::MetaData{.EntityName = "Original Scene Entity"});
+    scene.Raw().emplace<Sel::SelectableTag>(original);
+    engine.GetSelectionController().SetSelectedEntity(scene, original);
+
+    auto queued = engine.QueueSceneLoadFromPath(validScene.Path.string());
+    ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
+    EXPECT_TRUE(queued->Task.IsValid());
+    EXPECT_FALSE(engine.GetLastSceneFileEvent().has_value());
+
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable";
+    engine.Run();
+
+    EXPECT_LT(app->Frames(), 256u);
+    const std::optional<Runtime::RuntimeSceneFileEvent>& event =
+        engine.GetLastSceneFileEvent();
+    ASSERT_TRUE(event.has_value());
+    EXPECT_TRUE(event->Succeeded());
+    ASSERT_TRUE(event->LoadResult.has_value());
+    EXPECT_EQ(event->LoadResult->Stats.Entities, 1u);
+    EXPECT_EQ(event->Task, queued->Task);
+    EXPECT_TRUE(SceneContainsNamedEntity(scene, "Loaded Scene Entity"));
+    EXPECT_FALSE(SceneContainsNamedEntity(scene, "Original Scene Entity"));
+    EXPECT_EQ(engine.GetSelectionController().SelectedCount(), 0u);
 
     engine.Shutdown();
 }

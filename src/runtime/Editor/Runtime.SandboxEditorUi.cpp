@@ -873,6 +873,94 @@ namespace Extrinsic::Runtime
             return message;
         }
 
+        [[nodiscard]] std::string BuildSceneFilePendingMessage(
+            const SandboxEditorSceneFileCommand& command,
+            const SandboxEditorSceneFileOperation operation)
+        {
+            std::string message{};
+            switch (operation)
+            {
+            case SandboxEditorSceneFileOperation::New:
+                message = "Queued scene new";
+                break;
+            case SandboxEditorSceneFileOperation::Save:
+                message = "Queued scene save";
+                break;
+            case SandboxEditorSceneFileOperation::Load:
+                message = "Queued scene open";
+                break;
+            case SandboxEditorSceneFileOperation::Close:
+                message = "Queued scene close";
+                break;
+            }
+            if (!command.Path.empty())
+            {
+                if (operation == SandboxEditorSceneFileOperation::Save)
+                    message += " to ";
+                else if (operation == SandboxEditorSceneFileOperation::Load)
+                    message += " from ";
+                else
+                    message += " ";
+                message += command.Path;
+            }
+            message += ".";
+            return message;
+        }
+
+        [[nodiscard]] SandboxEditorSceneFileOperation ToSandboxSceneFileOperation(
+            const RuntimeSceneFileOperation operation) noexcept
+        {
+            switch (operation)
+            {
+            case RuntimeSceneFileOperation::Save:
+                return SandboxEditorSceneFileOperation::Save;
+            case RuntimeSceneFileOperation::Load:
+                return SandboxEditorSceneFileOperation::Load;
+            case RuntimeSceneFileOperation::None:
+                break;
+            }
+            return SandboxEditorSceneFileOperation::Load;
+        }
+
+        [[nodiscard]] SandboxEditorSceneFileResult
+        BuildSceneFileResultFromRuntimeEvent(const RuntimeSceneFileEvent& event)
+        {
+            const SandboxEditorSceneFileOperation operation =
+                ToSandboxSceneFileOperation(event.Operation);
+            if (!event.Succeeded())
+            {
+                return SandboxEditorSceneFileResult{
+                    .Status = operation == SandboxEditorSceneFileOperation::Save
+                        ? SandboxEditorCommandStatus::SceneSaveFailed
+                        : SandboxEditorCommandStatus::SceneLoadFailed,
+                    .Operation = operation,
+                    .Task = event.Task,
+                    .Error = event.Error,
+                    .Message = BuildSceneFileFailureMessage(operation, event.Error),
+                };
+            }
+
+            SandboxEditorSceneFileResult result{
+                .Status = SandboxEditorCommandStatus::Applied,
+                .Operation = operation,
+                .Task = event.Task,
+                .Error = Core::ErrorCode::Success,
+            };
+            if (operation == SandboxEditorSceneFileOperation::Load &&
+                event.LoadResult.has_value())
+            {
+                result.Stats = event.LoadResult->Stats;
+            }
+            else if (operation == SandboxEditorSceneFileOperation::Save &&
+                     event.SaveResult.has_value())
+            {
+                result.Stats = event.SaveResult->Stats;
+            }
+            result.Message = BuildSceneFileSuccessMessage(
+                SandboxEditorSceneFileCommand{.Path = event.Path},
+                result);
+            return result;
+        }
 
         [[nodiscard]] SandboxEditorSpatialDebugBindingModel FromSpatialDebugBinding(
             const ECSC::SpatialDebugBinding& binding) noexcept
@@ -12000,7 +12088,9 @@ namespace Extrinsic::Runtime
                 model.LastResult = *context.LastSceneFileResult;
                 if (!context.LastSceneFileResult->Message.empty())
                     model.StatusText = context.LastSceneFileResult->Message;
-                if (!context.LastSceneFileResult->Succeeded())
+                if (!context.LastSceneFileResult->Succeeded() &&
+                    context.LastSceneFileResult->Status !=
+                        SandboxEditorCommandStatus::Pending)
                 {
                     AddDiagnostic(model.Diagnostics,
                                   SandboxEditorDiagnosticCode::SceneFileFailed,
@@ -12556,24 +12646,27 @@ namespace Extrinsic::Runtime
                     .Load =
                         [&engine](const SandboxEditorSceneFileCommand& command)
                         {
-                            auto loaded = engine.LoadSceneFromPath(command.Path);
-                            if (!loaded.has_value())
+                            auto queued = engine.QueueSceneLoadFromPath(command.Path);
+                            if (!queued.has_value())
                             {
                                 return SandboxEditorSceneFileResult{
                                     .Status = SandboxEditorCommandStatus::SceneLoadFailed,
                                     .Operation = SandboxEditorSceneFileOperation::Load,
-                                    .Error = loaded.error(),
+                                    .Error = queued.error(),
                                     .Message = BuildSceneFileFailureMessage(
                                         SandboxEditorSceneFileOperation::Load,
-                                        loaded.error()),
+                                        queued.error()),
                                 };
                             }
                             SandboxEditorSceneFileResult result{
-                                .Status = SandboxEditorCommandStatus::Applied,
+                                .Status = SandboxEditorCommandStatus::Pending,
                                 .Operation = SandboxEditorSceneFileOperation::Load,
-                                .Stats = loaded->Stats,
+                                .Task = queued->Task,
+                                .Error = Core::ErrorCode::Success,
                             };
-                            result.Message = BuildSceneFileSuccessMessage(command, result);
+                            result.Message = BuildSceneFilePendingMessage(
+                                command,
+                                result.Operation);
                             return result;
                         },
                     .Close =
@@ -20195,6 +20288,14 @@ namespace Extrinsic::Runtime
             result.Error = Core::ErrorCode::Success;
             InvalidateSelectedModelCache(context);
         }
+        else if (result.Status == SandboxEditorCommandStatus::Pending)
+        {
+            if (result.Message.empty())
+                result.Message = BuildSceneFilePendingMessage(
+                    command,
+                    result.Operation);
+            result.Error = Core::ErrorCode::Success;
+        }
         else if (result.Message.empty())
         {
             result.Message = BuildSceneFileFailureMessage(result.Operation, result.Error);
@@ -20235,6 +20336,14 @@ namespace Extrinsic::Runtime
                 result.Message = BuildSceneFileSuccessMessage(command, result);
             result.Error = Core::ErrorCode::Success;
             InvalidateSelectedModelCache(context);
+        }
+        else if (result.Status == SandboxEditorCommandStatus::Pending)
+        {
+            if (result.Message.empty())
+                result.Message = BuildSceneFilePendingMessage(
+                    command,
+                    result.Operation);
+            result.Error = Core::ErrorCode::Success;
         }
         else if (result.Message.empty())
         {
@@ -23946,6 +24055,17 @@ namespace Extrinsic::Runtime
                     m_LastImportResult =
                         BuildFileImportResultFromRuntimeEvent(*runtimeImport);
                     m_LastObservedRuntimeImportSequence = runtimeImport->Sequence;
+                }
+                const std::optional<RuntimeSceneFileEvent>& runtimeSceneFile =
+                    m_Engine->GetLastSceneFileEvent();
+                if (runtimeSceneFile.has_value() &&
+                    runtimeSceneFile->Sequence !=
+                        m_LastObservedRuntimeSceneFileSequence)
+                {
+                    m_LastSceneFileResult =
+                        BuildSceneFileResultFromRuntimeEvent(*runtimeSceneFile);
+                    m_LastObservedRuntimeSceneFileSequence =
+                        runtimeSceneFile->Sequence;
                 }
                 SandboxEditorContext context = BuildContextFromEngine(*m_Engine);
                 context.SelectedModelCache = &m_SelectedModelCache;

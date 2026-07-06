@@ -1064,6 +1064,15 @@ namespace Extrinsic::Runtime
             Core::ErrorCode Error{Core::ErrorCode::Unknown};
         };
 
+        struct QueuedSceneLoadState
+        {
+            std::string Path{};
+            StreamingTaskHandle Task{};
+            ECS::Scene::Registry LoadedScene{};
+            std::optional<SceneDeserializationResult> Result{};
+            Core::ErrorCode Error{Core::ErrorCode::Unknown};
+        };
+
         struct GeometryImportBounds
         {
             glm::vec3 Min{0.0f};
@@ -5088,6 +5097,40 @@ namespace Extrinsic::Runtime
         m_LastAssetImportEvent = std::move(event);
     }
 
+    void Engine::RecordSceneFileEvent(RuntimeSceneFileEvent event)
+    {
+        event.Sequence = ++m_SceneFileEventSequence;
+        const char* operationName = "None";
+        switch (event.Operation)
+        {
+        case RuntimeSceneFileOperation::Load:
+            operationName = "Load";
+            break;
+        case RuntimeSceneFileOperation::Save:
+            operationName = "Save";
+            break;
+        case RuntimeSceneFileOperation::None:
+            break;
+        }
+
+        if (event.Succeeded())
+        {
+            Core::Log::Info(
+                "[Runtime] Scene file operation succeeded: operation={} path='{}'",
+                operationName,
+                event.Path);
+        }
+        else
+        {
+            Core::Log::Warn(
+                "[Runtime] Scene file operation failed: operation={} path='{}' error={}",
+                operationName,
+                event.Path,
+                Core::Error::ToString(event.Error));
+        }
+        m_LastSceneFileEvent = std::move(event);
+    }
+
     Core::Expected<RuntimeAssetImportResult> Engine::ImportAssetFromPathImpl(
         RuntimeAssetImportRequest request,
         const Assets::AssetId existingAsset)
@@ -5246,6 +5289,112 @@ namespace Extrinsic::Runtime
         m_StableEntityLookup.Rebuild(*m_Scene);
         m_EditorCommandHistory.ResetDocument(path);
         return loaded;
+    }
+
+    Core::Expected<RuntimeQueuedSceneFileOperation>
+    Engine::QueueSceneLoadFromPath(std::string path)
+    {
+        if (!m_Initialized || !m_Scene || !m_StreamingExecutor)
+        {
+            return Core::Err<RuntimeQueuedSceneFileOperation>(
+                Core::ErrorCode::InvalidState);
+        }
+        if (path.empty())
+        {
+            return Core::Err<RuntimeQueuedSceneFileOperation>(
+                Core::ErrorCode::InvalidPath);
+        }
+
+        auto state = std::make_shared<QueuedSceneLoadState>();
+        state->Path = std::move(path);
+
+        const StreamingTaskHandle handle = m_StreamingExecutor->Submit(
+            StreamingTaskDesc{
+                .Name = "Runtime.SceneLoad." + FileNameFromPath(state->Path),
+                .Kind = Core::Dag::TaskKind::AssetDecode,
+                .Priority = Core::Dag::TaskPriority::Normal,
+                .EstimatedCost = 4u,
+                .Execute = [state]() mutable -> StreamingResult
+                {
+                    Core::IO::FileIOBackend backend;
+                    auto loaded = LoadSceneDocument(
+                        state->LoadedScene,
+                        state->Path,
+                        backend);
+                    if (!loaded.has_value())
+                    {
+                        state->Error = loaded.error();
+                        return StreamingResult{
+                            StreamingCpuPayloadReady{.PayloadToken = 0u}};
+                    }
+
+                    state->Result = *loaded;
+                    state->Error = Core::ErrorCode::Success;
+                    return StreamingResult{
+                        StreamingCpuPayloadReady{.PayloadToken = 0u}};
+                },
+                .ApplyOnMainThread = [this, state](StreamingResult&& result) mutable
+                {
+                    Core::Expected<SceneDeserializationResult> loaded =
+                        Core::Err<SceneDeserializationResult>(
+                            result.has_value() ? state->Error : result.error());
+
+                    if (result.has_value() &&
+                        state->Error == Core::ErrorCode::Success &&
+                        state->Result.has_value())
+                    {
+                        if (!m_Initialized || !m_Scene)
+                        {
+                            loaded = Core::Err<SceneDeserializationResult>(
+                                Core::ErrorCode::InvalidState);
+                        }
+                        else
+                        {
+                            loaded = *state->Result;
+                            ClearSceneRuntimeState();
+                            m_Scene->Clear();
+                            m_Scene->Raw() = std::move(state->LoadedScene.Raw());
+                            m_StableEntityLookup.Rebuild(*m_Scene);
+                            m_EditorCommandHistory.ResetDocument(state->Path);
+                        }
+                    }
+
+                    RuntimeSceneFileEvent event{
+                        .Operation = RuntimeSceneFileOperation::Load,
+                        .Task = state->Task,
+                        .Path = state->Path,
+                        .Error = loaded.has_value()
+                            ? Core::ErrorCode::Success
+                            : loaded.error(),
+                    };
+                    if (loaded.has_value())
+                    {
+                        event.LoadResult = *loaded;
+                    }
+                    RecordSceneFileEvent(std::move(event));
+                },
+            });
+
+        if (!handle.IsValid())
+        {
+            return Core::Err<RuntimeQueuedSceneFileOperation>(
+                Core::ErrorCode::InvalidState);
+        }
+
+        state->Task = handle;
+        Core::Log::Info(
+            "[Runtime] Queued scene load: path='{}'",
+            state->Path);
+        return RuntimeQueuedSceneFileOperation{
+            .Task = handle,
+            .Operation = RuntimeSceneFileOperation::Load,
+        };
+    }
+
+    const std::optional<RuntimeSceneFileEvent>&
+    Engine::GetLastSceneFileEvent() const noexcept
+    {
+        return m_LastSceneFileEvent;
     }
 
     Core::Result Engine::NewSceneDocument()

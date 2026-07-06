@@ -62,15 +62,18 @@ between those phases: frame delta, fixed-step interpolation alpha, render frame
 index, render input, extraction stats, and the acquired render-world pool slot.
 It is intentionally not exported as public runtime API.
 
-Dropped asset imports and Sandbox editor model-scene/texture import commands
-use the persistent runtime `StreamingExecutor` instead of doing file IO or
-decode work directly from the platform-event or ImGui-callback phase. Geometry,
-model-scene, and texture drops plus queued editor model/texture imports create
-ingest records and route diagnostics on the frame thread, run file read/decode
-work on the worker lane, then apply the decoded CPU payload from the bounded
+Dropped asset imports, Sandbox editor model-scene/texture import commands, and
+Sandbox editor scene-open commands use the persistent runtime
+`StreamingExecutor` instead of doing file IO or decode/parse work directly from
+the platform-event or ImGui-callback phase. Geometry, model-scene, and texture
+drops plus queued editor model/texture imports create ingest records and route
+diagnostics on the frame thread, run file read/decode work on the worker lane,
+then apply the decoded CPU payload from the bounded main-thread apply drain.
+Queued editor scene loads read and parse into a temporary registry on the
+worker lane, then run the documented scene-replacement lifecycle from the same
 main-thread apply drain. The apply step is the only place that mutates
 `AssetService`, ECS scene state, texture/model-scene handoffs, selection/focus
-state, or editor document history.
+state, stable entity lookup, or editor document history.
 
 ### Camera focus command
 

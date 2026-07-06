@@ -47,15 +47,16 @@ import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
-    import Extrinsic.Runtime.SceneSerialization;
-    import Extrinsic.Runtime.SelectedMeshTextureBake;
-    import Extrinsic.Runtime.SelectionController;
-    import Geometry.Graph.Vertex.Normals;
-    import Geometry.HalfedgeMesh.Vertices.Normals;
-    import Geometry.PointCloud.Normals;
-    import Geometry.PointCloud.Utils;
-    import Geometry.Smoothing;
-    import Geometry.UvAtlas;
+import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Runtime.SceneSerialization;
+import Extrinsic.Runtime.SelectedMeshTextureBake;
+import Extrinsic.Runtime.SelectionController;
+import Geometry.Graph.Vertex.Normals;
+import Geometry.HalfedgeMesh.Vertices.Normals;
+import Geometry.PointCloud.Normals;
+import Geometry.PointCloud.Utils;
+import Geometry.Smoothing;
+import Geometry.UvAtlas;
 
 namespace Extrinsic::Runtime::Detail
 {
@@ -1444,6 +1445,7 @@ export namespace Extrinsic::Runtime
     {
         SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
         SandboxEditorSceneFileOperation Operation{SandboxEditorSceneFileOperation::Save};
+        StreamingTaskHandle Task{};
         SceneSerializationStats Stats{};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
@@ -2748,6 +2750,7 @@ export namespace Extrinsic::Runtime
         Assets::AssetPayloadKind m_ImportPayloadKind{
             Assets::AssetPayloadKind::Unknown};
         std::uint64_t m_LastObservedRuntimeImportSequence{0};
+        std::uint64_t m_LastObservedRuntimeSceneFileSequence{0};
         std::optional<SandboxEditorFileImportResult> m_LastImportResult{};
         std::optional<SandboxEditorSceneFileResult> m_LastSceneFileResult{};
         std::optional<SandboxEditorKMeansResult> m_LastKMeansResult{};
