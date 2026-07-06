@@ -52,6 +52,7 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
@@ -61,6 +62,7 @@ import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.KMeansBackend;
+import Extrinsic.Runtime.KMeansGpuBackend;
 import Extrinsic.Runtime.KMeansGpuJobQueue;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
@@ -12718,18 +12720,6 @@ namespace Extrinsic::Runtime
                 },
                 .VisualizationAdapterBindingRevision =
                     engine.GetVisualizationAdapterBindingRevision(),
-                .KMeansGpuCommands = SandboxEditorKMeansGpuCommandSurface{
-                    .Submit =
-                        [&engine](RuntimeKMeansGpuJobRequest request)
-                        {
-                            return engine.SubmitKMeansGpuJob(std::move(request));
-                        },
-                    .ConsumeCompleted =
-                        [&engine]()
-                        {
-                            return engine.ConsumeCompletedKMeansGpuJob();
-                        },
-                },
                 .DerivedJobCommands = SandboxEditorDerivedJobCommandSurface{
                     .Submit =
                         [&engine](DerivedJobDesc desc)
@@ -24041,10 +24031,61 @@ namespace Extrinsic::Runtime
         Detach();
     }
 
+    void SandboxEditorUi::AttachKMeansGpuQueue(Engine& engine)
+    {
+        DetachKMeansGpuQueue();
+        m_KMeansGpuJobs = std::make_unique<RuntimeKMeansGpuJobQueue>(
+            engine.GetDevice(),
+            engine.GetRenderer().GetBufferManager(),
+            engine.GetDevice().GetTransferQueue());
+        m_KMeansGpuParticipant = engine.RegisterRuntimeGpuJobParticipant(
+            RuntimeGpuJobParticipantDesc{
+                .DebugName = "SandboxEditor.KMeansGpu",
+                .RecordFrameCommands =
+                    [this](RHI::ICommandContext& commandContext)
+                    {
+                        if (m_KMeansGpuJobs)
+                            m_KMeansGpuJobs->AdvanceGpuWork(commandContext);
+                    },
+                .DrainCompletedTransfers =
+                    [this]()
+                    {
+                        if (m_KMeansGpuJobs)
+                            m_KMeansGpuJobs->DrainCompletedTransfers();
+                    },
+                .HasInFlightWork =
+                    [this]() -> bool
+                    {
+                        return m_KMeansGpuJobs &&
+                               m_KMeansGpuJobs->HasInFlightJob();
+                    },
+                .ShutdownAfterDeviceIdle =
+                    [this]()
+                    {
+                        m_KMeansGpuJobs.reset();
+                        m_KMeansGpuParticipant = {};
+                    },
+            });
+        if (!m_KMeansGpuParticipant.IsValid())
+            m_KMeansGpuJobs.reset();
+    }
+
+    void SandboxEditorUi::DetachKMeansGpuQueue()
+    {
+        if (m_Engine != nullptr && m_KMeansGpuParticipant.IsValid())
+        {
+            m_Engine->UnregisterRuntimeGpuJobParticipant(
+                m_KMeansGpuParticipant);
+        }
+        m_KMeansGpuParticipant = {};
+        m_KMeansGpuJobs.reset();
+    }
+
     void SandboxEditorUi::Attach(Engine& engine)
     {
         Detach();
         m_Engine = &engine;
+        AttachKMeansGpuQueue(engine);
         engine.SetImGuiEditorCallback(
             [this]
             {
@@ -24072,6 +24113,29 @@ namespace Extrinsic::Runtime
                 }
                 SandboxEditorContext context = BuildContextFromEngine(*m_Engine);
                 context.SelectedModelCache = &m_SelectedModelCache;
+                context.KMeansGpuCommands = SandboxEditorKMeansGpuCommandSurface{
+                    .Submit =
+                        [this](RuntimeKMeansGpuJobRequest request)
+                        {
+                            if (!m_KMeansGpuJobs)
+                            {
+                                return RuntimeKMeansGpuJobSubmission{
+                                    .Status = RuntimeKMeansGpuJobStatus::GpuUnavailable,
+                                    .GpuStatus = KMeansGpuStatus::DeviceUnavailable,
+                                    .Diagnostic =
+                                        "Sandbox editor K-Means GPU job queue is unavailable.",
+                                };
+                            }
+                            return m_KMeansGpuJobs->Submit(std::move(request));
+                        },
+                    .ConsumeCompleted =
+                        [this]() -> std::optional<RuntimeKMeansGpuJobResult>
+                        {
+                            if (!m_KMeansGpuJobs)
+                                return std::nullopt;
+                            return m_KMeansGpuJobs->ConsumeCompleted();
+                        },
+                };
                 if (context.KMeansGpuCommands.Available())
                 {
                     while (std::optional<RuntimeKMeansGpuJobResult> completed =
@@ -24445,8 +24509,14 @@ namespace Extrinsic::Runtime
     {
         if (m_Engine != nullptr)
         {
+            DetachKMeansGpuQueue();
             m_Engine->SetImGuiEditorCallback({});
             m_Engine = nullptr;
+        }
+        else
+        {
+            m_KMeansGpuParticipant = {};
+            m_KMeansGpuJobs.reset();
         }
         m_SelectedModelCache.Clear();
     }

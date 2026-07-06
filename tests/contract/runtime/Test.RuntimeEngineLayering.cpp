@@ -135,26 +135,35 @@ TEST(RuntimeEngineLayering, RunFrameStopsAfterPlatformCloseBeforeRendererContrac
     EXPECT_LT(returnFromClose, renderContract);
 }
 
-TEST(RuntimeEngineLayering, ShutdownWaitsIdleBeforeDestroyingRuntimeGpuJobQueue)
+TEST(RuntimeEngineLayering, ShutdownWaitsIdleBeforeDestroyingRuntimeGpuParticipants)
 {
     const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
     const auto shutdown = SliceBetween(content,
                                        "void Engine::Shutdown()",
                                        "// ── Main loop");
+    const auto unregister = SliceBetween(
+        content,
+        "void Engine::UnregisterRuntimeGpuJobParticipant(",
+        "Engine::RuntimeGpuJobParticipantRecord*");
 
-    const auto detachHook = shutdown.find("SetRuntimeFrameCommandHook({})");
-    const auto waitIdle = shutdown.find("m_Device->WaitIdle();", detachHook);
-    const auto destroyKMeans = shutdown.find("m_KMeansGpuJobs.reset();", waitIdle);
+    const auto participantShutdown =
+        shutdown.find("ShutdownRuntimeGpuJobParticipants();");
     const auto executeShutdown = shutdown.find("Core::ExecuteShutdownContract(hooks)");
+    const auto detachHook =
+        unregister.find("UninstallRuntimeGpuJobParticipantFrameHook(*it)");
+    const auto waitIdle = unregister.find("m_Device->WaitIdle();", detachHook);
+    const auto destroyParticipant =
+        unregister.find("it->Desc.ShutdownAfterDeviceIdle()", waitIdle);
 
+    ASSERT_NE(participantShutdown, std::string::npos);
+    ASSERT_NE(executeShutdown, std::string::npos);
     ASSERT_NE(detachHook, std::string::npos);
     ASSERT_NE(waitIdle, std::string::npos);
-    ASSERT_NE(destroyKMeans, std::string::npos);
-    ASSERT_NE(executeShutdown, std::string::npos);
+    ASSERT_NE(destroyParticipant, std::string::npos);
 
+    EXPECT_LT(participantShutdown, executeShutdown);
     EXPECT_LT(detachHook, waitIdle);
-    EXPECT_LT(waitIdle, destroyKMeans);
-    EXPECT_LT(destroyKMeans, executeShutdown);
+    EXPECT_LT(waitIdle, destroyParticipant);
 }
 
 TEST(RuntimeEngineLayering, RunFrameCarriesDataOnlyFrameContext)

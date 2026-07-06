@@ -3484,3 +3484,14 @@ queue `StreamingExecutor` work, keep file IO and decode/parse/serialize work
 off the frame callback path, and apply results on the bounded main-thread
 drain. A slow fake IO backend regression proves the frame loop advances while
 queued texture reads remain blocked.
+
+[`RUNTIME-143`](RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md) —
+Multi-subscriber frame-command hook and K-Means decoupling from Engine retired
+to `tasks/done/` on 2026-07-05 at `Operational`. `IRenderer` now exposes
+deterministic add/remove runtime frame-command hook registration, `Engine`
+owns a domain-free runtime GPU participant registry for frame command
+recording, maintenance drains, in-flight checks, and post-device-idle
+teardown, and `SandboxEditorUi` owns the concrete `RuntimeKMeansGpuJobQueue`
+while attached. `Runtime.Engine.cppm` and `.cpp` are grep-clean for K-Means,
+and the existing Sandbox K-Means GPU command surface continues to submit and
+consume through the attached queue.

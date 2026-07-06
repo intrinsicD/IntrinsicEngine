@@ -951,7 +951,7 @@ TEST(RendererFrameLifecycle, PlacedTransientAliasingFallsBackWhenMemoryBlocksUna
     renderer->Shutdown();
 }
 
-TEST(RendererFrameLifecycle, RuntimeFrameCommandHookRunsInsideExecuteFrameCommandContext)
+TEST(RendererFrameLifecycle, RuntimeFrameCommandHooksRunInsideExecuteFrameCommandContext)
 {
     Extrinsic::Tests::MockDevice device;
     device.NextFrame = Extrinsic::RHI::FrameHandle{.FrameIndex = 2u, .SwapchainImageIndex = 0u};
@@ -964,15 +964,31 @@ TEST(RendererFrameLifecycle, RuntimeFrameCommandHookRunsInsideExecuteFrameComman
     constexpr std::uint32_t kHookDispatchX = 4091u;
     constexpr std::uint32_t kHookDispatchY = 4093u;
     constexpr std::uint32_t kHookDispatchZ = 4099u;
-    int hookCalls = 0;
+    constexpr std::uint32_t kSecondHookDispatchX = 2027u;
+    constexpr std::uint32_t kSecondHookDispatchY = 2029u;
+    constexpr std::uint32_t kSecondHookDispatchZ = 2039u;
+    std::vector<int> hookOrder{};
     int hookEventStart = -1;
-    renderer->SetRuntimeFrameCommandHook(
+    const Extrinsic::Graphics::RuntimeFrameCommandHookHandle firstHook =
+        renderer->RegisterRuntimeFrameCommandHook(
         [&](Extrinsic::RHI::ICommandContext& commandContext)
         {
-            ++hookCalls;
+            hookOrder.push_back(1);
             hookEventStart = static_cast<int>(device.CommandContext.Events.size());
             commandContext.Dispatch(kHookDispatchX, kHookDispatchY, kHookDispatchZ);
         });
+    ASSERT_TRUE(firstHook.IsValid());
+    const Extrinsic::Graphics::RuntimeFrameCommandHookHandle secondHook =
+        renderer->RegisterRuntimeFrameCommandHook(
+        [&](Extrinsic::RHI::ICommandContext& commandContext)
+        {
+            hookOrder.push_back(2);
+            commandContext.Dispatch(
+                kSecondHookDispatchX,
+                kSecondHookDispatchY,
+                kSecondHookDispatchZ);
+        });
+    ASSERT_TRUE(secondHook.IsValid());
 
     Extrinsic::RHI::FrameHandle frame{};
     ASSERT_TRUE(renderer->BeginFrame(frame));
@@ -983,13 +999,25 @@ TEST(RendererFrameLifecycle, RuntimeFrameCommandHookRunsInsideExecuteFrameComman
     renderer->PrepareFrame(world);
     renderer->ExecuteFrame(frame, world);
 
-    EXPECT_EQ(hookCalls, 1);
+    ASSERT_EQ(hookOrder.size(), 2u);
+    EXPECT_EQ(hookOrder[0], 1);
+    EXPECT_EQ(hookOrder[1], 2);
     ASSERT_FALSE(device.CommandContext.DispatchRecords.empty());
     EXPECT_TRUE(std::ranges::any_of(
         device.CommandContext.DispatchRecords,
         [](const Extrinsic::Tests::MockCommandContext::DispatchRecord& record)
         {
             return DispatchMatches(record, kHookDispatchX, kHookDispatchY, kHookDispatchZ);
+        }));
+    EXPECT_TRUE(std::ranges::any_of(
+        device.CommandContext.DispatchRecords,
+        [](const Extrinsic::Tests::MockCommandContext::DispatchRecord& record)
+        {
+            return DispatchMatches(
+                record,
+                kSecondHookDispatchX,
+                kSecondHookDispatchY,
+                kSecondHookDispatchZ);
         }));
 
     const int beginIndex = FindEventIndex(
@@ -1009,9 +1037,10 @@ TEST(RendererFrameLifecycle, RuntimeFrameCommandHookRunsInsideExecuteFrameComman
     EXPECT_LT(beginIndex, dispatchIndex);
     EXPECT_LT(dispatchIndex, endIndex);
 
-    renderer->SetRuntimeFrameCommandHook({});
+    renderer->UnregisterRuntimeFrameCommandHook(firstHook);
     device.CommandContext.DispatchRecords.clear();
     device.CommandContext.Events.clear();
+    hookOrder.clear();
 
     Extrinsic::RHI::FrameHandle secondFrame{};
     ASSERT_TRUE(renderer->BeginFrame(secondFrame));
@@ -1019,12 +1048,47 @@ TEST(RendererFrameLifecycle, RuntimeFrameCommandHookRunsInsideExecuteFrameComman
     renderer->PrepareFrame(secondWorld);
     renderer->ExecuteFrame(secondFrame, secondWorld);
 
-    EXPECT_EQ(hookCalls, 1);
+    ASSERT_EQ(hookOrder.size(), 1u);
+    EXPECT_EQ(hookOrder[0], 2);
     EXPECT_TRUE(std::ranges::none_of(
         device.CommandContext.DispatchRecords,
         [](const Extrinsic::Tests::MockCommandContext::DispatchRecord& record)
         {
             return DispatchMatches(record, kHookDispatchX, kHookDispatchY, kHookDispatchZ);
+        }));
+    EXPECT_TRUE(std::ranges::any_of(
+        device.CommandContext.DispatchRecords,
+        [](const Extrinsic::Tests::MockCommandContext::DispatchRecord& record)
+        {
+            return DispatchMatches(
+                record,
+                kSecondHookDispatchX,
+                kSecondHookDispatchY,
+                kSecondHookDispatchZ);
+        }));
+
+    renderer->UnregisterRuntimeFrameCommandHook(secondHook);
+    device.CommandContext.DispatchRecords.clear();
+    device.CommandContext.Events.clear();
+    hookOrder.clear();
+
+    Extrinsic::RHI::FrameHandle thirdFrame{};
+    ASSERT_TRUE(renderer->BeginFrame(thirdFrame));
+    Extrinsic::Graphics::RenderWorld thirdWorld =
+        renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(thirdWorld);
+    renderer->ExecuteFrame(thirdFrame, thirdWorld);
+
+    EXPECT_TRUE(hookOrder.empty());
+    EXPECT_TRUE(std::ranges::none_of(
+        device.CommandContext.DispatchRecords,
+        [](const Extrinsic::Tests::MockCommandContext::DispatchRecord& record)
+        {
+            return DispatchMatches(
+                record,
+                kSecondHookDispatchX,
+                kSecondHookDispatchY,
+                kSecondHookDispatchZ);
         }));
 
     renderer->Shutdown();

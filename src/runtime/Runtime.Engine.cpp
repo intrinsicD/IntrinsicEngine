@@ -72,8 +72,6 @@ import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.ImGuiAdapter;
-import Extrinsic.Runtime.KMeansGpuBackend;
-import Extrinsic.Runtime.KMeansGpuJobQueue;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Core.FrameLoop;
@@ -3072,6 +3070,11 @@ namespace Extrinsic::Runtime
         m_Renderer = Graphics::CreateRenderer();
         m_Renderer->Initialize(*m_Device);
         m_RendererOperational = m_Device->IsOperational();
+        for (RuntimeGpuJobParticipantRecord& participant :
+             m_RuntimeGpuJobParticipants)
+        {
+            InstallRuntimeGpuJobParticipantFrameHook(participant);
+        }
         if (!m_Config.Render.DefaultRecipeConfigPath.empty())
         {
             (void)LoadAndApplyRenderRecipeConfigFile(
@@ -3128,16 +3131,6 @@ namespace Extrinsic::Runtime
             m_Renderer->GetTextureManager(),
             m_Renderer->GetSamplerManager(),
             m_Device->GetTransferQueue());
-        m_KMeansGpuJobs = std::make_unique<RuntimeKMeansGpuJobQueue>(
-            *m_Device,
-            m_Renderer->GetBufferManager(),
-            m_Device->GetTransferQueue());
-        m_Renderer->SetRuntimeFrameCommandHook(
-            [this](RHI::ICommandContext& commandContext)
-            {
-                if (m_KMeansGpuJobs)
-                    m_KMeansGpuJobs->AdvanceGpuWork(commandContext);
-            });
 
         // RUNTIME-070: bootstrap the runtime-owned 4×4 magenta-and-black
         // checkerboard fallback texture exactly once. Skipped when the
@@ -3243,15 +3236,7 @@ namespace Extrinsic::Runtime
         // destructor shuts the overlay system + ImGui context down; the overlay
         // system value member is reusable on a later re-Initialize().
         m_ImGuiAdapter.reset();
-        if (m_Renderer)
-            m_Renderer->SetRuntimeFrameCommandHook({});
-        // Runtime K-Means GPU jobs own direct compute pipeline handles and
-        // cache BufferLease values. Detach the hook first, wait for any in-flight
-        // frame commands to retire, then drop the leases before renderer/device
-        // teardown.
-        if (m_KMeansGpuJobs && m_Device)
-            m_Device->WaitIdle();
-        m_KMeansGpuJobs.reset();
+        ShutdownRuntimeGpuJobParticipants();
 
         struct ShutdownHooks final : Core::IShutdownHooks
         {
@@ -3746,8 +3731,12 @@ namespace Extrinsic::Runtime
                               *m_Renderer);
         const auto maintenanceBegin = std::chrono::steady_clock::now();
         Core::ExecuteMaintenanceContract(transferHooks, streamingHooks, assetHooks, 8);
-        if (m_KMeansGpuJobs)
-            m_KMeansGpuJobs->DrainCompletedTransfers();
+        for (RuntimeGpuJobParticipantRecord& participant :
+             m_RuntimeGpuJobParticipants)
+        {
+            if (participant.Desc.DrainCompletedTransfers)
+                participant.Desc.DrainCompletedTransfers();
+        }
         pacing.MaintenanceMicros = ElapsedMicros(maintenanceBegin);
 
         // ── RUNTIME-092 Slice B: refresh the stable-entity lookup ──────────
@@ -5950,26 +5939,117 @@ namespace Extrinsic::Runtime
         return m_RenderExtraction.GetVisualizationAdapterBindingRevision();
     }
 
-    RuntimeKMeansGpuJobSubmission Engine::SubmitKMeansGpuJob(
-        RuntimeKMeansGpuJobRequest request)
+    RuntimeGpuJobParticipantHandle Engine::RegisterRuntimeGpuJobParticipant(
+        RuntimeGpuJobParticipantDesc desc)
     {
-        if (!m_KMeansGpuJobs)
+        if (!desc.RecordFrameCommands && !desc.DrainCompletedTransfers &&
+            !desc.HasInFlightWork && !desc.ShutdownAfterDeviceIdle)
         {
-            return RuntimeKMeansGpuJobSubmission{
-                .Status = RuntimeKMeansGpuJobStatus::GpuUnavailable,
-                .GpuStatus = KMeansGpuStatus::DeviceUnavailable,
-                .Diagnostic = "Runtime K-Means GPU job queue is unavailable.",
-            };
+            return {};
         }
-        return m_KMeansGpuJobs->Submit(std::move(request));
+
+        RuntimeGpuJobParticipantRecord participant{};
+        participant.Handle =
+            RuntimeGpuJobParticipantHandle{m_NextRuntimeGpuJobParticipantHandle++};
+        participant.Desc = std::move(desc);
+        m_RuntimeGpuJobParticipants.push_back(std::move(participant));
+        InstallRuntimeGpuJobParticipantFrameHook(
+            m_RuntimeGpuJobParticipants.back());
+        return m_RuntimeGpuJobParticipants.back().Handle;
     }
 
-    std::optional<RuntimeKMeansGpuJobResult>
-    Engine::ConsumeCompletedKMeansGpuJob()
+    void Engine::UnregisterRuntimeGpuJobParticipant(
+        const RuntimeGpuJobParticipantHandle handle)
     {
-        if (!m_KMeansGpuJobs)
-            return std::nullopt;
-        return m_KMeansGpuJobs->ConsumeCompleted();
+        if (!handle.IsValid())
+            return;
+
+        const auto it = std::ranges::find_if(
+            m_RuntimeGpuJobParticipants,
+            [handle](const RuntimeGpuJobParticipantRecord& participant) noexcept
+            {
+                return participant.Handle == handle;
+            });
+        if (it == m_RuntimeGpuJobParticipants.end())
+            return;
+
+        UninstallRuntimeGpuJobParticipantFrameHook(*it);
+        const bool hasInFlightWork = it->Desc.HasInFlightWork
+            ? it->Desc.HasInFlightWork()
+            : static_cast<bool>(it->Desc.RecordFrameCommands);
+        if (hasInFlightWork && m_Device)
+            m_Device->WaitIdle();
+        if (it->Desc.ShutdownAfterDeviceIdle)
+            it->Desc.ShutdownAfterDeviceIdle();
+        m_RuntimeGpuJobParticipants.erase(it);
+    }
+
+    Engine::RuntimeGpuJobParticipantRecord*
+    Engine::FindRuntimeGpuJobParticipant(
+        const RuntimeGpuJobParticipantHandle handle) noexcept
+    {
+        if (!handle.IsValid())
+            return nullptr;
+        const auto it = std::ranges::find_if(
+            m_RuntimeGpuJobParticipants,
+            [handle](const RuntimeGpuJobParticipantRecord& participant) noexcept
+            {
+                return participant.Handle == handle;
+            });
+        return it == m_RuntimeGpuJobParticipants.end() ? nullptr : &*it;
+    }
+
+    const Engine::RuntimeGpuJobParticipantRecord*
+    Engine::FindRuntimeGpuJobParticipant(
+        const RuntimeGpuJobParticipantHandle handle) const noexcept
+    {
+        if (!handle.IsValid())
+            return nullptr;
+        const auto it = std::ranges::find_if(
+            m_RuntimeGpuJobParticipants,
+            [handle](const RuntimeGpuJobParticipantRecord& participant) noexcept
+            {
+                return participant.Handle == handle;
+            });
+        return it == m_RuntimeGpuJobParticipants.end() ? nullptr : &*it;
+    }
+
+    void Engine::InstallRuntimeGpuJobParticipantFrameHook(
+        RuntimeGpuJobParticipantRecord& participant)
+    {
+        if (!m_Renderer || participant.RendererHook.IsValid() ||
+            !participant.Desc.RecordFrameCommands)
+        {
+            return;
+        }
+
+        const RuntimeGpuJobParticipantHandle handle = participant.Handle;
+        participant.RendererHook =
+            m_Renderer->RegisterRuntimeFrameCommandHook(
+                [this, handle](RHI::ICommandContext& commandContext)
+                {
+                    RuntimeGpuJobParticipantRecord* record =
+                        FindRuntimeGpuJobParticipant(handle);
+                    if (record != nullptr && record->Desc.RecordFrameCommands)
+                        record->Desc.RecordFrameCommands(commandContext);
+                });
+    }
+
+    void Engine::UninstallRuntimeGpuJobParticipantFrameHook(
+        RuntimeGpuJobParticipantRecord& participant) noexcept
+    {
+        if (m_Renderer && participant.RendererHook.IsValid())
+            m_Renderer->UnregisterRuntimeFrameCommandHook(participant.RendererHook);
+        participant.RendererHook = {};
+    }
+
+    void Engine::ShutdownRuntimeGpuJobParticipants()
+    {
+        while (!m_RuntimeGpuJobParticipants.empty())
+        {
+            UnregisterRuntimeGpuJobParticipant(
+                m_RuntimeGpuJobParticipants.back().Handle);
+        }
     }
 
     DerivedJobHandle Engine::SubmitDerivedJob(DerivedJobDesc desc)

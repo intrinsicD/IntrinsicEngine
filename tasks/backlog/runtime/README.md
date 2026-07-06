@@ -24,9 +24,11 @@ Blocking fixes first, then abstractness seams, then steady-state efficiency:
   is retired; dropped/editor model-scene and texture imports plus editor
   scene save/load now use the runtime streaming lane instead of blocking the
   frame path.
-- [`RUNTIME-143`](RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md) —
-  multi-subscriber renderer frame-command hook; K-Means GPU queue decoupled
-  from `Engine` internals and public API.
+- [`RUNTIME-143`](../../done/RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md)
+  is retired; the renderer runtime frame-command hook is now a
+  multi-subscriber registry, `Engine` owns a generic runtime GPU participant
+  seam, and Sandbox editor K-Means GPU execution owns its queue outside
+  `Engine`.
 - [`RUNTIME-144`](RUNTIME-144-post-import-processor-and-ux-policy-seam.md) —
   post-import processor + import UX-policy seam (normal-bake registration,
   focus/auto-select policy, `F`-key routing; coordinates with
@@ -157,6 +159,12 @@ split; narratives live in the retirement log.
   serialize work off the frame callback path, and apply results on the bounded
   main-thread drain. A slow fake IO backend regression proves the frame loop
   advances while queued texture reads remain blocked.
+- [RUNTIME-143 — Multi-subscriber frame-command hook and K-Means decoupling from Engine](../../done/RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md)
+  (done, 2026-07-05, `Operational`): `IRenderer` now exposes deterministic
+  add/remove runtime frame-command hook registration, `Engine` exposes a
+  generic runtime GPU participant seam for command recording, maintenance
+  drains, in-flight checks, and post-idle teardown, and `SandboxEditorUi` owns
+  the concrete `RuntimeKMeansGpuJobQueue` while attached.
 - [RUNTIME-125 — Optional AoS fast lane for static geometry](../../done/RUNTIME-125-aos-static-fast-lane.md)
   (done, 2026-07-02, `CPUContracted`): PR-fast SoA/probe benchmark evidence and
   planning-only storage-lane/promotion contracts landed without allocating an

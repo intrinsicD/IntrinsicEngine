@@ -1418,13 +1418,14 @@ Concretely:
   does not retain ECS registry references. Slot 0 remains the default legacy
   path, while the pipelined render-N-1 path writes extraction-N to the acquired
   back slot and extracts from the acquired previous-front slot.
-- `IRenderer::SetRuntimeFrameCommandHook(...)` is the promoted handoff for
+- `IRenderer::RegisterRuntimeFrameCommandHook(...)` /
+  `UnregisterRuntimeFrameCommandHook(...)` are the promoted handoff for
   runtime-owned GPU work that must record inside the renderer's current frame
-  command context. The renderer invokes the hook only while an
+  command context. Registered hooks run in registration order only while an
   `RHI::ICommandContext` is open, so runtime queues such as K-Means GPU execution
   can append compute/readback commands without acquiring or presenting a second
-  swapchain image. The hook may record RHI commands but must not retain the
-  borrowed command context.
+  swapchain image. Hooks may record RHI commands but must not retain the
+  borrowed command context or mutate hook registration during recording.
 - Renderable asset-generation observation is runtime-owned. Per `GRAPHICS-023C`,
   `Extrinsic.Runtime.RenderExtraction` may compare `AssetInstance::Source` with a
   supplied `Graphics.GpuAssetCache` view and `GpuSceneSlot` metadata, but

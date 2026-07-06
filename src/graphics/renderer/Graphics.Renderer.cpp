@@ -2130,7 +2130,7 @@ namespace Extrinsic::Graphics
                 m_ImGuiOverlaySystem->ShutdownGpuResources();
             }
             m_ImGuiOverlaySystem = nullptr;
-            m_RuntimeFrameCommandHook = {};
+            m_RuntimeFrameCommandHooks.clear();
             // GRAPHICS-077 Slice B — drop the transient-debug upload
             // helper before the BufferManager is destroyed so the
             // helper's internal `BufferManager::BufferLease` destructor
@@ -2262,9 +2262,32 @@ namespace Extrinsic::Graphics
             return m_ImGuiOverlaySystem != nullptr && m_ImGuiPass.has_value();
         }
 
-        void SetRuntimeFrameCommandHook(RuntimeFrameCommandHook hook) override
+        RuntimeFrameCommandHookHandle RegisterRuntimeFrameCommandHook(
+            RuntimeFrameCommandHook hook) override
         {
-            m_RuntimeFrameCommandHook = std::move(hook);
+            if (!hook)
+                return {};
+
+            RuntimeFrameCommandHookHandle handle{
+                m_NextRuntimeFrameCommandHookHandle++};
+            m_RuntimeFrameCommandHooks.push_back(RuntimeFrameCommandHookEntry{
+                .Handle = handle,
+                .Hook = std::move(hook),
+            });
+            return handle;
+        }
+
+        void UnregisterRuntimeFrameCommandHook(
+            const RuntimeFrameCommandHookHandle handle) noexcept override
+        {
+            if (!handle.IsValid())
+                return;
+            std::erase_if(
+                m_RuntimeFrameCommandHooks,
+                [handle](const RuntimeFrameCommandHookEntry& entry) noexcept
+                {
+                    return entry.Handle == handle;
+                });
         }
 
         void SubmitRuntimeSnapshots(const RuntimeRenderSnapshotBatch& snapshots,
@@ -3556,8 +3579,8 @@ namespace Extrinsic::Graphics
                         submitBarriersForContext(graphicsContext, packet);
                     });
                 recordPostGraphReadbacks(graphicsContext, result.has_value());
-                if (result.has_value() && m_RuntimeFrameCommandHook)
-                    m_RuntimeFrameCommandHook(graphicsContext);
+                if (result.has_value())
+                    InvokeRuntimeFrameCommandHooks(graphicsContext);
                 graphicsContext.End();
                 return result;
             };
@@ -3666,8 +3689,7 @@ namespace Extrinsic::Graphics
                             return finalBarriers;
                         }
                         recordPostGraphReadbacks(context, true);
-                        if (m_RuntimeFrameCommandHook)
-                            m_RuntimeFrameCommandHook(context);
+                        InvokeRuntimeFrameCommandHooks(context);
                     }
                     context.End();
                 }
@@ -4270,6 +4292,22 @@ namespace Extrinsic::Graphics
         }
 
     private:
+        struct RuntimeFrameCommandHookEntry
+        {
+            RuntimeFrameCommandHookHandle Handle{};
+            RuntimeFrameCommandHook Hook{};
+        };
+
+        void InvokeRuntimeFrameCommandHooks(RHI::ICommandContext& context)
+        {
+            for (const RuntimeFrameCommandHookEntry& entry :
+                 m_RuntimeFrameCommandHooks)
+            {
+                if (entry.Hook)
+                    entry.Hook(context);
+            }
+        }
+
         // GRAPHICS-031A — canonical default-debug-surface PipelineDesc.
         //
         // VertexShaderPath / FragmentShaderPath point at the compiled SPIR-V
@@ -9173,7 +9211,8 @@ namespace Extrinsic::Graphics
         // overlay system the route reports `SkippedUnavailable`.
         ImGuiOverlaySystem*                  m_ImGuiOverlaySystem{nullptr};
         std::optional<ImGuiPass>             m_ImGuiPass;
-        RuntimeFrameCommandHook              m_RuntimeFrameCommandHook{};
+        std::vector<RuntimeFrameCommandHookEntry> m_RuntimeFrameCommandHooks{};
+        std::uint64_t m_NextRuntimeFrameCommandHookHandle{1u};
         // GRAPHICS-077 Slice A — scaffold-only `TransientDebugSurfacePass`.
         // Default-constructible (no system dependency), held as a plain
         // member so it lives for the renderer's full lifetime. Slice A

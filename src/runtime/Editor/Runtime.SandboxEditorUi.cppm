@@ -2738,6 +2738,9 @@ export namespace Extrinsic::Runtime
         }
 
     private:
+        void AttachKMeansGpuQueue(Engine& engine);
+        void DetachKMeansGpuQueue();
+
         Engine*                 m_Engine{nullptr};
         SandboxEditorPanelFrame m_LastFrame{};
         SandboxEditorSelectedModelCache m_SelectedModelCache{};
@@ -2754,6 +2757,8 @@ export namespace Extrinsic::Runtime
         std::optional<SandboxEditorFileImportResult> m_LastImportResult{};
         std::optional<SandboxEditorSceneFileResult> m_LastSceneFileResult{};
         std::optional<SandboxEditorKMeansResult> m_LastKMeansResult{};
+        std::unique_ptr<RuntimeKMeansGpuJobQueue> m_KMeansGpuJobs{};
+        RuntimeGpuJobParticipantHandle m_KMeansGpuParticipant{};
         std::optional<SandboxEditorMeshDenoiseResult>
             m_LastMeshDenoiseResult{};
         std::optional<SandboxEditorMeshCurvatureResult>

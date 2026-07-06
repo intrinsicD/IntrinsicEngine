@@ -84,6 +84,16 @@ namespace Extrinsic::Graphics
     export using RuntimeFrameCommandHook =
         std::function<void(RHI::ICommandContext&)>;
 
+    export struct RuntimeFrameCommandHookHandle
+    {
+        std::uint64_t Value{0};
+
+        [[nodiscard]] bool IsValid() const noexcept { return Value != 0; }
+        [[nodiscard]] friend bool operator==(
+            RuntimeFrameCommandHookHandle,
+            RuntimeFrameCommandHookHandle) noexcept = default;
+    };
+
     export struct RenderGraphCompileStats
     {
         bool Succeeded = false;
@@ -449,9 +459,13 @@ namespace Extrinsic::Graphics
 
         // Runtime-owned GPU work that must record inside the renderer's frame
         // command context without creating a second swapchain present. Graphics
-        // owns the invocation point; the callback records only RHI commands and
-        // must not retain the borrowed command context.
-        virtual void SetRuntimeFrameCommandHook(RuntimeFrameCommandHook hook) = 0;
+        // owns the invocation point; callbacks run in registration order, record
+        // only RHI commands, must not retain the borrowed command context, and
+        // should unregister outside the recording callback.
+        [[nodiscard]] virtual RuntimeFrameCommandHookHandle
+            RegisterRuntimeFrameCommandHook(RuntimeFrameCommandHook hook) = 0;
+        virtual void UnregisterRuntimeFrameCommandHook(
+            RuntimeFrameCommandHookHandle handle) noexcept = 0;
 
         [[nodiscard]] virtual RenderWorld ExtractRenderWorld(
             const RenderFrameInput& input,

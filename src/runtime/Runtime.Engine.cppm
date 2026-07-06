@@ -19,6 +19,7 @@ import Extrinsic.Core.FrameClock;
 import Extrinsic.Core.FrameGraph;
 import Extrinsic.Core.IOBackend;
 import Extrinsic.ECS.Scene.Handle;
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Device;
 import Extrinsic.Platform.Window;
 import Extrinsic.Graphics.CameraSnapshots;
@@ -35,7 +36,6 @@ import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.ImGuiAdapter;
-import Extrinsic.Runtime.KMeansGpuJobQueue;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.ReferenceScene;
@@ -75,6 +75,25 @@ namespace Extrinsic::Runtime
 
     export using RuntimeIOBackendFactory =
         std::function<std::unique_ptr<Core::IO::IIOBackend>()>;
+
+    export struct RuntimeGpuJobParticipantHandle
+    {
+        std::uint64_t Value{0};
+
+        [[nodiscard]] bool IsValid() const noexcept { return Value != 0; }
+        [[nodiscard]] friend bool operator==(
+            RuntimeGpuJobParticipantHandle,
+            RuntimeGpuJobParticipantHandle) noexcept = default;
+    };
+
+    export struct RuntimeGpuJobParticipantDesc
+    {
+        std::string DebugName{};
+        std::function<void(RHI::ICommandContext&)> RecordFrameCommands{};
+        std::function<void()> DrainCompletedTransfers{};
+        std::function<bool()> HasInFlightWork{};
+        std::function<void()> ShutdownAfterDeviceIdle{};
+    };
 
     export struct RuntimeAssetImportResult
     {
@@ -599,15 +618,14 @@ namespace Extrinsic::Runtime
         [[nodiscard]] std::uint64_t
             GetVisualizationAdapterBindingRevision() const noexcept;
 
-        // Runtime-owned operational K-Means GPU queue. The synchronous
-        // `Runtime.KMeansBackend` overload remains a CPU fallback seam; editor
-        // GPU requests submit copied point data here and consume completion on a
-        // later frame after the renderer runtime frame-command hook records one
-        // queue phase and maintenance drains async readbacks.
-        [[nodiscard]] RuntimeKMeansGpuJobSubmission SubmitKMeansGpuJob(
-            RuntimeKMeansGpuJobRequest request);
-        [[nodiscard]] std::optional<RuntimeKMeansGpuJobResult>
-            ConsumeCompletedKMeansGpuJob();
+        // Runtime-owned GPU work lanes that must record commands inside the
+        // renderer frame command context and drain completion on the maintenance
+        // path. Engine owns only lifecycle ordering; participants own their
+        // domain-specific queues and public command surfaces.
+        [[nodiscard]] RuntimeGpuJobParticipantHandle
+            RegisterRuntimeGpuJobParticipant(RuntimeGpuJobParticipantDesc desc);
+        void UnregisterRuntimeGpuJobParticipant(
+            RuntimeGpuJobParticipantHandle handle);
         [[nodiscard]] DerivedJobHandle SubmitDerivedJob(DerivedJobDesc desc);
         void CancelDerivedJob(DerivedJobHandle handle);
         [[nodiscard]] DerivedJobQueueSnapshot GetDerivedJobQueueSnapshot() const;
@@ -682,7 +700,14 @@ namespace Extrinsic::Runtime
         Graphics::ImGuiOverlaySystem         m_ImGuiOverlay{};
         std::function<void()>                m_ImGuiEditorCallback{};
         std::unique_ptr<ImGuiAdapter>        m_ImGuiAdapter{};
-        std::unique_ptr<RuntimeKMeansGpuJobQueue> m_KMeansGpuJobs{};
+        struct RuntimeGpuJobParticipantRecord
+        {
+            RuntimeGpuJobParticipantHandle Handle{};
+            RuntimeGpuJobParticipantDesc Desc{};
+            Graphics::RuntimeFrameCommandHookHandle RendererHook{};
+        };
+        std::vector<RuntimeGpuJobParticipantRecord> m_RuntimeGpuJobParticipants{};
+        std::uint64_t m_NextRuntimeGpuJobParticipantHandle{1u};
         RenderExtractionCache                 m_RenderExtraction;
         // GRAPHICS-036C — runtime-owned render-world slot pool. Constructed in
         // Initialize() sized from RenderConfig::SynchronousExtraction (held by
@@ -795,5 +820,17 @@ namespace Extrinsic::Runtime
         bool m_RendererOperational{false};
         bool m_WindowCloseLogged{false};
         RuntimeFramePacingDiagnostics m_LastFramePacingDiagnostics{};
+
+        [[nodiscard]] RuntimeGpuJobParticipantRecord*
+            FindRuntimeGpuJobParticipant(
+                RuntimeGpuJobParticipantHandle handle) noexcept;
+        [[nodiscard]] const RuntimeGpuJobParticipantRecord*
+            FindRuntimeGpuJobParticipant(
+                RuntimeGpuJobParticipantHandle handle) const noexcept;
+        void InstallRuntimeGpuJobParticipantFrameHook(
+            RuntimeGpuJobParticipantRecord& participant);
+        void UninstallRuntimeGpuJobParticipantFrameHook(
+            RuntimeGpuJobParticipantRecord& participant) noexcept;
+        void ShutdownRuntimeGpuJobParticipants();
     };
 }
