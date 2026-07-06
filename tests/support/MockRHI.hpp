@@ -19,6 +19,7 @@
 #include <cstddef>
 #include <cstring>
 #include <expected>
+#include <mutex>
 #include <optional>
 #include <string_view>
 #include <unordered_map>
@@ -580,6 +581,7 @@ namespace Extrinsic::Tests
         std::vector<RHI::ParallelCommandContextRequest> RecordedParallelCommandContextPlan;
         std::vector<RHI::ParallelCommandContextRequest> ParallelCommandContextRequests;
         std::vector<RHI::ParallelCommandContextRequest> SubmittedParallelCommandContexts;
+        std::mutex ParallelCommandContextRequestsMutex;
 
         // GRAPHICS-033E: records every `NoteRecipeGraphValidation(bool)` call
         // so contract tests can verify the renderer publishes the recipe-aware
@@ -707,7 +709,10 @@ namespace Extrinsic::Tests
         [[nodiscard]] RHI::ICommandContext& GetParallelCommandContext(
             const RHI::ParallelCommandContextRequest& request) override
         {
-            ParallelCommandContextRequests.push_back(request);
+            {
+                std::scoped_lock lock(ParallelCommandContextRequestsMutex);
+                ParallelCommandContextRequests.push_back(request);
+            }
             if (request.ContextIndex < ParallelCommandContexts.size())
             {
                 return ParallelCommandContexts[request.ContextIndex];

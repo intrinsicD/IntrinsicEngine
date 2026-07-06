@@ -171,12 +171,14 @@ When enabled on a single-queue frame, the renderer asks
 per-pass command-context plan. If the device declines or does not support
 parallel command contexts, `RenderGraphFrameStats::Execute.SerialFallbackUsed`
 is set and the renderer records through the serial graphics context. If the
-device accepts, the current path records each pass into its acquired context
-without worker fan-out, then calls
-`IDevice::SubmitParallelCommandContext(...)` in compiled serial order while
+device accepts, the renderer records each pass into its acquired context through
+`RenderGraphExecutor::ExecuteParallelRecordJoin(...)`; when
+`Core::Tasks::Scheduler` is initialized, pass bodies are dispatched to scheduler
+workers, otherwise the executor records on the caller thread. The renderer then
+calls `IDevice::SubmitParallelCommandContext(...)` in compiled serial order while
 barriers, post-graph readbacks, and runtime frame hooks remain on the primary
-graphics context. This proves the RHI acquisition and deterministic submit
-contract without racing renderer-owned pass state.
+graphics context. This preserves deterministic GPU-visible order while allowing
+CPU-side pass recording to fan out.
 
 `RenderGraphFrameStats::Execute` reports whether the executor used scheduler
 workers. Command-record diagnostics now accumulate through a guarded frame-local
@@ -187,17 +189,19 @@ consume it. Transient-debug, visualization-overlay, and ImGui dynamic upload
 helpers serialize per-frame reset plus pass-body upload/execute sections behind
 a shared renderer guard. Postprocess pass helpers also serialize per-frame
 bloom scratch, histogram viewport/buffer, and AA stage pass-object recording.
-The current renderer path still pins scheduler use false while the remaining
-worker fan-out audit, benchmark evidence, and opt-in Vulkan smoke are completed.
+Frame-sampled bridge descriptor updates are also serialized before route
+dispatch because promoted Vulkan updates shared descriptor-set state. Remaining
+`GRAPHICS-119` scope is non-graphics queue fan-out, benchmark evidence, and
+opt-in Vulkan smoke coverage.
 
 Null provides CPU bookkeeping contexts for this contract. Vulkan accepts the
 current graphics-queue plan shape with backend-local secondary command buffers
 and records `vkCmdExecuteCommands(...)` into the primary context at each serial
 submit callback; each accepted context owns a frame-scoped command pool, and the
 pool plus secondary buffer are retained until the frame-slot fence has retired
-and are destroyed on the next `BeginFrame`. Non-graphics queue fan-out, worker
-fan-out through `Core::Tasks`, benchmark evidence, and opt-in `gpu;vulkan`
-smoke coverage remain later `GRAPHICS-119` slices.
+and are destroyed on the next `BeginFrame`. Non-graphics queue fan-out,
+benchmark evidence, and opt-in `gpu;vulkan` smoke coverage remain later
+`GRAPHICS-119` slices.
 
 ## Boundaries
 

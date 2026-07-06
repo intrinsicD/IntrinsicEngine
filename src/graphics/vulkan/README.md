@@ -83,14 +83,13 @@ available through the Vulkan 1.2/1.3 feature chain.
   `SubmitParallelCommandContext(...)` emits `vkCmdExecuteCommands(...)` into
   the primary graphics context in compiled serial order. Secondary command
   buffers and their command pools stay alive until the frame-slot fence retires
-  and are destroyed on the next `BeginFrame`. The current renderer route remains
-  single-threaded: dynamic upload helpers now serialize per-frame reset plus
-  upload/execute sections behind a renderer guard, and postprocess pass helpers
-  serialize per-frame bloom/histogram/AA helper state. Non-graphics queue
-  support, true worker fan-out, benchmark evidence, and opt-in `gpu;vulkan`
-  smoke coverage remain later `GRAPHICS-119` slices. Command-record diagnostics
-  and readback issue metadata are already routed through guarded renderer
-  accumulators/helpers.
+  and are destroyed on the next `BeginFrame`. The renderer dispatches accepted
+  graphics-queue pass recording to `Core::Tasks` workers when the scheduler is
+  initialized; otherwise it records on the caller thread. Dynamic upload helpers,
+  postprocess helpers, frame-sampled descriptor bridge updates, command-record
+  diagnostics, and readback issue metadata are routed through guarded renderer
+  helpers. Non-graphics queue support, benchmark evidence, and opt-in
+  `gpu;vulkan` smoke coverage remain later `GRAPHICS-119` slices.
 - `GetVulkanServiceDiagnosticsSnapshot()` reports guarded post-bootstrap service
   handoff: bindless heap creation, global pipeline-layout creation, transfer
   queue/staging creation, command-context rebinding, bindless capacity, clean

@@ -19,6 +19,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 import Extrinsic.Core.Filesystem.PathResolver;
+import Extrinsic.Core.Tasks;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.CurrentRendererContractAdapter;
 import Extrinsic.Graphics.Renderer;
@@ -52,6 +53,35 @@ namespace
 {
     constexpr Extrinsic::RHI::FrontFace kVulkanCameraTriangleFrontFace =
         Extrinsic::RHI::FrontFace::Clockwise;
+
+    namespace Tasks = Extrinsic::Core::Tasks;
+
+    class SchedulerScope
+    {
+    public:
+        explicit SchedulerScope(const unsigned threadCount)
+            : m_Owns(!Tasks::Scheduler::IsInitialized())
+        {
+            if (m_Owns)
+            {
+                Tasks::Scheduler::Initialize(threadCount);
+            }
+        }
+
+        ~SchedulerScope()
+        {
+            if (m_Owns)
+            {
+                Tasks::Scheduler::Shutdown();
+            }
+        }
+
+        SchedulerScope(const SchedulerScope&) = delete;
+        SchedulerScope& operator=(const SchedulerScope&) = delete;
+
+    private:
+        bool m_Owns = false;
+    };
 
     [[nodiscard]] const Extrinsic::RHI::PipelineDesc* FindCreatedPipelineDesc(
         const Extrinsic::Tests::MockDevice& device,
@@ -1336,6 +1366,58 @@ TEST(RendererFrameLifecycle, ParallelRecordingUsesAcceptedContextPlanInSerialSub
     ASSERT_NE(histogramPass, nullptr);
     EXPECT_EQ(histogramPass->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    EXPECT_EQ(device.ParallelCommandContextRequests.size(),
+              device.RecordedParallelCommandContextPlan.size());
+    EXPECT_EQ(device.SubmittedParallelCommandContexts.size(),
+              device.RecordedParallelCommandContextPlan.size());
+
+    for (std::size_t i = 0; i < device.RecordedParallelCommandContextPlan.size(); ++i)
+    {
+        EXPECT_EQ(device.SubmittedParallelCommandContexts[i].PassIndex,
+                  device.RecordedParallelCommandContextPlan[i].PassIndex);
+        EXPECT_EQ(device.SubmittedParallelCommandContexts[i].ContextIndex,
+                  device.RecordedParallelCommandContextPlan[i].ContextIndex);
+    }
+
+    renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle, ParallelRecordingUsesSchedulerWorkersWhenAvailable)
+{
+    SchedulerScope scheduler{4u};
+
+    Extrinsic::Tests::MockDevice device;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{79u, 3u};
+    device.ParallelCommandContextsAvailable = true;
+    device.AcceptParallelCommandContextPlans = true;
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+    renderer->SetParallelRenderGraphRecordingEnabled(true);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.ParallelRecordingRequested);
+    EXPECT_TRUE(stats.Execute.ParallelRecordingAccepted);
+    EXPECT_FALSE(stats.Execute.SerialFallbackUsed);
+    EXPECT_TRUE(stats.Execute.ParallelRecordUsedScheduler);
+    EXPECT_GT(stats.Execute.ParallelRecordWorkerTaskCount, 0u);
+    EXPECT_EQ(stats.Execute.ParallelRecordWorkerTaskCount,
+              stats.Execute.ParallelRecordedPassCount);
+    EXPECT_EQ(stats.Execute.ParallelRecordCallerRecordCount, 0u);
+    EXPECT_EQ(stats.Execute.ParallelCommandContextCount,
+              device.RecordedParallelCommandContextPlan.size());
     EXPECT_EQ(device.ParallelCommandContextRequests.size(),
               device.RecordedParallelCommandContextPlan.size());
     EXPECT_EQ(device.SubmittedParallelCommandContexts.size(),

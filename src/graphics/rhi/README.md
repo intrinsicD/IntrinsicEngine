@@ -48,8 +48,10 @@ This directory contains the `RHI` module/files.
   declines the plan, preserving serial fallback. Null implements CPU
   bookkeeping contexts; Vulkan implements backend-local secondary command
   buffers for graphics-queue plans and executes them from the primary context
-  without exposing `Vk*` handles through RHI. Non-graphics queue support, worker
-  fan-out, and the opt-in Vulkan smoke remain later `GRAPHICS-119` slices.
+  without exposing `Vk*` handles through RHI. The renderer can dispatch accepted
+  recording work through `Core::Tasks` workers when the scheduler is live.
+  Non-graphics queue support and the opt-in Vulkan smoke remain later
+  `GRAPHICS-119` slices.
 
 ## Timeline semaphores
 

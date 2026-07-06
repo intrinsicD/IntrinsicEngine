@@ -148,11 +148,10 @@ namespace Extrinsic::Graphics
         constexpr std::uint32_t kFrameSampledDescriptorSlotDebugView = 1u;
         constexpr std::uint32_t kFrameSampledDescriptorSlotPresent = 2u;
         constexpr std::uint32_t kFrameSampledDescriptorSlotSelectionOutline = 3u;
-        // GRAPHICS-119 Slice C.2 audit gate: renderer pass callbacks still
-        // mutate renderer-owned stats, upload helpers, readback counters, and
-        // shared pass helper state. Keep worker fan-out disabled until those
-        // surfaces are isolated or synchronized by a later slice.
-        constexpr bool kRenderGraphParallelRecordWorkerFanOutEnabled = false;
+        // GRAPHICS-119 Slice C.6: pass callbacks route shared renderer state
+        // through guarded helpers, so accepted parallel command contexts may
+        // record on scheduler workers while serial submit order stays fixed.
+        constexpr bool kRenderGraphParallelRecordWorkerFanOutEnabled = true;
 
         struct FrameRecipeContributionCacheKey
         {
@@ -3386,14 +3385,34 @@ namespace Extrinsic::Graphics
                         ? compiled->PassIds[passIndex]
                         : FramePassId{};
                     const ActiveRenderPassDesc activeRenderPass = BuildActiveRenderPassDesc(*compiled, passIndex);
+                    const auto bindFrameSampledTextureByResource =
+                        [&](const FrameResourceId resourceId,
+                            const std::uint32_t descriptorSlot) -> bool
+                        {
+                            std::lock_guard<std::mutex> descriptorLock(m_FrameSampledDescriptorMutex);
+                            return BindFrameSampledTextureByResourceId(
+                                graphicsContext,
+                                *compiled,
+                                resourceId,
+                                descriptorSlot);
+                        };
+                    const auto bindFrameSampledDeclaredTexture =
+                        [&](const std::uint32_t textureIndex,
+                            const std::uint32_t descriptorSlot) -> bool
+                        {
+                            std::lock_guard<std::mutex> descriptorLock(m_FrameSampledDescriptorMutex);
+                            return BindFrameSampledDeclaredTexture(
+                                graphicsContext,
+                                *compiled,
+                                textureIndex,
+                                descriptorSlot);
+                        };
                     if (passIndex < compiled->PassDeclarations.size())
                     {
                         bool sampledTextureBound = false;
                         if (passId == ToFramePassId(FrameRecipePassKind::SelectionOutline))
                         {
-                            sampledTextureBound = BindFrameSampledTextureByResourceId(
-                                graphicsContext,
-                                *compiled,
+                            sampledTextureBound = bindFrameSampledTextureByResource(
                                 ToFrameResourceId(FrameRecipeResourceKind::EntityId),
                                 kFrameSampledDescriptorSlotSelectionOutline);
                         }
@@ -3403,9 +3422,7 @@ namespace Extrinsic::Graphics
                             const DebugViewResolvedSelection selection = m_DebugViewSystem->GetResolvedSelection();
                             if (selection.Enabled)
                             {
-                                sampledTextureBound = BindFrameSampledTextureByResourceId(
-                                    graphicsContext,
-                                    *compiled,
+                                sampledTextureBound = bindFrameSampledTextureByResource(
                                     selection.SelectedResourceId,
                                     kFrameSampledDescriptorSlotDebugView);
                             }
@@ -3439,11 +3456,7 @@ namespace Extrinsic::Graphics
                             const std::uint32_t textureIndex = declarations.ReadTextures.front();
                             const std::uint32_t descriptorSlot =
                                 FrameSampledDescriptorSlotForPass(passId);
-                            (void)BindFrameSampledDeclaredTexture(
-                                graphicsContext,
-                                *compiled,
-                                textureIndex,
-                                descriptorSlot);
+                            (void)bindFrameSampledDeclaredTexture(textureIndex, descriptorSlot);
                         }
                     }
                     if (activeRenderPass.HasAttachments)
@@ -3695,6 +3708,7 @@ namespace Extrinsic::Graphics
                     &parallelRecordStats,
                     ParallelRecordOptions{
                         .UseScheduler = kRenderGraphParallelRecordWorkerFanOutEnabled,
+                        .MinWorkerPassCount = 1u,
                     });
                 m_LastRenderGraphStats.Execute.ParallelRecordedPassCount =
                     parallelRecordStats.ScheduledPassCount;
@@ -9638,8 +9652,11 @@ namespace Extrinsic::Graphics
         // GRAPHICS-119 Slice C.5b: postprocess pass helpers cache per-frame
         // handles/settings (`SetBloomScratch`, histogram viewport/buffer) and
         // share PostProcessSystem-backed pass objects. Serialize their setter
-        // + Execute sections until worker fan-out can use per-context state.
+        // + Execute sections while worker fan-out records pass callbacks.
         std::mutex m_PostProcessPassMutex;
+        // GRAPHICS-119 Slice C.6: frame-sampled bridge descriptors update
+        // shared backend descriptor-set state before pass route dispatch.
+        std::mutex m_FrameSampledDescriptorMutex;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardSurfacePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardLinePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardPointPipelineLease;

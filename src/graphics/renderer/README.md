@@ -106,18 +106,18 @@ frame. Devices that decline the plan keep the historical serial
 `RenderGraphFrameStats::Execute.SerialFallbackUsed`; devices that accept record
 pass bodies into per-pass contexts and submit those contexts in compiled serial
 order through `IDevice::SubmitParallelCommandContext(...)`. The current path is
-single-threaded to keep renderer-owned pass state deterministic while proving
-the RHI/null/Vulkan acquisition and submit-order contract. Vulkan accepts the
-graphics-queue plan with backend-local secondary command buffers; non-graphics
-queue support and worker fan-out remain later `GRAPHICS-119` slices after the
-final fan-out audit, benchmark evidence, and opt-in Vulkan smoke. The current
-audit keeps
-`RenderGraphFrameStats::Execute.ParallelRecordUsedScheduler` false even though
-transient-debug, visualization-overlay, and ImGui dynamic upload helpers now
-serialize per-frame reset plus upload/execute sections behind a shared renderer
-guard, and postprocess pass helpers serialize per-frame bloom scratch,
-histogram viewport/buffer, and AA stage pass-object recording. Vulkan accepted
-parallel contexts own frame-scoped command pools for their secondary buffers.
+worker-dispatched when `Core::Tasks::Scheduler` is initialized, and records on
+the caller thread when no scheduler is live. Vulkan accepts the graphics-queue
+plan with backend-local secondary command buffers; non-graphics queue support,
+benchmark evidence, and opt-in Vulkan smoke remain later `GRAPHICS-119` slices.
+`RenderGraphFrameStats::Execute.ParallelRecordUsedScheduler` reports whether the
+executor dispatched worker tasks. Transient-debug, visualization-overlay, and
+ImGui dynamic upload helpers serialize per-frame reset plus upload/execute
+sections behind a shared renderer guard; postprocess pass helpers serialize
+per-frame bloom scratch, histogram viewport/buffer, and AA stage pass-object
+recording; and frame-sampled bridge descriptor updates serialize because
+promoted Vulkan writes shared descriptor-set state. Vulkan accepted parallel
+contexts own frame-scoped command pools for their secondary buffers.
 Command-record diagnostics accumulate through a guarded frame-local accumulator
 and publish to `RenderGraphFrameStats::CommandRecords` after the record/join
 path completes. Picking and histogram readback issue counters plus per-slot
