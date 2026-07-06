@@ -908,6 +908,61 @@ struct GpuSceneInputSummary
     Extrinsic::RHI::GpuBounds FirstPointBounds{};
 };
 
+struct GpuInstanceConfigReadback
+{
+    bool Found{false};
+    std::uint32_t Slot{kInvalidIndex};
+    Extrinsic::RHI::GpuInstanceStatic Instance{};
+    Extrinsic::RHI::GpuEntityConfig Config{};
+};
+
+[[nodiscard]] GpuInstanceConfigReadback ReadVisibleInstanceConfigByEntityId(
+    Extrinsic::RHI::IDevice& device,
+    Extrinsic::Graphics::IRenderer& renderer,
+    const std::uint32_t entityId,
+    const std::uint32_t requiredRenderFlags)
+{
+    auto& gpuWorld = renderer.GetGpuWorld();
+    const std::uint32_t capacity = gpuWorld.GetInstanceCapacity();
+    std::vector<Extrinsic::RHI::GpuInstanceStatic> instances(capacity);
+
+    if (instances.empty() ||
+        !gpuWorld.GetInstanceStaticBuffer().IsValid() ||
+        !gpuWorld.GetEntityConfigBuffer().IsValid())
+    {
+        return {};
+    }
+
+    device.ReadBuffer(gpuWorld.GetInstanceStaticBuffer(),
+                      instances.data(),
+                      static_cast<std::uint64_t>(instances.size() * sizeof(instances.front())),
+                      0u);
+
+    for (std::uint32_t slot = 0u; slot < instances.size(); ++slot)
+    {
+        const auto& inst = instances[slot];
+        if (inst.EntityID != entityId ||
+            (inst.RenderFlags & Extrinsic::RHI::GpuRender_Visible) == 0u ||
+            (inst.RenderFlags & requiredRenderFlags) != requiredRenderFlags)
+        {
+            continue;
+        }
+
+        GpuInstanceConfigReadback result{};
+        result.Found = true;
+        result.Slot = slot;
+        result.Instance = inst;
+        device.ReadBuffer(gpuWorld.GetEntityConfigBuffer(),
+                          &result.Config,
+                          sizeof(result.Config),
+                          static_cast<std::uint64_t>(inst.ConfigSlot) *
+                              sizeof(result.Config));
+        return result;
+    }
+
+    return {};
+}
+
 [[nodiscard]] GpuSceneInputSummary SummarizeGpuSceneInputs(
     Extrinsic::RHI::IDevice& device,
     Extrinsic::Graphics::IRenderer& renderer)
@@ -2231,6 +2286,7 @@ inline constexpr float kScalarFieldSmokeRangeMax = 1.0f;
 inline constexpr float kScalarFieldSmokeLineWidthPx = 8.0f;
 inline constexpr float kScalarFieldSmokePointSizePx = 12.0f;
 inline constexpr std::uint32_t kScalarFieldSmokeSampleRadius = 8u;
+inline constexpr std::uint32_t kScalarFieldSurfaceSmokeSampleRadius = 3u;
 // Minimum RGB distance from the background clear for a sampled neighborhood
 // pixel to count as a drawn line/point fragment.
 inline constexpr int kScalarFieldSmokeMinForeground = 60;
@@ -2301,6 +2357,55 @@ struct ForegroundSample
     RgbaPixel Pixel{};
     int BackgroundDistance{0};
 };
+
+struct ClosestPixelSample
+{
+    RgbaPixel Pixel{};
+    int TargetDistance{std::numeric_limits<int>::max()};
+};
+
+[[nodiscard]] ClosestPixelSample FindClosestPixelTo(
+    const std::vector<std::uint8_t>& bytes,
+    const Extrinsic::RHI::Format format,
+    const std::uint32_t bytesPerPixel,
+    const Extrinsic::Core::Extent2D extent,
+    const std::uint32_t centerX,
+    const std::uint32_t centerY,
+    const std::uint32_t radius,
+    const RgbaPixel target)
+{
+    ClosestPixelSample best{};
+    if (extent.Width == 0u || extent.Height == 0u)
+    {
+        return best;
+    }
+
+    best.Pixel = ReadPixel(bytes, format, bytesPerPixel, extent, centerX, centerY);
+    best.TargetDistance = RgbDistance(ToLinearPixel(format, best.Pixel), target);
+
+    const auto minX = static_cast<std::uint32_t>(
+        std::max<int>(0, static_cast<int>(centerX) - static_cast<int>(radius)));
+    const auto minY = static_cast<std::uint32_t>(
+        std::max<int>(0, static_cast<int>(centerY) - static_cast<int>(radius)));
+    const auto maxX = static_cast<std::uint32_t>(
+        std::min<int>(static_cast<int>(extent.Width) - 1, static_cast<int>(centerX) + static_cast<int>(radius)));
+    const auto maxY = static_cast<std::uint32_t>(
+        std::min<int>(static_cast<int>(extent.Height) - 1, static_cast<int>(centerY) + static_cast<int>(radius)));
+    for (std::uint32_t y = minY; y <= maxY; ++y)
+    {
+        for (std::uint32_t x = minX; x <= maxX; ++x)
+        {
+            const RgbaPixel px = ReadPixel(bytes, format, bytesPerPixel, extent, x, y);
+            const int d = RgbDistance(ToLinearPixel(format, px), target);
+            if (d < best.TargetDistance)
+            {
+                best.TargetDistance = d;
+                best.Pixel = px;
+            }
+        }
+    }
+    return best;
+}
 
 // Return the neighborhood pixel furthest from the background clear (the most
 // strongly drawn fragment), so the colormap comparison targets the actual
@@ -2582,6 +2687,180 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldColormapResol
 
     expectColormapLane("line", glm::vec3{0.0f, -0.5f, 0.0f});  // bottom-edge midpoint (v0-v1)
     expectColormapLane("point", glm::vec3{0.0f, 0.5f, 0.0f});  // apex vertex v2 (point impostor)
+
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+    device.DestroyBuffer(readbackBuffer);
+    engine.Shutdown();
+}
+
+// BUG-060 operational surface proof for the sandbox Appearance Scalar /
+// Isolines preset path. The scalar field is intentionally binned with
+// `BinCount == IsolineCount`: the non-contour probe has raw t=0.4 but binned
+// t=0.5, so a shader that still applies isolines to the binned value paints it
+// as a false contour instead of the Viridis mid-point colour.
+TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldSurfaceAndIsolinesResolveOnGpu)
+{
+    auto bootstrap = BootstrapDefaultSandboxAppEngine();
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+
+    const EntityHandle triangle = FindEntityByName(engine.GetScene(), "ReferenceTriangle");
+    ASSERT_TRUE(IsReferenceTriangleEntityValid(engine.GetScene(), triangle))
+        << "ReferenceTriangle is not a valid first-class mesh renderable entity: "
+        << BuildReferenceTriangleEntityDiagnostic(engine.GetScene(), triangle);
+
+    auto& raw = engine.GetScene().Raw();
+    auto& vertices = raw.get<gs::Vertices>(triangle);
+    vertices.Properties
+        .GetOrAdd<float>(std::string{kScalarFieldSmokeProperty}, 0.0f)
+        .Vector() = {kScalarFieldSmokeRangeMin,
+                     kScalarFieldSmokeRangeMax,
+                     kScalarFieldSmokeRangeMin};
+
+    G::VisualizationConfig surfaceVisualization{};
+    surfaceVisualization.Source = G::VisualizationConfig::ColorSource::ScalarField;
+    surfaceVisualization.ScalarFieldName = std::string{kScalarFieldSmokeProperty};
+    surfaceVisualization.ScalarDomain = G::VisualizationConfig::Domain::Vertex;
+    surfaceVisualization.Scalar.Map = Extrinsic::Graphics::Colormap::Type::Viridis;
+    surfaceVisualization.Scalar.AutoRange = false;
+    surfaceVisualization.Scalar.RangeMin = kScalarFieldSmokeRangeMin;
+    surfaceVisualization.Scalar.RangeMax = kScalarFieldSmokeRangeMax;
+    surfaceVisualization.Scalar.BinCount = 3u;
+    surfaceVisualization.Scalar.Isolines.Num = 3u;
+    surfaceVisualization.Scalar.Isolines.Width = 32.0f;
+    surfaceVisualization.Scalar.Isolines.Color = glm::vec4{0.0f, 0.95f, 1.0f, 1.0f};
+    raw.emplace_or_replace<G::VisualizationLaneOverrides>(triangle).Surface =
+        surfaceVisualization;
+
+    auto& renderer = engine.GetRenderer();
+    auto& device = engine.GetDevice();
+    const Extrinsic::RHI::Format backbufferFormat = device.GetBackbufferFormat();
+    const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(backbufferFormat);
+    const Extrinsic::Core::Extent2D extent = device.GetBackbufferExtent();
+    if (bytesPerPixel < 4u || extent.Width == 0u || extent.Height == 0u)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style smoke readback.";
+    }
+
+    const std::uint64_t readbackSize =
+        static_cast<std::uint64_t>(bytesPerPixel) *
+        static_cast<std::uint64_t>(extent.Width) *
+        static_cast<std::uint64_t>(extent.Height);
+    const Extrinsic::RHI::BufferHandle readbackBuffer = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+        .SizeBytes = readbackSize,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .DebugName = "Sandbox.ScalarFieldSurfaceIsolines.Readback",
+    });
+    if (!readbackBuffer.IsValid())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan smoke is opt-in.";
+    }
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbackBuffer);
+
+    const auto run = DriveAcceptanceAndCapture(engine);
+
+    if (!run.DeviceOperational)
+    {
+        renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+        device.DestroyBuffer(readbackBuffer);
+        engine.Shutdown();
+        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan for scalar-field surface/isolines readback: status="
+                      << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
+                      << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+        return;
+    }
+
+    EXPECT_TRUE(run.Stats.Compile.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_TRUE(run.Stats.Execute.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_EQ(FindPassStatus(run.Stats, "SurfacePass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_EQ(FindPassStatus(run.Stats, "Present"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
+        << "Sandbox scalar-field surface/isolines readback copy did not record on an operational frame.";
+
+    const std::uint32_t triangleRenderId =
+        Extrinsic::Runtime::SelectionController::ToStableEntityId(triangle);
+    const GpuInstanceConfigReadback surfaceInstance =
+        ReadVisibleInstanceConfigByEntityId(
+            device, renderer, triangleRenderId, Extrinsic::RHI::GpuRender_Surface);
+    ASSERT_TRUE(surfaceInstance.Found)
+        << "ReferenceTriangle did not emit a visible surface instance with render id "
+        << triangleRenderId << ".";
+
+    const std::uint32_t expectedColormapId =
+        renderer.GetColormapSystem().GetBindlessIndex(Extrinsic::Graphics::Colormap::Type::Viridis);
+    const Extrinsic::RHI::GpuEntityConfig& cfg = surfaceInstance.Config;
+    EXPECT_EQ(cfg.ColorSourceMode, kColorSourceScalarFieldMode)
+        << DescribeColormapConfig("surface", cfg, expectedColormapId);
+    EXPECT_EQ(cfg.ColormapID, expectedColormapId)
+        << DescribeColormapConfig("surface", cfg, expectedColormapId);
+    EXPECT_NE(cfg.ScalarBDA, 0u)
+        << "surface scalar-field buffer not resident; "
+        << DescribeColormapConfig("surface", cfg, expectedColormapId);
+    EXPECT_FLOAT_EQ(cfg.ScalarRangeMin, kScalarFieldSmokeRangeMin)
+        << DescribeColormapConfig("surface", cfg, expectedColormapId);
+    EXPECT_FLOAT_EQ(cfg.ScalarRangeMax, kScalarFieldSmokeRangeMax)
+        << DescribeColormapConfig("surface", cfg, expectedColormapId);
+    EXPECT_EQ(cfg.BinCount, 3u)
+        << DescribeColormapConfig("surface", cfg, expectedColormapId);
+    EXPECT_FLOAT_EQ(cfg.IsolineCount, 3.0f)
+        << DescribeColormapConfig("surface", cfg, expectedColormapId);
+    EXPECT_FLOAT_EQ(cfg.IsolineWidth, 32.0f)
+        << DescribeColormapConfig("surface", cfg, expectedColormapId);
+    EXPECT_FLOAT_EQ(cfg.IsolineColor.x, surfaceVisualization.Scalar.Isolines.Color.x)
+        << DescribeColormapConfig("surface", cfg, expectedColormapId);
+    EXPECT_FLOAT_EQ(cfg.IsolineColor.y, surfaceVisualization.Scalar.Isolines.Color.y)
+        << DescribeColormapConfig("surface", cfg, expectedColormapId);
+    EXPECT_FLOAT_EQ(cfg.IsolineColor.z, surfaceVisualization.Scalar.Isolines.Color.z)
+        << DescribeColormapConfig("surface", cfg, expectedColormapId);
+    EXPECT_FLOAT_EQ(cfg.IsolineColor.w, surfaceVisualization.Scalar.Isolines.Color.w)
+        << DescribeColormapConfig("surface", cfg, expectedColormapId);
+
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(readbackSize), 0u);
+    device.ReadBuffer(readbackBuffer, bytes.data(), readbackSize, 0u);
+
+    const auto lutMid = renderer.GetColormapSystem().SampleCpu(
+        Extrinsic::Graphics::Colormap::Type::Viridis, 0.5f);
+    const RgbaPixel expectedColormap{
+        .R = lutMid.R, .G = lutMid.G, .B = lutMid.B, .A = 255u};
+    const RgbaPixel expectedIsoline{0u, 242u, 255u, 255u};
+
+    const auto expectProbe = [&](const std::string_view label,
+                                 const glm::vec3 worldSample,
+                                 const RgbaPixel expected,
+                                 const RgbaPixel rejected)
+    {
+        const auto [px, py] = ProjectReferenceCameraPixel(worldSample, extent);
+        const ClosestPixelSample rawSample = FindClosestPixelTo(
+            bytes, backbufferFormat, bytesPerPixel, extent, px, py,
+            kScalarFieldSurfaceSmokeSampleRadius, expected);
+        const RgbaPixel lit = ToLinearPixel(backbufferFormat, rawSample.Pixel);
+        const int toExpected = RgbDistance(lit, expected);
+        const int toRejected = RgbDistance(lit, rejected);
+        EXPECT_LT(toExpected, toRejected)
+            << label << " surface probe resolved closer to the rejected colour than the expected colour. "
+            << "sample=(" << px << "," << py << ")"
+            << " pixel(linearized)=" << PixelText(lit)
+            << " expected=" << PixelText(expected)
+            << " rejected=" << PixelText(rejected)
+            << " toExpected=" << toExpected
+            << " toRejected=" << toRejected
+            << " cfg=[" << DescribeColormapConfig("surface", cfg, expectedColormapId) << "]";
+    };
+
+    // raw t = 0.4, binned t = 0.5: must stay Viridis, not a false contour.
+    expectProbe("non-isoline", glm::vec3{0.025f, -0.25f, 0.0f},
+                expectedColormap, expectedIsoline);
+    // raw t = 0.5: actual evenly-spaced isoline at the interior level boundary.
+    expectProbe("isoline", glm::vec3{0.125f, -0.25f, 0.0f},
+                expectedIsoline, expectedColormap);
 
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
     device.DestroyBuffer(readbackBuffer);

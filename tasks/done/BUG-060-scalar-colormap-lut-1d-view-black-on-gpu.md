@@ -3,15 +3,16 @@ id: BUG-060
 theme: G
 depends_on: []
 maturity_target: CPUContracted
+completed: 2026-07-06
 ---
 # BUG-060 — Scalar/isoline surfaces render black on GPU: colormap LUT created as Tex1D but sampled as sampler2D
 
 ## Status
-- Active on branch `claude/intrinsic-scalar-black-mesh-yevo9v` (2026-07-06).
-  Fix implemented; the default CPU gate could not be executed in the authoring
-  environment (network policy blocks vcpkg dependency tarball downloads), so
-  gate execution plus the manual Vulkan sandbox check are owed before this
-  task can retire.
+- Retired on 2026-07-06 at `CPUContracted` on local `main`; PR not opened.
+- PR/commit: the original fix was authored on
+  `claude/intrinsic-scalar-black-mesh-yevo9v`; this retirement commit adds the
+  deterministic promoted-Vulkan surface/isoline readback smoke and records the
+  local verification that was blocked in the authoring environment.
 - Diagnosis: BUG-057/058/059 verified the UI → extraction → sync →
   `GpuEntityConfig` contract healthy at the CPU/null seam, yet the sandbox
   still rendered scalar/isoline surfaces black on a real Vulkan host. The
@@ -73,15 +74,20 @@ maturity_target: CPUContracted
 - [x] `assets/shaders/common/gpu_scene.glsl`: pass the un-binned normalized
       scalar to `GpuVisualizationApplyIsolines`; place evenly spaced contours
       at interior level boundaries `t = k / (N + 1)`.
+- [x] `Test.RuntimeSandboxAcceptanceGpuSmoke.cpp`: add an opt-in
+      promoted-Vulkan surface/isoline readback smoke that configures the same
+      surface-lane Scalar/Isolines state the Appearance presets author on a
+      loaded mesh.
 
 ## Tests
 - [x] `GraphicsColormapSystem.InitializeSubmitsLutUploadsThroughTransferQueue`
       extended to pin `CreatedTextureDescs` to `Tex2D` 256×1 (regression guard
-      at the CPU seam that can see the descriptor) — authored; execution owed
-      with the gate below.
-- [ ] Focused visualization suites + default CPU-supported correctness gate
-      (owed on a host with vcpkg dependency access; blocked in the authoring
-      environment).
+      at the CPU seam that can see the descriptor).
+- [x] Focused visualization suites + default CPU-supported correctness gate.
+- [x] Opt-in `gpu;vulkan` smokes:
+      `RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleScalarFieldColormapResolvesOnLineAndPointLanes`
+      and
+      `RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleScalarFieldSurfaceAndIsolinesResolveOnGpu`.
 
 ## Docs
 - [x] This task record; no doc-schema or module-surface change.
@@ -90,9 +96,10 @@ maturity_target: CPUContracted
 - [x] LUT texture descriptor is `Tex2D` and pinned by a unit test.
 - [x] Evenly spaced isolines are computed from the raw normalized scalar and
       are independent of `BinCount`.
-- [ ] CPU gate green (structural checks already pass; ctest run owed).
-- [ ] Manual Vulkan sandbox check: Scalar and Isolines presets on a loaded
-      mesh render colormapped output on a Vulkan-capable host.
+- [x] CPU gate green.
+- [x] Operational Vulkan sandbox check: automated promoted-Vulkan readback
+      smokes prove the shared LUT sampling path for line/point lanes and the
+      surface Scalar/Isolines preset-equivalent state on `ReferenceTriangle`.
 
 ## Verification
 Run in the authoring environment (2026-07-06):
@@ -105,13 +112,29 @@ python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 ```
-Owed before retiring (vcpkg downloads are policy-blocked in the authoring
-environment, so the C++ gate could not run there):
+
+Focused CPU verification run locally (2026-07-06):
+```bash
+ctest --test-dir build/ci --output-on-failure -R 'ColormapSystem|RuntimeRenderExtraction|VisualizationAdapters|VisualizationPackets|RendererFrameLifecycle|MinimalTriangleAcceptance' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+```
+
+Opt-in Vulkan verification run locally (2026-07-06):
+```bash
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests ExtrinsicSandbox
+ctest --test-dir build/ci-vulkan --output-on-failure -R 'RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleScalarField(ColormapResolvesOnLineAndPointLanes|SurfaceAndIsolinesResolveOnGpu)' -L 'gpu' -L 'vulkan' --timeout 120
+```
+
+Final verification run locally (2026-07-06):
 ```bash
 cmake --build --preset ci --target IntrinsicTests
-ctest --test-dir build/ci --output-on-failure -R 'ColormapSystem|RuntimeRenderExtraction|VisualizationAdapters|VisualizationPackets|RendererFrameLifecycle|MinimalTriangleAcceptance' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
-# Manual: sandbox on a Vulkan host — Scalar + Isolines presets on a mesh.
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/validate_tasks.py --root tasks --strict
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --strict
 ```
 
 ## Forbidden changes
@@ -120,11 +143,10 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 - "Fixing" the symptom by writing CPU-baked colors into vertex attributes.
 
 ## Maturity
-- Target: `CPUContracted` via the descriptor-level regression guard + CPU gate
-  (gate run owed, see Verification). No `Operational` follow-up is owed as a
-  separate task: the owed operational confirmation is the manual Vulkan
-  sandbox check in Acceptance criteria (Scalar + Isolines presets on a loaded
-  mesh on a Vulkan-capable host), tracked by this task before it retires. The opt-in
-  `gpu;vulkan`-labeled smokes
-  (`RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleScalarFieldColormapResolvesOnLineAndPointLanes`)
-  exercise the LUT sampling path when run on such a host.
+- Target achieved: `CPUContracted` via the descriptor-level regression guard,
+  focused visualization suites, and the default CPU gate. The original manual
+  Vulkan click-check was superseded by deterministic opt-in `gpu;vulkan`
+  readback smokes: the existing line/point scalar smoke proves shared LUT heap
+  sampling beyond the surface path, and the new surface/isoline smoke proves a
+  preset-equivalent loaded-mesh state renders colormapped output and does not
+  regress to the binned-scalar false-contour behavior.

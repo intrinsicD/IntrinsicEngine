@@ -11,10 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`BUG-060`](BUG-060-scalar-colormap-lut-1d-view-black-on-gpu.md) —
-  scalar/isoline colormap LUT GPU black-output fix. Status: implemented;
-  verification owed before retirement. Next verification: run the default
-  CPU gate plus the manual Vulkan sandbox Scalar/Isolines preset check.
+No active tasks.
 
 ## History
 

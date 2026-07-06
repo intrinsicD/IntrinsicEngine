@@ -3560,3 +3560,14 @@ decoded geometry import payloads shared across worker-to-apply and reload
 captures. Focused runtime regressions plus the full default CPU gate prove the
 covered frame-path behavior remains unchanged while the recurring idle-frame
 work is removed.
+
+[`BUG-060`](BUG-060-scalar-colormap-lut-1d-view-black-on-gpu.md) —
+Scalar/isoline surface black-output fix retired to `tasks/done/` on
+2026-07-06 at `CPUContracted`. The GPU-only root cause was the colormap LUT
+being created as a 1D image view while all promoted shader consumers sample the
+bindless heap as `sampler2D`; the LUT is now a 256x1 `Tex2D`, and evenly
+spaced isolines use raw normalized scalar values instead of binned values.
+The retirement adds a promoted-Vulkan sandbox readback smoke for the
+surface-lane Scalar/Isolines preset-equivalent state, alongside the existing
+line/point scalar LUT smoke, so the operational check is deterministic rather
+than a manual UI click.
