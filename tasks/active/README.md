@@ -19,11 +19,12 @@ Each active task should include:
   with serial fallback stats. Slice C.1 adds Vulkan backend-local secondary
   command buffers for accepted graphics-queue parallel context plans. Slice C.2
   exposes the renderer worker fan-out stats, and Slice C.3 isolates
-  command-record diagnostics behind a guarded frame-local accumulator. Scheduler
-  dispatch stays disabled because dynamic upload helpers, readback counters,
-  shared pass helper state, and Vulkan command-pool ownership still need
-  isolation or synchronization. Benchmark evidence and the `gpu;vulkan` smoke
-  remain later slices.
+  command-record diagnostics behind a guarded frame-local accumulator. Slice C.4
+  routes picking and histogram readback issue counters and per-slot metadata
+  through guarded renderer helpers. Scheduler dispatch stays disabled because
+  dynamic upload helpers, shared pass helper state, and Vulkan command-pool
+  ownership still need isolation or synchronization. Benchmark evidence and the
+  `gpu;vulkan` smoke remain later slices.
 
 ## History
 

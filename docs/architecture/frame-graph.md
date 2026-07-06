@@ -181,11 +181,12 @@ contract without racing renderer-owned pass state.
 `RenderGraphFrameStats::Execute` reports whether the executor used scheduler
 workers. Command-record diagnostics now accumulate through a guarded frame-local
 renderer accumulator and publish to `RenderGraphFrameStats::CommandRecords` after
-record/join completion. The current renderer path still pins scheduler use
-false because pass callbacks still mutate dynamic upload helpers, readback
-counters, shared pass helper state, and backend command-pool ownership. Later
-`GRAPHICS-119` slices must isolate or synchronize those remaining surfaces
-before enabling `Core::Tasks` fan-out.
+record/join completion. Picking and histogram readback issue metadata now route
+through guarded renderer helpers before the render-thread `BeginFrame()` drains
+consume it. The current renderer path still pins scheduler use false because
+pass callbacks still mutate dynamic upload helpers, shared pass helper state,
+and backend command-pool ownership. Later `GRAPHICS-119` slices must isolate or
+synchronize those remaining surfaces before enabling `Core::Tasks` fan-out.
 
 Null provides CPU bookkeeping contexts for this contract. Vulkan accepts the
 current graphics-queue plan shape with backend-local secondary command buffers

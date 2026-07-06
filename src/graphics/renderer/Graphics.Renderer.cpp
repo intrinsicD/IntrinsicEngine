@@ -7993,6 +7993,45 @@ namespace Extrinsic::Graphics
             }
         }
 
+        void NotePickingReadbackCopyIssued(const std::uint32_t frameIndex,
+                                           const std::uint32_t slot,
+                                           const std::uint32_t pickX,
+                                           const std::uint32_t pickY,
+                                           const std::uint64_t sequence,
+                                           const bool depthCopied)
+        {
+            std::lock_guard<std::mutex> lock(m_ReadbackIssueMutex);
+            ++m_LastRenderGraphStats.PickingReadbackCopyCount;
+
+            if (slot < m_PickingSlotPending.size())
+            {
+                m_PickingSlotPending[slot] = true;
+                m_PickingSlotIssuedFrame[slot] = frameIndex;
+                m_PickingSlotRequest[slot] = PickPixelRequest{
+                    .X = pickX,
+                    .Y = pickY,
+                    .Pending = true,
+                };
+                m_PickingSlotInvalidated[slot] = false;
+                m_PickingSlotSequence[slot] = sequence;
+                m_PickingSlotDepthCopied[slot] = depthCopied;
+            }
+        }
+
+        void NoteHistogramReadbackCopyIssued(const std::uint32_t frameIndex,
+                                             const std::uint32_t slot)
+        {
+            std::lock_guard<std::mutex> lock(m_ReadbackIssueMutex);
+            ++m_LastRenderGraphStats.HistogramReadbackCopyCount;
+
+            if (slot < m_HistogramSlotPending.size())
+            {
+                m_HistogramSlotPending[slot] = true;
+                m_HistogramSlotIssuedFrame[slot] = frameIndex;
+                m_HistogramSlotInvalidated[slot] = false;
+            }
+        }
+
         [[nodiscard]] RenderCommandPassStatus RecordReconstructionPass(const std::uint32_t frameIndex)
         {
             if (m_Device == nullptr || !m_Device->IsOperational())
@@ -9746,6 +9785,11 @@ namespace Extrinsic::Graphics
         // behind this guard and publish to m_LastRenderGraphStats after join.
         std::mutex                           m_CommandRecordStatsMutex;
         RenderGraphCommandRecordStats        m_CommandRecordStats;
+        // GRAPHICS-119 Slice C.4: pass callbacks route readback issue
+        // counters and per-slot metadata through helpers guarded here. The
+        // BeginFrame drains and rebuild resize policy remain render-thread
+        // lifecycle work.
+        std::mutex                           m_ReadbackIssueMutex;
     };
 
     NullRenderer::RenderCommandRouteContext& NullRenderer::RouteContextFrom(void* context) noexcept
@@ -9891,21 +9935,12 @@ namespace Extrinsic::Graphics
                                        RHI::TextureLayout::TransferSrc,
                                        RHI::TextureLayout::DepthReadOnly);
                 }
-                ++m_LastRenderGraphStats.PickingReadbackCopyCount;
-
-                if (slot < m_PickingSlotPending.size())
-                {
-                    m_PickingSlotPending[slot] = true;
-                    m_PickingSlotIssuedFrame[slot] = frame.FrameIndex;
-                    m_PickingSlotRequest[slot] = PickPixelRequest{
-                        .X = pickX,
-                        .Y = pickY,
-                        .Pending = true,
-                    };
-                    m_PickingSlotInvalidated[slot] = false;
-                    m_PickingSlotSequence[slot] = renderWorld.PickRequest.Sequence;
-                    m_PickingSlotDepthCopied[slot] = depthCopied;
-                }
+                NotePickingReadbackCopyIssued(frame.FrameIndex,
+                                              slot,
+                                              pickX,
+                                              pickY,
+                                              renderWorld.PickRequest.Sequence,
+                                              depthCopied);
             }
         }
     }
@@ -10022,14 +10057,7 @@ namespace Extrinsic::Graphics
             cmd.BufferBarrier(histogramHandle,
                               RHI::MemoryAccess::TransferRead,
                               RHI::MemoryAccess::ShaderWrite);
-            ++m_LastRenderGraphStats.HistogramReadbackCopyCount;
-
-            if (slot < m_HistogramSlotPending.size())
-            {
-                m_HistogramSlotPending[slot] = true;
-                m_HistogramSlotIssuedFrame[slot] = frame.FrameIndex;
-                m_HistogramSlotInvalidated[slot] = false;
-            }
+            NoteHistogramReadbackCopyIssued(frame.FrameIndex, slot);
         }
     }
 
