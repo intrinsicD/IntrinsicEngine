@@ -112,8 +112,11 @@ graphics-queue plan with backend-local secondary command buffers; non-graphics
 queue support and worker fan-out remain later `GRAPHICS-119` slices after
 pass-state and command-pool synchronization are fixed. The C.2 audit keeps
 `RenderGraphFrameStats::Execute.ParallelRecordUsedScheduler` false because
-pass callbacks still mutate command-record stats, dynamic upload helpers,
-readback counters, and shared pass helper state.
+pass callbacks still mutate dynamic upload helpers, readback counters, and
+shared pass helper state. Command-record diagnostics are the first isolated
+surface: pass callbacks now accumulate them through a guarded frame-local
+accumulator and publish to `RenderGraphFrameStats::CommandRecords` after the
+record/join path completes.
 
 `Extrinsic.Graphics.RenderingContract` is the CPU-only public contract vocabulary
 for the renderer/snapshot/recipe architecture introduced by `GRAPHICS-099`.

@@ -8,12 +8,11 @@ depends_on: []
 ## Status
 - In progress on local `main`; PR not opened.
 - Owner/agent: Codex.
-- Current slice: Slice C.2 (renderer worker fan-out audit gate) completed and
+- Current slice: Slice C.3 (command-record diagnostics isolation) completed and
   verified locally.
-- Next implementation step: Slice C.3 — isolate or synchronize command-record
-  stats, dynamic upload helpers, readback counters, shared pass helper state,
-  and Vulkan command-pool ownership before enabling worker fan-out behind the
-  fallback flag.
+- Next implementation step: Slice C.4 — isolate or synchronize dynamic upload
+  helpers, readback counters, shared pass helper state, and Vulkan command-pool
+  ownership before enabling worker fan-out behind the fallback flag.
 
 ## Goal
 - Record render-graph pass command buffers in parallel: independent passes
@@ -84,11 +83,14 @@ depends_on: []
 - [x] Slice C.2: renderer exposes worker fan-out stats and pins the accepted
       parallel-context path to caller-thread recording until shared pass state
       is isolated or synchronized.
+- [x] Slice C.3: command-record diagnostics accumulate through a guarded
+      frame-local renderer accumulator and publish after graph record/join.
 - [ ] RHI contract for parallel recording: acquire per-thread/per-batch
       command contexts, record independently, submit in compiled order;
       Null + Vulkan implementations.
 - [ ] Audit and fix thread-affinity of pass-recording state (descriptor
-      allocation, dynamic uploads, per-pass stats) — per-context or
+      allocation, dynamic uploads, readback counters, shared pass helper state)
+      — per-context or
       synchronized, chosen per site and documented.
 - [ ] Parallel executor path: fan pass recording out by topological
       layer/batch via `Core::Tasks::Scheduler`, join on a `CounterEvent`,
@@ -114,6 +116,9 @@ depends_on: []
       context.
 - [x] Slice C.2 renderer contract: accepted parallel context plans report no
       scheduler worker tasks and record every pass on the caller thread.
+- [x] Slice C.3 renderer contract: accepted parallel context plans still
+      publish internally consistent command-record diagnostics from the
+      isolated accumulator.
 - [ ] CPU/null contract: parallel recording produces the same
       pass-execution/barrier submission order as serial (bookkeeping
       comparison over randomized graphs).
@@ -134,6 +139,8 @@ depends_on: []
       deferred non-graphics queue / worker fan-out scope.
 - [x] Slice C.2: document the worker fan-out audit finding and the mutable
       renderer surfaces that keep `Core::Tasks` dispatch disabled.
+- [x] Slice C.3: document command-record diagnostics isolation and the
+      remaining mutable surfaces that still block worker fan-out.
 - [x] Update `docs/architecture/frame-graph.md` and
       `src/graphics/renderer/README.md` (threading model, fallback flag).
 
@@ -219,6 +226,22 @@ cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests
 ctest --test-dir build/ci --output-on-failure -R 'RendererFrameLifecycle\..*ParallelRecording|GraphicsQueueAffinity\..*ParallelCommand|RenderGraphParallelRecording' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
 ctest --test-dir build/ci --output-on-failure -R 'RendererFrameLifecycle|RenderGraphParallelRecording|GraphicsQueueAffinity|RenderGraphValidation' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
 git diff --check
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/validate_tasks.py --root tasks --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --strict
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+```
+
+Slice C.3 verification run locally on 2026-07-06:
+
+```bash
+cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure -R 'RendererFrameLifecycle\..*ParallelRecording|GraphicsQueueAffinity\..*ParallelCommand|RenderGraphParallelRecording' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+python3 tools/agents/generate_session_brief.py
+git diff --check
+ctest --test-dir build/ci --output-on-failure -R 'RendererFrameLifecycle|RenderGraphParallelRecording|GraphicsQueueAffinity|RenderGraphValidation' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/agents/validate_tasks.py --root tasks --strict
 python3 tools/docs/check_doc_links.py --root .

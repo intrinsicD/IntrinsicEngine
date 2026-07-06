@@ -1280,6 +1280,16 @@ TEST(RendererFrameLifecycle, ParallelRecordingUsesAcceptedContextPlanInSerialSub
     EXPECT_EQ(stats.Execute.ParallelRecordWorkerTaskCount, 0u);
     EXPECT_EQ(stats.Execute.ParallelRecordCallerRecordCount,
               stats.Execute.ParallelRecordedPassCount);
+    EXPECT_GT(stats.CommandRecords.Passes.size(), 0u);
+    EXPECT_EQ(stats.CommandRecords.Passes.size(),
+              static_cast<std::size_t>(stats.CommandRecords.Recorded + stats.CommandRecords.Skipped));
+    EXPECT_EQ(stats.CommandRecords.Skipped,
+              stats.CommandRecords.SkippedNonOperational + stats.CommandRecords.SkippedUnavailable);
+    const Extrinsic::Graphics::RenderGraphCommandPassStats* presentPass =
+        FindCommandPass(stats, "Present");
+    ASSERT_NE(presentPass, nullptr);
+    EXPECT_EQ(presentPass->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     EXPECT_EQ(device.ParallelCommandContextRequests.size(),
               device.RecordedParallelCommandContextPlan.size());
     EXPECT_EQ(device.SubmittedParallelCommandContexts.size(),

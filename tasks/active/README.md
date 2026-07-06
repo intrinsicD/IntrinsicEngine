@@ -18,11 +18,12 @@ Each active task should include:
   Null/Mock provide CPU bookkeeping, and the renderer exposes a debug selector
   with serial fallback stats. Slice C.1 adds Vulkan backend-local secondary
   command buffers for accepted graphics-queue parallel context plans. Slice C.2
-  exposes the renderer worker fan-out stats and keeps scheduler dispatch
-  disabled because command-record stats, dynamic upload helpers, readback
-  counters, shared pass helper state, and Vulkan command-pool ownership still
-  need isolation or synchronization. Benchmark evidence and the `gpu;vulkan`
-  smoke remain later slices.
+  exposes the renderer worker fan-out stats, and Slice C.3 isolates
+  command-record diagnostics behind a guarded frame-local accumulator. Scheduler
+  dispatch stays disabled because dynamic upload helpers, readback counters,
+  shared pass helper state, and Vulkan command-pool ownership still need
+  isolation or synchronization. Benchmark evidence and the `gpu;vulkan` smoke
+  remain later slices.
 
 ## History
 

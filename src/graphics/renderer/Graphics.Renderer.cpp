@@ -9,6 +9,7 @@ module;
 #include <functional>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <span>
 #include <string>
@@ -2890,6 +2891,7 @@ namespace Extrinsic::Graphics
                           const RenderWorld& renderWorld) override
         {
             m_LastRenderGraphStats = {};
+            ResetCommandRecordStats();
             m_LastRenderGraphStats.VisualizationPropertyBuffers =
                 renderWorld.Visualization.PropertyBufferDiagnostics;
             if (!m_HasPreparedFrame)
@@ -3536,22 +3538,10 @@ namespace Extrinsic::Graphics
             const auto recordPostGraphReadbacks =
                 [&](RHI::ICommandContext& graphicsContext, const bool graphExecuted)
                 {
-                    const auto transientDebugRecordedThisFrame =
-                        std::any_of(m_LastRenderGraphStats.CommandRecords.Passes.begin(),
-                                    m_LastRenderGraphStats.CommandRecords.Passes.end(),
-                                    [](const RenderGraphCommandPassStats& pass)
-                                    {
-                                        return pass.Id == ToFramePassId(FrameRecipePassKind::TransientDebugSurface) &&
-                                               pass.Status == RenderCommandPassStatus::Recorded;
-                                    });
-                    const auto visualizationOverlayRecordedThisFrame =
-                        std::any_of(m_LastRenderGraphStats.CommandRecords.Passes.begin(),
-                                    m_LastRenderGraphStats.CommandRecords.Passes.end(),
-                                    [](const RenderGraphCommandPassStats& pass)
-                                    {
-                                        return pass.Id == ToFramePassId(FrameRecipePassKind::VisualizationOverlay) &&
-                                               pass.Status == RenderCommandPassStatus::Recorded;
-                                    });
+                    const bool transientDebugRecordedThisFrame =
+                        CommandRecordPassRecorded(ToFramePassId(FrameRecipePassKind::TransientDebugSurface));
+                    const bool visualizationOverlayRecordedThisFrame =
+                        CommandRecordPassRecorded(ToFramePassId(FrameRecipePassKind::VisualizationOverlay));
 
                     // GRAPHICS-076E / GRAPHICS-077E / GRAPHICS-078E —
                     // opt-in pixel-readback hooks: copy after the executor's
@@ -3816,6 +3806,7 @@ namespace Extrinsic::Graphics
             const auto executeEnd = std::chrono::steady_clock::now();
             m_LastRenderGraphStats.Execute.TimeMicros = static_cast<std::uint64_t>(
                 std::chrono::duration_cast<std::chrono::microseconds>(executeEnd - executeBegin).count());
+            PublishCommandRecordStats();
             const auto resetCacheAfterFallback = [&]()
             {
                 if (m_InvalidateRenderGraphCompileCacheAfterFrame)
@@ -7902,6 +7893,7 @@ namespace Extrinsic::Graphics
             m_HasPreparedFrame = false;
             m_LastRenderPrepResult = {};
             m_LastRenderGraphStats = {};
+            ResetCommandRecordStats();
         }
 
         [[nodiscard]] RHI::CameraUBO BuildCameraUbo(const RenderWorld& world,
@@ -7945,11 +7937,41 @@ namespace Extrinsic::Graphics
             return camera;
         }
 
+        void ResetCommandRecordStats()
+        {
+            std::lock_guard<std::mutex> lock(m_CommandRecordStatsMutex);
+            m_CommandRecordStats = {};
+        }
+
+        [[nodiscard]] RenderGraphCommandRecordStats SnapshotCommandRecordStats()
+        {
+            std::lock_guard<std::mutex> lock(m_CommandRecordStatsMutex);
+            return m_CommandRecordStats;
+        }
+
+        void PublishCommandRecordStats()
+        {
+            m_LastRenderGraphStats.CommandRecords = SnapshotCommandRecordStats();
+        }
+
+        [[nodiscard]] bool CommandRecordPassRecorded(const FramePassId passId)
+        {
+            std::lock_guard<std::mutex> lock(m_CommandRecordStatsMutex);
+            return std::any_of(m_CommandRecordStats.Passes.begin(),
+                               m_CommandRecordStats.Passes.end(),
+                               [passId](const RenderGraphCommandPassStats& pass)
+                               {
+                                   return pass.Id == passId &&
+                                          pass.Status == RenderCommandPassStatus::Recorded;
+                               });
+        }
+
         void AccumulateCommandRecordStatus(const std::string_view passName,
                                            const FramePassId passId,
                                            const RenderCommandPassStatus status)
         {
-            m_LastRenderGraphStats.CommandRecords.Passes.push_back(RenderGraphCommandPassStats{
+            std::lock_guard<std::mutex> lock(m_CommandRecordStatsMutex);
+            m_CommandRecordStats.Passes.push_back(RenderGraphCommandPassStats{
                 .Name = std::string{passName},
                 .Id = passId,
                 .Status = status,
@@ -7958,15 +7980,15 @@ namespace Extrinsic::Graphics
             switch (status)
             {
             case RenderCommandPassStatus::Recorded:
-                ++m_LastRenderGraphStats.CommandRecords.Recorded;
+                ++m_CommandRecordStats.Recorded;
                 break;
             case RenderCommandPassStatus::SkippedNonOperational:
-                ++m_LastRenderGraphStats.CommandRecords.Skipped;
-                ++m_LastRenderGraphStats.CommandRecords.SkippedNonOperational;
+                ++m_CommandRecordStats.Skipped;
+                ++m_CommandRecordStats.SkippedNonOperational;
                 break;
             case RenderCommandPassStatus::SkippedUnavailable:
-                ++m_LastRenderGraphStats.CommandRecords.Skipped;
-                ++m_LastRenderGraphStats.CommandRecords.SkippedUnavailable;
+                ++m_CommandRecordStats.Skipped;
+                ++m_CommandRecordStats.SkippedUnavailable;
                 break;
             }
         }
@@ -9719,6 +9741,11 @@ namespace Extrinsic::Graphics
         // `VisualizationOverlayPass` recording this frame.
         RHI::BufferHandle                    m_VisualizationOverlayReadbackBuffer{};
         RenderGraphFrameStats                m_LastRenderGraphStats;
+        // GRAPHICS-119 Slice C.3: pass callbacks can run from worker threads
+        // once fan-out is enabled, so command-record diagnostics accumulate
+        // behind this guard and publish to m_LastRenderGraphStats after join.
+        std::mutex                           m_CommandRecordStatsMutex;
+        RenderGraphCommandRecordStats        m_CommandRecordStats;
     };
 
     NullRenderer::RenderCommandRouteContext& NullRenderer::RouteContextFrom(void* context) noexcept

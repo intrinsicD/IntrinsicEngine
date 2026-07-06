@@ -179,10 +179,13 @@ graphics context. This proves the RHI acquisition and deterministic submit
 contract without racing renderer-owned pass state.
 
 `RenderGraphFrameStats::Execute` reports whether the executor used scheduler
-workers. The current renderer path pins that flag false: pass callbacks still
-mutate renderer-owned command-record stats, dynamic upload helpers, readback
-counters, and shared pass helper state. A later `GRAPHICS-119` slice must
-isolate or synchronize those surfaces before enabling `Core::Tasks` fan-out.
+workers. Command-record diagnostics now accumulate through a guarded frame-local
+renderer accumulator and publish to `RenderGraphFrameStats::CommandRecords` after
+record/join completion. The current renderer path still pins scheduler use
+false because pass callbacks still mutate dynamic upload helpers, readback
+counters, shared pass helper state, and backend command-pool ownership. Later
+`GRAPHICS-119` slices must isolate or synchronize those remaining surfaces
+before enabling `Core::Tasks` fan-out.
 
 Null provides CPU bookkeeping contexts for this contract. Vulkan accepts the
 current graphics-queue plan shape with backend-local secondary command buffers
