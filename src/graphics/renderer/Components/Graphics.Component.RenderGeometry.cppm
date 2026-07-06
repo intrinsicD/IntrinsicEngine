@@ -1,5 +1,6 @@
 module;
 
+#include <array>
 #include <cstdint>
 #include <glm/glm.hpp>
 #include <string>
@@ -47,12 +48,22 @@ export namespace Extrinsic::Graphics::Components
         /// 0 = continuous (smooth gradient).
         std::uint32_t BinCount = 0;
 
+        /// Maximum explicit highlight isovalues carried per config; matches
+        /// the bounded slots in RHI::GpuEntityConfig / gpu_scene.glsl.
+        static constexpr std::uint32_t kMaxIsolineValues = 8u;
+
         struct Isolines
         {
             /// Number of evenly-spaced isocontour lines.  0 = none.
             std::uint32_t Num   = 0;
             glm::vec4     Color = {0.f, 0.f, 0.f, 1.f};
             float         Width = 1.5f;  ///< Screen-space pixels.
+
+            /// Explicit highlight isovalues in raw scalar units (e.g. H = 0),
+            /// drawn in addition to the evenly-spaced contours. Only the
+            /// first ValueCount entries are used.
+            std::array<float, kMaxIsolineValues> Values{};
+            std::uint32_t ValueCount = 0;
         } Isolines;
     };
 

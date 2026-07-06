@@ -172,6 +172,15 @@ struct GpuEntityConfig {
     GpuEntityPointConfig Point;
     GpuEntityLineConfig Line;
     vec4 UniformColor;
+
+    // UI-032 — explicit highlight isovalues in raw scalar units (bounded at
+    // 8); normalized against ScalarRangeMin/Max at shading time.
+    vec4 IsoValuesA;
+    vec4 IsoValuesB;
+    uint IsoValueCount;
+    uint _padIso0;
+    uint _padIso1;
+    uint _padIso2;
 };
 
 
@@ -408,6 +417,41 @@ vec4 GpuVisualizationApplyIsolines(GpuEntityConfig cfg, float t, vec4 color)
     return color;
 }
 
+// UI-032 — un-binned normalization used for explicit isovalue placement so
+// highlight contours sit at exact scalar positions even when BinCount bands
+// the colormap lookup.
+float GpuVisualizationNormalizedScalarRaw(GpuEntityConfig cfg, float scalarValue)
+{
+    const float range = cfg.ScalarRangeMax - cfg.ScalarRangeMin;
+    if (abs(range) <= 1.0e-20) {
+        return 0.0;
+    }
+    return clamp((scalarValue - cfg.ScalarRangeMin) / range, 0.0, 1.0);
+}
+
+// UI-032 — explicit highlight isovalues (raw scalar units in
+// cfg.IsoValuesA/B). Uses the shared IsolineWidth/IsolineColor styling and
+// the same width parameterization as the evenly-spaced contours.
+vec4 GpuVisualizationApplyExplicitIsoValues(GpuEntityConfig cfg,
+                                            float rawT,
+                                            vec4 color)
+{
+    const uint count = min(cfg.IsoValueCount, 8u);
+    if (count == 0u || cfg.IsolineWidth <= 0.0) {
+        return color;
+    }
+
+    const float width = clamp(cfg.IsolineWidth / 128.0, 0.001, 0.5);
+    float lineMix = 0.0;
+    for (uint i = 0u; i < count; ++i) {
+        const float isoValue = (i < 4u) ? cfg.IsoValuesA[i] : cfg.IsoValuesB[i - 4u];
+        const float isoT = GpuVisualizationNormalizedScalarRaw(cfg, isoValue);
+        lineMix = max(lineMix, 1.0 - smoothstep(0.0, width, abs(rawT - isoT)));
+    }
+    color.rgb = mix(color.rgb, cfg.IsolineColor.rgb, lineMix * cfg.IsolineColor.a);
+    return color;
+}
+
 vec4 GpuResolveVisualizationColorFallback(GpuEntityConfig cfg,
                                           vec4 perElementColor,
                                           vec4 baseColor)
@@ -437,6 +481,10 @@ vec4 GpuResolveVisualizationColorWithColormap(GpuEntityConfig cfg,
     vec4 color = texture(colormapLut, vec2(t, 0.5));
     color.a = 1.0;
     color = GpuVisualizationApplyIsolines(cfg, t, color);
+    color = GpuVisualizationApplyExplicitIsoValues(
+        cfg,
+        GpuVisualizationNormalizedScalarRaw(cfg, scalarValue),
+        color);
     color.a *= cfg.VisualizationAlpha;
     return color;
 }
