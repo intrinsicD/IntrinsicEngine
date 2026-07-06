@@ -2,11 +2,32 @@
 id: GRAPHICS-120
 theme: B
 depends_on: []
+completed: 2026-07-06
 ---
 # GRAPHICS-120 — Framegraph compiler/executor efficiency and hygiene polish
 
+## Completion
+- Completed: 2026-07-06. Commit/PR: slice commits `2884539f`,
+  `36c457f9`, `a1dba3cc`, `4cc737ce`, `f5a17cf3`, `1c8ddd3e`,
+  `386112e0`, and `f39633a8`; retirement in this commit.
+- Maturity: `CPUContracted`; no `Operational` follow-up is owed because the
+  framegraph compiler/executor hygiene work is backend-neutral and verified
+  through CPU/null graphics and renderer lifecycle contracts.
+- Summary: color attachment reads now use a read-only barrier state,
+  transient texture sizing is pinned to `RHI::EstimateTextureStorageBytes`,
+  compile validation diagnostics use explicit result plumbing, executor and
+  renderer barrier emission share sorted-packet range lookup, compiler packet
+  insertion and duplicate pass-id validation use indexed/sorted paths, and
+  `RenderGraph::Reset()` plus stateful `RenderGraph::Compile()` recycle
+  declaration/compiler scratch without changing compiled graph ownership.
+- Evidence: focused graphics contract tests, benchmark smoke runs with strict
+  manifest/result validation, the broad graphics selection, `IntrinsicTests`,
+  the default CPU-supported CTest gate (3584/3584), task policy, task
+  validator, docs links, docs sync, layering, and test-layout checks all
+  passed locally on 2026-07-06.
+
 ## Status
-- In progress on local `main`; PR not opened.
+- Retired on local `main`; PR not opened.
 - Owner/agent: Codex.
 - Current slices: Slice A, Slice B, Slice C, Slice D1, Slice D2a, Slice D2b,
   and Slice D2c
@@ -24,7 +45,7 @@ depends_on: []
   allocation-counter smoke evidence. Stateful `RenderGraph::Compile()` now
   reuses private compiler scratch for graph-analysis temporaries while keeping
   `CompiledRenderGraph` output names value-owned.
-- Next implementation step: retire the task.
+- Next implementation step: none.
 
 ## Goal
 - Remove the per-compile/per-execute waste and small contract hazards inside

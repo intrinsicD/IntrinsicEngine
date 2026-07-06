@@ -27,9 +27,6 @@ without requiring them to read every file.
 - [`GRAPHICS-119`](GRAPHICS-119-parallel-pass-command-recording.md) —
   parallel render-pass command recording via the task scheduler
   (2026-07-03 review R13).
-- [`GRAPHICS-120`](../../active/GRAPHICS-120-framegraph-compiler-executor-efficiency.md) —
-  framegraph compiler/executor efficiency and hygiene polish
-  (2026-07-03 review R18; currently active).
 
 ## Legacy Parity Follow-Ups
 

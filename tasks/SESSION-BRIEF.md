@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `GRAPHICS-120` — Framegraph compiler/executor efficiency and hygiene polish (tasks/active/GRAPHICS-120-framegraph-compiler-executor-efficiency.md)
+- none
 
 ## Theme B — Rendering modernization
 

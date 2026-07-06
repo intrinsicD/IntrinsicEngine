@@ -71,9 +71,9 @@ open Theme B leaves include the object-space normal bake runtime scheduling
 follow-up (`RUNTIME-129`), the profile-gated vertex attribute operational
 follow-up (`RUNTIME-139`), and the 2026-07-03 render-graph
 review leaves — pass contribution seam (`GRAPHICS-116`), compile caching
-(`GRAPHICS-117`), placed transient aliasing (`GRAPHICS-118`), parallel
-command recording (`GRAPHICS-119`), and compiler/executor polish
-(`GRAPHICS-120`); see
+(`GRAPHICS-117`), placed transient aliasing (`GRAPHICS-118`), and parallel
+command recording (`GRAPHICS-119`); compiler/executor polish (`GRAPHICS-120`)
+is retired; see
 [`rendering/README.md`](rendering/README.md) and
 [`docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`](../../docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md). The runtime GPU readback job/write-back leg
 (`RUNTIME-126`) is retired with the transfer facade/readback ring wired into the

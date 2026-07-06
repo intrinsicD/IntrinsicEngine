@@ -9,6 +9,23 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`GRAPHICS-120`](GRAPHICS-120-framegraph-compiler-executor-efficiency.md) —
+Framegraph compiler/executor efficiency and hygiene polish — retired on
+2026-07-06 at maturity `CPUContracted`. The framegraph now treats
+`TextureUsage::ColorAttachmentRead` as a read-only barrier state, keeps
+transient texture estimates routed through `RHI::EstimateTextureStorageBytes`,
+publishes compile validation through explicit result plumbing instead of
+`thread_local` state, emits executor/renderer barriers through shared indexed
+sorted-packet ranges, and uses indexed/sorted compiler paths for packet
+insertion plus duplicate typed pass-id validation. `RenderGraph::Reset()` and
+stateful `RenderGraph::Compile()` now recycle pass declaration and compiler
+scratch while keeping `CompiledRenderGraph` outputs value-owned. PR-fast smoke
+benchmarks captured barrier-emission, compiler-indexing, and allocation-counter
+improvements, and the default CPU-supported gate passed 3584/3584. Compile
+caching, placed transient aliasing, and parallel command recording remain owned
+by `GRAPHICS-117`, `GRAPHICS-118`, and `GRAPHICS-119`.
+
+Active
 [`BUG-061`](BUG-061-texture-bake-gpu-gate-and-service-context.md) —
 Texture bake UI misses service context and GPU availability gate — retired on
 2026-07-06 at maturity `CPUContracted`. Live sandbox editor contexts now pass
