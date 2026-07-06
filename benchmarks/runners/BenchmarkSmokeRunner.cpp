@@ -25,6 +25,7 @@
 #include "../physics/Bench.SphFluidReferenceSmoke.hpp"
 #include "../physics/Bench.XpbdClothReferenceSmoke.hpp"
 #include "../rendering/Bench.FramegraphBarrierEmissionSmoke.hpp"
+#include "../rendering/Bench.FramegraphCompilerIndexingSmoke.hpp"
 #include "../rendering/Bench.FrameRecipeCompileCacheSmoke.hpp"
 #include "../rendering/Bench.VertexFetchLayoutSmoke.hpp"
 
@@ -804,6 +805,58 @@ auto EmitFramegraphBarrierEmissionSmoke(const std::string &commit)
                           metrics.Succeeded};
 }
 
+auto EmitFramegraphCompilerIndexingSmoke(const std::string &commit)
+    -> EmittedBenchmark {
+  using namespace Intrinsic::Bench::Rendering;
+
+  const auto metrics = RunFramegraphCompilerIndexingSmoke();
+
+  std::ostringstream out;
+  out.setf(std::ios::fixed);
+  out.precision(6);
+  out << "{\n"
+      << "  \"benchmark_id\": \""
+      << EscapeJson(kFramegraphCompilerIndexingSmokeBenchmarkId) << "\",\n"
+      << "  \"method\": \""
+      << EscapeJson(kFramegraphCompilerIndexingSmokeMethod) << "\",\n"
+      << "  \"backend\": \"cpu_reference\",\n"
+      << "  \"dataset\": \""
+      << EscapeJson(kFramegraphCompilerIndexingSmokeDataset) << "\",\n"
+      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
+      << "  \"metrics\": {\n"
+      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
+      << "  },\n"
+      << "  \"diagnostics\": {\n"
+      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+      << "    \"mode\": \"smoke\",\n"
+      << "    \"warmup_iterations\": " << metrics.WarmupIterations << ",\n"
+      << "    \"measured_iterations\": " << metrics.MeasuredIterations << ",\n"
+      << "    \"baseline_mode\": \"legacy_nested_scan_and_linear_packet_insert\",\n"
+      << "    \"probe_mode\": \"sorted_pass_ids_and_indexed_packet_insert\",\n"
+      << "    \"adoption_claim\": false,\n"
+      << "    \"legacy_scan_ms\": " << metrics.LegacyScanMilliseconds << ",\n"
+      << "    \"indexed_ms\": " << metrics.IndexedMilliseconds << ",\n"
+      << "    \"pass_count\": " << metrics.PassCount << ",\n"
+      << "    \"request_count\": " << metrics.RequestCount << ",\n"
+      << "    \"barrier_packet_count\": " << metrics.BarrierPacketCount << ",\n"
+      << "    \"legacy_pass_id_comparisons\": "
+      << metrics.LegacyPassIdComparisons << ",\n"
+      << "    \"indexed_pass_id_comparisons\": "
+      << metrics.IndexedPassIdComparisons << ",\n"
+      << "    \"legacy_packet_comparisons\": "
+      << metrics.LegacyPacketComparisons << ",\n"
+      << "    \"indexed_packet_lookups\": " << metrics.IndexedPacketLookups
+      << "\n"
+      << "  },\n"
+      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
+      << "\"\n"
+      << "}\n";
+
+  return EmittedBenchmark{kFramegraphCompilerIndexingSmokeBenchmarkId,
+                          out.str(), metrics.Succeeded};
+}
+
 auto EmitFrameRecipeCompileCacheSmoke(const std::string &commit)
     -> EmittedBenchmark {
   using namespace Intrinsic::Bench::Rendering;
@@ -896,6 +949,7 @@ auto main(int argc, char **argv) -> int {
   emitted.push_back(EmitXpbdClothReferenceSmoke(commit));
   emitted.push_back(EmitSphFluidReferenceSmoke(commit));
   emitted.push_back(EmitFramegraphBarrierEmissionSmoke(commit));
+  emitted.push_back(EmitFramegraphCompilerIndexingSmoke(commit));
   emitted.push_back(EmitFrameRecipeCompileCacheSmoke(commit));
   emitted.push_back(EmitVertexFetchLayoutSmoke(commit));
 

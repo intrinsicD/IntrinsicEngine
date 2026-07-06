@@ -470,32 +470,63 @@ namespace Extrinsic::Graphics
         [[nodiscard]] bool ValidateUniquePassIds(const std::span<const RenderPassRecord> passes,
                                                  RenderGraphValidationResult& validation)
         {
+            struct PassIdEntry
+            {
+                FramePassId Id{};
+                std::uint32_t PassIndex = 0u;
+            };
+
+            std::vector<PassIdEntry> entries{};
+            entries.reserve(passes.size());
             for (std::uint32_t passIndex = 0; passIndex < passes.size(); ++passIndex)
             {
-                const FramePassId id = passes[passIndex].Id;
-                if (!id.IsValid())
+                if (passes[passIndex].Id.IsValid())
+                {
+                    entries.push_back(PassIdEntry{
+                        .Id = passes[passIndex].Id,
+                        .PassIndex = passIndex,
+                    });
+                }
+            }
+
+            std::ranges::sort(entries, [](const PassIdEntry lhs, const PassIdEntry rhs) {
+                return std::tuple{lhs.Id.Value, lhs.PassIndex} <
+                       std::tuple{rhs.Id.Value, rhs.PassIndex};
+            });
+
+            std::uint32_t firstDuplicateIndex = InvalidValidationIndex();
+            std::uint32_t firstDuplicatePriorIndex = InvalidValidationIndex();
+            FramePassId duplicateId{};
+            for (std::size_t entryIndex = 1u; entryIndex < entries.size(); ++entryIndex)
+            {
+                if (entries[entryIndex - 1u].Id != entries[entryIndex].Id)
                 {
                     continue;
                 }
 
-                for (std::uint32_t priorIndex = 0; priorIndex < passIndex; ++priorIndex)
+                const std::uint32_t priorIndex = entries[entryIndex - 1u].PassIndex;
+                const std::uint32_t duplicateIndex = entries[entryIndex].PassIndex;
+                if (duplicateIndex < firstDuplicateIndex)
                 {
-                    if (passes[priorIndex].Id != id)
-                    {
-                        continue;
-                    }
-
-                    SetCompileFinding(
-                        validation,
-                        RenderGraphValidationCode::DuplicatePassId,
-                        "RenderGraph duplicate typed pass id: id=" + std::to_string(id.Value) +
-                            " first_pass=\"" + passes[priorIndex].Name + "\" duplicate_pass=\"" +
-                            passes[passIndex].Name + "\".",
-                        passIndex,
-                        passes[passIndex].Name);
-                    return false;
+                    firstDuplicateIndex = duplicateIndex;
+                    firstDuplicatePriorIndex = priorIndex;
+                    duplicateId = entries[entryIndex].Id;
                 }
             }
+
+            if (firstDuplicateIndex != InvalidValidationIndex())
+            {
+                SetCompileFinding(
+                    validation,
+                    RenderGraphValidationCode::DuplicatePassId,
+                    "RenderGraph duplicate typed pass id: id=" + std::to_string(duplicateId.Value) +
+                        " first_pass=\"" + passes[firstDuplicatePriorIndex].Name + "\" duplicate_pass=\"" +
+                        passes[firstDuplicateIndex].Name + "\".",
+                    firstDuplicateIndex,
+                    passes[firstDuplicateIndex].Name);
+                return false;
+            }
+
             return true;
         }
 
@@ -885,24 +916,70 @@ namespace Extrinsic::Graphics
             };
         }
 
-        [[nodiscard]] BarrierPacket& FindOrCreateBarrierPacket(std::vector<BarrierPacket>& packets,
-                                                               const std::uint32_t passIndex,
-                                                               const BarrierPacketStage stage)
+        struct BarrierPacketBuilder
         {
-            const auto it = std::ranges::find_if(packets, [passIndex, stage](const BarrierPacket& packet) {
-                return packet.PassIndex == passIndex && packet.Stage == stage;
-            });
-            if (it != packets.end())
+            static constexpr std::uint32_t InvalidPacketIndex = std::numeric_limits<std::uint32_t>::max();
+
+            explicit BarrierPacketBuilder(const std::uint32_t passCount, const std::size_t reserveCount)
+                : PacketIndexByKey((static_cast<std::size_t>(passCount) + 1u) * 2u, InvalidPacketIndex),
+                  PassSlotCount(passCount + 1u)
             {
-                return *it;
+                Packets.reserve(reserveCount);
             }
 
-            packets.push_back(BarrierPacket{
-                .PassIndex = passIndex,
-                .Stage = stage,
-            });
-            return packets.back();
-        }
+            [[nodiscard]] BarrierPacket& FindOrCreate(const std::uint32_t passIndex,
+                                                      const BarrierPacketStage stage)
+            {
+                if (passIndex < PassSlotCount)
+                {
+                    const std::size_t key = PacketKey(passIndex, stage);
+                    const std::uint32_t existingIndex = PacketIndexByKey[key];
+                    if (existingIndex != InvalidPacketIndex)
+                    {
+                        return Packets[existingIndex];
+                    }
+
+                    const auto packetIndex = static_cast<std::uint32_t>(Packets.size());
+                    PacketIndexByKey[key] = packetIndex;
+                    Packets.push_back(BarrierPacket{
+                        .PassIndex = passIndex,
+                        .Stage = stage,
+                    });
+                    return Packets.back();
+                }
+
+                const auto it = std::ranges::find_if(Packets, [passIndex, stage](const BarrierPacket& packet) {
+                    return packet.PassIndex == passIndex && packet.Stage == stage;
+                });
+                if (it != Packets.end())
+                {
+                    return *it;
+                }
+
+                Packets.push_back(BarrierPacket{
+                    .PassIndex = passIndex,
+                    .Stage = stage,
+                });
+                return Packets.back();
+            }
+
+            [[nodiscard]] std::vector<BarrierPacket> Finish() &&
+            {
+                return std::move(Packets);
+            }
+
+            std::vector<BarrierPacket> Packets{};
+            std::vector<std::uint32_t> PacketIndexByKey{};
+            std::uint32_t PassSlotCount = 0u;
+
+        private:
+            [[nodiscard]] static constexpr std::size_t PacketKey(const std::uint32_t passIndex,
+                                                                 const BarrierPacketStage stage) noexcept
+            {
+                return (static_cast<std::size_t>(passIndex) * 2u) +
+                       static_cast<std::size_t>(BarrierPacketStageSortKey(stage));
+            }
+        };
 
         void SortBarrierPackets(std::vector<BarrierPacket>& packets)
         {
@@ -1953,8 +2030,9 @@ namespace Extrinsic::Graphics
                                   textureQueueSharingModes,
                                   bufferQueueSharingModes);
 
-        std::vector<BarrierPacket> barrierPackets{};
-        barrierPackets.reserve(order.size() + resourceHandoffs.size());
+        BarrierPacketBuilder barrierPackets(
+            passCount,
+            order.size() + resourceHandoffs.size() + 1u);
         std::vector<TextureBarrierState> textureStateByRef(textures.size(), TextureBarrierState::Undefined);
         std::vector<BufferBarrierState> bufferStateByRef(buffers.size(), BufferBarrierState::Undefined);
         std::vector<std::int32_t> textureLastAccessorByRef(textures.size(), -1);
@@ -1996,8 +2074,7 @@ namespace Extrinsic::Graphics
                 if (needsOwnershipTransfer)
                 {
                     const RenderQueue sourceQueue = textureQueueByRef[textureIndex];
-                    BarrierPacket& release = FindOrCreateBarrierPacket(
-                        barrierPackets,
+                    BarrierPacket& release = barrierPackets.FindOrCreate(
                         static_cast<std::uint32_t>(textureLastAccessorByRef[textureIndex]),
                         BarrierPacketStage::AfterPass);
                     release.TextureBarriers.push_back(TextureBarrierPacket{
@@ -2010,7 +2087,7 @@ namespace Extrinsic::Graphics
                                                                    pass.Queue),
                     });
 
-                    BarrierPacket& acquire = FindOrCreateBarrierPacket(barrierPackets, passIndex, BarrierPacketStage::BeforePass);
+                    BarrierPacket& acquire = barrierPackets.FindOrCreate(passIndex, BarrierPacketStage::BeforePass);
                     acquire.TextureBarriers.push_back(TextureBarrierPacket{
                         .TextureIndex = textureIndex,
                         .Before = prev,
@@ -2025,7 +2102,7 @@ namespace Extrinsic::Graphics
                 }
                 else if (prev != next)
                 {
-                    BarrierPacket& packet = FindOrCreateBarrierPacket(barrierPackets, passIndex, BarrierPacketStage::BeforePass);
+                    BarrierPacket& packet = barrierPackets.FindOrCreate(passIndex, BarrierPacketStage::BeforePass);
                     packet.TextureBarriers.push_back(TextureBarrierPacket{
                         .TextureIndex = textureIndex,
                         .Before = prev,
@@ -2052,8 +2129,7 @@ namespace Extrinsic::Graphics
                 if (needsOwnershipTransfer)
                 {
                     const RenderQueue sourceQueue = bufferQueueByRef[bufferIndex];
-                    BarrierPacket& release = FindOrCreateBarrierPacket(
-                        barrierPackets,
+                    BarrierPacket& release = barrierPackets.FindOrCreate(
                         static_cast<std::uint32_t>(bufferLastAccessorByRef[bufferIndex]),
                         BarrierPacketStage::AfterPass);
                     release.BufferBarriers.push_back(BufferBarrierPacket{
@@ -2066,7 +2142,7 @@ namespace Extrinsic::Graphics
                                                                    pass.Queue),
                     });
 
-                    BarrierPacket& acquire = FindOrCreateBarrierPacket(barrierPackets, passIndex, BarrierPacketStage::BeforePass);
+                    BarrierPacket& acquire = barrierPackets.FindOrCreate(passIndex, BarrierPacketStage::BeforePass);
                     acquire.BufferBarriers.push_back(BufferBarrierPacket{
                         .BufferIndex = bufferIndex,
                         .Before = prev,
@@ -2081,7 +2157,7 @@ namespace Extrinsic::Graphics
                 }
                 else if (prev != next)
                 {
-                    BarrierPacket& packet = FindOrCreateBarrierPacket(barrierPackets, passIndex, BarrierPacketStage::BeforePass);
+                    BarrierPacket& packet = barrierPackets.FindOrCreate(passIndex, BarrierPacketStage::BeforePass);
                     packet.BufferBarriers.push_back(BufferBarrierPacket{
                         .BufferIndex = bufferIndex,
                         .Before = prev,
@@ -2145,10 +2221,13 @@ namespace Extrinsic::Graphics
 
         if (!importedFinalPacket.TextureBarriers.empty() || !importedFinalPacket.BufferBarriers.empty())
         {
-            barrierPackets.push_back(std::move(importedFinalPacket));
+            BarrierPacket& packet = barrierPackets.FindOrCreate(passCount, BarrierPacketStage::BeforePass);
+            packet.TextureBarriers = std::move(importedFinalPacket.TextureBarriers);
+            packet.BufferBarriers = std::move(importedFinalPacket.BufferBarriers);
         }
 
-        SortBarrierPackets(barrierPackets);
+        std::vector<BarrierPacket> compiledBarrierPackets = std::move(barrierPackets).Finish();
+        SortBarrierPackets(compiledBarrierPackets);
 
         CompiledRenderGraph compiled{};
         compiled.PassCount = livePassCount;
@@ -2186,7 +2265,7 @@ namespace Extrinsic::Graphics
         compiled.CrossQueueTimelineSignals = std::move(crossQueueTimelineSignals);
         compiled.CrossQueueTimelineWaits = std::move(crossQueueTimelineWaits);
         compiled.CrossQueueTimelineEdges = std::move(crossQueueTimelineEdges);
-        compiled.BarrierPackets = std::move(barrierPackets);
+        compiled.BarrierPackets = std::move(compiledBarrierPackets);
         validation = ValidateCompiledGraph(compiled);
         compiled.ValidationFindings = validation.Findings;
         publishValidation(std::move(validation));

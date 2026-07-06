@@ -1,0 +1,25 @@
+# GRAPHICS-120 - framegraph compiler indexing baseline/probe.
+#
+# This smoke benchmark compares the legacy duplicate-pass nested scan and
+# barrier packet linear insertion shape against the sorted/indexed shape on the
+# same deterministic synthetic compiler work. It is CPU-side algorithm evidence
+# only and does not claim renderer-wide frame-time adoption benefit.
+
+benchmark_id: rendering.framegraph_compiler_indexing.smoke
+method: rendering.framegraph_compiler_indexing
+dataset: builtin.synthetic_framegraph_compiler_indexing.512_passes
+params:
+  intent: smoke
+  pass_count: 512
+  texture_count: 128
+  buffer_count: 128
+  warmup_iterations: 4
+  measured_iterations: 96
+  baseline_mode: legacy_nested_scan_and_linear_packet_insert
+  probe_mode: sorted_pass_ids_and_indexed_packet_insert
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 250
+  quality_error_l2_max: 0.0

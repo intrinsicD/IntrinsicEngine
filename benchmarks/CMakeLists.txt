@@ -33,6 +33,7 @@ add_executable(IntrinsicBenchmarkSmoke
     physics/Bench_XpbdClothReferenceSmoke.cpp
     physics/Bench_SphFluidReferenceSmoke.cpp
     rendering/Bench_FramegraphBarrierEmissionSmoke.cpp
+    rendering/Bench_FramegraphCompilerIndexingSmoke.cpp
     rendering/Bench_FrameRecipeCompileCacheSmoke.cpp
     rendering/Bench_VertexFetchLayoutSmoke.cpp
     ${CMAKE_SOURCE_DIR}/methods/physics/rigid_body_reference/src/RigidBodyReference.cpp

@@ -525,6 +525,29 @@ TEST(FrameRecipeContract, DuplicateTypedPassIdsAreDiagnosed)
     EXPECT_NE(result.Findings[0].Message.find("FirstTypedPass"), std::string::npos);
 }
 
+TEST(FrameRecipeContract, DuplicateTypedPassIdsReportEarliestDuplicateAcrossGroups)
+{
+    RenderGraph graph;
+    const PassRef firstLateGroup = graph.AddPass("FirstLateGroup", true);
+    const PassRef firstEarlyGroup = graph.AddPass("FirstEarlyGroup", true);
+    const PassRef duplicateEarlyGroup = graph.AddPass("DuplicateEarlyGroup", true);
+    const PassRef duplicateLateGroup = graph.AddPass("DuplicateLateGroup", true);
+    ASSERT_TRUE(graph.SetPassId(firstLateGroup, FramePassId{101u}).has_value());
+    ASSERT_TRUE(graph.SetPassId(firstEarlyGroup, FramePassId{202u}).has_value());
+    ASSERT_TRUE(graph.SetPassId(duplicateEarlyGroup, FramePassId{202u}).has_value());
+    ASSERT_TRUE(graph.SetPassId(duplicateLateGroup, FramePassId{101u}).has_value());
+
+    const auto compiled = graph.Compile();
+    EXPECT_FALSE(compiled.has_value());
+
+    const RenderGraphValidationResult& result = graph.GetLastCompileValidationResult();
+    ASSERT_EQ(result.Findings.size(), 1u);
+    EXPECT_EQ(result.Findings[0].Code, RenderGraphValidationCode::DuplicatePassId);
+    EXPECT_EQ(result.Findings[0].PassName, "DuplicateEarlyGroup");
+    EXPECT_NE(result.Findings[0].Message.find("FirstEarlyGroup"), std::string::npos);
+    EXPECT_NE(result.Findings[0].Message.find("DuplicateEarlyGroup"), std::string::npos);
+}
+
 TEST(FrameRecipeContract, DuplicateTypedResourceIdsAreDiagnosed)
 {
     RenderGraph graph;

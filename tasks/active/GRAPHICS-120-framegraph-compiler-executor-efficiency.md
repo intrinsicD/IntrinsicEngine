@@ -8,15 +8,18 @@ depends_on: []
 ## Status
 - In progress on local `main`; PR not opened.
 - Owner/agent: Codex.
-- Current slices: Slice A, Slice B, Slice C, and Slice D1 completed locally.
+- Current slices: Slice A, Slice B, Slice C, Slice D1, and Slice D2a
+  completed locally.
   `TextureUsage::ColorAttachmentRead` now uses a read-only barrier state,
   transient texture memory estimates are pinned to RHI block-compressed storage
   sizing, and compiler validation diagnostics flow through explicit out-params
   instead of `thread_local` state. Barrier emission now uses shared sorted-packet
   range lookup plus one-time bounds validation in the executor and renderer
-  multi-queue path, with PR-fast smoke benchmark evidence.
-- Next implementation step: continue with Slice D2 (persistent compiler scratch,
-  packet insertion, and uniqueness-scan efficiency).
+  multi-queue path, with PR-fast smoke benchmark evidence. Compiler barrier
+  packet insertion now uses a pass/stage index, and duplicate typed pass-id
+  validation uses a sorted scan that preserves earliest-duplicate diagnostics.
+- Next implementation step: continue with Slice D2b (persistent compiler scratch
+  and allocation-counter evidence).
 
 ## Goal
 - Remove the per-compile/per-execute waste and small contract hazards inside
@@ -77,8 +80,11 @@ depends_on: []
 - **Slice D1.** Route executor and renderer multi-queue barrier emission through
   a shared indexed range lookup over sorted packets, add one-time packet bounds
   validation, and record PR-fast smoke benchmark evidence.
-- **Slice D2.** Tackle remaining allocation churn, packet insertion, and
-  uniqueness-scan efficiency with follow-up benchmark/counter evidence.
+- **Slice D2a.** Replace compiler barrier packet insertion scans with an
+  indexed pass/stage builder, replace duplicate pass-id O(n^2) validation with
+  sorted duplicate detection, and record PR-fast smoke benchmark evidence.
+- **Slice D2b.** Tackle persistent compiler scratch and remaining allocation
+  churn with allocator/counter evidence.
 
 ## Required changes
 - [ ] Persistent compiler scratch: reuse compile-scoped containers across
@@ -88,8 +94,11 @@ depends_on: []
 - [x] Slice D1: shared indexed barrier emission over sorted packet ranges in
       both the executor and renderer multi-queue path; one-time packet bounds
       validation preserves fail-closed behavior.
-- [ ] Slice D2: make packet insertion amortized O(1); sort-or-hash
-      `ValidateUniquePassIds`; finish compile/emit allocation reduction.
+- [x] Slice D2a: make compiler packet insertion indexed by pass/stage and make
+      `ValidateUniquePassIds` sort-based while preserving deterministic
+      diagnostics.
+- [ ] Slice D2b: persistent compiler scratch; finish compile/emit allocation
+      reduction with counter evidence.
 - [x] Slice C: replace the `thread_local` validation side channel: return the
       validation result in the `Compile()` `Expected` payload (or a caller
       out-param); make `Compile` non-`const` or move its mutations out.
@@ -110,7 +119,9 @@ depends_on: []
 - [x] Existing framegraph suites stay green.
 - [x] Slice D1 PR-fast benchmark: barrier emission CPU traversal before/after on
       a pass-heavy synthetic graph.
-- [ ] Slice D2 PR-fast benchmark: compile + emission CPU time before/after on a
+- [x] Slice D2a PR-fast benchmark: duplicate pass-id validation and compiler
+      barrier packet insertion baseline/probe on synthetic compiler work.
+- [ ] Slice D2b PR-fast benchmark: compile + allocation counter evidence on a
       pass-heavy synthetic graph.
 
 ## Docs
@@ -122,11 +133,13 @@ depends_on: []
       non-`const` stateful graph compilation.
 - [x] Slice D1: document sorted barrier packet traversal and indexed range
       lookup contract.
+- [x] Slice D2a: document compiler indexing smoke benchmark scope.
 
 ## Acceptance criteria
 - [x] Zero `thread_local` compile state; validation results flow through
       explicit out-param paths.
-- [x] Barrier-emission benchmark evidence recorded with baseline comparison.
+- [x] Barrier-emission and compiler-indexing benchmark evidence recorded with
+      baseline comparison.
 - [ ] Steady-state per-frame allocations in
       compile/emit measurably reduced (counter or allocator probe).
 - [x] Both defect fixes pinned by tests; CPU gate green.
@@ -194,6 +207,28 @@ Slice D1 benchmark result (`rendering.framegraph_barrier_emission.smoke`,
 `legacy_packet_comparisons=175959`, `indexed_range_packet_visits=343`,
 `quality_error_l2=0.0`.
 
+Slice D2a verification run locally on 2026-07-06:
+
+```bash
+cmake --build --preset ci --target ExtrinsicGraphicsRenderGraph
+cmake --build --preset ci --target IntrinsicBenchmarkSmoke
+cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests
+python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
+build/ci/bin/IntrinsicBenchmarkSmoke build/ci/benchmark-graphics120-d2
+python3 tools/benchmark/validate_benchmark_results.py --root build/ci/benchmark-graphics120-d2 --strict
+ctest --test-dir build/ci --output-on-failure -R 'FrameRecipeContract.DuplicateTypedPassIds|IntrinsicBenchmarkSmoke|RenderGraphValidation|OwnershipTransferBarriers|CrossQueueTimeline|FrameRecipeContract.DependencyDrivenDefaultRecipeKeepsBarrierPacketsTopological' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -R 'IntrinsicBenchmarkSmoke|RenderGraphValidation|CrossQueueTimeline|FrameRecipeContract|RendererFrameLifecycle|OwnershipTransferBarriers|QueueAffinity' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+```
+
+Slice D2a benchmark result
+(`rendering.framegraph_compiler_indexing.smoke`, `cpu_reference`,
+`builtin.synthetic_framegraph_compiler_indexing.512_passes`):
+`legacy_scan_ms=18.246658`, `indexed_ms=6.443927`,
+`legacy_pass_id_comparisons=130816`, `indexed_pass_id_comparisons=511`,
+`legacy_packet_comparisons=433998`, `indexed_packet_lookups=1270`,
+`quality_error_l2=0.0`.
+
 ## Forbidden changes
 - Changing compiled-graph semantics beyond the two pinned defect fixes.
 - Perf claims without benchmark numbers.
@@ -213,3 +248,6 @@ Slice D1 benchmark result (`rendering.framegraph_barrier_emission.smoke`,
 - Slice D1 closes the duplicated barrier-emission scan item at `CPUContracted`
   with a PR-fast smoke benchmark baseline/probe; persistent compiler scratch and
   allocation-counter evidence remain in Slice D2.
+- Slice D2a closes the compiler packet-insertion and duplicate-pass-id scan
+  items at `CPUContracted` with PR-fast synthetic compiler indexing evidence;
+  persistent compiler scratch and allocation-counter evidence remain in D2b.
