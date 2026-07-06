@@ -530,6 +530,8 @@ namespace Extrinsic::Tests
         bool AsyncComputeQueueAvailable = false;
         bool TransferQueueAvailable = false;
         bool AcceptQueueSubmitPlans = false;
+        bool ParallelCommandContextsAvailable = false;
+        bool AcceptParallelCommandContextPlans = false;
         RHI::FrameHandle NextFrame{.FrameIndex = 0u, .SwapchainImageIndex = 0u};
         RHI::TextureHandle BackbufferHandle{100u, 1u};
         RHI::Format BackbufferFormat = RHI::Format::RGBA8_UNORM;
@@ -575,6 +577,9 @@ namespace Extrinsic::Tests
         std::vector<RHI::SamplerHandle> CreatedSamplerHandles;
         std::vector<QueueSubmitContextRequest> QueueSubmitContextRequests;
         std::vector<RecordedQueueSubmitBatch> RecordedQueueSubmitPlan;
+        std::vector<RHI::ParallelCommandContextRequest> RecordedParallelCommandContextPlan;
+        std::vector<RHI::ParallelCommandContextRequest> ParallelCommandContextRequests;
+        std::vector<RHI::ParallelCommandContextRequest> SubmittedParallelCommandContexts;
 
         // GRAPHICS-033E: records every `NoteRecipeGraphValidation(bool)` call
         // so contract tests can verify the renderer publishes the recipe-aware
@@ -585,6 +590,7 @@ namespace Extrinsic::Tests
         MockCommandContext CommandContext;
         MockCommandContext AsyncComputeContext;
         MockCommandContext TransferContext;
+        std::vector<MockCommandContext> ParallelCommandContexts;
         MockTransferQueue  TransferQueue;
 
         // ---- IDevice -------------------------------------------------------
@@ -672,6 +678,53 @@ namespace Extrinsic::Tests
                 .BatchIndex = batchIndex,
             });
             return GetMockQueueContext(affinity);
+        }
+
+        [[nodiscard]] bool SupportsParallelCommandContexts() const noexcept override
+        {
+            return ParallelCommandContextsAvailable;
+        }
+
+        [[nodiscard]] bool BeginFrameParallelCommandContexts(
+            const RHI::FrameHandle&,
+            const RHI::ParallelCommandContextPlanDesc& plan) override
+        {
+            RecordedParallelCommandContextPlan.clear();
+            ParallelCommandContextRequests.clear();
+            SubmittedParallelCommandContexts.clear();
+            ParallelCommandContexts.clear();
+
+            if (!ParallelCommandContextsAvailable || !AcceptParallelCommandContextPlans)
+            {
+                return false;
+            }
+
+            RecordedParallelCommandContextPlan.assign(plan.Requests.begin(), plan.Requests.end());
+            ParallelCommandContexts.resize(RecordedParallelCommandContextPlan.size());
+            return !ParallelCommandContexts.empty();
+        }
+
+        [[nodiscard]] RHI::ICommandContext& GetParallelCommandContext(
+            const RHI::ParallelCommandContextRequest& request) override
+        {
+            ParallelCommandContextRequests.push_back(request);
+            if (request.ContextIndex < ParallelCommandContexts.size())
+            {
+                return ParallelCommandContexts[request.ContextIndex];
+            }
+            return GetMockQueueContext(request.Queue);
+        }
+
+        void SubmitParallelCommandContext(const RHI::ParallelCommandContextRequest& request,
+                                          RHI::ICommandContext& submitContext) override
+        {
+            (void)submitContext;
+            SubmittedParallelCommandContexts.push_back(request);
+        }
+
+        void EndFrameParallelCommandContexts(const RHI::FrameHandle&) override
+        {
+            ParallelCommandContexts.clear();
         }
 
         void SetQueueCapabilityProfile(const RHI::QueueCapabilityProfile profile) noexcept

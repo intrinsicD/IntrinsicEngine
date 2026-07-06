@@ -121,6 +121,11 @@ namespace Extrinsic::Graphics
     {
         bool Succeeded = false;
         bool DeviceOperational = false;
+        bool ParallelRecordingRequested = false;
+        bool ParallelRecordingAccepted = false;
+        bool SerialFallbackUsed = false;
+        std::uint32_t ParallelCommandContextCount = 0;
+        std::uint32_t ParallelRecordedPassCount = 0;
         std::uint64_t TimeMicros = 0;
     };
 
@@ -506,6 +511,8 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual bool IsTransientAliasingEnabled() const noexcept = 0;
         virtual void SetRenderGraphDebugDumpEnabled(bool enabled) noexcept = 0;
         [[nodiscard]] virtual bool GetRenderGraphDebugDumpEnabled() const noexcept = 0;
+        virtual void SetParallelRenderGraphRecordingEnabled(bool enabled) noexcept = 0;
+        [[nodiscard]] virtual bool IsParallelRenderGraphRecordingEnabled() const noexcept = 0;
 
         // GRAPHICS-031A — accessor for the canonical missing-material fallback
         // pipeline. Returns the operational device-side handle when the

@@ -74,6 +74,20 @@ namespace Extrinsic::RHI
         std::span<const QueueSubmitBatchDesc> Batches{};
     };
 
+    export struct ParallelCommandContextRequest
+    {
+        QueueAffinity Queue = QueueAffinity::Graphics;
+        std::uint32_t FrameIndex = 0;
+        std::uint32_t PassIndex = 0;
+        std::uint32_t TopologicalLayer = 0;
+        std::uint32_t ContextIndex = 0;
+    };
+
+    export struct ParallelCommandContextPlanDesc
+    {
+        std::span<const ParallelCommandContextRequest> Requests{};
+    };
+
     export struct ResourceMemoryRequirements
     {
         std::uint64_t SizeBytes = 0;
@@ -285,6 +299,35 @@ namespace Extrinsic::RHI
         {
             (void)batchIndex;
             return GetQueueContext(affinity, frameIndex);
+        }
+
+        // ---- Parallel command-context recording -----------------------
+        // Backend-neutral per-pass command-context seam used by renderer
+        // debug/contract paths before concrete backends wire secondary command
+        // buffers. The default is unsupported so existing devices preserve the
+        // historical serial command buffer path.
+        [[nodiscard]] virtual bool SupportsParallelCommandContexts() const noexcept { return false; }
+        [[nodiscard]] virtual bool BeginFrameParallelCommandContexts(
+            const FrameHandle& frame,
+            const ParallelCommandContextPlanDesc& plan)
+        {
+            (void)frame;
+            (void)plan;
+            return false;
+        }
+        virtual ICommandContext& GetParallelCommandContext(const ParallelCommandContextRequest& request)
+        {
+            return GetQueueContext(request.Queue, request.FrameIndex);
+        }
+        virtual void SubmitParallelCommandContext(const ParallelCommandContextRequest& request,
+                                                  ICommandContext& submitContext)
+        {
+            (void)request;
+            (void)submitContext;
+        }
+        virtual void EndFrameParallelCommandContexts(const FrameHandle& frame)
+        {
+            (void)frame;
         }
 
         // ---- Placed resource memory ----------------------------------

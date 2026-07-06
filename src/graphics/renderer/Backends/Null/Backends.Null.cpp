@@ -3,6 +3,7 @@ module;
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 module Extrinsic.Backends.Null;
 
@@ -205,6 +206,49 @@ namespace Extrinsic::Backends::Null
         }
 
         RHI::ICommandContext& GetGraphicsContext(std::uint32_t) override { return m_CommandContext; }
+
+        [[nodiscard]] bool SupportsParallelCommandContexts() const noexcept override { return true; }
+
+        [[nodiscard]] bool BeginFrameParallelCommandContexts(
+            const RHI::FrameHandle& frame,
+            const RHI::ParallelCommandContextPlanDesc& plan) override
+        {
+            m_ParallelCommandContextFrame = frame;
+            m_ParallelCommandContextRequests.assign(plan.Requests.begin(), plan.Requests.end());
+            m_ParallelCommandContexts.clear();
+            m_ParallelCommandContexts.reserve(m_ParallelCommandContextRequests.size());
+            for (std::size_t i = 0; i < m_ParallelCommandContextRequests.size(); ++i)
+            {
+                m_ParallelCommandContexts.push_back(std::make_unique<NullCommandContext>());
+            }
+            return !m_ParallelCommandContexts.empty();
+        }
+
+        RHI::ICommandContext& GetParallelCommandContext(
+            const RHI::ParallelCommandContextRequest& request) override
+        {
+            if (request.ContextIndex < m_ParallelCommandContexts.size() &&
+                m_ParallelCommandContexts[request.ContextIndex] != nullptr)
+            {
+                return *m_ParallelCommandContexts[request.ContextIndex];
+            }
+            return GetGraphicsContext(request.FrameIndex);
+        }
+
+        void SubmitParallelCommandContext(const RHI::ParallelCommandContextRequest& request,
+                                          RHI::ICommandContext& submitContext) override
+        {
+            (void)submitContext;
+            m_SubmittedParallelCommandContexts.push_back(request);
+        }
+
+        void EndFrameParallelCommandContexts(const RHI::FrameHandle& frame) override
+        {
+            (void)frame;
+            m_ParallelCommandContextRequests.clear();
+            m_SubmittedParallelCommandContexts.clear();
+            m_ParallelCommandContexts.clear();
+        }
 
         [[nodiscard]] RHI::BufferHandle CreateBuffer(const RHI::BufferDesc& desc) override
         {
@@ -428,6 +472,10 @@ namespace Extrinsic::Backends::Null
         std::unique_ptr<RHI::ITransferQueue> m_TransferQueue;
         std::unique_ptr<RHI::IBindlessHeap> m_BindlessHeap;
         std::unique_ptr<RHI::IProfiler> m_Profiler;
+        RHI::FrameHandle m_ParallelCommandContextFrame{};
+        std::vector<RHI::ParallelCommandContextRequest> m_ParallelCommandContextRequests;
+        std::vector<RHI::ParallelCommandContextRequest> m_SubmittedParallelCommandContexts;
+        std::vector<std::unique_ptr<NullCommandContext>> m_ParallelCommandContexts;
 
         Core::ResourcePool<BufferEntry, RHI::BufferHandle, 0> m_Buffers;
         Core::ResourcePool<TextureEntry, RHI::TextureHandle, 0> m_Textures;

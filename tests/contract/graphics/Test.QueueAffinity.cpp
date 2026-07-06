@@ -3,9 +3,11 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <utility>
 #include <vector>
 
+import Extrinsic.Backends.Null;
 import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.QueueAffinity;
@@ -251,6 +253,101 @@ TEST(GraphicsQueueAffinity, MockDeviceRecordsFrameQueueSubmitPlanAndBatchContext
     EXPECT_EQ(graphics1, static_cast<RHI::ICommandContext*>(&device.CommandContext));
     ASSERT_EQ(device.QueueSubmitContextRequests.size(), 3u);
     EXPECT_EQ(device.QueueSubmitContextRequests[1].BatchIndex, 1u);
+}
+
+TEST(GraphicsQueueAffinity, NullDeviceProvidesDistinctParallelCommandContexts)
+{
+    std::unique_ptr<RHI::IDevice> device = Extrinsic::Backends::Null::CreateNullDevice();
+    ASSERT_NE(device, nullptr);
+    EXPECT_TRUE(device->SupportsParallelCommandContexts());
+
+    const RHI::FrameHandle frame{.FrameIndex = 0u, .SwapchainImageIndex = 0u};
+    const std::array<RHI::ParallelCommandContextRequest, 2u> requests{{
+        RHI::ParallelCommandContextRequest{
+            .Queue = RHI::QueueAffinity::Graphics,
+            .FrameIndex = frame.FrameIndex,
+            .PassIndex = 3u,
+            .TopologicalLayer = 0u,
+            .ContextIndex = 0u,
+        },
+        RHI::ParallelCommandContextRequest{
+            .Queue = RHI::QueueAffinity::Graphics,
+            .FrameIndex = frame.FrameIndex,
+            .PassIndex = 7u,
+            .TopologicalLayer = 0u,
+            .ContextIndex = 1u,
+        },
+    }};
+
+    ASSERT_TRUE(device->BeginFrameParallelCommandContexts(
+        frame,
+        RHI::ParallelCommandContextPlanDesc{.Requests = requests}));
+    RHI::ICommandContext* primary = &device->GetGraphicsContext(frame.FrameIndex);
+    RHI::ICommandContext* first = &device->GetParallelCommandContext(requests[0]);
+    RHI::ICommandContext* second = &device->GetParallelCommandContext(requests[1]);
+    EXPECT_NE(first, primary);
+    EXPECT_NE(second, primary);
+    EXPECT_NE(first, second);
+
+    device->SubmitParallelCommandContext(requests[0], *primary);
+    device->SubmitParallelCommandContext(requests[1], *primary);
+    device->EndFrameParallelCommandContexts(frame);
+}
+
+TEST(GraphicsQueueAffinity, MockDeviceRecordsParallelCommandContextPlanAndSubmitOrder)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.ParallelCommandContextsAvailable = true;
+    device.AcceptParallelCommandContextPlans = true;
+
+    const RHI::FrameHandle frame{.FrameIndex = 5u, .SwapchainImageIndex = 0u};
+    const std::array<RHI::ParallelCommandContextRequest, 3u> requests{{
+        RHI::ParallelCommandContextRequest{
+            .Queue = RHI::QueueAffinity::Graphics,
+            .FrameIndex = frame.FrameIndex,
+            .PassIndex = 0u,
+            .TopologicalLayer = 0u,
+            .ContextIndex = 0u,
+        },
+        RHI::ParallelCommandContextRequest{
+            .Queue = RHI::QueueAffinity::Graphics,
+            .FrameIndex = frame.FrameIndex,
+            .PassIndex = 1u,
+            .TopologicalLayer = 0u,
+            .ContextIndex = 1u,
+        },
+        RHI::ParallelCommandContextRequest{
+            .Queue = RHI::QueueAffinity::Graphics,
+            .FrameIndex = frame.FrameIndex,
+            .PassIndex = 2u,
+            .TopologicalLayer = 1u,
+            .ContextIndex = 2u,
+        },
+    }};
+
+    ASSERT_TRUE(device.SupportsParallelCommandContexts());
+    ASSERT_TRUE(device.BeginFrameParallelCommandContexts(
+        frame,
+        RHI::ParallelCommandContextPlanDesc{.Requests = requests}));
+    EXPECT_EQ(device.RecordedParallelCommandContextPlan.size(), requests.size());
+
+    RHI::ICommandContext* first = &device.GetParallelCommandContext(requests[0]);
+    RHI::ICommandContext* second = &device.GetParallelCommandContext(requests[1]);
+    RHI::ICommandContext* third = &device.GetParallelCommandContext(requests[2]);
+    EXPECT_NE(first, second);
+    EXPECT_NE(second, third);
+    EXPECT_EQ(device.ParallelCommandContextRequests.size(), requests.size());
+
+    device.SubmitParallelCommandContext(requests[0], device.CommandContext);
+    device.SubmitParallelCommandContext(requests[1], device.CommandContext);
+    device.SubmitParallelCommandContext(requests[2], device.CommandContext);
+    ASSERT_EQ(device.SubmittedParallelCommandContexts.size(), requests.size());
+    EXPECT_EQ(device.SubmittedParallelCommandContexts[0].PassIndex, 0u);
+    EXPECT_EQ(device.SubmittedParallelCommandContexts[1].PassIndex, 1u);
+    EXPECT_EQ(device.SubmittedParallelCommandContexts[2].PassIndex, 2u);
+
+    device.EndFrameParallelCommandContexts(frame);
+    EXPECT_TRUE(device.ParallelCommandContexts.empty());
 }
 
 TEST(GraphicsQueueAffinity, BuildQueueSubmitPlanCreatesBatchesAndTimelineBoundaries)

@@ -3490,6 +3490,43 @@ namespace Extrinsic::Graphics
                 {
                     SubmitBarrierPacket(graphicsContext, *compiled, packet, frameGraphQueueProfile);
                 };
+            std::vector<RHI::ParallelCommandContextRequest> parallelContextRequests{};
+            std::vector<std::uint32_t> parallelContextIndexByPass(
+                compiled->PassDeclarations.size(),
+                std::numeric_limits<std::uint32_t>::max());
+            const auto buildParallelContextRequests = [&]()
+            {
+                if (!parallelContextRequests.empty())
+                {
+                    return;
+                }
+
+                const RHI::QueueCapabilityProfile profile =
+                    m_Device != nullptr ? m_Device->GetQueueCapabilityProfile()
+                                        : RHI::QueueCapabilityProfile{};
+                parallelContextRequests.reserve(compiled->TopologicalOrder.size());
+                for (const std::uint32_t passIndex : compiled->TopologicalOrder)
+                {
+                    if (passIndex >= compiled->PassQueues.size() ||
+                        passIndex >= compiled->TopologicalLayerByPass.size() ||
+                        passIndex >= parallelContextIndexByPass.size())
+                    {
+                        continue;
+                    }
+                    const RHI::QueueAffinityResolution queue =
+                        RHI::ResolveQueueAffinity(compiled->PassQueues[passIndex], profile);
+                    const std::uint32_t contextIndex =
+                        static_cast<std::uint32_t>(parallelContextRequests.size());
+                    parallelContextIndexByPass[passIndex] = contextIndex;
+                    parallelContextRequests.push_back(RHI::ParallelCommandContextRequest{
+                        .Queue = queue.Resolved,
+                        .FrameIndex = frame.FrameIndex,
+                        .PassIndex = passIndex,
+                        .TopologicalLayer = compiled->TopologicalLayerByPass[passIndex],
+                        .ContextIndex = contextIndex,
+                    });
+                }
+            };
 
             const auto recordPostGraphReadbacks =
                 [&](RHI::ICommandContext& graphicsContext, const bool graphExecuted)
@@ -3584,6 +3621,93 @@ namespace Extrinsic::Graphics
                 return result;
             };
 
+            const auto executeParallelSingleQueueOrFallback = [&]() -> Core::Result
+            {
+                m_LastRenderGraphStats.Execute.ParallelRecordingRequested = true;
+                if (!m_Device->SupportsParallelCommandContexts())
+                {
+                    m_LastRenderGraphStats.Execute.SerialFallbackUsed = true;
+                    return executeSingleQueue();
+                }
+
+                buildParallelContextRequests();
+                if (parallelContextRequests.empty() ||
+                    !m_Device->BeginFrameParallelCommandContexts(
+                        frame,
+                        RHI::ParallelCommandContextPlanDesc{.Requests = parallelContextRequests}))
+                {
+                    m_LastRenderGraphStats.Execute.SerialFallbackUsed = true;
+                    return executeSingleQueue();
+                }
+
+                m_LastRenderGraphStats.Execute.ParallelRecordingAccepted = true;
+                m_LastRenderGraphStats.Execute.ParallelCommandContextCount =
+                    static_cast<std::uint32_t>(parallelContextRequests.size());
+
+                RHI::ICommandContext& primaryContext = m_Device->GetGraphicsContext(frame.FrameIndex);
+                primaryContext.Begin();
+                ParallelRecordStats parallelRecordStats{};
+                Core::Result result = m_RenderGraphExecutor.ExecuteParallelRecordJoin(
+                    *compiled,
+                    [&](const std::uint32_t passIndex,
+                        const std::uint32_t layerIndex) -> Core::Result
+                    {
+                        if (passIndex >= parallelContextIndexByPass.size())
+                        {
+                            return Core::Err(Core::ErrorCode::OutOfRange);
+                        }
+                        const std::uint32_t contextIndex = parallelContextIndexByPass[passIndex];
+                        if (contextIndex >= parallelContextRequests.size())
+                        {
+                            return Core::Err(Core::ErrorCode::InvalidState);
+                        }
+                        const RHI::ParallelCommandContextRequest& request =
+                            parallelContextRequests[contextIndex];
+                        if (request.TopologicalLayer != layerIndex)
+                        {
+                            return Core::Err(Core::ErrorCode::InvalidState);
+                        }
+
+                        RHI::ICommandContext& passContext =
+                            m_Device->GetParallelCommandContext(request);
+                        passContext.Begin();
+                        recordPass(passContext, passIndex);
+                        passContext.End();
+                        return Core::Ok();
+                    },
+                    [&](const std::uint32_t passIndex)
+                    {
+                        if (passIndex >= parallelContextIndexByPass.size())
+                        {
+                            return;
+                        }
+                        const std::uint32_t contextIndex = parallelContextIndexByPass[passIndex];
+                        if (contextIndex >= parallelContextRequests.size())
+                        {
+                            return;
+                        }
+                        m_Device->SubmitParallelCommandContext(
+                            parallelContextRequests[contextIndex],
+                            primaryContext);
+                    },
+                    [&submitBarriersForContext, &primaryContext](const BarrierPacket& packet)
+                    {
+                        submitBarriersForContext(primaryContext, packet);
+                    },
+                    &parallelRecordStats,
+                    ParallelRecordOptions{.UseScheduler = false});
+                m_LastRenderGraphStats.Execute.ParallelRecordedPassCount =
+                    parallelRecordStats.ScheduledPassCount;
+                recordPostGraphReadbacks(primaryContext, result.has_value());
+                if (result.has_value())
+                {
+                    InvokeRuntimeFrameCommandHooks(primaryContext);
+                }
+                primaryContext.End();
+                m_Device->EndFrameParallelCommandContexts(frame);
+                return result;
+            };
+
             const auto emitBarriersForPass =
                 [&](RHI::ICommandContext& context,
                     const std::uint32_t passIndex,
@@ -3669,7 +3793,11 @@ namespace Extrinsic::Graphics
             };
 
             const Core::Result executeResult =
-                useQueueSubmitPlan ? executeSubmitPlan() : executeSingleQueue();
+                useQueueSubmitPlan
+                    ? executeSubmitPlan()
+                    : (m_ParallelRenderGraphRecordingEnabled
+                           ? executeParallelSingleQueueOrFallback()
+                           : executeSingleQueue());
             const auto executeEnd = std::chrono::steady_clock::now();
             m_LastRenderGraphStats.Execute.TimeMicros = static_cast<std::uint64_t>(
                 std::chrono::duration_cast<std::chrono::microseconds>(executeEnd - executeBegin).count());
@@ -4261,6 +4389,16 @@ namespace Extrinsic::Graphics
         [[nodiscard]] bool GetRenderGraphDebugDumpEnabled() const noexcept override
         {
             return m_RenderGraphDebugDumpEnabled;
+        }
+
+        void SetParallelRenderGraphRecordingEnabled(const bool enabled) noexcept override
+        {
+            m_ParallelRenderGraphRecordingEnabled = enabled;
+        }
+
+        [[nodiscard]] bool IsParallelRenderGraphRecordingEnabled() const noexcept override
+        {
+            return m_ParallelRenderGraphRecordingEnabled;
         }
 
     private:
@@ -9128,6 +9266,7 @@ namespace Extrinsic::Graphics
         std::optional<RenderGraphCompileCacheEntry> m_RenderGraphCompileCache{};
         bool                                 m_InvalidateRenderGraphCompileCacheAfterFrame{false};
         bool                                 m_RenderGraphDebugDumpEnabled{false};
+        bool                                 m_ParallelRenderGraphRecordingEnabled{false};
         RenderGraphExecutor                  m_RenderGraphExecutor;
         RenderCommandRouter                  m_CommandRouter;
         std::vector<std::vector<RHI::TextureHandle>> m_FrameTransientTextures{};

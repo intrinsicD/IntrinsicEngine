@@ -38,6 +38,16 @@ This directory contains the `RHI` module/files.
   command context for renderer recording. Default implementations decline the
   plan and route back to the single graphics context, so capability-absent hosts
   remain fail-closed.
+- `RHI::ParallelCommandContextPlanDesc` is the backend-neutral per-pass command
+  context acquisition seam for parallel render-graph recording. A renderer first
+  asks `IDevice::BeginFrameParallelCommandContexts(...)` with one
+  `ParallelCommandContextRequest` per live pass, records each accepted request
+  through `GetParallelCommandContext(...)`, and later calls
+  `SubmitParallelCommandContext(...)` in compiled submit order against the
+  primary context. The default `IDevice` implementation reports unsupported and
+  declines the plan, preserving serial fallback. Null implements CPU
+  bookkeeping contexts; Vulkan secondary command buffers remain deferred to
+  `GRAPHICS-119` later slices.
 
 ## Timeline semaphores
 

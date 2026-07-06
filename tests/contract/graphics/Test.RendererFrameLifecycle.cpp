@@ -1206,6 +1206,89 @@ TEST(RendererFrameLifecycle, AsyncComputeQueuePlanIncrementsUtilizationStat)
     renderer->Shutdown();
 }
 
+TEST(RendererFrameLifecycle, ParallelRecordingFlagFallsBackWhenDeviceDeclinesContextPlan)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{77u, 3u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+    EXPECT_FALSE(renderer->IsParallelRenderGraphRecordingEnabled());
+    renderer->SetParallelRenderGraphRecordingEnabled(true);
+    EXPECT_TRUE(renderer->IsParallelRenderGraphRecordingEnabled());
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.ParallelRecordingRequested);
+    EXPECT_FALSE(stats.Execute.ParallelRecordingAccepted);
+    EXPECT_TRUE(stats.Execute.SerialFallbackUsed);
+    EXPECT_EQ(stats.Execute.ParallelCommandContextCount, 0u);
+    EXPECT_TRUE(device.RecordedParallelCommandContextPlan.empty());
+    EXPECT_GE(device.CommandContext.BeginCalls, 1);
+    EXPECT_GE(device.CommandContext.EndCalls, 1);
+
+    renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle, ParallelRecordingUsesAcceptedContextPlanInSerialSubmitOrder)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{77u, 3u};
+    device.ParallelCommandContextsAvailable = true;
+    device.AcceptParallelCommandContextPlans = true;
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+    renderer->SetParallelRenderGraphRecordingEnabled(true);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.ParallelRecordingRequested);
+    EXPECT_TRUE(stats.Execute.ParallelRecordingAccepted);
+    EXPECT_FALSE(stats.Execute.SerialFallbackUsed);
+    EXPECT_GT(stats.Execute.ParallelCommandContextCount, 0u);
+    EXPECT_EQ(stats.Execute.ParallelCommandContextCount,
+              device.RecordedParallelCommandContextPlan.size());
+    EXPECT_EQ(stats.Execute.ParallelRecordedPassCount,
+              device.RecordedParallelCommandContextPlan.size());
+    EXPECT_EQ(device.ParallelCommandContextRequests.size(),
+              device.RecordedParallelCommandContextPlan.size());
+    EXPECT_EQ(device.SubmittedParallelCommandContexts.size(),
+              device.RecordedParallelCommandContextPlan.size());
+
+    for (std::size_t i = 0; i < device.RecordedParallelCommandContextPlan.size(); ++i)
+    {
+        EXPECT_EQ(device.SubmittedParallelCommandContexts[i].PassIndex,
+                  device.RecordedParallelCommandContextPlan[i].PassIndex);
+        EXPECT_EQ(device.SubmittedParallelCommandContexts[i].ContextIndex,
+                  device.RecordedParallelCommandContextPlan[i].ContextIndex);
+    }
+
+    renderer->Shutdown();
+}
+
 TEST(RendererFrameLifecycle, InvalidDeviceBackbufferReportsRecipeDiagnostic)
 {
     Extrinsic::Tests::MockDevice device;

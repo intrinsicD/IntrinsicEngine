@@ -157,6 +157,32 @@ evidence: aliasing-off/naive was 263168 bytes, aliasing-on/placed peak was
 197632 bytes, readback matched aliasing-off output, and validation counters were
 stable across the aliasing-on frame.
 
+## Parallel Command Recording
+
+`RenderGraphExecutor::ExecuteParallelRecordJoin(...)` is the backend-neutral
+record/join primitive. It records live passes by
+`CompiledRenderGraph::TopologicalLayerByPass`, then emits barrier and submit
+callbacks in the same serial topological order as `Execute(...)`.
+
+The renderer exposes `IRenderer::SetParallelRenderGraphRecordingEnabled(...)`
+as a debug/contract selector. When disabled, the historical serial path is used.
+When enabled on a single-queue frame, the renderer asks
+`RHI::IDevice::BeginFrameParallelCommandContexts(...)` for a frame-scoped
+per-pass command-context plan. If the device declines or does not support
+parallel command contexts, `RenderGraphFrameStats::Execute.SerialFallbackUsed`
+is set and the renderer records through the serial graphics context. If the
+device accepts, the current Slice B path records each pass into its acquired
+context without worker fan-out, then calls
+`IDevice::SubmitParallelCommandContext(...)` in compiled serial order while
+barriers, post-graph readbacks, and runtime frame hooks remain on the primary
+graphics context. This proves the RHI/null acquisition and deterministic submit
+contract without racing renderer-owned pass state.
+
+Null provides CPU bookkeeping contexts for this contract. Vulkan secondary
+command buffers, worker fan-out through `Core::Tasks`, pass-state thread-safety
+audit, benchmark evidence, and opt-in `gpu;vulkan` smoke coverage remain later
+`GRAPHICS-119` slices.
+
 ## Boundaries
 
 - Graphics owns frame recipes, render-graph compilation, resource transitions,

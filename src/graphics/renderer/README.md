@@ -97,6 +97,19 @@ The compiler debug dump is opt-in through
 `IRenderer::SetRenderGraphDebugDumpEnabled(...)`; default frames do not build
 the dump string.
 
+`IRenderer::SetParallelRenderGraphRecordingEnabled(...)` is the
+`GRAPHICS-119` debug/contract selector for the render-graph command-recording
+path. The default is off. When enabled, the renderer requests a
+`RHI::ParallelCommandContextPlanDesc` for the live passes in a single-queue
+frame. Devices that decline the plan keep the historical serial
+`GetGraphicsContext(...)` path and report
+`RenderGraphFrameStats::Execute.SerialFallbackUsed`; devices that accept record
+pass bodies into per-pass contexts and submit those contexts in compiled serial
+order through `IDevice::SubmitParallelCommandContext(...)`. The current path is
+single-threaded to keep renderer-owned pass state deterministic while proving
+the RHI/null acquisition and submit-order contract. Vulkan secondary command
+buffers and worker fan-out remain later `GRAPHICS-119` slices.
+
 `Extrinsic.Graphics.RenderingContract` is the CPU-only public contract vocabulary
 for the renderer/snapshot/recipe architecture introduced by `GRAPHICS-099`.
 It defines renderer descriptors, scoped snapshot envelopes, renderer-independent
