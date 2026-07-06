@@ -3510,3 +3510,28 @@ teardown, and `SandboxEditorUi` owns the concrete `RuntimeKMeansGpuJobQueue`
 while attached. `Runtime.Engine.cppm` and `.cpp` are grep-clean for K-Means,
 and the existing Sandbox K-Means GPU command surface continues to submit and
 consume through the attached queue.
+
+[`BUG-059`](BUG-059-curvature-scalar-isoline-viz-black-end-to-end.md) —
+Curvature scalar/isoline visualization renders black, diagnosed end to end and
+retired to `tasks/done/` on 2026-07-06 at `CPUContracted`. New regression
+tests mirror the real editor flow (Appearance surface-lane override presets,
+double-typed `v:mean_curvature`, late property arrival, steady-state frames)
+and proved the promoted extraction→sync→config contract healthy; the
+reproducible all-black modes were heavy-tailed min/max auto ranges compressing
+the surface bulk into the colormap's darkest bin and degenerate manual ranges
+reaching the prepared config. Auto ranges now clamp to the [2%, 98%]
+quantiles for fields with ≥64 samples (with a dedicated clamp counter), and
+`BuildEntityConfig` sanitizes degenerate/non-finite ranges before the shader
+can normalize every fragment to t=0.
+
+[`UI-032`](UI-032-appearance-scalar-isoline-visualization-controls.md) —
+Appearance scalar/isoline visualization controls retired to `tasks/done/` on
+2026-07-06 at `CPUContracted`. The Appearance panel gains colormap selection,
+auto/manual range clamping, binning, isoline count/width/color, and up to
+eight explicit highlight isovalues; preset buttons now preserve configured
+styling and tuned ranges instead of resetting to defaults. The editor
+command/model surface, `ScalarFieldConfig`, scene serialization,
+`RHI::GpuEntityConfig` (176-byte layout), `gpu_scene.glsl`, and
+`VisualizationSyncSystem` plumb the new fields end to end with fail-closed
+validation, locked by editor-command, extraction, and serialization
+regressions.

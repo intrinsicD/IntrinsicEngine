@@ -155,7 +155,7 @@ This allows geometry-processing operators to recompute normals and upload only t
 Two persistent SSBOs per entity slot (default max: 100 000 slots), indexed by the same slot ID. See §5.1 for the full struct definitions.
 
 - **`GpuInstanceData[]`** (set=2, binding=0, 96 bytes/entity) — Model transform, EntityID, MaterialSlot, RenderFlags, vertex/index counts and offsets. Updated frequently (every frame for moving entities).
-- **`GpuEntityConfig[]`** (set=2, binding=1, 128 bytes/entity) — BDA attribute pointers (normals, scalars, colors), visualization config (colormap, scalar range, isoline params), shared color-source state, plus named point/line domain config blocks. Updated rarely (on vis config change).
+- **`GpuEntityConfig[]`** (set=2, binding=1, 176 bytes/entity) — BDA attribute pointers (normals, scalars, colors), visualization config (colormap, scalar range, isoline params, explicit highlight isovalues), shared color-source state, plus named point/line domain config blocks. Updated rarely (on vis config change).
 
 The cull shader reads `GpuInstanceData` (transform + counts) to generate indirect draw commands. Fragment shaders read both SSBOs via the shared `SlotIndex` push constant.
 
@@ -449,7 +449,7 @@ struct GpuInstanceData {
 Visualization parameters and BDA attribute pointers. Updated only when the user changes visualization settings, an algorithm writes new properties, or attribute SSBOs are re-uploaded.
 
 ```glsl
-// scalar block layout — 128 bytes per entity
+// scalar block layout — 176 bytes per entity
 struct GpuEntityPointConfig {
     float    PointSize;         // uniform point size in pixels
     uint     PointMode;         // FlatDisc=0, ImpostorSphere=1, Surfel=2
@@ -486,8 +486,14 @@ struct GpuEntityConfig {
     GpuEntityPointConfig Point;
     GpuEntityLineConfig  Line;
     vec4                 UniformColor;
+
+    // ---- Explicit highlight isovalues (UI-032) ----
+    vec4   IsoValuesA;          // isovalues 0..3 (raw scalar units)
+    vec4   IsoValuesB;          // isovalues 4..7 (raw scalar units)
+    uint   IsoValueCount;       // 0..8 populated entries
+    uint   _padIso0, _padIso1, _padIso2;
 };
-// sizeof(GpuEntityConfig) = 128 bytes
+// sizeof(GpuEntityConfig) = 176 bytes
 ```
 
 **Why split?** Transform changes (camera orbit, animation) touch `GpuInstanceData` every frame for affected entities. Visualization config changes (user adjusts scalar range, switches colormap) are rare — typically once per user interaction. Separating them avoids uploading 96 bytes of unchanged visualization data on every transform update, and avoids dirtying the config SSBO on every frame. The cull shader reads only `GpuInstanceData` (transform + counts); fragment shaders read both.

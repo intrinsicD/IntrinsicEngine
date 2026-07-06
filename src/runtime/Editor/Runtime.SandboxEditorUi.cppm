@@ -26,6 +26,7 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.RenderRecipeConfig;
@@ -1981,6 +1982,15 @@ export namespace Extrinsic::Runtime
         float ScalarRangeMax{1.0f};
         std::uint32_t ScalarBinCount{0u};
         std::uint32_t IsolineCount{0u};
+        // UI-032 — scalar styling controls.
+        Graphics::Colormap::Type ScalarColormap{
+            Graphics::Colormap::Type::Viridis};
+        float IsolineWidth{1.5f};
+        glm::vec4 IsolineColor{0.0f, 0.0f, 0.0f, 1.0f};
+        std::array<float,
+                   Graphics::Components::ScalarFieldConfig::kMaxIsolineValues>
+            IsolineValues{};
+        std::uint32_t IsolineValueCount{0u};
     };
 
     struct SandboxEditorVisualizationPropertyInfo
@@ -2436,6 +2446,15 @@ export namespace Extrinsic::Runtime
         float ScalarRangeMax{1.0f};
         std::uint32_t ScalarBinCount{0u};
         std::uint32_t IsolineCount{0u};
+        // UI-032 — scalar styling controls.
+        Graphics::Colormap::Type ScalarColormap{
+            Graphics::Colormap::Type::Viridis};
+        float IsolineWidth{1.5f};
+        glm::vec4 IsolineColor{0.0f, 0.0f, 0.0f, 1.0f};
+        std::array<float,
+                   Graphics::Components::ScalarFieldConfig::kMaxIsolineValues>
+            IsolineValues{};
+        std::uint32_t IsolineValueCount{0u};
     };
 
     struct SandboxEditorVisualizationPropertyCommand

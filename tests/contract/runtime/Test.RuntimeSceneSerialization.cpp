@@ -218,6 +218,9 @@ namespace
         visualization.Scalar.Isolines.Num = 8u;
         visualization.Scalar.Isolines.Color = glm::vec4{0.1f, 0.2f, 0.3f, 1.0f};
         visualization.Scalar.Isolines.Width = 2.25f;
+        visualization.Scalar.Isolines.Values[0] = -0.5f;
+        visualization.Scalar.Isolines.Values[1] = 1.25f;
+        visualization.Scalar.Isolines.ValueCount = 2u;
         visualization.ScalarDomain = G::VisualizationConfig::Domain::Face;
         visualization.ColorBufferName = "v:kmeans_color";
         G::VisualizationLaneOverrides overrides{};
@@ -382,6 +385,9 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesPromotedSandboxSceneDa
     EXPECT_EQ(visualization.Scalar.Isolines.Num, 8u);
     EXPECT_EQ(visualization.Scalar.Isolines.Color, glm::vec4(0.1f, 0.2f, 0.3f, 1.0f));
     EXPECT_FLOAT_EQ(visualization.Scalar.Isolines.Width, 2.25f);
+    EXPECT_EQ(visualization.Scalar.Isolines.ValueCount, 2u);
+    EXPECT_FLOAT_EQ(visualization.Scalar.Isolines.Values[0], -0.5f);
+    EXPECT_FLOAT_EQ(visualization.Scalar.Isolines.Values[1], 1.25f);
     EXPECT_EQ(visualization.ScalarDomain, G::VisualizationConfig::Domain::Face);
     EXPECT_EQ(visualization.ColorBufferName, "v:kmeans_color");
     ASSERT_TRUE(raw.all_of<G::VisualizationLaneOverrides>(loadedMesh));

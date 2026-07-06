@@ -220,10 +220,19 @@ export namespace Extrinsic::RHI
         GpuEntityPointConfig Point{};
         GpuEntityLineConfig Line{};
         alignas(16) glm::vec4 UniformColor{1.f};
+        // UI-032 — explicit highlight isovalues in raw scalar units; the
+        // shader normalizes them with ScalarRangeMin/Max. Two vec4 slots
+        // bound the set at 8 values (VisualizationConfig::kMaxIsolineValues).
+        alignas(16) glm::vec4 IsoValuesA{0.f};
+        glm::vec4 IsoValuesB{0.f};
+        std::uint32_t IsoValueCount = 0;
+        std::uint32_t _padIso0 = 0;
+        std::uint32_t _padIso1 = 0;
+        std::uint32_t _padIso2 = 0;
     };
     // Matches assets/shaders/common/gpu_scene.glsl (scalar block layout):
-    // 8-byte BDAs + packed scalar/vector fields, total 128 bytes.
-    static_assert(sizeof(GpuEntityConfig) == 128);
+    // 8-byte BDAs + packed scalar/vector fields, total 176 bytes.
+    static_assert(sizeof(GpuEntityConfig) == 176);
     static_assert(offsetof(GpuEntityConfig, VertexNormalBDA) == 0);
     static_assert(offsetof(GpuEntityConfig, ScalarBDA) == 8);
     static_assert(offsetof(GpuEntityConfig, ColorBDA) == 16);
@@ -232,6 +241,9 @@ export namespace Extrinsic::RHI
     static_assert(offsetof(GpuEntityConfig, Point) == 80);
     static_assert(offsetof(GpuEntityConfig, Line) == 96);
     static_assert(offsetof(GpuEntityConfig, UniformColor) == 112);
+    static_assert(offsetof(GpuEntityConfig, IsoValuesA) == 128);
+    static_assert(offsetof(GpuEntityConfig, IsoValuesB) == 144);
+    static_assert(offsetof(GpuEntityConfig, IsoValueCount) == 160);
 
     struct alignas(16) GpuBounds
     {

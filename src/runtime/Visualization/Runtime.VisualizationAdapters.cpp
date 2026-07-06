@@ -112,11 +112,25 @@ namespace Extrinsic::Runtime
             return CopyBytes(std::span<const float>{converted.data(), converted.size()});
         }
 
+        // BUG-059 — robust auto-range. Raw min/max auto ranges collapse on
+        // heavy-tailed fields (mean/gaussian curvature spikes at slivers or
+        // near-degenerate vertices): a handful of extreme values stretches the
+        // range so far that every other element normalizes to the colormap's
+        // darkest bin and the surface reads as uniformly black. For fields
+        // with enough samples the auto range therefore clamps to the
+        // [2%, 98%] quantiles; the shader already clamps t into [0, 1], so
+        // outliers saturate at the colormap ends instead of owning the range.
+        // Small fields keep exact min/max (quantiles degenerate to the
+        // extremes there, and synthetic contract fixtures expect exactness).
+        inline constexpr std::size_t kRobustAutoRangeMinSamples = 64u;
+        inline constexpr double kRobustAutoRangeLowerQuantile = 0.02;
+        inline constexpr double kRobustAutoRangeUpperQuantile = 0.98;
+
         template <typename T>
         [[nodiscard]] bool ComputeRange(std::span<const T> values,
                                         float& minOut,
                                         float& maxOut,
-                                        VisualizationAdapterStats& stats) noexcept
+                                        VisualizationAdapterStats& stats)
         {
             if (values.empty())
             {
@@ -124,17 +138,9 @@ namespace Extrinsic::Runtime
                 return false;
             }
 
-            float first = 0.0f;
-            ++stats.ScalarValueScanCount;
-            if (!ToFiniteFloat(values.front(), first))
-            {
-                ++stats.NonFiniteValueCount;
-                return false;
-            }
-
-            float minValue = first;
-            float maxValue = first;
-            for (const T value : values.subspan(1u))
+            std::vector<float> finite;
+            finite.reserve(values.size());
+            for (const T value : values)
             {
                 float converted = 0.0f;
                 ++stats.ScalarValueScanCount;
@@ -143,9 +149,33 @@ namespace Extrinsic::Runtime
                     ++stats.NonFiniteValueCount;
                     return false;
                 }
+                finite.push_back(converted);
+            }
 
-                minValue = std::min(minValue, converted);
-                maxValue = std::max(maxValue, converted);
+            const auto [minIt, maxIt] =
+                std::minmax_element(finite.begin(), finite.end());
+            float minValue = *minIt;
+            float maxValue = *maxIt;
+
+            if (finite.size() >= kRobustAutoRangeMinSamples)
+            {
+                const auto quantile = [&finite](const double q)
+                {
+                    const std::size_t index = static_cast<std::size_t>(
+                        q * static_cast<double>(finite.size() - 1u));
+                    std::nth_element(finite.begin(),
+                                     finite.begin() + static_cast<std::ptrdiff_t>(index),
+                                     finite.end());
+                    return finite[index];
+                };
+                const float lower = quantile(kRobustAutoRangeLowerQuantile);
+                const float upper = quantile(kRobustAutoRangeUpperQuantile);
+                if (lower < upper && (lower > minValue || upper < maxValue))
+                {
+                    minValue = lower;
+                    maxValue = upper;
+                    ++stats.RobustAutoRangeClampedCount;
+                }
             }
 
             if (minValue == maxValue)

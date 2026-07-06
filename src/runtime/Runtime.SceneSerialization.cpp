@@ -684,6 +684,12 @@ namespace Extrinsic::Runtime
                         {"num", config.Scalar.Isolines.Num},
                         {"color", Vec4ToJson(config.Scalar.Isolines.Color)},
                         {"width", config.Scalar.Isolines.Width},
+                        {"values", json(std::vector<float>(
+                            config.Scalar.Isolines.Values.begin(),
+                            config.Scalar.Isolines.Values.begin() +
+                                std::min<std::size_t>(
+                                    config.Scalar.Isolines.ValueCount,
+                                    config.Scalar.Isolines.Values.size())))},
                     }},
                 }},
             };
@@ -807,6 +813,28 @@ namespace Extrinsic::Runtime
                         if (!isolines["width"].is_number())
                             return false;
                         config.Scalar.Isolines.Width = isolines["width"].get<float>();
+                    }
+
+                    // UI-032 — bounded explicit highlight isovalues.
+                    if (isolines.contains("values"))
+                    {
+                        const json& values = isolines["values"];
+                        if (!values.is_array() ||
+                            values.size() >
+                                G::ScalarFieldConfig::kMaxIsolineValues)
+                        {
+                            return false;
+                        }
+                        std::uint32_t count = 0u;
+                        for (const json& entry : values)
+                        {
+                            if (!entry.is_number())
+                                return false;
+                            config.Scalar.Isolines.Values[count] =
+                                entry.get<float>();
+                            ++count;
+                        }
+                        config.Scalar.Isolines.ValueCount = count;
                     }
                 }
             }

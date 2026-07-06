@@ -52,6 +52,7 @@ import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Hierarchy.Mutation;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.Component.RenderGeometry;
@@ -8503,6 +8504,94 @@ TEST(SandboxEditorUi, TextureBakeControlsReportUvSourcesAndRouteCommand)
     EXPECT_EQ(albedo->SourceKind,
               Runtime::ProgressiveSlotSourceKind::GeneratedTextureAsset);
     EXPECT_EQ(albedo->GeneratedTexture, result.GeneratedTexture);
+}
+
+// UI-032 — preset buttons switch the scalar source but must preserve styling
+// (colormap, isoline width/color, highlight isovalues) already configured on
+// the target lane, and the styling fields must round-trip through the config
+// command onto the component.
+TEST(SandboxEditorUi, VisualizationPresetPreservesConfiguredScalarStyling)
+{
+    using Domain = Runtime::SandboxEditorVisualizationPropertyDomain;
+    using Preset = Runtime::SandboxEditorVisualizationPropertyPreset;
+    using Target = Runtime::SandboxEditorVisualizationTarget;
+
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "StylingMesh");
+    AddTriangleMeshSource(registry, mesh);
+    auto& vertices = registry.Raw().get<GS::Vertices>(mesh);
+    vertices.Properties.GetOrAdd<float>("v:temperature", 0.0f)
+        .Vector() = {0.0f, 0.5f, 1.0f};
+    vertices.Properties.GetOrAdd<double>("v:mean_curvature", 0.0)
+        .Vector() = {-0.02, 0.004, 0.05};
+
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.VisualizationCommandsAvailable = true;
+
+    // Configure a styled scalar field on the surface lane.
+    Runtime::SandboxEditorVisualizationConfigCommand styled{
+        .StableEntityId = stableId,
+        .Target = Target::Surface,
+        .EnableConfig = true,
+        .Source = G::VisualizationConfig::ColorSource::ScalarField,
+        .ScalarFieldName = "v:temperature",
+        .ScalarDomain = G::VisualizationConfig::Domain::Vertex,
+        .ScalarAutoRange = true,
+        .IsolineCount = 6u,
+        .ScalarColormap = Graphics::Colormap::Type::Jet,
+        .IsolineWidth = 3.0f,
+        .IsolineColor = {1.0f, 0.0f, 0.0f, 1.0f},
+    };
+    styled.IsolineValues[0] = 0.25f;
+    styled.IsolineValues[1] = 0.75f;
+    styled.IsolineValueCount = 2u;
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationConfigCommand(
+                  context,
+                  styled),
+              Runtime::SandboxEditorCommandStatus::Applied);
+
+    {
+        ASSERT_TRUE(registry.Raw().all_of<G::VisualizationLaneOverrides>(mesh));
+        const auto& overrides =
+            registry.Raw().get<G::VisualizationLaneOverrides>(mesh);
+        ASSERT_TRUE(overrides.Surface.has_value());
+        EXPECT_EQ(overrides.Surface->Scalar.Map, Graphics::Colormap::Type::Jet);
+        EXPECT_FLOAT_EQ(overrides.Surface->Scalar.Isolines.Width, 3.0f);
+        EXPECT_EQ(overrides.Surface->Scalar.Isolines.ValueCount, 2u);
+        EXPECT_FLOAT_EQ(overrides.Surface->Scalar.Isolines.Values[0], 0.25f);
+        EXPECT_FLOAT_EQ(overrides.Surface->Scalar.Isolines.Values[1], 0.75f);
+    }
+
+    // Switching the property through the Scalar preset must keep the styling.
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+                  context,
+                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                      .StableEntityId = stableId,
+                      .Target = Target::Surface,
+                      .Domain = Domain::MeshVertices,
+                      .Preset = Preset::Scalar,
+                      .PropertyName = "v:mean_curvature",
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+
+    ASSERT_TRUE(registry.Raw().all_of<G::VisualizationLaneOverrides>(mesh));
+    const auto& overrides =
+        registry.Raw().get<G::VisualizationLaneOverrides>(mesh);
+    ASSERT_TRUE(overrides.Surface.has_value());
+    const G::VisualizationConfig& lane = *overrides.Surface;
+    EXPECT_EQ(lane.Source, G::VisualizationConfig::ColorSource::ScalarField);
+    EXPECT_EQ(lane.ScalarFieldName, "v:mean_curvature");
+    EXPECT_EQ(lane.Scalar.Isolines.Num, 0u);
+    EXPECT_EQ(lane.Scalar.Map, Graphics::Colormap::Type::Jet);
+    EXPECT_FLOAT_EQ(lane.Scalar.Isolines.Width, 3.0f);
+    EXPECT_FLOAT_EQ(lane.Scalar.Isolines.Color.x, 1.0f);
+    EXPECT_EQ(lane.Scalar.Isolines.ValueCount, 2u);
+    EXPECT_FLOAT_EQ(lane.Scalar.Isolines.Values[0], 0.25f);
+    EXPECT_FLOAT_EQ(lane.Scalar.Isolines.Values[1], 0.75f);
 }
 
 TEST(SandboxEditorUi, VisualizationPropertyPresetCommandRoutesThroughConfig)

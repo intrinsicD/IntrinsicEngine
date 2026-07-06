@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <array>
 #include <cstddef>
+#include <limits>
 #include <memory>
 #include <span>
 #include <string>
@@ -933,6 +934,257 @@ TEST(RuntimeRenderExtraction, MeshScalarPropertyBufferReachesPreparedEntityConfi
     EXPECT_FLOAT_EQ(config.IsolineColor.y, 0.75f);
     EXPECT_FLOAT_EQ(config.IsolineColor.z, 1.0f);
     EXPECT_FLOAT_EQ(config.IsolineColor.w, 1.0f);
+}
+
+// BUG-059 — mirrors the editor Appearance flow: the mesh window's Scalar /
+// Isolines preset buttons write a fresh VisualizationLaneOverrides::Surface
+// config (Target=Surface), and the UI curvature command authors
+// "v:mean_curvature" as a double property. The prior regression only covered
+// the base-component float path.
+TEST(RuntimeRenderExtraction, MeshSurfaceLaneOverrideDoubleCurvatureReachesPreparedEntityConfig)
+{
+    namespace GS = ECS::Components::GeometrySources;
+    using ColorSource = Graphics::Components::VisualizationConfig::ColorSource;
+    using Domain = Graphics::Components::VisualizationConfig::Domain;
+
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+
+    const auto entity = scene.Create();
+    auto& registry = scene.Raw();
+    registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix =
+        glm::mat4{1.f};
+    registry.emplace<Graphics::Components::RenderSurface>(entity);
+    AttachTriangleMeshSources(scene, entity);
+
+    auto& vertexProperties = registry.get<GS::Vertices>(entity).Properties;
+    vertexProperties.GetOrAdd<double>("v:mean_curvature", 0.0).Vector() =
+        {-0.02, 0.004, 0.05};
+
+    // Exactly what ApplySandboxEditorVisualizationPropertyCommand builds for
+    // the Scalar preset via ToVisualizationConfig: a default config with only
+    // the command fields assigned (colormap stays the ScalarFieldConfig
+    // default), stored on the surface lane.
+    Graphics::Components::VisualizationConfig laneConfig{};
+    laneConfig.Source = ColorSource::ScalarField;
+    laneConfig.ScalarFieldName = "v:mean_curvature";
+    laneConfig.ScalarDomain = Domain::Vertex;
+    laneConfig.Scalar.AutoRange = true;
+    auto& overrides =
+        registry.emplace<Graphics::Components::VisualizationLaneOverrides>(entity);
+    overrides.Surface = laneConfig;
+
+    const auto stats = fixture.Extract(scene);
+    Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
+    ASSERT_EQ(stats.MeshGeometryUploads, 1u);
+    ASSERT_EQ(stats.VisualizationScalarPacketCount, 1u);
+    ASSERT_EQ(world.Visualization.Scalars.size(), 1u);
+    EXPECT_FLOAT_EQ(world.Visualization.Scalars.front().RangeMin,
+                    static_cast<float>(-0.02));
+    EXPECT_FLOAT_EQ(world.Visualization.Scalars.front().RangeMax,
+                    static_cast<float>(0.05));
+
+    fixture.Renderer->PrepareFrame(world);
+
+    const auto sidecar =
+        fixture.Extraction.FindRenderableSidecarForTest(StableId(entity));
+    ASSERT_TRUE(sidecar.has_value());
+    ASSERT_TRUE(sidecar->Instance.IsValid());
+
+    const RHI::GpuEntityConfig config =
+        fixture.Renderer->GetGpuWorld().GetEntityConfigForTest(sidecar->Instance);
+    EXPECT_EQ(config.ColorSourceMode, 2u);
+    EXPECT_NE(config.ScalarBDA, 0u);
+    EXPECT_NE(config.ColormapID, 0u);
+    EXPECT_EQ(config.ElementCount, 3u);
+    EXPECT_FLOAT_EQ(config.ScalarRangeMin, static_cast<float>(-0.02));
+    EXPECT_FLOAT_EQ(config.ScalarRangeMax, static_cast<float>(0.05));
+}
+
+// BUG-059 — same flow with the Isolines preset (IsolineCount=12, default
+// width/color from ScalarFieldConfig).
+TEST(RuntimeRenderExtraction, MeshSurfaceLaneOverrideIsolinePresetReachesPreparedEntityConfig)
+{
+    namespace GS = ECS::Components::GeometrySources;
+    using ColorSource = Graphics::Components::VisualizationConfig::ColorSource;
+    using Domain = Graphics::Components::VisualizationConfig::Domain;
+
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+
+    const auto entity = scene.Create();
+    auto& registry = scene.Raw();
+    registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix =
+        glm::mat4{1.f};
+    registry.emplace<Graphics::Components::RenderSurface>(entity);
+    AttachTriangleMeshSources(scene, entity);
+
+    auto& vertexProperties = registry.get<GS::Vertices>(entity).Properties;
+    vertexProperties.GetOrAdd<double>("v:mean_curvature", 0.0).Vector() =
+        {-0.02, 0.004, 0.05};
+
+    Graphics::Components::VisualizationConfig laneConfig{};
+    laneConfig.Source = ColorSource::ScalarField;
+    laneConfig.ScalarFieldName = "v:mean_curvature";
+    laneConfig.ScalarDomain = Domain::Vertex;
+    laneConfig.Scalar.AutoRange = true;
+    laneConfig.Scalar.Isolines.Num = 12u;
+    // UI-032 — explicit highlight isovalues (raw scalar units); one
+    // non-finite entry must be skipped fail-closed.
+    laneConfig.Scalar.Isolines.Values[0] = 0.0f;
+    laneConfig.Scalar.Isolines.Values[1] =
+        std::numeric_limits<float>::quiet_NaN();
+    laneConfig.Scalar.Isolines.Values[2] = 0.03f;
+    laneConfig.Scalar.Isolines.ValueCount = 3u;
+    auto& overrides =
+        registry.emplace<Graphics::Components::VisualizationLaneOverrides>(entity);
+    overrides.Surface = laneConfig;
+
+    const auto stats = fixture.Extract(scene);
+    Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
+    ASSERT_EQ(stats.VisualizationScalarPacketCount, 1u);
+
+    fixture.Renderer->PrepareFrame(world);
+
+    const auto sidecar =
+        fixture.Extraction.FindRenderableSidecarForTest(StableId(entity));
+    ASSERT_TRUE(sidecar.has_value());
+    ASSERT_TRUE(sidecar->Instance.IsValid());
+
+    const RHI::GpuEntityConfig config =
+        fixture.Renderer->GetGpuWorld().GetEntityConfigForTest(sidecar->Instance);
+    EXPECT_EQ(config.ColorSourceMode, 2u);
+    EXPECT_NE(config.ScalarBDA, 0u);
+    EXPECT_NE(config.ColormapID, 0u);
+    EXPECT_EQ(config.ElementCount, 3u);
+    EXPECT_FLOAT_EQ(config.ScalarRangeMin, static_cast<float>(-0.02));
+    EXPECT_FLOAT_EQ(config.ScalarRangeMax, static_cast<float>(0.05));
+    EXPECT_FLOAT_EQ(config.IsolineCount, 12.0f);
+    EXPECT_GT(config.IsolineWidth, 0.0f);
+    EXPECT_EQ(config.IsoValueCount, 2u);
+    EXPECT_FLOAT_EQ(config.IsoValuesA.x, 0.0f);
+    EXPECT_FLOAT_EQ(config.IsoValuesA.y, 0.03f);
+}
+
+// BUG-059 — multi-frame variant of the editor flow: the mesh renders with
+// material shading first, the curvature job applies the property and the
+// Appearance preset arrives later, and the visualization must then survive
+// subsequent steady-state frames (no packet/config decay).
+TEST(RuntimeRenderExtraction, MeshScalarVisualizationSurvivesLatePropertyAndSteadyStateFrames)
+{
+    namespace GS = ECS::Components::GeometrySources;
+    using ColorSource = Graphics::Components::VisualizationConfig::ColorSource;
+    using Domain = Graphics::Components::VisualizationConfig::Domain;
+
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+
+    const auto entity = scene.Create();
+    auto& registry = scene.Raw();
+    registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix =
+        glm::mat4{1.f};
+    registry.emplace<Graphics::Components::RenderSurface>(entity);
+    AttachTriangleMeshSources(scene, entity);
+
+    // Frame 1 — plain material rendering, no curvature property yet.
+    (void)fixture.Extract(scene);
+    {
+        Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
+        fixture.Renderer->PrepareFrame(world);
+    }
+
+    // Curvature job apply + Appearance "Scalar" preset land between frames.
+    auto& vertexProperties = registry.get<GS::Vertices>(entity).Properties;
+    vertexProperties.GetOrAdd<double>("v:mean_curvature", 0.0).Vector() =
+        {-0.02, 0.004, 0.05};
+    registry.emplace_or_replace<ECS::Components::DirtyTags::DirtyVertexAttributes>(entity);
+
+    Graphics::Components::VisualizationConfig laneConfig{};
+    laneConfig.Source = ColorSource::ScalarField;
+    laneConfig.ScalarFieldName = "v:mean_curvature";
+    laneConfig.ScalarDomain = Domain::Vertex;
+    laneConfig.Scalar.AutoRange = true;
+    laneConfig.Scalar.Isolines.Num = 12u;
+    registry.emplace<Graphics::Components::VisualizationLaneOverrides>(entity)
+        .Surface = laneConfig;
+
+    const auto sidecar =
+        fixture.Extraction.FindRenderableSidecarForTest(StableId(entity));
+    ASSERT_TRUE(sidecar.has_value());
+
+    // Frames 2..4 — the prepared config must resolve scalar data on the first
+    // frame after the preset and keep resolving on steady-state frames.
+    for (int frame = 2; frame <= 4; ++frame)
+    {
+        (void)fixture.Extract(scene);
+        Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
+        fixture.Renderer->PrepareFrame(world);
+
+        const RHI::GpuEntityConfig config =
+            fixture.Renderer->GetGpuWorld().GetEntityConfigForTest(sidecar->Instance);
+        EXPECT_EQ(config.ColorSourceMode, 2u) << "frame " << frame;
+        EXPECT_NE(config.ScalarBDA, 0u) << "frame " << frame;
+        EXPECT_NE(config.ColormapID, 0u) << "frame " << frame;
+        EXPECT_EQ(config.ElementCount, 3u) << "frame " << frame;
+        EXPECT_FLOAT_EQ(config.ScalarRangeMin, static_cast<float>(-0.02))
+            << "frame " << frame;
+        EXPECT_FLOAT_EQ(config.ScalarRangeMax, static_cast<float>(0.05))
+            << "frame " << frame;
+        EXPECT_FLOAT_EQ(config.IsolineCount, 12.0f) << "frame " << frame;
+    }
+}
+
+// BUG-059 — a degenerate manual range on the component keeps the documented
+// fail-closed packet behavior (adapters reject it, no scalar buffer), but the
+// prepared config must not forward a range whose shader normalization pins
+// every fragment to t=0; sync expands it around the requested value.
+TEST(RuntimeRenderExtraction, MeshScalarDegenerateManualRangeIsSanitizedInPreparedConfig)
+{
+    namespace GS = ECS::Components::GeometrySources;
+    using ColorSource = Graphics::Components::VisualizationConfig::ColorSource;
+    using Domain = Graphics::Components::VisualizationConfig::Domain;
+
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+
+    const auto entity = scene.Create();
+    auto& registry = scene.Raw();
+    registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix =
+        glm::mat4{1.f};
+    registry.emplace<Graphics::Components::RenderSurface>(entity);
+    AttachTriangleMeshSources(scene, entity);
+
+    auto& vertexProperties = registry.get<GS::Vertices>(entity).Properties;
+    vertexProperties.GetOrAdd<double>("v:mean_curvature", 0.0).Vector() =
+        {-0.02, 0.004, 0.05};
+
+    Graphics::Components::VisualizationConfig laneConfig{};
+    laneConfig.Source = ColorSource::ScalarField;
+    laneConfig.ScalarFieldName = "v:mean_curvature";
+    laneConfig.ScalarDomain = Domain::Vertex;
+    laneConfig.Scalar.AutoRange = false;
+    laneConfig.Scalar.RangeMin = 0.5f;
+    laneConfig.Scalar.RangeMax = 0.5f;
+    registry.emplace<Graphics::Components::VisualizationLaneOverrides>(entity)
+        .Surface = laneConfig;
+
+    const auto stats = fixture.Extract(scene);
+    Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
+    EXPECT_EQ(stats.VisualizationAdapterInvalidRangeCount, 1u);
+    EXPECT_EQ(world.Visualization.Scalars.size(), 0u);
+
+    fixture.Renderer->PrepareFrame(world);
+
+    const auto sidecar =
+        fixture.Extraction.FindRenderableSidecarForTest(StableId(entity));
+    ASSERT_TRUE(sidecar.has_value());
+
+    const RHI::GpuEntityConfig config =
+        fixture.Renderer->GetGpuWorld().GetEntityConfigForTest(sidecar->Instance);
+    EXPECT_EQ(config.ColorSourceMode, 2u);
+    EXPECT_LT(config.ScalarRangeMin, config.ScalarRangeMax);
+    EXPECT_FLOAT_EQ(config.ScalarRangeMin, 0.0f);
+    EXPECT_FLOAT_EQ(config.ScalarRangeMax, 1.0f);
 }
 
 TEST(RuntimeRenderExtraction, GraphVisualizationPropertyBuffersUploadFromNodeAndEdgeDomains)
