@@ -9,6 +9,15 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`PROC-014`](PROC-014-task-state-index-done-link-cleanup.md) — Task-state
+index done-link cleanup — retired on 2026-07-07 at maturity `Retired`. The
+rendering and runtime backlog indexes now cite recently retired tasks from
+live current-state sections as plain code spans instead of direct links into
+`tasks/done/`, preserving the current-state facts while satisfying
+`check_task_state_links.py`. No task dependencies, priorities, or engine code
+changed.
+
+Active
 [`GRAPHICS-121`](GRAPHICS-121-vulkan-resource-sharing-async-compute.md) —
 Vulkan resource sharing includes async compute — retired on 2026-07-07 at
 maturity `Operational`. The promoted Vulkan backend now creates buffers and

@@ -13,31 +13,25 @@ Opened from the main-loop/task-graph/render-graph review
 ([`docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`](../../../docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md)).
 Blocking fixes first, then abstractness seams, then steady-state efficiency:
 
-- [`RUNTIME-140`](../../done/RUNTIME-140-remove-global-waitforall-from-import-apply.md)
-  is retired; runtime import apply now uses per-asset completion and event
-  flushes instead of a global `Scheduler::WaitForAll()` barrier.
-- [`RUNTIME-141`](../../done/RUNTIME-141-async-editor-method-command-lane.md)
-  is retired; heavy Sandbox editor CPU method commands now queue runtime
-  derived jobs, keep rendering advanceable while jobs run, and suppress
+- `RUNTIME-140` is retired; runtime import apply now uses per-asset completion
+  and event flushes instead of a global `Scheduler::WaitForAll()` barrier.
+- `RUNTIME-141` is retired; heavy Sandbox editor CPU method commands now queue
+  runtime derived jobs, keep rendering advanceable while jobs run, and suppress
   duplicate active same-output submits instead of blocking the ImGui callback.
-- [`RUNTIME-142`](../../done/RUNTIME-142-async-modelscene-texture-scenefile-io.md)
-  is retired; dropped/editor model-scene and texture imports plus editor
-  scene save/load now use the runtime streaming lane instead of blocking the
-  frame path.
-- [`RUNTIME-143`](../../done/RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md)
-  is retired; the renderer runtime frame-command hook is now a
+- `RUNTIME-142` is retired; dropped/editor model-scene and texture imports plus
+  editor scene save/load now use the runtime streaming lane instead of blocking
+  the frame path.
+- `RUNTIME-143` is retired; the renderer runtime frame-command hook is now a
   multi-subscriber registry, `Engine` owns a generic runtime GPU participant
   seam, and Sandbox editor K-Means GPU execution owns its queue outside
   `Engine`.
-- [`RUNTIME-144`](../../done/RUNTIME-144-post-import-processor-and-ux-policy-seam.md)
-  is retired; post-import processors, import authoring/default UX, and the
-  `F` focus action now register through runtime seams while sandbox/default
+- `RUNTIME-144` is retired; post-import processors, import authoring/default
+  UX, and the `F` focus action now register through runtime seams while sandbox/default
   composition owns the default bundle (normal-bake registration coordinates
   with `RUNTIME-129`/`GRAPHICS-104`).
-- [`RUNTIME-145`](../../done/RUNTIME-145-runtime-frame-path-efficiency-polish.md)
-  is retired; it delivered steady-state frame-path efficiency polish (incremental
-  `StableEntityLookup`, `StreamingExecutor` slot recycling, dirty-gated
-  pre-render flush, extraction/import allocation cleanup).
+- `RUNTIME-145` is retired; it delivered steady-state frame-path efficiency
+  polish (incremental `StableEntityLookup`, `StreamingExecutor` slot recycling,
+  dirty-gated pre-render flush, extraction/import allocation cleanup).
 
 Related core-layer work from the same review lives in
 [`tasks/backlog/architecture/`](../architecture/README.md) (`BUG-055`,
