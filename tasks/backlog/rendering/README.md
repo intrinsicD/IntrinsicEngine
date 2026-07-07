@@ -24,9 +24,10 @@ without requiring them to read every file.
 
 ## Current open rendering leaves
 
-- [`GRAPHICS-119`](../../active/GRAPHICS-119-parallel-pass-command-recording.md) —
-  parallel render-pass command recording via the task scheduler
-  (2026-07-03 review R13; currently active).
+- None. The 2026-07-03 review R13 follow-up
+  [`GRAPHICS-119`](../../done/GRAPHICS-119-parallel-pass-command-recording.md)
+  retired parallel render-pass command recording via the task scheduler on
+  2026-07-07.
 
 ## Legacy Parity Follow-Ups
 

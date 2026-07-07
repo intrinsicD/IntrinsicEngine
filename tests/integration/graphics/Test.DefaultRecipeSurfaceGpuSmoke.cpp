@@ -467,7 +467,7 @@ void ExpectDefaultRecipeDebugViewReadbackRecorded(
         .Recipe = Extrinsic::Graphics::RenderRecipeDescriptor{
             .RecipeId = "graphics-119.parallel-vulkan-smoke",
         },
-        .DisabledExtensionSlots = {"postprocess"},
+        .DisabledExtensionSlots = {"lighting", "postprocess"},
         .SourceId = "GRAPHICS-119",
     };
 }
@@ -677,9 +677,15 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialReadbackWithVal
         GTEST_SKIP() << "Vulkan validation layer/debug-utils is unavailable; parallel-recording validation smoke is opt-in.";
     }
 
+    auto& renderer = engine.GetRenderer();
+    auto& device = engine.GetDevice();
+    renderer.SetActiveFrameRecipeOverride(
+        std::make_optional(MakeGraphicsOnlyFrameRecipeOverride()));
+
     const auto warmup = DriveDefaultRecipeAndCapture(engine);
     if (!warmup.DeviceOperational)
     {
+        renderer.ClearActiveFrameRecipeOverride();
         engine.Shutdown();
         ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during parallel-recording smoke warmup: status="
                       << ToString(warmup.Status.Code) << " reason=" << ToString(warmup.Status.Reason)
@@ -687,12 +693,11 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialReadbackWithVal
         return;
     }
 
-    auto& renderer = engine.GetRenderer();
-    auto& device = engine.GetDevice();
     const Extrinsic::RHI::Format backbufferFormat = device.GetBackbufferFormat();
     const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(backbufferFormat);
     if (bytesPerPixel == 0u)
     {
+        renderer.ClearActiveFrameRecipeOverride();
         engine.Shutdown();
         GTEST_SKIP() << "Backbuffer format has no host-uploadable layout on this host; parallel-recording smoke skipped.";
     }
@@ -714,8 +719,6 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialReadbackWithVal
     }
 
     renderer.SetRenderGraphDebugDumpEnabled(true);
-    renderer.SetActiveFrameRecipeOverride(
-        std::make_optional(MakeGraphicsOnlyFrameRecipeOverride()));
 
     const ReadbackRunCapture serial = CaptureDefaultRecipeReadbackFrame(
         engine,
@@ -743,8 +746,8 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialReadbackWithVal
     EXPECT_FALSE(serialStats.Execute.SerialFallbackUsed);
     EXPECT_EQ(serialStats.Execute.ParallelCommandContextCount, 0u);
     EXPECT_EQ(serialStats.AsyncComputeUtilizedFrames, 0u)
-        << "The GRAPHICS-119 Vulkan smoke disables postprocess so the current Vulkan "
-           "parallel-command implementation exercises a graphics-only context plan.";
+        << "The GRAPHICS-119 Vulkan smoke disables async-capable optional recipe "
+           "slots so the Vulkan path exercises a graphics-only context plan.";
     EXPECT_TRUE(Counters::IsStable(serial.Run.Before, serial.Run.After))
         << "Vulkan fallback/validation counters changed across serial baseline frame.";
     ExpectMinimalHarnessReadbackSamples(device,
@@ -804,6 +807,156 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialReadbackWithVal
     renderer.SetParallelRenderGraphRecordingEnabled(false);
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
     renderer.ClearActiveFrameRecipeOverride();
+    device.DestroyBuffer(readbackBuffer);
+    engine.Shutdown();
+}
+
+TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialAsyncComputeReadbackWithValidation)
+{
+    auto bootstrap = BootstrapEngineForDefaultRecipe(
+        4u,
+        "Intrinsic Default-recipe gpu;vulkan parallel async-compute smoke",
+        true);
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+    const auto bootstrapDiagnostics = GetVulkanBootstrapDiagnosticsSnapshot();
+    if (!bootstrapDiagnostics.ValidationEnabled || !bootstrapDiagnostics.DebugUtilsEnabled)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Vulkan validation layer/debug-utils is unavailable; async parallel-recording validation smoke is opt-in.";
+    }
+
+    auto& renderer = engine.GetRenderer();
+    auto& device = engine.GetDevice();
+    if (!device.GetQueueCapabilityProfile().SupportsAsyncCompute)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Promoted Vulkan framegraph async-compute queue is unavailable; GRAPHICS-119 async smoke is opt-in.";
+    }
+
+    const auto warmup = DriveDefaultRecipeAndCapture(engine);
+    if (!warmup.DeviceOperational)
+    {
+        engine.Shutdown();
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during async parallel-recording smoke warmup: status="
+                      << ToString(warmup.Status.Code) << " reason=" << ToString(warmup.Status.Reason)
+                      << ". Host capability checks passed, so this is a GRAPHICS-119 Slice C.11 regression, not a skip condition.";
+        return;
+    }
+
+    const Extrinsic::RHI::Format backbufferFormat = device.GetBackbufferFormat();
+    const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(backbufferFormat);
+    if (bytesPerPixel == 0u)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Backbuffer format has no host-uploadable layout on this host; async parallel-recording smoke skipped.";
+    }
+
+    const std::uint64_t readbackSize =
+        static_cast<std::uint64_t>(bytesPerPixel) *
+        static_cast<std::uint64_t>(Readback::kFramebufferWidth) *
+        static_cast<std::uint64_t>(Readback::kFramebufferHeight);
+    Extrinsic::RHI::BufferHandle readbackBuffer = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+        .SizeBytes = readbackSize,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .DebugName = "DefaultRecipe.ParallelAsyncRecordingReadback",
+    });
+    if (!readbackBuffer.IsValid())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan async parallel-recording smoke is opt-in.";
+    }
+
+    renderer.SetRenderGraphDebugDumpEnabled(true);
+
+    const ReadbackRunCapture serial = CaptureDefaultRecipeReadbackFrame(
+        engine,
+        readbackBuffer,
+        readbackSize,
+        false);
+    if (!serial.Run.DeviceOperational)
+    {
+        renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+        device.DestroyBuffer(readbackBuffer);
+        engine.Shutdown();
+        ADD_FAILURE() << "Promoted Vulkan operational gate dropped during async serial baseline frame: status="
+                      << ToString(serial.Run.Status.Code) << " reason=" << ToString(serial.Run.Status.Reason);
+        return;
+    }
+
+    const auto& serialStats = serial.Run.Stats;
+    ExpectDefaultRecipeDebugViewReadbackRecorded(serialStats);
+    EXPECT_EQ(FindPassStatus(serialStats, "PostProcessHistogramPass"),
+              RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(serialStats);
+    EXPECT_GE(serialStats.AsyncComputeUtilizedFrames, 1u)
+        << "Serial baseline did not accept the async-compute queue-submit plan.";
+    EXPECT_FALSE(serialStats.Execute.ParallelRecordingRequested);
+    EXPECT_FALSE(serialStats.Execute.ParallelRecordingAccepted);
+    EXPECT_FALSE(serialStats.Execute.SerialFallbackUsed);
+    EXPECT_EQ(serialStats.Execute.ParallelCommandContextCount, 0u);
+    EXPECT_TRUE(Counters::IsStable(serial.Run.Before, serial.Run.After))
+        << "Vulkan fallback/validation counters changed across async serial baseline frame.";
+    ExpectMinimalHarnessReadbackSamples(device,
+                                        readbackBuffer,
+                                        readbackSize,
+                                        bytesPerPixel,
+                                        backbufferFormat,
+                                        serialStats);
+
+    const ReadbackRunCapture parallel = CaptureDefaultRecipeReadbackFrame(
+        engine,
+        readbackBuffer,
+        readbackSize,
+        true);
+    if (!parallel.Run.DeviceOperational)
+    {
+        renderer.SetParallelRenderGraphRecordingEnabled(false);
+        renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+        device.DestroyBuffer(readbackBuffer);
+        engine.Shutdown();
+        ADD_FAILURE() << "Promoted Vulkan operational gate dropped during async parallel-recording frame: status="
+                      << ToString(parallel.Run.Status.Code) << " reason=" << ToString(parallel.Run.Status.Reason);
+        return;
+    }
+
+    const auto& parallelStats = parallel.Run.Stats;
+    ExpectDefaultRecipeDebugViewReadbackRecorded(parallelStats);
+    EXPECT_EQ(FindPassStatus(parallelStats, "PostProcessHistogramPass"),
+              RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(parallelStats);
+    EXPECT_GE(parallelStats.AsyncComputeUtilizedFrames, 1u)
+        << "Parallel frame did not accept the async-compute queue-submit plan.";
+    EXPECT_TRUE(parallelStats.Execute.ParallelRecordingRequested);
+    EXPECT_TRUE(parallelStats.Execute.ParallelRecordingAccepted);
+    EXPECT_FALSE(parallelStats.Execute.SerialFallbackUsed);
+    EXPECT_GT(parallelStats.Execute.ParallelCommandContextCount, 0u);
+    EXPECT_EQ(parallelStats.Execute.ParallelRecordedPassCount,
+              parallelStats.Execute.ParallelCommandContextCount);
+    EXPECT_EQ(parallelStats.Execute.ParallelRecordWorkerTaskCount +
+                  parallelStats.Execute.ParallelRecordCallerRecordCount,
+              parallelStats.Execute.ParallelCommandContextCount);
+    EXPECT_TRUE(Counters::IsStable(parallel.Run.Before, parallel.Run.After))
+        << "Vulkan fallback/validation counters changed across async parallel-recording frame.";
+    ExpectMinimalHarnessReadbackSamples(device,
+                                        readbackBuffer,
+                                        readbackSize,
+                                        bytesPerPixel,
+                                        backbufferFormat,
+                                        parallelStats);
+    ExpectReadbackImagesEqual(
+        serial.Bytes,
+        parallel.Bytes,
+        bytesPerPixel,
+        serialStats.DebugDump,
+        parallelStats.DebugDump);
+
+    renderer.SetParallelRenderGraphRecordingEnabled(false);
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
     device.DestroyBuffer(readbackBuffer);
     engine.Shutdown();
 }

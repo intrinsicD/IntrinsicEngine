@@ -382,6 +382,8 @@ TEST(RendererFrameLifecycle, FrameRecipeOverrideProjectionDisablesPostProcess)
     defaults.EnableDebugView = true;
     defaults.EnablePicking = true;
     defaults.LightingPath = Extrinsic::Graphics::FrameRecipeLightingPath::Deferred;
+    defaults.EnableClusterGridBuild = true;
+    defaults.EnableClusterLightAssignment = true;
 
     const Extrinsic::Graphics::FrameRecipeOverrideProjection projection =
         Extrinsic::Graphics::ProjectFrameRecipeOverride(
@@ -422,6 +424,8 @@ TEST(RendererFrameLifecycle, FrameRecipeOverrideProjectionDisablesMappedFeatureS
     EXPECT_FALSE(projection.Features.EnablePicking);
     EXPECT_EQ(projection.Features.LightingPath,
               Extrinsic::Graphics::FrameRecipeLightingPath::Forward);
+    EXPECT_FALSE(projection.Features.EnableClusterGridBuild);
+    EXPECT_FALSE(projection.Features.EnableClusterLightAssignment);
 }
 
 TEST(RendererFrameLifecycle, FrameRecipeOverrideProjectionFailsClosedForUnknownSlot)

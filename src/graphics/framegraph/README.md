@@ -132,8 +132,9 @@ their serial placement. The PR-fast
 parity plus serial/parallel CPU timings without making an adoption claim, and
 `DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation`
 is the opt-in `gpu;vulkan` proof for the implemented graphics-queue secondary
-command path. Vulkan non-graphics secondary execution remains `GRAPHICS-119`
-later scope.
+command path. `DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialAsyncComputeReadbackWithValidation`
+keeps postprocess enabled and proves accepted async-compute secondary command
+contexts through the same serial/parallel readback parity harness.
 
 ## Transient Placement Contract
 
@@ -242,7 +243,12 @@ queue support. On promoted Vulkan hosts with async compute, the
 fixture asserts that `RenderGraphFrameStats::AsyncComputeUtilizedFrames >= 1`
 and that the same four-sample backbuffer-readback parity harness still matches.
 `DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation`
-disables the postprocess extension to keep the current Vulkan plan graphics-only,
+disables the lighting and postprocess extension slots to keep the current
+Vulkan plan graphics-only, then captures serial and parallel readback bytes
+with validation enabled and asserts that the parallel frame accepted secondary
+command contexts without a serial fallback.
+`DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialAsyncComputeReadbackWithValidation`
+keeps postprocess enabled, requires an operational async-compute queue profile,
 then captures serial and parallel readback bytes with validation enabled and
-asserts that the parallel frame accepted secondary command contexts without a
-serial fallback.
+asserts that accepted async-compute secondary command contexts did not fall
+back to serial.

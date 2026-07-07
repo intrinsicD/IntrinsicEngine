@@ -111,14 +111,16 @@ same worker fan-out seam and joins them back through each
 `GetQueueSubmitContext(...)` batch so queue submission order, timeline
 waits/signals, and barriers remain unchanged. The current path is
 worker-dispatched when `Core::Tasks::Scheduler` is initialized, and records on
-the caller thread when no scheduler is live. Vulkan accepts the graphics-queue
-plan with backend-local secondary command buffers. The opt-in
+the caller thread when no scheduler is live. Vulkan accepts graphics-queue and
+async-compute plans with backend-local secondary command buffers in the
+corresponding queue family. The opt-in
 `gpu;vulkan;graphics` fixture
 `DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation`
 compares serial and parallel default-recipe readback bytes under validation and
 asserts the accepted graphics-only parallel path did not fall back to serial.
-Vulkan non-graphics secondary execution remains later `GRAPHICS-119` backend
-scope.
+`DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialAsyncComputeReadbackWithValidation`
+keeps postprocess enabled and asserts the accepted async-compute parallel path
+does not fall back to serial while preserving readback parity.
 `RenderGraphFrameStats::Execute.ParallelRecordUsedScheduler` reports whether the
 executor dispatched worker tasks. Transient-debug, visualization-overlay, and
 ImGui dynamic upload helpers serialize per-frame reset plus upload/execute
@@ -241,10 +243,10 @@ activation translates the usable preview into the `FrameRecipeOverride` wrapper.
 seam for a validated recipe overlay. The live frame driver remains
 `FrameRecipeFeatures` plus `BuildDefaultFrameRecipe(...)`; the override wrapper
 can only disable mapped optional extension slots (`postprocess`, `debug-view`,
-`picking`, and the lighting-path fallback). It never adds pass-graph nodes,
-never replaces the fixed core, and never enables a feature whose derived
-availability gate was false. Unknown, fixed-core, or unsupported slot requests
-leave the derived defaults unchanged and are reported on
+`picking`, and the lighting-path fallback plus clustered-light compute gates).
+It never adds pass-graph nodes, never replaces the fixed core, and never enables
+a feature whose derived availability gate was false. Unknown, fixed-core, or
+unsupported slot requests leave the derived defaults unchanged and are reported on
 `RenderGraphFrameStats::FrameRecipeOverrideDiagnostics`.
 
 `Extrinsic.Graphics.SharedRenderRecipeExecution` is the `GRAPHICS-102`

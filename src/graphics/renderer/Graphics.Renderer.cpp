@@ -740,11 +740,15 @@ namespace Extrinsic::Graphics
             }
             if (stableName == "lighting")
             {
-                if (features.LightingPath != FrameRecipeLightingPath::Forward)
+                if (features.LightingPath != FrameRecipeLightingPath::Forward ||
+                    features.EnableClusterGridBuild ||
+                    features.EnableClusterLightAssignment)
                 {
                     ++disabledSlotCount;
                 }
                 features.LightingPath = FrameRecipeLightingPath::Forward;
+                features.EnableClusterGridBuild = false;
+                features.EnableClusterLightAssignment = false;
             }
         }
 

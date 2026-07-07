@@ -79,12 +79,13 @@ available through the Vulkan 1.2/1.3 feature chain.
   `RHI::ParallelCommandContextPlanDesc` frames.
   `BeginFrameParallelCommandContexts(...)` creates one frame-scoped command
   pool per accepted live pass and allocates that pass's secondary buffer from
-  the owned pool. `GetParallelCommandContext` records the pass body, and
-  `SubmitParallelCommandContext(...)` emits `vkCmdExecuteCommands(...)` into
-  the primary graphics context in compiled serial order. Secondary command
-  buffers and their command pools stay alive until the frame-slot fence retires
-  and are destroyed on the next `BeginFrame`. The renderer dispatches accepted
-  graphics-queue pass recording to `Core::Tasks` workers when the scheduler is
+  the owned pool in the request queue family. `GetParallelCommandContext`
+  records the pass body, and `SubmitParallelCommandContext(...)` emits
+  `vkCmdExecuteCommands(...)` into the matching queue-submit primary context in
+  compiled serial order. Secondary command buffers and their command pools stay
+  alive until the frame-slot fence retires and are destroyed on the next
+  `BeginFrame`. The renderer dispatches accepted graphics-queue and
+  async-compute pass recording to `Core::Tasks` workers when the scheduler is
   initialized; otherwise it records on the caller thread. Dynamic upload helpers,
   postprocess helpers, frame-sampled descriptor bridge updates, command-record
   diagnostics, and readback issue metadata are routed through guarded renderer
@@ -92,7 +93,9 @@ available through the Vulkan 1.2/1.3 feature chain.
   `DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation`
   fixture exercises the graphics-queue secondary path on promoted Vulkan with
   validation enabled and compares serial/parallel backbuffer readback bytes.
-  Non-graphics queue support remains later `GRAPHICS-119` backend scope.
+  `DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialAsyncComputeReadbackWithValidation`
+  keeps postprocess enabled and exercises accepted async-compute secondary
+  command buffers with the same validation/readback parity harness.
 - `GetVulkanServiceDiagnosticsSnapshot()` reports guarded post-bootstrap service
   handoff: bindless heap creation, global pipeline-layout creation, transfer
   queue/staging creation, command-context rebinding, bindless capacity, clean
@@ -272,14 +275,14 @@ available through the Vulkan 1.2/1.3 feature chain.
   concrete Vulkan queue-family indices. Same-family transfers collapse back to
   `VK_QUEUE_FAMILY_IGNORED`, which preserves the single-family fallback path on
   adapters that expose compute work through the graphics family. The promoted
-  device currently reports a graphics-only framegraph `QueueCapabilityProfile`
-  so optional async-compute/transfer passes demote into the graphics submit path
-  until cross-queue barrier lowering is validation-clean. To keep barrier
-  ownership resolution consistent with that pass batching, the device binds the
-  physical async-compute/transfer queue families into each command context only
-  when the framegraph profile actually schedules onto them
-  (`ResolveFrameGraphBarrierQueueFamilies`); under the graphics-only profile they
-  arrive as `VK_QUEUE_FAMILY_IGNORED` so `SubmitBarriers` resolves async/transfer
+  device reports async-compute framegraph support when the operational Vulkan
+  device has acquired an async-compute queue; render-graph transfer passes still
+  demote into the graphics submit path. To keep barrier ownership resolution
+  consistent with accepted pass batching, queue-submit and parallel command
+  contexts bind physical async-compute/transfer queue families only when their
+  accepted submit plan actually schedules work onto them
+  (`ResolveFrameGraphBarrierQueueFamilies`); otherwise they arrive as
+  `VK_QUEUE_FAMILY_IGNORED` so `SubmitBarriers` resolves async/transfer
   ownership tokens back to the graphics family and records no cross-queue
   ownership-transfer barrier (BUG-015 — avoids `VkBufferMemoryBarrier-buffer-00004`
   acquire-without-release errors and `-00001/-00003` duplicate-barrier warnings on
@@ -588,13 +591,16 @@ operational Vulkan, or async-compute support, and otherwise asserts
 four-sample readback parity.
 
 GRAPHICS-119 adds
-`DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation`.
-The fixture requests validation, disables the postprocess extension to keep the
-current Vulkan parallel-command plan graphics-only, captures serial and parallel
-default-recipe debug-view readback bytes, and asserts
+`DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation`
+and
+`DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialAsyncComputeReadbackWithValidation`.
+Both fixtures request validation and capture serial/parallel default-recipe
+debug-view readback bytes. The first disables lighting and postprocess
+extension slots to prove the graphics-only secondary path; the second keeps
+postprocess enabled, requires an operational async-compute queue profile, and
+proves the accepted async-compute secondary path. Both assert
 `RenderGraphFrameStats::Execute.ParallelRecordingAccepted` with no serial
-fallback or validation-counter increment. Non-graphics secondary command buffers
-for async-compute queue plans remain deferred backend work.
+fallback or validation-counter increment.
 
 GRAPHICS-077 and GRAPHICS-078 extend the same operational proof to the default
 recipe's post-lit overlay band. The opt-in `gpu;vulkan;graphics` fixtures

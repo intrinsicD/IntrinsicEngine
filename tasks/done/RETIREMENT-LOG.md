@@ -3601,3 +3601,15 @@ non-operational `BarrierValidationFailed` path. The selected promoted Vulkan
 sandbox/ImGui/frame-pacing envelope passes 18/18, and the default sandbox
 fixture now installs the same runtime default policy bundle as the production
 `ExtrinsicSandbox` app before custom smoke apps run.
+
+[`GRAPHICS-119`](GRAPHICS-119-parallel-pass-command-recording.md) — Parallel
+render-pass command recording via the task scheduler retired to `tasks/done/`
+on 2026-07-07 at `Operational`. Render-graph pass recording now fans out by
+compiled topological layer through `Core::Tasks`, acquires backend-neutral
+parallel command contexts, joins them back in deterministic submit order, and
+keeps the serial fallback/debug selector as the reference path. Null and Mock
+contracts prove deterministic CPU behavior, promoted Vulkan records graphics
+and async-compute queue-family-local secondary command buffers under validation
+smokes, and benchmark smoke parity is recorded without claiming a performance
+win. Transfer render-graph scheduling remains out of scope because no
+production transfer pass is enabled.

@@ -11,20 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`GRAPHICS-119`](GRAPHICS-119-parallel-pass-command-recording.md) —
-  parallel render-pass command recording via the task scheduler. Slices A and B
-  are complete locally: the executor has a backend-neutral layer-parallel
-  record/join contract, RHI has a per-pass command-context acquisition seam,
-  Null/Mock provide CPU bookkeeping, and the renderer exposes a debug selector
-  with serial fallback stats. Slice C.1 adds Vulkan backend-local secondary
-  command buffers for accepted graphics-queue parallel context plans. Slice C.2
-  exposes the renderer worker fan-out stats, and Slice C.3 isolates
-  command-record diagnostics behind a guarded frame-local accumulator. Slice C.4
-  routes picking and histogram readback issue counters and per-slot metadata
-  through guarded renderer helpers. Scheduler dispatch stays disabled because
-  dynamic upload helpers, shared pass helper state, and Vulkan command-pool
-  ownership still need isolation or synchronization. Benchmark evidence and the
-  `gpu;vulkan` smoke remain later slices.
+- None.
 
 ## History
 

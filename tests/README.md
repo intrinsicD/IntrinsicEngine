@@ -79,6 +79,11 @@ is the GRAPHICS-119 opt-in Vulkan check: it runs serial and parallel
 default-recipe frames with validation enabled, compares the captured readback
 bytes, and asserts the graphics-only parallel context plan was accepted without
 falling back to the serial path.
+`DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialAsyncComputeReadbackWithValidation`
+is the companion non-graphics check: it keeps postprocess enabled, requires an
+operational async-compute queue profile, compares serial/parallel readback
+bytes, and asserts the accepted async-compute parallel context plan did not
+fall back to serial.
 
 The opt-in `IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests` executable (labels
 `gpu;vulkan;integration;runtime;graphics`, RUNTIME-095 Slice 3) drives

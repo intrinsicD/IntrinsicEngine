@@ -2,16 +2,37 @@
 id: GRAPHICS-119
 theme: B
 depends_on: []
+maturity_target: Operational
+completed: 2026-07-07
 ---
 # GRAPHICS-119 — Parallel render-pass command recording via the task scheduler
 
+## Completion
+- Completed: 2026-07-07. Commit/PR: this retirement change.
+- Maturity: `Operational` on Vulkan-capable hosts; `CPUContracted` for the
+  deterministic Null/device-neutral contracts. Graphics-queue and
+  async-compute Vulkan secondary-command-buffer paths both have opt-in
+  `gpu;vulkan` smoke evidence. Transfer render-graph scheduling remains
+  outside this task because no production render-graph transfer pass is
+  enabled.
+- Summary: render-graph pass command recording can fan out by compiled
+  topological layer through `Core::Tasks`, acquire backend-neutral parallel
+  command contexts, and join the accepted contexts back into serial submit
+  order. Null and Mock devices prove deterministic CPU behavior, Vulkan records
+  graphics and async-compute secondaries from queue-family-local command pools,
+  and the renderer keeps the serial fallback/debug selector as the determinism
+  reference.
+- Evidence: focused CPU/null contracts, graphics-only and async-compute
+  promoted Vulkan validation smokes, benchmark smoke parity, structural gates,
+  clean-workshop review, `IntrinsicTests` build, and the full CPU-supported
+  CTest gate passed locally. See `## Verification` for exact commands.
+
 ## Status
-- In progress on local `main`; PR not opened.
-- Owner/agent: Codex.
-- Current slice: Slice C.10 (opt-in Vulkan graphics-queue smoke) completed and
-  verified locally.
-- Next implementation step: cover remaining Vulkan non-graphics secondary
-  execution scope.
+- Retired on 2026-07-07 at `Operational` on local `main`; PR not opened.
+- PR/commit: this retirement commit.
+- Slice C.11 completed Vulkan async-compute secondary contexts, re-enabled the
+  promoted Vulkan async framegraph capability when a live async queue is
+  acquired, and passed final local verification.
 
 ## Goal
 - Record render-graph pass command buffers in parallel: independent passes
@@ -112,9 +133,13 @@ depends_on: []
       metrics with no performance-win adoption claim.
 - [x] Slice C.10: add opt-in promoted Vulkan smoke coverage that compares
       serial and accepted graphics-queue parallel readback bytes under
-      validation, with postprocess disabled so the current Vulkan secondary
-      command implementation is not forced through the deferred non-graphics
-      plan.
+      validation, with lighting-path fallback, clustered-light compute gates,
+      and postprocess disabled so the Vulkan secondary command implementation
+      exercises a graphics-only plan.
+- [x] Slice C.11: accept Vulkan async-compute parallel command-context plans
+      with queue-family-local secondary command buffers, execute each
+      secondary into the matching queue-submit primary, and re-enable promoted
+      Vulkan framegraph async-compute scheduling once validation-clean.
 - [x] RHI contract for parallel recording: acquire per-thread/per-batch
       command contexts, record independently, submit in compiled order;
       Null + Vulkan implementations.
@@ -181,9 +206,11 @@ depends_on: []
       (probe), with the join deterministic.
 - [x] Opt-in `gpu;vulkan` smoke: default recipe graphics-queue plan
       image-identical serial vs parallel; validation layers clean under
-      parallel recording. The smoke disables postprocess to keep the plan
-      graphics-only; Vulkan non-graphics secondary execution remains later
-      backend scope.
+      parallel recording. The smoke disables lighting and postprocess
+      extension slots to keep the plan graphics-only.
+- [x] Opt-in `gpu;vulkan` smoke: default recipe async-compute plan
+      image-identical serial vs parallel; validation layers clean under
+      accepted non-graphics parallel command contexts.
 - [x] PR-fast benchmark: recording CPU ms/frame serial vs parallel on a
       pass-heavy synthetic recipe.
 
@@ -208,18 +235,22 @@ depends_on: []
 - [x] Slice C.5c: document per-context Vulkan command-pool ownership and the
       remaining worker fan-out, benchmark, and opt-in Vulkan smoke scope.
 - [x] Slice C.6: document scheduler-backed renderer worker fan-out, the guarded
-      frame-sampled descriptor bridge, and the remaining non-graphics queue /
-      benchmark / opt-in Vulkan smoke scope.
+      frame-sampled descriptor bridge, and the then-outstanding non-graphics
+      queue, benchmark, and opt-in Vulkan smoke scope.
 - [x] Slice C.7: task record documents seeded CPU/null determinism coverage;
       no architecture docs changed.
-- [x] Slice C.8: document accepted CPU/null multi-queue fan-out and the
-      remaining Vulkan non-graphics secondary-execution scope.
+- [x] Slice C.8: document accepted CPU/null multi-queue fan-out and the then
+      outstanding Vulkan async secondary-execution scope.
 - [x] Slice C.9: document the render-graph parallel-recording smoke benchmark
       and record that it is benchmark evidence, not a renderer-wide performance
       win claim.
 - [x] Slice C.10: document the opt-in
       `DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation`
-      Vulkan smoke and the remaining non-graphics secondary-execution scope.
+      Vulkan smoke and the then-outstanding async secondary-execution
+      scope.
+- [x] Slice C.11: document accepted Vulkan async-compute secondary command
+      contexts, the promoted Vulkan async framegraph profile, and the opt-in
+      async parallel-recording smoke evidence.
 - [x] Update `docs/architecture/frame-graph.md` and
       `src/graphics/renderer/README.md` (threading model, fallback flag).
 
@@ -511,8 +542,8 @@ adoption_claim: false
 
 Conclusion: checksum parity holds and scheduler fan-out is exercised, but this
 PR-fast CPU smoke does not show a win at the current synthetic pass count/work
-shape. The parallel renderer path remains behind the debug selector until the
-remaining non-graphics Vulkan secondary-execution evidence exists.
+shape. The parallel renderer path remains behind the debug selector as the
+serial fallback and determinism reference.
 
 Slice C.10 focused verification run locally on 2026-07-07:
 
@@ -522,10 +553,10 @@ ctest --test-dir build/ci --output-on-failure -R 'DefaultRecipeSurfaceGpuSmoke\.
 ```
 
 Slice C.10 opt-in Vulkan smoke result: 1/1 tests passed. The smoke requested
-validation, disabled the postprocess extension to keep the current Vulkan plan
-graphics-only, compared serial and parallel default-recipe debug-view readback
-bytes, asserted `ParallelRecordingAccepted == true`, and observed no
-fallback/validation counter increment across the parallel frame.
+validation, disabled the lighting and postprocess extension slots to keep the
+current Vulkan plan graphics-only, compared serial and parallel default-recipe
+debug-view readback bytes, asserted `ParallelRecordingAccepted == true`, and
+observed no fallback/validation counter increment across the parallel frame.
 
 Slice C.10 final verification run locally on 2026-07-07:
 
@@ -544,14 +575,60 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 
 Slice C.10 full CPU-supported gate result: 3596/3596 tests passed.
 
+Slice C.11 focused verification run locally on 2026-07-07:
+
+```bash
+cmake --build --preset ci --target IntrinsicGraphicsVulkanSmokeTests IntrinsicGraphicsVulkanContractTests
+ctest --test-dir build/ci --output-on-failure -R 'VulkanFailClosedContract\..*ParallelCommand|RendererFrameLifecycle\.ParallelRecordingUsesAcceptedContextsForAsyncComputeQueuePlan' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+ctest --test-dir build/ci --output-on-failure -R 'DefaultRecipeSurfaceGpuSmoke\.AsyncComputeHistogramQueueReadbackMatchesMinimalHarnessSamples' -L 'gpu' -L 'vulkan' --timeout 120
+cmake --build --preset ci --target IntrinsicGraphicsVulkanSmokeTests
+ctest --test-dir build/ci --output-on-failure -R 'DefaultRecipeSurfaceGpuSmoke\.ParallelRecordingMatchesSerialAsyncComputeReadbackWithValidation' -L 'gpu' -L 'vulkan' --timeout 120
+```
+
+Slice C.11 focused result: CPU contracts passed 2/2, the existing async-compute
+Vulkan smoke passed 1/1 after the promoted Vulkan framegraph profile re-enabled
+async scheduling, and the new async parallel-recording validation smoke passed
+1/1. The new smoke compares serial and accepted parallel default-recipe
+readback bytes with postprocess enabled, asserts the histogram pass records on
+an async-compute queue-submit plan, and observes no fallback/validation counter
+increment across the parallel frame.
+
+Slice C.11 final focused verification run locally on 2026-07-07:
+
+```bash
+cmake --build --preset ci --target IntrinsicGraphicsVulkanSmokeTests IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure -R 'RendererFrameLifecycle\.(FrameRecipeOverrideProjectionDisablesMappedFeatureSlots|ParallelRecordingUsesAcceptedContextsForAsyncComputeQueuePlan)' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+ctest --test-dir build/ci --output-on-failure -R 'DefaultRecipeSurfaceGpuSmoke\.(ParallelRecordingMatchesSerialReadbackWithValidation|ParallelRecordingMatchesSerialAsyncComputeReadbackWithValidation|AsyncComputeHistogramQueueReadbackMatchesMinimalHarnessSamples)' -L 'gpu' -L 'vulkan' --timeout 120
+cmake --build --preset ci --target IntrinsicGraphicsVulkanSmokeTests IntrinsicGraphicsContractCpuTests
+cmake --build --preset ci --target IntrinsicGraphicsVulkanContractTests
+ctest --test-dir build/ci --output-on-failure -R 'VulkanFailClosedContract\..*ParallelCommand|RendererFrameLifecycle\.ParallelRecordingUsesAcceptedContextsForAsyncComputeQueuePlan' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+```
+
+Slice C.11 final focused result: renderer contract coverage passed 2/2, the
+grouped promoted Vulkan graphics-only/async validation smoke coverage passed
+3/3, Vulkan fail-closed plus async renderer CPU contracts passed 3/3,
+`IntrinsicTests` built successfully, and the full CPU-supported CTest gate
+passed 3851/3851.
+
+Clean-workshop manual scorecard for Slice C.11: row 3 `n/a` (no public
+`.cppm` API surface changed), row 4 `pass` (the Vulkan async secondary-context
+acceptance and renderer feature-slot projection are owned by the existing
+GRAPHICS-119 parallel-command-context and frame-recipe override seams, not a
+new renderer subsystem), row 5 `n/a` (no new frame-graph pass), row 6 `n/a`
+(no new frame-recipe dependency edge). Findings: none; no follow-up task ID
+required.
+
 ## Forbidden changes
 - Nondeterministic submission order or frame output.
 - Passing `Vk*` types through RHI/renderer/framegraph public APIs.
-- Making the parallel path the only path before non-graphics Vulkan secondary
-  execution is covered or explicitly deferred.
+- Removing the serial fallback/debug selector; it remains the determinism
+  reference for parallel recording.
 
 ## Maturity
 - Target: `Operational` on Vulkan-capable hosts; `CPUContracted` for the
-  determinism/distribution contracts on Null. The graphics-queue Vulkan
-  secondary path has opt-in `gpu;vulkan` smoke evidence; non-graphics Vulkan
-  secondary execution remains later backend scope.
+  determinism/distribution contracts on Null. Graphics-queue and async-compute
+  Vulkan secondary paths both have opt-in `gpu;vulkan` smoke evidence, while
+  transfer render-graph scheduling remains outside this task because no
+  production render-graph transfer pass is enabled.

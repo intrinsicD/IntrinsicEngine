@@ -3429,13 +3429,9 @@ RHI::ICommandContext& VulkanDevice::GetGraphicsContext(uint32_t frameIndex)
 
 RHI::QueueCapabilityProfile VulkanDevice::GetQueueCapabilityProfile() const noexcept
 {
-    // GRAPHICS-037D follow-up: keep render-graph frame execution on the
-    // graphics queue until cross-queue barrier lowering is validation-clean.
-    // The dedicated VulkanTransferQueue remains available through
-    // GetTransferQueue() for upload traffic; this profile only controls
-    // framegraph pass batching.
     return RHI::QueueCapabilityProfile{
-        .SupportsAsyncCompute = false,
+        .SupportsAsyncCompute = HasLiveOperationalPrerequisites() &&
+                                m_AsyncComputeQueue != VK_NULL_HANDLE,
         .SupportsTransfer = false,
     };
 }
@@ -3480,6 +3476,27 @@ bool VulkanDevice::BeginFrameQueueSubmitPlan(const RHI::FrameHandle& frame,
         }
         return perFrame.CmdPool;
     };
+    RHI::QueueCapabilityProfile submitPlanQueueProfile{};
+    for (const RHI::QueueSubmitBatchDesc& batch : plan.Batches)
+    {
+        switch (batch.Queue)
+        {
+        case RHI::QueueAffinity::AsyncCompute:
+            submitPlanQueueProfile.SupportsAsyncCompute =
+                submitPlanQueueProfile.SupportsAsyncCompute ||
+                (m_AsyncComputeQueue != VK_NULL_HANDLE &&
+                 perFrame.AsyncComputeCmdPool != VK_NULL_HANDLE);
+            break;
+        case RHI::QueueAffinity::Transfer:
+            submitPlanQueueProfile.SupportsTransfer =
+                submitPlanQueueProfile.SupportsTransfer ||
+                (m_TransferVkQueue != VK_NULL_HANDLE &&
+                 perFrame.TransferCmdPool != VK_NULL_HANDLE);
+            break;
+        case RHI::QueueAffinity::Graphics:
+            break;
+        }
+    }
 
     pending.reserve(plan.Batches.size());
     contexts.resize(plan.Batches.size());
@@ -3549,7 +3566,7 @@ bool VulkanDevice::BeginFrameQueueSubmitPlan(const RHI::FrameHandle& frame,
                 m_AsyncComputeQueue != VK_NULL_HANDLE ? m_AsyncComputeFamily : VK_QUEUE_FAMILY_IGNORED,
                 m_TransferVkQueue != VK_NULL_HANDLE ? m_TransferFamily : VK_QUEUE_FAMILY_IGNORED,
                 m_PresentFamily,
-                GetQueueCapabilityProfile());
+                submitPlanQueueProfile);
         contexts[batchIndex].Bind(m_Device,
                                   commandBuffer,
                                   m_GlobalPipelineLayout,
@@ -3600,6 +3617,7 @@ bool VulkanDevice::BeginFrameParallelCommandContexts(
     std::vector<VulkanCommandContext>& contexts = m_ParallelCommandContexts[frame.FrameIndex];
     std::vector<PendingParallelCommandContext>& commandBuffers =
         m_ParallelCommandBuffers[frame.FrameIndex];
+    PerFrame& perFrame = m_Frames[frame.FrameIndex];
 
     if (!commandBuffers.empty())
     {
@@ -3625,13 +3643,56 @@ bool VulkanDevice::BeginFrameParallelCommandContexts(
         contexts.clear();
     };
 
+    const auto queueFamilyForParallelContext =
+        [this, &perFrame](const RHI::QueueAffinity queue) noexcept -> std::uint32_t
+    {
+        switch (queue)
+        {
+        case RHI::QueueAffinity::Graphics:
+            return m_GraphicsQueue != VK_NULL_HANDLE && perFrame.CmdPool != VK_NULL_HANDLE
+                ? m_GraphicsFamily
+                : VK_QUEUE_FAMILY_IGNORED;
+        case RHI::QueueAffinity::AsyncCompute:
+            return m_AsyncComputeQueue != VK_NULL_HANDLE &&
+                       perFrame.AsyncComputeCmdPool != VK_NULL_HANDLE
+                ? m_AsyncComputeFamily
+                : VK_QUEUE_FAMILY_IGNORED;
+        case RHI::QueueAffinity::Transfer:
+            return m_TransferVkQueue != VK_NULL_HANDLE &&
+                       perFrame.TransferCmdPool != VK_NULL_HANDLE
+                ? m_TransferFamily
+                : VK_QUEUE_FAMILY_IGNORED;
+        }
+        return VK_QUEUE_FAMILY_IGNORED;
+    };
+
+    RHI::QueueCapabilityProfile parallelPlanQueueProfile{};
+    for (const RHI::ParallelCommandContextRequest& request : plan.Requests)
+    {
+        switch (request.Queue)
+        {
+        case RHI::QueueAffinity::AsyncCompute:
+            parallelPlanQueueProfile.SupportsAsyncCompute =
+                parallelPlanQueueProfile.SupportsAsyncCompute ||
+                (queueFamilyForParallelContext(request.Queue) != VK_QUEUE_FAMILY_IGNORED);
+            break;
+        case RHI::QueueAffinity::Transfer:
+            parallelPlanQueueProfile.SupportsTransfer =
+                parallelPlanQueueProfile.SupportsTransfer ||
+                (queueFamilyForParallelContext(request.Queue) != VK_QUEUE_FAMILY_IGNORED);
+            break;
+        case RHI::QueueAffinity::Graphics:
+            break;
+        }
+    }
+
     const VulkanFrameGraphBarrierQueueFamilies barrierFamilies =
         ResolveFrameGraphBarrierQueueFamilies(
             m_GraphicsFamily,
             m_AsyncComputeQueue != VK_NULL_HANDLE ? m_AsyncComputeFamily : VK_QUEUE_FAMILY_IGNORED,
             m_TransferVkQueue != VK_NULL_HANDLE ? m_TransferFamily : VK_QUEUE_FAMILY_IGNORED,
             m_PresentFamily,
-            GetQueueCapabilityProfile());
+            parallelPlanQueueProfile);
 
     for (std::size_t requestIndex = 0; requestIndex < plan.Requests.size(); ++requestIndex)
     {
@@ -3642,10 +3703,11 @@ bool VulkanDevice::BeginFrameParallelCommandContexts(
             Core::Log::Warn("[VulkanDevice::BeginFrameParallelCommandContexts] rejected non-contiguous context plan");
             return false;
         }
-        if (request.Queue != RHI::QueueAffinity::Graphics)
+        const std::uint32_t queueFamily = queueFamilyForParallelContext(request.Queue);
+        if (queueFamily == VK_QUEUE_FAMILY_IGNORED)
         {
             releaseParallelCommandPools();
-            Core::Log::Warn("[VulkanDevice::BeginFrameParallelCommandContexts] rejected non-graphics context plan; falling back to serial recording");
+            Core::Log::Warn("[VulkanDevice::BeginFrameParallelCommandContexts] rejected unsupported queue context plan; falling back to serial recording");
             return false;
         }
 
@@ -3653,7 +3715,7 @@ bool VulkanDevice::BeginFrameParallelCommandContexts(
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT |
                          VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-        poolInfo.queueFamilyIndex = m_GraphicsFamily;
+        poolInfo.queueFamilyIndex = queueFamily;
 
         VkCommandPool pool = VK_NULL_HANDLE;
         VkResult result = vkCreateCommandPool(m_Device, &poolInfo, nullptr, &pool);
@@ -3725,14 +3787,18 @@ RHI::ICommandContext& VulkanDevice::GetParallelCommandContext(
 void VulkanDevice::SubmitParallelCommandContext(const RHI::ParallelCommandContextRequest& request,
                                                 RHI::ICommandContext& submitContext)
 {
-    (void)submitContext;
     if (request.FrameIndex >= kMaxFramesInFlight ||
-        request.ContextIndex >= m_ParallelCommandContexts[request.FrameIndex].size())
+        request.ContextIndex >= m_ParallelCommandContexts[request.FrameIndex].size() ||
+        request.ContextIndex >= m_ParallelCommandBuffers[request.FrameIndex].size())
+    {
+        return;
+    }
+    if (m_ParallelCommandBuffers[request.FrameIndex][request.ContextIndex].Queue != request.Queue)
     {
         return;
     }
 
-    VulkanCommandContext& primaryContext = m_CmdContexts[request.FrameIndex];
+    VulkanCommandContext& primaryContext = static_cast<VulkanCommandContext&>(submitContext);
     primaryContext.ExecuteSecondary(m_ParallelCommandContexts[request.FrameIndex][request.ContextIndex]);
 }
 

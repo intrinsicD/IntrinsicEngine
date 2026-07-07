@@ -185,9 +185,10 @@ then joins those contexts back through each `GetQueueSubmitContext(...)` batch i
 the existing queue-submit order. Backend-visible queue submission, timeline
 wait/signal placement, barriers, post-graph readbacks, and runtime frame hooks
 stay on the existing submit-plan path. This preserves deterministic GPU-visible
-order while allowing CPU-side pass recording to fan out; Vulkan currently
-declines non-graphics parallel command-context plans, so operational
-non-graphics secondary execution remains later `GRAPHICS-119` backend scope.
+order while allowing CPU-side pass recording to fan out. Vulkan accepts graphics
+and async-compute parallel command-context plans, records secondary command
+buffers from the corresponding queue-family command pools, and executes each
+secondary through the matching queue-submit primary.
 
 `RenderGraphFrameStats::Execute` reports whether the executor used scheduler
 workers. Command-record diagnostics now accumulate through a guarded frame-local
@@ -200,21 +201,23 @@ a shared renderer guard. Postprocess pass helpers also serialize per-frame
 bloom scratch, histogram viewport/buffer, and AA stage pass-object recording.
 Frame-sampled bridge descriptor updates are also serialized before route
 dispatch because promoted Vulkan updates shared descriptor-set state. Accepted
-CPU/null multi-queue submit plans use the same per-pass parallel contexts and
-join them back through each queue-submit batch so submission order, timeline
-waits/signals, and barriers remain unchanged. Remaining `GRAPHICS-119` scope is
-Vulkan non-graphics secondary execution.
+CPU/null and promoted Vulkan async-compute multi-queue submit plans use the same
+per-pass parallel contexts and join them back through each queue-submit batch so
+submission order, timeline waits/signals, and barriers remain unchanged.
 
-Null provides CPU bookkeeping contexts for this contract. Vulkan accepts the
-current graphics-queue plan shape with backend-local secondary command buffers
-and records `vkCmdExecuteCommands(...)` into the primary context at each serial
-submit callback; each accepted context owns a frame-scoped command pool, and the
-pool plus secondary buffer are retained until the frame-slot fence has retired
-and are destroyed on the next `BeginFrame`. The opt-in `gpu;vulkan` smoke
+Null provides CPU bookkeeping contexts for this contract. Vulkan accepts
+graphics-queue and async-compute plan shapes with backend-local secondary command
+buffers and records `vkCmdExecuteCommands(...)` into the matching queue-submit
+primary context at each serial submit callback; each accepted context owns a
+frame-scoped command pool in the corresponding queue family, and the pool plus
+secondary buffer are retained until the frame-slot fence has retired and are
+destroyed on the next `BeginFrame`. The opt-in `gpu;vulkan` smoke
 `DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation`
 forces the default recipe onto a graphics-only pass plan, compares serial and
 parallel backbuffer readback bytes, and asserts validation counters stay stable.
-Vulkan non-graphics secondary execution remains later backend scope.
+`DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialAsyncComputeReadbackWithValidation`
+keeps postprocess enabled, compares serial and accepted parallel async-compute
+readback bytes, and asserts validation counters stay stable.
 
 ## Boundaries
 

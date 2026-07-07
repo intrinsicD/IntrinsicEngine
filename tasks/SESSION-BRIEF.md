@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `GRAPHICS-119` — Parallel render-pass command recording via the task scheduler (tasks/active/GRAPHICS-119-parallel-pass-command-recording.md)
+- none
 
 ## Theme B — Rendering modernization
 
