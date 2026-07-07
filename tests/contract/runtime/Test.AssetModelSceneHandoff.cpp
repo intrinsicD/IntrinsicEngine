@@ -44,6 +44,7 @@ import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.DerivedJobGraph;
+import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.StreamingExecutor;
@@ -212,6 +213,17 @@ namespace
             Core::Tasks::Scheduler::WaitForAll();
         }
         service.Tick();
+    }
+
+    void PumpDerivedJobs(Runtime::DerivedJobRegistry& jobs, const std::uint32_t maxLaunches)
+    {
+        jobs.Pump(maxLaunches);
+        if (Core::Tasks::Scheduler::IsInitialized())
+        {
+            Core::Tasks::Scheduler::WaitForAll();
+        }
+        jobs.DrainCompletions();
+        jobs.ApplyMainThreadResults();
     }
 }
 
@@ -431,12 +443,8 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstPublishesNormalsA
     EXPECT_TRUE(initialVertices->Properties.Exists("v:normal"));
     EXPECT_FALSE(initialVertices->Properties.Exists("v:texcoord"));
 
-    jobs.Pump(2u);
-    jobs.DrainCompletions();
-    jobs.ApplyMainThreadResults();
-    jobs.Pump(2u);
-    jobs.DrainCompletions();
-    jobs.ApplyMainThreadResults();
+    PumpDerivedJobs(jobs, 2u);
+    PumpDerivedJobs(jobs, 2u);
 
     const auto* vertices = fx.Scene.Raw().try_get<ECS::Components::GeometrySources::Vertices>(entity);
     ASSERT_NE(vertices, nullptr);
@@ -464,6 +472,274 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstPublishesNormalsA
     EXPECT_EQ(albedo->Readiness, Runtime::ProgressiveReadinessState::Ready);
     EXPECT_TRUE(albedo->GeneratedTexture.IsValid());
     EXPECT_NE(albedo->LastDiagnostic.find("without upload"), std::string::npos);
+}
+
+TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpaceNormalBakeWhenInputsReady)
+{
+    SceneHandoffFixture fx;
+    Runtime::StreamingExecutor streaming{};
+    Runtime::DerivedJobRegistry jobs{streaming};
+    Runtime::RuntimeObjectSpaceNormalBakeQueue normalBakeQueue{};
+    TmpFile modelFile("asset_model_scene_handoff_progressive_ready_normal_bake.gltf");
+    auto payload = MakeModelScenePayload(
+        /*includeTexcoords*/ true,
+        /*includeVertexColor*/ false,
+        /*includeNormals*/ true);
+    payload.Materials[0].NormalTexture = {};
+    auto model = LoadModel(
+        fx.Service,
+        modelFile.Path.string(),
+        std::move(payload));
+    ASSERT_TRUE(model.has_value()) << static_cast<int>(model.error());
+
+    Runtime::AssetModelSceneHandoffDiagnostics diagnostics{};
+    Runtime::AssetModelSceneHandoffOptions options{};
+    options.ProgressiveRawGeometryFirst = true;
+    options.ProgressiveJobs = &jobs;
+    options.ObjectSpaceNormalBakeQueue = &normalBakeQueue;
+    options.ObjectSpaceNormalBakeGraphicsBackendOperational = true;
+    auto state = Runtime::MaterializeModelSceneAsset(
+        fx.Service,
+        fx.Cache,
+        fx.Scene,
+        fx.Materials,
+        *model,
+        options,
+        &diagnostics);
+    ASSERT_TRUE(state.has_value()) << static_cast<int>(state.error());
+    ASSERT_EQ(state->Record.Primitives.size(), 1u);
+    EXPECT_TRUE(state->Record.GeneratedTextureAssets.empty());
+    EXPECT_EQ(diagnostics.ProgressiveNormalJobsQueued, 0u);
+    EXPECT_EQ(diagnostics.ProgressiveTextureBakeJobsQueued, 1u);
+    EXPECT_EQ(normalBakeQueue.Diagnostics().QueuedRequests, 0u);
+
+    const ECS::EntityHandle entity = state->Record.Primitives[0].Entity;
+    ASSERT_TRUE(fx.Scene.IsValid(entity));
+    const auto initialJobs =
+        jobs.SnapshotEntity(Runtime::StableEntityLookup::ToRenderId(entity));
+    bool sawCpuNormalBake = false;
+    bool sawGpuSchedule = false;
+    for (const auto& entry : initialJobs.Entries)
+    {
+        sawCpuNormalBake = sawCpuNormalBake || entry.Name == "bake normal texture";
+        sawGpuSchedule =
+            sawGpuSchedule || entry.Name == "schedule normal GPU bake request";
+    }
+    EXPECT_FALSE(sawCpuNormalBake);
+    EXPECT_TRUE(sawGpuSchedule);
+
+    PumpDerivedJobs(jobs, 2u);
+    PumpDerivedJobs(jobs, 2u);
+    const auto afterJobs =
+        jobs.SnapshotEntity(Runtime::StableEntityLookup::ToRenderId(entity));
+    for (const auto& entry : afterJobs.Entries)
+    {
+        if (entry.Name == "schedule normal GPU bake request")
+        {
+            EXPECT_EQ(entry.Status, Runtime::DerivedJobStatus::Complete)
+                << entry.Diagnostic;
+        }
+    }
+    EXPECT_EQ(normalBakeQueue.Diagnostics().QueuedRequests, 1u);
+    EXPECT_EQ(normalBakeQueue.Diagnostics().NonOperationalNoOps, 0u);
+    EXPECT_EQ(normalBakeQueue.PendingCount(), 1u);
+
+    ASSERT_EQ(state->Record.Materials.size(), 1u);
+    EXPECT_FALSE(state->Record.Materials[0].TextureBindings.Normal.IsValid());
+    EXPECT_EQ(state->Record.Materials[0].TextureBindings.NormalSpace,
+              Graphics::MaterialNormalTextureSpace::TangentSpaceNormal);
+
+    auto& bindings =
+        fx.Scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
+    const Runtime::ProgressivePresentationBinding* presentation =
+        Runtime::FindPresentationBinding(bindings, "mesh.surface");
+    ASSERT_NE(presentation, nullptr);
+    const Runtime::ProgressiveSlotBinding* normal =
+        Runtime::FindSlotBinding(*presentation,
+                                 Runtime::ProgressiveSlotSemantic::Normal);
+    ASSERT_NE(normal, nullptr);
+    EXPECT_EQ(normal->Readiness, Runtime::ProgressiveReadinessState::Pending);
+    EXPECT_FALSE(normal->GeneratedTexture.IsValid());
+    EXPECT_NE(normal->LastDiagnostic.find("queued object-space normal GPU bake request"),
+              std::string::npos);
+}
+
+TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpaceNormalBakeAfterUvEnrichment)
+{
+    SceneHandoffFixture fx;
+    Runtime::StreamingExecutor streaming{};
+    Runtime::DerivedJobRegistry jobs{streaming};
+    Runtime::RuntimeObjectSpaceNormalBakeQueue normalBakeQueue{};
+    TmpFile modelFile("asset_model_scene_handoff_progressive_enriched_normal_bake.gltf");
+    auto payload = MakeModelScenePayload(
+        /*includeTexcoords*/ false,
+        /*includeVertexColor*/ false,
+        /*includeNormals*/ true);
+    payload.Materials[0].NormalTexture = {};
+    auto model = LoadModel(
+        fx.Service,
+        modelFile.Path.string(),
+        std::move(payload));
+    ASSERT_TRUE(model.has_value()) << static_cast<int>(model.error());
+
+    Runtime::AssetModelSceneHandoffDiagnostics diagnostics{};
+    Runtime::AssetModelSceneHandoffOptions options{};
+    options.ProgressiveRawGeometryFirst = true;
+    options.ProgressiveJobs = &jobs;
+    options.ObjectSpaceNormalBakeQueue = &normalBakeQueue;
+    options.ObjectSpaceNormalBakeGraphicsBackendOperational = true;
+    auto state = Runtime::MaterializeModelSceneAsset(
+        fx.Service,
+        fx.Cache,
+        fx.Scene,
+        fx.Materials,
+        *model,
+        options,
+        &diagnostics);
+    ASSERT_TRUE(state.has_value()) << static_cast<int>(state.error());
+    ASSERT_EQ(state->Record.Primitives.size(), 1u);
+    EXPECT_EQ(diagnostics.ProgressiveUvAtlasJobsQueued, 1u);
+    EXPECT_EQ(diagnostics.ProgressiveNormalJobsQueued, 0u);
+    EXPECT_EQ(diagnostics.ProgressiveTextureBakeJobsQueued, 1u);
+    EXPECT_EQ(normalBakeQueue.Diagnostics().QueuedRequests, 0u);
+
+    const ECS::EntityHandle entity = state->Record.Primitives[0].Entity;
+    ASSERT_TRUE(fx.Scene.IsValid(entity));
+    const auto initialJobs =
+        jobs.SnapshotEntity(Runtime::StableEntityLookup::ToRenderId(entity));
+    bool sawUvAtlas = false;
+    bool sawGpuSchedule = false;
+    std::size_t scheduleDependencies = 0u;
+    for (const auto& entry : initialJobs.Entries)
+    {
+        sawUvAtlas = sawUvAtlas || entry.Name == "generate mesh uv atlas";
+        if (entry.Name == "schedule normal GPU bake request")
+        {
+            sawGpuSchedule = true;
+            scheduleDependencies = entry.Dependencies.size();
+        }
+    }
+    EXPECT_TRUE(sawUvAtlas);
+    EXPECT_TRUE(sawGpuSchedule);
+    EXPECT_EQ(scheduleDependencies, 1u);
+
+    const auto* initialVertices =
+        fx.Scene.Raw().try_get<ECS::Components::GeometrySources::Vertices>(entity);
+    ASSERT_NE(initialVertices, nullptr);
+    EXPECT_FALSE(initialVertices->Properties.Exists("v:texcoord"));
+
+    PumpDerivedJobs(jobs, 2u);
+    PumpDerivedJobs(jobs, 2u);
+
+    const auto* vertices =
+        fx.Scene.Raw().try_get<ECS::Components::GeometrySources::Vertices>(entity);
+    ASSERT_NE(vertices, nullptr);
+    EXPECT_TRUE(vertices->Properties.Exists("v:texcoord"));
+    EXPECT_EQ(normalBakeQueue.Diagnostics().QueuedRequests, 1u);
+    EXPECT_EQ(normalBakeQueue.CachedContentKeyCount(), 1u);
+    EXPECT_EQ(normalBakeQueue.PendingCount(), 1u);
+
+    auto& bindings =
+        fx.Scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
+    const Runtime::ProgressivePresentationBinding* presentation =
+        Runtime::FindPresentationBinding(bindings, "mesh.surface");
+    ASSERT_NE(presentation, nullptr);
+    const Runtime::ProgressiveSlotBinding* normal =
+        Runtime::FindSlotBinding(*presentation,
+                                 Runtime::ProgressiveSlotSemantic::Normal);
+    ASSERT_NE(normal, nullptr);
+    EXPECT_EQ(normal->Readiness, Runtime::ProgressiveReadinessState::Pending);
+    EXPECT_FALSE(normal->GeneratedTexture.IsValid());
+    EXPECT_NE(normal->LastDiagnostic.find("queued object-space normal GPU bake request"),
+              std::string::npos);
+}
+
+TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstDoesNotCpuFallbackWhenNormalBakeBackendIsNonOperational)
+{
+    SceneHandoffFixture fx;
+    Runtime::StreamingExecutor streaming{};
+    Runtime::DerivedJobRegistry jobs{streaming};
+    Runtime::RuntimeObjectSpaceNormalBakeQueue normalBakeQueue{};
+    TmpFile modelFile("asset_model_scene_handoff_progressive_nonoperational_normal_bake.gltf");
+    auto payload = MakeModelScenePayload(
+        /*includeTexcoords*/ true,
+        /*includeVertexColor*/ false,
+        /*includeNormals*/ true);
+    payload.Materials[0].NormalTexture = {};
+    auto model = LoadModel(
+        fx.Service,
+        modelFile.Path.string(),
+        std::move(payload));
+    ASSERT_TRUE(model.has_value()) << static_cast<int>(model.error());
+
+    Runtime::AssetModelSceneHandoffDiagnostics diagnostics{};
+    Runtime::AssetModelSceneHandoffOptions options{};
+    options.ProgressiveRawGeometryFirst = true;
+    options.ProgressiveJobs = &jobs;
+    options.ObjectSpaceNormalBakeQueue = &normalBakeQueue;
+    options.ObjectSpaceNormalBakeGraphicsBackendOperational = false;
+    auto state = Runtime::MaterializeModelSceneAsset(
+        fx.Service,
+        fx.Cache,
+        fx.Scene,
+        fx.Materials,
+        *model,
+        options,
+        &diagnostics);
+    ASSERT_TRUE(state.has_value()) << static_cast<int>(state.error());
+    ASSERT_EQ(state->Record.Primitives.size(), 1u);
+    EXPECT_TRUE(state->Record.GeneratedTextureAssets.empty());
+    EXPECT_EQ(diagnostics.ProgressiveTextureBakeJobsQueued, 1u);
+    EXPECT_EQ(normalBakeQueue.Diagnostics().QueuedRequests, 0u);
+
+    const ECS::EntityHandle entity = state->Record.Primitives[0].Entity;
+    ASSERT_TRUE(fx.Scene.IsValid(entity));
+    const auto initialJobs =
+        jobs.SnapshotEntity(Runtime::StableEntityLookup::ToRenderId(entity));
+    bool sawCpuNormalBake = false;
+    bool sawGpuSchedule = false;
+    for (const auto& entry : initialJobs.Entries)
+    {
+        sawCpuNormalBake = sawCpuNormalBake || entry.Name == "bake normal texture";
+        sawGpuSchedule =
+            sawGpuSchedule || entry.Name == "schedule normal GPU bake request";
+    }
+    EXPECT_FALSE(sawCpuNormalBake);
+    EXPECT_TRUE(sawGpuSchedule);
+
+    PumpDerivedJobs(jobs, 2u);
+    PumpDerivedJobs(jobs, 2u);
+    const auto afterJobs =
+        jobs.SnapshotEntity(Runtime::StableEntityLookup::ToRenderId(entity));
+    for (const auto& entry : afterJobs.Entries)
+    {
+        if (entry.Name == "schedule normal GPU bake request")
+        {
+            EXPECT_EQ(entry.Status, Runtime::DerivedJobStatus::Complete)
+                << entry.Diagnostic;
+        }
+    }
+    EXPECT_EQ(normalBakeQueue.Diagnostics().QueuedRequests, 0u);
+    EXPECT_EQ(normalBakeQueue.Diagnostics().NonOperationalNoOps, 1u);
+    EXPECT_EQ(normalBakeQueue.PendingCount(), 0u);
+
+    ASSERT_EQ(state->Record.Materials.size(), 1u);
+    EXPECT_FALSE(state->Record.Materials[0].TextureBindings.Normal.IsValid());
+    EXPECT_EQ(state->Record.Materials[0].TextureBindings.NormalSpace,
+              Graphics::MaterialNormalTextureSpace::TangentSpaceNormal);
+
+    auto& bindings =
+        fx.Scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
+    const Runtime::ProgressivePresentationBinding* presentation =
+        Runtime::FindPresentationBinding(bindings, "mesh.surface");
+    ASSERT_NE(presentation, nullptr);
+    const Runtime::ProgressiveSlotBinding* normal =
+        Runtime::FindSlotBinding(*presentation,
+                                 Runtime::ProgressiveSlotSemantic::Normal);
+    ASSERT_NE(normal, nullptr);
+    EXPECT_EQ(normal->Readiness, Runtime::ProgressiveReadinessState::Pending);
+    EXPECT_FALSE(normal->GeneratedTexture.IsValid());
+    EXPECT_NE(normal->LastDiagnostic.find("no CPU fallback"), std::string::npos);
 }
 
 TEST(RuntimeAssetModelSceneHandoff, ReadyModelSceneEventMaterializesRecordAndOwnsGeneratedEntities)

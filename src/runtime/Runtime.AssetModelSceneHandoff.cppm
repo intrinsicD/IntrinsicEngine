@@ -20,6 +20,7 @@ import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.DerivedJobGraph;
+import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 
 export namespace Extrinsic::Runtime
 {
@@ -33,6 +34,8 @@ export namespace Extrinsic::Runtime
         bool GenerateMissingAlbedoTextures{true};
         bool ProgressiveRawGeometryFirst{false};
         DerivedJobRegistry* ProgressiveJobs{nullptr};
+        RuntimeObjectSpaceNormalBakeQueue* ObjectSpaceNormalBakeQueue{nullptr};
+        bool ObjectSpaceNormalBakeGraphicsBackendOperational{false};
         std::string GeneratedNormalPropertyName{"v:normal"};
         std::string GeneratedAlbedoPropertyName{"v:color"};
         std::uint32_t GeneratedTextureWidth{64u};
