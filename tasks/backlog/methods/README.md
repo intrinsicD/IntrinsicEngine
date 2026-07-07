@@ -29,6 +29,11 @@ map.
 - [METHOD-014 — Progressive Poisson GPU operational parity](METHOD-014-progressive-poisson-gpu-operational-parity.md)
   (Vulkan compute operational/parity follow-up to retired `METHOD-013`; no
   speedup claim without benchmark baseline comparison).
+- [METHOD-015 — Coherent Point Drift registration family reference backend](METHOD-015-coherent-point-drift-family-reference-backend.md)
+  (variant A rigid default with affine/nonrigid in-package; gated on
+  `geometry/GEOM-058` Gaussian-mixture/EM seam).
+- [METHOD-016 — Locally Optimal Projection (LOP/WLOP) consolidation reference backend](METHOD-016-locally-optimal-projection-reference-backend.md)
+  (variant A WLOP default; no solver gate — promotable now).
 
 ## Convergence
 
@@ -48,6 +53,12 @@ map.
   Each task lists explicit algorithm variants with a marked public-facing
   default backend; changing a default re-opens the corresponding solver-seam
   gating (see the per-task notes above).
+- METHOD-015 and METHOD-016 are seeded by the 2026-07-07 framework24
+  (`bcg_framework`) port-gap comparison (see the geometry backlog README's
+  port-gap section). METHOD-015's E-step numerics are owned by
+  `geometry/GEOM-058` (encoded in `depends_on`), and its optimized nonrigid
+  fast path is deferred to the `geometry/GEOM-060` permutohedral seam.
+  METHOD-016 has no solver gate.
 - Forbidden: importing runtime, graphics, platform, app, or live ECS ownership
   into a method package; claiming performance wins without a baseline.
 

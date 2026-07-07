@@ -15,6 +15,16 @@ map.
 - [GEOM-024 — Sparse symmetric generalized eigensolver seam](GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
   (gates `methods/METHOD-006` variant B; depends on `GEOM-020`; promote when
   METHOD-006 is the next-priority method).
+- [GEOM-058 — Gaussian mixture models and Anderson-accelerated EM seam](GEOM-058-gaussian-mixture-em-anderson-acceleration.md)
+  (gates `methods/METHOD-015`; framework24 port-gap follow-up).
+- [GEOM-059 — Kernel matrices, Nyström approximation, and Gaussian-process interpolation seam](GEOM-059-kernel-matrices-nystroem-gaussian-process.md)
+  (framework24 port-gap follow-up).
+- [GEOM-060 — Permutohedral lattice fast high-dimensional filtering seam](GEOM-060-permutohedral-lattice-highdim-filtering.md)
+  (named future fast path for the METHOD-015 nonrigid optimized backend and
+  bilateral-filter consumers; framework24 port-gap follow-up).
+- [GEOM-061 — Point-cloud grid-downsampling reduction strategies](GEOM-061-grid-downsampling-reduction-strategies.md)
+  (index-returning per-cell reduction extending retired GEOM-016's voxel
+  downsampling; framework24 port-gap follow-up).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ### bcg_code_base geometry-processing port gaps (seeded 2026-06-26)
@@ -25,6 +35,18 @@ Grouped by cluster; each is `geometry -> core` only and targets `CPUContracted`.
 
 All seeded primitive, statistics, and linear-algebra gaps in this cluster are
 retired; see the retired entries below.
+
+A second port-gap sweep (2026-07-07, direct comparison against the
+`framework24` checkout of `bcg_framework`) seeded the remaining
+research-numerics gaps that the 2026-06-26 review did not cover: `GEOM-058`
+(Gaussian mixtures + Anderson-accelerated EM), `GEOM-059` (kernel
+matrices/Nyström/Gaussian-process interpolation), `GEOM-060` (permutohedral
+lattice filtering), and `GEOM-061` (grid-downsampling reduction strategies),
+plus the method packages `methods/METHOD-015` (Coherent Point Drift family)
+and `methods/METHOD-016` (LOP/WLOP consolidation) and the editor task
+`ui/UI-034` (framework24 interaction/layout conventions). Each task file names
+the exact `lib_bcg_framework`/`lib_bcg_viewer` source headers it ports and the
+robustness/determinism contracts the port must add over the originals.
 
 The indexed decrease-key heap that backs Dijkstra is a `core` container filed
 under the runtime backlog as `CORE-004`; the paired editor/runtime integration

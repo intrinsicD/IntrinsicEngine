@@ -35,6 +35,7 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-149` — Extract render-recipe and hot-config control out of Engine (tasks/backlog/runtime/RUNTIME-149-extract-engine-config-control-subsystem.md)
 - unblocked: `RUNTIME-150` — Split the frame-loop hook adapters out of Runtime.Engine.cpp (tasks/backlog/runtime/RUNTIME-150-split-engine-frame-loop-implementation-unit.md)
 - blocked by `RUNTIME-146`: `RUNTIME-151` — Slim the Engine module interface and remove the entt leak (tasks/backlog/runtime/RUNTIME-151-slim-engine-interface-and-remove-entt-leak.md)
+- unblocked: `UI-034` — Decentralized editor window contribution, capture contract, and property-plot widgets (tasks/backlog/ui/UI-034-framework24-editor-interaction-layout-conventions.md)
 
 ## Theme H — Agentic workflow hardening
 
@@ -46,6 +47,10 @@ the authoritative open/unblocked view.
 - unblocked: `GEOM-014` — Feature-aware quadric error mesh simplification (tasks/backlog/geometry/GEOM-014-feature-aware-quadric-error-simplification.md)
 - unblocked: `GEOM-019` — Harmonic/Tutte parameterization and boundary constraints (tasks/backlog/geometry/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md)
 - unblocked: `GEOM-024` — Sparse symmetric generalized eigensolver seam (tasks/backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
+- unblocked: `GEOM-058` — Gaussian mixture models and Anderson-accelerated EM seam (tasks/backlog/geometry/GEOM-058-gaussian-mixture-em-anderson-acceleration.md)
+- unblocked: `GEOM-059` — Kernel matrices, Nyström approximation, and Gaussian-process interpolation seam (tasks/backlog/geometry/GEOM-059-kernel-matrices-nystroem-gaussian-process.md)
+- unblocked: `GEOM-060` — Permutohedral lattice fast high-dimensional filtering seam (tasks/backlog/geometry/GEOM-060-permutohedral-lattice-highdim-filtering.md)
+- unblocked: `GEOM-061` — Point-cloud grid-downsampling reduction strategies (tasks/backlog/geometry/GEOM-061-grid-downsampling-reduction-strategies.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 - unblocked: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
 - unblocked: `METHOD-004` — Walk on Spheres / Walk on Stars PDE solver reference backend (tasks/backlog/methods/METHOD-004-walk-on-spheres-reference-backend.md)
@@ -53,6 +58,8 @@ the authoritative open/unblocked view.
 - blocked by `GEOM-024`: `METHOD-006` — Cross-field / frame-field design reference backend (tasks/backlog/methods/METHOD-006-cross-field-design-reference-backend.md)
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
 - unblocked: `METHOD-014` — Progressive Poisson GPU operational parity (tasks/backlog/methods/METHOD-014-progressive-poisson-gpu-operational-parity.md)
+- blocked by `GEOM-058`: `METHOD-015` — Coherent Point Drift registration family reference backend (tasks/backlog/methods/METHOD-015-coherent-point-drift-family-reference-backend.md)
+- unblocked: `METHOD-016` — Locally Optimal Projection (LOP/WLOP) point-cloud consolidation reference backend (tasks/backlog/methods/METHOD-016-locally-optimal-projection-reference-backend.md)
 
 ## Audits
 

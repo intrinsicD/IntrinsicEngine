@@ -10,8 +10,13 @@ map.
 
 ## Tasks
 
-- No concrete UI integration tasks are currently open. Future UI children open
-  from the deferred triggers recorded by the retired RORG-031F seed.
+- [UI-034 — Decentralized editor window contribution, capture contract, and property-plot widgets](UI-034-framework24-editor-interaction-layout-conventions.md)
+  (Theme F; adopts the framework24 viewer interaction/layout conventions —
+  domain-window registration seam, lazy window lifecycle, unified input-capture
+  contract, global UI toggle, and generic property-plot widgets).
+
+Further UI children open from the deferred triggers recorded by the retired
+RORG-031F seed.
 
 The runtime SpatialDebug closest-face picking consumer for `GEOM-039` is
 retired under the runtime backlog as `RUNTIME-135`.
