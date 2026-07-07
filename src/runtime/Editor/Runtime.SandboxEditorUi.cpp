@@ -13210,6 +13210,12 @@ namespace Extrinsic::Runtime
             return model.HasSelectedEntity && model.DomainMatches;
         }
 
+        [[nodiscard]] bool DomainAppearanceReady(
+            const SandboxEditorDomainWindowModel& model) noexcept
+        {
+            return model.HasSelectedEntity && model.VisualizationTargetAvailable;
+        }
+
         void DrawDomainWindowHeader(const SandboxEditorDomainWindowModel& model)
         {
             ImGui::Text("Expected domain: %s",
@@ -14434,7 +14440,7 @@ namespace Extrinsic::Runtime
             DrawRenderHintStatus(model.RenderHints);
 
             ImGui::SeparatorText("Render controls");
-            const bool canEditRenderHints = DomainWindowReady(model);
+            const bool canEditRenderHints = DomainAppearanceReady(model);
             if (!canEditRenderHints)
                 ImGui::BeginDisabled();
             switch (model.Kind)
@@ -14452,7 +14458,7 @@ namespace Extrinsic::Runtime
             if (!canEditRenderHints)
                 ImGui::EndDisabled();
 
-            if (DomainWindowReady(model))
+            if (DomainAppearanceReady(model))
             {
                 ImGui::SeparatorText("Visualization");
                 DrawDomainVisualizationControls(model, context);

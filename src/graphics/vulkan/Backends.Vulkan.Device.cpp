@@ -1817,6 +1817,7 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
                                           &m_Samplers,
                                           &m_Pipelines,
                                           m_DefaultSamplerHandle,
+                                          m_GraphicsFamily,
                                           barrierFamilies.Graphics,
                                           barrierFamilies.AsyncCompute,
                                           barrierFamilies.Present,
@@ -2194,6 +2195,7 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
                                           &m_Samplers,
                                           &m_Pipelines,
                                           m_DefaultSamplerHandle,
+                                          m_GraphicsFamily,
                                           barrierFamilies.Graphics,
                                           barrierFamilies.AsyncCompute,
                                           barrierFamilies.Present,
@@ -2757,6 +2759,7 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
                                     &m_Samplers,
                                     &m_Pipelines,
                                     m_DefaultSamplerHandle,
+                                    m_GraphicsFamily,
                                     m_GraphicsFamily,
                                     m_AsyncComputeQueue != VK_NULL_HANDLE
                                         ? m_AsyncComputeFamily
@@ -3476,6 +3479,28 @@ bool VulkanDevice::BeginFrameQueueSubmitPlan(const RHI::FrameHandle& frame,
         }
         return perFrame.CmdPool;
     };
+    const auto queueFamilyForQueue =
+        [this, &perFrame](const RHI::QueueAffinity queue) noexcept -> std::uint32_t
+    {
+        switch (queue)
+        {
+        case RHI::QueueAffinity::AsyncCompute:
+            return m_AsyncComputeQueue != VK_NULL_HANDLE &&
+                       perFrame.AsyncComputeCmdPool != VK_NULL_HANDLE
+                     ? m_AsyncComputeFamily
+                     : m_GraphicsFamily;
+        case RHI::QueueAffinity::Transfer:
+            return m_TransferVkQueue != VK_NULL_HANDLE &&
+                       perFrame.TransferCmdPool != VK_NULL_HANDLE
+                     ? m_TransferFamily
+                     : m_GraphicsFamily;
+        case RHI::QueueAffinity::Graphics:
+            return perFrame.CmdPool != VK_NULL_HANDLE
+                     ? m_GraphicsFamily
+                     : VK_QUEUE_FAMILY_IGNORED;
+        }
+        return VK_QUEUE_FAMILY_IGNORED;
+    };
     RHI::QueueCapabilityProfile submitPlanQueueProfile{};
     for (const RHI::QueueSubmitBatchDesc& batch : plan.Batches)
     {
@@ -3576,6 +3601,7 @@ bool VulkanDevice::BeginFrameQueueSubmitPlan(const RHI::FrameHandle& frame,
                                   &m_Samplers,
                                   &m_Pipelines,
                                   m_DefaultSamplerHandle,
+                                  queueFamilyForQueue(batch.Queue),
                                   barrierFamilies.Graphics,
                                   barrierFamilies.AsyncCompute,
                                   barrierFamilies.Present,
@@ -3762,6 +3788,7 @@ bool VulkanDevice::BeginFrameParallelCommandContexts(
                                     &m_Samplers,
                                     &m_Pipelines,
                                     m_DefaultSamplerHandle,
+                                    queueFamily,
                                     barrierFamilies.Graphics,
                                     barrierFamilies.AsyncCompute,
                                     barrierFamilies.Present,
@@ -3880,22 +3907,34 @@ namespace
         }
     }
 
-    void PushUniqueQueueFamily(std::uint32_t* queueFamilies,
+    template <std::size_t Capacity>
+    void PushUniqueQueueFamily(std::array<std::uint32_t, Capacity>& queueFamilies,
                                std::uint32_t& queueFamilyCount,
                                const std::uint32_t family)
     {
+        if (family == VK_QUEUE_FAMILY_IGNORED)
+            return;
+
         for (std::uint32_t index = 0; index < queueFamilyCount; ++index)
         {
             if (queueFamilies[index] == family)
                 return;
         }
-        queueFamilies[queueFamilyCount++] = family;
+        if (queueFamilyCount < Capacity)
+            queueFamilies[queueFamilyCount++] = family;
+    }
+
+    [[nodiscard]] std::uint32_t LiveQueueFamilyOrIgnored(const VkQueue queue,
+                                                         const std::uint32_t family) noexcept
+    {
+        return queue != VK_NULL_HANDLE ? family : VK_QUEUE_FAMILY_IGNORED;
     }
 
     [[nodiscard]] VkBufferCreateInfo MakeVulkanBufferCreateInfo(
         const RHI::BufferDesc& desc,
         std::array<std::uint32_t, 3>& queueFamilies,
         const std::uint32_t graphicsFamily,
+        const std::uint32_t asyncComputeFamily,
         const std::uint32_t transferFamily)
     {
         VkBufferCreateInfo info{};
@@ -3906,9 +3945,9 @@ namespace
                      VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
         std::uint32_t queueFamilyCount = 0;
-        PushUniqueQueueFamily(queueFamilies.data(), queueFamilyCount, graphicsFamily);
-        if (transferFamily != graphicsFamily)
-            PushUniqueQueueFamily(queueFamilies.data(), queueFamilyCount, transferFamily);
+        PushUniqueQueueFamily(queueFamilies, queueFamilyCount, graphicsFamily);
+        PushUniqueQueueFamily(queueFamilies, queueFamilyCount, asyncComputeFamily);
+        PushUniqueQueueFamily(queueFamilies, queueFamilyCount, transferFamily);
 
         if (queueFamilyCount > 1u)
         {
@@ -3927,7 +3966,7 @@ namespace
     struct VulkanImageCreateInfoBundle
     {
         VkImageCreateInfo Info{};
-        std::array<std::uint32_t, 2> QueueFamilies{};
+        std::array<std::uint32_t, 3> QueueFamilies{};
         VkFormat Format = VK_FORMAT_UNDEFINED;
         VkImageUsageFlags Usage = 0;
         std::uint32_t Depth = 1;
@@ -3938,6 +3977,7 @@ namespace
     [[nodiscard]] VulkanImageCreateInfoBundle MakeVulkanImageCreateInfo(
         const RHI::TextureDesc& desc,
         const std::uint32_t graphicsFamily,
+        const std::uint32_t asyncComputeFamily,
         const std::uint32_t transferFamily,
         const bool aliasMemory = false)
     {
@@ -3969,11 +4009,15 @@ namespace
         info.tiling = VK_IMAGE_TILING_OPTIMAL;
         info.usage = bundle.Usage;
 
-        if (transferFamily != graphicsFamily)
+        std::uint32_t queueFamilyCount = 0;
+        PushUniqueQueueFamily(bundle.QueueFamilies, queueFamilyCount, graphicsFamily);
+        PushUniqueQueueFamily(bundle.QueueFamilies, queueFamilyCount, asyncComputeFamily);
+        PushUniqueQueueFamily(bundle.QueueFamilies, queueFamilyCount, transferFamily);
+
+        if (queueFamilyCount > 1u)
         {
-            bundle.QueueFamilies = {graphicsFamily, transferFamily};
             info.sharingMode = VK_SHARING_MODE_CONCURRENT;
-            info.queueFamilyIndexCount = 2u;
+            info.queueFamilyIndexCount = queueFamilyCount;
             info.pQueueFamilyIndices = bundle.QueueFamilies.data();
         }
         else
@@ -4163,14 +4207,18 @@ RHI::BufferHandle VulkanDevice::CreateBuffer(const RHI::BufferDesc& desc)
     if (!HasLiveOperationalPrerequisites() || desc.SizeBytes == 0)
         return {};
 
-    // GRAPHICS-018 §4 queue-family handling: if the transfer queue lives on a
-    // different family from graphics, declare CONCURRENT sharing so transfer
-    // uploads and graphics reads can touch the same buffer without explicit
-    // queue-family ownership-transfer barriers between the two queues. The
-    // simpler EXCLUSIVE path is preserved when families coincide.
+    // GRAPHICS-121 queue-family handling: resources are created for every live
+    // queue family that can submit or upload them. This keeps async-compute
+    // render-graph passes and transfer uploads within Vulkan's concurrent
+    // sharing contract without exposing queue-family policy through RHI.
     std::array<std::uint32_t, 3> bufferQueueFamilies{};
     const VkBufferCreateInfo bci =
-        MakeVulkanBufferCreateInfo(desc, bufferQueueFamilies, m_GraphicsFamily, m_TransferFamily);
+        MakeVulkanBufferCreateInfo(
+            desc,
+            bufferQueueFamilies,
+            m_GraphicsFamily,
+            LiveQueueFamilyOrIgnored(m_AsyncComputeQueue, m_AsyncComputeFamily),
+            LiveQueueFamilyOrIgnored(m_TransferVkQueue, m_TransferFamily));
 
     VmaAllocationCreateInfo aci{};
     VmaAllocationInfo info{};
@@ -4504,7 +4552,12 @@ RHI::ResourceMemoryRequirements VulkanDevice::GetBufferMemoryRequirements(
 
     std::array<std::uint32_t, 3> bufferQueueFamilies{};
     const VkBufferCreateInfo bufferInfo =
-        MakeVulkanBufferCreateInfo(desc, bufferQueueFamilies, m_GraphicsFamily, m_TransferFamily);
+        MakeVulkanBufferCreateInfo(
+            desc,
+            bufferQueueFamilies,
+            m_GraphicsFamily,
+            LiveQueueFamilyOrIgnored(m_AsyncComputeQueue, m_AsyncComputeFamily),
+            LiveQueueFamilyOrIgnored(m_TransferVkQueue, m_TransferFamily));
 
     VkMemoryDedicatedRequirements dedicated{};
     dedicated.sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_REQUIREMENTS;
@@ -4643,7 +4696,12 @@ RHI::BufferHandle VulkanDevice::CreatePlacedBuffer(const RHI::PlacedBufferDesc& 
 
     std::array<std::uint32_t, 3> bufferQueueFamilies{};
     const VkBufferCreateInfo bufferInfo =
-        MakeVulkanBufferCreateInfo(placedDesc.Desc, bufferQueueFamilies, m_GraphicsFamily, m_TransferFamily);
+        MakeVulkanBufferCreateInfo(
+            placedDesc.Desc,
+            bufferQueueFamilies,
+            m_GraphicsFamily,
+            LiveQueueFamilyOrIgnored(m_AsyncComputeQueue, m_AsyncComputeFamily),
+            LiveQueueFamilyOrIgnored(m_TransferVkQueue, m_TransferFamily));
 
     VkBuffer buffer = VK_NULL_HANDLE;
     VkResult result = vkCreateBuffer(m_Device, &bufferInfo, nullptr, &buffer);
@@ -4711,7 +4769,11 @@ RHI::TextureHandle VulkanDevice::CreateTexture(const RHI::TextureDesc& desc)
         return {};
 
     VulkanImageCreateInfoBundle imageInfoBundle =
-        MakeVulkanImageCreateInfo(desc, m_GraphicsFamily, m_TransferFamily);
+        MakeVulkanImageCreateInfo(
+            desc,
+            m_GraphicsFamily,
+            LiveQueueFamilyOrIgnored(m_AsyncComputeQueue, m_AsyncComputeFamily),
+            LiveQueueFamilyOrIgnored(m_TransferVkQueue, m_TransferFamily));
     RebindVulkanImageCreateInfoPointers(imageInfoBundle);
     if (!imageInfoBundle.IsValid)
         return {};
@@ -4843,7 +4905,12 @@ RHI::ResourceMemoryRequirements VulkanDevice::GetTextureMemoryRequirements(
         return {};
 
     VulkanImageCreateInfoBundle imageInfoBundle =
-        MakeVulkanImageCreateInfo(desc, m_GraphicsFamily, m_TransferFamily, true);
+        MakeVulkanImageCreateInfo(
+            desc,
+            m_GraphicsFamily,
+            LiveQueueFamilyOrIgnored(m_AsyncComputeQueue, m_AsyncComputeFamily),
+            LiveQueueFamilyOrIgnored(m_TransferVkQueue, m_TransferFamily),
+            true);
     RebindVulkanImageCreateInfoPointers(imageInfoBundle);
     if (!imageInfoBundle.IsValid)
         return {};
@@ -4902,7 +4969,12 @@ RHI::TextureHandle VulkanDevice::CreatePlacedTexture(const RHI::PlacedTextureDes
         return {};
 
     VulkanImageCreateInfoBundle imageInfoBundle =
-        MakeVulkanImageCreateInfo(placedDesc.Desc, m_GraphicsFamily, m_TransferFamily, true);
+        MakeVulkanImageCreateInfo(
+            placedDesc.Desc,
+            m_GraphicsFamily,
+            LiveQueueFamilyOrIgnored(m_AsyncComputeQueue, m_AsyncComputeFamily),
+            LiveQueueFamilyOrIgnored(m_TransferVkQueue, m_TransferFamily),
+            true);
     RebindVulkanImageCreateInfoPointers(imageInfoBundle);
     if (!imageInfoBundle.IsValid)
         return {};

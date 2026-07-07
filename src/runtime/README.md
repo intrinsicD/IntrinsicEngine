@@ -530,6 +530,14 @@ and `Graph / Processing / Vertices / Normals`; the old omnibus per-domain
 generation-keyed async selected-analysis cache/job pipeline remains owned by
 open `RUNTIME-138`.
 
+`UI-033` makes the `Appearance` windows compositional over render lanes rather
+than exact provenance-domain gates. `PointCloud / Appearance` is the point/vertex
+lane surface and can show controls for selected point clouds, graphs, or meshes
+when the points lane is available; `Graph / Appearance` owns edge/connectivity
+appearance; `Mesh / Appearance` owns surface/face appearance. The exact-domain
+gate remains in the raw `Properties` window and the `Processing` windows so
+method execution cannot silently run on a richer or incompatible domain.
+
 ### Sandbox Editor Vertex Channel Bindings
 
 `RUNTIME-123` extends `Extrinsic.Runtime.SandboxEditorUi` with normal/color

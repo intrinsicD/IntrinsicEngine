@@ -23,6 +23,32 @@ namespace
     {
         g_FallbackCommandRecordingAttempts.fetch_add(1, std::memory_order_relaxed);
     }
+
+    [[nodiscard]] VkPipelineStageFlags2 SanitizeStageMaskForBoundQueue(
+        const VkPipelineStageFlags2 stages,
+        const std::uint32_t boundQueueFamily,
+        const std::uint32_t graphicsQueueFamily) noexcept
+    {
+        if (stages == VK_PIPELINE_STAGE_2_NONE ||
+            boundQueueFamily == VK_QUEUE_FAMILY_IGNORED ||
+            boundQueueFamily == graphicsQueueFamily)
+        {
+            return stages;
+        }
+
+        constexpr VkPipelineStageFlags2 kGraphicsOnlyStages =
+            VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT |
+            VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT |
+            VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT |
+            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT |
+            VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
+            VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+
+        const VkPipelineStageFlags2 filteredStages = stages & ~kGraphicsOnlyStages;
+        return filteredStages != VK_PIPELINE_STAGE_2_NONE
+                 ? filteredStages
+                 : VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    }
 }
 
 std::uint64_t GetFallbackCommandRecordingAttemptCount() noexcept
@@ -42,6 +68,7 @@ void VulkanCommandContext::Bind(VkDevice device, VkCommandBuffer cmd,
                                  Core::ResourcePool<VulkanSampler,  RHI::SamplerHandle,  kMaxFramesInFlight>* samplers,
                                  Core::ResourcePool<VulkanPipeline, RHI::PipelineHandle, kMaxFramesInFlight>* pipelines,
                                  RHI::SamplerHandle defaultSampler,
+                                 uint32_t boundQueueFamily,
                                  uint32_t graphicsQueueFamily,
                                  uint32_t asyncComputeQueueFamily,
                                  uint32_t presentQueueFamily,
@@ -57,6 +84,7 @@ void VulkanCommandContext::Bind(VkDevice device, VkCommandBuffer cmd,
     m_Samplers      = samplers;
     m_Pipelines     = pipelines;
     m_DefaultSampler = defaultSampler;
+    m_BoundQueueFamily = boundQueueFamily;
     m_GraphicsQueueFamily = graphicsQueueFamily;
     m_AsyncComputeQueueFamily = asyncComputeQueueFamily;
     m_PresentQueueFamily  = presentQueueFamily;
@@ -582,9 +610,15 @@ void VulkanCommandContext::BufferBarrier(RHI::BufferHandle buf,
 
     VkBufferMemoryBarrier2 barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-    barrier.srcStageMask  = ToVkStage(before);
+    barrier.srcStageMask  = SanitizeStageMaskForBoundQueue(
+        ToVkStage(before),
+        m_BoundQueueFamily,
+        m_GraphicsQueueFamily);
     barrier.srcAccessMask = ToVkAccess(before);
-    barrier.dstStageMask  = ToVkStage(after);
+    barrier.dstStageMask  = SanitizeStageMaskForBoundQueue(
+        ToVkStage(after),
+        m_BoundQueueFamily,
+        m_GraphicsQueueFamily);
     barrier.dstAccessMask = ToVkAccess(after);
     barrier.buffer        = b->Buffer;
     barrier.offset        = 0;
@@ -666,9 +700,15 @@ void VulkanCommandContext::SubmitBarriers(const RHI::BarrierBatchDesc& batch)
 
         VkImageMemoryBarrier2 barrier{};
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-        barrier.srcStageMask = ToVkStage(desc.BeforeAccess);
+        barrier.srcStageMask = SanitizeStageMaskForBoundQueue(
+            ToVkStage(desc.BeforeAccess),
+            m_BoundQueueFamily,
+            m_GraphicsQueueFamily);
         barrier.srcAccessMask = ToVkAccess(desc.BeforeAccess);
-        barrier.dstStageMask = ToVkStage(desc.AfterAccess);
+        barrier.dstStageMask = SanitizeStageMaskForBoundQueue(
+            ToVkStage(desc.AfterAccess),
+            m_BoundQueueFamily,
+            m_GraphicsQueueFamily);
         barrier.dstAccessMask = ToVkAccess(desc.AfterAccess);
         barrier.oldLayout = ToVkImageLayout(desc.BeforeLayout);
         barrier.newLayout = ToVkImageLayout(desc.AfterLayout);
@@ -695,9 +735,15 @@ void VulkanCommandContext::SubmitBarriers(const RHI::BarrierBatchDesc& batch)
 
         VkBufferMemoryBarrier2 barrier{};
         barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-        barrier.srcStageMask = ToVkStage(desc.BeforeAccess);
+        barrier.srcStageMask = SanitizeStageMaskForBoundQueue(
+            ToVkStage(desc.BeforeAccess),
+            m_BoundQueueFamily,
+            m_GraphicsQueueFamily);
         barrier.srcAccessMask = ToVkAccess(desc.BeforeAccess);
-        barrier.dstStageMask = ToVkStage(desc.AfterAccess);
+        barrier.dstStageMask = SanitizeStageMaskForBoundQueue(
+            ToVkStage(desc.AfterAccess),
+            m_BoundQueueFamily,
+            m_GraphicsQueueFamily);
         barrier.dstAccessMask = ToVkAccess(desc.AfterAccess);
         const ResolvedOwnershipFamilies ownership =
             resolveOwnershipFamilies(desc.SrcQueueFamily, desc.DstQueueFamily);
@@ -713,9 +759,15 @@ void VulkanCommandContext::SubmitBarriers(const RHI::BarrierBatchDesc& batch)
     {
         VkMemoryBarrier2 barrier{};
         barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
-        barrier.srcStageMask = ToVkStage(desc.BeforeAccess);
+        barrier.srcStageMask = SanitizeStageMaskForBoundQueue(
+            ToVkStage(desc.BeforeAccess),
+            m_BoundQueueFamily,
+            m_GraphicsQueueFamily);
         barrier.srcAccessMask = ToVkAccess(desc.BeforeAccess);
-        barrier.dstStageMask = ToVkStage(desc.AfterAccess);
+        barrier.dstStageMask = SanitizeStageMaskForBoundQueue(
+            ToVkStage(desc.AfterAccess),
+            m_BoundQueueFamily,
+            m_GraphicsQueueFamily);
         barrier.dstAccessMask = ToVkAccess(desc.AfterAccess);
         memoryBarriers.push_back(barrier);
     }

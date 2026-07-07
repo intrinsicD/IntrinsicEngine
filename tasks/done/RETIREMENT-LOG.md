@@ -9,6 +9,32 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`GRAPHICS-121`](GRAPHICS-121-vulkan-resource-sharing-async-compute.md) —
+Vulkan resource sharing includes async compute — retired on 2026-07-07 at
+maturity `Operational`. The promoted Vulkan backend now creates buffers and
+images with every live render-graph submit queue family: graphics, async
+compute, and transfer when present and distinct. Command contexts also carry
+their bound queue family and sanitize Sync2 barrier stage masks so async
+compute command buffers do not record graphics-only stages. The
+`DefaultRecipeSurfaceGpuSmoke` Vulkan smoke passed 8/8, the default
+CPU-supported gate passed 3596/3596, and the broader `gpu;vulkan` label
+intersection improved to the existing unrelated 270/272 state
+(`GraphicsRenderGraph.LifetimeFirstAndLastUseTracksPassIndices` and
+`ExtrinsicSandbox.FramePacingDiagnosticCapture`).
+
+Active
+[`UI-033`](UI-033-compositional-appearance-domain-windows.md) —
+Compositional Appearance domain windows — retired on 2026-07-07 at maturity
+`CPUContracted`. Sandbox editor `Appearance` windows now use selected-entity
+render-lane availability instead of exact provenance-domain matching, so
+`PointCloud / Appearance` can expose point/vertex controls for point-cloud,
+graph, and mesh entities when the point lane exists, while graph and mesh
+appearance continue to layer edge/connectivity and surface/face controls.
+Processing and raw Properties windows remain exact-domain gated. Focused
+`SandboxEditorUi` coverage passed, and the default CPU-supported gate passed
+3596/3596.
+
+Active
 [`GRAPHICS-120`](GRAPHICS-120-framegraph-compiler-executor-efficiency.md) —
 Framegraph compiler/executor efficiency and hygiene polish — retired on
 2026-07-06 at maturity `CPUContracted`. The framegraph now treats
