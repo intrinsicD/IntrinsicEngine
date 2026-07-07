@@ -31,7 +31,17 @@ maturity_target: Operational
   `Engine::Initialize()` with references to the collaborators it already
   uses today (`StreamingExecutor`, `AssetService`, `GpuAssetCache`,
   `RenderExtractionCache`, `ECS::Scene::Registry`,
-  `CameraControllerRegistry`, `SelectionController`, `EngineConfig`).
+  `CameraControllerRegistry`, `SelectionController`,
+  `EditorCommandHistory`, `EngineConfig`).
+- Document dirty-state coupling: successful scene-changing imports mark
+  the document dirty via `m_EditorCommandHistory.MarkDirty("Import
+  Asset")` / `("Reimport Asset")` in `ImportAssetFromPath`,
+  `ReimportAsset`, the dropped-file apply, and both queued applies
+  (`Runtime.Engine.cpp:4217,4271,4557,4816,5190`). The pipeline must keep
+  marking through the engine-owned `EditorCommandHistory` — after Slice B
+  removes the `Engine` delegations there is no other place this happens,
+  so omitting the reference would silently regress File/Scene dirty
+  state for imports.
 - Current locations, all in `src/runtime/Runtime.Engine.{cppm,cpp}`:
   - Public methods: `ImportAssetFromPath`, `QueueModelTextureImport`,
     `ReimportAsset`, `ImportDroppedFilePaths`, `CancelAssetImport`,
@@ -86,6 +96,9 @@ maturity_target: Operational
 - [ ] Construct/destroy the pipeline in `Engine::Initialize()` /
       `Engine::Shutdown()` preserving current ordering relative to
       `StreamingExecutor`, `AssetService`, and `GpuAssetCache` teardown.
+- [ ] Wire the engine-owned `EditorCommandHistory` into the pipeline and
+      preserve the `MarkDirty` calls on every successful scene-changing
+      import path (sync, reimport, dropped-file apply, queued applies).
 - [ ] Add `Engine::GetAssetImportPipeline()` (and `const` overload).
 - [ ] Slice A: keep delegating `Engine` methods; Slice B: migrate all call
       sites and delete the delegations.
@@ -103,6 +116,11 @@ maturity_target: Operational
 - [ ] One new contract test proving `GetAssetImportPipeline()` exposes the
       same event-log/queue-snapshot state the `Engine` facade returned
       before the move (guards the delegation removal in Slice B).
+- [ ] A contract test (new or extended) asserting the
+      `EditorCommandHistory` document state reads dirty after a
+      successful scene-changing import driven through the pipeline, and
+      stays unmarked after a failed import (guards the dirty-state
+      coupling across Slice B).
 
 ## Docs
 - [ ] Update `src/runtime/README.md` module list for the new module.
@@ -114,6 +132,8 @@ maturity_target: Operational
       method or member listed in Context; `Runtime.Engine.cpp` shrinks by
       at least the moved helper block (~2,500+ lines total).
 - [ ] All import behavior verified by the existing test suite is unchanged.
+- [ ] Document dirty-state marking for imports behaves identically before
+      and after Slice B (covered by the named contract test).
 - [ ] Teardown ordering is preserved (no new shutdown races; existing
       shutdown-path tests pass).
 - [ ] CPU gate and layering check pass after each slice.

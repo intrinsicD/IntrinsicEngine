@@ -38,13 +38,23 @@ maturity_target: Operational
     `CopySerializableComponent`, `CopySerializableTag`,
     `CopySerializableHierarchy`, `QueuedSceneLoadState`,
     `QueuedSceneSaveState`.
-- Coupling to preserve: scene replacement must still (1) rebuild
-  `StableEntityLookup` at the replacement boundary
-  (`RebuildStableEntityLookupAfterSceneReplacement`), (2) clear selection
-  and runtime sidecars (`ClearSceneRuntimeState`), and (3) mark
-  `EditorCommandHistory` document state. Whether these run via direct
-  references or an `Engine`-installed post-replacement callback is the
-  implementer's choice; the ordering contract is what the tests pin.
+- Coupling to preserve — the exact replacement sequence used by
+  `LoadSceneFromPath`, the queued-load apply, and `NewSceneDocument`
+  (`Runtime.Engine.cpp:5809-5814`, `5877-5883`, `5930-5935`):
+  1. `ClearSceneRuntimeState()` — selection/render-extraction sidecars
+     are cleared against the **outgoing** scene, before any registry
+     mutation;
+  2. `DisconnectStableEntityLookupTracking()`;
+  3. registry clear + replacement (`m_Scene->Clear()`, move-in for
+     loads);
+  4. `RebuildStableEntityLookupAfterSceneReplacement()` (loads) or
+     lookup `Clear()` + reconnect (new/close);
+  5. `EditorCommandHistory.ResetDocument(...)`.
+  Running sidecar cleanup after the replacement would clear against the
+  new/empty scene and leave stale selection/render-extraction state from
+  the outgoing scene. Whether the steps run via direct references or an
+  `Engine`-installed callback is the implementer's choice; this ordering
+  is the contract the tests pin.
 - Known consumers to update: `Runtime.SandboxEditorUi` (editor file menu),
   Sandbox app code, `Test.RuntimeSceneLifecycle.cpp`, and any acceptance
   tests driving save/load through `Engine`.
@@ -57,7 +67,9 @@ maturity_target: Operational
       in Context verbatim.
 - [ ] Construct/destroy the subsystem in `Engine::Initialize()` /
       `Shutdown()`; keep the scene-replacement side-effect ordering
-      (lookup rebuild → sidecar clear → history marking) identical.
+      identical to the five-step sequence in Context (sidecar clear
+      against the outgoing scene → lookup disconnect → registry
+      replacement → lookup rebuild/clear → history document reset).
 - [ ] Add `Engine::GetSceneDocument()` (and `const` overload); migrate
       call sites; do not keep delegating methods on `Engine`.
 - [ ] Keep drop-event and import paths (owned elsewhere) compiling against
