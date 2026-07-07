@@ -13,9 +13,11 @@ import Extrinsic.Asset.Service;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
+import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
@@ -23,6 +25,7 @@ import Extrinsic.Runtime.StreamingExecutor;
 
 namespace Assets = Extrinsic::Assets;
 namespace ECS = Extrinsic::ECS;
+namespace Graphics = Extrinsic::Graphics;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
 namespace Runtime = Extrinsic::Runtime;
 
@@ -455,6 +458,107 @@ TEST(RuntimeSelectedMeshTextureBake, SynchronousCommandBakesBindsAndUsesHistory)
               Runtime::ProgressiveSlotSourceKind::GeneratedTextureAsset);
     EXPECT_EQ(slot->Readiness, Runtime::ProgressiveReadinessState::Ready);
     EXPECT_EQ(slot->GeneratedTexture, result.GeneratedTexture);
+}
+
+TEST(RuntimeSelectedMeshTextureBake, ObjectSpaceNormalQueueSchedulesSelectedMeshNormalBakeWithoutAssetService)
+{
+    ECS::Scene::Registry scene{};
+    const ECS::EntityHandle entity = MakeMeshEntity(scene);
+    Runtime::RuntimeObjectSpaceNormalBakeQueue normalBakeQueue{};
+
+    Runtime::SelectedMeshTextureBakeRequest request = MakeNormalRequest(entity);
+    request.Width = 64u;
+    request.Height = 128u;
+    request.SourceGeneration = 12u;
+    request.DirtyStamp = 34u;
+    Runtime::SelectedMeshTextureBakeContext context{
+        .Scene = &scene,
+        .ObjectSpaceNormalBakeQueue = &normalBakeQueue,
+        .ObjectSpaceNormalBakeGraphicsBackendOperational = true,
+    };
+
+    const Runtime::SelectedMeshTextureBakeResult result =
+        Runtime::ApplySelectedMeshTextureBakeCommand(context, request);
+
+    ASSERT_EQ(result.Status, Runtime::SelectedMeshTextureBakeStatus::Scheduled);
+    EXPECT_EQ(result.ExecutionMode,
+              Runtime::SelectedMeshTextureBakeExecutionMode::ObjectSpaceNormalBakeQueue);
+    EXPECT_EQ(result.GeneratedTexture, (Assets::AssetId{request.StableEntityId, 1u}));
+    EXPECT_TRUE(result.BoundGeneratedTexture);
+    EXPECT_EQ(result.BindingGeneration, 8u);
+    EXPECT_EQ(normalBakeQueue.PendingCount(), 1u);
+    EXPECT_EQ(normalBakeQueue.CachedContentKeyCount(), 1u);
+    EXPECT_EQ(normalBakeQueue.Diagnostics().QueuedRequests, 1u);
+
+    const auto& bindings =
+        scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
+    const Runtime::ProgressiveSlotBinding* slot =
+        FindSlot(bindings, Runtime::ProgressiveSlotSemantic::Normal);
+    ASSERT_NE(slot, nullptr);
+    EXPECT_EQ(slot->SourceKind, Runtime::ProgressiveSlotSourceKind::PropertyBake);
+    EXPECT_EQ(slot->Readiness, Runtime::ProgressiveReadinessState::Pending);
+    EXPECT_FALSE(slot->GeneratedTexture.IsValid());
+
+    const auto completion = normalBakeQueue.Complete(result.GeneratedTexture.IsValid()
+        ? Runtime::RuntimeObjectSpaceNormalBakeStaleKey{
+              .EntityGeneration = request.StableEntityId,
+              .Bake = {
+                  .GeneratedTextureAsset = result.GeneratedTexture,
+                  .Source = {
+                      .EntityKey = request.StableEntityId,
+                      .GeometryGeneration = 34u,
+                      .TexcoordGeneration = 12u,
+                      .NormalGeneration = 12u,
+                  },
+                  .Width = 64u,
+                  .Height = 128u,
+                  .PaddingTexels = 4u,
+                  .Space = Graphics::NormalTextureSpace::ObjectSpaceNormal,
+              },
+          }
+        : Runtime::RuntimeObjectSpaceNormalBakeStaleKey{});
+    EXPECT_EQ(completion.Status,
+              Runtime::RuntimeObjectSpaceNormalBakeStatus::ReadyForBinding);
+}
+
+TEST(RuntimeSelectedMeshTextureBake, ObjectSpaceNormalQueueNoOpsOnNonOperationalBackend)
+{
+    ECS::Scene::Registry scene{};
+    const ECS::EntityHandle entity = MakeMeshEntity(scene);
+    Runtime::RuntimeObjectSpaceNormalBakeQueue normalBakeQueue{};
+
+    Runtime::SelectedMeshTextureBakeRequest request = MakeNormalRequest(entity);
+    request.Width = 64u;
+    request.Height = 64u;
+    Runtime::SelectedMeshTextureBakeContext context{
+        .Scene = &scene,
+        .ObjectSpaceNormalBakeQueue = &normalBakeQueue,
+        .ObjectSpaceNormalBakeGraphicsBackendOperational = false,
+    };
+
+    const Runtime::SelectedMeshTextureBakeResult result =
+        Runtime::ApplySelectedMeshTextureBakeCommand(context, request);
+
+    EXPECT_FALSE(result.Succeeded());
+    EXPECT_EQ(result.Status,
+              Runtime::SelectedMeshTextureBakeStatus::NonOperationalBackend);
+    EXPECT_EQ(result.ExecutionMode,
+              Runtime::SelectedMeshTextureBakeExecutionMode::ObjectSpaceNormalBakeQueue);
+    EXPECT_NE(result.Diagnostic.find("no CPU fallback"), std::string::npos);
+    EXPECT_EQ(result.BindingGeneration, 0u);
+    EXPECT_EQ(normalBakeQueue.PendingCount(), 0u);
+    EXPECT_EQ(normalBakeQueue.CachedContentKeyCount(), 0u);
+    EXPECT_EQ(normalBakeQueue.Diagnostics().NonOperationalNoOps, 1u);
+
+    const auto& bindings =
+        scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
+    EXPECT_EQ(bindings.BindingGeneration, 7u);
+    const Runtime::ProgressiveSlotBinding* slot =
+        FindSlot(bindings, Runtime::ProgressiveSlotSemantic::Normal);
+    ASSERT_NE(slot, nullptr);
+    EXPECT_EQ(slot->SourceKind, Runtime::ProgressiveSlotSourceKind::PropertyBake);
+    EXPECT_EQ(slot->Readiness, Runtime::ProgressiveReadinessState::Pending);
+    EXPECT_FALSE(slot->GeneratedTexture.IsValid());
 }
 
 TEST(RuntimeSelectedMeshTextureBake, SynchronousCommandBakesFaceColorToAlbedoSlot)

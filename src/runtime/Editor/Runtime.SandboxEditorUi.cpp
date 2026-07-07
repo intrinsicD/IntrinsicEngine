@@ -21560,6 +21560,7 @@ namespace Extrinsic::Runtime
                 break;
             case SelectedMeshTextureBakeStatus::Success:
             case SelectedMeshTextureBakeStatus::Scheduled:
+            case SelectedMeshTextureBakeStatus::NonOperationalBackend:
             case SelectedMeshTextureBakeStatus::MissingProgressiveBindings:
             case SelectedMeshTextureBakeStatus::MissingPresentation:
             case SelectedMeshTextureBakeStatus::MissingSlot:

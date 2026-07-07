@@ -14,6 +14,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
+import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.ProgressiveRenderData;
 
 export namespace Extrinsic::Runtime
@@ -22,6 +23,7 @@ export namespace Extrinsic::Runtime
     {
         Success,
         Scheduled,
+        NonOperationalBackend,
         MissingScene,
         MissingAssetService,
         StaleEntity,
@@ -54,6 +56,7 @@ export namespace Extrinsic::Runtime
     {
         Synchronous,
         DerivedJob,
+        ObjectSpaceNormalBakeQueue,
     };
 
     struct SelectedMeshTextureBakeRequest
@@ -106,6 +109,8 @@ export namespace Extrinsic::Runtime
         Assets::AssetService* AssetService{nullptr};
         EditorCommandHistory* CommandHistory{nullptr};
         DerivedJobRegistry* DerivedJobs{nullptr};
+        RuntimeObjectSpaceNormalBakeQueue* ObjectSpaceNormalBakeQueue{nullptr};
+        bool ObjectSpaceNormalBakeGraphicsBackendOperational{false};
     };
 
     struct SelectedMeshTextureBakeResult
