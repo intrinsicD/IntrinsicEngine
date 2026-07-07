@@ -24,10 +24,17 @@ the authoritative open/unblocked view.
 - unblocked: `CORE-007` — Scheduler priority, wait, and wake hardening (tasks/backlog/architecture/CORE-007-scheduler-priority-wait-wake-hardening.md)
 - unblocked: `CORE-008` — Compiled task-graph plan reuse across executions (tasks/backlog/architecture/CORE-008-compiled-taskgraph-plan-reuse.md)
 - unblocked: `CORE-009` — App-owned config sections out of core EngineConfig (tasks/backlog/architecture/CORE-009-app-owned-config-sections.md)
+- unblocked: `LEGACY-043` — Retire stale multi-descriptor-set shader sources (tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RUNTIME-137` — Async GPU readback helper + pooled destination for compute backends (tasks/backlog/runtime/RUNTIME-137-async-gpu-readback-helper-for-compute-backends.md)
 - unblocked: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
+- unblocked: `RUNTIME-146` — Extract engine config boot into a free-standing module (tasks/backlog/runtime/RUNTIME-146-extract-engine-config-boot-module.md)
+- unblocked: `RUNTIME-147` — Extract the runtime asset-import pipeline out of Engine (tasks/backlog/runtime/RUNTIME-147-extract-asset-import-pipeline-subsystem.md)
+- unblocked: `RUNTIME-148` — Extract the scene-document facade out of Engine (tasks/backlog/runtime/RUNTIME-148-extract-scene-document-subsystem.md)
+- unblocked: `RUNTIME-149` — Extract render-recipe and hot-config control out of Engine (tasks/backlog/runtime/RUNTIME-149-extract-engine-config-control-subsystem.md)
+- unblocked: `RUNTIME-150` — Split the frame-loop hook adapters out of Runtime.Engine.cpp (tasks/backlog/runtime/RUNTIME-150-split-engine-frame-loop-implementation-unit.md)
+- blocked by `RUNTIME-146`: `RUNTIME-151` — Slim the Engine module interface and remove the entt leak (tasks/backlog/runtime/RUNTIME-151-slim-engine-interface-and-remove-entt-leak.md)
 
 ## Theme H — Agentic workflow hardening
 

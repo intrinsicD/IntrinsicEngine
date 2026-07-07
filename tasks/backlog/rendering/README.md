@@ -35,6 +35,15 @@ These were opened by `LEGACY-011` as focused blockers for legacy graphics/RHI
 retirement. They are not part of the modernization feature DAG; select them
 when retiring legacy behavior is the priority.
 
+- [`LEGACY-043`](LEGACY-043-retire-stale-multiset-shaders.md) — delete the
+  pre-bindless multi-descriptor-set shader sources under `assets/shaders/`
+  (root `surface.*`, `surface_gbuffer.*`, `deferred_lighting.frag`,
+  `deferred/gbuffer.*`, root `triangle.*`/`point.*`/`line.*`). No renderer
+  pass references them, they cannot form a valid pipeline against the
+  promoted single-set bindless layout, and the `CompileShaders.cmake` glob
+  still compiles them on every build (seeded 2026-07-06 from the
+  binding-model audit).
+
 ## Dependency DAG
 
 <!-- state-link-guard: allow-done-links -->
