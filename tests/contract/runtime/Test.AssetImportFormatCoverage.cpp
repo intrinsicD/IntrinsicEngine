@@ -451,49 +451,6 @@ namespace
         }
     }
 
-    void ExpectGeneratedNormalTextureBinding(
-        Runtime::Engine& engine,
-        const ECS::EntityHandle entity,
-        const std::string_view meshPath)
-    {
-        const std::string generatedPath =
-            Runtime::BuildGeneratedTextureAssetPath(
-                meshPath,
-                0u,
-                "normal",
-                "v:normal");
-        EXPECT_TRUE(engine.GetAssetService().PathIndexContains(generatedPath));
-
-        const std::uint32_t stableId =
-            Runtime::StableEntityLookup::ToRenderId(entity);
-        const auto binding =
-            engine.GetMaterialTextureAssetBindingsForTest(stableId);
-        ASSERT_TRUE(binding.has_value());
-        EXPECT_FALSE(binding->Albedo.IsValid());
-        ASSERT_TRUE(binding->Normal.IsValid());
-        EXPECT_EQ(binding->NormalSpace,
-                  Graphics::MaterialNormalTextureSpace::ObjectSpaceNormal);
-
-        auto boundPath = engine.GetAssetService().GetPath(binding->Normal);
-        ASSERT_TRUE(boundPath.has_value()) << static_cast<int>(boundPath.error());
-        EXPECT_EQ(*boundPath, generatedPath);
-        auto payload = engine.GetAssetService().Read<Assets::AssetTexture2DPayload>(
-            binding->Normal);
-        ASSERT_TRUE(payload.has_value()) << static_cast<int>(payload.error());
-        ASSERT_EQ(payload->size(), 1u);
-        EXPECT_EQ((*payload)[0].Metadata.Width, 64u);
-        EXPECT_EQ((*payload)[0].Metadata.Height, 64u);
-        EXPECT_EQ((*payload)[0].Metadata.PixelFormat,
-                  Assets::AssetTexturePixelFormat::Rgba8Unorm);
-        EXPECT_EQ((*payload)[0].Metadata.ColorSpace,
-                  Assets::AssetTextureColorSpace::Linear);
-        EXPECT_EQ((*payload)[0].Metadata.SourceKind,
-                  Assets::AssetTextureSourceKind::Generated);
-        EXPECT_EQ((*payload)[0].PixelBytes.size(), 64u * 64u * 4u);
-        EXPECT_EQ(engine.GetGpuAssetCache().GetState(binding->Normal),
-                  Graphics::GpuAssetState::NotRequested);
-    }
-
     [[nodiscard]] bool HasGeneratedNormalTextureBinding(
         Runtime::Engine& engine,
         const ECS::EntityHandle entity) noexcept
@@ -542,7 +499,20 @@ namespace
     {
         return MeshHasVertexProperty(engine, entity, "v:texcoord") &&
             MeshHasVertexProperty(engine, entity, "v:normal") &&
-            HasGeneratedNormalTextureBinding(engine, entity);
+            engine.GetObjectSpaceNormalBakeQueueDiagnosticsForTest()
+                .NonOperationalNoOps > 0u;
+    }
+
+    void ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(
+        Runtime::Engine& engine,
+        const ECS::EntityHandle entity)
+    {
+        EXPECT_FALSE(HasGeneratedNormalTextureBinding(engine, entity));
+        const auto& diagnostics =
+            engine.GetObjectSpaceNormalBakeQueueDiagnosticsForTest();
+        EXPECT_EQ(diagnostics.QueuedRequests, 0u);
+        EXPECT_EQ(diagnostics.NonOperationalNoOps, 1u);
+        EXPECT_EQ(engine.GetPendingObjectSpaceNormalBakeCountForTest(), 0u);
     }
 
     void ExpectMaterialDrivenImportedSurface(
@@ -646,7 +616,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGe
             {0.0f, 1.0f, 0.0f},
             {0.0f, 0.0f, -1.0f},
         });
-    ExpectGeneratedNormalTextureBinding(engine, *meshEntity, meshFile.Path.string());
+    ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(engine, *meshEntity);
 
     engine.Shutdown();
 }
@@ -740,7 +710,7 @@ TEST(RuntimeAssetImportFormatCoverage, DefaultImportPoliciesApplyAuthoringUxAndP
     engine.Run();
 
     ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity));
-    ExpectGeneratedNormalTextureBinding(engine, *meshEntity, meshFile.Path.string());
+    ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(engine, *meshEntity);
 
     engine.Shutdown();
 }
@@ -1127,7 +1097,7 @@ TEST(RuntimeAssetImportFormatCoverage, ReimportInvalidAssetReportsDeterministicI
     engine.Shutdown();
 }
 
-TEST(RuntimeAssetImportFormatCoverage, DirectObjImportBakesGeneratedNormalTextureFromAuthoredVertexNormals)
+TEST(RuntimeAssetImportFormatCoverage, DirectObjImportQueuesGeneratedNormalBakeFromAuthoredVertexNormals)
 {
     TempAssetFile meshFile(
         "assetio007_normals_texcoords.obj",
@@ -1179,7 +1149,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportBakesGeneratedNormalTextur
 
     EXPECT_TRUE(engine.GetScene().IsValid(*meshEntity));
     ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity));
-    ExpectGeneratedNormalTextureBinding(engine, *meshEntity, meshFile.Path.string());
+    ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(engine, *meshEntity);
 
     engine.Shutdown();
 }
@@ -1241,12 +1211,12 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesVertexNormalsWhenM
             {0.0f, 0.0f, 1.0f},
             {0.0f, 0.0f, 1.0f},
         });
-    ExpectGeneratedNormalTextureBinding(engine, *meshEntity, meshFile.Path.string());
+    ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(engine, *meshEntity);
 
     engine.Shutdown();
 }
 
-TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesAndBakesGeneratedNormalTextureWhenMissingNormals)
+TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesNormalsAndQueuesGeneratedNormalBake)
 {
     TempAssetFile meshFile(
         "assetio007_no_normals_texcoords.obj",
@@ -1303,7 +1273,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesAndBakesGeneratedN
             {0.0f, 0.0f, 1.0f},
             {0.0f, 0.0f, 1.0f},
         });
-    ExpectGeneratedNormalTextureBinding(engine, *meshEntity, meshFile.Path.string());
+    ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(engine, *meshEntity);
 
     engine.Shutdown();
 }

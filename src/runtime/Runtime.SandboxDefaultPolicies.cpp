@@ -1,6 +1,8 @@
 module;
 
 #include <cstdint>
+#include <bit>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -31,6 +33,7 @@ import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Material;
+import Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Platform.Input;
 import Extrinsic.Runtime.AssetMeshNormals;
@@ -40,6 +43,7 @@ import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
+import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.StreamingExecutor;
@@ -220,6 +224,153 @@ namespace Extrinsic::Runtime
             return result;
         }
 
+        [[nodiscard]] std::uint32_t NarrowBakeCount(
+            const std::size_t value) noexcept
+        {
+            return value > std::numeric_limits<std::uint32_t>::max()
+                ? std::numeric_limits<std::uint32_t>::max()
+                : static_cast<std::uint32_t>(value);
+        }
+
+        [[nodiscard]] std::uint64_t MixObjectSpaceNormalBakeKey(
+            std::uint64_t seed,
+            const std::uint64_t value) noexcept
+        {
+            seed ^= value + 0x9e3779b97f4a7c15ull + (seed << 6u) + (seed >> 2u);
+            return seed;
+        }
+
+        [[nodiscard]] std::uint64_t FloatKeyBits(const float value) noexcept
+        {
+            return static_cast<std::uint64_t>(std::bit_cast<std::uint32_t>(value));
+        }
+
+        [[nodiscard]] std::uint64_t HashVec2Property(
+            const Geometry::ConstProperty<glm::vec2>& property) noexcept
+        {
+            if (!property.IsValid())
+            {
+                return 0u;
+            }
+
+            std::uint64_t hash = 0xcbf29ce484222325ull;
+            hash = MixObjectSpaceNormalBakeKey(hash, property.Vector().size());
+            for (const glm::vec2& value : property.Vector())
+            {
+                hash = MixObjectSpaceNormalBakeKey(hash, FloatKeyBits(value.x));
+                hash = MixObjectSpaceNormalBakeKey(hash, FloatKeyBits(value.y));
+            }
+            return hash == 0u ? 1u : hash;
+        }
+
+        [[nodiscard]] std::uint64_t HashVec3Property(
+            const Geometry::ConstProperty<glm::vec3>& property) noexcept
+        {
+            if (!property.IsValid())
+            {
+                return 0u;
+            }
+
+            std::uint64_t hash = 0xcbf29ce484222325ull;
+            hash = MixObjectSpaceNormalBakeKey(hash, property.Vector().size());
+            for (const glm::vec3& value : property.Vector())
+            {
+                hash = MixObjectSpaceNormalBakeKey(hash, FloatKeyBits(value.x));
+                hash = MixObjectSpaceNormalBakeKey(hash, FloatKeyBits(value.y));
+                hash = MixObjectSpaceNormalBakeKey(hash, FloatKeyBits(value.z));
+            }
+            return hash == 0u ? 1u : hash;
+        }
+
+        [[nodiscard]] RuntimeObjectSpaceNormalBakeContentKey
+        BuildDirectMeshObjectSpaceNormalBakeContentKey(
+            const std::uint32_t vertexCount,
+            const std::uint32_t indexCount,
+            const Geometry::ConstPropertySet& vertexProperties)
+        {
+            const auto positions = vertexProperties.Get<glm::vec3>(
+                ECS::Components::GeometrySources::PropertyNames::kPosition);
+            const auto texcoords = vertexProperties.Get<glm::vec2>("v:texcoord");
+            const auto normals = vertexProperties.Get<glm::vec3>(
+                ECS::Components::GeometrySources::PropertyNames::kNormal);
+
+            std::uint64_t geometryKey = 0x84222325cbf29ce4ull;
+            geometryKey = MixObjectSpaceNormalBakeKey(geometryKey, vertexCount);
+            geometryKey = MixObjectSpaceNormalBakeKey(geometryKey, indexCount);
+            const std::uint64_t positionKey = HashVec3Property(positions);
+            geometryKey = MixObjectSpaceNormalBakeKey(
+                geometryKey,
+                positionKey != 0u ? positionKey : vertexCount);
+
+            return RuntimeObjectSpaceNormalBakeContentKey{
+                .GeometryKey = geometryKey,
+                .TexcoordKey = HashVec2Property(texcoords),
+                .NormalKey = HashVec3Property(normals),
+                .VertexCount = vertexCount,
+                .IndexCount = indexCount,
+            };
+        }
+
+        [[nodiscard]] std::optional<RuntimeObjectSpaceNormalBakeRequest>
+        BuildDirectMeshObjectSpaceNormalBakeRequest(
+            const ECS::Scene::Registry& scene,
+            const ECS::EntityHandle entity)
+        {
+            namespace GS = ECS::Components::GeometrySources;
+
+            if (!scene.IsValid(entity))
+            {
+                return std::nullopt;
+            }
+
+            const GS::ConstSourceView view = GS::BuildConstView(scene.Raw(), entity);
+            if (!view.Valid() ||
+                view.ActiveDomain != GS::Domain::Mesh ||
+                view.VertexSource == nullptr)
+            {
+                return std::nullopt;
+            }
+
+            const Geometry::ConstPropertySet vertexProperties{
+                view.VertexSource->Properties};
+            const std::uint32_t vertexCount =
+                NarrowBakeCount(view.VerticesAlive());
+            const std::uint32_t indexCount =
+                NarrowBakeCount(view.FacesAlive() * 3u);
+            RuntimeObjectSpaceNormalBakeContentKey contentKey =
+                BuildDirectMeshObjectSpaceNormalBakeContentKey(
+                    vertexCount,
+                    indexCount,
+                    vertexProperties);
+            if (!contentKey.IsValid())
+            {
+                return std::nullopt;
+            }
+
+            const std::uint32_t stableId = StableEntityLookup::ToRenderId(entity);
+            Graphics::ObjectSpaceNormalTextureBakeOptions bakeOptions{};
+            bakeOptions.Width = 64u;
+            bakeOptions.Height = 64u;
+            bakeOptions.Space = Graphics::NormalTextureSpace::ObjectSpaceNormal;
+
+            return RuntimeObjectSpaceNormalBakeRequest{
+                .EntityScopedGeneratedTextureAsset =
+                    stableId != kBackgroundRenderId
+                        ? Assets::AssetId{stableId, 1u}
+                        : Assets::AssetId{},
+                .SourceKey = Graphics::ObjectSpaceNormalTextureBakeSourceKey{
+                    .EntityKey = stableId,
+                    .GeometryGeneration = 1u,
+                    .TexcoordGeneration = 1u,
+                    .NormalGeneration = 1u,
+                },
+                .EntityGeneration = stableId,
+                .Options = bakeOptions,
+                .ContentKey = contentKey,
+                .HasStableContentKey = true,
+            };
+        }
+
         void MarkMeshGeometryDirty(entt::registry& raw,
                                    const ECS::EntityHandle entity)
         {
@@ -289,6 +440,8 @@ namespace Extrinsic::Runtime
             Graphics::GpuAssetCache& gpuAssetCache,
             RenderExtractionCache& extraction,
             ECS::Scene::Registry& scene,
+            RuntimeObjectSpaceNormalBakeQueue* objectSpaceNormalBakeQueue,
+            const bool objectSpaceNormalBakeGraphicsBackendOperational,
             std::string meshPath,
             const Geometry::MeshIO::MeshIOResult& meshPayload,
             const ECS::EntityHandle entity)
@@ -312,7 +465,11 @@ namespace Extrinsic::Runtime
                     .Priority = Core::Dag::TaskPriority::Low,
                     .EstimatedCost = 8u,
                     .Execute =
-                        [state]() mutable -> StreamingResult
+                        [
+                            state,
+                            useObjectSpaceNormalBakeQueue =
+                                objectSpaceNormalBakeQueue != nullptr]() mutable
+                            -> StreamingResult
                         {
                             auto materialized =
                                 BuildRuntimeHalfedgeMeshMaterialization(
@@ -328,12 +485,15 @@ namespace Extrinsic::Runtime
                                     StreamingCpuPayloadReady{.PayloadToken = 0u}};
                             }
 
-                            state->GeneratedNormalTexture =
-                                BakeDirectMeshGeneratedNormalTexturePayload(
-                                    state->Path,
-                                    materialized->Mesh,
-                                    materialized->Diagnostics
-                                        .ResolvedTexcoordsValid);
+                            if (!useObjectSpaceNormalBakeQueue)
+                            {
+                                state->GeneratedNormalTexture =
+                                    BakeDirectMeshGeneratedNormalTexturePayload(
+                                        state->Path,
+                                        materialized->Mesh,
+                                        materialized->Diagnostics
+                                            .ResolvedTexcoordsValid);
+                            }
                             state->Materialized = std::move(*materialized);
                             state->Error = Core::ErrorCode::Success;
                             return StreamingResult{
@@ -345,7 +505,10 @@ namespace Extrinsic::Runtime
                             &assetService,
                             &gpuAssetCache,
                             &extraction,
-                            &scene](StreamingResult&& result) mutable
+                            &scene,
+                            objectSpaceNormalBakeQueue,
+                            objectSpaceNormalBakeGraphicsBackendOperational](
+                                StreamingResult&& result) mutable
                         {
                             if (!result.has_value() ||
                                 state->Error != Core::ErrorCode::Success ||
@@ -382,6 +545,41 @@ namespace Extrinsic::Runtime
                                 state->Entity,
                                 currentNormals);
                             MarkMeshGeometryDirty(raw, state->Entity);
+
+                            if (objectSpaceNormalBakeQueue != nullptr)
+                            {
+                                const std::optional<
+                                    RuntimeObjectSpaceNormalBakeRequest> request =
+                                    BuildDirectMeshObjectSpaceNormalBakeRequest(
+                                        scene,
+                                        state->Entity);
+                                if (!request.has_value())
+                                {
+                                    Core::Log::Warn(
+                                        "[Runtime] Direct mesh object-space normal bake request is invalid: path='{}'",
+                                        state->Path);
+                                    return;
+                                }
+
+                                const RuntimeObjectSpaceNormalBakeResult queued =
+                                    objectSpaceNormalBakeQueue->Schedule(
+                                        *request,
+                                        objectSpaceNormalBakeGraphicsBackendOperational);
+                                if (queued.Status !=
+                                        RuntimeObjectSpaceNormalBakeStatus::Queued &&
+                                    queued.Status !=
+                                        RuntimeObjectSpaceNormalBakeStatus::
+                                            NonOperationalBackend)
+                                {
+                                    Core::Log::Warn(
+                                        "[Runtime] Direct mesh object-space normal bake request failed: path='{}' status={} diagnostic='{}'",
+                                        state->Path,
+                                        DebugNameForRuntimeObjectSpaceNormalBakeStatus(
+                                            queued.Status),
+                                        queued.Diagnostic);
+                                }
+                                return;
+                            }
 
                             if (state->GeneratedNormalTexture.has_value())
                             {
@@ -612,6 +810,8 @@ namespace Extrinsic::Runtime
                                     *services.GpuAssetCache,
                                     *services.RenderExtraction,
                                     *services.Scene,
+                                    services.ObjectSpaceNormalBakeQueue,
+                                    services.ObjectSpaceNormalBakeGraphicsBackendOperational,
                                     std::string{context.Path},
                                     *context.MeshPayload,
                                     context.Entity);

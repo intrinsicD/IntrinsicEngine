@@ -1144,7 +1144,9 @@ namespace
         const ECS::EntityHandle entity)
     {
         return MeshHasVertexProperty(engine, entity, "v:texcoord") &&
-            MeshHasVertexProperty(engine, entity, "v:normal");
+            MeshHasVertexProperty(engine, entity, "v:normal") &&
+            engine.GetObjectSpaceNormalBakeQueueDiagnosticsForTest()
+                .NonOperationalNoOps > 0u;
     }
 
     void ExpectMeshVertexNormalsNear(
@@ -7159,17 +7161,15 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandSurvivesPendingDirectMeshPostProce
         "vn 1 0 0\n"
         "f 1/1/1 2/2/2 3/3/3\n");
 
+    std::optional<ECS::EntityHandle> meshEntity{};
     std::optional<std::uint32_t> stableId{};
     Runtime::Engine engine(
         HeadlessConfig(),
         std::make_unique<WaitForConditionApplication>(
-            [&stableId](Runtime::Engine& runningEngine)
+            [&meshEntity](Runtime::Engine& runningEngine)
             {
-                if (!stableId.has_value())
-                    return false;
-                const std::optional<Graphics::MaterialTextureAssetBindings> bindings =
-                    runningEngine.GetMaterialTextureAssetBindingsForTest(*stableId);
-                return bindings.has_value() && bindings->Normal.IsValid();
+                return meshEntity.has_value() &&
+                    DirectMeshPostProcessReady(runningEngine, *meshEntity);
             },
             128u));
     engine.Initialize();
@@ -7181,8 +7181,7 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandSurvivesPendingDirectMeshPostProce
     });
     ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
 
-    const std::optional<ECS::EntityHandle> meshEntity =
-        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    meshEntity = FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
     stableId = Runtime::SelectionController::ToStableEntityId(*meshEntity);
 
@@ -7218,10 +7217,14 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandSurvivesPendingDirectMeshPostProce
 
     const std::optional<Graphics::MaterialTextureAssetBindings> bindings =
         engine.GetMaterialTextureAssetBindingsForTest(*stableId);
-    ASSERT_TRUE(bindings.has_value());
-    ASSERT_TRUE(bindings->Normal.IsValid());
-    EXPECT_EQ(bindings->NormalSpace,
-              Graphics::MaterialNormalTextureSpace::ObjectSpaceNormal);
+    if (bindings.has_value())
+    {
+        EXPECT_FALSE(bindings->Normal.IsValid());
+    }
+    const auto& diagnostics =
+        engine.GetObjectSpaceNormalBakeQueueDiagnosticsForTest();
+    EXPECT_EQ(diagnostics.NonOperationalNoOps, 1u);
+    EXPECT_EQ(engine.GetPendingObjectSpaceNormalBakeCountForTest(), 0u);
     ExpectMeshVertexNormalsNear(
         engine,
         *meshEntity,

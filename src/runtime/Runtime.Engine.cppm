@@ -43,6 +43,7 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
+import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.SelectionController;
@@ -127,6 +128,8 @@ namespace Extrinsic::Runtime
         Graphics::GpuAssetCache* GpuAssetCache{};
         RenderExtractionCache* RenderExtraction{};
         ECS::Scene::Registry* Scene{};
+        RuntimeObjectSpaceNormalBakeQueue* ObjectSpaceNormalBakeQueue{};
+        bool ObjectSpaceNormalBakeGraphicsBackendOperational{false};
     };
 
     export struct RuntimePostImportProcessorDesc
@@ -679,6 +682,10 @@ namespace Extrinsic::Runtime
             GetEngineConfigControlState() const noexcept;
         [[nodiscard]] Assets::AssetService&   GetAssetService()  noexcept;
         [[nodiscard]] Graphics::GpuAssetCache& GetGpuAssetCache() noexcept;
+        [[nodiscard]] const RuntimeObjectSpaceNormalBakeQueueDiagnostics&
+            GetObjectSpaceNormalBakeQueueDiagnosticsForTest() const noexcept;
+        [[nodiscard]] std::size_t
+            GetPendingObjectSpaceNormalBakeCountForTest() const noexcept;
         [[nodiscard]] ECS::Scene::Registry&   GetScene()         noexcept;
         // UI-001 Slice D — runtime-owned file/import command seam. Editor UI
         // submits a path + payload hint here; Engine composes the promoted
@@ -987,6 +994,7 @@ namespace Extrinsic::Runtime
         // BufferLease/TextureLease destructors run while their managers are
         // still alive.
         std::unique_ptr<Graphics::GpuAssetCache> m_GpuAssetCache;
+        RuntimeObjectSpaceNormalBakeQueue         m_ObjectSpaceNormalBakeQueue{};
         Assets::AssetEventBus::ListenerToken     m_GpuAssetCacheListener{
             Assets::AssetEventBus::InvalidToken};
         std::unique_ptr<AssetModelTextureHandoff> m_AssetModelTextureHandoff;

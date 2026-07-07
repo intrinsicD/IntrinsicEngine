@@ -73,6 +73,7 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
+import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Core.FrameLoop;
 import Extrinsic.Runtime.EcsSystemBundle;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -2112,6 +2113,8 @@ namespace Extrinsic::Runtime
             const std::span<const RuntimeImportEntityAuthoringPolicyRecord>
                 importEntityPolicies,
             const std::span<const RuntimePostImportProcessorRecord> postImportProcessors,
+            RuntimeObjectSpaceNormalBakeQueue* objectSpaceNormalBakeQueue,
+            const bool objectSpaceNormalBakeGraphicsBackendOperational,
             const DecodedGeometryImport& decoded)
         {
             RuntimeImportEntityAuthoringPolicyServices authoringServices{
@@ -2123,6 +2126,9 @@ namespace Extrinsic::Runtime
                 .GpuAssetCache = &gpuAssetCache,
                 .RenderExtraction = &extraction,
                 .Scene = &scene,
+                .ObjectSpaceNormalBakeQueue = objectSpaceNormalBakeQueue,
+                .ObjectSpaceNormalBakeGraphicsBackendOperational =
+                    objectSpaceNormalBakeGraphicsBackendOperational,
             };
 
             return std::visit(
@@ -3129,11 +3135,17 @@ namespace Extrinsic::Runtime
         m_AssetModelTextureHandoff = std::make_unique<AssetModelTextureHandoff>(
             *m_AssetService,
             *m_GpuAssetCache);
+        AssetModelSceneHandoffOptions modelSceneOptions{};
+        modelSceneOptions.ObjectSpaceNormalBakeQueue =
+            &m_ObjectSpaceNormalBakeQueue;
+        modelSceneOptions.ObjectSpaceNormalBakeGraphicsBackendOperational =
+            m_Device != nullptr && m_Device->IsOperational();
         m_AssetModelSceneHandoff = std::make_unique<AssetModelSceneHandoff>(
             *m_AssetService,
             *m_GpuAssetCache,
             *m_Scene,
-            *m_Renderer);
+            *m_Renderer,
+            std::move(modelSceneOptions));
 
         // RUNTIME-092 Slice B — attach the runtime-owned stable-entity lookup
         // to the selection authority so render-id resolution flows through the
@@ -4068,6 +4080,17 @@ namespace Extrinsic::Runtime
 
     Assets::AssetService& Engine::GetAssetService()  noexcept { return *m_AssetService;  }
     Graphics::GpuAssetCache& Engine::GetGpuAssetCache() noexcept { return *m_GpuAssetCache; }
+    const RuntimeObjectSpaceNormalBakeQueueDiagnostics&
+    Engine::GetObjectSpaceNormalBakeQueueDiagnosticsForTest() const noexcept
+    {
+        return m_ObjectSpaceNormalBakeQueue.Diagnostics();
+    }
+
+    std::size_t Engine::GetPendingObjectSpaceNormalBakeCountForTest() const noexcept
+    {
+        return m_ObjectSpaceNormalBakeQueue.PendingCount();
+    }
+
     ECS::Scene::Registry& Engine::GetScene()         noexcept { return *m_Scene;         }
     GizmoInteraction& Engine::GetGizmoInteraction() noexcept { return m_GizmoInteraction; }
     const GizmoInteraction& Engine::GetGizmoInteraction() const noexcept { return m_GizmoInteraction; }
@@ -4760,6 +4783,8 @@ namespace Extrinsic::Runtime
                         m_StreamingExecutor.get(),
                         m_ImportEntityAuthoringPolicies,
                         m_PostImportProcessors,
+                        &m_ObjectSpaceNormalBakeQueue,
+                        m_Device != nullptr && m_Device->IsOperational(),
                         *state->Decoded);
                     if (materialized.has_value())
                     {
@@ -5598,6 +5623,8 @@ namespace Extrinsic::Runtime
                 m_StreamingExecutor.get(),
                 m_ImportEntityAuthoringPolicies,
                 m_PostImportProcessors,
+                &m_ObjectSpaceNormalBakeQueue,
+                m_Device != nullptr && m_Device->IsOperational(),
                 *decoded);
             if (!materialized.has_value())
             {
@@ -5674,6 +5701,7 @@ namespace Extrinsic::Runtime
     {
         if (m_Renderer)
             m_RenderExtraction.ClearSceneState(*m_Renderer);
+        m_ObjectSpaceNormalBakeQueue.Clear();
         if (m_Scene)
             m_SelectionController.ClearSceneState(*m_Scene);
         m_LastRefinedPrimitive.reset();

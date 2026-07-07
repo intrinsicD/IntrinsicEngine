@@ -9,7 +9,7 @@ startup/shutdown.
 | Module | Responsibility |
 |---|---|
 | `Extrinsic.Runtime.Engine` | Composition root, frame loop, subsystem wiring, app-facing reference engine config helper, the runtime-owned `ImportAssetFromPath(...)` / `ReimportAsset(...)` facades that compose promoted ASSETIO geometry/model/texture decoders, `AssetService`, standalone geometry ECS materialization with local/world culling bounds, registered post-import processor/import authoring/import-completed/input-action dispatch callbacks, model/texture handoffs for editor file/import commands, and a generic runtime GPU job participant registry for frame-command recording, maintenance drains, and shutdown ordering. Platform drop events enqueue geometry decode/conversion plus model-scene/texture file read and decode on `Runtime.StreamingExecutor`; `AssetService`, ECS materialization, and texture/model-scene handoffs stay in the main-thread apply phase. Dropped ambiguous geometry extensions such as PLY try supported geometry payloads in import-router order before failing closed. Runtime logs dropped-file receipt, per-path routing/queue decisions, and shared import completion so failed drops remain diagnosable outside the editor panel. Direct mesh imports publish the decoded raw mesh entity with explicit or synthesized `v:normal` before derived materialization; derived UV/normal-bake work is owned by registered post-import processors instead of hardcoded engine materialization. Mesh imports that fail strict shared-topology conversion only for renderable non-manifold/inconsistent-winding diagnostics materialize through a disconnected render-only mesh fallback; geometry algorithms still use the strict converter as their topology contract. The `SaveSceneToPath(...)` / `LoadSceneFromPath(...)` / `NewSceneDocument()` / `CloseSceneDocument()` scene-file facades route through one runtime scene-replacement boundary: pre-clear render-extraction sidecar drain, selection hover/click/pick-correlation cleanup, refined-primitive cache reset, scene registry replacement/clear, stable-lookup rebuild or clear, and `EditorCommandHistory` dirty/path transitions. Scene-changing import facades mark the same runtime history dirty; UI reads the history snapshot but does not own document state. |
-| `Extrinsic.Runtime.SandboxDefaultPolicies` | Runtime-owned sandbox/default composition helper. `RegisterSandboxDefaultRuntimePolicies(Engine&)` installs the standard direct-mesh generated-normal post-import processor, import authoring defaults (`SelectableTag`, render lanes, visualization defaults), import-completed focus/auto-select UX, and the `F` focus-on-selection input action; `UnregisterSandboxDefaultRuntimePolicies(...)` removes the returned handles. The helper keeps the default behavior opt-in for app/feature composition and keeps `Engine` limited to generic registries/dispatch. Current generated direct normal textures still bake through the CPU compatibility helper, request GPU upload when the backend can accept it, and register a data-only normal binding for the extraction-owned material sidecar with `MaterialNormalTextureSpace::ObjectSpaceNormal` metadata. `GRAPHICS-104` owns replacing that CPU bake with the asynchronous GPU object-space normal bake job. |
+| `Extrinsic.Runtime.SandboxDefaultPolicies` | Runtime-owned sandbox/default composition helper. `RegisterSandboxDefaultRuntimePolicies(Engine&)` installs the standard direct-mesh generated-normal post-import processor, import authoring defaults (`SelectableTag`, render lanes, visualization defaults), import-completed focus/auto-select UX, and the `F` focus-on-selection input action; `UnregisterSandboxDefaultRuntimePolicies(...)` removes the returned handles. The helper keeps the default behavior opt-in for app/feature composition and keeps `Engine` limited to generic registries/dispatch. When `RuntimePostImportProcessorServices` supplies a `RuntimeObjectSpaceNormalBakeQueue`, the direct-mesh post-processor resolves UVs/normals on the streaming lane, then schedules an object-space normal GPU-bake request on main-thread apply and leaves material binding deferred; non-operational backends record the queue's no-CPU-fallback diagnostic. Without that queue service, the legacy CPU generated-normal compatibility helper remains available for older isolated callers. |
 | `Extrinsic.Runtime.AssetIngestStateMachine` | Runtime-owned ingest request/result state machine (`RUNTIME-101`). Exports request sources for manual import, dropped files, and reimport; phases from `Queued` through route resolution, decode scheduling/execution, main-thread apply, `Complete`, `Failed`, and `Cancelled`; and a diagnostic taxonomy for missing path/file, route failures, invalid reimport target, duplicate active request, decode failure, callback failure, materialization failure, cancellation, stale completion, invalid transition, and unknown handles. The state machine is backend-neutral and owns no decoders, ECS mutation, `AssetService`, graphics, RHI, or worker threads. `Engine::ImportAssetFromPath(...)`, `Engine::QueueModelTextureImport(...)`, `Engine::ReimportAsset(...)`, synchronous dropped non-promoted imports, and deferred dropped geometry/model-scene/texture imports submit records through this contract; deferred file reads and decodes run on `Runtime.StreamingExecutor` and complete/fail only from its main-thread apply lane. Reimport resolves the existing asset path and payload kind from `AssetService`, reloads the same `AssetId` transactionally, lets texture/model-scene handoffs consume `Reloaded`/`Ready` events, and does not revive ECS `AssetSourceRef` coupling; standalone geometry scene entities remain authoring snapshots and are not duplicated. |
 | `Extrinsic.Runtime.AssetGeometryIO` | Runtime-owned registration seam for `ASSETIO-001` Slice B. Exports `RegisterPromotedGeometryIOCallbacks(Assets::AssetGeometryIOBridge&)`, imports the promoted geometry IO modules in runtime, and registers OBJ/OFF/STL/PLY mesh importers, XYZ/PTS/XYZRGB/PCD/PLY point-cloud importers, TGF/edge-list graph importers, OBJ/STL/PLY mesh exporters, XYZ/PCD/PLY point-cloud exporters, and TGF/edge-list graph exporters. The adapter translates legacy geometry `Core.Error` decoder failures into promoted `Extrinsic.Core.Error` codes before they enter the asset bridge, keeping `src/assets` free of geometry/runtime/graphics imports. It does not construct ECS entities or GPU residency; later `ASSETIO-001` slices own model/texture payloads and runtime handoff. |
 | `Extrinsic.Runtime.AssetMeshNormals` | Runtime-owned mesh payload materialization helper for asset import paths. Exports `RuntimeMeshUvResolutionOptions`, `RuntimeMeshGeometryOnlyOptions`, `RuntimeMeshMaterializationDiagnostics`, `BuildRuntimeHalfedgeMeshGeometryOnly(...)`, `BuildRuntimeHalfedgeMeshMaterialization(...)`, the compatibility wrapper `BuildRuntimeHalfedgeMeshWithNormals(...)`, and `MeshPayloadHasValidVertexTexcoords(...)`. The geometry-only helper triangulates promoted `Geometry::MeshIO::MeshIOResult` payloads for immediate authoring publication without invoking UV atlas resolution or texture baking; it copies typed vertex properties and writes explicit `v:normal` vectors or deterministic area-weighted fallback normals so the first upload has count-matched normals. The full materialization helper validates authored UVs through `Geometry.UvAtlas`, preserves valid authored `v:texcoord` by default, invokes the selected atlas backend when UVs are missing/invalid or regeneration is forced, defaults to `UvAtlasMethod::FastStaged`, exposes explicit `Method` and `AllowXAtlasFallback` controls for compatibility/fail-closed tests, and fails closed under the default required-UV policy when no valid UVs can be produced. It copies explicit `v:normal` vectors or synthesizes deterministic area-weighted normals, preserves typed vertex payload properties such as `glm::vec3`/`glm::vec4` colors and scalar/vector algorithm results across seam-split output using source-vertex xrefs, records `v:source_vertex` / `f:source_face` provenance, and reports authored-vs-generated UV provenance, invalid-authored status, backend status, seam-split count, chart count, and atlas dimensions. Direct mesh imports may opt into the disconnected render-only fallback for non-manifold/inconsistent-winding payloads; model-scene materialization uses the strict topology path. |
@@ -852,9 +852,12 @@ freshly-constructed subsystems):
    uploads from promoted CPU payloads. The model-scene handoff subscribes to
    model-scene `Ready` events, materializes generated `GeometrySources`
    entities, mints embedded texture child assets, and records material
-   `AssetId` bindings. Shutdown resets the model-scene handoff before
-   reference-scene teardown or scene reset because it borrows the scene and
-   renderer; the texture handoff resets before `AssetService` or
+   `AssetId` bindings. Engine owns one `RuntimeObjectSpaceNormalBakeQueue`,
+   passes it to model-scene handoff options and direct-mesh post-import services,
+   and clears it with scene runtime state so stale generated-normal completions
+   cannot survive a scene replacement. Shutdown resets the model-scene handoff
+   before reference-scene teardown or scene reset because it borrows the scene
+   and renderer; the texture handoff resets before `AssetService` or
    `GpuAssetCache` destruction.
 7. Opt-in reference-scene bootstrap (GRAPHICS-029A/B). The optional camera seed
    is retained for the runtime camera controller created lazily on the first
@@ -1125,19 +1128,24 @@ GPU geometry or material rebind.
 
 For direct mesh imports that stay on the runtime-authored `GeometrySources`
 residency lane, extraction also accepts data-only
-`Graphics::MaterialTextureAssetBindings` keyed by stable render id. The engine
-uses that seam for generated normal textures baked from CPU `v:normal` until
-`GRAPHICS-104` replaces the bake with an asynchronous GPU object-space normal
-job. Generated normal bindings are tagged
+`Graphics::MaterialTextureAssetBindings` keyed by stable render id. The engine's
+default direct-mesh post-import processor now resolves finite UVs/normals on the
+streaming lane, then schedules `RuntimeObjectSpaceNormalBakeQueue` with a stable
+geometry/UV/normal content key on main-thread apply. The material keeps vertex
+normal shading until a later render-thread GPU submission and ready-texture
+binding path installs a generated `ObjectSpaceNormal` texture; on the default
+Null backend the queue records a deterministic non-operational no-op and no CPU
+fallback texture or material normal binding is created. The older CPU generated
+normal texture path remains only as compatibility when no queue service is
+provided to the post-import processor. Generated normal bindings, once installed
+by the completion path, are tagged
 `Graphics::MaterialNormalTextureSpace::ObjectSpaceNormal`; authored normal
 texture bindings keep the tangent-space default and do not set the object-space
-shader flag. The cache resolves the `AssetId` bindings against
-`GpuAssetCache` onto the sidecar-owned `StandardPBR` material lease during
-extraction. This keeps ECS free of graphics handles while letting direct
-OBJ-style mesh imports shade from a generated normal map after queued runtime
-materialization has resolved finite UVs. Valid authored UVs are preserved by
-default in that downstream task; missing or invalid source UVs run through the
-selected `Geometry.UvAtlas` backend before the bake, defaulting to the promoted
+shader flag. This keeps ECS free of graphics handles while letting direct
+OBJ-style mesh imports publish geometry immediately and defer generated-normal
+texture residency to the runtime GPU-bake lane. Valid authored UVs are preserved
+by default in that downstream task; missing or invalid source UVs run through the
+selected `Geometry.UvAtlas` backend before scheduling, defaulting to the promoted
 fast-staged path with explicit xatlas compatibility fallback, and backend
 failure stays fail-closed for the deferred post-process result while the
 already-published raw geometry remains live.
