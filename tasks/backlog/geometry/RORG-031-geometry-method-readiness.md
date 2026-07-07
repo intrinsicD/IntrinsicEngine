@@ -24,15 +24,21 @@ depends_on: []
 - Open children (all under `tasks/backlog/geometry/`): `GEOM-013` (dual
   contouring), `GEOM-014` (FA-QEM simplification), `GEOM-019`
   (harmonic/Tutte, unblocked by retired GEOM-020), `GEOM-024`
-  (generalized eigensolver seam, gated on GEOM-020).
+  (generalized eigensolver seam, gated on GEOM-020), `GEOM-058`
+  (Gaussian mixtures + Anderson-accelerated EM), `GEOM-059`
+  (kernels/Nyström/Gaussian-process interpolation), `GEOM-060`
+  (permutohedral lattice filtering), `GEOM-061` (grid-downsampling
+  reduction strategies) — the latter four seeded by the 2026-07-07
+  framework24 port-gap sweep.
 - Retired children/foundations: `GEOM-005..012`, `GEOM-015`, `GEOM-016`,
   `GEOM-017`, `GEOM-020..023`, `GEOM-025..034`, `GEOM-037..052`,
   `GEOM-054`, `GEOM-055`, `GEOIO-002`, and `GEOIO-003`
   (narratives in the retirement log; index in the category README).
 - Method-readiness edges this seed watches: `GEOM-020 → METHOD-002`,
-  `GEOM-023 → METHOD-003`, `GEOM-024 → METHOD-006` (encoded in those tasks'
-  `depends_on`), and retired `GEOM-017 →` future robust/global registration
-  method packages.
+  `GEOM-023 → METHOD-003`, `GEOM-024 → METHOD-006`, `GEOM-058 → METHOD-015`
+  (encoded in those tasks' `depends_on`), the deferred
+  `GEOM-060 →` METHOD-015 optimized-nonrigid fast-path edge, and retired
+  `GEOM-017 →` future robust/global registration method packages.
 
 ## Required changes
 - [ ] Keep the open-children list in Context aligned with the actual
