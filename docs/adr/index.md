@@ -27,6 +27,7 @@ This index tracks long-lived architecture decisions for IntrinsicEngine.
 21. [0021 — Progressive entity render-data pipeline](0021-progressive-entity-render-data-pipeline.md)
 22. [0022 — Vertex storage: uniform SoA with per-channel streaming](0022-vertex-storage-soa-per-channel-streaming.md)
 23. [0023 — CPU↔GPU transfer foundation: async readback ring, buffer-transfer math, and a transfer facade](0023-cpu-gpu-transfer-foundation.md)
+24. [0024 — Kernel/module runtime architecture and communication contract](0024-kernel-module-architecture.md)
 
 ## Conventions
 

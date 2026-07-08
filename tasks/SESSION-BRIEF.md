@@ -19,6 +19,12 @@ the authoritative open/unblocked view.
 ## Theme F — Architecture/runtime/UI foundation seeds
 
 - unblocked: `ARCH-006` — Move Sandbox application editor content out of runtime (tasks/backlog/architecture/ARCH-006-sandbox-editor-content-out-of-runtime.md)
+- unblocked: `ARCH-007` — Kernel command bus with a single pre-sim drain point (tasks/backlog/architecture/ARCH-007-kernel-command-bus-single-drain-point.md)
+- unblocked: `ARCH-008` — Queued-only kernel event bus with two pump points (tasks/backlog/architecture/ARCH-008-kernel-event-bus-queued-only.md)
+- blocked by `ARCH-008`: `ARCH-009` — Kernel JobService: snapshot-in/result-out background jobs (tasks/backlog/architecture/ARCH-009-kernel-jobservice-snapshot-in-result-out.md)
+- blocked by `ARCH-008`: `ARCH-010` — Kernel WorldRegistry with deferred, two-phase world operations (tasks/backlog/architecture/ARCH-010-kernel-worldregistry-deferred-world-ops.md)
+- blocked by `ARCH-007`: `ARCH-011` — RuntimeModule contract, EngineSetup, and two-phase ServiceRegistry (tasks/backlog/architecture/ARCH-011-runtimemodule-contract-service-registry.md)
+- blocked by `ARCH-011`: `ARCH-012` — ClusteringModule: proving extraction onto the kernel seams (tasks/backlog/architecture/ARCH-012-clusteringmodule-proving-extraction.md)
 - unblocked: `CORE-005` — Non-blocking TaskGraph submission and completion API (tasks/backlog/architecture/CORE-005-nonblocking-taskgraph-submit-api.md)
 - unblocked: `CORE-006` — Domain-free core task/DAG vocabulary (tasks/backlog/architecture/CORE-006-domain-free-core-task-vocabulary.md)
 - unblocked: `CORE-007` — Scheduler priority, wait, and wake hardening (tasks/backlog/architecture/CORE-007-scheduler-priority-wait-wake-hardening.md)
