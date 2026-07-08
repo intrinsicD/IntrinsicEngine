@@ -191,15 +191,18 @@ bus, JobService, WorldRegistry, RuntimeModule contract) that the
 extractions (`ARCH-006`, `UI-034`) land onto. Recommended order per ADR-0024
 D12: `ARCH-007`/`ARCH-008` first (both dependency-free), then `ARCH-009` →
 `ARCH-010` → `ARCH-011`, closed by the proving extraction `ARCH-012`.
-Sequencing note: `RUNTIME-150`/`RUNTIME-151` touch the same `RunFrame()` and
-Engine-interface surfaces the seams wire into — both are now front-matter
-gated (`RUNTIME-150` on `ARCH-007`/`ARCH-008`, `RUNTIME-151` additionally on
-`ARCH-011`); the mechanical moves `RUNTIME-146..149` may proceed in
-parallel. After the seam set completes, `ARCH-013` (blocked on `ARCH-012`
-by design) re-reviews the full collision inventory — `RUNTIME-129`,
-`RUNTIME-137`, `RUNTIME-138`, `RUNTIME-146..151`, `ARCH-006`, `UI-034`,
-`CORE-005`/`007`/`008`/`009`, `GRAPHICS-105`, `PLATFORM-004` — against
-ADR-0024 before any of them promotes.
+Sequencing note: tasks whose deliverable ADR-0024 supersedes are
+front-matter gated on their seam dependencies — `RUNTIME-150` on
+`ARCH-007`/`ARCH-008`, `RUNTIME-151` additionally on `ARCH-011`, `ARCH-006`
+and `UI-034` on `ARCH-012`, `RUNTIME-137` on `ARCH-009`, `RUNTIME-138` on
+`ARCH-007`/`ARCH-009` — so they cannot promote before the seams they must
+build on. The mechanical moves `RUNTIME-146..149` and the scheduler
+substrate (`CORE-005`/`007`/`008`) may proceed in parallel. After the seam
+set completes, `ARCH-013` (blocked on `ARCH-012` by design) runs the
+post-completion sweep: it confirms the gated rows built on the seams and
+records decisions for the audit-only rows (`RUNTIME-129`,
+`RUNTIME-146..149`, `CORE-005`/`007`/`008`/`009`, `GRAPHICS-105`,
+`PLATFORM-004`).
 
 Open members (kernel-seam priority set first):
 - [`architecture/ARCH-007-kernel-command-bus-single-drain-point.md`](architecture/ARCH-007-kernel-command-bus-single-drain-point.md).

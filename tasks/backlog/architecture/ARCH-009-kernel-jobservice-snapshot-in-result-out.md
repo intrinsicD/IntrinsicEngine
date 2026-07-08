@@ -9,9 +9,12 @@ depends_on:
 ## Goal
 - Give the runtime kernel a `JobService` for multi-frame background work on
   the shared worker pool: `Submit(JobDesc) -> JobToken`, cooperative
-  cancellation scoped to a `WorldHandle`, completion observed via kernel
-  events published from workers, and a reap step in the Maintenance phase,
-  per [ADR-0024](../../../docs/adr/0024-kernel-module-architecture.md) D8.
+  cancellation scoped to a `WorldHandle`, and service-owned completion
+  publication behind the token gate — workers deposit results into the
+  service, and only the service publishes completion events, main-thread,
+  after checking token and world scope — plus a reap step in the
+  Maintenance phase, per
+  [ADR-0024](../../../docs/adr/0024-kernel-module-architecture.md) D8.
 
 ## Non-goals
 - No `GpuQueue` execution target in this task — the GPU path rides the
@@ -29,21 +32,34 @@ depends_on:
 ## Context
 - Owner/layer: `runtime` (kernel spine per ADR-0024 D9); executes on the
   existing core task scheduler so the FrameGraph and jobs share one pool.
-- Completion channel: the job's work function publishes its own domain event
-  through the `ARCH-008` bus (thread-safe publish → next main-thread pump);
-  module completion handlers commit results to the live world at pump B.
-  The service itself only tracks token lifecycle.
+- Completion channel: the work function returns its result payload to the
+  JobService (workers never publish job-completion events to the `ARCH-008`
+  bus — a completion already enqueued on the bus could not be suppressed by
+  a later cancellation). The service drains finished results on the main
+  thread each frame before pump B, drops results whose token is cancelled
+  or whose scope world is being torn down, and publishes the job's declared
+  completion event only for survivors; module completion handlers then
+  commit to the live world at pump B. Cancellation and publication both run
+  on the main thread, so no suppression race exists.
 - Cancellation contract: cancelling marks the token; the work function polls
-  a `JobCancellation` view; a cancelled job's completion is dropped at the
-  token layer so results are never half-applied. `ARCH-010` wires
-  world-teardown cancellation onto this.
+  a `JobCancellation` view; a cancelled job's result — even one already
+  finished on the worker — is dropped whole at the service's completion
+  gate before any event is published, so results are never half-applied.
+  `ARCH-010` wires world-teardown cancellation onto this.
 - Depends on `ARCH-008` for the worker→main-thread completion channel.
 
 ## Required changes
 - [ ] New `Extrinsic.Runtime.JobService` module (interface `.cppm` +
       implementation `.cpp`): `JobDesc { DebugName, Target, Scope(WorldHandle),
-      Work(const JobCancellation&) }`, `Submit`, `Cancel`, `IsComplete`,
-      `CancelAllForWorld(WorldHandle)`.
+      Work(const JobCancellation&) -> Result, PublishCompletion(EventBus&,
+      Result&&) }`, `Submit`, `Cancel`, `IsComplete`,
+      `CancelAllForWorld(WorldHandle)`. Workers deposit `Result` into the
+      service's internal completion queue; they get no event-bus access for
+      completions.
+- [ ] Completion gate: a main-thread drain step (wired before pump B in
+      `Engine::RunFrame()`) that checks each finished token, drops
+      cancelled/world-dead results whole, and invokes `PublishCompletion`
+      for survivors.
 - [ ] `JobToken` handle type usable by `ARCH-007`'s future `Pending` outcome
       and by parked `CommandSequence` links (declaration only; no sequence
       machinery).
@@ -53,10 +69,13 @@ depends_on:
 
 ## Tests
 - [ ] Unit/contract tests (headless, `unit;runtime` labels): submit → work
-      runs on a pool thread → completion event delivered at the next pump →
-      commit handler runs on the main thread.
+      runs on a pool thread → gate publishes → completion event delivered
+      at pump B → commit handler runs on the main thread.
 - [ ] Cancellation test: cancel before start (work never runs) and cancel
       mid-flight (cooperative poll observes it; completion dropped).
+- [ ] Gate-suppression test: work finishes on the worker, then the token is
+      cancelled (or its world torn down) before the gate drains — no
+      completion event is delivered and no commit happens.
 - [ ] World-scope test: `CancelAllForWorld` cancels only that world's jobs.
 - [ ] Sanitizer run covers the submit/complete/cancel races.
 
@@ -82,6 +101,8 @@ python3 tools/agents/check_task_policy.py --root . --strict
 ```
 
 ## Forbidden changes
+- Publishing job-completion events from worker threads or from anywhere
+  that bypasses the service's token/world gate.
 - Any API accepting `ECS::SceneRegistry&` (or component references) into a
   job's work function.
 - Blocking waits on job completion from the main loop.

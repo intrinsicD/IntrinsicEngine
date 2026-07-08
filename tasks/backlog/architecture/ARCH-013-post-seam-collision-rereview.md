@@ -7,13 +7,16 @@ depends_on:
 # ARCH-013 — Post-seam re-review of backlog tasks colliding with ADR-0024
 
 ## Goal
-- After the kernel-seam set `ARCH-007`..`ARCH-012` has fully retired,
-  re-review every open backlog task that overlaps the seams' surfaces or
-  assumptions against
-  [ADR-0024](../../../docs/adr/0024-kernel-module-architecture.md), and
-  record a per-task decision — unchanged / re-scoped / re-gated / retired —
-  in each task file, so no pre-seam task lands with a design the seams have
-  since superseded.
+- After the kernel-seam set `ARCH-007`..`ARCH-012` has fully retired, run
+  the scheduled post-completion sweep over the collision inventory against
+  [ADR-0024](../../../docs/adr/0024-kernel-module-architecture.md):
+  confirm that the front-matter-gated tasks actually built on the seams
+  they were gated on, and for the audit-only rows (tasks allowed to land
+  pre-seam by design) record a per-task decision — unchanged / re-scoped /
+  re-gated / retired — in each task file. Enforcement against landing
+  superseded designs is NOT this task's job: it lives in the `depends_on`
+  gates already stamped into the affected tasks' front matter (inventory
+  below); this task is the audit that closes the loop.
 
 ## Non-goals
 - No implementation work: this task only re-validates and re-writes task
@@ -31,39 +34,42 @@ depends_on:
   keeps it blocked until the whole seam set (`ARCH-007`..`ARCH-011` via the
   proving extraction) is done, then surfaces it as unblocked — it is the
   scheduled "check the collisions again afterwards" step.
-- Hard collisions are already machine-gated in front matter and excluded
-  here except for confirmation: `RUNTIME-150` depends on
-  `ARCH-007`/`ARCH-008` (RunFrame surface), `RUNTIME-151` depends on
-  `ARCH-011` (Engine interface surface).
-- Collision inventory to review (rationale per row; drop rows already
-  retired by then, add new collisions discovered during the seam work):
-  - `RUNTIME-146`..`RUNTIME-149` — the `Engine::GetX()` engine-owned-facade
-    accessor pattern predates the RuntimeModule/service direction (ADR-0024
-    D9/D12); decide per subsystem whether the extracted facade should become
-    a module/Resolve-phase service instead. `RUNTIME-147` additionally owns
-    the parked asset-boundary question (ADR-0024 open question 3).
-  - `RUNTIME-150`/`RUNTIME-151` — confirm the front-matter gates held and
-    the landed slices matched the seam wiring.
-  - `ARCH-006` — Sandbox editor content out of runtime: re-scope onto the
-    EditorUiModule extraction direction (ADR-0024 D11, migration step ⑦).
-  - `UI-034` — window-contribution seam and capture contract: the capture
-    contract became a kernel input-capture filter chain and the
-    registration seam becomes the EditorUiModule panel registry (D11);
-    its framework24-reference context needs rebasing onto those primitives.
-  - `RUNTIME-137` — async GPU readback helper: re-check as the substrate
-    for the JobService `GpuQueue` target (D8) rather than a free-standing
-    helper.
-  - `RUNTIME-138` — non-blocking selected-entity editor cache: the
-    "submit commands/jobs, bounded main-thread apply" language must adopt
-    CommandBus enqueue/drain and JobService snapshot-commit semantics (D5,
-    D8) instead of bespoke lanes.
-  - `RUNTIME-129` — GPU normal-bake scheduling after import: background
-    scheduling should ride JobService; the "bake finished → attribute
-    refresh" path is a standing event reaction (D6).
-  - `CORE-005`, `CORE-007`, `CORE-008` — verify the scheduler/task-graph
-    capabilities still match what JobService and the FrameGraph two-tier
-    split (D8) actually consume (e.g. whether `CORE-005` submit/token
-    underpins JobService or is superseded by it).
+- **Front-matter-gated rows (enforcement lives in `depends_on`; this task
+  confirms the gates held and the landed slices built on the seams):**
+  - `RUNTIME-150` — gated on `ARCH-007`/`ARCH-008` (shared `RunFrame()`
+    surface).
+  - `RUNTIME-151` — gated additionally on `ARCH-011` (shared Engine
+    interface surface).
+  - `ARCH-006` — gated on `ARCH-012`: Sandbox editor content re-scopes onto
+    the EditorUiModule extraction direction (ADR-0024 D11, migration
+    step ⑦).
+  - `UI-034` — gated on `ARCH-012`: the capture contract became a kernel
+    input-capture filter chain and the window-registration seam becomes the
+    EditorUiModule panel registry (D11); its framework24-reference context
+    needs rebasing onto those primitives before implementation.
+  - `RUNTIME-137` — gated on `ARCH-009`: the readback helper is the
+    substrate for the JobService `GpuQueue` target (D8), not a
+    free-standing helper.
+  - `RUNTIME-138` — gated on `ARCH-007`/`ARCH-009`: "submit commands/jobs,
+    bounded main-thread apply" must adopt CommandBus enqueue/drain and
+    JobService snapshot-commit semantics (D5, D8) instead of bespoke lanes.
+- **Audit-only rows (allowed to land pre-seam by design — mechanical,
+  substrate, or incidental overlap; record a dated decision per row; drop
+  rows already retired by then, add collisions discovered during the seam
+  work):**
+  - `RUNTIME-146`..`RUNTIME-149` — mechanical decomposition moves, useful
+    either way; decide per subsystem whether the landed `Engine::GetX()`
+    facade becomes a module/Resolve-phase service (D9/D12). `RUNTIME-147`
+    additionally owns the parked asset-boundary question (ADR-0024 open
+    question 3).
+  - `RUNTIME-129` — schedules onto the existing bake queue (Theme B
+    progress, acceptable pre-seam); post-seam, background scheduling should
+    migrate to JobService and the "bake finished → attribute refresh" path
+    to a standing event reaction (D6).
+  - `CORE-005`, `CORE-007`, `CORE-008` — scheduler substrate beneath the
+    seams; verify the capabilities match what JobService and the FrameGraph
+    two-tier split (D8) actually consume (e.g. whether `CORE-005`
+    submit/token underpins JobService or is superseded by it).
   - `CORE-009` — app-owned config sections: re-check against
     application-as-parts-list (D12) for where sections should live.
   - `GRAPHICS-105` — attribute-source authority: light check that it
@@ -73,9 +79,13 @@ depends_on:
     against the kernel input-capture chain (D11).
 
 ## Required changes
-- [ ] Re-review each row of the collision inventory against ADR-0024 and
-      record the decision (unchanged / re-scoped / re-gated / retired) with
-      a dated note in that task's `Context` (or retire it with the normal
+- [ ] Confirm each front-matter-gated row: the gate held (no pre-seam
+      landing) and the task's scope now builds on the seams; record the
+      confirmation (or the corrective re-scope) as a dated note in that
+      task's `Context`.
+- [ ] Re-review each audit-only row against ADR-0024 and record the
+      decision (unchanged / re-scoped / re-gated / retired) with a dated
+      note in that task's `Context` (or retire it with the normal
       retirement flow).
 - [ ] Apply resulting front-matter `depends_on` changes where re-gating is
       decided.
@@ -99,7 +109,8 @@ depends_on:
 
 ## Acceptance criteria
 - [ ] Every inventory row (plus discovered additions) carries an explicit
-      dated decision in its task file; none is left implicitly pre-seam.
+      dated confirmation or decision in its task file; no row is left
+      unexamined.
 - [ ] No open backlog task still prescribes a mechanism ADR-0024 rejected
       (immediate dispatch, bespoke job queues, `Engine&` pass-through,
       engine-resident domain machinery) without a recorded justification.

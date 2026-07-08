@@ -120,9 +120,14 @@ One shared worker pool, two tiers:
   declared Read/Write.
 - **JobService** (kernel) — multi-frame background work under an iron rule:
   *snapshot in, self-contained result out, main-thread commit at a pump*.
-  Jobs never hold references into a live world. Jobs carry cancellation scoped
-  to a `WorldHandle`; two-phase world teardown cancels them, and a cancelled
-  result is dropped whole at commit — never half-applied. One submission API
+  Jobs never hold references into a live world. Completion publication is
+  owned by the JobService: workers deposit results into the service and never
+  publish completion events themselves; the service drains results on the
+  main thread, drops those whose token is cancelled or whose scope world is
+  being torn down, and publishes completion events only for survivors. Jobs
+  carry cancellation scoped to a `WorldHandle`; two-phase world teardown
+  cancels them, and a cancelled result — even one already finished on a
+  worker — is dropped whole at this gate, never half-applied. One submission API
   with execution targets `CpuPool | GpuQueue`; the GPU target rides the
   GPU-job-participant frame contract internally. Long computations produce new
   versioned results (e.g. new geometry versions) — enabling A/B compare, undo,

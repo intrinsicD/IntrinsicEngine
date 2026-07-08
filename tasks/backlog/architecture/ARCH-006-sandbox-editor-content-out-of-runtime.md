@@ -1,7 +1,8 @@
 ---
 id: ARCH-006
 theme: F
-depends_on: []
+depends_on:
+  - ARCH-012
 ---
 # ARCH-006 — Move Sandbox application editor content out of runtime
 
