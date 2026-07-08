@@ -5,15 +5,26 @@ contract mirrors, task indexes, task metadata, and audit cadences mechanically
 honest. These tasks change docs, task tooling, and CI policy surfaces only —
 never engine code.
 
-Origin: agentic-workflow review (2026-06-09) of `AGENTS.md`, `docs/agent/*`,
-the skill mirrors, and the `tasks/` tree.
+Origin: agentic-workflow reviews of `AGENTS.md`, `docs/agent/*`, the skill
+mirrors, and the `tasks/` tree (2026-06-09 seeded PROC-001..009; 2026-07-08
+seeded PROC-015..024 from a review that additionally mined the 601 retired
+tasks for recurring playbooks).
 
 See [`tasks/backlog/README.md`](../README.md) for the cross-domain convergence
 map.
 
 ## Tasks
 
-No open process backlog tasks.
+- [PROC-010 — Encode P1/P3/P5 research-engine invariants in AGENTS.md + review checklist](PROC-010-encode-research-engine-invariants-in-contract.md)
+  (draft for owner review).
+- [PROC-018 — Author the import-visibility-contract skill (playbook wave 2)](PROC-018-import-visibility-contract-skill.md)
+- [PROC-019 — Author the geometry-io-format skill (playbook wave 2)](PROC-019-geometry-io-format-skill.md)
+- [PROC-020 — Author the sandbox-input-lifecycle skill (playbook wave 2)](PROC-020-sandbox-input-lifecycle-skill.md)
+- [PROC-021 — Wire docs-sync and task-state-link validators into CI (or retire the promise)](PROC-021-docs-sync-strict-mode-wiring.md)
+- [PROC-022 — Refresh tools/* directory READMEs to match their contents](PROC-022-tool-directory-readme-refresh.md)
+- [PROC-023 — Canonicalize skill-body content that outgrew its docs/agent source](PROC-023-canonicalize-skill-body-content.md)
+- [PROC-024 — Give the research/method track a theme and priority](PROC-024-theme-research-method-track.md)
+  (draft for owner review, scheduling half of the `PROC-010` gap).
 
 `PROC-012` (resolve the duplicate `GEOM-027` ID by renumbering the
 control-surface/KMeans backend-seam task to `GEOM-052`) is retired; see the
@@ -78,3 +89,17 @@ split; narratives live in the retirement log.
   (done, 2026-06-29): routed `AGENTS.md` to the canonical architecture index,
   added backend-axis and config/command lane rows to the architecture checklist,
   and documented optional `## Control surfaces` and `## Backends` task sections.
+- [PROC-015 - Codify recurring diagnosis playbooks as skills (wave 1)](../../done/PROC-015-diagnosis-playbook-skills-wave-1.md)
+  (done, 2026-07-08): authored `intrinsicengine-vulkan-frame-triage`,
+  `intrinsicengine-gpu-smoke-authoring`, and
+  `intrinsicengine-stale-build-triage` from the retired-task history and
+  registered them in the routing surfaces.
+- [PROC-016 - Fix skills/docs mirror drift and dead routings](../../done/PROC-016-skills-docs-mirror-drift-fixes.md)
+  (done, 2026-07-08): rewrote the stale skills README, mirrored
+  clean-workshop/drift-audit into `intrinsicengine-review`, fixed the
+  zoom-out dead route, unified the test-category taxonomy, completed
+  `contract.md`'s layering table, and indexed `prompt.md` from `AGENTS.md`.
+- [PROC-017 - Document branch/CI-failure/claiming/batch-seed conventions](../../done/PROC-017-workflow-convention-gaps.md)
+  (done, 2026-07-08): wrote down branch naming, CI-failure→`BUG-` intake,
+  task claiming, and batch-seeding ID rules in `prompt.md`,
+  `task-format.md`, and `AGENTS.md` §10.
