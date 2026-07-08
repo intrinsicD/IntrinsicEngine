@@ -46,6 +46,16 @@ depends_on: []
   build/test acceptance boxes stay unchecked until the CI presets
   (`pr-fast`/`ci-linux-clang`) verify them. Do not retire this task on the
   authoring session's evidence alone.
+- 2026-07-08 (CI round on head `e732e69`, after the BUG-062 budget fix
+  unblocked the configure step): the full build compiles under
+  `pr-fast`/`ci-linux-clang`/`ci-vulkan` and the suite runs; all nine
+  `RuntimeCommandBus.*` contract tests pass (the runtime label suite ran
+  860 tests; the only failures anywhere are the pre-existing defects
+  tracked as `BUG-063` — streaming-import flakes, red on `main` since
+  ≥2026-07-07 — and `BUG-064` — ci-vulkan frame-pacing capture headless
+  DISPLAY, red across all branches). ARCH-007's own gate evidence is
+  therefore positive; overall PR greenness is blocked only by the
+  pre-existing `BUG-063`/`BUG-064` defects.
 
 ## Required changes
 - [x] New `Extrinsic.Runtime.CommandBus` module (interface `.cppm` +

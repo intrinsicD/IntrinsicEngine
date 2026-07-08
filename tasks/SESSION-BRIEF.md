@@ -47,6 +47,8 @@ the authoritative open/unblocked view.
 ## Theme G — Active bugs
 
 - unblocked: `BUG-062` — Warm-configure CI budget (10 s) flakes on shared-runner variance (tasks/backlog/bugs/BUG-062-warm-configure-budget-flaky-runner-variance.md)
+- unblocked: `BUG-063` — Streaming-import contract tests flaky on main (tasks/backlog/bugs/BUG-063-streaming-import-contract-tests-flaky-on-main.md)
+- unblocked: `BUG-064` — ci-vulkan FramePacingDiagnosticCapture cannot run headless (tasks/backlog/bugs/BUG-064-ci-vulkan-framepacing-headless-display.md)
 
 ## Theme H — Agentic workflow hardening
 
