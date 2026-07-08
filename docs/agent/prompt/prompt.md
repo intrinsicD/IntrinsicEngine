@@ -46,6 +46,8 @@ Read the chosen task file completely before touching code. Treat it as the sourc
 
 If you intend to land more than one slice, promote the task into `tasks/active/` with status, owner, branch, and next verification step (see `docs/agent/task-format.md` or `intrinsicengine-task-workflow`). Single-slice patches may stay in `tasks/backlog/` while you work them.
 
+**Claiming.** Whichever directory the task sits in, record the owner and branch in the task file (a `Status`/`Context` line is enough) in your first commit that touches it. That record is the claim signal for concurrent sessions: skim it before picking a task, and treat a task with a fresh owner/branch line as taken. Historical duplicate-ID collisions (`BUG-021`/`BUG-022` ×2, `HARDEN-065` ×3) came from concurrent sessions skipping this step.
+
 # Implement the smallest robust slice
 
 The layering, coding, change-scope, testing, and docs-sync rules are owned by `/AGENTS.md` §2, §5, §7, and §9 — including the mechanical-vs-semantic split, one-task patch scoping, `.cppm` interface/implementation placement, no-new-features-during-reorganization, test category labels, and module-inventory regeneration. Apply them from the contract; this prompt deliberately does not restate them.
@@ -106,10 +108,17 @@ Apply `docs/agent/review-checklist.md` (or the `intrinsicengine-review` skill if
 - verification commands actually ran in this session,
 - temporary shims tracked with removal task IDs.
 
+# When CI fails
+
+- **Your change caused it** → fix it in the same PR; never weaken a gate, relax an assertion, or add a quarantine label to reach green without a diagnosis.
+- **Pre-existing or environmental** (flake on unmodified code, runner variance, infra/harness defect) → file a `BUG-` task under `tasks/backlog/bugs/` in the same session you observe it, recording the failing workflow/step, evidence links or log excerpts, and what was ruled out; reference the task from the PR so reviewers can separate your diff from the noise (the `BUG-062`/`BUG-063`/`BUG-064` pattern).
+- **A red default gate on `main` is itself a reproducible regression** — under pick-priority rule 4 it outranks new feature work. Red gates that linger teach reviewers to ignore red, which is how real regressions slip.
+
 # Commit and PR hygiene
 
 Scope expectations (one task per PR, no mixed mechanical/semantic changes, docs/tests synchronized) are the `/AGENTS.md` §12 review checklist; apply it as written. Additionally:
 
+- **Branch naming:** prefer `<owner>/<task-id-lowercase>-<short-slug>` (e.g. `claude/bug-063-streaming-import-flake`) so the branch names its primary task. Harness-assigned branch names are acceptable; either way, record the branch in the task file you are working (that record, not the name, is what audits check).
 - Separate commits for independent slices and for non-trivial docs/task synchronization.
 - Stage only intentional changes; never include editor/build artifacts.
 - Never use `--no-verify`, `--amend` on shared history, or force-push to `main`/`master`.

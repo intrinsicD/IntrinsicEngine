@@ -255,6 +255,10 @@ When code, structure, or policy changes:
   merge blockers, not advisories. A newly introduced check may run in warning mode only while a referenced task ID owns
   its tightening (same idiom as §13 temporary exceptions); an untracked warning-mode check is a policy violation.
 - Workflow definitions must stay readable and split by purpose.
+- A failing check that is pre-existing or environmental (flake, runner variance, harness defect) is converted into a
+  `BUG-` task under `tasks/backlog/bugs/` in the same session it is observed, with evidence, and referenced from the PR
+  (see `docs/agent/prompt/prompt.md` §"When CI fails"). Gates are never weakened, skipped, or quarantined to reach
+  green without a diagnosis.
 - Agent/Codex verification must configure the `ci` preset, build a meaningful target such as `IntrinsicTests` (never
   `help` as a stand-in), and run CTest. The current Codex verification command mirrors the default CPU-supported gate
   from the testing protocol.
@@ -317,6 +321,7 @@ Read this `AGENTS.md` file at the start of every session/task; it is the authori
 | Document                                      | Read when                                                                                                                                                                                                               |
 |-----------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `docs/agent/contract.md`                      | You need expanded rationale or detail for this contract, especially during onboarding or policy edits.                                                                                                                  |
+| `docs/agent/prompt/prompt.md`                 | Starting a generic (non-task-specific) session: work selection, slice picking, verification bundles, commit/PR hygiene, anti-patterns, and multi-task loop-mode policy (default stop condition, checkpoint pushes).      |
 | `docs/architecture/index.md`                  | Designing subsystem architecture, algorithm backend splits, config/command control surfaces, recipe/frame composition, or deciding which canonical architecture doc or ADR governs a change.                           |
 | `docs/agent/task-format.md`                   | Creating, promoting, retiring, or materially updating files under `tasks/`.                                                                                                                                             |
 | `docs/agent/review-checklist.md`              | Before committing or reporting completion for any non-trivial change.                                                                                                                                                   |

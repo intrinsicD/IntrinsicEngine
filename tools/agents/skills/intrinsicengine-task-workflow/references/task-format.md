@@ -139,6 +139,19 @@ grep -rhoE '^# <PREFIX>-[0-9]+' tasks/active tasks/backlog tasks/done | sort -V 
 Letter-suffixed child slices (e.g. `GRAPHICS-033A`) extend their parent's
 number and do not claim a new one.
 
+Prefixes come from the canonical list in `tasks/README.md` §"Task ID
+prefixes"; do not invent a new prefix without adding it there in the same
+change (historical `tasks/done/` entries contain retired prefix variants —
+they are not precedent).
+
+When **batch-seeding** several tasks (e.g. converting review findings into a
+task series), allocate the whole contiguous range up front and run
+`python3 tools/agents/validate_tasks.py --root .` locally before committing —
+CI enforces uniqueness, but a concurrent session may claim the same numbers
+in flight (`GEOM-027` collided this way and had to be renumbered by
+`PROC-012`). If two branches race, the first one merged keeps the numbers and
+the later branch renumbers.
+
 ## Optional `## Maturity` field
 
 For tasks where the stop-state is ambiguous — typically rendering, Vulkan,
