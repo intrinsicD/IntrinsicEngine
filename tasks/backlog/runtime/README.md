@@ -48,6 +48,17 @@ facades into engine-owned subsystem objects, following the existing
 pattern. `RUNTIME-146..150` are mechanical, mutually order-independent
 moves; `RUNTIME-151` is the single semantic slice and must land last.
 
+Sequencing against the ADR-0024 kernel seams
+([`docs/adr/0024-kernel-module-architecture.md`](../../../docs/adr/0024-kernel-module-architecture.md),
+priority set `ARCH-007`..`ARCH-012`): the seams take precedence for
+architecture/runtime picks. `RUNTIME-150`/`RUNTIME-151` touch the same
+`RunFrame()` and Engine-interface surfaces the seams wire into and are
+front-matter gated (`RUNTIME-150` on `ARCH-007`/`ARCH-008`, `RUNTIME-151`
+additionally on `ARCH-011`). The mechanical moves `RUNTIME-146..149` may
+proceed in parallel with the seam tasks; note that after the seam set
+completes, `ARCH-013` re-reviews this whole series (accessor-facade pattern
+vs. the ADR-0024 module/service direction) before further promotion.
+
 - [`RUNTIME-146`](RUNTIME-146-extract-engine-config-boot-module.md) —
   extract boot-time config resolution (`ResolveEngineConfigForBoot`,
   `CreateReferenceEngineConfig`, `EngineConfigBoot*`) into a free-standing

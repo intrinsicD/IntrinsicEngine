@@ -1,7 +1,8 @@
 ---
 id: RUNTIME-137
 theme: F
-depends_on: []
+depends_on:
+  - ARCH-009
 ---
 # RUNTIME-137 — Async GPU readback helper + pooled destination for compute backends
 

@@ -1,7 +1,8 @@
 ---
 id: UI-034
 theme: F
-depends_on: []
+depends_on:
+  - ARCH-012
 maturity_target: CPUContracted
 ---
 # UI-034 — Decentralized editor window contribution, capture contract, and property-plot widgets

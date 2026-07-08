@@ -30,6 +30,31 @@ Opened from the 2026-07-03 main-loop/task-graph/render-graph review
   Sandbox application editor content from `runtime` to `app` (sliced
   migration; planning slice first).
 
+Opened from the 2026-07-08 kernel/module architecture decision record
+([`docs/adr/0024-kernel-module-architecture.md`](../../../docs/adr/0024-kernel-module-architecture.md));
+seams-first migration order, `ARCH-012` is the Operational proving
+extraction:
+
+- [`ARCH-007`](ARCH-007-kernel-command-bus-single-drain-point.md) — kernel
+  command bus with a single pre-sim drain point (plain-data payloads,
+  correlation IDs, fail-closed handlers).
+- [`ARCH-008`](ARCH-008-kernel-event-bus-queued-only.md) — queued-only
+  kernel event bus (two pump points, worker inbox, no `trigger`).
+- [`ARCH-009`](ARCH-009-kernel-jobservice-snapshot-in-result-out.md) —
+  kernel JobService for multi-frame background jobs
+  (snapshot-in/result-out, world-scoped cancellation).
+- [`ARCH-010`](ARCH-010-kernel-worldregistry-deferred-world-ops.md) —
+  kernel WorldRegistry with deferred, two-phase world operations.
+- [`ARCH-011`](ARCH-011-runtimemodule-contract-service-registry.md) —
+  `IRuntimeModule` contract, `EngineSetup`, and two-phase ServiceRegistry.
+- [`ARCH-012`](ARCH-012-clusteringmodule-proving-extraction.md) —
+  ClusteringModule proving extraction onto the kernel seams (closes the
+  seams' `Operational` gate).
+- [`ARCH-013`](ARCH-013-post-seam-collision-rereview.md) — post-seam
+  re-review of backlog tasks colliding with ADR-0024 (blocked on
+  `ARCH-012` by design; re-gates/re-scopes/retires the collision
+  inventory after the seam set completes).
+
 ## Retired Legacy Program
 
 `src/legacy/` is retired. The final sweep first retired the remaining legacy

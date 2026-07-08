@@ -7,6 +7,7 @@ depends_on:
   - RUNTIME-148
   - RUNTIME-149
   - RUNTIME-150
+  - ARCH-011
 maturity_target: Operational
 ---
 # RUNTIME-151 — Slim the Engine module interface and remove the entt leak

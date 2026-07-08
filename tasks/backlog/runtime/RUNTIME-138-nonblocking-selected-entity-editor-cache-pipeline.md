@@ -1,7 +1,9 @@
 ---
 id: RUNTIME-138
 theme: F
-depends_on: []
+depends_on:
+  - ARCH-007
+  - ARCH-009
 maturity_target: Operational
 ---
 # RUNTIME-138 — Nonblocking selected-entity editor cache pipeline

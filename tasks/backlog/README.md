@@ -180,7 +180,37 @@ efficiency polish `RUNTIME-145` removed the recurring runtime frame-path waste
 called out by the review. The retired correctness fix `BUG-055` (Theme G)
 unblocks `CORE-005`.
 
-Open members:
+**Priority entry point (P0 within Theme F): the ADR-0024 kernel/module
+architecture seams.** The 2026-07-08 kernel/module architecture decision
+record ([`docs/adr/0024-kernel-module-architecture.md`](../../docs/adr/0024-kernel-module-architecture.md))
+seeded the seams-first migration set `ARCH-007`..`ARCH-012`. This set is the
+preferred next pick for architecture/runtime work ahead of other Theme F
+members: it creates the registration/communication seams (command bus, event
+bus, JobService, WorldRegistry, RuntimeModule contract) that the
+`Runtime.Engine` decomposition set (`RUNTIME-146`..`151`) and the module
+extractions (`ARCH-006`, `UI-034`) land onto. Recommended order per ADR-0024
+D12: `ARCH-007`/`ARCH-008` first (both dependency-free), then `ARCH-009` →
+`ARCH-010` → `ARCH-011`, closed by the proving extraction `ARCH-012`.
+Sequencing note: tasks whose deliverable ADR-0024 supersedes are
+front-matter gated on their seam dependencies — `RUNTIME-150` on
+`ARCH-007`/`ARCH-008`, `RUNTIME-151` additionally on `ARCH-011`, `ARCH-006`
+and `UI-034` on `ARCH-012`, `RUNTIME-137` on `ARCH-009`, `RUNTIME-138` on
+`ARCH-007`/`ARCH-009` — so they cannot promote before the seams they must
+build on. The mechanical moves `RUNTIME-146..149` and the scheduler
+substrate (`CORE-005`/`007`/`008`) may proceed in parallel. After the seam
+set completes, `ARCH-013` (blocked on `ARCH-012` by design) runs the
+post-completion sweep: it confirms the gated rows built on the seams and
+records decisions for the audit-only rows (`RUNTIME-129`,
+`RUNTIME-146..149`, `CORE-005`/`007`/`008`/`009`, `GRAPHICS-105`,
+`PLATFORM-004`).
+
+Open members (kernel-seam priority set first):
+- [`architecture/ARCH-007-kernel-command-bus-single-drain-point.md`](architecture/ARCH-007-kernel-command-bus-single-drain-point.md).
+- [`architecture/ARCH-008-kernel-event-bus-queued-only.md`](architecture/ARCH-008-kernel-event-bus-queued-only.md).
+- [`architecture/ARCH-009-kernel-jobservice-snapshot-in-result-out.md`](architecture/ARCH-009-kernel-jobservice-snapshot-in-result-out.md).
+- [`architecture/ARCH-010-kernel-worldregistry-deferred-world-ops.md`](architecture/ARCH-010-kernel-worldregistry-deferred-world-ops.md).
+- [`architecture/ARCH-011-runtimemodule-contract-service-registry.md`](architecture/ARCH-011-runtimemodule-contract-service-registry.md).
+- [`architecture/ARCH-012-clusteringmodule-proving-extraction.md`](architecture/ARCH-012-clusteringmodule-proving-extraction.md).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md`](runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md).
 - [`architecture/CORE-005-nonblocking-taskgraph-submit-api.md`](architecture/CORE-005-nonblocking-taskgraph-submit-api.md).

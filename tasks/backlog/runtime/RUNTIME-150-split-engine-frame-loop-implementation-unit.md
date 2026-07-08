@@ -1,7 +1,9 @@
 ---
 id: RUNTIME-150
 theme: F
-depends_on: []
+depends_on:
+  - ARCH-007
+  - ARCH-008
 maturity_target: Operational
 ---
 # RUNTIME-150 — Split the frame-loop hook adapters out of Runtime.Engine.cpp
