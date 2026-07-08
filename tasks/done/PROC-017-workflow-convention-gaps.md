@@ -10,8 +10,8 @@ depends_on: []
 - Status: done (retired 2026-07-08). Documented in the same PR that seeded
   the task (agentic-workflow review batch on
   `claude/agentic-workflow-skills-review-tbnb0b`).
-- PR/commit: this retirement commit on
-  `claude/agentic-workflow-skills-review-tbnb0b`.
+- PR/commit: PR #1011 (`claude/agentic-workflow-skills-review-tbnb0b`),
+  implementation commit `7cd684b2`.
 - Origin: agentic-workflow review (2026-07-08): four lifecycle conventions
   were exercised in practice but written down nowhere.
 

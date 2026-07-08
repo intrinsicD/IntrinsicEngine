@@ -10,8 +10,8 @@ depends_on: []
 - Status: done (retired 2026-07-08). Fixed in the same PR that seeded the
   task (agentic-workflow review batch on
   `claude/agentic-workflow-skills-review-tbnb0b`).
-- PR/commit: this retirement commit on
-  `claude/agentic-workflow-skills-review-tbnb0b`.
+- PR/commit: PR #1011 (`claude/agentic-workflow-skills-review-tbnb0b`),
+  implementation commit `9c2379df`.
 - Origin: agentic-workflow review (2026-07-08) of `AGENTS.md`, `docs/agent/*`,
   and the skill mirror surfaces.
 

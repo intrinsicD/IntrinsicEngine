@@ -11,8 +11,8 @@ depends_on: []
   task (agentic-workflow review batch on
   `claude/agentic-workflow-skills-review-tbnb0b`), following the
   PROC-001..009 fix-and-retire precedent.
-- PR/commit: this retirement commit on
-  `claude/agentic-workflow-skills-review-tbnb0b`.
+- PR/commit: PR #1011 (`claude/agentic-workflow-skills-review-tbnb0b`),
+  implementation commit `eed9853d`.
 - Origin: agentic-workflow review (2026-07-08) mining of `tasks/done/`
   (601 retired tasks) for knowledge re-derived across multiple sessions.
 
