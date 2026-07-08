@@ -33,34 +33,50 @@ depends_on: []
 - Fail-closed rule: enqueueing a command type with no registered handler must
   surface a loud diagnostic at drain time, not silently drop.
 
+## Status
+
+- 2026-07-08: implementation landed on branch
+  `claude/research-repo-comparison-vy5x0l` (module, Engine wiring, contract
+  tests, docs). Compiler/CTest verification could not run in the authoring
+  environment: the session egress policy blocks the vcpkg-tool download
+  (`github.com/microsoft/vcpkg-tool/releases/...` → 403), so
+  `cmake --preset ci` cannot configure. Structural gates
+  (`check_layering.py --strict`, `check_task_policy.py --strict`,
+  `check_doc_links.py`, inventory regeneration) ran clean locally; the
+  build/test acceptance boxes stay unchecked until the CI presets
+  (`pr-fast`/`ci-linux-clang`) verify them. Do not retire this task on the
+  authoring session's evidence alone.
+
 ## Required changes
-- [ ] New `Extrinsic.Runtime.CommandBus` module (interface `.cppm` +
+- [x] New `Extrinsic.Runtime.CommandBus` module (interface `.cppm` +
       implementation `.cpp`): typed handler registration, type-erased MPSC
       enqueue, correlation-ID allocation, drain loop.
-- [ ] `CommandContext` struct per ADR-0024 D13 (no `Engine&` member).
-- [ ] `CommandOutcome { Completed | Failed, error string }`; failures and
+- [x] `CommandContext` struct per ADR-0024 D13 (no `Engine&` member).
+- [x] `CommandOutcome { Completed | Failed, error string }`; failures and
       missing-handler drains emit a diagnostic (log + counter; event
       integration follows `ARCH-008`).
-- [ ] Wire the drain call into `Engine::RunFrame()` between Phase 1 and
+- [x] Wire the drain call into `Engine::RunFrame()` between Phase 1 and
       Phase 2 with a phase comment matching the existing style.
-- [ ] Post-execution history hook seam (callback invoked after successful
+- [x] Post-execution history hook seam (callback invoked after successful
       execution of a command that declares an inverse payload).
-- [ ] Built-in `QuitRequested` command replacing direct shutdown calls from
+- [x] Built-in `QuitRequested` command replacing direct shutdown calls from
       future module code (ADR-0024 D13).
 
 ## Tests
-- [ ] Unit/contract tests (headless, `unit;runtime` labels): drain executes
+- [x] Contract tests authored (headless, `contract;runtime` labels via
+      `RuntimeContractTestObjs`, matching the `Test.RuntimeEcsSystemBundle`
+      precedent): drain executes
       in enqueue order on the draining thread; cross-thread enqueue is safe;
       payloads are copied (mutating the source after enqueue does not change
       the drained payload).
-- [ ] Fail-closed test: enqueue with no handler → drain reports the
+- [x] Fail-closed test: enqueue with no handler → drain reports the
       diagnostic and does not crash.
-- [ ] Handler-failure test: `Failed` outcome carries the error and does not
+- [x] Handler-failure test: `Failed` outcome carries the error and does not
       abort the drain of subsequent commands.
 
 ## Docs
-- [ ] Regenerate `docs/api/generated/module_inventory.md` (new module).
-- [ ] Link the drain point from the frame-phase description in
+- [x] Regenerate `docs/api/generated/module_inventory.md` (new module).
+- [x] Link the drain point from the frame-phase description in
       `docs/architecture/runtime.md` (or the doc that owns the phase list),
       citing ADR-0024.
 

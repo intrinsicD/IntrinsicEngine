@@ -303,6 +303,7 @@ if(TARGET ExtrinsicRuntime)
         Test.RuntimeInputActions.cpp
         Test.RuntimeRenderRecipeActivation.cpp
         Test.RuntimeCameraFocusCommand.cpp
+        Test.RuntimeCommandBus.cpp
         Test.RuntimeEcsSystemBundle.cpp
         Test.RuntimeReferenceScene.cpp
         Test.RuntimeSceneLifecycle.cpp
