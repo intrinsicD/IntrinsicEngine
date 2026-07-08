@@ -34,6 +34,14 @@ depends_on: []
 - Likely axis: shared-runner slowness (the same 2026-07-08 window showed
   ~+50 % configure-time variance, see `BUG-062`); a bounded frame budget
   plus real-time decode on loaded runners is timing-sensitive.
+- 2026-07-08 ~15:00 evidence (PR #1010 head `5d0c773`, a docs-only
+  commit): only the Manual variant failed while Dropped passed —
+  classic flake variance — and an unrelated timing-sensitive test,
+  `CoreTasks.StaleWaitTokenUnparkDoesNotResumeNewWaiters` (unit;core),
+  failed in the same round on the same docs-only diff. The scheduler
+  wait/wake hardening owner for that area is `CORE-007`; if the
+  CoreTasks flake recurs, file it as its own bug against that line
+  rather than widening this task.
 
 ## Required changes
 - [ ] Reproduce with per-test output (`--output-on-failure` artifact or
