@@ -50,6 +50,10 @@ extraction:
 - [`ARCH-012`](ARCH-012-clusteringmodule-proving-extraction.md) —
   ClusteringModule proving extraction onto the kernel seams (closes the
   seams' `Operational` gate).
+- [`ARCH-013`](ARCH-013-post-seam-collision-rereview.md) — post-seam
+  re-review of backlog tasks colliding with ADR-0024 (blocked on
+  `ARCH-012` by design; re-gates/re-scopes/retires the collision
+  inventory after the seam set completes).
 
 ## Retired Legacy Program
 

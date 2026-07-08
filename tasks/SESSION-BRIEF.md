@@ -25,6 +25,7 @@ the authoritative open/unblocked view.
 - blocked by `ARCH-008`: `ARCH-010` — Kernel WorldRegistry with deferred, two-phase world operations (tasks/backlog/architecture/ARCH-010-kernel-worldregistry-deferred-world-ops.md)
 - blocked by `ARCH-007`: `ARCH-011` — RuntimeModule contract, EngineSetup, and two-phase ServiceRegistry (tasks/backlog/architecture/ARCH-011-runtimemodule-contract-service-registry.md)
 - blocked by `ARCH-011`: `ARCH-012` — ClusteringModule: proving extraction onto the kernel seams (tasks/backlog/architecture/ARCH-012-clusteringmodule-proving-extraction.md)
+- blocked by `ARCH-012`: `ARCH-013` — Post-seam re-review of backlog tasks colliding with ADR-0024 (tasks/backlog/architecture/ARCH-013-post-seam-collision-rereview.md)
 - unblocked: `CORE-005` — Non-blocking TaskGraph submission and completion API (tasks/backlog/architecture/CORE-005-nonblocking-taskgraph-submit-api.md)
 - unblocked: `CORE-006` — Domain-free core task/DAG vocabulary (tasks/backlog/architecture/CORE-006-domain-free-core-task-vocabulary.md)
 - unblocked: `CORE-007` — Scheduler priority, wait, and wake hardening (tasks/backlog/architecture/CORE-007-scheduler-priority-wait-wake-hardening.md)
@@ -39,7 +40,7 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-147` — Extract the runtime asset-import pipeline out of Engine (tasks/backlog/runtime/RUNTIME-147-extract-asset-import-pipeline-subsystem.md)
 - unblocked: `RUNTIME-148` — Extract the scene-document facade out of Engine (tasks/backlog/runtime/RUNTIME-148-extract-scene-document-subsystem.md)
 - unblocked: `RUNTIME-149` — Extract render-recipe and hot-config control out of Engine (tasks/backlog/runtime/RUNTIME-149-extract-engine-config-control-subsystem.md)
-- unblocked: `RUNTIME-150` — Split the frame-loop hook adapters out of Runtime.Engine.cpp (tasks/backlog/runtime/RUNTIME-150-split-engine-frame-loop-implementation-unit.md)
+- blocked by `ARCH-007`: `RUNTIME-150` — Split the frame-loop hook adapters out of Runtime.Engine.cpp (tasks/backlog/runtime/RUNTIME-150-split-engine-frame-loop-implementation-unit.md)
 - blocked by `RUNTIME-146`: `RUNTIME-151` — Slim the Engine module interface and remove the entt leak (tasks/backlog/runtime/RUNTIME-151-slim-engine-interface-and-remove-entt-leak.md)
 - unblocked: `UI-034` — Decentralized editor window contribution, capture contract, and property-plot widgets (tasks/backlog/ui/UI-034-framework24-editor-interaction-layout-conventions.md)
 

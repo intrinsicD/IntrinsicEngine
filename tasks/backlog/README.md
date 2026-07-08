@@ -192,9 +192,14 @@ extractions (`ARCH-006`, `UI-034`) land onto. Recommended order per ADR-0024
 D12: `ARCH-007`/`ARCH-008` first (both dependency-free), then `ARCH-009` →
 `ARCH-010` → `ARCH-011`, closed by the proving extraction `ARCH-012`.
 Sequencing note: `RUNTIME-150`/`RUNTIME-151` touch the same `RunFrame()` and
-Engine-interface surfaces the seams wire into — land them after (or rebase
-them onto) `ARCH-007`/`ARCH-008`; the mechanical moves `RUNTIME-146..149`
-may proceed in parallel.
+Engine-interface surfaces the seams wire into — both are now front-matter
+gated (`RUNTIME-150` on `ARCH-007`/`ARCH-008`, `RUNTIME-151` additionally on
+`ARCH-011`); the mechanical moves `RUNTIME-146..149` may proceed in
+parallel. After the seam set completes, `ARCH-013` (blocked on `ARCH-012`
+by design) re-reviews the full collision inventory — `RUNTIME-129`,
+`RUNTIME-137`, `RUNTIME-138`, `RUNTIME-146..151`, `ARCH-006`, `UI-034`,
+`CORE-005`/`007`/`008`/`009`, `GRAPHICS-105`, `PLATFORM-004` — against
+ADR-0024 before any of them promotes.
 
 Open members (kernel-seam priority set first):
 - [`architecture/ARCH-007-kernel-command-bus-single-drain-point.md`](architecture/ARCH-007-kernel-command-bus-single-drain-point.md).
