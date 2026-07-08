@@ -43,17 +43,22 @@ cross-layer composition, while reusable phase contracts live in
 The frame order is:
 
 1. poll platform events and handle minimized/resize skip paths;
-2. fixed-step simulation and CPU `FrameGraph` execution;
-3. ImGui begin-frame, variable application tick, and ImGui end-frame;
-4. build `Graphics::RenderFrameInput`, update the active camera controller,
+2. drain the kernel command bus (`Engine::Commands()`) — the single
+   pre-simulation mutation window per
+   [ADR-0024](../adr/0024-kernel-module-architecture.md) D5; commands enqueue
+   thread-safely from any phase and execute here in enqueue order, fail-closed
+   when no handler is registered (ARCH-007);
+3. fixed-step simulation and CPU `FrameGraph` execution;
+4. ImGui begin-frame, variable application tick, and ImGui end-frame;
+5. build `Graphics::RenderFrameInput`, update the active camera controller,
    dispatch registered input actions, and drain one coalesced selection pick;
-5. execute the render-frame contract: begin frame, runtime render extraction,
+6. execute the render-frame contract: begin frame, runtime render extraction,
    renderer world extraction, prepare, execute, and end frame;
-6. present the completed frame;
-7. execute maintenance: transfer retirement, streaming drain/apply/submit/pump,
+7. present the completed frame;
+8. execute maintenance: transfer retirement, streaming drain/apply/submit/pump,
    asset-service tick, GPU asset cache tick, material texture re-resolution, and
    render-extraction deferred-retire ticks;
-8. drain completed pick readbacks through the incrementally maintained
+9. drain completed pick readbacks through the incrementally maintained
    stable-entity lookup, release the consumed `RenderWorldPool` slot, and
    finalize the frame clock.
 

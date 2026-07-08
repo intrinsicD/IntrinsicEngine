@@ -2987,6 +2987,17 @@ namespace Extrinsic::Runtime
         // Must be first — all three graphs dispatch through it.
         Core::Tasks::Scheduler::Initialize(m_Config.Simulation.WorkerThreadCount);
 
+        // ARCH-007 — built-in kernel command (ADR-0024 D13): the sanctioned
+        // shutdown path for module/UI code. Future module code enqueues
+        // `QuitRequested` instead of reaching for an Engine& to call
+        // shutdown entry points directly.
+        m_CommandBus.RegisterHandler<QuitRequested>(
+            [this](CommandContext&, const QuitRequested&) -> CommandOutcome
+            {
+                RequestExit();
+                return CommandOutcome::Ok();
+            });
+
         // ── 2. Subsystems ─────────────────────────────────────────────────
         // ARCH-005 / WORKSHOP-002: runtime owns the cross-layer composition
         // between platform window and graphics backend. RHI is platform-
@@ -3195,6 +3206,12 @@ namespace Extrinsic::Runtime
 
     void Engine::Shutdown()
     {
+        // ARCH-007 — drop commands enqueued after the final frame's drain
+        // (e.g. from OnVariableTick just before RequestExit()). The engine
+        // is documented as reusable via Shutdown() + Initialize(); stale
+        // commands must not replay into the next session's fresh scene.
+        m_CommandBus.DiscardPending();
+
         if (m_Window)
             m_Window->Listen({});
 
@@ -3506,6 +3523,13 @@ namespace Extrinsic::Runtime
         (void)Core::ExecuteOperationalTransitionContract(operationalHooks);
         pacing.OperationalTransitionMicros = ElapsedMicros(operationalBegin);
 
+        // ── Command drain (pre-sim; ARCH-007 / ADR-0024 D5) ───────────────
+        // The single mutation window before simulation: everything the
+        // fixed-step ticks and the render snapshot observe this frame is
+        // post-command, pre-tick. Commands enqueued during the drain (by
+        // handlers) or later in the frame execute at the next frame's drain.
+        m_CommandBus.Drain(*m_Scene);
+
         // ── Phase 2: Fixed-step simulation + CPU task graph ───────────────
         // Each tick: app adds FrameGraph passes → Engine compiles and executes
         // the ECS system DAG → reset for next tick.
@@ -3776,6 +3800,7 @@ namespace Extrinsic::Runtime
 
     // ── Query / control ───────────────────────────────────────────────────
 
+    CommandBus& Engine::Commands() noexcept { return m_CommandBus; }
     bool Engine::IsRunning() const noexcept { return m_Running; }
     void Engine::RequestExit()      noexcept { m_Running = false; }
 

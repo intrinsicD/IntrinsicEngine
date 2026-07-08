@@ -35,6 +35,7 @@ import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
@@ -687,6 +688,10 @@ namespace Extrinsic::Runtime
         [[nodiscard]] std::size_t
             GetPendingObjectSpaceNormalBakeCountForTest() const noexcept;
         [[nodiscard]] ECS::Scene::Registry&   GetScene()         noexcept;
+        // ARCH-007 — kernel command bus (ADR-0024 D5). Enqueue from any
+        // thread/phase; the Engine drains once per frame between platform
+        // input and the fixed-step simulation.
+        [[nodiscard]] CommandBus&             Commands()         noexcept;
         // UI-001 Slice D — runtime-owned file/import command seam. Editor UI
         // submits a path + payload hint here; Engine composes the promoted
         // ASSETIO geometry/model/texture decoders, AssetService, and runtime
@@ -1020,6 +1025,8 @@ namespace Extrinsic::Runtime
         std::uint64_t                              m_AssetImportEventSequence{0};
         std::optional<RuntimeSceneFileEvent>       m_LastSceneFileEvent{};
         std::uint64_t                              m_SceneFileEventSequence{0};
+        // ARCH-007 — kernel command bus; drained in RunFrame() pre-sim.
+        CommandBus                             m_CommandBus{};
         // ECS scene registry
         std::unique_ptr<ECS::Scene::Registry>  m_Scene;
         // Declared after m_Scene so scoped disconnection runs before the

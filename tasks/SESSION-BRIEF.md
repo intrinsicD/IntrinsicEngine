@@ -44,6 +44,12 @@ the authoritative open/unblocked view.
 - blocked by `RUNTIME-146`: `RUNTIME-151` — Slim the Engine module interface and remove the entt leak (tasks/backlog/runtime/RUNTIME-151-slim-engine-interface-and-remove-entt-leak.md)
 - blocked by `ARCH-012`: `UI-034` — Decentralized editor window contribution, capture contract, and property-plot widgets (tasks/backlog/ui/UI-034-framework24-editor-interaction-layout-conventions.md)
 
+## Theme G — Active bugs
+
+- unblocked: `BUG-062` — Warm-configure CI budget (10 s) flakes on shared-runner variance (tasks/backlog/bugs/BUG-062-warm-configure-budget-flaky-runner-variance.md)
+- unblocked: `BUG-063` — Streaming-import contract tests flaky on main (tasks/backlog/bugs/BUG-063-streaming-import-contract-tests-flaky-on-main.md)
+- unblocked: `BUG-064` — ci-vulkan FramePacingDiagnosticCapture cannot run headless (tasks/backlog/bugs/BUG-064-ci-vulkan-framepacing-headless-display.md)
+
 ## Theme H — Agentic workflow hardening
 
 - unblocked: `PROC-010` — Encode P1/P3/P5 research-engine invariants in AGENTS.md + review checklist (tasks/backlog/process/PROC-010-encode-research-engine-invariants-in-contract.md)
