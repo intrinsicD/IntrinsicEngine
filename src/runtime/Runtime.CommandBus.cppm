@@ -139,6 +139,7 @@ namespace Extrinsic::Runtime
         std::uint64_t MissingHandler{0};
         std::uint64_t Drains{0};
         std::uint64_t LastDrainCount{0};
+        std::uint64_t Discarded{0};
     };
 
     // Built-in kernel command (ADR-0024 D13): the sanctioned way for
@@ -198,8 +199,20 @@ namespace Extrinsic::Runtime
         void RecordInverse(CommandEnvelope inverse);
 
         // Install the post-execution history hook (e.g. the editor
-        // command history). One hook; replaces any previous hook.
+        // command history). One hook; replaces any previous hook. Hook
+        // exceptions are isolated per record and logged — a throwing
+        // hook can neither fail the already-executed command nor wedge
+        // the bus.
         void SetHistoryHook(CommandHistoryHook hook);
+
+        // Drop every command still queued without executing it and
+        // return the number dropped. Called by `Engine::Shutdown()` so
+        // commands enqueued after the final frame's drain (e.g. from
+        // the variable tick just before exit) cannot replay into a
+        // freshly re-initialized scene on the documented
+        // Shutdown() + Initialize() reuse path. Thread-safe; logs when
+        // it drops a non-empty queue.
+        std::size_t DiscardPending();
 
         [[nodiscard]] CommandBusStats Stats() const;
 

@@ -61,6 +61,11 @@ depends_on: []
       execution of a command that declares an inverse payload).
 - [x] Built-in `QuitRequested` command replacing direct shutdown calls from
       future module code (ADR-0024 D13).
+- [x] PR #1010 review follow-ups: `DiscardPending()` wired into
+      `Engine::Shutdown()` so stale commands cannot replay into a
+      re-initialized scene (Shutdown()+Initialize() reuse path), and
+      history-hook exceptions are isolated per record with an RAII guard
+      on the drain flag so a throwing hook cannot wedge the bus.
 
 ## Tests
 - [x] Contract tests authored (headless, `contract;runtime` labels via
@@ -73,6 +78,9 @@ depends_on: []
       diagnostic and does not crash.
 - [x] Handler-failure test: `Failed` outcome carries the error and does not
       abort the drain of subsequent commands.
+- [x] Review-regression tests: throwing history hook leaves the bus
+      drainable; `DiscardPending()` drops queued commands without
+      executing them and counts them in `Stats().Discarded`.
 
 ## Docs
 - [x] Regenerate `docs/api/generated/module_inventory.md` (new module).

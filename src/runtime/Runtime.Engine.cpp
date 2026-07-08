@@ -3206,6 +3206,12 @@ namespace Extrinsic::Runtime
 
     void Engine::Shutdown()
     {
+        // ARCH-007 — drop commands enqueued after the final frame's drain
+        // (e.g. from OnVariableTick just before RequestExit()). The engine
+        // is documented as reusable via Shutdown() + Initialize(); stale
+        // commands must not replay into the next session's fresh scene.
+        m_CommandBus.DiscardPending();
+
         if (m_Window)
             m_Window->Listen({});
 

@@ -270,6 +270,67 @@ TEST(RuntimeCommandBus, HistoryHookReceivesReEnqueueableInverse)
     EXPECT_EQ(hookCalls, 2);  // the undo records its own inverse (redo)
 }
 
+TEST(RuntimeCommandBus, ThrowingHistoryHookDoesNotWedgeTheBus)
+{
+    Registry   scene;
+    CommandBus bus;
+
+    int executed = 0;
+    bus.RegisterHandler<SetValue>(
+        [&](CommandContext& ctx, const SetValue& cmd) -> CommandOutcome
+        {
+            ++executed;
+            ctx.Commands.RecordInverse(
+                CommandEnvelope::Make(SetValue{cmd.New, cmd.Old}));
+            return CommandOutcome::Ok();
+        });
+    bus.SetHistoryHook([](const CommandHistoryRecord&)
+                       { throw std::runtime_error("intentional hook throw"); });
+
+    bus.Enqueue(SetValue{0, 1});
+    bus.Enqueue(SetValue{1, 2});
+    bus.Drain(scene);
+
+    // The hook throw is isolated per record: both commands executed and
+    // the command itself still counts as a success.
+    EXPECT_EQ(executed, 2);
+    EXPECT_EQ(bus.Stats().Executed, 2u);
+    EXPECT_EQ(bus.Stats().Failed, 0u);
+
+    // Regression (PR #1010 review): the bus must not stay wedged as
+    // "reentrant" after an unwinding hook — later drains still run.
+    bus.Enqueue(SetValue{2, 3});
+    bus.Drain(scene);
+    EXPECT_EQ(executed, 3);
+}
+
+TEST(RuntimeCommandBus, DiscardPendingDropsQueuedCommandsWithoutExecuting)
+{
+    Registry   scene;
+    CommandBus bus;
+
+    int executed = 0;
+    bus.RegisterHandler<AppendValue>(
+        [&](CommandContext&, const AppendValue&) -> CommandOutcome
+        {
+            ++executed;
+            return CommandOutcome::Ok();
+        });
+
+    // Regression (PR #1010 review): commands enqueued after the final
+    // frame's drain must not replay into a freshly initialized scene on
+    // the Engine Shutdown() + Initialize() reuse path.
+    bus.Enqueue(AppendValue{1});
+    bus.Enqueue(AppendValue{2});
+    EXPECT_EQ(bus.DiscardPending(), 2u);
+    EXPECT_EQ(bus.Stats().Discarded, 2u);
+
+    bus.Drain(scene);
+    EXPECT_EQ(executed, 0);
+    EXPECT_EQ(bus.Stats().Executed, 0u);
+    EXPECT_EQ(bus.DiscardPending(), 0u);
+}
+
 TEST(RuntimeCommandBus, FailedCommandDoesNotNotifyHistoryHook)
 {
     Registry   scene;
