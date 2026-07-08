@@ -1,19 +1,19 @@
 module;
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <string_view>
-#include <typeindex>
-#include <typeinfo>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
 export module Extrinsic.Runtime.CommandBus;
 
+import Extrinsic.Core.FrameGraph;
 import Extrinsic.ECS.Scene.Registry;
 
 // ============================================================
@@ -38,12 +38,40 @@ import Extrinsic.ECS.Scene.Registry;
 // capabilities, never `Engine&`. The context grows additional
 // members (events, jobs, worlds) as ARCH-008..ARCH-010 land.
 //
+// The repository builds with -fno-rtti and -fno-exceptions: type
+// identity uses the same compile-time FNV-1a type tokens the
+// FrameGraph uses (`Core::TypeToken<T>()`, no RTTI), diagnostics
+// names come from the compiler signature at compile time, and
+// handlers/hooks must not throw (any throw terminates the
+// process by construction — there is no exception path to guard).
+//
 // Layering: kernel substrate per ADR-0024 D9 — no domain nouns.
 // ============================================================
 
 namespace Extrinsic::Runtime
 {
     export class CommandBus;
+
+    // Compile-time command-type identity (no RTTI): the FrameGraph's
+    // FNV-1a token of the compiler type signature.
+    export using CommandTypeKey = std::size_t;
+
+    // Compile-time, allocation-free diagnostics name for a command
+    // type. The returned view points at the compiler's function
+    // signature literal (static storage duration) and contains the
+    // type name; precise formatting is compiler-specific and only
+    // used for logs.
+    export template <typename TCommand>
+    [[nodiscard]] consteval std::string_view CommandTypeNameOf() noexcept
+    {
+#if defined(__clang__) || defined(__GNUC__)
+        return __PRETTY_FUNCTION__;
+#elif defined(_MSC_VER)
+        return __FUNCSIG__;
+#else
+        return "CommandTypeNameOf<unknown>";
+#endif
+    }
 
     export struct CommandCorrelationId
     {
@@ -95,9 +123,9 @@ namespace Extrinsic::Runtime
         template <typename TCommand>
         [[nodiscard]] static CommandEnvelope Make(TCommand payload)
         {
-            return CommandEnvelope(std::type_index(typeid(TCommand)),
+            return CommandEnvelope(Core::TypeToken<TCommand>(),
                                    std::make_shared<const TCommand>(std::move(payload)),
-                                   typeid(TCommand).name());
+                                   CommandTypeNameOf<TCommand>());
         }
 
         [[nodiscard]] bool IsValid() const noexcept { return static_cast<bool>(m_Payload); }
@@ -106,16 +134,16 @@ namespace Extrinsic::Runtime
     private:
         friend class CommandBus;
 
-        CommandEnvelope(std::type_index type,
+        CommandEnvelope(CommandTypeKey type,
                         std::shared_ptr<const void> payload,
-                        std::string typeName)
-            : m_Type(type), m_Payload(std::move(payload)), m_TypeName(std::move(typeName))
+                        std::string_view typeName)
+            : m_Type(type), m_Payload(std::move(payload)), m_TypeName(typeName)
         {
         }
 
-        std::type_index             m_Type{typeid(void)};
+        CommandTypeKey              m_Type{0};
         std::shared_ptr<const void> m_Payload{};
-        std::string                 m_TypeName{};
+        std::string_view            m_TypeName{};
     };
 
     // Post-execution history record (ADR-0024 D5 undo seam). The bus
@@ -166,8 +194,8 @@ namespace Extrinsic::Runtime
             std::function<CommandOutcome(CommandContext&, const TCommand&)> handler)
         {
             RegisterHandlerErased(
-                std::type_index(typeid(TCommand)),
-                typeid(TCommand).name(),
+                Core::TypeToken<TCommand>(),
+                CommandTypeNameOf<TCommand>(),
                 [h = std::move(handler)](CommandContext& ctx,
                                          const void*     payload) -> CommandOutcome
                 { return h(ctx, *static_cast<const TCommand*>(payload)); });
@@ -199,10 +227,9 @@ namespace Extrinsic::Runtime
         void RecordInverse(CommandEnvelope inverse);
 
         // Install the post-execution history hook (e.g. the editor
-        // command history). One hook; replaces any previous hook. Hook
-        // exceptions are isolated per record and logged — a throwing
-        // hook can neither fail the already-executed command nor wedge
-        // the bus.
+        // command history). One hook; replaces any previous hook.
+        // Hooks must not throw (the codebase builds with
+        // -fno-exceptions; a throw is a process-terminating defect).
         void SetHistoryHook(CommandHistoryHook hook);
 
         // Drop every command still queued without executing it and
@@ -222,8 +249,8 @@ namespace Extrinsic::Runtime
 
         struct HandlerRecord
         {
-            ErasedHandler Handler{};
-            std::string   TypeName{};
+            ErasedHandler    Handler{};
+            std::string_view TypeName{};
         };
 
         struct PendingCommand
@@ -232,9 +259,9 @@ namespace Extrinsic::Runtime
             CommandCorrelationId Correlation{};
         };
 
-        void RegisterHandlerErased(std::type_index type,
-                                   std::string     typeName,
-                                   ErasedHandler   handler);
+        void RegisterHandlerErased(CommandTypeKey   type,
+                                   std::string_view typeName,
+                                   ErasedHandler    handler);
 
         // Pending queue: mutex-guarded multi-producer queue swapped
         // whole at drain time (single consumer). Handlers/registry are
@@ -243,8 +270,8 @@ namespace Extrinsic::Runtime
         std::vector<PendingCommand> m_Pending;
         std::uint64_t               m_NextCorrelation{1};
 
-        std::unordered_map<std::type_index, HandlerRecord> m_Handlers;
-        CommandHistoryHook                                 m_HistoryHook{};
+        std::unordered_map<CommandTypeKey, HandlerRecord> m_Handlers;
+        CommandHistoryHook                                m_HistoryHook{};
 
         bool            m_Draining{false};
         CommandEnvelope m_RecordedInverse{};

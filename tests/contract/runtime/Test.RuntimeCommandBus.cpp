@@ -2,7 +2,6 @@
 
 #include <atomic>
 #include <cstdint>
-#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -179,30 +178,6 @@ TEST(RuntimeCommandBus, HandlerFailureIsCountedAndDrainContinues)
     EXPECT_EQ(executed, 1);
 }
 
-TEST(RuntimeCommandBus, ThrowingHandlerIsCountedAsFailureAndDrainContinues)
-{
-    Registry   scene;
-    CommandBus bus;
-
-    int executed = 0;
-    bus.RegisterHandler<FailingCommand>(
-        [](CommandContext&, const FailingCommand&) -> CommandOutcome
-        { throw std::runtime_error("intentional test throw"); });
-    bus.RegisterHandler<AppendValue>(
-        [&](CommandContext&, const AppendValue&) -> CommandOutcome
-        {
-            ++executed;
-            return CommandOutcome::Ok();
-        });
-
-    bus.Enqueue(FailingCommand{});
-    bus.Enqueue(AppendValue{1});
-    bus.Drain(scene);
-
-    EXPECT_EQ(bus.Stats().Failed, 1u);
-    EXPECT_EQ(executed, 1);
-}
-
 TEST(RuntimeCommandBus, HandlerEnqueuedFollowUpDefersToNextDrain)
 {
     Registry   scene;
@@ -268,40 +243,6 @@ TEST(RuntimeCommandBus, HistoryHookReceivesReEnqueueableInverse)
 
     EXPECT_EQ(current, 0);
     EXPECT_EQ(hookCalls, 2);  // the undo records its own inverse (redo)
-}
-
-TEST(RuntimeCommandBus, ThrowingHistoryHookDoesNotWedgeTheBus)
-{
-    Registry   scene;
-    CommandBus bus;
-
-    int executed = 0;
-    bus.RegisterHandler<SetValue>(
-        [&](CommandContext& ctx, const SetValue& cmd) -> CommandOutcome
-        {
-            ++executed;
-            ctx.Commands.RecordInverse(
-                CommandEnvelope::Make(SetValue{cmd.New, cmd.Old}));
-            return CommandOutcome::Ok();
-        });
-    bus.SetHistoryHook([](const CommandHistoryRecord&)
-                       { throw std::runtime_error("intentional hook throw"); });
-
-    bus.Enqueue(SetValue{0, 1});
-    bus.Enqueue(SetValue{1, 2});
-    bus.Drain(scene);
-
-    // The hook throw is isolated per record: both commands executed and
-    // the command itself still counts as a success.
-    EXPECT_EQ(executed, 2);
-    EXPECT_EQ(bus.Stats().Executed, 2u);
-    EXPECT_EQ(bus.Stats().Failed, 0u);
-
-    // Regression (PR #1010 review): the bus must not stay wedged as
-    // "reentrant" after an unwinding hook — later drains still run.
-    bus.Enqueue(SetValue{2, 3});
-    bus.Drain(scene);
-    EXPECT_EQ(executed, 3);
 }
 
 TEST(RuntimeCommandBus, DiscardPendingDropsQueuedCommandsWithoutExecuting)

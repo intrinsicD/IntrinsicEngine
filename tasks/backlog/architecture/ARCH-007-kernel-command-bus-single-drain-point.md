@@ -63,9 +63,17 @@ depends_on: []
       future module code (ADR-0024 D13).
 - [x] PR #1010 review follow-ups: `DiscardPending()` wired into
       `Engine::Shutdown()` so stale commands cannot replay into a
-      re-initialized scene (Shutdown()+Initialize() reuse path), and
-      history-hook exceptions are isolated per record with an RAII guard
-      on the drain flag so a throwing hook cannot wedge the bus.
+      re-initialized scene (Shutdown()+Initialize() reuse path); an RAII
+      guard keeps the drain flag correct on every exit path. The
+      reviewer's hook-exception-wedge scenario is impossible in this
+      codebase (`-fno-exceptions`: any throw terminates), so no catch
+      path exists by design.
+- [x] CI round 1 rework: the codebase builds with `-fno-rtti` and
+      `-fno-exceptions`; replaced `typeid`/`std::type_index` with the
+      FrameGraph's compile-time FNV-1a type tokens
+      (`Core::TypeToken<T>()`) plus a `consteval` signature-based
+      diagnostics name, and removed all try/catch (a throwing handler
+      is a process-terminating defect, not a recoverable outcome).
 
 ## Tests
 - [x] Contract tests authored (headless, `contract;runtime` labels via
@@ -78,9 +86,10 @@ depends_on: []
       diagnostic and does not crash.
 - [x] Handler-failure test: `Failed` outcome carries the error and does not
       abort the drain of subsequent commands.
-- [x] Review-regression tests: throwing history hook leaves the bus
-      drainable; `DiscardPending()` drops queued commands without
-      executing them and counts them in `Stats().Discarded`.
+- [x] Review-regression test: `DiscardPending()` drops queued commands
+      without executing them and counts them in `Stats().Discarded`.
+      (Throwing-handler/hook tests were removed as invalid — the
+      codebase builds with `-fno-exceptions`.)
 
 ## Docs
 - [x] Regenerate `docs/api/generated/module_inventory.md` (new module).

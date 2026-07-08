@@ -1,9 +1,9 @@
 module;
 
-#include <exception>
+#include <cstddef>
+#include <cstdint>
 #include <mutex>
-#include <string>
-#include <typeindex>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -28,11 +28,11 @@ namespace Extrinsic::Runtime
         return correlation;
     }
 
-    void CommandBus::RegisterHandlerErased(std::type_index type,
-                                           std::string     typeName,
-                                           ErasedHandler   handler)
+    void CommandBus::RegisterHandlerErased(CommandTypeKey   type,
+                                           std::string_view typeName,
+                                           ErasedHandler    handler)
     {
-        m_Handlers[type] = HandlerRecord{std::move(handler), std::move(typeName)};
+        m_Handlers[type] = HandlerRecord{std::move(handler), typeName};
     }
 
     void CommandBus::RecordInverse(CommandEnvelope inverse)
@@ -93,9 +93,10 @@ namespace Extrinsic::Runtime
             batch.swap(m_Pending);
         }
 
-        // Scope guard: m_Draining must clear even if something below
-        // unwinds (e.g. bad_alloc) — otherwise every later drain would
-        // be refused as reentrant and the bus would stay wedged.
+        // Scope guard: keeps the flag correct on every exit path so a
+        // future early return cannot leave the bus refusing all later
+        // drains as "reentrant". (No exception paths exist — the
+        // codebase builds with -fno-exceptions.)
         struct DrainingScope final
         {
             bool& Flag;
@@ -131,20 +132,8 @@ namespace Extrinsic::Runtime
             CommandContext context{activeWorld, *this, pending.Correlation};
             m_RecordedInverse = CommandEnvelope{};
 
-            CommandOutcome outcome{};
-            try
-            {
-                outcome = record.Handler(context,
-                                         pending.Envelope.m_Payload.get());
-            }
-            catch (const std::exception& ex)
-            {
-                outcome = CommandOutcome::Fail(ex.what());
-            }
-            catch (...)
-            {
-                outcome = CommandOutcome::Fail("unknown exception");
-            }
+            const CommandOutcome outcome =
+                record.Handler(context, pending.Envelope.m_Payload.get());
 
             if (outcome.Status == CommandStatus::Failed)
             {
@@ -160,33 +149,10 @@ namespace Extrinsic::Runtime
             m_Stats.Executed += 1;
             if (m_HistoryHook && m_RecordedInverse.IsValid())
             {
-                // Isolate hook failures: the command already executed, so
-                // a throwing history integration must neither undo that
-                // fact nor abort the remaining batch.
-                try
-                {
-                    m_HistoryHook(CommandHistoryRecord{
-                        record.TypeName,
-                        pending.Correlation,
-                        std::move(m_RecordedInverse)});
-                }
-                catch (const std::exception& ex)
-                {
-                    Core::Log::Error(
-                        "[CommandBus] History hook threw for command '{}' "
-                        "(correlation {}): {}",
-                        record.TypeName,
-                        pending.Correlation.Value,
-                        ex.what());
-                }
-                catch (...)
-                {
-                    Core::Log::Error(
-                        "[CommandBus] History hook threw a non-std exception "
-                        "for command '{}' (correlation {}).",
-                        record.TypeName,
-                        pending.Correlation.Value);
-                }
+                m_HistoryHook(CommandHistoryRecord{
+                    record.TypeName,
+                    pending.Correlation,
+                    std::move(m_RecordedInverse)});
                 m_RecordedInverse = CommandEnvelope{};
             }
         }
