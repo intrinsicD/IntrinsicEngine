@@ -13,6 +13,15 @@ Before exploring code, load the layering vocabulary from `intrinsicengine-core`
 and any relevant ADRs under `docs/adr/`. Bugs in a layered engine almost always
 have a layer; name it early.
 
+Two domain playbooks narrow this loop for recurring failure classes — route
+there first when they match:
+
+- Unexplained SEGV/ASan/vtable/ICE failure, especially after `.cppm` module
+  changes → `intrinsicengine-stale-build-triage` (rule out stale BMIs before
+  diagnosing).
+- Black/wrong frame, validation (VUID) cascade, or driver crash on the
+  promoted Vulkan path → `intrinsicengine-vulkan-frame-triage`.
+
 ## Phase 1 — Build a feedback loop
 
 **This is the skill.** Everything else is mechanical. With a fast, deterministic,
