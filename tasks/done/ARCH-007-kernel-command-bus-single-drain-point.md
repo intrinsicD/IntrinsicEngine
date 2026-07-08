@@ -10,7 +10,7 @@ depends_on: []
   correlation IDs, thread-safe enqueue from any thread/phase, and execution
   main-thread-only at a single drain point in `Engine::RunFrame()` between
   platform input (Phase 1) and fixed-step simulation (Phase 2), per
-  [ADR-0024](../../../docs/adr/0024-kernel-module-architecture.md) D5/D13.
+  [ADR-0024](../../docs/adr/0024-kernel-module-architecture.md) D5/D13.
 
 ## Non-goals
 - No `CommandSequence` (ADR-0024 D6 defers it to its first real customer).
@@ -35,6 +35,8 @@ depends_on: []
 
 ## Status
 
+- **Retired 2026-07-08 at `CPUContracted`.** Commit/PR: pull request #1010
+  (merge commit: `977244d`). `Operational` owned by `ARCH-012`.
 - 2026-07-08: implementation landed on branch
   `claude/research-repo-comparison-vy5x0l` (module, Engine wiring, contract
   tests, docs). Compiler/CTest verification could not run in the authoring
@@ -108,12 +110,18 @@ depends_on: []
       citing ADR-0024.
 
 ## Acceptance criteria
-- [ ] `CommandBus` exists as a kernel module with no domain nouns and no
-      imports above `runtime` substrate needs.
-- [ ] Drain point runs in `Engine::RunFrame()` pre-sim; no other execution
+- [x] `CommandBus` exists as a kernel module with no domain nouns and no
+      imports above `runtime` substrate needs (imports: `Core.FrameGraph`,
+      `Core.Logging`, `ECS.Scene.Registry`; layering gate green).
+- [x] Drain point runs in `Engine::RunFrame()` pre-sim; no other execution
       path exists.
-- [ ] All listed tests pass under the default CPU gate.
-- [ ] `Operational` follow-up is owned by `ARCH-012`.
+- [x] All nine `RuntimeCommandBus.*` contract tests passed inside the
+      default CPU gate in three consecutive PR #1010 CI rounds (heads
+      `e732e69`, `5d0c773`, `635915a`). The gate *as a whole* was red in
+      those rounds solely from the pre-existing, diff-independent defects
+      `BUG-063`/`BUG-064` (both also red on `main`); no CommandBus test
+      ever failed.
+- [x] `Operational` follow-up is owned by `ARCH-012`.
 
 ## Verification
 ```bash

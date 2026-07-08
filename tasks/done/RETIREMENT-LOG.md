@@ -3685,3 +3685,27 @@ task intake in `prompt.md` §"When CI fails" anchored from `AGENTS.md` §10
 (the `BUG-062`/`063`/`064` pattern), and batch-seeding ID allocation plus the
 canonical-prefix pointer in `docs/agent/task-format.md` (the
 `GEOM-027`/`PROC-012` collision lesson).
+[`ARCH-007`](ARCH-007-kernel-command-bus-single-drain-point.md) — Kernel
+command bus with a single pre-sim drain point retired to `tasks/done/` on
+2026-07-08 at `CPUContracted` (PR #1010, merge `977244d`). First ADR-0024
+kernel seam: `Extrinsic.Runtime.CommandBus` provides plain-data commands
+with correlation IDs, thread-safe multi-producer enqueue, one deterministic
+pre-sim drain point in `Engine::RunFrame()`, fail-closed missing-handler
+diagnostics, a post-execution history-hook seam with re-enqueueable inverse
+envelopes, `DiscardPending()` teardown so stale commands cannot replay into
+a re-initialized scene, and the built-in `QuitRequested` command. Type
+identity uses the FrameGraph's compile-time FNV-1a tokens (no RTTI) and the
+implementation carries no exception machinery (`-fno-exceptions`). Nine
+contract tests passed inside the default CPU gate across three PR CI
+rounds; the gate's overall red in those rounds came solely from the
+pre-existing `BUG-063`/`BUG-064` defects. `Operational` is owned by
+`ARCH-012`.
+
+[`BUG-062`](BUG-062-warm-configure-budget-flaky-runner-variance.md) — Warm-
+configure CI budget flake closed on 2026-07-08 (PR #1010). The 10 s
+warm-cache configure guard, calibrated at the shared-runner median, killed
+five merge-gating workflows across three PR heads (including a
+markdown-only diff) before their build steps. The budget moved to 20 s in
+all seven invocations across six workflows with guard semantics and timing
+telemetry unchanged; three consecutive PR CI rounds then completed every
+configure step without a budget kill.

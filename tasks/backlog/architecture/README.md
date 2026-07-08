@@ -35,9 +35,6 @@ Opened from the 2026-07-08 kernel/module architecture decision record
 seams-first migration order, `ARCH-012` is the Operational proving
 extraction:
 
-- [`ARCH-007`](ARCH-007-kernel-command-bus-single-drain-point.md) — kernel
-  command bus with a single pre-sim drain point (plain-data payloads,
-  correlation IDs, fail-closed handlers).
 - [`ARCH-008`](ARCH-008-kernel-event-bus-queued-only.md) — queued-only
   kernel event bus (two pump points, worker inbox, no `trigger`).
 - [`ARCH-009`](ARCH-009-kernel-jobservice-snapshot-in-result-out.md) —
@@ -87,6 +84,15 @@ root must update the relevant `docs/architecture/*` doc set in the same PR per
 - [`docs/agent/architecture-review-checklist.md`](../../../docs/agent/architecture-review-checklist.md).
 
 ## Retired
+
+- [ARCH-007 — Kernel command bus with a single pre-sim drain point](../../done/ARCH-007-kernel-command-bus-single-drain-point.md)
+  (done, 2026-07-08, `CPUContracted`, PR #1010): first ADR-0024 kernel seam.
+  `Extrinsic.Runtime.CommandBus` ships plain-data commands with correlation
+  IDs, thread-safe enqueue, a single pre-sim drain in `Engine::RunFrame()`,
+  fail-closed missing-handler diagnostics, a history-hook seam with
+  re-enqueueable inverse envelopes, `DiscardPending()` on shutdown, and the
+  built-in `QuitRequested` command. No-RTTI/no-exceptions compliant via
+  `Core::TypeToken` type identity. `Operational` owned by `ARCH-012`.
 
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
