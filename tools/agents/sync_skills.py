@@ -34,6 +34,8 @@ REFERENCE_MAP = {
     "docs/agent/review-checklist.md": "intrinsicengine-review/references/review-checklist.md",
     "docs/agent/architecture-review-checklist.md": "intrinsicengine-review/references/architecture-review-checklist.md",
     "docs/agent/agent-output-review-checklist.md": "intrinsicengine-review/references/agent-output-review-checklist.md",
+    "docs/agent/clean-workshop-review.md": "intrinsicengine-review/references/clean-workshop-review.md",
+    "docs/agent/drift-audit-checklist.md": "intrinsicengine-review/references/drift-audit-checklist.md",
     "docs/agent/method-workflow.md": "intrinsicengine-method/references/method-workflow.md",
     "docs/agent/method-review-checklist.md": "intrinsicengine-method/references/method-review-checklist.md",
     "docs/agent/benchmark-workflow.md": "intrinsicengine-benchmark/references/benchmark-workflow.md",

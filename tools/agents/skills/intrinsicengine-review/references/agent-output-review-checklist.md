@@ -182,8 +182,8 @@ reference rows directly.
 
 - [`/AGENTS.md`](../../../../../AGENTS.md) — authoritative repository contract; §9 (docs
   sync), §12 (per-PR review checklist), §13 (temporary migration exceptions).
-- [`docs/agent/contract.md`](../../../../../docs/agent/contract.md) — expanded contract; cadence pointer
-  lives in the testing/verification section.
+- [`docs/agent/contract.md`](../../../../../docs/agent/contract.md) — expanded contract; the cadence is
+  described in its "Weekly agent-output review cadence" section.
 - [`docs/agent/review-checklist.md`](../../../../../docs/agent/review-checklist.md) — per-PR review
   checklist (not replaced by this cadence).
 - [`docs/agent/roles.md`](../../../../../docs/agent/roles.md) — reviewer ownership for the weekly

@@ -58,7 +58,11 @@ without scrolling back.
    - One or more of: `intrinsicengine-core`, `intrinsicengine-task-workflow`,
      `intrinsicengine-review`, `intrinsicengine-method`,
      `intrinsicengine-benchmark`, `intrinsicengine-docs-sync`,
-     `intrinsicengine-diagnose`, `intrinsicengine-zoom-out`.
+     `intrinsicengine-diagnose`, `intrinsicengine-vulkan-frame-triage`,
+     `intrinsicengine-gpu-smoke-authoring`,
+     `intrinsicengine-stale-build-triage` (`intrinsicengine-zoom-out` is
+     user-invoked only — suggest the user run it, or read its SKILL.md
+     directly).
    - Pick the ones that match the touched scope; don't list all of them.
 
 ## Rules

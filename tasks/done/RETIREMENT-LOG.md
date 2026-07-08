@@ -3648,3 +3648,40 @@ and async-compute queue-family-local secondary command buffers under validation
 smokes, and benchmark smoke parity is recorded without claiming a performance
 win. Transfer render-graph scheduling remains out of scope because no
 production transfer pass is enabled.
+
+[`PROC-015`](PROC-015-diagnosis-playbook-skills-wave-1.md) — Recurring
+diagnosis playbooks codified as skills (wave 1) retired to `tasks/done/` on
+2026-07-08. The 2026-07-08 agentic-workflow review mined the 601 retired
+tasks and found three playbooks re-derived across many sessions: Vulkan
+frame-content triage (≥14 tasks, with the bindless bridge slot defect
+shipping three times), the opt-in `gpu;vulkan` readback smoke shape (~14
+hand-rolled instances), and stale C++23-module/ccache artifact triage (three
+whole-session sinks). They now exist as self-contained discipline skills —
+`intrinsicengine-vulkan-frame-triage`, `intrinsicengine-gpu-smoke-authoring`,
+and `intrinsicengine-stale-build-triage` — registered in the
+`intrinsicengine-core` routing table, the skills README, and routed from
+`intrinsicengine-diagnose`. Wave-2 playbooks are seeded as
+`PROC-018`/`PROC-019`/`PROC-020`.
+
+[`PROC-016`](PROC-016-skills-docs-mirror-drift-fixes.md) — Skills/docs mirror
+drift and dead routings fixed, retired to `tasks/done/` on 2026-07-08. The
+skills README no longer claims 13 source docs, describes the real
+`sync_skills.py` mechanism instead of a harmful `cp` script, and documents the
+symlink layout; `clean-workshop-review.md` and `drift-audit-checklist.md` are
+now mirrored into `intrinsicengine-review` (REFERENCE_MAP 14→16 files); the
+`intrinsicengine-zoom-out` routing no longer asks the model to invoke a
+user-only skill; the test-category taxonomy is unified on `AGENTS.md` §7
+across `contract.md` and both review checklists; `contract.md`'s layering
+table gained the missing `graphics/assets`/`graphics/vulkan`/`platform` rows;
+`docs/agent/prompt/prompt.md` is indexed from the `AGENTS.md` routing table;
+and `tasks/README.md` now states the single-slice-from-backlog rule.
+Skill-body canonicalization is deferred to `PROC-023`.
+
+[`PROC-017`](PROC-017-workflow-convention-gaps.md) — Undocumented workflow
+conventions written down, retired to `tasks/done/` on 2026-07-08. Four
+conventions the workflow already practiced now have owning text: branch
+naming and task claiming in `docs/agent/prompt/prompt.md`, CI-failure→`BUG-`
+task intake in `prompt.md` §"When CI fails" anchored from `AGENTS.md` §10
+(the `BUG-062`/`063`/`064` pattern), and batch-seeding ID allocation plus the
+canonical-prefix pointer in `docs/agent/task-format.md` (the
+`GEOM-027`/`PROC-012` collision lesson).
