@@ -5,7 +5,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-None.
+- [`BUG-062` — Warm-configure CI budget (10 s) flakes on shared-runner variance](BUG-062-warm-configure-budget-flaky-runner-variance.md):
+  the `time_command.py` warm-cache configure guard killed five merge-gating
+  workflows across three PR #1010 heads (including a markdown-only diff)
+  at 10.06–14.80 s measured against the 10 s budget, before any build step
+  ran. Fix in flight: budget raised to 20 s in all seven invocations;
+  closes when a full PR CI round passes the configure step at the new
+  budget.
 
 ---
 

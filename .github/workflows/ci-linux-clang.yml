@@ -63,7 +63,7 @@ jobs:
           python3 tools/ci/time_command.py \
             --label "Configure (ci preset)" \
             --warm-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
-            --max-warm-seconds 10 \
+            --max-warm-seconds 20 \
             -- cmake --preset ci
 
       - name: Build full CPU targets
