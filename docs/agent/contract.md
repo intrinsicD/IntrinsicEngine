@@ -22,7 +22,10 @@ Required dependency boundaries:
 - `ecs` -> `core`; geometry handles/types only when explicitly required
 - `physics` -> `core`, `geometry`; no live ECS/runtime/graphics/platform/app ownership
 - `graphics/rhi` -> `core`
+- `graphics/assets` -> `core`, asset IDs (`Asset.Registry` types only), `graphics/rhi`; no live `AssetService` traffic
+- `graphics/vulkan` -> `core`, `graphics/rhi`, backend-local Vulkan dependencies (`Vulkan::Vulkan`, `volk`, `VulkanMemoryAllocator`, `glfw`); no ECS, runtime, or live asset-service knowledge, and no `Vk*` types through RHI/renderer APIs
 - `graphics/*` -> `core`, asset IDs, `graphics/rhi`, geometry GPU views; no live ECS knowledge
+- `platform` -> `core`
 - `runtime` -> lower layers; owns composition/wiring, including physics bridge ownership
 - `app` -> `runtime` only
 - `methods` -> public method API + declared backend integration only
@@ -110,7 +113,7 @@ normally — no task depends on it.
 - Run strongest relevant verification subset for touched scope.
 - Add/update tests for behavior changes.
 - Keep pass rate stable or improved unless temporary shim is explicitly documented.
-- Use explicit test categories: `unit`, `contract`, `integration`, `regression`, `gpu`, `benchmark`.
+- Use explicit test categories: `unit`, `contract`, `integration`, `regression`, `benchmark`, `slo`. `gpu`/`vulkan`/`glfw` are capability labels and `slow`/`flaky-quarantine` are opt-in labels, not categories (see `AGENTS.md` §7 and `tests/README.md` for the full label allow-list).
 - Verification hygiene:
   - Prefer configured presets over ad-hoc build directories. If a non-default build tree is needed, first confirm it uses a compiler/toolchain that satisfies the repository C++23 requirements; stale trees using older toolchains are not valid evidence.
   - When a task needs a non-headless backend sanity check, prefer the smallest direct target that proves the touched seam. For Vulkan renderer integration, use focused CPU contract tests plus a direct `ExtrinsicBackendsVulkan` build before attempting broad runtime-test executables.

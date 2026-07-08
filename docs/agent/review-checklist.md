@@ -60,7 +60,7 @@ Use this checklist before commit and PR creation.
 
 - [ ] Strongest relevant verification subset was run.
 - [ ] Tests for behavior changes were added or updated.
-- [ ] Test labels/category are correct (`unit`, `contract`, `integration`, `regression`, `gpu`, `benchmark`).
+- [ ] Test labels/category are correct (categories: `unit`, `contract`, `integration`, `regression`, `benchmark`, `slo`; capability labels `gpu`/`vulkan`/`glfw` and opt-in labels `slow`/`flaky-quarantine` per `AGENTS.md` §7 and `tests/README.md`).
 - [ ] Focused build/test targets were run before broad or long-running targets.
 - [ ] If `tools/ci/touched_scope.py` was used, its selected commands are recorded and any broad fallback/full-gate requirements are still addressed.
 - [ ] Build trees used for evidence were confirmed current and compatible with repository C++23/toolchain requirements.

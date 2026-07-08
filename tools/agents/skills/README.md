@@ -1,10 +1,11 @@
 # IntrinsicEngine Agent Skills
 
-This folder contains twelve [Agent Skills](https://agentskills.io). Six of them
-wrap the IntrinsicEngine `AGENTS.md` contract and the procedure docs under
-`docs/agent/`; three add IntrinsicEngine-specific cross-cutting workflow
-disciplines (diagnosis, zoom-out, handoff) that don't have a single source doc
-under `docs/agent/`; three are imported third-party productivity skills.
+This folder contains fifteen [Agent Skills](https://agentskills.io). Six of
+them wrap the IntrinsicEngine `AGENTS.md` contract and the procedure docs
+under `docs/agent/`; six add IntrinsicEngine-specific cross-cutting workflow
+disciplines (diagnosis, Vulkan frame triage, GPU smoke authoring, stale-build
+triage, zoom-out, handoff) that don't have a single source doc under
+`docs/agent/`; three are imported third-party productivity skills.
 The skills are designed to load *progressively*: only the metadata (~100 tokens
 per skill) sits in context by default, with full content loaded only when the
 skill's trigger description matches the current task.
@@ -12,7 +13,7 @@ skill's trigger description matches the current task.
 ## Why these skills exist
 
 The IntrinsicEngine repo already encodes its agent workflow extensively in
-`AGENTS.md` plus 13 expanded procedure docs under `docs/agent/`. That works,
+`AGENTS.md` plus the expanded procedure docs under `docs/agent/`. That works,
 but relies on each agent session remembering to read `AGENTS.md` and follow
 its routing table.
 
@@ -35,16 +36,18 @@ Packaging the same content as Agent Skills gives three additional benefits:
 | --- | --- | --- |
 | `intrinsicengine-core` | `AGENTS.md` + `docs/agent/contract.md` + `docs/agent/roles.md` + `docs/agent/prompt/prompt.md` | Any work in this repo — always-on master |
 | `intrinsicengine-task-workflow` | `docs/agent/task-format.md` + `docs/agent/task-maturity.md` + `tasks/templates/task.md` | Creating, promoting, retiring, or materially editing task files |
-| `intrinsicengine-review` | `docs/agent/review-checklist.md` + `docs/agent/architecture-review-checklist.md` + `docs/agent/agent-output-review-checklist.md` | Pre-commit, PR review, architecture-impacting changes, weekly audit |
+| `intrinsicengine-review` | `docs/agent/review-checklist.md` + `docs/agent/architecture-review-checklist.md` + `docs/agent/agent-output-review-checklist.md` + `docs/agent/clean-workshop-review.md` + `docs/agent/drift-audit-checklist.md` | Pre-commit, PR review, architecture-impacting changes, weekly audit, drift audit |
 | `intrinsicengine-method` | `docs/agent/method-workflow.md` + `docs/agent/method-review-checklist.md` | Paper/method implementation under `methods/` |
 | `intrinsicengine-benchmark` | `docs/agent/benchmark-workflow.md` + `docs/agent/benchmark-review-checklist.md` | Benchmark manifests, runners, performance claims |
 | `intrinsicengine-docs-sync` | `docs/agent/docs-sync-policy.md` | File moves, API surface changes, inventory regeneration |
 
-Together these cover all 13 of the `docs/agent/*.md` files plus `AGENTS.md`
+Together these cover all 14 of the `docs/agent/*.md` files plus `AGENTS.md`
 itself, the session-onboarding prompt under `docs/agent/prompt/prompt.md`, and
-the task template at `tasks/templates/task.md`.
+the task template at `tasks/templates/task.md`. The authoritative
+source-to-mirror mapping is `REFERENCE_MAP` in `tools/agents/sync_skills.py`;
+if that map and this table disagree, the map wins.
 
-### Cross-cutting workflow disciplines (three)
+### Cross-cutting workflow disciplines (six)
 
 These skills do not wrap a single source doc under `docs/agent/`. They encode
 disciplines that apply across multiple touched scopes. The skill body is
@@ -53,7 +56,10 @@ authoritative for these.
 | Skill | Purpose | Triggers on |
 | --- | --- | --- |
 | `intrinsicengine-diagnose` | Disciplined diagnosis loop: feedback-loop → reproduce → rank hypotheses → instrument with tagged probes → fix → regression-test → cleanup. Adapted with C++/Vulkan tooling (ctest labels, validation layers, RenderDoc, backend differentials, benchmark baselines). | "diagnose this", crashes, validation-layer errors, CPU/null gate failures, reference-vs-optimized parity mismatches, benchmark regressions |
-| `intrinsicengine-zoom-out` | One-shot layer-cake map of an unfamiliar file using the engine's domain vocabulary (`core`/`geometry`/`assets`/`ecs`/`physics`/`graphics/*`/`runtime`/`app`/`methods`) and `.cppm` module surfaces. | "zoom out", "where does this fit", "give me the layer map" |
+| `intrinsicengine-vulkan-frame-triage` | Domain playbook for wrong-frame-content defects on the promoted Vulkan path: validation-first triage, per-stage readback bisection, and the engine invariants (bindless bridge slot ownership, render-id conventions, integer clears, QFOT pairing, Y-flip) that past bugs re-derived repeatedly. | black frame, black readback, VUID cascade, driver crash in `vkCmd*`, descriptor/bindless anomaly |
+| `intrinsicengine-gpu-smoke-authoring` | House pattern for opt-in `gpu;vulkan` readback smoke tests: label policy, skip-vs-fail discipline, pixel-sampling idioms, `ci-vulkan` incantations, and when a fix owes an `Operational` smoke follow-up. | adding/changing gpu/vulkan-labeled tests, proving a fix `Operational`, readback assertions |
+| `intrinsicengine-stale-build-triage` | Rule out stale C++23-module/ccache artifacts (BMIs) before diagnosing any unexplained SEGV/ASan/vtable/ICE failure; clean-rebuild ladder and staleness signatures. | unexplained SEGV after module changes, PC=0x0 dispatch, "not reproducible", ccache/ICE anomalies |
+| `intrinsicengine-zoom-out` | One-shot layer-cake map of an unfamiliar file using the engine's domain vocabulary (`core`/`geometry`/`assets`/`ecs`/`physics`/`graphics/*`/`runtime`/`app`/`methods`) and `.cppm` module surfaces. | user-invoked only (`/intrinsicengine-zoom-out`): "zoom out", "where does this fit" |
 | `intrinsicengine-handoff` | Compact the current conversation into a handoff document for the next agent. Saves to `$TMPDIR`, never into the repo (no in-tree planning docs). | "handoff", "compact this", end-of-session summarization |
 
 ### Imported productivity skills (three)
@@ -83,6 +89,10 @@ authority chain is:
 If a skill body and a source doc disagree, the source doc wins. Resync the
 skill (see "Keeping in sync" below).
 
+The cross-cutting discipline skills have no `docs/agent/` source; their
+SKILL.md bodies are authoritative, but the `AGENTS.md` contract still wins on
+anything it covers.
+
 For imported productivity skills, upstream content is the source material, but
 the IntrinsicEngine `AGENTS.md` contract still wins on repository hygiene,
 task workflow, verification, and commit behavior.
@@ -95,31 +105,34 @@ layout:
 ```
 intrinsicengine-<name>/
 ├── SKILL.md              # YAML frontmatter + routing/summary body
-└── references/           # Source docs, copied verbatim; loaded on demand
+└── references/           # Generated mirrors of the source docs; loaded on demand
     └── <doc>.md
 ```
 
 The `SKILL.md` body is a routing layer with checklist summaries and pointers;
-the `references/` files are the verbatim source procedure for deep reads.
-Imported productivity skills may use standalone companion files instead of a
+the `references/` files are generated from the source procedure docs by
+`tools/agents/sync_skills.py`, which **rewrites relative links** during the
+copy so they resolve from the mirror location — the mirrors are therefore not
+byte-identical to their sources and must never be edited by hand or copied
+with plain `cp`. Cross-cutting discipline skills are SKILL.md-only. Imported
+productivity skills may use standalone companion files instead of a
 `references/` directory when that is how the upstream skill is structured.
 
-## Installation
+## Where the skills live in this repo
 
-### Claude Code
+The physical skill tree is this directory, `tools/agents/skills/`. The
+harness-facing roots `.claude/skills` and `.codex/skills` are symlinks to it,
+so every agent session in the repo picks the skills up automatically — no
+installation step is needed in-tree. The copy-based installation flows below
+are only for exporting the skills to *another* machine or repository.
+
+### Exporting to Claude Code / Codex user scope
 
 ```bash
-# User-level (available across all projects)
+# Claude Code, user-level (available across all projects)
 cp -r intrinsicengine-* teach grilling grill-me ~/.claude/skills/
 
-# Or project-level (only this repo)
-mkdir -p .claude/skills
-cp -r intrinsicengine-* teach grilling grill-me .claude/skills/
-```
-
-### Codex
-
-```bash
+# Codex, user-level
 mkdir -p ~/.codex/skills
 cp -r intrinsicengine-* teach grilling grill-me ~/.codex/skills/
 ```
@@ -132,69 +145,39 @@ Most tools support the agentskills.io standard. Either:
 - use `gh skill install` from a published skills repository (see
   https://github.blog/changelog/2026-04-16-manage-agent-skills-with-github-cli/).
 
-### As a repo-local plugin (recommended)
-
-Drop this whole directory into the IntrinsicEngine repo at `.claude/skills/`
-(or `.codex/skills/`, etc., depending on tooling). That way every agent
-session in the repo automatically gets the skills, and the skills travel with
-the codebase.
-
 ## Keeping in sync
 
-The `references/` files in each IntrinsicEngine workflow skill are **copies** of
-the source docs. When the source docs change, the skill references must update
-too. Imported third-party productivity skills are not generated from
-`docs/agent/*`.
-
-A trivial resync script:
+The `references/` files are **generated**. The one and only sync mechanism is:
 
 ```bash
-#!/bin/bash
-set -euo pipefail
-REPO_ROOT="$(git rev-parse --show-toplevel)"
-SKILLS="$REPO_ROOT/.claude/skills"
+# Regenerate the mirrors after editing any mapped source doc
+python3 tools/agents/sync_skills.py --write
 
-# Core
-cp "$REPO_ROOT/docs/agent/contract.md"          "$SKILLS/intrinsicengine-core/references/contract.md"
-cp "$REPO_ROOT/docs/agent/roles.md"             "$SKILLS/intrinsicengine-core/references/roles.md"
-cp "$REPO_ROOT/docs/agent/prompt/prompt.md"     "$SKILLS/intrinsicengine-core/references/session-onboarding.md"
-
-# Task workflow
-cp "$REPO_ROOT/docs/agent/task-format.md"       "$SKILLS/intrinsicengine-task-workflow/references/task-format.md"
-cp "$REPO_ROOT/docs/agent/task-maturity.md"     "$SKILLS/intrinsicengine-task-workflow/references/task-maturity.md"
-cp "$REPO_ROOT/tasks/templates/task.md"         "$SKILLS/intrinsicengine-task-workflow/references/task-template.md"
-
-# Review
-cp "$REPO_ROOT/docs/agent/review-checklist.md"               "$SKILLS/intrinsicengine-review/references/review-checklist.md"
-cp "$REPO_ROOT/docs/agent/architecture-review-checklist.md"  "$SKILLS/intrinsicengine-review/references/architecture-review-checklist.md"
-cp "$REPO_ROOT/docs/agent/agent-output-review-checklist.md"  "$SKILLS/intrinsicengine-review/references/agent-output-review-checklist.md"
-
-# Method
-cp "$REPO_ROOT/docs/agent/method-workflow.md"          "$SKILLS/intrinsicengine-method/references/method-workflow.md"
-cp "$REPO_ROOT/docs/agent/method-review-checklist.md"  "$SKILLS/intrinsicengine-method/references/method-review-checklist.md"
-
-# Benchmark
-cp "$REPO_ROOT/docs/agent/benchmark-workflow.md"          "$SKILLS/intrinsicengine-benchmark/references/benchmark-workflow.md"
-cp "$REPO_ROOT/docs/agent/benchmark-review-checklist.md"  "$SKILLS/intrinsicengine-benchmark/references/benchmark-review-checklist.md"
-
-# Docs sync
-cp "$REPO_ROOT/docs/agent/docs-sync-policy.md"  "$SKILLS/intrinsicengine-docs-sync/references/docs-sync-policy.md"
-
-echo "Skill references resynced."
+# Verify (this is what CI runs)
+python3 tools/agents/sync_skills.py --check
 ```
 
-Save this as `tools/agents/resync_skills.sh` if you adopt the skills. A CI
-job that runs `diff -r` between source docs and skill references would catch
-drift automatically.
+`tools/agents/resync_skills.sh` is a thin wrapper around `--write`. The
+source-to-mirror mapping lives in `REFERENCE_MAP` inside `sync_skills.py`;
+when a new `docs/agent/*` doc should be surfaced through a skill, add a map
+entry and re-run `--write`. CI (`ci-docs.yml`) runs the `--check` mode on
+every docs run and fails on drift, and `tools/ci/touched_scope.py` includes
+the same check locally. Do not hand-copy files into `references/` — plain
+`cp` skips the link rewriting and will fail the CI check.
+
+Imported third-party productivity skills are not generated from
+`docs/agent/*`; update them manually from upstream, preserve local
+guardrails, and keep `THIRD_PARTY_LICENSES.md` provenance current.
 
 ## When to edit which file
 
 | Edit case | What to change |
 | --- | --- |
-| Contract rule changed | Edit `AGENTS.md` + matching `docs/agent/*` source doc, then resync references. |
+| Contract rule changed | Edit `AGENTS.md` + matching `docs/agent/*` source doc, then `python3 tools/agents/sync_skills.py --write`. |
 | Skill body needs better triggering | Edit the skill's `SKILL.md` `description` field (and run a triggering eval if you have one set up). |
 | Routing between skills changed | Edit the `## Routing` or `## References` section in the relevant `SKILL.md` bodies. |
-| Pure typo in source doc | Edit the source doc, then resync. |
+| Pure typo in source doc | Edit the source doc, then re-run the sync. |
+| New doc should surface through a skill | Add a `REFERENCE_MAP` entry in `tools/agents/sync_skills.py`, re-run `--write`, update the mirror table above. |
 | Third-party productivity skill update | Update the imported skill files manually from upstream, preserve local guardrails, and keep `THIRD_PARTY_LICENSES.md` provenance current. Do not add them to `sync_skills.py`; that tool only mirrors IntrinsicEngine canonical docs. |
 
 ## Pairing with non-IntrinsicEngine skills

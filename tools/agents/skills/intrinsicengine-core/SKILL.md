@@ -1,6 +1,6 @@
 ---
 name: intrinsicengine-core
-description: Authoritative repository contract for IntrinsicEngine — a modular C++23 Vulkan-based research engine for graphics and geometry processing. Defines layering invariants (core/geometry/assets/ecs/physics/graphics/runtime/app), C++23 module rules with clang-20 + clang-scan-deps-20, the CMake preset workflow, the task-driven slice discipline, and the default CPU correctness gate. Use this skill whenever working in any clone of `IntrinsicEngine`, touching any file under `src/`, `tasks/`, `methods/`, `benchmarks/`, `docs/`, or `tools/`, or when asked about layer ownership, module conventions, build commands, the CI preset, the agentic workflow, or anything that mentions IntrinsicEngine, `AGENTS.md`, or repository policy — even if the user does not explicitly ask for the contract.
+description: Authoritative repository contract for IntrinsicEngine — a modular C++23 Vulkan-based research engine for graphics and geometry processing. Defines layering invariants (core/geometry/assets/ecs/physics/graphics/platform/runtime/app), C++23 module rules with clang-20 + clang-scan-deps-20, the CMake preset workflow, the task-driven slice discipline, and the default CPU correctness gate. Use this skill whenever working in any clone of `IntrinsicEngine`, touching any file under `src/`, `tasks/`, `methods/`, `benchmarks/`, `docs/`, or `tools/`, or when asked about layer ownership, module conventions, build commands, the CI preset, the agentic workflow, or anything that mentions IntrinsicEngine, `AGENTS.md`, or repository policy — even if the user does not explicitly ask for the contract.
 ---
 
 # IntrinsicEngine Core Contract
@@ -153,7 +153,10 @@ Load the specialist skill for the touched scope rather than reading every guide:
 | Adding, changing, or running benchmark harnesses/manifests/baselines | `intrinsicengine-benchmark` |
 | Moving files, changing public APIs/module surfaces, refreshing inventories | `intrinsicengine-docs-sync` |
 | Diagnosing a hard bug, validation-layer error, parity mismatch, or perf regression | `intrinsicengine-diagnose` |
-| Getting a layer-cake map of an unfamiliar file before editing | `intrinsicengine-zoom-out` |
+| Debugging a black/wrong frame, VUID cascade, or driver crash on the promoted Vulkan path | `intrinsicengine-vulkan-frame-triage` |
+| Authoring or changing an opt-in `gpu;vulkan` readback smoke, or proving a fix `Operational` | `intrinsicengine-gpu-smoke-authoring` |
+| Unexplained SEGV/ASan/vtable/ICE failure, especially after `.cppm` module changes | `intrinsicengine-stale-build-triage` |
+| Getting a layer-cake map of an unfamiliar file before editing | read `tools/agents/skills/intrinsicengine-zoom-out/SKILL.md` directly (user-invoked slash skill, not model-invocable) |
 | Navigating module deps, change impact, or paper→method→code links | Knowledge-graph discovery aid (below) |
 | Compacting a long session into a handoff doc for the next agent | `intrinsicengine-handoff` |
 

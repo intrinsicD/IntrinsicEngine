@@ -1,20 +1,23 @@
 ---
 name: intrinsicengine-review
-description: Pre-commit, pre-PR, and weekly review procedures for IntrinsicEngine. Bundles three checklists: the per-PR review checklist (scope, layering, tests, docs, maturity closure), the architecture review checklist (layering invariants, lifetime/ownership, concurrency, error handling for architecture-impacting changes), and the weekly human-led audit of agent-authored commits (silent scope creep, decorative comments, premature abstraction, documented-but-not-tested claims, ceremony-without-shipped-value). Use this skill whenever the user is about to commit, open a PR, finish a slice, ask "is this ready to merge", change a dependency boundary or module ownership, run the weekly agent-output audit, or whenever pre-commit/pre-merge verification of any non-trivial change is needed in this repo.
+description: Pre-commit, pre-PR, and recurring review procedures for IntrinsicEngine. Bundles five checklists: the per-PR review checklist (scope, layering, tests, docs, maturity closure), the architecture review checklist (layering invariants, lifetime/ownership, concurrency, error handling for architecture-impacting changes), the clean-workshop drift/decomposition scorecard for boundary-touching changes, the weekly human-led audit of agent-authored commits (silent scope creep, decorative comments, premature abstraction, documented-but-not-tested claims, ceremony-without-shipped-value), and the recurring whole-tree repo-state drift audit. Use this skill whenever the user is about to commit, open a PR, finish a slice, ask "is this ready to merge", change a dependency boundary or module ownership, run the weekly agent-output audit or drift audit, or whenever pre-commit/pre-merge verification of any non-trivial change is needed in this repo.
 ---
 
 # IntrinsicEngine Review Procedures
 
-This skill bundles three IntrinsicEngine review procedures with progressively
+This skill bundles the IntrinsicEngine review procedures with progressively
 wider scope. **Apply them in order of relevance to the change at hand** — most
 PRs need only the per-PR checklist; architecture-impacting changes add the
-architecture checklist; the weekly audit is a separate human-led cadence.
+architecture checklist (and usually the clean-workshop scorecard); the weekly
+audit and the drift audit are separate human-led cadences.
 
 | Procedure | When | Reference |
 | --- | --- | --- |
 | Per-PR review | Before every commit / PR for a non-trivial change | `references/review-checklist.md` |
 | Architecture review | When changing dependency boundaries, module ownership, source layout, runtime wiring, or architecture docs | `references/architecture-review-checklist.md` |
+| Clean-workshop scorecard | When a change touches a dependency boundary, adds a renderer subsystem/pass, changes RHI/platform/runtime wiring, closes a scaffold/parity task, or edits the layering allowlist | `references/clean-workshop-review.md` |
 | Weekly agent-output audit | Once per week, human-led, covering ~1 week of agent-authored slices | `references/agent-output-review-checklist.md` |
+| Repo-state drift audit | On demand or every 2–4 weeks, human-led, whole-tree state audit (inventory drift, stale markers, dead seams, cross-doc rot) | `references/drift-audit-checklist.md` |
 
 ---
 
@@ -271,3 +274,7 @@ definition, how-to-find-it commands, and how-to-fix-it remediation.
   changes; layered on top of per-PR.
 - `references/agent-output-review-checklist.md` — weekly human-led audit with
   9 numbered failure-mode rows; additive cadence, not a per-PR gate.
+- `references/clean-workshop-review.md` — drift/decomposition scorecard for
+  boundary-touching changes; triggered from the per-PR checklist.
+- `references/drift-audit-checklist.md` — recurring whole-tree repo-state
+  drift audit; state-scoped, additive to the weekly sweep.

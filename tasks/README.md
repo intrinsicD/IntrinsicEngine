@@ -11,6 +11,12 @@ Tasks move through this lifecycle:
 3. `tasks/done/` — completed work with completion metadata; retirement
    narratives are appended to [`done/RETIREMENT-LOG.md`](done/RETIREMENT-LOG.md).
 
+Promotion to `tasks/active/` is required only for work that spans more than
+one slice or session. A single-slice task may be worked and retired directly
+from `tasks/backlog/` (see `docs/agent/prompt/prompt.md`); in that case record
+the owner/branch in the task file while it is being worked so concurrent
+sessions do not pick it up.
+
 The generated [`SESSION-BRIEF.md`](SESSION-BRIEF.md) is the authoritative
 open/unblocked view of this tree; regenerate it with
 `python3 tools/agents/generate_session_brief.py` after opening, retiring, or

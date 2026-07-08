@@ -42,7 +42,7 @@ Use this checklist for architecture-impacting changes (code, build, docs, CI, an
 
 ## Testing and verification
 
-- [ ] Test categories are correct (`unit`, `contract`, `integration`, `regression`, `gpu`, `benchmark`).
+- [ ] Test categories are correct (categories: `unit`, `contract`, `integration`, `regression`, `benchmark`, `slo`; capability labels `gpu`/`vulkan`/`glfw` and opt-in labels `slow`/`flaky-quarantine` per `AGENTS.md` §7 and `tests/README.md`).
 - [ ] Verification command subset is strong enough for touched scope.
 - [ ] Behavior changes include test additions/updates.
 

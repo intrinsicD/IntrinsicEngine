@@ -143,6 +143,10 @@ A slice plan reads like:
 
 ## Grilling alignment before authoring a task
 
+This section is the IntrinsicEngine-specialized form of the `grilling` skill;
+if the interview mechanics here ever diverge from `grilling/SKILL.md`, follow
+`grilling` for the mechanics and this section for the engine-specific probes.
+
 Before writing a task file for any non-trivial change, **interview the user
 relentlessly** about the change until you reach a shared understanding. Walk
 down each branch of the design tree, resolving dependencies one at a time.
