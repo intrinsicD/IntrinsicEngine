@@ -61,14 +61,35 @@ flip a box when the invariant holds on `main`. Baseline column is the
       splatting-lighting participation; order-dependent transparency)
 - [ ] Input capture filter chain — `UI-034` / EditorUiModule extraction
 
-### Kernel is slim (measurable; run the greps in `ARCH-014`)
+### Kernel is slim (measurable)
+
+> **Domain-import metric (allowlist).** The kernel's *permitted substrate*
+> import prefixes are small and enumerable; everything else in
+> `Runtime.Engine.cppm` is a domain import. Keep the allowlist in sync as
+> seams land (add `Runtime.KernelEvents`/`JobService`/`WorldRegistry`/
+> `Module`/`ServiceRegistry` as `ARCH-008`..`ARCH-011` create them):
+>
+> ```bash
+> SUB='^import (Extrinsic\.Core\.|Extrinsic\.ECS\.Scene\.(Registry|Handle)|Extrinsic\.RHI\.|Extrinsic\.Platform\.|Extrinsic\.Graphics\.(Renderer|RenderFrameInput|FrameRecipe|RenderWorld)|Extrinsic\.Runtime\.(CommandBus|KernelEvents|JobService|WorldRegistry|Module|ServiceRegistry|RenderExtraction|RenderWorldPool))'
+> grep -E '^import ' src/runtime/Runtime.Engine.cppm | grep -vcE "$SUB"   # domain imports (target 0; baseline 27)
+> ```
+>
+> This inline grep is the **interim** metric. The authoritative, maintained
+> counter is the `ARCH-014` ratchet checker
+> (`tools/repo/check_kernel_convergence.py`, seeded there); wire the invariant
+> flip and the `pr-fast` guard to that, not to the grep.
+
 
 - [ ] `Runtime.Engine.cppm` import count ≤ 12 substrate modules
       (**baseline 45**)
-- [ ] Domain-noun imports in `Runtime.Engine.cppm` = 0
-      (**baseline 17**: ImGui, Gizmo, Selection, KMeans, ObjectSpaceNormalBake,
-      AssetModel*, Camera, SceneSerialization, EditorCommand, ReferenceScene,
-      MeshPrimitive, Streaming, DerivedJob …)
+- [ ] Domain (non-substrate) imports in `Runtime.Engine.cppm` = 0
+      (**baseline 27**). Measure by **allowlist**, not a blocklist of names:
+      count every `import` that is *not* kernel substrate (see the metric
+      below). A name blocklist silently undercounts as new domain imports
+      appear (e.g. `AssetIngestStateMachine`, `Asset.Service`,
+      `Geometry.HalfedgeMesh.IO`); the allowlist cannot. Authoritative count
+      is the `ARCH-014` ratchet checker once it lands; do not flip this row to
+      0 on the interim grep alone.
 - [ ] `Engine::GetX()` domain-facade accessors = 0 (kernel-service
       accessors only) (**baseline 13**)
 - [ ] No `entt::dispatcher::trigger` or direct dispatcher use in module code
@@ -77,8 +98,10 @@ flip a box when the invariant holds on `main`. Baseline column is the
 
 ### Domains are modules (D9) — one row per extracted domain
 
-- [x] Clustering — `ARCH-012` (proving extraction; closes the seam
-      `Operational` gate)
+- [ ] Clustering — `ARCH-012` (proving extraction; **not landed** —
+      `Runtime.KMeans*` still live in `src/runtime/`, `ARCH-012` open/blocked;
+      flipping this row also closes the seam `Operational` gate, so it must
+      not be checked before `ARCH-012` retires)
 - [ ] EditorUi (ImGui adapter, dockspace, panel registry, `Pass.ImGui`) —
       `ARCH-006` + `UI-034`
 - [ ] AssetImport pipeline — `RUNTIME-147`

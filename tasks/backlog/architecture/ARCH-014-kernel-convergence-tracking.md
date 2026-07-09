@@ -29,9 +29,12 @@ depends_on: []
   [`docs/architecture/kernel-target-state.md`](../../../docs/architecture/kernel-target-state.md)
   (living scorecard + knob-decision guide).
 - Baseline 2026-07-08 (post-`ARCH-007`): `Runtime.Engine.cppm` has 45
-  imports, 17 domain-noun imports, 13 `Engine::GetX()` domain-facade
-  accessors; `OnSimTick`/`OnVariableTick` still present. `ARCH-007`
-  (CommandBus) is the first seam landed.
+  imports, **27 domain (non-substrate) imports** (measured by the allowlist
+  complement in Verification, not a name blocklist), ~13 `Engine::GetX()`
+  domain-facade accessors; `OnSimTick`/`OnVariableTick` still present.
+  `ARCH-007` (CommandBus) is the first seam landed; `ARCH-012` (ClusteringModule
+  proving extraction) is still open, so the Clustering scorecard row and the
+  seam `Operational` gate are NOT yet met.
 - This task is the umbrella `RORG-031`-style: it references children, keeps
   the scorecard honest, and provides the review guardrail so the kernel does
   not regrow while the migration is in flight.
@@ -42,10 +45,14 @@ depends_on: []
       refresh the baseline metric numbers.
 - [ ] Seed a ratchet guard as a child `HARDEN` task: a
       `tools/repo/check_kernel_convergence.py` (or an extension of an
-      existing structural check) that fails when `Runtime.Engine.cppm`
-      gains a *new* domain-noun import or a *new* `Engine::GetX()` domain
-      accessor — a monotone "no backsliding" gate wired into `pr-fast`.
-      Until it exists, the review guardrail below is enforced by reviewers.
+      existing structural check) that computes the domain-import count as the
+      **allowlist complement** (every `Runtime.Engine.cppm` import that is not
+      kernel substrate — never a hardcoded name blocklist, which silently
+      undercounts) and fails when it *increases* or a *new* `Engine::GetX()`
+      domain accessor appears — a monotone "no backsliding" gate wired into
+      `pr-fast`. This checker is the authoritative metric; the inline grep in
+      the target-state doc is only an interim approximation. Until it exists,
+      the review guardrail below is enforced by reviewers.
 - [ ] Keep the child-task inventory in the target-state doc in sync with the
       backlog (add extractions discovered during seam work; remove retired
       rows).
@@ -84,8 +91,10 @@ This umbrella closes only when ALL of the following hold on `main`:
 ## Verification
 ```bash
 # Live scorecard metrics (agents run these to check current state):
-grep -cE '^import ' src/runtime/Runtime.Engine.cppm
-grep -cE '^import .*(ImGui|Gizmo|Selection|KMeans|ObjectSpaceNormalBake|AssetModel|Camera|SceneSerial|EditorCommand|ReferenceScene|MeshPrimitive|Streaming|DerivedJob)' src/runtime/Runtime.Engine.cppm
+grep -cE '^import ' src/runtime/Runtime.Engine.cppm   # total imports (target <= 12)
+# Domain imports = allowlist complement (target 0). Keep SUB in sync as seams land:
+SUB='^import (Extrinsic\.Core\.|Extrinsic\.ECS\.Scene\.(Registry|Handle)|Extrinsic\.RHI\.|Extrinsic\.Platform\.|Extrinsic\.Graphics\.(Renderer|RenderFrameInput|FrameRecipe|RenderWorld)|Extrinsic\.Runtime\.(CommandBus|KernelEvents|JobService|WorldRegistry|Module|ServiceRegistry|RenderExtraction|RenderWorldPool))'
+grep -E '^import ' src/runtime/Runtime.Engine.cppm | grep -vcE "$SUB"   # domain imports (baseline 27)
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 python3 tools/agents/generate_session_brief.py
