@@ -37,7 +37,17 @@ All agents may use the shared setup entrypoints under `tools/setup/`:
   optionally pre-builds core library targets. On Debian/Ubuntu hosts this may
   install system packages with `sudo`; invoke it intentionally, and remember it
   is a convenience setup helper, not a replacement for preset-based
-  verification.
+  verification. It always runs a vcpkg egress preflight and records
+  `ready`/`reachable`/`blocked`/`unknown` to `/tmp/intrinsic-session-setup.vcpkg`;
+  on a blocked host it prints an actionable diagnosis (`BUG-065`) instead of a
+  later cryptic preset `403`. Pass `--bootstrap-vcpkg` (or
+  `INTRINSIC_SESSION_BOOTSTRAP_VCPKG=1`) to pre-bake the vcpkg tool when the
+  download host is reachable.
+- `tools/setup/bootstrap_vcpkg.sh` bootstraps the repository-local vcpkg tool
+  the `ci`/`dev` presets chainload. It gates on `tools/setup/vcpkg_preflight.sh`
+  and fails closed with an actionable diagnosis when the environment egress
+  policy blocks the tool download (`BUG-065`); set `INTRINSIC_VCPKG_FORCE=1` to
+  attempt regardless.
 - `tools/setup/wait_for_agent_setup.sh` blocks until the session setup marker is
   written or a complete Clang 20+ toolchain is visible. Use it before CMake
   gates if setup is running in the background.

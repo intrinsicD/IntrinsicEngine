@@ -8,6 +8,24 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-065`](BUG-065-vcpkg-egress-blocked-cryptic-403.md) — vcpkg bootstrap
+egress block surfacing as a cryptic `curl: (22) ... 403` retired to
+`tasks/done/` on 2026-07-09. Managed/cloud sessions that allow git-protocol
+clones and the GitHub API but deny general HTTPS GETs to github.com (HTTP 403)
+cannot download vcpkg's prebuilt tool binary (`vcpkg-glibc` release assets), so
+`cmake --preset ci` aborts during `project()` with no useful breadcrumb. In-repo
+mitigation: a new `tools/setup/vcpkg_preflight.sh` single-probe egress check
+(emits `ready|reachable|blocked|unknown`, prints an actionable diagnosis on a
+blocked host); `tools/setup/bootstrap_vcpkg.sh` now gates on it and fails closed
+with that diagnosis (exit 3; `INTRINSIC_VCPKG_FORCE=1` overrides); and
+`tools/setup/agent_session_setup.sh` always records the status to
+`/tmp/intrinsic-session-setup.vcpkg` with an opt-in `--bootstrap-vcpkg` pre-bake.
+Verified live in a blocked sandbox (preflight and bootstrap gate both emit the
+diagnosis and exit 3; `bash -n` clean; status marker records `blocked`). The
+egress policy itself is environment-level and out of repository scope;
+`docs/build-troubleshooting.md` documents the operator fixes (allow the host, or
+pre-bake vcpkg + a binary cache into the snapshot).
+
 [`ARCH-011`](ARCH-011-runtimemodule-contract-service-registry.md) —
 RuntimeModule contract, `EngineSetup`, and two-phase `ServiceRegistry` retired
 to `tasks/done/` on 2026-07-09 at `CPUContracted`. The fifth and final additive

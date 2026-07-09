@@ -53,7 +53,22 @@ if ! git -C "${vcpkg_root}" checkout --detach "${baseline}"; then
     git -C "${vcpkg_root}" checkout --detach "${baseline}"
 fi
 
-"${vcpkg_root}/bootstrap-vcpkg.sh" -disableMetrics
+# Fail loudly and early when the environment's egress policy blocks the vcpkg
+# tool download, instead of surfacing a cryptic `curl: (22) ... 403` from
+# bootstrap-vcpkg.sh (BUG-065). Set INTRINSIC_VCPKG_FORCE=1 to attempt anyway.
+if [[ "${INTRINSIC_VCPKG_FORCE:-0}" != "1" ]]; then
+    if ! "${repo_root}/tools/setup/vcpkg_preflight.sh" --repo-root "${repo_root}" >/dev/null; then
+        echo "[bootstrap_vcpkg] Aborting before the tool download: egress preflight failed (diagnosis above)." >&2
+        echo "[bootstrap_vcpkg] Re-run with INTRINSIC_VCPKG_FORCE=1 to attempt the download regardless." >&2
+        exit 3
+    fi
+fi
+
+if ! "${vcpkg_root}/bootstrap-vcpkg.sh" -disableMetrics; then
+    echo "[bootstrap_vcpkg] bootstrap-vcpkg.sh failed (tool download or unpack)." >&2
+    "${repo_root}/tools/setup/vcpkg_preflight.sh" --repo-root "${repo_root}" >/dev/null || true
+    exit 1
+fi
 
 cat <<EOF
 [bootstrap_vcpkg] OK

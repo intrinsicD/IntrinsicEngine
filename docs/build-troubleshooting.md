@@ -94,6 +94,46 @@ cmake --preset ci
 requirements still apply. Installed packages live under
 `external/vcpkg-installed/<preset>/`.
 
+### Blocked vcpkg tool download (egress 403)
+
+Some managed/cloud environments allow git-protocol clones and the GitHub API but
+deny general HTTPS GETs to `github.com` with HTTP 403. vcpkg's bootstrap
+downloads a prebuilt tool binary (`vcpkg-glibc`) from GitHub release assets — the
+blocked class — so `cmake --preset ci` aborts during `project()` with
+`vcpkg install failed`, and `build/<preset>/vcpkg-bootstrap.log` shows only:
+
+```text
+Downloading vcpkg-glibc...
+curl: (22) The requested URL returned error: 403
+```
+
+This is the **environment egress policy, not a repository defect** (`BUG-065`).
+Confirm and classify it:
+
+```bash
+tools/setup/vcpkg_preflight.sh                              # prints diagnosis; exit 3 when blocked
+git ls-remote https://github.com/microsoft/vcpkg-tool HEAD  # git protocol still works
+curl -sS "$HTTPS_PROXY/__agentproxy/status"                 # 403 = egress denial
+```
+
+`tools/setup/agent_session_setup.sh` runs this preflight at session start and
+records the result to `/tmp/intrinsic-session-setup.vcpkg`. Resolve it at the
+environment level:
+
+1. Allow the vcpkg tool download host (github.com release assets /
+   `objects.githubusercontent.com`) in the environment network policy; then
+   `cmake --preset ci` bootstraps normally. Network policies are chosen per
+   environment — see <https://code.claude.com/docs/en/claude-code-on-the-web>.
+2. Or pre-bake vcpkg into the environment snapshot: with network available run
+   `tools/setup/bootstrap_vcpkg.sh` (or `agent_session_setup.sh
+   --bootstrap-vcpkg`) and ship the bootstrapped `external/vcpkg` plus a
+   populated `external/vcpkg-bincache`, then export `VCPKG_BINARY_SOURCES` at
+   that cache so sessions start build-ready and offline.
+
+Even with the tool present, a fully blocked environment also fails to fetch
+dependency sources (most as `github.com/.../archive/*.tar.gz`), so option 1 or a
+populated binary cache is required for an actual build.
+
 Raw IDE-generated configure commands are supported after bootstrap when they do
 not set `CMAKE_TOOLCHAIN_FILE`: the top-level `CMakeLists.txt` selects the
 repository vcpkg toolchain before `project()` and uses
