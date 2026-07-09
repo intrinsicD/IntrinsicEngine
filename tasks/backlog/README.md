@@ -180,6 +180,12 @@ efficiency polish `RUNTIME-145` removed the recurring runtime frame-path waste
 called out by the review. The retired correctness fix `BUG-055` (Theme G)
 unblocks `CORE-005`.
 
+**North star: [`docs/architecture/kernel-target-state.md`](../../docs/architecture/kernel-target-state.md)**
+— the living target and convergence scorecard for the ADR-0024 kernel/module
+migration, owned by the umbrella task `ARCH-014`. Any agent adding runtime
+functionality reads its knob-decision table first; the unchecked scorecard
+rows are the remaining work.
+
 **Priority entry point (P0 within Theme F): the ADR-0024 kernel/module
 architecture seams.** The 2026-07-08 kernel/module architecture decision
 record ([`docs/adr/0024-kernel-module-architecture.md`](../../docs/adr/0024-kernel-module-architecture.md))
@@ -188,8 +194,9 @@ preferred next pick for architecture/runtime work ahead of other Theme F
 members: it creates the registration/communication seams (command bus, event
 bus, JobService, WorldRegistry, RuntimeModule contract) that the
 `Runtime.Engine` decomposition set (`RUNTIME-146`..`151`) and the module
-extractions (`ARCH-006`, `UI-034`) land onto. Recommended order per ADR-0024
-D12: `ARCH-007`/`ARCH-008` first (both dependency-free), then `ARCH-009` →
+extractions (`ARCH-006`, `UI-034`) land onto. `ARCH-007` (command bus) is
+retired (2026-07-08, PR #1010, `CPUContracted`). Remaining order per
+ADR-0024 D12: `ARCH-008` next (dependency-free), then `ARCH-009` →
 `ARCH-010` → `ARCH-011`, closed by the proving extraction `ARCH-012`.
 Sequencing note: tasks whose deliverable ADR-0024 supersedes are
 front-matter gated on their seam dependencies — `RUNTIME-150` on
@@ -205,7 +212,7 @@ records decisions for the audit-only rows (`RUNTIME-129`,
 `PLATFORM-004`).
 
 Open members (kernel-seam priority set first):
-- [`architecture/ARCH-007-kernel-command-bus-single-drain-point.md`](architecture/ARCH-007-kernel-command-bus-single-drain-point.md).
+- [`architecture/ARCH-014-kernel-convergence-tracking.md`](architecture/ARCH-014-kernel-convergence-tracking.md) (umbrella north-star; not a slice).
 - [`architecture/ARCH-008-kernel-event-bus-queued-only.md`](architecture/ARCH-008-kernel-event-bus-queued-only.md).
 - [`architecture/ARCH-009-kernel-jobservice-snapshot-in-result-out.md`](architecture/ARCH-009-kernel-jobservice-snapshot-in-result-out.md).
 - [`architecture/ARCH-010-kernel-worldregistry-deferred-world-ops.md`](architecture/ARCH-010-kernel-worldregistry-deferred-world-ops.md).

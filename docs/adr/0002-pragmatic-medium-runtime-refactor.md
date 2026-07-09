@@ -1,6 +1,6 @@
 # ADR O2 — Pragmatic Medium Runtime Refactor Path
 
-- **Status:** Accepted default runtime migration path
+- **Status:** Superseded by [ADR-0024](0024-kernel-module-architecture.md) — the "Accepted default runtime migration path" / O2 role is withdrawn. ADR-0024 (kernel/module contract, seams-first strangler migration) is the accepted plan; O2's "preserve the current subsystem ownership split" target is explicitly replaced by the kernel/module decomposition (ADR-0024 D9/D12).
 - **Date:** 2026-03-19
 - **Owners:** Runtime / Rendering Architecture
 - **Related backlog:** `tasks/backlog/legacy-todo.md` → `B3. Engine Architecture Review Follow-Up`, `B3.7 Recommended Path (default = O2) + Migration Plan`

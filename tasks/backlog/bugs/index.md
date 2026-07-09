@@ -15,17 +15,18 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   sandbox frame-pacing capture needs a display (GLFW: DISPLAY missing →
   zero frames → "no samples"); needs xvfb or a documented environment skip.
 
-- [`BUG-062` — Warm-configure CI budget (10 s) flakes on shared-runner variance](BUG-062-warm-configure-budget-flaky-runner-variance.md):
-  the `time_command.py` warm-cache configure guard killed five merge-gating
-  workflows across three PR #1010 heads (including a markdown-only diff)
-  at 10.06–14.80 s measured against the 10 s budget, before any build step
-  ran. Fix in flight: budget raised to 20 s in all seven invocations;
-  closes when a full PR CI round passes the configure step at the new
-  budget.
 
 ---
 
 ## Verified / Closed
+
+- Closed 2026-07-08: [`BUG-062` — Warm-configure CI budget flakes on shared-runner variance](../../done/BUG-062-warm-configure-budget-flaky-runner-variance.md).
+  The 10 s warm-cache configure budget was calibrated at the runner median and
+  killed five merge-gating workflows across three PR #1010 heads (including a
+  markdown-only diff) before any build step ran. Budget raised to 20 s in all
+  seven invocations across six workflows; guard semantics and telemetry
+  unchanged. Three consecutive PR #1010 CI rounds completed every configure
+  step with zero budget kills.
 
 - Closed 2026-07-06: [`BUG-056` — ExtrinsicSandbox default Vulkan validation gate fallback](../../done/BUG-056-extrinsic-sandbox-default-vulkan-validation-gate.md). The default deferred GBuffer fragment now consumes the full `default_debug_surface.vert` interface and resolves visualization color from the shared config stream, eliminating the SPIR-V interface warnings that blocked promoted Vulkan readiness. The frame-pacing report now records final `IDevice::IsOperational()`, and the validator fails shader-interface warnings or a non-operational `BarrierValidationFailed` result while still allowing documented environment capability skips. The selected promoted Vulkan sandbox/ImGui/frame-pacing envelope passes 18/18.
 

@@ -891,6 +891,17 @@ SceneManager (CPU, authoritative)
 
 ---
 
+> **Superseded by [ADR-0024](../adr/0024-kernel-module-architecture.md) (§14–§15).**
+> The frame loop below (single `entt::dispatcher::update()` dispatch, `OnRender`
+> callbacks) and the "Algorithm Module System" (modules registering via
+> `entt::dispatcher`, `DrawWidget` callbacks taking `Runtime::Engine&`) are a
+> historical design. The accepted contract is: one pre-sim **command drain** +
+> **two queued event pumps** (D5/D7), modules communicate via the kernel
+> CommandBus/EventBus (never raw `entt::dispatcher`, D3/D7), no `Engine&` is
+> passed into module callbacks (narrow capability contexts, D13), and the
+> K-Means "algorithm module" is exactly the ClusteringModule redesigned onto
+> the kernel seams by `ARCH-012`. Read `runtime.md` + ADR-0024 as authoritative.
+
 ## 14. Simulate → Render Loop & System Boundaries
 
 ### 14.1 The Frame Loop

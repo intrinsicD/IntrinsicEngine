@@ -310,6 +310,13 @@ Bundling that kind of rewrite into an unrelated feature commit makes review nois
 ### `entt::dispatcher` — Cross-System Notifications
 Value-type event structs in `ECS::Events`. All sinks run on main thread during `dispatcher.update()`.
 
+> **ADR-0024:** for *new* module→module notifications use the kernel **EventBus**
+> (queued-only, two pump points, worker-safe inbox — [ADR-0024](../adr/0024-kernel-module-architecture.md)
+> D7 / `ARCH-008`), not raw `entt::dispatcher`. The scorecard drives direct
+> dispatcher use out of module code. (The `on_destroy` hooks below are a
+> *different* mechanism — entt component-lifecycle signals — and stay
+> synchronous; D7 does not govern them.)
+
 **Use for:** Selection/hover changed, entity spawned/destroyed, geometry modified, async GPU readback completed.
 **Don't use for:** Per-component dirty tracking (→ `DirtyTag`), GPU cleanup (→ `on_destroy`), high-frequency per-entity data (→ direct ECS queries), cross-thread (→ `RunOnMainThread()` queue first).
 

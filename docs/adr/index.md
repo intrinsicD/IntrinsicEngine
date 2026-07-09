@@ -4,9 +4,9 @@ This index tracks long-lived architecture decisions for IntrinsicEngine.
 
 ## Active ADRs
 
-1. [0001 — Minimal runtime refactor](0001-minimal-runtime-refactor.md)
-2. [0002 — Pragmatic medium runtime refactor](0002-pragmatic-medium-runtime-refactor.md)
-3. [0003 — Ideal runtime architecture](0003-ideal-runtime-architecture.md)
+1. [0001 — Minimal runtime refactor](0001-minimal-runtime-refactor.md) — *superseded by [0024](0024-kernel-module-architecture.md)*
+2. [0002 — Pragmatic medium runtime refactor](0002-pragmatic-medium-runtime-refactor.md) — *superseded by [0024](0024-kernel-module-architecture.md)*
+3. [0003 — Ideal runtime architecture](0003-ideal-runtime-architecture.md) — *refined/superseded by [0024](0024-kernel-module-architecture.md)*
 4. [0004 — Vulkan backend bring-up and fail-closed fallback](0004-vulkan-backend-bringup-and-fallback.md)
 5. [0005 — Vulkan operational readiness gate and runtime reconciliation](0005-vulkan-operational-readiness-gate.md)
 6. [0006 — Camera, picking-request, and gizmo runtime handoff](0006-camera-picking-and-gizmo-runtime-handoff.md)

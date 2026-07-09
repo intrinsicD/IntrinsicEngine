@@ -260,3 +260,9 @@ one place: `main()`.
 - The layering gate (`tools/repo/check_layering.py --root src --strict`) and
   module inventory regeneration verify the import-surface shrinkage claim as
   extractions land.
+- Ongoing convergence toward this contract is tracked by the living
+  [`docs/architecture/kernel-target-state.md`](../architecture/kernel-target-state.md)
+  scorecard (greppable kernel-slimness invariants + per-domain module rows),
+  owned by the umbrella task
+  [`ARCH-014`](../../tasks/backlog/architecture/ARCH-014-kernel-convergence-tracking.md).
+  `ARCH-007` retired 2026-07-08 (first seam; CommandBus).

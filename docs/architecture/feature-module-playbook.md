@@ -4,6 +4,14 @@ This playbook defines the **default way** to add and refactor runtime features w
 
 Use it when introducing anything like `Runtime.SomethingModule.cppm`, geometry tooling, streaming jobs, or render integrations.
 
+> **Target state first.** Before adding anything to `Runtime.Engine` or a new
+> `Runtime.*Module`, read [`kernel-target-state.md`](kernel-target-state.md)
+> and use its knob-decision table to place the responsibility. The kernel is
+> converging to a slim seam-only core ([ADR-0024](../adr/0024-kernel-module-architecture.md),
+> tracked by [`ARCH-014`](../../tasks/backlog/architecture/ARCH-014-kernel-convergence-tracking.md)):
+> if your feature wants a new `Engine` method, that is the signal it is a
+> module, a command, an event, or a service — not kernel surface.
+
 ---
 
 ## 0) Minimal-feature floor
@@ -30,7 +38,7 @@ behavior inside ad-hoc runtime or ImGui code.
 
 When a feature grows past the floor, it is a small contract-driven slice:
 
-1. **Runtime facade** (orchestrates frame phase integration).
+1. **RuntimeModule** (composed by the app; registers command handlers, systems, and UI contributions — orchestrates frame-phase integration via the kernel seams, not an `Engine` facade; see [`kernel-target-state.md`](kernel-target-state.md)).
 2. **Domain/service layer** (pure logic, testable without GPU/UI).
 3. **Data contract** (typed IDs/handles, immutable inputs, explicit outputs).
 4. **Adapters** (ECS, GPU, IO, UI hooks).
@@ -191,8 +199,9 @@ domain algorithm module and not in `src/app/` glue code.
   or a future `src/runtime/Editor/Runtime.<Feature>Editor.*` promoted module.
 - **Panel/menu registration:** the promoted `SandboxEditorUi` frame model and
   ImGui adapter attachment.
-- **Execution trigger:** UI emits a typed request to the runtime feature facade
-  (`Extrinsic.Runtime.<Feature>` or equivalent runtime-owned command surface).
+- **Execution trigger:** UI **enqueues a command** on the kernel CommandBus
+  (a `<Feature>Requested` payload), drained pre-sim and handled by the feature's
+  RuntimeModule (ADR-0024 D5). It does not call an `Engine` facade method.
 - **Background progress/result polling:** runtime/streaming lane, then UI only renders readonly status
 
 Current promoted precedent follows this pattern in
@@ -205,7 +214,7 @@ runtime.
 Use a one-way command path:
 
 1. UI captures params and validates cheap constraints.
-2. UI submits `FeatureRequest` to runtime facade.
+2. UI enqueues a `FeatureRequested` command on the kernel CommandBus (D5).
 3. Runtime routes to CPU graph / GPU frame graph / async streaming graph.
 4. Runtime publishes `FeatureResult` + diagnostics.
 5. UI renders status/results from immutable snapshots.

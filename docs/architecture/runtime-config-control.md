@@ -1,8 +1,18 @@
 # Runtime Config Control
 
-`Extrinsic.Runtime.Engine` owns the live config-control facade for non-ImGui
-callers and the Sandbox Editor. The facade is a set of typed Engine methods and
-DTOs, not a command bus.
+> **Transitional (ADR-0024).** This doc describes the config-control facade as
+> it exists *today*. It is a migration target, not the end state: under
+> [ADR-0024](../adr/0024-kernel-module-architecture.md) config-apply becomes a
+> `*Requested` **command** drained pre-sim (D5), handled by a **ConfigControl
+> RuntimeModule** extracted from `Engine` (`RUNTIME-149`); the
+> `Engine::GetConfigControl*()` accessors are driven to zero per the
+> [kernel target-state](kernel-target-state.md) scorecard. Do not add new
+> `Engine` config-control methods — add a command + a module handler.
+
+`Extrinsic.Runtime.Engine` currently owns the live config-control facade for
+non-ImGui callers and the Sandbox Editor. Today the facade is a set of typed
+Engine methods and DTOs; ADR-0024 replaces that surface with commands handled
+by the ConfigControl module (see the banner above).
 
 ## Entry Points
 

@@ -76,6 +76,7 @@ maturity_target: Operational
 - Part of the `Runtime.Engine` decomposition series (`RUNTIME-146..151`).
   This is the largest slice of the series; land it via the slice plan below.
 
+- Transitional facade (ADR-0024): the `Engine::Get{X}()` accessor this task adds is a **transitional landing**, not the end state. Per ADR-0024 D9/D12 and the [kernel target-state](../../../docs/architecture/kernel-target-state.md) scorecard (`Engine::GetX()` domain-facade accessors = 0), its conversion to a RuntimeModule / Resolve-phase service is owned by `ARCH-013` (per-subsystem decision) and tracked by `ARCH-014`. This task extracts the subsystem; it does not make the accessor permanent.
 ## Slice plan
 - **Slice A (mechanical extraction).** Create
   `src/runtime/Runtime.AssetImportPipeline.{cppm,cpp}`; move types, state,

@@ -5,6 +5,11 @@ depends_on: []
 ---
 # BUG-062 — Warm-configure CI budget (10 s) flakes on shared-runner variance
 
+## Status
+
+- **Closed 2026-07-08.** Commit/PR: pull request #1010 (merge commit:
+  `977244d`).
+
 ## Goal
 - Stop the `tools/ci/time_command.py --max-warm-seconds 10` guard from
   killing CI jobs before their build step on ordinary shared-runner
@@ -51,15 +56,17 @@ depends_on: []
       environment cannot execute GitHub runners locally).
 
 ## Docs
-- [ ] If `INFRA-001` (warm-cache CI timing evidence) is still open at
-      closure time, record the 2026-07-08 measurement series there as
-      calibration evidence.
+- [x] Calibration evidence recorded in this task's Context (2026-07-08
+      measurement series); `INFRA-001` tracks only deprecation cleanup and
+      can reference it from here.
 
 ## Acceptance criteria
-- [ ] A full PR CI round completes with no "Warm configure budget
-      exceeded" kill at the new budget.
-- [ ] The guard still hard-fails when the budget is exceeded (semantics
-      unchanged; only the value moved).
+- [x] Three consecutive PR #1010 CI rounds (heads `e732e69`, `5d0c773`,
+      `635915a`) completed all configure steps with zero "Warm configure
+      budget exceeded" kills at the 20 s budget.
+- [x] The guard still hard-fails when the budget is exceeded (semantics
+      unchanged in `tools/ci/time_command.py`; only the workflow value
+      moved).
 
 ## Verification
 ```bash
