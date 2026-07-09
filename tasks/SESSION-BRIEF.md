@@ -25,6 +25,7 @@ the authoritative open/unblocked view.
 - blocked by `ARCH-008`: `ARCH-011` — RuntimeModule contract, EngineSetup, and two-phase ServiceRegistry (tasks/backlog/architecture/ARCH-011-runtimemodule-contract-service-registry.md)
 - blocked by `ARCH-011`: `ARCH-012` — ClusteringModule: proving extraction onto the kernel seams (tasks/backlog/architecture/ARCH-012-clusteringmodule-proving-extraction.md)
 - blocked by `ARCH-012`: `ARCH-013` — Post-seam re-review of backlog tasks colliding with ADR-0024 (tasks/backlog/architecture/ARCH-013-post-seam-collision-rereview.md)
+- unblocked: `ARCH-014` — Kernel convergence tracking (umbrella north-star) (tasks/backlog/architecture/ARCH-014-kernel-convergence-tracking.md)
 - unblocked: `CORE-005` — Non-blocking TaskGraph submission and completion API (tasks/backlog/architecture/CORE-005-nonblocking-taskgraph-submit-api.md)
 - unblocked: `CORE-006` — Domain-free core task/DAG vocabulary (tasks/backlog/architecture/CORE-006-domain-free-core-task-vocabulary.md)
 - unblocked: `CORE-007` — Scheduler priority, wait, and wake hardening (tasks/backlog/architecture/CORE-007-scheduler-priority-wait-wake-hardening.md)

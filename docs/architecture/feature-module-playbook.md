@@ -4,6 +4,14 @@ This playbook defines the **default way** to add and refactor runtime features w
 
 Use it when introducing anything like `Runtime.SomethingModule.cppm`, geometry tooling, streaming jobs, or render integrations.
 
+> **Target state first.** Before adding anything to `Runtime.Engine` or a new
+> `Runtime.*Module`, read [`kernel-target-state.md`](kernel-target-state.md)
+> and use its knob-decision table to place the responsibility. The kernel is
+> converging to a slim seam-only core ([ADR-0024](../adr/0024-kernel-module-architecture.md),
+> tracked by [`ARCH-014`](../../tasks/backlog/architecture/ARCH-014-kernel-convergence-tracking.md)):
+> if your feature wants a new `Engine` method, that is the signal it is a
+> module, a command, an event, or a service — not kernel surface.
+
 ---
 
 ## 0) Minimal-feature floor

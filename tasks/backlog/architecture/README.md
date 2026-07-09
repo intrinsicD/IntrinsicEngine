@@ -51,6 +51,10 @@ extraction:
   re-review of backlog tasks colliding with ADR-0024 (blocked on
   `ARCH-012` by design; re-gates/re-scopes/retires the collision
   inventory after the seam set completes).
+- [`ARCH-014`](ARCH-014-kernel-convergence-tracking.md) — umbrella
+  north-star: owns the [kernel target-state](../../../docs/architecture/kernel-target-state.md)
+  convergence scorecard and the review/ratchet guardrail; stays open
+  until the whole ADR-0024 migration is reached.
 
 ## Retired Legacy Program
 
