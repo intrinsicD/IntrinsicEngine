@@ -42,7 +42,6 @@ the authoritative open/unblocked view.
 
 ## Theme G — Active bugs
 
-- unblocked: `BUG-063` — Streaming-import contract tests flaky on main (tasks/backlog/bugs/BUG-063-streaming-import-contract-tests-flaky-on-main.md)
 - unblocked: `BUG-064` — ci-vulkan FramePacingDiagnosticCapture cannot run headless (tasks/backlog/bugs/BUG-064-ci-vulkan-framepacing-headless-display.md)
 
 ## Theme H — Agentic workflow hardening

@@ -5,6 +5,19 @@ depends_on: []
 ---
 # BUG-063 — Streaming-import contract tests flaky on main
 
+## Status
+- Completed 2026-07-09 on
+  `copilot/bug-063-streaming-import-flake`; commit/PR: `e42c0e1d` / #1015
+  (stacked on #1014).
+- The exact three-process repro failed both streaming tests before the fix and
+  passed 25 repetitions per test after the fix. The full 16-test
+  `RuntimeAssetImportFormatCoverage` group passed 25 repetitions, and the
+  combined stacked default CPU-supported gate passed 3635/3635.
+- #1014's `ci-linux-clang` and `pr-fast` runs independently reproduced only
+  the two BUG-063 `AssetDecodeFailed` failures while all repaired
+  `RuntimeModuleContract` tests passed. Its `ci-vulkan` failure is the
+  independently tracked BUG-064 display fixture defect.
+
 ## Goal
 - Make `RuntimeAssetImportFormatCoverage.DroppedModelSceneAndTextureImportThroughStreamingQueue`
   and `...ManualModelSceneAndTextureImportQueueCompletesThroughStreaming`
@@ -61,18 +74,19 @@ depends_on: []
       end-to-end streaming coverage and production behavior unchanged.
 
 ## Tests
-- [ ] The three formerly colliding tests pass together under `-j 3` for 25
+- [x] The three formerly colliding tests pass together under `-j 3` for 25
       repetitions.
-- [ ] The full `RuntimeAssetImportFormatCoverage` contract group and default
+- [x] The full `RuntimeAssetImportFormatCoverage` contract group and default
       CPU-supported gate pass.
 
 ## Docs
 - [x] Record the diagnosis and fix in this task; update `bugs/index.md`.
 
 ## Acceptance criteria
-- [ ] Parallel CTest execution cannot delete another format-coverage test's
+- [x] Parallel CTest execution cannot delete another format-coverage test's
       external glTF buffer.
-- [ ] `ci-linux-clang` completes with no streaming-import failures.
+- [x] The combined default CPU-supported gate completes with no
+      streaming-import failures.
 
 ## Verification
 ```bash
