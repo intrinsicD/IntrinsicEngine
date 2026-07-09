@@ -15,7 +15,8 @@ map.
 
 ## Tasks
 
-- [CI-004 — Build only the test executables selected by each gate](CI-004-label-derived-test-build-aggregates.md)
+- [CI-004 — Build only the test executables selected by each gate](../../active/CI-004-label-derived-test-build-aggregates.md)
+  (currently active).
 - [CI-005 — Make PR-fast a real touched-scope feedback gate](CI-005-real-touched-scope-pr-fast-gate.md)
 - [CI-006 — Remove duplicate sanitizer work and calibrate test parallelism](CI-006-sanitizer-topology-and-test-parallelism.md)
 - [CI-007 — Pilot persistent module-safe ccache in CI](CI-007-module-safe-persistent-ccache-pilot.md)

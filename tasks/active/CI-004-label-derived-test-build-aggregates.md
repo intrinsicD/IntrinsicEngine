@@ -6,6 +6,14 @@ depends_on:
 ---
 # CI-004 — Build only the test executables selected by each gate
 
+## Status
+- In progress on branch `copilot/ci-004-test-build-aggregates`.
+- Owner/agent: GitHub Copilot CLI.
+- Current slice: inspect registration metadata and define one authoritative
+  aggregate derivation path.
+- Next verification step: prove current target/label selection semantics against
+  the configured CTest inventory before changing workflow targets.
+
 ## Goal
 - Derive gate-specific aggregate build targets from the same CTest label
   metadata used for execution so PR-fast and Vulkan jobs stop compiling test
@@ -51,6 +59,15 @@ depends_on:
 - [ ] Extend prerequisite checks so a missing executable selected by the CTest
       filter fails before CTest, while an intentionally unselected executable
       is not required.
+
+## Slice plan
+- **Slice A.** Centralize target/label metadata and derive the four stable
+  aggregate targets with configuration-time validation and exact tooling
+  regression coverage. Preserve all workflow targets.
+- **Slice B.** Route PR-fast and Vulkan workflows to their aggregates, align
+  prerequisite validation, and update canonical test/build documentation.
+- **Slice C.** Record comparable cold-build/Ninja-edge evidence against the
+  CI-003 aggregate baseline, run the specialized selectors, and retire the task.
 
 ## Tests
 - [ ] Add CMake/tooling regression coverage that enumerates registered targets

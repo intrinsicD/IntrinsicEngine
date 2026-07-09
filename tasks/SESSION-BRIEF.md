@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `CI-004` — Build only the test executables selected by each gate (tasks/active/CI-004-label-derived-test-build-aggregates.md)
 
 ## Theme B — Rendering modernization
 
@@ -47,7 +47,6 @@ the authoritative open/unblocked view.
 
 ## Theme H — Agentic workflow hardening
 
-- unblocked: `CI-004` — Build only the test executables selected by each gate (tasks/backlog/process/CI-004-label-derived-test-build-aggregates.md)
 - blocked by `CI-004`: `CI-005` — Make PR-fast a real touched-scope feedback gate (tasks/backlog/process/CI-005-real-touched-scope-pr-fast-gate.md)
 - blocked by `CI-005`: `CI-006` — Remove duplicate sanitizer work and calibrate test parallelism (tasks/backlog/process/CI-006-sanitizer-topology-and-test-parallelism.md)
 - unblocked: `CI-007` — Pilot persistent module-safe ccache in CI (tasks/backlog/process/CI-007-module-safe-persistent-ccache-pilot.md)

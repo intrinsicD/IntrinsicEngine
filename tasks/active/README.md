@@ -11,7 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-No tasks are currently active.
+- [`CI-004`](CI-004-label-derived-test-build-aggregates.md) — derive
+  gate-specific build aggregates from the same target/label metadata that
+  drives CTest selection, then route PR-fast and Vulkan away from the complete
+  test aggregate.
 
 ## History
 
