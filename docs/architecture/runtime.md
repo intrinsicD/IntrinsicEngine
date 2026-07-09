@@ -54,19 +54,23 @@ The frame order is:
    published as events become visible before fixed-step simulation, while
    listener-published events wait for the next pump (ARCH-008);
 4. fixed-step simulation and CPU `FrameGraph` execution;
-5. pump the kernel event bus at pump B — post-simulation and pre-UI/extraction
+5. drain the kernel job-service completion gate — workers deposit results into
+   `Engine::Jobs()` only, and the service publishes survivor completion events
+   after token/world cancellation checks, main-thread, before pump B per
+   ADR-0024 D8 (ARCH-009);
+6. pump the kernel event bus at pump B — post-simulation and pre-UI/extraction
    per ADR-0024 D7, so simulation/completion events reach listeners before
    the frame builds UI and render products;
-6. ImGui begin-frame, variable application tick, and ImGui end-frame;
-7. build `Graphics::RenderFrameInput`, update the active camera controller,
+7. ImGui begin-frame, variable application tick, and ImGui end-frame;
+8. build `Graphics::RenderFrameInput`, update the active camera controller,
    dispatch registered input actions, and drain one coalesced selection pick;
-8. execute the render-frame contract: begin frame, runtime render extraction,
+9. execute the render-frame contract: begin frame, runtime render extraction,
    renderer world extraction, prepare, execute, and end frame;
-9. present the completed frame;
-10. execute maintenance: transfer retirement, streaming drain/apply/submit/pump,
-   asset-service tick, GPU asset cache tick, material texture re-resolution, and
-   render-extraction deferred-retire ticks;
-11. drain completed pick readbacks through the incrementally maintained
+10. present the completed frame;
+11. execute maintenance: transfer retirement, streaming drain/apply/submit/pump,
+   job-service reaping, asset-service tick, GPU asset cache tick, material
+   texture re-resolution, and render-extraction deferred-retire ticks;
+12. drain completed pick readbacks through the incrementally maintained
    stable-entity lookup, release the consumed `RenderWorldPool` slot, and
    finalize the frame clock.
 
@@ -74,6 +78,19 @@ The internal `RuntimeFrameContext` record carries the data that must survive
 between those phases: frame delta, fixed-step interpolation alpha, render frame
 index, render input, extraction stats, and the acquired render-world pool slot.
 It is intentionally not exported as public runtime API.
+
+Runtime has two CPU scheduling tiers. `Core::FrameGraph` is the in-frame DAG:
+systems add passes during a fixed-step tick, and the engine compiles, executes,
+and resets that graph before the next tick. `Runtime.JobService` is the
+multi-frame background lane for snapshot-in/result-out work: jobs receive only
+captured value snapshots plus a cooperative `JobCancellation` view, never live
+world or ECS references. Worker functions run on the shared `Core::Tasks`
+pool and place their result back into the service; they do not publish
+completion events. The frame thread drains the service before event pump B,
+drops cancelled or world-scoped-invalid results whole, and publishes only
+surviving completion events onto `Runtime.KernelEvents`. The `GpuQueue` target
+is reserved for the later GPU-job participant/readback integration owned by
+`RUNTIME-137`.
 
 Dropped asset imports, Sandbox editor model-scene/texture import commands, and
 Sandbox editor scene-file save/open commands use the persistent runtime

@@ -16,6 +16,7 @@ target_sources(${target_name}
         Runtime.AssetModelTextureHandoff.cppm
         Runtime.AssetModelTextureIO.cppm
         Runtime.KernelEvents.cppm
+        Runtime.JobService.cppm
         Runtime.CommandBus.cppm
         Runtime.DerivedJobGraph.cppm
         Runtime.MeshAttributeTextureBake.cppm
@@ -73,6 +74,7 @@ target_sources(${target_name}
         Runtime.AssetModelTextureHandoff.cpp
         Runtime.AssetModelTextureIO.cpp
         Runtime.KernelEvents.cpp
+        Runtime.JobService.cpp
         Runtime.CommandBus.cpp
         Runtime.DerivedJobGraph.cpp
         Runtime.MeshAttributeTextureBake.cpp

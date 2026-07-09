@@ -3559,6 +3559,12 @@ namespace Extrinsic::Runtime
         bool preRenderTransformFlushNeeded =
             HasPendingPreRenderTransformFlush(*m_Scene);
 
+        // -- Job completion gate (post-sim, pre-pump B; ARCH-009 / D8) -----
+        // Workers deposit results into JobService only. The service checks
+        // token/world cancellation here and publishes survivor completion
+        // events onto the queued EventBus for pump B delivery.
+        m_JobService.DrainCompletions(m_EventBus);
+
         // -- Event pump B (post-sim, pre-UI/extraction; ARCH-008 / D7) ------
         // Simulation and job-style completion events reach listeners before
         // the frame builds UI and render extraction products.
@@ -3764,6 +3770,7 @@ namespace Extrinsic::Runtime
                               *m_Renderer);
         const auto maintenanceBegin = std::chrono::steady_clock::now();
         Core::ExecuteMaintenanceContract(transferHooks, streamingHooks, assetHooks, 8);
+        (void)m_JobService.ReapCompleted();
         for (RuntimeGpuJobParticipantRecord& participant :
              m_RuntimeGpuJobParticipants)
         {
@@ -3813,6 +3820,7 @@ namespace Extrinsic::Runtime
 
     CommandBus& Engine::Commands() noexcept { return m_CommandBus; }
     EventBus& Engine::Events() noexcept { return m_EventBus; }
+    JobService& Engine::Jobs() noexcept { return m_JobService; }
     bool Engine::IsRunning() const noexcept { return m_Running; }
     void Engine::RequestExit()      noexcept { m_Running = false; }
 

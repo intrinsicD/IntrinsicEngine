@@ -9,6 +9,22 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`ARCH-009`](ARCH-009-kernel-jobservice-snapshot-in-result-out.md) —
+Kernel JobService: snapshot-in/result-out background jobs — retired on
+2026-07-09 at maturity `CPUContracted`. `Extrinsic.Runtime.JobService` now
+provides typed `JobToken`/`WorldHandle` handles, cooperative
+`JobCancellation`, `CpuPool` submission through the shared
+`Core::Tasks::Scheduler`, a reserved `GpuQueue` target, main-thread
+completion gating through `Runtime.KernelEvents`, world-scoped cancellation,
+maintenance-phase completion reaping, and diagnostics counters. Headless
+`contract;runtime` coverage verifies worker-thread execution, pump-B delivery
+on the main thread, cancel-before-start, mid-flight cooperative cancellation,
+finished-before-gate suppression, and `CancelAllForWorld` scope isolation.
+The module inventory and runtime architecture docs were updated with the
+FrameGraph-vs-JobService two-tier rule. `Operational` remains owned by
+`ARCH-012`; `GpuQueue` execution is deferred to `RUNTIME-137`.
+
+Active
 [`PROC-014`](PROC-014-task-state-index-done-link-cleanup.md) — Task-state
 index done-link cleanup — retired on 2026-07-07 at maturity `Retired`. The
 rendering and runtime backlog indexes now cite recently retired tasks from

@@ -37,6 +37,7 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.KernelEvents;
+import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
@@ -696,6 +697,9 @@ namespace Extrinsic::Runtime
         // ARCH-008 - queued-only kernel event bus (ADR-0024 D7). Publish from
         // any thread; Engine pumps post-drain and post-simulation.
         [[nodiscard]] EventBus&               Events()           noexcept;
+        // ARCH-009 - snapshot-in/result-out background jobs. Submit work to
+        // the shared CPU pool; Engine drains completions before pump B.
+        [[nodiscard]] JobService&             Jobs()             noexcept;
         // UI-001 Slice D — runtime-owned file/import command seam. Editor UI
         // submits a path + payload hint here; Engine composes the promoted
         // ASSETIO geometry/model/texture decoders, AssetService, and runtime
@@ -1033,6 +1037,9 @@ namespace Extrinsic::Runtime
         CommandBus                             m_CommandBus{};
         // ARCH-008 - queued-only kernel events; pumped twice per frame.
         EventBus                               m_EventBus{};
+        // ARCH-009 - kernel background job service; completion gate runs
+        // main-thread before the post-simulation event pump.
+        JobService                             m_JobService{};
         // ECS scene registry
         std::unique_ptr<ECS::Scene::Registry>  m_Scene;
         // Declared after m_Scene so scoped disconnection runs before the

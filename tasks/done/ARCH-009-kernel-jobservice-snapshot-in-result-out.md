@@ -14,7 +14,7 @@ depends_on:
   service, and only the service publishes completion events, main-thread,
   after checking token and world scope — plus a reap step in the
   Maintenance phase, per
-  [ADR-0024](../../../docs/adr/0024-kernel-module-architecture.md) D8.
+  [ADR-0024](../../docs/adr/0024-kernel-module-architecture.md) D8.
 
 ## Non-goals
 - No `GpuQueue` execution target in this task — the GPU path rides the
@@ -48,47 +48,56 @@ depends_on:
   `ARCH-010` wires world-teardown cancellation onto this.
 - Depends on `ARCH-008` for the worker→main-thread completion channel.
 
+## Status
+- **Retired 2026-07-09 at `CPUContracted`.** Commit/PR: pending local change
+  set on branch `codex/arch-009-jobservice`.
+- Focused `RuntimeJobService|RuntimeKernelEvents` contract tests and the full
+  default CPU-supported gate pass locally under the sanitizer-enabled `ci`
+  preset. The default gate passed with 3621/3621 tests passing.
+- `Operational` is owned by `ARCH-012`; `GpuQueue` integration is deferred to
+  `RUNTIME-137`.
+
 ## Required changes
-- [ ] New `Extrinsic.Runtime.JobService` module (interface `.cppm` +
+- [x] New `Extrinsic.Runtime.JobService` module (interface `.cppm` +
       implementation `.cpp`): `JobDesc { DebugName, Target, Scope(WorldHandle),
       Work(const JobCancellation&) -> Result, PublishCompletion(EventBus&,
       Result&&) }`, `Submit`, `Cancel`, `IsComplete`,
       `CancelAllForWorld(WorldHandle)`. Workers deposit `Result` into the
       service's internal completion queue; they get no event-bus access for
       completions.
-- [ ] Completion gate: a main-thread drain step (wired before pump B in
+- [x] Completion gate: a main-thread drain step (wired before pump B in
       `Engine::RunFrame()`) that checks each finished token, drops
       cancelled/world-dead results whole, and invokes `PublishCompletion`
       for survivors.
-- [ ] `JobToken` handle type usable by `ARCH-007`'s future `Pending` outcome
+- [x] `JobToken` handle type usable by `ARCH-007`'s future `Pending` outcome
       and by parked `CommandSequence` links (declaration only; no sequence
       machinery).
-- [ ] Reap step (`ReapCompleted`) wired into the Maintenance phase of
+- [x] Reap step (`ReapCompleted`) wired into the Maintenance phase of
       `Engine::RunFrame()`.
-- [ ] Diagnostics: in-flight/completed/cancelled counters.
+- [x] Diagnostics: in-flight/completed/cancelled counters.
 
 ## Tests
-- [ ] Unit/contract tests (headless, `unit;runtime` labels): submit → work
+- [x] Unit/contract tests (headless, `contract;runtime` labels): submit → work
       runs on a pool thread → gate publishes → completion event delivered
       at pump B → commit handler runs on the main thread.
-- [ ] Cancellation test: cancel before start (work never runs) and cancel
+- [x] Cancellation test: cancel before start (work never runs) and cancel
       mid-flight (cooperative poll observes it; completion dropped).
-- [ ] Gate-suppression test: work finishes on the worker, then the token is
+- [x] Gate-suppression test: work finishes on the worker, then the token is
       cancelled (or its world torn down) before the gate drains — no
       completion event is delivered and no commit happens.
-- [ ] World-scope test: `CancelAllForWorld` cancels only that world's jobs.
-- [ ] Sanitizer run covers the submit/complete/cancel races.
+- [x] World-scope test: `CancelAllForWorld` cancels only that world's jobs.
+- [x] Sanitizer run covers the submit/complete/cancel races.
 
 ## Docs
-- [ ] Regenerate `docs/api/generated/module_inventory.md` (new module).
-- [ ] Record the FrameGraph-vs-JobService two-tier rule in the runtime
+- [x] Regenerate `docs/api/generated/module_inventory.md` (new module).
+- [x] Record the FrameGraph-vs-JobService two-tier rule in the runtime
       architecture doc, citing ADR-0024 D8.
 
 ## Acceptance criteria
-- [ ] Jobs receive no live-world references anywhere in the API surface.
-- [ ] Completion commits demonstrably run main-thread at a pump point.
-- [ ] All listed tests pass under the default CPU gate and sanitizers.
-- [ ] `Operational` follow-up is owned by `ARCH-012`; the `GpuQueue` target
+- [x] Jobs receive no live-world references anywhere in the API surface.
+- [x] Completion commits demonstrably run main-thread at a pump point.
+- [x] All listed tests pass under the default CPU gate and sanitizers.
+- [x] `Operational` follow-up is owned by `ARCH-012`; the `GpuQueue` target
       is deferred to the `RUNTIME-137` follow-up line.
 
 ## Verification

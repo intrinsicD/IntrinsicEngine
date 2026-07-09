@@ -35,9 +35,6 @@ Opened from the 2026-07-08 kernel/module architecture decision record
 seams-first migration order, `ARCH-012` is the Operational proving
 extraction:
 
-- [`ARCH-009`](ARCH-009-kernel-jobservice-snapshot-in-result-out.md) —
-  kernel JobService for multi-frame background jobs
-  (snapshot-in/result-out, world-scoped cancellation).
 - [`ARCH-010`](ARCH-010-kernel-worldregistry-deferred-world-ops.md) —
   kernel WorldRegistry with deferred, two-phase world operations.
 - [`ARCH-011`](ARCH-011-runtimemodule-contract-service-registry.md) —
@@ -54,11 +51,15 @@ extraction:
   convergence scorecard and the review/ratchet guardrail; stays open
   until the whole ADR-0024 migration is reached.
 
-Retired seams:
+## Retired seams
 
 - [`ARCH-008`](../../done/ARCH-008-kernel-event-bus-queued-only.md) —
   queued-only kernel event bus (two pump points, worker inbox, no `trigger`)
   retired on 2026-07-09 at `CPUContracted`.
+- [`ARCH-009`](../../done/ARCH-009-kernel-jobservice-snapshot-in-result-out.md) —
+  kernel JobService for multi-frame background jobs
+  (snapshot-in/result-out, world-scoped cancellation) retired on 2026-07-09
+  at `CPUContracted`.
 
 ## Retired Legacy Program
 
