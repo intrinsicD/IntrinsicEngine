@@ -45,7 +45,7 @@ and compile hotspot. This series keeps `Engine` as the concrete composition
 root (lifecycle, ownership, explicit frame skeleton) and relocates domain
 facades into engine-owned subsystem objects, following the existing
 `SelectionController`/`EditorCommandHistory`/`GizmoInteraction` accessor
-pattern. `RUNTIME-146` through `RUNTIME-163` are retired. Runtime device
+pattern. `RUNTIME-146` through `RUNTIME-164` are retired. Runtime device
 selection, backend factory dispatch, Vulkan fallback breadcrumb policy, GPU
 asset fallback-texture descriptor construction, legacy mesh primitive-view
 compatibility translation, reference-scene lifecycle control, and runtime
@@ -59,8 +59,10 @@ normal bake GPU-queue service ownership, dependency setup, JobService
 participant registration, diagnostics access, transform-gizmo interaction state,
 undo storage, selected-entity scratch, packet building, and gizmo-vs-selection
 input interlock, plus render-extraction cache ownership, render-world pool
-state, last extraction stats, and frame-index ownership now live outside
-`Runtime.Engine.cpp`.
+state, last extraction stats, frame-index ownership, GPU asset cache ownership,
+asset-event listener wiring, model texture/model scene handoff ownership,
+pending material-binding re-resolution, and asset-residency teardown ordering
+now live outside `Runtime.Engine.cpp`.
 `RUNTIME-129` remains the owner of production Vulkan bake plan-provider wiring.
 `RUNTIME-154` keeps the existing reference-scene public facade while moving
 provider resolution, population state, camera-seed caching, and teardown policy
@@ -127,9 +129,22 @@ gizmo accessors.
 `RUNTIME-163` is retired; `RenderExtractionCache`, render-world pool, last
 extraction stats, frame-index ownership, and render-extraction facade delegation
 now live behind `Extrinsic.Runtime.RenderExtractionService`.
+`RUNTIME-164` is retired; `Graphics::GpuAssetCache`, the cache's
+`AssetEventBus` listener token, `AssetModelTextureHandoff`,
+`AssetModelSceneHandoff`, fallback bootstrap delegation, pending material
+binding re-resolution, and asset-residency teardown ordering now live behind
+`Extrinsic.Runtime.AssetResidencyService`.
 
 #### Retired decomposition entries
 
+- [RUNTIME-164 — Extract asset residency service out of Engine](../../done/RUNTIME-164-extract-asset-residency-service.md)
+  (done, 2026-07-09, `Operational`): GPU asset cache ownership, cache
+  asset-event listener wiring, model texture/model scene handoff ownership,
+  fallback bootstrap delegation, pending material-binding re-resolution, and
+  asset-residency teardown ordering now live in
+  `Extrinsic.Runtime.AssetResidencyService`. `Engine` keeps lifecycle/frame
+  ordering plus public `GetAssetService()` / `GetGpuAssetCache()`
+  compatibility facades.
 - [RUNTIME-163 — Extract render extraction service out of Engine](../../done/RUNTIME-163-extract-render-extraction-service.md)
   (done, 2026-07-09, `Operational`): live render-extraction cache, render-world
   pool, last extraction stats, and frame-index ownership now live in

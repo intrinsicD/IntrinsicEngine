@@ -4204,3 +4204,76 @@ tree:
     evidence:
       - "git commit -m 'runtime: extract Engine service seams'"
     status: resolved
+  - id: N178
+    type: experiment
+    title: "RUNTIME-164 asset residency service extraction"
+    provenance: ai-executed
+    timestamp: "2026-07-09T07:16"
+    also_depends_on: [N176, N177]
+    evidence:
+      - "src/runtime/Runtime.AssetResidencyService.cppm"
+      - "src/runtime/Runtime.AssetResidencyService.cpp"
+      - "src/runtime/Runtime.Engine.cppm"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "src/runtime/Runtime.Engine.FrameLoop.cppm"
+      - "tests/contract/runtime/Test.RuntimeEngineLayering.cpp"
+      - "tasks/done/RUNTIME-164-extract-asset-residency-service.md"
+      - "cmake --build --preset ci --target IntrinsicRuntimeContractTests"
+      - "ctest --test-dir build/ci --output-on-failure -R 'RuntimeEngineLayering|RuntimeAssetModelTextureHandoff|RuntimeAssetModelSceneHandoff|AssetImportFormatCoverage|RuntimeRenderExtraction|ObjectSpaceNormalBake' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+      - "python3 tools/docs/check_docs_sync.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "tools/ci/run_clean_workshop_review.sh . --strict"
+      - "git diff --check"
+    result: >
+      Retired RUNTIME-164 at Operational. `Extrinsic.Runtime.AssetResidencyService`
+      now owns GPU asset cache construction, fallback bootstrap delegation, cache
+      asset-event listener wiring, model texture/model scene handoff ownership,
+      pending material-binding re-resolution, and asset-residency teardown
+      ordering. `Runtime.Engine` keeps lifecycle/frame ordering and public asset
+      service/GPU cache facades. Focused runtime asset/import/render/object-space
+      normal bake and Engine-layering coverage passed 93/93, `IntrinsicTests`
+      built, the default CPU-supported CTest gate passed 3646/3646, strict
+      task/docs/layering/test-layout/diff checks passed, and only pre-existing
+      warning-mode root/task-state findings remained.
+    status: resolved
+  - id: N179
+    type: decision
+    title: "Stop after RUNTIME-164 Engine cleanup"
+    provenance: ai-executed
+    timestamp: "2026-07-09T07:16"
+    also_depends_on: [N178]
+    choice: >
+      Stop this turn after retiring RUNTIME-164 because the next verified
+      cleanup slice moved the asset-residency ownership cluster out of
+      `Runtime.Engine`; further cleanup should start from a fresh hotspot scan
+      and task contract.
+    alternatives:
+      - "Open another Runtime.Engine cleanup task immediately after the full CPU gate."
+      - "Broaden RUNTIME-164 to move render extraction or asset import ownership, which its task forbids."
+    evidence:
+      - "tasks/done/RUNTIME-164-extract-asset-residency-service.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "rg -n 'm_GpuAssetCache|m_GpuAssetCacheListener|m_AssetModelTextureHandoff|m_AssetModelSceneHandoff' src/runtime/Runtime.Engine.cppm src/runtime/Runtime.Engine.cpp src/runtime/Runtime.Engine.FrameLoop.cppm"
+    status: resolved
+  - id: N180
+    type: decision
+    title: "Commit RUNTIME-164 asset residency extraction"
+    provenance: ai-executed
+    timestamp: "2026-07-09T07:21"
+    also_depends_on: [N178, N179]
+    choice: >
+      Committed the verified RUNTIME-164 asset-residency extraction with
+      message `runtime: extract asset residency service`.
+    alternatives:
+      - "Leave the verified RUNTIME-164 extraction uncommitted."
+      - "Create another runtime cleanup slice before committing the completed task."
+    evidence:
+      - "git commit -m 'runtime: extract asset residency service'"
+      - "git status --short --branch"
+    status: resolved

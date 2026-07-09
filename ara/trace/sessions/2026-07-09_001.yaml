@@ -2,9 +2,9 @@ session:
   id: "2026-07-09_001"
   date: "2026-07-09"
   started: "2026-07-09T00:46"
-  last_turn: "2026-07-09T06:43"
-  turn_count: 5
-  summary: "Implemented and verified the ADR-0024 Runtime.Engine decomposition through RUNTIME-163, landed RUNTIME-129's CPUContracted object-space normal bake GPU-queue participant, and committed the accumulated Engine service-seam batch."
+  last_turn: "2026-07-09T07:21"
+  turn_count: 7
+  summary: "Implemented, verified, and committed the ADR-0024 Runtime.Engine decomposition through RUNTIME-164, and landed RUNTIME-129's CPUContracted object-space normal bake GPU-queue participant."
 
 events_logged:
   - turn: 1
@@ -73,6 +73,30 @@ events_logged:
     routing: staged
     provenance: ai-suggested
     summary: "Remaining asset/GPU handoff wiring is a candidate Engine cleanup slice."
+  - turn: 6
+    type: experiment
+    id: "N178"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired RUNTIME-164; asset residency ownership moved out of Engine and CPU gate passed 3646/3646."
+  - turn: 6
+    type: decision
+    id: "N179"
+    routing: direct
+    provenance: ai-executed
+    summary: "Stopped after RUNTIME-164; further Engine cleanup should start from a fresh hotspot scan and task contract."
+  - turn: 6
+    type: architecture
+    id: "A05"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "O07 crystallized by artifact commitment into the Engine-owned asset residency service architecture decision."
+  - turn: 7
+    type: decision
+    id: "N180"
+    routing: direct
+    provenance: ai-executed
+    summary: "Committed the verified RUNTIME-164 asset residency extraction."
 
 ai_actions:
   - turn: 1
@@ -171,6 +195,32 @@ ai_actions:
       - "tasks/done/RUNTIME-161-extract-object-space-normal-bake-service.md"
       - "tasks/done/RUNTIME-162-extract-gizmo-frame-service.md"
       - "tasks/done/RUNTIME-163-extract-render-extraction-service.md"
+  - turn: 6
+    action: "Added Runtime.AssetResidencyService, delegated Engine GPU asset cache/listener/model-handoff ownership and maintenance ticks to it, updated Engine-layering tests, refreshed runtime docs/module inventory/task records/session brief, retired RUNTIME-164, and reran focused plus full CPU verification."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.AssetResidencyService.cppm"
+      - "src/runtime/Runtime.AssetResidencyService.cpp"
+      - "src/runtime/Runtime.Engine.cppm"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "src/runtime/Runtime.Engine.FrameLoop.cppm"
+      - "src/runtime/CMakeLists.txt"
+      - "tests/contract/runtime/Test.RuntimeEngineLayering.cpp"
+      - "src/runtime/README.md"
+      - "docs/api/generated/module_inventory.md"
+      - "tasks/done/RUNTIME-164-extract-asset-residency-service.md"
+      - "tasks/backlog/runtime/README.md"
+      - "tasks/backlog/README.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+      - "tasks/SESSION-BRIEF.md"
+  - turn: 7
+    action: "Committed the verified RUNTIME-164 asset-residency extraction and amended this turn record into the same commit."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-07-09_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
 
 claims_touched: []
 
@@ -185,10 +235,14 @@ key_context:
     excerpt: "User asked to continue until Runtime.Engine.cppm and Runtime.Engine.cpp were clean; runtime-module contribution scheduling was extracted and retired as RUNTIME-156."
   - turn: 5
     excerpt: "User asked to commit the accumulated changes after RUNTIME-163 passed the final CPU gate and task retirement checks."
+  - turn: 6
+    excerpt: "Goal continuation asked to keep moving toward clean Runtime.Engine files; RUNTIME-164 extracted the asset-residency ownership cluster and retired after focused plus full CPU verification."
+  - turn: 7
+    excerpt: "User asked to commit the completed changes; the verified RUNTIME-164 extraction was committed locally."
 
 open_threads:
   - "RUNTIME-129 still needs the production Vulkan geometry-buffer/pipeline/dilation plan provider plus opt-in gpu/vulkan smoke before it can retire at Operational."
-  - "Further Runtime.Engine cleanup candidate: extract GPU asset cache listener and model texture/scene handoff ownership into an Engine-owned asset-residency service."
+  - "Further Runtime.Engine cleanup should start from a fresh hotspot scan and task contract after RUNTIME-164."
 
 ai_suggestions_pending:
-  - "Open a scoped follow-up task for an asset-residency service if continuing Engine cleanup."
+  - "No specific next Engine cleanup task was opened after RUNTIME-164; run a fresh hotspot scan before selecting the next slice."

@@ -72,7 +72,7 @@ observations:
     context: "Post-RUNTIME-163 hotspot scan before the user asked for a commit; the agent identified this as a possible next scoped task but did not open or implement it."
     potential_type: architecture
     bound_to: [N176, N177]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A05"
+    crystallized_via: artifact-commitment
     stale: false

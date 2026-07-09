@@ -43,7 +43,6 @@ import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.SamplerManager;
-import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
@@ -53,9 +52,8 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.AssetGeometryIO;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetMeshNormals;
-import Extrinsic.Runtime.AssetModelSceneHandoff;
-import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.AssetModelTextureIO;
+import Extrinsic.Runtime.AssetResidencyService;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.DerivedJobGraph;
@@ -87,7 +85,6 @@ import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
-import Extrinsic.Asset.EventBus;
 import Extrinsic.Asset.GeometryIOBridge;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.ModelTextureIOBridge;
@@ -528,47 +525,15 @@ namespace Extrinsic::Runtime
         // ── 5. Asset service ──────────────────────────────────────────────
         m_AssetService = std::make_unique<Assets::AssetService>();
 
-        // ── 5b. GPU asset cache ───────────────────────────────────────────
-        // Bridges AssetId to refcounted Buffer/Texture leases.  Subscribes
-        // to AssetEventBus for Failed / Reloaded / Destroyed transitions;
-        // type-specific bridges drive RequestUpload separately. The cache
-        // receives the renderer's `SamplerManager` so RUNTIME-070's fallback
-        // texture (and future texture-asset bridges) can resolve sampler
-        // descriptors through the deduplicated manager path.
-        m_GpuAssetCache = std::make_unique<Graphics::GpuAssetCache>(
-            m_Renderer->GetBufferManager(),
-            m_Renderer->GetTextureManager(),
-            m_Renderer->GetSamplerManager(),
-            m_Device->GetTransferQueue());
-
-        // RUNTIME-152: fallback texture descriptor/bytes live in the runtime
-        // device-bootstrap module; Engine only preserves composition order.
-        if (Core::Result fallback =
-                InitializeRuntimeGpuAssetFallbackTexture(*m_GpuAssetCache,
-                                                         *m_Device);
-            !fallback.has_value())
-        {
-            Core::Log::Warn(
-                "[Runtime] GpuAssetCache fallback texture bootstrap failed: error={}; material code will use factor-only fallback.",
-                static_cast<int>(fallback.error()));
-        }
-
-        m_GpuAssetCacheListener = m_AssetService->SubscribeAll(
-            [cache = m_GpuAssetCache.get()](Assets::AssetId id, Assets::AssetEvent ev)
-            {
-                switch (ev)
-                {
-                case Assets::AssetEvent::Failed:    cache->NotifyFailed(id);    break;
-                case Assets::AssetEvent::Reloaded:  cache->NotifyReloaded(id);  break;
-                case Assets::AssetEvent::Destroyed: cache->NotifyDestroyed(id); break;
-                case Assets::AssetEvent::Ready:     /* no-op: type-specific bridges
-                                                       drive RequestUpload */    break;
-                }
-            });
+        // ── 5b. GPU asset residency ───────────────────────────────────────
+        m_AssetResidencyService.InitializeGpuCache(
+            *m_AssetService,
+            *m_Renderer,
+            *m_Device);
 
         m_ObjectSpaceNormalBakeService.SetDependencies(
             ObjectSpaceNormalBakeServiceDependencies{
-                .GpuAssets = m_GpuAssetCache.get(),
+                .GpuAssets = m_AssetResidencyService.CachePtr(),
                 .RenderExtraction = &m_RenderExtractionService.Cache(),
                 .Device = m_Device.get(),
             });
@@ -581,20 +546,16 @@ namespace Extrinsic::Runtime
         if (m_Scene != nullptr)
             m_StableEntityLookupBinding.Connect(m_StableEntityLookup, *m_Scene);
 
-        m_AssetModelTextureHandoff = std::make_unique<AssetModelTextureHandoff>(
+        m_AssetResidencyService.InitializeSceneHandoffs(
             *m_AssetService,
-            *m_GpuAssetCache);
-        AssetModelSceneHandoffOptions modelSceneOptions{};
-        modelSceneOptions.ObjectSpaceNormalBakeQueue =
-            &m_ObjectSpaceNormalBakeService.Queue();
-        modelSceneOptions.ObjectSpaceNormalBakeGraphicsBackendOperational =
-            m_Device != nullptr && m_Device->IsOperational();
-        m_AssetModelSceneHandoff = std::make_unique<AssetModelSceneHandoff>(
-            *m_AssetService,
-            *m_GpuAssetCache,
             *m_Scene,
             *m_Renderer,
-            std::move(modelSceneOptions));
+            AssetResidencySceneHandoffOptions{
+                .ObjectSpaceNormalBakeQueue =
+                    &m_ObjectSpaceNormalBakeService.Queue(),
+                .ObjectSpaceNormalBakeGraphicsBackendOperational =
+                    m_Device != nullptr && m_Device->IsOperational(),
+            });
 
         m_AssetImportPipeline->SetDependencies(
             AssetImportPipelineDependencies{
@@ -602,9 +563,11 @@ namespace Extrinsic::Runtime
                 .Config = &m_Config,
                 .Streaming = m_StreamingExecutor.get(),
                 .AssetService = m_AssetService.get(),
-                .GpuAssetCache = m_GpuAssetCache.get(),
-                .ModelTextureHandoff = m_AssetModelTextureHandoff.get(),
-                .ModelSceneHandoff = m_AssetModelSceneHandoff.get(),
+                .GpuAssetCache = m_AssetResidencyService.CachePtr(),
+                .ModelTextureHandoff =
+                    m_AssetResidencyService.ModelTextureHandoff(),
+                .ModelSceneHandoff =
+                    m_AssetResidencyService.ModelSceneHandoff(),
                 .RenderExtraction = &m_RenderExtractionService.Cache(),
                 .Scene = m_Scene,
                 .CameraControllers = &m_CameraControllers,
@@ -692,10 +655,7 @@ namespace Extrinsic::Runtime
             std::unique_ptr<StreamingExecutor>& StreamingExecutorPtr;
             std::unique_ptr<DerivedJobRegistry>& DerivedJobRegistryPtr;
             std::unique_ptr<Assets::AssetService>& AssetService;
-            std::unique_ptr<Graphics::GpuAssetCache>& GpuAssetCache;
-            std::unique_ptr<AssetModelTextureHandoff>& AssetModelTextureHandoffPtr;
-            std::unique_ptr<AssetModelSceneHandoff>& AssetModelSceneHandoffPtr;
-            Assets::AssetEventBus::ListenerToken& GpuAssetCacheListener;
+            AssetResidencyService& AssetResidency;
             WorldRegistry& Worlds;
             ECS::Scene::Registry*& Scene;
             ReferenceSceneControl& ReferenceScene;
@@ -713,10 +673,7 @@ namespace Extrinsic::Runtime
                           std::unique_ptr<StreamingExecutor>& streamingExecutor,
                           std::unique_ptr<DerivedJobRegistry>& derivedJobRegistry,
                           std::unique_ptr<Assets::AssetService>& assetService,
-                          std::unique_ptr<Graphics::GpuAssetCache>& gpuAssetCache,
-                          std::unique_ptr<AssetModelTextureHandoff>& assetModelTextureHandoff,
-                          std::unique_ptr<AssetModelSceneHandoff>& assetModelSceneHandoff,
-                          Assets::AssetEventBus::ListenerToken& gpuAssetCacheListener,
+                          AssetResidencyService& assetResidency,
                           WorldRegistry& worlds,
                           ECS::Scene::Registry*& scene,
                           ReferenceSceneControl& referenceScene,
@@ -733,10 +690,7 @@ namespace Extrinsic::Runtime
                 , StreamingExecutorPtr(streamingExecutor)
                 , DerivedJobRegistryPtr(derivedJobRegistry)
                 , AssetService(assetService)
-                , GpuAssetCache(gpuAssetCache)
-                , AssetModelTextureHandoffPtr(assetModelTextureHandoff)
-                , AssetModelSceneHandoffPtr(assetModelSceneHandoff)
-                , GpuAssetCacheListener(gpuAssetCacheListener)
+                , AssetResidency(assetResidency)
                 , Worlds(worlds)
                 , Scene(scene)
                 , ReferenceScene(referenceScene)
@@ -767,9 +721,7 @@ namespace Extrinsic::Runtime
                 Owner.m_StableEntityLookupBinding.Disconnect();
                 Owner.m_StableEntityLookup.Clear();
 
-                // The model-scene handoff borrows the scene and renderer, so
-                // detach it before provider teardown or wholesale scene reset.
-                AssetModelSceneHandoffPtr.reset();
+                AssetResidency.DestroySceneBorrowers();
 
                 ReferenceScene.TeardownIfInstalled(ReferenceConfig, Scene);
                 CameraControllers = CameraControllerRegistry{};
@@ -778,18 +730,7 @@ namespace Extrinsic::Runtime
             }
             void DestroyAssets() override
             {
-                // Unsubscribe before destroying the cache so a late event
-                // flush cannot reach a freed cache.  The cache is destroyed
-                // before the renderer (which owns Buffer/Texture managers)
-                // so leases unwind through live managers.
-                AssetModelTextureHandoffPtr.reset();
-                if (AssetService &&
-                    GpuAssetCacheListener != Assets::AssetEventBus::InvalidToken)
-                {
-                    AssetService->UnsubscribeAll(GpuAssetCacheListener);
-                    GpuAssetCacheListener = Assets::AssetEventBus::InvalidToken;
-                }
-                GpuAssetCache.reset();
+                AssetResidency.DestroyAssets(AssetService.get());
                 AssetService.reset();
             }
             void DestroyStreamingState() override
@@ -836,10 +777,7 @@ namespace Extrinsic::Runtime
                             m_StreamingExecutor,
                             m_DerivedJobRegistry,
                             m_AssetService,
-                            m_GpuAssetCache,
-                            m_AssetModelTextureHandoff,
-                            m_AssetModelSceneHandoff,
-                            m_GpuAssetCacheListener,
+                            m_AssetResidencyService,
                             m_WorldRegistry,
                             m_Scene,
                             m_ReferenceSceneControl,
@@ -1170,7 +1108,7 @@ namespace Extrinsic::Runtime
         RuntimeRenderFrameHooks renderHooks(*m_Renderer,
                                             *m_Scene,
                                             m_RenderExtractionService.Cache(),
-                                            m_GpuAssetCache.get(),
+                                            m_AssetResidencyService.CachePtr(),
                                             m_SelectionController,
                                             m_RenderExtractionService.Pool(),
                                             m_Config.Render.SynchronousExtraction,
@@ -1209,8 +1147,7 @@ namespace Extrinsic::Runtime
         StreamingHooks streamingHooks(*m_StreamingExecutor,
                                       m_DerivedJobRegistry.get());
         AssetHooks assetHooks(*m_AssetService,
-                              m_GpuAssetCache.get(),
-                              m_AssetModelSceneHandoff.get(),
+                              m_AssetResidencyService,
                               *m_Device,
                               m_RenderExtractionService.Cache(),
                               *m_Renderer);
@@ -1314,7 +1251,10 @@ namespace Extrinsic::Runtime
     }
 
     Assets::AssetService& Engine::GetAssetService()  noexcept { return *m_AssetService;  }
-    Graphics::GpuAssetCache& Engine::GetGpuAssetCache() noexcept { return *m_GpuAssetCache; }
+    Graphics::GpuAssetCache& Engine::GetGpuAssetCache() noexcept
+    {
+        return m_AssetResidencyService.Cache();
+    }
     AssetImportPipeline& Engine::GetAssetImportPipeline() noexcept
     {
         return *m_AssetImportPipeline;

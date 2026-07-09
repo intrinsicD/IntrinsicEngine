@@ -71,8 +71,8 @@ sessions:
     open_threads: 2
   - id: "2026-07-09_001"
     date: "2026-07-09"
-    summary: "Implemented and verified the ADR-0024 Runtime.Engine decomposition through RUNTIME-163, landed RUNTIME-129's CPUContracted object-space normal bake GPU-queue participant, and committed the accumulated Engine service-seam batch."
-    turn_count: 5
-    events_count: 11
+    summary: "Implemented, verified, and committed the ADR-0024 Runtime.Engine decomposition through RUNTIME-164, and landed RUNTIME-129's CPUContracted object-space normal bake GPU-queue participant."
+    turn_count: 7
+    events_count: 15
     claims_touched: []
     open_threads: 2

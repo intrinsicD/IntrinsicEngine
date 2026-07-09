@@ -692,3 +692,13 @@ entries:
       - "Routed RUNTIME-157..163 retirement and verification as direct journey facts because the turn produced task-state movement, code artifacts, and full-gate evidence."
       - "Routed commit as a direct decision because the user explicitly requested committing the accumulated changes."
       - "Staged O07 rather than opening a task because the asset-residency service was an AI-suggested next cleanup candidate, not a user-accepted scope."
+  - turn: "2026-07-09_001#6"
+    notes:
+      - "Routed RUNTIME-164 as a direct experiment because the turn produced code, tests, docs, task retirement, focused verification, full CPU gate evidence, and structural checks."
+      - "Crystallized O07 to A05 via artifact commitment because the asset-residency service is now implemented and task-backed."
+      - "Routed the stop point as a direct decision because the scoped asset-residency cleanup is complete and the next Engine cleanup needs a fresh hotspot scan."
+  - turn: "2026-07-09_001#7"
+    notes:
+      - "Routed the user-requested commit as a direct decision because it changed repository artifact state after the verified RUNTIME-164 extraction."
+      - "Did not stage a new claim; the relevant fact is the local commit and the already-recorded verification evidence."
+      - "Amended this epilogue into the same commit so the worktree remains clean after satisfying the commit request."

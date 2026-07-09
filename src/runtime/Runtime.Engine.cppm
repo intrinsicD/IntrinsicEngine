@@ -24,15 +24,13 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.RHI.Device;
 import Extrinsic.Platform.Window;
 import Extrinsic.Graphics.CameraSnapshots;
-import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Runtime.AssetResidencyService;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.AssetImportPipeline;
-import Extrinsic.Runtime.AssetModelSceneHandoff;
-import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EngineConfigControl;
@@ -58,7 +56,6 @@ import Extrinsic.Runtime.RenderExtractionService;
 import Extrinsic.Runtime.SelectionReadback;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
-import Extrinsic.Asset.EventBus;
 import Extrinsic.Asset.Service;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Scene.Registry;
@@ -407,16 +404,11 @@ namespace Extrinsic::Runtime
         std::unique_ptr<DerivedJobRegistry>     m_DerivedJobRegistry;
         // Asset service — CPU payload authority
         std::unique_ptr<Assets::AssetService>  m_AssetService;
-        // GPU-side asset cache — bridges AssetId to refcounted GPU resources.
-        // Constructed after the renderer; destroyed before the renderer so
-        // BufferLease/TextureLease destructors run while their managers are
-        // still alive.
-        std::unique_ptr<Graphics::GpuAssetCache> m_GpuAssetCache;
+        // RUNTIME-164 — GPU-side asset residency owner state. Engine keeps
+        // lifecycle/frame ordering and public facades; the service owns the
+        // cache, asset-event listener, model handoffs, and cache/handoff ticks.
+        AssetResidencyService                    m_AssetResidencyService{};
         ObjectSpaceNormalBakeService             m_ObjectSpaceNormalBakeService{};
-        Assets::AssetEventBus::ListenerToken     m_GpuAssetCacheListener{
-            Assets::AssetEventBus::InvalidToken};
-        std::unique_ptr<AssetModelTextureHandoff> m_AssetModelTextureHandoff;
-        std::unique_ptr<AssetModelSceneHandoff>   m_AssetModelSceneHandoff;
         std::unique_ptr<AssetImportPipeline>      m_AssetImportPipeline;
         std::unique_ptr<SceneDocument>            m_SceneDocument;
         RuntimeInputActionRegistry            m_InputActions{};

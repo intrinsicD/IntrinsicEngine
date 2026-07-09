@@ -251,6 +251,90 @@ TEST(RuntimeEngineLayering, ObjectSpaceNormalBakeServiceKeepsGpuQueueComposition
               std::string::npos);
 }
 
+TEST(RuntimeEngineLayering, AssetResidencyServiceKeepsGpuCacheAndModelHandoffsOutOfEngine)
+{
+    const auto engineInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+    const auto engineImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto frameLoop =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.cppm");
+    const auto serviceInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.AssetResidencyService.cppm");
+    const auto serviceImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.AssetResidencyService.cpp");
+
+    EXPECT_NE(engineInterface.find("import Extrinsic.Runtime.AssetResidencyService"),
+              std::string::npos);
+    EXPECT_NE(engineInterface.find("AssetResidencyService                    m_AssetResidencyService"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AssetResidencyService.InitializeGpuCache("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AssetResidencyService.InitializeSceneHandoffs("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AssetResidencyService.CachePtr()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AssetResidencyService.ModelTextureHandoff()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AssetResidencyService.ModelSceneHandoff()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AssetResidencyService.Cache()"),
+              std::string::npos);
+    EXPECT_NE(frameLoop.find("AssetResidency.TickAssets(AssetService"),
+              std::string::npos);
+
+    EXPECT_EQ(engineInterface.find("import Extrinsic.Runtime.AssetModelSceneHandoff"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("import Extrinsic.Runtime.AssetModelTextureHandoff"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("import Extrinsic.Asset.EventBus"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_GpuAssetCache"), std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_GpuAssetCacheListener"), std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_AssetModelTextureHandoff"), std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_AssetModelSceneHandoff"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("import Extrinsic.Runtime.AssetModelSceneHandoff"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("import Extrinsic.Runtime.AssetModelTextureHandoff"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("import Extrinsic.Asset.EventBus"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("std::make_unique<Graphics::GpuAssetCache>"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("std::make_unique<AssetModelTextureHandoff>"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("std::make_unique<AssetModelSceneHandoff>"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("SubscribeAll("), std::string::npos);
+    EXPECT_EQ(engineImpl.find("NotifyFailed(id)"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("InitializeRuntimeGpuAssetFallbackTexture("),
+              std::string::npos);
+    EXPECT_EQ(frameLoop.find("AssetModelSceneHandoff*"), std::string::npos);
+
+    EXPECT_NE(serviceInterface.find("export module Extrinsic.Runtime.AssetResidencyService"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("std::unique_ptr<Graphics::GpuAssetCache> m_GpuAssetCache"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("m_GpuAssetCacheListener"), std::string::npos);
+    EXPECT_NE(serviceInterface.find("std::unique_ptr<AssetModelTextureHandoff> m_AssetModelTextureHandoff"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("std::unique_ptr<AssetModelSceneHandoff> m_AssetModelSceneHandoff"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("std::make_unique<Graphics::GpuAssetCache>"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("InitializeRuntimeGpuAssetFallbackTexture(*m_GpuAssetCache"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("assets.SubscribeAll("), std::string::npos);
+    EXPECT_NE(serviceImpl.find("cache->NotifyFailed(id)"), std::string::npos);
+    EXPECT_NE(serviceImpl.find("std::make_unique<AssetModelTextureHandoff>"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("std::make_unique<AssetModelSceneHandoff>"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("ResolvePendingMaterialTextureBindings()"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("assets->UnsubscribeAll(m_GpuAssetCacheListener)"),
+              std::string::npos);
+}
+
 TEST(RuntimeEngineLayering, GizmoFrameServiceKeepsInteractionStateOutOfEngine)
 {
     const auto engineInterface =
@@ -525,12 +609,16 @@ TEST(RuntimeEngineLayering, DeviceBootstrapKeepsBackendAndFallbackPolicyOutOfEng
         ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
     const auto bootstrap =
         ReadFile(RepoRoot() / "src/runtime/Runtime.DeviceBootstrap.cpp");
+    const auto residency =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.AssetResidencyService.cpp");
 
     EXPECT_NE(engineImpl.find("import Extrinsic.Runtime.DeviceBootstrap"),
               std::string::npos);
     EXPECT_NE(engineImpl.find("CreateRuntimeDevice(m_Config.Render)"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("InitializeRuntimeGpuAssetFallbackTexture("),
+    EXPECT_EQ(engineImpl.find("InitializeRuntimeGpuAssetFallbackTexture("),
+              std::string::npos);
+    EXPECT_NE(residency.find("InitializeRuntimeGpuAssetFallbackTexture("),
               std::string::npos);
 
     EXPECT_EQ(engineInterface.find("RuntimeDeviceSelection"), std::string::npos);

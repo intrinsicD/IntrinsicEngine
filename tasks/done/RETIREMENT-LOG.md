@@ -9,6 +9,21 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`RUNTIME-164`](RUNTIME-164-extract-asset-residency-service.md) —
+Extract asset residency service out of Engine — retired on 2026-07-09 at
+maturity `Operational`. `Extrinsic.Runtime.AssetResidencyService` now owns
+`Graphics::GpuAssetCache`, the cache's `AssetEventBus` listener token,
+`AssetModelTextureHandoff`, `AssetModelSceneHandoff`, fallback bootstrap
+delegation, pending material-binding re-resolution, and asset-residency teardown
+ordering. `Runtime.Engine` keeps lifecycle/frame ordering, dependent subsystem
+wiring, and public `GetAssetService()` / `GetGpuAssetCache()` compatibility
+facades while no longer storing the raw cache/listener/model-handoff members or
+constructing/resetting those objects directly. Focused runtime asset/import,
+render-extraction, object-space normal bake, and Engine-layering coverage passed
+93/93, `IntrinsicTests` built, and the default CPU-supported gate passed
+3646/3646.
+
+Active
 [`RUNTIME-163`](RUNTIME-163-extract-render-extraction-service.md) —
 Extract render extraction service out of Engine — retired on 2026-07-09 at
 maturity `Operational`. `Extrinsic.Runtime.RenderExtractionService` now owns

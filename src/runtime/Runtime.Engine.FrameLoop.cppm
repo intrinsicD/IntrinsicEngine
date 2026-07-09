@@ -31,7 +31,7 @@ import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.TransferQueue;
-import Extrinsic.Runtime.AssetModelSceneHandoff;
+import Extrinsic.Runtime.AssetResidencyService;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EcsSystemBundle;
@@ -325,21 +325,18 @@ namespace Extrinsic::Runtime
     struct AssetHooks final : Core::IAssetFrameHooks
     {
         Assets::AssetService&     AssetService;
-        Graphics::GpuAssetCache*  GpuAssetCache;
-        AssetModelSceneHandoff*   ModelSceneHandoff;
+        AssetResidencyService&    AssetResidency;
         RHI::IDevice&             Device;
         RenderExtractionCache&    Extraction;
         Graphics::IRenderer&      Renderer;
 
         AssetHooks(Assets::AssetService& assetService,
-                   Graphics::GpuAssetCache* gpuAssetCache,
-                   AssetModelSceneHandoff* modelSceneHandoff,
+                   AssetResidencyService& assetResidency,
                    RHI::IDevice& device,
                    RenderExtractionCache& extraction,
                    Graphics::IRenderer& renderer)
             : AssetService(assetService)
-            , GpuAssetCache(gpuAssetCache)
-            , ModelSceneHandoff(modelSceneHandoff)
+            , AssetResidency(assetResidency)
             , Device(device)
             , Extraction(extraction)
             , Renderer(renderer)
@@ -348,22 +345,9 @@ namespace Extrinsic::Runtime
 
         void TickAssets() override
         {
-            // Asset service main-thread tick: advances state machines, fires
-            // AssetEventBus::Ready / Reloaded / Destroyed callbacks. The
-            // cache subscribed in Engine::Initialize observes those events
-            // synchronously during this Tick.
-            AssetService.Tick();
             const std::uint64_t currentFrame = Device.GetGlobalFrameNumber();
             const std::uint32_t framesInFlight = Device.GetFramesInFlight();
-            if (GpuAssetCache)
-            {
-                GpuAssetCache->Tick(currentFrame, framesInFlight);
-            }
-            if (ModelSceneHandoff)
-            {
-                static_cast<void>(
-                    ModelSceneHandoff->ResolvePendingMaterialTextureBindings());
-            }
+            AssetResidency.TickAssets(AssetService, currentFrame, framesInFlight);
             // GRAPHICS-030C: drive the procedural geometry cache's
             // deferred-retire window with the same CPU frame counter and
             // framesInFlight the asset cache uses. Final FreeGeometry calls

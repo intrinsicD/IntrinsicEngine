@@ -188,7 +188,7 @@ record ([`docs/adr/0024-kernel-module-architecture.md`](../../docs/adr/0024-kern
 seeded the seams-first migration set `ARCH-007`..`ARCH-012`; that set is now
 retired. It created the registration/communication seams (command bus, event
 bus, JobService, WorldRegistry, RuntimeModule contract) that the
-`Runtime.Engine` decomposition set (`RUNTIME-146`..`163`) and the module
+`Runtime.Engine` decomposition set (`RUNTIME-146`..`164`) and the module
 extractions (`ARCH-006`, `UI-034`) land onto. `ARCH-012` closed the
 `Operational` proof by composing `ClusteringModule` through the full command →
 job → event → commit path while keeping `KMeans*` out of
@@ -206,7 +206,8 @@ extraction, `RUNTIME-155` as the runtime input-action registry extraction, and
 as the ImGui editor bridge extraction, and `RUNTIME-160` as the
 JobService GPU-queue bridge extraction, `RUNTIME-161` as the object-space
 normal bake service extraction, `RUNTIME-162` as the gizmo frame service
-extraction, and `RUNTIME-163` as the render-extraction service extraction.
+extraction, `RUNTIME-163` as the render-extraction service extraction, and
+`RUNTIME-164` as the asset-residency service extraction.
 `RUNTIME-129` still owns the production Vulkan provider work.
 Provider resolution, population state, camera-seed caching, reference-scene
 teardown policy, input-action descriptor/state/dispatch policy, and
@@ -220,7 +221,9 @@ participant registration, diagnostics access, shutdown dependency clearing,
 transform-gizmo frame state, selected-entity scratch, gizmo/selection pointer
 interlock, and transform-gizmo packet production now live outside
 `Runtime.Engine.cpp`; render-extraction cache/pool/stats/frame-index ownership
-now lives behind `Extrinsic.Runtime.RenderExtractionService`.
+now lives behind `Extrinsic.Runtime.RenderExtractionService`, and GPU asset
+cache/model-handoff residency ownership now lives behind
+`Extrinsic.Runtime.AssetResidencyService`.
 Sequencing note: tasks whose deliverable ADR-0024 supersedes are
 front-matter gated on their seam dependencies — `RUNTIME-150` on
 `ARCH-007`/`ARCH-008`, `RUNTIME-151` additionally on `ARCH-011`, `ARCH-006`

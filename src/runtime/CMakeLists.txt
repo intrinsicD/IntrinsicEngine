@@ -9,6 +9,7 @@ target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Runtime.AsyncBufferReadback.cppm
+        Runtime.AssetResidencyService.cppm
         Runtime.AssetImportPipeline.cppm
         Runtime.AssetGeometryIO.cppm
         Runtime.AssetIngestStateMachine.cppm
@@ -90,6 +91,7 @@ target_sources(${target_name}
         Visualization/Runtime.VisualizationAdapters.cppm
         PRIVATE
         Runtime.AsyncBufferReadback.cpp
+        Runtime.AssetResidencyService.cpp
         Runtime.AssetImportPipeline.cpp
         Runtime.AssetGeometryIO.cpp
         Runtime.AssetIngestStateMachine.cpp
