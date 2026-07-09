@@ -6,12 +6,14 @@ depends_on: []
 # CI-003 — Make CI gate latency observable and cancel stale runs
 
 ## Status
-- In progress on branch `copilot/ci-003-gate-observability`.
-- Owner/agent: GitHub Copilot CLI.
-- Current slice: Slices A, B, and C complete; retirement is next.
-- Next verification step:
-  run the strict task/docs checks and retire the task with Slice C's commit
-  reference.
+- Completed on 2026-07-09 at `CPUContracted`.
+- Commit: `f168f15d` (result contract), `78c4b152` (workflow instrumentation
+  and cancellation), and `fbc3ae9d` (historical aggregate baseline).
+- No `Operational` follow-up is owed: this process task's endpoint is
+  repository-validated workflow policy. Post-publication timing artifacts are
+  measurements consumed by `CI-004..009`, not missing implementation.
+- Remote publication remains environment-blocked until the GitHub OAuth token
+  has `workflow` scope; the completed commits remain local meanwhile.
 
 ## Goal
 - Publish comparable, machine-readable configure/build/test/total timing for
@@ -126,7 +128,7 @@ depends_on: []
       document.
 - [x] Update the CI workflow documentation with stale-run cancellation
       semantics.
-- [ ] Regenerate `tasks/SESSION-BRIEF.md` when retiring this task.
+- [x] Regenerate `tasks/SESSION-BRIEF.md` when retiring this task.
 
 ## Acceptance criteria
 - [x] Every compile-heavy required gate publishes machine-readable phase

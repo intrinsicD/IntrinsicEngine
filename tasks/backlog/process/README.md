@@ -15,8 +15,6 @@ map.
 
 ## Tasks
 
-- [CI-003 — Make CI gate latency observable and cancel stale runs](../../active/CI-003-ci-gate-timing-observability-and-cancellation.md)
-  (currently active).
 - [CI-004 — Build only the test executables selected by each gate](CI-004-label-derived-test-build-aggregates.md)
 - [CI-005 — Make PR-fast a real touched-scope feedback gate](CI-005-real-touched-scope-pr-fast-gate.md)
 - [CI-006 — Remove duplicate sanitizer work and calibrate test parallelism](CI-006-sanitizer-topology-and-test-parallelism.md)
@@ -41,7 +39,7 @@ retirement log.
 ## Convergence
 
 - These tasks anchor **Theme H — Agentic workflow hardening**.
-- CI latency order: `CI-003` establishes telemetry/cancellation;
+- CI latency order: retired `CI-003` establishes telemetry/cancellation;
   `CI-004`, `CI-007`, and source-hotspot tasks may then proceed independently;
   `CI-005` consumes `CI-004`; `CI-006` consumes the unsanitized fast-preset
   decision from `CI-005`; `CI-008` consumes the aggregate metadata from
@@ -82,6 +80,10 @@ task-specific policy into `docs/agent/prompt/prompt.md`.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [CI-003 — Make CI gate latency observable and cancel stale runs](../../done/CI-003-ci-gate-timing-observability-and-cancellation.md)
+  (done 2026-07-09): added the stable per-run timing profile, instrumented and
+  cancellation-scoped every compile-heavy workflow, and published the
+  API-verified five-sample-per-gate aggregate baseline.
 - [PROC-001 - Skill mirror sync generator and CI gate](../../done/PROC-001-skill-mirror-sync-generator-and-ci-gate.md) (done 2026-06-09).
 - [PROC-002 - Task ID uniqueness validation and allocation rule](../../done/PROC-002-task-id-uniqueness-and-allocation-rule.md) (done 2026-06-09).
 - [PROC-003 - Split task index state from retirement history](../../done/PROC-003-split-task-index-state-from-retirement-history.md) (done 2026-06-09).

@@ -11,11 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`CI-003`](CI-003-ci-gate-timing-observability-and-cancellation.md) —
-  CI gate timing observability and stale-run cancellation. Slice A defines the
-  stable benchmark/result contract and aggregation regressions; Slice B wires
-  compile-heavy workflows and concurrency; Slice C backfills the claim-grade
-  historical baseline.
+No tasks are currently active.
 
 ## History
 

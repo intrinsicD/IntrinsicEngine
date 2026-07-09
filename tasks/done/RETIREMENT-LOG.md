@@ -8,6 +8,21 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`CI-003`](CI-003-ci-gate-timing-observability-and-cancellation.md) — CI gate
+latency observability and stale-run cancellation retired on 2026-07-09 at
+`CPUContracted`. The stable
+`ci.gate-latency.github-ubuntu-24.04.v1` profile now emits canonical
+configure/build/test/total timing and contextual diagnostics from every
+compile-heavy workflow; PR-scoped concurrency cancels only superseded runs.
+The distinct manifest-backed aggregate baseline preserves the same five
+pull-request commits across six gate populations, with all 30 jobs and 25 runs
+verified against the authenticated GitHub API. Cold compile median/p95 evidence,
+warm-vcpkg state, selected test counts, raw run/job IDs, compile hotspots, and
+the invalid pre-BUG-064 Vulkan test-timing caveat are retained for
+`CI-004..009`. No build tree, object, or BMI cache was introduced. Remote
+publication remains blocked until the GitHub token has `workflow` scope; the
+completed local commits are `f168f15d`, `78c4b152`, and `fbc3ae9d`.
+
 [`BUG-063`](BUG-063-streaming-import-contract-tests-flaky-on-main.md) —
 streaming-import contract-test flake retired on 2026-07-09. The two streaming
 tests and the representative promoted-format test used the same external glTF
