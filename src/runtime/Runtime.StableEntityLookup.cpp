@@ -8,6 +8,7 @@ module;
 #include <vector>
 
 #include <entt/entity/registry.hpp>
+#include <entt/signal/sigh.hpp>
 
 module Extrinsic.Runtime.StableEntityLookup;
 
@@ -18,6 +19,126 @@ namespace Extrinsic::Runtime
     namespace
     {
         namespace Comp = Extrinsic::ECS::Components;
+    }
+
+    struct StableEntityLookupSceneBinding::Impl
+    {
+        StableEntityLookup* Lookup{};
+        Registry* Scene{};
+        entt::scoped_connection StableIdConstructConnection{};
+        entt::scoped_connection StableIdUpdateConnection{};
+        entt::scoped_connection StableIdDestroyConnection{};
+
+        ~Impl()
+        {
+            Disconnect();
+        }
+
+        void Connect(StableEntityLookup& lookup, Registry& registry)
+        {
+            Disconnect();
+
+            Lookup = &lookup;
+            Scene = &registry;
+
+            auto& raw = registry.Raw();
+            StableIdConstructConnection =
+                raw.on_construct<Comp::StableId>()
+                    .connect<&Impl::OnStableIdConstruct>(*this);
+            StableIdUpdateConnection =
+                raw.on_update<Comp::StableId>()
+                    .connect<&Impl::OnStableIdUpdate>(*this);
+            StableIdDestroyConnection =
+                raw.on_destroy<Comp::StableId>()
+                    .connect<&Impl::OnStableIdDestroy>(*this);
+        }
+
+        void Disconnect() noexcept
+        {
+            StableIdConstructConnection.release();
+            StableIdUpdateConnection.release();
+            StableIdDestroyConnection.release();
+            Lookup = nullptr;
+            Scene = nullptr;
+        }
+
+        [[nodiscard]] bool IsConnected() const noexcept
+        {
+            return Lookup != nullptr && Scene != nullptr;
+        }
+
+        void OnStableIdConstruct(entt::registry& registry, entt::entity entity)
+        {
+            if (Lookup == nullptr || Scene == nullptr || &registry != &Scene->Raw())
+                return;
+            (void)Lookup->Track(*Scene, entity);
+        }
+
+        void OnStableIdUpdate(entt::registry& registry, entt::entity entity)
+        {
+            if (Lookup == nullptr || Scene == nullptr || &registry != &Scene->Raw())
+                return;
+            (void)Lookup->Track(*Scene, entity);
+        }
+
+        void OnStableIdDestroy(entt::registry& registry, entt::entity entity)
+        {
+            if (Lookup == nullptr || Scene == nullptr || &registry != &Scene->Raw())
+                return;
+            Lookup->Forget(entity);
+        }
+    };
+
+    StableEntityLookupSceneBinding::StableEntityLookupSceneBinding()
+        : m_Impl(std::make_unique<Impl>())
+    {
+    }
+
+    StableEntityLookupSceneBinding::~StableEntityLookupSceneBinding()
+    {
+        Disconnect();
+    }
+
+    StableEntityLookupSceneBinding::StableEntityLookupSceneBinding(
+        StableEntityLookupSceneBinding&&) noexcept = default;
+
+    StableEntityLookupSceneBinding& StableEntityLookupSceneBinding::operator=(
+        StableEntityLookupSceneBinding&&) noexcept = default;
+
+    void StableEntityLookupSceneBinding::Connect(
+        StableEntityLookup& lookup,
+        Registry& registry)
+    {
+        m_Impl->Connect(lookup, registry);
+    }
+
+    void StableEntityLookupSceneBinding::Disconnect() noexcept
+    {
+        if (m_Impl == nullptr)
+            return;
+        m_Impl->Disconnect();
+    }
+
+    void StableEntityLookupSceneBinding::Rebuild(
+        StableEntityLookup& lookup,
+        Registry* registry)
+    {
+        Disconnect();
+        if (registry == nullptr)
+        {
+            lookup.Clear();
+            return;
+        }
+
+        Connect(lookup, *registry);
+        lookup.Rebuild(*registry);
+    }
+
+    bool StableEntityLookupSceneBinding::IsConnected() const noexcept
+    {
+        if (m_Impl == nullptr)
+            return false;
+        return m_Impl->IsConnected();
     }
 
     void StableEntityLookup::EraseWinner(StableId id, std::uint32_t renderId)

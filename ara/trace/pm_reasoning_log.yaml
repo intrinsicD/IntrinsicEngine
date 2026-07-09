@@ -667,3 +667,28 @@ entries:
       - "Routed the imported OBJ unlit-material diagnosis as a direct experiment because it produced a failing regression, a scoped runtime import fix, focused verification, Vulkan bake smoke evidence, and the full CPU gate."
       - "Did not stage a new claim: the material-driven direct mesh import behavior is now encoded in `Test.AssetImportFormatCoverage` and `Runtime.Engine.cpp`."
       - "Updated the open generated-normal thread to distinguish the verified GPU bake implementation from the still-CPU direct OBJ orchestration path."
+  - turn: "2026-07-09_001#1"
+    notes:
+      - "Routed the ADR-0024 seam and Runtime.Engine decomposition loop as a direct experiment because the turn produced code, task retirements, generated docs, and final CPU/structural verification."
+      - "Routed the stop point as a direct decision because RUNTIME-151 satisfied the user's explicit Engine cleanup goal and unrelated scheduler substrate tasks remain independent."
+      - "Did not stage a new claim; the clean Engine interface state is artifact-backed by `Runtime.Engine.cppm` scans, task retirement records, and passing verification."
+  - turn: "2026-07-09_001#2"
+    notes:
+      - "Routed the RUNTIME-129 Slice B participant work as a direct experiment because the turn produced code, task/docs updates, focused tests, full CPU gate evidence, and structural checks."
+      - "Routed the non-retirement as a direct decision because the task artifact explicitly preserves the remaining production Vulkan provider and gpu/vulkan smoke scope."
+      - "Did not stage a new claim; the CPUContracted stop state is artifact-backed by the open RUNTIME-129 task record and passing verification."
+  - turn: "2026-07-09_001#3"
+    notes:
+      - "Routed RUNTIME-154/RUNTIME-155 as one direct experiment because the turn produced code, tests, docs, task retirements, line-count evidence, focused tests, full CPU gate evidence, and structural checks."
+      - "Routed the stop point as a direct decision because both scoped Engine-cleanup tasks were retired and a further cleanup slice needs a fresh hotspot review/task contract."
+      - "Did not stage new architecture claims; ownership is artifact-backed by the retired task records, module inventory, source-contract tests, and passing verification."
+  - turn: "2026-07-09_001#4"
+    notes:
+      - "Routed RUNTIME-156 as a direct experiment because it produced code, tests, docs, task retirement, line-count evidence, focused runtime tests, full CPU gate evidence, and structural checks."
+      - "Routed the stop point as a direct decision because RUNTIME-156 completed the next scoped Engine cleanup slice and further cleanup needs a fresh hotspot review/task contract."
+      - "Did not stage new architecture claims; ownership is artifact-backed by the retired task record, module inventory, source-contract test, and passing verification."
+  - turn: "2026-07-09_001#5"
+    notes:
+      - "Routed RUNTIME-157..163 retirement and verification as direct journey facts because the turn produced task-state movement, code artifacts, and full-gate evidence."
+      - "Routed commit as a direct decision because the user explicitly requested committing the accumulated changes."
+      - "Staged O07 rather than opening a task because the asset-residency service was an AI-suggested next cleanup candidate, not a user-accepted scope."

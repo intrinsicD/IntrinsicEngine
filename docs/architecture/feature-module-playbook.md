@@ -88,6 +88,18 @@ minimum shape:
 - `Execute(...) -> std::expected<Result, Error>`
 - `EnqueueAsync(...)` for streaming/off-main-thread heavy work (if applicable)
 
+Runtime integration for a grown feature goes through
+`Extrinsic.Runtime.Module`: implement `IRuntimeModule`, register commands,
+events, jobs, worlds, services, fixed-step sim systems, and frame-phase hooks
+through `EngineSetup`, and add the module to the engine before
+`Engine::Initialize()`. Per ADR-0024 D13, module-facing setup/context surfaces
+must stay narrow capability surfaces and must not receive `Engine&`. Shared
+synchronous infrastructure should be provided in `OnRegister`, required or found
+from the two-phase `ServiceRegistry` in `OnResolve`, and shut down after the
+runtime shutdown announce event has pumped. Module sim systems declare
+wait/signal labels on `SimSystemDesc` so pass ordering is data-driven rather
+than dependent on `AddModule` order.
+
 This surface is not required for a one-caller, synchronous probe that still fits
 the floor. Add it when a second caller, a backend split, scheduled work,
 persisted config, command routing, UI control, or telemetry-backed diagnostics

@@ -54,6 +54,7 @@ import Extrinsic.Runtime.ProceduralGeometryPacker;
 import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SpatialDebugAdapters;
+import Extrinsic.Runtime.WorldHandle;
 export import Extrinsic.Runtime.VisualizationAdapters;
 
 export namespace Extrinsic::Runtime
@@ -87,6 +88,7 @@ export namespace Extrinsic::Runtime
 
     struct RuntimeRenderExtractionStats
     {
+        WorldHandle World{DefaultWorldHandle};
         std::uint32_t CandidateRenderableCount{0};
         std::uint32_t SubmittedTransformCount{0};
         std::uint32_t SubmittedVisualizationCount{0};
@@ -378,7 +380,8 @@ export namespace Extrinsic::Runtime
             Graphics::GpuAssetCache* gpuAssets = nullptr,
             const SelectionController* selection = nullptr,
             std::uint32_t runtimeSnapshotStorageSlot = 0u,
-            std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos = {});
+            std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos = {},
+            WorldHandle world = DefaultWorldHandle);
         // Scene replacement boundary: free scene-owned renderable sidecars,
         // collapse deferred retire queues, clear per-entity extraction settings
         // and bindings, and submit an empty snapshot. Adapter registrations stay

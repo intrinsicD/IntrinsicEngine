@@ -22,6 +22,13 @@ maturity_target: CPUContracted
 - Current state: `Runtime.SandboxEditorUi` enumerates a closed `SandboxEditorDomainWindowKind` (42 kinds) — adding a domain window means editing the central registry, and per-window update cost is not uniformly gated by visibility (retired `UI-031` moved model builds behind visibility for its windows; the async cache side is owned by `RUNTIME-138`).
 - Precedents to preserve: menu-first defaults (retired `UI-018`), the Properties-as-data-explorer information architecture (retired `UI-031`), input-capture leak regression coverage (retired `BUG-036`), and the property catalog (retired `UI-016`).
 - Clarification (nonblocking): plotting needs an ImPlot equivalent. Default chosen here: add the `implot` vcpkg port next to the existing `imgui` dependency. If a repo-local minimal histogram widget is preferred instead, only the widget-layer checkbox below changes.
+- ARCH-013 re-review (2026-07-08): Decision re-scoped onto ADR-0024 D11. The
+  `ARCH-012` gate held; the window contribution seam should be the planned
+  EditorUiModule/panel registry shape rather than another central enum, and
+  input capture should be a single frame snapshot consumed by runtime
+  viewport/picking code. Panels issue commands/events through runtime seams
+  and may consume module services, but must not own algorithm state or receive
+  `Engine&`.
 
 ## Required changes
 - [ ] Add a domain-window registration seam to `Runtime.SandboxEditorUi`: domains register `{menu path, window id, draw callback, open-state}` at composition time; the closed `SandboxEditorDomainWindowKind` enum becomes an implementation detail behind the seam (existing kinds keep working during migration).

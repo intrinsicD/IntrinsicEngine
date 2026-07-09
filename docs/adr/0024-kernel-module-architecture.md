@@ -3,10 +3,11 @@
 - **Status:** Accepted
 - **Date:** 2026-07-08
 - **Owners:** Runtime / Architecture
-- **Related tasks:** `ARCH-007`..`ARCH-012` (kernel seams + proving extraction),
-  `RUNTIME-146`..`RUNTIME-151` (Engine decomposition), `ARCH-006` (Sandbox
-  editor content), `UI-034` (editor window contribution), `RUNTIME-137`
-  (async GPU readback), `CORE-005`..`CORE-008` (task-system hardening)
+- **Related tasks:** `ARCH-007`..`ARCH-013` (kernel seams, proving extraction,
+  post-seam collision re-review), `RUNTIME-146`..`RUNTIME-151` (Engine
+  decomposition), `ARCH-006` (Sandbox editor content), `UI-034` (editor window
+  contribution), `RUNTIME-137` (async GPU readback / `JobService` `GpuQueue`),
+  `CORE-005`..`CORE-008` (task-system hardening)
 - **Related docs:** [ADR-0003](0003-ideal-runtime-architecture.md) (staged
   frame products; this ADR refines it), 
   [`docs/architecture/ground-up-redesign-vision.md`](../architecture/ground-up-redesign-vision.md),
@@ -142,7 +143,7 @@ Kernel: frame loop, CommandBus, EventBus, JobService + worker pool,
 WorldRegistry, FrameGraph seam, FrameRecipe activation + extension slots,
 input capture chain. Modules: clustering, texture baking, asset import
 pipeline, editor UI, world-switch policy, selection/gizmos — everything with a
-domain noun, including today's kernel residents `KMeans*`,
+domain noun, including then-current kernel residents `KMeans*`,
 `ObjectSpaceNormalBakeQueue`, `SelectionController`, `GizmoInteraction`.
 
 ### D10 — Rendering extensibility: closed core, extension slots
@@ -186,7 +187,8 @@ throughout: ① CommandBus (`ARCH-007`) ② EventBus wrapper (`ARCH-008`)
 ③ JobService (`ARCH-009`) ④ WorldRegistry (`ARCH-010`) ⑤ RuntimeModule
 contract + ServiceRegistry (`ARCH-011`) — all additive inside the current
 Engine — then ⑥ **ClusteringModule as the proving extraction** (`ARCH-012`,
-exercises every seam), ⑦ EditorUiModule (`ARCH-006`, `UI-034`), then
+retired 2026-07-08 after exercising every seam), ⑦ EditorUiModule (`ARCH-006`,
+`UI-034`), then
 `RUNTIME-146`..`151` as further extractions onto the same seams, ⑧ tick
 removal + experiment template. `CommandSequence` lands when its first real
 customer appears.
@@ -215,7 +217,9 @@ one place: `main()`.
 - Risks: hook-vocabulary proliferation (mitigated by D9 and keeping the
   `EngineSetup` surface small); extension-slot contract freezing before the
   two D10 validation items are checked (tracked in the slot-contract task).
-- Follow-up tasks: `ARCH-007`..`ARCH-012` seeded with this ADR.
+- Follow-up tasks: `ARCH-007`..`ARCH-012` seeded with this ADR and retired
+  through the first proving extraction; `ARCH-013` retired the post-seam
+  collision re-review.
 
 ## Open questions (parked deliberately, none blocks the seams)
 
@@ -252,11 +256,22 @@ one place: `main()`.
 
 ## Validation
 
-- Each seam task (`ARCH-007`..`ARCH-011`) closes `CPUContracted` with
+- Each seam task (`ARCH-007`..`ARCH-011`) closed `CPUContracted` with
   headless contract tests under the default CPU gate.
-- `ARCH-012` (ClusteringModule extraction) is the Operational proof: every
-  seam exercised end-to-end in Sandbox composition, `KMeans*` modules gone
-  from `src/runtime/` kernel surface.
+- `ARCH-012` (ClusteringModule extraction) closed the Operational proof:
+  Sandbox composes `Extrinsic.Runtime.ClusteringModule`, a `RunKMeans` command
+  snapshots active-world geometry into `JobService`, completion commits labels
+  through kernel event pump B, and `ClusterLabelsChanged` drives the standing
+  visualization refresh reaction. `Runtime.Engine.cppm` and
+  `Runtime.Engine.cpp` contain no `KMeans` or `Runtime.ClusteringModule`
+  imports/surface tokens; the remaining Vulkan queue move is owned by
+  `RUNTIME-137`.
+- `ARCH-013` (post-seam collision re-review) retired 2026-07-08: every
+  front-matter-gated row received a dated confirmation/re-scope note, every
+  audit-only row received an unchanged/re-scoped/re-gated decision, `RUNTIME-129`
+  was re-gated on `RUNTIME-137` for the `JobService` `GpuQueue` substrate, and
+  the backlog sweep found no additional task prescribing rejected ADR-0024
+  mechanisms without a recorded decision.
 - The layering gate (`tools/repo/check_layering.py --root src --strict`) and
   module inventory regeneration verify the import-surface shrinkage claim as
   extractions land.

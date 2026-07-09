@@ -4,6 +4,7 @@ module;
 
 export module Extrinsic.Runtime.SandboxDefaultPolicies;
 
+import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.Engine;
 
 export namespace Extrinsic::Runtime

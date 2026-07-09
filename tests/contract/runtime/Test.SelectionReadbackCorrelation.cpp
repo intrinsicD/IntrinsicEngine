@@ -22,11 +22,15 @@ import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.SelectionSystem;
+import Extrinsic.Graphics.RenderFrameInput;
+import Extrinsic.Platform.Window;
+import Extrinsic.Runtime.SelectionReadback;
 import Extrinsic.Runtime.SelectionController;
 
 using Extrinsic::ECS::EntityHandle;
 using Extrinsic::ECS::Scene::Registry;
 using Extrinsic::Runtime::SelectionController;
+using Extrinsic::Runtime::SelectionReadbackState;
 
 namespace Sel = Extrinsic::ECS::Components::Selection;
 namespace G = Extrinsic::Graphics;
@@ -67,29 +71,66 @@ namespace
         });
     }
 
-    // Mirror Engine::RunFrame's maintenance-phase drain: drain every completed
-    // readback FIFO and resolve each by its Sequence (falling back to oldest
-    // for an uncorrelated, Sequence==0, result).
-    void DrainReadbacks(G::SelectionSystem& system, SelectionController& controller, Registry& registry)
+    void DrainReadbacks(SelectionReadbackState& readbacks,
+                        G::SelectionSystem& system,
+                        SelectionController& controller,
+                        Registry& registry)
     {
-        while (const std::optional<G::PickReadbackResult> result = system.PopPickResult())
-        {
-            if (result->Sequence != 0u)
-            {
-                if (result->Hit)
-                    controller.ConsumeHit(registry, result->StableEntityId, result->Sequence);
-                else
-                    controller.ConsumeNoHit(registry, result->Sequence);
-            }
-            else
-            {
-                if (result->Hit)
-                    controller.ConsumeHit(registry, result->StableEntityId);
-                else
-                    controller.ConsumeNoHit(registry);
-            }
-        }
+        readbacks.DrainCompletedReadbacksForFrame(system, controller, registry);
     }
+}
+
+TEST(SelectionReadbackBridge, PendingDrainRequestsRendererPickAndTracksSequence)
+{
+    SelectionController controller;
+    G::SelectionSystem system;
+    SelectionReadbackState readbacks;
+    system.Initialize();
+
+    controller.RequestClickPick(3u, 4u);
+    ASSERT_TRUE(controller.HasPendingPick());
+
+    G::RenderFrameInput input{};
+    readbacks.DrainPendingPickForFrame(controller,
+                                       system,
+                                       Extrinsic::Platform::Extent2D{.Width = 64, .Height = 32},
+                                       input);
+
+    EXPECT_FALSE(controller.HasPendingPick());
+    EXPECT_EQ(controller.InFlightPickCount(), 1u);
+    EXPECT_TRUE(input.HasPendingPick);
+    EXPECT_EQ(input.Pick.X, 3u);
+    EXPECT_EQ(input.Pick.Y, 4u);
+    EXPECT_TRUE(input.Pick.Pending);
+    EXPECT_NE(input.Pick.Sequence, 0u);
+
+    ASSERT_TRUE(system.HasPendingPick());
+    const std::optional<G::PickRequest> request = system.ConsumePick();
+    ASSERT_TRUE(request.has_value());
+    EXPECT_EQ(request->PixelX, 3u);
+    EXPECT_EQ(request->PixelY, 4u);
+
+    system.Shutdown();
+}
+
+TEST(SelectionReadbackBridge, BackgroundReadbackAndClearBumpRefinedPrimitiveGeneration)
+{
+    Registry registry;
+    SelectionController controller;
+    G::SelectionSystem system;
+    SelectionReadbackState readbacks;
+    system.Initialize();
+
+    system.PublishNoHit();
+    readbacks.DrainCompletedReadbacksForFrame(system, controller, registry);
+    EXPECT_FALSE(readbacks.LastRefinedPrimitive().has_value());
+    EXPECT_EQ(readbacks.LastRefinedPrimitiveGeneration(), 1u);
+
+    readbacks.ClearRefinedPrimitiveCache();
+    EXPECT_FALSE(readbacks.LastRefinedPrimitive().has_value());
+    EXPECT_EQ(readbacks.LastRefinedPrimitiveGeneration(), 2u);
+
+    system.Shutdown();
 }
 
 // Two picks in flight (a click then a hover); the renderer publishes their
@@ -100,6 +141,7 @@ TEST(SelectionReadbackCorrelation, OutOfOrderReadbacksApplyToCorrectRequestBySeq
     Registry            registry;
     SelectionController controller;
     G::SelectionSystem  system;
+    SelectionReadbackState readbacks;
     system.Initialize();
 
     const EntityHandle clickTarget = MakeSelectable(registry);
@@ -123,7 +165,7 @@ TEST(SelectionReadbackCorrelation, OutOfOrderReadbacksApplyToCorrectRequestBySeq
     PublishHit(system, hoverTarget, hoverPick->Sequence);
     PublishHit(system, clickTarget, clickPick->Sequence);
 
-    DrainReadbacks(system, controller, registry);
+    DrainReadbacks(readbacks, system, controller, registry);
 
     // The click request selected its target; the hover request hovered its own.
     EXPECT_TRUE(controller.IsSelected(clickTarget));
@@ -150,6 +192,7 @@ TEST(SelectionReadbackCorrelation, MissingOldestReadbackDoesNotMisapplyNewerBySe
     Registry            registry;
     SelectionController controller;
     G::SelectionSystem  system;
+    SelectionReadbackState readbacks;
     system.Initialize();
 
     const EntityHandle hoverTarget = MakeSelectable(registry);
@@ -169,7 +212,7 @@ TEST(SelectionReadbackCorrelation, MissingOldestReadbackDoesNotMisapplyNewerBySe
     // Only the click readback is published; the hover slot was recycled and its
     // result lost.
     PublishHit(system, clickTarget, clickPick->Sequence);
-    DrainReadbacks(system, controller, registry);
+    DrainReadbacks(readbacks, system, controller, registry);
 
     // The click selected its own target (click semantics), not the hover target.
     EXPECT_TRUE(controller.IsSelected(clickTarget));

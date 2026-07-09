@@ -32,28 +32,46 @@ Opened from the 2026-07-03 main-loop/task-graph/render-graph review
 
 Opened from the 2026-07-08 kernel/module architecture decision record
 ([`docs/adr/0024-kernel-module-architecture.md`](../../../docs/adr/0024-kernel-module-architecture.md));
-seams-first migration order, `ARCH-012` is the Operational proving
-extraction:
+the seams-first migration order and post-seam collision sweep are retired
+through `ARCH-013`.
 
-- [`ARCH-007`](ARCH-007-kernel-command-bus-single-drain-point.md) — kernel
-  command bus with a single pre-sim drain point (plain-data payloads,
-  correlation IDs, fail-closed handlers).
-- [`ARCH-008`](ARCH-008-kernel-event-bus-queued-only.md) — queued-only
-  kernel event bus (two pump points, worker inbox, no `trigger`).
-- [`ARCH-009`](ARCH-009-kernel-jobservice-snapshot-in-result-out.md) —
-  kernel JobService for multi-frame background jobs
-  (snapshot-in/result-out, world-scoped cancellation).
-- [`ARCH-010`](ARCH-010-kernel-worldregistry-deferred-world-ops.md) —
-  kernel WorldRegistry with deferred, two-phase world operations.
-- [`ARCH-011`](ARCH-011-runtimemodule-contract-service-registry.md) —
-  `IRuntimeModule` contract, `EngineSetup`, and two-phase ServiceRegistry.
-- [`ARCH-012`](ARCH-012-clusteringmodule-proving-extraction.md) —
-  ClusteringModule proving extraction onto the kernel seams (closes the
-  seams' `Operational` gate).
-- [`ARCH-013`](ARCH-013-post-seam-collision-rereview.md) — post-seam
-  re-review of backlog tasks colliding with ADR-0024 (blocked on
-  `ARCH-012` by design; re-gates/re-scopes/retires the collision
-  inventory after the seam set completes).
+Retired seam tasks:
+
+- [`ARCH-007`](../../done/ARCH-007-kernel-command-bus-single-drain-point.md) —
+  kernel command bus with a single pre-sim drain point (plain-data payloads,
+  correlation IDs, fail-closed handlers), retired 2026-07-08 at
+  `CPUContracted`; `ARCH-012` closed its `Operational` proof.
+- [`ARCH-008`](../../done/ARCH-008-kernel-event-bus-queued-only.md) —
+  queued-only kernel event bus with two pump points, worker-safe publish, and
+  next-pump cascade deferral, retired 2026-07-08 at `CPUContracted`;
+  `ARCH-012` closed its `Operational` proof.
+- [`ARCH-009`](../../done/ARCH-009-kernel-jobservice-snapshot-in-result-out.md) —
+  kernel JobService for snapshot-in/result-out multi-frame background jobs,
+  world-scoped cancellation, main-thread completion publication, and
+  maintenance reaping, retired 2026-07-08 at `CPUContracted`; `GpuQueue`
+  execution remains deferred to `RUNTIME-137`, and `ARCH-012` closed its
+  `Operational` proof.
+- [`ARCH-010`](../../done/ARCH-010-kernel-worldregistry-deferred-world-ops.md) —
+  kernel WorldRegistry with boot world #0, deferred active-world changes,
+  two-phase world destruction, scoped job cancellation, and explicit extraction
+  world handles, retired 2026-07-08 at `CPUContracted`; preview/switch policy
+  remains out of scope, and `ARCH-012` closed its `Operational` proof.
+- [`ARCH-011`](../../done/ARCH-011-runtimemodule-contract-service-registry.md) —
+  `IRuntimeModule`, `EngineSetup`, two-phase ServiceRegistry, module sim-system
+  registration, and frame-phase hooks, retired 2026-07-08 at `CPUContracted`;
+  `ARCH-012` closed its `Operational` proof.
+- [`ARCH-012`](../../done/ARCH-012-clusteringmodule-proving-extraction.md) —
+  ClusteringModule proving extraction onto the kernel seams, retired
+  2026-07-08 at `Operational`; Sandbox composes the module through
+  `RunKMeans` command → `JobService` snapshot → completion event →
+  main-thread label commit → `ClusterLabelsChanged` visualization reaction.
+  `Runtime.Engine.cppm`/`.cpp` no longer import or name `KMeans*`; the remaining
+  Vulkan queue move is owned by `RUNTIME-137`.
+- [`ARCH-013`](../../done/ARCH-013-post-seam-collision-rereview.md) —
+  post-seam collision re-review, retired 2026-07-08 as task-governance work:
+  every inventory row carries a dated decision, `RUNTIME-129` is re-gated on
+  `RUNTIME-137`, and no open backlog task now prescribes rejected ADR-0024
+  mechanisms without a recorded justification.
 
 ## Retired Legacy Program
 

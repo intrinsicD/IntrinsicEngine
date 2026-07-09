@@ -65,3 +65,14 @@ observations:
     promoted_to: "logic/solution/constraints.md:K02"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O07
+    timestamp: "2026-07-09T06:43"
+    provenance: ai-suggested
+    content: "Remaining `Runtime.Engine` asset/GPU handoff wiring is a candidate cleanup slice: `GpuAssetCache` construction/listener ownership plus `AssetModelTextureHandoff` and `AssetModelSceneHandoff` setup, maintenance, and teardown could move behind an Engine-owned asset-residency service while preserving public `GetAssetService()` and `GetGpuAssetCache()` facades."
+    context: "Post-RUNTIME-163 hotspot scan before the user asked for a commit; the agent identified this as a possible next scoped task but did not open or implement it."
+    potential_type: architecture
+    bound_to: [N176, N177]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false

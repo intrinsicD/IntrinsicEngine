@@ -19,6 +19,7 @@ import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.EngineConfigBoot;
 
 namespace
 {

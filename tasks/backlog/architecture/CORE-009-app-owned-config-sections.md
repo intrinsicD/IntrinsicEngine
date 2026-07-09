@@ -38,6 +38,12 @@ depends_on: []
   same PR (docs-sync policy).
 - Origin: `docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`
   finding R3.
+- ARCH-013 re-review (2026-07-08): Decision re-scoped onto the module/app
+  composition seams. App-owned config sections should be registered by the
+  owning app/module through composition (`EngineSetup`/`ServiceRegistry` or a
+  narrow config-section registry), not enumerated in core config or in
+  `Runtime.Engine`. Coordinate with `ARCH-006` when Poisson UI/content moves
+  to `app/Sandbox`.
 
 ## Control surfaces
 - Config: generic `app`/`sections` lane in the engine config document;

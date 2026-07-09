@@ -2,8 +2,11 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <algorithm>
+#include <deque>
 #include <string>
 #include <utility>
+#include <vector>
 
 module Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 
@@ -48,6 +51,15 @@ namespace Extrinsic::Runtime
                 .Status = status,
                 .Diagnostic = std::move(diagnostic),
             };
+        }
+
+        [[nodiscard]] bool SubmissionMatches(
+            const RuntimeObjectSpaceNormalBakeSubmission& submission,
+            const RuntimeObjectSpaceNormalBakeStaleKey& key) noexcept
+        {
+            return RuntimeObjectSpaceNormalBakeStaleKeyMatches(
+                submission.StaleKey,
+                key);
         }
     }
 
@@ -174,6 +186,7 @@ namespace Extrinsic::Runtime
         };
 
         m_LatestByEntity[request.SourceKey.EntityKey] = submission.StaleKey;
+        m_PendingSubmissions.push_back(submission);
         ++m_Diagnostics.QueuedRequests;
 
         return RuntimeObjectSpaceNormalBakeResult{
@@ -212,6 +225,12 @@ namespace Extrinsic::Runtime
             .StaleKey = completion,
         };
         m_LatestByEntity.erase(latest);
+        std::erase_if(
+            m_PendingSubmissions,
+            [&completion](const RuntimeObjectSpaceNormalBakeSubmission& pending)
+            {
+                return SubmissionMatches(pending, completion);
+            });
         ++m_Diagnostics.ReadyCompletions;
 
         return RuntimeObjectSpaceNormalBakeResult{
@@ -219,6 +238,55 @@ namespace Extrinsic::Runtime
             .Submission = submission,
             .Diagnostic = "object-space normal bake ready for material binding",
         };
+    }
+
+    bool RuntimeObjectSpaceNormalBakeQueue::IsLatest(
+        const RuntimeObjectSpaceNormalBakeStaleKey& key) const noexcept
+    {
+        const std::uint64_t entity = key.Bake.Source.EntityKey;
+        if (entity == 0u)
+            return false;
+
+        const auto latest = m_LatestByEntity.find(entity);
+        return latest != m_LatestByEntity.end() &&
+               RuntimeObjectSpaceNormalBakeStaleKeyMatches(latest->second, key);
+    }
+
+    std::size_t
+    RuntimeObjectSpaceNormalBakeQueue::PendingSubmissionCount() const noexcept
+    {
+        return m_PendingSubmissions.size();
+    }
+
+    std::vector<RuntimeObjectSpaceNormalBakeSubmission>
+    RuntimeObjectSpaceNormalBakeQueue::TakePendingSubmissions(
+        const std::size_t maxCount)
+    {
+        const std::size_t count = maxCount == 0u
+            ? m_PendingSubmissions.size()
+            : std::min(maxCount, m_PendingSubmissions.size());
+        std::vector<RuntimeObjectSpaceNormalBakeSubmission> out{};
+        out.reserve(count);
+        for (std::size_t index = 0u; index < count; ++index)
+        {
+            out.push_back(std::move(m_PendingSubmissions.front()));
+            m_PendingSubmissions.pop_front();
+        }
+        return out;
+    }
+
+    void RuntimeObjectSpaceNormalBakeQueue::RequeuePendingSubmission(
+        RuntimeObjectSpaceNormalBakeSubmission submission)
+    {
+        if (!IsLatest(submission.StaleKey))
+            return;
+        m_PendingSubmissions.push_back(std::move(submission));
+    }
+
+    void RuntimeObjectSpaceNormalBakeQueue::ClearPending()
+    {
+        m_LatestByEntity.clear();
+        m_PendingSubmissions.clear();
     }
 
     const RuntimeObjectSpaceNormalBakeQueueDiagnostics&
@@ -241,6 +309,7 @@ namespace Extrinsic::Runtime
     {
         m_ContentKeyAssets.clear();
         m_LatestByEntity.clear();
+        m_PendingSubmissions.clear();
         m_Diagnostics = {};
     }
 }

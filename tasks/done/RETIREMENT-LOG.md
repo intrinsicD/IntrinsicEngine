@@ -9,6 +9,159 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`RUNTIME-163`](RUNTIME-163-extract-render-extraction-service.md) —
+Extract render extraction service out of Engine — retired on 2026-07-09 at
+maturity `Operational`. `Extrinsic.Runtime.RenderExtractionService` now owns
+the live `RenderExtractionCache`, configured `RenderWorldPool`, last extraction
+stats, and frame-index counter. `Runtime.Engine` keeps render-frame phase
+ordering, dependent subsystem wiring, and public compatibility facades while no
+longer storing the raw cache/pool/stats/counter or calling render-extraction
+facade helpers directly. Focused render-extraction, render-world pool, runtime
+sandbox, and Engine-layering coverage passed, `IntrinsicTests` built, and the
+default CPU-supported gate passed 3646/3646.
+
+Active
+[`RUNTIME-162`](RUNTIME-162-extract-gizmo-frame-service.md) —
+Extract gizmo frame service out of Engine — retired on 2026-07-09 at maturity
+`Operational`. `Extrinsic.Runtime.GizmoFrameService` now owns live
+transform-gizmo interaction state, undo storage, selected-entity scratch,
+gizmo/selection pointer interlock, and transform-gizmo packet building.
+`Runtime.Engine` keeps frame phase ordering plus `GetGizmoInteraction()` and
+`GetGizmoUndoStack()` as public compatibility facades while no longer importing
+`GizmoInteraction`, storing the raw gizmo state, or calling the frame-loop gizmo
+helper/packet builder directly. Focused gizmo, runtime sandbox, and
+Engine-layering coverage passed, `IntrinsicTests` built, and the default
+CPU-supported gate passed 3646/3646.
+
+Active
+[`RUNTIME-161`](RUNTIME-161-extract-object-space-normal-bake-service.md) —
+Extract object-space normal bake service out of Engine — retired on 2026-07-09
+at maturity `Operational`. `Extrinsic.Runtime.ObjectSpaceNormalBakeService`
+now owns object-space normal bake GPU-queue lifetime, dependency setup,
+ready-frame callback construction, JobService participant registration,
+diagnostics access, pending-count access, and dependency clearing.
+`Runtime.Engine` keeps lifecycle ordering and queue handoff to import,
+scene-document, direct-mesh, and selected-mesh callers while no longer storing
+`RuntimeObjectSpaceNormalBakeGpuQueue`, constructing its dependencies, or
+registering its JobService participant directly. Focused object-space-normal,
+JobService, and Engine-layering coverage passed, `IntrinsicTests` built, and
+the default CPU-supported gate passed 3646/3646. `RUNTIME-129` remains the
+owner of production Vulkan plan-provider and `gpu;vulkan` smoke closure.
+
+Active
+[`RUNTIME-160`](RUNTIME-160-extract-jobservice-gpu-queue-bridge.md) —
+Extract JobService GPU queue bridge out of Engine — retired on 2026-07-09 at
+maturity `Operational`. `Extrinsic.Runtime.JobServiceGpuQueueBridge` now owns
+the renderer runtime-frame hook token, installs the JobService GPU-queue
+command-recording bridge, detaches the hook before participant teardown, and
+forwards the Engine-owned device-idle wait callback into participant shutdown.
+`Runtime.Engine` keeps renderer/device ownership, JobService ownership, and
+initialize/shutdown ordering while no longer storing a raw frame-hook handle or
+calling `RegisterRuntimeFrameCommandHook(...)`,
+`UnregisterRuntimeFrameCommandHook(...)`, or
+`JobService::RecordGpuQueueFrameCommands(...)` directly. Focused JobService,
+object-space normal bake, and Engine-layering coverage passed,
+`IntrinsicTests` built, and the default CPU-supported gate passed 3646/3646.
+
+Active
+[`RUNTIME-159`](RUNTIME-159-extract-imgui-editor-bridge.md) —
+Extract ImGui editor bridge out of Engine — retired on 2026-07-09 at maturity
+`Operational`. `Extrinsic.Runtime.ImGuiEditorBridge` now owns the runtime
+`ImGuiAdapter`, shared `Graphics::ImGuiOverlaySystem`, editor callback storage,
+renderer overlay attach/detach, adapter initialize/shutdown, per-frame
+Begin/End delegation, capture-state reads, and diagnostics access.
+`Runtime.Engine` keeps frame phase ordering plus `SetImGuiEditorCallback(...)`
+and `GetImGuiAdapter()` compatibility facades. Focused ImGui wiring,
+SandboxEditorUi, Engine-layering, and frame-pacing coverage passed,
+`IntrinsicTests` built, and the default CPU-supported gate passed 3646/3646.
+
+Active
+[`RUNTIME-158`](RUNTIME-158-extract-frame-pacing-diagnostics.md) —
+Extract frame pacing diagnostics out of Engine — retired on 2026-07-09 at
+maturity `Operational`. `Extrinsic.Runtime.FramePacingDiagnostics` now owns
+the exported `RuntimeFramePacingDiagnostics` record and pure ImGui adapter /
+render-graph counter mirroring helpers. `Runtime.Engine` keeps
+`Engine::GetLastFramePacingDiagnostics()` as the public compatibility facade
+and composes only phase timing writes plus helper delegation. Focused
+frame-pacing, sandbox acceptance, ImGui adapter wiring, and Engine-layering
+coverage passed, `IntrinsicTests` built, and the default CPU-supported gate
+passed 3646/3646.
+
+Active
+[`RUNTIME-157`](RUNTIME-157-extract-selection-readback-state.md) —
+Extract selection readback state out of Engine — retired on 2026-07-09 at
+maturity `Operational`. `Extrinsic.Runtime.SelectionReadback` now owns
+in-flight pick readback context retention, pending pick drain into
+`Graphics::SelectionSystem`, completed readback FIFO drain, sequence-correlated
+`SelectionController` hit/no-hit application, context-aware primitive
+refinement, and the editor-facing refined primitive cache/generation.
+`Runtime.Engine` keeps the public refined-primitive accessors as delegating
+facades and owns only the composition call sites; `Runtime.SceneDocument`
+clears the cache through the same state object during scene replacement.
+Focused selection/readback/refinement/layering coverage passed,
+`IntrinsicTests` built, and the default CPU-supported gate passed 3646/3646.
+
+Active
+[`RUNTIME-156`](RUNTIME-156-extract-runtime-module-schedule.md) —
+Extract runtime-module schedule out of Engine — retired on 2026-07-09 at
+maturity `Operational`. `Extrinsic.Runtime.ModuleSchedule` now owns
+runtime-module sim-system/frame-hook records, deterministic dependency
+ordering, frame-hook ordering, fixed-step `FrameGraph` pass insertion/context
+construction, and frame-hook dispatch. `Runtime.Engine` still owns module
+objects, built-in service provisioning, `OnRegister` / `OnResolve` sequencing,
+and shutdown calls while delegating schedule storage/finalization/dispatch.
+Focused runtime-module and Engine-layering coverage passed, `IntrinsicTests`
+built, and the default CPU-supported gate passed 3644/3644.
+
+Active
+[`RUNTIME-155`](RUNTIME-155-extract-runtime-input-action-registry.md) —
+Extract runtime input-action registry out of Engine — retired on 2026-07-09 at
+maturity `Operational`. `Extrinsic.Runtime.InputActions` now owns the
+input-action descriptor/service/context/handle API, handle allocation,
+registration state, key-edge trigger checks, ImGui keyboard-capture
+suppression, callback failure logging, and per-frame dispatch. `Runtime.Engine`
+re-exports the API for compatibility and keeps `RegisterInputAction(...)` /
+`UnregisterInputAction(...)` as delegating facades, while
+`Runtime.Engine.FrameLoop.cppm` no longer carries input-action trigger or
+dispatch helpers. Focused runtime input-action and Engine-layering coverage
+passed, and the default CPU-supported gate passed 3644/3644.
+
+Active
+[`RUNTIME-154`](RUNTIME-154-extract-reference-scene-control.md) — Extract
+reference-scene lifecycle control out of Engine — retired on 2026-07-09 at
+maturity `Operational`. `Extrinsic.Runtime.ReferenceSceneControl` now owns the
+reference-scene registry, provider registration/resolution, installed
+population state, camera-seed caching, and provider teardown. `Runtime.Engine`
+keeps `GetReferenceSceneRegistry()`, `IsReferenceSceneInstalled()`, and
+`GetReferenceCameraSeed()` as public delegating facades, while
+`Runtime.Engine.cpp` no longer names provider interfaces, default-provider
+registration, population storage, or provider populate/teardown calls. Focused
+reference-scene, Engine-layering, and runtime sandbox acceptance coverage
+passed, and the default CPU-supported gate passed 3644/3644.
+
+Active
+[`RUNTIME-153`](RUNTIME-153-extract-mesh-primitive-view-controls.md) — Extract
+mesh primitive-view controls out of Engine — retired on 2026-07-09 at maturity
+`Operational`. `Extrinsic.Runtime.MeshPrimitiveViewControls` now owns the
+legacy `MeshPrimitiveViewSettings` compatibility translation to authoritative
+ECS `RenderEdges` / `RenderPoints` components. `Runtime.Engine` keeps only the
+public compatibility facade and extraction-cache invalidation call, and no
+longer imports render-geometry component policy or names the render component
+types directly. Focused mesh primitive-view, scene lifecycle, and Engine-
+layering coverage passed, and the default CPU-supported gate passed 3644/3644.
+
+Active
+[`RUNTIME-152`](RUNTIME-152-extract-runtime-device-bootstrap.md) — Extract
+runtime device bootstrap out of Engine — retired on 2026-07-09 at maturity
+`Operational`. `Extrinsic.Runtime.DeviceBootstrap` now owns runtime
+device-selection policy, backend factory dispatch, Vulkan-requested breadcrumb
+policy, and GPU asset fallback-texture descriptor construction. `Runtime.Engine`
+keeps the concrete composition responsibilities that need live platform/window
+state: creating the platform window, initializing the selected `RHI::IDevice`,
+recording startup diagnostics, and wiring renderer-facing services. Focused
+device-selection, Vulkan breadcrumb, and Engine-layering coverage passed.
+
+Active
 [`PROC-014`](PROC-014-task-state-index-done-link-cleanup.md) — Task-state
 index done-link cleanup — retired on 2026-07-07 at maturity `Retired`. The
 rendering and runtime backlog indexes now cite recently retired tasks from
@@ -3648,3 +3801,230 @@ and async-compute queue-family-local secondary command buffers under validation
 smokes, and benchmark smoke parity is recorded without claiming a performance
 win. Transfer render-graph scheduling remains out of scope because no
 production transfer pass is enabled.
+
+[`ARCH-007`](ARCH-007-kernel-command-bus-single-drain-point.md) — Kernel
+command bus with a single pre-sim drain point retired to `tasks/done/` on
+2026-07-08 at `CPUContracted`. Runtime now owns a domain-free
+`Extrinsic.Runtime.CommandBus` with plain-data payloads, correlation IDs,
+thread-safe enqueue from any phase/thread, fail-closed missing-handler
+diagnostics, a post-success inverse/history hook seam, and a built-in
+`QuitRequested` command. `Engine::RunFrame()` drains the bus exactly once
+between platform input and fixed-step simulation, and `Engine::Shutdown()`
+discards pending commands so teardown/reset cannot replay stale work. Headless
+contract tests prove enqueue ordering, cross-thread enqueue, payload copying,
+handler failures, missing handlers, follow-up deferral, history inverse
+re-enqueue, and pending discard. `ARCH-012` later closed the `Operational`
+proof through a real module flow.
+
+[`ARCH-008`](ARCH-008-kernel-event-bus-queued-only.md) — Queued-only kernel
+event bus retired to `tasks/done/` on 2026-07-08 at `CPUContracted`. Runtime
+now owns `Extrinsic.Runtime.KernelEvents`, a domain-free queued event bus with
+typed subscriptions, removable handles, worker-safe publish into an inbox,
+main-thread-only `Pump()`, and stats for published, delivered, and listener
+invocation counts. `Engine::RunFrame()` pumps exactly twice per frame: once
+after the command-bus drain and once after fixed-step simulation. Publishes
+made by listeners are bounded to the next pump, not recursively dispatched in
+the current batch. Six runtime contract tests cover next-pump delivery,
+cascade deferral, cross-thread publish under the sanitizer-enabled `ci` preset,
+unsubscribe behavior, unsubscribe-during-pump safety, and the two engine pump
+positions. `ARCH-012` later closed the `Operational` proof through a real
+module flow.
+
+[`ARCH-009`](ARCH-009-kernel-jobservice-snapshot-in-result-out.md) — Kernel
+JobService for snapshot-in/result-out multi-frame background jobs retired to
+`tasks/done/` on 2026-07-08 at `CPUContracted`. Runtime now owns
+`Extrinsic.Runtime.JobService` plus the small
+`Extrinsic.Runtime.WorldHandle` token module; `Engine` exposes `Jobs()`, drains
+finished results through a main-thread completion gate before event pump B, and
+reaps terminal records in Maintenance. Worker functions receive only a
+`JobCancellation` view and return a result envelope, so they never receive ECS
+scenes, component references, live world references, or event-bus access.
+Seven runtime contract tests cover pool-thread execution, pump-B publication,
+cancel-before-start, mid-flight cooperative cancellation, post-finish gate
+suppression, world-scoped cancellation, and terminal reaping under the
+sanitizer-enabled `ci` preset. `GpuQueue` execution remains deferred to
+`RUNTIME-137`, and `ARCH-012` later closed the `Operational` proof through a
+real module flow.
+
+[`ARCH-010`](ARCH-010-kernel-worldregistry-deferred-world-ops.md) — Kernel
+WorldRegistry with deferred, two-phase world operations retired to
+`tasks/done/` on 2026-07-08 at `CPUContracted`. Runtime now owns
+`Extrinsic.Runtime.WorldRegistry`; `Engine` boots `DefaultWorldHandle` world #0
+through it, exposes `Worlds()`/`ActiveWorld()`, and keeps `GetScene()` as the
+active-world compatibility accessor while module extractions adopt explicit
+handles. Active-world changes and destroys are request-only and apply at the
+end-of-frame Maintenance boundary. Destroy publishes `WorldWillBeDestroyed`,
+cancels jobs scoped to that world, and tears the inactive registry down on a
+later Maintenance pass. Render extraction now accepts an explicit
+`WorldHandle` and mirrors it in extraction stats. Five runtime contract tests
+cover create/get, deferred active switch with `ActiveWorldChanged`, two-phase
+destroy plus scoped job cancellation, active-world destroy rejection, and
+frame-0 Engine boot/switch behavior under the sanitizer-enabled `ci` preset.
+Preview/readiness/switch UX remains out of scope, and `ARCH-012` later closed
+the `Operational` proof through a real module flow.
+
+[`ARCH-011`](ARCH-011-runtimemodule-contract-service-registry.md) —
+RuntimeModule contract, EngineSetup, and two-phase ServiceRegistry retired to
+`tasks/done/` on 2026-07-08 at `CPUContracted`. Runtime now owns
+`Extrinsic.Runtime.Module` and `Extrinsic.Runtime.ServiceRegistry`; `Engine`
+exposes `AddModule(...)`, `EmplaceModule<T>(...)`, and `Services()`, provides
+the built-in kernel services during module registration, runs every
+`OnRegister` before every `OnResolve`, and locks the registry after fail-closed
+boot validation. Module-facing contexts expose commands, events, jobs, worlds,
+services, fixed-step sim systems, and frame-phase hooks without exposing
+`Engine&`. Module sim systems carry declared wait/signal labels so pass order is
+data-driven and independent of `AddModule` order. Three runtime module contract
+tests and two ServiceRegistry tests cover two-phase service resolution,
+fail-closed missing requirements, deterministic registration-order behavior,
+fixed-step dependency ordering, frame hooks, command/event/job/world service
+access, and shutdown announce observation under the sanitizer-enabled `ci`
+preset. `ARCH-012` later closed the `Operational` proof through a real
+`ClusteringModule` flow.
+
+[`ARCH-012`](ARCH-012-clusteringmodule-proving-extraction.md) —
+ClusteringModule proving extraction retired to `tasks/done/` on 2026-07-08 at
+`Operational`. Runtime now owns `Extrinsic.Runtime.ClusteringModule` under
+`src/runtime/Modules/Clustering/`, with `RunKMeans`, `KMeansRunCompleted`,
+`ClusterLabelsChanged`, `ClusteringService`, and `ClusteringModule`. Sandbox
+composition registers the module from app startup, not from `Engine`: the editor
+submits a `RunKMeans` command, the module snapshots active-world mesh/graph/point
+cloud positions, submits a world-scoped CPU reference job through `JobService`,
+publishes completion at the main-thread job gate, commits labels during kernel
+event pump B, and publishes `ClusterLabelsChanged` so the standing visualization
+reaction marks vertex attributes dirty. Headless contract tests cover
+end-to-end `Engine::Run()` label commits/change events, active-world switch
+stale-result suppression, and fail-closed missing-module command drain behavior;
+the focused K-Means/editor/backend filter, runtime seam CTest subset, full
+`IntrinsicTests` build, default CPU-supported CTest gate, and strict layering
+gate all passed. `Runtime.Engine.cppm` and `Runtime.Engine.cpp` contain no
+`KMeans` or `Runtime.ClusteringModule` tokens. The explicit Vulkan
+`KMeansGpuJobQueue` participant path intentionally remains in runtime/editor
+ownership until `RUNTIME-137` moves GPU dispatch onto the kernel GPU-job target.
+
+[`ARCH-013`](ARCH-013-post-seam-collision-rereview.md) — Post-seam collision
+re-review retired to `tasks/done/` on 2026-07-08 as task-governance work. Every
+front-matter-gated row (`RUNTIME-150`, `RUNTIME-151`, `ARCH-006`, `UI-034`,
+`RUNTIME-137`, `RUNTIME-138`) and every audit row (`RUNTIME-129`,
+`RUNTIME-146..149`, `CORE-005`/`006`/`007`/`008`/`009`, `GRAPHICS-105`,
+`PLATFORM-004`) now carries a dated `ARCH-013 re-review` note with an
+unchanged/re-scoped/re-gated decision. `RUNTIME-129` was re-gated on
+`RUNTIME-137`; `RUNTIME-137` is now explicitly the `JobService` `GpuQueue` and
+async-readback substrate, and the remaining K-Means GPU participant migration is
+owned there. The backlog sweep found no additional open task prescribing
+ADR-0024-rejected mechanisms without a recorded justification, and ADR-0024 plus
+the backlog/category READMEs now summarize the result.
+
+[`RUNTIME-146`](RUNTIME-146-extract-engine-config-boot-module.md) — Engine
+config boot extraction retired to `tasks/done/` on 2026-07-08 at `Operational`.
+Runtime now owns `Extrinsic.Runtime.EngineConfigBoot`, a free-standing module
+exporting `CreateReferenceEngineConfig()`, `EngineConfigBootSource`,
+`EngineConfigBootOptions`, `EngineConfigBootResult`, and
+`ResolveEngineConfigForBoot(...)` without importing the full `Engine`
+interface. Sandbox startup and runtime config-control tests import the module
+directly, while `Runtime.Engine.cppm` and `Runtime.Engine.cpp` contain no
+boot-helper declarations or definitions. Focused runtime config-boot/control
+tests passed 11/11, `IntrinsicRuntimeContractTests` and `IntrinsicTests` built,
+the full default CPU-supported CTest gate passed 3636/3636, strict layering and
+test-layout checks passed, and the module inventory was regenerated.
+
+[`RUNTIME-147`](RUNTIME-147-extract-asset-import-pipeline-subsystem.md) —
+Asset-import pipeline extraction retired to `tasks/done/` on 2026-07-08 at
+`Operational`. Runtime now owns `Extrinsic.Runtime.AssetImportPipeline`, an
+engine-owned subsystem carrying the import/reimport/queue/cancel facade, ingest
+state records, import event log, post-import processor / import-authoring-policy
+/ import-completed registries, decode/materialize helpers, queue
+snapshot/cancel/clear state, and import dirty-state marking through
+`EditorCommandHistory`. `Runtime.Engine.cppm` now exposes only
+`Engine::GetAssetImportPipeline()` for this surface, and `Runtime.Engine.cpp`
+keeps only platform drop delegation plus lifecycle wiring for the pipeline.
+Sandbox default policies, Sandbox editor UI, and runtime import tests call the
+pipeline directly. Focused runtime import/editor tests passed 31/31,
+`IntrinsicRuntimeContractTests` and `IntrinsicTests` built, the full default
+CPU-supported CTest gate passed 3638/3638, strict layering, test-layout,
+task-policy, docs-link, docs-sync, and diff-whitespace checks passed, and the
+module inventory was regenerated.
+
+[`RUNTIME-149`](RUNTIME-149-extract-engine-config-control-subsystem.md) —
+Render-recipe and hot-config control extraction retired to `tasks/done/` on
+2026-07-08 at `Operational`. Runtime now owns
+`Extrinsic.Runtime.EngineConfigControl`, an engine-owned subsystem carrying
+render-recipe preview/apply/clear, startup recipe activation, engine-config
+hot-subset preview/apply, boot-only rejection diagnostics, active control state,
+and the moved helper routines. `Runtime.Engine.cppm` now exposes only
+`Engine::GetConfigControl()` for this surface, and `Runtime.Engine.cpp` keeps
+only lifecycle dependency wiring plus startup default-recipe delegation through
+the subsystem. Sandbox editor UI and runtime config-control/render-recipe tests
+call the subsystem directly. Focused runtime config-control/render-recipe tests
+passed 9/9, `IntrinsicRuntimeContractTests` and `IntrinsicTests` built, the
+full default CPU-supported CTest gate passed 3638/3638, strict layering,
+test-layout, task-policy, docs-link, docs-sync, and diff-whitespace checks
+passed, and the module inventory was regenerated.
+
+[`RUNTIME-148`](RUNTIME-148-extract-scene-document-subsystem.md) —
+Scene-document facade extraction retired to `tasks/done/` on 2026-07-08 at
+`Operational`. Runtime now owns `Extrinsic.Runtime.SceneDocument`, an
+engine-owned subsystem carrying direct and queued scene save/load, new/close
+document behavior, the scene-file event log, serializable-scene snapshot
+helpers, and the scene replacement cleanup/rebuild ordering. `Runtime.Engine.cppm`
+now exposes only `Engine::GetSceneDocument()` for this surface, and
+`Runtime.Engine.cpp` keeps only lifecycle dependency wiring plus the active-world
+maintenance call into `SceneDocument::ClearSceneRuntimeState()`. Sandbox editor
+UI and runtime scene lifecycle/stable-lookup tests call the document subsystem
+directly. Focused runtime scene/editor tests passed 6/6,
+`IntrinsicRuntimeContractTests` and `IntrinsicTests` built, the full default
+CPU-supported CTest gate passed 3638/3638, strict layering, test-layout,
+task-policy, docs-link, docs-sync, and diff-whitespace checks passed, and the
+module inventory was regenerated.
+
+[`RUNTIME-150`](RUNTIME-150-split-engine-frame-loop-implementation-unit.md) —
+Frame-loop partition split retired to `tasks/done/` on 2026-07-08 at
+`Operational`. Runtime now owns the private
+`Extrinsic.Runtime.Engine:FrameLoop` partition carrying `Core.FrameLoop` hook
+adapters and `RunFrame()`-only per-frame helpers for platform polling,
+operational transitions, render prep/execution, transfer/streaming/assets,
+selection readback, gizmo and viewport input, fixed-step simulation, camera
+population, and runtime input-action dispatch. `Runtime.Engine.cpp` imports the
+partition, `Engine::RunFrame()` remains on `Engine`, the partition exports no
+declarations, and no frame phase/order/control-surface behavior changed.
+`Runtime.Engine.cpp` no longer defines the moved hook adapters or listed
+per-frame helper routines, and the module inventory was regenerated to 367
+modules. Focused runtime frame-loop/selection/gizmo/input/render-world-pool
+tests, `IntrinsicRuntimeContractTests`, `IntrinsicTests`, the full default
+CPU-supported CTest gate, strict layering, test-layout, task-policy,
+docs-link, docs-sync, root-hygiene warning-mode, and diff-whitespace checks
+passed.
+
+[`RUNTIME-151`](RUNTIME-151-slim-engine-interface-and-remove-entt-leak.md) —
+Engine-interface slimming retired to `tasks/done/` on 2026-07-08 at
+`Operational`. Runtime now owns `StableEntityLookupSceneBinding` in
+`Extrinsic.Runtime.StableEntityLookup`; the binding owns the StableId
+construct/update/destroy signal connections and preserves the same incremental
+`Track`/`Forget` behavior plus whole-scene rebuild behavior on scene
+replacement. `SceneDocument` calls the binding for disconnect/connect/rebuild,
+and `Engine` holds the binding without declaring EnTT-scoped connections or
+callbacks in `Runtime.Engine.cppm`. The direct task audit moved
+`Runtime.Engine.cppm` from 733 lines / 50 imports / 2 EnTT includes to 721
+lines / 46 imports / 0 EnTT tokens. Focused StableEntityLookup, selection
+snapshot, and runtime scene-lifecycle tests passed, `IntrinsicRuntimeContractTests`
+and `IntrinsicTests` built, the full default CPU-supported CTest gate passed
+3638/3638, strict structural/docs/diff checks passed, and the module inventory
+was regenerated.
+
+[`RUNTIME-137`](RUNTIME-137-async-gpu-readback-helper-for-compute-backends.md) —
+Async GPU readback helper and JobService `GpuQueue` substrate retired to
+`tasks/done/` on 2026-07-09 at `Operational`. Runtime now owns
+`Extrinsic.Runtime.AsyncBufferReadback`, a pooled `Graphics.GpuTransfer`
+readback wrapper that records the `ShaderWrite -> TransferRead` drain and lets
+compute backends poll/collect without `IDevice::ReadBuffer` or per-drain host
+allocation. `JobService` now owns the `GpuQueue` participant registry; Engine
+installs one renderer frame-command bridge, drains GPU queue transfer/readback
+completions during Maintenance, and shuts participants down through JobService
+after unregistering the bridge and waiting for device idle when required.
+`SandboxEditorUi` registers `RuntimeKMeansGpuJobQueue` through
+`engine.Jobs().RegisterGpuQueueParticipant(...)`, so `Runtime.Engine.cppm` no
+longer exposes `RuntimeGpuJobParticipant*` types or registration functions.
+Focused runtime GTest passed 33/33, `RuntimeEngineLayering.*` passed 11/11,
+focused CTest passed 169/169, `IntrinsicTests` built, the full default
+CPU-supported CTest gate passed 3640/3640, the opt-in `gpu;vulkan` readback /
+KMeans smoke selection passed 5/5, and the module inventory/session brief were
+regenerated.

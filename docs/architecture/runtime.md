@@ -28,10 +28,10 @@ the boot source and passes the resulting value-type `EngineConfig` into
 `Engine`.
 
 Live agent/CLI configuration uses the runtime-owned
-[`runtime config control`](runtime-config-control.md) facade on `Engine`.
-That facade previews render recipes and engine config documents without ImGui,
-activates recipes through the same renderer override path used by startup and
-the Sandbox Editor, and hot-applies only the current
+[`runtime config control`](runtime-config-control.md) subsystem exposed through
+`Engine::GetConfigControl()`. That facade previews render recipes and engine
+config documents without ImGui, activates recipes through the same renderer
+override path used by startup and the Sandbox Editor, and hot-applies only the current
 `render.default_recipe_config_path` and `sandbox.progressive_poisson`
 engine-config subset. Other engine-config differences remain boot-only and are
 reported without mutating the live engine.
@@ -40,6 +40,27 @@ reported without mutating the live engine.
 cross-layer composition, while reusable phase contracts live in
 `Extrinsic.Core.FrameLoop` so `core` stays dependency-free.
 
+Runtime modules compose through `Engine::AddModule(...)` before
+`Engine::Initialize()`. Boot sorts modules by stable name, invokes every
+`IRuntimeModule::OnRegister(EngineSetup&)`, then invokes every
+`IRuntimeModule::OnResolve(EngineSetup&)` after the two-phase
+`ServiceRegistry` has all provided services. `EngineSetup` exposes only the
+kernel command, event, job, world, service, sim-system, and frame-hook seams; it
+does not expose `Engine&`. Module sim systems join the fixed-step `FrameGraph`
+with declared wait/signal labels so registration order does not decide pass
+order. Module shutdown runs after `RuntimeShutdownAnnounced` has been published
+and pumped.
+
+`Extrinsic.Runtime.ClusteringModule` is the first extracted domain module on
+this contract. Sandbox composes it from app startup, not from the kernel engine:
+the module provides `ClusteringService`, registers the `RunKMeans` command,
+copies active-world geometry into a `JobService` CPU snapshot, publishes a
+completion event at the main-thread job gate, commits labels during event pump B,
+and emits `ClusterLabelsChanged` as the standing visualization refresh reaction.
+`Runtime.Engine.cppm` and `Runtime.Engine.cpp` do not import or name the K-Means
+modules; direct Vulkan K-Means queue ownership remains with the existing Sandbox
+editor GPU participant path until the `RUNTIME-137` GPU-job target follow-up.
+
 The frame order is:
 
 1. poll platform events and handle minimized/resize skip paths;
@@ -47,20 +68,35 @@ The frame order is:
    pre-simulation mutation window per
    [ADR-0024](../adr/0024-kernel-module-architecture.md) D5; commands enqueue
    thread-safely from any phase and execute here in enqueue order, fail-closed
-   when no handler is registered (ARCH-007);
-3. fixed-step simulation and CPU `FrameGraph` execution;
-4. ImGui begin-frame, variable application tick, and ImGui end-frame;
-5. build `Graphics::RenderFrameInput`, update the active camera controller,
-   dispatch registered input actions, and drain one coalesced selection pick;
-6. execute the render-frame contract: begin frame, runtime render extraction,
+   when no handler is registered (ARCH-007), then run runtime-module
+   `AfterCommandDrain` hooks;
+3. pump the queued kernel event bus (`Engine::Events()`) post-command-drain;
+   command-published events become visible before simulation, and events
+   published by listeners defer to the next pump per
+   [ADR-0024](../adr/0024-kernel-module-architecture.md) D7 (ARCH-008);
+4. fixed-step simulation and CPU `FrameGraph` execution, with module-registered
+   sim systems appended beside the legacy application tick systems;
+5. drain `Engine::Jobs()` completions before pump B; `JobService` checks token
+   and world-scope cancellation on the main thread, drops suppressed results
+   whole, and publishes completion events only for survivors per
+   [ADR-0024](../adr/0024-kernel-module-architecture.md) D8 (ARCH-009);
+6. pump the queued kernel event bus post-simulation, before UI/extraction;
+7. ImGui begin-frame, variable application tick, runtime-module `UiBuild`
+   hooks, and ImGui end-frame;
+8. build `Graphics::RenderFrameInput`, update the active camera controller,
+   dispatch registered input actions, drain one coalesced selection pick, and
+   run runtime-module `BeforeExtraction` hooks;
+9. execute the render-frame contract: begin frame, runtime render extraction,
    renderer world extraction, prepare, execute, and end frame;
-7. present the completed frame;
-8. execute maintenance: transfer retirement, streaming drain/apply/submit/pump,
+10. present the completed frame;
+11. execute maintenance: transfer retirement, streaming drain/apply/submit/pump,
    asset-service tick, GPU asset cache tick, material texture re-resolution, and
-   render-extraction deferred-retire ticks;
-9. drain completed pick readbacks through the incrementally maintained
-   stable-entity lookup, release the consumed `RenderWorldPool` slot, and
-   finalize the frame clock.
+   render-extraction deferred-retire ticks, terminal `JobService` reaping, and
+   runtime-module `Maintenance` hooks;
+12. drain completed pick readbacks through the incrementally maintained
+   stable-entity lookup, release the consumed `RenderWorldPool` slot, apply
+   deferred `WorldRegistry` active/destroy operations, and finalize the frame
+   clock.
 
 The internal `RuntimeFrameContext` record carries the data that must survive
 between those phases: frame delta, fixed-step interpolation alpha, render frame
@@ -93,6 +129,29 @@ current direct-mesh generated-normal processor, import authoring defaults,
 focus-on-import handler, and auto-select behavior through
 `Extrinsic.Runtime.SandboxDefaultPolicies`; a bare `Engine` with no
 registrations still materializes geometry without those policies.
+
+Runtime uses two tiers for CPU work. The fixed-step `FrameGraph` is the
+per-frame ECS/system DAG: it runs inside the simulation phase and may read/write
+the live active world under the normal frame contract. `JobService` is the
+multi-frame background tier from ADR-0024 D8: callers submit immutable snapshots
+and a `WorldHandle` scope, workers receive only `JobCancellation`, and workers
+deposit opaque result envelopes back into the service. The service-owned
+main-thread completion gate runs after fixed-step simulation and before event
+pump B; it suppresses cancelled/world-scoped results before publishing any
+completion event. Commit handlers therefore run as kernel-event listeners at
+pump B, never on worker threads and never by holding live ECS references inside
+job work.
+
+Runtime world ownership is split between mechanism and policy per ADR-0024 D2.
+`WorldRegistry` is the kernel mechanism: it owns `ECS::Scene::Registry`
+instances behind opaque `WorldHandle`s, creates the boot world before frame 0,
+tracks exactly one active world, and applies active-world switches or destroy
+requests only at the Maintenance boundary. Destroy is two phase: Maintenance
+publishes `WorldWillBeDestroyed` and cancels jobs scoped to that world, the
+event pumps on a later frame, and only a later Maintenance pass tears the
+registry down. Higher-level preview/readiness/switch UX policy is deliberately
+not in the registry; later runtime modules compose those behaviors through the
+kernel events, jobs, and explicit world handles.
 
 ### Camera focus command
 
@@ -131,9 +190,10 @@ still live.
 ## Scene Replacement Lifecycle
 
 Scene load/new/close operations are runtime-owned lifecycle transitions.
-`Engine::LoadSceneFromPath(...)` deserializes into a temporary
-`ECS::Scene::Registry`; only a successful parse reaches the live scene. Before
-replacement, runtime drains scene-local sidecars through
+`Engine::GetSceneDocument().LoadSceneFromPath(...)` deserializes into a
+temporary `ECS::Scene::Registry`; only a successful parse reaches the live
+scene. Before replacement, `Extrinsic.Runtime.SceneDocument` drains
+scene-local sidecars through
 `RenderExtractionCache::ClearSceneState(...)`, clears selected/hovered/pending
 pick state through `SelectionController::ClearSceneState(...)`, disconnects the
 stable-entity component-event hooks, and resets the refined-primitive cache.

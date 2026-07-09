@@ -28,6 +28,7 @@ import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.TextureUpload;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.EngineConfigBoot;
 
 namespace
 {

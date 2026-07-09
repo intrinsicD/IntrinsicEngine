@@ -76,6 +76,12 @@ namespace Extrinsic::Runtime
 
     void CommandBus::Drain(ECS::Scene::Registry& activeWorld)
     {
+        Drain(activeWorld, CommandDrainServices{});
+    }
+
+    void CommandBus::Drain(ECS::Scene::Registry& activeWorld,
+                           CommandDrainServices services)
+    {
         if (m_Draining)
         {
             Core::Log::Error(
@@ -129,7 +135,14 @@ namespace Extrinsic::Runtime
             // mid-call is documented as unsupported).
             const HandlerRecord& record = handlerIt->second;
 
-            CommandContext context{activeWorld, *this, pending.Correlation};
+            CommandContext context{
+                .ActiveWorld = activeWorld,
+                .Commands = *this,
+                .Events = services.Events,
+                .Jobs = services.Jobs,
+                .Worlds = services.Worlds,
+                .Correlation = pending.Correlation,
+            };
             m_RecordedInverse = CommandEnvelope{};
 
             const CommandOutcome outcome =

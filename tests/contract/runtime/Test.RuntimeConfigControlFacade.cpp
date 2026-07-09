@@ -15,6 +15,8 @@ import Extrinsic.Graphics.CurrentRendererContractAdapter;
 import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.EngineConfigBoot;
+import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.SandboxEditorUi;
 
 namespace CoreConfig = Extrinsic::Core::Config;
@@ -115,31 +117,32 @@ TEST(RuntimeConfigControlFacade, AgentCliControlsRecipeAndEngineConfigWithoutUi)
 
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
     engine.Initialize();
+    Runtime::EngineConfigControl& configControl = engine.GetConfigControl();
 
     const Graphics::RenderRecipeConfigLoadResult preview =
-        engine.PreviewRenderRecipeConfigDocument(
+        configControl.PreviewRenderRecipeConfigDocument(
             RenderRecipeConfigDisablingPostprocess("runtime.agent.preview"),
             "agent-preview.json");
     ASSERT_TRUE(Graphics::IsConfigUsable(preview));
 
     const Runtime::RuntimeRenderRecipeApplyResult directApply =
-        engine.ApplyRenderRecipeConfigPreview(
+        configControl.ApplyRenderRecipeConfigPreview(
             preview,
             Runtime::RuntimeRenderRecipeActivationSource::AgentCli);
     ASSERT_TRUE(directApply.Succeeded());
-    EXPECT_EQ(engine.GetRenderRecipeState().ActiveSource,
+    EXPECT_EQ(configControl.GetRenderRecipeState().ActiveSource,
               Runtime::RuntimeRenderRecipeActivationSource::AgentCli);
 
     CoreConfig::EngineConfig candidate = engine.GetEngineConfig();
     candidate.Render.DefaultRecipeConfigPath = recipePath.string();
     const CoreConfig::EngineConfigLoadResult configPreview =
-        engine.PreviewEngineConfigControlDocument(
+        configControl.PreviewEngineConfigControlDocument(
             CoreConfig::SerializeEngineConfig(candidate),
             "agent-engine-config.json");
     ASSERT_TRUE(CoreConfig::IsConfigUsable(configPreview));
 
     const Runtime::RuntimeEngineConfigApplyResult configApply =
-        engine.ApplyEngineConfigHotSubset(
+        configControl.ApplyEngineConfigHotSubset(
             configPreview,
             Runtime::RuntimeConfigControlSource::AgentCli);
     ASSERT_TRUE(configApply.Succeeded());
@@ -152,7 +155,7 @@ TEST(RuntimeConfigControlFacade, AgentCliControlsRecipeAndEngineConfigWithoutUi)
               Runtime::RuntimeRenderRecipeActivationSource::AgentCli);
     EXPECT_EQ(engine.GetEngineConfig().Render.DefaultRecipeConfigPath,
               recipePath.string());
-    EXPECT_EQ(engine.GetEngineConfigControlState().ActiveConfig.Render
+    EXPECT_EQ(configControl.GetEngineConfigControlState().ActiveConfig.Render
                   .DefaultRecipeConfigPath,
               recipePath.string());
 
@@ -171,17 +174,18 @@ TEST(RuntimeConfigControlFacade, BootOnlyEngineConfigDifferencesAreRejected)
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
     engine.Initialize();
+    Runtime::EngineConfigControl& configControl = engine.GetConfigControl();
 
     CoreConfig::EngineConfig candidate = engine.GetEngineConfig();
     candidate.Window.Width += 1;
     const CoreConfig::EngineConfigLoadResult configPreview =
-        engine.PreviewEngineConfigControlDocument(
+        configControl.PreviewEngineConfigControlDocument(
             CoreConfig::SerializeEngineConfig(candidate),
             "agent-boot-only.json");
     ASSERT_TRUE(CoreConfig::IsConfigUsable(configPreview));
 
     const Runtime::RuntimeEngineConfigApplyResult configApply =
-        engine.ApplyEngineConfigHotSubset(
+        configControl.ApplyEngineConfigHotSubset(
             configPreview,
             Runtime::RuntimeConfigControlSource::AgentCli);
     EXPECT_FALSE(configApply.Succeeded());
@@ -198,6 +202,7 @@ TEST(RuntimeConfigControlFacade, SandboxProgressivePoissonConfigIsHotApplied)
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
     engine.Initialize();
+    Runtime::EngineConfigControl& configControl = engine.GetConfigControl();
 
     CoreConfig::EngineConfig candidate = engine.GetEngineConfig();
     candidate.Sandbox.ProgressivePoisson.Dimension = 2u;
@@ -222,13 +227,13 @@ TEST(RuntimeConfigControlFacade, SandboxProgressivePoissonConfigIsHotApplied)
     candidate.Sandbox.ProgressivePoisson.DebounceSeconds = 0.5;
 
     const CoreConfig::EngineConfigLoadResult configPreview =
-        engine.PreviewEngineConfigControlDocument(
+        configControl.PreviewEngineConfigControlDocument(
             CoreConfig::SerializeEngineConfig(candidate),
             "agent-progressive-poisson.json");
     ASSERT_TRUE(CoreConfig::IsConfigUsable(configPreview));
 
     const Runtime::RuntimeEngineConfigApplyResult configApply =
-        engine.ApplyEngineConfigHotSubset(
+        configControl.ApplyEngineConfigHotSubset(
             configPreview,
             Runtime::RuntimeConfigControlSource::AgentCli);
     ASSERT_TRUE(configApply.Succeeded());
@@ -260,7 +265,7 @@ TEST(RuntimeConfigControlFacade, SandboxProgressivePoissonConfigIsHotApplied)
     EXPECT_FALSE(active.MeshSurfaceInterpolateNormals);
     EXPECT_FALSE(active.AutoRunOnEdit);
     EXPECT_DOUBLE_EQ(active.DebounceSeconds, 0.5);
-    EXPECT_EQ(engine.GetEngineConfigControlState().ActiveConfig.Sandbox
+    EXPECT_EQ(configControl.GetEngineConfigControlState().ActiveConfig.Sandbox
                   .ProgressivePoisson.GridWidth,
               9u);
 
@@ -275,27 +280,28 @@ TEST(RuntimeConfigControlFacade, InvalidHotRecipeConfigPreservesActiveOverride)
 
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
     engine.Initialize();
+    Runtime::EngineConfigControl& configControl = engine.GetConfigControl();
 
     const Runtime::RuntimeRenderRecipeApplyResult baselineApply =
-        engine.ActivateRenderRecipeConfigDocument(
+        configControl.ActivateRenderRecipeConfigDocument(
             RenderRecipeConfigDisablingPostprocess("runtime.agent.baseline"),
             "baseline-preview.json",
             Runtime::RuntimeRenderRecipeActivationSource::AgentCli);
     ASSERT_TRUE(baselineApply.Succeeded());
-    ASSERT_TRUE(engine.GetRenderRecipeState().ActiveOverride.has_value());
-    EXPECT_EQ(engine.GetRenderRecipeState().ActiveConfig.Preview.Recipe.RecipeId,
+    ASSERT_TRUE(configControl.GetRenderRecipeState().ActiveOverride.has_value());
+    EXPECT_EQ(configControl.GetRenderRecipeState().ActiveConfig.Preview.Recipe.RecipeId,
               "runtime.agent.baseline");
 
     CoreConfig::EngineConfig candidate = engine.GetEngineConfig();
     candidate.Render.DefaultRecipeConfigPath = invalidPath.string();
     const CoreConfig::EngineConfigLoadResult configPreview =
-        engine.PreviewEngineConfigControlDocument(
+        configControl.PreviewEngineConfigControlDocument(
             CoreConfig::SerializeEngineConfig(candidate),
             "agent-invalid-hot-recipe.json");
     ASSERT_TRUE(CoreConfig::IsConfigUsable(configPreview));
 
     const Runtime::RuntimeEngineConfigApplyResult configApply =
-        engine.ApplyEngineConfigHotSubset(
+        configControl.ApplyEngineConfigHotSubset(
             configPreview,
             Runtime::RuntimeConfigControlSource::AgentCli);
     EXPECT_FALSE(configApply.Succeeded());
@@ -304,8 +310,8 @@ TEST(RuntimeConfigControlFacade, InvalidHotRecipeConfigPreservesActiveOverride)
     EXPECT_EQ(configApply.RecipeApply.Status,
               Runtime::RuntimeRenderRecipeApplyStatus::Rejected);
     EXPECT_EQ(engine.GetEngineConfig().Render.DefaultRecipeConfigPath, "");
-    ASSERT_TRUE(engine.GetRenderRecipeState().ActiveOverride.has_value());
-    EXPECT_EQ(engine.GetRenderRecipeState().ActiveConfig.Preview.Recipe.RecipeId,
+    ASSERT_TRUE(configControl.GetRenderRecipeState().ActiveOverride.has_value());
+    EXPECT_EQ(configControl.GetRenderRecipeState().ActiveConfig.Preview.Recipe.RecipeId,
               "runtime.agent.baseline");
 
     std::filesystem::remove(invalidPath);
@@ -316,29 +322,34 @@ TEST(RuntimeConfigControlFacade, EditorAndAgentPreviewUseSameFacadeResult)
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
     engine.Initialize();
+    Runtime::EngineConfigControl& configControl = engine.GetConfigControl();
 
     const std::string document =
         RenderRecipeConfigDisablingPostprocess("runtime.shared.config-control");
     const Graphics::RenderRecipeConfigLoadResult agentPreview =
-        engine.PreviewRenderRecipeConfigDocument(document, "shared-preview.json");
+        configControl.PreviewRenderRecipeConfigDocument(
+            document,
+            "shared-preview.json");
     ASSERT_TRUE(Graphics::IsConfigUsable(agentPreview));
 
     Graphics::RenderRecipeConfigContext recipeContext =
-        engine.CreateRenderRecipeConfigContext();
+        configControl.CreateRenderRecipeConfigContext();
     Runtime::SandboxEditorRenderRecipeEditorState editorState{};
     Runtime::SandboxEditorContext context{};
     context.RenderRecipeContext = &recipeContext;
     context.RenderRecipeEditorState = &editorState;
-    context.RenderRecipeRuntimeState = &engine.GetRenderRecipeState();
+    context.RenderRecipeRuntimeState = &configControl.GetRenderRecipeState();
     context.PreviewRenderRecipeDocument =
-        [&engine](const std::string& draft, const std::string& sourceId)
+        [&configControl](const std::string& draft, const std::string& sourceId)
         {
-            return engine.PreviewRenderRecipeConfigDocument(draft, sourceId);
+            return configControl.PreviewRenderRecipeConfigDocument(
+                draft,
+                sourceId);
         };
     context.ApplyRenderRecipePreview =
-        [&engine](const Graphics::RenderRecipeConfigLoadResult& loadResult)
+        [&configControl](const Graphics::RenderRecipeConfigLoadResult& loadResult)
         {
-            return engine.ApplyRenderRecipeConfigPreview(
+            return configControl.ApplyRenderRecipeConfigPreview(
                 loadResult,
                 Runtime::RuntimeRenderRecipeActivationSource::Editor);
         };
@@ -366,9 +377,9 @@ TEST(RuntimeConfigControlFacade, EditorAndAgentPreviewUseSameFacadeResult)
             .Kind = Runtime::SandboxEditorRenderRecipeCommandKind::ActivatePreview,
         });
     ASSERT_TRUE(editorResult.Succeeded());
-    EXPECT_EQ(engine.GetRenderRecipeState().ActiveSource,
+    EXPECT_EQ(configControl.GetRenderRecipeState().ActiveSource,
               Runtime::RuntimeRenderRecipeActivationSource::Editor);
-    EXPECT_EQ(engine.GetRenderRecipeState().ActiveConfig.Preview.Recipe.RecipeId,
+    EXPECT_EQ(configControl.GetRenderRecipeState().ActiveConfig.Preview.Recipe.RecipeId,
               agentPreview.Preview.Recipe.RecipeId);
 
     engine.Shutdown();

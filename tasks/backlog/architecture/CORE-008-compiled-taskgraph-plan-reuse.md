@@ -34,6 +34,10 @@ depends_on: []
   `CanUsePlan()` notion, but `Reset()` discards everything each tick.
 - Origin: `docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`
   finding R16 (CPU half), scheduler finding 7.
+- ARCH-013 re-review (2026-07-08): Decision unchanged. Plan reuse remains a
+  core DAG optimization; the runtime adoption point must respect the retired
+  `RunFrame()` seam and avoid adding new command drains, event pumps, or
+  module-owned scheduling paths.
 
 ## Required changes
 - [ ] Split "clear execution state" from "clear structure": a reset flavor

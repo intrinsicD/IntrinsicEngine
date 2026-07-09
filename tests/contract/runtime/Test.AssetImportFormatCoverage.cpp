@@ -40,6 +40,7 @@ import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.VisualizationSyncSystem;
+import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.CameraControllers;
@@ -188,7 +189,7 @@ namespace
         void OnVariableTick(Runtime::Engine& engine, double, double) override
         {
             ++m_Frames;
-            if (!m_ReleasedRead && engine.GetLastAssetImportEvent().has_value())
+            if (!m_ReleasedRead && engine.GetAssetImportPipeline().GetLastAssetImportEvent().has_value())
                 m_EventArrivedBeforeRelease = true;
 
             if (!m_ReleasedRead &&
@@ -200,7 +201,7 @@ namespace
                 m_ReleasedRead = true;
             }
 
-            if (m_ReleasedRead && engine.GetLastAssetImportEvent().has_value())
+            if (m_ReleasedRead && engine.GetAssetImportPipeline().GetLastAssetImportEvent().has_value())
             {
                 engine.RequestExit();
                 return;
@@ -579,7 +580,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGe
     engine.Initialize();
     InstallSandboxDefaultRuntimePolicies(engine);
 
-    auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+    auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
         .PayloadKind = Assets::AssetPayloadKind::Mesh,
     });
@@ -639,7 +640,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportDefaultsToMaterialDrivenSh
     engine.Initialize();
     InstallSandboxDefaultRuntimePolicies(engine);
 
-    auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+    auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
         .PayloadKind = Assets::AssetPayloadKind::Mesh,
     });
@@ -683,7 +684,7 @@ TEST(RuntimeAssetImportFormatCoverage, DefaultImportPoliciesApplyAuthoringUxAndP
     engine.Initialize();
     InstallSandboxDefaultRuntimePolicies(engine);
 
-    auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+    auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
         .PayloadKind = Assets::AssetPayloadKind::Mesh,
     });
@@ -744,7 +745,7 @@ TEST(RuntimeAssetImportFormatCoverage, UnregisteredImportPoliciesMaterializeMini
             64u));
     engine.Initialize();
 
-    auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+    auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
         .PayloadKind = Assets::AssetPayloadKind::Mesh,
     });
@@ -787,14 +788,14 @@ TEST(RuntimeAssetImportFormatCoverage, DirectImportCompletesIngestStateMachineRe
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
     engine.Initialize();
 
-    auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+    auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
         .PayloadKind = Assets::AssetPayloadKind::Mesh,
     });
     ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
 
     const std::vector<Runtime::RuntimeAssetIngestRecord> records =
-        engine.GetAssetIngestRecordsForTest();
+        engine.GetAssetImportPipeline().GetAssetIngestRecordsForTest();
     ASSERT_EQ(records.size(), 1u);
     EXPECT_EQ(records[0].Request.Source,
               Runtime::RuntimeAssetIngestSource::ManualImport);
@@ -806,11 +807,128 @@ TEST(RuntimeAssetImportFormatCoverage, DirectImportCompletesIngestStateMachineRe
     EXPECT_EQ(records[0].Result->Asset, imported->Asset);
 
     const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
-        engine.GetLastAssetImportEvent();
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
     ASSERT_TRUE(lastEvent.has_value());
     EXPECT_TRUE(lastEvent->Succeeded());
     EXPECT_EQ(lastEvent->IngestDiagnostic,
               Runtime::RuntimeAssetIngestDiagnostic::None);
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, AssetImportPipelineAccessorExposesQueueAndEventState)
+{
+    const std::vector<std::byte> pngBytes = TinyPngBytes();
+    TempAssetFile textureFile(
+        "assetio147_pipeline_accessor_albedo.png",
+        std::span<const std::byte>(pngBytes.data(), pngBytes.size()));
+
+    auto readState = std::make_shared<BlockingReadBackendState>();
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForConditionApplication>(
+            [](Runtime::Engine& runningEngine)
+            {
+                const Runtime::RuntimeAssetImportQueueSnapshot queue =
+                    runningEngine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
+                return queue.Entries.size() == 1u &&
+                    queue.ActiveCount == 0u &&
+                    queue.TerminalCount == 1u;
+            },
+            256u));
+    engine.Initialize();
+
+    Runtime::AssetImportPipeline& pipeline = engine.GetAssetImportPipeline();
+    pipeline.SetModelTextureImportIOBackendFactoryForTest(
+        [readState]()
+        {
+            return std::make_unique<BlockingReadIOBackend>(readState);
+        });
+
+    auto queued = pipeline.QueueModelTextureImport(
+        Runtime::RuntimeAssetImportRequest{
+            .Path = textureFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Texture2D,
+        });
+    ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
+    WaitUntilTrue(readState->ReadStarted);
+
+    Runtime::RuntimeAssetImportQueueSnapshot queue =
+        pipeline.GetAssetImportQueueSnapshot();
+    ASSERT_EQ(queue.Entries.size(), 1u);
+    EXPECT_EQ(queue.ActiveCount, 1u);
+    EXPECT_EQ(queue.Entries[0].Operation, queued->Operation);
+    EXPECT_EQ(queue.Entries[0].SourcePath, textureFile.Path.string());
+    EXPECT_EQ(queue.Entries[0].PayloadKind, Assets::AssetPayloadKind::Texture2D);
+    EXPECT_EQ(queue.Entries[0].Stage,
+              Runtime::RuntimeAssetImportQueueStage::Decoding);
+    EXPECT_FALSE(pipeline.GetLastAssetImportEvent().has_value());
+
+    readState->ReleaseRead.store(true, std::memory_order_release);
+    engine.Run();
+
+    queue = pipeline.GetAssetImportQueueSnapshot();
+    ASSERT_EQ(queue.Entries.size(), 1u);
+    EXPECT_EQ(queue.ActiveCount, 0u);
+    EXPECT_EQ(queue.TerminalCount, 1u);
+    EXPECT_EQ(queue.Entries[0].TerminalStatus,
+              Runtime::RuntimeAssetImportQueueTerminalStatus::Complete);
+
+    const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
+        pipeline.GetLastAssetImportEvent();
+    ASSERT_TRUE(lastEvent.has_value());
+    EXPECT_TRUE(lastEvent->Succeeded());
+    ASSERT_TRUE(lastEvent->Result.has_value());
+    EXPECT_EQ(lastEvent->Result->PayloadKind, Assets::AssetPayloadKind::Texture2D);
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, AssetImportPipelinePreservesImportDirtyState)
+{
+    TempAssetFile meshFile(
+        "assetio147_dirty_import.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    const std::filesystem::path missingPath =
+        std::filesystem::temp_directory_path() /
+        "assetio147_missing_import_should_not_exist.obj";
+    std::error_code ignored;
+    std::filesystem::remove(missingPath, ignored);
+
+    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+    Runtime::AssetImportPipeline& pipeline = engine.GetAssetImportPipeline();
+
+    EXPECT_FALSE(engine.GetEditorCommandHistory().IsDirty());
+
+    auto failed = pipeline.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+        .Path = missingPath.string(),
+        .PayloadKind = Assets::AssetPayloadKind::Mesh,
+    });
+    EXPECT_FALSE(failed.has_value());
+    EXPECT_FALSE(engine.GetEditorCommandHistory().IsDirty());
+
+    const std::optional<Runtime::RuntimeAssetImportEvent>& failedEvent =
+        pipeline.GetLastAssetImportEvent();
+    ASSERT_TRUE(failedEvent.has_value());
+    EXPECT_FALSE(failedEvent->Succeeded());
+
+    auto imported = pipeline.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+        .Path = meshFile.Path.string(),
+        .PayloadKind = Assets::AssetPayloadKind::Mesh,
+    });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+    EXPECT_TRUE(engine.GetEditorCommandHistory().IsDirty());
+    EXPECT_TRUE(engine.GetEditorCommandHistory().Snapshot().Dirty);
+
+    const std::optional<Runtime::RuntimeAssetImportEvent>& importedEvent =
+        pipeline.GetLastAssetImportEvent();
+    ASSERT_TRUE(importedEvent.has_value());
+    EXPECT_TRUE(importedEvent->Succeeded());
 
     engine.Shutdown();
 }
@@ -847,7 +965,7 @@ TEST(RuntimeAssetImportFormatCoverage, PostImportProcessorsRunInOrderAndCanUnreg
 
     std::vector<int> observedOrder{};
     const Runtime::RuntimePostImportProcessorHandle first =
-        engine.RegisterPostImportProcessor(Runtime::RuntimePostImportProcessorDesc{
+        engine.GetAssetImportPipeline().RegisterPostImportProcessor(Runtime::RuntimePostImportProcessorDesc{
             .DebugName = "test.first",
             .PayloadKind = Assets::AssetPayloadKind::Mesh,
             .Process =
@@ -871,7 +989,7 @@ TEST(RuntimeAssetImportFormatCoverage, PostImportProcessorsRunInOrderAndCanUnreg
         });
     ASSERT_TRUE(first.IsValid());
     const Runtime::RuntimePostImportProcessorHandle failing =
-        engine.RegisterPostImportProcessor(Runtime::RuntimePostImportProcessorDesc{
+        engine.GetAssetImportPipeline().RegisterPostImportProcessor(Runtime::RuntimePostImportProcessorDesc{
             .DebugName = "test.failing",
             .PayloadKind = Assets::AssetPayloadKind::Mesh,
             .Process =
@@ -885,7 +1003,7 @@ TEST(RuntimeAssetImportFormatCoverage, PostImportProcessorsRunInOrderAndCanUnreg
         });
     ASSERT_TRUE(failing.IsValid());
     const Runtime::RuntimePostImportProcessorHandle second =
-        engine.RegisterPostImportProcessor(Runtime::RuntimePostImportProcessorDesc{
+        engine.GetAssetImportPipeline().RegisterPostImportProcessor(Runtime::RuntimePostImportProcessorDesc{
             .DebugName = "test.second",
             .PayloadKind = Assets::AssetPayloadKind::Mesh,
             .Process =
@@ -899,7 +1017,7 @@ TEST(RuntimeAssetImportFormatCoverage, PostImportProcessorsRunInOrderAndCanUnreg
         });
     ASSERT_TRUE(second.IsValid());
 
-    auto meshA = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+    auto meshA = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFileA.Path.string(),
         .PayloadKind = Assets::AssetPayloadKind::Mesh,
     });
@@ -907,26 +1025,26 @@ TEST(RuntimeAssetImportFormatCoverage, PostImportProcessorsRunInOrderAndCanUnreg
     EXPECT_EQ(observedOrder, (std::vector<int>{1, 9, 2}));
 
     observedOrder.clear();
-    auto graph = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+    auto graph = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = graphFile.Path.string(),
         .PayloadKind = Assets::AssetPayloadKind::Graph,
     });
     ASSERT_TRUE(graph.has_value()) << static_cast<int>(graph.error());
     EXPECT_TRUE(observedOrder.empty());
 
-    engine.UnregisterPostImportProcessor(first);
+    engine.GetAssetImportPipeline().UnregisterPostImportProcessor(first);
     observedOrder.clear();
-    auto meshB = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+    auto meshB = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFileB.Path.string(),
         .PayloadKind = Assets::AssetPayloadKind::Mesh,
     });
     ASSERT_TRUE(meshB.has_value()) << static_cast<int>(meshB.error());
     EXPECT_EQ(observedOrder, (std::vector<int>{9, 2}));
 
-    engine.UnregisterPostImportProcessor(failing);
-    engine.UnregisterPostImportProcessor(second);
+    engine.GetAssetImportPipeline().UnregisterPostImportProcessor(failing);
+    engine.GetAssetImportPipeline().UnregisterPostImportProcessor(second);
     observedOrder.clear();
-    auto meshC = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+    auto meshC = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFileC.Path.string(),
         .PayloadKind = Assets::AssetPayloadKind::Mesh,
     });
@@ -948,7 +1066,7 @@ TEST(RuntimeAssetImportFormatCoverage, ReimportExistingMeshReloadsAssetWithoutDu
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
     engine.Initialize();
 
-    auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+    auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
         .PayloadKind = Assets::AssetPayloadKind::Mesh,
     });
@@ -968,7 +1086,7 @@ TEST(RuntimeAssetImportFormatCoverage, ReimportExistingMeshReloadsAssetWithoutDu
                "f 1 3 4\n";
     }
 
-    auto reimported = engine.ReimportAsset(Runtime::RuntimeAssetReimportRequest{
+    auto reimported = engine.GetAssetImportPipeline().ReimportAsset(Runtime::RuntimeAssetReimportRequest{
         .Asset = imported->Asset,
     });
     ASSERT_TRUE(reimported.has_value()) << static_cast<int>(reimported.error());
@@ -992,7 +1110,7 @@ TEST(RuntimeAssetImportFormatCoverage, ReimportExistingMeshReloadsAssetWithoutDu
     EXPECT_EQ((*meshPayload)[0].Faces.Size(), 2u);
 
     const std::vector<Runtime::RuntimeAssetIngestRecord> records =
-        engine.GetAssetIngestRecordsForTest();
+        engine.GetAssetImportPipeline().GetAssetIngestRecordsForTest();
     ASSERT_EQ(records.size(), 2u);
     EXPECT_EQ(records[1].Request.Source,
               Runtime::RuntimeAssetIngestSource::Reimport);
@@ -1004,7 +1122,7 @@ TEST(RuntimeAssetImportFormatCoverage, ReimportExistingMeshReloadsAssetWithoutDu
     EXPECT_EQ(records[1].Result->PrimitiveEntitiesCreated, 0u);
 
     const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
-        engine.GetLastAssetImportEvent();
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
     ASSERT_TRUE(lastEvent.has_value());
     EXPECT_TRUE(lastEvent->Succeeded());
     EXPECT_EQ(lastEvent->IngestDiagnostic,
@@ -1045,7 +1163,7 @@ TEST(RuntimeAssetImportFormatCoverage, ImportAssetFromPathDoesNotWaitForUnrelate
     }
 
     const auto before = std::chrono::steady_clock::now();
-    auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+    auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
         .PayloadKind = Assets::AssetPayloadKind::Mesh,
     });
@@ -1071,14 +1189,14 @@ TEST(RuntimeAssetImportFormatCoverage, ReimportInvalidAssetReportsDeterministicI
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
     engine.Initialize();
 
-    auto reimported = engine.ReimportAsset(Runtime::RuntimeAssetReimportRequest{
+    auto reimported = engine.GetAssetImportPipeline().ReimportAsset(Runtime::RuntimeAssetReimportRequest{
         .Asset = Assets::AssetId{999u, 1u},
     });
     EXPECT_FALSE(reimported.has_value());
     EXPECT_EQ(reimported.error(), Core::ErrorCode::ResourceNotFound);
 
     const std::vector<Runtime::RuntimeAssetIngestRecord> records =
-        engine.GetAssetIngestRecordsForTest();
+        engine.GetAssetImportPipeline().GetAssetIngestRecordsForTest();
     ASSERT_EQ(records.size(), 1u);
     EXPECT_EQ(records[0].Request.Source,
               Runtime::RuntimeAssetIngestSource::Reimport);
@@ -1087,7 +1205,7 @@ TEST(RuntimeAssetImportFormatCoverage, ReimportInvalidAssetReportsDeterministicI
               Runtime::RuntimeAssetIngestDiagnostic::InvalidReimportTarget);
 
     const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
-        engine.GetLastAssetImportEvent();
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
     ASSERT_TRUE(lastEvent.has_value());
     EXPECT_FALSE(lastEvent->Succeeded());
     EXPECT_EQ(lastEvent->Error, Core::ErrorCode::ResourceNotFound);
@@ -1124,7 +1242,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportQueuesGeneratedNormalBakeF
     engine.Initialize();
     InstallSandboxDefaultRuntimePolicies(engine);
 
-    auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+    auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
         .PayloadKind = Assets::AssetPayloadKind::Mesh,
     });
@@ -1175,7 +1293,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesVertexNormalsWhenM
     engine.Initialize();
     InstallSandboxDefaultRuntimePolicies(engine);
 
-    auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+    auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
         .PayloadKind = Assets::AssetPayloadKind::Mesh,
     });
@@ -1240,7 +1358,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesNormalsAndQueuesGe
     engine.Initialize();
     InstallSandboxDefaultRuntimePolicies(engine);
 
-    auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+    auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
         .PayloadKind = Assets::AssetPayloadKind::Mesh,
     });
@@ -1319,7 +1437,7 @@ TEST(RuntimeAssetImportFormatCoverage, RepresentativePromotedFormatsMaterializeD
     engine.Initialize();
     InstallSandboxDefaultRuntimePolicies(engine);
 
-    auto mesh = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+    auto mesh = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
         .PayloadKind = Assets::AssetPayloadKind::Mesh,
     });
@@ -1327,7 +1445,7 @@ TEST(RuntimeAssetImportFormatCoverage, RepresentativePromotedFormatsMaterializeD
     EXPECT_EQ(mesh->PayloadKind, Assets::AssetPayloadKind::Mesh);
     EXPECT_EQ(mesh->PrimitiveEntitiesCreated, 1u);
 
-    auto graph = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+    auto graph = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = graphFile.Path.string(),
         .PayloadKind = Assets::AssetPayloadKind::Graph,
     });
@@ -1335,7 +1453,7 @@ TEST(RuntimeAssetImportFormatCoverage, RepresentativePromotedFormatsMaterializeD
     EXPECT_EQ(graph->PayloadKind, Assets::AssetPayloadKind::Graph);
     EXPECT_EQ(graph->PrimitiveEntitiesCreated, 1u);
 
-    auto cloud = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+    auto cloud = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = cloudFile.Path.string(),
         .PayloadKind = Assets::AssetPayloadKind::PointCloud,
     });
@@ -1343,7 +1461,7 @@ TEST(RuntimeAssetImportFormatCoverage, RepresentativePromotedFormatsMaterializeD
     EXPECT_EQ(cloud->PayloadKind, Assets::AssetPayloadKind::PointCloud);
     EXPECT_EQ(cloud->PrimitiveEntitiesCreated, 1u);
 
-    auto model = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+    auto model = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = modelFile.Path.string(),
     });
     ASSERT_TRUE(model.has_value()) << static_cast<int>(model.error());
@@ -1353,7 +1471,7 @@ TEST(RuntimeAssetImportFormatCoverage, RepresentativePromotedFormatsMaterializeD
     EXPECT_EQ(model->EmbeddedTextureAssetsCreated, 1u);
     EXPECT_EQ(model->TextureUploadRequests, 0u);
 
-    auto texture = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+    auto texture = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = textureFile.Path.string(),
     });
     ASSERT_TRUE(texture.has_value()) << static_cast<int>(texture.error());
@@ -1387,7 +1505,7 @@ TEST(RuntimeAssetImportFormatCoverage, RepresentativePromotedFormatsMaterializeD
     EXPECT_TRUE(raw.all_of<G::RenderPoints>(*cloudEntity));
 
     const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
-        engine.GetLastAssetImportEvent();
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
     ASSERT_TRUE(lastEvent.has_value());
     EXPECT_TRUE(lastEvent->Succeeded());
     ASSERT_TRUE(lastEvent->Result.has_value());
@@ -1417,7 +1535,7 @@ TEST(RuntimeAssetImportFormatCoverage, DroppedModelSceneAndTextureImportThroughS
             [](Runtime::Engine& runningEngine)
             {
                 const Runtime::RuntimeAssetImportQueueSnapshot queue =
-                    runningEngine.GetAssetImportQueueSnapshot();
+                    runningEngine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
                 return queue.Entries.size() == 2u &&
                     queue.ActiveCount == 0u &&
                     queue.TerminalCount == 2u;
@@ -1429,13 +1547,13 @@ TEST(RuntimeAssetImportFormatCoverage, DroppedModelSceneAndTextureImportThroughS
         modelFile.Path.string(),
         textureFile.Path.string(),
     };
-    engine.ImportDroppedFilePaths(droppedPaths);
+    engine.GetAssetImportPipeline().ImportDroppedFilePaths(droppedPaths);
 
-    EXPECT_FALSE(engine.GetLastAssetImportEvent().has_value());
+    EXPECT_FALSE(engine.GetAssetImportPipeline().GetLastAssetImportEvent().has_value());
     EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 0u);
 
     Runtime::RuntimeAssetImportQueueSnapshot queue =
-        engine.GetAssetImportQueueSnapshot();
+        engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
     ASSERT_EQ(queue.Entries.size(), 2u);
     EXPECT_EQ(queue.ActiveCount, 2u);
     EXPECT_EQ(queue.Entries[0].SourcePath, modelFile.Path.string());
@@ -1453,7 +1571,7 @@ TEST(RuntimeAssetImportFormatCoverage, DroppedModelSceneAndTextureImportThroughS
         << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
     engine.Run();
 
-    queue = engine.GetAssetImportQueueSnapshot();
+    queue = engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
     ASSERT_EQ(queue.Entries.size(), 2u);
     EXPECT_EQ(queue.ActiveCount, 0u);
     EXPECT_EQ(queue.TerminalCount, 2u);
@@ -1463,7 +1581,7 @@ TEST(RuntimeAssetImportFormatCoverage, DroppedModelSceneAndTextureImportThroughS
               Runtime::RuntimeAssetImportQueueTerminalStatus::Complete);
 
     const std::vector<Runtime::RuntimeAssetIngestRecord> records =
-        engine.GetAssetIngestRecordsForTest();
+        engine.GetAssetImportPipeline().GetAssetIngestRecordsForTest();
     ASSERT_EQ(records.size(), 2u);
 
     const auto modelRecord = std::find_if(
@@ -1510,7 +1628,7 @@ TEST(RuntimeAssetImportFormatCoverage, DroppedModelSceneAndTextureImportThroughS
     EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
     EXPECT_TRUE(engine.GetAssetService().PathIndexContains(textureFile.Path.string()));
     const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
-        engine.GetLastAssetImportEvent();
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
     ASSERT_TRUE(lastEvent.has_value());
     EXPECT_TRUE(lastEvent->Succeeded());
 
@@ -1538,7 +1656,7 @@ TEST(RuntimeAssetImportFormatCoverage, ManualModelSceneAndTextureImportQueueComp
             [](Runtime::Engine& runningEngine)
             {
                 const Runtime::RuntimeAssetImportQueueSnapshot queue =
-                    runningEngine.GetAssetImportQueueSnapshot();
+                    runningEngine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
                 return queue.Entries.size() == 2u &&
                     queue.ActiveCount == 0u &&
                     queue.TerminalCount == 2u;
@@ -1546,7 +1664,7 @@ TEST(RuntimeAssetImportFormatCoverage, ManualModelSceneAndTextureImportQueueComp
             256u));
     engine.Initialize();
 
-    auto modelQueued = engine.QueueModelTextureImport(
+    auto modelQueued = engine.GetAssetImportPipeline().QueueModelTextureImport(
         Runtime::RuntimeAssetImportRequest{
             .Path = modelFile.Path.string(),
             .PayloadKind = Assets::AssetPayloadKind::Unknown,
@@ -1555,7 +1673,7 @@ TEST(RuntimeAssetImportFormatCoverage, ManualModelSceneAndTextureImportQueueComp
     EXPECT_TRUE(modelQueued->Operation.IsValid());
     EXPECT_EQ(modelQueued->PayloadKind, Assets::AssetPayloadKind::ModelScene);
 
-    auto textureQueued = engine.QueueModelTextureImport(
+    auto textureQueued = engine.GetAssetImportPipeline().QueueModelTextureImport(
         Runtime::RuntimeAssetImportRequest{
             .Path = textureFile.Path.string(),
             .PayloadKind = Assets::AssetPayloadKind::Unknown,
@@ -1564,11 +1682,11 @@ TEST(RuntimeAssetImportFormatCoverage, ManualModelSceneAndTextureImportQueueComp
     EXPECT_TRUE(textureQueued->Operation.IsValid());
     EXPECT_EQ(textureQueued->PayloadKind, Assets::AssetPayloadKind::Texture2D);
 
-    EXPECT_FALSE(engine.GetLastAssetImportEvent().has_value());
+    EXPECT_FALSE(engine.GetAssetImportPipeline().GetLastAssetImportEvent().has_value());
     EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 0u);
 
     Runtime::RuntimeAssetImportQueueSnapshot queue =
-        engine.GetAssetImportQueueSnapshot();
+        engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
     ASSERT_EQ(queue.Entries.size(), 2u);
     EXPECT_EQ(queue.ActiveCount, 2u);
     EXPECT_EQ(queue.Entries[0].Operation, modelQueued->Operation);
@@ -1590,7 +1708,7 @@ TEST(RuntimeAssetImportFormatCoverage, ManualModelSceneAndTextureImportQueueComp
         << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
     engine.Run();
 
-    queue = engine.GetAssetImportQueueSnapshot();
+    queue = engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
     ASSERT_EQ(queue.Entries.size(), 2u);
     EXPECT_EQ(queue.ActiveCount, 0u);
     EXPECT_EQ(queue.TerminalCount, 2u);
@@ -1600,7 +1718,7 @@ TEST(RuntimeAssetImportFormatCoverage, ManualModelSceneAndTextureImportQueueComp
               Runtime::RuntimeAssetImportQueueTerminalStatus::Complete);
 
     const std::vector<Runtime::RuntimeAssetIngestRecord> records =
-        engine.GetAssetIngestRecordsForTest();
+        engine.GetAssetImportPipeline().GetAssetIngestRecordsForTest();
     ASSERT_EQ(records.size(), 2u);
 
     const auto modelRecord = std::find_if(
@@ -1646,7 +1764,7 @@ TEST(RuntimeAssetImportFormatCoverage, ManualModelSceneAndTextureImportQueueComp
 
     EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
     const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
-        engine.GetLastAssetImportEvent();
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
     ASSERT_TRUE(lastEvent.has_value());
     EXPECT_TRUE(lastEvent->Succeeded());
 
@@ -1665,14 +1783,14 @@ TEST(RuntimeAssetImportFormatCoverage, SlowQueuedTextureReadDoesNotBlockRunFrame
     SlowImportProbeApplication* app = application.get();
     Runtime::Engine engine(HeadlessConfig(), std::move(application));
     engine.Initialize();
-    engine.SetModelTextureImportIOBackendFactoryForTest(
+    engine.GetAssetImportPipeline().SetModelTextureImportIOBackendFactoryForTest(
         [readState]()
         {
             return std::make_unique<BlockingReadIOBackend>(readState);
         });
 
     const auto queueBegin = std::chrono::steady_clock::now();
-    auto queued = engine.QueueModelTextureImport(
+    auto queued = engine.GetAssetImportPipeline().QueueModelTextureImport(
         Runtime::RuntimeAssetImportRequest{
             .Path = textureFile.Path.string(),
             .PayloadKind = Assets::AssetPayloadKind::Texture2D,
@@ -1696,7 +1814,7 @@ TEST(RuntimeAssetImportFormatCoverage, SlowQueuedTextureReadDoesNotBlockRunFrame
     EXPECT_TRUE(readState->ReadStarted.load(std::memory_order_acquire));
     EXPECT_TRUE(readState->ReadFinished.load(std::memory_order_acquire));
     const std::optional<Runtime::RuntimeAssetImportEvent>& event =
-        engine.GetLastAssetImportEvent();
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
     ASSERT_TRUE(event.has_value());
     EXPECT_TRUE(event->Succeeded());
     ASSERT_TRUE(event->Result.has_value());
@@ -1704,7 +1822,7 @@ TEST(RuntimeAssetImportFormatCoverage, SlowQueuedTextureReadDoesNotBlockRunFrame
     EXPECT_TRUE(event->Result->Asset.IsValid());
 
     Runtime::RuntimeAssetImportQueueSnapshot queue =
-        engine.GetAssetImportQueueSnapshot();
+        engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
     ASSERT_EQ(queue.Entries.size(), 1u);
     EXPECT_EQ(queue.ActiveCount, 0u);
     EXPECT_EQ(queue.TerminalCount, 1u);

@@ -16,7 +16,9 @@ backend layout, selection policy, and dependency note.
 - [PLATFORM-004 — Alternative-platform backend onboarding policy (planning seed)](PLATFORM-004-alternative-platform-backend-onboarding.md):
   planning-only umbrella for Wayland / Windows / macOS backends documented as
   future plug-in slots in `src/platform/README.md`. Stays planning-only until
-  there is a concrete need.
+  there is a concrete need. ARCH-013 confirmed this remains unchanged: runtime
+  UI capture sits above platform, and `platform -> core` stays the only layer
+  edge.
 
 Retired:
 

@@ -1,0 +1,194 @@
+session:
+  id: "2026-07-09_001"
+  date: "2026-07-09"
+  started: "2026-07-09T00:46"
+  last_turn: "2026-07-09T06:43"
+  turn_count: 5
+  summary: "Implemented and verified the ADR-0024 Runtime.Engine decomposition through RUNTIME-163, landed RUNTIME-129's CPUContracted object-space normal bake GPU-queue participant, and committed the accumulated Engine service-seam batch."
+
+events_logged:
+  - turn: 1
+    type: experiment
+    id: "N168"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired ARCH-007..013 and RUNTIME-146..151; final CPU gate passed 3638/3638."
+  - turn: 1
+    type: decision
+    id: "N169"
+    routing: direct
+    provenance: ai-executed
+    summary: "Stopped after RUNTIME-151 because the Engine cleanup goal was satisfied."
+  - turn: 2
+    type: experiment
+    id: "N170"
+    routing: direct
+    provenance: ai-executed
+    summary: "Landed and verified RUNTIME-129 Slice B CPUContracted GPU-queue participant; CPU gate passed 3643/3643."
+  - turn: 2
+    type: decision
+    id: "N171"
+    routing: direct
+    provenance: ai-executed
+    summary: "Kept RUNTIME-129 open because production Vulkan plan-provider wiring and gpu/vulkan smoke remain open."
+  - turn: 3
+    type: experiment
+    id: "N172"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired RUNTIME-154 and RUNTIME-155; CPU gate passed 3644/3644."
+  - turn: 3
+    type: decision
+    id: "N173"
+    routing: direct
+    provenance: ai-executed
+    summary: "Stopped after RUNTIME-155; further Engine cleanup should begin with a fresh scoped task."
+  - turn: 4
+    type: experiment
+    id: "N174"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired RUNTIME-156; runtime-module schedule policy moved out of Engine and CPU gate passed 3644/3644."
+  - turn: 4
+    type: decision
+    id: "N175"
+    routing: direct
+    provenance: ai-executed
+    summary: "Stopped after RUNTIME-156; further Engine cleanup should begin with a fresh hotspot review and task contract."
+  - turn: 5
+    type: experiment
+    id: "N176"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired RUNTIME-157..163; final Engine cleanup CPU gate passed 3646/3646."
+  - turn: 5
+    type: decision
+    id: "N177"
+    routing: direct
+    provenance: ai-executed
+    summary: "Committed accumulated Engine service seams."
+  - turn: 5
+    type: observation
+    id: "O07"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Remaining asset/GPU handoff wiring is a candidate Engine cleanup slice."
+
+ai_actions:
+  - turn: 1
+    action: "Implemented ADR-0024 kernel seams, extracted Runtime.Engine subsystems, split frame-loop helpers, moved StableId signal tracking into StableEntityLookupSceneBinding, retired completed tasks, refreshed generated docs/session brief, and reran verification."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.Engine.cppm"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "src/runtime/Runtime.StableEntityLookup.cppm"
+      - "src/runtime/Runtime.StableEntityLookup.cpp"
+      - "src/runtime/Runtime.Engine.FrameLoop.cppm"
+      - "src/runtime/Runtime.AssetImportPipeline.cppm"
+      - "src/runtime/Runtime.AssetImportPipeline.cpp"
+      - "src/runtime/Runtime.SceneDocument.cppm"
+      - "src/runtime/Runtime.SceneDocument.cpp"
+      - "src/runtime/Runtime.EngineConfigBoot.cppm"
+      - "src/runtime/Runtime.EngineConfigBoot.cpp"
+      - "src/runtime/Runtime.EngineConfigControl.cppm"
+      - "src/runtime/Runtime.EngineConfigControl.cpp"
+      - "tasks/done/RUNTIME-151-slim-engine-interface-and-remove-entt-leak.md"
+      - "tasks/SESSION-BRIEF.md"
+  - turn: 2
+    action: "Added Runtime.ObjectSpaceNormalBakeGpuQueue, moved Engine to compose that JobService GpuQueue participant, retained/drained pending normal-bake submissions, added CPU/null contract coverage, updated RUNTIME-129 docs/task state, regenerated module inventory and session brief, and reran focused plus full CPU verification."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.ObjectSpaceNormalBakeGpuQueue.cppm"
+      - "src/runtime/Runtime.ObjectSpaceNormalBakeGpuQueue.cpp"
+      - "src/runtime/Runtime.ObjectSpaceNormalBakeQueue.cppm"
+      - "src/runtime/Runtime.ObjectSpaceNormalBakeQueue.cpp"
+      - "src/runtime/Runtime.Engine.cppm"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "tests/contract/runtime/Test.ObjectSpaceNormalBakeGpuQueue.cpp"
+      - "tasks/backlog/runtime/RUNTIME-129-schedule-gpu-normal-bake-after-import.md"
+      - "docs/api/generated/module_inventory.md"
+      - "tasks/SESSION-BRIEF.md"
+  - turn: 3
+    action: "Added Runtime.ReferenceSceneControl and Runtime.InputActions, delegated Engine reference-scene lifecycle and input-action registration/dispatch to those modules, updated layering/input-action tests, refreshed runtime docs/module inventory/task records/session brief, retired RUNTIME-154 and RUNTIME-155, and reran focused plus full CPU verification."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.ReferenceSceneControl.cppm"
+      - "src/runtime/Runtime.ReferenceSceneControl.cpp"
+      - "src/runtime/Runtime.InputActions.cppm"
+      - "src/runtime/Runtime.InputActions.cpp"
+      - "src/runtime/Runtime.Engine.cppm"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "src/runtime/Runtime.Engine.FrameLoop.cppm"
+      - "src/runtime/CMakeLists.txt"
+      - "tests/contract/runtime/Test.RuntimeEngineLayering.cpp"
+      - "src/runtime/README.md"
+      - "docs/api/generated/module_inventory.md"
+      - "tasks/done/RUNTIME-154-extract-reference-scene-control.md"
+      - "tasks/done/RUNTIME-155-extract-runtime-input-action-registry.md"
+      - "tasks/backlog/runtime/README.md"
+      - "tasks/backlog/README.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+      - "tasks/SESSION-BRIEF.md"
+  - turn: 4
+    action: "Added Runtime.ModuleSchedule, delegated Engine runtime-module contribution registration/finalization/pass insertion/frame-hook dispatch to it, updated source-contract coverage, refreshed runtime docs/module inventory/task records/session brief, retired RUNTIME-156, and reran focused plus full CPU verification."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.ModuleSchedule.cppm"
+      - "src/runtime/Runtime.ModuleSchedule.cpp"
+      - "src/runtime/Runtime.Engine.cppm"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "src/runtime/CMakeLists.txt"
+      - "tests/contract/runtime/Test.RuntimeEngineLayering.cpp"
+      - "src/runtime/README.md"
+      - "docs/api/generated/module_inventory.md"
+      - "tasks/done/RUNTIME-156-extract-runtime-module-schedule.md"
+      - "tasks/backlog/runtime/README.md"
+      - "tasks/backlog/README.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+      - "tasks/SESSION-BRIEF.md"
+  - turn: 5
+    action: "Retired RUNTIME-157 through RUNTIME-163, added focused runtime services for selection readback, frame pacing, ImGui editor bridging, JobService GPU queue bridging, object-space normal bake composition, gizmo frame state, and render extraction ownership, reran strict validators and the default CPU-supported gate, then committed the accumulated batch."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.SelectionReadback.cppm"
+      - "src/runtime/Runtime.SelectionReadback.cpp"
+      - "src/runtime/Runtime.FramePacingDiagnostics.cppm"
+      - "src/runtime/Runtime.FramePacingDiagnostics.cpp"
+      - "src/runtime/Runtime.ImGuiEditorBridge.cppm"
+      - "src/runtime/Runtime.ImGuiEditorBridge.cpp"
+      - "src/runtime/Runtime.JobServiceGpuQueueBridge.cppm"
+      - "src/runtime/Runtime.JobServiceGpuQueueBridge.cpp"
+      - "src/runtime/Runtime.ObjectSpaceNormalBakeService.cppm"
+      - "src/runtime/Runtime.ObjectSpaceNormalBakeService.cpp"
+      - "src/runtime/Gizmos/Runtime.GizmoFrameService.cppm"
+      - "src/runtime/Gizmos/Runtime.GizmoFrameService.cpp"
+      - "src/runtime/Runtime.RenderExtractionService.cppm"
+      - "src/runtime/Runtime.RenderExtractionService.cpp"
+      - "tasks/done/RUNTIME-157-extract-selection-readback-state.md"
+      - "tasks/done/RUNTIME-158-extract-frame-pacing-diagnostics.md"
+      - "tasks/done/RUNTIME-159-extract-imgui-editor-bridge.md"
+      - "tasks/done/RUNTIME-160-extract-jobservice-gpu-queue-bridge.md"
+      - "tasks/done/RUNTIME-161-extract-object-space-normal-bake-service.md"
+      - "tasks/done/RUNTIME-162-extract-gizmo-frame-service.md"
+      - "tasks/done/RUNTIME-163-extract-render-extraction-service.md"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "User requested continuing the ARCH-007 task chain until Runtime.Engine.cppm/Runtime.Engine.cpp were clean of specific code bleeding into Engine."
+  - turn: 2
+    excerpt: "User asked to continue tasks toward clean Runtime.Engine files; RUNTIME-129 was advanced only to verified CPUContracted substrate because the production Vulkan provider remains unimplemented."
+  - turn: 3
+    excerpt: "User asked to continue task iteration toward clean Runtime.Engine files; reference-scene lifecycle and input-action dispatch were extracted and retired as RUNTIME-154/RUNTIME-155."
+  - turn: 4
+    excerpt: "User asked to continue until Runtime.Engine.cppm and Runtime.Engine.cpp were clean; runtime-module contribution scheduling was extracted and retired as RUNTIME-156."
+  - turn: 5
+    excerpt: "User asked to commit the accumulated changes after RUNTIME-163 passed the final CPU gate and task retirement checks."
+
+open_threads:
+  - "RUNTIME-129 still needs the production Vulkan geometry-buffer/pipeline/dilation plan provider plus opt-in gpu/vulkan smoke before it can retire at Operational."
+  - "Further Runtime.Engine cleanup candidate: extract GPU asset cache listener and model texture/scene handoff ownership into an Engine-owned asset-residency service."
+
+ai_suggestions_pending:
+  - "Open a scoped follow-up task for an asset-residency service if continuing Engine cleanup."

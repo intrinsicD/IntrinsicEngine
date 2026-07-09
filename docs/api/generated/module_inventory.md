@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 55 |
+| `runtime` | 80 |
 
 ## Modules
 
@@ -329,9 +329,12 @@ Root scanned: `src`
 | `Extrinsic.Runtime.CameraControllers` | `src/runtime/Cameras/Runtime.CameraControllers.cppm` | `runtime` |
 | `Extrinsic.Runtime.CameraFocusCommand` | `src/runtime/Cameras/Runtime.CameraFocusCommand.cppm` | `runtime` |
 | `Extrinsic.Runtime.SandboxEditorUi` | `src/runtime/Editor/Runtime.SandboxEditorUi.cppm` | `runtime` |
+| `Extrinsic.Runtime.GizmoFrameService` | `src/runtime/Gizmos/Runtime.GizmoFrameService.cppm` | `runtime` |
 | `Extrinsic.Runtime.GizmoInteraction` | `src/runtime/Gizmos/Runtime.GizmoInteraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.ImGuiAdapter` | `src/runtime/ImGui/Runtime.ImGuiAdapter.cppm` | `runtime` |
+| `Extrinsic.Runtime.ClusteringModule` | `src/runtime/Modules/Clustering/Runtime.ClusteringModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetGeometryIO` | `src/runtime/Runtime.AssetGeometryIO.cppm` | `runtime` |
+| `Extrinsic.Runtime.AssetImportPipeline` | `src/runtime/Runtime.AssetImportPipeline.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetIngestStateMachine` | `src/runtime/Runtime.AssetIngestStateMachine.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetMeshNormals` | `src/runtime/Runtime.AssetMeshNormals.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetModelSceneHandoff` | `src/runtime/Runtime.AssetModelSceneHandoff.cppm` | `runtime` |
@@ -340,21 +343,36 @@ Root scanned: `src`
 | `Extrinsic.Runtime.AsyncBufferReadback` | `src/runtime/Runtime.AsyncBufferReadback.cppm` | `runtime` |
 | `Extrinsic.Runtime.CommandBus` | `src/runtime/Runtime.CommandBus.cppm` | `runtime` |
 | `Extrinsic.Runtime.DerivedJobGraph` | `src/runtime/Runtime.DerivedJobGraph.cppm` | `runtime` |
+| `Extrinsic.Runtime.DeviceBootstrap` | `src/runtime/Runtime.DeviceBootstrap.cppm` | `runtime` |
 | `Extrinsic.Runtime.EcsSystemBundle` | `src/runtime/Runtime.EcsSystemBundle.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorCommandHistory` | `src/runtime/Runtime.EditorCommandHistory.cppm` | `runtime` |
+| `Extrinsic.Runtime.Engine:FrameLoop` | `src/runtime/Runtime.Engine.FrameLoop.cppm` | `runtime` |
 | `Extrinsic.Runtime.Engine` | `src/runtime/Runtime.Engine.cppm` | `runtime` |
+| `Extrinsic.Runtime.EngineConfigBoot` | `src/runtime/Runtime.EngineConfigBoot.cppm` | `runtime` |
+| `Extrinsic.Runtime.EngineConfigControl` | `src/runtime/Runtime.EngineConfigControl.cppm` | `runtime` |
+| `Extrinsic.Runtime.FramePacingDiagnostics` | `src/runtime/Runtime.FramePacingDiagnostics.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeometryAvailability` | `src/runtime/Runtime.GeometryAvailability.cppm` | `runtime` |
 | `Extrinsic.Runtime.GpuReadbackJob` | `src/runtime/Runtime.GpuReadbackJob.cppm` | `runtime` |
 | `Extrinsic.Runtime.GraphGeometryPacker` | `src/runtime/Runtime.GraphGeometryPacker.cppm` | `runtime` |
+| `Extrinsic.Runtime.ImGuiEditorBridge` | `src/runtime/Runtime.ImGuiEditorBridge.cppm` | `runtime` |
+| `Extrinsic.Runtime.InputActions` | `src/runtime/Runtime.InputActions.cppm` | `runtime` |
+| `Extrinsic.Runtime.JobService` | `src/runtime/Runtime.JobService.cppm` | `runtime` |
+| `Extrinsic.Runtime.JobServiceGpuQueueBridge` | `src/runtime/Runtime.JobServiceGpuQueueBridge.cppm` | `runtime` |
 | `Extrinsic.Runtime.KMeansBackend` | `src/runtime/Runtime.KMeansBackend.cppm` | `runtime` |
 | `Extrinsic.Runtime.KMeansGpuBackend` | `src/runtime/Runtime.KMeansGpuBackend.cppm` | `runtime` |
 | `Extrinsic.Runtime.KMeansGpuJobQueue` | `src/runtime/Runtime.KMeansGpuJobQueue.cppm` | `runtime` |
+| `Extrinsic.Runtime.KernelEvents` | `src/runtime/Runtime.KernelEvents.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshAttributeTextureBake` | `src/runtime/Runtime.MeshAttributeTextureBake.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshGeometryPacker` | `src/runtime/Runtime.MeshGeometryPacker.cppm` | `runtime` |
+| `Extrinsic.Runtime.MeshPrimitiveViewControls` | `src/runtime/Runtime.MeshPrimitiveViewControls.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshPrimitiveViewPacker` | `src/runtime/Runtime.MeshPrimitiveViewPacker.cppm` | `runtime` |
 | `Extrinsic.Runtime.MethodFigureExport` | `src/runtime/Runtime.MethodFigureExport.cppm` | `runtime` |
+| `Extrinsic.Runtime.Module` | `src/runtime/Runtime.Module.cppm` | `runtime` |
+| `Extrinsic.Runtime.ModuleSchedule` | `src/runtime/Runtime.ModuleSchedule.cppm` | `runtime` |
 | `Extrinsic.Runtime.ObjectSpaceNormalBakeBinding` | `src/runtime/Runtime.ObjectSpaceNormalBakeBinding.cppm` | `runtime` |
+| `Extrinsic.Runtime.ObjectSpaceNormalBakeGpuQueue` | `src/runtime/Runtime.ObjectSpaceNormalBakeGpuQueue.cppm` | `runtime` |
 | `Extrinsic.Runtime.ObjectSpaceNormalBakeQueue` | `src/runtime/Runtime.ObjectSpaceNormalBakeQueue.cppm` | `runtime` |
+| `Extrinsic.Runtime.ObjectSpaceNormalBakeService` | `src/runtime/Runtime.ObjectSpaceNormalBakeService.cppm` | `runtime` |
 | `Extrinsic.Runtime.ObjectSpaceNormalBakeSubmission` | `src/runtime/Runtime.ObjectSpaceNormalBakeSubmission.cppm` | `runtime` |
 | `Extrinsic.Runtime.PhysicsBridge` | `src/runtime/Runtime.PhysicsBridge.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointCloudGeometryPacker` | `src/runtime/Runtime.PointCloudGeometryPacker.cppm` | `runtime` |
@@ -365,21 +383,28 @@ Root scanned: `src`
 | `Extrinsic.Runtime.ProgressivePresentationExtraction` | `src/runtime/Runtime.ProgressivePresentationExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressiveRenderData` | `src/runtime/Runtime.ProgressiveRenderData.cppm` | `runtime` |
 | `Extrinsic.Runtime.ReferenceScene` | `src/runtime/Runtime.ReferenceScene.cppm` | `runtime` |
+| `Extrinsic.Runtime.ReferenceSceneControl` | `src/runtime/Runtime.ReferenceSceneControl.cppm` | `runtime` |
 | `Extrinsic.Runtime.RegistrationAlignment` | `src/runtime/Runtime.RegistrationAlignment.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderArtifactPublication` | `src/runtime/Runtime.RenderArtifactPublication.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
+| `Extrinsic.Runtime.RenderExtractionService` | `src/runtime/Runtime.RenderExtractionService.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderWorldPool` | `src/runtime/Runtime.RenderWorldPool.cppm` | `runtime` |
 | `Extrinsic.Runtime.SandboxDefaultPolicies` | `src/runtime/Runtime.SandboxDefaultPolicies.cppm` | `runtime` |
+| `Extrinsic.Runtime.SceneDocument` | `src/runtime/Runtime.SceneDocument.cppm` | `runtime` |
 | `Extrinsic.Runtime.SceneSerialization` | `src/runtime/Runtime.SceneSerialization.cppm` | `runtime` |
 | `Extrinsic.Runtime.SelectedMeshTextureBake` | `src/runtime/Runtime.SelectedMeshTextureBake.cppm` | `runtime` |
 | `Extrinsic.Runtime.SelectionController` | `src/runtime/Runtime.SelectionController.cppm` | `runtime` |
+| `Extrinsic.Runtime.SelectionReadback` | `src/runtime/Runtime.SelectionReadback.cppm` | `runtime` |
+| `Extrinsic.Runtime.ServiceRegistry` | `src/runtime/Runtime.ServiceRegistry.cppm` | `runtime` |
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 | `Extrinsic.Runtime.VertexAttributeBinding` | `src/runtime/Runtime.VertexAttributeBinding.cppm` | `runtime` |
 | `Extrinsic.Runtime.VertexChannelBindings` | `src/runtime/Runtime.VertexChannelBindings.cppm` | `runtime` |
 | `Extrinsic.Runtime.VertexChannelStreams` | `src/runtime/Runtime.VertexChannelStreams.cppm` | `runtime` |
+| `Extrinsic.Runtime.WorldHandle` | `src/runtime/Runtime.WorldHandle.cppm` | `runtime` |
+| `Extrinsic.Runtime.WorldRegistry` | `src/runtime/Runtime.WorldRegistry.cppm` | `runtime` |
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 | `Extrinsic.Runtime.SpatialDebugClosestFace` | `src/runtime/SpatialDebug/Runtime.SpatialDebugClosestFace.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **355**
+Total modules: **380**

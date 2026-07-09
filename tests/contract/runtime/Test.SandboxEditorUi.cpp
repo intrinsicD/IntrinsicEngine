@@ -65,11 +65,13 @@ import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
+import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.KMeansGpuJobQueue;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
@@ -1043,7 +1045,7 @@ namespace
         void OnVariableTick(Runtime::Engine& engine, double, double) override
         {
             ++m_ObservedFrames;
-            if (engine.GetLastAssetImportEvent().has_value() ||
+            if (engine.GetAssetImportPipeline().GetLastAssetImportEvent().has_value() ||
                 m_ObservedFrames >= m_MaxFrames)
             {
                 engine.RequestExit();
@@ -2368,6 +2370,108 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesInspectorAnalysis)
     EXPECT_EQ(cacheStats.SelectedAnalysisCacheMisses, 1u);
     EXPECT_EQ(cacheStats.SelectedAnalysisCacheHits, 1u);
     EXPECT_EQ(cacheStats.Entries, 1u);
+}
+
+TEST(SandboxEditorUi, SelectedModelCachePartitionsAnalysisByVisibleWindow)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    Runtime::SandboxEditorSelectedModelCache cache{};
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.SelectedModelCache = &cache;
+
+    const Runtime::SandboxEditorPanelFrame inspector =
+        Runtime::BuildSandboxEditorPanelFrame(
+            context,
+            MakeOnlyInspectorModelBuildRequest());
+    ASSERT_TRUE(inspector.Inspector.HasEntity);
+    EXPECT_EQ(inspector.ModelBuildStats.SelectedAnalysisCacheMisses, 1u);
+    EXPECT_EQ(inspector.ModelBuildStats.SelectedAnalysisCacheHits, 0u);
+
+    auto buildDomain =
+        [&](const Runtime::SandboxEditorDomainWindowKind kind,
+            Runtime::SandboxEditorModelBuildStats& stats)
+    {
+        stats = Runtime::SandboxEditorModelBuildStats{};
+        context.ModelBuildStats = &stats;
+        return Runtime::BuildSandboxEditorDomainWindowModel(context, kind);
+    };
+
+    Runtime::SandboxEditorModelBuildStats meshStats{};
+    const Runtime::SandboxEditorDomainWindowModel meshModel =
+        buildDomain(Runtime::SandboxEditorDomainWindowKind::Mesh, meshStats);
+    ASSERT_TRUE(meshModel.HasSelectedEntity);
+    EXPECT_TRUE(meshModel.DomainMatches);
+    EXPECT_EQ(meshStats.SelectedAnalysisCacheMisses, 1u);
+    EXPECT_EQ(meshStats.SelectedAnalysisCacheHits, 0u);
+    EXPECT_EQ(meshStats.PropertyCatalogModelBuilds, 1u);
+    EXPECT_GT(meshStats.SelectedAnalysisModelBuildTimeNs, 0u);
+
+    Runtime::SandboxEditorModelBuildStats cachedMeshStats{};
+    const Runtime::SandboxEditorDomainWindowModel cachedMesh =
+        buildDomain(Runtime::SandboxEditorDomainWindowKind::Mesh,
+                    cachedMeshStats);
+    ASSERT_TRUE(cachedMesh.HasSelectedEntity);
+    EXPECT_TRUE(cachedMesh.DomainMatches);
+    EXPECT_EQ(cachedMeshStats.SelectedAnalysisCacheMisses, 0u);
+    EXPECT_EQ(cachedMeshStats.SelectedAnalysisCacheHits, 1u);
+    EXPECT_EQ(cachedMeshStats.PropertyCatalogModelBuilds, 0u);
+    EXPECT_EQ(cachedMeshStats.BoundStateModelBuilds, 0u);
+    EXPECT_EQ(cachedMeshStats.TextureBakeModelBuilds, 0u);
+    EXPECT_EQ(cachedMeshStats.SelectedAnalysisModelBuildTimeNs, 0u);
+
+    Runtime::SandboxEditorModelBuildStats graphStats{};
+    const Runtime::SandboxEditorDomainWindowModel graphModel =
+        buildDomain(Runtime::SandboxEditorDomainWindowKind::Graph, graphStats);
+    ASSERT_TRUE(graphModel.HasSelectedEntity);
+    EXPECT_FALSE(graphModel.DomainMatches);
+    EXPECT_EQ(graphStats.SelectedAnalysisCacheMisses, 1u);
+    EXPECT_EQ(graphStats.SelectedAnalysisCacheHits, 0u);
+    EXPECT_EQ(graphStats.PropertyCatalogModelBuilds, 1u);
+
+    Runtime::SandboxEditorModelBuildStats cachedGraphStats{};
+    const Runtime::SandboxEditorDomainWindowModel cachedGraph =
+        buildDomain(Runtime::SandboxEditorDomainWindowKind::Graph,
+                    cachedGraphStats);
+    ASSERT_TRUE(cachedGraph.HasSelectedEntity);
+    EXPECT_FALSE(cachedGraph.DomainMatches);
+    EXPECT_EQ(cachedGraphStats.SelectedAnalysisCacheMisses, 0u);
+    EXPECT_EQ(cachedGraphStats.SelectedAnalysisCacheHits, 1u);
+    EXPECT_EQ(cachedGraphStats.PropertyCatalogModelBuilds, 0u);
+    EXPECT_EQ(cachedGraphStats.SelectedAnalysisModelBuildTimeNs, 0u);
+
+    Runtime::SandboxEditorModelBuildStats pointStats{};
+    const Runtime::SandboxEditorDomainWindowModel pointModel =
+        buildDomain(Runtime::SandboxEditorDomainWindowKind::PointCloud,
+                    pointStats);
+    ASSERT_TRUE(pointModel.HasSelectedEntity);
+    EXPECT_FALSE(pointModel.DomainMatches);
+    EXPECT_EQ(pointStats.SelectedAnalysisCacheMisses, 1u);
+    EXPECT_EQ(pointStats.SelectedAnalysisCacheHits, 0u);
+    EXPECT_EQ(pointStats.PropertyCatalogModelBuilds, 1u);
+
+    Runtime::SandboxEditorModelBuildStats cachedPointStats{};
+    const Runtime::SandboxEditorDomainWindowModel cachedPoint =
+        buildDomain(Runtime::SandboxEditorDomainWindowKind::PointCloud,
+                    cachedPointStats);
+    ASSERT_TRUE(cachedPoint.HasSelectedEntity);
+    EXPECT_FALSE(cachedPoint.DomainMatches);
+    EXPECT_EQ(cachedPointStats.SelectedAnalysisCacheMisses, 0u);
+    EXPECT_EQ(cachedPointStats.SelectedAnalysisCacheHits, 1u);
+    EXPECT_EQ(cachedPointStats.PropertyCatalogModelBuilds, 0u);
+    EXPECT_EQ(cachedPointStats.SelectedAnalysisModelBuildTimeNs, 0u);
+
+    context.ModelBuildStats = nullptr;
+    const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
+        cache.Stats();
+    EXPECT_EQ(cacheStats.SelectedAnalysisCacheMisses, 4u);
+    EXPECT_EQ(cacheStats.SelectedAnalysisCacheHits, 3u);
+    EXPECT_EQ(cacheStats.Entries, 4u);
 }
 
 TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnSelectionGeneration)
@@ -7175,7 +7279,7 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandSurvivesPendingDirectMeshPostProce
     engine.Initialize();
     InstallSandboxDefaultRuntimePolicies(engine);
 
-    auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+    auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
         .PayloadKind = Assets::AssetPayloadKind::Mesh,
     });
@@ -10487,7 +10591,7 @@ TEST(SandboxEditorUi, EngineImportFacadeReportsMissingFile)
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
     engine.Initialize();
 
-    auto imported = engine.ImportAssetFromPath(
+    auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(
         Runtime::RuntimeAssetImportRequest{
             .Path = "/tmp/intrinsicengine-ui-001-missing.gltf",
         });
@@ -10523,7 +10627,7 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesStandaloneGeometryDomains)
     engine.Initialize();
     InstallSandboxDefaultRuntimePolicies(engine);
 
-    auto mesh = engine.ImportAssetFromPath(
+    auto mesh = engine.GetAssetImportPipeline().ImportAssetFromPath(
         Runtime::RuntimeAssetImportRequest{
             .Path = meshFile.Path.string(),
             .PayloadKind = Assets::AssetPayloadKind::Mesh,
@@ -10533,7 +10637,7 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesStandaloneGeometryDomains)
     EXPECT_EQ(mesh->PayloadKind, Assets::AssetPayloadKind::Mesh);
     EXPECT_EQ(mesh->PrimitiveEntitiesCreated, 1u);
 
-    auto graph = engine.ImportAssetFromPath(
+    auto graph = engine.GetAssetImportPipeline().ImportAssetFromPath(
         Runtime::RuntimeAssetImportRequest{
             .Path = graphFile.Path.string(),
             .PayloadKind = Assets::AssetPayloadKind::Graph,
@@ -10543,7 +10647,7 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesStandaloneGeometryDomains)
     EXPECT_EQ(graph->PayloadKind, Assets::AssetPayloadKind::Graph);
     EXPECT_EQ(graph->PrimitiveEntitiesCreated, 1u);
 
-    auto cloud = engine.ImportAssetFromPath(
+    auto cloud = engine.GetAssetImportPipeline().ImportAssetFromPath(
         Runtime::RuntimeAssetImportRequest{
             .Path = cloudFile.Path.string(),
             .PayloadKind = Assets::AssetPayloadKind::PointCloud,
@@ -10600,7 +10704,7 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesStandaloneGeometryDomains)
     EXPECT_GT(cloudWorld.WorldBoundingSphere.Radius, 1.8f);
 
     const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
-        engine.GetLastAssetImportEvent();
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
     ASSERT_TRUE(lastEvent.has_value());
     EXPECT_TRUE(lastEvent->Succeeded());
     ASSERT_TRUE(lastEvent->Result.has_value());
@@ -10641,7 +10745,7 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesNonManifoldObjAsRenderableMe
     engine.Initialize();
     InstallSandboxDefaultRuntimePolicies(engine);
 
-    auto mesh = engine.ImportAssetFromPath(
+    auto mesh = engine.GetAssetImportPipeline().ImportAssetFromPath(
         Runtime::RuntimeAssetImportRequest{
             .Path = meshFile.Path.string(),
             .PayloadKind = Assets::AssetPayloadKind::Mesh,
@@ -10708,7 +10812,7 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesObjWithoutAuthoredTexcoordsA
     engine.Initialize();
     InstallSandboxDefaultRuntimePolicies(engine);
 
-    auto mesh = engine.ImportAssetFromPath(
+    auto mesh = engine.GetAssetImportPipeline().ImportAssetFromPath(
         Runtime::RuntimeAssetImportRequest{
             .Path = meshFile.Path.string(),
             .PayloadKind = Assets::AssetPayloadKind::Mesh,
@@ -10783,9 +10887,9 @@ TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacad
     ui.Attach(engine);
 
     const std::vector<std::string> droppedPaths{cloudFile.Path.string()};
-    engine.ImportDroppedFilePaths(droppedPaths);
+    engine.GetAssetImportPipeline().ImportDroppedFilePaths(droppedPaths);
     EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::PointCloud), 0u);
-    EXPECT_FALSE(engine.GetLastAssetImportEvent().has_value());
+    EXPECT_FALSE(engine.GetAssetImportPipeline().GetLastAssetImportEvent().has_value());
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
         << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
@@ -10794,7 +10898,7 @@ TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacad
 
     EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::PointCloud), 1u);
     const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
-        engine.GetLastAssetImportEvent();
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
     ASSERT_TRUE(lastEvent.has_value());
     EXPECT_TRUE(lastEvent->Succeeded());
     ASSERT_TRUE(lastEvent->Result.has_value());
@@ -10830,10 +10934,10 @@ TEST(SandboxEditorUi, DuplicateDroppedGeometryImportUsesSingleIngestRecord)
         meshFile.Path.string(),
         meshFile.Path.string(),
     };
-    engine.ImportDroppedFilePaths(droppedPaths);
+    engine.GetAssetImportPipeline().ImportDroppedFilePaths(droppedPaths);
 
     std::vector<Runtime::RuntimeAssetIngestRecord> records =
-        engine.GetAssetIngestRecordsForTest();
+        engine.GetAssetImportPipeline().GetAssetIngestRecordsForTest();
     ASSERT_EQ(records.size(), 1u);
     EXPECT_EQ(records[0].Request.Source,
               Runtime::RuntimeAssetIngestSource::DroppedFile);
@@ -10841,7 +10945,7 @@ TEST(SandboxEditorUi, DuplicateDroppedGeometryImportUsesSingleIngestRecord)
     EXPECT_EQ(records[0].Phase, Runtime::RuntimeAssetIngestPhase::Decoding);
 
     const std::optional<Runtime::RuntimeAssetImportEvent>& duplicateEvent =
-        engine.GetLastAssetImportEvent();
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
     ASSERT_TRUE(duplicateEvent.has_value());
     EXPECT_FALSE(duplicateEvent->Succeeded());
     EXPECT_EQ(duplicateEvent->Error, Core::ErrorCode::ResourceBusy);
@@ -10854,7 +10958,7 @@ TEST(SandboxEditorUi, DuplicateDroppedGeometryImportUsesSingleIngestRecord)
     engine.Run();
 
     EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
-    records = engine.GetAssetIngestRecordsForTest();
+    records = engine.GetAssetImportPipeline().GetAssetIngestRecordsForTest();
     ASSERT_EQ(records.size(), 1u);
     EXPECT_EQ(records[0].Phase, Runtime::RuntimeAssetIngestPhase::Complete);
     EXPECT_EQ(records[0].Diagnostic, Runtime::RuntimeAssetIngestDiagnostic::None);
@@ -10862,7 +10966,7 @@ TEST(SandboxEditorUi, DuplicateDroppedGeometryImportUsesSingleIngestRecord)
     EXPECT_EQ(records[0].Result->PrimitiveEntitiesCreated, 1u);
 
     const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
-        engine.GetLastAssetImportEvent();
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
     ASSERT_TRUE(lastEvent.has_value());
     EXPECT_TRUE(lastEvent->Succeeded());
     EXPECT_EQ(lastEvent->IngestDiagnostic,
@@ -10893,10 +10997,10 @@ TEST(SandboxEditorUi, DroppedFileQueuePreservesOrderDiagnosticsAndClearCompleted
         meshFile.Path.string(),
         missingFile.string(),
     };
-    engine.ImportDroppedFilePaths(droppedPaths);
+    engine.GetAssetImportPipeline().ImportDroppedFilePaths(droppedPaths);
 
     Runtime::RuntimeAssetImportQueueSnapshot queue =
-        engine.GetAssetImportQueueSnapshot();
+        engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
     ASSERT_EQ(queue.Entries.size(), 2u);
     EXPECT_EQ(queue.ActiveCount, 2u);
     EXPECT_EQ(queue.Entries[0].SourcePath, meshFile.Path.string());
@@ -10909,7 +11013,7 @@ TEST(SandboxEditorUi, DroppedFileQueuePreservesOrderDiagnosticsAndClearCompleted
         << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
     engine.Run();
 
-    queue = engine.GetAssetImportQueueSnapshot();
+    queue = engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
     ASSERT_EQ(queue.Entries.size(), 2u);
     EXPECT_EQ(queue.ActiveCount, 0u);
     EXPECT_EQ(queue.TerminalCount, 2u);
@@ -10923,8 +11027,8 @@ TEST(SandboxEditorUi, DroppedFileQueuePreservesOrderDiagnosticsAndClearCompleted
     EXPECT_FALSE(queue.Entries[1].DiagnosticText.empty());
     EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
 
-    EXPECT_EQ(engine.ClearCompletedAssetImports(), 2u);
-    queue = engine.GetAssetImportQueueSnapshot();
+    EXPECT_EQ(engine.GetAssetImportPipeline().ClearCompletedAssetImports(), 2u);
+    queue = engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
     EXPECT_TRUE(queue.Entries.empty());
 
     engine.Shutdown();
@@ -10945,15 +11049,15 @@ TEST(SandboxEditorUi, DroppedGeometryQueueCancellationPreventsMainThreadApply)
     engine.Initialize();
 
     const std::vector<std::string> droppedPaths{meshFile.Path.string()};
-    engine.ImportDroppedFilePaths(droppedPaths);
+    engine.GetAssetImportPipeline().ImportDroppedFilePaths(droppedPaths);
 
     Runtime::RuntimeAssetImportQueueSnapshot queue =
-        engine.GetAssetImportQueueSnapshot();
+        engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
     ASSERT_EQ(queue.Entries.size(), 1u);
     EXPECT_TRUE(queue.Entries[0].CanCancel);
-    EXPECT_TRUE(engine.CancelAssetImport(queue.Entries[0].Operation).has_value());
+    EXPECT_TRUE(engine.GetAssetImportPipeline().CancelAssetImport(queue.Entries[0].Operation).has_value());
 
-    queue = engine.GetAssetImportQueueSnapshot();
+    queue = engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
     ASSERT_EQ(queue.Entries.size(), 1u);
     EXPECT_EQ(queue.Entries[0].TerminalStatus,
               Runtime::RuntimeAssetImportQueueTerminalStatus::Cancelled);
@@ -10986,7 +11090,7 @@ TEST(SandboxEditorUi, DroppedGeometryAssetReimportReloadsSameAssetWithoutDuplica
     InstallSandboxDefaultRuntimePolicies(engine);
 
     const std::vector<std::string> droppedPaths{meshFile.Path.string()};
-    engine.ImportDroppedFilePaths(droppedPaths);
+    engine.GetAssetImportPipeline().ImportDroppedFilePaths(droppedPaths);
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
         << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
@@ -10994,7 +11098,7 @@ TEST(SandboxEditorUi, DroppedGeometryAssetReimportReloadsSameAssetWithoutDuplica
     engine.Run();
 
     const std::optional<Runtime::RuntimeAssetImportEvent>& droppedEvent =
-        engine.GetLastAssetImportEvent();
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
     ASSERT_TRUE(droppedEvent.has_value());
     ASSERT_TRUE(droppedEvent->Succeeded());
     ASSERT_TRUE(droppedEvent->Result.has_value());
@@ -11015,7 +11119,7 @@ TEST(SandboxEditorUi, DroppedGeometryAssetReimportReloadsSameAssetWithoutDuplica
                "f 1 3 4\n";
     }
 
-    auto reimported = engine.ReimportAsset(Runtime::RuntimeAssetReimportRequest{
+    auto reimported = engine.GetAssetImportPipeline().ReimportAsset(Runtime::RuntimeAssetReimportRequest{
         .Asset = droppedAsset,
     });
     ASSERT_TRUE(reimported.has_value()) << static_cast<int>(reimported.error());
@@ -11031,7 +11135,7 @@ TEST(SandboxEditorUi, DroppedGeometryAssetReimportReloadsSameAssetWithoutDuplica
     EXPECT_GT(secondTicket->generation, firstTicket->generation);
 
     const std::vector<Runtime::RuntimeAssetIngestRecord> records =
-        engine.GetAssetIngestRecordsForTest();
+        engine.GetAssetImportPipeline().GetAssetIngestRecordsForTest();
     ASSERT_EQ(records.size(), 2u);
     EXPECT_EQ(records[0].Request.Source,
               Runtime::RuntimeAssetIngestSource::DroppedFile);
@@ -11043,7 +11147,7 @@ TEST(SandboxEditorUi, DroppedGeometryAssetReimportReloadsSameAssetWithoutDuplica
     EXPECT_EQ(records[1].Diagnostic, Runtime::RuntimeAssetIngestDiagnostic::None);
 
     const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
-        engine.GetLastAssetImportEvent();
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
     ASSERT_TRUE(lastEvent.has_value());
     EXPECT_TRUE(lastEvent->Succeeded());
     EXPECT_EQ(lastEvent->IngestDiagnostic,
@@ -11086,7 +11190,7 @@ TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesRenderCo
 
     EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
     const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
-        engine.GetLastAssetImportEvent();
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
     ASSERT_TRUE(lastEvent.has_value());
     EXPECT_TRUE(lastEvent->Succeeded());
     ASSERT_TRUE(lastEvent->Result.has_value());
@@ -11175,7 +11279,7 @@ TEST(SandboxEditorUi, PlatformDropNoUvObjUploadsRawSurfaceBeforeDeferredPostProc
 
     EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
     const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
-        engine.GetLastAssetImportEvent();
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
     ASSERT_TRUE(lastEvent.has_value());
     EXPECT_TRUE(lastEvent->Succeeded());
     ASSERT_TRUE(lastEvent->Result.has_value());
@@ -11219,7 +11323,7 @@ TEST(SandboxEditorUi, DroppedFileImportFailureLogsDiagnostics)
         << "The platform drop boundary must log receipt before deferred import work completes.";
     EXPECT_TRUE(LogSnapshotContains(queuedLogs, "Queued dropped geometry import"))
         << "Dropped geometry imports must log that they were queued off the platform polling path.";
-    EXPECT_FALSE(engine.GetLastAssetImportEvent().has_value());
+    EXPECT_FALSE(engine.GetAssetImportPipeline().GetLastAssetImportEvent().has_value());
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
         << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
@@ -11227,7 +11331,7 @@ TEST(SandboxEditorUi, DroppedFileImportFailureLogsDiagnostics)
     engine.Run();
 
     const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
-        engine.GetLastAssetImportEvent();
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
     ASSERT_TRUE(lastEvent.has_value());
     EXPECT_FALSE(lastEvent->Succeeded());
     EXPECT_EQ(lastEvent->RequestedPayloadKind, Assets::AssetPayloadKind::Mesh);
@@ -11271,7 +11375,7 @@ TEST(SandboxEditorUi, PlatformDropEventImportsOffMesh)
 
     EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
     const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
-        engine.GetLastAssetImportEvent();
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
     ASSERT_TRUE(lastEvent.has_value());
     EXPECT_TRUE(lastEvent->Succeeded());
     ASSERT_TRUE(lastEvent->Result.has_value());

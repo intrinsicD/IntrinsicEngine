@@ -15,6 +15,7 @@
 #include <vector>
 
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.EngineConfigBoot;
 
 import Extrinsic.Sandbox;
 
@@ -417,6 +418,7 @@ int main(int argc, char** argv)
     }
 
     Extrinsic::Runtime::Engine engine{config, std::move(app)};
+    Extrinsic::Sandbox::RegisterSandboxRuntimeModules(engine);
     engine.Initialize();
     engine.Run();
     if (capture != nullptr)

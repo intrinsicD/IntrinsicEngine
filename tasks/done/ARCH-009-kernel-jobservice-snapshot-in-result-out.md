@@ -1,0 +1,143 @@
+---
+id: ARCH-009
+theme: F
+depends_on:
+  - ARCH-008
+maturity_target: CPUContracted
+completed: 2026-07-08
+---
+# ARCH-009 — Kernel JobService: snapshot-in/result-out background jobs
+
+## Status
+
+- Retired on 2026-07-08 at `CPUContracted`.
+- PR: pending. Commit: pending local change.
+- The code landed as `Extrinsic.Runtime.JobService` plus the small
+  `Extrinsic.Runtime.WorldHandle` token module. `Engine` now exposes
+  `Engine::Jobs()`, drains JobService completions before event pump B, and
+  reaps terminal job records in Maintenance.
+- The landed API keeps the iron rule from ADR-0024 D8: worker functions
+  receive only `JobCancellation` and return a `JobResultEnvelope`; they do
+  not receive the kernel event bus, ECS scenes, component references, or live
+  world references. Only the service publishes completion events after token
+  and world-scope checks at the main-thread gate.
+- `GpuQueue` is reserved in the public target enum and intentionally rejected
+  in this slice. GPU-job execution remains deferred to `RUNTIME-137`.
+- Verified locally with the `ci` preset, which enables
+  `INTRINSIC_ENABLE_SANITIZERS=ON`: configure passed, the focused
+  `IntrinsicRuntimeContractTests` target built, all seven
+  `RuntimeJobService.*` contract tests passed directly and through CTest,
+  `IntrinsicTests` built, and the full default CPU-supported CTest gate
+  passed 3623/3623.
+- `Operational` use of the JobService remains owned by `ARCH-012`, which
+  composes command -> job -> event -> commit through a real
+  `ClusteringModule` flow.
+
+## Goal
+- Give the runtime kernel a `JobService` for multi-frame background work on
+  the shared worker pool: `Submit(JobDesc) -> JobToken`, cooperative
+  cancellation scoped to a `WorldHandle`, and service-owned completion
+  publication behind the token gate — workers deposit results into the
+  service, and only the service publishes completion events, main-thread,
+  after checking token and world scope — plus a reap step in the
+  Maintenance phase, per
+  [ADR-0024](../../docs/adr/0024-kernel-module-architecture.md) D8.
+
+## Non-goals
+- No `GpuQueue` execution target in this task — the GPU path rides the
+  GPU-job-participant frame contract and `RUNTIME-137`; this task ships
+  `CpuPool` and reserves the target enum.
+- No migration of `Runtime.DerivedJobGraph`, `Runtime.StreamingExecutor`,
+  `Runtime.KMeansGpuJobQueue`, or `Runtime.AsyncBufferReadback` onto the
+  service; `ARCH-012` and later extractions own consumer moves.
+- No in-place mutation escape hatch: jobs never receive live-world references
+  (iron rule, ADR-0024 D8). Rejected alternative (locking/checkout) stays
+  rejected.
+- No new scheduler machinery — reuse `Extrinsic.Core.Tasks`; scheduler
+  hardening stays owned by `CORE-005`/`CORE-007`.
+
+## Context
+- Owner/layer: `runtime` (kernel spine per ADR-0024 D9); executes on the
+  existing core task scheduler so the FrameGraph and jobs share one pool.
+- Completion channel: the work function returns its result payload to the
+  JobService (workers never publish job-completion events to the `ARCH-008`
+  bus — a completion already enqueued on the bus could not be suppressed by
+  a later cancellation). The service drains finished results on the main
+  thread each frame before pump B, drops results whose token is cancelled
+  or whose scope world is being torn down, and publishes the job's declared
+  completion event only for survivors; module completion handlers then
+  commit to the live world at pump B. Cancellation and publication both run
+  on the main thread, so no suppression race exists.
+- Cancellation contract: cancelling marks the token; the work function polls
+  a `JobCancellation` view; a cancelled job's result — even one already
+  finished on the worker — is dropped whole at the service's completion
+  gate before any event is published, so results are never half-applied.
+  `ARCH-010` wires world-teardown cancellation onto this.
+- Depends on `ARCH-008` for the worker→main-thread completion channel.
+
+## Required changes
+- [x] New `Extrinsic.Runtime.JobService` module (interface `.cppm` +
+      implementation `.cpp`): `JobDesc { DebugName, Target, Scope(WorldHandle),
+      Work(const JobCancellation&) -> Result, PublishCompletion(EventBus&,
+      Result&&) }`, `Submit`, `Cancel`, `IsComplete`,
+      `CancelAllForWorld(WorldHandle)`. Workers deposit `Result` into the
+      service's internal completion queue; they get no event-bus access for
+      completions.
+- [x] Completion gate: a main-thread drain step (wired before pump B in
+      `Engine::RunFrame()`) that checks each finished token, drops
+      cancelled/world-dead results whole, and invokes `PublishCompletion`
+      for survivors.
+- [x] `JobToken` handle type usable by `ARCH-007`'s future `Pending` outcome
+      and by parked `CommandSequence` links (declaration only; no sequence
+      machinery).
+- [x] Reap step (`ReapCompleted`) wired into the Maintenance phase of
+      `Engine::RunFrame()`.
+- [x] Diagnostics: in-flight/completed/cancelled counters.
+
+## Tests
+- [x] Contract tests (headless, `contract;runtime` labels): submit → work
+      runs on a pool thread → gate publishes → completion event delivered
+      at pump B → commit handler runs on the main thread.
+- [x] Cancellation test: cancel before start (work never runs) and cancel
+      mid-flight (cooperative poll observes it; completion dropped).
+- [x] Gate-suppression test: work finishes on the worker, then the token is
+      cancelled (or its world torn down) before the gate drains — no
+      completion event is delivered and no commit happens.
+- [x] World-scope test: `CancelAllForWorld` cancels only that world's jobs.
+- [x] Sanitizer run covers the submit/complete/cancel races.
+
+## Docs
+- [x] Regenerate `docs/api/generated/module_inventory.md` (new module).
+- [x] Record the FrameGraph-vs-JobService two-tier rule in the runtime
+      architecture doc, citing ADR-0024 D8.
+
+## Acceptance criteria
+- [x] Jobs receive no live-world references anywhere in the API surface.
+- [x] Completion commits demonstrably run main-thread at a pump point.
+- [x] All listed tests pass under the default CPU gate and sanitizers.
+- [x] `Operational` follow-up is owned by `ARCH-012`; the `GpuQueue` target
+      is deferred to the `RUNTIME-137` follow-up line.
+
+## Verification
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='RuntimeJobService.*'
+ctest --test-dir build/ci --output-on-failure -R 'RuntimeJobService' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+```
+
+## Forbidden changes
+- Publishing job-completion events from worker threads or from anywhere
+  that bypasses the service's token/world gate.
+- Any API accepting `ECS::SceneRegistry&` (or component references) into a
+  job's work function.
+- Blocking waits on job completion from the main loop.
+- Creating a second worker pool.
+
+## Maturity
+- Target achieved: `CPUContracted`. `Operational` remains owned by
+  `ARCH-012`; GPU execution remains deferred to `RUNTIME-137`.

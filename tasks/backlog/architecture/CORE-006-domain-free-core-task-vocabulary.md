@@ -35,6 +35,10 @@ depends_on: []
   should not enumerate upper-layer domains.
 - Origin: `docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`
   finding R6.
+- ARCH-013 re-review (2026-07-08): Decision unchanged as a discovered
+  adjacent row. ADR-0024 strengthens the need for this task: core remains
+  domain-free, while runtime/module adapters own any taxonomy consumed by
+  `JobService`, render prep, or streaming work.
 
 ## Required changes
 - [ ] Replace the `TaskKind` domain enum with an opaque token

@@ -2,8 +2,10 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 export module Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 
@@ -123,6 +125,14 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] RuntimeObjectSpaceNormalBakeResult Complete(
             const RuntimeObjectSpaceNormalBakeStaleKey& completion);
 
+        [[nodiscard]] bool IsLatest(
+            const RuntimeObjectSpaceNormalBakeStaleKey& key) const noexcept;
+        [[nodiscard]] std::size_t PendingSubmissionCount() const noexcept;
+        [[nodiscard]] std::vector<RuntimeObjectSpaceNormalBakeSubmission>
+            TakePendingSubmissions(std::size_t maxCount = 0u);
+        void RequeuePendingSubmission(RuntimeObjectSpaceNormalBakeSubmission submission);
+        void ClearPending();
+
         [[nodiscard]] const RuntimeObjectSpaceNormalBakeQueueDiagnostics&
             Diagnostics() const noexcept;
         [[nodiscard]] std::size_t PendingCount() const noexcept;
@@ -136,6 +146,7 @@ export namespace Extrinsic::Runtime
             RuntimeObjectSpaceNormalBakeContentKeyHash> m_ContentKeyAssets{};
         std::unordered_map<std::uint64_t, RuntimeObjectSpaceNormalBakeStaleKey>
             m_LatestByEntity{};
+        std::deque<RuntimeObjectSpaceNormalBakeSubmission> m_PendingSubmissions{};
         RuntimeObjectSpaceNormalBakeQueueDiagnostics m_Diagnostics{};
     };
 }

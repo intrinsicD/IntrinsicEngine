@@ -20,6 +20,7 @@ import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.TextureUpload;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.ImGuiAdapter;
 
 namespace

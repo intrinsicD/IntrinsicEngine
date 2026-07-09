@@ -34,6 +34,10 @@ depends_on:
   finding R12.
 - Gated on `BUG-055` because completion-state lifetime must be safe before it
   can escape `Execute`'s stack frame as a token.
+- ARCH-013 re-review (2026-07-08): Decision unchanged. This remains core
+  scheduler/DAG substrate below `JobService`; the submit token may underpin
+  runtime jobs or frame-graph work, but it must not grow runtime/module domain
+  vocabulary or duplicate command/event semantics.
 
 ## Required changes
 - [ ] Add a non-blocking submission API returning a completion handle

@@ -5,6 +5,7 @@ module;
 export module Extrinsic.Sandbox;
 
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SandboxEditorUi;
 
@@ -50,5 +51,14 @@ namespace Extrinsic::Sandbox
 
 export namespace Extrinsic::Sandbox
 {
+    void RegisterSandboxRuntimeModules(Runtime::Engine& engine);
     [[nodiscard]] std::unique_ptr<Runtime::IApplication> CreateSandboxApp();
+}
+
+namespace Extrinsic::Sandbox
+{
+    void RegisterSandboxRuntimeModules(Runtime::Engine& engine)
+    {
+        engine.EmplaceModule<Runtime::ClusteringModule>();
+    }
 }

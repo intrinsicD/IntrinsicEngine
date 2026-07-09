@@ -9,7 +9,7 @@
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Window;
-import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.EngineConfigBoot;
 
 using namespace Extrinsic;
 
