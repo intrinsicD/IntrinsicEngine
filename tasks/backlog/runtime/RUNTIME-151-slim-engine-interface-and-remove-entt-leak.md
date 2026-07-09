@@ -49,6 +49,10 @@ maturity_target: Operational
   lines today. After `RUNTIME-146..150` remove moved types, this task
   re-audits every remaining `import` in the interface and drops the ones
   only implementation units need.
+- The newer 2026-07-09 `CI-003` hosted audit measured the interface at
+  140.072s, 1,153 lines, and 50 imports/exports. That retained measurement
+  supersedes exploratory hotspot discovery for task selection; retirement
+  still requires comparable before/after samples for any improvement claim.
 - In-src importers to re-verify after slimming:
   `Runtime.SandboxDefaultPolicies`, `Runtime.SandboxEditorUi`,
   `src/app/Sandbox/*`.
@@ -68,6 +72,8 @@ maturity_target: Operational
       implementation units into those units.
 - [ ] Record before/after interface line count and import count in this
       task file at retirement.
+- [ ] Record before/after clean interface compile duration and downstream Ninja
+      rebuild edges against `CI-003`.
 
 ## Tests
 - [ ] `Test.SelectionStableLookupComposition.cpp` and

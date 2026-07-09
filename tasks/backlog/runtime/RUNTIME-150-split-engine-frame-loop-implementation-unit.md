@@ -58,6 +58,10 @@ maturity_target: Operational
   changes their linkage to module linkage. That is the intended mechanism;
   nothing may be exported from the partition.
 - Part of the `Runtime.Engine` decomposition series (`RUNTIME-146..151`).
+- The 2026-07-09 `CI-003` audit measured `Runtime.Engine.cpp` at 86.816s and
+  6,529 lines. Use that retained observation to choose the split; record
+  comparable before/after compile and Ninja-edge results at retirement rather
+  than rerunning exploratory hotspot discovery.
 
 ## Required changes
 - [ ] Add `src/runtime/Runtime.Engine.FrameLoop.cppm` declaring
@@ -91,6 +95,8 @@ maturity_target: Operational
 - [ ] Nothing is exported from the `:FrameLoop` partition.
 - [ ] CPU gate and layering check pass; a clean rebuild of the `ci` preset
       succeeds with clang-scan-deps resolving the partition.
+- [ ] Before/after implementation-unit compile duration and clean-build edge
+      count are recorded against `CI-003`; no performance claim uses one run.
 
 ## Verification
 ```bash

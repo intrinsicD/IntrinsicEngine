@@ -38,6 +38,7 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-149` — Extract render-recipe and hot-config control out of Engine (tasks/backlog/runtime/RUNTIME-149-extract-engine-config-control-subsystem.md)
 - unblocked: `RUNTIME-150` — Split the frame-loop hook adapters out of Runtime.Engine.cpp (tasks/backlog/runtime/RUNTIME-150-split-engine-frame-loop-implementation-unit.md)
 - blocked by `RUNTIME-146`: `RUNTIME-151` — Slim the Engine module interface and remove the entt leak (tasks/backlog/runtime/RUNTIME-151-slim-engine-interface-and-remove-entt-leak.md)
+- blocked by `CI-003`: `RUNTIME-152` — Slim and partition the RenderExtraction module (tasks/backlog/runtime/RUNTIME-152-slim-render-extraction-module.md)
 - blocked by `ARCH-012`: `UI-034` — Decentralized editor window contribution, capture contract, and property-plot widgets (tasks/backlog/ui/UI-034-framework24-editor-interaction-layout-conventions.md)
 
 ## Theme G — Active bugs
@@ -47,6 +48,13 @@ the authoritative open/unblocked view.
 
 ## Theme H — Agentic workflow hardening
 
+- unblocked: `CI-003` — Make CI gate latency observable and cancel stale runs (tasks/backlog/process/CI-003-ci-gate-timing-observability-and-cancellation.md)
+- blocked by `CI-003`: `CI-004` — Build only the test executables selected by each gate (tasks/backlog/process/CI-004-label-derived-test-build-aggregates.md)
+- blocked by `CI-003`: `CI-005` — Make PR-fast a real touched-scope feedback gate (tasks/backlog/process/CI-005-real-touched-scope-pr-fast-gate.md)
+- blocked by `CI-003`: `CI-006` — Remove duplicate sanitizer work and calibrate test parallelism (tasks/backlog/process/CI-006-sanitizer-topology-and-test-parallelism.md)
+- blocked by `CI-003`: `CI-007` — Pilot persistent module-safe ccache in CI (tasks/backlog/process/CI-007-module-safe-persistent-ccache-pilot.md)
+- blocked by `CI-003`: `CI-008` — Reduce CTest process overhead without oversubscribing workers (tasks/backlog/process/CI-008-grouped-ctest-and-worker-oversubscription.md)
+- blocked by `CI-003`: `CI-009` — Route heavy gates by lifecycle and evaluate runner scaling (tasks/backlog/process/CI-009-heavy-gate-routing-and-runner-evaluation.md)
 - unblocked: `PROC-010` — Encode P1/P3/P5 research-engine invariants in AGENTS.md + review checklist (tasks/backlog/process/PROC-010-encode-research-engine-invariants-in-contract.md)
 - unblocked: `PROC-018` — Author the import-visibility-contract skill (playbook wave 2) (tasks/backlog/process/PROC-018-import-visibility-contract-skill.md)
 - unblocked: `PROC-019` — Author the geometry-io-format skill (playbook wave 2) (tasks/backlog/process/PROC-019-geometry-io-format-skill.md)
