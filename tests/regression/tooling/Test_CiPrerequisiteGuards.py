@@ -26,6 +26,7 @@ class CiPrerequisiteGuardTests(unittest.TestCase):
             args = SimpleNamespace(
                 build_dir=build_dir,
                 skip_undeclared=True,
+                inventory=None,
                 targets=["IntrinsicCoreTests"],
             )
 
@@ -46,6 +47,7 @@ class CiPrerequisiteGuardTests(unittest.TestCase):
             args = SimpleNamespace(
                 build_dir=build_dir,
                 skip_undeclared=True,
+                inventory=None,
                 targets=["IntrinsicGraphicsVulkanContractTests"],
             )
 
@@ -55,6 +57,106 @@ class CiPrerequisiteGuardTests(unittest.TestCase):
 
             self.assertEqual(result, 0)
             self.assertIn("skipped undeclared optional", stdout.getvalue())
+
+    def test_inventory_requires_only_selected_executables(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            build_dir = Path(tmp)
+            inventory = build_dir / "IntrinsicPrFastTests.txt"
+            inventory.write_text(
+                "IntrinsicCoreTests\nIntrinsicEcsContractTests\n",
+                encoding="utf-8",
+            )
+            bin_dir = build_dir / "bin"
+            bin_dir.mkdir()
+            for target in ("IntrinsicCoreTests", "IntrinsicEcsContractTests"):
+                artifact = bin_dir / target
+                artifact.write_text("#!/bin/sh\n", encoding="utf-8")
+                artifact.chmod(0o755)
+            args = SimpleNamespace(
+                build_dir=build_dir,
+                skip_undeclared=False,
+                inventory=inventory,
+                targets=None,
+            )
+
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                result = check_prerequisites.check_test_binaries(args)
+
+            self.assertEqual(result, 0)
+            self.assertIn("passed for 2", stdout.getvalue())
+            self.assertNotIn("IntrinsicGeometryTests", stdout.getvalue())
+
+    def test_inventory_missing_selected_binary_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            build_dir = Path(tmp)
+            inventory = build_dir / "IntrinsicGpuVulkanTests.txt"
+            inventory.write_text(
+                "IntrinsicGraphicsVulkanSmokeTests\n",
+                encoding="utf-8",
+            )
+            args = SimpleNamespace(
+                build_dir=build_dir,
+                skip_undeclared=False,
+                inventory=inventory,
+                targets=None,
+            )
+
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                result = check_prerequisites.check_test_binaries(args)
+
+            self.assertEqual(result, check_prerequisites.BLOCKED_EXIT_CODE)
+            output = stdout.getvalue()
+            self.assertIn("IntrinsicGraphicsVulkanSmokeTests", output)
+            self.assertNotIn("IntrinsicRuntimeIntegrationTests", output)
+
+    def test_malformed_inventories_fail_closed(self) -> None:
+        cases = {
+            "missing": None,
+            "empty": "",
+            "blank": "IntrinsicCoreTests\n\nIntrinsicECSTests\n",
+            "duplicate": "IntrinsicCoreTests\nIntrinsicCoreTests\n",
+            "invalid": "Intrinsic Core Tests\n",
+        }
+        for name, content in cases.items():
+            with self.subTest(case=name), tempfile.TemporaryDirectory() as tmp:
+                build_dir = Path(tmp)
+                inventory = build_dir / f"{name}.txt"
+                if content is not None:
+                    inventory.write_text(content, encoding="utf-8")
+                args = SimpleNamespace(
+                    build_dir=build_dir,
+                    skip_undeclared=False,
+                    inventory=inventory,
+                    targets=None,
+                )
+
+                stdout = io.StringIO()
+                with redirect_stdout(stdout):
+                    result = check_prerequisites.check_test_binaries(args)
+
+                self.assertEqual(result, check_prerequisites.BLOCKED_EXIT_CODE)
+                self.assertIn("BLOCKED", stdout.getvalue())
+
+    def test_non_utf8_inventory_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            build_dir = Path(tmp)
+            inventory = build_dir / "invalid-encoding.txt"
+            inventory.write_bytes(b"\xff\xfe")
+            args = SimpleNamespace(
+                build_dir=build_dir,
+                skip_undeclared=False,
+                inventory=inventory,
+                targets=None,
+            )
+
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                result = check_prerequisites.check_test_binaries(args)
+
+            self.assertEqual(result, check_prerequisites.BLOCKED_EXIT_CODE)
+            self.assertIn("cannot read test target inventory", stdout.getvalue())
 
     def test_missing_path_reports_producer_target(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -79,4 +181,3 @@ class CiPrerequisiteGuardTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

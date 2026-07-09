@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 from pathlib import Path
 
 BLOCKED_EXIT_CODE = 3
@@ -29,12 +30,63 @@ def _target_declared(build_dir: Path, target: str) -> bool:
     return any(needle in text for needle in needles)
 
 
+def _validate_target_names(targets: list[str], source: str) -> str | None:
+    if not targets:
+        return f"{source} contains no test binary targets"
+    if len(targets) != len(set(targets)):
+        return f"{source} contains duplicate test binary targets"
+    invalid = [
+        target
+        for target in targets
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.+-]*", target) is None
+    ]
+    if invalid:
+        return f"{source} contains invalid target name(s): {', '.join(invalid)}"
+    return None
+
+
+def _load_inventory(path: Path) -> tuple[list[str], str | None]:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except FileNotFoundError:
+        return [], f"test target inventory does not exist: {path}"
+    except (OSError, UnicodeError) as exc:
+        return [], f"cannot read test target inventory {path}: {exc}"
+
+    targets: list[str] = []
+    for line_number, line in enumerate(lines, start=1):
+        target = line.strip()
+        if not target:
+            return [], f"{path}:{line_number}: blank inventory entries are invalid"
+        targets.append(target)
+
+    return targets, _validate_target_names(targets, str(path))
+
+
+def _resolve_test_targets(args: argparse.Namespace) -> tuple[list[str], str | None]:
+    inventory = getattr(args, "inventory", None)
+    targets = list(getattr(args, "targets", None) or [])
+    if inventory is not None:
+        if args.skip_undeclared:
+            return [], "--skip-undeclared cannot be combined with --inventory"
+        return _load_inventory(inventory)
+    return targets, _validate_target_names(targets, "--targets")
+
+
 def check_test_binaries(args: argparse.Namespace) -> int:
     build_dir = args.build_dir
+    targets, declaration_error = _resolve_test_targets(args)
+    if declaration_error:
+        print(
+            "BLOCKED: invalid test binary prerequisite declaration; "
+            f"{declaration_error}."
+        )
+        return BLOCKED_EXIT_CODE
+
     missing: list[tuple[str, Path]] = []
     skipped: list[str] = []
 
-    for target in args.targets:
+    for target in targets:
         if args.skip_undeclared and not _target_declared(build_dir, target):
             skipped.append(target)
             continue
@@ -52,7 +104,7 @@ def check_test_binaries(args: argparse.Namespace) -> int:
 
     if skipped:
         print("Prerequisite check skipped undeclared optional target(s): " + ", ".join(skipped))
-    print(f"Prerequisite check passed for {len(args.targets) - len(skipped)} test binary target(s).")
+    print(f"Prerequisite check passed for {len(targets) - len(skipped)} test binary target(s).")
     return 0
 
 
@@ -84,7 +136,17 @@ def build_parser() -> argparse.ArgumentParser:
     binaries = subparsers.add_parser("test-binaries", help="Check CTest-producing executable targets exist")
     binaries.add_argument("--build-dir", type=Path, required=True, help="CMake build directory")
     binaries.add_argument("--skip-undeclared", action="store_true", help="Skip targets not declared in build.ninja")
-    binaries.add_argument("--targets", nargs="+", required=True, help="Executable target names expected under <build-dir>/bin")
+    target_source = binaries.add_mutually_exclusive_group(required=True)
+    target_source.add_argument(
+        "--targets",
+        nargs="+",
+        help="Executable target names expected under <build-dir>/bin",
+    )
+    target_source.add_argument(
+        "--inventory",
+        type=Path,
+        help="Generated one-target-per-line aggregate inventory",
+    )
     binaries.set_defaults(func=check_test_binaries)
 
     path = subparsers.add_parser("path", help="Check a required file or directory exists")
@@ -105,4 +167,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

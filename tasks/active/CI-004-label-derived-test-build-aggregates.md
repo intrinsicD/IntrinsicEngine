@@ -9,9 +9,10 @@ depends_on:
 ## Status
 - In progress on branch `copilot/ci-004-test-build-aggregates`.
 - Owner/agent: GitHub Copilot CLI.
-- Current slice: Slice A complete; Slice B workflow/prerequisite routing is next.
-- Next verification step: route PR-fast and Vulkan through their generated
-  inventories and prove fail-closed missing-binary handling.
+- Current slice: Slices A and B complete; Slice C comparative evidence and
+  specialized selector runs are next.
+- Next verification step: configure/build the `ci-vulkan` aggregate and record
+  comparable Ninja-edge counts against the CI-003 baseline.
 
 ## Goal
 - Derive gate-specific aggregate build targets from the same CTest label
@@ -51,11 +52,11 @@ depends_on:
 - [x] Make label include/exclude/intersection semantics explicit and fail
       configuration when an aggregate references undeclared labels or a
       registered target has ambiguous metadata.
-- [ ] Change `pr-fast` and `ci-vulkan` to build their gate-specific aggregate
+- [x] Change `pr-fast` and `ci-vulkan` to build their gate-specific aggregate
       rather than `IntrinsicTests`; keep `ExtrinsicSandbox` explicit where the
       operational Vulkan smoke requires it.
 - [x] Keep `IntrinsicTests` as the canonical complete local/default aggregate.
-- [ ] Extend prerequisite checks so a missing executable selected by the CTest
+- [x] Extend prerequisite checks so a missing executable selected by the CTest
       filter fails before CTest, while an intentionally unselected executable
       is not required.
 
@@ -80,15 +81,15 @@ depends_on:
       baseline; report the delta without adding a timing threshold from one run.
 
 ## Docs
-- [ ] Document aggregate target meanings and their relationship to CTest label
+- [x] Document aggregate target meanings and their relationship to CTest label
       selectors in `tests/README.md`.
-- [ ] Update workflow/build documentation that currently prescribes
+- [x] Update workflow/build documentation that currently prescribes
       `IntrinsicTests` for specialized gates; retain it for the default CPU
       correctness gate.
 - [ ] Regenerate `tasks/SESSION-BRIEF.md` on retirement.
 
 ## Acceptance criteria
-- [ ] `pr-fast` and `ci-vulkan` no longer build the complete
+- [x] `pr-fast` and `ci-vulkan` no longer build the complete
       `IntrinsicTests` aggregate.
 - [ ] Every test selected by each specialized CTest command has its executable
       built, and no unrelated test executable is pulled in by the aggregate.
@@ -127,6 +128,18 @@ selector-to-command comparison matched all generated inventories exactly:
 PR-fast selects 3,576 tests / 19 executables, CPU selects 3,635 / 22,
 GPU+Vulkan selects 59 / 5 after excluding the explicit Sandbox capture, and
 PR-smoke selects 51 / 1.
+
+Slice B verification run on 2026-07-09:
+
+```bash
+python3 tests/regression/tooling/Test_CiPrerequisiteGuards.py -v
+python3 tests/regression/tooling/Test.WorkflowConcurrency.py -v
+python3 tests/regression/tooling/Test.TestBuildAggregates.py -v
+python3 tools/ci/check_prerequisites.py test-binaries --build-dir build/ci --inventory build/ci/test-inventories/IntrinsicPrFastTests.txt
+python3 tools/ci/check_prerequisites.py test-binaries --build-dir build/ci --inventory build/ci/test-inventories/IntrinsicGpuVulkanTests.txt
+python3 -c 'from pathlib import Path; import yaml; [yaml.safe_load(path.read_text()) for path in Path(".github/workflows").glob("*.yml")]'
+git diff --check
+```
 
 ## Forbidden changes
 - Hand-maintaining a second target list that can drift from test labels.

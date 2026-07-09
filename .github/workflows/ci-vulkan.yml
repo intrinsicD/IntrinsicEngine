@@ -69,7 +69,7 @@ jobs:
           python3 tools/ci/time_command.py \
             --label "Build promoted Vulkan targets" \
             --json-out build/ci-vulkan/ci-timing/phases/build.json \
-            -- cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicTests
+            -- cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicGpuVulkanTests
 
       # GRAPHICS-080: `ctest -L 'gpu' -L 'vulkan'` is the documented intersection
       # form across labels (each `-L` regex must match at least one label). The
@@ -88,6 +88,12 @@ jobs:
       # batch green if a future host build trims the fixture set to empty.
       - name: Run gpu;vulkan opt-in fixtures
         run: |
+          python3 tools/ci/check_prerequisites.py test-binaries \
+            --build-dir build/ci-vulkan \
+            --inventory build/ci-vulkan/test-inventories/IntrinsicGpuVulkanTests.txt
+          python3 tools/ci/check_prerequisites.py test-binaries \
+            --build-dir build/ci-vulkan \
+            --targets ExtrinsicSandbox
           python3 tools/ci/time_command.py \
             --label "Run gpu;vulkan opt-in fixtures" \
             --json-out build/ci-vulkan/ci-timing/phases/test.json \
@@ -111,7 +117,7 @@ jobs:
              frame_pacing_tests="$(ctest --test-dir build/ci-vulkan --show-only=json-v1 -R "^ExtrinsicSandbox\\.FramePacingDiagnosticCapture$" -L "gpu" -L "vulkan" | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')"; then
             context_args+=(--selected-test-count "$((gpu_tests + frame_pacing_tests))")
           fi
-          if ninja_edges="$(ninja -C build/ci-vulkan -t commands ExtrinsicSandbox IntrinsicTests | sed '/^[[:space:]]*$/d' | wc -l)"; then
+          if ninja_edges="$(ninja -C build/ci-vulkan -t commands ExtrinsicSandbox IntrinsicGpuVulkanTests | sed '/^[[:space:]]*$/d' | wc -l)"; then
             context_args+=(--ninja-edge-count "$ninja_edges")
           fi
           python3 tools/ci/aggregate_gate_timing.py \

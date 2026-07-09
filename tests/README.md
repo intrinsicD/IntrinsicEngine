@@ -27,6 +27,25 @@ The documented label set is:
 executable helper. Additions must update this README and the helper's allow-list
 in the same change before a new CTest label can be used.
 
+`cmake/IntrinsicTest.cmake` is the authoritative executable/label registry. It
+derives these build aggregates from exact label membership and writes their
+one-target-per-line inventories under `build/<preset>/test-inventories/`:
+
+| Target | Matching CTest policy |
+| --- | --- |
+| `IntrinsicTests` | Every registered CTest-producing executable |
+| `IntrinsicPrFastTests` | Any `unit` or `contract`; exclude `gpu`, `vulkan`, `slow`, `flaky-quarantine` |
+| `IntrinsicCpuTests` | Exclude `gpu`, `vulkan`, `slow`, `flaky-quarantine` |
+| `IntrinsicGpuVulkanTests` | Require both `gpu` and `vulkan`; exclude `slow`, `flaky-quarantine` |
+| `IntrinsicPrSmokeTests` | Require `integration`, `runtime`, and `graphics`; apply the standard fast exclusions |
+
+Repeated `-L` CTest arguments are intersections, so `IntrinsicGpuVulkanTests`
+and `IntrinsicPrSmokeTests` use `INCLUDE_ALL`; the PR-fast
+`-L 'unit|contract'` regex is an `INCLUDE_ANY` union. Configuration fails for
+undeclared/duplicate labels, duplicate registrations, non-executable producers,
+or empty aggregates. `IntrinsicTests` remains the complete local/default
+correctness target.
+
 Use `slow` for valid tests that should not run in fast PR or default local CPU
 correctness gates, including executables that boot the full headless engine,
 initialize Vulkan in a non-`gpu`-only path, run benchmark/SLO thresholds, or
@@ -48,6 +67,7 @@ and report unrelated assertion failures instead of an explicit environment skip.
 Common gates:
 
 ```bash
+cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -L 'unit|contract' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j$(nproc)
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j$(nproc)
 ```

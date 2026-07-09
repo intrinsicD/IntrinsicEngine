@@ -54,6 +54,11 @@ jobs:
       - name: Validate compile-heavy workflow timing policy
         run: python3 tests/regression/tooling/Test.WorkflowConcurrency.py
 
+      - name: Validate test build aggregate policy
+        run: |
+          python3 tests/regression/tooling/Test.TestBuildAggregates.py
+          python3 tests/regression/tooling/Test_CiPrerequisiteGuards.py
+
       - name: Validate generated module inventory freshness
         run: |
           python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md

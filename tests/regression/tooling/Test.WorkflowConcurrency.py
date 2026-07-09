@@ -36,6 +36,36 @@ def _load_workflow(name: str) -> tuple[dict[str, object], str]:
 
 
 class WorkflowConcurrencyTests(unittest.TestCase):
+    def test_specialized_workflows_build_only_selected_aggregates(self) -> None:
+        _, pr_fast = _load_workflow("pr-fast.yml")
+        self.assertIn(
+            "cmake --build --preset ci --target IntrinsicPrFastTests",
+            pr_fast,
+        )
+        self.assertIn(
+            "--inventory build/ci/test-inventories/IntrinsicPrFastTests.txt",
+            pr_fast,
+        )
+        self.assertNotIn(
+            "cmake --build --preset ci --target IntrinsicTests",
+            pr_fast,
+        )
+
+        _, vulkan = _load_workflow("ci-vulkan.yml")
+        self.assertIn(
+            "--target ExtrinsicSandbox IntrinsicGpuVulkanTests",
+            vulkan,
+        )
+        self.assertIn(
+            "--inventory "
+            "build/ci-vulkan/test-inventories/IntrinsicGpuVulkanTests.txt",
+            vulkan,
+        )
+        self.assertNotIn(
+            "--target ExtrinsicSandbox IntrinsicTests",
+            vulkan,
+        )
+
     def test_compile_heavy_workflows_cancel_only_matching_stale_runs(self) -> None:
         for name, (_, _, expected_cancellation) in WORKFLOWS.items():
             with self.subTest(workflow=name):

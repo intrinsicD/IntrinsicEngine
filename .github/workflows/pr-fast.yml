@@ -50,15 +50,18 @@ jobs:
             --json-out build/ci/ci-timing/phases/configure.json \
             -- cmake --preset ci
 
-      - name: Build IntrinsicTests target
+      - name: Build PR-fast test aggregate
         run: |
           python3 tools/ci/time_command.py \
-            --label "Build IntrinsicTests target" \
+            --label "Build PR-fast test aggregate" \
             --json-out build/ci/ci-timing/phases/build.json \
-            -- cmake --build --preset ci --target IntrinsicTests
+            -- cmake --build --preset ci --target IntrinsicPrFastTests
 
       - name: Run unit and contract tests
         run: |
+          python3 tools/ci/check_prerequisites.py test-binaries \
+            --build-dir build/ci \
+            --inventory build/ci/test-inventories/IntrinsicPrFastTests.txt
           python3 tools/ci/time_command.py \
             --label "Run unit and contract tests" \
             --json-out build/ci/ci-timing/phases/test.json \
@@ -71,7 +74,7 @@ jobs:
           if selected_tests="$(ctest --test-dir build/ci --show-only=json-v1 -L "unit|contract" -LE "gpu|vulkan|slow|flaky-quarantine" | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')"; then
             context_args+=(--selected-test-count "$selected_tests")
           fi
-          if ninja_edges="$(ninja -C build/ci -t commands IntrinsicTests | sed '/^[[:space:]]*$/d' | wc -l)"; then
+          if ninja_edges="$(ninja -C build/ci -t commands IntrinsicPrFastTests | sed '/^[[:space:]]*$/d' | wc -l)"; then
             context_args+=(--ninja-edge-count "$ninja_edges")
           fi
           python3 tools/ci/aggregate_gate_timing.py \

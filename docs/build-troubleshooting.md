@@ -200,6 +200,20 @@ producer targets and output directories to exist. Workflows use
 failures instead of presenting missing binaries or missing benchmark directories
 as the root cause.
 
+Specialized test gates pass the generated aggregate inventory instead of
+maintaining another executable list:
+
+```bash
+python3 tools/ci/check_prerequisites.py test-binaries \
+  --build-dir build/ci \
+  --inventory build/ci/test-inventories/IntrinsicPrFastTests.txt
+```
+
+The check requires every selected executable and ignores targets absent from the
+inventory. Missing, empty, malformed, or duplicate inventory entries fail
+closed. `--targets ... --skip-undeclared` remains available for legacy or
+configuration-conditional checks; it cannot be combined with `--inventory`.
+
 ## Fast touched-scope verification
 
 For local iteration on small, well-scoped changes, use the touched-scope helper
