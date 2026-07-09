@@ -86,6 +86,20 @@ vs. the ADR-0024 module/service direction) before further promotion.
   `Runtime.Engine.cppm` via a `StableEntityLookup` scene-binding type and
   re-audit the interface import list.
 
+### Compile-hotspot decomposition (seeded 2026-07-09)
+
+The CI-latency audit retained in
+[`CI-003`](../process/CI-003-ci-gate-timing-observability-and-cancellation.md)
+measured the runtime layer's three largest exported-interface hotspots:
+`Runtime.SandboxEditorUi.cppm` (159.174s, owned by `ARCH-006`),
+`Runtime.Engine.cppm` (140.072s, owned by `RUNTIME-151` after the mechanical
+`RUNTIME-146..150` splits), and `Runtime.RenderExtraction.cppm` (106.935s).
+
+- [`RUNTIME-152`](RUNTIME-152-slim-render-extraction-module.md) — hide
+  `RenderExtractionCache` private residency/retire/adapter state, slim the
+  exported import surface, and split independent implementation domains without
+  changing extraction behavior.
+
 ### bcg geometry-processing port integration (seeded 2026-06-26)
 
 Core/runtime work paired with the `bcg_code_base` geometry port gaps tracked in

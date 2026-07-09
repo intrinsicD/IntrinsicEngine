@@ -15,6 +15,13 @@ map.
 
 ## Tasks
 
+- [CI-003 — Make CI gate latency observable and cancel stale runs](CI-003-ci-gate-timing-observability-and-cancellation.md)
+- [CI-004 — Build only the test executables selected by each gate](CI-004-label-derived-test-build-aggregates.md)
+- [CI-005 — Make PR-fast a real touched-scope feedback gate](CI-005-real-touched-scope-pr-fast-gate.md)
+- [CI-006 — Remove duplicate sanitizer work and calibrate test parallelism](CI-006-sanitizer-topology-and-test-parallelism.md)
+- [CI-007 — Pilot persistent module-safe ccache in CI](CI-007-module-safe-persistent-ccache-pilot.md)
+- [CI-008 — Reduce CTest process overhead without oversubscribing workers](CI-008-grouped-ctest-and-worker-oversubscription.md)
+- [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](CI-009-heavy-gate-routing-and-runner-evaluation.md)
 - [PROC-010 — Encode P1/P3/P5 research-engine invariants in AGENTS.md + review checklist](PROC-010-encode-research-engine-invariants-in-contract.md)
   (draft for owner review).
 - [PROC-018 — Author the import-visibility-contract skill (playbook wave 2)](PROC-018-import-visibility-contract-skill.md)
@@ -33,6 +40,15 @@ retirement log.
 ## Convergence
 
 - These tasks anchor **Theme H — Agentic workflow hardening**.
+- CI latency order: `CI-003` establishes telemetry/cancellation;
+  `CI-004`, `CI-007`, and source-hotspot tasks may then proceed independently;
+  `CI-005` consumes `CI-004`; `CI-006` consumes the unsanitized fast-preset
+  decision from `CI-005`; `CI-008` consumes the aggregate metadata from
+  `CI-004`; and `CI-009` evaluates lifecycle/runner changes only after
+  `CI-003..008` have removed avoidable software duplication.
+- Compile-hotspot source ownership is intentionally outside the process queue:
+  `ARCH-006` owns Sandbox editor/UI and `Sandbox.cppm`, `RUNTIME-146..151` own
+  `Runtime.Engine`, and `RUNTIME-152` owns `Runtime.RenderExtraction`.
 - Dependency order: `PROC-001` first (every other task edits docs that are
   mirrored into skills), then `PROC-005`, `PROC-002`, and `PROC-007`
   (independent of each other), then `PROC-003`, then `PROC-004`, then

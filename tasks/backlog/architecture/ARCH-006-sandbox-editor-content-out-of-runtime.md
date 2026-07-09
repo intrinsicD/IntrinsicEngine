@@ -41,6 +41,12 @@ depends_on:
   it, not duplicate it.
 - Origin: `docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`
   finding R5.
+- Compile-cost evidence from the 2026-07-09 `CI-003` audit:
+  `Runtime.SandboxEditorUi.cppm` was the largest compile hotspot at 159.174s
+  (2,899 lines, 44 imports), `Runtime.SandboxEditorUi.cpp` took 80.264s at
+  24,807 lines, `Test.SandboxEditorUi.cpp` took 96.017s, and the 54-line
+  `Sandbox.cppm` importer took 92.724s. These measurements are retained in
+  `CI-003`; do not repeat exploratory benchmarking before slicing this task.
 
 ## Required changes
 - [ ] Slice 0 (planning, this file): inventory `Runtime.SandboxEditorUi`
@@ -55,6 +61,10 @@ depends_on:
       at a time (method panels first: K-Means, Poisson, registration,
       mesh-processing, figure export), each slice green on the CPU gate and
       layering check.
+- [ ] Split the monolithic implementation and matching
+      `Test.SandboxEditorUi.cpp` coverage along the same panel-family boundaries
+      so moves create independently compilable units rather than one equally
+      large app-side translation unit.
 - [ ] Final slice: `src/runtime/Editor` contains no method/sandbox-specific
       panel code; update module inventories.
 
@@ -76,6 +86,9 @@ depends_on:
 - [ ] No panel behavior change (mechanical moves verified by unchanged
       tests).
 - [ ] Layering gate green at every slice boundary.
+- [ ] Record before/after interface lines/imports, top translation-unit compile
+      durations, and clean build edges against the `CI-003` baseline; no
+      compile-time claim is made from one run.
 
 ## Verification
 ```bash
@@ -91,6 +104,8 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Mixing mechanical moves with semantic refactors in one slice.
 - Moving live ECS/renderer/asset ownership into `app`.
 - Starting content moves before the Slice-0 inventory is recorded here.
+- Moving the monolith intact and declaring the source-ownership change a
+  compile-time improvement without comparable measurements.
 
 ## Maturity
 - Target: `Retired`-style structural endpoint (content relocated, layering
