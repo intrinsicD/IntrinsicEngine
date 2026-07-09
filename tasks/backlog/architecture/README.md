@@ -32,11 +32,10 @@ Opened from the 2026-07-03 main-loop/task-graph/render-graph review
 
 Opened from the 2026-07-08 kernel/module architecture decision record
 ([`docs/adr/0024-kernel-module-architecture.md`](../../../docs/adr/0024-kernel-module-architecture.md));
-seams-first migration order, `ARCH-012` is the Operational proving
+seams-first migration order. All five additive seams (`ARCH-007`..`ARCH-011`)
+are retired to `tasks/done/`; `ARCH-012` is the Operational proving
 extraction:
 
-- [`ARCH-011`](ARCH-011-runtimemodule-contract-service-registry.md) —
-  `IRuntimeModule` contract, `EngineSetup`, and two-phase ServiceRegistry.
 - [`ARCH-012`](ARCH-012-clusteringmodule-proving-extraction.md) —
   ClusteringModule proving extraction onto the kernel seams (closes the
   seams' `Operational` gate).

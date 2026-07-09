@@ -7,6 +7,7 @@ module;
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include <entt/entity/registry.hpp>
@@ -39,6 +40,8 @@ import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.WorldRegistry;
+import Extrinsic.Runtime.ServiceRegistry;
+import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
@@ -707,6 +710,32 @@ namespace Extrinsic::Runtime
         [[nodiscard]] WorldRegistry&          Worlds()           noexcept;
         [[nodiscard]] const WorldRegistry&    Worlds()     const noexcept;
         [[nodiscard]] WorldHandle             ActiveWorld() const noexcept;
+        // ARCH-011 - kernel two-phase service registry (ADR-0024 D3). Modules
+        // Provide during OnRegister and Require/Find during OnResolve; a
+        // missing Require fails closed at boot. Exposed for the composition
+        // root and contract tests.
+        [[nodiscard]] ServiceRegistry&        Services()         noexcept;
+        // ARCH-011 - RuntimeModule composition (ADR-0024 D1/D12/D13). Add
+        // modules before Initialize(): it runs every module's OnRegister then
+        // every module's OnResolve (registration order is not load-bearing),
+        // wires their sim systems into the fixed-step graph and their frame
+        // hooks into RunFrame, and Shutdown() announces + pumps
+        // EngineWillShutDown before running OnShutdown in reverse order.
+        void AddModule(std::unique_ptr<IRuntimeModule> runtimeModule);
+        template <typename TModule, typename... TArgs>
+        TModule& EmplaceModule(TArgs&&... args)
+        {
+            auto owned = std::make_unique<TModule>(std::forward<TArgs>(args)...);
+            TModule& reference = *owned;
+            AddModule(std::move(owned));
+            return reference;
+        }
+        // ARCH-011 contract-test seam: the composed module registration sink.
+        // Tests inspect the collected sim systems / frame hooks and drive the
+        // shared ApplySimSystems path against a scratch FrameGraph to prove
+        // registration-order independence without running the full frame loop.
+        [[nodiscard]] const ModuleRegistrationSink&
+            GetModuleRegistrationForTest() const noexcept;
         // UI-001 Slice D — runtime-owned file/import command seam. Editor UI
         // submits a path + payload hint here; Engine composes the promoted
         // ASSETIO geometry/model/texture decoders, AssetService, and runtime
@@ -888,6 +917,10 @@ namespace Extrinsic::Runtime
 
     private:
         void RunFrame();      // executes one full frame — called by Run()
+        // ARCH-011 - invoke module frame hooks for a phase with a narrow
+        // FrameHookContext built from the active world + kernel substrate
+        // (ADR-0024 D13). No-ops when no module registered a hook for `phase`.
+        void RunModuleFrameHooks(FramePhase phase, double frameDt, double alpha);
         void HandlePlatformEvent(const Platform::Event& event);
         void RequestExitFromWindowClose(std::string_view source);
         void HandleWindowDropEvent(const Platform::WindowDropEvent& event);
@@ -1054,6 +1087,16 @@ namespace Extrinsic::Runtime
         // single-world call sites migrate to explicit WorldHandle plumbing.
         WorldRegistry                          m_Worlds{};
         ECS::Scene::Registry*                  m_Scene{};
+        // ARCH-011 - kernel two-phase service registry + RuntimeModule
+        // composition (ADR-0024 D1/D3/D12/D13). m_Services holds borrowed
+        // references providers publish in OnRegister; m_ModuleRegistration
+        // collects module-registered sim systems + frame hooks;
+        // m_Modules owns the composed modules for the engine lifetime.
+        // Declared after the kernel substrate so module objects tear down
+        // before the buses/worlds their handlers borrow.
+        ServiceRegistry                        m_Services{};
+        ModuleRegistrationSink                 m_ModuleRegistration{};
+        std::vector<std::unique_ptr<IRuntimeModule>> m_Modules{};
         // Scoped connections must disconnect before their borrowed active
         // registry can be switched or destroyed.
         entt::scoped_connection m_StableIdConstructConnection{};

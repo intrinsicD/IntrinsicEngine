@@ -306,6 +306,7 @@ if(TARGET ExtrinsicRuntime)
         Test.RuntimeCommandBus.cpp
         Test.RuntimeJobService.cpp
         Test.RuntimeKernelEvents.cpp
+        Test.RuntimeModuleContract.cpp
         Test.RuntimeWorldRegistry.cpp
         Test.RuntimeEcsSystemBundle.cpp
         Test.RuntimeReferenceScene.cpp

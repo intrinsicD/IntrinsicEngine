@@ -77,3 +77,37 @@
 ## Findings -> Follow-ups
 
 - None.
+
+# Clean-workshop review — ARCH-011 RuntimeModule contract + ServiceRegistry
+
+## Change Under Review
+
+- Change: `ARCH-011` RuntimeModule composition seam — new
+  `Extrinsic.Runtime.ServiceRegistry` and `Extrinsic.Runtime.Module` modules
+  plus additive `Engine` wiring (`AddModule`/`EmplaceModule`, two-phase
+  `OnRegister`→`OnResolve` boot, module sim-system application in the
+  fixed-step graph, frame hooks at four phases, `EngineWillShutDown`
+  announce-pump + reverse-order `OnShutdown`).
+- Trigger(s): adds runtime modules; changes runtime wiring/composition order.
+- Reviewer: Claude.
+
+## Scorecard
+
+| # | Check | Outcome | Notes |
+| --- | --- | --- | --- |
+| 1 | Promoted layer imports match `/AGENTS.md` §2 | pass | `tools/repo/check_layering.py --root src --strict` ran clean (0 violations). `Runtime.ServiceRegistry` imports only `Core.FrameGraph` (plus `Core.Logging` in its impl); `Runtime.Module` imports core FrameGraph, ECS scene registry, and the runtime kernel substrate modules only. |
+| 2 | CMake target links match layer policy | pass | No new target link edge; `ExtrinsicRuntime` owns both new module interfaces and their implementation units. |
+| 3 | No new public API exposes a higher-layer type to a lower layer | pass | New public API is runtime-layer only. `EngineSetup`/`FrameHookContext` expose no `Engine&` (ADR-0024 D13); `ServiceRegistry` stores borrowed `void*` keyed by compile-time `TypeToken` and surfaces nothing from a lower layer. |
+| 4 | Renderer member/subsystem growth is justified by an owning seam | n/a | No renderer member, subsystem, or pass added. |
+| 5 | New passes use typed IDs, not string routing | pass | Module sim systems declare FrameGraph Read/Write via `Core::TypeToken<T>()` and order by those tokens + named signals; pass names are diagnostic labels, not routing keys. |
+| 6 | New frame-recipe dependencies are resource-driven or explicitly justified | n/a | No frame-recipe dependency changed (extension-pass registration is deferred to the D10 slot-contract task). |
+| 7 | Scaffold/parity tasks have a follow-up maturity gate | pass | `ARCH-011` retires at `CPUContracted`; `Operational` is explicitly owned by `ARCH-012` (ClusteringModule proving extraction). |
+| 8 | Legacy/temporary exceptions have a task ID and expiry | pass | No allowlist row, temporary shim, or compatibility exception added; the change is additive and existing `IApplication` behavior is unchanged. |
+
+## Findings -> Follow-ups
+
+- The C++ build and default CPU-supported test gate could not run in the cloud
+  session (vcpkg tool download blocked by egress policy with a 403; no Ninja
+  generator), so CI must confirm the build and the new
+  `Test.RuntimeModuleContract.cpp` scenarios before merge. Tracked in the
+  `ARCH-011` Status block, not a separate task.

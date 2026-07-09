@@ -661,6 +661,7 @@ namespace Extrinsic::Runtime
                                          IApplication& application,
                                          Core::FrameGraph& frameGraph,
                                          ECS::Scene::Registry& scene,
+                                         const ModuleRegistrationSink& moduleRegistration,
                                          double& accumulator,
                                          const double fixedDt,
                                          const int maxSubSteps)
@@ -673,6 +674,13 @@ namespace Extrinsic::Runtime
                 // RUNTIME-091: register the promoted baseline ECS systems after
                 // the app has had a chance to add its own fixed-step passes.
                 (void)RegisterPromotedEcsSystemBundle(frameGraph, scene);
+
+                // ARCH-011: append every module-registered SimSystem after the
+                // built-in bundle and before Compile. Execution order comes
+                // from each system's declared Read/Write tokens + named
+                // signals, so it is independent of module registration order
+                // (ADR-0024 D1/D3).
+                moduleRegistration.ApplySimSystems(frameGraph, scene);
 
                 if (frameGraph.PassCount() > 0)
                 {
@@ -3238,6 +3246,29 @@ namespace Extrinsic::Runtime
             m_ReferenceSceneInstalled = true;
         }
 
+        // ── 6c. RuntimeModule two-phase composition (ARCH-011 / D3) ───────
+        // Register-before-Resolve: every module publishes services and
+        // registers systems/hooks/command-handlers/event-subscriptions, THEN
+        // every module binds its required services (fail-closed). Registration
+        // order is deliberately not load-bearing — inter-module ordering comes
+        // from declared System data dependencies and this two-phase startup.
+        // Tables are cleared first so a reused engine (Shutdown() +
+        // Initialize()) re-composes from empty state.
+        m_ModuleRegistration.Clear();
+        m_Services.Clear();
+        {
+            EngineSetup setup{m_CommandBus, m_EventBus, m_JobService, m_Worlds,
+                              m_Services, m_ModuleRegistration};
+            for (const std::unique_ptr<IRuntimeModule>& runtimeModule : m_Modules)
+                runtimeModule->OnRegister(setup);
+            for (const std::unique_ptr<IRuntimeModule>& runtimeModule : m_Modules)
+            {
+                m_Services.SetActiveRequester(runtimeModule->Name());
+                runtimeModule->OnResolve(m_Services);
+            }
+            m_Services.SetActiveRequester({});
+        }
+
         // ── 7. Application ────────────────────────────────────────────────
         m_Application->OnInitialize(*this);
 
@@ -3259,6 +3290,21 @@ namespace Extrinsic::Runtime
         // is documented as reusable via Shutdown() + Initialize(); stale
         // commands must not replay into the next session's fresh scene.
         m_CommandBus.DiscardPending();
+
+        // ARCH-011 — RuntimeModule two-phase teardown (ADR-0024 D7). Announce
+        // at a pump so every module observes EngineWillShutDown while the
+        // kernel substrate is still live, then run OnShutdown in reverse
+        // registration order. Runs before the subsystem teardown contract
+        // below, so modules can still reach commands/events/jobs/worlds.
+        // Guarded on m_Initialized so a never-initialized or already-torn-down
+        // engine does not pump a bus whose subscriptions never registered.
+        if (m_Initialized && !m_Modules.empty())
+        {
+            m_EventBus.Publish(EngineWillShutDown{});
+            m_EventBus.Pump();
+            for (auto it = m_Modules.rbegin(); it != m_Modules.rend(); ++it)
+                (*it)->OnShutdown();
+        }
 
         if (m_Window)
             m_Window->Listen({});
@@ -3589,6 +3635,10 @@ namespace Extrinsic::Runtime
         // are deferred to pump B, never recursively dispatched.
         m_EventBus.Pump();
 
+        // ARCH-011 — module frame hooks: react to fresh command effects,
+        // pre-sim (frameDt/alpha are computed below, so 0 here by design).
+        RunModuleFrameHooks(FramePhase::AfterCommandDrain, 0.0, 0.0);
+
         // ── Phase 2: Fixed-step simulation + CPU task graph ───────────────
         // Each tick: app adds FrameGraph passes → Engine compiles and executes
         // the ECS system DAG → reset for next tick.
@@ -3602,6 +3652,7 @@ namespace Extrinsic::Runtime
                                     *m_Application,
                                     *m_FrameGraph,
                                     *m_Scene,
+                                    m_ModuleRegistration,
                                     m_Accumulator,
                                     m_FixedDt,
                                     m_MaxSubSteps);
@@ -3639,6 +3690,11 @@ namespace Extrinsic::Runtime
         const auto variableTickBegin = std::chrono::steady_clock::now();
         m_Application->OnVariableTick(*this, alpha, frameDt);
         pacing.VariableTickMicros = ElapsedMicros(variableTickBegin);
+
+        // ARCH-011 — module frame hooks: build UI panels after the variable
+        // tick, inside the Dear ImGui frame scope (the future EditorUiModule
+        // attaches here; headless compositions register nothing).
+        RunModuleFrameHooks(FramePhase::UiBuild, frameDt, alpha);
         preRenderTransformFlushNeeded =
             preRenderTransformFlushNeeded ||
             HasPendingPreRenderTransformFlush(*m_Scene);
@@ -3764,6 +3820,10 @@ namespace Extrinsic::Runtime
         pacing.SelectionPickDrainMicros =
             ElapsedMicros(selectionPickDrainBegin);
 
+        // ARCH-011 — module frame hooks: last chance to touch live sim state
+        // this frame, before the render-frame contract snapshots the world.
+        RunModuleFrameHooks(FramePhase::BeforeExtraction, frameDt, alpha);
+
         // ── Phases 5–9: promoted render-frame contract ───────────────────
         RHI::FrameHandle frame{};
         Graphics::RenderWorld renderWorld{};
@@ -3832,6 +3892,9 @@ namespace Extrinsic::Runtime
                 participant.Desc.DrainCompletedTransfers();
         }
         pacing.MaintenanceMicros = ElapsedMicros(maintenanceBegin);
+
+        // ARCH-011 — module frame hooks: deferred-ops window, post-render.
+        RunModuleFrameHooks(FramePhase::Maintenance, frameDt, alpha);
 
         // ── RUNTIME-092 / RUNTIME-145: completed selection readbacks ───────
         // The durable StableId winner-map is maintained incrementally from
@@ -3902,6 +3965,52 @@ namespace Extrinsic::Runtime
     WorldRegistry& Engine::Worlds() noexcept { return m_Worlds; }
     const WorldRegistry& Engine::Worlds() const noexcept { return m_Worlds; }
     WorldHandle Engine::ActiveWorld() const noexcept { return m_Worlds.ActiveWorld(); }
+    ServiceRegistry& Engine::Services() noexcept { return m_Services; }
+
+    const ModuleRegistrationSink&
+    Engine::GetModuleRegistrationForTest() const noexcept
+    {
+        return m_ModuleRegistration;
+    }
+
+    void Engine::AddModule(std::unique_ptr<IRuntimeModule> runtimeModule)
+    {
+        if (!runtimeModule)
+        {
+            Core::Log::Error("[Runtime] Engine::AddModule ignored a null module.");
+            return;
+        }
+        if (m_Initialized)
+        {
+            // Composition is a boot-time parts list (ADR-0024 D12): every
+            // module's OnRegister/OnResolve already ran, so a late add would
+            // never be wired in. Fail loudly rather than silently half-compose.
+            Core::Log::Error(
+                "[Runtime] Engine::AddModule('{}') called after Initialize(); "
+                "modules must be added before boot. Ignored.",
+                runtimeModule->Name());
+            return;
+        }
+        m_Modules.push_back(std::move(runtimeModule));
+    }
+
+    void Engine::RunModuleFrameHooks(const FramePhase phase,
+                                     const double     frameDt,
+                                     const double     alpha)
+    {
+        if (m_Scene == nullptr)
+            return;
+        FrameHookContext context{*m_Scene,
+                                 m_Worlds.ActiveWorld(),
+                                 m_CommandBus,
+                                 m_EventBus,
+                                 m_JobService,
+                                 m_Worlds,
+                                 frameDt,
+                                 alpha};
+        m_ModuleRegistration.InvokeFrameHooks(phase, context);
+    }
+
     bool Engine::IsRunning() const noexcept { return m_Running; }
     void Engine::RequestExit()      noexcept { m_Running = false; }
 

@@ -15,10 +15,15 @@ BUILD_DIR="${INTRINSIC_SESSION_BUILD_DIR:-${PROJECT_ROOT}/build}"
 LOG="${INTRINSIC_SESSION_SETUP_LOG:-/tmp/intrinsic-session-setup.log}"
 DONE_MARKER="${INTRINSIC_SESSION_SETUP_DONE:-/tmp/intrinsic-session-setup.done}"
 FAIL_MARKER="${INTRINSIC_SESSION_SETUP_FAILED:-/tmp/intrinsic-session-setup.failed}"
+VCPKG_STATUS_MARKER="${INTRINSIC_SESSION_VCPKG_STATUS:-/tmp/intrinsic-session-setup.vcpkg}"
 ASYNC_TIMEOUT_MS="${INTRINSIC_SESSION_ASYNC_TIMEOUT_MS:-1800000}"
 
 ASYNC_JSON=0
 RUN_KNOWLEDGE_GRAPH=1
+# Opt-in vcpkg tool pre-bake (BUG-065). Off by default so the common warm-image
+# session start stays fast; enable when a network-capable environment wants the
+# first `cmake --preset ci` to skip the vcpkg tool bootstrap.
+BOOTSTRAP_VCPKG="${INTRINSIC_SESSION_BOOTSTRAP_VCPKG:-0}"
 
 usage() {
     cat <<EOF
@@ -33,6 +38,8 @@ Usage:
 Options:
   --async-json             Emit Claude-style async JSON before backgrounding.
   --skip-knowledge-graph   Do not start optional Knowledge Graph provisioning.
+  --bootstrap-vcpkg        Pre-bake the vcpkg tool when the download host is
+                           reachable (also via INTRINSIC_SESSION_BOOTSTRAP_VCPKG=1).
   --project-root PATH      Repository root. Defaults to this script's repo.
   --build-dir PATH         CMake build directory. Defaults to build/.
   --log PATH               Setup log. Defaults to /tmp/intrinsic-session-setup.log.
@@ -41,6 +48,9 @@ Options:
 Notes:
   System package installation may use sudo on Debian/Ubuntu hosts.
   This setup helper does not replace preset-based verification.
+  A vcpkg egress preflight always runs and records ready/reachable/blocked/
+  unknown to ${VCPKG_STATUS_MARKER}; a blocked result prints an actionable
+  diagnosis (BUG-065) instead of a later cryptic preset 403.
 EOF
 }
 
@@ -50,6 +60,8 @@ while [[ $# -gt 0 ]]; do
             ASYNC_JSON=1; shift ;;
         --skip-knowledge-graph)
             RUN_KNOWLEDGE_GRAPH=0; shift ;;
+        --bootstrap-vcpkg)
+            BOOTSTRAP_VCPKG=1; shift ;;
         --project-root)
             [[ $# -ge 2 ]] || { echo "--project-root requires a value" >&2; exit 2; }
             PROJECT_ROOT="$2"; shift 2 ;;
@@ -112,10 +124,38 @@ toolchain_present() {
     return 1
 }
 
+# Always surface vcpkg egress status (BUG-065): the toolchain may be warm while
+# the preset path is still blocked from bootstrapping vcpkg. Records a status
+# token to VCPKG_STATUS_MARKER, logs the actionable diagnosis on a blocked host,
+# and (opt-in) pre-bakes the vcpkg tool when the host is reachable. Never fatal.
+report_vcpkg_status() {
+    local status rc
+    set +e
+    status="$("${PROJECT_ROOT}/tools/setup/vcpkg_preflight.sh" --repo-root "$PROJECT_ROOT")"
+    rc=$?
+    set -e
+    status="${status:-unknown}"
+    printf '%s\n' "$status" >"$VCPKG_STATUS_MARKER" 2>/dev/null || true
+    echo "==> vcpkg preflight: ${status} (rc=${rc}); status marker: ${VCPKG_STATUS_MARKER}"
+
+    if [[ "$BOOTSTRAP_VCPKG" == "1" && ( "$status" == "reachable" || "$status" == "unknown" ) ]]; then
+        echo "==> Pre-baking vcpkg tool (bootstrap-vcpkg opt-in) ..."
+        if "${PROJECT_ROOT}/tools/setup/bootstrap_vcpkg.sh"; then
+            echo "==> vcpkg tool bootstrap succeeded."
+            printf 'ready\n' >"$VCPKG_STATUS_MARKER" 2>/dev/null || true
+        else
+            echo "==> vcpkg tool bootstrap did not complete (see message above); presets will bootstrap on demand." >&2
+        fi
+    fi
+}
+
 start_knowledge_graph
 
 if toolchain_present; then
     printf 'IntrinsicEngine: clang-20+ toolchain and windowing/Vulkan dev headers already present; skipping provisioning.\n' >"$LOG"
+    # The toolchain is warm, but the vcpkg-dependent preset path may still be
+    # blocked; report it so a later `cmake --preset ci` 403 is pre-explained.
+    report_vcpkg_status >>"$LOG" 2>&1 || true
     : >"$DONE_MARKER"
     rm -f "$FAIL_MARKER"
     if [[ "$ASYNC_JSON" -eq 0 ]]; then
@@ -256,6 +296,7 @@ build_project() {
 install_system_deps
 configure_build
 build_project || true
+report_vcpkg_status || true
 
 echo "========================================"
 echo " Setup complete: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
