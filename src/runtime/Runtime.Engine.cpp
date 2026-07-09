@@ -3528,7 +3528,13 @@ namespace Extrinsic::Runtime
         // fixed-step ticks and the render snapshot observe this frame is
         // post-command, pre-tick. Commands enqueued during the drain (by
         // handlers) or later in the frame execute at the next frame's drain.
-        m_CommandBus.Drain(*m_Scene);
+        m_CommandBus.Drain(*m_Scene, m_EventBus);
+
+        // -- Event pump A (post-drain, pre-sim; ARCH-008 / ADR-0024 D7) ----
+        // Command effects published as events become visible before the
+        // fixed-step ticks. Events published by listeners during this pump
+        // are deferred to pump B, never recursively dispatched.
+        m_EventBus.Pump();
 
         // ── Phase 2: Fixed-step simulation + CPU task graph ───────────────
         // Each tick: app adds FrameGraph passes → Engine compiles and executes
@@ -3552,6 +3558,11 @@ namespace Extrinsic::Runtime
         frameContext.FixedStepAlpha = alpha;
         bool preRenderTransformFlushNeeded =
             HasPendingPreRenderTransformFlush(*m_Scene);
+
+        // -- Event pump B (post-sim, pre-UI/extraction; ARCH-008 / D7) ------
+        // Simulation and job-style completion events reach listeners before
+        // the frame builds UI and render extraction products.
+        m_EventBus.Pump();
 
         // ── RUNTIME-090 Slice B: open the Dear ImGui frame ────────────────
         // BeginFrame runs after Window::PollEvents (Phase 1) and the
@@ -3801,6 +3812,7 @@ namespace Extrinsic::Runtime
     // ── Query / control ───────────────────────────────────────────────────
 
     CommandBus& Engine::Commands() noexcept { return m_CommandBus; }
+    EventBus& Engine::Events() noexcept { return m_EventBus; }
     bool Engine::IsRunning() const noexcept { return m_Running; }
     void Engine::RequestExit()      noexcept { m_Running = false; }
 

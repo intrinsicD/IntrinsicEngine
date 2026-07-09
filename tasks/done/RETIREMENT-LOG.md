@@ -3709,3 +3709,20 @@ markdown-only diff) before their build steps. The budget moved to 20 s in
 all seven invocations across six workflows with guard semantics and timing
 telemetry unchanged; three consecutive PR CI rounds then completed every
 configure step without a budget kill.
+
+[`ARCH-008`](ARCH-008-kernel-event-bus-queued-only.md) — Queued-only kernel
+event bus with two pump points retired to `tasks/done/` on 2026-07-09 at
+`CPUContracted`. The second ADR-0024 kernel seam adds
+`Extrinsic.Runtime.KernelEvents`, a typed queued-only `EventBus` over
+`entt::dispatcher` with no synchronous trigger API, thread-safe publish into
+an internal inbox, subscription handles, same-pump cascade deferral, and
+per-pump diagnostics. `CommandContext` now carries `EventBus&`, and
+`Engine::RunFrame()` pumps once after the command drain and once after
+fixed-step simulation. Contract coverage proves deferred delivery,
+cascade-bounding, cross-thread publish delivery, safe unsubscribe, and command
+handler event publication; the focused cross-thread test passes in the
+sanitizer-enabled `build/ci` tree. The default CPU-supported gate passed
+3616/3616 locally. The local `Runtime.EngineTarget.*` sketch was preserved
+under `docs/architecture/sketches/` with `.txt` suffixes so module inventory
+regeneration records only real source modules. `Operational` remains owned by
+`ARCH-012`; `ARCH-009` is now the next kernel seam.

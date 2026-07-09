@@ -1,0 +1,195 @@
+module Extrinsic.Runtime.Engine;
+
+import Extrinsic.Core.Logging;
+import Extrinsic.Core.Tasks;   // the ONE worker pool (implementation detail)
+
+namespace Extrinsic::Runtime
+{
+    // ════════════════════════════════════════════════════════
+    // Boot: substrate first, then the two-phase module startup.
+    // ════════════════════════════════════════════════════════
+    void Engine::Initialize()
+    {
+        // 1. The shared worker pool. Must be first — FrameGraph
+        //    execution AND JobService dispatch through it (D8).
+        Core::Tasks::Scheduler::Initialize(m_Config.Simulation.WorkerThreadCount);
+
+        // 2. Built-in kernel commands (D13): the sanctioned shutdown
+        //    path. Modules enqueue QuitRequested, never call into us.
+        m_Commands.RegisterHandler<QuitRequested>(
+            [this](CommandContext&, const QuitRequested&) -> CommandOutcome
+            { m_Running = false; return CommandOutcome::Ok(); });
+        m_Commands.RegisterHandler<SetActiveWorldRequested>(
+            [this](CommandContext&, const SetActiveWorldRequested& cmd) -> CommandOutcome
+            { m_Worlds.RequestSetActiveWorld(cmd.World); return CommandOutcome::Ok(); });
+        m_Commands.RegisterHandler<ActivateFrameRecipeRequested>(
+            [this](CommandContext&, const ActivateFrameRecipeRequested& cmd) -> CommandOutcome
+            { m_PendingRecipe = cmd.Recipe; return CommandOutcome::Ok(); }); // applied at Maintenance
+
+        // 3. Platform + RHI + renderer. Backend selection stays
+        //    fail-closed: Vulkan only when configured AND operational,
+        //    Null otherwise; nothing downstream gates on Vulkan
+        //    diagnostics, only on IDevice::IsOperational().
+        m_Window   = Platform::CreateWindow(m_Config.Window);
+        m_Device   = CreateDevice(m_Config.Render);
+        m_Device->Initialize(RHI::MakeDeviceCreateDesc(
+            m_Config.Render, m_Window->GetFramebufferExtent(),
+            m_Window->GetNativeHandle()));
+        m_Renderer = Graphics::CreateRenderer();     // render-graph instance lives in here
+        m_Renderer->Initialize(*m_Device);
+        m_RendererOperational = m_Device->IsOperational();
+
+        // 4. Worlds: #0 exists before any module runs (D2) — frame 0
+        //    is never ambiguous, headless tests never special-case.
+        m_Worlds.CreateWorld("primary");
+
+        // 5. Two-phase module startup (D3). Registration order is
+        //    deliberately irrelevant; Resolve failures are boot errors
+        //    that name the requesting module and the missing service.
+        EngineSetup setup{m_Commands, m_Events, m_Jobs, m_Worlds, m_Services,
+                          /* + the Register* callables bound to our tables */};
+        for (auto& module : m_Modules) module->OnRegister(setup);
+        std::stable_sort(m_CaptureChain.begin(), m_CaptureChain.end(),
+                         [](auto& a, auto& b){ return a.Priority > b.Priority; });
+        for (auto& module : m_Modules) module->OnResolve(m_Services);
+    }
+
+    // ════════════════════════════════════════════════════════
+    // The spine. Every mutation window and delivery point is a
+    // named phase; nothing happens between the lines.
+    // ════════════════════════════════════════════════════════
+    void Engine::RunFrame()
+    {
+        m_FrameClock.BeginFrame();
+        ECS::Scene::Registry& world = m_Worlds.Get(m_Worlds.ActiveWorld());
+        FrameHookContext hookCtx{world, m_Worlds.ActiveWorld(), m_Commands,
+                                 m_Events, m_Jobs, m_Worlds,
+                                 /*dt*/ 0.0, /*alpha*/ 0.0};
+
+        // ── 1. Platform ─────────────────────────────────────
+        // Poll OS events; swapchain resize (drain GPU, resize device
+        // + renderer targets); operational-transition check on the
+        // fail-closed device. Then route every input event through
+        // the capture chain: first claiming filter consumes it,
+        // unclaimed events fire registered input actions (which, by
+        // discipline, enqueue commands).
+        m_Window->PollEvents();
+        if (m_Window->ShouldClose()) { m_Commands.Enqueue(QuitRequested{}); }
+        HandleResizeIfNeeded();
+        RouteInputThroughCaptureChain();
+
+        // ── 2. Command drain (D5) — THE mutation window ─────
+        // Single, pre-sim, main-thread. Parked CommandSequences whose
+        // JobToken completed resume ahead of new commands (D6).
+        ResumeParkedSequences();
+        m_Commands.Drain(world);
+
+        // ── 3. Event pump A (D7) ────────────────────────────
+        // Command effects become visible as events before the sim
+        // ticks. Events published during this pump deliver at pump B.
+        m_Events.Pump();
+
+        // ── 4. Fixed-step simulation + CPU task graph ───────
+        // Per substep: reset graph → add builtin kernel systems
+        // (transform hierarchy, bounds) + every module SimSystem →
+        // Compile (order = Read/Write tokens + signals) → Execute on
+        // the shared pool. Systems are the ONLY code that touches the
+        // live world concurrently, under their declared access.
+        const double frameDt = m_FrameClock.FrameDeltaClamped(m_MaxFrameDelta);
+        m_Accumulator += frameDt;
+        int substeps = 0;
+        while (m_Accumulator >= m_FixedDt && substeps < m_MaxSubSteps)
+        {
+            m_FrameGraph.Reset();
+            RegisterBuiltinEcsSystems(m_FrameGraph, world);       // kernel-owned
+            for (const SimSystemDesc& sys : m_SimSystems)         // module-owned
+                AddSimSystemPass(m_FrameGraph, sys, world);
+            m_FrameGraph.Compile();
+            m_FrameGraph.Execute();
+            m_Accumulator -= m_FixedDt;
+            ++substeps;
+        }
+        const double alpha = m_Accumulator / m_FixedDt;
+        hookCtx.FrameDt = frameDt; hookCtx.FixedStepAlpha = alpha;
+
+        // ── 5. Job completion gate (D8, ARCH-009) ───────────
+        // Workers deposited results into the service; ONLY the
+        // service publishes completion events, here, main-thread,
+        // after checking token + world scope. Cancelled or
+        // world-dead results are dropped whole — never half-applied.
+        m_Jobs.DrainCompletionsThroughGate(m_Events);
+
+        // ── 6. Event pump B (D7) ────────────────────────────
+        // Completions and sim-produced events reach module handlers
+        // BEFORE extraction and UI — commit handlers write the live
+        // world here, so this frame's snapshot sees the results.
+        m_Events.Pump();
+
+        // ── 7. Frame hooks ──────────────────────────────────
+        RunFrameHooks(FramePhase::AfterCommandDrain, hookCtx); // (early hooks ran conceptually post-drain; kept adjacent for cache warmth)
+        RunFrameHooks(FramePhase::UiBuild, hookCtx);           // EditorUiModule: panels → commands
+        RunFrameHooks(FramePhase::BeforeExtraction, hookCtx);
+
+        // ── 8. Extraction (D4) ──────────────────────────────
+        // Snapshot the active world into an immutable RenderWorld.
+        // World handle is an explicit parameter (preview panes stay a
+        // refactor). Past this line the renderer never sees live ECS.
+        const Graphics::RenderWorld& snapshot =
+            m_Extraction.BuildSnapshot(m_Worlds.ActiveWorld(), world);
+
+        // ── 9. Render (D10) ─────────────────────────────────
+        // Kernel hands the renderer: recipe (data) + extension passes
+        // (module code at declared slots) + snapshot. The renderer
+        // compiles them into ITS render graph (graphics layer),
+        // records (possibly in parallel), submits, presents —
+        // non-blocking with respect to the next sim tick.
+        if (m_Renderer->BeginFrame())
+        {
+            m_Renderer->Render(m_ActiveRecipe, m_ExtensionPasses, snapshot);
+            m_Renderer->EndFrameAndPresent();
+        }
+
+        // ── 10. Maintenance ─────────────────────────────────
+        // The ONLY place deferred structural ops apply: active-world
+        // swaps, two-phase world destruction (announce pumped a full
+        // frame ago → cancel that world's jobs → tear down), recipe
+        // activation, job reaping, device/streaming ticks.
+        RunFrameHooks(FramePhase::Maintenance, hookCtx);
+        ApplyDeferredWorldOps();                  // uses m_Jobs.CancelAllForWorld
+        if (m_PendingRecipe) { m_ActiveRecipe = *std::exchange(m_PendingRecipe, {}); }
+        m_Jobs.ReapCompleted();
+        m_Extraction.RetireOldSnapshots();
+
+        // ── 11. Clock ───────────────────────────────────────
+        m_FrameClock.EndFrame();
+        PublishPacingSample(m_Pacing);
+    }
+
+    // ════════════════════════════════════════════════════════
+    // Run + two-phase shutdown (D7): announce at a pump, destroy
+    // at the boundary — same rule for worlds, modules, engine.
+    // ════════════════════════════════════════════════════════
+    Core::Result<void> Engine::Run()
+    {
+        Initialize();
+        m_Running = true;
+        while (m_Running) { RunFrame(); }
+        Shutdown();
+        return Core::Ok();
+    }
+
+    void Engine::Shutdown()
+    {
+        m_Commands.DiscardPending();          // no stale replay into a reused Engine
+        m_Events.Publish(EngineWillShutDown{});
+        m_Events.Pump();                      // every module hears it while alive
+        m_Jobs.CancelAll();
+        m_Jobs.WaitForWorkersIdle();          // workers park; no result ever commits
+        for (auto it = m_Modules.rbegin(); it != m_Modules.rend(); ++it)
+            (*it)->OnShutdown();
+        m_Device->WaitIdle();
+        m_Renderer.reset(); m_Device.reset(); m_Window.reset();
+        m_Worlds.DestroyAllImmediate();       // no observers left; two-phase not needed
+        Core::Tasks::Scheduler::Shutdown();
+    }
+}

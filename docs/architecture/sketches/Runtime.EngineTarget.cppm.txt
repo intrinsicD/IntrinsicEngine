@@ -1,0 +1,219 @@
+module;
+
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <vector>
+
+export module Extrinsic.Runtime.Engine;
+
+// ── Substrate imports only. No domain nouns (D9). ──────────
+import Extrinsic.Core.Config.Engine;     // boot config (parts list lives in the app)
+import Extrinsic.Core.Error;             // Result<T>
+import Extrinsic.Core.FrameClock;
+import Extrinsic.Core.FrameGraph;        // CPU task-graph TYPE (core owns the vocabulary)
+import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.FrameRecipe;   // recipe data + extension-slot vocabulary
+import Extrinsic.Graphics.RenderWorld;   // immutable extraction snapshot type
+import Extrinsic.Graphics.Renderer;      // owns the render-graph instance internally
+import Extrinsic.Platform.Input;         // InputEvent, action types
+import Extrinsic.Platform.Window;
+import Extrinsic.RHI.Device;
+import Extrinsic.Runtime.CommandBus;     // ARCH-007 (shipped)
+import Extrinsic.Runtime.KernelEvents;   // ARCH-008 (EventBus)
+import Extrinsic.Runtime.JobService;     // ARCH-009
+import Extrinsic.Runtime.WorldRegistry;  // ARCH-010
+// ── That is the whole list. ─────────────────────────────────
+
+namespace Extrinsic::Runtime
+{
+    export class Engine;
+
+    // ── Handles ─────────────────────────────────────────────
+    export struct SystemHandle        { std::uint64_t Value{0}; };
+    export struct FrameHookHandle     { std::uint64_t Value{0}; };
+    export struct CaptureFilterHandle { std::uint64_t Value{0}; };
+    // WorldHandle, JobToken, CommandCorrelationId, SubscriptionHandle,
+    // Graphics::ExtensionPassHandle come from their owning modules.
+
+    // ── Systems (D1): per-substep schedulable units ─────────
+    // The FrameGraph compiles execution order from these declarations;
+    // registration order is never load-bearing (D3).
+    export struct SimSystemDesc
+    {
+        std::string PassName{};
+        std::vector<Core::TypeToken>  Reads{};
+        std::vector<Core::TypeToken>  Writes{};
+        std::vector<std::string_view> WaitsFor{};   // named signals
+        std::vector<std::string_view> Signals{};
+        std::function<void(ECS::Scene::Registry&, Core::FrameGraphContext&)> Execute{};
+    };
+
+    // ── Frame hooks: neutral loop attachment points ─────────
+    // Note what is NOT here: no "ImGui phase". UiBuild is a neutral
+    // slot the EditorUiModule happens to attach to (D11); headless
+    // compositions attach nothing and pay nothing.
+    export enum class FramePhase : std::uint8_t
+    {
+        AfterCommandDrain,   // react to fresh command effects, pre-sim
+        UiBuild,             // EditorUiModule builds panels here
+        BeforeExtraction,    // last chance to touch sim state this frame
+        Maintenance,         // deferred-ops window, post-render
+    };
+
+    // Narrow capabilities only — no Engine& anywhere (D13).
+    export struct FrameHookContext
+    {
+        ECS::Scene::Registry& ActiveWorld;
+        WorldHandle           ActiveWorldHandle{};
+        CommandBus&           Commands;
+        EventBus&             Events;
+        JobService&           Jobs;
+        WorldRegistry&        Worlds;
+        double                FrameDt{0.0};
+        double                FixedStepAlpha{0.0};
+    };
+
+    // ── Input capture chain (D11): the one UI-shaped kernel piece ──
+    // Priority-ordered claim filters run in Phase 1. A filter that
+    // returns true consumes the event; unclaimed events flow to the
+    // kernel's input-action registry. EditorUiModule registers a
+    // high-priority filter that claims events when ImGui wants capture.
+    export struct InputCaptureFilterDesc
+    {
+        std::string  DebugName{};
+        std::int32_t Priority{0};                                  // higher first
+        std::function<bool(const Platform::InputEvent&)> Claims{};
+    };
+
+    export struct InputActionDesc
+    {
+        std::string  DebugName{};
+        Platform::InputBinding Binding{};       // key/button/axis chord
+        std::function<void(FrameHookContext&)> Fire{};  // usually just enqueues a command
+    };
+    export struct InputActionHandle { std::uint64_t Value{0}; };
+
+    // ── RuntimeModule contract (D1/D3/D12) ──────────────────
+    // Everything a module may register, gathered in one narrow
+    // surface. "Kernel" stays a documentation word; the class is
+    // Engine and this is EngineSetup (D13).
+    export struct EngineSetup
+    {
+        CommandBus&      Commands;
+        EventBus&        Events;
+        JobService&      Jobs;
+        WorldRegistry&   Worlds;
+        ServiceRegistry& Services;
+
+        SystemHandle        RegisterSimSystem(SimSystemDesc);
+        FrameHookHandle     RegisterFrameHook(FramePhase,
+                                std::function<void(FrameHookContext&)>);
+        Graphics::ExtensionPassHandle
+                            RegisterExtensionPass(Graphics::ExtensionPassDesc); // D10 slots
+        CaptureFilterHandle RegisterInputCaptureFilter(InputCaptureFilterDesc);
+        InputActionHandle   RegisterInputAction(InputActionDesc);
+    };
+
+    // Two-phase service registry (D3): Provide in OnRegister,
+    // Require/Find in OnResolve; missing Require = boot error naming
+    // both modules. This is the escape hatch, not the default channel.
+    export class ServiceRegistry
+    {
+    public:
+        template <typename TService> void      Provide(TService& service);
+        template <typename TService> TService& Require();          // fail-closed
+        template <typename TService> TService* Find() noexcept;    // optional dep
+    };
+
+    export class IRuntimeModule
+    {
+    public:
+        virtual ~IRuntimeModule() = default;
+        [[nodiscard]] virtual std::string_view Name() const noexcept = 0;
+        virtual void OnRegister(EngineSetup&) = 0;       // provide + register everything
+        virtual void OnResolve(ServiceRegistry&) {}      // require services; fail-closed
+        virtual void OnShutdown() {}                     // after the announce pump (D7)
+    };
+
+    // ── The kernel ──────────────────────────────────────────
+    export class Engine
+    {
+    public:
+        explicit Engine(Core::Config::EngineConfig config);
+        ~Engine();
+
+        // Composition (D12): the app is a parts list; order irrelevant.
+        void AddModule(std::unique_ptr<IRuntimeModule> module);
+        template <typename TModule, typename... TArgs>
+        TModule& EmplaceModule(TArgs&&... args);
+
+        // Boot → loop → two-phase shutdown. The only public verbs.
+        [[nodiscard]] Core::Result<void> Run();
+
+        // Kernel service accessors (main composition + tests). Note:
+        // handlers/hooks/systems never need these — their contexts
+        // carry the narrow set already (D13).
+        [[nodiscard]] CommandBus&    Commands() noexcept { return m_Commands; }
+        [[nodiscard]] EventBus&      Events()   noexcept { return m_Events; }
+        [[nodiscard]] JobService&    Jobs()     noexcept { return m_Jobs; }
+        [[nodiscard]] WorldRegistry& Worlds()   noexcept { return m_Worlds; }
+
+    private:
+        void Initialize();          // substrate boot + module Register/Resolve
+        void RunFrame();            // the spine (see .cpp)
+        void Shutdown();            // two-phase teardown (D7)
+        void ApplyDeferredWorldOps();
+        void RouteInputThroughCaptureChain();
+        void RunFrameHooks(FramePhase, FrameHookContext&);
+
+        // ── Configuration & timing (kernel-owned) ───────────
+        Core::Config::EngineConfig m_Config;
+        Core::FrameClock           m_FrameClock;
+        double                     m_Accumulator{0.0};
+        double                     m_FixedDt{1.0 / 60.0};
+        int                        m_MaxSubSteps{4};
+        bool                       m_Running{false};
+
+        // ── Communication substrate (D5–D9) ─────────────────
+        CommandBus      m_Commands;
+        EventBus        m_Events;        // two pumps + worker inbox
+        JobService      m_Jobs;          // shares the Core::Tasks pool
+        WorldRegistry   m_Worlds;        // N registries, world #0 at boot
+        ServiceRegistry m_Services;
+
+        // ── CPU task graph: TYPE from core, INSTANCE here ────
+        // Rebuilt per fixed-step substep from builtin + module systems.
+        Core::FrameGraph            m_FrameGraph;
+        std::vector<SimSystemDesc>  m_SimSystems;      // module-registered
+
+        // ── Platform / RHI / renderer (kernel plumbing) ─────
+        std::unique_ptr<Platform::IWindow> m_Window;
+        std::unique_ptr<RHI::IDevice>      m_Device;   // fail-closed selection
+        std::unique_ptr<Graphics::IRenderer> m_Renderer; // owns render-graph instance
+        bool m_RendererOperational{false};
+
+        // ── Render-side kernel state (D10) ──────────────────
+        Graphics::FrameRecipe m_ActiveRecipe;              // swapped at boundary via command
+        Graphics::ExtensionPassRegistry m_ExtensionPasses; // slot-keyed module passes
+        Graphics::RenderExtraction m_Extraction;           // world → RenderWorld snapshot
+
+        // ── Input (D11) ─────────────────────────────────────
+        std::vector<InputCaptureFilterDesc> m_CaptureChain;  // sorted by priority
+        std::vector<InputActionDesc>        m_InputActions;
+
+        // ── Hook tables ─────────────────────────────────────
+        // One vector per phase; execution order inside a phase is
+        // registration-stable but must never be semantically relied on.
+        std::vector<std::function<void(FrameHookContext&)>>
+            m_Hooks[4 /* FramePhase count */];
+
+        // ── Composition ─────────────────────────────────────
+        std::vector<std::unique_ptr<IRuntimeModule>> m_Modules;
+
+        // ── Diagnostics ─────────────────────────────────────
+        FramePacingDiagnostics m_Pacing;   // per-phase micros, published per frame
+    };
+}

@@ -19,10 +19,9 @@ the authoritative open/unblocked view.
 ## Theme F — Architecture/runtime/UI foundation seeds
 
 - blocked by `ARCH-012`: `ARCH-006` — Move Sandbox application editor content out of runtime (tasks/backlog/architecture/ARCH-006-sandbox-editor-content-out-of-runtime.md)
-- unblocked: `ARCH-008` — Queued-only kernel event bus with two pump points (tasks/backlog/architecture/ARCH-008-kernel-event-bus-queued-only.md)
-- blocked by `ARCH-008`: `ARCH-009` — Kernel JobService: snapshot-in/result-out background jobs (tasks/backlog/architecture/ARCH-009-kernel-jobservice-snapshot-in-result-out.md)
-- blocked by `ARCH-008`: `ARCH-010` — Kernel WorldRegistry with deferred, two-phase world operations (tasks/backlog/architecture/ARCH-010-kernel-worldregistry-deferred-world-ops.md)
-- blocked by `ARCH-008`: `ARCH-011` — RuntimeModule contract, EngineSetup, and two-phase ServiceRegistry (tasks/backlog/architecture/ARCH-011-runtimemodule-contract-service-registry.md)
+- unblocked: `ARCH-009` — Kernel JobService: snapshot-in/result-out background jobs (tasks/backlog/architecture/ARCH-009-kernel-jobservice-snapshot-in-result-out.md)
+- blocked by `ARCH-009`: `ARCH-010` — Kernel WorldRegistry with deferred, two-phase world operations (tasks/backlog/architecture/ARCH-010-kernel-worldregistry-deferred-world-ops.md)
+- blocked by `ARCH-009`: `ARCH-011` — RuntimeModule contract, EngineSetup, and two-phase ServiceRegistry (tasks/backlog/architecture/ARCH-011-runtimemodule-contract-service-registry.md)
 - blocked by `ARCH-011`: `ARCH-012` — ClusteringModule: proving extraction onto the kernel seams (tasks/backlog/architecture/ARCH-012-clusteringmodule-proving-extraction.md)
 - blocked by `ARCH-012`: `ARCH-013` — Post-seam re-review of backlog tasks colliding with ADR-0024 (tasks/backlog/architecture/ARCH-013-post-seam-collision-rereview.md)
 - unblocked: `ARCH-014` — Kernel convergence tracking (umbrella north-star) (tasks/backlog/architecture/ARCH-014-kernel-convergence-tracking.md)
@@ -40,7 +39,7 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-147` — Extract the runtime asset-import pipeline out of Engine (tasks/backlog/runtime/RUNTIME-147-extract-asset-import-pipeline-subsystem.md)
 - unblocked: `RUNTIME-148` — Extract the scene-document facade out of Engine (tasks/backlog/runtime/RUNTIME-148-extract-scene-document-subsystem.md)
 - unblocked: `RUNTIME-149` — Extract render-recipe and hot-config control out of Engine (tasks/backlog/runtime/RUNTIME-149-extract-engine-config-control-subsystem.md)
-- blocked by `ARCH-008`: `RUNTIME-150` — Split the frame-loop hook adapters out of Runtime.Engine.cpp (tasks/backlog/runtime/RUNTIME-150-split-engine-frame-loop-implementation-unit.md)
+- unblocked: `RUNTIME-150` — Split the frame-loop hook adapters out of Runtime.Engine.cpp (tasks/backlog/runtime/RUNTIME-150-split-engine-frame-loop-implementation-unit.md)
 - blocked by `RUNTIME-146`: `RUNTIME-151` — Slim the Engine module interface and remove the entt leak (tasks/backlog/runtime/RUNTIME-151-slim-engine-interface-and-remove-entt-leak.md)
 - blocked by `ARCH-012`: `UI-034` — Decentralized editor window contribution, capture contract, and property-plot widgets (tasks/backlog/ui/UI-034-framework24-editor-interaction-layout-conventions.md)
 

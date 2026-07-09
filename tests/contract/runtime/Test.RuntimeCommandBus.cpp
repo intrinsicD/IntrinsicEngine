@@ -8,6 +8,7 @@
 
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.CommandBus;
+import Extrinsic.Runtime.KernelEvents;
 
 // ARCH-007 — contract coverage for the kernel command bus (ADR-0024 D5/D13).
 // Headless: a bus plus a standalone scene registry; no Engine, no platform.
@@ -20,6 +21,7 @@ using Extrinsic::Runtime::CommandEnvelope;
 using Extrinsic::Runtime::CommandHistoryRecord;
 using Extrinsic::Runtime::CommandOutcome;
 using Extrinsic::Runtime::CommandStatus;
+using Extrinsic::Runtime::EventBus;
 
 namespace
 {
@@ -51,6 +53,7 @@ TEST(RuntimeCommandBus, DrainExecutesInEnqueueOrderOnDrainingThread)
 {
     Registry   scene;
     CommandBus bus;
+    EventBus   events;
 
     std::vector<int>      seen;
     const std::thread::id mainThread = std::this_thread::get_id();
@@ -72,7 +75,7 @@ TEST(RuntimeCommandBus, DrainExecutesInEnqueueOrderOnDrainingThread)
     EXPECT_TRUE(second.IsValid());
     EXPECT_NE(first, second);
 
-    bus.Drain(scene);
+    bus.Drain(scene, events);
 
     EXPECT_EQ(seen, (std::vector<int>{1, 2, 3}));
     EXPECT_TRUE(threadOk);
@@ -84,6 +87,7 @@ TEST(RuntimeCommandBus, CrossThreadEnqueueIsSafeAndComplete)
 {
     Registry   scene;
     CommandBus bus;
+    EventBus   events;
 
     std::atomic<int> total{0};
     bus.RegisterHandler<AppendValue>(
@@ -113,7 +117,7 @@ TEST(RuntimeCommandBus, CrossThreadEnqueueIsSafeAndComplete)
         worker.join();
     }
 
-    bus.Drain(scene);
+    bus.Drain(scene, events);
 
     EXPECT_EQ(total.load(), kThreads * kPerThread);
     EXPECT_EQ(bus.Stats().Executed,
@@ -124,6 +128,7 @@ TEST(RuntimeCommandBus, PayloadIsCopiedAtEnqueueTime)
 {
     Registry   scene;
     CommandBus bus;
+    EventBus   events;
 
     int observed = 0;
     bus.RegisterHandler<AppendValue>(
@@ -137,7 +142,7 @@ TEST(RuntimeCommandBus, PayloadIsCopiedAtEnqueueTime)
     bus.Enqueue(source);
     source.Value = 99;  // must not affect the already-enqueued payload
 
-    bus.Drain(scene);
+    bus.Drain(scene, events);
 
     EXPECT_EQ(observed, 42);
 }
@@ -146,9 +151,10 @@ TEST(RuntimeCommandBus, MissingHandlerFailsClosedWithoutCrashing)
 {
     Registry   scene;
     CommandBus bus;
+    EventBus   events;
 
     bus.Enqueue(UnhandledCommand{});
-    bus.Drain(scene);
+    bus.Drain(scene, events);
 
     EXPECT_EQ(bus.Stats().MissingHandler, 1u);
     EXPECT_EQ(bus.Stats().Executed, 0u);
@@ -158,6 +164,7 @@ TEST(RuntimeCommandBus, HandlerFailureIsCountedAndDrainContinues)
 {
     Registry   scene;
     CommandBus bus;
+    EventBus   events;
 
     int executed = 0;
     bus.RegisterHandler<FailingCommand>(
@@ -172,7 +179,7 @@ TEST(RuntimeCommandBus, HandlerFailureIsCountedAndDrainContinues)
 
     bus.Enqueue(FailingCommand{});
     bus.Enqueue(AppendValue{1});
-    bus.Drain(scene);
+    bus.Drain(scene, events);
 
     EXPECT_EQ(bus.Stats().Failed, 1u);
     EXPECT_EQ(executed, 1);
@@ -182,6 +189,7 @@ TEST(RuntimeCommandBus, HandlerEnqueuedFollowUpDefersToNextDrain)
 {
     Registry   scene;
     CommandBus bus;
+    EventBus   events;
 
     int followUps = 0;
     bus.RegisterHandler<AppendValue>(
@@ -198,10 +206,10 @@ TEST(RuntimeCommandBus, HandlerEnqueuedFollowUpDefersToNextDrain)
         });
 
     bus.Enqueue(AppendValue{1});
-    bus.Drain(scene);
+    bus.Drain(scene, events);
     EXPECT_EQ(followUps, 0);  // deferred, not same-drain (ADR-0024 D5)
 
-    bus.Drain(scene);
+    bus.Drain(scene, events);
     EXPECT_EQ(followUps, 1);
 }
 
@@ -209,6 +217,7 @@ TEST(RuntimeCommandBus, HistoryHookReceivesReEnqueueableInverse)
 {
     Registry   scene;
     CommandBus bus;
+    EventBus   events;
 
     int current = 0;
     bus.RegisterHandler<SetValue>(
@@ -231,7 +240,7 @@ TEST(RuntimeCommandBus, HistoryHookReceivesReEnqueueableInverse)
         });
 
     bus.Enqueue(SetValue{0, 7});
-    bus.Drain(scene);
+    bus.Drain(scene, events);
 
     EXPECT_EQ(current, 7);
     EXPECT_EQ(hookCalls, 1);
@@ -239,7 +248,7 @@ TEST(RuntimeCommandBus, HistoryHookReceivesReEnqueueableInverse)
 
     // Undo = re-enqueue the recorded inverse envelope.
     bus.Enqueue(inverse);
-    bus.Drain(scene);
+    bus.Drain(scene, events);
 
     EXPECT_EQ(current, 0);
     EXPECT_EQ(hookCalls, 2);  // the undo records its own inverse (redo)
@@ -249,6 +258,7 @@ TEST(RuntimeCommandBus, DiscardPendingDropsQueuedCommandsWithoutExecuting)
 {
     Registry   scene;
     CommandBus bus;
+    EventBus   events;
 
     int executed = 0;
     bus.RegisterHandler<AppendValue>(
@@ -266,7 +276,7 @@ TEST(RuntimeCommandBus, DiscardPendingDropsQueuedCommandsWithoutExecuting)
     EXPECT_EQ(bus.DiscardPending(), 2u);
     EXPECT_EQ(bus.Stats().Discarded, 2u);
 
-    bus.Drain(scene);
+    bus.Drain(scene, events);
     EXPECT_EQ(executed, 0);
     EXPECT_EQ(bus.Stats().Executed, 0u);
     EXPECT_EQ(bus.DiscardPending(), 0u);
@@ -276,6 +286,7 @@ TEST(RuntimeCommandBus, FailedCommandDoesNotNotifyHistoryHook)
 {
     Registry   scene;
     CommandBus bus;
+    EventBus   events;
 
     bus.RegisterHandler<FailingCommand>(
         [](CommandContext& ctx, const FailingCommand&) -> CommandOutcome
@@ -288,7 +299,7 @@ TEST(RuntimeCommandBus, FailedCommandDoesNotNotifyHistoryHook)
     bus.SetHistoryHook([&](const CommandHistoryRecord&) { ++hookCalls; });
 
     bus.Enqueue(FailingCommand{});
-    bus.Drain(scene);
+    bus.Drain(scene, events);
 
     EXPECT_EQ(hookCalls, 0);
     EXPECT_EQ(bus.Stats().Failed, 1u);

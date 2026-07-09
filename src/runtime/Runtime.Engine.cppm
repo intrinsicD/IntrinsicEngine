@@ -36,6 +36,7 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CommandBus;
+import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
@@ -692,6 +693,9 @@ namespace Extrinsic::Runtime
         // thread/phase; the Engine drains once per frame between platform
         // input and the fixed-step simulation.
         [[nodiscard]] CommandBus&             Commands()         noexcept;
+        // ARCH-008 - queued-only kernel event bus (ADR-0024 D7). Publish from
+        // any thread; Engine pumps post-drain and post-simulation.
+        [[nodiscard]] EventBus&               Events()           noexcept;
         // UI-001 Slice D — runtime-owned file/import command seam. Editor UI
         // submits a path + payload hint here; Engine composes the promoted
         // ASSETIO geometry/model/texture decoders, AssetService, and runtime
@@ -1027,6 +1031,8 @@ namespace Extrinsic::Runtime
         std::uint64_t                              m_SceneFileEventSequence{0};
         // ARCH-007 — kernel command bus; drained in RunFrame() pre-sim.
         CommandBus                             m_CommandBus{};
+        // ARCH-008 - queued-only kernel events; pumped twice per frame.
+        EventBus                               m_EventBus{};
         // ECS scene registry
         std::unique_ptr<ECS::Scene::Registry>  m_Scene;
         // Declared after m_Scene so scoped disconnection runs before the

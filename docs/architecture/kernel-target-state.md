@@ -53,7 +53,7 @@ flip a box when the invariant holds on `main`. Baseline column is the
 ### Kernel seams exist (ADR-0024 D5–D11)
 
 - [x] CommandBus + single pre-sim drain — `ARCH-007` (done 2026-07-08)
-- [ ] EventBus, queued-only, two pumps — `ARCH-008`
+- [x] EventBus, queued-only, two pumps — `ARCH-008` (done 2026-07-09)
 - [ ] JobService, snapshot-in/result-out — `ARCH-009`
 - [ ] WorldRegistry, deferred two-phase world ops — `ARCH-010`
 - [ ] RuntimeModule contract + EngineSetup + ServiceRegistry — `ARCH-011`
@@ -139,5 +139,5 @@ flip a box when the invariant holds on `main`. Baseline column is the
   invariant (new domain-noun import, new `Engine::GetX()`, new direct
   dispatcher use, new `Engine&` pass-through).
 - **Picking work?** The unchecked seam rows are the ADR-0024 migration order
-  (`ARCH-008` next); the unchecked domain rows are the extractions that
-  follow each seam.
+  (`ARCH-009` next after `ARCH-008` retired); the unchecked domain rows are
+  the extractions that follow each seam.

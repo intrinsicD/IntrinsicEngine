@@ -74,7 +74,7 @@ namespace Extrinsic::Runtime
         return m_Stats;
     }
 
-    void CommandBus::Drain(ECS::Scene::Registry& activeWorld)
+    void CommandBus::Drain(ECS::Scene::Registry& activeWorld, EventBus& events)
     {
         if (m_Draining)
         {
@@ -129,7 +129,7 @@ namespace Extrinsic::Runtime
             // mid-call is documented as unsupported).
             const HandlerRecord& record = handlerIt->second;
 
-            CommandContext context{activeWorld, *this, pending.Correlation};
+            CommandContext context{activeWorld, *this, events, pending.Correlation};
             m_RecordedInverse = CommandEnvelope{};
 
             const CommandOutcome outcome =

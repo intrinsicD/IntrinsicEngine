@@ -10,7 +10,7 @@ depends_on: []
   is queued-only (no `trigger` in the API), pumps at exactly two main-thread
   points per frame (post-command-drain and post-simulation), and accepts
   publishes from worker threads via an internal thread-safe inbox, per
-  [ADR-0024](../../../docs/adr/0024-kernel-module-architecture.md) D7.
+  [ADR-0024](../../docs/adr/0024-kernel-module-architecture.md) D7.
 
 ## Non-goals
 - No migration of existing direct `entt::dispatcher`/`entt::sigh` users in
@@ -36,39 +36,52 @@ depends_on: []
   has not landed yet, pump A anchors to the same pre-sim location the drain
   will occupy; the two tasks are independently landable.
 
+## Status
+
+- **Retired 2026-07-09 at `CPUContracted`.** Commit/PR: pending local change
+  set. `Operational` is owned by `ARCH-012`.
+- Implementation, focused contract tests, sanitizer-focused cross-thread
+  coverage, module inventory regeneration, layering, task policy, and the
+  default CPU-supported CTest gate all pass locally. The default gate passed
+  with 3616/3616 tests passing.
+- The local `Runtime.EngineTarget.*` target-state sketch was preserved under
+  [`docs/architecture/sketches/`](../../docs/architecture/sketches/) with
+  `.txt` suffixes so source/module tooling no longer treats it as a
+  production `Extrinsic.Runtime.Engine` module.
+
 ## Required changes
-- [ ] New kernel event-bus module (interface `.cppm` + implementation
+- [x] New kernel event-bus module (interface `.cppm` + implementation
       `.cpp`): typed `Subscribe`/`Unsubscribe` with handles, thread-safe
       `Publish` (deferred always), internal MPSC inbox for cross-thread
       publishes.
-- [ ] Same-pump deferral: publishes made by listeners during `Pump()` land in
+- [x] Same-pump deferral: publishes made by listeners during `Pump()` land in
       the next pump's batch.
-- [ ] Wire pump A (post-drain, pre-sim) and pump B (post-sim, pre-UI/extraction)
+- [x] Wire pump A (post-drain, pre-sim) and pump B (post-sim, pre-UI/extraction)
       into `Engine::RunFrame()` with phase comments.
-- [ ] Diagnostics: per-pump delivered-event counters exposed for tests.
+- [x] Diagnostics: per-pump delivered-event counters exposed for tests.
 
 ## Tests
-- [ ] Unit/contract tests (headless, `unit;runtime` labels): subscribe →
+- [x] Unit/contract tests (headless, `contract;runtime` labels): subscribe →
       publish → delivered at next pump, not at publish time.
-- [ ] Cascade-bounding test: listener publishes during pump; delivery happens
+- [x] Cascade-bounding test: listener publishes during pump; delivery happens
       at the following pump only.
-- [ ] Cross-thread test: publishes from a worker thread are delivered at the
+- [x] Cross-thread test: publishes from a worker thread are delivered at the
       next main-thread pump without data races (exercised under the
       sanitizer-enabled preset).
-- [ ] Unsubscribe test: handle removal stops delivery; unsubscribing during a
+- [x] Unsubscribe test: handle removal stops delivery; unsubscribing during a
       pump is safe.
 
 ## Docs
-- [ ] Regenerate `docs/api/generated/module_inventory.md` (new module).
-- [ ] Record the two pump points in the frame-phase description doc, citing
+- [x] Regenerate `docs/api/generated/module_inventory.md` (new module).
+- [x] Record the two pump points in the frame-phase description doc, citing
       ADR-0024 D7.
 
 ## Acceptance criteria
-- [ ] The kernel event API exposes no synchronous dispatch path.
-- [ ] Both pumps run in `Engine::RunFrame()` at the ADR-0024 positions.
-- [ ] All listed tests pass under the default CPU gate; the cross-thread test
-      passes under sanitizers.
-- [ ] `Operational` follow-up is owned by `ARCH-012`.
+- [x] The kernel event API exposes no synchronous dispatch path.
+- [x] Both pumps run in `Engine::RunFrame()` at the ADR-0024 positions.
+- [x] All listed tests pass under the default CPU gate.
+- [x] The cross-thread test passes under sanitizers.
+- [x] `Operational` follow-up is owned by `ARCH-012`.
 
 ## Verification
 ```bash
