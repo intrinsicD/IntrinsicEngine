@@ -1,0 +1,582 @@
+{
+  "schema_version": 1,
+  "benchmark_id": "ci.gate-latency.github-ubuntu-24.04.v1.aggregate-baseline",
+  "method": "ci.gate-latency",
+  "backend": "external_baseline",
+  "dataset": "github.hosted.ubuntu_24_04.x86_64",
+  "commit": "historical-multi-commit",
+  "status": "passed",
+  "timestamp_utc": "2026-07-09T20:45:00Z",
+  "runner": "github-actions",
+  "metrics": {
+    "population_count": 6,
+    "sample_count": 30,
+    "warm_population_count": 0,
+    "cold_population_statistics": {
+      "pr-fast": {
+        "configure_time_ms": {"median": 15000, "p95": 29000},
+        "build_time_ms": {"median": 1381000, "p95": 1425000},
+        "test_time_ms": {"median": 232000, "p95": 234000},
+        "total_time_ms": {"median": 1626000, "p95": 1670000}
+      },
+      "ci-linux-clang": {
+        "configure_time_ms": {"median": 18000, "p95": 19000},
+        "build_time_ms": {"median": 1383000, "p95": 1420000},
+        "test_time_ms": {"median": 244000, "p95": 246000},
+        "total_time_ms": {"median": 1642000, "p95": 1685000}
+      },
+      "ci-sanitizers-asan": {
+        "configure_time_ms": {"median": 13000, "p95": 22000},
+        "build_time_ms": {"median": 1273000, "p95": 1290000},
+        "test_time_ms": {"median": 462000, "p95": 470000},
+        "total_time_ms": {"median": 1749000, "p95": 1773000}
+      },
+      "ci-sanitizers-ubsan": {
+        "configure_time_ms": {"median": 7000, "p95": 19000},
+        "build_time_ms": {"median": 950000, "p95": 1265000},
+        "test_time_ms": {"median": 132000, "p95": 156000},
+        "total_time_ms": {"median": 1089000, "p95": 1439000}
+      },
+      "ci-vulkan": {
+        "configure_time_ms": {"median": 12000, "p95": 19000},
+        "build_time_ms": {"median": 1399000, "p95": 1492000},
+        "test_time_ms": {"median": 4000, "p95": 4000},
+        "total_time_ms": {"median": 1414000, "p95": 1509000}
+      },
+      "ci-bench-smoke": {
+        "configure_time_ms": {"median": 12000, "p95": 22000},
+        "build_time_ms": {"median": 392000, "p95": 429000},
+        "test_time_ms": {"median": 25000, "p95": 26000},
+        "total_time_ms": {"median": 427000, "p95": 467000}
+      }
+    }
+  },
+  "diagnostics": {
+    "source_benchmark_id": "ci.gate-latency.github-ubuntu-24.04.v1",
+    "source_verification": {
+      "verified_date_utc": "2026-07-09",
+      "api_jobs_verified": 30,
+      "api_runs_verified": 25,
+      "verified_fields": [
+        "workflow_id",
+        "run_job_association",
+        "commit",
+        "event",
+        "conclusion",
+        "runner_image",
+        "phase_durations",
+        "job_duration",
+        "vcpkg_cache_step"
+      ]
+    },
+    "methodology": {
+      "source": "GitHub Actions jobs API step timestamps",
+      "runner_image": "ubuntu-24.04",
+      "compiler": "clang-20",
+      "workflow_generation": "pre-ci003-2026-07-09",
+      "sample_time_resolution_seconds": 1,
+      "measured_total_definition": "configure_plus_build_plus_test",
+      "percentile_method": "nearest_rank",
+      "compile_cache_state": "cold",
+      "vcpkg_cache_hit": true,
+      "warm_compile_sample_count": 0,
+      "notes": [
+        "No ccache was active, so every compile is cold even though the vcpkg binary-package cache was warm.",
+        "Every population uses the same five pull-request commits; sanitizer legs share workflow runs by matrix design.",
+        "Failed test conclusions are retained only when configure/build/test steps all completed; this is a latency baseline, not correctness evidence.",
+        "Whole-job time is diagnostic context and is not comparable to total_time_ms, which sums measured phases."
+      ]
+    },
+    "populations": [
+    {
+      "gate": "pr-fast",
+      "workflow_id": 267903569,
+      "workflow_file": ".github/workflows/pr-fast.yml",
+      "preset": "ci",
+      "sanitizer": "combined-project-default",
+      "selected_test_count": 3526,
+      "test_timing_valid": true,
+      "samples": [
+        {
+          "run_id": 29044370625,
+          "job_id": 86209230534,
+          "commit": "0f73194130da128b4a2aa413cd3a2a9b1944f000",
+          "event": "pull_request",
+          "conclusion": "success",
+          "metrics": {
+            "configure_time_ms": 29000,
+            "build_time_ms": 1206000,
+            "test_time_ms": 224000,
+            "total_time_ms": 1459000
+          },
+          "job_time_ms": 1500000
+        },
+        {
+          "run_id": 29044267787,
+          "job_id": 86208894230,
+          "commit": "e42c0e1d7a48444cb5867c6b92fefaa31676084c",
+          "event": "pull_request",
+          "conclusion": "success",
+          "metrics": {
+            "configure_time_ms": 9000,
+            "build_time_ms": 1425000,
+            "test_time_ms": 233000,
+            "total_time_ms": 1667000
+          },
+          "job_time_ms": 1701000
+        },
+        {
+          "run_id": 29042046492,
+          "job_id": 86201390260,
+          "commit": "c0c23324cf0fcd73e77f50e2a3c351ed30560951",
+          "event": "pull_request",
+          "conclusion": "failure",
+          "metrics": {
+            "configure_time_ms": 13000,
+            "build_time_ms": 1381000,
+            "test_time_ms": 232000,
+            "total_time_ms": 1626000
+          },
+          "job_time_ms": 1649000
+        },
+        {
+          "run_id": 29047322721,
+          "job_id": 86219096121,
+          "commit": "a0a23f3d616d48f931dc3cf462c8cc1b4faf8670",
+          "event": "pull_request",
+          "conclusion": "failure",
+          "metrics": {
+            "configure_time_ms": 15000,
+            "build_time_ms": 1341000,
+            "test_time_ms": 228000,
+            "total_time_ms": 1584000
+          },
+          "job_time_ms": 1618000
+        },
+        {
+          "run_id": 29033611899,
+          "job_id": 86172621345,
+          "commit": "a168957d4d4c48d1c444a092ba6ce5f9ef137cac",
+          "event": "pull_request",
+          "conclusion": "failure",
+          "metrics": {
+            "configure_time_ms": 21000,
+            "build_time_ms": 1415000,
+            "test_time_ms": 234000,
+            "total_time_ms": 1670000
+          },
+          "job_time_ms": 1713000
+        }
+      ]
+    },
+    {
+      "gate": "ci-linux-clang",
+      "workflow_id": 267907025,
+      "workflow_file": ".github/workflows/ci-linux-clang.yml",
+      "preset": "ci",
+      "sanitizer": "combined-project-default",
+      "selected_test_count": 3594,
+      "test_timing_valid": true,
+      "samples": [
+        {
+          "run_id": 29042046463,
+          "job_id": 86201390059,
+          "commit": "c0c23324cf0fcd73e77f50e2a3c351ed30560951",
+          "event": "pull_request",
+          "conclusion": "failure",
+          "metrics": {
+            "configure_time_ms": 14000,
+            "build_time_ms": 1248000,
+            "test_time_ms": 219000,
+            "total_time_ms": 1481000
+          },
+          "job_time_ms": 1510000
+        },
+        {
+          "run_id": 29044370719,
+          "job_id": 86209231073,
+          "commit": "0f73194130da128b4a2aa413cd3a2a9b1944f000",
+          "event": "pull_request",
+          "conclusion": "success",
+          "metrics": {
+            "configure_time_ms": 11000,
+            "build_time_ms": 1383000,
+            "test_time_ms": 243000,
+            "total_time_ms": 1637000
+          },
+          "job_time_ms": 1680000
+        },
+        {
+          "run_id": 29044267371,
+          "job_id": 86208892750,
+          "commit": "e42c0e1d7a48444cb5867c6b92fefaa31676084c",
+          "event": "pull_request",
+          "conclusion": "success",
+          "metrics": {
+            "configure_time_ms": 18000,
+            "build_time_ms": 1380000,
+            "test_time_ms": 244000,
+            "total_time_ms": 1642000
+          },
+          "job_time_ms": 1697000
+        },
+        {
+          "run_id": 29047322705,
+          "job_id": 86219095979,
+          "commit": "a0a23f3d616d48f931dc3cf462c8cc1b4faf8670",
+          "event": "pull_request",
+          "conclusion": "failure",
+          "metrics": {
+            "configure_time_ms": 18000,
+            "build_time_ms": 1403000,
+            "test_time_ms": 245000,
+            "total_time_ms": 1666000
+          },
+          "job_time_ms": 1711000
+        },
+        {
+          "run_id": 29033611885,
+          "job_id": 86172621197,
+          "commit": "a168957d4d4c48d1c444a092ba6ce5f9ef137cac",
+          "event": "pull_request",
+          "conclusion": "failure",
+          "metrics": {
+            "configure_time_ms": 19000,
+            "build_time_ms": 1420000,
+            "test_time_ms": 246000,
+            "total_time_ms": 1685000
+          },
+          "job_time_ms": 1746000
+        }
+      ]
+    },
+    {
+      "gate": "ci-sanitizers-asan",
+      "workflow_id": 267909997,
+      "workflow_file": ".github/workflows/ci-sanitizers.yml",
+      "preset": "ci",
+      "sanitizer": "asan",
+      "selected_test_count": 3592,
+      "test_timing_valid": true,
+      "samples": [
+        {
+          "run_id": 29044370615,
+          "job_id": 86209230507,
+          "commit": "0f73194130da128b4a2aa413cd3a2a9b1944f000",
+          "event": "pull_request",
+          "conclusion": "success",
+          "metrics": {
+            "configure_time_ms": 13000,
+            "build_time_ms": 1290000,
+            "test_time_ms": 470000,
+            "total_time_ms": 1773000
+          },
+          "job_time_ms": 1805000
+        },
+        {
+          "run_id": 29044267358,
+          "job_id": 86208892951,
+          "commit": "e42c0e1d7a48444cb5867c6b92fefaa31676084c",
+          "event": "pull_request",
+          "conclusion": "success",
+          "metrics": {
+            "configure_time_ms": 6000,
+            "build_time_ms": 888000,
+            "test_time_ms": 345000,
+            "total_time_ms": 1239000
+          },
+          "job_time_ms": 1282000
+        },
+        {
+          "run_id": 29042046532,
+          "job_id": 86201390353,
+          "commit": "c0c23324cf0fcd73e77f50e2a3c351ed30560951",
+          "event": "pull_request",
+          "conclusion": "success",
+          "metrics": {
+            "configure_time_ms": 22000,
+            "build_time_ms": 1274000,
+            "test_time_ms": 462000,
+            "total_time_ms": 1758000
+          },
+          "job_time_ms": 1789000
+        },
+        {
+          "run_id": 29047322720,
+          "job_id": 86219096120,
+          "commit": "a0a23f3d616d48f931dc3cf462c8cc1b4faf8670",
+          "event": "pull_request",
+          "conclusion": "failure",
+          "metrics": {
+            "configure_time_ms": 9000,
+            "build_time_ms": 1273000,
+            "test_time_ms": 467000,
+            "total_time_ms": 1749000
+          },
+          "job_time_ms": 1773000
+        },
+        {
+          "run_id": 29033612413,
+          "job_id": 86172622967,
+          "commit": "a168957d4d4c48d1c444a092ba6ce5f9ef137cac",
+          "event": "pull_request",
+          "conclusion": "failure",
+          "metrics": {
+            "configure_time_ms": 15000,
+            "build_time_ms": 974000,
+            "test_time_ms": 374000,
+            "total_time_ms": 1363000
+          },
+          "job_time_ms": 1398000
+        }
+      ]
+    },
+    {
+      "gate": "ci-sanitizers-ubsan",
+      "workflow_id": 267909997,
+      "workflow_file": ".github/workflows/ci-sanitizers.yml",
+      "preset": "ci",
+      "sanitizer": "ubsan",
+      "selected_test_count": 3592,
+      "test_timing_valid": true,
+      "samples": [
+        {
+          "run_id": 29044370615,
+          "job_id": 86209230508,
+          "commit": "0f73194130da128b4a2aa413cd3a2a9b1944f000",
+          "event": "pull_request",
+          "conclusion": "success",
+          "metrics": {
+            "configure_time_ms": 7000,
+            "build_time_ms": 880000,
+            "test_time_ms": 111000,
+            "total_time_ms": 998000
+          },
+          "job_time_ms": 1036000
+        },
+        {
+          "run_id": 29044267358,
+          "job_id": 86208892909,
+          "commit": "e42c0e1d7a48444cb5867c6b92fefaa31676084c",
+          "event": "pull_request",
+          "conclusion": "success",
+          "metrics": {
+            "configure_time_ms": 7000,
+            "build_time_ms": 950000,
+            "test_time_ms": 132000,
+            "total_time_ms": 1089000
+          },
+          "job_time_ms": 1141000
+        },
+        {
+          "run_id": 29042046532,
+          "job_id": 86201390346,
+          "commit": "c0c23324cf0fcd73e77f50e2a3c351ed30560951",
+          "event": "pull_request",
+          "conclusion": "success",
+          "metrics": {
+            "configure_time_ms": 15000,
+            "build_time_ms": 1265000,
+            "test_time_ms": 154000,
+            "total_time_ms": 1434000
+          },
+          "job_time_ms": 1459000
+        },
+        {
+          "run_id": 29047322720,
+          "job_id": 86219096155,
+          "commit": "a0a23f3d616d48f931dc3cf462c8cc1b4faf8670",
+          "event": "pull_request",
+          "conclusion": "failure",
+          "metrics": {
+            "configure_time_ms": 19000,
+            "build_time_ms": 1264000,
+            "test_time_ms": 156000,
+            "total_time_ms": 1439000
+          },
+          "job_time_ms": 1481000
+        },
+        {
+          "run_id": 29033612413,
+          "job_id": 86172623070,
+          "commit": "a168957d4d4c48d1c444a092ba6ce5f9ef137cac",
+          "event": "pull_request",
+          "conclusion": "failure",
+          "metrics": {
+            "configure_time_ms": 6000,
+            "build_time_ms": 876000,
+            "test_time_ms": 111000,
+            "total_time_ms": 993000
+          },
+          "job_time_ms": 1027000
+        }
+      ]
+    },
+    {
+      "gate": "ci-vulkan",
+      "workflow_id": 276548514,
+      "workflow_file": ".github/workflows/ci-vulkan.yml",
+      "preset": "ci-vulkan",
+      "sanitizer": "combined-project-default",
+      "selected_test_count": 60,
+      "test_timing_valid": false,
+      "test_timing_note": "All sampled test steps failed before the later Xvfb frame-pacing step existed or executed; use build timing only until post-BUG-064 samples accumulate.",
+      "samples": [
+        {
+          "run_id": 29044370630,
+          "job_id": 86209230943,
+          "commit": "0f73194130da128b4a2aa413cd3a2a9b1944f000",
+          "event": "pull_request",
+          "conclusion": "failure",
+          "metrics": {
+            "configure_time_ms": 10000,
+            "build_time_ms": 1341000,
+            "test_time_ms": 4000,
+            "total_time_ms": 1355000
+          },
+          "job_time_ms": 1383000
+        },
+        {
+          "run_id": 29044267383,
+          "job_id": 86208892731,
+          "commit": "e42c0e1d7a48444cb5867c6b92fefaa31676084c",
+          "event": "pull_request",
+          "conclusion": "failure",
+          "metrics": {
+            "configure_time_ms": 13000,
+            "build_time_ms": 1492000,
+            "test_time_ms": 4000,
+            "total_time_ms": 1509000
+          },
+          "job_time_ms": 1537000
+        },
+        {
+          "run_id": 29042046479,
+          "job_id": 86201390108,
+          "commit": "c0c23324cf0fcd73e77f50e2a3c351ed30560951",
+          "event": "pull_request",
+          "conclusion": "failure",
+          "metrics": {
+            "configure_time_ms": 7000,
+            "build_time_ms": 1488000,
+            "test_time_ms": 3000,
+            "total_time_ms": 1498000
+          },
+          "job_time_ms": 1537000
+        },
+        {
+          "run_id": 29047322713,
+          "job_id": 86219096075,
+          "commit": "a0a23f3d616d48f931dc3cf462c8cc1b4faf8670",
+          "event": "pull_request",
+          "conclusion": "failure",
+          "metrics": {
+            "configure_time_ms": 12000,
+            "build_time_ms": 1399000,
+            "test_time_ms": 3000,
+            "total_time_ms": 1414000
+          },
+          "job_time_ms": 1442000
+        },
+        {
+          "run_id": 29033611912,
+          "job_id": 86172621284,
+          "commit": "a168957d4d4c48d1c444a092ba6ce5f9ef137cac",
+          "event": "pull_request",
+          "conclusion": "failure",
+          "metrics": {
+            "configure_time_ms": 19000,
+            "build_time_ms": 1389000,
+            "test_time_ms": 4000,
+            "total_time_ms": 1412000
+          },
+          "job_time_ms": 1444000
+        }
+      ]
+    },
+    {
+      "gate": "ci-bench-smoke",
+      "workflow_id": 267917628,
+      "workflow_file": ".github/workflows/ci-bench-smoke.yml",
+      "preset": "ci",
+      "sanitizer": "combined-project-default",
+      "selected_test_count": 0,
+      "selected_test_count_applicable": false,
+      "test_timing_valid": true,
+      "test_timing_note": "test_time_ms measures the IntrinsicBenchmarks runner target, not CTest.",
+      "samples": [
+        {
+          "run_id": 29044370620,
+          "job_id": 86209230558,
+          "commit": "0f73194130da128b4a2aa413cd3a2a9b1944f000",
+          "event": "pull_request",
+          "conclusion": "success",
+          "metrics": {
+            "configure_time_ms": 11000,
+            "build_time_ms": 409000,
+            "test_time_ms": 26000,
+            "total_time_ms": 446000
+          },
+          "job_time_ms": 471000
+        },
+        {
+          "run_id": 29044267380,
+          "job_id": 86208892813,
+          "commit": "e42c0e1d7a48444cb5867c6b92fefaa31676084c",
+          "event": "pull_request",
+          "conclusion": "success",
+          "metrics": {
+            "configure_time_ms": 10000,
+            "build_time_ms": 392000,
+            "test_time_ms": 25000,
+            "total_time_ms": 427000
+          },
+          "job_time_ms": 452000
+        },
+        {
+          "run_id": 29042046433,
+          "job_id": 86201390102,
+          "commit": "c0c23324cf0fcd73e77f50e2a3c351ed30560951",
+          "event": "pull_request",
+          "conclusion": "success",
+          "metrics": {
+            "configure_time_ms": 12000,
+            "build_time_ms": 429000,
+            "test_time_ms": 26000,
+            "total_time_ms": 467000
+          },
+          "job_time_ms": 502000
+        },
+        {
+          "run_id": 29047322840,
+          "job_id": 86219096775,
+          "commit": "a0a23f3d616d48f931dc3cf462c8cc1b4faf8670",
+          "event": "pull_request",
+          "conclusion": "success",
+          "metrics": {
+            "configure_time_ms": 16000,
+            "build_time_ms": 340000,
+            "test_time_ms": 23000,
+            "total_time_ms": 379000
+          },
+          "job_time_ms": 409000
+        },
+        {
+          "run_id": 29033611886,
+          "job_id": 86172621186,
+          "commit": "a168957d4d4c48d1c444a092ba6ce5f9ef137cac",
+          "event": "pull_request",
+          "conclusion": "success",
+          "metrics": {
+            "configure_time_ms": 22000,
+            "build_time_ms": 366000,
+            "test_time_ms": 24000,
+            "total_time_ms": 412000
+          },
+          "job_time_ms": 438000
+        }
+      ]
+    }
+    ]
+  }
+}

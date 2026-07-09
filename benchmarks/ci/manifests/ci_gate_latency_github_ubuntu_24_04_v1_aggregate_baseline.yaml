@@ -1,0 +1,22 @@
+# CI-003 — aggregate baseline report for the stable per-run CI gate profile.
+
+benchmark_id: ci.gate-latency.github-ubuntu-24.04.v1.aggregate-baseline
+method: ci.gate-latency
+dataset: github.hosted.ubuntu_24_04.x86_64
+params:
+  intent: performance
+  report_kind: aggregate_baseline
+  source_benchmark_id: ci.gate-latency.github-ubuntu-24.04.v1
+  runner_platform: github-hosted
+  runner_image: ubuntu-24.04
+  architecture: x86_64
+  compile_cache_state: cold
+  vcpkg_cache_state: warm
+  percentile_method: nearest_rank
+  minimum_samples_per_population: 5
+metrics:
+  - population_count
+  - sample_count
+  - warm_population_count
+  - cold_population_statistics
+thresholds: {}

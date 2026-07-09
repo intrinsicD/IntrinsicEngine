@@ -47,6 +47,12 @@ test count, Ninja command-edge count, ccache counts, vcpkg cache state, phase
 return codes, and unavailable-counter flags belong in `diagnostics`. Cold and
 warm results are different populations for baseline comparison.
 
+The multi-run baseline report uses the distinct ID
+`ci.gate-latency.github-ubuntu-24.04.v1.aggregate-baseline`. It links back to
+the per-run profile through `diagnostics.source_benchmark_id` and reports
+population/sample counts plus grouped cold-population statistics. Consumers
+must not interpret those aggregates as one gate invocation.
+
 ## Metric value constraints
 
 Within `metrics`:

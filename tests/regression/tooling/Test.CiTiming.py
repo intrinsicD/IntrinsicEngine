@@ -13,7 +13,14 @@ TIME_COMMAND = REPO_ROOT / "tools" / "ci" / "time_command.py"
 AGGREGATOR = REPO_ROOT / "tools" / "ci" / "aggregate_gate_timing.py"
 MANIFEST_VALIDATOR = REPO_ROOT / "tools" / "benchmark" / "validate_benchmark_manifests.py"
 RESULT_VALIDATOR = REPO_ROOT / "tools" / "benchmark" / "validate_benchmark_results.py"
+BASELINE_VALIDATOR = REPO_ROOT / "tools" / "ci" / "validate_gate_timing_baseline.py"
 CI_MANIFEST_ROOT = REPO_ROOT / "benchmarks" / "ci"
+CI_BASELINE = (
+    REPO_ROOT
+    / "benchmarks"
+    / "baselines"
+    / "ci_gate_latency_github_ubuntu_24_04_v1.json"
+)
 
 
 def _write_phase(path: Path, elapsed_seconds: float, returncode: int = 0) -> None:
@@ -254,6 +261,95 @@ class CiTimingTests(unittest.TestCase):
             self.assertEqual(payload["metrics"]["test_time_ms"], 0)
             self.assertEqual(len(payload["diagnostics"]["phase_errors"]), 1)
             self.assertFalse(payload["diagnostics"]["selected_test_count_available"])
+
+    def test_historical_baseline_statistics_validate(self) -> None:
+        payload = json.loads(CI_BASELINE.read_text(encoding="utf-8"))
+        self.assertEqual(
+            payload["benchmark_id"],
+            "ci.gate-latency.github-ubuntu-24.04.v1.aggregate-baseline",
+        )
+        self.assertEqual(
+            payload["diagnostics"]["source_benchmark_id"],
+            "ci.gate-latency.github-ubuntu-24.04.v1",
+        )
+        result = subprocess.run(
+            [sys.executable, str(BASELINE_VALIDATOR)],
+            cwd=REPO_ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        self.assertIn("validation passed", result.stdout)
+
+        canonical = subprocess.run(
+            [
+                sys.executable,
+                str(RESULT_VALIDATOR),
+                "--root",
+                str(CI_BASELINE.parent),
+                "--strict",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        self.assertEqual(
+            canonical.returncode,
+            0,
+            msg=canonical.stdout + canonical.stderr,
+        )
+
+    def test_historical_baseline_rejects_context_drift(self) -> None:
+        payload = json.loads(CI_BASELINE.read_text(encoding="utf-8"))
+        payload["diagnostics"]["populations"][2]["sanitizer"] = "ubsan"
+        with tempfile.TemporaryDirectory() as tmp:
+            baseline = Path(tmp) / "baseline.json"
+            baseline.write_text(json.dumps(payload), encoding="utf-8")
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(BASELINE_VALIDATOR),
+                    "--baseline",
+                    str(baseline),
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("sanitizer must be 'asan'", result.stdout)
+
+    def test_historical_baseline_rejects_malformed_audit_metadata(self) -> None:
+        payload = json.loads(CI_BASELINE.read_text(encoding="utf-8"))
+        payload["diagnostics"]["source_verification"] = []
+        with tempfile.TemporaryDirectory() as tmp:
+            baseline = Path(tmp) / "baseline.json"
+            baseline.write_text(json.dumps(payload), encoding="utf-8")
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(BASELINE_VALIDATOR),
+                    "--baseline",
+                    str(baseline),
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            "diagnostics.source_verification must be an object",
+            result.stdout,
+        )
+        self.assertNotIn("Traceback", result.stderr)
 
 
 if __name__ == "__main__":

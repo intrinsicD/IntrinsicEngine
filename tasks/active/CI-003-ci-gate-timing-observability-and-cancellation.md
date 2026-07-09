@@ -8,10 +8,10 @@ depends_on: []
 ## Status
 - In progress on branch `copilot/ci-003-gate-observability`.
 - Owner/agent: GitHub Copilot CLI.
-- Current slice: Slices A and B complete; Slice C baseline publication is next.
+- Current slice: Slices A, B, and C complete; retirement is next.
 - Next verification step:
-  validate the historical sample report and its median/p95 statistics against
-  the cited GitHub Actions run/job IDs.
+  run the strict task/docs checks and retire the task with Slice C's commit
+  reference.
 
 ## Goal
 - Publish comparable, machine-readable configure/build/test/total timing for
@@ -68,6 +68,15 @@ depends_on: []
   build on four cores, a 0.125s no-op build, a 16s implementation-only touch,
   and 3m23s–4m19s module-interface touches. The operational rule remains:
   non-trivial implementation belongs outside `.cppm` interfaces.
+- The formal pre-optimization baseline is
+  [`benchmarks/baselines/ci_gate_latency_github_ubuntu_24_04_v1.json`](../../benchmarks/baselines/ci_gate_latency_github_ubuntu_24_04_v1.json).
+  Its distinct `ci.gate-latency.github-ubuntu-24.04.v1.aggregate-baseline`
+  identity links back to the per-run profile without impersonating one gate
+  result. It uses the same five pull-request commits for every population,
+  retains all 30 job and 25 run IDs, and records the completed authenticated API audit.
+  All samples are cold compiles with warm vcpkg binary-package caches; no warm
+  compile population existed. The pre-BUG-064 Vulkan test/total statistics are
+  diagnostic only, while configure/build remain comparable.
 
 ## Slice plan
 - **Slice A.** Define the stable benchmark manifest/result contract, extend the
@@ -95,10 +104,10 @@ depends_on: []
       tree or BMIs.
 - [x] Add workflow-level concurrency groups keyed by workflow plus PR/ref, with
       `cancel-in-progress: true`, to PR-triggered compile-heavy workflows.
-- [ ] Seed the formal baseline from the run/job IDs above and at least five
+- [x] Seed the formal baseline from the run/job IDs above and at least five
       comparable samples per gate (historical logs are acceptable); report
       median and p95 separately for cold and warm-cache observations.
-- [ ] Keep the captured table and the formal baseline artifact linked from the
+- [x] Keep the captured table and the formal baseline artifact linked from the
       implementation task/benchmark report so future sessions do not rerun the
       exploratory audit.
 
@@ -122,7 +131,7 @@ depends_on: []
 ## Acceptance criteria
 - [x] Every compile-heavy required gate publishes machine-readable phase
       timings and the contextual counters needed for a comparable result.
-- [ ] A baseline report contains at least five comparable samples per gate and
+- [x] A baseline report contains at least five comparable samples per gate and
       reports median/p95 without presenting the representative table as a
       performance claim.
 - [x] Pushing a newer commit to one PR cancels older in-progress runs of the
@@ -162,6 +171,22 @@ ninja -C build/ci -t commands IntrinsicTests
 python3 -c 'from pathlib import Path; import yaml; [yaml.safe_load(path.read_text()) for path in Path(".github/workflows").glob("*.yml")]'
 git diff --check
 ```
+
+Slice C verification run on 2026-07-09:
+
+```bash
+python3 tools/ci/validate_gate_timing_baseline.py
+python3 tests/regression/tooling/Test.CiTiming.py -v
+python3 tools/benchmark/validate_benchmark_results.py --root benchmarks --strict
+python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
+python3 -m py_compile tools/ci/validate_gate_timing_baseline.py tests/regression/tooling/Test.CiTiming.py
+git diff --check
+```
+
+The retained source records were also checked through authenticated GitHub API
+job/run endpoints: 30/30 jobs and 25/25 distinct workflow runs matched their
+workflow IDs, run/job associations, SHAs, events, conclusions, runner images,
+phase/job durations, and vcpkg cache-step completion.
 
 ## Forbidden changes
 - Claiming a percentage improvement without a named comparable baseline.

@@ -33,6 +33,33 @@ Cold and warm-cache samples are reported separately. Performance claims require
 at least five comparable samples and cite median and p95 plus the exact commit,
 runner image, preset, sanitizer, and gate selector.
 
+The CI-003 pre-optimization baseline is
+[`benchmarks/baselines/ci_gate_latency_github_ubuntu_24_04_v1.json`](../../benchmarks/baselines/ci_gate_latency_github_ubuntu_24_04_v1.json).
+It contains five GitHub Actions API samples for each required gate and both
+sanitizer matrix legs. Median and p95 use the nearest-rank method; with five
+samples p95 is the observed maximum. All baseline compiles are cold because
+ccache was absent, while the vcpkg binary-package cache was warm. No warm-
+compile population existed, and the baseline records that absence rather than
+combining cache states.
+
+Every population uses the same five pull-request commits. The retained run/job
+IDs were checked against all 30 jobs and 25 workflow runs through the
+authenticated GitHub API; workflow identity, SHA, event, conclusion, runner
+image, phase/job durations, and vcpkg cache-step completion matched the
+artifact. Compare future cohorts by median/p95 rather than a single run because
+the sanitizer samples retain substantial cold-build variance.
+
+The aggregate uses the distinct benchmark ID
+`ci.gate-latency.github-ubuntu-24.04.v1.aggregate-baseline` and links to the
+per-run `ci.gate-latency.github-ubuntu-24.04.v1` profile through
+`diagnostics.source_benchmark_id`. It reports population/sample counts and
+grouped cold-population statistics; it does not impersonate the direct
+configure/build/test/total metrics emitted by one gate invocation.
+
+The sampled Vulkan test phase predates the completed Xvfb split and failed
+before frame-pacing capture, so its test/total timing is diagnostic only. Use
+its configure/build baseline until five post-BUG-064 test samples accumulate.
+
 The result artifact is uploaded as `ci-gate-timing-<gate>` (with the sanitizer
 name appended for matrix legs) and contains one canonical `result.json`.
 Configure, build, and test/execution phase inputs remain job-local and are not

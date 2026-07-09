@@ -34,6 +34,10 @@ ALLOWED_METRICS = {
     "build_time_ms",
     "test_time_ms",
     "total_time_ms",
+    "population_count",
+    "sample_count",
+    "warm_population_count",
+    "cold_population_statistics",
 }
 
 
