@@ -8,8 +8,9 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 - [`BUG-063` — Streaming-import contract tests flaky on main](BUG-063-streaming-import-contract-tests-flaky-on-main.md):
   `RuntimeAssetImportFormatCoverage` streaming-queue tests fail on `main`
   since ≥2026-07-07 (markdown-only merges included) and on PR #1010's head
-  while all other tests pass — timing-sensitive frame-budget waits on slow
-  shared runners are the likely axis.
+  while all other tests pass. The reproduced cause is a shared external glTF
+  buffer path: a parallel representative-format test removes the buffer while
+  the two streaming decoders are still reading it.
 - [`BUG-064` — ci-vulkan FramePacingDiagnosticCapture cannot run headless](BUG-064-ci-vulkan-framepacing-headless-display.md):
   `ci-vulkan` is red on every recent run across all branches because the
   sandbox frame-pacing capture needs a display (GLFW: DISPLAY missing →
