@@ -63,6 +63,14 @@ the authoritative open/unblocked view.
 
 ## Unthemed
 
+- unblocked: `CI-003` — Front-load structural validators and add cancel-in-progress concurrency to PR workflows (tasks/backlog/ci/CI-003-frontload-validators-and-pr-concurrency.md)
+- unblocked: `CI-004` — Warm compiler cache (ccache) for the non-authoritative PR build lanes (tasks/backlog/ci/CI-004-ccache-warm-pr-build-lanes.md)
+- blocked by `BUG-064`: `CI-005` — ci-vulkan device probe short-circuit and per-merge re-tier (tasks/backlog/ci/CI-005-ci-vulkan-device-probe-and-retier.md)
+- unblocked: `CI-006` — Parallelize the sanitizer ctest and run diff-relevant tests first in pr-fast (tasks/backlog/ci/CI-006-parallel-sanitizer-and-earliest-failure-ordering.md)
+- unblocked: `CI-007` — Gate-inventory and executed-coverage audit (tasks/backlog/ci/CI-007-gate-inventory-and-coverage-audit.md)
+- blocked by `CI-007`: `CI-008` — Fail-closed touched-scope PR tier with a merge-queue full gate (tasks/backlog/ci/CI-008-tiered-touched-scope-pr-tier-merge-queue.md)
+- unblocked: `CI-009` — Scope-split the IntrinsicTests aggregate for the fast lane (tasks/backlog/ci/CI-009-scope-split-intrinsictests-fast-aggregate.md)
+- blocked by `CI-007`: `CI-010` — Collapse per-case process spawns and reintroduce the shared engine fixture (tasks/backlog/ci/CI-010-grouped-ctest-and-shared-engine-fixture.md)
 - unblocked: `GEOM-013` — Feature-preserving dual contouring (tasks/backlog/geometry/GEOM-013-feature-preserving-dual-contouring.md)
 - unblocked: `GEOM-014` — Feature-aware quadric error mesh simplification (tasks/backlog/geometry/GEOM-014-feature-aware-quadric-error-simplification.md)
 - unblocked: `GEOM-019` — Harmonic/Tutte parameterization and boundary constraints (tasks/backlog/geometry/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md)

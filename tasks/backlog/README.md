@@ -13,6 +13,8 @@ READMEs.
 - [`architecture/`](architecture/) — architecture and layering decisions.
 - [`assets/`](assets/) — promoted CPU asset authority and import/export ingest.
 - [`bugs/`](bugs/) — reproducible correctness bugs and harness defects.
+- [`ci/`](ci/) — workflow/automation and test-harness changes for faster
+  failure feedback without net coverage loss.
 - [`ecs/`](ecs/) — promoted ECS scene/components/systems hardening.
 - [`geometry/`](geometry/) — geometry algorithms, IO, and method readiness.
 - [`methods/`](methods/) — paper/method packages following the method workflow.
@@ -264,6 +266,19 @@ floor and config/command artifact.
 `PROC-011` is retired; the contract now routes architecture questions to the
 canonical architecture index, and task authoring prompts record backend/config
 control-surface intent.
+
+### Test/CI feedback-speed stream (P1)
+
+Make the test/CI feedback loop dramatically faster **without net coverage loss**,
+the stated motivation being that finding bugs takes too long today. Seeded
+2026-07-09 from an agentic test-effectiveness survey that measured the PR
+pipeline against the GitHub Actions API. The stream lives in
+[`ci/`](ci/) as `CI-003..010` and builds on the retired `CI-001` (test-runtime
+slimming), `CI-002`/`CI-002B` (the local touched-scope helper), and `INFRA-001`
+(vcpkg binary cache). The coverage-detectability keystone (`CI-007`) lands first;
+`CI-005` is gated on `BUG-064`, and `CI-008`/`CI-010` on `CI-007` and `BUG-063`.
+See [`ci/README.md`](ci/README.md) for the sequenced member list and dependency
+order.
 
 ## Cross-domain dependency anchors
 
