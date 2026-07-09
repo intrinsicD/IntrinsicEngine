@@ -33,7 +33,8 @@ jobs:
             libgl1-mesa-dev \
             libvulkan-dev \
             vulkan-tools \
-            spirv-tools
+            spirv-tools \
+            xvfb
 
       - name: Cache vcpkg binary packages
         id: vcpkg-cache
@@ -72,7 +73,16 @@ jobs:
       # splits the labels we can drop the `slow` exclusion here. On runners
       # without a Vulkan device the remaining smoke fixtures self-skip via
       # `GTEST_SKIP` and the runtime fallback breadcrumb fires — the gate passes
-      # as long as no fixture fails. `--no-tests=ignore` keeps the job green if
-      # a future host build trims the fixture set to empty.
+      # as long as no fixture fails. BUG-064 runs the sandbox frame-pacing
+      # capture separately under Xvfb because that process must execute frames
+      # before it can emit a diagnostic report. `--no-tests=ignore` keeps this
+      # batch green if a future host build trims the fixture set to empty.
       - name: Run gpu;vulkan opt-in fixtures
-        run: ctest --test-dir build/ci-vulkan --output-on-failure -L "gpu" -L "vulkan" -LE "slow|flaky-quarantine" --no-tests=ignore --timeout 120 -j$(nproc)
+        run: ctest --test-dir build/ci-vulkan --output-on-failure -L "gpu" -L "vulkan" -LE "slow|flaky-quarantine" -E "^ExtrinsicSandbox\\.FramePacingDiagnosticCapture$" --no-tests=ignore --timeout 120 -j$(nproc)
+
+      - name: Run frame-pacing capture under virtual display
+        run: |
+          xvfb-run -a --server-args="-screen 0 1280x720x24" \
+            ctest --test-dir build/ci-vulkan --output-on-failure \
+              -R "^ExtrinsicSandbox\\.FramePacingDiagnosticCapture$" \
+              -L "gpu" -L "vulkan" --no-tests=error --timeout 180

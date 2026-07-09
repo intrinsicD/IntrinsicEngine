@@ -120,7 +120,11 @@ wrapper stops the app after the requested frame count, reads
 diagnostics; the sandbox app still imports runtime only and does not branch on
 Vulkan backend internals. The opt-in CTest
 `ExtrinsicSandbox.FramePacingDiagnosticCapture` validates this mode in the
-`ci-vulkan` preset.
+`ci-vulkan` preset. The hosted `ci-vulkan` workflow runs this case separately
+under Xvfb so the GLFW window can execute frames even when the runner has no
+native display. Vulkan device/extension limitations remain capability
+diagnostics handled by the validator; a missing display must not collapse the
+capture to zero samples.
 
 ## Contents
 

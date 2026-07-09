@@ -30,9 +30,14 @@ depends_on: []
   documented environment-capability skip like the GPU smoke fixtures.
 - Impact: `ci-vulkan` is unconditionally red on hosted runners; its
   signal value is currently zero.
+- Chosen remedy: keep the existing validator strict and run only
+  `ExtrinsicSandbox.FramePacingDiagnosticCapture` under an isolated Xvfb server
+  in `ci-vulkan.yml`. The remaining `gpu;vulkan` batch keeps its current
+  capability-skip behavior; this task does not implicitly promote every smoke
+  onto a hosted software-Vulkan path.
 
 ## Required changes
-- [ ] Decide the remedy: (a) run the capture under `xvfb-run` in
+- [x] Decide the remedy: (a) run the capture under `xvfb-run` in
       `ci-vulkan.yml`, or (b) add a documented environment skip to the
       validator/test registration when no display is available at
       runtime.
@@ -45,7 +50,7 @@ depends_on: []
       documented reason.
 
 ## Docs
-- [ ] Update the workflow comment/docs describing which environments
+- [x] Update the workflow comment/docs describing which environments
       execute versus skip the capture.
 
 ## Acceptance criteria
@@ -55,7 +60,12 @@ depends_on: []
 ## Verification
 ```bash
 grep -n "xvfb\|DISPLAY" .github/workflows/ci-vulkan.yml
-# CI evidence: ci-vulkan concludes green or with documented skips.
+python3 tools/ci/check_workflow_names.py --root .github/workflows
+xvfb-run -a --server-args="-screen 0 1280x720x24" \
+  ctest --test-dir build/ci-vulkan --output-on-failure \
+    -R '^ExtrinsicSandbox\.FramePacingDiagnosticCapture$' \
+    -L gpu -L vulkan --timeout 180
+# Hosted CI evidence: ci-vulkan concludes green.
 ```
 
 ## Forbidden changes
