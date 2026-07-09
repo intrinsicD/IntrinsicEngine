@@ -9,10 +9,9 @@ depends_on:
 ## Status
 - In progress on branch `copilot/ci-004-test-build-aggregates`.
 - Owner/agent: GitHub Copilot CLI.
-- Current slice: inspect registration metadata and define one authoritative
-  aggregate derivation path.
-- Next verification step: prove current target/label selection semantics against
-  the configured CTest inventory before changing workflow targets.
+- Current slice: Slice A complete; Slice B workflow/prerequisite routing is next.
+- Next verification step: route PR-fast and Vulkan through their generated
+  inventories and prove fail-closed missing-binary handling.
 
 ## Goal
 - Derive gate-specific aggregate build targets from the same CTest label
@@ -42,20 +41,20 @@ depends_on:
   tests. The new aggregates must remain compatible with that fail-closed check.
 
 ## Required changes
-- [ ] Refactor test registration metadata into one helper that can derive build
+- [x] Refactor test registration metadata into one helper that can derive build
       aggregates and CTest selection expectations from the same target/label
       declarations.
-- [ ] Add stable aggregate targets for the exact supported gates:
+- [x] Add stable aggregate targets for the exact supported gates:
       `IntrinsicPrFastTests`, `IntrinsicCpuTests`,
       `IntrinsicGpuVulkanTests`, and a deliberately small
       `IntrinsicPrSmokeTests` used by `CI-005`.
-- [ ] Make label include/exclude/intersection semantics explicit and fail
+- [x] Make label include/exclude/intersection semantics explicit and fail
       configuration when an aggregate references undeclared labels or a
       registered target has ambiguous metadata.
 - [ ] Change `pr-fast` and `ci-vulkan` to build their gate-specific aggregate
       rather than `IntrinsicTests`; keep `ExtrinsicSandbox` explicit where the
       operational Vulkan smoke requires it.
-- [ ] Keep `IntrinsicTests` as the canonical complete local/default aggregate.
+- [x] Keep `IntrinsicTests` as the canonical complete local/default aggregate.
 - [ ] Extend prerequisite checks so a missing executable selected by the CTest
       filter fails before CTest, while an intentionally unselected executable
       is not required.
@@ -70,10 +69,10 @@ depends_on:
   CI-003 aggregate baseline, run the specialized selectors, and retire the task.
 
 ## Tests
-- [ ] Add CMake/tooling regression coverage that enumerates registered targets
+- [x] Add CMake/tooling regression coverage that enumerates registered targets
       and proves each gate's build set exactly contains its selected executable
       set.
-- [ ] Prove the GPU/Vulkan aggregate implements label intersection and excludes
+- [x] Prove the GPU/Vulkan aggregate implements label intersection and excludes
       `slow`/`flaky-quarantine` targets.
 - [ ] Run the PR-fast and GPU/Vulkan selectors after building only their new
       aggregates; no selected test may be absent.
@@ -110,6 +109,24 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -LE 'slow|
 python3 tests/regression/tooling/Test.TestBuildAggregates.py
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+Slice A verification run on 2026-07-09:
+
+```bash
+python3 tests/regression/tooling/Test.TestBuildAggregates.py -v
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicPrFastTests IntrinsicCpuTests IntrinsicGpuVulkanTests IntrinsicPrSmokeTests
+ctest --test-dir build/ci --show-only=json-v1 -L 'unit|contract' -LE 'gpu|vulkan|slow|flaky-quarantine'
+ctest --test-dir build/ci --show-only=json-v1 -LE 'gpu|vulkan|slow|flaky-quarantine'
+ctest --test-dir build/ci --show-only=json-v1 -L gpu -L vulkan -LE 'slow|flaky-quarantine'
+ctest --test-dir build/ci --show-only=json-v1 -L integration -L runtime -L graphics -LE 'gpu|vulkan|slow|flaky-quarantine'
+```
+
+The configured `ci` registry contains 30 executable targets. Independent
+selector-to-command comparison matched all generated inventories exactly:
+PR-fast selects 3,576 tests / 19 executables, CPU selects 3,635 / 22,
+GPU+Vulkan selects 59 / 5 after excluding the explicit Sandbox capture, and
+PR-smoke selects 51 / 1.
 
 ## Forbidden changes
 - Hand-maintaining a second target list that can drift from test labels.

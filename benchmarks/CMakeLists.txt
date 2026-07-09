@@ -104,7 +104,10 @@ endif()
 # validator script is invoked as a follow-up fixture so the JSON is
 # structurally checked on every run.
 if(BUILD_TESTING)
-    set_property(GLOBAL APPEND PROPERTY INTRINSIC_REGISTERED_TEST_TARGETS IntrinsicBenchmarkSmoke)
+    intrinsic_register_test_executable(
+        TARGET IntrinsicBenchmarkSmoke
+        LABELS benchmark geometry graphics physics
+    )
 
     set(_intrinsic_bench_smoke_test_dir "${CMAKE_BINARY_DIR}/benchmark-ctest/IntrinsicBenchmarkSmokeTest")
 
@@ -135,7 +138,10 @@ if(BUILD_TESTING)
     endif()
 
     if(TARGET IntrinsicKMeansGpuBenchmarkSmoke)
-        set_property(GLOBAL APPEND PROPERTY INTRINSIC_REGISTERED_TEST_TARGETS IntrinsicKMeansGpuBenchmarkSmoke)
+        intrinsic_register_test_executable(
+            TARGET IntrinsicKMeansGpuBenchmarkSmoke
+            LABELS benchmark geometry runtime gpu vulkan
+        )
 
         set(_intrinsic_kmeans_gpu_bench_dir
             "${CMAKE_BINARY_DIR}/benchmark-ctest/IntrinsicKMeansGpuBenchmarkSmoke")

@@ -266,6 +266,9 @@ endif()
 if(INTRINSIC_BUILD_TESTS)
     include(CTest)
 endif()
+if(BUILD_TESTING)
+    include(cmake/IntrinsicTest.cmake)
+endif()
 
 # ------------------------------------------------------------------------------
 # Source-root path abstraction (RORG-091)
@@ -325,4 +328,26 @@ endif()
 
 if(INTRINSIC_BUILD_TESTS AND BUILD_TESTING)
     add_subdirectory(tests)
+
+    intrinsic_write_test_registry()
+    intrinsic_add_test_aggregate(NAME IntrinsicTests)
+    intrinsic_add_test_aggregate(
+        NAME IntrinsicPrFastTests
+        INCLUDE_ANY unit contract
+        EXCLUDE_ANY gpu vulkan slow flaky-quarantine
+    )
+    intrinsic_add_test_aggregate(
+        NAME IntrinsicCpuTests
+        EXCLUDE_ANY gpu vulkan slow flaky-quarantine
+    )
+    intrinsic_add_test_aggregate(
+        NAME IntrinsicGpuVulkanTests
+        INCLUDE_ALL gpu vulkan
+        EXCLUDE_ANY slow flaky-quarantine
+    )
+    intrinsic_add_test_aggregate(
+        NAME IntrinsicPrSmokeTests
+        INCLUDE_ALL integration runtime graphics
+        EXCLUDE_ANY gpu vulkan slow flaky-quarantine
+    )
 endif()
