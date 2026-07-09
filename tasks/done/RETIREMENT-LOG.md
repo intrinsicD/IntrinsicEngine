@@ -8,6 +8,39 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`ARCH-011`](ARCH-011-runtimemodule-contract-service-registry.md) —
+RuntimeModule contract, `EngineSetup`, and two-phase `ServiceRegistry` retired
+to `tasks/done/` on 2026-07-09 at `CPUContracted`. The fifth and final additive
+ADR-0024 kernel seam adds `Extrinsic.Runtime.ServiceRegistry` (compile-time
+TypeToken-keyed `Provide`/`Require`/`Find`; a missing `Require` aborts boot
+fail-closed, naming the requesting module and the missing service type) and
+`Extrinsic.Runtime.Module` (`IRuntimeModule` with
+`Name`/`OnRegister`/`OnResolve`/`OnShutdown`, the narrow `EngineSetup`
+registration surface, `SimSystemDesc`, the `FramePhase`/`FrameHookContext`
+frame-hook vocabulary, the inspectable `ModuleRegistrationSink`, and the
+built-in `EngineWillShutDown` lifecycle event). `Engine` gains
+`AddModule`/`EmplaceModule`, a two-phase `OnRegister`→`OnResolve` boot
+(registration order is not load-bearing; the resolve loop names the active
+requester for fail-closed diagnostics), module sim-system application into the
+fixed-step FrameGraph after the built-in ECS bundle, module frame-hook
+invocation at the `AfterCommandDrain`/`UiBuild`/`BeforeExtraction`/
+`Maintenance` phases in `RunFrame()`, and a two-phase shutdown that publishes
+and pumps `EngineWillShutDown` before running `OnShutdown` in reverse order. No
+`Engine&` crosses the module surface (ADR-0024 D13). The change is additive:
+existing `IApplication` tick/hook behavior is unchanged and no domain feature
+is extracted yet. `tests/contract/runtime/Test.RuntimeModuleContract.cpp`
+covers two-phase resolve under both add orders, fail-closed `Require`
+(`EXPECT_DEATH`), registration-order-independent compiled schedules plus
+phase-bucketed hooks, dependency-honored sim-system execution, and
+announce-before-`OnShutdown`. Structural gates passed locally
+(`check_layering.py --strict` 0 violations, `check_test_layout.py --strict`,
+`check_task_policy.py --strict`, `check_doc_links.py`, module-inventory
+regeneration); the C++ build and the default CPU-supported test gate could not
+run in the cloud session (the vcpkg tool download is blocked by egress policy
+with a 403 and no Ninja generator is present), so CI must confirm the build and
+the new contract tests before merge. `Operational` remains owned by `ARCH-012`,
+which extracts the ClusteringModule onto these seams end-to-end.
+
 Active
 [`ARCH-010`](ARCH-010-kernel-worldregistry-deferred-world-ops.md) —
 Kernel WorldRegistry with deferred, two-phase world operations — retired on

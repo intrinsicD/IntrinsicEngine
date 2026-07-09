@@ -53,7 +53,10 @@ The frame order is:
    [ADR-0024](../adr/0024-kernel-module-architecture.md) D7; command effects
    published as events become visible before fixed-step simulation, while
    listener-published events wait for the next pump (ARCH-008);
-4. fixed-step simulation and CPU `FrameGraph` execution;
+4. fixed-step simulation and CPU `FrameGraph` execution, appending every
+   module-registered sim system after the built-in ECS bundle and before
+   compile so execution order follows declared Read/Write tokens, not module
+   registration order (ARCH-011);
 5. drain the kernel job-service completion gate — workers deposit results into
    `Engine::Jobs()` only, and the service publishes survivor completion events
    after token/world cancellation checks, main-thread, before pump B per
@@ -107,6 +110,26 @@ the first boundary publishes `WorldWillBeDestroyed` and cancels
 registry entry down after the queued event had a full frame to pump.
 `RenderExtractionCache::ExtractAndSubmit` accepts the active `WorldHandle`
 explicitly; the current renderer path still extracts only the active world.
+
+`Runtime.Module` and `Runtime.ServiceRegistry` are the kernel composition seam
+(ADR-0024 D1/D3/D12/D13). An app adds `IRuntimeModule`s to the `Engine` before
+`Initialize()` via `AddModule`/`EmplaceModule`; `Initialize()` then runs every
+module's `OnRegister` — which publishes services and registers sim systems,
+frame hooks, command handlers, and event subscriptions through a narrow
+`EngineSetup` (never an `Engine&`, per D13) — followed by every module's
+`OnResolve`, which binds required services. `ServiceRegistry::Require` fails
+closed at boot, naming the requesting module and the missing service type;
+`Find` is the optional-dependency form. Registration order is not load-bearing:
+inter-module ordering comes from declared sim-system Read/Write data
+dependencies and the two-phase startup. `RunFrame` invokes module frame hooks
+at four neutral phases — `AfterCommandDrain`, `UiBuild`, `BeforeExtraction`,
+and `Maintenance` — each handed a narrow `FrameHookContext`. Shutdown is
+two-phase by construction: `Engine::Shutdown()` publishes and pumps
+`EngineWillShutDown` so every module observes it while the substrate is still
+live, then runs `OnShutdown` in reverse registration order before subsystem
+teardown. `ARCH-011` landed the seam additively — existing `IApplication`
+tick/hook behavior is unchanged and no domain feature has been extracted onto
+it yet; `ARCH-012` extracts the ClusteringModule as the proving end-to-end use.
 
 Dropped asset imports, Sandbox editor model-scene/texture import commands, and
 Sandbox editor scene-file save/open commands use the persistent runtime

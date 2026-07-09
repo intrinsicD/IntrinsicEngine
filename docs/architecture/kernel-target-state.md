@@ -56,7 +56,8 @@ flip a box when the invariant holds on `main`. Baseline column is the
 - [x] EventBus, queued-only, two pumps — `ARCH-008` (done 2026-07-09)
 - [x] JobService, snapshot-in/result-out — `ARCH-009` (done 2026-07-09)
 - [x] WorldRegistry, deferred two-phase world ops — `ARCH-010` (done 2026-07-09)
-- [ ] RuntimeModule contract + EngineSetup + ServiceRegistry — `ARCH-011`
+- [x] RuntimeModule contract + EngineSetup + ServiceRegistry — `ARCH-011`
+      (done 2026-07-09)
 - [ ] Extension-pass slot contract frozen (D10 validation items checked:
       splatting-lighting participation; order-dependent transparency)
 - [ ] Input capture filter chain — `UI-034` / EditorUiModule extraction
@@ -140,5 +141,7 @@ flip a box when the invariant holds on `main`. Baseline column is the
   invariant (new domain-noun import, new `Engine::GetX()`, new direct
   dispatcher use, new `Engine&` pass-through).
 - **Picking work?** The unchecked seam rows are the ADR-0024 migration order
-  (`ARCH-011` next after `ARCH-010` retired); the unchecked domain rows are
-  the extractions that follow each seam.
+  (with all five additive seams `ARCH-007`..`ARCH-011` landed, `ARCH-012` —
+  the ClusteringModule proving extraction that exercises every seam
+  end-to-end — is next); the unchecked domain rows are the extractions that
+  follow each seam.

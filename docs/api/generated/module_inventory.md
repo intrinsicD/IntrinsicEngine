@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 59 |
+| `runtime` | 61 |
 
 ## Modules
 
@@ -355,6 +355,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.MeshGeometryPacker` | `src/runtime/Runtime.MeshGeometryPacker.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshPrimitiveViewPacker` | `src/runtime/Runtime.MeshPrimitiveViewPacker.cppm` | `runtime` |
 | `Extrinsic.Runtime.MethodFigureExport` | `src/runtime/Runtime.MethodFigureExport.cppm` | `runtime` |
+| `Extrinsic.Runtime.Module` | `src/runtime/Runtime.Module.cppm` | `runtime` |
 | `Extrinsic.Runtime.ObjectSpaceNormalBakeBinding` | `src/runtime/Runtime.ObjectSpaceNormalBakeBinding.cppm` | `runtime` |
 | `Extrinsic.Runtime.ObjectSpaceNormalBakeQueue` | `src/runtime/Runtime.ObjectSpaceNormalBakeQueue.cppm` | `runtime` |
 | `Extrinsic.Runtime.ObjectSpaceNormalBakeSubmission` | `src/runtime/Runtime.ObjectSpaceNormalBakeSubmission.cppm` | `runtime` |
@@ -375,6 +376,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SceneSerialization` | `src/runtime/Runtime.SceneSerialization.cppm` | `runtime` |
 | `Extrinsic.Runtime.SelectedMeshTextureBake` | `src/runtime/Runtime.SelectedMeshTextureBake.cppm` | `runtime` |
 | `Extrinsic.Runtime.SelectionController` | `src/runtime/Runtime.SelectionController.cppm` | `runtime` |
+| `Extrinsic.Runtime.ServiceRegistry` | `src/runtime/Runtime.ServiceRegistry.cppm` | `runtime` |
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 | `Extrinsic.Runtime.VertexAttributeBinding` | `src/runtime/Runtime.VertexAttributeBinding.cppm` | `runtime` |
@@ -386,4 +388,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugClosestFace` | `src/runtime/SpatialDebug/Runtime.SpatialDebugClosestFace.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **359**
+Total modules: **361**

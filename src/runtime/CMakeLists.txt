@@ -20,6 +20,8 @@ target_sources(${target_name}
         Runtime.JobService.cppm
         Runtime.WorldRegistry.cppm
         Runtime.CommandBus.cppm
+        Runtime.ServiceRegistry.cppm
+        Runtime.Module.cppm
         Runtime.DerivedJobGraph.cppm
         Runtime.MeshAttributeTextureBake.cppm
         Runtime.MethodFigureExport.cppm
@@ -79,6 +81,8 @@ target_sources(${target_name}
         Runtime.JobService.cpp
         Runtime.WorldRegistry.cpp
         Runtime.CommandBus.cpp
+        Runtime.ServiceRegistry.cpp
+        Runtime.Module.cpp
         Runtime.DerivedJobGraph.cpp
         Runtime.MeshAttributeTextureBake.cpp
         Runtime.MethodFigureExport.cpp
