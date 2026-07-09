@@ -71,8 +71,12 @@ The frame order is:
    job-service reaping, asset-service tick, GPU asset cache tick, material
    texture re-resolution, and render-extraction deferred-retire ticks;
 12. drain completed pick readbacks through the incrementally maintained
-   stable-entity lookup, release the consumed `RenderWorldPool` slot, and
-   finalize the frame clock.
+   stable-entity lookup and release the consumed `RenderWorldPool` slot;
+13. apply deferred kernel world operations (`Engine::Worlds()`): active-world
+   swaps, `WorldWillBeDestroyed` announcements, world-scoped job cancellation,
+   and destruction requests whose announce event had a full frame to pump,
+   per ADR-0024 D2/D4/D7 (ARCH-010);
+14. finalize the frame clock.
 
 The internal `RuntimeFrameContext` record carries the data that must survive
 between those phases: frame delta, fixed-step interpolation alpha, render frame
@@ -91,6 +95,18 @@ drops cancelled or world-scoped-invalid results whole, and publishes only
 surviving completion events onto `Runtime.KernelEvents`. The `GpuQueue` target
 is reserved for the later GPU-job participant/readback integration owned by
 `RUNTIME-137`.
+
+`Runtime.WorldRegistry` owns the kernel world table: N `ECS::Scene::Registry`
+instances behind `WorldHandle`s plus the scalar active-world state. The first
+world is created during `Engine::Initialize()` before `IApplication::OnInitialize`
+runs, so frame 0 and app initialization always have a valid active scene.
+`RequestSetActiveWorld` and `RequestDestroyWorld` are deferred requests only;
+they take effect at the end-of-frame maintenance boundary. Destroy is two-phase:
+the first boundary publishes `WorldWillBeDestroyed` and cancels
+`JobService` work scoped to that world, while the next boundary tears the world
+registry entry down after the queued event had a full frame to pump.
+`RenderExtractionCache::ExtractAndSubmit` accepts the active `WorldHandle`
+explicitly; the current renderer path still extracts only the active world.
 
 Dropped asset imports, Sandbox editor model-scene/texture import commands, and
 Sandbox editor scene-file save/open commands use the persistent runtime

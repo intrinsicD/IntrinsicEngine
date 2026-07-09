@@ -83,6 +83,7 @@ import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Runtime.StableEntityLookup;
+import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Asset.EventBus;
 import Extrinsic.Asset.GeometryIOBridge;
 import Extrinsic.Asset.ImportRouter;
@@ -231,6 +232,7 @@ namespace Extrinsic::Runtime
             RHI::FrameHandle& Frame;
             const Graphics::RenderFrameInput& Input;
             std::span<const Graphics::TransformGizmoRenderPacket> TransformGizmos;
+            WorldHandle WorldScope;
             Graphics::RenderWorld& World;
             RuntimeFramePacingDiagnostics* Pacing;
 
@@ -247,6 +249,7 @@ namespace Extrinsic::Runtime
                                     RHI::FrameHandle& frame,
                                     const Graphics::RenderFrameInput& input,
                                     std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos,
+                                    WorldHandle worldScope,
                                     Graphics::RenderWorld& world,
                                     RuntimeFramePacingDiagnostics* pacing)
                 : Renderer(renderer)
@@ -262,6 +265,7 @@ namespace Extrinsic::Runtime
                 , Frame(frame)
                 , Input(input)
                 , TransformGizmos(transformGizmos)
+                , WorldScope(worldScope)
                 , World(world)
                 , Pacing(pacing)
             {
@@ -295,7 +299,8 @@ namespace Extrinsic::Runtime
                     backSlot != RenderWorldPool::kInvalidSlot ? backSlot : 0u;
                 if (backSlot != RenderWorldPool::kInvalidSlot)
                 {
-                    Stats = Extraction.ExtractAndSubmit(Scene,
+                    Stats = Extraction.ExtractAndSubmit(WorldScope,
+                                                         Scene,
                                                          Renderer,
                                                          GpuAssetCache,
                                                          &Selection,
@@ -2921,6 +2926,46 @@ namespace Extrinsic::Runtime
             Shutdown();
     }
 
+    void Engine::RefreshActiveScenePointer() noexcept
+    {
+        m_Scene = m_Worlds.Get(m_Worlds.ActiveWorld());
+    }
+
+    void Engine::RebindActiveSceneRuntimeState()
+    {
+        DisconnectStableEntityLookupTracking();
+        RefreshActiveScenePointer();
+        ClearSceneRuntimeState();
+
+        if (!m_Scene)
+        {
+            m_StableEntityLookup.Clear();
+            m_SelectionController.SetStableEntityLookup(nullptr);
+            m_AssetModelSceneHandoff.reset();
+            return;
+        }
+
+        ConnectStableEntityLookupTracking();
+        m_StableEntityLookup.Rebuild(*m_Scene);
+        m_SelectionController.SetStableEntityLookup(&m_StableEntityLookup);
+
+        if (m_AssetService && m_GpuAssetCache && m_Renderer)
+        {
+            AssetModelSceneHandoffOptions modelSceneOptions{};
+            modelSceneOptions.ObjectSpaceNormalBakeQueue =
+                &m_ObjectSpaceNormalBakeQueue;
+            modelSceneOptions.ObjectSpaceNormalBakeGraphicsBackendOperational =
+                m_Device != nullptr && m_Device->IsOperational();
+            m_AssetModelSceneHandoff =
+                std::make_unique<AssetModelSceneHandoff>(
+                    *m_AssetService,
+                    *m_GpuAssetCache,
+                    *m_Scene,
+                    *m_Renderer,
+                    std::move(modelSceneOptions));
+        }
+    }
+
     void Engine::ConnectStableEntityLookupTracking()
     {
         if (!m_Scene)
@@ -3139,8 +3184,11 @@ namespace Extrinsic::Runtime
                                                        drive RequestUpload */    break;
                 }
             });
-        // ── 6. ECS scene ──────────────────────────────────────────────────
-        m_Scene = std::make_unique<ECS::Scene::Registry>();
+        // ── 6. ECS scene / kernel world registry ─────────────────────────
+        m_Worlds.Clear();
+        const WorldHandle bootWorld = m_Worlds.CreateWorld("main");
+        (void)bootWorld;
+        RefreshActiveScenePointer();
         ConnectStableEntityLookupTracking();
 
         m_AssetModelTextureHandoff = std::make_unique<AssetModelTextureHandoff>(
@@ -3244,7 +3292,8 @@ namespace Extrinsic::Runtime
             std::unique_ptr<AssetModelTextureHandoff>& AssetModelTextureHandoffPtr;
             std::unique_ptr<AssetModelSceneHandoff>& AssetModelSceneHandoffPtr;
             Assets::AssetEventBus::ListenerToken& GpuAssetCacheListener;
-            std::unique_ptr<ECS::Scene::Registry>& Scene;
+            WorldRegistry& Worlds;
+            ECS::Scene::Registry*& Scene;
             ReferenceSceneRegistry& ReferenceRegistry;
             ReferenceScenePopulation& ReferencePopulation;
             std::optional<Graphics::CameraViewInput>& ReferenceCameraSeed;
@@ -3268,7 +3317,8 @@ namespace Extrinsic::Runtime
                           std::unique_ptr<AssetModelTextureHandoff>& assetModelTextureHandoff,
                           std::unique_ptr<AssetModelSceneHandoff>& assetModelSceneHandoff,
                           Assets::AssetEventBus::ListenerToken& gpuAssetCacheListener,
-                          std::unique_ptr<ECS::Scene::Registry>& scene,
+                          WorldRegistry& worlds,
+                          ECS::Scene::Registry*& scene,
                           ReferenceSceneRegistry& referenceRegistry,
                           ReferenceScenePopulation& referencePopulation,
                           std::optional<Graphics::CameraViewInput>& referenceCameraSeed,
@@ -3291,6 +3341,7 @@ namespace Extrinsic::Runtime
                 , AssetModelTextureHandoffPtr(assetModelTextureHandoff)
                 , AssetModelSceneHandoffPtr(assetModelSceneHandoff)
                 , GpuAssetCacheListener(gpuAssetCacheListener)
+                , Worlds(worlds)
                 , Scene(scene)
                 , ReferenceRegistry(referenceRegistry)
                 , ReferencePopulation(referencePopulation)
@@ -3344,7 +3395,8 @@ namespace Extrinsic::Runtime
                 }
                 ReferenceCameraSeed.reset();
                 CameraControllers = CameraControllerRegistry{};
-                Scene.reset();
+                Worlds.Clear();
+                Scene = nullptr;
             }
             void DestroyAssets() override
             {
@@ -3410,6 +3462,7 @@ namespace Extrinsic::Runtime
                             m_AssetModelTextureHandoff,
                             m_AssetModelSceneHandoff,
                             m_GpuAssetCacheListener,
+                            m_Worlds,
                             m_Scene,
                             m_ReferenceSceneRegistry,
                             m_ReferenceScenePopulation,
@@ -3735,6 +3788,7 @@ namespace Extrinsic::Runtime
                                             frame,
                                             renderInput,
                                             transformGizmos,
+                                            m_Worlds.ActiveWorld(),
                                             renderWorld,
                                             &pacing);
 
@@ -3811,6 +3865,30 @@ namespace Extrinsic::Runtime
             m_RenderWorldPool->ReleaseFront(frameContext.PooledFrontSlot);
         pacing.ReleaseRenderWorldMicros = ElapsedMicros(releaseFrontBegin);
 
+        // ── ARCH-010: deferred world mutations at the frame boundary ──────
+        // World switches and two-phase destroy teardowns happen after all
+        // scene consumers for this frame have run. Events published here
+        // become visible at next frame's pump A, and destroyed-world jobs are
+        // cancelled before the teardown maintenance boundary.
+        const auto worldOpsBegin = std::chrono::steady_clock::now();
+        const WorldHandle previousActiveWorld = m_Worlds.ActiveWorld();
+        const bool activeWorldWillTeardown =
+            m_Worlds.IsDestroyAnnounced(previousActiveWorld);
+        if (activeWorldWillTeardown)
+        {
+            DisconnectStableEntityLookupTracking();
+            m_AssetModelSceneHandoff.reset();
+        }
+
+        (void)m_Worlds.ApplyDeferredOperations(m_EventBus, m_JobService);
+        RefreshActiveScenePointer();
+        if (activeWorldWillTeardown ||
+            m_Worlds.ActiveWorld() != previousActiveWorld)
+        {
+            RebindActiveSceneRuntimeState();
+        }
+        pacing.MaintenanceMicros += ElapsedMicros(worldOpsBegin);
+
         // ── Phase 11: Clock EndFrame ──────────────────────────────────────
         m_FrameClock.EndFrame();
         publishPacingSample();
@@ -3821,6 +3899,9 @@ namespace Extrinsic::Runtime
     CommandBus& Engine::Commands() noexcept { return m_CommandBus; }
     EventBus& Engine::Events() noexcept { return m_EventBus; }
     JobService& Engine::Jobs() noexcept { return m_JobService; }
+    WorldRegistry& Engine::Worlds() noexcept { return m_Worlds; }
+    const WorldRegistry& Engine::Worlds() const noexcept { return m_Worlds; }
+    WorldHandle Engine::ActiveWorld() const noexcept { return m_Worlds.ActiveWorld(); }
     bool Engine::IsRunning() const noexcept { return m_Running; }
     void Engine::RequestExit()      noexcept { m_Running = false; }
 
@@ -4836,7 +4917,7 @@ namespace Extrinsic::Runtime
                         const ECS::EntityHandle createdEntity =
                             materialized->Entity;
                         RuntimeImportCompletedServices completedServices{
-                            .Scene = m_Scene.get(),
+                            .Scene = m_Scene,
                             .CameraControllers = &m_CameraControllers,
                             .Selection = &m_SelectionController,
                             .Config = &m_Config,
@@ -5678,7 +5759,7 @@ namespace Extrinsic::Runtime
             }
             const ECS::EntityHandle createdEntity = materialized->Entity;
             RuntimeImportCompletedServices completedServices{
-                .Scene = m_Scene.get(),
+                .Scene = m_Scene,
                 .CameraControllers = &m_CameraControllers,
                 .Selection = &m_SelectionController,
                 .Config = &m_Config,

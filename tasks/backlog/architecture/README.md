@@ -35,8 +35,6 @@ Opened from the 2026-07-08 kernel/module architecture decision record
 seams-first migration order, `ARCH-012` is the Operational proving
 extraction:
 
-- [`ARCH-010`](ARCH-010-kernel-worldregistry-deferred-world-ops.md) —
-  kernel WorldRegistry with deferred, two-phase world operations.
 - [`ARCH-011`](ARCH-011-runtimemodule-contract-service-registry.md) —
   `IRuntimeModule` contract, `EngineSetup`, and two-phase ServiceRegistry.
 - [`ARCH-012`](ARCH-012-clusteringmodule-proving-extraction.md) —
@@ -60,6 +58,9 @@ extraction:
   kernel JobService for multi-frame background jobs
   (snapshot-in/result-out, world-scoped cancellation) retired on 2026-07-09
   at `CPUContracted`.
+- [`ARCH-010`](../../done/ARCH-010-kernel-worldregistry-deferred-world-ops.md) —
+  kernel `WorldRegistry` with deferred, two-phase world operations retired
+  on 2026-07-09 at `CPUContracted`.
 
 ## Retired Legacy Program
 

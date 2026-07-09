@@ -7,6 +7,15 @@ depends_on:
 ---
 # ARCH-010 — Kernel WorldRegistry with deferred, two-phase world operations
 
+## Status
+- **Retired 2026-07-09 at `CPUContracted`.** Commit/PR: pending local change
+  set on branch `codex/arch-010-worldregistry`.
+- Focused `RuntimeWorldRegistry|RuntimeJobService|RuntimeKernelEvents`
+  contract tests and the full default CPU-supported gate pass locally under
+  the sanitizer-enabled `ci` preset. The default gate passed with 3625/3625
+  tests passing.
+- `Operational` is owned by `ARCH-012`.
+
 ## Goal
 - Give the runtime kernel a `WorldRegistry` owning N `ECS::SceneRegistry`
   instances behind `WorldHandle`s: world lifetimes, scalar active-world
@@ -14,7 +23,7 @@ depends_on:
   applied only in the Maintenance phase, and two-phase destruction
   (`WorldWillBeDestroyed` announce pump → job cancellation → teardown at the
   boundary), per
-  [ADR-0024](../../../docs/adr/0024-kernel-module-architecture.md) D2/D4/D7.
+  [ADR-0024](../../docs/adr/0024-kernel-module-architecture.md) D2/D4/D7.
 
 ## Non-goals
 - No `WorldSwitchModule` (preview orchestration, readiness tracking, switch
@@ -40,40 +49,40 @@ depends_on:
   teardown).
 
 ## Required changes
-- [ ] New `Extrinsic.Runtime.WorldRegistry` module (interface `.cppm` +
+- [x] New `Extrinsic.Runtime.WorldRegistry` module (interface `.cppm` +
       implementation `.cpp`): `CreateWorld(debugName)`,
       `RequestDestroyWorld`, `RequestSetActiveWorld`, `ActiveWorld()`,
       `Get(WorldHandle)`.
-- [ ] Deferred-op application in the Maintenance phase of
+- [x] Deferred-op application in the Maintenance phase of
       `Engine::RunFrame()`: active-world swaps and destroys whose announce
       pumped a full frame ago.
-- [ ] `WorldWillBeDestroyed` / `ActiveWorldChanged` kernel events.
-- [ ] `CancelAllForWorld` invoked between announce and teardown.
-- [ ] Engine boot creates world #0; existing engine-internal registry
+- [x] `WorldWillBeDestroyed` / `ActiveWorldChanged` kernel events.
+- [x] `CancelAllForWorld` invoked between announce and teardown.
+- [x] Engine boot creates world #0; existing engine-internal registry
       accesses route through the registry (mechanical redirection only).
-- [ ] Extraction entry point takes an explicit `WorldHandle` parameter.
+- [x] Extraction entry point takes an explicit `WorldHandle` parameter.
 
 ## Tests
-- [ ] Unit/contract tests (headless, `unit;runtime` labels): create/get;
+- [x] Unit/contract tests (headless, `contract;runtime` labels): create/get;
       active-world swap requested mid-frame applies at Maintenance, not
       immediately; `ActiveWorldChanged` delivered at the following pump.
-- [ ] Two-phase destroy test: announce event observed one full frame before
+- [x] Two-phase destroy test: announce event observed one full frame before
       the registry is torn down; world-scoped in-flight job is cancelled in
       between; handles to the destroyed world report invalid afterwards.
-- [ ] Frame-0 test: engine boots with a valid active world before any module
+- [x] Frame-0 test: engine boots with a valid active world before any module
       or app content runs.
 
 ## Docs
-- [ ] Regenerate `docs/api/generated/module_inventory.md` (new module).
-- [ ] Record the mechanism/policy world split in the runtime architecture
+- [x] Regenerate `docs/api/generated/module_inventory.md` (new module).
+- [x] Record the mechanism/policy world split in the runtime architecture
       doc, citing ADR-0024 D2.
 
 ## Acceptance criteria
-- [ ] No world mutation (swap/destroy) can take effect mid-frame.
-- [ ] All listed tests pass under the default CPU gate.
-- [ ] Single-world behavior of the existing engine is unchanged (existing
+- [x] No world mutation (swap/destroy) can take effect mid-frame.
+- [x] All listed tests pass under the default CPU gate.
+- [x] Single-world behavior of the existing engine is unchanged (existing
       CPU gate stays green).
-- [ ] `Operational` follow-up is owned by `ARCH-012`.
+- [x] `Operational` follow-up is owned by `ARCH-012`.
 
 ## Verification
 ```bash
@@ -90,4 +99,4 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Preview/multi-world rendering work.
 
 ## Maturity
-- Target: `CPUContracted`. `Operational` owned by `ARCH-012`.
+- Reached: `CPUContracted`. `Operational` owned by `ARCH-012`.

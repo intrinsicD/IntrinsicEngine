@@ -9,6 +9,22 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`ARCH-010`](ARCH-010-kernel-worldregistry-deferred-world-ops.md) —
+Kernel WorldRegistry with deferred, two-phase world operations — retired on
+2026-07-09 at maturity `CPUContracted`. `Extrinsic.Runtime.WorldRegistry`
+now owns boot-world creation, `WorldHandle` keyed `ECS::Scene::Registry`
+storage, active-world swaps, and two-phase destroy requests that announce
+`WorldWillBeDestroyed`, cancel world-scoped jobs, then tear down at the next
+maintenance boundary. `Runtime.Engine` resolves its single-world compatibility
+scene through the active world, exposes `Engine::Worlds()`/`ActiveWorld()`,
+and passes an explicit world handle into render extraction. Headless
+`contract;runtime` coverage verifies create/get, deferred active swaps,
+two-phase destroy plus `CancelAllForWorld`, and frame-0 active-world
+availability before application initialization. Runtime docs and the generated
+module inventory record the kernel mechanism/policy split. `Operational`
+remains owned by `ARCH-012`.
+
+Active
 [`ARCH-009`](ARCH-009-kernel-jobservice-snapshot-in-result-out.md) —
 Kernel JobService: snapshot-in/result-out background jobs — retired on
 2026-07-09 at maturity `CPUContracted`. `Extrinsic.Runtime.JobService` now

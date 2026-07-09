@@ -38,6 +38,7 @@ import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
@@ -700,6 +701,12 @@ namespace Extrinsic::Runtime
         // ARCH-009 - snapshot-in/result-out background jobs. Submit work to
         // the shared CPU pool; Engine drains completions before pump B.
         [[nodiscard]] JobService&             Jobs()             noexcept;
+        // ARCH-010 - kernel world registry. World lifetimes and active-world
+        // swaps are deferred to the frame boundary; GetScene() is the active
+        // world's registry for compatibility with existing single-world code.
+        [[nodiscard]] WorldRegistry&          Worlds()           noexcept;
+        [[nodiscard]] const WorldRegistry&    Worlds()     const noexcept;
+        [[nodiscard]] WorldHandle             ActiveWorld() const noexcept;
         // UI-001 Slice D — runtime-owned file/import command seam. Editor UI
         // submits a path + payload hint here; Engine composes the promoted
         // ASSETIO geometry/model/texture decoders, AssetService, and runtime
@@ -908,6 +915,8 @@ namespace Extrinsic::Runtime
             RuntimeAssetIngestDiagnostic ingestDiagnostic);
         void RecordSceneFileEvent(RuntimeSceneFileEvent event);
         void ClearSceneRuntimeState();
+        void RefreshActiveScenePointer() noexcept;
+        void RebindActiveSceneRuntimeState();
 
         Core::Config::EngineConfig           m_Config;
         std::unique_ptr<IApplication>        m_Application;
@@ -1040,10 +1049,13 @@ namespace Extrinsic::Runtime
         // ARCH-009 - kernel background job service; completion gate runs
         // main-thread before the post-simulation event pump.
         JobService                             m_JobService{};
-        // ECS scene registry
-        std::unique_ptr<ECS::Scene::Registry>  m_Scene;
-        // Declared after m_Scene so scoped disconnection runs before the
-        // registry is destroyed during fallback/destructor unwinding.
+        // ARCH-010 - kernel world registry owns scene registries. m_Scene is
+        // a borrowed active-world cache while existing engine-internal
+        // single-world call sites migrate to explicit WorldHandle plumbing.
+        WorldRegistry                          m_Worlds{};
+        ECS::Scene::Registry*                  m_Scene{};
+        // Scoped connections must disconnect before their borrowed active
+        // registry can be switched or destroyed.
         entt::scoped_connection m_StableIdConstructConnection{};
         entt::scoped_connection m_StableIdUpdateConnection{};
         entt::scoped_connection m_StableIdDestroyConnection{};

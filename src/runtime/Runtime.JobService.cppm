@@ -13,12 +13,10 @@ export module Extrinsic.Runtime.JobService;
 
 import Extrinsic.Core.StrongHandle;
 import Extrinsic.Runtime.KernelEvents;
+export import Extrinsic.Runtime.WorldHandle;
 
 namespace Extrinsic::Runtime
 {
-    export struct RuntimeWorldTag;
-    export using WorldHandle = Core::StrongHandle<RuntimeWorldTag>;
-
     export struct JobToken
     {
         std::uint32_t Index{Core::INVALID_HANDLE_INDEX};

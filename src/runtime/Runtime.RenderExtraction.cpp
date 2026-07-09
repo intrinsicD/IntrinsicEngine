@@ -61,6 +61,7 @@ import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Runtime.SpatialDebugAdapters;
 import Extrinsic.Runtime.VisualizationAdapters;
 import Extrinsic.Runtime.VertexChannelBindings;
+import Extrinsic.Runtime.WorldHandle;
 import Geometry.Properties;
 
 namespace Extrinsic::Runtime
@@ -2322,7 +2323,26 @@ namespace Extrinsic::Runtime
         const std::uint32_t runtimeSnapshotStorageSlot,
         std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos)
     {
+        return ExtractAndSubmit(WorldHandle{},
+                                scene,
+                                renderer,
+                                gpuAssets,
+                                selection,
+                                runtimeSnapshotStorageSlot,
+                                transformGizmos);
+    }
+
+    RuntimeRenderExtractionStats RenderExtractionCache::ExtractAndSubmit(
+        WorldHandle world,
+        ECS::Scene::Registry& scene,
+        Graphics::IRenderer& renderer,
+        Graphics::GpuAssetCache* gpuAssets,
+        const SelectionController* selection,
+        const std::uint32_t runtimeSnapshotStorageSlot,
+        std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos)
+    {
         RuntimeRenderExtractionStats stats{};
+        stats.World = world;
         auto& registry = scene.Raw();
         m_LiveRenderableKeys.clear();
 

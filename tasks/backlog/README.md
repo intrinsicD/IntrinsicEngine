@@ -198,8 +198,10 @@ extractions (`ARCH-006`, `UI-034`) land onto. `ARCH-007` (command bus) is
 retired (2026-07-08, PR #1010, `CPUContracted`). `ARCH-008` (queued-only
 event bus) is retired in the current 2026-07-09 change set at
 `CPUContracted`. `ARCH-009` (JobService) is retired in the current
-2026-07-09 change set at `CPUContracted`. Remaining order per ADR-0024 D12:
-`ARCH-010` → `ARCH-011`, closed by the proving extraction `ARCH-012`.
+2026-07-09 change set at `CPUContracted`. `ARCH-010` (WorldRegistry) is
+retired in the current 2026-07-09 change set at `CPUContracted`. Remaining
+order per ADR-0024 D12: `ARCH-011`, closed by the proving extraction
+`ARCH-012`.
 Sequencing note: tasks whose deliverable ADR-0024 supersedes are
 front-matter gated on their seam dependencies — `RUNTIME-150` on
 `ARCH-007`/`ARCH-008`, `RUNTIME-151` additionally on `ARCH-011`, `ARCH-006`
@@ -215,7 +217,6 @@ records decisions for the audit-only rows (`RUNTIME-129`,
 
 Open members (kernel-seam priority set first):
 - [`architecture/ARCH-014-kernel-convergence-tracking.md`](architecture/ARCH-014-kernel-convergence-tracking.md) (umbrella north-star; not a slice).
-- [`architecture/ARCH-010-kernel-worldregistry-deferred-world-ops.md`](architecture/ARCH-010-kernel-worldregistry-deferred-world-ops.md).
 - [`architecture/ARCH-011-runtimemodule-contract-service-registry.md`](architecture/ARCH-011-runtimemodule-contract-service-registry.md).
 - [`architecture/ARCH-012-clusteringmodule-proving-extraction.md`](architecture/ARCH-012-clusteringmodule-proving-extraction.md).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).

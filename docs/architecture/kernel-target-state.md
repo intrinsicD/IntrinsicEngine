@@ -55,7 +55,7 @@ flip a box when the invariant holds on `main`. Baseline column is the
 - [x] CommandBus + single pre-sim drain — `ARCH-007` (done 2026-07-08)
 - [x] EventBus, queued-only, two pumps — `ARCH-008` (done 2026-07-09)
 - [x] JobService, snapshot-in/result-out — `ARCH-009` (done 2026-07-09)
-- [ ] WorldRegistry, deferred two-phase world ops — `ARCH-010`
+- [x] WorldRegistry, deferred two-phase world ops — `ARCH-010` (done 2026-07-09)
 - [ ] RuntimeModule contract + EngineSetup + ServiceRegistry — `ARCH-011`
 - [ ] Extension-pass slot contract frozen (D10 validation items checked:
       splatting-lighting participation; order-dependent transparency)
@@ -126,10 +126,11 @@ flip a box when the invariant holds on `main`. Baseline column is the
    `ShutdownAfterDeviceIdle`). The JobService `GpuQueue` target (`RUNTIME-137`)
    must absorb that whole lifecycle, or it splits into an extension pass
    (records) + a job (computes). Pin the shape before `RUNTIME-137` lands.
-2. **World-scoped module state:** selection, camera set, undo history are
-   implicitly per-world today because there is one world. When `ARCH-010`
-   introduces N worlds, decide per module whether its state is world-scoped
-   or global. The single-world present is hiding this decision.
+2. **World-scoped module state:** `ARCH-010` introduced the kernel
+   `WorldRegistry`, but selection, camera set, undo history, and similar
+   domain state still behave as active-world/global engine state. Each
+   extraction task must decide whether its module state is world-scoped or
+   global before it moves behind `RuntimeModule` services.
 
 ## How this doc is used
 
@@ -139,5 +140,5 @@ flip a box when the invariant holds on `main`. Baseline column is the
   invariant (new domain-noun import, new `Engine::GetX()`, new direct
   dispatcher use, new `Engine&` pass-through).
 - **Picking work?** The unchecked seam rows are the ADR-0024 migration order
-  (`ARCH-010` next after `ARCH-009` retired); the unchecked domain rows are
+  (`ARCH-011` next after `ARCH-010` retired); the unchecked domain rows are
   the extractions that follow each seam.
