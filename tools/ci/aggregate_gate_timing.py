@@ -81,7 +81,7 @@ def _append_summary(result: dict[str, object]) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     for phase in PHASE_NAMES:
-        parser.add_argument(f"--{phase}-json", type=Path, required=True)
+        parser.add_argument(f"--{phase}-json", type=Path, action="append", required=True)
     parser.add_argument("--gate", required=True)
     parser.add_argument("--preset", required=True)
     parser.add_argument("--compiler", required=True)
@@ -102,31 +102,44 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    phase_paths = {
+    phase_paths: dict[str, list[Path]] = {
         "configure": args.configure_json,
         "build": args.build_json,
         "test": args.test_json,
     }
-    phase_payloads: dict[str, dict[str, object]] = {}
+    phase_payloads: dict[str, list[dict[str, object]]] = {
+        phase: [] for phase in PHASE_NAMES
+    }
     phase_errors: list[str] = []
-    for phase, path in phase_paths.items():
-        payload, error = _read_phase(path)
-        if error:
-            phase_errors.append(error)
-        elif payload is not None:
-            phase_payloads[phase] = payload
+    for phase, paths in phase_paths.items():
+        for path in paths:
+            payload, error = _read_phase(path)
+            if error:
+                phase_errors.append(error)
+            elif payload is not None:
+                phase_payloads[phase].append(payload)
 
     phase_times_ms = {
-        phase: int(round(float(phase_payloads.get(phase, {}).get("elapsed_seconds", 0.0)) * 1000.0))
+        phase: int(
+            round(
+                sum(float(payload["elapsed_seconds"]) for payload in phase_payloads[phase])
+                * 1000.0
+            )
+        )
         for phase in PHASE_NAMES
     }
     phase_returncodes = {
-        phase: phase_payloads.get(phase, {}).get("returncode") for phase in PHASE_NAMES
+        phase: [payload["returncode"] for payload in phase_payloads[phase]]
+        for phase in PHASE_NAMES
     }
 
     if phase_errors:
         status = "error"
-    elif any(code != 0 for code in phase_returncodes.values()):
+    elif any(
+        code != 0
+        for returncodes in phase_returncodes.values()
+        for code in returncodes
+    ):
         status = "failed"
     else:
         status = "passed"
@@ -151,6 +164,13 @@ def main() -> int:
         "vcpkg_cache_hit": args.vcpkg_cache_hit or False,
         "vcpkg_cache_state_available": args.vcpkg_cache_hit is not None,
         "phase_order": list(PHASE_NAMES),
+        "phase_report_counts": {
+            phase: len(phase_payloads[phase]) for phase in PHASE_NAMES
+        },
+        "phase_labels": {
+            phase: [payload.get("label", "") for payload in phase_payloads[phase]]
+            for phase in PHASE_NAMES
+        },
         "phase_returncodes": phase_returncodes,
         "phase_errors": phase_errors,
         "total_definition": "sum_measured_configure_build_test_phases",

@@ -33,6 +33,28 @@ Cold and warm-cache samples are reported separately. Performance claims require
 at least five comparable samples and cite median and p95 plus the exact commit,
 runner image, preset, sanitizer, and gate selector.
 
+The result artifact is uploaded as `ci-gate-timing-<gate>` (with the sanitizer
+name appended for matrix legs) and contains one canonical `result.json`.
+Configure, build, and test/execution phase inputs remain job-local and are not
+uploaded. If a measured phase fails or never starts, aggregation still emits an
+`error`/`failed` result with phase diagnostics and fails closed.
+
+## Stale-run cancellation
+
+Compile-heavy pull-request workflows use this workflow-level concurrency key:
+
+```yaml
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+```
+
+A newer commit cancels only an older run of the same workflow for the same pull
+request. Different pull requests and default-branch runs have distinct groups.
+Manual/push events fall back to the full Git ref. The `ci-linux-clang`
+default-branch trigger disables cancellation explicitly so every merged commit
+retains its full confidence result and timing artifact.
+
 ## Failure policy
 
 - Schema validation failures are hard failures.

@@ -4,6 +4,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   benchmark-smoke:
     runs-on: ubuntu-24.04
@@ -45,18 +49,27 @@ jobs:
             --label "Configure (ci preset)" \
             --warm-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
             --max-warm-seconds 20 \
+            --json-out build/ci/ci-timing/phases/configure.json \
             -- cmake --preset ci
 
       - name: Validate benchmark manifests (strict)
         run: python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
 
       - name: Build benchmark smoke target
-        run: cmake --build --preset ci --target IntrinsicBenchmarkSmoke
+        run: |
+          python3 tools/ci/time_command.py \
+            --label "Build benchmark smoke target" \
+            --json-out build/ci/ci-timing/phases/build.json \
+            -- cmake --build --preset ci --target IntrinsicBenchmarkSmoke
 
       - name: Run benchmark smoke runner
         env:
           GIT_COMMIT: ${{ github.sha }}
-        run: cmake --build --preset ci --target IntrinsicBenchmarks
+        run: |
+          python3 tools/ci/time_command.py \
+            --label "Run benchmark smoke runner" \
+            --json-out build/ci/ci-timing/phases/test.json \
+            -- cmake --build --preset ci --target IntrinsicBenchmarks
 
       - name: Validate benchmark result JSON
         run: python3 tools/benchmark/validate_benchmark_results.py --root build/ci/benchmark --strict
@@ -66,3 +79,37 @@ jobs:
         with:
           name: benchmark-smoke-result
           path: build/ci/benchmark/IntrinsicBenchmarkSmoke/result.json
+
+      - name: Aggregate gate timing result
+        if: always()
+        run: |
+          context_args=()
+          if ninja_edges="$(ninja -C build/ci -t commands IntrinsicBenchmarks | sed '/^[[:space:]]*$/d' | wc -l)"; then
+            context_args+=(--ninja-edge-count "$ninja_edges")
+          fi
+          python3 tools/ci/aggregate_gate_timing.py \
+            --configure-json build/ci/ci-timing/phases/configure.json \
+            --build-json build/ci/ci-timing/phases/build.json \
+            --test-json build/ci/ci-timing/phases/test.json \
+            --gate ci-bench-smoke \
+            --preset ci \
+            --compiler clang-20 \
+            --runner-image ubuntu-24.04 \
+            --commit '${{ github.sha }}' \
+            --cache-state cold \
+            --vcpkg-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
+            --job-url 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}' \
+            "${context_args[@]}" \
+            --output build/ci/ci-timing/result/result.json
+
+      - name: Validate gate timing result
+        if: always()
+        run: python3 tools/benchmark/validate_benchmark_results.py --root build/ci/ci-timing/result --strict
+
+      - name: Upload gate timing result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-gate-timing-ci-bench-smoke
+          path: build/ci/ci-timing/result/result.json
+          if-no-files-found: error

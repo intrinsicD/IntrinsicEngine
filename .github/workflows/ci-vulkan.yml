@@ -4,6 +4,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ci-vulkan:
     runs-on: ubuntu-24.04
@@ -57,10 +61,15 @@ jobs:
             --label "Configure (ci-vulkan preset)" \
             --warm-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
             --max-warm-seconds 20 \
+            --json-out build/ci-vulkan/ci-timing/phases/configure.json \
             -- cmake --preset ci-vulkan
 
       - name: Build promoted Vulkan targets
-        run: cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicTests
+        run: |
+          python3 tools/ci/time_command.py \
+            --label "Build promoted Vulkan targets" \
+            --json-out build/ci-vulkan/ci-timing/phases/build.json \
+            -- cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicTests
 
       # GRAPHICS-080: `ctest -L 'gpu' -L 'vulkan'` is the documented intersection
       # form across labels (each `-L` regex must match at least one label). The
@@ -78,11 +87,57 @@ jobs:
       # before it can emit a diagnostic report. `--no-tests=ignore` keeps this
       # batch green if a future host build trims the fixture set to empty.
       - name: Run gpu;vulkan opt-in fixtures
-        run: ctest --test-dir build/ci-vulkan --output-on-failure -L "gpu" -L "vulkan" -LE "slow|flaky-quarantine" -E "^ExtrinsicSandbox\\.FramePacingDiagnosticCapture$" --no-tests=ignore --timeout 120 -j$(nproc)
+        run: |
+          python3 tools/ci/time_command.py \
+            --label "Run gpu;vulkan opt-in fixtures" \
+            --json-out build/ci-vulkan/ci-timing/phases/test.json \
+            -- ctest --test-dir build/ci-vulkan --output-on-failure -L "gpu" -L "vulkan" -LE "slow|flaky-quarantine" -E "^ExtrinsicSandbox\\.FramePacingDiagnosticCapture$" --no-tests=ignore --timeout 120 -j$(nproc)
 
       - name: Run frame-pacing capture under virtual display
         run: |
-          xvfb-run -a --server-args="-screen 0 1280x720x24" \
-            ctest --test-dir build/ci-vulkan --output-on-failure \
-              -R "^ExtrinsicSandbox\\.FramePacingDiagnosticCapture$" \
-              -L "gpu" -L "vulkan" --no-tests=error --timeout 180
+          python3 tools/ci/time_command.py \
+            --label "Run frame-pacing capture under virtual display" \
+            --json-out build/ci-vulkan/ci-timing/phases/test_frame_pacing.json \
+            -- xvfb-run -a --server-args="-screen 0 1280x720x24" \
+              ctest --test-dir build/ci-vulkan --output-on-failure \
+                -R "^ExtrinsicSandbox\\.FramePacingDiagnosticCapture$" \
+                -L "gpu" -L "vulkan" --no-tests=error --timeout 180
+
+      - name: Aggregate gate timing result
+        if: always()
+        run: |
+          context_args=()
+          if gpu_tests="$(ctest --test-dir build/ci-vulkan --show-only=json-v1 -L "gpu" -L "vulkan" -LE "slow|flaky-quarantine" -E "^ExtrinsicSandbox\\.FramePacingDiagnosticCapture$" | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')" &&
+             frame_pacing_tests="$(ctest --test-dir build/ci-vulkan --show-only=json-v1 -R "^ExtrinsicSandbox\\.FramePacingDiagnosticCapture$" -L "gpu" -L "vulkan" | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')"; then
+            context_args+=(--selected-test-count "$((gpu_tests + frame_pacing_tests))")
+          fi
+          if ninja_edges="$(ninja -C build/ci-vulkan -t commands ExtrinsicSandbox IntrinsicTests | sed '/^[[:space:]]*$/d' | wc -l)"; then
+            context_args+=(--ninja-edge-count "$ninja_edges")
+          fi
+          python3 tools/ci/aggregate_gate_timing.py \
+            --configure-json build/ci-vulkan/ci-timing/phases/configure.json \
+            --build-json build/ci-vulkan/ci-timing/phases/build.json \
+            --test-json build/ci-vulkan/ci-timing/phases/test.json \
+            --test-json build/ci-vulkan/ci-timing/phases/test_frame_pacing.json \
+            --gate ci-vulkan \
+            --preset ci-vulkan \
+            --compiler clang-20 \
+            --runner-image ubuntu-24.04 \
+            --commit '${{ github.sha }}' \
+            --cache-state cold \
+            --vcpkg-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
+            --job-url 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}' \
+            "${context_args[@]}" \
+            --output build/ci-vulkan/ci-timing/result/result.json
+
+      - name: Validate gate timing result
+        if: always()
+        run: python3 tools/benchmark/validate_benchmark_results.py --root build/ci-vulkan/ci-timing/result --strict
+
+      - name: Upload gate timing result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-gate-timing-ci-vulkan
+          path: build/ci-vulkan/ci-timing/result/result.json
+          if-no-files-found: error

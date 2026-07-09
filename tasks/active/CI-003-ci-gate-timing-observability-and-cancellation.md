@@ -8,10 +8,10 @@ depends_on: []
 ## Status
 - In progress on branch `copilot/ci-003-gate-observability`.
 - Owner/agent: GitHub Copilot CLI.
-- Current slice: Slice A complete; Slice B workflow wiring is next.
+- Current slice: Slices A and B complete; Slice C baseline publication is next.
 - Next verification step:
-  `python3 tests/regression/tooling/Test.WorkflowConcurrency.py` after adding
-  timing and cancellation policy to every compile-heavy PR workflow.
+  validate the historical sample report and its median/p95 statistics against
+  the cited GitHub Actions run/job IDs.
 
 ## Goal
 - Publish comparable, machine-readable configure/build/test/total timing for
@@ -82,7 +82,7 @@ depends_on: []
   docs, and retire the task.
 
 ## Required changes
-- [ ] Extend the existing timing wrapper/reporting path so configure, build,
+- [x] Extend the existing timing wrapper/reporting path so configure, build,
       test, and total workflow phases emit one schema-versioned JSON result plus
       a GitHub step summary.
 - [x] Give the telemetry series a stable identity
@@ -91,9 +91,9 @@ depends_on: []
       count, Ninja edge count, ccache hit/miss counts, phase durations, and
       diagnostics in a repository benchmark manifest/result pair validated
       under the benchmark policy.
-- [ ] Persist the result as a small workflow artifact; do not persist the build
+- [x] Persist the result as a small workflow artifact; do not persist the build
       tree or BMIs.
-- [ ] Add workflow-level concurrency groups keyed by workflow plus PR/ref, with
+- [x] Add workflow-level concurrency groups keyed by workflow plus PR/ref, with
       `cancel-in-progress: true`, to PR-triggered compile-heavy workflows.
 - [ ] Seed the formal baseline from the run/job IDs above and at least five
       comparable samples per gate (historical logs are acceptable); report
@@ -105,7 +105,7 @@ depends_on: []
 ## Tests
 - [x] Add regression coverage for successful/failed command timing, JSON
       schema/version, unit conversion, and diagnostic propagation.
-- [ ] Add a workflow-policy regression proving every compile-heavy PR workflow
+- [x] Add a workflow-policy regression proving every compile-heavy PR workflow
       has the intended concurrency group and wraps all measured phases.
 - [x] Validate any benchmark manifest/result fixture through the repository
       validators.
@@ -115,19 +115,19 @@ depends_on: []
       distinction, artifact location, and baseline-comparison rule in
       `docs/benchmarking/ci-policy.md` or the nearest canonical CI performance
       document.
-- [ ] Update the CI workflow documentation with stale-run cancellation
+- [x] Update the CI workflow documentation with stale-run cancellation
       semantics.
 - [ ] Regenerate `tasks/SESSION-BRIEF.md` when retiring this task.
 
 ## Acceptance criteria
-- [ ] Every compile-heavy required gate publishes machine-readable phase
+- [x] Every compile-heavy required gate publishes machine-readable phase
       timings and the contextual counters needed for a comparable result.
 - [ ] A baseline report contains at least five comparable samples per gate and
       reports median/p95 without presenting the representative table as a
       performance claim.
-- [ ] Pushing a newer commit to one PR cancels older in-progress runs of the
+- [x] Pushing a newer commit to one PR cancels older in-progress runs of the
       same workflow without cancelling another PR or the default branch.
-- [ ] No build tree, BMI, or object cache is introduced.
+- [x] No build tree, BMI, or object cache is introduced.
 
 ## Verification
 ```bash
@@ -148,6 +148,18 @@ python3 tests/regression/tooling/Test_BenchmarkManifestValidator.py -v
 python3 tests/regression/tooling/Test_BenchmarkResultValidator.py -v
 python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
 python3 -m py_compile tools/ci/time_command.py tools/ci/aggregate_gate_timing.py tests/regression/tooling/Test.CiTiming.py
+git diff --check
+```
+
+Slice B verification run on 2026-07-09:
+
+```bash
+python3 tests/regression/tooling/Test.CiTiming.py -v
+python3 tests/regression/tooling/Test.WorkflowConcurrency.py -v
+python3 -m py_compile tools/ci/time_command.py tools/ci/aggregate_gate_timing.py tests/regression/tooling/Test.CiTiming.py tests/regression/tooling/Test.WorkflowConcurrency.py
+ctest --test-dir build/ci --show-only=json-v1 -L 'unit|contract' -LE 'gpu|vulkan|slow|flaky-quarantine'
+ninja -C build/ci -t commands IntrinsicTests
+python3 -c 'from pathlib import Path; import yaml; [yaml.safe_load(path.read_text()) for path in Path(".github/workflows").glob("*.yml")]'
 git diff --check
 ```
 

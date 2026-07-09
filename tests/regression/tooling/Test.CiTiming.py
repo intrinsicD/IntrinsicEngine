@@ -126,10 +126,12 @@ class CiTimingTests(unittest.TestCase):
             configure = tmp_path / "configure.json"
             build = tmp_path / "build.json"
             test = tmp_path / "test.json"
+            test_second = tmp_path / "test-second.json"
             output = tmp_path / "result" / "result.json"
             _write_phase(configure, 1.25)
             _write_phase(build, 2.5)
             _write_phase(test, 0.125)
+            _write_phase(test_second, 0.25)
 
             result = subprocess.run(
                 [
@@ -141,6 +143,8 @@ class CiTimingTests(unittest.TestCase):
                     str(build),
                     "--test-json",
                     str(test),
+                    "--test-json",
+                    str(test_second),
                     "--gate",
                     "fixture",
                     "--preset",
@@ -180,10 +184,11 @@ class CiTimingTests(unittest.TestCase):
             self.assertEqual(payload["backend"], "external_baseline")
             self.assertEqual(payload["metrics"]["configure_time_ms"], 1250)
             self.assertEqual(payload["metrics"]["build_time_ms"], 2500)
-            self.assertEqual(payload["metrics"]["test_time_ms"], 125)
-            self.assertEqual(payload["metrics"]["total_time_ms"], 3875)
+            self.assertEqual(payload["metrics"]["test_time_ms"], 375)
+            self.assertEqual(payload["metrics"]["total_time_ms"], 4125)
             self.assertEqual(payload["diagnostics"]["selected_test_count"], 42)
             self.assertEqual(payload["diagnostics"]["ninja_edge_count"], 123)
+            self.assertEqual(payload["diagnostics"]["phase_report_counts"]["test"], 2)
             self.assertEqual(payload["status"], "passed")
 
             validation = subprocess.run(

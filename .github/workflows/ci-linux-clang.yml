@@ -6,6 +6,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   ci-linux-clang:
     runs-on: ubuntu-24.04
@@ -64,10 +68,15 @@ jobs:
             --label "Configure (ci preset)" \
             --warm-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
             --max-warm-seconds 20 \
+            --json-out build/ci/ci-timing/phases/configure.json \
             -- cmake --preset ci
 
       - name: Build full CPU targets
-        run: cmake --build --preset ci
+        run: |
+          python3 tools/ci/time_command.py \
+            --label "Build full CPU targets" \
+            --json-out build/ci/ci-timing/phases/build.json \
+            -- cmake --build --preset ci
 
       - name: Compile hotspot benchmark gate
         run: |
@@ -101,11 +110,55 @@ jobs:
               IntrinsicGraphicsContractTests \
               IntrinsicGraphicsContractCpuTests \
               IntrinsicRuntimeGraphicsCpuTests
-          ctest --test-dir build/ci --output-on-failure -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60 -j$(nproc)
+          python3 tools/ci/time_command.py \
+            --label "Run full CPU test suite" \
+            --json-out build/ci/ci-timing/phases/test.json \
+            -- ctest --test-dir build/ci --output-on-failure -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60 -j$(nproc)
 
       - name: SLO performance gate (FrameGraph 2k-node scenario)
         run: |
           python3 tools/ci/check_prerequisites.py test-binaries \
             --build-dir build/ci \
             --targets IntrinsicBenchmarkTests
-          ./build/ci/bin/IntrinsicBenchmarkTests --gtest_filter=ArchitectureSLO.FrameGraphP95P99BudgetsAt2000Nodes
+          python3 tools/ci/time_command.py \
+            --label "Run FrameGraph SLO gate" \
+            --json-out build/ci/ci-timing/phases/test_slo.json \
+            -- ./build/ci/bin/IntrinsicBenchmarkTests --gtest_filter=ArchitectureSLO.FrameGraphP95P99BudgetsAt2000Nodes
+
+      - name: Aggregate gate timing result
+        if: always()
+        run: |
+          context_args=()
+          if selected_tests="$(ctest --test-dir build/ci --show-only=json-v1 -LE "gpu|vulkan|slow|flaky-quarantine" | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')"; then
+            context_args+=(--selected-test-count "$((selected_tests + 1))")
+          fi
+          if ninja_edges="$(ninja -C build/ci -t commands | sed '/^[[:space:]]*$/d' | wc -l)"; then
+            context_args+=(--ninja-edge-count "$ninja_edges")
+          fi
+          python3 tools/ci/aggregate_gate_timing.py \
+            --configure-json build/ci/ci-timing/phases/configure.json \
+            --build-json build/ci/ci-timing/phases/build.json \
+            --test-json build/ci/ci-timing/phases/test.json \
+            --test-json build/ci/ci-timing/phases/test_slo.json \
+            --gate ci-linux-clang \
+            --preset ci \
+            --compiler clang-20 \
+            --runner-image ubuntu-24.04 \
+            --commit '${{ github.sha }}' \
+            --cache-state cold \
+            --vcpkg-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
+            --job-url 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}' \
+            "${context_args[@]}" \
+            --output build/ci/ci-timing/result/result.json
+
+      - name: Validate gate timing result
+        if: always()
+        run: python3 tools/benchmark/validate_benchmark_results.py --root build/ci/ci-timing/result --strict
+
+      - name: Upload gate timing result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-gate-timing-ci-linux-clang
+          path: build/ci/ci-timing/result/result.json
+          if-no-files-found: error

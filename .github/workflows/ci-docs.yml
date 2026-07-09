@@ -51,6 +51,9 @@ jobs:
       - name: Validate workflow file naming policy
         run: python3 tools/ci/check_workflow_names.py --root .github/workflows
 
+      - name: Validate compile-heavy workflow timing policy
+        run: python3 tests/regression/tooling/Test.WorkflowConcurrency.py
+
       - name: Validate generated module inventory freshness
         run: |
           python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md

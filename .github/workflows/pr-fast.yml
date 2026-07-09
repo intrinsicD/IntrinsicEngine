@@ -4,6 +4,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   pr-fast:
     runs-on: ubuntu-24.04
@@ -43,13 +47,59 @@ jobs:
             --label "Configure (ci preset)" \
             --warm-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
             --max-warm-seconds 20 \
+            --json-out build/ci/ci-timing/phases/configure.json \
             -- cmake --preset ci
 
       - name: Build IntrinsicTests target
-        run: cmake --build --preset ci --target IntrinsicTests
+        run: |
+          python3 tools/ci/time_command.py \
+            --label "Build IntrinsicTests target" \
+            --json-out build/ci/ci-timing/phases/build.json \
+            -- cmake --build --preset ci --target IntrinsicTests
 
       - name: Run unit and contract tests
-        run: ctest --test-dir build/ci --output-on-failure -L "unit|contract" -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60 -j$(nproc)
+        run: |
+          python3 tools/ci/time_command.py \
+            --label "Run unit and contract tests" \
+            --json-out build/ci/ci-timing/phases/test.json \
+            -- ctest --test-dir build/ci --output-on-failure -L "unit|contract" -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60 -j$(nproc)
+
+      - name: Aggregate gate timing result
+        if: always()
+        run: |
+          context_args=()
+          if selected_tests="$(ctest --test-dir build/ci --show-only=json-v1 -L "unit|contract" -LE "gpu|vulkan|slow|flaky-quarantine" | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')"; then
+            context_args+=(--selected-test-count "$selected_tests")
+          fi
+          if ninja_edges="$(ninja -C build/ci -t commands IntrinsicTests | sed '/^[[:space:]]*$/d' | wc -l)"; then
+            context_args+=(--ninja-edge-count "$ninja_edges")
+          fi
+          python3 tools/ci/aggregate_gate_timing.py \
+            --configure-json build/ci/ci-timing/phases/configure.json \
+            --build-json build/ci/ci-timing/phases/build.json \
+            --test-json build/ci/ci-timing/phases/test.json \
+            --gate pr-fast \
+            --preset ci \
+            --compiler clang-20 \
+            --runner-image ubuntu-24.04 \
+            --commit '${{ github.sha }}' \
+            --cache-state cold \
+            --vcpkg-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
+            --job-url 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}' \
+            "${context_args[@]}" \
+            --output build/ci/ci-timing/result/result.json
+
+      - name: Validate gate timing result
+        if: always()
+        run: python3 tools/benchmark/validate_benchmark_results.py --root build/ci/ci-timing/result --strict
+
+      - name: Upload gate timing result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-gate-timing-pr-fast
+          path: build/ci/ci-timing/result/result.json
+          if-no-files-found: error
 
       - name: Install Python validation deps
         run: python3 -m pip install --disable-pip-version-check pyyaml
