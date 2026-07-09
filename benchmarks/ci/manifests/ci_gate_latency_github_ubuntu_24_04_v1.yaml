@@ -1,0 +1,24 @@
+# CI-003 — stable GitHub-hosted CI gate latency measurement contract.
+
+benchmark_id: ci.gate-latency.github-ubuntu-24.04.v1
+method: ci.gate-latency
+dataset: github.hosted.ubuntu_24_04.x86_64
+params:
+  intent: performance
+  runner_platform: github-hosted
+  runner_image: ubuntu-24.04
+  architecture: x86_64
+  phase_model:
+    - configure
+    - build
+    - test
+  total_definition: sum_measured_configure_build_test_phases
+  baseline_policy: five_sample_median_p95_same_gate_context
+  warmup_iterations: 0
+  measured_iterations: 1
+metrics:
+  - configure_time_ms
+  - build_time_ms
+  - test_time_ms
+  - total_time_ms
+thresholds: {}

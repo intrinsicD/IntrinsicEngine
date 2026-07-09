@@ -30,6 +30,10 @@ ALLOWED_METRICS = {
     "quality_error_linf",
     "throughput_items_per_sec",
     "gpu_time_ms",
+    "configure_time_ms",
+    "build_time_ms",
+    "test_time_ms",
+    "total_time_ms",
 }
 
 

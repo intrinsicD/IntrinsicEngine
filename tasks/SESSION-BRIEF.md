@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `CI-003` — Make CI gate latency observable and cancel stale runs (tasks/active/CI-003-ci-gate-timing-observability-and-cancellation.md)
 
 ## Theme B — Rendering modernization
 
@@ -47,7 +47,6 @@ the authoritative open/unblocked view.
 
 ## Theme H — Agentic workflow hardening
 
-- unblocked: `CI-003` — Make CI gate latency observable and cancel stale runs (tasks/backlog/process/CI-003-ci-gate-timing-observability-and-cancellation.md)
 - blocked by `CI-003`: `CI-004` — Build only the test executables selected by each gate (tasks/backlog/process/CI-004-label-derived-test-build-aggregates.md)
 - blocked by `CI-003`: `CI-005` — Make PR-fast a real touched-scope feedback gate (tasks/backlog/process/CI-005-real-touched-scope-pr-fast-gate.md)
 - blocked by `CI-003`: `CI-006` — Remove duplicate sanitizer work and calibrate test parallelism (tasks/backlog/process/CI-006-sanitizer-topology-and-test-parallelism.md)

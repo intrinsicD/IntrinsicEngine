@@ -269,7 +269,7 @@ invariants rather than descriptive prose:
   "Theme I — Research control surface" convergence theme).
 
 The CI-latency track is also Theme H because fast, trustworthy agent feedback is
-workflow infrastructure. [`process/CI-003`](process/CI-003-ci-gate-timing-observability-and-cancellation.md)
+workflow infrastructure. [`CI-003`](../active/CI-003-ci-gate-timing-observability-and-cancellation.md)
 captures the 2026-07-09 hosted-run measurements and compile hotspots, then owns
 machine-readable telemetry and stale-run cancellation. `CI-004..008` address
 test build selection, real touched-scope PR feedback, sanitizer duplication,

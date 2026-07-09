@@ -34,6 +34,19 @@ These fields are optional but recommended for reportability and reproducibility:
 - `host` (string): Machine/runner identifier.
 - `notes` (string): Short additional context.
 
+## CI gate timing profile
+
+The stable `ci.gate-latency.github-ubuntu-24.04.v1` profile uses
+`backend: external_baseline`, method `ci.gate-latency`, and dataset
+`github.hosted.ubuntu_24_04.x86_64`. Its metrics are
+`configure_time_ms`, `build_time_ms`, `test_time_ms`, and `total_time_ms`.
+The measured total is the sum of those phases, not whole-job time.
+
+Gate, preset, compiler, sanitizer, runner image, cold/warm cache state, selected
+test count, Ninja command-edge count, ccache counts, vcpkg cache state, phase
+return codes, and unavailable-counter flags belong in `diagnostics`. Cold and
+warm results are different populations for baseline comparison.
+
 ## Metric value constraints
 
 Within `metrics`:

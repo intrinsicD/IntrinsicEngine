@@ -5,6 +5,14 @@ depends_on: []
 ---
 # CI-003 — Make CI gate latency observable and cancel stale runs
 
+## Status
+- In progress on branch `copilot/ci-003-gate-observability`.
+- Owner/agent: GitHub Copilot CLI.
+- Current slice: Slice A complete; Slice B workflow wiring is next.
+- Next verification step:
+  `python3 tests/regression/tooling/Test.WorkflowConcurrency.py` after adding
+  timing and cancellation policy to every compile-heavy PR workflow.
+
 ## Goal
 - Publish comparable, machine-readable configure/build/test/total timing for
   every required CI gate and cancel superseded runs so latency work has a stable
@@ -61,11 +69,23 @@ depends_on: []
   and 3m23s–4m19s module-interface touches. The operational rule remains:
   non-trivial implementation belongs outside `.cppm` interfaces.
 
+## Slice plan
+- **Slice A.** Define the stable benchmark manifest/result contract, extend the
+  timing tooling to aggregate phase JSON into one validated gate result, and
+  add regression fixtures for success/failure/units/diagnostics. No workflow
+  routing changes.
+- **Slice B.** Add concurrency cancellation, wrap every compile-heavy workflow
+  phase, publish one result artifact per gate, and add workflow-policy
+  regressions. No gate selection or sanitizer topology changes.
+- **Slice C.** Backfill at least five comparable historical samples per gate,
+  publish cold/warm median and p95 baseline evidence, update benchmarking/CI
+  docs, and retire the task.
+
 ## Required changes
 - [ ] Extend the existing timing wrapper/reporting path so configure, build,
       test, and total workflow phases emit one schema-versioned JSON result plus
       a GitHub step summary.
-- [ ] Give the telemetry series a stable identity
+- [x] Give the telemetry series a stable identity
       (`ci.gate-latency.github-ubuntu-24.04.v1`) and declare gate, preset,
       compiler, sanitizer, runner image, SHA, cold/warm state, selected test
       count, Ninja edge count, ccache hit/miss counts, phase durations, and
@@ -83,15 +103,15 @@ depends_on: []
       exploratory audit.
 
 ## Tests
-- [ ] Add regression coverage for successful/failed command timing, JSON
+- [x] Add regression coverage for successful/failed command timing, JSON
       schema/version, unit conversion, and diagnostic propagation.
 - [ ] Add a workflow-policy regression proving every compile-heavy PR workflow
       has the intended concurrency group and wraps all measured phases.
-- [ ] Validate any benchmark manifest/result fixture through the repository
+- [x] Validate any benchmark manifest/result fixture through the repository
       validators.
 
 ## Docs
-- [ ] Document the telemetry identity, measurement conditions, cold/warm
+- [x] Document the telemetry identity, measurement conditions, cold/warm
       distinction, artifact location, and baseline-comparison rule in
       `docs/benchmarking/ci-policy.md` or the nearest canonical CI performance
       document.
@@ -118,6 +138,17 @@ python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --stri
 python3 tools/benchmark/validate_benchmark_results.py --root <ci-timing-result-dir> --strict
 python3 tools/repo/check_pr_contract.py --root .
 python3 tools/agents/check_task_policy.py --root . --strict
+```
+
+Slice A verification run on 2026-07-09:
+
+```bash
+python3 tests/regression/tooling/Test.CiTiming.py -v
+python3 tests/regression/tooling/Test_BenchmarkManifestValidator.py -v
+python3 tests/regression/tooling/Test_BenchmarkResultValidator.py -v
+python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
+python3 -m py_compile tools/ci/time_command.py tools/ci/aggregate_gate_timing.py tests/regression/tooling/Test.CiTiming.py
+git diff --check
 ```
 
 ## Forbidden changes

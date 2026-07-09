@@ -15,7 +15,8 @@ map.
 
 ## Tasks
 
-- [CI-003 — Make CI gate latency observable and cancel stale runs](CI-003-ci-gate-timing-observability-and-cancellation.md)
+- [CI-003 — Make CI gate latency observable and cancel stale runs](../../active/CI-003-ci-gate-timing-observability-and-cancellation.md)
+  (currently active).
 - [CI-004 — Build only the test executables selected by each gate](CI-004-label-derived-test-build-aggregates.md)
 - [CI-005 — Make PR-fast a real touched-scope feedback gate](CI-005-real-touched-scope-pr-fast-gate.md)
 - [CI-006 — Remove duplicate sanitizer work and calibrate test parallelism](CI-006-sanitizer-topology-and-test-parallelism.md)

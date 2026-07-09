@@ -41,6 +41,10 @@ The validator currently accepts the following metric names:
 - `quality_error_linf`
 - `throughput_items_per_sec`
 - `gpu_time_ms`
+- `configure_time_ms`
+- `build_time_ms`
+- `test_time_ms`
+- `total_time_ms`
 
 Additional metrics can be added in a dedicated schema update task.
 

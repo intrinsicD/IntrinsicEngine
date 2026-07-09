@@ -9,7 +9,10 @@ import os
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
+
+PHASE_SCHEMA_VERSION = 1
 
 
 def _strip_command_separator(command: list[str]) -> list[str]:
@@ -20,6 +23,10 @@ def _strip_command_separator(command: list[str]) -> list[str]:
 
 def _parse_cache_hit(value: str | None) -> bool:
     return str(value or "").strip().lower() == "true"
+
+
+def _timestamp_utc() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def _emit_github_message(level: str, title: str, message: str) -> None:
@@ -71,9 +78,20 @@ def main() -> int:
         print("ERROR: command is required after --", file=sys.stderr)
         return 2
 
+    started_at_utc = _timestamp_utc()
     start = time.monotonic()
     completed = subprocess.run(command, check=False)
     elapsed_seconds = time.monotonic() - start
+    finished_at_utc = _timestamp_utc()
+
+    warm_threshold_exceeded = (
+        args.max_warm_seconds is not None
+        and _parse_cache_hit(args.warm_cache_hit)
+        and elapsed_seconds > args.max_warm_seconds
+    )
+    returncode = int(completed.returncode)
+    if returncode == 0 and warm_threshold_exceeded:
+        returncode = 1
 
     print(f"{args.label} elapsed: {elapsed_seconds:.3f} s")
     _write_github_outputs(elapsed_seconds)
@@ -84,11 +102,16 @@ def main() -> int:
         args.json_out.write_text(
             json.dumps(
                 {
+                    "schema_version": PHASE_SCHEMA_VERSION,
                     "label": args.label,
                     "command": command,
+                    "started_at_utc": started_at_utc,
+                    "finished_at_utc": finished_at_utc,
                     "elapsed_seconds": round(elapsed_seconds, 3),
+                    "elapsed_ms": int(round(elapsed_seconds * 1000.0)),
                     "warm_cache_hit": _parse_cache_hit(args.warm_cache_hit),
-                    "returncode": completed.returncode,
+                    "command_returncode": int(completed.returncode),
+                    "returncode": returncode,
                 },
                 indent=2,
                 sort_keys=True,
@@ -98,20 +121,16 @@ def main() -> int:
         )
 
     if completed.returncode != 0:
-        return int(completed.returncode)
+        return returncode
 
-    if (
-        args.max_warm_seconds is not None
-        and _parse_cache_hit(args.warm_cache_hit)
-        and elapsed_seconds > args.max_warm_seconds
-    ):
+    if warm_threshold_exceeded:
         message = (
             f"{args.label} took {elapsed_seconds:.3f} s with an exact vcpkg cache hit; "
             f"limit is {args.max_warm_seconds:.3f} s."
         )
         _emit_github_message("error", "Warm configure budget exceeded", message)
         print(f"ERROR: {message}", file=sys.stderr)
-        return 1
+        return returncode
 
     return 0
 

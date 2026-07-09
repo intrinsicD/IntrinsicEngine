@@ -14,6 +14,25 @@ Benchmark execution is split by cost so CI remains fast while still guarding qua
 - Include broader datasets and optional GPU workloads.
 - Publish benchmark artifacts for trend tracking.
 
+## Gate latency telemetry
+
+Compile-heavy workflows emit one result for
+`ci.gate-latency.github-ubuntu-24.04.v1`. The result measures configure, build,
+and test/execution phases and reports their sum as `total_time_ms`; it does not
+include runner queue time, dependency installation, unrelated structural
+checks, or artifact upload.
+
+The result uses the canonical benchmark JSON schema with
+`backend: external_baseline`. Gate identity, preset, compiler, sanitizer,
+runner image, cache state, selected test count, Ninja command-edge count, and
+cache diagnostics remain explicit. Unavailable counters are represented by
+zero plus a matching `*_available: false` diagnostic rather than being silently
+invented.
+
+Cold and warm-cache samples are reported separately. Performance claims require
+at least five comparable samples and cite median and p95 plus the exact commit,
+runner image, preset, sanitizer, and gate selector.
+
 ## Failure policy
 
 - Schema validation failures are hard failures.

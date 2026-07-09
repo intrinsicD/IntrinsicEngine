@@ -13,6 +13,7 @@ This directory owns IntrinsicEngine benchmark infrastructure and benchmark artif
 ## Layout
 
 - `geometry/`: geometry-processing benchmark suites and manifests.
+- `ci/`: GitHub-hosted CI gate latency contracts and manifests.
 - `physics/`: physics and dynamics benchmark suites and manifests.
 - `rendering/`: rendering and frame-graph benchmark suites.
 - `datasets/`: dataset policy docs and manifests (no large binaries in-repo).

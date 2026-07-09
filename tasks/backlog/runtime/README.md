@@ -89,7 +89,7 @@ vs. the ADR-0024 module/service direction) before further promotion.
 ### Compile-hotspot decomposition (seeded 2026-07-09)
 
 The CI-latency audit retained in
-[`CI-003`](../process/CI-003-ci-gate-timing-observability-and-cancellation.md)
+[`CI-003`](../../active/CI-003-ci-gate-timing-observability-and-cancellation.md)
 measured the runtime layer's three largest exported-interface hotspots:
 `Runtime.SandboxEditorUi.cppm` (159.174s, owned by `ARCH-006`),
 `Runtime.Engine.cppm` (140.072s, owned by `RUNTIME-151` after the mechanical
