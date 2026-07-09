@@ -9,10 +9,11 @@ depends_on:
 ## Status
 - In progress on branch `copilot/ci-004-test-build-aggregates`.
 - Owner/agent: GitHub Copilot CLI.
-- Current slice: Slices A and B complete; Slice C comparative evidence and
-  specialized selector runs are next.
-- Next verification step: configure/build the `ci-vulkan` aggregate and record
-  comparable Ninja-edge counts against the CI-003 baseline.
+- Current slice: Slices A and B complete; Slice C selector parity and
+  deterministic Ninja-edge evidence are complete.
+- Blocked retirement condition: publish the workflow-bearing branch and record
+  comparable hosted cold-build wall time against the `CI-003` baseline. The
+  current GitHub credential cannot push workflow changes.
 
 ## Goal
 - Derive gate-specific aggregate build targets from the same CTest label
@@ -75,7 +76,7 @@ depends_on:
       set.
 - [x] Prove the GPU/Vulkan aggregate implements label intersection and excludes
       `slow`/`flaky-quarantine` targets.
-- [ ] Run the PR-fast and GPU/Vulkan selectors after building only their new
+- [x] Run the PR-fast and GPU/Vulkan selectors after building only their new
       aggregates; no selected test may be absent.
 - [ ] Record cold build duration and Ninja edge count against the `CI-003`
       baseline; report the delta without adding a timing threshold from one run.
@@ -91,9 +92,9 @@ depends_on:
 ## Acceptance criteria
 - [x] `pr-fast` and `ci-vulkan` no longer build the complete
       `IntrinsicTests` aggregate.
-- [ ] Every test selected by each specialized CTest command has its executable
+- [x] Every test selected by each specialized CTest command has its executable
       built, and no unrelated test executable is pulled in by the aggregate.
-- [ ] The default `IntrinsicTests` aggregate and full CPU gate retain complete
+- [x] The default `IntrinsicTests` aggregate and full CPU gate retain complete
       coverage.
 - [ ] Comparable telemetry demonstrates the build-edge and wall-time delta
       against `ci.gate-latency.github-ubuntu-24.04.v1`.
@@ -102,11 +103,17 @@ depends_on:
 ```bash
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicPrFastTests IntrinsicCpuTests IntrinsicPrSmokeTests
-python3 tools/ci/check_prerequisites.py test-binaries --build-dir build/ci --skip-undeclared
+python3 tools/ci/check_prerequisites.py test-binaries --build-dir build/ci --inventory build/ci/test-inventories/IntrinsicPrFastTests.txt
 ctest --test-dir build/ci --output-on-failure -L 'unit|contract' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j$(nproc)
 cmake --preset ci-vulkan
 cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicGpuVulkanTests
-ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -LE 'slow|flaky-quarantine' --timeout 120 -j$(nproc)
+python3 tools/ci/check_prerequisites.py test-binaries --build-dir build/ci-vulkan --inventory build/ci-vulkan/test-inventories/IntrinsicGpuVulkanTests.txt
+python3 tools/ci/check_prerequisites.py test-binaries --build-dir build/ci-vulkan --targets ExtrinsicSandbox
+ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -LE 'slow|flaky-quarantine' -E '^ExtrinsicSandbox\.FramePacingDiagnosticCapture$' --timeout 120 -j$(nproc)
+xvfb-run -a --server-args='-screen 0 1280x720x24' \
+  ctest --test-dir build/ci-vulkan --output-on-failure \
+    -R '^ExtrinsicSandbox\.FramePacingDiagnosticCapture$' \
+    -L gpu -L vulkan --no-tests=error --timeout 180
 python3 tests/regression/tooling/Test.TestBuildAggregates.py
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
@@ -140,6 +147,54 @@ python3 tools/ci/check_prerequisites.py test-binaries --build-dir build/ci --inv
 python3 -c 'from pathlib import Path; import yaml; [yaml.safe_load(path.read_text()) for path in Path(".github/workflows").glob("*.yml")]'
 git diff --check
 ```
+
+Slice C local verification run on 2026-07-09:
+
+```bash
+cmake --build --preset ci --target IntrinsicPrFastTests
+ctest --test-dir build/ci --output-on-failure -L 'unit|contract' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j$(nproc)
+# 3,576/3,576 passed in 52.08 s.
+
+cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicGpuVulkanTests
+ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -LE 'slow|flaky-quarantine' -E '^ExtrinsicSandbox\.FramePacingDiagnosticCapture$' --timeout 120 -j$(nproc)
+# 59/59 passed in 24.10 s on NVIDIA GeForce RTX 3050, driver 590.48.01.
+
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -L integration -L runtime -L graphics -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j$(nproc)
+# Complete aggregate built; PR-smoke selector passed 51/51 in 3.98 s.
+```
+
+Independent `ninja -t commands` closure counts provide deterministic structural
+evidence without making a local wall-time claim:
+
+| Build closure | Command edges | Delta from prior complete closure |
+|---|---:|---:|
+| `IntrinsicTests` (`ci`) | 2,180 | baseline |
+| `IntrinsicPrFastTests` (`ci`) | 1,941 | -239 (-11.0%) |
+| `IntrinsicCpuTests` (`ci`) | 2,003 | -177 (-8.1%) |
+| `IntrinsicPrSmokeTests` (`ci`) | 1,355 | -825 (-37.8%) |
+| `ExtrinsicSandbox IntrinsicTests` (`ci-vulkan`) | 2,188 | baseline |
+| `ExtrinsicSandbox IntrinsicGpuVulkanTests` (`ci-vulkan`) | 1,492 | -696 (-31.8%) |
+
+The hosted `CI-003` cold-build medians remain 1,381 s for `pr-fast` and
+1,399 s for `ci-vulkan`. Comparable post-change wall time must come from the
+same `ubuntu-24.04` workflows after publication; the local edge counts above
+are not presented as a hosted performance result.
+
+The separate `ExtrinsicSandbox.FramePacingDiagnosticCapture` executable passed
+the fail-closed prerequisite check but could not execute locally because
+`xvfb-run` is absent and this host requires an interactive sudo password.
+`ci-vulkan.yml` installs `xvfb` before running that isolated capture.
+
+The default CPU selector enumerated all 3,635 expected tests and completed
+3,634 before one incremental-tree ASan failure in
+`CoreTasks.CoroutineDispatch`. It then passed 25 focused repetitions in the
+incremental tree. Stale-build triage configured a fresh
+`build/ci-coretasks-clean` preset tree, built
+`IntrinsicCoreWrapperUnitTests` with `CCACHE_DISABLE=1` under Clang 23, and
+passed 100 sequential plus 100 concurrent-process focused runs. Per the
+stale-build policy, this is recorded as a stale module-artifact incident; no
+speculative scheduler source change or bug task is warranted.
 
 ## Forbidden changes
 - Hand-maintaining a second target list that can drift from test labels.
