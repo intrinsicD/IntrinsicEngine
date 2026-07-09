@@ -56,6 +56,7 @@ maturity_target: Operational
   construction.
 - Part of the `Runtime.Engine` decomposition series (`RUNTIME-146..151`).
 
+- Transitional facade (ADR-0024): the `Engine::Get{X}()` accessor this task adds is a **transitional landing**, not the end state. Per ADR-0024 D9/D12 and the [kernel target-state](../../../docs/architecture/kernel-target-state.md) scorecard (`Engine::GetX()` domain-facade accessors = 0), its conversion to a RuntimeModule / Resolve-phase service is owned by `ARCH-013` (per-subsystem decision) and tracked by `ARCH-014`. This task extracts the subsystem; it does not make the accessor permanent.
 ## Control surfaces
 - Config: unchanged — same hot-subset and recipe documents.
 - UI: `SandboxEditorUi` calls `engine.GetConfigControl().*` instead of

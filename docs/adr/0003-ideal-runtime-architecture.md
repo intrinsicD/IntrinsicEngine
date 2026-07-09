@@ -1,6 +1,6 @@
 # ADR O3 — Ideal Runtime Architecture Target
 
-- **Status:** Accepted as a documented long-horizon target option
+- **Status:** Refined and superseded by [ADR-0024](0024-kernel-module-architecture.md), which carries forward O3's staged frame products (W → R → F → G) and adds the composition/communication contract O3 left unspecified. Read ADR-0024 as the current target; this doc is retained as the predecessor rationale.
 - **Date:** 2026-03-19
 - **Owners:** Runtime / Rendering Architecture
 - **Related backlog:** `tasks/backlog/legacy-todo.md` → `B3. Engine Architecture Review Follow-Up`, `B3.7 Recommended Path (default = O2) + Migration Plan`

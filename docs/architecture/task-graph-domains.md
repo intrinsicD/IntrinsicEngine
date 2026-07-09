@@ -126,6 +126,11 @@ Target complexity:
 
 ## 9. Runtime frame-phase boundaries (`Engine::RunFrame`)
 
+> **Authoritative frame order is [`runtime.md`](runtime.md)** (which now
+> includes the ADR-0024 single pre-sim **command drain** and the **two event
+> pump points**). The list below predates that and omits the drain/pumps; treat
+> it as a task-graph-domain sketch, not the current phase contract.
+
 Canonical high-level phase boundaries:
 
 1. Platform events / resize handling.

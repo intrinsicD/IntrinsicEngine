@@ -1,6 +1,6 @@
 # ADR O1 — Minimal Runtime Refactor Path
 
-- **Status:** Accepted as a documented fallback option
+- **Status:** Superseded by [ADR-0024](0024-kernel-module-architecture.md) — retained as historical background. This O1 fallback option (keep `Engine::Run()` as the composition root, keep the existing subsystem split) is part of the O1/O2/O3 option set that ADR-0024 replaces.
 - **Date:** 2026-03-19
 - **Owners:** Runtime / Rendering Architecture
 - **Related backlog:** `tasks/backlog/legacy-todo.md` → `B3. Engine Architecture Review Follow-Up`
