@@ -10,9 +10,9 @@ depends_on:
 # ARCH-011 — RuntimeModule contract, EngineSetup, and two-phase ServiceRegistry
 
 ## Status
-- **Retired 2026-07-09 at `CPUContracted`.** Commit/PR: pending local change
-  set on branch `claude/agentic-workflow-continue-fl4754` (fifth and final
-  additive ADR-0024 kernel seam; `ARCH-007`..`ARCH-011` are now all landed).
+- **Retired 2026-07-09 at `CPUContracted`.** Commit/PR: PR #1013 on branch
+  `claude/agentic-workflow-continue-fl4754` (fifth and final additive ADR-0024
+  kernel seam; `ARCH-007`..`ARCH-011` are now all landed).
 - New modules `Extrinsic.Runtime.ServiceRegistry` (two-phase `Provide`/
   `Require`/`Find`, fail-closed boot abort naming requester + missing type)
   and `Extrinsic.Runtime.Module` (`IRuntimeModule`, `EngineSetup`,
@@ -26,13 +26,12 @@ depends_on:
   `check_test_layout.py --strict` (0 findings), `check_task_policy.py
   --strict`, `check_doc_links.py`, module-inventory regeneration (+2 modules),
   and `generate_session_brief.py`.
-- **Not run locally:** the C++ build and the default CPU-supported test gate
-  (including the new `Test.RuntimeModuleContract.cpp` scenarios). The cloud
-  session could not bootstrap vcpkg (egress policy returns 403 for the vcpkg
-  tool download) and has no Ninja generator, so a preset build was not
-  possible here. CI (with vcpkg binary caching) must confirm the build and the
-  full default gate before merge; the "tests pass under the default CPU gate"
-  acceptance box is deliberately left unchecked until it does.
+- **Merge follow-up:** the originating cloud session could not run the C++
+  gate. PR #1013 CI built successfully but exposed two deterministic failures:
+  module systems inherited `AddModule` order because the sequential-hazard
+  FrameGraph cannot infer producer direction from a Read/Write pair alone.
+  `BUG-066` repairs the contract with stable pass ordering plus explicit named
+  causal signals while preserving core FrameGraph semantics.
 - `Operational` is owned by `ARCH-012` (ClusteringModule proving extraction).
 
 ## Goal
@@ -127,8 +126,8 @@ pending CI — see Status):
       through `AddModule`/`EmplaceModule` + `EngineSetup`).
 - [x] `EngineSetup`/`CommandContext` surfaces expose no `Engine&`.
 - [x] All listed tests are authored under the default CPU-gate labels and
-      compose the kernel headlessly; local execution of the C++ gate was
-      blocked by the sandbox toolchain, so it is confirmed in CI at merge
+      compose the kernel headlessly. PR #1013 CI exposed the system-ordering
+      defect; BUG-066 repaired it and passed the default CPU gate locally
       (see Status).
 - [x] `Operational` follow-up is owned by `ARCH-012`.
 

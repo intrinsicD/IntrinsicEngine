@@ -1,14 +1,122 @@
 module;
 
 #include <cstddef>
+#include <cstdint>
 #include <functional>
+#include <set>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
 module Extrinsic.Runtime.Module;
 
+import Extrinsic.Core.Logging;
+
 namespace Extrinsic::Runtime
 {
+    namespace
+    {
+        [[nodiscard]] Core::Expected<std::vector<const SimSystemDesc*>> BuildSystemOrder(
+            const std::vector<SimSystemDesc>& systems)
+        {
+            const std::size_t systemCount = systems.size();
+            std::unordered_set<std::string> passNames;
+            for (const SimSystemDesc& system : systems)
+            {
+                if (!passNames.insert(system.PassName).second)
+                {
+                    Core::Log::Error(
+                        "[Runtime.Module] Duplicate SimSystem PassName '{}'",
+                        system.PassName);
+                    return Core::Err<std::vector<const SimSystemDesc*>>(
+                        Core::ErrorCode::InvalidArgument);
+                }
+            }
+
+            std::unordered_map<std::uint32_t, std::vector<std::size_t>> signalers;
+            for (std::size_t index = 0; index < systemCount; ++index)
+            {
+                for (const Core::Hash::StringID signal : systems[index].EmitSignals)
+                    signalers[signal.Value].push_back(index);
+            }
+
+            std::vector<std::unordered_set<std::size_t>> successors(systemCount);
+            std::vector<std::size_t>                     inDegree(systemCount, 0);
+            for (std::size_t waiter = 0; waiter < systemCount; ++waiter)
+            {
+                for (const Core::Hash::StringID signal : systems[waiter].WaitForSignals)
+                {
+                    const auto found = signalers.find(signal.Value);
+                    if (found == signalers.end())
+                        continue;
+
+                    for (const std::size_t signaler : found->second)
+                    {
+                        if (signaler == waiter)
+                        {
+                            Core::Log::Error(
+                                "[Runtime.Module] SimSystem '{}' waits for its own signal {}",
+                                systems[waiter].PassName,
+                                signal.Value);
+                            return Core::Err<std::vector<const SimSystemDesc*>>(
+                                Core::ErrorCode::InvalidState);
+                        }
+                        if (successors[signaler].insert(waiter).second)
+                            ++inDegree[waiter];
+                    }
+                }
+            }
+
+            const auto stableLess = [&systems](const std::size_t lhs,
+                                               const std::size_t rhs)
+            {
+                if (systems[lhs].PassName != systems[rhs].PassName)
+                    return systems[lhs].PassName < systems[rhs].PassName;
+                return lhs < rhs;
+            };
+            std::set<std::size_t, decltype(stableLess)> ready(stableLess);
+            for (std::size_t index = 0; index < systemCount; ++index)
+            {
+                if (inDegree[index] == 0)
+                    ready.insert(index);
+            }
+
+            std::vector<const SimSystemDesc*> ordered;
+            ordered.reserve(systemCount);
+            while (!ready.empty())
+            {
+                const std::size_t index = *ready.begin();
+                ready.erase(ready.begin());
+                ordered.push_back(&systems[index]);
+
+                for (const std::size_t successor : successors[index])
+                {
+                    if (--inDegree[successor] == 0)
+                        ready.insert(successor);
+                }
+            }
+
+            if (ordered.size() != systemCount)
+            {
+                for (std::size_t index = 0; index < systemCount; ++index)
+                {
+                    if (inDegree[index] != 0)
+                    {
+                        Core::Log::Error(
+                            "[Runtime.Module] SimSystem '{}' participates in a cyclic named-signal dependency",
+                            systems[index].PassName);
+                    }
+                }
+                return Core::Err<std::vector<const SimSystemDesc*>>(
+                    Core::ErrorCode::InvalidState);
+            }
+
+            return ordered;
+        }
+    }
+
     SystemHandle ModuleRegistrationSink::AddSimSystem(SimSystemDesc desc)
     {
         const SystemHandle handle{m_NextSystemHandle++};
@@ -24,25 +132,28 @@ namespace Extrinsic::Runtime
         return handle;
     }
 
-    void ModuleRegistrationSink::ApplySimSystems(Core::FrameGraph&     graph,
-                                                 ECS::Scene::Registry& scene) const
+    Core::Result ModuleRegistrationSink::ApplySimSystems(Core::FrameGraph&     graph,
+                                                         ECS::Scene::Registry& scene) const
     {
-        // Each SimSystemDesc becomes a FrameGraph pass. `Declare` runs at
-        // setup to lay down Read/Write tokens + named signals; `Execute` runs
-        // when the graph fires. The pass callbacks bind to the desc through a
-        // stable pointer into m_SimSystems and to the caller's `scene`; both
-        // outlive the per-substep graph (the sink is engine-owned and the
-        // graph is compiled/executed within the same frame), so the captures
-        // stay valid.
-        for (const SimSystemDesc& system : m_SimSystems)
+        // Named signals establish causal direction before the sequential
+        // FrameGraph hazard builder sees the passes; PassName provides the
+        // deterministic order for otherwise-independent systems.
+        const auto orderedSystems = BuildSystemOrder(m_SimSystems);
+        if (!orderedSystems.has_value())
+            return Core::Err(orderedSystems.error());
+
+        for (const SimSystemDesc* const desc : *orderedSystems)
         {
-            const SimSystemDesc* const desc = &system;
             graph.AddPass(
                 desc->PassName,
                 [desc](Core::FrameGraphBuilder& builder)
                 {
+                    for (const Core::Hash::StringID signal : desc->WaitForSignals)
+                        builder.WaitFor(signal);
                     if (desc->Declare)
                         desc->Declare(builder);
+                    for (const Core::Hash::StringID signal : desc->EmitSignals)
+                        builder.Signal(signal);
                 },
                 [desc, &scene]
                 {
@@ -50,6 +161,7 @@ namespace Extrinsic::Runtime
                         desc->Execute(scene);
                 });
         }
+        return Core::Ok();
     }
 
     void ModuleRegistrationSink::InvokeFrameHooks(FramePhase        phase,

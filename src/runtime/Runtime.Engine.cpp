@@ -676,13 +676,20 @@ namespace Extrinsic::Runtime
                 (void)RegisterPromotedEcsSystemBundle(frameGraph, scene);
 
                 // ARCH-011: append every module-registered SimSystem after the
-                // built-in bundle and before Compile. Execution order comes
-                // from each system's declared Read/Write tokens + named
-                // signals, so it is independent of module registration order
-                // (ADR-0024 D1/D3).
-                moduleRegistration.ApplySimSystems(frameGraph, scene);
+                // built-in bundle and before Compile. The module sink first
+                // canonicalizes unique pass names under named-signal edges;
+                // the FrameGraph then applies each system's declared
+                // Read/Write hazards in that stable order (ADR-0024 D1/D3).
+                const auto moduleApply =
+                    moduleRegistration.ApplySimSystems(frameGraph, scene);
 
-                if (frameGraph.PassCount() > 0)
+                if (!moduleApply.has_value())
+                {
+                    Core::Log::Error(
+                        "[Runtime] Module system ordering failed: error={}",
+                        static_cast<int>(moduleApply.error()));
+                }
+                else if (frameGraph.PassCount() > 0)
                 {
                     if (auto r = frameGraph.Compile(); r.has_value())
                     {
@@ -697,8 +704,8 @@ namespace Extrinsic::Runtime
                         Core::Log::Error("[Runtime] FrameGraph Compile() failed: error={}",
                                          static_cast<int>(r.error()));
                     }
-                    frameGraph.Reset();
                 }
+                frameGraph.Reset();
 
                 accumulator -= fixedDt;
                 ++substeps;

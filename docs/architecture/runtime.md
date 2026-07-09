@@ -55,8 +55,9 @@ The frame order is:
    listener-published events wait for the next pump (ARCH-008);
 4. fixed-step simulation and CPU `FrameGraph` execution, appending every
    module-registered sim system after the built-in ECS bundle and before
-   compile so execution order follows declared Read/Write tokens, not module
-   registration order (ARCH-011);
+   compile; the module sink canonicalizes unique pass names under explicit
+   named signal dependencies, then the `FrameGraph` applies declared
+   Read/Write hazards in that stable order (ARCH-011, BUG-066);
 5. drain the kernel job-service completion gate — workers deposit results into
    `Engine::Jobs()` only, and the service publishes survivor completion events
    after token/world cancellation checks, main-thread, before pump B per
@@ -119,11 +120,14 @@ frame hooks, command handlers, and event subscriptions through a narrow
 `EngineSetup` (never an `Engine&`, per D13) — followed by every module's
 `OnResolve`, which binds required services. `ServiceRegistry::Require` fails
 closed at boot, naming the requesting module and the missing service type;
-`Find` is the optional-dependency form. Registration order is not load-bearing:
-inter-module ordering comes from declared sim-system Read/Write data
-dependencies and the two-phase startup. `RunFrame` invokes module frame hooks
-at four neutral phases — `AfterCommandDrain`, `UiBuild`, `BeforeExtraction`,
-and `Maintenance` — each handed a narrow `FrameHookContext`. Shutdown is
+`Find` is the optional-dependency form. The two-phase startup makes service
+publication order non-load-bearing. Module systems have unique stable pass
+names; explicit `WaitForSignals`/`EmitSignals` metadata establishes causal
+direction before the core FrameGraph applies each system's declared
+Read/Write hazards. `AddModule` order therefore cannot reverse a system
+schedule. `RunFrame` invokes module frame hooks at four neutral phases —
+`AfterCommandDrain`, `UiBuild`, `BeforeExtraction`, and `Maintenance` — each
+handed a narrow `FrameHookContext`. Shutdown is
 two-phase by construction: `Engine::Shutdown()` publishes and pumps
 `EngineWillShutDown` so every module observes it while the substrate is still
 live, then runs `OnShutdown` in reverse registration order before subsystem

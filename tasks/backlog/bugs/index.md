@@ -20,6 +20,12 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Verified / Closed
 
+- Closed 2026-07-09: [`BUG-066` — RuntimeModule system order followed module registration order](../../done/BUG-066-runtime-module-system-registration-order.md).
+  `ModuleRegistrationSink` now canonicalizes unique system pass names under
+  explicit named signal edges before appending passes to the sequential-hazard
+  FrameGraph; duplicate names and signal cycles fail closed. The reversed
+  registration regressions pass, and the default CPU gate passed 3635/3635.
+
 - Closed 2026-07-08: [`BUG-062` — Warm-configure CI budget flakes on shared-runner variance](../../done/BUG-062-warm-configure-budget-flaky-runner-variance.md).
   The 10 s warm-cache configure budget was calibrated at the runner median and
   killed five merge-gating workflows across three PR #1010 heads (including a

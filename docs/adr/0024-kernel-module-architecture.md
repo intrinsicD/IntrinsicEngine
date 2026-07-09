@@ -37,7 +37,11 @@ Two composition concepts, not three:
   dependencies (`Read`/`Write` TypeTokens + named signals), exactly as
   `Runtime.EcsSystemBundle` already registers FrameGraph passes. ECS-query
   systems are the common flavor; extraction, readback pumps, and bake pumps
-  are Systems too.
+  are Systems too. Module systems carry a unique stable pass name and explicit
+  named wait/signal metadata. The module sink resolves those causal edges and
+  canonicalizes otherwise-independent systems before the sequential-hazard
+  FrameGraph applies `Read`/`Write`; a producer/consumer relationship must use
+  a named signal rather than relying on module registration order.
 - **RuntimeModule** — the app-facing unit of composition: binds command
   handlers, UI contributions, the Systems it registers, and its owned state.
   Named `RuntimeModule` to avoid collision with C++23 modules.
@@ -66,7 +70,9 @@ always-present synchronous infrastructure: a two-phase **ServiceRegistry** —
 `OnResolve`; a missing `Require` is a **boot error naming both modules**,
 never a null-deref at frame 400. Direct module-to-module pointers are
 forbidden. Ordering between modules comes from declared data dependencies and
-the two-phase startup, never from registration order.
+the two-phase startup, never from registration order. For Systems, named
+signals establish causal direction; `Read`/`Write` then preserve RAW/WAR/WAW
+safety in the resulting stable pass order.
 
 ### D4 — World rendering topology
 

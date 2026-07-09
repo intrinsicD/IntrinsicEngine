@@ -11,6 +11,8 @@ module;
 export module Extrinsic.Runtime.Module;
 
 import Extrinsic.Core.FrameGraph;
+import Extrinsic.Core.Hash;
+import Extrinsic.Core.Error;
 import Extrinsic.ECS.Scene.Registry;
 export import Extrinsic.Runtime.WorldHandle;
 export import Extrinsic.Runtime.ServiceRegistry;
@@ -73,16 +75,20 @@ namespace Extrinsic::Runtime
         [[nodiscard]] friend bool operator==(FrameHookHandle, FrameHookHandle) noexcept = default;
     };
 
-    // A per-substep schedulable unit (ADR-0024 D1). `Declare` states the
-    // component Read/Write tokens and named signals on the FrameGraph builder;
-    // the graph compiles execution order from those declarations, so two
-    // modules' systems order by data dependency, never by registration order
-    // (D3). `Execute` runs against the active world's registry inside the
-    // fixed-step graph. This is the same `Read`/`Write`/`WaitFor`/`Signal`
-    // path the built-in `Runtime.EcsSystemBundle` passes use.
+    // A per-substep schedulable unit (ADR-0024 D1). `PassName` is the unique,
+    // stable system identity. The module sink orders systems canonically by
+    // that identity, constrained by `WaitForSignals`/`EmitSignals`, before
+    // appending them to the FrameGraph. `Declare` then states component
+    // Read/Write hazards on the shared builder. Because the core FrameGraph
+    // preserves sequential WAR as well as RAW/WAW hazards, systems with a
+    // causal producer/consumer relationship must encode its direction with a
+    // named signal instead of relying on module registration order (D3).
+    // `Execute` runs against the active world's registry.
     export struct SimSystemDesc
     {
         std::string                                   PassName{};
+        std::vector<Core::Hash::StringID>             WaitForSignals{};
+        std::vector<Core::Hash::StringID>             EmitSignals{};
         std::function<void(Core::FrameGraphBuilder&)> Declare{};
         std::function<void(ECS::Scene::Registry&)>    Execute{};
     };
@@ -130,11 +136,14 @@ namespace Extrinsic::Runtime
                                      std::function<void(FrameHookContext&)> hook);
 
         // Append every registered system as a FrameGraph pass bound to the
-        // supplied active-world registry. Called once per fixed-step substep
-        // after the built-in ECS bundle and before Compile; the same call
-        // powers the contract-test schedule inspection.
-        void ApplySimSystems(Core::FrameGraph&     graph,
-                             ECS::Scene::Registry& scene) const;
+        // supplied active-world registry. Systems are canonicalized by unique
+        // PassName and named signal dependencies first, so AddModule order is
+        // not load-bearing. Called once per fixed-step substep after the
+        // built-in ECS bundle and before Compile; the same call powers the
+        // contract-test schedule inspection. Duplicate PassNames fail with
+        // InvalidArgument; cyclic named dependencies fail with InvalidState.
+        [[nodiscard]] Core::Result ApplySimSystems(Core::FrameGraph&     graph,
+                                                   ECS::Scene::Registry& scene) const;
 
         // Invoke every hook registered for `phase`, in registration order.
         // No-ops cheaply when no module registered a hook for the phase.

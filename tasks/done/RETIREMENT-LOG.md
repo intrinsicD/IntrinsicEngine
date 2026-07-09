@@ -8,6 +8,20 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-066`](BUG-066-runtime-module-system-registration-order.md) —
+RuntimeModule system ordering regression retired to `tasks/done/` on
+2026-07-09 at `CPUContracted`. PR #1013 appended module systems directly to
+the core FrameGraph, whose RAW/WAR/WAW hazards intentionally follow pass
+registration order; reversing `AddModule` therefore reversed the system
+schedule and ran a reader before its writer. `SimSystemDesc` now carries a
+unique stable `PassName` plus explicit `WaitForSignals`/`EmitSignals`.
+`ModuleRegistrationSink` topologically orders those causal edges with a stable
+name tie-break before the FrameGraph applies resource hazards, and rejects
+duplicate names or signal cycles. The original reversed-order failures and
+new fail-closed cases pass; the default CPU gate passed 3635/3635. Core
+FrameGraph semantics are unchanged, and `Operational` remains owned by
+`ARCH-012`.
+
 [`BUG-065`](BUG-065-vcpkg-egress-blocked-cryptic-403.md) — vcpkg bootstrap
 egress block surfacing as a cryptic `curl: (22) ... 403` retired to
 `tasks/done/` on 2026-07-09. Managed/cloud sessions that allow git-protocol

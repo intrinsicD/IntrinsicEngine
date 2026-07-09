@@ -8,7 +8,9 @@
 #include <vector>
 
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameGraph;
+import Extrinsic.Core.Hash;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.Engine;
@@ -99,6 +101,9 @@ namespace
     {
     };
 
+    inline constexpr Extrinsic::Core::Hash::StringID OrderResourceReady{
+        "RuntimeModuleContract.OrderResourceReady"};
+
     struct OrderingProbe
     {
         std::atomic<bool> WriterRan{false};
@@ -118,10 +123,11 @@ namespace
         void OnRegister(EngineSetup& setup) override
         {
             setup.RegisterSimSystem(SimSystemDesc{
-                "ordering.writer",
-                [](Extrinsic::Core::FrameGraphBuilder& builder)
+                .PassName = "ordering.writer",
+                .EmitSignals = {OrderResourceReady},
+                .Declare = [](Extrinsic::Core::FrameGraphBuilder& builder)
                 { builder.Write<OrderResourceToken>(); },
-                [this](Extrinsic::ECS::Scene::Registry&)
+                .Execute = [this](Extrinsic::ECS::Scene::Registry&)
                 {
                     m_Probe.WriterRan.store(true, std::memory_order_release);
                     m_Probe.WriterRuns.fetch_add(1, std::memory_order_acq_rel);
@@ -143,10 +149,11 @@ namespace
         void OnRegister(EngineSetup& setup) override
         {
             setup.RegisterSimSystem(SimSystemDesc{
-                "ordering.reader",
-                [](Extrinsic::Core::FrameGraphBuilder& builder)
+                .PassName = "ordering.reader",
+                .WaitForSignals = {OrderResourceReady},
+                .Declare = [](Extrinsic::Core::FrameGraphBuilder& builder)
                 { builder.Read<OrderResourceToken>(); },
-                [this](Extrinsic::ECS::Scene::Registry&)
+                .Execute = [this](Extrinsic::ECS::Scene::Registry&)
                 {
                     m_Probe.ReaderSawWriterFirst.store(
                         m_Probe.WriterRan.load(std::memory_order_acquire),
@@ -182,7 +189,11 @@ namespace
     [[nodiscard]] std::vector<std::string> CompiledModuleSchedule(Engine& engine)
     {
         Extrinsic::Core::FrameGraph graph;
-        engine.GetModuleRegistrationForTest().ApplySimSystems(graph, engine.GetScene());
+        const auto apply =
+            engine.GetModuleRegistrationForTest().ApplySimSystems(graph, engine.GetScene());
+        EXPECT_TRUE(apply.has_value());
+        if (!apply.has_value())
+            return {};
         EXPECT_TRUE(graph.Compile().has_value());
         std::vector<std::string> order;
         for (const std::vector<std::uint32_t>& layer : graph.GetExecutionLayers())
@@ -262,6 +273,47 @@ TEST(RuntimeModuleRegistration, FrameHooksBucketByPhaseAndInvokeInRegistrationOr
 
     sink.InvokeFrameHooks(FramePhase::Maintenance, context);
     EXPECT_EQ(log, (std::vector<int>{1, 2, 3}));
+}
+
+TEST(RuntimeModuleRegistration, DuplicateSystemPassNamesFailClosed)
+{
+    ModuleRegistrationSink sink;
+    sink.AddSimSystem(SimSystemDesc{.PassName = "duplicate"});
+    sink.AddSimSystem(SimSystemDesc{.PassName = "duplicate"});
+
+    Extrinsic::Core::FrameGraph graph;
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto result = sink.ApplySimSystems(graph, scene);
+
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Extrinsic::Core::ErrorCode::InvalidArgument);
+    EXPECT_EQ(graph.PassCount(), 0u);
+}
+
+TEST(RuntimeModuleRegistration, CyclicSystemSignalsFailClosed)
+{
+    constexpr Extrinsic::Core::Hash::StringID SignalA{
+        "RuntimeModuleContract.SignalA"};
+    constexpr Extrinsic::Core::Hash::StringID SignalB{
+        "RuntimeModuleContract.SignalB"};
+
+    ModuleRegistrationSink sink;
+    sink.AddSimSystem(SimSystemDesc{
+        .PassName = "cycle.a",
+        .WaitForSignals = {SignalB},
+        .EmitSignals = {SignalA}});
+    sink.AddSimSystem(SimSystemDesc{
+        .PassName = "cycle.b",
+        .WaitForSignals = {SignalA},
+        .EmitSignals = {SignalB}});
+
+    Extrinsic::Core::FrameGraph graph;
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto result = sink.ApplySimSystems(graph, scene);
+
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Extrinsic::Core::ErrorCode::InvalidState);
+    EXPECT_EQ(graph.PassCount(), 0u);
 }
 
 // ── Two-phase composition on the Engine (ADR-0024 D1/D3/D12) ──────────────
@@ -344,7 +396,9 @@ TEST(RuntimeModuleContract, ModuleSimSystemExecutesWithDeclaredDependencyOrder)
     engine.Initialize();
 
     Extrinsic::Core::FrameGraph graph;
-    engine.GetModuleRegistrationForTest().ApplySimSystems(graph, engine.GetScene());
+    ASSERT_TRUE(
+        engine.GetModuleRegistrationForTest().ApplySimSystems(graph, engine.GetScene())
+            .has_value());
     ASSERT_TRUE(graph.Compile().has_value());
     ASSERT_TRUE(graph.Execute().has_value());
 

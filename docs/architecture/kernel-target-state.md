@@ -29,7 +29,7 @@ this table. If it does not fit a row, that is a signal to revisit ADR-0024,
 | --- | --- | --- |
 | A user/UI action that *changes state* (import, save, bake, switch world, apply config, run an algorithm) | a **command** handled by a module | `Commands().Enqueue(XRequested{...})`; drained pre-sim (D5) |
 | "When X happens, always do Y" (refresh a visualization after an attribute changes) | an **event reaction** in a module | `Events().Subscribe<XChanged>(...)` (D6); never a chain |
-| Per-frame / per-substep data-dependent work (ECS query, extraction, a pump) | a **System** | `RegisterSimSystem(SimSystemDesc{Reads, Writes, ...})` (D1) |
+| Per-frame / per-substep data-dependent work (ECS query, extraction, a pump) | a **System** | `RegisterSimSystem(SimSystemDesc{.WaitForSignals, .EmitSignals, .Declare, ...})`; named signals set causal order, then `Declare` supplies Read/Write hazards (D1) |
 | Background multi-frame compute (remesh, k-means, bake, readback) | a **job** | `Jobs().Submit(JobDesc{...})`; snapshot in, result committed at a pump (D8) |
 | A new render technique (overlay, fullscreen analysis, compute fill) | an **extension pass** at a slot | `RegisterExtensionPass(...)` (D10) |
 | Deciding whether a click belongs to UI or the viewport | an **input capture filter** | `RegisterInputCaptureFilter(...)` (D11) |
