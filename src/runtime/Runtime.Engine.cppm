@@ -27,11 +27,11 @@ import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Runtime.AsyncWorkService;
 import Extrinsic.Runtime.AssetResidencyService;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.AssetImportPipeline;
-import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GizmoFrameService;
@@ -51,7 +51,6 @@ import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SceneDocument;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.StableEntityLookup;
-import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.RenderExtractionService;
 import Extrinsic.Runtime.SelectionReadback;
 import Extrinsic.Runtime.WorldHandle;
@@ -113,7 +112,7 @@ namespace Extrinsic::Runtime
     // Owns: Window, IDevice, IRenderer, FrameClock,
     //       Tasks::Scheduler (static — initialized/shutdown here),
     //       AssetService, Scene::Registry, FrameGraph (CPU),
-    //       StreamingExecutor.
+    //       AsyncWorkService.
     //
     // Scheduling surfaces:
     //   CPU     — Core::FrameGraph wrapping a Dag::TaskGraph(Cpu).
@@ -124,10 +123,10 @@ namespace Extrinsic::Runtime
     //   GPU     — Owned internally by IRenderer.
     //             Engine drives it via BeginFrame / ExecuteFrame / EndFrame.
     //
-    //   Streaming — Runtime.StreamingExecutor owned by Engine.
-    //               Asset IO / geometry processing tasks submit persistent
-    //               executor work and publish main-thread apply callbacks in
-    //               Phase 10 (maintenance lane) each frame.
+    //   Streaming — Runtime.AsyncWorkService owned by Engine.
+    //               Asset IO / geometry processing tasks borrow the service's
+    //               persistent executor and publish main-thread apply callbacks
+    //               in Phase 10 (maintenance lane) each frame.
     //
     // Frame shape (executed inside Run()):
     //
@@ -397,11 +396,10 @@ namespace Extrinsic::Runtime
 
         // CPU task graph — ECS system scheduling
         std::unique_ptr<Core::FrameGraph>      m_FrameGraph;
-        // Persistent streaming executor — cross-frame background work
-        std::unique_ptr<StreamingExecutor>      m_StreamingExecutor;
-        // Runtime/editor derived jobs — submitted through the streaming
-        // executor and applied on the maintenance lane.
-        std::unique_ptr<DerivedJobRegistry>     m_DerivedJobRegistry;
+        // RUNTIME-165 — runtime async work ownership. Engine keeps lifecycle
+        // ordering and compatibility facades; the service owns the persistent
+        // streaming executor plus derived-job registry and maintenance drains.
+        AsyncWorkService                        m_AsyncWorkService{};
         // Asset service — CPU payload authority
         std::unique_ptr<Assets::AssetService>  m_AssetService;
         // RUNTIME-164 — GPU-side asset residency owner state. Engine keeps

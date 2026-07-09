@@ -45,7 +45,7 @@ and compile hotspot. This series keeps `Engine` as the concrete composition
 root (lifecycle, ownership, explicit frame skeleton) and relocates domain
 facades into engine-owned subsystem objects, following the existing
 `SelectionController`/`EditorCommandHistory`/`GizmoInteraction` accessor
-pattern. `RUNTIME-146` through `RUNTIME-164` are retired. Runtime device
+pattern. `RUNTIME-146` through `RUNTIME-165` are retired. Runtime device
 selection, backend factory dispatch, Vulkan fallback breadcrumb policy, GPU
 asset fallback-texture descriptor construction, legacy mesh primitive-view
 compatibility translation, reference-scene lifecycle control, and runtime
@@ -61,8 +61,10 @@ undo storage, selected-entity scratch, packet building, and gizmo-vs-selection
 input interlock, plus render-extraction cache ownership, render-world pool
 state, last extraction stats, frame-index ownership, GPU asset cache ownership,
 asset-event listener wiring, model texture/model scene handoff ownership,
-pending material-binding re-resolution, and asset-residency teardown ordering
-now live outside `Runtime.Engine.cpp`.
+pending material-binding re-resolution, and asset-residency teardown ordering,
+plus persistent `StreamingExecutor` / `DerivedJobRegistry` ownership,
+maintenance drains, shutdown reset, and derived-job facade delegation now live
+outside `Runtime.Engine.cpp`.
 `RUNTIME-129` remains the owner of production Vulkan bake plan-provider wiring.
 `RUNTIME-154` keeps the existing reference-scene public facade while moving
 provider resolution, population state, camera-seed caching, and teardown policy
@@ -134,9 +136,20 @@ now live behind `Extrinsic.Runtime.RenderExtractionService`.
 `AssetModelSceneHandoff`, fallback bootstrap delegation, pending material
 binding re-resolution, and asset-residency teardown ordering now live behind
 `Extrinsic.Runtime.AssetResidencyService`.
+`RUNTIME-165` is retired; persistent `StreamingExecutor` /
+`DerivedJobRegistry` ownership, maintenance drains, shutdown reset, and
+derived-job facade delegation now live behind
+`Extrinsic.Runtime.AsyncWorkService`.
 
 #### Retired decomposition entries
 
+- [RUNTIME-165 — Extract async work service out of Engine](../../done/RUNTIME-165-extract-async-work-service.md)
+  (done, 2026-07-09, `Operational`): persistent `StreamingExecutor` /
+  `DerivedJobRegistry` ownership, maintenance-lane completion/readback drains,
+  count-limited main-thread apply, background pumping, shutdown reset ordering,
+  and derived-job facade delegation now live in
+  `Extrinsic.Runtime.AsyncWorkService`. `Engine` keeps lifecycle/frame ordering,
+  dependent subsystem wiring, and public derived-job compatibility facades.
 - [RUNTIME-164 — Extract asset residency service out of Engine](../../done/RUNTIME-164-extract-asset-residency-service.md)
   (done, 2026-07-09, `Operational`): GPU asset cache ownership, cache
   asset-event listener wiring, model texture/model scene handoff ownership,

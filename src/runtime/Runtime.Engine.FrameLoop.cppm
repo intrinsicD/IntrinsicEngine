@@ -31,16 +31,15 @@ import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.TransferQueue;
+import Extrinsic.Runtime.AsyncWorkService;
 import Extrinsic.Runtime.AssetResidencyService;
 import Extrinsic.Runtime.CameraControllers;
-import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EcsSystemBundle;
 import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Runtime.SelectionController;
-import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.WorldHandle;
 
 namespace Extrinsic::Runtime
@@ -281,44 +280,25 @@ namespace Extrinsic::Runtime
     {
         static constexpr std::uint32_t kApplyBudgetPerFrame = 8u;
 
-        StreamingExecutor& Executor;
-        DerivedJobRegistry* DerivedJobs;
+        AsyncWorkService& AsyncWork;
 
-        explicit StreamingHooks(StreamingExecutor& executor,
-                                DerivedJobRegistry* derivedJobs)
-            : Executor(executor)
-            , DerivedJobs(derivedJobs)
+        explicit StreamingHooks(AsyncWorkService& asyncWork)
+            : AsyncWork(asyncWork)
         {
         }
 
         void DrainCompletions() override
         {
-            if (DerivedJobs != nullptr)
-            {
-                DerivedJobs->DrainCompletions();
-                DerivedJobs->DrainReadbacks();
-                return;
-            }
-            Executor.DrainCompletions();
+            AsyncWork.DrainCompletions();
         }
         void ApplyMainThreadResults() override
         {
-            if (DerivedJobs != nullptr)
-            {
-                (void)DerivedJobs->ApplyMainThreadResults(kApplyBudgetPerFrame);
-                return;
-            }
-            (void)Executor.ApplyMainThreadResults(kApplyBudgetPerFrame);
+            (void)AsyncWork.ApplyMainThreadResults(kApplyBudgetPerFrame);
         }
         void SubmitFrameWork() override {}
         void PumpBackground(std::uint32_t maxLaunches) override
         {
-            if (DerivedJobs != nullptr)
-            {
-                DerivedJobs->Pump(maxLaunches);
-                return;
-            }
-            Executor.PumpBackground(maxLaunches);
+            AsyncWork.PumpBackground(maxLaunches);
         }
     };
 

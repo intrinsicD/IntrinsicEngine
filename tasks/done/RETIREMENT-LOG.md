@@ -9,6 +9,20 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`RUNTIME-165`](RUNTIME-165-extract-async-work-service.md) —
+Extract async work service out of Engine — retired on 2026-07-09 at maturity
+`Operational`. `Extrinsic.Runtime.AsyncWorkService` now owns the live
+`StreamingExecutor` and `DerivedJobRegistry`, constructs the registry over the
+executor, and centralizes completion/readback drains, count-limited main-thread
+apply, background pumping, shutdown draining, reset ordering, and derived-job
+facade delegation. `Runtime.Engine` keeps lifecycle/frame ordering, dependent
+subsystem wiring, and public derived-job compatibility facades while no longer
+importing/storing the raw executor/registry or branching the frame-loop
+maintenance path over both concrete types. Focused runtime async/job/import/
+scene/layering coverage passed 56/56, `IntrinsicTests` built, and the default
+CPU-supported gate passed 3646/3646.
+
+Active
 [`RUNTIME-164`](RUNTIME-164-extract-asset-residency-service.md) —
 Extract asset residency service out of Engine — retired on 2026-07-09 at
 maturity `Operational`. `Extrinsic.Runtime.AssetResidencyService` now owns

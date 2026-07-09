@@ -49,6 +49,7 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Component.VisualizationConfig;
+import Extrinsic.Runtime.AsyncWorkService;
 import Extrinsic.Runtime.AssetGeometryIO;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetMeshNormals;
@@ -56,7 +57,6 @@ import Extrinsic.Runtime.AssetModelTextureIO;
 import Extrinsic.Runtime.AssetResidencyService;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraFocusCommand;
-import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.DeviceBootstrap;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EngineConfigControl;
@@ -77,7 +77,6 @@ import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.ReferenceSceneControl;
-import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.RenderExtractionService;
 import Extrinsic.Runtime.SceneDocument;
 import Extrinsic.Runtime.SelectionReadback;
@@ -518,9 +517,7 @@ namespace Extrinsic::Runtime
         m_FrameGraph = std::make_unique<Core::FrameGraph>();
 
         // ── 4. Streaming executor (asset IO / geometry processing) ────────
-        m_StreamingExecutor = std::make_unique<StreamingExecutor>();
-        m_DerivedJobRegistry =
-            std::make_unique<DerivedJobRegistry>(*m_StreamingExecutor);
+        m_AsyncWorkService.Initialize();
 
         // ── 5. Asset service ──────────────────────────────────────────────
         m_AssetService = std::make_unique<Assets::AssetService>();
@@ -561,7 +558,7 @@ namespace Extrinsic::Runtime
             AssetImportPipelineDependencies{
                 .Initialized = &m_Initialized,
                 .Config = &m_Config,
-                .Streaming = m_StreamingExecutor.get(),
+                .Streaming = m_AsyncWorkService.Streaming(),
                 .AssetService = m_AssetService.get(),
                 .GpuAssetCache = m_AssetResidencyService.CachePtr(),
                 .ModelTextureHandoff =
@@ -581,7 +578,7 @@ namespace Extrinsic::Runtime
             SceneDocumentDependencies{
                 .Initialized = &m_Initialized,
                 .Scene = &m_Scene,
-                .Streaming = m_StreamingExecutor.get(),
+                .Streaming = m_AsyncWorkService.Streaming(),
                 .CommandHistory = &m_EditorCommandHistory,
                 .Renderer = m_Renderer.get(),
                 .RenderExtraction = &m_RenderExtractionService.Cache(),
@@ -652,8 +649,7 @@ namespace Extrinsic::Runtime
             std::unique_ptr<RHI::IDevice>& Device;
             std::unique_ptr<Graphics::IRenderer>& Renderer;
             std::unique_ptr<Core::FrameGraph>& FrameGraph;
-            std::unique_ptr<StreamingExecutor>& StreamingExecutorPtr;
-            std::unique_ptr<DerivedJobRegistry>& DerivedJobRegistryPtr;
+            AsyncWorkService& AsyncWork;
             std::unique_ptr<Assets::AssetService>& AssetService;
             AssetResidencyService& AssetResidency;
             WorldRegistry& Worlds;
@@ -670,8 +666,7 @@ namespace Extrinsic::Runtime
                           std::unique_ptr<RHI::IDevice>& device,
                           std::unique_ptr<Graphics::IRenderer>& renderer,
                           std::unique_ptr<Core::FrameGraph>& frameGraph,
-                          std::unique_ptr<StreamingExecutor>& streamingExecutor,
-                          std::unique_ptr<DerivedJobRegistry>& derivedJobRegistry,
+                          AsyncWorkService& asyncWork,
                           std::unique_ptr<Assets::AssetService>& assetService,
                           AssetResidencyService& assetResidency,
                           WorldRegistry& worlds,
@@ -687,8 +682,7 @@ namespace Extrinsic::Runtime
                 , Device(device)
                 , Renderer(renderer)
                 , FrameGraph(frameGraph)
-                , StreamingExecutorPtr(streamingExecutor)
-                , DerivedJobRegistryPtr(derivedJobRegistry)
+                , AsyncWork(asyncWork)
                 , AssetService(assetService)
                 , AssetResidency(assetResidency)
                 , Worlds(worlds)
@@ -713,8 +707,7 @@ namespace Extrinsic::Runtime
             }
             void ShutdownStreaming() override
             {
-                if (StreamingExecutorPtr)
-                    StreamingExecutorPtr->ShutdownAndDrain();
+                AsyncWork.ShutdownAndDrain();
             }
             void DestroyScene() override
             {
@@ -735,8 +728,7 @@ namespace Extrinsic::Runtime
             }
             void DestroyStreamingState() override
             {
-                DerivedJobRegistryPtr.reset();
-                StreamingExecutorPtr.reset();
+                AsyncWork.Reset();
             }
             void DestroyFrameGraph() override { FrameGraph.reset(); }
             void ShutdownRenderer() override
@@ -774,8 +766,7 @@ namespace Extrinsic::Runtime
                             m_Device,
                             m_Renderer,
                             m_FrameGraph,
-                            m_StreamingExecutor,
-                            m_DerivedJobRegistry,
+                            m_AsyncWorkService,
                             m_AssetService,
                             m_AssetResidencyService,
                             m_WorldRegistry,
@@ -1144,8 +1135,7 @@ namespace Extrinsic::Runtime
 
         // ── Phase 10: Maintenance ─────────────────────────────────────────
         TransferHooks transferHooks(*m_Device);
-        StreamingHooks streamingHooks(*m_StreamingExecutor,
-                                      m_DerivedJobRegistry.get());
+        StreamingHooks streamingHooks(m_AsyncWorkService);
         AssetHooks assetHooks(*m_AssetService,
                               m_AssetResidencyService,
                               *m_Device,
@@ -1486,22 +1476,17 @@ namespace Extrinsic::Runtime
 
     DerivedJobHandle Engine::SubmitDerivedJob(DerivedJobDesc desc)
     {
-        if (!m_DerivedJobRegistry)
-            return {};
-        return m_DerivedJobRegistry->Submit(std::move(desc));
+        return m_AsyncWorkService.SubmitDerivedJob(std::move(desc));
     }
 
     void Engine::CancelDerivedJob(const DerivedJobHandle handle)
     {
-        if (m_DerivedJobRegistry)
-            m_DerivedJobRegistry->Cancel(handle);
+        m_AsyncWorkService.CancelDerivedJob(handle);
     }
 
     DerivedJobQueueSnapshot Engine::GetDerivedJobQueueSnapshot() const
     {
-        if (!m_DerivedJobRegistry)
-            return {};
-        return m_DerivedJobRegistry->SnapshotAll();
+        return m_AsyncWorkService.SnapshotDerivedJobs();
     }
 
     void Engine::SetImGuiEditorCallback(std::function<void()> callback)

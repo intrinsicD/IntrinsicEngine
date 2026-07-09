@@ -8,6 +8,7 @@ option(INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN
 target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
+        Runtime.AsyncWorkService.cppm
         Runtime.AsyncBufferReadback.cppm
         Runtime.AssetResidencyService.cppm
         Runtime.AssetImportPipeline.cppm
@@ -90,6 +91,7 @@ target_sources(${target_name}
         SpatialDebug/Runtime.SpatialDebugClosestFace.cppm
         Visualization/Runtime.VisualizationAdapters.cppm
         PRIVATE
+        Runtime.AsyncWorkService.cpp
         Runtime.AsyncBufferReadback.cpp
         Runtime.AssetResidencyService.cpp
         Runtime.AssetImportPipeline.cpp

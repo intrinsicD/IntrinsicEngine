@@ -2,9 +2,9 @@ session:
   id: "2026-07-09_001"
   date: "2026-07-09"
   started: "2026-07-09T00:46"
-  last_turn: "2026-07-09T07:21"
-  turn_count: 7
-  summary: "Implemented, verified, and committed the ADR-0024 Runtime.Engine decomposition through RUNTIME-164, and landed RUNTIME-129's CPUContracted object-space normal bake GPU-queue participant."
+  last_turn: "2026-07-09T07:46"
+  turn_count: 8
+  summary: "Implemented, verified, and committed the ADR-0024 Runtime.Engine decomposition through RUNTIME-165, and landed RUNTIME-129's CPUContracted object-space normal bake GPU-queue participant."
 
 events_logged:
   - turn: 1
@@ -97,6 +97,18 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Committed the verified RUNTIME-164 asset residency extraction."
+  - turn: 8
+    type: experiment
+    id: "N181"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired RUNTIME-165; async work ownership moved out of Engine and CPU gate passed 3646/3646."
+  - turn: 8
+    type: decision
+    id: "N182"
+    routing: direct
+    provenance: ai-executed
+    summary: "Committed the verified RUNTIME-165 async work extraction."
 
 ai_actions:
   - turn: 1
@@ -221,6 +233,27 @@ ai_actions:
       - "ara/trace/sessions/2026-07-09_001.yaml"
       - "ara/trace/sessions/session_index.yaml"
       - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 8
+    action: "Added Runtime.AsyncWorkService, delegated Engine streaming executor and derived-job registry ownership, maintenance drains, shutdown reset ordering, and public derived-job facades to it, updated Engine-layering tests, refreshed runtime docs/module inventory/task records/session brief, retired RUNTIME-165, reran focused plus full CPU verification, and committed the slice."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.AsyncWorkService.cppm"
+      - "src/runtime/Runtime.AsyncWorkService.cpp"
+      - "src/runtime/Runtime.Engine.cppm"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "src/runtime/Runtime.Engine.FrameLoop.cppm"
+      - "src/runtime/CMakeLists.txt"
+      - "tests/contract/runtime/Test.RuntimeEngineLayering.cpp"
+      - "src/runtime/README.md"
+      - "docs/api/generated/module_inventory.md"
+      - "tasks/done/RUNTIME-165-extract-async-work-service.md"
+      - "tasks/backlog/runtime/README.md"
+      - "tasks/backlog/README.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-07-09_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
 
 claims_touched: []
 
@@ -239,10 +272,12 @@ key_context:
     excerpt: "Goal continuation asked to keep moving toward clean Runtime.Engine files; RUNTIME-164 extracted the asset-residency ownership cluster and retired after focused plus full CPU verification."
   - turn: 7
     excerpt: "User asked to commit the completed changes; the verified RUNTIME-164 extraction was committed locally."
+  - turn: 8
+    excerpt: "User asked to commit the current changes; the verified RUNTIME-165 async-work service extraction was committed locally."
 
 open_threads:
   - "RUNTIME-129 still needs the production Vulkan geometry-buffer/pipeline/dilation plan provider plus opt-in gpu/vulkan smoke before it can retire at Operational."
-  - "Further Runtime.Engine cleanup should start from a fresh hotspot scan and task contract after RUNTIME-164."
+  - "Further Runtime.Engine cleanup should start from a fresh hotspot scan and task contract after RUNTIME-165."
 
 ai_suggestions_pending:
-  - "No specific next Engine cleanup task was opened after RUNTIME-164; run a fresh hotspot scan before selecting the next slice."
+  - "No specific next Engine cleanup task was opened after RUNTIME-165; run a fresh hotspot scan before selecting the next slice."

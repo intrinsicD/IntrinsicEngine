@@ -702,3 +702,8 @@ entries:
       - "Routed the user-requested commit as a direct decision because it changed repository artifact state after the verified RUNTIME-164 extraction."
       - "Did not stage a new claim; the relevant fact is the local commit and the already-recorded verification evidence."
       - "Amended this epilogue into the same commit so the worktree remains clean after satisfying the commit request."
+  - turn: "2026-07-09_001#8"
+    notes:
+      - "Routed RUNTIME-165 as a direct experiment because the turn produced code, tests, docs, task retirement, focused verification, full CPU gate evidence, structural checks, and a local commit."
+      - "Routed the commit as a direct decision because the user explicitly requested committing the current changes."
+      - "Did not stage a new architecture claim; async-work ownership is artifact-backed by the retired task record, module inventory, source-contract test, and passing verification."

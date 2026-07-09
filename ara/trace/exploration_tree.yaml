@@ -4277,3 +4277,59 @@ tree:
       - "git commit -m 'runtime: extract asset residency service'"
       - "git status --short --branch"
     status: resolved
+  - id: N181
+    type: experiment
+    title: "RUNTIME-165 async work service extraction"
+    provenance: ai-executed
+    timestamp: "2026-07-09T07:46"
+    also_depends_on: [N178, N180]
+    evidence:
+      - "src/runtime/Runtime.AsyncWorkService.cppm"
+      - "src/runtime/Runtime.AsyncWorkService.cpp"
+      - "src/runtime/Runtime.Engine.cppm"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "src/runtime/Runtime.Engine.FrameLoop.cppm"
+      - "tests/contract/runtime/Test.RuntimeEngineLayering.cpp"
+      - "tasks/done/RUNTIME-165-extract-async-work-service.md"
+      - "cmake --build --preset ci --target IntrinsicRuntimeContractTests"
+      - "ctest --test-dir build/ci --output-on-failure -R 'RuntimeEngineLayering|RuntimeDerivedJobEngineWiring|RuntimeStreamingExecutor|DerivedJob|StreamingExecutor|RuntimeAssetImportFormatCoverage|RuntimeSceneLifecycle' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+      - "python3 tools/docs/check_docs_sync.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "tools/ci/run_clean_workshop_review.sh . --strict"
+      - "git diff --check"
+      - "git diff --cached --check"
+    result: >
+      Retired RUNTIME-165 at Operational. `Extrinsic.Runtime.AsyncWorkService`
+      now owns the live `StreamingExecutor` and `DerivedJobRegistry`, centralizes
+      completion/readback drains, count-limited main-thread apply, background
+      pumping, shutdown draining, reset ordering, and derived-job facade
+      delegation. `Runtime.Engine` keeps lifecycle/frame ordering and dependent
+      subsystem wiring while no longer importing/storing the raw executor/registry
+      or branching the frame-loop maintenance hook over both concrete types.
+      Focused runtime async/job/import/scene/layering coverage passed 56/56,
+      `IntrinsicTests` built, the default CPU-supported CTest gate passed
+      3646/3646, strict task/docs/layering/test-layout/diff checks passed, and
+      only pre-existing warning-mode root/task-state findings remained.
+    status: resolved
+  - id: N182
+    type: decision
+    title: "Commit RUNTIME-165 async work extraction"
+    provenance: ai-executed
+    timestamp: "2026-07-09T07:46"
+    also_depends_on: [N181]
+    choice: >
+      Committed the verified RUNTIME-165 async-work extraction with message
+      `runtime: extract async work service`.
+    alternatives:
+      - "Leave the verified RUNTIME-165 extraction uncommitted after the user requested a commit."
+      - "Open another runtime cleanup slice before committing the completed task."
+    evidence:
+      - "git commit -m 'runtime: extract async work service'"
+      - "git status --short --branch"
+    status: resolved

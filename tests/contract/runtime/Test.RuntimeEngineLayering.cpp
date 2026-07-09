@@ -103,10 +103,10 @@ TEST(RuntimeEngineLayering, StreamingHookAppliesMainThreadResultsWithFrameBudget
 
     EXPECT_NE(content.find("static constexpr std::uint32_t kApplyBudgetPerFrame = 8u;"),
               std::string::npos);
-    EXPECT_NE(content.find("DerivedJobs->ApplyMainThreadResults(kApplyBudgetPerFrame)"),
+    EXPECT_NE(content.find("AsyncWork.ApplyMainThreadResults(kApplyBudgetPerFrame)"),
               std::string::npos);
-    EXPECT_NE(content.find("Executor.ApplyMainThreadResults(kApplyBudgetPerFrame)"),
-              std::string::npos);
+    EXPECT_EQ(content.find("DerivedJobs->ApplyMainThreadResults"), std::string::npos);
+    EXPECT_EQ(content.find("Executor.ApplyMainThreadResults"), std::string::npos);
     EXPECT_EQ(content.find("Executor.ApplyMainThreadResults();"), std::string::npos);
     EXPECT_EQ(content.find("DerivedJobs->ApplyMainThreadResults();"), std::string::npos);
 }
@@ -583,6 +583,95 @@ TEST(RuntimeEngineLayering, StreamingExecutorApiStaysCpuOnly)
     EXPECT_EQ(publicApi.find("import Extrinsic.RHI"), std::string::npos);
     EXPECT_EQ(publicApi.find("Vk"), std::string::npos);
     EXPECT_EQ(publicApi.find("GpuWorld"), std::string::npos);
+}
+
+TEST(RuntimeEngineLayering, AsyncWorkServiceKeepsStreamingAndDerivedJobOwnershipOutOfEngine)
+{
+    const auto engineInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+    const auto engineImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto frameLoop =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.cppm");
+    const auto serviceInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.AsyncWorkService.cppm");
+    const auto serviceImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.AsyncWorkService.cpp");
+
+    EXPECT_NE(engineInterface.find("import Extrinsic.Runtime.AsyncWorkService"),
+              std::string::npos);
+    EXPECT_NE(engineInterface.find("AsyncWorkService                        m_AsyncWorkService"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AsyncWorkService.Initialize()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AsyncWorkService.Streaming()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AsyncWorkService.ShutdownAndDrain()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AsyncWorkService.Reset()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AsyncWorkService.SubmitDerivedJob("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AsyncWorkService.CancelDerivedJob("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AsyncWorkService.SnapshotDerivedJobs()"),
+              std::string::npos);
+    EXPECT_NE(frameLoop.find("import Extrinsic.Runtime.AsyncWorkService"),
+              std::string::npos);
+    EXPECT_NE(frameLoop.find("AsyncWork.DrainCompletions()"),
+              std::string::npos);
+    EXPECT_NE(frameLoop.find("AsyncWork.PumpBackground(maxLaunches)"),
+              std::string::npos);
+
+    EXPECT_EQ(engineInterface.find("import Extrinsic.Runtime.StreamingExecutor"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("import Extrinsic.Runtime.DerivedJobGraph"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_StreamingExecutor"), std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_DerivedJobRegistry"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("import Extrinsic.Runtime.StreamingExecutor"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("import Extrinsic.Runtime.DerivedJobGraph"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("std::make_unique<StreamingExecutor>"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("std::make_unique<DerivedJobRegistry>"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_DerivedJobRegistry->Submit("),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_DerivedJobRegistry->Cancel("),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_DerivedJobRegistry->SnapshotAll()"),
+              std::string::npos);
+    EXPECT_EQ(frameLoop.find("import Extrinsic.Runtime.StreamingExecutor"),
+              std::string::npos);
+    EXPECT_EQ(frameLoop.find("import Extrinsic.Runtime.DerivedJobGraph"),
+              std::string::npos);
+    EXPECT_EQ(frameLoop.find("StreamingExecutor&"), std::string::npos);
+    EXPECT_EQ(frameLoop.find("DerivedJobRegistry*"), std::string::npos);
+    EXPECT_EQ(frameLoop.find("DerivedJobs->"), std::string::npos);
+    EXPECT_EQ(frameLoop.find("Executor."), std::string::npos);
+
+    EXPECT_NE(serviceInterface.find("export module Extrinsic.Runtime.AsyncWorkService"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("export import Extrinsic.Runtime.DerivedJobGraph"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("export import Extrinsic.Runtime.StreamingExecutor"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("std::unique_ptr<StreamingExecutor> m_StreamingExecutor"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("std::unique_ptr<DerivedJobRegistry> m_DerivedJobRegistry"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("std::make_unique<StreamingExecutor>"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("std::make_unique<DerivedJobRegistry>(*m_StreamingExecutor)"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("m_DerivedJobRegistry->DrainReadbacks()"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("m_DerivedJobRegistry->ApplyMainThreadResults(maxApplyCount)"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("m_StreamingExecutor->ShutdownAndDrain()"),
+              std::string::npos);
 }
 
 TEST(RuntimeEngineLayering, FrameLoopContractDoesNotBecomeCompositionRoot)

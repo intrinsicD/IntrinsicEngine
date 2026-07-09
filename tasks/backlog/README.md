@@ -206,8 +206,9 @@ extraction, `RUNTIME-155` as the runtime input-action registry extraction, and
 as the ImGui editor bridge extraction, and `RUNTIME-160` as the
 JobService GPU-queue bridge extraction, `RUNTIME-161` as the object-space
 normal bake service extraction, `RUNTIME-162` as the gizmo frame service
-extraction, `RUNTIME-163` as the render-extraction service extraction, and
-`RUNTIME-164` as the asset-residency service extraction.
+extraction, `RUNTIME-163` as the render-extraction service extraction,
+`RUNTIME-164` as the asset-residency service extraction, and `RUNTIME-165`
+as the async-work service extraction.
 `RUNTIME-129` still owns the production Vulkan provider work.
 Provider resolution, population state, camera-seed caching, reference-scene
 teardown policy, input-action descriptor/state/dispatch policy, and
@@ -223,7 +224,9 @@ interlock, and transform-gizmo packet production now live outside
 `Runtime.Engine.cpp`; render-extraction cache/pool/stats/frame-index ownership
 now lives behind `Extrinsic.Runtime.RenderExtractionService`, and GPU asset
 cache/model-handoff residency ownership now lives behind
-`Extrinsic.Runtime.AssetResidencyService`.
+`Extrinsic.Runtime.AssetResidencyService`; persistent streaming executor,
+derived-job registry, maintenance drains, and derived-job facade delegation now
+live behind `Extrinsic.Runtime.AsyncWorkService`.
 Sequencing note: tasks whose deliverable ADR-0024 supersedes are
 front-matter gated on their seam dependencies — `RUNTIME-150` on
 `ARCH-007`/`ARCH-008`, `RUNTIME-151` additionally on `ARCH-011`, `ARCH-006`
