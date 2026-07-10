@@ -265,6 +265,42 @@ TEST(RuntimeWorldRegistry, DestroyActiveWorldIsRejected)
     EXPECT_TRUE(worlds.Contains(active));
 }
 
+TEST(RuntimeWorldRegistry, ActivatingDestroyPendingWorldIsRejected)
+{
+    // BUG-075: a world with a pending destroy must not be activatable.
+    Runtime::WorldRegistry worlds;
+    const Runtime::WorldHandle active = worlds.CreateWorld("main");
+    const Runtime::WorldHandle doomed = worlds.CreateWorld("doomed");
+    ASSERT_EQ(worlds.ActiveWorld(), active);
+
+    ASSERT_TRUE(worlds.RequestDestroyWorld(doomed).has_value());
+
+    const Extrinsic::Core::Result result = worlds.RequestSetActiveWorld(doomed);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Extrinsic::Core::ErrorCode::ResourceBusy);
+}
+
+TEST(RuntimeWorldRegistry, PendingActivationDroppedWhenTargetDestroyRequested)
+{
+    // BUG-075: a destroy requested after a set-active was queued must drop the
+    // stale activation at maintenance — the destroy-pending world must never
+    // become active (and thus never active-and-destroy-announced).
+    Runtime::WorldRegistry worlds;
+    Runtime::KernelEventBus events;
+    Runtime::JobService jobs;
+
+    const Runtime::WorldHandle active = worlds.CreateWorld("main");
+    const Runtime::WorldHandle doomed = worlds.CreateWorld("secondary");
+    ASSERT_EQ(worlds.ActiveWorld(), active);
+
+    ASSERT_TRUE(worlds.RequestSetActiveWorld(doomed).has_value());
+    ASSERT_TRUE(worlds.RequestDestroyWorld(doomed).has_value());
+
+    (void)worlds.ApplyMaintenance(events, jobs);
+
+    EXPECT_EQ(worlds.ActiveWorld(), active);
+}
+
 TEST(RuntimeWorldRegistry, EngineBootsFrameZeroWorldAndAppliesSwitchAtMaintenance)
 {
     auto app = std::make_unique<EngineWorldProbeApplication>();

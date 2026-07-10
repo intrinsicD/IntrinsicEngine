@@ -1,10 +1,12 @@
 module;
 
+#include <array>
 #include <cstdint>
 
 module Extrinsic.Runtime.EcsSystemBundle;
 
 import Extrinsic.Core.FrameGraph;
+import Extrinsic.Core.Hash;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.System.BoundsPropagation;
 import Extrinsic.ECS.System.RenderSync;
@@ -31,6 +33,15 @@ namespace Extrinsic::Runtime
         ++stats.Registered;
 
         return stats;
+    }
+
+    std::array<Core::Hash::StringID, 3> PromotedEcsSystemBundleSignalLabels()
+    {
+        return {
+            Core::Hash::StringID{ECS::Systems::TransformHierarchy::PassName},
+            Core::Hash::StringID{ECS::Systems::BoundsPropagation::PassName},
+            Core::Hash::StringID{ECS::Systems::RenderSync::PassName},
+        };
     }
 
     PreRenderTransformFlushStats FlushPreRenderTransformState(

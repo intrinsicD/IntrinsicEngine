@@ -19,8 +19,18 @@ namespace Extrinsic::Runtime
                 .ReadyFrame =
                     [device]() -> std::uint64_t
                     {
+                        // BUG-073: gate readiness FramesInFlight ahead of the
+                        // issue frame, not +1. The bake is recorded into the
+                        // current frame's graphics command buffer and the GPU
+                        // may not finish it until up to FramesInFlight frames
+                        // later. The CPU cannot run more than FramesInFlight
+                        // ahead of the GPU, so currentFrame >= issueFrame +
+                        // FramesInFlight guarantees the bake completed before it
+                        // is bound/sampled. A fixed +1 was a read-before-write
+                        // hazard whenever FramesInFlight > 1.
                         return device != nullptr
-                            ? device->GetGlobalFrameNumber() + 1u
+                            ? device->GetGlobalFrameNumber() +
+                                  device->GetFramesInFlight()
                             : 0u;
                     },
             });

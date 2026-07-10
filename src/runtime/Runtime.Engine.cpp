@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -34,6 +35,7 @@ import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameClock;
 import Extrinsic.Core.FrameGraph;
+import Extrinsic.Core.Hash;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.Core.Logging;
 import Extrinsic.Core.IOBackend;
@@ -270,7 +272,6 @@ namespace Extrinsic::Runtime
             }
         }
 
-        m_RuntimeModuleSchedule.FinalizeForBoot();
     }
 
     void Engine::ResolveRuntimeModulesForBoot()
@@ -324,6 +325,29 @@ namespace Extrinsic::Runtime
             std::terminate();
         }
         m_ServiceRegistry.Lock();
+
+        // BUG-071: finalize the schedule after BOTH the register and resolve
+        // phases. OnResolve can register sim-systems (the resolve EngineSetup
+        // wires the sim-system registrar), so finalizing at the end of the
+        // register phase left resolve-registered systems appended after the
+        // sort — unordered and skipping the duplicate/cycle/unprovided-signal
+        // validation in FinalizeForBoot.
+        //
+        // Seed the promoted baseline ECS bundle's signals as externally
+        // provided so a module may wait on e.g. "TransformUpdate" without boot
+        // failing — the bundle is appended to the fixed-step FrameGraph ahead of
+        // module systems (BUG-069), so the per-tick WaitFor edge resolves.
+        const std::array<Core::Hash::StringID, 3> baselineSignals =
+            PromotedEcsSystemBundleSignalLabels();
+        if (Core::Result finalizeResult =
+                m_RuntimeModuleSchedule.FinalizeForBoot(baselineSignals);
+            !finalizeResult.has_value())
+        {
+            Core::Log::Error(
+                "[RuntimeModule] Sim system schedule finalize failed: {}",
+                Core::Error::ToString(finalizeResult.error()));
+            std::terminate();
+        }
     }
 
     void Engine::RegisterRuntimeModuleSimSystemsForTick(
@@ -411,11 +435,66 @@ namespace Extrinsic::Runtime
         m_SceneDocument->ClearSceneRuntimeState();
         RefreshActiveWorldScenePointer();
         RebuildStableEntityLookupAfterSceneReplacement();
+        // BUG-068: rebind the scene-borrowing asset subsystems to the new active
+        // scene so they do not keep referencing the previous world's registry.
+        BindActiveSceneAssetHandoffs();
     }
 
     void Engine::RebuildStableEntityLookupAfterSceneReplacement()
     {
         m_StableEntityLookupBinding.Rebuild(m_StableEntityLookup, m_Scene);
+    }
+
+    void Engine::BindActiveSceneAssetHandoffs()
+    {
+        // BUG-068: (re)bind the scene-borrowing asset subsystems to the current
+        // active scene (m_Scene). The AssetModelSceneHandoff holds the scene by
+        // reference and the import pipeline captured the scene pointer plus the
+        // handoff pointers, so on an active-world change they must be rebound;
+        // otherwise they retain a reference to the previous world's registry,
+        // which is freed once that world is destroyed → use-after-free in
+        // AssetResidencyService::TickAssets and asset-event listeners. Only a
+        // non-active world can be destroyed (WorldRegistry), so rebinding to the
+        // new active scene on the change keeps every borrower off the doomed
+        // registry. Called at boot and from ApplyWorldRegistryMaintenance.
+        // (SceneDocument tracks &m_Scene and needs no rebind.)
+        if (m_Scene == nullptr)
+        {
+            m_AssetResidencyService.DestroySceneBorrowers();
+            return;
+        }
+
+        m_AssetResidencyService.InitializeSceneHandoffs(
+            *m_AssetService,
+            *m_Scene,
+            *m_Renderer,
+            AssetResidencySceneHandoffOptions{
+                .ObjectSpaceNormalBakeQueue =
+                    &m_ObjectSpaceNormalBakeService.Queue(),
+                .ObjectSpaceNormalBakeGraphicsBackendOperational =
+                    m_Device != nullptr && m_Device->IsOperational(),
+            });
+
+        m_AssetImportPipeline->SetDependencies(
+            AssetImportPipelineDependencies{
+                .Initialized = &m_Initialized,
+                .Config = &m_Config,
+                .Streaming = m_AsyncWorkService.Streaming(),
+                .AssetService = m_AssetService.get(),
+                .GpuAssetCache = m_AssetResidencyService.CachePtr(),
+                .ModelTextureHandoff =
+                    m_AssetResidencyService.ModelTextureHandoff(),
+                .ModelSceneHandoff =
+                    m_AssetResidencyService.ModelSceneHandoff(),
+                .RenderExtraction = &m_RenderExtractionService.Cache(),
+                .Scene = m_Scene,
+                .CameraControllers = &m_CameraControllers,
+                .Selection = &m_SelectionController,
+                .CommandHistory = &m_EditorCommandHistory,
+                .ObjectSpaceNormalBakeQueue =
+                    &m_ObjectSpaceNormalBakeService.Queue(),
+                .Device = m_Device.get(),
+            });
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
@@ -543,37 +622,7 @@ namespace Extrinsic::Runtime
         if (m_Scene != nullptr)
             m_StableEntityLookupBinding.Connect(m_StableEntityLookup, *m_Scene);
 
-        m_AssetResidencyService.InitializeSceneHandoffs(
-            *m_AssetService,
-            *m_Scene,
-            *m_Renderer,
-            AssetResidencySceneHandoffOptions{
-                .ObjectSpaceNormalBakeQueue =
-                    &m_ObjectSpaceNormalBakeService.Queue(),
-                .ObjectSpaceNormalBakeGraphicsBackendOperational =
-                    m_Device != nullptr && m_Device->IsOperational(),
-            });
-
-        m_AssetImportPipeline->SetDependencies(
-            AssetImportPipelineDependencies{
-                .Initialized = &m_Initialized,
-                .Config = &m_Config,
-                .Streaming = m_AsyncWorkService.Streaming(),
-                .AssetService = m_AssetService.get(),
-                .GpuAssetCache = m_AssetResidencyService.CachePtr(),
-                .ModelTextureHandoff =
-                    m_AssetResidencyService.ModelTextureHandoff(),
-                .ModelSceneHandoff =
-                    m_AssetResidencyService.ModelSceneHandoff(),
-                .RenderExtraction = &m_RenderExtractionService.Cache(),
-                .Scene = m_Scene,
-                .CameraControllers = &m_CameraControllers,
-                .Selection = &m_SelectionController,
-                .CommandHistory = &m_EditorCommandHistory,
-                .ObjectSpaceNormalBakeQueue =
-                    &m_ObjectSpaceNormalBakeService.Queue(),
-                .Device = m_Device.get(),
-            });
+        BindActiveSceneAssetHandoffs();
         m_SceneDocument->SetDependencies(
             SceneDocumentDependencies{
                 .Initialized = &m_Initialized,

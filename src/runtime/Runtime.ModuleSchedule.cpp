@@ -4,12 +4,14 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
 
 module Extrinsic.Runtime.ModuleSchedule;
 
+import Extrinsic.Core.Error;
 import Extrinsic.Core.Hash;
 import Extrinsic.Core.Logging;
 
@@ -18,7 +20,7 @@ namespace Extrinsic::Runtime
     namespace
     {
         [[nodiscard]] bool HasLabel(
-            const std::vector<Core::Hash::StringID>& labels,
+            std::span<const Core::Hash::StringID> labels,
             const Core::Hash::StringID needle) noexcept
         {
             return std::find(labels.begin(), labels.end(), needle) != labels.end();
@@ -78,11 +80,29 @@ namespace Extrinsic::Runtime
         });
     }
 
-    void RuntimeModuleSchedule::FinalizeForBoot()
+    Core::Result RuntimeModuleSchedule::FinalizeForBoot(
+        std::span<const Core::Hash::StringID> externalSignals)
     {
         std::sort(m_SimSystems.begin(),
                   m_SimSystems.end(),
                   SimSystemLess);
+
+        // BUG-070: fail closed on duplicate (module, pass) identity. The
+        // per-tick pass name is "Module.Name"; two systems sharing it would both
+        // be appended to the FrameGraph (which does not dedupe pass names) and
+        // silently execute twice. The sort above makes duplicates adjacent.
+        for (std::size_t i = 1; i < m_SimSystems.size(); ++i)
+        {
+            if (m_SimSystems[i].ModuleName == m_SimSystems[i - 1].ModuleName &&
+                m_SimSystems[i].Desc.Name == m_SimSystems[i - 1].Desc.Name)
+            {
+                Core::Log::Error(
+                    "[RuntimeModule] Duplicate sim system identity '{}.{}' rejected.",
+                    m_SimSystems[i].ModuleName,
+                    m_SimSystems[i].Desc.Name);
+                return Core::Err(Core::ErrorCode::InvalidArgument);
+            }
+        }
 
         const std::size_t count = m_SimSystems.size();
         std::vector<std::vector<std::size_t>> edges(count);
@@ -115,12 +135,20 @@ namespace Extrinsic::Runtime
 
                 if (!matched)
                 {
+                    // Satisfied by a producer registered outside this schedule
+                    // (e.g. the baseline ECS bundle's "TransformUpdate"). No
+                    // intra-schedule edge is needed — the external producer is
+                    // ordered ahead per-tick and the per-tick FrameGraph WaitFor
+                    // edge (BUG-072) enforces it.
+                    if (HasLabel(externalSignals, waitLabel))
+                        continue;
+
                     Core::Log::Error(
                         "[RuntimeModule] Sim system '{}.{}' waits for unprovided signal {}.",
                         m_SimSystems[waiter].ModuleName,
                         m_SimSystems[waiter].Desc.Name,
                         waitLabel.Value);
-                    std::terminate();
+                    return Core::Err(Core::ErrorCode::InvalidState);
                 }
             }
         }
@@ -165,7 +193,7 @@ namespace Extrinsic::Runtime
         {
             Core::Log::Error(
                 "[RuntimeModule] Sim system dependency cycle detected during boot.");
-            std::terminate();
+            return Core::Err(Core::ErrorCode::InvalidState);
         }
 
         std::vector<RuntimeModuleSimSystemRecord> sorted;
@@ -177,6 +205,8 @@ namespace Extrinsic::Runtime
         std::sort(m_FrameHooks.begin(),
                   m_FrameHooks.end(),
                   FrameHookLess);
+
+        return Core::Ok();
     }
 
     void RuntimeModuleSchedule::RegisterSimSystemsForTick(
@@ -191,8 +221,22 @@ namespace Extrinsic::Runtime
             context.Graph.AddPass(
                 passName,
                 record.Desc.Options,
-                [setup = record.Desc.Setup](Core::FrameGraphBuilder& builder)
+                [setup = record.Desc.Setup,
+                 signalLabels = record.Desc.SignalLabels,
+                 waitForSignals = record.Desc.WaitForSignals](
+                    Core::FrameGraphBuilder& builder)
                 {
+                    // BUG-072: translate the declarative wait/signal labels into
+                    // real per-tick FrameGraph edges. Without this the labels
+                    // affected only FinalizeForBoot's boot-time insertion order,
+                    // and per-tick ordering silently relied on that insertion
+                    // order surviving execution (which only holds while passes
+                    // are MainThreadOnly / non-parallel). Declaring them here
+                    // means order is expressed once, in signal space.
+                    for (const Core::Hash::StringID label : signalLabels)
+                        builder.Signal(label);
+                    for (const Core::Hash::StringID label : waitForSignals)
+                        builder.WaitFor(label);
                     if (setup)
                         setup(builder);
                 },

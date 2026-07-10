@@ -41,7 +41,7 @@ are retired to `tasks/done/`; `ARCH-014` remains the open umbrella:
   convergence scorecard and the review/ratchet guardrail; stays open
   until the whole ADR-0024 migration is reached.
 
-Retired seam tasks:
+### Retired seam tasks
 
 - [`ARCH-007`](../../done/ARCH-007-kernel-command-bus-single-drain-point.md) —
   kernel command bus with a single pre-sim drain point (plain-data payloads,

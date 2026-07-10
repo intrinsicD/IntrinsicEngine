@@ -74,11 +74,16 @@ The frame order is:
    command-published events become visible before simulation, and events
    published by listeners defer to the next pump per
    [ADR-0024](../adr/0024-kernel-module-architecture.md) D7 (ARCH-008);
-4. fixed-step simulation and CPU `FrameGraph` execution, with module-registered
-   sim systems appended beside the legacy application tick systems;
-   `Runtime.ModuleSchedule` canonicalizes sim systems by stable module/pass
-   identity under explicit named-signal dependencies so the applied order is
-   independent of module registration order (ARCH-011, BUG-066);
+4. fixed-step simulation and CPU `FrameGraph` execution: the promoted baseline
+   ECS system bundle is appended **first**, before module-registered sim
+   systems, so a module system that reads a baseline output (e.g.
+   `Transform::WorldMatrix`) or waits on the baseline `TransformUpdate` signal is
+   ordered after its producer — the core `FrameGraph` preserves insertion order
+   for passes that share a resource, so bundle-last would place such a module
+   before its producer (BUG-069). `Runtime.ModuleSchedule` then canonicalizes sim
+   systems by stable module/pass identity under explicit named-signal
+   dependencies so the applied order among modules is independent of module
+   registration order (ARCH-011, BUG-066);
 5. drain `Engine::Jobs()` completions before pump B; `JobService` checks token
    and world-scope cancellation on the main thread, drops suppressed results
    whole, and publishes completion events only for survivors per

@@ -375,12 +375,20 @@ namespace Extrinsic::Runtime
         while (accumulator >= fixedDt && substeps < maxSubSteps)
         {
             application.OnSimTick(engine, fixedDt);
-            registerModuleSystems(frameGraph, scene, fixedDt);
 
-            // RUNTIME-091: register the promoted baseline ECS systems after
-            // the app and runtime modules have had a chance to add their
-            // own fixed-step passes.
+            // BUG-069 (restores BUG-066): register the promoted baseline ECS
+            // systems FIRST. The core FrameGraph orients every resource hazard
+            // edge from earlier- to later-inserted passes and preserves
+            // insertion order for passes that touch the same resource, so a
+            // module sim-system that reads a baseline output (e.g.
+            // Transform::WorldMatrix) or waits on the baseline "TransformUpdate"
+            // signal must be appended AFTER the bundle. Registering the bundle
+            // last (RUNTIME-091) inserts such a module before its producer,
+            // which reads the previous substep's data or fails to compile with
+            // "no prior signaler" and drops the substep's passes.
             (void)RegisterPromotedEcsSystemBundle(frameGraph, scene);
+
+            registerModuleSystems(frameGraph, scene, fixedDt);
 
             if (frameGraph.PassCount() > 0)
             {
