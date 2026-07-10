@@ -53,7 +53,6 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-074` — Orphaned GpuAssetCache slot causes per-entity bake retry livelock (tasks/backlog/bugs/BUG-074-object-space-normal-bake-orphaned-cache-slot-livelock.md)
 - unblocked: `BUG-075` — A world can be made active while its destroy is pending (tasks/backlog/bugs/BUG-075-worldregistry-activate-while-destroy-pending.md)
 - unblocked: `BUG-076` — AsyncWorkService::ShutdownAndDrain does not drain the derived job registry (tasks/backlog/bugs/BUG-076-asyncworkservice-shutdown-skips-derived-job-registry.md)
-- unblocked: `BUG-077` — Architecture backlog index links retired ARCH tasks (strict gate red) (tasks/backlog/bugs/BUG-077-architecture-backlog-index-links-retired-arch-tasks.md)
 - unblocked: `BUG-079` — CoreTasks abandoned wait continuation leaks coroutine frame (tasks/backlog/bugs/BUG-079-coretasks-abandoned-wait-continuation-leak.md)
 
 ## Theme H — Agentic workflow hardening

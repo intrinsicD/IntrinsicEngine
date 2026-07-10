@@ -52,15 +52,15 @@ regressed hardening that main had shipped as the closed `BUG-066`.
   state. LOW (suspected).
 - [`BUG-076` — AsyncWorkService::ShutdownAndDrain does not drain the derived job registry](BUG-076-asyncworkservice-shutdown-skips-derived-job-registry.md):
   shutdown drains only the executor; registry quiesce is implicit. LOW.
-- [`BUG-077` — Architecture backlog index links retired ARCH tasks (strict gate red)](BUG-077-architecture-backlog-index-links-retired-arch-tasks.md):
-  the merge retired ARCH-007..013 (all seven kernel seam tasks) but left them
-  linked as active → `check_task_state_links --strict` red, 7 findings (was green
-  pre-merge). LOW (mechanical).
-
-
 ---
 
 ## Verified / Closed
+
+- Closed 2026-07-10: [`BUG-077` — Architecture backlog index links retired ARCH tasks](../../done/BUG-077-architecture-backlog-index-links-retired-arch-tasks.md).
+  Commit `09183ea1` promoted the `Retired seam tasks` lead-in to a recognized
+  history heading, so all seven `ARCH-007`..`ARCH-013` links remain available
+  without being classified as active backlog. The strict task-state-link
+  validator passes with zero findings.
 
 - Closed 2026-07-10: [`BUG-078` — CoreTasks CounterEvent rearm can race coroutine destruction](../../done/BUG-078-coretasks-counterevent-rearm-uaf.md).
   Detached task frames now self-destroy at final suspend, and scheduler workers

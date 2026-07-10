@@ -8,6 +8,15 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-077`](BUG-077-architecture-backlog-index-links-retired-arch-tasks.md) —
+architecture backlog state-link regression retired on 2026-07-10. Commit
+`09183ea1` promoted the `Retired seam tasks` lead-in in
+`tasks/backlog/architecture/README.md` to a recognized history heading, keeping
+all seven `ARCH-007`..`ARCH-013` links available without classifying their done
+records as active backlog. Strict task-state links pass with zero findings;
+task policy, documentation links, and generated session-brief freshness also
+pass. No task content or retirement decision changed.
+
 [`CI-004`](CI-004-label-derived-test-build-aggregates.md) — gate-specific test
 build aggregates retired on 2026-07-10 at `Operational`. Canonical test-target
 and label metadata now derives `IntrinsicPrFastTests`, `IntrinsicCpuTests`,
