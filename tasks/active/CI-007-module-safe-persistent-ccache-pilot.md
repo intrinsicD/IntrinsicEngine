@@ -13,8 +13,14 @@ depends_on:
 - Pilot scope: `pr-fast` only; no other gate consumes the persistent store.
 - Current slice: Slice B hermetic module-interface invalidation probe complete
   locally after independent audit.
+- Current Slice C evidence ref: `agent/ci-007-hosted-evidence`.
+- The first hosted dispatch attempt on 2026-07-10 was rejected before creating
+  a run because GitHub Actions does not expose the `runner` context in job-level
+  `env`. The workflow now uses a fixed runner-local `/tmp` path, still outside
+  the checkout and build tree, with regression coverage for that parser-level
+  constraint.
 - Next verification step: collect Slice C hosted cold/warm/interface-change
-  samples after the commits are published, then retain or roll back the pilot.
+  samples, then retain or roll back the pilot.
 
 ## Goal
 - Persist only ccache's content-addressed store across CI runs and prove that it
@@ -100,6 +106,16 @@ depends_on:
 - [x] A `.cppm` interface/layout change invalidates affected importers and
       matches a clean no-cache build/test result.
 - [x] Cache failures are visible and cannot silently substitute stale objects.
+
+Slice C retain/rollback rule, declared before the first successful hosted run:
+retain the `pr-fast` pilot only if every sampled correctness gate and the
+interface-invalidation probe pass, every sample reports zero ccache errors, warm
+samples report non-zero safe hits, the five-sample warm build-time median
+improves against a comparable cold population, and warm p95 does not regress.
+If the historical `CI-003` gate shape is not comparable to the current gate,
+collect a contemporaneous five-sample cold population rather than claiming an
+acceleration. Failure of any safety condition rolls the pilot back; a neutral or
+negative timing result keeps the evidence but removes the cache from `pr-fast`.
 
 ## Verification
 ```bash

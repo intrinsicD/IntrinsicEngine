@@ -64,12 +64,15 @@ class CcacheWorkflowTests(unittest.TestCase):
         job = payload["jobs"]["pr-fast"]
         self.assertEqual(
             job["env"]["CCACHE_DIR"],
-            "${{ runner.temp }}/intrinsic-pr-fast-ccache",
+            "/tmp/intrinsic-pr-fast-ccache",
         )
         self.assertEqual(job["env"]["CCACHE_MAXSIZE"], "2G")
         self.assertEqual(
             job["env"]["CCACHE_CONFIGPATH"],
-            "${{ runner.temp }}/intrinsic-pr-fast-ccache.conf",
+            "/tmp/intrinsic-pr-fast-ccache.conf",
+        )
+        self.assertFalse(
+            any("${{ runner." in str(value) for value in job["env"].values())
         )
 
         text = self._workflow_text()

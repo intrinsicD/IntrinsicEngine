@@ -15,8 +15,8 @@ jobs:
   pr-fast:
     runs-on: ubuntu-24.04
     env:
-      CCACHE_DIR: ${{ runner.temp }}/intrinsic-pr-fast-ccache
-      CCACHE_CONFIGPATH: ${{ runner.temp }}/intrinsic-pr-fast-ccache.conf
+      CCACHE_DIR: /tmp/intrinsic-pr-fast-ccache
+      CCACHE_CONFIGPATH: /tmp/intrinsic-pr-fast-ccache.conf
       CCACHE_MAXSIZE: 2G
       INTRINSIC_CCACHE_MAXSIZE_DISPLAY: 2.0 GB
 

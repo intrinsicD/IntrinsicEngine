@@ -165,9 +165,10 @@ therefore starts a new binary-cache line while older archives remain available
 through restore keys.
 
 The `pr-fast` workflow also pilots a separate ccache store at
-`${{ runner.temp }}/intrinsic-pr-fast-ccache`. That cache is deliberately outside
-the repository and build tree; `build/`, CMake state, Ninja metadata, object
-directories, Clang BMI files, and the ccache config file are not cached. Ccache
+`/tmp/intrinsic-pr-fast-ccache` on its dedicated Ubuntu runner. That cache is
+deliberately outside the repository and build tree; `build/`, CMake state,
+Ninja metadata, object directories, Clang BMI files, and the ccache config file
+are not cached. Ccache
 4.9.1 passes named-module interface compiles through. Cacheable implementation
 and importer units therefore use preprocessor mode with direct and depend modes
 disabled, while `CCACHE_EXTRAFILES` adds a CMake-generated digest of every
