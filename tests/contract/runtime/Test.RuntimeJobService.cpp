@@ -284,6 +284,13 @@ TEST(RuntimeJobService, SubmitRunsOnPoolThreadAndPublishesAtGate)
     EXPECT_NE(workerThread, mainThread);
     EXPECT_TRUE(jobs.IsComplete(token));
     EXPECT_EQ(jobs.Stats().PublishedCompletions, 1u);
+
+    // BUG-067: a drained completion must settle in a terminal state and reap
+    // cleanly. The pre-fix worker stored AwaitingGate after the completion was
+    // already enqueued (and drainable), so a same-window drain's terminal state
+    // could be clobbered back to AwaitingGate, wedging the job forever.
+    EXPECT_EQ(jobs.GetState(token), Runtime::JobState::Published);
+    EXPECT_EQ(jobs.ReapCompleted(), 1u);
 }
 
 TEST(RuntimeJobService, GpuQueueParticipantRecordsDrainsAndUnregisters)
