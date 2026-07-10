@@ -65,6 +65,12 @@ gate over the built-in planar grid, strip, cube, cylinder, octahedron proxy,
 high-valence fan, and disconnected-quad fixtures. Its result diagnostics record
 per-fixture runtime ratios, signed quality regressions, fast-path flipped
 elements, chart-overlap counts, `promotion_pass`, and `adoption_claim`.
+For each fixture it warms one fast/xatlas pair, individually times five pairs
+with alternating fast→xatlas / xatlas→fast order, and gates on the median
+paired runtime ratio. The result retains all raw backend times and paired ratios
+while reporting median backend runtimes; this prevents a minority of scheduler
+stalls from changing the strict 1.0 mean / 1.25 per-fixture decision without
+hiding sustained regressions (`BUG-080`).
 Keeping the constants in the headers is the binding mechanism.
 
 ## Fixture policy

@@ -3,6 +3,7 @@
 #include "Bench.UvAtlasSmoke.hpp"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -25,8 +26,6 @@ namespace Intrinsic::Bench::Geometry {
 namespace {
 constexpr int kSmokeWarmupIterations = 1;
 constexpr int kSmokeMeasuredIterations = 4;
-constexpr int kPromotionWarmupIterations = 1;
-constexpr int kPromotionMeasuredIterations = 3;
 
 constexpr double kRuntimeRatioMeanMax = 1.0;
 constexpr double kRuntimeRatioPerFixtureMax = 1.25;
@@ -54,6 +53,24 @@ struct TickResult {
 struct TimedRun {
   TickResult Last{};
   double MeanRuntimeMilliseconds{0.0};
+};
+
+struct TimedTick {
+  TickResult Result{};
+  double RuntimeMilliseconds{0.0};
+};
+
+struct PairedTimedRun {
+  TickResult FastLast{};
+  TickResult XAtlasLast{};
+  std::array<double, kUvAtlasPromotionMeasuredPairs>
+      FastRuntimeSamplesMilliseconds{};
+  std::array<double, kUvAtlasPromotionMeasuredPairs>
+      XAtlasRuntimeSamplesMilliseconds{};
+  std::array<double, kUvAtlasPromotionMeasuredPairs> RuntimeRatios{};
+  double FastMedianRuntimeMilliseconds{0.0};
+  double XAtlasMedianRuntimeMilliseconds{0.0};
+  double MedianRuntimeRatio{0.0};
 };
 
 [[nodiscard]] IndexedMesh MakeSquareGridFixture(const std::uint32_t columns,
@@ -269,6 +286,75 @@ MakeHighValenceFanFixture(const std::uint32_t slices) {
   return run;
 }
 
+[[nodiscard]] TimedTick TimeTick(const IndexedMesh &mesh,
+                                 const UvAtlasMethod method) {
+  const auto t0 = std::chrono::steady_clock::now();
+  TickResult result = Tick(mesh, method);
+  const auto t1 = std::chrono::steady_clock::now();
+  const auto elapsed =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count();
+  return TimedTick{
+      .Result = std::move(result),
+      .RuntimeMilliseconds = static_cast<double>(elapsed) * 1.0e-6,
+  };
+}
+
+[[nodiscard]] constexpr double MedianOfFive(
+    std::array<double, kUvAtlasPromotionMeasuredPairs> samples) {
+  static_assert(kUvAtlasPromotionMeasuredPairs == 5u);
+  for (std::size_t i = 0; i < samples.size(); ++i) {
+    for (std::size_t j = i + 1u; j < samples.size(); ++j) {
+      if (samples[j] < samples[i]) {
+        const double tmp = samples[i];
+        samples[i] = samples[j];
+        samples[j] = tmp;
+      }
+    }
+  }
+  return samples[samples.size() / 2u];
+}
+
+// BUG-080: the strict threshold must ignore a minority of isolated scheduler
+// stalls but still reject a sustained majority slowdown.
+static_assert(MedianOfFive({0.50, 0.55, 0.60, 20.0, 30.0}) == 0.60);
+static_assert(MedianOfFive({0.50, 0.55, 2.00, 2.50, 3.00}) >
+              kRuntimeRatioPerFixtureMax);
+
+[[nodiscard]] PairedTimedRun
+MeasurePromotionRuntime(const IndexedMesh &mesh) {
+  PairedTimedRun run{};
+  for (std::size_t pairIndex = 0;
+       pairIndex < kUvAtlasPromotionMeasuredPairs;
+       ++pairIndex) {
+    TimedTick fast{};
+    TimedTick xatlas{};
+    if ((pairIndex % 2u) == 0u) {
+      fast = TimeTick(mesh, UvAtlasMethod::FastStaged);
+      xatlas = TimeTick(mesh, UvAtlasMethod::XAtlas);
+    } else {
+      xatlas = TimeTick(mesh, UvAtlasMethod::XAtlas);
+      fast = TimeTick(mesh, UvAtlasMethod::FastStaged);
+    }
+
+    run.FastRuntimeSamplesMilliseconds[pairIndex] = fast.RuntimeMilliseconds;
+    run.XAtlasRuntimeSamplesMilliseconds[pairIndex] =
+        xatlas.RuntimeMilliseconds;
+    run.RuntimeRatios[pairIndex] =
+        xatlas.RuntimeMilliseconds > 0.0
+            ? fast.RuntimeMilliseconds / xatlas.RuntimeMilliseconds
+            : std::numeric_limits<double>::infinity();
+    run.FastLast = std::move(fast.Result);
+    run.XAtlasLast = std::move(xatlas.Result);
+  }
+
+  run.FastMedianRuntimeMilliseconds =
+      MedianOfFive(run.FastRuntimeSamplesMilliseconds);
+  run.XAtlasMedianRuntimeMilliseconds =
+      MedianOfFive(run.XAtlasRuntimeSamplesMilliseconds);
+  run.MedianRuntimeRatio = MedianOfFive(run.RuntimeRatios);
+  return run;
+}
+
 [[nodiscard]] bool IsFiniteNormalizedUv(const glm::vec2 uv) noexcept {
   return std::isfinite(uv.x) && std::isfinite(uv.y) &&
          uv.x >= -kUvBoundsTolerance && uv.y >= -kUvBoundsTolerance &&
@@ -367,55 +453,58 @@ MakeHighValenceFanFixture(const std::uint32_t slices) {
 
 [[nodiscard]] UvAtlasPromotionFixtureMetrics
 RunPromotionFixture(const Fixture &fixture) {
-  for (int i = 0; i < kPromotionWarmupIterations; ++i) {
+  for (std::size_t i = 0; i < kUvAtlasPromotionWarmupPairs; ++i) {
     (void)Tick(fixture.Mesh, UvAtlasMethod::FastStaged);
     (void)Tick(fixture.Mesh, UvAtlasMethod::XAtlas);
   }
 
-  const TimedRun fast = MeanRuntimeMilliseconds(
-      fixture.Mesh, UvAtlasMethod::FastStaged, kPromotionMeasuredIterations);
-  const TimedRun xatlas = MeanRuntimeMilliseconds(
-      fixture.Mesh, UvAtlasMethod::XAtlas, kPromotionMeasuredIterations);
+  const PairedTimedRun timing = MeasurePromotionRuntime(fixture.Mesh);
 
   UvAtlasPromotionFixtureMetrics metrics{};
   metrics.Name = fixture.Name;
   metrics.InputVertexCount = fixture.Mesh.VertexCount();
   metrics.InputFaceCount = fixture.Mesh.FaceCount();
-  metrics.FastRuntimeMilliseconds = fast.MeanRuntimeMilliseconds;
-  metrics.XAtlasRuntimeMilliseconds = xatlas.MeanRuntimeMilliseconds;
-  metrics.FastToXAtlasRuntimeRatio =
-      xatlas.MeanRuntimeMilliseconds > 0.0
-          ? fast.MeanRuntimeMilliseconds / xatlas.MeanRuntimeMilliseconds
-          : std::numeric_limits<double>::infinity();
-  metrics.FastOutputVertexCount = fast.Last.Result.OutputMesh.VertexCount();
-  metrics.XAtlasOutputVertexCount = xatlas.Last.Result.OutputMesh.VertexCount();
-  metrics.FastOutputFaceCount = fast.Last.Result.OutputMesh.FaceCount();
-  metrics.XAtlasOutputFaceCount = xatlas.Last.Result.OutputMesh.FaceCount();
-  metrics.FastChartCount = fast.Last.Diagnostics.ChartCount;
-  metrics.XAtlasChartCount = xatlas.Last.Diagnostics.ChartCount;
+  metrics.FastRuntimeMilliseconds = timing.FastMedianRuntimeMilliseconds;
+  metrics.XAtlasRuntimeMilliseconds = timing.XAtlasMedianRuntimeMilliseconds;
+  metrics.FastToXAtlasRuntimeRatio = timing.MedianRuntimeRatio;
+  metrics.FastRuntimeSamplesMilliseconds =
+      timing.FastRuntimeSamplesMilliseconds;
+  metrics.XAtlasRuntimeSamplesMilliseconds =
+      timing.XAtlasRuntimeSamplesMilliseconds;
+  metrics.PairedRuntimeRatios = timing.RuntimeRatios;
+  metrics.FastOutputVertexCount =
+      timing.FastLast.Result.OutputMesh.VertexCount();
+  metrics.XAtlasOutputVertexCount =
+      timing.XAtlasLast.Result.OutputMesh.VertexCount();
+  metrics.FastOutputFaceCount =
+      timing.FastLast.Result.OutputMesh.FaceCount();
+  metrics.XAtlasOutputFaceCount =
+      timing.XAtlasLast.Result.OutputMesh.FaceCount();
+  metrics.FastChartCount = timing.FastLast.Diagnostics.ChartCount;
+  metrics.XAtlasChartCount = timing.XAtlasLast.Diagnostics.ChartCount;
   metrics.FastFlippedElementCount =
-      fast.Last.Diagnostics.Quality.FlippedElementCount;
+      timing.FastLast.Diagnostics.Quality.FlippedElementCount;
   metrics.XAtlasFlippedElementCount =
-      xatlas.Last.Diagnostics.Quality.FlippedElementCount;
-  metrics.FastChartOverlapCount = CountChartOverlaps(fast.Last.Result);
+      timing.XAtlasLast.Diagnostics.Quality.FlippedElementCount;
+  metrics.FastChartOverlapCount = CountChartOverlaps(timing.FastLast.Result);
   metrics.FastMeanConformalDistortion =
-      fast.Last.Diagnostics.Quality.MeanConformalDistortion;
+      timing.FastLast.Diagnostics.Quality.MeanConformalDistortion;
   metrics.XAtlasMeanConformalDistortion =
-      xatlas.Last.Diagnostics.Quality.MeanConformalDistortion;
-  metrics.FastMaxStretch = fast.Last.Diagnostics.Quality.MaxStretch;
-  metrics.XAtlasMaxStretch = xatlas.Last.Diagnostics.Quality.MaxStretch;
-  metrics.FastPackingUtilization = PackingUtilization(fast.Last.Result);
+      timing.XAtlasLast.Diagnostics.Quality.MeanConformalDistortion;
+  metrics.FastMaxStretch = timing.FastLast.Diagnostics.Quality.MaxStretch;
+  metrics.XAtlasMaxStretch = timing.XAtlasLast.Diagnostics.Quality.MaxStretch;
+  metrics.FastPackingUtilization = PackingUtilization(timing.FastLast.Result);
   metrics.FastSucceeded =
-      fast.Last.Succeeded &&
-      fast.Last.Diagnostics.ActualMethod == UvAtlasMethod::FastStaged;
+      timing.FastLast.Succeeded &&
+      timing.FastLast.Diagnostics.ActualMethod == UvAtlasMethod::FastStaged;
   metrics.XAtlasSucceeded =
-      xatlas.Last.Succeeded &&
-      xatlas.Last.Diagnostics.ActualMethod == UvAtlasMethod::XAtlas;
+      timing.XAtlasLast.Succeeded &&
+      timing.XAtlasLast.Diagnostics.ActualMethod == UvAtlasMethod::XAtlas;
   metrics.FastFiniteNormalized =
-      AllOutputUvsFiniteNormalized(fast.Last.Result) &&
-      IsFiniteNormalizedUv(fast.Last.Diagnostics.NormalizedUvMin) &&
-      IsFiniteNormalizedUv(fast.Last.Diagnostics.NormalizedUvMax);
-  metrics.FastUsedFallback = fast.Last.Diagnostics.UsedFallback;
+      AllOutputUvsFiniteNormalized(timing.FastLast.Result) &&
+      IsFiniteNormalizedUv(timing.FastLast.Diagnostics.NormalizedUvMin) &&
+      IsFiniteNormalizedUv(timing.FastLast.Diagnostics.NormalizedUvMax);
+  metrics.FastUsedFallback = timing.FastLast.Diagnostics.UsedFallback;
 
   metrics.ConformalRegression =
       std::max(0.0, metrics.FastMeanConformalDistortion -

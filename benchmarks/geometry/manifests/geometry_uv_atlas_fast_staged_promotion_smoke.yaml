@@ -20,8 +20,11 @@ params:
   probe_method: fast_staged
   resolution: 256
   padding: 2
-  warmup_iterations: 1
-  measured_iterations: 3
+  warmup_pairs: 1
+  measured_pairs: 5
+  timing_statistic: median_paired_runtime_ratio
+  backend_runtime_statistic: median_individual_runtime_ms
+  measurement_order: alternating_fast_xatlas_xatlas_fast
   adoption_claim: true
   runtime_ratio_mean_max: 1.0
   runtime_ratio_per_fixture_max: 1.25

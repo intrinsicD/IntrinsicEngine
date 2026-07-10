@@ -1,6 +1,7 @@
 // GEOM-057 — UV atlas fast-staged vs xatlas smoke benchmark declaration.
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <string>
 #include <vector>
@@ -17,6 +18,14 @@ inline constexpr const char *kUvAtlasPromotionMethod =
     "geometry.uv_atlas.fast_staged_promotion";
 inline constexpr const char *kUvAtlasPromotionDataset =
     "builtin.uv_atlas_promotion_suite";
+inline constexpr std::size_t kUvAtlasPromotionWarmupPairs = 1u;
+inline constexpr std::size_t kUvAtlasPromotionMeasuredPairs = 5u;
+inline constexpr const char *kUvAtlasPromotionTimingStatistic =
+    "median_paired_runtime_ratio";
+inline constexpr const char *kUvAtlasPromotionBackendRuntimeStatistic =
+    "median_individual_runtime_ms";
+inline constexpr const char *kUvAtlasPromotionMeasurementOrder =
+    "alternating_fast_xatlas_xatlas_fast";
 
 struct UvAtlasSmokeMetrics {
   double RuntimeMilliseconds{0.0};
@@ -42,6 +51,11 @@ struct UvAtlasPromotionFixtureMetrics {
   double FastRuntimeMilliseconds{0.0};
   double XAtlasRuntimeMilliseconds{0.0};
   double FastToXAtlasRuntimeRatio{0.0};
+  std::array<double, kUvAtlasPromotionMeasuredPairs>
+      FastRuntimeSamplesMilliseconds{};
+  std::array<double, kUvAtlasPromotionMeasuredPairs>
+      XAtlasRuntimeSamplesMilliseconds{};
+  std::array<double, kUvAtlasPromotionMeasuredPairs> PairedRuntimeRatios{};
   double ConformalRegression{0.0};
   double StretchRegression{0.0};
   std::size_t FastOutputVertexCount{0};

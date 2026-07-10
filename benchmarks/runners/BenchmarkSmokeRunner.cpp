@@ -31,6 +31,7 @@
 #include "../rendering/Bench.RenderGraphParallelRecordingSmoke.hpp"
 #include "../rendering/Bench.VertexFetchLayoutSmoke.hpp"
 
+#include <array>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -67,6 +68,19 @@ auto EscapeJson(std::string_view input) -> std::string {
     }
   }
   return out;
+}
+
+template <std::size_t N>
+void EmitDoubleSamples(std::ostringstream &out,
+                       const std::array<double, N> &samples) {
+  out << "[";
+  for (std::size_t i = 0; i < samples.size(); ++i) {
+    if (i > 0u) {
+      out << ", ";
+    }
+    out << samples[i];
+  }
+  out << "]";
 }
 
 auto ResolveCommit() -> std::string {
@@ -238,8 +252,16 @@ auto EmitUvAtlasPromotionSmoke(const std::string &commit) -> EmittedBenchmark {
       << "  \"diagnostics\": {\n"
       << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
       << "    \"mode\": \"promotion_smoke\",\n"
-      << "    \"warmup_iterations\": 1,\n"
-      << "    \"measured_iterations\": 3,\n"
+      << "    \"warmup_pairs\": " << kUvAtlasPromotionWarmupPairs
+      << ",\n"
+      << "    \"measured_pairs\": " << kUvAtlasPromotionMeasuredPairs
+      << ",\n"
+      << "    \"timing_statistic\": \""
+      << EscapeJson(kUvAtlasPromotionTimingStatistic) << "\",\n"
+      << "    \"backend_runtime_statistic\": \""
+      << EscapeJson(kUvAtlasPromotionBackendRuntimeStatistic) << "\",\n"
+      << "    \"measurement_order\": \""
+      << EscapeJson(kUvAtlasPromotionMeasurementOrder) << "\",\n"
       << "    \"baseline_method\": \"xatlas\",\n"
       << "    \"probe_method\": \"fast_staged\",\n"
       << "    \"adoption_claim\": "
@@ -290,6 +312,15 @@ auto EmitUvAtlasPromotionSmoke(const std::string &commit) -> EmittedBenchmark {
         << fixture.XAtlasRuntimeMilliseconds << ",\n"
         << "        \"fast_to_xatlas_runtime_ratio\": "
         << fixture.FastToXAtlasRuntimeRatio << ",\n"
+        << "        \"fast_runtime_samples_ms\": ";
+    EmitDoubleSamples(out, fixture.FastRuntimeSamplesMilliseconds);
+    out << ",\n"
+        << "        \"xatlas_runtime_samples_ms\": ";
+    EmitDoubleSamples(out, fixture.XAtlasRuntimeSamplesMilliseconds);
+    out << ",\n"
+        << "        \"paired_runtime_ratio_samples\": ";
+    EmitDoubleSamples(out, fixture.PairedRuntimeRatios);
+    out << ",\n"
         << "        \"conformal_regression\": " << fixture.ConformalRegression
         << ",\n"
         << "        \"stretch_regression\": " << fixture.StretchRegression

@@ -8,6 +8,16 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-080`](BUG-080-uv-atlas-promotion-smoke-timing-flake.md) — UV-atlas
+promotion-smoke timing flake retired on 2026-07-10 at `CPUContracted`. Each
+fixture now warms one pair, individually times five fast-staged/xatlas pairs in
+alternating order, and gates on the median paired runtime ratio. Median backend
+runtimes plus every raw backend and ratio sample remain in the result for
+auditability; benchmark identity, dataset, quality gates, and strict 1.0/1.25
+thresholds are unchanged. Twenty-five loaded-host runs produced 475/475 passing
+result files with a worst robust fixture ratio of 0.604228, and the complete
+3,658-test default CPU gate plus strict benchmark/structural validators pass.
+
 [`BUG-070`](BUG-070-runtime-module-schedule-failclosed-guards-regressed.md) —
 runtime-module fail-closed schedule regression retired on 2026-07-10 at
 `CPUContracted`. Commit `7e77e47f` restored recoverable `InvalidArgument` for

@@ -47,6 +47,13 @@ regressed hardening that main had shipped as the closed `BUG-066`.
 
 ## Verified / Closed
 
+- Closed 2026-07-10: [`BUG-080` — UV-atlas promotion smoke flakes on one-sided scheduler stalls](../../done/BUG-080-uv-atlas-promotion-smoke-timing-flake.md).
+  The promotion gate now times five alternating fast-staged/xatlas pairs per
+  fixture and gates on their median ratio while retaining every raw sample.
+  Twenty-five loaded-host runs, strict result validation, and the complete
+  default CPU gate pass with the stable benchmark ID and 1.0/1.25 thresholds
+  unchanged.
+
 - Closed 2026-07-10: [`BUG-070` — RuntimeModule schedule dropped BUG-066 fail-closed guards](../../done/BUG-070-runtime-module-schedule-failclosed-guards-regressed.md).
   Schedule finalization again returns deterministic errors for duplicate
   identities, cycles, and unprovided signals. Direct contracts pin each error,
