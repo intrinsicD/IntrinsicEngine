@@ -8,6 +8,18 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`CI-004`](CI-004-label-derived-test-build-aggregates.md) — gate-specific test
+build aggregates retired on 2026-07-10 at `Operational`. Canonical test-target
+and label metadata now derives `IntrinsicPrFastTests`, `IntrinsicCpuTests`,
+`IntrinsicGpuVulkanTests`, and `IntrinsicPrSmokeTests`; specialized workflows
+build only the executable closure selected by their CTest filters, while
+`IntrinsicTests` remains the complete default aggregate. Hosted artifacts show
+PR-fast edges down 10.3% but build time 2.6–4.2% above the CI-003 median, so no
+PR-fast speedup is claimed. Three comparable Vulkan build phases show 32.6%
+fewer edges and 30.4–49.8% lower build time; their main `gpu;vulkan` selectors
+passed, while the unrelated isolated frame-pacing capture remains `BUG-064`.
+Implementation commits are `e741293d`, `bc5c7cea`, and `99c579e0`.
+
 [`BUG-078`](BUG-078-coretasks-counterevent-rearm-uaf.md) — Core.Tasks
 `CounterEvent` rearm coroutine lifetime race retired on 2026-07-10 at
 `CPUContracted`. A legal early-resume interleaving let one worker complete and

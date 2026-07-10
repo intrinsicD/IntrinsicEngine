@@ -306,7 +306,8 @@ The CI-latency track is also Theme H because fast, trustworthy agent feedback is
 workflow infrastructure. `CI-003` is retired after capturing the 2026-07-09
 hosted-run measurements and compile hotspots and adding machine-readable
 telemetry, a claim-grade aggregate baseline, and stale-run cancellation.
-`CI-004..008` address test build selection, real touched-scope PR feedback,
+`CI-004` is retired after routing specialized gates through label-derived test
+build aggregates. `CI-005..008` address real touched-scope PR feedback,
 sanitizer duplication, module-safe ccache, and CTest/process oversubscription.
 `CI-009` is deliberately last: heavy-gate lifecycle and larger-runner decisions
 must use post-optimization median/p95 evidence rather than masking avoidable

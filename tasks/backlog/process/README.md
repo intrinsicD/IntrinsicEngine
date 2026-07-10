@@ -15,8 +15,6 @@ map.
 
 ## Tasks
 
-- [CI-004 — Build only the test executables selected by each gate](../../active/CI-004-label-derived-test-build-aggregates.md)
-  (currently active).
 - [CI-005 — Make PR-fast a real touched-scope feedback gate](CI-005-real-touched-scope-pr-fast-gate.md)
 - [CI-006 — Remove duplicate sanitizer work and calibrate test parallelism](CI-006-sanitizer-topology-and-test-parallelism.md)
 - [CI-007 — Pilot persistent module-safe ccache in CI](../../active/CI-007-module-safe-persistent-ccache-pilot.md)
@@ -41,9 +39,10 @@ retirement log.
 ## Convergence
 
 - These tasks anchor **Theme H — Agentic workflow hardening**.
-- CI latency order: retired `CI-003` establishes telemetry/cancellation;
-  `CI-004`, `CI-007`, and source-hotspot tasks may then proceed independently;
-  `CI-005` consumes `CI-004`; `CI-006` consumes the unsanitized fast-preset
+- CI latency order: retired `CI-003` establishes telemetry/cancellation and
+  retired `CI-004` establishes label-derived test build aggregates; `CI-007`
+  and source-hotspot tasks may proceed independently; `CI-005` consumes
+  `CI-004`; `CI-006` consumes the unsanitized fast-preset
   decision from `CI-005`; `CI-008` consumes the aggregate metadata from
   `CI-004`; and `CI-009` evaluates lifecycle/runner changes only after
   `CI-003..008` have removed avoidable software duplication.
@@ -82,6 +81,10 @@ task-specific policy into `docs/agent/prompt/prompt.md`.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [CI-004 — Build only the test executables selected by each gate](../../done/CI-004-label-derived-test-build-aggregates.md)
+  (done 2026-07-10): derived gate-specific aggregates from canonical test-label
+  metadata, routed PR-fast and Vulkan workflows to exact executable closures,
+  and verified hosted edge/time deltas without claiming a PR-fast speedup.
 - [CI-003 — Make CI gate latency observable and cancel stale runs](../../done/CI-003-ci-gate-timing-observability-and-cancellation.md)
   (done 2026-07-09): added the stable per-run timing profile, instrumented and
   cancellation-scoped every compile-heavy workflow, and published the

@@ -7,13 +7,13 @@ depends_on:
 # CI-004 — Build only the test executables selected by each gate
 
 ## Status
-- In progress on branch `copilot/ci-004-test-build-aggregates`.
-- Owner/agent: GitHub Copilot CLI.
-- Current slice: Slices A and B complete; Slice C selector parity and
-  deterministic Ninja-edge evidence are complete.
-- Blocked retirement condition: publish the workflow-bearing branch and record
-  comparable hosted cold-build wall time against the `CI-003` baseline. The
-  current GitHub credential cannot push workflow changes.
+- Completed 2026-07-10 at `Operational` on `main`.
+- Implementation commit references: `e741293d`, `bc5c7cea`, and `99c579e0`;
+  retirement recorded in this local commit.
+- Hosted `pr-fast` and `ci-vulkan` artifacts supply the missing Slice C
+  cold-build/edge evidence. PR-fast compiled fewer edges without a measured
+  wall-time win; Vulkan compiled materially fewer edges and completed its build
+  substantially faster than the CI-003 cold baseline.
 
 ## Goal
 - Derive gate-specific aggregate build targets from the same CTest label
@@ -78,7 +78,7 @@ depends_on:
       `slow`/`flaky-quarantine` targets.
 - [x] Run the PR-fast and GPU/Vulkan selectors after building only their new
       aggregates; no selected test may be absent.
-- [ ] Record cold build duration and Ninja edge count against the `CI-003`
+- [x] Record cold build duration and Ninja edge count against the `CI-003`
       baseline; report the delta without adding a timing threshold from one run.
 
 ## Docs
@@ -87,7 +87,7 @@ depends_on:
 - [x] Update workflow/build documentation that currently prescribes
       `IntrinsicTests` for specialized gates; retain it for the default CPU
       correctness gate.
-- [ ] Regenerate `tasks/SESSION-BRIEF.md` on retirement.
+- [x] Regenerate `tasks/SESSION-BRIEF.md` on retirement.
 
 ## Acceptance criteria
 - [x] `pr-fast` and `ci-vulkan` no longer build the complete
@@ -96,7 +96,7 @@ depends_on:
       built, and no unrelated test executable is pulled in by the aggregate.
 - [x] The default `IntrinsicTests` aggregate and full CPU gate retain complete
       coverage.
-- [ ] Comparable telemetry demonstrates the build-edge and wall-time delta
+- [x] Comparable telemetry demonstrates the build-edge and wall-time delta
       against `ci.gate-latency.github-ubuntu-24.04.v1`.
 
 ## Verification
@@ -195,6 +195,35 @@ incremental tree. Stale-build triage configured a fresh
 passed 100 sequential plus 100 concurrent-process focused runs. Per the
 stale-build policy, this is recorded as a stale module-artifact incident; no
 speculative scheduler source change or bug task is warranted.
+
+Slice C hosted verification recorded on 2026-07-10 from the published
+`origin/main` workflow artifacts:
+
+| Gate | Run / artifact | Build time | Hosted edges | Baseline delta |
+|---|---|---:|---:|---:|
+| `pr-fast` | [29079330857](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29079330857) / `8222675239` | 1,416.611 s | 1,955 | +2.6% time; -10.3% edges |
+| `pr-fast` | [29083843623](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29083843623) / `8224514366` | 1,438.647 s | 1,955 | +4.2% time; -10.3% edges |
+| `ci-vulkan` | [29079330858](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29079330858) / `8222434441` | 973.955 s | 1,475 | -30.4% time; -32.6% edges |
+| `ci-vulkan` | [29082107754](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29082107754) / `8223466674` | 707.794 s | 1,475 | -49.4% time; -32.6% edges |
+| `ci-vulkan` | [29083843657](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29083843657) / `8224168737` | 701.741 s | 1,475 | -49.8% time; -32.6% edges |
+
+The comparison uses the checked-in CI-003 cold-build medians (1,381 s
+`pr-fast`, 1,399 s `ci-vulkan`) and prior complete aggregate closures (2,180
+and 2,188 edges respectively). A third PR-fast build from run `29082108175`
+completed in 1,427.436 s with 1,955 edges, but concurrency cancellation left
+its test phase report missing; it is diagnostic context, not part of the
+complete-result comparison. The two complete PR-fast samples do **not** support
+a speedup claim. Every Vulkan configure/build and main `gpu;vulkan` selector
+passed; only the isolated frame-pacing capture failed, which remains owned by
+`BUG-064` and does not invalidate the CI-003 build-phase comparison policy.
+
+## Completion
+
+- Completed: 2026-07-10. Commit references: `e741293d`, `bc5c7cea`, `99c579e0`;
+  task retirement recorded in this local commit.
+- Maturity: `Operational` in hosted `pr-fast` and `ci-vulkan` workflows.
+- No timing threshold was added from this small sample, and no PR-fast speedup
+  is claimed.
 
 ## Forbidden changes
 - Hand-maintaining a second target list that can drift from test labels.

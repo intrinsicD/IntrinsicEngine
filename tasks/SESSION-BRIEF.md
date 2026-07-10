@@ -8,7 +8,6 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `CI-004` — Build only the test executables selected by each gate (tasks/active/CI-004-label-derived-test-build-aggregates.md)
 - `CI-007` — Pilot persistent module-safe ccache in CI (tasks/active/CI-007-module-safe-persistent-ccache-pilot.md)
 
 ## Theme B — Rendering modernization
@@ -59,10 +58,10 @@ the authoritative open/unblocked view.
 
 ## Theme H — Agentic workflow hardening
 
-- blocked by `CI-004`: `CI-005` — Make PR-fast a real touched-scope feedback gate (tasks/backlog/process/CI-005-real-touched-scope-pr-fast-gate.md)
+- unblocked: `CI-005` — Make PR-fast a real touched-scope feedback gate (tasks/backlog/process/CI-005-real-touched-scope-pr-fast-gate.md)
 - blocked by `CI-005`: `CI-006` — Remove duplicate sanitizer work and calibrate test parallelism (tasks/backlog/process/CI-006-sanitizer-topology-and-test-parallelism.md)
-- blocked by `CI-004`: `CI-008` — Reduce CTest process overhead without oversubscribing workers (tasks/backlog/process/CI-008-grouped-ctest-and-worker-oversubscription.md)
-- blocked by `CI-004`: `CI-009` — Route heavy gates by lifecycle and evaluate runner scaling (tasks/backlog/process/CI-009-heavy-gate-routing-and-runner-evaluation.md)
+- unblocked: `CI-008` — Reduce CTest process overhead without oversubscribing workers (tasks/backlog/process/CI-008-grouped-ctest-and-worker-oversubscription.md)
+- blocked by `CI-005`: `CI-009` — Route heavy gates by lifecycle and evaluate runner scaling (tasks/backlog/process/CI-009-heavy-gate-routing-and-runner-evaluation.md)
 - unblocked: `PROC-010` — Encode P1/P3/P5 research-engine invariants in AGENTS.md + review checklist (tasks/backlog/process/PROC-010-encode-research-engine-invariants-in-contract.md)
 - unblocked: `PROC-018` — Author the import-visibility-contract skill (playbook wave 2) (tasks/backlog/process/PROC-018-import-visibility-contract-skill.md)
 - unblocked: `PROC-019` — Author the geometry-io-format skill (playbook wave 2) (tasks/backlog/process/PROC-019-geometry-io-format-skill.md)
