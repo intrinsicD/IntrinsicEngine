@@ -58,6 +58,7 @@ jobs:
         run: |
           python3 tests/regression/tooling/Test.CiTiming.py
           python3 tests/regression/tooling/Test.CcacheWorkflow.py
+          python3 tests/regression/tooling/Test.CcacheModuleInvalidationProbe.py
 
       - name: Validate test build aggregate policy
         run: |

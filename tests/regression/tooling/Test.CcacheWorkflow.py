@@ -112,6 +112,7 @@ class CcacheWorkflowTests(unittest.TestCase):
         self.assertNotIn("-ci-nosan-", text)
         self.assertIn("'CMakePresets.json'", text)
         self.assertIn("'cmake/**/*.cmake'", text)
+        self.assertIn("'tools/ci/ccache_module_invalidation_probe.py'", text)
         self.assertIn("'vcpkg.json'", text)
         self.assertIn("'vcpkg-configuration.json'", text)
         self.assertIn("'tools/vcpkg/**'", text)
@@ -129,12 +130,27 @@ class CcacheWorkflowTests(unittest.TestCase):
         self.assertIn("cache-matched-key", text)
         self.assertIn("--ccache-stats-json", text)
         self.assertIn("--require-ccache-stats", text)
+        self.assertIn("ccache_module_invalidation_probe.py", text)
+        self.assertIn("--cxx '${{ steps.toolchain.outputs.compiler-path }}'", text)
+        self.assertIn(
+            "--scan-deps '${{ steps.toolchain.outputs.scan-deps-path }}'", text
+        )
+        self.assertIn("ci-ccache-module-invalidation-pr-fast", text)
+        self.assertIn("ccache/module-invalidation-probe.json", text)
         self.assertNotIn("steps.ccache-stats.outputs", text)
         self.assertNotIn(" || 0", text)
 
         self.assertLess(
             text.index("Configure (ci preset)"),
             text.index("Restore compatible ccache store"),
+        )
+        self.assertLess(
+            text.index("Validate ccache pilot mode"),
+            text.index("Run module invalidation ccache probe"),
+        )
+        self.assertLess(
+            text.index("Run module invalidation ccache probe"),
+            text.index("ccache --zero-stats"),
         )
         self.assertLess(
             text.index("ccache --zero-stats"),
@@ -159,6 +175,9 @@ class CcacheWorkflowTests(unittest.TestCase):
         text = CI_DOCS_WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("tests/regression/tooling/Test.CcacheWorkflow.py", text)
         self.assertIn("tests/regression/tooling/Test.CiTiming.py", text)
+        self.assertIn(
+            "tests/regression/tooling/Test.CcacheModuleInvalidationProbe.py", text
+        )
 
     def test_cmake_ccache_launcher_has_explicit_opt_out(self) -> None:
         text = DEPENDENCIES.read_text(encoding="utf-8")

@@ -81,9 +81,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: ccache-v1-${{ runner.os }}-${{ runner.arch }}-pr-fast-${{ steps.toolchain.outputs.compiler-key }}-${{ steps.toolchain.outputs.scan-deps-key }}-${{ steps.toolchain.outputs.ccache-key }}-preset-ci-sanitizer-${{ steps.toolchain.outputs.sanitizer }}-${{ hashFiles('.github/workflows/pr-fast.yml', 'CMakeLists.txt', 'CMakePresets.json', 'cmake/**/*.cmake', 'tools/ci/ccache_ci.py', 'tools/setup/bootstrap_vcpkg.sh', 'tools/vcpkg/**', 'vcpkg.json', 'vcpkg-configuration.json') }}-${{ github.sha }}
+          key: ccache-v1-${{ runner.os }}-${{ runner.arch }}-pr-fast-${{ steps.toolchain.outputs.compiler-key }}-${{ steps.toolchain.outputs.scan-deps-key }}-${{ steps.toolchain.outputs.ccache-key }}-preset-ci-sanitizer-${{ steps.toolchain.outputs.sanitizer }}-${{ hashFiles('.github/workflows/pr-fast.yml', 'CMakeLists.txt', 'CMakePresets.json', 'cmake/**/*.cmake', 'tools/ci/ccache_ci.py', 'tools/ci/ccache_module_invalidation_probe.py', 'tools/setup/bootstrap_vcpkg.sh', 'tools/vcpkg/**', 'vcpkg.json', 'vcpkg-configuration.json') }}-${{ github.sha }}
           restore-keys: |
-            ccache-v1-${{ runner.os }}-${{ runner.arch }}-pr-fast-${{ steps.toolchain.outputs.compiler-key }}-${{ steps.toolchain.outputs.scan-deps-key }}-${{ steps.toolchain.outputs.ccache-key }}-preset-ci-sanitizer-${{ steps.toolchain.outputs.sanitizer }}-${{ hashFiles('.github/workflows/pr-fast.yml', 'CMakeLists.txt', 'CMakePresets.json', 'cmake/**/*.cmake', 'tools/ci/ccache_ci.py', 'tools/setup/bootstrap_vcpkg.sh', 'tools/vcpkg/**', 'vcpkg.json', 'vcpkg-configuration.json') }}-
+            ccache-v1-${{ runner.os }}-${{ runner.arch }}-pr-fast-${{ steps.toolchain.outputs.compiler-key }}-${{ steps.toolchain.outputs.scan-deps-key }}-${{ steps.toolchain.outputs.ccache-key }}-preset-ci-sanitizer-${{ steps.toolchain.outputs.sanitizer }}-${{ hashFiles('.github/workflows/pr-fast.yml', 'CMakeLists.txt', 'CMakePresets.json', 'cmake/**/*.cmake', 'tools/ci/ccache_ci.py', 'tools/ci/ccache_module_invalidation_probe.py', 'tools/setup/bootstrap_vcpkg.sh', 'tools/vcpkg/**', 'vcpkg.json', 'vcpkg-configuration.json') }}-
 
       - name: Validate ccache pilot mode
         run: |
@@ -92,6 +92,14 @@ jobs:
             --repo-root . \
             --expected-cache-dir "$CCACHE_DIR" \
             --expected-max-size "$INTRINSIC_CCACHE_MAXSIZE_DISPLAY"
+
+      - name: Run module invalidation ccache probe
+        run: |
+          python3 tools/ci/ccache_module_invalidation_probe.py \
+            --work-dir "$RUNNER_TEMP/intrinsic-ccache-module-probe" \
+            --cxx '${{ steps.toolchain.outputs.compiler-path }}' \
+            --scan-deps '${{ steps.toolchain.outputs.scan-deps-path }}' \
+            --output build/ci/ci-timing/ccache/module-invalidation-probe.json
 
       - name: Zero ccache stats
         run: ccache --zero-stats
@@ -162,6 +170,14 @@ jobs:
         with:
           name: ci-gate-timing-pr-fast
           path: build/ci/ci-timing/result/result.json
+          if-no-files-found: error
+
+      - name: Upload module invalidation probe result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-ccache-module-invalidation-pr-fast
+          path: build/ci/ci-timing/ccache/module-invalidation-probe.json
           if-no-files-found: error
 
       - name: Install Python validation deps

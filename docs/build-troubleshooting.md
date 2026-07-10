@@ -187,6 +187,14 @@ stale-build triage playbook at
 `tools/agents/skills/intrinsicengine-stale-build-triage/SKILL.md`
 before changing engine source.
 
+The workflow's pre-build module invalidation probe is deliberately isolated
+from that store and config. It uses the configured compiler/scanner pair and a
+fresh temporary cache to prove real hits for unchanged implementation/importer
+sources, misses after changing only the `.cppm`, importer recompilation, and
+cached-versus-clean output parity. The result is uploaded as
+`ci-ccache-module-invalidation-pr-fast`. A failed or missing probe result blocks
+the job and prevents the restored store from being saved.
+
 For a local clean no-ccache comparison build, keep the `ci` preset inputs but
 configure a separate tree with `-DINTRINSIC_ENABLE_CCACHE=OFF`, for example:
 

@@ -11,9 +11,10 @@ depends_on:
   `copilot/ci-007-module-safe-ccache` is stale relative to `origin/main`.
 - Owner/agent: Codex CLI continuing the active task.
 - Pilot scope: `pr-fast` only; no other gate consumes the persistent store.
-- Current slice: corrected Slice A implementation after independent audit.
-- Next verification step: land Slice B's hermetic module-interface invalidation
-  probe, then rerun cached/clean correctness parity before hosted samples.
+- Current slice: Slice B hermetic module-interface invalidation probe complete
+  locally after independent audit.
+- Next verification step: collect Slice C hosted cold/warm/interface-change
+  samples after the commits are published, then retain or roll back the pilot.
 
 ## Goal
 - Persist only ccache's content-addressed store across CI runs and prove that it
@@ -59,7 +60,7 @@ depends_on:
 - [ ] Validate three scenarios: empty-cache full build, restored-cache
       unchanged full build, and restored-cache build after a representative
       exported `.cppm` layout/API change.
-- [ ] Add a stale-artifact probe that compares the cached result with a clean
+- [x] Add a stale-artifact probe that compares the cached result with a clean
       no-ccache build/test result for the interface-change scenario.
 - [ ] Expand beyond the pilot only after full-gate correctness parity and a
       five-sample median/p95 comparison; document rollback/clear instructions.
@@ -80,9 +81,9 @@ depends_on:
 ## Tests
 - [x] Add workflow/config regression coverage for key dimensions, cache path,
       size cap, depend mode, and direct-mode disablement.
-- [ ] Run the default CPU gate from both cached and clean builds after the
+- [x] Run the default CPU gate from both cached and clean builds after the
       module-interface probe.
-- [ ] Run the repository stale-build regression/probe that exercises imported
+- [x] Run the repository stale-build regression/probe that exercises imported
       class layout or virtual surface changes.
 - [ ] Record cache hit/miss and wall-time distributions against `CI-003`.
 
@@ -96,7 +97,7 @@ depends_on:
 - [x] CI persists only the ccache store, never build/BMI state.
 - [ ] Warm runs show non-zero safe hits and a baseline-comparable build-time
       delta.
-- [ ] A `.cppm` interface/layout change invalidates affected importers and
+- [x] A `.cppm` interface/layout change invalidates affected importers and
       matches a clean no-cache build/test result.
 - [x] Cache failures are visible and cannot silently substitute stale objects.
 
@@ -259,6 +260,53 @@ format/lint checks also passed. This validates Slice A's immutable cache-key,
 configured toolchain identity, fail-closed statistics, and coarse module
 interface digest. The hermetic interface-invalidation probe remains Slice B;
 hosted warm-run hit/wall-time distributions remain Slice C.
+
+Corrected Slice B verification run on 2026-07-10:
+
+```bash
+python3 tools/ci/ccache_module_invalidation_probe.py \
+  --work-dir /tmp/intrinsic-ci007-b/work \
+  --cxx /bin/clang++-23 \
+  --scan-deps /bin/clang-scan-deps-23 \
+  --output /tmp/intrinsic-ci007-b/result.json
+python3 tests/regression/tooling/Test.CcacheModuleInvalidationProbe.py -v
+python3 tests/regression/tooling/Test.CcacheWorkflow.py -v
+python3 tests/regression/tooling/Test.CiTiming.py -v
+python3 tests/regression/tooling/Test.WorkflowConcurrency.py -v
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j$(nproc)
+cmake --build build/ci-no-ccache --target IntrinsicTests
+ctest --test-dir build/ci-no-ccache --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j$(nproc)
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/repo/check_pr_contract.py
+python3 tools/agents/generate_session_brief.py --check
+```
+
+The isolated Clang 23/ccache 4.9.1 probe passed four scenarios. The cold v1
+build recorded 0 hits/2 misses and output `11`; the unchanged v1 rebuild kept
+the implementation and importer byte-for-byte and mtime-stable, recorded 2
+preprocessed hits/0 misses, and output `11`; changing only `Probe.cppm` to the
+v2 layout dirtied and recompiled the importer, recorded 0 hits/2 misses, and
+output `29`. The clean no-ccache v2 build also output `29`. Every cached
+scenario reported zero ccache errors, and `.cppm` compilation was explicitly
+classified as compiler pass-through.
+
+The final serial default gates passed on an otherwise idle host: cached
+`build/ci` passed 3,655/3,655 in 63.69 s and `build/ci-no-ccache` passed
+3,655/3,655 in 63.10 s. Earlier concurrent attempts were discarded because a
+simultaneous clean rebuild and then an unrelated CUDA extension build starved
+the benchmark smoke past its 60-second timeout; the focused cached benchmark
+subgate subsequently passed 2/2 in 11.39 s. Focused tooling and structural
+regressions passed: `Test.CcacheModuleInvalidationProbe.py` 4/4,
+`Test.CcacheWorkflow.py` 15/15, `Test.CiTiming.py` 12/12, and
+`Test.WorkflowConcurrency.py` 4/4. Strict task policy and test layout,
+documentation links and synchronization, the PR contract, session-brief
+freshness, workflow YAML parsing, Python syntax compilation, and Ruff
+format/lint checks also passed. Hosted full-gate warm/cache-hit distributions
+and the five-sample comparison remain Slice C evidence.
 
 ## Forbidden changes
 - Caching any configured build directory, BMI, `.o`, or Ninja state directly.

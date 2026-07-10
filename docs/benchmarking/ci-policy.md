@@ -49,6 +49,15 @@ and hash a deterministic digest of every repository module interface through
 `CCACHE_EXTRAFILES`. No warm-compile population existed in the CI-003 baseline,
 and the baseline records that absence rather than combining cache states.
 
+Before the measured build, `pr-fast` runs a hermetic named-module invalidation
+probe with the compiler and `clang-scan-deps` selected by the configured `ci`
+preset. The probe uses its own ccache config and content store, keeps the module
+implementation and importer byte-for-byte and mtime-stable, and requires an
+empty-cache miss, unchanged-source hits, misses after an interface-only layout
+change, Ninja importer invalidation, and output parity with a clean no-ccache
+build. Its JSON is uploaded as `ci-ccache-module-invalidation-pr-fast`; probe
+time and probe-cache statistics are not included in the measured gate result.
+
 Every population uses the same five pull-request commits. The retained run/job
 IDs were checked against all 30 jobs and 25 workflow runs through the
 authenticated GitHub API; workflow identity, SHA, event, conclusion, runner
