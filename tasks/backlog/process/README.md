@@ -19,7 +19,8 @@ map.
   (currently active).
 - [CI-005 — Make PR-fast a real touched-scope feedback gate](CI-005-real-touched-scope-pr-fast-gate.md)
 - [CI-006 — Remove duplicate sanitizer work and calibrate test parallelism](CI-006-sanitizer-topology-and-test-parallelism.md)
-- [CI-007 — Pilot persistent module-safe ccache in CI](CI-007-module-safe-persistent-ccache-pilot.md)
+- [CI-007 — Pilot persistent module-safe ccache in CI](../../active/CI-007-module-safe-persistent-ccache-pilot.md)
+  (currently active).
 - [CI-008 — Reduce CTest process overhead without oversubscribing workers](CI-008-grouped-ctest-and-worker-oversubscription.md)
 - [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](CI-009-heavy-gate-routing-and-runner-evaluation.md)
 - [PROC-010 — Encode P1/P3/P5 research-engine invariants in AGENTS.md + review checklist](PROC-010-encode-research-engine-invariants-in-contract.md)

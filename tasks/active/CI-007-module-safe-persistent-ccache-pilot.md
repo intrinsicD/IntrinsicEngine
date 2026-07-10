@@ -6,6 +6,14 @@ depends_on:
 ---
 # CI-007 — Pilot persistent module-safe ccache in CI
 
+## Status
+- In progress on branch `copilot/ci-007-module-safe-ccache`.
+- Owner/agent: GitHub Copilot CLI.
+- Pilot scope: `pr-fast` only; no other gate consumes the persistent store.
+- Current slice: Slice A, fail-closed cache guard, persistence, and telemetry.
+- Next verification step: run the hermetic workflow/config regression and the
+  module-interface invalidation probe before exercising the default CPU gate.
+
 ## Goal
 - Persist only ccache's content-addressed store across CI runs and prove that it
   accelerates repeated C++23 module builds without reintroducing stale BMI/
@@ -51,6 +59,17 @@ depends_on:
       no-ccache build/test result for the interface-change scenario.
 - [ ] Expand beyond the pilot only after full-gate correctness parity and a
       five-sample median/p95 comparison; document rollback/clear instructions.
+
+## Slice plan
+- **Slice A.** Add the `pr-fast`-only pinned ccache setup, safe cache key,
+  external bounded store, configured-launcher guard, machine-readable
+  statistics, and workflow/config regressions. No speedup claim.
+- **Slice B.** Add a hermetic Clang module-interface invalidation probe,
+  document safety/rollback policy, and verify cached versus clean output parity.
+- **Slice C.** Publish the workflow, collect empty/restored/interface-change
+  full-gate evidence plus five comparable samples, then either retire the task
+  or roll back the pilot. Expansion to other gates is explicitly deferred until
+  this slice.
 
 ## Tests
 - [ ] Add workflow/config regression coverage for key dimensions, cache path,

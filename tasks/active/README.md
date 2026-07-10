@@ -15,6 +15,9 @@ Each active task should include:
   gate-specific build aggregates from the same target/label metadata that
   drives CTest selection, then route PR-fast and Vulkan away from the complete
   test aggregate.
+- [`CI-007`](CI-007-module-safe-persistent-ccache-pilot.md) — pilot a bounded
+  external ccache store in `pr-fast`, with module-safe hashing, fail-closed
+  telemetry, and cached-versus-clean interface-change parity.
 
 ## History
 
