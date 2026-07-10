@@ -36,9 +36,6 @@ regressed hardening that main had shipped as the closed `BUG-066`.
   signal now `std::terminate()` instead of a recoverable error; tests deleted. MEDIUM.
 - [`BUG-071` — Sim-systems registered during OnResolve bypass FinalizeForBoot](BUG-071-onresolve-sim-systems-bypass-finalizeforboot.md):
   late-registered systems escape ordering and signal/cycle/duplicate validation. MEDIUM.
-- [`BUG-072` — Declarative sim-system signal fields create no per-tick FrameGraph edge](BUG-072-declarative-sim-signal-fields-no-per-tick-edge.md):
-  `WaitForSignals`/`SignalLabels` affect only boot-time insertion order; the
-  durable fix for `BUG-069`. MEDIUM.
 - [`BUG-073` — Object-space normal bake may be sampled before its GPU write completes](BUG-073-object-space-normal-bake-read-before-gpu-write.md):
   `ReadyFrame` gates on a bare CPU frame counter with no fence; read-before-write
   when frames-in-flight > 1. MEDIUM (suspected).
@@ -53,12 +50,18 @@ regressed hardening that main had shipped as the closed `BUG-066`.
 
 ## Verified / Closed
 
+- Closed 2026-07-10: [`BUG-072` — Declarative sim-system signal fields create no per-tick FrameGraph edge](../../done/BUG-072-declarative-sim-signal-fields-no-per-tick-edge.md).
+  `WaitForSignals` and `SignalLabels` now materialize as named edges in every
+  fixed-step `FrameGraph`. A direct schedule regression registers the consumer
+  first, enables parallel execution on both systems, and proves the compiled
+  graph and execution still order producer before consumer.
+
 - Closed 2026-07-10: [`BUG-069` — RuntimeModule sim-systems scheduled before the baseline ECS bundle](../../done/BUG-069-runtime-module-systems-scheduled-before-ecs-bundle.md).
   Runtime now registers the promoted ECS bundle before module sim systems,
   accepts its external signal labels at boot, and materializes declarative
   waits per tick. A real-engine regression proves a module waiting on
   `TransformUpdate` observes the current substep's `WorldMatrix`. `BUG-072`
-  owns the remaining durable signal-unification audit.
+  subsequently closed the durable signal-unification and parallel-pass audit.
 
 - Closed 2026-07-10: [`BUG-077` — Architecture backlog index links retired ARCH tasks](../../done/BUG-077-architecture-backlog-index-links-retired-arch-tasks.md).
   Commit `09183ea1` promoted the `Retired seam tasks` lead-in to a recognized

@@ -21,6 +21,7 @@ import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Scene.Bootstrap;
 import Extrinsic.ECS.Scene.Handle;
+import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.JobService;
@@ -678,6 +679,79 @@ TEST(RuntimeModuleSchedule, SignalOrderedScheduleFinalizesOk)
         Runtime::SimSystemDesc{.Name = "consumer", .WaitForSignals = {ready}});
 
     EXPECT_TRUE(schedule.FinalizeForBoot({}).has_value());
+}
+
+TEST(RuntimeModuleSchedule, DeclarativeSignalsCreatePerTickEdgeForParallelSystems)
+{
+    const Core::Hash::StringID ready{
+        "RuntimeModuleSchedule.ParallelReady"};
+    const Core::FrameGraphPassOptions parallelOptions{
+        .MainThreadOnly = false,
+        .AllowParallel = true,
+        .DebugCategory = "RuntimeModuleTest",
+    };
+
+    bool producerRan = false;
+    bool consumerObservedProducer = false;
+    Runtime::RuntimeModuleSchedule schedule;
+
+    // Register the consumer first so neither registration nor module-name order
+    // can accidentally satisfy the dependency. The declarative label must
+    // create the per-tick FrameGraph edge even though both passes may run on
+    // workers in parallel.
+    schedule.RegisterSimSystem(
+        "A.Module",
+        Runtime::SimSystemDesc{
+            .Name = "Consume",
+            .Options = parallelOptions,
+            .WaitForSignals = {ready},
+            .Execute = [&](Runtime::SimSystemContext&)
+            {
+                consumerObservedProducer = producerRan;
+            },
+        });
+    schedule.RegisterSimSystem(
+        "Z.Module",
+        Runtime::SimSystemDesc{
+            .Name = "Produce",
+            .Options = parallelOptions,
+            .SignalLabels = {ready},
+            .Execute = [&](Runtime::SimSystemContext&) { producerRan = true; },
+        });
+    ASSERT_TRUE(schedule.FinalizeForBoot({}).has_value());
+
+    Core::FrameGraph graph;
+    Extrinsic::ECS::Scene::Registry activeWorld;
+    Runtime::CommandBus commands;
+    Runtime::KernelEventBus events;
+    Runtime::JobService jobs;
+    Runtime::WorldRegistry worlds;
+    Runtime::ServiceRegistry services;
+    schedule.RegisterSimSystemsForTick(
+        Runtime::RuntimeModuleSimSystemScheduleContext{
+            .Graph = graph,
+            .ActiveWorld = activeWorld,
+            .ActiveWorldHandle = Runtime::DefaultWorldHandle,
+            .Commands = commands,
+            .Events = events,
+            .Jobs = jobs,
+            .Worlds = worlds,
+            .Services = services,
+            .FrameIndex = 7,
+            .FixedDeltaSeconds = 1.0 / 60.0,
+        });
+
+    ASSERT_TRUE(graph.Compile().has_value());
+    ASSERT_EQ(graph.PassCount(), 2u);
+    const auto& layers = graph.GetExecutionLayers();
+    ASSERT_EQ(layers.size(), 2u);
+    ASSERT_EQ(layers[0].size(), 1u);
+    ASSERT_EQ(layers[1].size(), 1u);
+    EXPECT_EQ(graph.PassName(layers[0][0]), "Z.Module.Produce");
+    EXPECT_EQ(graph.PassName(layers[1][0]), "A.Module.Consume");
+
+    ASSERT_TRUE(graph.Execute().has_value());
+    EXPECT_TRUE(consumerObservedProducer);
 }
 
 TEST(RuntimeModuleSchedule, WaitOnExternalBaselineSignalIsSatisfied)

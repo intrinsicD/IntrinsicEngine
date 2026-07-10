@@ -8,6 +8,16 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-072`](BUG-072-declarative-sim-signal-fields-no-per-tick-edge.md) —
+declarative runtime-module signal regression retired on 2026-07-10 at
+`CPUContracted`. Commit `f45371c6` translates every `WaitForSignals` and
+`SignalLabels` entry into real named edges in each fixed-step `FrameGraph`, and
+the baseline bundle exposes `TransformUpdate` through the same contract. The
+closure regression registers a consumer before its producer, marks both passes
+parallel-capable, declares no manual builder edges, and proves the compiled
+layers and execution remain producer-before-consumer. Focused runtime-module,
+default CPU, and strict structural gates pass; no host or GPU follow-up is owed.
+
 [`PROC-021`](PROC-021-docs-sync-strict-mode-wiring.md) — structural CI
 enforcement wiring retired on 2026-07-10 at `Operational`. `ci-docs` now fetches
 full history, compares documentation rules against the pull request base SHA,

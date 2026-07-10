@@ -47,7 +47,6 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-068` — AssetModelSceneHandoff not rebound on active-world change (UAF) (tasks/backlog/bugs/BUG-068-asset-scene-handoff-not-rebound-on-active-world-change.md)
 - unblocked: `BUG-070` — RuntimeModule schedule dropped BUG-066 fail-closed guards (tasks/backlog/bugs/BUG-070-runtime-module-schedule-failclosed-guards-regressed.md)
 - unblocked: `BUG-071` — Sim-systems registered during OnResolve bypass FinalizeForBoot (tasks/backlog/bugs/BUG-071-onresolve-sim-systems-bypass-finalizeforboot.md)
-- unblocked: `BUG-072` — Declarative sim-system signal fields create no per-tick FrameGraph edge (tasks/backlog/bugs/BUG-072-declarative-sim-signal-fields-no-per-tick-edge.md)
 - unblocked: `BUG-073` — Object-space normal bake may be sampled before its GPU write completes (tasks/backlog/bugs/BUG-073-object-space-normal-bake-read-before-gpu-write.md)
 - unblocked: `BUG-074` — Orphaned GpuAssetCache slot causes per-entity bake retry livelock (tasks/backlog/bugs/BUG-074-object-space-normal-bake-orphaned-cache-slot-livelock.md)
 - unblocked: `BUG-075` — A world can be made active while its destroy is pending (tasks/backlog/bugs/BUG-075-worldregistry-activate-while-destroy-pending.md)
