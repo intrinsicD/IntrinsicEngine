@@ -861,7 +861,7 @@ TEST(RuntimeEngineLayering, RuntimeModuleScheduleKeepsContributionPolicyOutOfEng
               std::string::npos);
     EXPECT_NE(engineImpl.find("m_RuntimeModuleSchedule.Clear()"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("m_RuntimeModuleSchedule.FinalizeForBoot()"),
+    EXPECT_NE(engineImpl.find("m_RuntimeModuleSchedule.FinalizeForBoot("),
               std::string::npos);
     EXPECT_NE(engineImpl.find("m_RuntimeModuleSchedule.RegisterSimSystemsForTick("),
               std::string::npos);
