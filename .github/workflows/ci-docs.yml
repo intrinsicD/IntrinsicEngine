@@ -10,6 +10,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -24,6 +27,21 @@ jobs:
 
       - name: Validate task policy (strict mode)
         run: python3 tools/agents/check_task_policy.py --root . --strict
+
+      - name: Validate task state links (strict mode)
+        run: python3 tools/agents/check_task_state_links.py --root . --strict
+
+      - name: Validate documentation synchronization (strict mode)
+        run: |
+          base_ref=origin/main
+          if [ -n '${{ github.event.pull_request.base.sha }}' ]; then
+            base_ref='${{ github.event.pull_request.base.sha }}'
+          fi
+          python3 tools/docs/check_docs_sync.py \
+            --root . \
+            --diff-mode \
+            --base-ref "$base_ref" \
+            --strict
 
       - name: Validate agent skill mirrors
         run: python3 tools/agents/sync_skills.py --check
@@ -53,6 +71,9 @@ jobs:
 
       - name: Validate compile-heavy workflow timing policy
         run: python3 tests/regression/tooling/Test.WorkflowConcurrency.py
+
+      - name: Validate structural CI policy regressions
+        run: python3 tests/regression/tooling/Test.CheckTaskStateLinks.py
 
       - name: Validate CI timing and ccache pilot policy
         run: |

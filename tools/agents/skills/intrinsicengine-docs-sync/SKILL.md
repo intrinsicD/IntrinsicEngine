@@ -60,11 +60,19 @@ python3 tools/docs/check_docs_sync.py \
     --base-ref origin/main
 ```
 
-Strict mode (used by CI in later migration phases):
+Strict changed-file mode (enforced by `ci-docs.yml` with fetched base history):
 
 ```bash
-python3 tools/docs/check_docs_sync.py --root . --strict
+python3 tools/docs/check_docs_sync.py \
+    --root . \
+    --diff-mode \
+    --base-ref origin/main \
+    --strict
 ```
+
+`ci-docs.yml` also runs
+`python3 tools/agents/check_task_state_links.py --root . --strict` so lifecycle
+claims and links stay synchronized with task locations.
 
 Link integrity check:
 

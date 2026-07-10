@@ -8,6 +8,17 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`PROC-021`](PROC-021-docs-sync-strict-mode-wiring.md) — structural CI
+enforcement wiring retired on 2026-07-10 at `Operational`. `ci-docs` now fetches
+full history, compares documentation rules against the pull request base SHA,
+and fails strictly on missing synchronized docs; it also runs the
+task-state-link checker strictly. A static workflow regression pins both
+commands, their strict/diff arguments, base-history checkout, and its own CI
+invocation. The canonical docs-sync policy, generated reference mirror, and
+skill routing summary now describe current enforcement. Both strict validators,
+the complete local docs-validation equivalent, skill sync, task policy, docs
+links, test layout, and session-brief freshness pass.
+
 [`BUG-069`](BUG-069-runtime-module-systems-scheduled-before-ecs-bundle.md) —
 runtime-module baseline ECS ordering regression retired on 2026-07-10 at
 `CPUContracted`. Runtime registers the promoted ECS bundle before module sim

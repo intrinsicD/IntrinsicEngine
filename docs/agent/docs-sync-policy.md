@@ -27,6 +27,12 @@ Documentation updates are required in the same PR when code/structure/policy cha
 
 ## Automation
 
-- Run `python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main` for warning-mode docs-sync validation against changed files.
-- Use `--strict` when enabling CI enforcement in later migration phases.
+- Run `python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main`
+  for a local warning-mode docs-sync preview against changed files.
+- `ci-docs.yml` fetches full history and runs the same changed-file comparison
+  with `--strict`; a missing required documentation update is a merge blocker.
+- `ci-docs.yml` also runs
+  `python3 tools/agents/check_task_state_links.py --root . --strict`, enforcing
+  that task links and nearby lifecycle claims match the task's actual
+  `backlog`/`active`/`done` location.
 - Rule mappings live in `tools/docs/docs_sync_rules.yaml`.
