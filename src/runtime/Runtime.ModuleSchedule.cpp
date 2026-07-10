@@ -10,6 +10,7 @@ module;
 
 module Extrinsic.Runtime.ModuleSchedule;
 
+import Extrinsic.Core.Error;
 import Extrinsic.Core.Hash;
 import Extrinsic.Core.Logging;
 
@@ -78,11 +79,28 @@ namespace Extrinsic::Runtime
         });
     }
 
-    void RuntimeModuleSchedule::FinalizeForBoot()
+    Core::Result RuntimeModuleSchedule::FinalizeForBoot()
     {
         std::sort(m_SimSystems.begin(),
                   m_SimSystems.end(),
                   SimSystemLess);
+
+        // BUG-070: fail closed on duplicate (module, pass) identity. The
+        // per-tick pass name is "Module.Name"; two systems sharing it would both
+        // be appended to the FrameGraph (which does not dedupe pass names) and
+        // silently execute twice. The sort above makes duplicates adjacent.
+        for (std::size_t i = 1; i < m_SimSystems.size(); ++i)
+        {
+            if (m_SimSystems[i].ModuleName == m_SimSystems[i - 1].ModuleName &&
+                m_SimSystems[i].Desc.Name == m_SimSystems[i - 1].Desc.Name)
+            {
+                Core::Log::Error(
+                    "[RuntimeModule] Duplicate sim system identity '{}.{}' rejected.",
+                    m_SimSystems[i].ModuleName,
+                    m_SimSystems[i].Desc.Name);
+                return Core::Err(Core::ErrorCode::InvalidArgument);
+            }
+        }
 
         const std::size_t count = m_SimSystems.size();
         std::vector<std::vector<std::size_t>> edges(count);
@@ -120,7 +138,7 @@ namespace Extrinsic::Runtime
                         m_SimSystems[waiter].ModuleName,
                         m_SimSystems[waiter].Desc.Name,
                         waitLabel.Value);
-                    std::terminate();
+                    return Core::Err(Core::ErrorCode::InvalidState);
                 }
             }
         }
@@ -165,7 +183,7 @@ namespace Extrinsic::Runtime
         {
             Core::Log::Error(
                 "[RuntimeModule] Sim system dependency cycle detected during boot.");
-            std::terminate();
+            return Core::Err(Core::ErrorCode::InvalidState);
         }
 
         std::vector<RuntimeModuleSimSystemRecord> sorted;
@@ -177,6 +195,8 @@ namespace Extrinsic::Runtime
         std::sort(m_FrameHooks.begin(),
                   m_FrameHooks.end(),
                   FrameHookLess);
+
+        return Core::Ok();
     }
 
     void RuntimeModuleSchedule::RegisterSimSystemsForTick(

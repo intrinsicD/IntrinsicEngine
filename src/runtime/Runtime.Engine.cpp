@@ -270,7 +270,15 @@ namespace Extrinsic::Runtime
             }
         }
 
-        m_RuntimeModuleSchedule.FinalizeForBoot();
+        if (Core::Result finalizeResult =
+                m_RuntimeModuleSchedule.FinalizeForBoot();
+            !finalizeResult.has_value())
+        {
+            Core::Log::Error(
+                "[RuntimeModule] Sim system schedule finalize failed: {}",
+                Core::Error::ToString(finalizeResult.error()));
+            std::terminate();
+        }
     }
 
     void Engine::ResolveRuntimeModulesForBoot()

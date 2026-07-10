@@ -20,6 +20,7 @@ import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.ModuleSchedule;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
@@ -525,4 +526,77 @@ TEST(RuntimeModule, RegistrationOrderDoesNotChangeHooksOrSchedule)
     EXPECT_EQ(providerFirst.SystemTrace[1], consumerFirst.SystemTrace[1]);
     EXPECT_EQ(providerFirst.SystemTrace[0], "Z.Provider.Producer");
     EXPECT_EQ(providerFirst.SystemTrace[1], "A.Consumer.Consumer");
+}
+
+// BUG-070: restore the fail-closed guards the recovery merge dropped from the
+// module schedule (equivalent to the deleted DuplicateSystemPassNamesFailClosed
+// and CyclicSystemSignalsFailClosed coverage), now exercised directly through
+// the recoverable FinalizeForBoot() result.
+TEST(RuntimeModuleSchedule, DuplicateSimSystemIdentityFailsClosed)
+{
+    Runtime::RuntimeModuleSchedule schedule;
+    schedule.RegisterSimSystem("Module", Runtime::SimSystemDesc{.Name = "dup"});
+    schedule.RegisterSimSystem("Module", Runtime::SimSystemDesc{.Name = "dup"});
+
+    const Core::Result result = schedule.FinalizeForBoot();
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidArgument);
+}
+
+TEST(RuntimeModuleSchedule, DistinctIdentitiesUnderOneModuleFinalizeOk)
+{
+    Runtime::RuntimeModuleSchedule schedule;
+    schedule.RegisterSimSystem("Module", Runtime::SimSystemDesc{.Name = "a"});
+    schedule.RegisterSimSystem("Module", Runtime::SimSystemDesc{.Name = "b"});
+
+    EXPECT_TRUE(schedule.FinalizeForBoot().has_value());
+}
+
+TEST(RuntimeModuleSchedule, CyclicSimSystemSignalsFailClosed)
+{
+    const Core::Hash::StringID signalA{"RuntimeModuleSchedule.CycleA"};
+    const Core::Hash::StringID signalB{"RuntimeModuleSchedule.CycleB"};
+
+    Runtime::RuntimeModuleSchedule schedule;
+    schedule.RegisterSimSystem(
+        "Module",
+        Runtime::SimSystemDesc{
+            .Name = "a", .WaitForSignals = {signalB}, .SignalLabels = {signalA}});
+    schedule.RegisterSimSystem(
+        "Module",
+        Runtime::SimSystemDesc{
+            .Name = "b", .WaitForSignals = {signalA}, .SignalLabels = {signalB}});
+
+    const Core::Result result = schedule.FinalizeForBoot();
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidState);
+}
+
+TEST(RuntimeModuleSchedule, UnprovidedWaitSignalFailsClosed)
+{
+    const Core::Hash::StringID missing{"RuntimeModuleSchedule.Missing"};
+
+    Runtime::RuntimeModuleSchedule schedule;
+    schedule.RegisterSimSystem(
+        "Module",
+        Runtime::SimSystemDesc{.Name = "waiter", .WaitForSignals = {missing}});
+
+    const Core::Result result = schedule.FinalizeForBoot();
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidState);
+}
+
+TEST(RuntimeModuleSchedule, SignalOrderedScheduleFinalizesOk)
+{
+    const Core::Hash::StringID ready{"RuntimeModuleSchedule.Ready"};
+
+    Runtime::RuntimeModuleSchedule schedule;
+    schedule.RegisterSimSystem(
+        "Module",
+        Runtime::SimSystemDesc{.Name = "producer", .SignalLabels = {ready}});
+    schedule.RegisterSimSystem(
+        "Module",
+        Runtime::SimSystemDesc{.Name = "consumer", .WaitForSignals = {ready}});
+
+    EXPECT_TRUE(schedule.FinalizeForBoot().has_value());
 }

@@ -7,6 +7,7 @@ module;
 
 export module Extrinsic.Runtime.ModuleSchedule;
 
+import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameGraph;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.CommandBus;
@@ -56,7 +57,7 @@ namespace Extrinsic::Runtime
         void RegisterFrameHook(std::string moduleName,
                                FramePhase phase,
                                RuntimeFrameHook hook);
-        void FinalizeForBoot();
+        [[nodiscard]] Core::Result FinalizeForBoot();
         void RegisterSimSystemsForTick(
             RuntimeModuleSimSystemScheduleContext context) const;
         void RunFrameHooks(
