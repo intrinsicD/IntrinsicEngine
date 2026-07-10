@@ -148,11 +148,13 @@ still open. `UI-031` is retired and consumes the visibility-gated model-build
 slice for the domain-window information-architecture cleanup; the broader async
 cache/job pipeline remains owned by `RUNTIME-138`.
 
-`RUNTIME-131` is retired to `tasks/done`: `Engine` now exposes the
-agent/CLI config-control facade for render-recipe preview/activation and the
-current engine-config hot subset (`render.default_recipe_config_path`), with the
-Sandbox Editor routed through the same facade. This satisfies the config-control
-dependency for `RUNTIME-134`, which is now retired at `CPUContracted`.
+`RUNTIME-131` is retired to `tasks/done`: runtime exposes the agent/CLI
+config-control facade for render-recipe preview/activation and the current
+engine-config hot subset (`render.default_recipe_config_path`), with the
+Sandbox Editor routed through the same facade. After `RUNTIME-149`, that facade
+lives in `Extrinsic.Runtime.EngineConfigControl` behind
+`Engine::GetConfigControl()`. This satisfies the config-control dependency for
+`RUNTIME-134`, which is now retired at `CPUContracted`.
 `RUNTIME-136` is also retired; operational progressive-Poisson GPU parity is now
 owned by `METHOD-014`.
 
@@ -189,37 +191,69 @@ rows are the remaining work.
 **Priority entry point (P0 within Theme F): the ADR-0024 kernel/module
 architecture seams.** The 2026-07-08 kernel/module architecture decision
 record ([`docs/adr/0024-kernel-module-architecture.md`](../../docs/adr/0024-kernel-module-architecture.md))
-seeded the seams-first migration set `ARCH-007`..`ARCH-012`. This set is the
-preferred next pick for architecture/runtime work ahead of other Theme F
-members: it creates the registration/communication seams (command bus, event
+seeded the seams-first migration set `ARCH-007`..`ARCH-012`; that set is now
+retired. It created the registration/communication seams (command bus, event
 bus, JobService, WorldRegistry, RuntimeModule contract) that the
-`Runtime.Engine` decomposition set (`RUNTIME-146`..`151`) and the module
-extractions (`ARCH-006`, `UI-034`) land onto. `ARCH-007` (command bus) is
-retired (2026-07-08, PR #1010, `CPUContracted`). `ARCH-008` (queued-only
-event bus) is retired in the current 2026-07-09 change set at
-`CPUContracted`. `ARCH-009` (JobService) is retired in the current
-2026-07-09 change set at `CPUContracted`. `ARCH-010` (WorldRegistry) is
-retired in the current 2026-07-09 change set at `CPUContracted`. `ARCH-011`
-(RuntimeModule contract + `EngineSetup` + two-phase `ServiceRegistry`) is
-retired in the current 2026-07-09 change set at `CPUContracted`, completing all
-five additive ADR-0024 seams. Remaining order per ADR-0024 D12: the proving
-extraction `ARCH-012`.
+`Runtime.Engine` decomposition set (`RUNTIME-146`..`164`) and the module
+extractions (`ARCH-006`, `UI-034`) land onto. `ARCH-012` closed the
+`Operational` proof by composing `ClusteringModule` through the full command →
+job → event → commit path while keeping `KMeans*` out of
+`Runtime.Engine.cppm`/`.cpp`. `RUNTIME-146` is retired as the free-standing
+config-boot extraction, `RUNTIME-147` as the asset-import pipeline extraction,
+`RUNTIME-148` as the scene-document extraction, `RUNTIME-149` as the
+config-control extraction, `RUNTIME-150` as the private frame-loop partition
+split, `RUNTIME-151` as the Engine-interface cleanup, `RUNTIME-152` as the
+device-bootstrap policy extraction, `RUNTIME-153` as the mesh primitive-view
+control extraction, `RUNTIME-154` as the reference-scene lifecycle-control
+extraction, `RUNTIME-155` as the runtime input-action registry extraction, and
+`RUNTIME-156` as the runtime-module contribution schedule extraction,
+`RUNTIME-157` as the selection readback/cache state extraction,
+`RUNTIME-158` as the frame-pacing diagnostics extraction, `RUNTIME-159`
+as the ImGui editor bridge extraction, and `RUNTIME-160` as the
+JobService GPU-queue bridge extraction, `RUNTIME-161` as the object-space
+normal bake service extraction, `RUNTIME-162` as the gizmo frame service
+extraction, `RUNTIME-163` as the render-extraction service extraction,
+`RUNTIME-164` as the asset-residency service extraction, and `RUNTIME-165`
+as the async-work service extraction. All five additive ADR-0024 seams
+(`ARCH-007`..`ARCH-011`) and the collision sweep (`ARCH-013`) are retired;
+`ARCH-014` remains the open kernel-convergence umbrella.
+`RUNTIME-129` still owns the production Vulkan provider work.
+Provider resolution, population state, camera-seed caching, reference-scene
+teardown policy, input-action descriptor/state/dispatch policy, and
+runtime-module contribution ordering/dispatch, selection readback correlation
+and refined primitive cache state, frame-pacing diagnostics, copied
+ImGui/render-graph counter mirroring, and Dear ImGui overlay/adapter/callback
+bridge ownership plus renderer overlay attachment, plus JobService GPU-queue
+renderer-hook ownership and participant shutdown sequencing, plus object-space
+normal bake GPU-queue ownership, ready-frame dependency setup, JobService
+participant registration, diagnostics access, shutdown dependency clearing,
+transform-gizmo frame state, selected-entity scratch, gizmo/selection pointer
+interlock, and transform-gizmo packet production now live outside
+`Runtime.Engine.cpp`; render-extraction cache/pool/stats/frame-index ownership
+now lives behind `Extrinsic.Runtime.RenderExtractionService`, and GPU asset
+cache/model-handoff residency ownership now lives behind
+`Extrinsic.Runtime.AssetResidencyService`; persistent streaming executor,
+derived-job registry, maintenance drains, and derived-job facade delegation now
+live behind `Extrinsic.Runtime.AsyncWorkService`.
 Sequencing note: tasks whose deliverable ADR-0024 supersedes are
 front-matter gated on their seam dependencies — `RUNTIME-150` on
 `ARCH-007`/`ARCH-008`, `RUNTIME-151` additionally on `ARCH-011`, `ARCH-006`
-and `UI-034` on `ARCH-012`, `RUNTIME-137` on `ARCH-009`, `RUNTIME-138` on
-`ARCH-007`/`ARCH-009` — so they cannot promote before the seams they must
-build on. The mechanical moves `RUNTIME-146..149` and the scheduler
-substrate (`CORE-005`/`007`/`008`) may proceed in parallel. After the seam
-set completes, `ARCH-013` (blocked on `ARCH-012` by design) runs the
-post-completion sweep: it confirms the gated rows built on the seams and
-records decisions for the audit-only rows (`RUNTIME-129`,
-`RUNTIME-146..149`, `CORE-005`/`007`/`008`/`009`, `GRAPHICS-105`,
-`PLATFORM-004`).
+and `UI-034` on `ARCH-012`, `RUNTIME-138` on
+`ARCH-007`/`ARCH-009` — are now unblocked where those dependencies were the
+only front-matter blocker. `ARCH-013` is retired: it confirmed the gated rows,
+recorded per-task decisions for the audit rows, re-scoped `RUNTIME-137` as the
+`JobService` `GpuQueue`/readback substrate, re-gated `RUNTIME-129` on
+`RUNTIME-137`, and marked `RUNTIME-147`'s `Engine::GetAssetImportPipeline()`
+as a transitional composition accessor rather than a new cross-module pattern.
+`RUNTIME-150` is retired as the private frame-loop partition split, and
+`RUNTIME-151` is retired as the Engine-interface cleanup. `RUNTIME-137` is now
+retired as the JobService `GpuQueue`/async readback substrate, so `RUNTIME-129`
+is unblocked for object-space normal bake GPU submission; the scheduler
+substrate (`CORE-005`/`007`/`008`) may proceed independently when selected by
+its owners.
 
 Open members (kernel-seam priority set first):
 - [`architecture/ARCH-014-kernel-convergence-tracking.md`](architecture/ARCH-014-kernel-convergence-tracking.md) (umbrella north-star; not a slice).
-- [`architecture/ARCH-012-clusteringmodule-proving-extraction.md`](architecture/ARCH-012-clusteringmodule-proving-extraction.md).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md`](runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md).
 - [`architecture/CORE-005-nonblocking-taskgraph-submit-api.md`](architecture/CORE-005-nonblocking-taskgraph-submit-api.md).

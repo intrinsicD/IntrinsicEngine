@@ -1,7 +1,9 @@
 module;
 
+#include <algorithm>
 #include <cstdint>
 #include <mutex>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -11,147 +13,165 @@ import Extrinsic.Core.Logging;
 
 namespace Extrinsic::Runtime
 {
-    EventBus::~EventBus()
+    KernelEventSubscription KernelEventBus::SubscribeErased(
+        const KernelEventTypeKey type,
+        const std::string_view typeName,
+        ErasedListener listener)
     {
-        for (auto& [_, subscription] : m_Subscriptions)
-        {
-            subscription->Disconnect(m_Dispatcher);
-        }
+        std::lock_guard lock(m_SubscriptionMutex);
+        KernelEventSubscription handle{
+            .Value = m_NextSubscription++,
+            .EventType = type,
+        };
+        m_Subscribers[type].push_back(SubscriberRecord{
+            .Handle = handle,
+            .Listener = std::move(listener),
+            .TypeName = typeName,
+        });
+        return handle;
     }
 
-    void EventBus::EnqueuePending(PendingEvent pending)
+    void KernelEventBus::Unsubscribe(const KernelEventSubscription subscription)
     {
-        if (!pending.Enqueue || !pending.Update)
+        if (!subscription.IsValid())
+            return;
+
+        std::lock_guard lock(m_SubscriptionMutex);
+        auto it = m_Subscribers.find(subscription.EventType);
+        if (it == m_Subscribers.end())
+            return;
+
+        std::vector<SubscriberRecord>& records = it->second;
+        records.erase(std::remove_if(records.begin(),
+                                     records.end(),
+                                     [subscription](const SubscriberRecord& record)
+                                     { return record.Handle == subscription; }),
+                      records.end());
+        if (records.empty())
+            m_Subscribers.erase(it);
+    }
+
+    void KernelEventBus::Publish(KernelEventEnvelope envelope)
+    {
+        if (!envelope.IsValid())
         {
-            Core::Log::Error("[EventBus] Rejected enqueue of an empty event.");
+            Core::Log::Error(
+                "[KernelEventBus] Rejected publish of an empty event envelope.");
             return;
         }
 
         {
             std::lock_guard lock(m_InboxMutex);
-            m_Inbox.push_back(std::move(pending));
+            m_Inbox.push_back(std::move(envelope));
         }
-
         {
             std::lock_guard lock(m_StatsMutex);
-            m_Stats.TotalPublished += 1;
+            m_Stats.PublishedEvents += 1;
         }
     }
 
-    void EventBus::RecordDelivery() noexcept
+    std::vector<KernelEventBus::ListenerSnapshot>
+        KernelEventBus::SnapshotListeners(const KernelEventTypeKey type) const
     {
-        m_DeliveriesThisPump += 1;
+        std::vector<ListenerSnapshot> listeners;
+        std::lock_guard lock(m_SubscriptionMutex);
+        const auto it = m_Subscribers.find(type);
+        if (it == m_Subscribers.end())
+            return listeners;
+
+        listeners.reserve(it->second.size());
+        for (const SubscriberRecord& record : it->second)
+        {
+            listeners.push_back(ListenerSnapshot{
+                .Handle = record.Handle,
+                .Listener = record.Listener,
+            });
+        }
+        return listeners;
     }
 
-    void EventBus::Unsubscribe(EventSubscriptionHandle handle)
+    bool KernelEventBus::IsSubscribed(
+        const KernelEventSubscription subscription) const
     {
-        if (!handle.IsValid())
-        {
-            return;
-        }
+        if (!subscription.IsValid())
+            return false;
 
-        const auto it = m_Subscriptions.find(handle.Value);
-        if (it == m_Subscriptions.end())
-        {
-            return;
-        }
-        if (!it->second->Active)
-        {
-            return;
-        }
+        std::lock_guard lock(m_SubscriptionMutex);
+        const auto it = m_Subscribers.find(subscription.EventType);
+        if (it == m_Subscribers.end())
+            return false;
 
-        it->second->Active = false;
-        {
-            std::lock_guard lock(m_StatsMutex);
-            m_Stats.Unsubscribed += 1;
-        }
-
-        if (m_Pumping)
-        {
-            m_PendingUnsubscriptions.push_back(handle);
-            return;
-        }
-
-        it->second->Disconnect(m_Dispatcher);
-        m_Subscriptions.erase(it);
-        UpdateActiveSubscriptionCount();
+        return std::any_of(it->second.begin(),
+                           it->second.end(),
+                           [subscription](const SubscriberRecord& record)
+                           { return record.Handle == subscription; });
     }
 
-    void EventBus::CleanupPendingUnsubscriptions()
-    {
-        for (const EventSubscriptionHandle handle : m_PendingUnsubscriptions)
-        {
-            const auto it = m_Subscriptions.find(handle.Value);
-            if (it == m_Subscriptions.end())
-            {
-                continue;
-            }
-            it->second->Disconnect(m_Dispatcher);
-            m_Subscriptions.erase(it);
-        }
-        m_PendingUnsubscriptions.clear();
-    }
-
-    void EventBus::UpdateActiveSubscriptionCount()
-    {
-        std::lock_guard lock(m_StatsMutex);
-        m_Stats.ActiveSubscriptions =
-            static_cast<std::uint64_t>(m_Subscriptions.size());
-    }
-
-    void EventBus::Pump()
+    std::uint64_t KernelEventBus::Pump()
     {
         if (m_Pumping)
         {
             Core::Log::Error(
-                "[EventBus] Reentrant Pump() refused; queued events remain "
-                "deferred for the next pump point.");
-            return;
+                "[KernelEventBus] Reentrant Pump() refused; queued events remain "
+                "for the next pump point.");
+            return 0;
         }
 
-        std::vector<PendingEvent> batch;
+        std::vector<KernelEventEnvelope> batch;
         {
             std::lock_guard lock(m_InboxMutex);
             batch.swap(m_Inbox);
         }
 
-        struct PumpScope final
+        struct PumpingScope final
         {
             bool& Flag;
-            explicit PumpScope(bool& flag) : Flag(flag) { Flag = true; }
-            ~PumpScope() { Flag = false; }
-        } pumpScope{m_Pumping};
-
-        m_DeliveriesThisPump = 0;
-        for (PendingEvent& pending : batch)
-        {
-            pending.Enqueue(m_Dispatcher);
-            pending.Update(m_Dispatcher);
-        }
-        const std::uint64_t delivered = m_DeliveriesThisPump;
-        CleanupPendingUnsubscriptions();
+            explicit PumpingScope(bool& flag) : Flag(flag) { Flag = true; }
+            ~PumpingScope() { Flag = false; }
+        } pumpingScope{m_Pumping};
 
         {
             std::lock_guard lock(m_StatsMutex);
-            m_Stats.PumpCount += 1;
-            m_Stats.LastPumpPublished =
-                static_cast<std::uint64_t>(batch.size());
-            m_Stats.LastPumpDelivered = delivered;
-            m_Stats.TotalDelivered += delivered;
-            m_Stats.ActiveSubscriptions =
-                static_cast<std::uint64_t>(m_Subscriptions.size());
+            m_Stats.Pumps += 1;
+            m_Stats.LastPumpEvents = static_cast<std::uint64_t>(batch.size());
+            m_Stats.LastPumpDeliveredEvents = 0;
+            m_Stats.LastPumpListenerInvocations = 0;
         }
+
+        std::uint64_t deliveredEvents = 0;
+        std::uint64_t listenerInvocations = 0;
+        for (const KernelEventEnvelope& pending : batch)
+        {
+            const std::vector<ListenerSnapshot> listeners =
+                SnapshotListeners(pending.m_Type);
+            bool eventDelivered = false;
+            for (const ListenerSnapshot& listener : listeners)
+            {
+                if (!IsSubscribed(listener.Handle))
+                    continue;
+
+                listener.Listener(pending.m_Payload.get());
+                eventDelivered = true;
+                listenerInvocations += 1;
+            }
+
+            if (eventDelivered)
+                deliveredEvents += 1;
+        }
+
+        {
+            std::lock_guard lock(m_StatsMutex);
+            m_Stats.DeliveredEvents += deliveredEvents;
+            m_Stats.LastPumpDeliveredEvents = deliveredEvents;
+            m_Stats.ListenerInvocations += listenerInvocations;
+            m_Stats.LastPumpListenerInvocations = listenerInvocations;
+        }
+        return deliveredEvents;
     }
 
-    EventBusStats EventBus::Stats() const
+    KernelEventBusStats KernelEventBus::Stats() const
     {
         std::lock_guard lock(m_StatsMutex);
         return m_Stats;
-    }
-
-    std::size_t EventBus::PendingCount() const
-    {
-        std::lock_guard lock(m_InboxMutex);
-        return m_Inbox.size();
     }
 }

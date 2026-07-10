@@ -1,398 +1,248 @@
 module;
 
 #include <algorithm>
-#include <cstddef>
 #include <cstdint>
-#include <limits>
 #include <memory>
 #include <string>
 #include <utility>
-#include <vector>
 
 module Extrinsic.Runtime.WorldRegistry;
 
+import Extrinsic.Core.Error;
+import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
+import Extrinsic.Runtime.WorldHandle;
+
 namespace Extrinsic::Runtime
 {
-    namespace
-    {
-        enum class WorldLifecycleState : std::uint8_t
-        {
-            Alive,
-            DestroyAnnounced,
-            Destroyed,
-        };
-    }
-
-    struct WorldRegistry::Impl
-    {
-        struct Record
-        {
-            std::uint32_t Generation{1u};
-            WorldLifecycleState State{WorldLifecycleState::Alive};
-            bool DestroyRequested{false};
-            std::string DebugName{};
-            std::unique_ptr<ECS::Scene::Registry> Scene{};
-        };
-
-        std::vector<Record> Worlds{};
-        WorldHandle Active{};
-        WorldHandle PendingActive{};
-
-        [[nodiscard]] WorldHandle HandleForIndex(const std::size_t index) const noexcept
-        {
-            if (index >= Worlds.size() ||
-                index > static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()))
-            {
-                return {};
-            }
-            return WorldHandle{static_cast<std::uint32_t>(index), Worlds[index].Generation};
-        }
-
-        [[nodiscard]] Record* Resolve(WorldHandle world) noexcept
-        {
-            if (!world.IsValid() || world.Index >= Worlds.size())
-            {
-                return nullptr;
-            }
-
-            Record& record = Worlds[world.Index];
-            if (record.Generation != world.Generation ||
-                record.State == WorldLifecycleState::Destroyed ||
-                record.Scene == nullptr)
-            {
-                return nullptr;
-            }
-            return &record;
-        }
-
-        [[nodiscard]] const Record* Resolve(WorldHandle world) const noexcept
-        {
-            if (!world.IsValid() || world.Index >= Worlds.size())
-            {
-                return nullptr;
-            }
-
-            const Record& record = Worlds[world.Index];
-            if (record.Generation != world.Generation ||
-                record.State == WorldLifecycleState::Destroyed ||
-                record.Scene == nullptr)
-            {
-                return nullptr;
-            }
-            return &record;
-        }
-
-        [[nodiscard]] std::size_t CountSurvivingWorldsExcept(
-            WorldHandle world) const noexcept
-        {
-            std::size_t count = 0;
-            for (std::size_t i = 0; i < Worlds.size(); ++i)
-            {
-                const Record& record = Worlds[i];
-                if (record.State == WorldLifecycleState::Destroyed ||
-                    record.Scene == nullptr ||
-                    record.DestroyRequested ||
-                    HandleForIndex(i) == world)
-                {
-                    continue;
-                }
-                ++count;
-            }
-            return count;
-        }
-
-        [[nodiscard]] WorldHandle FindFirstLiveWorldExcept(
-            WorldHandle world) const noexcept
-        {
-            for (std::size_t i = 0; i < Worlds.size(); ++i)
-            {
-                const Record& record = Worlds[i];
-                if (record.State != WorldLifecycleState::Alive ||
-                    record.Scene == nullptr ||
-                    record.DestroyRequested)
-                {
-                    continue;
-                }
-
-                const WorldHandle candidate = HandleForIndex(i);
-                if (candidate != world)
-                {
-                    return candidate;
-                }
-            }
-            return {};
-        }
-
-        [[nodiscard]] std::string DebugNameOf(WorldHandle world) const
-        {
-            if (const Record* record = Resolve(world))
-            {
-                return record->DebugName;
-            }
-            return {};
-        }
-    };
-
-    WorldRegistry::WorldRegistry()
-        : m_Impl(std::make_unique<Impl>())
-    {
-    }
-
+    WorldRegistry::WorldRegistry() = default;
     WorldRegistry::~WorldRegistry() = default;
-    WorldRegistry::WorldRegistry(WorldRegistry&&) noexcept = default;
-    WorldRegistry& WorldRegistry::operator=(WorldRegistry&&) noexcept = default;
 
     WorldHandle WorldRegistry::CreateWorld(std::string debugName)
     {
-        if (m_Impl == nullptr ||
-            m_Impl->Worlds.size() >
-                static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()))
+        std::uint32_t index = 0u;
+        if (!m_FreeList.empty())
         {
-            return {};
+            index = m_FreeList.back();
+            m_FreeList.pop_back();
+            WorldRecord& record = m_Worlds[index];
+            ++record.Generation;
+            if (record.Generation == 0u)
+                record.Generation = 1u;
+        }
+        else
+        {
+            index = static_cast<std::uint32_t>(m_Worlds.size());
+            m_Worlds.emplace_back();
+            if (index == DefaultWorldHandle.Index)
+                m_Worlds.back().Generation = DefaultWorldHandle.Generation;
         }
 
-        const std::size_t index = m_Impl->Worlds.size();
-        if (debugName.empty())
-        {
-            debugName = "world-" + std::to_string(index);
-        }
+        WorldRecord& record = m_Worlds[index];
+        record.Lifecycle = WorldLifecycle::Live;
+        record.Scene = std::make_unique<ECS::Scene::Registry>();
+        record.DebugName = debugName.empty() ? MakeDefaultName(index) : std::move(debugName);
+        record.DestroyAnnouncedEpoch = 0u;
 
-        m_Impl->Worlds.push_back(Impl::Record{
-            .Generation = 1u,
-            .State = WorldLifecycleState::Alive,
-            .DestroyRequested = false,
-            .DebugName = std::move(debugName),
-            .Scene = std::make_unique<ECS::Scene::Registry>()});
+        const WorldHandle handle = HandleForIndex(index);
+        if (!m_ActiveWorld.IsValid())
+            m_ActiveWorld = handle;
 
-        const WorldHandle handle = m_Impl->HandleForIndex(index);
-        if (!m_Impl->Active.IsValid())
-        {
-            m_Impl->Active = handle;
-        }
         return handle;
     }
 
-    bool WorldRegistry::RequestDestroyWorld(WorldHandle world) noexcept
+    Core::Result WorldRegistry::RequestSetActiveWorld(WorldHandle world)
     {
-        if (m_Impl == nullptr)
+        if (!Contains(world))
+            return Core::Err(Core::ErrorCode::ResourceNotFound);
+
+        if (world == m_ActiveWorld)
         {
-            return false;
+            m_PendingActiveWorld.reset();
+            return Core::Ok();
         }
 
-        Impl::Record* record = m_Impl->Resolve(world);
-        if (record == nullptr || record->DestroyRequested)
-        {
-            return record != nullptr;
-        }
-
-        if (m_Impl->CountSurvivingWorldsExcept(world) == 0)
-        {
-            return false;
-        }
-
-        record->DestroyRequested = true;
-        if (m_Impl->PendingActive == world)
-        {
-            m_Impl->PendingActive = {};
-        }
-        return true;
+        m_PendingActiveWorld = world;
+        return Core::Ok();
     }
 
-    bool WorldRegistry::RequestSetActiveWorld(WorldHandle world) noexcept
+    Core::Result WorldRegistry::RequestDestroyWorld(WorldHandle world)
     {
-        if (m_Impl == nullptr)
+        WorldRecord* record = Find(world);
+        if (record == nullptr)
+            return Core::Err(Core::ErrorCode::ResourceNotFound);
+        if (world == m_ActiveWorld)
+            return Core::Err(Core::ErrorCode::ResourceBusy);
+
+        if (record->Lifecycle == WorldLifecycle::DestroyPending ||
+            record->Lifecycle == WorldLifecycle::DestroyAnnounced)
         {
-            return false;
+            return Core::Ok();
         }
 
-        const Impl::Record* record = m_Impl->Resolve(world);
-        if (record == nullptr || record->DestroyRequested)
-        {
-            return false;
-        }
-
-        m_Impl->PendingActive = world;
-        return true;
+        record->Lifecycle = WorldLifecycle::DestroyPending;
+        return Core::Ok();
     }
 
     WorldHandle WorldRegistry::ActiveWorld() const noexcept
     {
-        return m_Impl != nullptr ? m_Impl->Active : WorldHandle{};
+        return m_ActiveWorld;
     }
 
     ECS::Scene::Registry* WorldRegistry::Get(WorldHandle world) noexcept
     {
-        if (m_Impl == nullptr)
-        {
-            return nullptr;
-        }
-
-        Impl::Record* record = m_Impl->Resolve(world);
+        WorldRecord* record = Find(world);
         return record != nullptr ? record->Scene.get() : nullptr;
     }
 
     const ECS::Scene::Registry* WorldRegistry::Get(WorldHandle world) const noexcept
     {
-        if (m_Impl == nullptr)
-        {
-            return nullptr;
-        }
-
-        const Impl::Record* record = m_Impl->Resolve(world);
+        const WorldRecord* record = Find(world);
         return record != nullptr ? record->Scene.get() : nullptr;
     }
 
     bool WorldRegistry::Contains(WorldHandle world) const noexcept
     {
-        return m_Impl != nullptr && m_Impl->Resolve(world) != nullptr;
+        return Find(world) != nullptr;
     }
 
-    bool WorldRegistry::IsDestroyAnnounced(WorldHandle world) const noexcept
+    std::uint32_t WorldRegistry::LiveWorldCount() const noexcept
     {
-        if (m_Impl == nullptr)
-        {
-            return false;
-        }
-
-        const Impl::Record* record = m_Impl->Resolve(world);
-        return record != nullptr &&
-               record->State == WorldLifecycleState::DestroyAnnounced;
-    }
-
-    std::size_t WorldRegistry::WorldCount() const noexcept
-    {
-        if (m_Impl == nullptr)
-        {
-            return 0;
-        }
-
-        std::size_t count = 0;
-        for (const Impl::Record& record : m_Impl->Worlds)
-        {
-            if (record.State != WorldLifecycleState::Destroyed &&
-                record.Scene != nullptr)
+        return static_cast<std::uint32_t>(std::count_if(
+            m_Worlds.begin(),
+            m_Worlds.end(),
+            [](const WorldRecord& record)
             {
-                ++count;
-            }
-        }
-        return count;
+                return record.Scene != nullptr &&
+                       record.Lifecycle != WorldLifecycle::Empty;
+            }));
     }
 
-    std::size_t WorldRegistry::PendingDestroyCount() const noexcept
+    std::string_view WorldRegistry::DebugName(WorldHandle world) const noexcept
     {
-        if (m_Impl == nullptr)
-        {
-            return 0;
-        }
-
-        return static_cast<std::size_t>(
-            std::count_if(
-                m_Impl->Worlds.begin(),
-                m_Impl->Worlds.end(),
-                [](const Impl::Record& record)
-                {
-                    return record.State != WorldLifecycleState::Destroyed &&
-                           record.DestroyRequested;
-                }));
+        const WorldRecord* record = Find(world);
+        return record != nullptr ? std::string_view{record->DebugName}
+                                 : std::string_view{};
     }
 
-    WorldRegistryMaintenanceStats WorldRegistry::ApplyDeferredOperations(
-        EventBus& events,
+    WorldRegistryMaintenanceStats WorldRegistry::ApplyMaintenance(
+        KernelEventBus& events,
         JobService& jobs)
     {
+        ++m_MaintenanceEpoch;
+
         WorldRegistryMaintenanceStats stats{};
-        if (m_Impl == nullptr)
-        {
-            return stats;
-        }
+        stats.ActiveWorld = m_ActiveWorld;
 
-        if (m_Impl->PendingActive.IsValid())
+        if (m_PendingActiveWorld.has_value())
         {
-            const WorldHandle requested = m_Impl->PendingActive;
-            m_Impl->PendingActive = {};
-
-            const Impl::Record* requestedRecord = m_Impl->Resolve(requested);
-            if (requestedRecord != nullptr &&
-                !requestedRecord->DestroyRequested &&
-                requested != m_Impl->Active)
+            const WorldHandle requested = *m_PendingActiveWorld;
+            m_PendingActiveWorld.reset();
+            if (Contains(requested) && requested != m_ActiveWorld)
             {
-                const WorldHandle previous = m_Impl->Active;
-                m_Impl->Active = requested;
+                const WorldHandle previous = m_ActiveWorld;
+                const std::string previousName{DebugName(previous)};
+                const std::string currentName{DebugName(requested)};
+                m_ActiveWorld = requested;
+                ++stats.AppliedActiveWorldChanges;
                 events.Publish(ActiveWorldChanged{
                     .Previous = previous,
                     .Current = requested,
-                    .DebugName = requestedRecord->DebugName});
-                ++stats.ActiveWorldChanges;
+                    .PreviousDebugName = previousName,
+                    .CurrentDebugName = currentName,
+                });
             }
         }
 
-        for (std::size_t i = 0; i < m_Impl->Worlds.size(); ++i)
+        for (std::uint32_t index = 0u; index < m_Worlds.size(); ++index)
         {
-            Impl::Record& record = m_Impl->Worlds[i];
-            if (record.State != WorldLifecycleState::DestroyAnnounced ||
-                !record.DestroyRequested ||
-                record.Scene == nullptr)
+            WorldRecord& record = m_Worlds[index];
+            if (record.Lifecycle == WorldLifecycle::DestroyPending)
+            {
+                const WorldHandle handle = HandleForIndex(index);
+                record.Lifecycle = WorldLifecycle::DestroyAnnounced;
+                record.DestroyAnnouncedEpoch = m_MaintenanceEpoch;
+                ++stats.DestroyAnnouncements;
+                events.Publish(WorldWillBeDestroyed{
+                    .World = handle,
+                    .DebugName = record.DebugName,
+                });
+                stats.CancelledJobs += jobs.CancelAllForWorld(handle);
+                continue;
+            }
+
+            if (record.Lifecycle != WorldLifecycle::DestroyAnnounced ||
+                record.DestroyAnnouncedEpoch >= m_MaintenanceEpoch)
             {
                 continue;
             }
 
-            const WorldHandle handle = m_Impl->HandleForIndex(i);
-            if (m_Impl->Active == handle)
-            {
-                const WorldHandle replacement =
-                    m_Impl->FindFirstLiveWorldExcept(handle);
-                if (!replacement.IsValid())
-                {
-                    continue;
-                }
-
-                const WorldHandle previous = m_Impl->Active;
-                m_Impl->Active = replacement;
-                events.Publish(ActiveWorldChanged{
-                    .Previous = previous,
-                    .Current = replacement,
-                    .DebugName = m_Impl->DebugNameOf(replacement)});
-                ++stats.ActiveWorldChanges;
-            }
+            const WorldHandle handle = HandleForIndex(index);
+            if (handle == m_ActiveWorld)
+                continue;
 
             record.Scene.reset();
-            record.State = WorldLifecycleState::Destroyed;
-            record.DestroyRequested = false;
-            ++record.Generation;
+            record.DebugName.clear();
+            record.Lifecycle = WorldLifecycle::Empty;
+            record.DestroyAnnouncedEpoch = 0u;
+            m_FreeList.push_back(index);
             ++stats.DestroyedWorlds;
         }
 
-        for (std::size_t i = 0; i < m_Impl->Worlds.size(); ++i)
-        {
-            Impl::Record& record = m_Impl->Worlds[i];
-            if (record.State != WorldLifecycleState::Alive ||
-                !record.DestroyRequested ||
-                record.Scene == nullptr)
-            {
-                continue;
-            }
-
-            const WorldHandle handle = m_Impl->HandleForIndex(i);
-            events.Publish(WorldWillBeDestroyed{
-                .World = handle,
-                .DebugName = record.DebugName});
-            stats.CancelledJobs += jobs.CancelAllForWorld(handle);
-            record.State = WorldLifecycleState::DestroyAnnounced;
-            ++stats.DestroyAnnouncedWorlds;
-        }
-
+        stats.ActiveWorld = m_ActiveWorld;
+        stats.LiveWorlds = LiveWorldCount();
         return stats;
     }
 
     void WorldRegistry::Clear() noexcept
     {
-        if (m_Impl == nullptr)
-        {
-            return;
-        }
+        m_PendingActiveWorld.reset();
+        m_ActiveWorld = {};
+        m_FreeList.clear();
+        m_Worlds.clear();
+        m_MaintenanceEpoch = 0u;
+    }
 
-        m_Impl->Worlds.clear();
-        m_Impl->Active = {};
-        m_Impl->PendingActive = {};
+    WorldRegistry::WorldRecord* WorldRegistry::Find(WorldHandle world) noexcept
+    {
+        if (!world.IsValid() || world.Index >= m_Worlds.size())
+            return nullptr;
+
+        WorldRecord& record = m_Worlds[world.Index];
+        if (record.Generation != world.Generation ||
+            record.Lifecycle == WorldLifecycle::Empty ||
+            record.Scene == nullptr)
+        {
+            return nullptr;
+        }
+        return &record;
+    }
+
+    const WorldRegistry::WorldRecord* WorldRegistry::Find(WorldHandle world) const noexcept
+    {
+        if (!world.IsValid() || world.Index >= m_Worlds.size())
+            return nullptr;
+
+        const WorldRecord& record = m_Worlds[world.Index];
+        if (record.Generation != world.Generation ||
+            record.Lifecycle == WorldLifecycle::Empty ||
+            record.Scene == nullptr)
+        {
+            return nullptr;
+        }
+        return &record;
+    }
+
+    WorldHandle WorldRegistry::HandleForIndex(const std::uint32_t index) const noexcept
+    {
+        if (index >= m_Worlds.size())
+            return {};
+        return WorldHandle{index, m_Worlds[index].Generation};
+    }
+
+    std::string WorldRegistry::MakeDefaultName(const std::uint32_t index) const
+    {
+        return "World " + std::to_string(index);
     }
 }

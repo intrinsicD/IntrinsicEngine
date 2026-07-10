@@ -39,6 +39,14 @@ depends_on:
   architecture in the same file. Open `RUNTIME-138` (nonblocking selected-
   entity pipeline) still touches the same file; this task must slice around
   it, not duplicate it.
+- ARCH-013 re-review (2026-07-08): Decision re-scoped onto the retired kernel
+  seams. `ARCH-012` proved the first application-specific extraction:
+  Sandbox now registers `ClusteringModule` from app startup and the editor
+  submits `RunKMeans` through `CommandBus`/`JobService`/`KernelEvents` instead
+  of `Engine` internals. Slice 0 must inventory generic editor-shell/panel-host
+  code versus Sandbox content with that module-composition shape as the target;
+  moved app panels may register modules and panel callbacks, but runtime must
+  not import app code or accept `Engine&` pass-through.
 - Origin: `docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`
   finding R5.
 - Compile-cost evidence from the 2026-07-09 `CI-003` audit:

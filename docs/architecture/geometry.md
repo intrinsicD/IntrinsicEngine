@@ -174,9 +174,10 @@ The RHI-visible integration hooks live in runtime:
 `Extrinsic::RHI::IDevice&`, evaluates `IDevice::IsOperational()` for GPU
 requests, and remains a nonblocking synchronous fallback seam. Real Vulkan
 KMeans execution is owned by `Extrinsic.Runtime.KMeansGpuBackend` and the
-renderer-hook-driven `Extrinsic.Runtime.KMeansGpuJobQueue`, which provide command
-recording, persistent GPU resources, and asynchronous readback ownership without
-importing RHI into geometry or creating an extra swapchain present.
+`JobService` `GpuQueue`-driven `Extrinsic.Runtime.KMeansGpuJobQueue`, which
+provide command recording, persistent GPU resources, and asynchronous readback
+ownership without importing RHI into geometry or creating an extra swapchain
+present.
 
 ### Geometry IO coverage
 

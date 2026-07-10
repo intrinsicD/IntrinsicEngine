@@ -15,7 +15,9 @@ export module Extrinsic.Runtime.CommandBus;
 
 import Extrinsic.Core.FrameGraph;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
+import Extrinsic.Runtime.WorldRegistry;
 
 // ============================================================
 // ARCH-007 — Kernel command bus with a single pre-sim drain point.
@@ -108,8 +110,17 @@ namespace Extrinsic::Runtime
     {
         ECS::Scene::Registry& ActiveWorld;
         CommandBus&           Commands;
-        EventBus&             Events;
+        KernelEventBus*       Events{};
+        JobService*           Jobs{};
+        WorldRegistry*        Worlds{};
         CommandCorrelationId  Correlation{};
+    };
+
+    export struct CommandDrainServices
+    {
+        KernelEventBus* Events{};
+        JobService* Jobs{};
+        WorldRegistry* Worlds{};
     };
 
     // Opaque, copyable, re-enqueueable command payload. Produced by
@@ -221,7 +232,9 @@ namespace Extrinsic::Runtime
         // fixed-step simulation; commands enqueued by handlers during
         // the drain run at the NEXT drain. Reentrant drains are a
         // programming error and are refused with a diagnostic.
-        void Drain(ECS::Scene::Registry& activeWorld, EventBus& events);
+        void Drain(ECS::Scene::Registry& activeWorld);
+        void Drain(ECS::Scene::Registry& activeWorld,
+                   CommandDrainServices services);
 
         // During handler execution only: record the inverse payload
         // that undoes the currently executing command. Forwarded to

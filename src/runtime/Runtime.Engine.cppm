@@ -7,61 +7,54 @@ module;
 #include <span>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
-
-#include <entt/entity/registry.hpp>
-#include <entt/signal/sigh.hpp>
+#include <utility>
 
 export module Extrinsic.Runtime.Engine;
 
+export import Extrinsic.Runtime.FramePacingDiagnostics;
+export import Extrinsic.Runtime.InputActions;
+
 import Extrinsic.Core.Config.Engine;
-import Extrinsic.Core.Config.EngineLoad;
-import Extrinsic.Core.Config.Render;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameClock;
 import Extrinsic.Core.FrameGraph;
 import Extrinsic.Core.Geometry2D;
-import Extrinsic.Core.IOBackend;
 import Extrinsic.ECS.Scene.Handle;
-import Geometry.HalfedgeMesh.IO;
-import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Device;
 import Extrinsic.Platform.Window;
 import Extrinsic.Graphics.CameraSnapshots;
-import Extrinsic.Graphics.GpuAssetCache;
-import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Graphics.Material;
-import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Runtime.AsyncWorkService;
+import Extrinsic.Runtime.AssetResidencyService;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CommandBus;
-import Extrinsic.Runtime.KernelEvents;
-import Extrinsic.Runtime.JobService;
-import Extrinsic.Runtime.WorldRegistry;
-import Extrinsic.Runtime.ServiceRegistry;
-import Extrinsic.Runtime.Module;
-import Extrinsic.Runtime.AssetIngestStateMachine;
-import Extrinsic.Runtime.AssetModelSceneHandoff;
-import Extrinsic.Runtime.AssetModelTextureHandoff;
-import Extrinsic.Runtime.DerivedJobGraph;
+import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.GizmoInteraction;
+import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.GizmoFrameService;
 import Extrinsic.Runtime.ImGuiAdapter;
+import Extrinsic.Runtime.ImGuiEditorBridge;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.JobServiceGpuQueueBridge;
+import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
-import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
+import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.ModuleSchedule;
+import Extrinsic.Runtime.ObjectSpaceNormalBakeService;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.ReferenceScene;
+import Extrinsic.Runtime.ReferenceSceneControl;
 import Extrinsic.Runtime.SelectionController;
-import Extrinsic.Runtime.SceneSerialization;
+import Extrinsic.Runtime.SceneDocument;
+import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.StableEntityLookup;
-import Extrinsic.Runtime.StreamingExecutor;
-import Extrinsic.Runtime.RenderExtraction;
-import Extrinsic.Runtime.RenderWorldPool;
-import Extrinsic.Asset.EventBus;
-import Extrinsic.Asset.ImportRouter;
-import Extrinsic.Asset.Registry;
+import Extrinsic.Runtime.RenderExtractionService;
+import Extrinsic.Runtime.SelectionReadback;
+import Extrinsic.Runtime.WorldHandle;
+import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Asset.Service;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Scene.Registry;
@@ -69,415 +62,6 @@ import Extrinsic.ECS.Scene.Registry;
 namespace Extrinsic::Runtime
 {
     export class Engine;
-
-    export struct RuntimeDeviceSelection
-    {
-        bool UsePromotedVulkanDevice{false};
-        bool FallsBackToNullDevice{true};
-    };
-
-    export struct RuntimeAssetImportRequest
-    {
-        std::string Path{};
-        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
-    };
-
-    export struct RuntimeAssetReimportRequest
-    {
-        Assets::AssetId Asset{};
-        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
-    };
-
-    export using RuntimeIOBackendFactory =
-        std::function<std::unique_ptr<Core::IO::IIOBackend>()>;
-
-    export struct RuntimeGpuJobParticipantHandle
-    {
-        std::uint64_t Value{0};
-
-        [[nodiscard]] bool IsValid() const noexcept { return Value != 0; }
-        [[nodiscard]] friend bool operator==(
-            RuntimeGpuJobParticipantHandle,
-            RuntimeGpuJobParticipantHandle) noexcept = default;
-    };
-
-    export struct RuntimeGpuJobParticipantDesc
-    {
-        std::string DebugName{};
-        std::function<void(RHI::ICommandContext&)> RecordFrameCommands{};
-        std::function<void()> DrainCompletedTransfers{};
-        std::function<bool()> HasInFlightWork{};
-        std::function<void()> ShutdownAfterDeviceIdle{};
-    };
-
-    export struct RuntimePostImportProcessorHandle
-    {
-        std::uint64_t Value{0};
-
-        [[nodiscard]] bool IsValid() const noexcept { return Value != 0; }
-        [[nodiscard]] friend bool operator==(
-            RuntimePostImportProcessorHandle,
-            RuntimePostImportProcessorHandle) noexcept = default;
-    };
-
-    export struct RuntimePostImportProcessorContext
-    {
-        std::string_view Path{};
-        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
-        ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
-        const Geometry::MeshIO::MeshIOResult* MeshPayload{};
-    };
-
-    export struct RuntimePostImportProcessorServices
-    {
-        StreamingExecutor* Streaming{};
-        Assets::AssetService* AssetService{};
-        Graphics::GpuAssetCache* GpuAssetCache{};
-        RenderExtractionCache* RenderExtraction{};
-        ECS::Scene::Registry* Scene{};
-        RuntimeObjectSpaceNormalBakeQueue* ObjectSpaceNormalBakeQueue{};
-        bool ObjectSpaceNormalBakeGraphicsBackendOperational{false};
-    };
-
-    export struct RuntimePostImportProcessorDesc
-    {
-        std::string DebugName{};
-        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
-        std::function<Core::Result(
-            const RuntimePostImportProcessorContext&,
-            RuntimePostImportProcessorServices&)> Process{};
-    };
-
-    struct RuntimePostImportProcessorRecord
-    {
-        RuntimePostImportProcessorHandle Handle{};
-        RuntimePostImportProcessorDesc Desc{};
-    };
-
-    export struct RuntimeImportEntityAuthoringPolicyHandle
-    {
-        std::uint64_t Value{0};
-
-        [[nodiscard]] bool IsValid() const noexcept { return Value != 0; }
-        [[nodiscard]] friend bool operator==(
-            RuntimeImportEntityAuthoringPolicyHandle,
-            RuntimeImportEntityAuthoringPolicyHandle) noexcept = default;
-    };
-
-    export struct RuntimeImportEntityAuthoringPolicyContext
-    {
-        std::string_view Path{};
-        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
-        ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
-    };
-
-    export struct RuntimeImportEntityAuthoringPolicyServices
-    {
-        ECS::Scene::Registry* Scene{};
-    };
-
-    export struct RuntimeImportEntityAuthoringPolicyDesc
-    {
-        std::string DebugName{};
-        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
-        std::function<Core::Result(
-            const RuntimeImportEntityAuthoringPolicyContext&,
-            RuntimeImportEntityAuthoringPolicyServices&)> Apply{};
-    };
-
-    struct RuntimeImportEntityAuthoringPolicyRecord
-    {
-        RuntimeImportEntityAuthoringPolicyHandle Handle{};
-        RuntimeImportEntityAuthoringPolicyDesc Desc{};
-    };
-
-    export struct RuntimeImportCompletedHandlerHandle
-    {
-        std::uint64_t Value{0};
-
-        [[nodiscard]] bool IsValid() const noexcept { return Value != 0; }
-        [[nodiscard]] friend bool operator==(
-            RuntimeImportCompletedHandlerHandle,
-            RuntimeImportCompletedHandlerHandle) noexcept = default;
-    };
-
-    export struct RuntimeImportCompletedContext
-    {
-        std::string_view Path{};
-        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
-        std::span<const ECS::EntityHandle> CreatedEntities{};
-        std::optional<CameraFocusTarget> FocusTarget{};
-    };
-
-    export struct RuntimeImportCompletedServices
-    {
-        ECS::Scene::Registry* Scene{};
-        CameraControllerRegistry* CameraControllers{};
-        SelectionController* Selection{};
-        const Core::Config::EngineConfig* Config{};
-    };
-
-    export struct RuntimeImportCompletedHandlerDesc
-    {
-        std::string DebugName{};
-        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
-        std::function<Core::Result(
-            const RuntimeImportCompletedContext&,
-            RuntimeImportCompletedServices&)> Handle{};
-    };
-
-    struct RuntimeImportCompletedHandlerRecord
-    {
-        RuntimeImportCompletedHandlerHandle Handle{};
-        RuntimeImportCompletedHandlerDesc Desc{};
-    };
-
-    export enum class RuntimeInputActionTrigger : std::uint8_t
-    {
-        KeyJustPressed = 0,
-    };
-
-    export struct RuntimeInputActionBinding
-    {
-        int KeyCode{-1};
-        RuntimeInputActionTrigger Trigger{
-            RuntimeInputActionTrigger::KeyJustPressed};
-        bool SuppressWhenImGuiCapturesKeyboard{true};
-    };
-
-    export struct RuntimeInputActionHandle
-    {
-        std::uint64_t Value{0};
-
-        [[nodiscard]] bool IsValid() const noexcept { return Value != 0; }
-        [[nodiscard]] friend bool operator==(
-            RuntimeInputActionHandle,
-            RuntimeInputActionHandle) noexcept = default;
-    };
-
-    export struct RuntimeInputActionContext
-    {
-        RuntimeInputActionBinding Binding{};
-        Core::Extent2D Viewport{};
-        double FrameDeltaSeconds{0.0};
-        std::uint64_t FrameIndex{0};
-        bool ImGuiCapturesKeyboard{false};
-    };
-
-    export struct RuntimeInputActionServices
-    {
-        ECS::Scene::Registry* Scene{};
-        CameraControllerRegistry* CameraControllers{};
-        SelectionController* Selection{};
-        Graphics::RenderFrameInput* RenderInput{};
-        const Core::Config::EngineConfig* Config{};
-    };
-
-    export struct RuntimeInputActionDesc
-    {
-        std::string DebugName{};
-        RuntimeInputActionBinding Binding{};
-        std::function<Core::Result(
-            const RuntimeInputActionContext&,
-            RuntimeInputActionServices&)> Execute{};
-    };
-
-    struct RuntimeInputActionRecord
-    {
-        RuntimeInputActionHandle Handle{};
-        RuntimeInputActionDesc Desc{};
-    };
-
-    export struct RuntimeAssetImportResult
-    {
-        Assets::AssetId Asset{};
-        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
-        std::uint64_t PrimitiveEntitiesCreated{0};
-        std::uint64_t EmbeddedTextureAssetsCreated{0};
-        std::uint64_t GeneratedTextureAssetsCreated{0};
-        std::uint64_t TextureUploadRequests{0};
-        std::uint64_t GeneratedTextureUploadRequests{0};
-        bool MaterializedModelScene{false};
-        bool RequestedTextureUpload{false};
-    };
-
-    export struct RuntimeAssetImportEvent
-    {
-        std::uint64_t Sequence{0};
-        std::string Path{};
-        Assets::AssetPayloadKind RequestedPayloadKind{Assets::AssetPayloadKind::Unknown};
-        Core::ErrorCode Error{Core::ErrorCode::Success};
-        RuntimeAssetIngestDiagnostic IngestDiagnostic{RuntimeAssetIngestDiagnostic::None};
-        std::optional<RuntimeAssetImportResult> Result{};
-
-        [[nodiscard]] bool Succeeded() const noexcept
-        {
-            return Result.has_value() && Error == Core::ErrorCode::Success;
-        }
-    };
-
-    export struct RuntimeQueuedAssetImport
-    {
-        RuntimeAssetIngestHandle Operation{};
-        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
-    };
-
-    export enum class RuntimeSceneFileOperation : std::uint8_t
-    {
-        None,
-        Save,
-        Load,
-    };
-
-    export struct RuntimeQueuedSceneFileOperation
-    {
-        StreamingTaskHandle Task{};
-        RuntimeSceneFileOperation Operation{RuntimeSceneFileOperation::None};
-    };
-
-    export struct RuntimeSceneFileEvent
-    {
-        std::uint64_t Sequence{0};
-        RuntimeSceneFileOperation Operation{RuntimeSceneFileOperation::None};
-        StreamingTaskHandle Task{};
-        std::string Path{};
-        Core::ErrorCode Error{Core::ErrorCode::Success};
-        std::optional<SceneSerializationResult> SaveResult{};
-        std::optional<SceneDeserializationResult> LoadResult{};
-
-        [[nodiscard]] bool Succeeded() const noexcept
-        {
-            return Error == Core::ErrorCode::Success;
-        }
-    };
-
-    export [[nodiscard]] RuntimeDeviceSelection SelectRuntimeDeviceBackend(
-        const Core::Config::RenderConfig& config,
-        bool promotedVulkanAvailable) noexcept;
-
-    // GRAPHICS-033B: pure decision for the runtime startup breadcrumb. Returns
-    // true when the runtime requested the promoted Vulkan device but the
-    // resolved device is not operational, matching the truth-table rows in
-    // `src/graphics/vulkan/README.md`. The breadcrumb is emitted exactly once
-    // per `Engine::Initialize()` because the call site evaluates this once;
-    // no internal guard is needed here.
-    export [[nodiscard]] bool ShouldEmitVulkanRequestedButNotOperationalBreadcrumb(
-        const Core::Config::RenderConfig& config,
-        bool isDeviceOperational) noexcept;
-
-    export [[nodiscard]] Core::Config::EngineConfig CreateReferenceEngineConfig();
-
-    export enum class EngineConfigBootSource : std::uint8_t
-    {
-        ReferenceDefaults = 0,
-        DefaultPath,
-        Environment,
-        CommandLine,
-    };
-
-    export struct EngineConfigBootOptions
-    {
-        std::string DefaultConfigPath{"config/engine.json"};
-        std::string EnvironmentVariable{"INTRINSIC_ENGINE_CONFIG"};
-        std::string CliFlag{"--engine-config"};
-    };
-
-    export struct EngineConfigBootResult
-    {
-        Core::Config::EngineConfig Config{};
-        EngineConfigBootSource Source{EngineConfigBootSource::ReferenceDefaults};
-        std::string SourcePath{};
-        Core::Config::EngineConfigLoadResult LoadResult{};
-        bool LoadedFile{false};
-        bool UsedReferenceFallback{true};
-    };
-
-    export [[nodiscard]] EngineConfigBootResult ResolveEngineConfigForBoot(
-        std::span<const std::string_view> args,
-        const EngineConfigBootOptions& options = {});
-
-    export enum class RuntimeRenderRecipeActivationSource : std::uint8_t
-    {
-        None = 0,
-        StartupConfigFile,
-        AgentCli,
-        Editor,
-        Programmatic,
-    };
-
-    export enum class RuntimeConfigControlSource : std::uint8_t
-    {
-        None = 0,
-        AgentCli,
-        Editor,
-        Programmatic,
-    };
-
-    export enum class RuntimeRenderRecipeApplyStatus : std::uint8_t
-    {
-        None = 0,
-        Applied,
-        Rejected,
-        MissingRenderer,
-    };
-
-    export struct RuntimeRenderRecipeApplyResult
-    {
-        RuntimeRenderRecipeApplyStatus Status{RuntimeRenderRecipeApplyStatus::None};
-        RuntimeRenderRecipeActivationSource Source{RuntimeRenderRecipeActivationSource::None};
-        Graphics::RenderRecipeConfigLoadResult LoadResult{};
-        bool RendererOverrideInstalled{false};
-
-        [[nodiscard]] bool Succeeded() const noexcept
-        {
-            return Status == RuntimeRenderRecipeApplyStatus::Applied;
-        }
-    };
-
-    export struct RuntimeRenderRecipeState
-    {
-        std::optional<Graphics::FrameRecipeOverride> ActiveOverride{};
-        Graphics::RenderRecipeConfigLoadResult ActiveConfig{};
-        bool HasActiveConfig{false};
-        RuntimeRenderRecipeActivationSource ActiveSource{
-            RuntimeRenderRecipeActivationSource::None};
-        RuntimeRenderRecipeApplyResult LastApply{};
-        bool HasLastApply{false};
-    };
-
-    export enum class RuntimeEngineConfigApplyStatus : std::uint8_t
-    {
-        None = 0,
-        Applied,
-        NoChange,
-        Rejected,
-    };
-
-    export struct RuntimeEngineConfigApplyResult
-    {
-        RuntimeEngineConfigApplyStatus Status{
-            RuntimeEngineConfigApplyStatus::None};
-        RuntimeConfigControlSource Source{RuntimeConfigControlSource::None};
-        Core::Config::EngineConfigLoadResult LoadResult{};
-        RuntimeRenderRecipeApplyResult RecipeApply{};
-        bool EngineConfigApplied{false};
-        bool DefaultRecipeConfigPathChanged{false};
-        bool SandboxProgressivePoissonChanged{false};
-        std::vector<std::string> RejectedBootOnlyFields{};
-
-        [[nodiscard]] bool Succeeded() const noexcept
-        {
-            return Status == RuntimeEngineConfigApplyStatus::Applied ||
-                   Status == RuntimeEngineConfigApplyStatus::NoChange;
-        }
-    };
-
-    export struct RuntimeEngineConfigControlState
-    {
-        Core::Config::EngineConfig ActiveConfig{};
-        RuntimeEngineConfigApplyResult LastApply{};
-        bool HasLastApply{false};
-    };
 
     // ============================================================
     // IApplication — the user-facing hook interface.
@@ -528,7 +112,7 @@ namespace Extrinsic::Runtime
     // Owns: Window, IDevice, IRenderer, FrameClock,
     //       Tasks::Scheduler (static — initialized/shutdown here),
     //       AssetService, Scene::Registry, FrameGraph (CPU),
-    //       StreamingExecutor.
+    //       AsyncWorkService.
     //
     // Scheduling surfaces:
     //   CPU     — Core::FrameGraph wrapping a Dag::TaskGraph(Cpu).
@@ -539,10 +123,10 @@ namespace Extrinsic::Runtime
     //   GPU     — Owned internally by IRenderer.
     //             Engine drives it via BeginFrame / ExecuteFrame / EndFrame.
     //
-    //   Streaming — Runtime.StreamingExecutor owned by Engine.
-    //               Asset IO / geometry processing tasks submit persistent
-    //               executor work and publish main-thread apply callbacks in
-    //               Phase 10 (maintenance lane) each frame.
+    //   Streaming — Runtime.AsyncWorkService owned by Engine.
+    //               Asset IO / geometry processing tasks borrow the service's
+    //               persistent executor and publish main-thread apply callbacks
+    //               in Phase 10 (maintenance lane) each frame.
     //
     // Frame shape (executed inside Run()):
     //
@@ -570,58 +154,6 @@ namespace Extrinsic::Runtime
     //   EndFrame(clock)
     // ============================================================
 
-    export struct RuntimeFramePacingDiagnostics
-    {
-        bool Valid{false};
-        bool PlatformContinueFrame{false};
-        bool RendererBeganFrame{false};
-        bool RendererCompletedFrame{false};
-        std::uint64_t FrameIndex{0u};
-        std::uint64_t TotalMicros{0u};
-        std::uint64_t PlatformBeginMicros{0u};
-        std::uint64_t ResizeMicros{0u};
-        std::uint64_t OperationalTransitionMicros{0u};
-        std::uint64_t FixedStepMicros{0u};
-        std::uint64_t ImGuiBeginMicros{0u};
-        std::uint64_t VariableTickMicros{0u};
-        std::uint64_t ImGuiEndMicros{0u};
-        std::uint64_t ImGuiEditorCallbackMicros{0u};
-        std::uint64_t ImGuiDrawDataCopyMicros{0u};
-        std::uint32_t ImGuiDrawListCount{0u};
-        std::uint32_t ImGuiVertexCount{0u};
-        std::uint32_t ImGuiIndexCount{0u};
-        std::uint32_t ImGuiCommandCount{0u};
-        std::uint32_t ImGuiFontAtlasCopyCount{0u};
-        std::uint32_t ImGuiFontAtlasReuseCount{0u};
-        bool          ImGuiFontAtlasCopied{false};
-        bool          ImGuiFrameUsedUserTexture{false};
-        std::uint64_t ImGuiFontAtlasByteCount{0u};
-        std::uint64_t ImGuiFontAtlasCopyBytes{0u};
-        std::uint64_t ImGuiVertexCopyBytes{0u};
-        std::uint64_t ImGuiIndexCopyBytes{0u};
-        std::uint64_t ImGuiCommandCopyBytes{0u};
-        std::uint64_t ImGuiOverlayCopyBytes{0u};
-        std::uint64_t PreRenderSetupMicros{0u};
-        std::uint64_t PreRenderTransformFlushMicros{0u};
-        bool          PreRenderTransformFlushRan{false};
-        std::uint32_t PreRenderTransformWorldUpdatedObserved{0u};
-        std::uint32_t PreRenderTransformDirtyTransformStamped{0u};
-        std::uint32_t PreRenderTransformWorldUpdatedCleared{0u};
-        std::uint64_t SelectionPickDrainMicros{0u};
-        std::uint64_t RenderContractMicros{0u};
-        std::uint64_t RenderBeginFrameMicros{0u};
-        std::uint64_t RenderExtractionMicros{0u};
-        std::uint64_t RenderPrepareMicros{0u};
-        std::uint64_t RenderExecuteMicros{0u};
-        std::uint64_t RenderEndFrameMicros{0u};
-        std::uint64_t RenderGraphCompileMicros{0u};
-        std::uint64_t RenderGraphExecuteMicros{0u};
-        std::uint64_t PresentMicros{0u};
-        std::uint64_t MaintenanceMicros{0u};
-        std::uint64_t SelectionReadbackMicros{0u};
-        std::uint64_t ReleaseRenderWorldMicros{0u};
-    };
-
     export class Engine
     {
     public:
@@ -645,48 +177,8 @@ namespace Extrinsic::Runtime
         [[nodiscard]] Graphics::IRenderer&    GetRenderer()      noexcept;
         [[nodiscard]] const Core::Config::EngineConfig&
             GetEngineConfig() const noexcept;
-        [[nodiscard]] Graphics::RenderRecipeConfigContext
-            CreateRenderRecipeConfigContext() const;
-        [[nodiscard]] Graphics::RenderRecipeConfigLoadResult
-            PreviewRenderRecipeConfigDocument(
-                std::string_view document,
-                std::string sourceId = "<memory>") const;
-        [[nodiscard]] Graphics::RenderRecipeConfigLoadResult
-            LoadRenderRecipeConfigPreviewFile(std::string path) const;
-        [[nodiscard]] RuntimeRenderRecipeApplyResult
-            ActivateRenderRecipeConfigDocument(
-                std::string_view document,
-                std::string sourceId = "<memory>",
-                RuntimeRenderRecipeActivationSource source =
-                    RuntimeRenderRecipeActivationSource::Programmatic);
-        [[nodiscard]] RuntimeRenderRecipeApplyResult ApplyRenderRecipeConfigPreview(
-            const Graphics::RenderRecipeConfigLoadResult& loadResult,
-            RuntimeRenderRecipeActivationSource source =
-                RuntimeRenderRecipeActivationSource::Programmatic);
-        [[nodiscard]] RuntimeRenderRecipeApplyResult LoadAndApplyRenderRecipeConfigFile(
-            std::string path,
-            RuntimeRenderRecipeActivationSource source =
-                RuntimeRenderRecipeActivationSource::Programmatic);
-        void ClearActiveRenderRecipeOverride() noexcept;
-        [[nodiscard]] const RuntimeRenderRecipeState&
-            GetRenderRecipeState() const noexcept;
-        [[nodiscard]] Core::Config::EngineConfigLoadResult
-            PreviewEngineConfigControlDocument(
-                std::string_view document,
-                std::string sourceId = "<memory>") const;
-        [[nodiscard]] Core::Config::EngineConfigLoadResult
-            LoadEngineConfigControlFile(std::string path) const;
-        [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEngineConfigHotSubset(
-            const Core::Config::EngineConfigLoadResult& loadResult,
-            RuntimeConfigControlSource source =
-                RuntimeConfigControlSource::Programmatic);
-        [[nodiscard]] RuntimeEngineConfigApplyResult
-            LoadAndApplyEngineConfigHotSubsetFile(
-                std::string path,
-                RuntimeConfigControlSource source =
-                    RuntimeConfigControlSource::Programmatic);
-        [[nodiscard]] const RuntimeEngineConfigControlState&
-            GetEngineConfigControlState() const noexcept;
+        [[nodiscard]] EngineConfigControl& GetConfigControl() noexcept;
+        [[nodiscard]] const EngineConfigControl& GetConfigControl() const noexcept;
         [[nodiscard]] Assets::AssetService&   GetAssetService()  noexcept;
         [[nodiscard]] Graphics::GpuAssetCache& GetGpuAssetCache() noexcept;
         [[nodiscard]] const RuntimeObjectSpaceNormalBakeQueueDiagnostics&
@@ -698,100 +190,51 @@ namespace Extrinsic::Runtime
         // thread/phase; the Engine drains once per frame between platform
         // input and the fixed-step simulation.
         [[nodiscard]] CommandBus&             Commands()         noexcept;
-        // ARCH-008 - queued-only kernel event bus (ADR-0024 D7). Publish from
-        // any thread; Engine pumps post-drain and post-simulation.
-        [[nodiscard]] EventBus&               Events()           noexcept;
-        // ARCH-009 - snapshot-in/result-out background jobs. Submit work to
-        // the shared CPU pool; Engine drains completions before pump B.
+        // ARCH-008 — queued-only kernel event bus (ADR-0024 D7). Publish
+        // from any thread/phase; the Engine pumps once after the command
+        // drain and once after fixed-step simulation.
+        [[nodiscard]] KernelEventBus&         Events()           noexcept;
+        // ARCH-009 — snapshot-in/result-out background jobs (ADR-0024 D8).
+        // Workers receive immutable snapshots and cancellation views; only the
+        // Engine-owned main-thread completion gate publishes job events.
         [[nodiscard]] JobService&             Jobs()             noexcept;
-        // ARCH-010 - kernel world registry. World lifetimes and active-world
-        // swaps are deferred to the frame boundary; GetScene() is the active
-        // world's registry for compatibility with existing single-world code.
+        // ARCH-010 — world registry owns scene lifetimes; legacy single-world
+        // accessors resolve through ActiveWorld() until module extractions
+        // carry WorldHandle explicitly.
         [[nodiscard]] WorldRegistry&          Worlds()           noexcept;
-        [[nodiscard]] const WorldRegistry&    Worlds()     const noexcept;
+        [[nodiscard]] const WorldRegistry&    Worlds() const     noexcept;
         [[nodiscard]] WorldHandle             ActiveWorld() const noexcept;
-        // ARCH-011 - kernel two-phase service registry (ADR-0024 D3). Modules
-        // Provide during OnRegister and Require/Find during OnResolve; a
-        // missing Require fails closed at boot. Exposed for the composition
-        // root and contract tests.
-        [[nodiscard]] ServiceRegistry&        Services()         noexcept;
-        // ARCH-011 - RuntimeModule composition (ADR-0024 D1/D12/D13). Add
-        // modules before Initialize(): it runs every module's OnRegister then
-        // every module's OnResolve (registration order is not load-bearing),
-        // wires their sim systems into the fixed-step graph and their frame
-        // hooks into RunFrame, and Shutdown() announces + pumps
-        // EngineWillShutDown before running OnShutdown in reverse order.
-        void AddModule(std::unique_ptr<IRuntimeModule> runtimeModule);
-        template <typename TModule, typename... TArgs>
-        TModule& EmplaceModule(TArgs&&... args)
+        // ARCH-011 — runtime modules register against EngineSetup, never an
+        // Engine&. Modules are registered before Initialize(); boot invokes all
+        // OnRegister callbacks, then all OnResolve callbacks after the
+        // two-phase ServiceRegistry has every provided service.
+        void AddModule(std::unique_ptr<IRuntimeModule> module);
+        template <typename TModule, typename... Args>
+        TModule& EmplaceModule(Args&&... args)
         {
-            auto owned = std::make_unique<TModule>(std::forward<TArgs>(args)...);
-            TModule& reference = *owned;
-            AddModule(std::move(owned));
-            return reference;
+            auto module = std::make_unique<TModule>(std::forward<Args>(args)...);
+            TModule& ref = *module;
+            AddModule(std::move(module));
+            return ref;
         }
-        // ARCH-011 contract-test seam: the composed module registration sink.
-        // Tests inspect the collected sim systems / frame hooks and drive the
-        // shared ApplySimSystems path against a scratch FrameGraph to prove
-        // registration-order independence without running the full frame loop.
-        [[nodiscard]] const ModuleRegistrationSink&
-            GetModuleRegistrationForTest() const noexcept;
-        // UI-001 Slice D — runtime-owned file/import command seam. Editor UI
-        // submits a path + payload hint here; Engine composes the promoted
-        // ASSETIO geometry/model/texture decoders, AssetService, and runtime
-        // handoffs. Platform drop events route through the same facade.
-        [[nodiscard]] Core::Expected<RuntimeAssetImportResult> ImportAssetFromPath(
-            RuntimeAssetImportRequest request);
-        [[nodiscard]] Core::Expected<RuntimeQueuedAssetImport> QueueModelTextureImport(
-            RuntimeAssetImportRequest request);
-        [[nodiscard]] Core::Expected<RuntimeAssetImportResult> ReimportAsset(
-            RuntimeAssetReimportRequest request);
-        [[nodiscard]] RuntimePostImportProcessorHandle RegisterPostImportProcessor(
-            RuntimePostImportProcessorDesc desc);
-        void UnregisterPostImportProcessor(
-            RuntimePostImportProcessorHandle handle);
-        [[nodiscard]] RuntimeImportEntityAuthoringPolicyHandle
-            RegisterImportEntityAuthoringPolicy(
-                RuntimeImportEntityAuthoringPolicyDesc desc);
-        void UnregisterImportEntityAuthoringPolicy(
-            RuntimeImportEntityAuthoringPolicyHandle handle);
-        [[nodiscard]] RuntimeImportCompletedHandlerHandle
-            RegisterImportCompletedHandler(RuntimeImportCompletedHandlerDesc desc);
-        void UnregisterImportCompletedHandler(
-            RuntimeImportCompletedHandlerHandle handle);
+        [[nodiscard]] ServiceRegistry& Services() noexcept;
+        [[nodiscard]] const ServiceRegistry& Services() const noexcept;
+        // RUNTIME-147 — runtime-owned asset import pipeline. Engine keeps
+        // composition ownership; callers use the subsystem surface directly
+        // instead of widening the Engine facade with import-specific methods.
+        [[nodiscard]] AssetImportPipeline& GetAssetImportPipeline() noexcept;
+        [[nodiscard]] const AssetImportPipeline& GetAssetImportPipeline() const noexcept;
+        // RUNTIME-148 — runtime-owned scene-document subsystem. Engine keeps
+        // composition ownership; callers use the subsystem surface directly
+        // instead of widening the Engine facade with scene-file methods.
+        [[nodiscard]] SceneDocument& GetSceneDocument() noexcept;
+        [[nodiscard]] const SceneDocument& GetSceneDocument() const noexcept;
         [[nodiscard]] RuntimeInputActionHandle RegisterInputAction(
             RuntimeInputActionDesc desc);
         void UnregisterInputAction(RuntimeInputActionHandle handle);
-        [[nodiscard]] const std::optional<RuntimeAssetImportEvent>&
-            GetLastAssetImportEvent() const noexcept;
-        [[nodiscard]] std::vector<RuntimeAssetIngestRecord>
-            GetAssetIngestRecordsForTest() const;
-        void SetModelTextureImportIOBackendFactoryForTest(
-            RuntimeIOBackendFactory factory);
-        [[nodiscard]] RuntimeAssetImportQueueSnapshot
-            GetAssetImportQueueSnapshot() const;
-        [[nodiscard]] std::size_t ClearCompletedAssetImports();
-        [[nodiscard]] Core::Result CancelAssetImport(
-            RuntimeAssetIngestHandle operation);
-        void ImportDroppedFilePaths(std::span<const std::string> paths);
         // Contract-test seam: replay a platform event through the same runtime
         // handler installed as the window listener during Initialize().
         void DispatchPlatformEventForTest(const Platform::Event& event);
-        // RUNTIME-098 — promoted scene persistence facade. Editor/UI code
-        // submits file paths here; Engine owns file IO, scene replacement, and
-        // runtime sidecar cleanup while the serializer stays backend-neutral.
-        [[nodiscard]] Core::Expected<SceneSerializationResult> SaveSceneToPath(
-            std::string path);
-        [[nodiscard]] Core::Expected<RuntimeQueuedSceneFileOperation>
-            QueueSceneSaveToPath(std::string path);
-        [[nodiscard]] Core::Expected<SceneDeserializationResult> LoadSceneFromPath(
-            std::string path);
-        [[nodiscard]] Core::Expected<RuntimeQueuedSceneFileOperation>
-            QueueSceneLoadFromPath(std::string path);
-        [[nodiscard]] const std::optional<RuntimeSceneFileEvent>&
-            GetLastSceneFileEvent() const noexcept;
-        [[nodiscard]] Core::Result NewSceneDocument();
-        [[nodiscard]] Core::Result CloseSceneDocument();
         // RUNTIME-089 Slice B — runtime/editor-owned selection authority.
         // Input ports / editor tools submit hover/click picks here; RunFrame
         // drains the coalesced pick into the renderer's SelectionSystem before
@@ -857,11 +300,11 @@ namespace Extrinsic::Runtime
         // contents — Register() before Initialize(), Resolve() after.
         [[nodiscard]] ReferenceSceneRegistry& GetReferenceSceneRegistry() noexcept;
         [[nodiscard]] bool IsReferenceSceneInstalled() const noexcept;
-        // GRAPHICS-029B/RUNTIME-081A: the optional CameraViewInput seed captured from
-        // the resolved provider's ReferenceScenePopulation. Empty when the
-        // reference scene is disabled or the provider returned no camera.
-        // The promoted camera-controller surface consumes this as initial
-        // state; it is retained as a test seam and no longer directly fills
+        // GRAPHICS-029B/RUNTIME-081A: the optional CameraViewInput seed captured
+        // from the installed reference-scene provider. Empty when the reference
+        // scene is disabled or the provider returned no camera. The promoted
+        // camera-controller surface consumes this as initial state; it is
+        // retained as a test seam and no longer directly fills
         // RenderFrameInput::Camera.
         [[nodiscard]] const std::optional<Graphics::CameraViewInput>&
             GetReferenceCameraSeed() const noexcept;
@@ -885,14 +328,6 @@ namespace Extrinsic::Runtime
         [[nodiscard]] std::uint64_t
             GetVisualizationAdapterBindingRevision() const noexcept;
 
-        // Runtime-owned GPU work lanes that must record commands inside the
-        // renderer frame command context and drain completion on the maintenance
-        // path. Engine owns only lifecycle ordering; participants own their
-        // domain-specific queues and public command surfaces.
-        [[nodiscard]] RuntimeGpuJobParticipantHandle
-            RegisterRuntimeGpuJobParticipant(RuntimeGpuJobParticipantDesc desc);
-        void UnregisterRuntimeGpuJobParticipant(
-            RuntimeGpuJobParticipantHandle handle);
         [[nodiscard]] DerivedJobHandle SubmitDerivedJob(DerivedJobDesc desc);
         void CancelDerivedJob(DerivedJobHandle handle);
         [[nodiscard]] DerivedJobQueueSnapshot GetDerivedJobQueueSnapshot() const;
@@ -917,82 +352,25 @@ namespace Extrinsic::Runtime
 
     private:
         void RunFrame();      // executes one full frame — called by Run()
-        // ARCH-011 - invoke module frame hooks for a phase with a narrow
-        // FrameHookContext built from the active world + kernel substrate
-        // (ADR-0024 D13). No-ops when no module registered a hook for `phase`.
-        void RunModuleFrameHooks(FramePhase phase, double frameDt, double alpha);
         void HandlePlatformEvent(const Platform::Event& event);
         void RequestExitFromWindowClose(std::string_view source);
         void HandleWindowDropEvent(const Platform::WindowDropEvent& event);
-        void QueueDroppedGeometryImport(
-            std::string path,
-            std::vector<Assets::AssetPayloadKind> payloadKinds);
-        [[nodiscard]] Core::Expected<RuntimeQueuedAssetImport>
-            QueueModelTextureImportWithIngest(
-                RuntimeAssetImportRequest request,
-                RuntimeAssetIngestSource source,
-                Assets::AssetId existingAsset = {});
-        void QueueDroppedModelTextureImport(
-            std::string path,
-            Assets::AssetPayloadKind payloadKind);
-        [[nodiscard]] Core::Expected<RuntimeAssetImportResult> ImportAssetFromPathWithIngest(
-            RuntimeAssetImportRequest request,
-            RuntimeAssetIngestSource source,
-            Assets::AssetId existingAsset);
-        [[nodiscard]] Core::Expected<RuntimeAssetImportResult> ImportAssetFromPathImpl(
-            RuntimeAssetImportRequest request,
-            Assets::AssetId existingAsset);
-        void RecordAssetImportEvent(
-            const RuntimeAssetImportRequest& request,
-            const Core::Expected<RuntimeAssetImportResult>& result,
-            RuntimeAssetIngestDiagnostic ingestDiagnostic);
-        void RecordSceneFileEvent(RuntimeSceneFileEvent event);
-        void ClearSceneRuntimeState();
-        void RefreshActiveScenePointer() noexcept;
-        void RebindActiveSceneRuntimeState();
 
         Core::Config::EngineConfig           m_Config;
         std::unique_ptr<IApplication>        m_Application;
+        std::vector<std::unique_ptr<IRuntimeModule>> m_RuntimeModules{};
         std::unique_ptr<Platform::IWindow>   m_Window;
         std::unique_ptr<RHI::IDevice>        m_Device;
         std::unique_ptr<Graphics::IRenderer> m_Renderer;
-        RuntimeRenderRecipeState             m_RenderRecipeState{};
-        RuntimeEngineConfigControlState      m_ConfigControlState{};
-        // RUNTIME-090 Slice B — runtime-side Dear ImGui adapter + the graphics
-        // overlay system it produces into. The overlay system instance is
-        // runtime-owned composition (the allowed runtime -> graphics edge) so
-        // the producer (this adapter) and the Pass.ImGui consumer
-        // (GRAPHICS-079) share one instance through
-        // IRenderer::SetImGuiOverlaySystem. The adapter is constructed in
-        // Initialize() after the Window and Renderer exist and torn down first
-        // in Shutdown() (it references the Window and the overlay system).
-        // Declared after m_Renderer / before m_RenderExtraction so the unique_ptr
-        // adapter is destroyed before the value-typed overlay system and the
-        // Window it borrows. The editor callback is stashed so it can be
-        // registered before Initialize() and re-applied across rebuilds.
-        Graphics::ImGuiOverlaySystem         m_ImGuiOverlay{};
-        std::function<void()>                m_ImGuiEditorCallback{};
-        std::unique_ptr<ImGuiAdapter>        m_ImGuiAdapter{};
-        struct RuntimeGpuJobParticipantRecord
-        {
-            RuntimeGpuJobParticipantHandle Handle{};
-            RuntimeGpuJobParticipantDesc Desc{};
-            Graphics::RuntimeFrameCommandHookHandle RendererHook{};
-        };
-        std::vector<RuntimeGpuJobParticipantRecord> m_RuntimeGpuJobParticipants{};
-        std::uint64_t m_NextRuntimeGpuJobParticipantHandle{1u};
-        RenderExtractionCache                 m_RenderExtraction;
-        // GRAPHICS-036C — runtime-owned render-world slot pool. Constructed in
-        // Initialize() sized from RenderConfig::SynchronousExtraction (held by
-        // unique_ptr because RenderWorldPool owns atomics and is neither copyable
-        // nor movable, so it cannot be resized by assignment). RunFrame drives the
-        // acquire/publish/acquire-current-or-previous/release sequence and mirrors
-        // its diagnostics into m_LastExtractionStats once per frame.
-        std::unique_ptr<RenderWorldPool>      m_RenderWorldPool{};
-        RuntimeRenderExtractionStats          m_LastExtractionStats{};
-        // Monotonic frame counter stamped onto pool slots for the consumer's
-        // frame-age computation; incremented once per RunFrame.
-        std::uint64_t                         m_FrameIndex{0u};
+        std::unique_ptr<EngineConfigControl> m_ConfigControl;
+        // RUNTIME-159 — runtime-side Dear ImGui overlay/adapter/callback
+        // bridge. Declared after m_Renderer / before render extraction so the
+        // borrowed renderer overlay attachment is cleared before teardown.
+        ImGuiEditorBridge                    m_ImGuiEditorBridge{};
+        // RUNTIME-163 — render extraction owner state and compatibility facades.
+        // Engine keeps frame ordering and dependent-subsystem wiring; the service
+        // owns the cache, pool, last stats, and frame-index counter.
+        RenderExtractionService               m_RenderExtractionService{};
         // RUNTIME-089 Slice B — selection authority; persists across frames so
         // in-flight picks correlate with their later readbacks.
         SelectionController                   m_SelectionController{};
@@ -1001,13 +379,10 @@ namespace Extrinsic::Runtime
         // save/load/import state here instead of keeping authoritative document
         // state in panel objects.
         EditorCommandHistory                  m_EditorCommandHistory{};
-        // RUNTIME-084 Slice B — runtime/editor transform-gizmo interaction and
-        // transient packet production. These are runtime-owned state; graphics
-        // receives copied TransformGizmoRenderPacket values only.
-        GizmoInteraction                      m_GizmoInteraction{};
-        GizmoUndoStack                        m_GizmoUndoStack{};
-        TransformGizmoRenderPacketBuilder     m_GizmoPacketBuilder{};
-        std::vector<ECS::EntityHandle>        m_GizmoSelectedEntities{};
+        // RUNTIME-162 — runtime/editor transform-gizmo frame service. Engine
+        // keeps frame order and public facades; the service owns interaction
+        // state, undo stack, selected-entity scratch, and packet production.
+        GizmoFrameService                    m_GizmoFrameService{};
         // RUNTIME-092 Slice B — runtime-owned StableId/render-id lookup sidecar.
         // Maintained incrementally from StableId component construct/update/
         // destroy events and attached to the controller in Initialize() so
@@ -1015,108 +390,54 @@ namespace Extrinsic::Runtime
         // (ECS/graphics hold no lookup state). Whole-scene replacement still
         // uses Rebuild() once at the replacement boundary.
         StableEntityLookup                    m_StableEntityLookup{};
-        // RUNTIME-093 Slice B2 — editor-facing refined sub-primitive of the last
-        // pick hit. Updated from the pick-readback drain in RunFrame; never read
-        // by graphics. Empty until the first pick resolves. The generation bumps
-        // whenever this optional is replaced/cleared so editor caches can key
-        // primitive-sensitive selected analysis without owning pick state.
-        std::optional<PrimitiveSelectionResult> m_LastRefinedPrimitive{};
-        std::uint64_t m_LastRefinedPrimitiveGeneration{0u};
-        // BUG-026 — per-sequence pick context captured when RunFrame drains a
-        // pending pick (issuing frame's inverse view-projection, viewport,
-        // pick ray, pixel-radius scale). Replayed when the matching readback
-        // arrives so the depth sample unprojects against the camera that
-        // issued the pick. Bounded mirror of the controller's in-flight FIFO.
-        struct InFlightPickContext
-        {
-            std::uint64_t       Sequence{0u};
-            PickReadbackContext Context{};
-        };
-        std::vector<InFlightPickContext>        m_InFlightPickContexts{};
+        // RUNTIME-157 — runtime-owned bridge for graphics pick readbacks,
+        // controller mutation, and editor-facing primitive refinement cache.
+        SelectionReadbackState                  m_SelectionReadback{};
 
         // CPU task graph — ECS system scheduling
         std::unique_ptr<Core::FrameGraph>      m_FrameGraph;
-        // Persistent streaming executor — cross-frame background work
-        std::unique_ptr<StreamingExecutor>      m_StreamingExecutor;
-        RuntimeIOBackendFactory                 m_ModelTextureImportIOBackendFactoryForTest{};
-        // Runtime/editor derived jobs — submitted through the streaming
-        // executor and applied on the maintenance lane.
-        std::unique_ptr<DerivedJobRegistry>     m_DerivedJobRegistry;
+        // RUNTIME-165 — runtime async work ownership. Engine keeps lifecycle
+        // ordering and compatibility facades; the service owns the persistent
+        // streaming executor plus derived-job registry and maintenance drains.
+        AsyncWorkService                        m_AsyncWorkService{};
         // Asset service — CPU payload authority
         std::unique_ptr<Assets::AssetService>  m_AssetService;
-        // GPU-side asset cache — bridges AssetId to refcounted GPU resources.
-        // Constructed after the renderer; destroyed before the renderer so
-        // BufferLease/TextureLease destructors run while their managers are
-        // still alive.
-        std::unique_ptr<Graphics::GpuAssetCache> m_GpuAssetCache;
-        RuntimeObjectSpaceNormalBakeQueue         m_ObjectSpaceNormalBakeQueue{};
-        Assets::AssetEventBus::ListenerToken     m_GpuAssetCacheListener{
-            Assets::AssetEventBus::InvalidToken};
-        std::unique_ptr<AssetModelTextureHandoff> m_AssetModelTextureHandoff;
-        std::unique_ptr<AssetModelSceneHandoff>   m_AssetModelSceneHandoff;
-        RuntimeAssetIngestStateMachine             m_AssetIngestStateMachine{};
-        std::vector<RuntimePostImportProcessorRecord> m_PostImportProcessors{};
-        std::uint64_t m_NextPostImportProcessorHandle{1u};
-        std::vector<RuntimeImportEntityAuthoringPolicyRecord>
-            m_ImportEntityAuthoringPolicies{};
-        std::uint64_t m_NextImportEntityAuthoringPolicyHandle{1u};
-        std::vector<RuntimeImportCompletedHandlerRecord>
-            m_ImportCompletedHandlers{};
-        std::uint64_t m_NextImportCompletedHandlerHandle{1u};
-        std::vector<RuntimeInputActionRecord> m_InputActions{};
-        std::uint64_t m_NextInputActionHandle{1u};
-        struct RuntimeAssetImportStreamingTask
-        {
-            RuntimeAssetIngestHandle Ingest{};
-            StreamingTaskHandle Streaming{};
-        };
-        std::vector<RuntimeAssetImportStreamingTask> m_AssetImportStreamingTasks{};
-        std::optional<RuntimeAssetImportEvent>     m_LastAssetImportEvent{};
-        std::uint64_t                              m_AssetImportEventSequence{0};
-        std::optional<RuntimeSceneFileEvent>       m_LastSceneFileEvent{};
-        std::uint64_t                              m_SceneFileEventSequence{0};
+        // RUNTIME-164 — GPU-side asset residency owner state. Engine keeps
+        // lifecycle/frame ordering and public facades; the service owns the
+        // cache, asset-event listener, model handoffs, and cache/handoff ticks.
+        AssetResidencyService                    m_AssetResidencyService{};
+        ObjectSpaceNormalBakeService             m_ObjectSpaceNormalBakeService{};
+        std::unique_ptr<AssetImportPipeline>      m_AssetImportPipeline;
+        std::unique_ptr<SceneDocument>            m_SceneDocument;
+        RuntimeInputActionRegistry            m_InputActions{};
         // ARCH-007 — kernel command bus; drained in RunFrame() pre-sim.
         CommandBus                             m_CommandBus{};
-        // ARCH-008 - queued-only kernel events; pumped twice per frame.
-        EventBus                               m_EventBus{};
-        // ARCH-009 - kernel background job service; completion gate runs
-        // main-thread before the post-simulation event pump.
+        // ARCH-008 — queued-only kernel events; pumped post-drain and post-sim.
+        KernelEventBus                         m_KernelEvents{};
+        // ARCH-009 — kernel background jobs; completions gate before pump B.
         JobService                             m_JobService{};
-        // ARCH-010 - kernel world registry owns scene registries. m_Scene is
-        // a borrowed active-world cache while existing engine-internal
-        // single-world call sites migrate to explicit WorldHandle plumbing.
-        WorldRegistry                          m_Worlds{};
+        // ARCH-011 — two-phase module service registry. Engine provides the
+        // always-present kernel services during module registration; feature
+        // modules provide their own synchronous infrastructure there and
+        // require/find dependencies only during resolution.
+        ServiceRegistry                        m_ServiceRegistry{};
+        // ARCH-010 — kernel world registry owns scene registries; m_Scene is
+        // the cached active-world pointer used by legacy single-world call
+        // sites until later module extractions carry WorldHandle explicitly.
+        WorldRegistry                          m_WorldRegistry{};
         ECS::Scene::Registry*                  m_Scene{};
-        // ARCH-011 - kernel two-phase service registry + RuntimeModule
-        // composition (ADR-0024 D1/D3/D12/D13). m_Services holds borrowed
-        // references providers publish in OnRegister; m_ModuleRegistration
-        // collects module-registered sim systems + frame hooks;
-        // m_Modules owns the composed modules for the engine lifetime.
-        // Declared after the kernel substrate so module objects tear down
-        // before the buses/worlds their handlers borrow.
-        ServiceRegistry                        m_Services{};
-        ModuleRegistrationSink                 m_ModuleRegistration{};
-        std::vector<std::unique_ptr<IRuntimeModule>> m_Modules{};
-        // Scoped connections must disconnect before their borrowed active
-        // registry can be switched or destroyed.
-        entt::scoped_connection m_StableIdConstructConnection{};
-        entt::scoped_connection m_StableIdUpdateConnection{};
-        entt::scoped_connection m_StableIdDestroyConnection{};
+        // RUNTIME-151 — owns StableId signal connections outside the Engine
+        // interface so EnTT plumbing stays behind StableEntityLookup.
+        // Declared after m_WorldRegistry so scoped disconnection runs before
+        // scene registries are destroyed during fallback/destructor unwinding.
+        StableEntityLookupSceneBinding         m_StableEntityLookupBinding{};
+        RuntimeModuleSchedule                  m_RuntimeModuleSchedule{};
 
-        // Reference-scene seam (GRAPHICS-029A/B): the registry is
-        // constructed empty so tests/impl-B can Register() before
-        // Initialize(). Initialize() then idempotently installs the
-        // production defaults for any unregistered selectors via
-        // RegisterDefaultReferenceProvidersIfAbsent before resolving the
-        // configured selector once. The returned entities/camera are stored
-        // so Shutdown can route teardown through the same provider and
-        // RunFrame can substitute RenderFrameInput::Camera until
-        // RUNTIME-081 (CameraControllers) takes over.
-        ReferenceSceneRegistry                  m_ReferenceSceneRegistry{};
-        ReferenceScenePopulation                m_ReferenceScenePopulation{};
-        std::optional<Graphics::CameraViewInput> m_ReferenceCamera{};
+        // Reference-scene seam (GRAPHICS-029A/B): constructed empty so
+        // tests/impl-B can Register() before Initialize(); install and teardown
+        // policy lives behind ReferenceSceneControl.
+        ReferenceSceneControl                  m_ReferenceSceneControl{};
         CameraControllerRegistry                m_CameraControllers{};
-        bool                                    m_ReferenceSceneInstalled{false};
 
         Core::FrameClock m_FrameClock{};
 
@@ -1132,22 +453,22 @@ namespace Extrinsic::Runtime
         bool m_WindowCloseLogged{false};
         RuntimeFramePacingDiagnostics m_LastFramePacingDiagnostics{};
 
-        [[nodiscard]] RuntimeGpuJobParticipantRecord*
-            FindRuntimeGpuJobParticipant(
-                RuntimeGpuJobParticipantHandle handle) noexcept;
-        [[nodiscard]] const RuntimeGpuJobParticipantRecord*
-            FindRuntimeGpuJobParticipant(
-                RuntimeGpuJobParticipantHandle handle) const noexcept;
-        void InstallRuntimeGpuJobParticipantFrameHook(
-            RuntimeGpuJobParticipantRecord& participant);
-        void UninstallRuntimeGpuJobParticipantFrameHook(
-            RuntimeGpuJobParticipantRecord& participant) noexcept;
-        void ShutdownRuntimeGpuJobParticipants();
-        void ConnectStableEntityLookupTracking();
-        void DisconnectStableEntityLookupTracking() noexcept;
+        // RUNTIME-160 — runtime-owned bridge from JobService GPU queue
+        // participants to the renderer frame-command hook.
+        JobServiceGpuQueueBridge m_JobServiceGpuQueueBridge{};
+        void RegisterRuntimeModulesForBoot();
+        void ResolveRuntimeModulesForBoot();
+        void RegisterRuntimeModuleSimSystemsForTick(
+            Core::FrameGraph& graph,
+            ECS::Scene::Registry& scene,
+            double fixedDt);
+        void RunRuntimeModuleFrameHooks(
+            FramePhase phase,
+            double frameDt,
+            double alpha);
+        void AnnounceAndShutdownRuntimeModules();
+        void RefreshActiveWorldScenePointer() noexcept;
+        void ApplyWorldRegistryMaintenance();
         void RebuildStableEntityLookupAfterSceneReplacement();
-        void OnStableIdConstruct(entt::registry& registry, entt::entity entity);
-        void OnStableIdUpdate(entt::registry& registry, entt::entity entity);
-        void OnStableIdDestroy(entt::registry& registry, entt::entity entity);
     };
 }

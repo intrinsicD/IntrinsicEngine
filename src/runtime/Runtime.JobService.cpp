@@ -1,474 +1,582 @@
 module;
 
+#include <algorithm>
 #include <atomic>
-#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
 module Extrinsic.Runtime.JobService;
 
 import Extrinsic.Core.Logging;
+import Extrinsic.Core.StrongHandle;
 import Extrinsic.Core.Tasks;
-import Extrinsic.Runtime.KernelEvents;
+import Extrinsic.RHI.CommandContext;
 
 namespace Extrinsic::Runtime
 {
     namespace
     {
-        enum class JobState : std::uint8_t
-        {
-            Queued,
-            Running,
-            Finished,
-            Publishing,
-            Completed,
-            Cancelled,
-            DroppedWorldScope,
-        };
-
         [[nodiscard]] bool IsTerminal(const JobState state) noexcept
         {
-            return state == JobState::Completed ||
-                   state == JobState::Cancelled ||
-                   state == JobState::DroppedWorldScope;
+            switch (state)
+            {
+            case JobState::Published:
+            case JobState::Dropped:
+            case JobState::Cancelled:
+            case JobState::Rejected:
+                return true;
+            case JobState::Invalid:
+            case JobState::Queued:
+            case JobState::Running:
+            case JobState::AwaitingGate:
+                return false;
+            }
+            return false;
         }
     }
 
-    JobCancellation::JobCancellation(
-        std::shared_ptr<std::atomic_bool> flag) noexcept
-        : m_Flag(std::move(flag))
+    struct JobService::SharedState
     {
-    }
-
-    bool JobCancellation::IsCancellationRequested() const noexcept
-    {
-        return m_Flag != nullptr &&
-               m_Flag->load(std::memory_order_acquire);
-    }
-
-    struct JobService::Impl
-    {
-        struct SharedJob
+        struct JobRecord
         {
             JobToken Token{};
-            WorldHandle Scope{};
+            WorldHandle Scope{DefaultWorldHandle};
+            JobTarget Target{JobTarget::CpuPool};
             std::string DebugName{};
-            std::shared_ptr<std::atomic_bool> Cancelled{
-                std::make_shared<std::atomic_bool>(false)};
-            std::move_only_function<std::shared_ptr<void>(const JobCancellation&)>
+            std::move_only_function<JobResultEnvelope(const JobCancellation&)>
                 Work{};
-            std::move_only_function<void(EventBus&, std::shared_ptr<void>)>
+            std::move_only_function<bool(KernelEventBus&,
+                                         const JobResultEnvelope&)>
                 PublishCompletion{};
-            std::shared_ptr<void> Result{};
-            bool Reaped{false};
+            std::shared_ptr<std::atomic<bool>> CancelRequested{
+                std::make_shared<std::atomic<bool>>(false)};
+            std::atomic<JobState> State{JobState::Queued};
         };
 
-        struct Record
+        struct CompletionRecord
         {
-            std::uint32_t Generation{1};
-            JobState State{JobState::Queued};
-            std::shared_ptr<SharedJob> Job{};
+            std::shared_ptr<JobRecord> Job{};
+            JobResultEnvelope Result{};
+        };
+
+        struct GpuQueueParticipantRecord
+        {
+            GpuQueueParticipantHandle Handle{};
+            std::string DebugName{};
+            WorldHandle Scope{DefaultWorldHandle};
+            std::function<void(RHI::ICommandContext&)> RecordFrameCommands{};
+            std::function<void()> DrainCompletedTransfers{};
+            std::function<bool()> HasInFlightWork{};
+            std::function<void()> ShutdownAfterDeviceIdle{};
         };
 
         mutable std::mutex Mutex{};
-        std::vector<Record> Records{};
-        std::vector<JobToken> CompletionQueue{};
+        std::unordered_map<JobToken,
+                           std::shared_ptr<JobRecord>,
+                           Core::StrongHandleHash<JobTokenTag>>
+            Jobs{};
+        std::vector<GpuQueueParticipantRecord> GpuQueueParticipants{};
+        std::vector<CompletionRecord> CompletionQueue{};
+        std::uint32_t NextTokenIndex{0u};
+        std::uint32_t NextGpuQueueParticipantIndex{0u};
         JobServiceStats Stats{};
-
-        [[nodiscard]] bool ResolveLocked(const JobToken token,
-                                         std::uint32_t& outIndex) const noexcept
-        {
-            if (!token.IsValid() || token.Index >= Records.size())
-            {
-                return false;
-            }
-            if (Records[token.Index].Generation != token.Generation)
-            {
-                return false;
-            }
-            outIndex = token.Index;
-            return true;
-        }
-
-        [[nodiscard]] JobServiceStats BuildStatsLocked() const
-        {
-            JobServiceStats result = Stats;
-            result.InFlight = 0;
-            for (const Record& record : Records)
-            {
-                if (!IsTerminal(record.State) && !record.Job->Reaped)
-                {
-                    ++result.InFlight;
-                }
-            }
-            result.PendingCompletions =
-                static_cast<std::uint64_t>(CompletionQueue.size());
-            return result;
-        }
-
-        [[nodiscard]] bool MarkRunning(const JobToken token)
-        {
-            std::lock_guard lock(Mutex);
-
-            std::uint32_t index = 0;
-            if (!ResolveLocked(token, index))
-            {
-                return false;
-            }
-
-            Record& record = Records[index];
-            if (IsTerminal(record.State))
-            {
-                return false;
-            }
-
-            record.State = JobState::Running;
-            Stats.Launched += 1;
-            return true;
-        }
-
-        void MarkFinished(JobToken token, std::shared_ptr<void> result)
-        {
-            std::lock_guard lock(Mutex);
-
-            std::uint32_t index = 0;
-            if (!ResolveLocked(token, index))
-            {
-                return;
-            }
-
-            Record& record = Records[index];
-            if (IsTerminal(record.State))
-            {
-                return;
-            }
-
-            record.Job->Result = std::move(result);
-            record.State = JobState::Finished;
-            CompletionQueue.push_back(token);
-            Stats.WorkerFinished += 1;
-        }
-
-        void RequestCancelLocked(Record& record)
-        {
-            if (IsTerminal(record.State) || record.State == JobState::Publishing)
-            {
-                return;
-            }
-
-            const bool alreadyCancelled =
-                record.Job->Cancelled->exchange(true, std::memory_order_acq_rel);
-            if (!alreadyCancelled)
-            {
-                Stats.CancelRequested += 1;
-            }
-        }
     };
 
     JobService::JobService()
-        : m_Impl(std::make_shared<Impl>())
+        : m_State(std::make_shared<SharedState>())
     {
     }
 
     JobService::~JobService() = default;
 
-    JobService::JobService(JobService&&) noexcept = default;
-    JobService& JobService::operator=(JobService&&) noexcept = default;
+    bool JobCancellation::IsCancelled() const noexcept
+    {
+        return m_Flag && m_Flag->load(std::memory_order_acquire);
+    }
 
     JobToken JobService::Submit(JobDesc desc)
     {
-        if (m_Impl == nullptr)
-        {
+        if (!m_State)
             return {};
-        }
 
         if (desc.Target != JobTarget::CpuPool)
         {
-            std::lock_guard lock(m_Impl->Mutex);
-            m_Impl->Stats.UnsupportedTarget += 1;
-            Core::Log::Warn(
-                "[JobService] Rejected job '{}' for unsupported target.",
+            std::lock_guard lock(m_State->Mutex);
+            m_State->Stats.RejectedJobs += 1;
+            Core::Log::Error(
+                "[JobService] Rejected job '{}': JobDesc targets only the CPU "
+                "pool; GPU frame work must register through "
+                "RegisterGpuQueueParticipant.",
                 desc.DebugName);
             return {};
         }
 
         if (!desc.Work || !desc.PublishCompletion)
         {
+            std::lock_guard lock(m_State->Mutex);
+            m_State->Stats.RejectedJobs += 1;
             Core::Log::Error(
-                "[JobService] Rejected job '{}' with incomplete callbacks.",
-                desc.DebugName);
-            return {};
-        }
-
-        if (!desc.Scope.IsValid())
-        {
-            Core::Log::Error(
-                "[JobService] Rejected job '{}' without a valid world scope.",
+                "[JobService] Rejected job '{}': work and completion publisher "
+                "must both be valid.",
                 desc.DebugName);
             return {};
         }
 
         if (!Core::Tasks::Scheduler::IsInitialized())
         {
+            std::lock_guard lock(m_State->Mutex);
+            m_State->Stats.RejectedJobs += 1;
             Core::Log::Error(
-                "[JobService] Rejected job '{}' because the scheduler is not "
-                "initialized.",
+                "[JobService] Rejected job '{}': shared Core::Tasks scheduler "
+                "is not initialized.",
                 desc.DebugName);
             return {};
         }
 
-        auto job = std::make_shared<Impl::SharedJob>();
-        job->Scope = desc.Scope;
-        job->DebugName = std::move(desc.DebugName);
-        job->Work = std::move(desc.Work);
-        job->PublishCompletion = std::move(desc.PublishCompletion);
-
-        JobToken token{};
+        auto job = std::make_shared<SharedState::JobRecord>();
         {
-            std::lock_guard lock(m_Impl->Mutex);
-            const auto index = static_cast<std::uint32_t>(m_Impl->Records.size());
-            token = JobToken{index, 1u};
-            job->Token = token;
-            m_Impl->Records.push_back(Impl::Record{
-                .Generation = token.Generation,
-                .State = JobState::Queued,
-                .Job = job});
-            m_Impl->Stats.Submitted += 1;
+            std::lock_guard lock(m_State->Mutex);
+            job->Token = JobToken{m_State->NextTokenIndex++, 1u};
+            job->Scope = desc.Scope.IsValid() ? desc.Scope : DefaultWorldHandle;
+            job->Target = desc.Target;
+            job->DebugName = std::move(desc.DebugName);
+            job->Work = std::move(desc.Work);
+            job->PublishCompletion = std::move(desc.PublishCompletion);
+            m_State->Jobs.emplace(job->Token, job);
+            m_State->Stats.SubmittedJobs += 1;
         }
 
-        std::weak_ptr<Impl> weakImpl{m_Impl};
-        Core::Tasks::Scheduler::Dispatch(
-            [weakImpl = std::move(weakImpl), job]() mutable
+        const std::shared_ptr<SharedState> state = m_State;
+        Core::Tasks::Scheduler::Dispatch([state, job]() mutable
+        {
+            if (job->CancelRequested->load(std::memory_order_acquire))
             {
-                const std::shared_ptr<Impl> impl = weakImpl.lock();
-                if (impl == nullptr)
-                {
-                    return;
-                }
+                job->State.store(JobState::Cancelled, std::memory_order_release);
+                return;
+            }
 
-                if (!impl->MarkRunning(job->Token))
-                {
-                    return;
-                }
+            job->State.store(JobState::Running, std::memory_order_release);
 
-                std::shared_ptr<void> result{};
-                const JobCancellation cancellation{job->Cancelled};
-                if (!cancellation.IsCancellationRequested())
-                {
-                    result = job->Work(cancellation);
-                }
+            JobResultEnvelope result =
+                job->Work(JobCancellation(job->CancelRequested));
 
-                impl->MarkFinished(job->Token, std::move(result));
-            });
+            if (job->CancelRequested->load(std::memory_order_acquire))
+            {
+                job->State.store(JobState::Cancelled, std::memory_order_release);
+                return;
+            }
 
-        return token;
+            if (!result.IsValid())
+            {
+                job->State.store(JobState::Dropped, std::memory_order_release);
+                std::lock_guard lock(state->Mutex);
+                state->Stats.DroppedCompletions += 1;
+                Core::Log::Error(
+                    "[JobService] Job '{}' produced an empty result envelope; "
+                    "completion dropped.",
+                    job->DebugName);
+                return;
+            }
+
+            {
+                std::lock_guard lock(state->Mutex);
+                state->CompletionQueue.push_back(SharedState::CompletionRecord{
+                    .Job = job,
+                    .Result = std::move(result),
+                });
+            }
+            job->State.store(JobState::AwaitingGate, std::memory_order_release);
+        });
+
+        return job->Token;
     }
 
-    void JobService::Cancel(JobToken token)
+    bool JobService::Cancel(const JobToken token)
     {
-        if (m_Impl == nullptr || !token.IsValid())
-        {
-            return;
-        }
-
-        std::lock_guard lock(m_Impl->Mutex);
-        std::uint32_t index = 0;
-        if (!m_Impl->ResolveLocked(token, index))
-        {
-            return;
-        }
-        m_Impl->RequestCancelLocked(m_Impl->Records[index]);
-    }
-
-    bool JobService::IsComplete(JobToken token) const
-    {
-        if (m_Impl == nullptr || !token.IsValid())
-        {
+        if (!token.IsValid() || !m_State)
             return false;
-        }
 
-        std::lock_guard lock(m_Impl->Mutex);
-        std::uint32_t index = 0;
-        if (!m_Impl->ResolveLocked(token, index))
+        std::shared_ptr<SharedState::JobRecord> job;
         {
-            return false;
+            std::lock_guard lock(m_State->Mutex);
+            const auto it = m_State->Jobs.find(token);
+            if (it == m_State->Jobs.end())
+                return false;
+            job = it->second;
+            if (!job || IsTerminal(job->State.load(std::memory_order_acquire)))
+                return false;
+
+            const bool alreadyCancelled =
+                job->CancelRequested->exchange(true, std::memory_order_acq_rel);
+            if (!alreadyCancelled)
+                m_State->Stats.CancelledJobs += 1;
+            return !alreadyCancelled;
         }
-        return IsTerminal(m_Impl->Records[index].State);
     }
 
-    std::uint32_t JobService::CancelAllForWorld(WorldHandle world)
+    std::uint64_t JobService::CancelAllForWorld(const WorldHandle world)
     {
-        if (m_Impl == nullptr || !world.IsValid())
-        {
+        if (!world.IsValid() || !m_State)
             return 0;
+
+        std::vector<JobToken> tokens;
+        {
+            std::lock_guard lock(m_State->Mutex);
+            for (const auto& [token, job] : m_State->Jobs)
+            {
+                if (job && job->Scope == world &&
+                    !IsTerminal(job->State.load(std::memory_order_acquire)))
+                    tokens.push_back(token);
+            }
         }
 
-        std::uint32_t cancelled = 0;
-        std::lock_guard lock(m_Impl->Mutex);
-        for (Impl::Record& record : m_Impl->Records)
+        std::uint64_t cancelled = 0;
+        for (const JobToken token : tokens)
         {
-            if (record.Job->Scope != world ||
-                IsTerminal(record.State) ||
-                record.State == JobState::Publishing)
-            {
-                continue;
-            }
-
-            const bool wasCancelled =
-                record.Job->Cancelled->load(std::memory_order_acquire);
-            m_Impl->RequestCancelLocked(record);
-            if (!wasCancelled)
-            {
-                ++cancelled;
-            }
+            if (Cancel(token))
+                cancelled += 1;
         }
         return cancelled;
     }
 
-    void JobService::DrainCompletions(EventBus& events)
+    std::uint64_t JobService::CancelAll()
     {
-        if (m_Impl == nullptr)
+        if (!m_State)
+            return 0;
+
+        std::vector<JobToken> tokens;
         {
-            return;
+            std::lock_guard lock(m_State->Mutex);
+            tokens.reserve(m_State->Jobs.size());
+            for (const auto& [token, job] : m_State->Jobs)
+            {
+                if (job &&
+                    !IsTerminal(job->State.load(std::memory_order_acquire)))
+                    tokens.push_back(token);
+            }
         }
 
-        std::vector<JobToken> completions;
+        std::uint64_t cancelled = 0;
+        for (const JobToken token : tokens)
         {
-            std::lock_guard lock(m_Impl->Mutex);
-            completions.swap(m_Impl->CompletionQueue);
-            m_Impl->Stats.LastDrainPublished = 0;
-            m_Impl->Stats.LastDrainDropped = 0;
+            if (Cancel(token))
+                cancelled += 1;
+        }
+        return cancelled;
+    }
+
+    bool JobService::IsComplete(const JobToken token) const
+    {
+        return IsTerminal(GetState(token));
+    }
+
+    JobState JobService::GetState(const JobToken token) const
+    {
+        if (!token.IsValid() || !m_State)
+            return JobState::Invalid;
+
+        std::lock_guard lock(m_State->Mutex);
+        const auto it = m_State->Jobs.find(token);
+        if (it == m_State->Jobs.end() || !it->second)
+            return JobState::Invalid;
+        return it->second->State.load(std::memory_order_acquire);
+    }
+
+    std::uint64_t JobService::DrainCompletions(KernelEventBus& events)
+    {
+        if (!m_State)
+            return 0;
+
+        std::vector<SharedState::CompletionRecord> batch;
+        {
+            std::lock_guard lock(m_State->Mutex);
+            batch.swap(m_State->CompletionQueue);
+            m_State->Stats.CompletionDrains += 1;
+            m_State->Stats.LastDrainFinished =
+                static_cast<std::uint64_t>(batch.size());
+            m_State->Stats.LastDrainPublished = 0;
+            m_State->Stats.LastDrainDropped = 0;
         }
 
         std::uint64_t published = 0;
         std::uint64_t dropped = 0;
-
-        for (const JobToken token : completions)
+        for (const SharedState::CompletionRecord& completion : batch)
         {
-            std::move_only_function<void(EventBus&, std::shared_ptr<void>)>
-                publish{};
-            std::shared_ptr<void> result{};
-            bool dropCancelled = false;
-            bool dropWorldScope = false;
-
+            const std::shared_ptr<SharedState::JobRecord>& job = completion.Job;
+            if (!job)
             {
-                std::lock_guard lock(m_Impl->Mutex);
-                std::uint32_t index = 0;
-                if (!m_Impl->ResolveLocked(token, index))
-                {
-                    continue;
-                }
-
-                Impl::Record& record = m_Impl->Records[index];
-                if (IsTerminal(record.State))
-                {
-                    continue;
-                }
-
-                if (record.Job->Cancelled->load(std::memory_order_acquire))
-                {
-                    record.State = JobState::Cancelled;
-                    record.Job->Result.reset();
-                    dropCancelled = true;
-                }
-                else if (!record.Job->Scope.IsValid())
-                {
-                    record.State = JobState::DroppedWorldScope;
-                    record.Job->Result.reset();
-                    dropWorldScope = true;
-                }
-                else
-                {
-                    record.State = JobState::Publishing;
-                    result = std::move(record.Job->Result);
-                    publish = std::move(record.Job->PublishCompletion);
-                }
-            }
-
-            if (dropCancelled || dropWorldScope)
-            {
-                ++dropped;
-                std::lock_guard lock(m_Impl->Mutex);
-                if (dropCancelled)
-                {
-                    m_Impl->Stats.DroppedCancelled += 1;
-                }
-                if (dropWorldScope)
-                {
-                    m_Impl->Stats.DroppedWorldScope += 1;
-                }
+                dropped += 1;
                 continue;
             }
 
-            if (publish)
+            if (job->CancelRequested->load(std::memory_order_acquire))
             {
-                publish(events, std::move(result));
+                job->State.store(JobState::Cancelled, std::memory_order_release);
+                dropped += 1;
+                continue;
             }
 
+            const bool didPublish =
+                job->PublishCompletion(events, completion.Result);
+            if (didPublish)
             {
-                std::lock_guard lock(m_Impl->Mutex);
-                std::uint32_t index = 0;
-                if (m_Impl->ResolveLocked(token, index))
-                {
-                    m_Impl->Records[index].State = JobState::Completed;
-                    m_Impl->Stats.PublishedCompletions += 1;
-                    ++published;
-                }
+                job->State.store(JobState::Published, std::memory_order_release);
+                published += 1;
+            }
+            else
+            {
+                job->State.store(JobState::Dropped, std::memory_order_release);
+                dropped += 1;
+                Core::Log::Error(
+                    "[JobService] Job '{}' completion publisher rejected result "
+                    "type '{}'; completion dropped.",
+                    job->DebugName,
+                    completion.Result.TypeName());
             }
         }
 
         {
-            std::lock_guard lock(m_Impl->Mutex);
-            m_Impl->Stats.LastDrainPublished = published;
-            m_Impl->Stats.LastDrainDropped = dropped;
+            std::lock_guard lock(m_State->Mutex);
+            m_State->Stats.CompletedJobs += published;
+            m_State->Stats.PublishedCompletions += published;
+            m_State->Stats.DroppedCompletions += dropped;
+            m_State->Stats.LastDrainPublished = published;
+            m_State->Stats.LastDrainDropped = dropped;
         }
+        return published;
     }
 
-    std::uint32_t JobService::ReapCompleted()
+    std::uint64_t JobService::ReapCompleted()
     {
-        if (m_Impl == nullptr)
-        {
+        if (!m_State)
             return 0;
-        }
 
-        std::uint32_t reaped = 0;
-        std::lock_guard lock(m_Impl->Mutex);
-        for (Impl::Record& record : m_Impl->Records)
+        std::uint64_t reaped = 0;
+        std::lock_guard lock(m_State->Mutex);
+        for (auto it = m_State->Jobs.begin(); it != m_State->Jobs.end();)
         {
-            if (!record.Job->Reaped && IsTerminal(record.State))
+            const std::shared_ptr<SharedState::JobRecord>& job = it->second;
+            if (!job ||
+                IsTerminal(job->State.load(std::memory_order_acquire)))
             {
-                record.Job->Reaped = true;
-                ++reaped;
+                it = m_State->Jobs.erase(it);
+                reaped += 1;
+            }
+            else
+            {
+                ++it;
             }
         }
-        m_Impl->Stats.Reaped += reaped;
+        m_State->Stats.ReapedJobs += reaped;
         return reaped;
     }
 
     JobServiceStats JobService::Stats() const
     {
-        if (m_Impl == nullptr)
+        if (!m_State)
+            return {};
+
+        std::lock_guard lock(m_State->Mutex);
+        JobServiceStats stats = m_State->Stats;
+        for (const auto& [_, job] : m_State->Jobs)
+        {
+            if (!job)
+                continue;
+
+            switch (job->State.load(std::memory_order_acquire))
+            {
+            case JobState::Queued:
+                stats.QueuedJobs += 1;
+                stats.InFlightJobs += 1;
+                break;
+            case JobState::Running:
+                stats.RunningJobs += 1;
+                stats.InFlightJobs += 1;
+                break;
+            case JobState::AwaitingGate:
+                stats.AwaitingGateJobs += 1;
+                stats.InFlightJobs += 1;
+                break;
+            case JobState::Invalid:
+            case JobState::Published:
+            case JobState::Dropped:
+            case JobState::Cancelled:
+            case JobState::Rejected:
+                break;
+            }
+        }
+        return stats;
+    }
+
+    GpuQueueParticipantHandle JobService::RegisterGpuQueueParticipant(
+        GpuQueueParticipantDesc desc)
+    {
+        if (!m_State)
+            return {};
+
+        if (!desc.RecordFrameCommands && !desc.DrainCompletedTransfers &&
+            !desc.HasInFlightWork && !desc.ShutdownAfterDeviceIdle)
         {
             return {};
         }
 
-        std::lock_guard lock(m_Impl->Mutex);
-        return m_Impl->BuildStatsLocked();
+        std::lock_guard lock(m_State->Mutex);
+        SharedState::GpuQueueParticipantRecord record{};
+        record.Handle =
+            GpuQueueParticipantHandle{m_State->NextGpuQueueParticipantIndex++, 1u};
+        record.DebugName = std::move(desc.DebugName);
+        record.Scope = desc.Scope.IsValid() ? desc.Scope : DefaultWorldHandle;
+        record.RecordFrameCommands = std::move(desc.RecordFrameCommands);
+        record.DrainCompletedTransfers = std::move(desc.DrainCompletedTransfers);
+        record.HasInFlightWork = std::move(desc.HasInFlightWork);
+        record.ShutdownAfterDeviceIdle = std::move(desc.ShutdownAfterDeviceIdle);
+        m_State->GpuQueueParticipants.push_back(std::move(record));
+        return m_State->GpuQueueParticipants.back().Handle;
     }
 
-    std::size_t JobService::PendingCompletionCount() const
+    void JobService::UnregisterGpuQueueParticipant(
+        const GpuQueueParticipantHandle handle,
+        std::function<void()> waitForGpuIdle)
     {
-        if (m_Impl == nullptr)
+        if (!handle.IsValid() || !m_State)
+            return;
+
+        SharedState::GpuQueueParticipantRecord record{};
         {
-            return 0;
+            std::lock_guard lock(m_State->Mutex);
+            const auto it = std::ranges::find_if(
+                m_State->GpuQueueParticipants,
+                [handle](const SharedState::GpuQueueParticipantRecord& participant) noexcept
+                {
+                    return participant.Handle == handle;
+                });
+            if (it == m_State->GpuQueueParticipants.end())
+                return;
+
+            record = std::move(*it);
+            m_State->GpuQueueParticipants.erase(it);
         }
 
-        std::lock_guard lock(m_Impl->Mutex);
-        return m_Impl->CompletionQueue.size();
+        const bool hasInFlightWork = record.HasInFlightWork
+            ? record.HasInFlightWork()
+            : static_cast<bool>(record.RecordFrameCommands);
+        if (hasInFlightWork && waitForGpuIdle)
+            waitForGpuIdle();
+        if (record.ShutdownAfterDeviceIdle)
+            record.ShutdownAfterDeviceIdle();
+    }
+
+    void JobService::RecordGpuQueueFrameCommands(
+        RHI::ICommandContext& commandContext)
+    {
+        if (!m_State)
+            return;
+
+        std::vector<std::function<void(RHI::ICommandContext&)>> callbacks;
+        {
+            std::lock_guard lock(m_State->Mutex);
+            callbacks.reserve(m_State->GpuQueueParticipants.size());
+            for (const SharedState::GpuQueueParticipantRecord& participant :
+                 m_State->GpuQueueParticipants)
+            {
+                if (participant.RecordFrameCommands)
+                    callbacks.push_back(participant.RecordFrameCommands);
+            }
+        }
+
+        for (const std::function<void(RHI::ICommandContext&)>& callback :
+             callbacks)
+        {
+            callback(commandContext);
+        }
+    }
+
+    std::uint64_t JobService::DrainGpuQueueCompletedTransfers()
+    {
+        if (!m_State)
+            return 0;
+
+        std::vector<std::function<void()>> callbacks;
+        {
+            std::lock_guard lock(m_State->Mutex);
+            callbacks.reserve(m_State->GpuQueueParticipants.size());
+            for (const SharedState::GpuQueueParticipantRecord& participant :
+                 m_State->GpuQueueParticipants)
+            {
+                if (participant.DrainCompletedTransfers)
+                    callbacks.push_back(participant.DrainCompletedTransfers);
+            }
+        }
+
+        for (const std::function<void()>& callback : callbacks)
+        {
+            callback();
+        }
+        return static_cast<std::uint64_t>(callbacks.size());
+    }
+
+    bool JobService::HasGpuQueueWork() const
+    {
+        if (!m_State)
+            return false;
+
+        std::vector<std::function<bool()>> probes;
+        bool hasUnconditionalFrameParticipant = false;
+        {
+            std::lock_guard lock(m_State->Mutex);
+            probes.reserve(m_State->GpuQueueParticipants.size());
+            for (const SharedState::GpuQueueParticipantRecord& participant :
+                 m_State->GpuQueueParticipants)
+            {
+                if (participant.HasInFlightWork)
+                {
+                    probes.push_back(participant.HasInFlightWork);
+                }
+                else if (participant.RecordFrameCommands)
+                {
+                    hasUnconditionalFrameParticipant = true;
+                }
+            }
+        }
+
+        if (hasUnconditionalFrameParticipant)
+            return true;
+
+        for (const std::function<bool()>& probe : probes)
+        {
+            if (probe())
+                return true;
+        }
+        return false;
+    }
+
+    std::uint64_t JobService::ShutdownGpuQueueParticipants(
+        std::function<void()> waitForGpuIdle)
+    {
+        if (!m_State)
+            return 0;
+
+        std::vector<GpuQueueParticipantHandle> handles;
+        {
+            std::lock_guard lock(m_State->Mutex);
+            handles.reserve(m_State->GpuQueueParticipants.size());
+            for (const SharedState::GpuQueueParticipantRecord& participant :
+                 m_State->GpuQueueParticipants)
+            {
+                handles.push_back(participant.Handle);
+            }
+        }
+
+        for (auto it = handles.rbegin(); it != handles.rend(); ++it)
+        {
+            UnregisterGpuQueueParticipant(*it, waitForGpuIdle);
+        }
+        return static_cast<std::uint64_t>(handles.size());
     }
 }

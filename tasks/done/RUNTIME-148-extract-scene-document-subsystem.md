@@ -3,8 +3,19 @@ id: RUNTIME-148
 theme: F
 depends_on: []
 maturity_target: Operational
+completed: 2026-07-08
 ---
 # RUNTIME-148 — Extract the scene-document facade out of Engine
+
+## Status
+- Done 2026-07-08 at `Operational`.
+- Runtime scene persistence now lives in `Extrinsic.Runtime.SceneDocument`,
+  exposed from `Engine::GetSceneDocument()` without keeping delegating
+  scene-file methods on `Engine`.
+- The moved subsystem owns direct and queued scene save/load, new/close
+  document behavior, scene-file events, serializable-scene snapshots, and the
+  scene replacement cleanup/rebuild ordering.
+- PR/commit: pending.
 
 ## Goal
 - Move the scene persistence facade (`RUNTIME-098`/`RUNTIME-142` surface) —
@@ -58,51 +69,68 @@ maturity_target: Operational
 - Known consumers to update: `Runtime.SandboxEditorUi` (editor file menu),
   Sandbox app code, `Test.RuntimeSceneLifecycle.cpp`, and any acceptance
   tests driving save/load through `Engine`.
+- ARCH-013 re-review (2026-07-08): Decision unchanged. Scene persistence stays
+  an engine-owned world-policy facade for this task; if later world preview or
+  multi-world persistence changes the shape, that follow-up must use
+  `WorldRegistry` handles and module services rather than `Engine&`
+  pass-through. This extraction does not need a new gate.
 - Part of the `Runtime.Engine` decomposition series (`RUNTIME-146..151`).
 
-- Transitional facade (ADR-0024): the `Engine::Get{X}()` accessor this task adds is a **transitional landing**, not the end state. Per ADR-0024 D9/D12 and the [kernel target-state](../../../docs/architecture/kernel-target-state.md) scorecard (`Engine::GetX()` domain-facade accessors = 0), its conversion to a RuntimeModule / Resolve-phase service is owned by `ARCH-013` (per-subsystem decision) and tracked by `ARCH-014`. This task extracts the subsystem; it does not make the accessor permanent.
+- Transitional facade (ADR-0024): the `Engine::Get{X}()` accessor this task adds is a **transitional landing**, not the end state. Per ADR-0024 D9/D12 and the [kernel target-state](../../docs/architecture/kernel-target-state.md) scorecard (`Engine::GetX()` domain-facade accessors = 0), its conversion to a RuntimeModule / Resolve-phase service is owned by `ARCH-013` (per-subsystem decision) and tracked by `ARCH-014`. This task extracts the subsystem; it does not make the accessor permanent.
 ## Required changes
-- [ ] Add `Extrinsic.Runtime.SceneDocument` interface + implementation
+- [x] Add `Extrinsic.Runtime.SceneDocument` interface + implementation
       units under `src/runtime/`, registered in `src/runtime/CMakeLists.txt`.
-- [ ] Move the methods, state, exported types, and snapshot helpers listed
+- [x] Move the methods, state, exported types, and snapshot helpers listed
       in Context verbatim.
-- [ ] Construct/destroy the subsystem in `Engine::Initialize()` /
+- [x] Construct/destroy the subsystem in `Engine::Initialize()` /
       `Shutdown()`; keep the scene-replacement side-effect ordering
       identical to the five-step sequence in Context (sidecar clear
       against the outgoing scene → lookup disconnect → registry
       replacement → lookup rebuild/clear → history document reset).
-- [ ] Add `Engine::GetSceneDocument()` (and `const` overload); migrate
+- [x] Add `Engine::GetSceneDocument()` (and `const` overload); migrate
       call sites; do not keep delegating methods on `Engine`.
-- [ ] Keep drop-event and import paths (owned elsewhere) compiling against
+- [x] Keep drop-event and import paths (owned elsewhere) compiling against
       the moved types.
 
 ## Tests
-- [ ] `Test.RuntimeSceneLifecycle.cpp` passes with only import/name
+- [x] `Test.RuntimeSceneLifecycle.cpp` passes with only import/name
       updates (behavior-preservation evidence for save/load/new/close and
       the event log).
-- [ ] The `RUNTIME-142` slow-IO regression (frame loop advances while a
+- [x] The `RUNTIME-142` slow-IO regression (frame loop advances while a
       queued scene save/load is blocked) still passes.
-- [ ] Default CPU gate stays green:
+- [x] Default CPU gate stays green:
       `ctest --test-dir build/ci -LE 'gpu|vulkan|slow|flaky-quarantine'`.
 
 ## Docs
-- [ ] Update `src/runtime/README.md` module list for the new module.
-- [ ] Regenerate module inventories per `intrinsicengine-docs-sync`.
-- [ ] Update `tasks/backlog/runtime/README.md` status line on retirement.
+- [x] Update `src/runtime/README.md` module list for the new module.
+- [x] Regenerate module inventories per `intrinsicengine-docs-sync`.
+- [x] Update `tasks/backlog/runtime/README.md` status line on retirement.
 
 ## Acceptance criteria
-- [ ] `Runtime.Engine.cppm` no longer declares any scene-file method,
+- [x] `Runtime.Engine.cppm` no longer declares any scene-file method,
       event type, or member listed in Context.
-- [ ] Scene replacement side-effect ordering is unchanged and covered by a
+- [x] Scene replacement side-effect ordering is unchanged and covered by a
       test (existing or extended `Test.RuntimeSceneLifecycle` case).
-- [ ] CPU gate and layering check pass.
+- [x] CPU gate and layering check pass.
 
 ## Verification
 ```bash
 cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+build/ci/tests/contract/runtime/IntrinsicRuntimeContractTests \
+  --gtest_filter='RuntimeSceneLifecycle.*:SelectionStableLookupComposition.SceneLoadRebuildsStableLookupAtReplacementBoundary:SandboxEditorUi.*SceneFile*'
+ctest --test-dir build/ci --output-on-failure \
+  -R 'RuntimeSceneLifecycle|SelectionStableLookupComposition.SceneLoadRebuildsStableLookupAtReplacementBoundary|SandboxEditorUi.SceneFile' \
+  -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root .
+python3 tools/repo/check_root_hygiene.py --root .
+git diff --check
 ```
 
 ## Forbidden changes

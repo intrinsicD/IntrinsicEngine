@@ -2,6 +2,7 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <span>
 #include <unordered_map>
@@ -160,5 +161,34 @@ export namespace Extrinsic::Runtime
         std::unordered_map<std::uint32_t, StableId> m_RenderIdToStableId{};
 
         StableEntityLookupDiagnostics m_Diagnostics{};
+    };
+
+    // Runtime-owned scene binding for StableId component signals.
+    //
+    // This keeps EnTT signal plumbing behind the StableEntityLookup module
+    // boundary while preserving the same incremental Track/Forget behavior.
+    class StableEntityLookupSceneBinding
+    {
+    public:
+        using Registry = StableEntityLookup::Registry;
+
+        StableEntityLookupSceneBinding();
+        ~StableEntityLookupSceneBinding();
+
+        StableEntityLookupSceneBinding(const StableEntityLookupSceneBinding&) = delete;
+        StableEntityLookupSceneBinding& operator=(const StableEntityLookupSceneBinding&) = delete;
+        StableEntityLookupSceneBinding(StableEntityLookupSceneBinding&&) noexcept;
+        StableEntityLookupSceneBinding& operator=(StableEntityLookupSceneBinding&&) noexcept;
+
+        void Connect(StableEntityLookup& lookup, Registry& registry);
+        void Disconnect() noexcept;
+        void Rebuild(StableEntityLookup& lookup, Registry* registry);
+
+        [[nodiscard]] bool IsConnected() const noexcept;
+
+    private:
+        struct Impl;
+
+        std::unique_ptr<Impl> m_Impl;
     };
 }

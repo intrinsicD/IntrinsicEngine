@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
 import Extrinsic.Core.Config.Render;
-import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.DeviceBootstrap;
 
 TEST(RuntimeDeviceSelection, DefaultsToNullFallbackForVulkanBackend)
 {
@@ -38,4 +38,3 @@ TEST(RuntimeDeviceSelection, SelectsPromotedVulkanOnlyWhenConfigAndBuildOptIn)
     EXPECT_TRUE(selection.UsePromotedVulkanDevice);
     EXPECT_FALSE(selection.FallsBackToNullDevice);
 }
-

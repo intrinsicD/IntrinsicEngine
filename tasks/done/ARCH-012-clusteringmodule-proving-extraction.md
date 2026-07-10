@@ -3,8 +3,35 @@ id: ARCH-012
 theme: F
 depends_on:
   - ARCH-011
+maturity_target: Operational
+completed: 2026-07-08
 ---
 # ARCH-012 — ClusteringModule: proving extraction onto the kernel seams
+
+## Status
+
+- Retired on 2026-07-08 at `Operational`.
+- PR: pending. Commit: pending local change.
+- Runtime now owns `Extrinsic.Runtime.ClusteringModule` under
+  `src/runtime/Modules/Clustering/`, with `RunKMeans`,
+  `KMeansRunCompleted`, `ClusterLabelsChanged`, `ClusteringService`, and
+  `ClusteringModule`.
+- Sandbox composition registers the module from app startup. The editor submits
+  a `RunKMeans` command; the module snapshots active-world mesh/graph/point
+  cloud positions, submits a world-scoped CPU reference job through
+  `JobService`, publishes completion at the main-thread job gate, commits
+  labels during kernel event pump B, and publishes `ClusterLabelsChanged` so the
+  standing visualization reaction marks vertex attributes dirty.
+- `Runtime.Engine.cppm` and `Runtime.Engine.cpp` contain no `KMeans` or
+  `Runtime.ClusteringModule` tokens.
+- The explicit Vulkan `KMeansGpuJobQueue` participant path remains in
+  runtime/editor ownership until `RUNTIME-137` moves GPU dispatch onto the
+  kernel GPU-job target.
+- Verified locally with the `ci` preset, which enables
+  `INTRINSIC_ENABLE_SANITIZERS=ON`: focused ClusteringModule/editor/backend
+  tests passed 13/13, the runtime seam CTest subset passed 70/70,
+  `IntrinsicTests` built, the full default CPU-supported CTest gate passed
+  3636/3636, and strict layering passed.
 
 ## Goal
 - Extract the k-means machinery (`Runtime.KMeansBackend`,
@@ -14,7 +41,7 @@ depends_on:
   CPU job on a snapshot → completion event → main-thread commit of cluster
   labels → visualization refresh via a standing event reaction — closing the
   `Operational` gate that `ARCH-007`..`ARCH-011` defer here
-  ([ADR-0024](../../../docs/adr/0024-kernel-module-architecture.md) D12,
+  ([ADR-0024](../../docs/adr/0024-kernel-module-architecture.md) D12,
   migration step ⑥).
 
 ## Non-goals
@@ -30,9 +57,9 @@ depends_on:
   own extraction after this proof.
 
 ## Context
-- Owner/layer: `runtime` module unit (first `RuntimeModule`); location
-  decision (e.g. `src/runtime/Modules/Clustering/`) is recorded in this task
-  when implementation starts and reflected in the module inventory.
+- Owner/layer: `runtime` module unit (first domain `RuntimeModule`);
+  implementation lives under `src/runtime/Modules/Clustering/` and is reflected
+  in the generated module inventory.
 - ADR-0024 D9 litmus test: "KMeans" is a domain noun — its scheduling
   logic, batching policy, and result handling do not belong in the kernel.
 - This is deliberately the **first** extraction because it exercises every
@@ -44,51 +71,55 @@ depends_on:
   subscribes to a `ClusterLabelsChanged`-style event; no command chain.
 
 ## Required changes
-- [ ] `ClusteringModule` implementing `IRuntimeModule`: registers the
+- [x] `ClusteringModule` implementing `IRuntimeModule`: registers the
       `RunKMeans` command handler, subscribes to its completion event,
       commits `ClusterLabels` (or the existing component equivalent) at the
       pump, publishes the attribute-changed event consumed by the existing
       visualization path.
-- [ ] Command handler snapshots input positions (copy) and submits a
+- [x] Command handler snapshots input positions (copy) and submits a
       world-scoped `CpuPool` job; no live-world references cross into the
       job.
-- [ ] Sandbox composition registers the module; the k-means capability is
+- [x] Sandbox composition registers the module; the k-means capability is
       absent when the module is not composed.
-- [ ] Remove the extracted k-means entry points from the Engine
+- [x] Remove the extracted k-means entry points from the Engine
       interface/implementation surface; `Runtime.Engine.cppm` no longer
       imports the k-means modules.
-- [ ] Record follow-up ownership for the GPU dispatch path move.
+- [x] Record follow-up ownership for the GPU dispatch path move
+      (`RUNTIME-137`).
 
 ## Tests
-- [ ] Integration/contract test (headless): compose kernel + ClusteringModule,
+- [x] Integration/contract test (headless): compose kernel + ClusteringModule,
       enqueue `RunKMeans`, run frames until completion, assert labels
       committed on the main thread and the attribute event observed.
-- [ ] Cancellation test: destroy/switch the world mid-job; no commit occurs.
-- [ ] Composition-absence test: without the module, `RunKMeans` drains
+- [x] Cancellation test: destroy/switch the world mid-job; no commit occurs.
+- [x] Composition-absence test: without the module, `RunKMeans` drains
       fail-closed (diagnostic, no crash).
-- [ ] Existing k-means correctness tests keep passing against the moved code.
+- [x] Existing k-means correctness tests keep passing against the moved code.
 
 ## Docs
-- [ ] Regenerate `docs/api/generated/module_inventory.md`.
-- [ ] Update the runtime architecture doc's Engine-surface description and
+- [x] Regenerate `docs/api/generated/module_inventory.md`.
+- [x] Update the runtime architecture doc's Engine-surface description and
       ADR-0024's validation note (import-count reduction evidence).
 
 ## Acceptance criteria
-- [ ] `KMeans*` no longer appears in the Engine module's imports or public
+- [x] `KMeans*` no longer appears in the Engine module's imports or public
       surface.
-- [ ] The end-to-end flow (command → job → event → commit → visualization
+- [x] The end-to-end flow (command → job → event → commit → visualization
       event) runs in Sandbox composition via `Engine::Run()` — this closes
       `Operational` for `ARCH-007`..`ARCH-011`.
-- [ ] Default CPU gate green; layering gate green.
+- [x] Default CPU gate green; layering gate green.
 
 ## Verification
+Completed 2026-07-08:
+
 ```bash
 cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='ClusteringModule.*:SandboxEditorUi.KMeans*:RuntimeKMeansBackend.*'
+ctest --test-dir build/ci --output-on-failure -R 'ClusteringModule|KMeans|Runtime(CommandBus|KernelEvents|JobService|WorldRegistry|Module)' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/repo/check_layering.py --root src --strict
-python3 tools/agents/check_task_policy.py --root . --strict
-python3 tools/agents/generate_session_brief.py
 ```
 
 ## Forbidden changes

@@ -28,6 +28,12 @@ maturity_target: Operational
 - The correct model (matches glTF 2.0 / Unreal / Unity / Godot): material owns a `ShadingModel { Lit, Unlit }` where **Unlit is an explicit opt-in**, never a fallback; missing material → a default **lit** material; vertex normals are guaranteed at import; a normal/attribute **texture perturbs/overrides the always-present vertex attribute**, gated by "is a texture bound + ready," in one über-shader. glTF `KHR_materials_unlit` maps onto `ShadingModel::Unlit`.
 - Existing building blocks to reuse: `MaterialFlags` (`Unlit`, `ObjectSpaceNormalMap`), the `VertexChannel`/`VertexAttributeBinding` resolver (`Runtime.VertexAttributeBinding.cppm`, RUNTIME-120), generic mesh attribute texture bake (RUNTIME-109), GPU object-space normal bake (GRAPHICS-104) + scheduling (RUNTIME-129), default-lit material for material-less model-scene imports (RUNTIME-128), and direct-import material-driven shading (`3485151`).
 - "Works end to end / only this path exists": this task must **remove** the divergent lit/unlit decision for ordinary mesh imports, not merely add a parallel one, and prove the unified path through the real runtime extraction path plus an opt-in Vulkan smoke.
+- ARCH-013 re-review (2026-07-08): Decision confirmed with a standing-event
+  requirement. Attribute-source and generated-texture readiness changes must be
+  observable through kernel events or a standing runtime reaction that feeds
+  extraction/dirty-attribute state; no `Engine` callback or direct
+  renderer/runtime live coupling should be introduced. This is the graphics
+  consumer side of ADR-0024 D6.
 
 ### Open questions (non-blocking — defaults chosen; revisit before Slice B/D)
 - **Source-choice scope.** Default: **per-material instance** — the material owns texture bindings and the per-channel `AttributeSource` flags; the UI edits the selected mesh's material; meshes sharing a material change together. Alternatives: per-entity/mesh-instance ECS override, or global-default-plus-override. (The question prompt did not reach the user; default chosen per repo "robust default" policy.)

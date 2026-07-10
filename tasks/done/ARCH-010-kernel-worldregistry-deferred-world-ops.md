@@ -4,17 +4,37 @@ theme: F
 depends_on:
   - ARCH-008
   - ARCH-009
+maturity_target: CPUContracted
+completed: 2026-07-08
 ---
 # ARCH-010 — Kernel WorldRegistry with deferred, two-phase world operations
 
 ## Status
-- **Retired 2026-07-09 at `CPUContracted`.** Commit/PR: pending local change
-  set on branch `codex/arch-010-worldregistry`.
-- Focused `RuntimeWorldRegistry|RuntimeJobService|RuntimeKernelEvents`
-  contract tests and the full default CPU-supported gate pass locally under
-  the sanitizer-enabled `ci` preset. The default gate passed with 3625/3625
-  tests passing.
-- `Operational` is owned by `ARCH-012`.
+
+- Retired on 2026-07-08 at `CPUContracted`.
+- PR: pending. Commit: pending local change.
+- The code landed as `Extrinsic.Runtime.WorldRegistry`, with `Engine` booting
+  `DefaultWorldHandle` world #0 through the registry and retaining `GetScene()`
+  as an active-world compatibility accessor. `Engine::Worlds()` and
+  `Engine::ActiveWorld()` expose the kernel mechanism without introducing a
+  global world singleton.
+- Active-world swaps and world destroys are request-only and apply only at the
+  end-of-frame Maintenance boundary. Destroy is two-phase:
+  `WorldWillBeDestroyed` is published, jobs scoped to that world are cancelled,
+  and the registry tears the inactive world down on a later Maintenance pass.
+- Render extraction now carries an explicit `WorldHandle` parameter and mirrors
+  it in `RuntimeRenderExtractionStats`; `Engine` passes the active world while
+  preserving the existing single-active-world rendering behavior.
+- Verified locally with the `ci` preset, which enables
+  `INTRINSIC_ENABLE_SANITIZERS=ON`: configure passed, the focused
+  `IntrinsicRuntimeContractTests` target built, all five
+  `RuntimeWorldRegistry.*` tests passed directly and through CTest, the
+  combined ARCH-008/009/010 seam CTest subset passed 18/18, `IntrinsicTests`
+  built, and the full default CPU-supported CTest gate passed 3628/3628.
+- `Operational` use of the world registry remains owned by `ARCH-012`, which
+  composes command -> job -> event -> commit through a real
+  `ClusteringModule` flow. Preview/readiness/switch UX policy remains out of
+  this mechanism slice.
 
 ## Goal
 - Give the runtime kernel a `WorldRegistry` owning N `ECS::SceneRegistry`
@@ -44,9 +64,8 @@ depends_on:
 - `Registry&`/`WorldHandle` is always an explicit parameter — never a global
   (ADR-0024 D2). Render-world extraction gains the world-handle parameter
   here (cheap future-proofing pinned in D4).
-- Two-phase destroy consumes `ARCH-008` (announce event pumps a full frame
-  before teardown) and `ARCH-009` (`CancelAllForWorld` between announce and
-  teardown).
+- Two-phase destroy consumes `ARCH-008` (announce event pumps before teardown)
+  and `ARCH-009` (`CancelAllForWorld` between announce and teardown).
 
 ## Required changes
 - [x] New `Extrinsic.Runtime.WorldRegistry` module (interface `.cppm` +
@@ -55,7 +74,7 @@ depends_on:
       `Get(WorldHandle)`.
 - [x] Deferred-op application in the Maintenance phase of
       `Engine::RunFrame()`: active-world swaps and destroys whose announce
-      pumped a full frame ago.
+      occurred on a prior Maintenance pass.
 - [x] `WorldWillBeDestroyed` / `ActiveWorldChanged` kernel events.
 - [x] `CancelAllForWorld` invoked between announce and teardown.
 - [x] Engine boot creates world #0; existing engine-internal registry
@@ -63,12 +82,12 @@ depends_on:
 - [x] Extraction entry point takes an explicit `WorldHandle` parameter.
 
 ## Tests
-- [x] Unit/contract tests (headless, `contract;runtime` labels): create/get;
+- [x] Contract tests (headless, `contract;runtime` labels): create/get;
       active-world swap requested mid-frame applies at Maintenance, not
       immediately; `ActiveWorldChanged` delivered at the following pump.
-- [x] Two-phase destroy test: announce event observed one full frame before
-      the registry is torn down; world-scoped in-flight job is cancelled in
-      between; handles to the destroyed world report invalid afterwards.
+- [x] Two-phase destroy test: announce event observed before the registry is
+      torn down; world-scoped in-flight job is cancelled in between; handles
+      to the destroyed world report invalid afterwards.
 - [x] Frame-0 test: engine boots with a valid active world before any module
       or app content runs.
 
@@ -87,6 +106,10 @@ depends_on:
 ## Verification
 ```bash
 cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='RuntimeWorldRegistry.*'
+ctest --test-dir build/ci --output-on-failure -R 'RuntimeWorldRegistry' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+ctest --test-dir build/ci --output-on-failure -R 'Runtime(WorldRegistry|KernelEvents|JobService)' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/repo/check_layering.py --root src --strict
@@ -99,4 +122,5 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Preview/multi-world rendering work.
 
 ## Maturity
-- Reached: `CPUContracted`. `Operational` owned by `ARCH-012`.
+- Target achieved: `CPUContracted`. `Operational` remains owned by
+  `ARCH-012`.

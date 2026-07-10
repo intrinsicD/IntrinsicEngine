@@ -12,6 +12,8 @@ import Extrinsic.Graphics.CurrentRendererContractAdapter;
 import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.EngineConfigBoot;
+import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.SandboxEditorUi;
 
 namespace CoreConfig = Extrinsic::Core::Config;
@@ -109,7 +111,8 @@ TEST(RuntimeRenderRecipeActivation, StartupRecipeConfigDisablesPostprocessOnFirs
     engine.Initialize();
     std::filesystem::remove(path);
 
-    const Runtime::RuntimeRenderRecipeState& recipeState = engine.GetRenderRecipeState();
+    const Runtime::RuntimeRenderRecipeState& recipeState =
+        engine.GetConfigControl().GetRenderRecipeState();
     ASSERT_TRUE(recipeState.HasLastApply);
     EXPECT_EQ(recipeState.LastApply.Status, Runtime::RuntimeRenderRecipeApplyStatus::Applied);
     EXPECT_EQ(recipeState.ActiveSource,
@@ -142,7 +145,8 @@ TEST(RuntimeRenderRecipeActivation, MissingStartupRecipeConfigFallsBackToDefault
     Runtime::Engine engine(config, std::make_unique<OneFrameApplication>());
     engine.Initialize();
 
-    const Runtime::RuntimeRenderRecipeState& recipeState = engine.GetRenderRecipeState();
+    const Runtime::RuntimeRenderRecipeState& recipeState =
+        engine.GetConfigControl().GetRenderRecipeState();
     ASSERT_TRUE(recipeState.HasLastApply);
     EXPECT_EQ(recipeState.LastApply.Status, Runtime::RuntimeRenderRecipeApplyStatus::Rejected);
     EXPECT_TRUE(Graphics::HasDiagnostic(
@@ -172,7 +176,8 @@ TEST(RuntimeRenderRecipeActivation, InvalidStartupRecipeConfigFallsBackToDefault
     engine.Initialize();
     std::filesystem::remove(path);
 
-    const Runtime::RuntimeRenderRecipeState& recipeState = engine.GetRenderRecipeState();
+    const Runtime::RuntimeRenderRecipeState& recipeState =
+        engine.GetConfigControl().GetRenderRecipeState();
     ASSERT_TRUE(recipeState.HasLastApply);
     EXPECT_EQ(recipeState.LastApply.Status, Runtime::RuntimeRenderRecipeApplyStatus::Rejected);
     EXPECT_TRUE(Graphics::HasDiagnostic(
@@ -195,23 +200,27 @@ TEST(RuntimeRenderRecipeActivation, EditorActivationCommandRoutesThroughRuntimeA
     CoreConfig::EngineConfig config = HeadlessConfig();
     Runtime::Engine engine(config, std::make_unique<OneFrameApplication>());
     engine.Initialize();
+    Runtime::EngineConfigControl& configControl = engine.GetConfigControl();
 
     Graphics::RenderRecipeConfigContext recipeContext =
-        engine.CreateRenderRecipeConfigContext();
+        configControl.CreateRenderRecipeConfigContext();
     Runtime::SandboxEditorRenderRecipeEditorState editorState{};
     Runtime::SandboxEditorContext context{};
     context.RenderRecipeContext = &recipeContext;
     context.RenderRecipeEditorState = &editorState;
-    context.RenderRecipeRuntimeState = &engine.GetRenderRecipeState();
+    context.RenderRecipeRuntimeState = &configControl.GetRenderRecipeState();
     context.PreviewRenderRecipeDocument =
-        [&engine](const std::string& document, const std::string& sourceId)
+        [&configControl](const std::string& document,
+                         const std::string& sourceId)
         {
-            return engine.PreviewRenderRecipeConfigDocument(document, sourceId);
+            return configControl.PreviewRenderRecipeConfigDocument(
+                document,
+                sourceId);
         };
     context.ApplyRenderRecipePreview =
-        [&engine](const Graphics::RenderRecipeConfigLoadResult& loadResult)
+        [&configControl](const Graphics::RenderRecipeConfigLoadResult& loadResult)
         {
-            return engine.ApplyRenderRecipeConfigPreview(
+            return configControl.ApplyRenderRecipeConfigPreview(
                 loadResult,
                 Runtime::RuntimeRenderRecipeActivationSource::Editor);
         };
@@ -239,7 +248,8 @@ TEST(RuntimeRenderRecipeActivation, EditorActivationCommandRoutesThroughRuntimeA
     EXPECT_EQ(result.Status,
               Runtime::SandboxEditorRenderRecipeCommandStatus::Activated);
 
-    const Runtime::RuntimeRenderRecipeState& recipeState = engine.GetRenderRecipeState();
+    const Runtime::RuntimeRenderRecipeState& recipeState =
+        configControl.GetRenderRecipeState();
     ASSERT_TRUE(recipeState.ActiveOverride.has_value());
     EXPECT_EQ(recipeState.ActiveSource,
               Runtime::RuntimeRenderRecipeActivationSource::Editor);

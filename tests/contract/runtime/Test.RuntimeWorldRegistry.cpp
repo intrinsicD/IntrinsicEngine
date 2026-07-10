@@ -2,256 +2,293 @@
 
 #include <atomic>
 #include <chrono>
-#include <future>
-#include <memory>
+#include <condition_variable>
+#include <mutex>
 #include <thread>
 
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.Window;
+import Extrinsic.Core.Error;
 import Extrinsic.Core.Tasks;
+import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
+import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
 
-using Extrinsic::Runtime::ActiveWorldChanged;
-using Extrinsic::Runtime::Engine;
-using Extrinsic::Runtime::EventBus;
-using Extrinsic::Runtime::JobCancellation;
-using Extrinsic::Runtime::JobService;
-using Extrinsic::Runtime::JobTarget;
-using Extrinsic::Runtime::MakeJobDesc;
-using Extrinsic::Runtime::WorldHandle;
-using Extrinsic::Runtime::WorldRegistry;
-using Extrinsic::Runtime::WorldWillBeDestroyed;
+namespace CoreConfig = Extrinsic::Core::Config;
+namespace Runtime = Extrinsic::Runtime;
 
 namespace
 {
     using namespace std::chrono_literals;
 
-    struct SchedulerScope
+    struct DestroyProbeResult
     {
-        bool Owned{false};
+        int Value{0};
+    };
 
-        explicit SchedulerScope(const unsigned workerCount)
+    struct DestroyProbeCompleted
+    {
+        int Value{0};
+    };
+
+    class SchedulerScope final
+    {
+    public:
+        explicit SchedulerScope(const unsigned workers = 2)
         {
-            if (!Extrinsic::Core::Tasks::Scheduler::IsInitialized())
-            {
-                Extrinsic::Core::Tasks::Scheduler::Initialize(workerCount);
-                Owned = true;
-            }
+            if (Extrinsic::Core::Tasks::Scheduler::IsInitialized())
+                Extrinsic::Core::Tasks::Scheduler::Shutdown();
+            Extrinsic::Core::Tasks::Scheduler::Initialize(workers);
         }
 
         ~SchedulerScope()
         {
-            if (Owned)
-            {
-                Extrinsic::Core::Tasks::Scheduler::WaitForAll();
-                Extrinsic::Core::Tasks::Scheduler::Shutdown();
-            }
+            Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+            Extrinsic::Core::Tasks::Scheduler::Shutdown();
         }
+
+        SchedulerScope(const SchedulerScope&) = delete;
+        SchedulerScope& operator=(const SchedulerScope&) = delete;
     };
 
-    template <typename TFuture>
-    void ExpectReady(TFuture& future)
+    template <typename Predicate>
+    [[nodiscard]] bool WaitUntil(Predicate&& predicate,
+                                 const std::chrono::milliseconds timeout = 2s)
     {
-        EXPECT_EQ(future.wait_for(2s), std::future_status::ready);
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        while (!predicate())
+        {
+            if (std::chrono::steady_clock::now() >= deadline)
+                return false;
+            std::this_thread::sleep_for(1ms);
+        }
+        return true;
     }
 
-    struct DestroyJobResult
+    [[nodiscard]] CoreConfig::EngineConfig NullWindowHeadlessConfig()
     {
-        bool SawCancellation{false};
-    };
-
-    struct DestroyJobCompleted
-    {
-    };
-
-    class BootWorldApplication final : public Extrinsic::Runtime::IApplication
-    {
-    public:
-        void OnInitialize(Engine& engine) override
-        {
-            const WorldHandle active = engine.ActiveWorld();
-            SawValidWorld = active.IsValid() &&
-                            engine.Worlds().Contains(active) &&
-                            engine.Worlds().Get(active) == &engine.GetScene();
-            const auto entity = engine.GetScene().Create();
-            SceneWritable = engine.GetScene().IsValid(entity);
-        }
-
-        void OnSimTick(Engine&, double) override {}
-        void OnVariableTick(Engine&, double, double) override {}
-        void OnShutdown(Engine&) override {}
-
-        bool SawValidWorld{false};
-        bool SceneWritable{false};
-    };
-
-    [[nodiscard]] Extrinsic::Core::Config::EngineConfig MinimalEngineConfig()
-    {
-        Extrinsic::Core::Config::EngineConfig config{};
+        CoreConfig::EngineConfig config{};
         config.ReferenceScene.Enabled = false;
         config.Camera.Enabled = false;
+        config.Window.Backend = CoreConfig::WindowBackend::Null;
         return config;
     }
-}
 
-TEST(RuntimeWorldRegistry, CreateWorldMakesFirstWorldActive)
-{
-    WorldRegistry worlds;
+    class EngineWorldProbeApplication final : public Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Runtime::Engine& engine) override
+        {
+            InitActive = engine.ActiveWorld();
+            InitScene = &engine.GetScene();
+            InitRegistryScene = engine.Worlds().Get(InitActive);
+            CreatedWorld = engine.Worlds().CreateWorld("secondary");
+            RequestResult = engine.Worlds().RequestSetActiveWorld(CreatedWorld);
+        }
 
-    const WorldHandle main = worlds.CreateWorld("main");
+        void OnSimTick(Runtime::Engine&, double) override {}
 
-    ASSERT_TRUE(main.IsValid());
-    EXPECT_EQ(worlds.ActiveWorld(), main);
-    ASSERT_NE(worlds.Get(main), nullptr);
-    EXPECT_TRUE(worlds.Contains(main));
-    EXPECT_EQ(worlds.WorldCount(), 1u);
-
-    const auto entity = worlds.Get(main)->Create();
-    EXPECT_TRUE(worlds.Get(main)->IsValid(entity));
-}
-
-TEST(RuntimeWorldRegistry, ActiveWorldSwapDefersUntilMaintenanceAndPump)
-{
-    WorldRegistry worlds;
-    EventBus events;
-    JobService jobs;
-
-    const WorldHandle first = worlds.CreateWorld("first");
-    const WorldHandle second = worlds.CreateWorld("second");
-    ASSERT_EQ(worlds.ActiveWorld(), first);
-
-    bool observed = false;
-    ActiveWorldChanged observedEvent{};
-    const auto subscription =
-        events.Subscribe<ActiveWorldChanged>(
-            [&](const ActiveWorldChanged& event)
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            ++VariableTicks;
+            if (VariableTicks == 1u)
             {
-                observed = true;
-                observedEvent = event;
-            });
-    ASSERT_TRUE(subscription.IsValid());
+                FirstVariableActive = engine.ActiveWorld();
+                FirstVariableScene = &engine.GetScene();
+                return;
+            }
 
-    ASSERT_TRUE(worlds.RequestSetActiveWorld(second));
-    EXPECT_EQ(worlds.ActiveWorld(), first);
+            if (VariableTicks == 2u)
+            {
+                SecondVariableActive = engine.ActiveWorld();
+                SecondVariableScene = &engine.GetScene();
+                return;
+            }
 
-    const auto stats = worlds.ApplyDeferredOperations(events, jobs);
-    EXPECT_EQ(stats.ActiveWorldChanges, 1u);
-    EXPECT_EQ(worlds.ActiveWorld(), second);
-    EXPECT_FALSE(observed);
-    EXPECT_EQ(events.PendingCount(), 1u);
+            ThirdVariableActive = engine.ActiveWorld();
+            LastExtractionWorld = engine.GetLastRenderExtractionStats().World;
+            engine.RequestExit();
+        }
 
-    events.Pump();
+        void OnShutdown(Runtime::Engine&) override {}
 
-    EXPECT_TRUE(observed);
-    EXPECT_EQ(observedEvent.Previous, first);
-    EXPECT_EQ(observedEvent.Current, second);
-    EXPECT_EQ(observedEvent.DebugName, "second");
+        Runtime::WorldHandle InitActive{};
+        Runtime::WorldHandle CreatedWorld{};
+        Runtime::WorldHandle FirstVariableActive{};
+        Runtime::WorldHandle SecondVariableActive{};
+        Runtime::WorldHandle ThirdVariableActive{};
+        Runtime::WorldHandle LastExtractionWorld{};
+        Extrinsic::Core::Result RequestResult{};
+        Extrinsic::ECS::Scene::Registry* InitScene{};
+        Extrinsic::ECS::Scene::Registry* InitRegistryScene{};
+        Extrinsic::ECS::Scene::Registry* FirstVariableScene{};
+        Extrinsic::ECS::Scene::Registry* SecondVariableScene{};
+        std::uint32_t VariableTicks{0};
+    };
 }
 
-TEST(RuntimeWorldRegistry, DestroyAnnouncesCancelsJobsThenTearsDownOnNextMaintenance)
+TEST(RuntimeWorldRegistry, CreateWorldBootsDefaultHandleAndDistinctRegistries)
+{
+    Runtime::WorldRegistry worlds;
+
+    const Runtime::WorldHandle first = worlds.CreateWorld("main");
+    const Runtime::WorldHandle second = worlds.CreateWorld("preview");
+
+    EXPECT_EQ(first, Runtime::DefaultWorldHandle);
+    EXPECT_TRUE(second.IsValid());
+    EXPECT_NE(first, second);
+    EXPECT_EQ(worlds.ActiveWorld(), first);
+    ASSERT_NE(worlds.Get(first), nullptr);
+    ASSERT_NE(worlds.Get(second), nullptr);
+    EXPECT_NE(worlds.Get(first), worlds.Get(second));
+    EXPECT_EQ(worlds.LiveWorldCount(), 2u);
+    EXPECT_EQ(worlds.DebugName(second), "preview");
+}
+
+TEST(RuntimeWorldRegistry, ActiveWorldChangeIsDeferredToMaintenanceAndNextPump)
+{
+    Runtime::WorldRegistry worlds;
+    Runtime::KernelEventBus events;
+    Runtime::JobService jobs;
+
+    const Runtime::WorldHandle first = worlds.CreateWorld("main");
+    const Runtime::WorldHandle second = worlds.CreateWorld("secondary");
+
+    Runtime::ActiveWorldChanged observed{};
+    int eventHits = 0;
+    (void)events.Subscribe<Runtime::ActiveWorldChanged>(
+        [&](const Runtime::ActiveWorldChanged& event)
+        {
+            observed = event;
+            ++eventHits;
+        });
+
+    ASSERT_TRUE(worlds.RequestSetActiveWorld(second).has_value());
+    EXPECT_EQ(worlds.ActiveWorld(), first);
+    EXPECT_EQ(eventHits, 0);
+
+    const Runtime::WorldRegistryMaintenanceStats stats =
+        worlds.ApplyMaintenance(events, jobs);
+    EXPECT_EQ(stats.AppliedActiveWorldChanges, 1u);
+    EXPECT_EQ(worlds.ActiveWorld(), second);
+    EXPECT_EQ(eventHits, 0);
+
+    EXPECT_EQ(events.Pump(), 1u);
+    EXPECT_EQ(eventHits, 1);
+    EXPECT_EQ(observed.Previous, first);
+    EXPECT_EQ(observed.Current, second);
+}
+
+TEST(RuntimeWorldRegistry, DestroyAnnouncesCancelsJobsAndTearsDownNextMaintenance)
 {
     SchedulerScope scheduler{2};
-    WorldRegistry worlds;
-    JobService jobs;
-    EventBus events;
+    Runtime::WorldRegistry worlds;
+    Runtime::KernelEventBus events;
+    Runtime::JobService jobs;
 
-    const WorldHandle main = worlds.CreateWorld("main");
-    const WorldHandle doomed = worlds.CreateWorld("doomed");
-    ASSERT_NE(main, doomed);
+    const Runtime::WorldHandle active = worlds.CreateWorld("main");
+    const Runtime::WorldHandle doomed = worlds.CreateWorld("doomed");
+    ASSERT_EQ(worlds.ActiveWorld(), active);
 
-    std::promise<void> workerStarted;
-    auto workerStartedFuture = workerStarted.get_future();
-    std::atomic_bool sawCancellation{false};
+    std::atomic<bool> started{false};
+    std::atomic<bool> observedCancellation{false};
+    int completionHits = 0;
+    int willDestroyHits = 0;
+    Runtime::WorldWillBeDestroyed willDestroy{};
 
-    int completed = 0;
-    const auto completionSubscription =
-        events.Subscribe<DestroyJobCompleted>(
-            [&](const DestroyJobCompleted&)
-            {
-                ++completed;
-            });
-    ASSERT_TRUE(completionSubscription.IsValid());
+    (void)events.Subscribe<Runtime::WorldWillBeDestroyed>(
+        [&](const Runtime::WorldWillBeDestroyed& event)
+        {
+            willDestroy = event;
+            ++willDestroyHits;
+        });
+    (void)events.Subscribe<DestroyProbeCompleted>(
+        [&](const DestroyProbeCompleted&) { ++completionHits; });
 
-    const auto token = jobs.Submit(
-        MakeJobDesc<DestroyJobResult>(
-            "world-scoped-destroy-probe",
-            JobTarget::CpuPool,
+    const Runtime::JobToken token = jobs.Submit(
+        Runtime::MakeCpuJobDesc<DestroyProbeResult>(
+            "destroy scoped job",
             doomed,
-            [&workerStarted, &sawCancellation](
-                const JobCancellation& cancellation) -> DestroyJobResult
+            [&](const Runtime::JobCancellation& cancellation)
             {
-                workerStarted.set_value();
-                while (!cancellation.IsCancellationRequested())
-                {
-                    std::this_thread::yield();
-                }
-                sawCancellation.store(true, std::memory_order_release);
-                return DestroyJobResult{.SawCancellation = true};
+                started.store(true, std::memory_order_release);
+                while (!cancellation.IsCancelled())
+                    std::this_thread::sleep_for(1ms);
+                observedCancellation.store(true, std::memory_order_release);
+                return DestroyProbeResult{.Value = 7};
             },
-            [](EventBus& bus, DestroyJobResult&& result)
-            {
-                if (result.SawCancellation)
-                {
-                    bus.Publish(DestroyJobCompleted{});
-                }
-            }));
+            [](const DestroyProbeResult& result)
+            { return DestroyProbeCompleted{.Value = result.Value}; }));
     ASSERT_TRUE(token.IsValid());
-    ExpectReady(workerStartedFuture);
+    ASSERT_TRUE(WaitUntil([&] { return started.load(std::memory_order_acquire); }));
 
-    int announced = 0;
-    WorldWillBeDestroyed observedDestroy{};
-    const auto destroySubscription =
-        events.Subscribe<WorldWillBeDestroyed>(
-            [&](const WorldWillBeDestroyed& event)
-            {
-                ++announced;
-                observedDestroy = event;
-            });
-    ASSERT_TRUE(destroySubscription.IsValid());
+    ASSERT_TRUE(worlds.RequestDestroyWorld(doomed).has_value());
+    const Runtime::WorldRegistryMaintenanceStats announce =
+        worlds.ApplyMaintenance(events, jobs);
+    EXPECT_EQ(announce.DestroyAnnouncements, 1u);
+    EXPECT_EQ(announce.CancelledJobs, 1u);
+    EXPECT_TRUE(worlds.Contains(doomed));
+    EXPECT_EQ(willDestroyHits, 0);
 
-    ASSERT_TRUE(worlds.RequestDestroyWorld(doomed));
-    const auto announceStats = worlds.ApplyDeferredOperations(events, jobs);
-
-    EXPECT_EQ(announceStats.DestroyAnnouncedWorlds, 1u);
-    EXPECT_EQ(announceStats.DestroyedWorlds, 0u);
-    EXPECT_EQ(announceStats.CancelledJobs, 1u);
-    EXPECT_TRUE(worlds.IsDestroyAnnounced(doomed));
-    EXPECT_NE(worlds.Get(doomed), nullptr);
-
-    events.Pump();
-    EXPECT_EQ(announced, 1);
-    EXPECT_EQ(observedDestroy.World, doomed);
-    EXPECT_EQ(observedDestroy.DebugName, "doomed");
+    EXPECT_EQ(events.Pump(), 1u);
+    EXPECT_EQ(willDestroyHits, 1);
+    EXPECT_EQ(willDestroy.World, doomed);
+    EXPECT_TRUE(worlds.Contains(doomed));
 
     Extrinsic::Core::Tasks::Scheduler::WaitForAll();
-    jobs.DrainCompletions(events);
-    events.Pump();
+    EXPECT_TRUE(observedCancellation.load(std::memory_order_acquire));
+    EXPECT_EQ(jobs.GetState(token), Runtime::JobState::Cancelled);
+    EXPECT_EQ(jobs.DrainCompletions(events), 0u);
+    EXPECT_EQ(events.Pump(), 0u);
+    EXPECT_EQ(completionHits, 0);
 
-    EXPECT_TRUE(sawCancellation.load(std::memory_order_acquire));
-    EXPECT_EQ(completed, 0);
-    EXPECT_TRUE(jobs.IsComplete(token));
-
-    const auto teardownStats = worlds.ApplyDeferredOperations(events, jobs);
-    EXPECT_EQ(teardownStats.DestroyedWorlds, 1u);
-    EXPECT_EQ(worlds.Get(doomed), nullptr);
+    const Runtime::WorldRegistryMaintenanceStats teardown =
+        worlds.ApplyMaintenance(events, jobs);
+    EXPECT_EQ(teardown.DestroyedWorlds, 1u);
     EXPECT_FALSE(worlds.Contains(doomed));
-    EXPECT_EQ(worlds.WorldCount(), 1u);
+    EXPECT_EQ(worlds.Get(doomed), nullptr);
+    EXPECT_EQ(worlds.LiveWorldCount(), 1u);
+    EXPECT_EQ(worlds.ActiveWorld(), active);
 }
 
-TEST(RuntimeWorldRegistry, EngineBootCreatesValidActiveWorldBeforeApplicationInitialize)
+TEST(RuntimeWorldRegistry, DestroyActiveWorldIsRejected)
 {
-    auto app = std::make_unique<BootWorldApplication>();
-    BootWorldApplication* observed = app.get();
+    Runtime::WorldRegistry worlds;
+    const Runtime::WorldHandle active = worlds.CreateWorld("main");
 
-    Engine engine(MinimalEngineConfig(), std::move(app));
+    const Extrinsic::Core::Result result = worlds.RequestDestroyWorld(active);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Extrinsic::Core::ErrorCode::ResourceBusy);
+    EXPECT_TRUE(worlds.Contains(active));
+}
+
+TEST(RuntimeWorldRegistry, EngineBootsFrameZeroWorldAndAppliesSwitchAtMaintenance)
+{
+    auto app = std::make_unique<EngineWorldProbeApplication>();
+    EngineWorldProbeApplication* appPtr = app.get();
+
+    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(app));
     engine.Initialize();
 
-    EXPECT_TRUE(observed->SawValidWorld);
-    EXPECT_TRUE(observed->SceneWritable);
-    EXPECT_TRUE(engine.ActiveWorld().IsValid());
-    EXPECT_TRUE(engine.Worlds().Contains(engine.ActiveWorld()));
+    ASSERT_TRUE(appPtr->InitActive.IsValid());
+    EXPECT_EQ(appPtr->InitActive, Runtime::DefaultWorldHandle);
+    EXPECT_NE(appPtr->InitScene, nullptr);
+    EXPECT_EQ(appPtr->InitRegistryScene, appPtr->InitScene);
+    ASSERT_TRUE(appPtr->RequestResult.has_value());
+
+    engine.Run();
+
+    EXPECT_EQ(appPtr->VariableTicks, 3u);
+    EXPECT_EQ(appPtr->FirstVariableActive, Runtime::DefaultWorldHandle);
+    EXPECT_EQ(appPtr->FirstVariableScene, appPtr->InitScene);
+    EXPECT_EQ(appPtr->SecondVariableActive, appPtr->CreatedWorld);
+    EXPECT_EQ(appPtr->SecondVariableScene,
+              engine.Worlds().Get(appPtr->CreatedWorld));
+    EXPECT_EQ(appPtr->ThirdVariableActive, appPtr->CreatedWorld);
+    EXPECT_EQ(appPtr->LastExtractionWorld, appPtr->CreatedWorld);
 
     engine.Shutdown();
 }

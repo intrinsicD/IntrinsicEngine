@@ -8,25 +8,29 @@ option(INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN
 target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
+        Runtime.AsyncWorkService.cppm
         Runtime.AsyncBufferReadback.cppm
+        Runtime.AssetResidencyService.cppm
+        Runtime.AssetImportPipeline.cppm
         Runtime.AssetGeometryIO.cppm
         Runtime.AssetIngestStateMachine.cppm
         Runtime.AssetMeshNormals.cppm
         Runtime.AssetModelSceneHandoff.cppm
         Runtime.AssetModelTextureHandoff.cppm
         Runtime.AssetModelTextureIO.cppm
-        Runtime.WorldHandle.cppm
-        Runtime.KernelEvents.cppm
-        Runtime.JobService.cppm
-        Runtime.WorldRegistry.cppm
         Runtime.CommandBus.cppm
-        Runtime.ServiceRegistry.cppm
-        Runtime.Module.cppm
         Runtime.DerivedJobGraph.cppm
+        Runtime.DeviceBootstrap.cppm
+        Runtime.JobService.cppm
+        Runtime.JobServiceGpuQueueBridge.cppm
+        Modules/Clustering/Runtime.ClusteringModule.cppm
         Runtime.MeshAttributeTextureBake.cppm
+        Runtime.MeshPrimitiveViewControls.cppm
         Runtime.MethodFigureExport.cppm
         Runtime.ObjectSpaceNormalBakeBinding.cppm
+        Runtime.ObjectSpaceNormalBakeGpuQueue.cppm
         Runtime.ObjectSpaceNormalBakeQueue.cppm
+        Runtime.ObjectSpaceNormalBakeService.cppm
         Runtime.ObjectSpaceNormalBakeSubmission.cppm
         Runtime.ProgressivePoissonGpuBackend.cppm
         Runtime.ProgressivePresentationExtraction.cppm
@@ -37,6 +41,18 @@ target_sources(${target_name}
         Runtime.EcsSystemBundle.cppm
         Runtime.EditorCommandHistory.cppm
         Runtime.Engine.cppm
+        Runtime.Engine.FrameLoop.cppm
+        Runtime.EngineConfigBoot.cppm
+        Runtime.EngineConfigControl.cppm
+        Runtime.FramePacingDiagnostics.cppm
+        Runtime.ImGuiEditorBridge.cppm
+        Runtime.InputActions.cppm
+        Runtime.KernelEvents.cppm
+        Runtime.Module.cppm
+        Runtime.ModuleSchedule.cppm
+        Runtime.ServiceRegistry.cppm
+        Runtime.WorldHandle.cppm
+        Runtime.WorldRegistry.cppm
         Runtime.GeometryAvailability.cppm
         Runtime.GpuReadbackJob.cppm
         Runtime.KMeansBackend.cppm
@@ -44,10 +60,12 @@ target_sources(${target_name}
         Runtime.KMeansGpuJobQueue.cppm
         Runtime.RegistrationAlignment.cppm
         Runtime.PhysicsBridge.cppm
+        Runtime.SceneDocument.cppm
         Runtime.SceneSerialization.cppm
         Cameras/Runtime.CameraControllers.cppm
         Cameras/Runtime.CameraFocusCommand.cppm
         Editor/Runtime.SandboxEditorUi.cppm
+        Gizmos/Runtime.GizmoFrameService.cppm
         Gizmos/Runtime.GizmoInteraction.cppm
         ImGui/Runtime.ImGuiAdapter.cppm
         Runtime.GraphGeometryPacker.cppm
@@ -58,8 +76,11 @@ target_sources(${target_name}
         Runtime.ProceduralGeometry.cppm
         Runtime.ProceduralGeometryPacker.cppm
         Runtime.ReferenceScene.cppm
+        Runtime.ReferenceSceneControl.cppm
         Runtime.RenderExtraction.cppm
+        Runtime.RenderExtractionService.cppm
         Runtime.RenderWorldPool.cppm
+        Runtime.SelectionReadback.cppm
         Runtime.SelectionController.cppm
         Runtime.StableEntityLookup.cppm
         Runtime.StreamingExecutor.cppm
@@ -70,24 +91,29 @@ target_sources(${target_name}
         SpatialDebug/Runtime.SpatialDebugClosestFace.cppm
         Visualization/Runtime.VisualizationAdapters.cppm
         PRIVATE
+        Runtime.AsyncWorkService.cpp
         Runtime.AsyncBufferReadback.cpp
+        Runtime.AssetResidencyService.cpp
+        Runtime.AssetImportPipeline.cpp
         Runtime.AssetGeometryIO.cpp
         Runtime.AssetIngestStateMachine.cpp
         Runtime.AssetMeshNormals.cpp
         Runtime.AssetModelSceneHandoff.cpp
         Runtime.AssetModelTextureHandoff.cpp
         Runtime.AssetModelTextureIO.cpp
-        Runtime.KernelEvents.cpp
-        Runtime.JobService.cpp
-        Runtime.WorldRegistry.cpp
         Runtime.CommandBus.cpp
-        Runtime.ServiceRegistry.cpp
-        Runtime.Module.cpp
         Runtime.DerivedJobGraph.cpp
+        Runtime.DeviceBootstrap.cpp
+        Runtime.JobService.cpp
+        Runtime.JobServiceGpuQueueBridge.cpp
+        Modules/Clustering/Runtime.ClusteringModule.cpp
         Runtime.MeshAttributeTextureBake.cpp
+        Runtime.MeshPrimitiveViewControls.cpp
         Runtime.MethodFigureExport.cpp
         Runtime.ObjectSpaceNormalBakeBinding.cpp
+        Runtime.ObjectSpaceNormalBakeGpuQueue.cpp
         Runtime.ObjectSpaceNormalBakeQueue.cpp
+        Runtime.ObjectSpaceNormalBakeService.cpp
         Runtime.ObjectSpaceNormalBakeSubmission.cpp
         Runtime.ProgressivePoissonGpuBackend.cpp
         Runtime.ProgressivePresentationExtraction.cpp
@@ -98,6 +124,15 @@ target_sources(${target_name}
         Runtime.EcsSystemBundle.cpp
         Runtime.EditorCommandHistory.cpp
         Runtime.Engine.cpp
+        Runtime.EngineConfigBoot.cpp
+        Runtime.EngineConfigControl.cpp
+        Runtime.FramePacingDiagnostics.cpp
+        Runtime.ImGuiEditorBridge.cpp
+        Runtime.InputActions.cpp
+        Runtime.KernelEvents.cpp
+        Runtime.ModuleSchedule.cpp
+        Runtime.ServiceRegistry.cpp
+        Runtime.WorldRegistry.cpp
         Runtime.GeometryAvailability.cpp
         Runtime.GpuReadbackJob.cpp
         Runtime.KMeansBackend.cpp
@@ -105,10 +140,12 @@ target_sources(${target_name}
         Runtime.KMeansGpuJobQueue.cpp
         Runtime.RegistrationAlignment.cpp
         Runtime.PhysicsBridge.cpp
+        Runtime.SceneDocument.cpp
         Runtime.SceneSerialization.cpp
         Cameras/Runtime.CameraControllers.cpp
         Cameras/Runtime.CameraFocusCommand.cpp
         Editor/Runtime.SandboxEditorUi.cpp
+        Gizmos/Runtime.GizmoFrameService.cpp
         Gizmos/Runtime.GizmoInteraction.cpp
         ImGui/Runtime.ImGuiAdapter.cpp
         Runtime.GraphGeometryPacker.cpp
@@ -119,8 +156,11 @@ target_sources(${target_name}
         Runtime.ProceduralGeometry.cpp
         Runtime.ProceduralGeometryPacker.cpp
         Runtime.ReferenceScene.cpp
+        Runtime.ReferenceSceneControl.cpp
         Runtime.RenderExtraction.cpp
+        Runtime.RenderExtractionService.cpp
         Runtime.RenderWorldPool.cpp
+        Runtime.SelectionReadback.cpp
         Runtime.SelectionController.cpp
         Runtime.StableEntityLookup.cpp
         Runtime.StreamingExecutor.cpp

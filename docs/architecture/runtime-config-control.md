@@ -1,18 +1,10 @@
 # Runtime Config Control
 
-> **Transitional (ADR-0024).** This doc describes the config-control facade as
-> it exists *today*. It is a migration target, not the end state: under
-> [ADR-0024](../adr/0024-kernel-module-architecture.md) config-apply becomes a
-> `*Requested` **command** drained pre-sim (D5), handled by a **ConfigControl
-> RuntimeModule** extracted from `Engine` (`RUNTIME-149`); the
-> `Engine::GetConfigControl*()` accessors are driven to zero per the
-> [kernel target-state](kernel-target-state.md) scorecard. Do not add new
-> `Engine` config-control methods — add a command + a module handler.
-
-`Extrinsic.Runtime.Engine` currently owns the live config-control facade for
-non-ImGui callers and the Sandbox Editor. Today the facade is a set of typed
-Engine methods and DTOs; ADR-0024 replaces that surface with commands handled
-by the ConfigControl module (see the banner above).
+`Extrinsic.Runtime.EngineConfigControl` owns the live config-control facade for
+non-ImGui callers and the Sandbox Editor. `Engine` constructs the subsystem,
+keeps ownership of the active `EngineConfig` value, and exposes the facade
+through `Engine::GetConfigControl()`. The facade is a set of typed subsystem
+methods and DTOs, not a command bus.
 
 ## Entry Points
 
@@ -49,10 +41,11 @@ The live engine-config fields in the current subset are:
 - `sandbox.progressive_poisson`
 
 Applying a non-empty path first loads and validates the referenced render recipe
-file. Only a usable recipe result reaches `ApplyRenderRecipeConfigPreview`, so an
-invalid file rejects the engine-config hot apply without clearing a previously
-active recipe override. Applying an empty path clears the active override and
-returns to the derived default frame recipe.
+file. Only a usable recipe result reaches
+`EngineConfigControl::ApplyRenderRecipeConfigPreview`, so an invalid file
+rejects the engine-config hot apply without clearing a previously active recipe
+override. Applying an empty path clears the active override and returns to the
+derived default frame recipe.
 
 The sandbox progressive-Poisson block carries the interactive playground's
 reference-sampler knobs, prefix/color-channel selection, mesh surface-sampling
@@ -71,15 +64,17 @@ unchanged.
 activation commands call the same facade callbacks supplied by
 `SandboxEditorUi::Attach(Engine&)`:
 
-- preview routes to `Engine::PreviewRenderRecipeConfigDocument`;
-- activation routes to `Engine::ApplyRenderRecipeConfigPreview` with
+- preview routes to
+  `Engine::GetConfigControl().PreviewRenderRecipeConfigDocument`;
+- activation routes to
+  `Engine::GetConfigControl().ApplyRenderRecipeConfigPreview` with
   `RuntimeRenderRecipeActivationSource::Editor`.
 - progressive-Poisson knob edits route to
-  `Engine::PreviewEngineConfigControlDocument` and
-  `Engine::ApplyEngineConfigHotSubset` with
+  `Engine::GetConfigControl().PreviewEngineConfigControlDocument` and
+  `Engine::GetConfigControl().ApplyEngineConfigHotSubset` with
   `RuntimeConfigControlSource::Editor`.
 
-Agent/CLI callers use the same Engine methods with
+Agent/CLI callers use the same `EngineConfigControl` methods with
 `RuntimeConfigControlSource::AgentCli` or
 `RuntimeRenderRecipeActivationSource::AgentCli`. The facade is CPU/headless and
 does not require any ImGui frame.

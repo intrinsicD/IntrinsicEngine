@@ -22,13 +22,13 @@ Blocking fixes first, then abstractness seams, then steady-state efficiency:
   editor scene save/load now use the runtime streaming lane instead of blocking
   the frame path.
 - `RUNTIME-143` is retired; the renderer runtime frame-command hook is now a
-  multi-subscriber registry, `Engine` owns a generic runtime GPU participant
-  seam, and Sandbox editor K-Means GPU execution owns its queue outside
-  `Engine`.
+  multi-subscriber registry. Its temporary Engine-owned generic GPU participant
+  seam was retired by `RUNTIME-137`, which moved the K-Means GPU participant
+  path onto the `JobService` `GpuQueue` registry.
 - `RUNTIME-144` is retired; post-import processors, import authoring/default
   UX, and the `F` focus action now register through runtime seams while sandbox/default
   composition owns the default bundle (normal-bake registration coordinates
-  with `RUNTIME-129`/`GRAPHICS-104`).
+  with `RUNTIME-129`/`RUNTIME-137`/`GRAPHICS-104`).
 - `RUNTIME-145` is retired; it delivered steady-state frame-path efficiency
   polish (incremental `StableEntityLookup`, `StreamingExecutor` slot recycling,
   dirty-gated pre-render flush, extraction/import allocation cleanup).
@@ -45,8 +45,32 @@ and compile hotspot. This series keeps `Engine` as the concrete composition
 root (lifecycle, ownership, explicit frame skeleton) and relocates domain
 facades into engine-owned subsystem objects, following the existing
 `SelectionController`/`EditorCommandHistory`/`GizmoInteraction` accessor
-pattern. `RUNTIME-146..150` are mechanical, mutually order-independent
-moves; `RUNTIME-151` is the single semantic slice and must land last.
+pattern. `RUNTIME-146` through `RUNTIME-165` are retired. Runtime device
+selection, backend factory dispatch, Vulkan fallback breadcrumb policy, GPU
+asset fallback-texture descriptor construction, legacy mesh primitive-view
+compatibility translation, reference-scene lifecycle control, and runtime
+input-action descriptor/state/dispatch policy, plus runtime-module contribution
+scheduling and dispatch, plus selection pick readback correlation state, drain
+policy, refined primitive cache ownership, frame-pacing diagnostics,
+ImGui/render-graph counter mirroring, and Dear ImGui overlay/adapter/callback
+bridge ownership plus renderer overlay attachment, plus JobService GPU-queue
+renderer-hook ownership and participant shutdown sequencing, plus object-space
+normal bake GPU-queue service ownership, dependency setup, JobService
+participant registration, diagnostics access, transform-gizmo interaction state,
+undo storage, selected-entity scratch, packet building, and gizmo-vs-selection
+input interlock, plus render-extraction cache ownership, render-world pool
+state, last extraction stats, frame-index ownership, GPU asset cache ownership,
+asset-event listener wiring, model texture/model scene handoff ownership,
+pending material-binding re-resolution, and asset-residency teardown ordering,
+plus persistent `StreamingExecutor` / `DerivedJobRegistry` ownership,
+maintenance drains, shutdown reset, and derived-job facade delegation now live
+outside `Runtime.Engine.cpp`.
+`RUNTIME-129` remains the owner of production Vulkan bake plan-provider wiring.
+`RUNTIME-154` keeps the existing reference-scene public facade while moving
+provider resolution, population state, camera-seed caching, and teardown policy
+into `Extrinsic.Runtime.ReferenceSceneControl`. `RUNTIME-155` keeps the
+existing input-action registration facade while moving descriptor/state/dispatch
+policy into `Extrinsic.Runtime.InputActions`.
 
 Sequencing against the ADR-0024 kernel seams
 ([`docs/adr/0024-kernel-module-architecture.md`](../../../docs/adr/0024-kernel-module-architecture.md),
@@ -54,37 +78,91 @@ priority set `ARCH-007`..`ARCH-012`): the seams take precedence for
 architecture/runtime picks. `RUNTIME-150`/`RUNTIME-151` touch the same
 `RunFrame()` and Engine-interface surfaces the seams wire into and are
 front-matter gated (`RUNTIME-150` on `ARCH-007`/`ARCH-008`, `RUNTIME-151`
-additionally on `ARCH-011`). The mechanical moves `RUNTIME-146..149` may
-proceed in parallel with the seam tasks; note that after the seam set
-completes, `ARCH-013` re-reviews this whole series (accessor-facade pattern
-vs. the ADR-0024 module/service direction) before further promotion.
+additionally on `ARCH-011`). `ARCH-013` completed the post-seam re-review:
+`RUNTIME-147` kept `Engine::GetAssetImportPipeline()` as a transitional
+composition accessor that should be shapeable into a narrow service/module seam
+later, while `RUNTIME-148` and `RUNTIME-149` remained unchanged mechanical
+extractions. `RUNTIME-146` is retired; boot-time config resolution now lives in
+the free-standing `Extrinsic.Runtime.EngineConfigBoot` module. `RUNTIME-147` is
+retired; asset import now lives in `Extrinsic.Runtime.AssetImportPipeline`.
+`RUNTIME-148` is retired; scene persistence now lives in
+`Extrinsic.Runtime.SceneDocument`. `RUNTIME-149` is retired; render-recipe
+activation and hot-config control now live in
+`Extrinsic.Runtime.EngineConfigControl`. `RUNTIME-150` is retired; the
+frame-loop hook adapters and per-frame helpers now live in the private
+`Extrinsic.Runtime.Engine:FrameLoop` partition. `RUNTIME-151` is retired;
+StableId signal tracking is owned by `StableEntityLookupSceneBinding`, and
+`Runtime.Engine.cppm` no longer exposes EnTT.
+`RUNTIME-152` is retired; device bootstrap policy now lives in
+`Extrinsic.Runtime.DeviceBootstrap`, with `Engine` remaining the platform
+window/device-initialize composition caller. `RUNTIME-153` is retired; legacy
+mesh primitive-view compatibility translation now lives in
+`Extrinsic.Runtime.MeshPrimitiveViewControls`, with `Engine` retaining the
+public compatibility methods as delegating facades. `RUNTIME-154` is retired;
+reference-scene lifecycle control now lives in
+`Extrinsic.Runtime.ReferenceSceneControl`, with `Engine` retaining the public
+reference-scene registry/state/camera-seed accessors as delegating facades.
+`RUNTIME-155` is retired; runtime input-action registration and dispatch policy
+now lives behind `Extrinsic.Runtime.InputActions`. `RUNTIME-156` is retired;
+registered runtime-module sim-system/frame-hook records, deterministic ordering,
+fixed-step pass insertion, and frame-hook dispatch now live behind
+`Extrinsic.Runtime.ModuleSchedule`. `RUNTIME-157` is retired; selection pick
+readback correlation state, refined primitive cache ownership, and the readback
+drain bridge now live behind `Extrinsic.Runtime.SelectionReadback`.
+`RUNTIME-158` is retired; the exported frame-pacing diagnostics record and
+ImGui/render-graph counter-copy policy now live behind
+`Extrinsic.Runtime.FramePacingDiagnostics`.
+`RUNTIME-159` is retired; runtime-side Dear ImGui overlay/adapter/callback
+ownership, per-frame Begin/End bracketing, capture reads, diagnostics access,
+and renderer overlay attachment now live behind
+`Extrinsic.Runtime.ImGuiEditorBridge`.
+`RUNTIME-160` is retired; the renderer frame-command hook token,
+`JobService::RecordGpuQueueFrameCommands(...)` delegation, and GPU-participant
+shutdown sequencing now live behind `Extrinsic.Runtime.JobServiceGpuQueueBridge`.
+`RUNTIME-161` is retired; object-space normal bake GPU-queue ownership,
+ready-frame dependency setup, JobService participant registration, queue
+diagnostics access, and shutdown dependency clearing now live behind
+`Extrinsic.Runtime.ObjectSpaceNormalBakeService` without closing the remaining
+production Vulkan work in `RUNTIME-129`.
+`RUNTIME-162` is retired; transform-gizmo frame state, selected-entity scratch,
+gizmo/selection pointer interlock, and transform-gizmo packet building now live
+behind `Extrinsic.Runtime.GizmoFrameService` while preserving the public Engine
+gizmo accessors.
+`RUNTIME-163` is retired; `RenderExtractionCache`, render-world pool, last
+extraction stats, frame-index ownership, and render-extraction facade delegation
+now live behind `Extrinsic.Runtime.RenderExtractionService`.
+`RUNTIME-164` is retired; `Graphics::GpuAssetCache`, the cache's
+`AssetEventBus` listener token, `AssetModelTextureHandoff`,
+`AssetModelSceneHandoff`, fallback bootstrap delegation, pending material
+binding re-resolution, and asset-residency teardown ordering now live behind
+`Extrinsic.Runtime.AssetResidencyService`.
+`RUNTIME-165` is retired; persistent `StreamingExecutor` /
+`DerivedJobRegistry` ownership, maintenance drains, shutdown reset, and
+derived-job facade delegation now live behind
+`Extrinsic.Runtime.AsyncWorkService`.
 
-- [`RUNTIME-146`](RUNTIME-146-extract-engine-config-boot-module.md) —
-  extract boot-time config resolution (`ResolveEngineConfigForBoot`,
-  `CreateReferenceEngineConfig`, `EngineConfigBoot*`) into a free-standing
-  `Extrinsic.Runtime.EngineConfigBoot` module.
-- [`RUNTIME-147`](RUNTIME-147-extract-asset-import-pipeline-subsystem.md) —
-  extract the asset-import facade (import/queue/reimport/cancel, ingest
-  wiring, event log, `RUNTIME-144` registries, decode/materialize helpers)
-  into `Extrinsic.Runtime.AssetImportPipeline` behind
-  `Engine::GetAssetImportPipeline()`. Two slices: mechanical extraction
-  with delegation, then call-site migration.
-- [`RUNTIME-148`](RUNTIME-148-extract-scene-document-subsystem.md) —
-  extract the scene persistence facade (save/load/queue, new/close,
-  scene-file event log, snapshot helpers) into
-  `Extrinsic.Runtime.SceneDocument` behind `Engine::GetSceneDocument()`.
-- [`RUNTIME-149`](RUNTIME-149-extract-engine-config-control-subsystem.md) —
-  extract render-recipe activation and the engine-config hot-subset apply
-  path into `Extrinsic.Runtime.EngineConfigControl` behind
-  `Engine::GetConfigControl()`.
-- [`RUNTIME-150`](RUNTIME-150-split-engine-frame-loop-implementation-unit.md) —
-  split the `Core.FrameLoop` hook adapters and `RunFrame()`-only helpers
-  out of `Runtime.Engine.cpp` into a non-exported
-  `Extrinsic.Runtime.Engine:FrameLoop` partition.
-- [`RUNTIME-151`](RUNTIME-151-slim-engine-interface-and-remove-entt-leak.md)
-  (depends on 146–150) — remove the `entt` include leak from
-  `Runtime.Engine.cppm` via a `StableEntityLookup` scene-binding type and
-  re-audit the interface import list.
+#### Retired decomposition entries
+
+- [RUNTIME-165 — Extract async work service out of Engine](../../done/RUNTIME-165-extract-async-work-service.md)
+  (done, 2026-07-09, `Operational`): persistent `StreamingExecutor` /
+  `DerivedJobRegistry` ownership, maintenance-lane completion/readback drains,
+  count-limited main-thread apply, background pumping, shutdown reset ordering,
+  and derived-job facade delegation now live in
+  `Extrinsic.Runtime.AsyncWorkService`. `Engine` keeps lifecycle/frame ordering,
+  dependent subsystem wiring, and public derived-job compatibility facades.
+- [RUNTIME-164 — Extract asset residency service out of Engine](../../done/RUNTIME-164-extract-asset-residency-service.md)
+  (done, 2026-07-09, `Operational`): GPU asset cache ownership, cache
+  asset-event listener wiring, model texture/model scene handoff ownership,
+  fallback bootstrap delegation, pending material-binding re-resolution, and
+  asset-residency teardown ordering now live in
+  `Extrinsic.Runtime.AssetResidencyService`. `Engine` keeps lifecycle/frame
+  ordering plus public `GetAssetService()` / `GetGpuAssetCache()`
+  compatibility facades.
+- [RUNTIME-163 — Extract render extraction service out of Engine](../../done/RUNTIME-163-extract-render-extraction-service.md)
+  (done, 2026-07-09, `Operational`): live render-extraction cache, render-world
+  pool, last extraction stats, and frame-index ownership now live in
+  `Extrinsic.Runtime.RenderExtractionService`. `Engine` keeps render-frame phase
+  ordering plus public render-extraction compatibility facades.
 
 ### Compile-hotspot decomposition (seeded 2026-07-09)
 
@@ -94,7 +172,7 @@ three largest exported-interface hotspots:
 `Runtime.Engine.cppm` (140.072s, owned by `RUNTIME-151` after the mechanical
 `RUNTIME-146..150` splits), and `Runtime.RenderExtraction.cppm` (106.935s).
 
-- [`RUNTIME-152`](RUNTIME-152-slim-render-extraction-module.md) — hide
+- [`RUNTIME-166`](RUNTIME-166-slim-render-extraction-module.md) — hide
   `RenderExtractionCache` private residency/retire/adapter state, slim the
   exported import surface, and split independent implementation domains without
   changing extraction behavior.
@@ -144,6 +222,10 @@ GPU-computed results ("compute -> read back -> derive color/vector-field ->
 re-upload -> visible") using the existing `SubmitFollowUp`/`DependsOn` edges.
 This foundation is recorded in
 [`ADR-0023`](../../../docs/adr/0023-cpu-gpu-transfer-foundation.md).
+`RUNTIME-137` is retired; the async readback helper is the sanctioned compute
+backend drain path and `JobService` owns the `GpuQueue` participant registry.
+`RUNTIME-129` is now unblocked to wire object-space normal bake GPU submission
+through that target.
 
 `RUNTIME-111` through `RUNTIME-115` are retired; additional progressive
 render-data follow-ups should open as value-gated tasks with a concrete
@@ -204,6 +286,116 @@ these as runtime work when scheduling and review:
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [RUNTIME-146 — Extract engine config boot into a free-standing module](../../done/RUNTIME-146-extract-engine-config-boot-module.md)
+  (done, 2026-07-08, `Operational`): boot-time config resolution now lives in
+  `Extrinsic.Runtime.EngineConfigBoot`, exporting `CreateReferenceEngineConfig()`,
+  `EngineConfigBoot*`, and `ResolveEngineConfigForBoot(...)` without importing
+  the full `Engine` interface. Sandbox startup and config-control tests import
+  the module directly; `Runtime.Engine.cppm`/`.cpp` contain no boot-helper
+  declarations or definitions.
+- [RUNTIME-147 — Extract the runtime asset-import pipeline out of Engine](../../done/RUNTIME-147-extract-asset-import-pipeline-subsystem.md)
+  (done, 2026-07-08, `Operational`): runtime asset import now lives in
+  `Extrinsic.Runtime.AssetImportPipeline`, including the import/reimport/queue/
+  cancel facade, ingest records, import event log, default-policy registries,
+  decode/materialize helpers, queue snapshot/cancel/clear state, and import
+  dirty-state marking. `Engine` keeps only
+  `GetAssetImportPipeline()` and platform drop delegation; Sandbox default
+  policies, editor UI, and runtime tests call the pipeline directly.
+- [RUNTIME-148 — Extract the scene-document facade out of Engine](../../done/RUNTIME-148-extract-scene-document-subsystem.md)
+  (done, 2026-07-08, `Operational`): runtime scene persistence now lives in
+  `Extrinsic.Runtime.SceneDocument`, including direct and queued scene
+  save/load, new/close document behavior, the scene-file event log, serializable
+  scene snapshots, and the replacement cleanup/rebuild ordering. `Engine` keeps
+  only `GetSceneDocument()` for this surface; Sandbox editor UI and runtime
+  scene lifecycle tests call the document subsystem directly.
+- [RUNTIME-149 — Extract render-recipe and hot-config control out of Engine](../../done/RUNTIME-149-extract-engine-config-control-subsystem.md)
+  (done, 2026-07-08, `Operational`): runtime render-recipe activation and
+  engine-config hot-subset control now live in
+  `Extrinsic.Runtime.EngineConfigControl`, including recipe preview/apply/clear,
+  startup recipe activation, hot-subset preview/apply diagnostics, boot-only
+  rejection, and the active config-control state. `Engine` keeps only
+  `GetConfigControl()` for this surface; Sandbox editor UI and runtime
+  config-control tests call the subsystem directly.
+- [RUNTIME-150 — Split the frame-loop hook adapters out of Runtime.Engine.cpp](../../done/RUNTIME-150-split-engine-frame-loop-implementation-unit.md)
+  (done, 2026-07-08, `Operational`): runtime frame-loop hook adapters and
+  per-frame helpers now live in the private
+  `Extrinsic.Runtime.Engine:FrameLoop` partition. `Engine::RunFrame()` remains
+  on `Engine`, imports the partition, and preserves frame shape and ordering;
+  the partition exports no declarations.
+- [RUNTIME-151 — Slim the Engine module interface and remove the entt leak](../../done/RUNTIME-151-slim-engine-interface-and-remove-entt-leak.md)
+  (done, 2026-07-08, `Operational`): StableId signal tracking now lives behind
+  `StableEntityLookupSceneBinding` in `Extrinsic.Runtime.StableEntityLookup`;
+  `Runtime.Engine.cppm` holds the binding but no EnTT include, token, scoped
+  connection, or callback declaration. The interface moved from 733 lines / 50
+  imports / 2 EnTT includes directly before the task to 721 lines / 46 imports
+  / 0 EnTT tokens, with lookup, selection, scene-lifecycle, and full CPU gate
+  verification passing.
+- [RUNTIME-152 — Extract runtime device bootstrap out of Engine](../../done/RUNTIME-152-extract-runtime-device-bootstrap.md)
+  (done, 2026-07-09, `Operational`): runtime device-selection policy, backend
+  factory dispatch, Vulkan-requested breadcrumb policy, and GPU asset fallback-
+  texture descriptor construction now live in
+  `Extrinsic.Runtime.DeviceBootstrap`. `Engine` remains the platform window and
+  device-initialize composition caller.
+- [RUNTIME-153 — Extract mesh primitive-view controls out of Engine](../../done/RUNTIME-153-extract-mesh-primitive-view-controls.md)
+  (done, 2026-07-09, `Operational`): legacy `MeshPrimitiveViewSettings`
+  compatibility translation now lives in
+  `Extrinsic.Runtime.MeshPrimitiveViewControls`, which applies, clears, and
+  reads the authoritative ECS `RenderEdges` / `RenderPoints` components. The
+  `Engine` methods remain compatibility facades and no longer import render-
+  geometry component policy directly.
+- [RUNTIME-154 — Extract reference-scene lifecycle control out of Engine](../../done/RUNTIME-154-extract-reference-scene-control.md)
+  (done, 2026-07-09, `Operational`): reference-scene lifecycle control now
+  lives in `Extrinsic.Runtime.ReferenceSceneControl`, including provider
+  registration/resolution, installed population state, camera-seed caching, and
+  provider teardown. `Engine` keeps `GetReferenceSceneRegistry()`,
+  `IsReferenceSceneInstalled()`, and `GetReferenceCameraSeed()` as delegating
+  facades.
+- [RUNTIME-155 — Extract runtime input-action registry out of Engine](../../done/RUNTIME-155-extract-runtime-input-action-registry.md)
+  (done, 2026-07-09, `Operational`): runtime input-action descriptor/service/
+  context/handle types, handle allocation, action storage, key-edge trigger
+  checks, ImGui keyboard-capture suppression, callback failure logging, and
+  per-frame dispatch now live in `Extrinsic.Runtime.InputActions`. `Engine`
+  re-exports the API for compatibility and keeps `RegisterInputAction(...)` /
+  `UnregisterInputAction(...)` as delegating facades.
+- [RUNTIME-156 — Extract runtime-module schedule out of Engine](../../done/RUNTIME-156-extract-runtime-module-schedule.md)
+  (done, 2026-07-09, `Operational`): runtime-module sim-system/frame-hook
+  records, deterministic dependency ordering, frame-hook ordering, fixed-step
+  pass insertion/context construction, and frame-hook dispatch now live in
+  `Extrinsic.Runtime.ModuleSchedule`. `Engine` still owns module objects,
+  built-in service provisioning, `OnRegister` / `OnResolve` sequencing, and
+  shutdown calls as delegating composition.
+- [RUNTIME-157 — Extract selection readback state out of Engine](../../done/RUNTIME-157-extract-selection-readback-state.md)
+  (done, 2026-07-09, `Operational`): selection pick readback correlation,
+  completed readback draining, primitive refinement, and the editor-facing
+  refined primitive cache now live in `Extrinsic.Runtime.SelectionReadback`.
+  `Engine` keeps public accessors as delegating compatibility facades.
+- [RUNTIME-158 — Extract frame pacing diagnostics out of Engine](../../done/RUNTIME-158-extract-frame-pacing-diagnostics.md)
+  (done, 2026-07-09, `Operational`): `RuntimeFramePacingDiagnostics` and the
+  ImGui/render-graph counter mirroring helpers now live behind
+  `Extrinsic.Runtime.FramePacingDiagnostics`; `Engine` keeps the public
+  diagnostics accessor and phase timing composition.
+- [RUNTIME-159 — Extract ImGui editor bridge out of Engine](../../done/RUNTIME-159-extract-imgui-editor-bridge.md)
+  (done, 2026-07-09, `Operational`): runtime Dear ImGui adapter, overlay
+  system ownership, editor callbacks, renderer overlay attachment, per-frame
+  Begin/End bracketing, capture reads, and diagnostics access now live in
+  `Extrinsic.Runtime.ImGuiEditorBridge`.
+- [RUNTIME-160 — Extract JobService GPU queue bridge out of Engine](../../done/RUNTIME-160-extract-jobservice-gpu-queue-bridge.md)
+  (done, 2026-07-09, `Operational`): renderer runtime-frame hook ownership,
+  JobService GPU-queue command recording, and participant shutdown sequencing
+  now live behind `Extrinsic.Runtime.JobServiceGpuQueueBridge`.
+- [RUNTIME-161 — Extract object-space normal bake service out of Engine](../../done/RUNTIME-161-extract-object-space-normal-bake-service.md)
+  (done, 2026-07-09, `Operational`): object-space normal bake GPU-queue
+  ownership, dependency setup, ready-frame callback construction, JobService
+  participant registration, diagnostics access, pending-count access, and
+  dependency clearing now live in
+  `Extrinsic.Runtime.ObjectSpaceNormalBakeService`. `RUNTIME-129` remains open
+  for production Vulkan plan-provider and `gpu;vulkan` smoke closure.
+- [RUNTIME-162 — Extract gizmo frame service out of Engine](../../done/RUNTIME-162-extract-gizmo-frame-service.md)
+  (done, 2026-07-09, `Operational`): transform-gizmo interaction state, undo
+  storage, selected-entity scratch, gizmo/selection pointer interlock, and
+  transform-gizmo packet building now live in
+  `Extrinsic.Runtime.GizmoFrameService`. `Engine` keeps frame ordering plus the
+  public gizmo interaction and undo-stack compatibility facades.
 - [RUNTIME-140 — Remove the global scheduler barrier from the import apply path](../../done/RUNTIME-140-remove-global-waitforall-from-import-apply.md)
   (done, 2026-07-05, `CPUContracted`): runtime import materialization now
   drains only the specific `AssetId` load/event through
@@ -218,10 +410,11 @@ split; narratives live in the retirement log.
   advances while queued texture reads remain blocked.
 - [RUNTIME-143 — Multi-subscriber frame-command hook and K-Means decoupling from Engine](../../done/RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md)
   (done, 2026-07-05, `Operational`): `IRenderer` now exposes deterministic
-  add/remove runtime frame-command hook registration, `Engine` exposes a
-  generic runtime GPU participant seam for command recording, maintenance
-  drains, in-flight checks, and post-idle teardown, and `SandboxEditorUi` owns
-  the concrete `RuntimeKMeansGpuJobQueue` while attached.
+  add/remove runtime frame-command hook registration. Its temporary
+  Engine-owned runtime GPU participant seam has been retired by `RUNTIME-137`;
+  K-Means GPU queue command recording, maintenance drains, in-flight checks,
+  and post-idle teardown now route through the `JobService` `GpuQueue`
+  participant registry.
 - [RUNTIME-144 — Post-import processor and import UX-policy seam](../../done/RUNTIME-144-post-import-processor-and-ux-policy-seam.md)
   (done, 2026-07-06, `Operational`): `Engine` now owns generic post-import
   processor, import-authoring, import-completed, and input-action dispatch

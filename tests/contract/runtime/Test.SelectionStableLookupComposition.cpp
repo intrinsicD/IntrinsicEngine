@@ -32,6 +32,7 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.SceneDocument;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StableEntityLookup;
 
@@ -359,14 +360,16 @@ TEST(SelectionStableLookupComposition, SceneLoadRebuildsStableLookupAtReplacemen
     const EntityHandle entity = scene.Create();
     scene.Raw().emplace<StableId>(entity, durable);
 
-    const auto saved = engine.SaveSceneToPath(sceneFile.Path.string());
+    const auto saved =
+        engine.GetSceneDocument().SaveSceneToPath(sceneFile.Path.string());
     ASSERT_TRUE(saved.has_value()) << static_cast<int>(saved.error());
-    ASSERT_TRUE(engine.NewSceneDocument().has_value());
+    ASSERT_TRUE(engine.GetSceneDocument().NewSceneDocument().has_value());
     EXPECT_FALSE(engine.ResolveEntityByStableId(durable).has_value());
 
     const std::uint32_t rebuildsBeforeLoad =
         engine.GetStableEntityLookupDiagnostics().Rebuilds;
-    const auto loaded = engine.LoadSceneFromPath(sceneFile.Path.string());
+    const auto loaded =
+        engine.GetSceneDocument().LoadSceneFromPath(sceneFile.Path.string());
     ASSERT_TRUE(loaded.has_value()) << static_cast<int>(loaded.error());
     EXPECT_EQ(engine.GetStableEntityLookupDiagnostics().Rebuilds,
               rebuildsBeforeLoad + 1u);

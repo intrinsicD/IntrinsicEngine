@@ -1,11 +1,11 @@
 ---
-id: RUNTIME-152
+id: RUNTIME-166
 theme: F
 depends_on:
   - CI-003
 maturity_target: Operational
 ---
-# RUNTIME-152 — Slim and partition the RenderExtraction module
+# RUNTIME-166 — Slim and partition the RenderExtraction module
 
 ## Goal
 - Reduce `Extrinsic.Runtime.RenderExtraction` interface compile cost and improve

@@ -31,6 +31,7 @@ import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.QueueAffinity;
 import Extrinsic.RHI.TextureUpload;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.RenderArtifactPublication;
 
 namespace

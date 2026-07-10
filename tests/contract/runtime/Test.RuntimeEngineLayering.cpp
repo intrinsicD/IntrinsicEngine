@@ -98,14 +98,15 @@ TEST(RuntimeEngineLayering, RunFrameDelegatesToPromotedContractsInDocumentedBroa
 
 TEST(RuntimeEngineLayering, StreamingHookAppliesMainThreadResultsWithFrameBudget)
 {
-    const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto content =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.cppm");
 
     EXPECT_NE(content.find("static constexpr std::uint32_t kApplyBudgetPerFrame = 8u;"),
               std::string::npos);
-    EXPECT_NE(content.find("DerivedJobs->ApplyMainThreadResults(kApplyBudgetPerFrame)"),
+    EXPECT_NE(content.find("AsyncWork.ApplyMainThreadResults(kApplyBudgetPerFrame)"),
               std::string::npos);
-    EXPECT_NE(content.find("Executor.ApplyMainThreadResults(kApplyBudgetPerFrame)"),
-              std::string::npos);
+    EXPECT_EQ(content.find("DerivedJobs->ApplyMainThreadResults"), std::string::npos);
+    EXPECT_EQ(content.find("Executor.ApplyMainThreadResults"), std::string::npos);
     EXPECT_EQ(content.find("Executor.ApplyMainThreadResults();"), std::string::npos);
     EXPECT_EQ(content.find("DerivedJobs->ApplyMainThreadResults();"), std::string::npos);
 }
@@ -135,51 +136,377 @@ TEST(RuntimeEngineLayering, RunFrameStopsAfterPlatformCloseBeforeRendererContrac
     EXPECT_LT(returnFromClose, renderContract);
 }
 
-TEST(RuntimeEngineLayering, ShutdownWaitsIdleBeforeDestroyingRuntimeGpuParticipants)
+TEST(RuntimeEngineLayering, EngineDelegatesGpuQueueLifecycleToJobService)
 {
     const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto publicApi = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+    const auto bridgeApi =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.JobServiceGpuQueueBridge.cppm");
+    const auto bridge =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.JobServiceGpuQueueBridge.cpp");
     const auto shutdown = SliceBetween(content,
                                        "void Engine::Shutdown()",
                                        "// ── Main loop");
-    const auto unregister = SliceBetween(
-        content,
-        "void Engine::UnregisterRuntimeGpuJobParticipant(",
-        "Engine::RuntimeGpuJobParticipantRecord*");
+    const auto bridgeInstall = SliceBetween(
+        bridge,
+        "void JobServiceGpuQueueBridge::Install",
+        "void JobServiceGpuQueueBridge::Uninstall");
+    const auto bridgeShutdown = SliceBetween(
+        bridge,
+        "std::uint64_t JobServiceGpuQueueBridge::ShutdownParticipants",
+        "bool JobServiceGpuQueueBridge::IsInstalled");
 
     const auto participantShutdown =
-        shutdown.find("ShutdownRuntimeGpuJobParticipants();");
+        shutdown.find("m_JobServiceGpuQueueBridge.ShutdownParticipants(");
     const auto executeShutdown = shutdown.find("Core::ExecuteShutdownContract(hooks)");
+    const auto installBridge =
+        content.find("m_JobServiceGpuQueueBridge.Install(*m_Renderer, m_JobService);");
+    const auto installDirectHook =
+        bridgeInstall.find("renderer.RegisterRuntimeFrameCommandHook(");
+    const auto recordCommands =
+        bridgeInstall.find("jobs.RecordGpuQueueFrameCommands(commandContext);");
     const auto detachHook =
-        unregister.find("UninstallRuntimeGpuJobParticipantFrameHook(*it)");
-    const auto waitIdle = unregister.find("m_Device->WaitIdle();", detachHook);
-    const auto destroyParticipant =
-        unregister.find("it->Desc.ShutdownAfterDeviceIdle()", waitIdle);
+        bridgeShutdown.find("Uninstall(renderer);");
+    const auto serviceShutdown =
+        bridgeShutdown.find("jobs.ShutdownGpuQueueParticipants(", detachHook);
+    const auto waitIdle = shutdown.find("m_Device->WaitIdle();", participantShutdown);
 
     ASSERT_NE(participantShutdown, std::string::npos);
     ASSERT_NE(executeShutdown, std::string::npos);
+    ASSERT_NE(installBridge, std::string::npos);
+    ASSERT_NE(installDirectHook, std::string::npos);
+    ASSERT_NE(recordCommands, std::string::npos);
     ASSERT_NE(detachHook, std::string::npos);
+    ASSERT_NE(serviceShutdown, std::string::npos);
     ASSERT_NE(waitIdle, std::string::npos);
-    ASSERT_NE(destroyParticipant, std::string::npos);
 
     EXPECT_LT(participantShutdown, executeShutdown);
-    EXPECT_LT(detachHook, waitIdle);
-    EXPECT_LT(waitIdle, destroyParticipant);
+    EXPECT_LT(installDirectHook, recordCommands);
+    EXPECT_LT(detachHook, serviceShutdown);
+    EXPECT_LT(participantShutdown, waitIdle);
+    EXPECT_EQ(publicApi.find("RuntimeFrameCommandHookHandle"), std::string::npos);
+    EXPECT_EQ(publicApi.find("m_JobServiceGpuQueueHook"), std::string::npos);
+    EXPECT_NE(bridgeApi.find("RuntimeFrameCommandHookHandle"), std::string::npos);
+    EXPECT_EQ(content.find("RegisterRuntimeFrameCommandHook"), std::string::npos);
+    EXPECT_EQ(content.find("UnregisterRuntimeFrameCommandHook"), std::string::npos);
+    EXPECT_EQ(content.find("RecordGpuQueueFrameCommands"), std::string::npos);
+    EXPECT_EQ(publicApi.find("RuntimeGpuJobParticipant"), std::string::npos);
+    EXPECT_EQ(content.find("RegisterRuntimeGpuJobParticipant"), std::string::npos);
+}
+
+TEST(RuntimeEngineLayering, ObjectSpaceNormalBakeServiceKeepsGpuQueueCompositionOutOfEngine)
+{
+    const auto engineInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+    const auto engineImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto serviceInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.ObjectSpaceNormalBakeService.cppm");
+    const auto serviceImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.ObjectSpaceNormalBakeService.cpp");
+
+    EXPECT_NE(engineInterface.find("import Extrinsic.Runtime.ObjectSpaceNormalBakeService"),
+              std::string::npos);
+    EXPECT_NE(engineInterface.find("ObjectSpaceNormalBakeService             m_ObjectSpaceNormalBakeService"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_ObjectSpaceNormalBakeService.SetDependencies("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_ObjectSpaceNormalBakeService.RegisterGpuQueueParticipant("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("&m_ObjectSpaceNormalBakeService.Queue()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_ObjectSpaceNormalBakeService.ClearDependencies()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_ObjectSpaceNormalBakeService.QueueDiagnostics()"),
+              std::string::npos);
+
+    EXPECT_EQ(engineInterface.find("import Extrinsic.Runtime.ObjectSpaceNormalBakeGpuQueue"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("RuntimeObjectSpaceNormalBakeGpuQueue"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("import Extrinsic.Runtime.ObjectSpaceNormalBakeGpuQueue"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("RuntimeObjectSpaceNormalBakeGpuQueueDependencies"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("MakeGpuQueueParticipantDesc()"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("GetGlobalFrameNumber() + 1u"),
+              std::string::npos);
+
+    EXPECT_NE(serviceInterface.find("export module Extrinsic.Runtime.ObjectSpaceNormalBakeService"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("RuntimeObjectSpaceNormalBakeGpuQueue m_GpuQueue"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("export import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("RuntimeObjectSpaceNormalBakeGpuQueueDependencies"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("device->GetGlobalFrameNumber() + 1u"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("jobs.RegisterGpuQueueParticipant(m_GpuQueue.MakeGpuQueueParticipantDesc())"),
+              std::string::npos);
+}
+
+TEST(RuntimeEngineLayering, AssetResidencyServiceKeepsGpuCacheAndModelHandoffsOutOfEngine)
+{
+    const auto engineInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+    const auto engineImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto frameLoop =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.cppm");
+    const auto serviceInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.AssetResidencyService.cppm");
+    const auto serviceImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.AssetResidencyService.cpp");
+
+    EXPECT_NE(engineInterface.find("import Extrinsic.Runtime.AssetResidencyService"),
+              std::string::npos);
+    EXPECT_NE(engineInterface.find("AssetResidencyService                    m_AssetResidencyService"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AssetResidencyService.InitializeGpuCache("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AssetResidencyService.InitializeSceneHandoffs("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AssetResidencyService.CachePtr()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AssetResidencyService.ModelTextureHandoff()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AssetResidencyService.ModelSceneHandoff()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AssetResidencyService.Cache()"),
+              std::string::npos);
+    EXPECT_NE(frameLoop.find("AssetResidency.TickAssets(AssetService"),
+              std::string::npos);
+
+    EXPECT_EQ(engineInterface.find("import Extrinsic.Runtime.AssetModelSceneHandoff"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("import Extrinsic.Runtime.AssetModelTextureHandoff"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("import Extrinsic.Asset.EventBus"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_GpuAssetCache"), std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_GpuAssetCacheListener"), std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_AssetModelTextureHandoff"), std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_AssetModelSceneHandoff"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("import Extrinsic.Runtime.AssetModelSceneHandoff"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("import Extrinsic.Runtime.AssetModelTextureHandoff"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("import Extrinsic.Asset.EventBus"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("std::make_unique<Graphics::GpuAssetCache>"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("std::make_unique<AssetModelTextureHandoff>"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("std::make_unique<AssetModelSceneHandoff>"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("SubscribeAll("), std::string::npos);
+    EXPECT_EQ(engineImpl.find("NotifyFailed(id)"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("InitializeRuntimeGpuAssetFallbackTexture("),
+              std::string::npos);
+    EXPECT_EQ(frameLoop.find("AssetModelSceneHandoff*"), std::string::npos);
+
+    EXPECT_NE(serviceInterface.find("export module Extrinsic.Runtime.AssetResidencyService"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("std::unique_ptr<Graphics::GpuAssetCache> m_GpuAssetCache"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("m_GpuAssetCacheListener"), std::string::npos);
+    EXPECT_NE(serviceInterface.find("std::unique_ptr<AssetModelTextureHandoff> m_AssetModelTextureHandoff"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("std::unique_ptr<AssetModelSceneHandoff> m_AssetModelSceneHandoff"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("std::make_unique<Graphics::GpuAssetCache>"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("InitializeRuntimeGpuAssetFallbackTexture(*m_GpuAssetCache"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("assets.SubscribeAll("), std::string::npos);
+    EXPECT_NE(serviceImpl.find("cache->NotifyFailed(id)"), std::string::npos);
+    EXPECT_NE(serviceImpl.find("std::make_unique<AssetModelTextureHandoff>"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("std::make_unique<AssetModelSceneHandoff>"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("ResolvePendingMaterialTextureBindings()"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("assets->UnsubscribeAll(m_GpuAssetCacheListener)"),
+              std::string::npos);
+}
+
+TEST(RuntimeEngineLayering, GizmoFrameServiceKeepsInteractionStateOutOfEngine)
+{
+    const auto engineInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+    const auto engineImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto frameLoop =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.cppm");
+    const auto serviceInterface =
+        ReadFile(RepoRoot() / "src/runtime/Gizmos/Runtime.GizmoFrameService.cppm");
+    const auto serviceImpl =
+        ReadFile(RepoRoot() / "src/runtime/Gizmos/Runtime.GizmoFrameService.cpp");
+
+    EXPECT_NE(engineInterface.find("import Extrinsic.Runtime.GizmoFrameService"),
+              std::string::npos);
+    EXPECT_NE(engineInterface.find("GizmoFrameService                    m_GizmoFrameService"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_GizmoFrameService.DriveInputForFrame("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_GizmoFrameService.BuildRenderPackets("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_GizmoFrameService.Interaction()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_GizmoFrameService.UndoStack()"),
+              std::string::npos);
+
+    EXPECT_EQ(engineInterface.find("import Extrinsic.Runtime.GizmoInteraction"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("GizmoInteraction                      m_GizmoInteraction"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("GizmoUndoStack                        m_GizmoUndoStack"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("TransformGizmoRenderPacketBuilder"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_GizmoSelectedEntities"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("import Extrinsic.Runtime.GizmoInteraction"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("DriveGizmoAndSelectionInputForFrame"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_GizmoPacketBuilder.Build("),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_GizmoInteraction.Mode()"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_GizmoSelectedEntities"),
+              std::string::npos);
+    EXPECT_EQ(frameLoop.find("import Extrinsic.Runtime.GizmoInteraction"),
+              std::string::npos);
+    EXPECT_EQ(frameLoop.find("DriveGizmoInteractionForFrame"),
+              std::string::npos);
+
+    EXPECT_NE(serviceInterface.find("export module Extrinsic.Runtime.GizmoFrameService"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("export import Extrinsic.Runtime.GizmoInteraction"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("GizmoInteraction m_Interaction"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("GizmoUndoStack m_UndoStack"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("TransformGizmoRenderPacketBuilder m_PacketBuilder"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("std::vector<ECS::EntityHandle> m_SelectedEntities"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("DriveGizmoInteractionForFrame"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("SubmitViewportSelectionClickForFrame"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("BuildRenderPackets"),
+              std::string::npos);
+}
+
+TEST(RuntimeEngineLayering, RenderExtractionServiceKeepsCachePoolAndStatsOutOfEngine)
+{
+    const auto engineInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+    const auto engineImpl = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto serviceInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.RenderExtractionService.cppm");
+    const auto serviceImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.RenderExtractionService.cpp");
+
+    EXPECT_NE(engineInterface.find("import Extrinsic.Runtime.RenderExtractionService"),
+              std::string::npos);
+    EXPECT_NE(engineInterface.find("RenderExtractionService               m_RenderExtractionService"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_RenderExtractionService.ConfigurePool("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_RenderExtractionService.Cache()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_RenderExtractionService.Pool()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_RenderExtractionService.ConsumeFrameIndex()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_RenderExtractionService.PublishLastStats("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_RenderExtractionService.ReleaseFrontSlot("),
+              std::string::npos);
+
+    EXPECT_EQ(engineInterface.find("import Extrinsic.Runtime.RenderExtraction;"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("import Extrinsic.Runtime.RenderWorldPool;"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("import Extrinsic.Runtime.RenderExtraction;"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("import Extrinsic.Runtime.RenderWorldPool;"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("RenderExtractionCache                 m_RenderExtraction"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("std::unique_ptr<RenderWorldPool>      m_RenderWorldPool"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("RuntimeRenderExtractionStats          m_LastExtractionStats"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("std::uint64_t                         m_FrameIndex"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_RenderExtraction.Shutdown("),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_RenderExtraction.GetMaterialTextureAssetBindings("),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_RenderExtraction.SetVisualizationAdapterBinding("),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_RenderExtraction.ClearVisualizationAdapterBinding("),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_RenderExtraction.GetVisualizationAdapterBinding("),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_RenderWorldPool->ReleaseFront("),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_LastExtractionStats ="),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_FrameIndex++"),
+              std::string::npos);
+
+    EXPECT_NE(serviceInterface.find("export module Extrinsic.Runtime.RenderExtractionService"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("export import Extrinsic.Runtime.RenderExtraction"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("export import Extrinsic.Runtime.RenderWorldPool"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("RenderExtractionCache m_Cache"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("std::unique_ptr<RenderWorldPool> m_Pool"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("RuntimeRenderExtractionStats m_LastStats"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("std::uint64_t m_FrameIndex"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("m_Cache.Shutdown(renderer)"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("m_Cache.SetVisualizationAdapterBinding("),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("RenderWorldPool::kDefaultBuffers"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("m_Pool->ReleaseFront(slot)"),
+              std::string::npos);
 }
 
 TEST(RuntimeEngineLayering, RunFrameCarriesDataOnlyFrameContext)
 {
     const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto frameLoop =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.cppm");
 
-    EXPECT_NE(content.find("struct RuntimeFrameContext"), std::string::npos);
-    EXPECT_NE(content.find("double FrameDeltaSeconds"), std::string::npos);
-    EXPECT_NE(content.find("double FixedStepAlpha"), std::string::npos);
-    EXPECT_NE(content.find("std::uint64_t FrameIndex"), std::string::npos);
-    EXPECT_NE(content.find("Graphics::RenderFrameInput RenderInput"), std::string::npos);
-    EXPECT_NE(content.find("RuntimeRenderExtractionStats ExtractionStats"), std::string::npos);
-    EXPECT_NE(content.find("std::uint32_t PooledFrontSlot"), std::string::npos);
+    EXPECT_NE(frameLoop.find("struct RuntimeFrameContext"), std::string::npos);
+    EXPECT_NE(frameLoop.find("double FrameDeltaSeconds"), std::string::npos);
+    EXPECT_NE(frameLoop.find("double FixedStepAlpha"), std::string::npos);
+    EXPECT_NE(frameLoop.find("std::uint64_t FrameIndex"), std::string::npos);
+    EXPECT_NE(frameLoop.find("Graphics::RenderFrameInput RenderInput"), std::string::npos);
+    EXPECT_NE(frameLoop.find("RuntimeRenderExtractionStats ExtractionStats"), std::string::npos);
+    EXPECT_NE(frameLoop.find("std::uint32_t PooledFrontSlot"), std::string::npos);
     EXPECT_NE(content.find("frameContext.FrameDeltaSeconds = frameDt;"), std::string::npos);
     EXPECT_NE(content.find("frameContext.FixedStepAlpha = alpha;"), std::string::npos);
-    EXPECT_NE(content.find("frameContext.FrameIndex = m_FrameIndex++;"), std::string::npos);
+    EXPECT_NE(content.find("frameContext.FrameIndex = m_RenderExtractionService.ConsumeFrameIndex();"),
+              std::string::npos);
     EXPECT_NE(content.find("frameContext.ExtractionStats"), std::string::npos);
     EXPECT_NE(content.find("frameContext.PooledFrontSlot"), std::string::npos);
 }
@@ -228,7 +555,8 @@ TEST(RuntimeEngineLayering, PromotedFrameLoopContractPreservesRendererAndMainten
 
 TEST(RuntimeEngineLayering, RunFrameRegistersPromotedEcsSystemBundleBetweenSimTickAndCompile)
 {
-    const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto content =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.cppm");
 
     const auto simTick = content.find("application.OnSimTick(engine, fixedDt);");
     const auto bundleRegistration = content.find(
@@ -257,6 +585,95 @@ TEST(RuntimeEngineLayering, StreamingExecutorApiStaysCpuOnly)
     EXPECT_EQ(publicApi.find("GpuWorld"), std::string::npos);
 }
 
+TEST(RuntimeEngineLayering, AsyncWorkServiceKeepsStreamingAndDerivedJobOwnershipOutOfEngine)
+{
+    const auto engineInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+    const auto engineImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto frameLoop =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.cppm");
+    const auto serviceInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.AsyncWorkService.cppm");
+    const auto serviceImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.AsyncWorkService.cpp");
+
+    EXPECT_NE(engineInterface.find("import Extrinsic.Runtime.AsyncWorkService"),
+              std::string::npos);
+    EXPECT_NE(engineInterface.find("AsyncWorkService                        m_AsyncWorkService"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AsyncWorkService.Initialize()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AsyncWorkService.Streaming()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AsyncWorkService.ShutdownAndDrain()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AsyncWorkService.Reset()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AsyncWorkService.SubmitDerivedJob("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AsyncWorkService.CancelDerivedJob("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_AsyncWorkService.SnapshotDerivedJobs()"),
+              std::string::npos);
+    EXPECT_NE(frameLoop.find("import Extrinsic.Runtime.AsyncWorkService"),
+              std::string::npos);
+    EXPECT_NE(frameLoop.find("AsyncWork.DrainCompletions()"),
+              std::string::npos);
+    EXPECT_NE(frameLoop.find("AsyncWork.PumpBackground(maxLaunches)"),
+              std::string::npos);
+
+    EXPECT_EQ(engineInterface.find("import Extrinsic.Runtime.StreamingExecutor"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("import Extrinsic.Runtime.DerivedJobGraph"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_StreamingExecutor"), std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_DerivedJobRegistry"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("import Extrinsic.Runtime.StreamingExecutor"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("import Extrinsic.Runtime.DerivedJobGraph"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("std::make_unique<StreamingExecutor>"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("std::make_unique<DerivedJobRegistry>"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_DerivedJobRegistry->Submit("),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_DerivedJobRegistry->Cancel("),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_DerivedJobRegistry->SnapshotAll()"),
+              std::string::npos);
+    EXPECT_EQ(frameLoop.find("import Extrinsic.Runtime.StreamingExecutor"),
+              std::string::npos);
+    EXPECT_EQ(frameLoop.find("import Extrinsic.Runtime.DerivedJobGraph"),
+              std::string::npos);
+    EXPECT_EQ(frameLoop.find("StreamingExecutor&"), std::string::npos);
+    EXPECT_EQ(frameLoop.find("DerivedJobRegistry*"), std::string::npos);
+    EXPECT_EQ(frameLoop.find("DerivedJobs->"), std::string::npos);
+    EXPECT_EQ(frameLoop.find("Executor."), std::string::npos);
+
+    EXPECT_NE(serviceInterface.find("export module Extrinsic.Runtime.AsyncWorkService"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("export import Extrinsic.Runtime.DerivedJobGraph"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("export import Extrinsic.Runtime.StreamingExecutor"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("std::unique_ptr<StreamingExecutor> m_StreamingExecutor"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("std::unique_ptr<DerivedJobRegistry> m_DerivedJobRegistry"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("std::make_unique<StreamingExecutor>"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("std::make_unique<DerivedJobRegistry>(*m_StreamingExecutor)"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("m_DerivedJobRegistry->DrainReadbacks()"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("m_DerivedJobRegistry->ApplyMainThreadResults(maxApplyCount)"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("m_StreamingExecutor->ShutdownAndDrain()"),
+              std::string::npos);
+}
+
 TEST(RuntimeEngineLayering, FrameLoopContractDoesNotBecomeCompositionRoot)
 {
     const auto frameLoop = ReadFile(RepoRoot() / "src/core/Core.FrameLoop.cppm");
@@ -271,6 +688,415 @@ TEST(RuntimeEngineLayering, FrameLoopContractDoesNotBecomeCompositionRoot)
     EXPECT_EQ(frameLoop.find("CreateDevice"), std::string::npos);
     EXPECT_EQ(frameLoop.find("AssetService"), std::string::npos);
     EXPECT_EQ(frameLoop.find("StreamingExecutor"), std::string::npos);
+}
+
+TEST(RuntimeEngineLayering, DeviceBootstrapKeepsBackendAndFallbackPolicyOutOfEngine)
+{
+    const auto engineInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+    const auto engineImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto bootstrap =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.DeviceBootstrap.cpp");
+    const auto residency =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.AssetResidencyService.cpp");
+
+    EXPECT_NE(engineImpl.find("import Extrinsic.Runtime.DeviceBootstrap"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("CreateRuntimeDevice(m_Config.Render)"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("InitializeRuntimeGpuAssetFallbackTexture("),
+              std::string::npos);
+    EXPECT_NE(residency.find("InitializeRuntimeGpuAssetFallbackTexture("),
+              std::string::npos);
+
+    EXPECT_EQ(engineInterface.find("RuntimeDeviceSelection"), std::string::npos);
+    EXPECT_EQ(engineInterface.find("SelectRuntimeDeviceBackend"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find(
+                  "ShouldEmitVulkanRequestedButNotOperationalBreadcrumb"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("MakeFallbackTextureBytes"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("BuildFallbackTextureDesc"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("CreateVulkanDevice"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("CreateNullDevice"), std::string::npos);
+
+    EXPECT_NE(bootstrap.find("MakeFallbackTextureBytes"), std::string::npos);
+    EXPECT_NE(bootstrap.find("BuildFallbackTextureDesc"), std::string::npos);
+    EXPECT_NE(bootstrap.find("CreateRuntimeDevice"), std::string::npos);
+}
+
+TEST(RuntimeEngineLayering, MeshPrimitiveViewControlsKeepRenderComponentPolicyOutOfEngine)
+{
+    const auto engineImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto controls =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.MeshPrimitiveViewControls.cpp");
+
+    EXPECT_NE(engineImpl.find("import Extrinsic.Runtime.MeshPrimitiveViewControls"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("ApplyMeshPrimitiveViewSettings(*m_Scene"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("ReadMeshPrimitiveViewSettings(*m_Scene"),
+              std::string::npos);
+
+    EXPECT_EQ(engineImpl.find("import Extrinsic.Graphics.Component.RenderGeometry"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("RenderEdges"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("RenderPoints"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("ToRenderPointType"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("ToMeshVertexViewRenderMode"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("entt::registry"), std::string::npos);
+
+    EXPECT_NE(controls.find("import Extrinsic.Graphics.Component.RenderGeometry"),
+              std::string::npos);
+    EXPECT_NE(controls.find("RenderEdges"), std::string::npos);
+    EXPECT_NE(controls.find("RenderPoints"), std::string::npos);
+}
+
+TEST(RuntimeEngineLayering, ReferenceSceneControlKeepsProviderLifecycleOutOfEngine)
+{
+    const auto engineInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+    const auto engineImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto controlInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.ReferenceSceneControl.cppm");
+    const auto controlImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.ReferenceSceneControl.cpp");
+
+    EXPECT_NE(engineInterface.find("import Extrinsic.Runtime.ReferenceSceneControl"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("import Extrinsic.Runtime.ReferenceSceneControl"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_ReferenceSceneControl.InstallIfEnabled("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("ReferenceScene.TeardownIfInstalled("),
+              std::string::npos);
+
+    EXPECT_EQ(engineInterface.find("ReferenceScenePopulation"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_ReferenceCamera"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_ReferenceSceneInstalled"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("IReferenceSceneProvider"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("RegisterDefaultReferenceProvidersIfAbsent"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("ReferenceScenePopulation"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("provider.Populate"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("provider->Teardown"), std::string::npos);
+
+    EXPECT_NE(controlInterface.find("ReferenceScenePopulation m_Population"),
+              std::string::npos);
+    EXPECT_NE(controlImpl.find("RegisterDefaultReferenceProvidersIfAbsent"),
+              std::string::npos);
+    EXPECT_NE(controlImpl.find("IReferenceSceneProvider"), std::string::npos);
+    EXPECT_NE(controlImpl.find("provider.Populate"), std::string::npos);
+    EXPECT_NE(controlImpl.find("provider->Teardown"), std::string::npos);
+}
+
+TEST(RuntimeEngineLayering, InputActionsKeepRegistryAndDispatchOutOfEngine)
+{
+    const auto engineInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+    const auto engineImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto frameLoop =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.cppm");
+    const auto inputInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.InputActions.cppm");
+    const auto inputImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.InputActions.cpp");
+
+    EXPECT_NE(engineInterface.find("export import Extrinsic.Runtime.InputActions"),
+              std::string::npos);
+    EXPECT_NE(engineInterface.find("RuntimeInputActionRegistry            m_InputActions"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_InputActions.Register(std::move(desc))"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_InputActions.DispatchForFrame("),
+              std::string::npos);
+
+    EXPECT_EQ(engineInterface.find("struct RuntimeInputActionRecord"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_NextInputActionHandle"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("RuntimeInputActionRecord"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_NextInputActionHandle"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_InputActions.push_back"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("std::erase_if(\n            m_InputActions"),
+              std::string::npos);
+    EXPECT_EQ(frameLoop.find("RuntimeInputActionTriggered"), std::string::npos);
+    EXPECT_EQ(frameLoop.find("DispatchRuntimeInputActionsForFrame"),
+              std::string::npos);
+
+    EXPECT_NE(inputInterface.find("export module Extrinsic.Runtime.InputActions"),
+              std::string::npos);
+    EXPECT_NE(inputInterface.find("struct RuntimeInputActionRecord"),
+              std::string::npos);
+    EXPECT_NE(inputInterface.find("std::vector<RuntimeInputActionRecord> m_Actions"),
+              std::string::npos);
+    EXPECT_NE(inputInterface.find("std::uint64_t m_NextHandle"),
+              std::string::npos);
+    EXPECT_NE(inputImpl.find("RuntimeInputActionTriggered"),
+              std::string::npos);
+    EXPECT_NE(inputImpl.find("std::erase_if("), std::string::npos);
+    EXPECT_NE(inputImpl.find("Core::Log::Warn"), std::string::npos);
+}
+
+TEST(RuntimeEngineLayering, RuntimeModuleScheduleKeepsContributionPolicyOutOfEngine)
+{
+    const auto engineInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+    const auto engineImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto scheduleInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.ModuleSchedule.cppm");
+    const auto scheduleImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.ModuleSchedule.cpp");
+
+    EXPECT_NE(engineInterface.find("import Extrinsic.Runtime.ModuleSchedule"),
+              std::string::npos);
+    EXPECT_NE(engineInterface.find("RuntimeModuleSchedule                  m_RuntimeModuleSchedule"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_RuntimeModuleSchedule.Clear()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_RuntimeModuleSchedule.FinalizeForBoot()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_RuntimeModuleSchedule.RegisterSimSystemsForTick("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_RuntimeModuleSchedule.RunFrameHooks("),
+              std::string::npos);
+
+    EXPECT_EQ(engineInterface.find("RuntimeModuleSimSystemRecord"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("RuntimeModuleFrameHookRecord"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_RuntimeModuleSimSystems"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_RuntimeModuleFrameHooks"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_NextRuntimeModuleRegistrationSequence"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("std::vector<std::vector<std::size_t>> edges"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("waits for unprovided signal"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("Sim system dependency cycle detected"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("record.Desc.Options"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("RuntimeFrameHookContext context{"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("for (const RuntimeModuleFrameHookRecord& hook"),
+              std::string::npos);
+
+    EXPECT_NE(scheduleInterface.find("export module Extrinsic.Runtime.ModuleSchedule"),
+              std::string::npos);
+    EXPECT_NE(scheduleInterface.find("RuntimeModuleSimSystemRecord"),
+              std::string::npos);
+    EXPECT_NE(scheduleInterface.find("RuntimeModuleFrameHookRecord"),
+              std::string::npos);
+    EXPECT_NE(scheduleImpl.find("std::vector<std::vector<std::size_t>> edges"),
+              std::string::npos);
+    EXPECT_NE(scheduleImpl.find("waits for unprovided signal"),
+              std::string::npos);
+    EXPECT_NE(scheduleImpl.find("Sim system dependency cycle detected"),
+              std::string::npos);
+    EXPECT_NE(scheduleImpl.find("context.Graph.AddPass("),
+              std::string::npos);
+    EXPECT_NE(scheduleImpl.find("RuntimeFrameHookContext hookContext"),
+              std::string::npos);
+    EXPECT_NE(scheduleImpl.find("for (const RuntimeModuleFrameHookRecord& hook"),
+              std::string::npos);
+}
+
+TEST(RuntimeEngineLayering, SelectionReadbackKeepsPickCorrelationCacheOutOfEngine)
+{
+    const auto engineInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+    const auto engineImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto frameLoop =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.cppm");
+    const auto sceneDocumentInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.SceneDocument.cppm");
+    const auto sceneDocumentImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.SceneDocument.cpp");
+    const auto readbackInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.SelectionReadback.cppm");
+    const auto readbackImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.SelectionReadback.cpp");
+
+    EXPECT_NE(engineInterface.find("import Extrinsic.Runtime.SelectionReadback"),
+              std::string::npos);
+    EXPECT_NE(engineInterface.find("SelectionReadbackState                  m_SelectionReadback"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_SelectionReadback.DrainPendingPickForFrame("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_SelectionReadback.DrainCompletedReadbacksForFrame("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_SelectionReadback.LastRefinedPrimitive()"),
+              std::string::npos);
+    EXPECT_NE(sceneDocumentInterface.find("SelectionReadbackState* SelectionReadback"),
+              std::string::npos);
+    EXPECT_NE(sceneDocumentImpl.find("SelectionReadback->ClearRefinedPrimitiveCache()"),
+              std::string::npos);
+
+    EXPECT_EQ(engineInterface.find("struct InFlightPickContext"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_InFlightPickContexts"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_LastRefinedPrimitive"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_LastRefinedPrimitiveGeneration"),
+              std::string::npos);
+    EXPECT_EQ(frameLoop.find("BuildPickReadbackContextForFrame"),
+              std::string::npos);
+    EXPECT_EQ(frameLoop.find("RememberPickReadbackContextForFrame"),
+              std::string::npos);
+    EXPECT_EQ(frameLoop.find("DrainPendingSelectionPickForFrame"),
+              std::string::npos);
+    EXPECT_EQ(frameLoop.find("ApplySelectionReadbackToController"),
+              std::string::npos);
+    EXPECT_EQ(frameLoop.find("RefineSelectionReadbackForFrame"),
+              std::string::npos);
+    EXPECT_EQ(frameLoop.find("DrainCompletedSelectionReadbacksForFrame"),
+              std::string::npos);
+    EXPECT_EQ(frameLoop.find("RefinePickReadbackResult(scene"),
+              std::string::npos);
+    EXPECT_EQ(sceneDocumentInterface.find("LastRefinedPrimitive{}"),
+              std::string::npos);
+    EXPECT_EQ(sceneDocumentInterface.find("LastRefinedPrimitiveGeneration{}"),
+              std::string::npos);
+
+    EXPECT_NE(readbackInterface.find("export module Extrinsic.Runtime.SelectionReadback"),
+              std::string::npos);
+    EXPECT_NE(readbackInterface.find("struct InFlightPickContext"),
+              std::string::npos);
+    EXPECT_NE(readbackInterface.find("std::vector<InFlightPickContext> m_InFlightPickContexts"),
+              std::string::npos);
+    EXPECT_NE(readbackInterface.find("std::optional<PrimitiveSelectionResult> m_LastRefinedPrimitive"),
+              std::string::npos);
+    EXPECT_NE(readbackImpl.find("BuildPickReadbackContextForFrame"),
+              std::string::npos);
+    EXPECT_NE(readbackImpl.find("ApplySelectionReadbackToController"),
+              std::string::npos);
+    EXPECT_NE(readbackImpl.find("selectionSystem.PopPickResult()"),
+              std::string::npos);
+    EXPECT_NE(readbackImpl.find("RefinePickReadbackResult(scene"),
+              std::string::npos);
+}
+
+TEST(RuntimeEngineLayering, FramePacingDiagnosticsKeepsCounterMirroringOutOfEngine)
+{
+    const auto engineInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+    const auto engineImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto frameLoop =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.cppm");
+    const auto diagnosticsInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.FramePacingDiagnostics.cppm");
+    const auto diagnosticsImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.FramePacingDiagnostics.cpp");
+
+    EXPECT_NE(engineInterface.find("export import Extrinsic.Runtime.FramePacingDiagnostics"),
+              std::string::npos);
+    EXPECT_NE(frameLoop.find("import Extrinsic.Runtime.FramePacingDiagnostics"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("MirrorImGuiFramePacingDiagnostics("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("MirrorRenderGraphFramePacingDiagnostics("),
+              std::string::npos);
+
+    EXPECT_EQ(engineInterface.find("export struct RuntimeFramePacingDiagnostics"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("pacing.ImGuiEditorCallbackMicros ="),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("pacing.ImGuiDrawDataCopyMicros ="),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("pacing.RenderGraphCompileMicros ="),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("pacing.RenderGraphExecuteMicros ="),
+              std::string::npos);
+
+    EXPECT_NE(diagnosticsInterface.find("export module Extrinsic.Runtime.FramePacingDiagnostics"),
+              std::string::npos);
+    EXPECT_NE(diagnosticsInterface.find("export struct RuntimeFramePacingDiagnostics"),
+              std::string::npos);
+    EXPECT_NE(diagnosticsInterface.find("MirrorImGuiFramePacingDiagnostics"),
+              std::string::npos);
+    EXPECT_NE(diagnosticsInterface.find("MirrorRenderGraphFramePacingDiagnostics"),
+              std::string::npos);
+    EXPECT_NE(diagnosticsImpl.find("pacing.ImGuiEditorCallbackMicros = imgui.LastEditorCallbackMicros"),
+              std::string::npos);
+    EXPECT_NE(diagnosticsImpl.find("pacing.RenderGraphCompileMicros = stats.Compile.TimeMicros"),
+              std::string::npos);
+}
+
+TEST(RuntimeEngineLayering, ImGuiEditorBridgeKeepsAdapterOwnershipOutOfEngine)
+{
+    const auto engineInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+    const auto engineImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto bridgeInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.ImGuiEditorBridge.cppm");
+    const auto bridgeImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.ImGuiEditorBridge.cpp");
+
+    EXPECT_NE(engineInterface.find("import Extrinsic.Runtime.ImGuiEditorBridge"),
+              std::string::npos);
+    EXPECT_NE(engineInterface.find("ImGuiEditorBridge                    m_ImGuiEditorBridge"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_ImGuiEditorBridge.Initialize("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_ImGuiEditorBridge.Shutdown("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_ImGuiEditorBridge.BeginFrame("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_ImGuiEditorBridge.EndFrame("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_ImGuiEditorBridge.Diagnostics()"),
+              std::string::npos);
+
+    EXPECT_EQ(engineInterface.find("import Extrinsic.Graphics.ImGuiOverlaySystem"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_ImGuiOverlay"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_ImGuiEditorCallback"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("m_ImGuiAdapter"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("std::make_unique<ImGuiAdapter>"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("SetImGuiOverlaySystem(&"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_ImGuiAdapter->BeginFrame"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_ImGuiAdapter->EndFrame"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_ImGuiAdapter->GetDiagnostics"),
+              std::string::npos);
+
+    EXPECT_NE(bridgeInterface.find("export module Extrinsic.Runtime.ImGuiEditorBridge"),
+              std::string::npos);
+    EXPECT_NE(bridgeInterface.find("class ImGuiEditorBridge"),
+              std::string::npos);
+    EXPECT_NE(bridgeInterface.find("Graphics::ImGuiOverlaySystem m_Overlay"),
+              std::string::npos);
+    EXPECT_NE(bridgeInterface.find("std::unique_ptr<ImGuiAdapter> m_Adapter"),
+              std::string::npos);
+    EXPECT_NE(bridgeImpl.find("std::make_unique<ImGuiAdapter>(window, m_Overlay)"),
+              std::string::npos);
+    EXPECT_NE(bridgeImpl.find("renderer.SetImGuiOverlaySystem(&m_Overlay)"),
+              std::string::npos);
+    EXPECT_NE(bridgeImpl.find("renderer->SetImGuiOverlaySystem(nullptr)"),
+              std::string::npos);
+    EXPECT_NE(bridgeImpl.find("m_Adapter->BeginFrame(deltaSeconds)"),
+              std::string::npos);
+    EXPECT_NE(bridgeImpl.find("m_Adapter->EndFrame()"),
+              std::string::npos);
 }
 
 TEST(RuntimeEngineLayering, RenderGraphStaysOutOfECSAndCoreStaysOutOfGpuBarriers)

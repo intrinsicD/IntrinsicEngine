@@ -40,6 +40,10 @@ depends_on: []
     the process (`Core.Tasks.Internal.cppm:103-107`).
   - Parallel execute allocates `std::function` wrappers and fresh vectors
     per pass completion (`Core.Dag.TaskGraph.cpp:916-922, 978-979`).
+- ARCH-013 re-review (2026-07-08): Decision unchanged. Scheduler priority,
+  stealing, wake, and scratch improvements stay below `JobService` and the
+  frame-graph split; priority lanes must remain generic scheduler policy, not
+  runtime domain queues.
 
 ## Required changes
 - [ ] Add a small fixed set of priority lanes to external dispatch (e.g.

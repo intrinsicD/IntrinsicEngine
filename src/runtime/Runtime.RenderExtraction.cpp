@@ -2321,25 +2321,8 @@ namespace Extrinsic::Runtime
         Graphics::GpuAssetCache* gpuAssets,
         const SelectionController* selection,
         const std::uint32_t runtimeSnapshotStorageSlot,
-        std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos)
-    {
-        return ExtractAndSubmit(WorldHandle{},
-                                scene,
-                                renderer,
-                                gpuAssets,
-                                selection,
-                                runtimeSnapshotStorageSlot,
-                                transformGizmos);
-    }
-
-    RuntimeRenderExtractionStats RenderExtractionCache::ExtractAndSubmit(
-        WorldHandle world,
-        ECS::Scene::Registry& scene,
-        Graphics::IRenderer& renderer,
-        Graphics::GpuAssetCache* gpuAssets,
-        const SelectionController* selection,
-        const std::uint32_t runtimeSnapshotStorageSlot,
-        std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos)
+        std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos,
+        WorldHandle world)
     {
         RuntimeRenderExtractionStats stats{};
         stats.World = world;

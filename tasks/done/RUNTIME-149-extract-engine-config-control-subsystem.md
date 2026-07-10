@@ -3,8 +3,19 @@ id: RUNTIME-149
 theme: F
 depends_on: []
 maturity_target: Operational
+completed: 2026-07-08
 ---
 # RUNTIME-149 — Extract render-recipe and hot-config control out of Engine
+
+## Status
+- Done 2026-07-08 at `Operational`.
+- Runtime render-recipe activation and engine-config hot-subset control now
+  live in `Extrinsic.Runtime.EngineConfigControl`, exposed from
+  `Engine::GetConfigControl()` without keeping delegating config-control
+  methods on `Engine`.
+- `Engine` remains the single active-config authority; the subsystem mutates
+  the engine-owned config only through its validated apply path.
+- PR/commit: pending.
 
 ## Goal
 - Move the runtime config-control facade — render-recipe preview/activate/
@@ -54,9 +65,13 @@ maturity_target: Operational
   (`RuntimeRenderRecipeActivationSource::StartupConfigFile`) is triggered
   from `Engine::Initialize()`; it delegates to the subsystem after
   construction.
+- ARCH-013 re-review (2026-07-08): Decision unchanged. This facade extraction
+  keeps `Engine` as the single active-config owner and aligns with ADR-0024's
+  app-as-parts-list direction; app/method-specific section ownership is
+  intentionally left to `CORE-009`, not added here.
 - Part of the `Runtime.Engine` decomposition series (`RUNTIME-146..151`).
 
-- Transitional facade (ADR-0024): the `Engine::Get{X}()` accessor this task adds is a **transitional landing**, not the end state. Per ADR-0024 D9/D12 and the [kernel target-state](../../../docs/architecture/kernel-target-state.md) scorecard (`Engine::GetX()` domain-facade accessors = 0), its conversion to a RuntimeModule / Resolve-phase service is owned by `ARCH-013` (per-subsystem decision) and tracked by `ARCH-014`. This task extracts the subsystem; it does not make the accessor permanent.
+- Transitional facade (ADR-0024): the `Engine::Get{X}()` accessor this task adds is a **transitional landing**, not the end state. Per ADR-0024 D9/D12 and the [kernel target-state](../../docs/architecture/kernel-target-state.md) scorecard (`Engine::GetX()` domain-facade accessors = 0), its conversion to a RuntimeModule / Resolve-phase service is owned by `ARCH-013` (per-subsystem decision) and tracked by `ARCH-014`. This task extracts the subsystem; it does not make the accessor permanent.
 ## Control surfaces
 - Config: unchanged — same hot-subset and recipe documents.
 - UI: `SandboxEditorUi` calls `engine.GetConfigControl().*` instead of
@@ -64,43 +79,55 @@ maturity_target: Operational
 - Agent/CLI: unchanged flags; call sites re-pointed at the subsystem.
 
 ## Required changes
-- [ ] Add `Extrinsic.Runtime.EngineConfigControl` interface +
+- [x] Add `Extrinsic.Runtime.EngineConfigControl` interface +
       implementation units under `src/runtime/`, registered in
       `src/runtime/CMakeLists.txt`.
-- [ ] Move the methods, state, exported types, and helpers listed in
+- [x] Move the methods, state, exported types, and helpers listed in
       Context verbatim; keep `Engine` as the owner of the active
       `EngineConfig` value.
-- [ ] Add `Engine::GetConfigControl()` (and `const` overload); migrate
+- [x] Add `Engine::GetConfigControl()` (and `const` overload); migrate
       call sites; do not keep delegating methods on `Engine`.
-- [ ] Keep the startup recipe activation path
+- [x] Keep the startup recipe activation path
       (`StartupConfigFile` source) working from `Initialize()`.
 
 ## Tests
-- [ ] `Test.RuntimeConfigControlFacade.cpp` and
+- [x] `Test.RuntimeConfigControlFacade.cpp` and
       `Test.RuntimeRenderRecipeActivation.cpp` pass with only import/name
       updates (behavior-preservation evidence, including boot-only field
       rejection and recipe-override install/clear).
-- [ ] Default CPU gate stays green:
+- [x] Default CPU gate stays green:
       `ctest --test-dir build/ci -LE 'gpu|vulkan|slow|flaky-quarantine'`.
 
 ## Docs
-- [ ] Update `src/runtime/README.md` module list for the new module.
-- [ ] Regenerate module inventories per `intrinsicengine-docs-sync`.
-- [ ] Update `tasks/backlog/runtime/README.md` status line on retirement.
+- [x] Update `src/runtime/README.md` module list for the new module.
+- [x] Regenerate module inventories per `intrinsicengine-docs-sync`.
+- [x] Update `tasks/backlog/runtime/README.md` status line on retirement.
 
 ## Acceptance criteria
-- [ ] `Runtime.Engine.cppm` no longer declares any recipe/config-control
+- [x] `Runtime.Engine.cppm` no longer declares any recipe/config-control
       method, type, or member listed in Context.
-- [ ] Exactly one config authority remains (the `Engine`-owned active
+- [x] Exactly one config authority remains (the `Engine`-owned active
       config, mutated only through the subsystem's apply path).
-- [ ] CPU gate and layering check pass.
+- [x] CPU gate and layering check pass.
 
 ## Verification
 ```bash
 cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+build/ci/tests/contract/runtime/IntrinsicRuntimeContractTests \
+  --gtest_filter='RuntimeConfigControlFacade.*:RuntimeRenderRecipeActivation.*'
+ctest --test-dir build/ci --output-on-failure \
+  -R 'RuntimeConfigControlFacade|RuntimeRenderRecipeActivation' \
+  -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root .
+python3 tools/repo/check_root_hygiene.py --root .
+git diff --check
 ```
 
 ## Forbidden changes

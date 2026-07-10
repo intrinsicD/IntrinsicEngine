@@ -71,14 +71,16 @@ produce diagnostics instead of silently changing the graph.
 
 There are three current edit lanes over the same preview/apply contract:
 
-- **Config files.** `Engine::LoadRenderRecipeConfigPreviewFile(...)` previews a
-  recipe file. `Engine::LoadAndApplyRenderRecipeConfigFile(...)` applies a
-  usable preview by installing a `FrameRecipeOverride` on the renderer.
+- **Config files.** `Engine::GetConfigControl().LoadRenderRecipeConfigPreviewFile(...)`
+  previews a recipe file.
+  `Engine::GetConfigControl().LoadAndApplyRenderRecipeConfigFile(...)` applies
+  a usable preview by installing a `FrameRecipeOverride` on the renderer.
 - **Sandbox UI.** The `Render Recipes` sandbox editor panel validates, previews,
   activates, cancels, publishes, and applies recipe drafts through runtime-owned
   command helpers. The UI stores draft/presentation state only; it does not own
   renderer state.
-- **Agent/CLI/programmatic control.** `Engine::PreviewRenderRecipeConfigDocument(...)`,
+- **Agent/CLI/programmatic control.**
+  `Engine::GetConfigControl().PreviewRenderRecipeConfigDocument(...)`,
   `ActivateRenderRecipeConfigDocument(...)`, and
   `ApplyRenderRecipeConfigPreview(...)` expose the same side-effect-free preview
   and fail-closed apply path to agents, CLI tools, tests, and application code.

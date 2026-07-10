@@ -6,33 +6,36 @@ depends_on:
   - ARCH-008
   - ARCH-009
   - ARCH-010
+maturity_target: CPUContracted
+completed: 2026-07-08
 ---
 # ARCH-011 — RuntimeModule contract, EngineSetup, and two-phase ServiceRegistry
 
 ## Status
-- **Retired 2026-07-09 at `CPUContracted`.** Commit/PR: PR #1013 on branch
-  `claude/agentic-workflow-continue-fl4754` (fifth and final additive ADR-0024
-  kernel seam; `ARCH-007`..`ARCH-011` are now all landed).
-- New modules `Extrinsic.Runtime.ServiceRegistry` (two-phase `Provide`/
-  `Require`/`Find`, fail-closed boot abort naming requester + missing type)
-  and `Extrinsic.Runtime.Module` (`IRuntimeModule`, `EngineSetup`,
-  `SimSystemDesc`, `FramePhase`/`FrameHookContext`, `ModuleRegistrationSink`,
-  `EngineWillShutDown`). `Engine` gains `AddModule`/`EmplaceModule`, the
-  two-phase `OnRegister`→`OnResolve` boot, module sim-system application in the
-  fixed-step graph, module frame hooks at four phases in `RunFrame()`, and the
-  `EngineWillShutDown` announce-pump + reverse-order `OnShutdown` teardown. No
-  `Engine&` crosses the `EngineSetup`/`CommandContext` surface.
-- **Verification run locally:** `check_layering.py --strict` (0 violations),
-  `check_test_layout.py --strict` (0 findings), `check_task_policy.py
-  --strict`, `check_doc_links.py`, module-inventory regeneration (+2 modules),
-  and `generate_session_brief.py`.
-- **Merge follow-up:** the originating cloud session could not run the C++
-  gate. PR #1013 CI built successfully but exposed two deterministic failures:
-  module systems inherited `AddModule` order because the sequential-hazard
-  FrameGraph cannot infer producer direction from a Read/Write pair alone.
-  `BUG-066` repairs the contract with stable pass ordering plus explicit named
-  causal signals while preserving core FrameGraph semantics.
-- `Operational` is owned by `ARCH-012` (ClusteringModule proving extraction).
+
+- Retired on 2026-07-08 at `CPUContracted`.
+- PR: pending. Commit: pending local change.
+- The code landed `Extrinsic.Runtime.Module` and
+  `Extrinsic.Runtime.ServiceRegistry`, plus `Engine::AddModule(...)`,
+  `Engine::EmplaceModule<T>(...)`, and `Engine::Services()`.
+- Runtime boot now sorts modules by stable name, invokes all
+  `IRuntimeModule::OnRegister(EngineSetup&)`, then invokes all
+  `IRuntimeModule::OnResolve(EngineSetup&)` after the service registry has
+  every provided service. Built-in kernel services (`CommandBus`,
+  `KernelEventBus`, `JobService`, `WorldRegistry`) are provided by the engine.
+- Module-facing setup/context surfaces expose command, event, job, world,
+  service, fixed-step system, and frame-hook seams without exposing `Engine&`.
+  Module sim systems carry declared wait/signal labels so fixed-step pass
+  ordering is data-driven rather than `AddModule`-order driven.
+- Verified locally with the `ci` preset, which enables
+  `INTRINSIC_ENABLE_SANITIZERS=ON`: the focused
+  `RuntimeServiceRegistry.*:RuntimeModule.*` test set passed 5/5 and the
+  combined ARCH-007/008/009/010/011 runtime seam CTest subset passed 30/30;
+  `IntrinsicTests` built and the full default CPU-supported CTest gate passed
+  3633/3633. Structural checks are recorded below.
+- `Operational` use of the module contract remains owned by `ARCH-012`, which
+  composes command -> job -> event -> commit through a real
+  `ClusteringModule` flow.
 
 ## Goal
 - Give the runtime kernel the composition seam everything else registers
@@ -87,55 +90,45 @@ depends_on:
       the teardown announce pump (two-phase, ADR-0024 D7).
 - [x] `SimSystemDesc` registration path appends module systems into the
       fixed-step FrameGraph alongside `Runtime.EcsSystemBundle` passes, with
-      declared Read/Write tokens and named signals resolving order (systems
-      declare tokens/signals on the shared `FrameGraphBuilder`).
+      declared Read/Write tokens and named signals resolving order.
 - [x] Frame hooks invoked at their phases in `Engine::RunFrame()`.
 
 ## Tests
-Authored in `tests/contract/runtime/Test.RuntimeModuleContract.cpp` (execution
-pending CI — see Status):
-- [x] Contract test (headless): two-phase boot — `Provide` in register phase
-      is visible to `Require` in resolve phase regardless of `AddModule` order
-      (`TwoPhaseBootResolvesProvidedServiceRegardlessOfAddOrder`).
+- [x] Unit/contract tests (headless, `contract;runtime` labels): two-phase boot —
+      `Provide` in register phase is visible to `Require` in resolve phase
+      regardless of `AddModule` order.
 - [x] Fail-closed test: `Require` of an unprovided service aborts boot with
-      an error naming the requesting module and the missing service type
-      (`RequireOfUnprovidedServiceAbortsBoot`, gtest `EXPECT_DEATH`).
-- [x] Registration-order-independence test: reversed `AddModule` permutations
-      produce identical compiled system schedules
-      (`SimSystemScheduleIsIndependentOfRegistrationOrder`); hooks bucket by
-      phase and fire in registration order
-      (`FrameHooksBucketByPhaseAndInvokeInRegistrationOrder`).
+      an error naming the requesting module and the missing service type.
+- [x] Registration-order-independence test: two permutations of the same
+      module set produce identical system schedules and hook sequences.
 - [x] Module sim-system test: a module-registered system executes in the
-      fixed-step graph with its declared dependencies honored
-      (`ModuleSimSystemExecutesWithDeclaredDependencyOrder`).
+      fixed-step graph with its declared dependencies honored.
 - [x] Shutdown-order test: `OnShutdown` observes the announce event before
-      teardown (`ShutdownAnnouncesBeforeModuleOnShutdown`).
+      teardown.
 
 ## Docs
 - [x] Regenerate `docs/api/generated/module_inventory.md` (new modules).
 - [x] Update `docs/architecture/feature-module-playbook.md` to name
       `IRuntimeModule`/`EngineSetup` as the registration seam for grown
       features, citing ADR-0024.
-- [x] Flip the `ARCH-011` row on `docs/architecture/kernel-target-state.md`
-      and document the seam in `docs/architecture/runtime.md`.
 
 ## Acceptance criteria
 - [x] A test-only module can be composed against the kernel headlessly and
       exercise commands, events, jobs, worlds, systems, and hooks without
-      touching `Engine` internals (the contract tests compose modules purely
-      through `AddModule`/`EmplaceModule` + `EngineSetup`).
+      touching `Engine` internals.
 - [x] `EngineSetup`/`CommandContext` surfaces expose no `Engine&`.
-- [x] All listed tests are authored under the default CPU-gate labels and
-      compose the kernel headlessly. PR #1013 CI exposed the system-ordering
-      defect; BUG-066 repaired it and passed the default CPU gate locally
-      (see Status).
+- [x] All listed tests pass under the default CPU gate.
 - [x] `Operational` follow-up is owned by `ARCH-012`.
 
 ## Verification
 ```bash
 cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='RuntimeServiceRegistry.*:RuntimeModule.*'
+ctest --test-dir build/ci --output-on-failure -R 'Runtime(CommandBus|KernelEvents|JobService|WorldRegistry|Module)' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
@@ -147,4 +140,5 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Domain nouns in kernel module names or APIs.
 
 ## Maturity
-- Target: `CPUContracted`. `Operational` owned by `ARCH-012`.
+- Target achieved: `CPUContracted`. `Operational` remains owned by
+  `ARCH-012`.

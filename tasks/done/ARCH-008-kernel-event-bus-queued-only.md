@@ -2,14 +2,39 @@
 id: ARCH-008
 theme: F
 depends_on: []
+maturity_target: CPUContracted
+completed: 2026-07-08
 ---
 # ARCH-008 — Queued-only kernel event bus with two pump points
 
+## Status
+
+- Retired on 2026-07-08 at `CPUContracted`.
+- PR: pending. Commit: pending local change.
+- The code landed as the domain-free `Extrinsic.Runtime.KernelEvents` module
+  plus `Engine::Events()` access, two `Engine::RunFrame()` pump points,
+  headless runtime contract tests, runtime frame-phase docs, and regenerated
+  module inventory.
+- The initial sketch named `entt::dispatcher`; the landed implementation uses
+  a direct queued dispatcher/inbox so the runtime kernel never exposes or wraps
+  an immediate-dispatch `trigger` path. The retained ADR-0024 D7 contract is
+  queued-only publish, main-thread pump delivery, worker-safe publish, and
+  next-pump cascade deferral.
+- Verified locally with the `ci` preset, which enables
+  `INTRINSIC_ENABLE_SANITIZERS=ON`: configure passed, the focused
+  `IntrinsicRuntimeContractTests` target built, all six
+  `RuntimeKernelEvents.*` contract tests passed directly and through CTest,
+  `IntrinsicTests` built, and the full default CPU-supported CTest gate passed
+  3616/3616.
+- `Operational` use of the event bus remains owned by `ARCH-012`, which
+  composes command -> job -> event -> commit through a real
+  `ClusteringModule` flow.
+
 ## Goal
-- Give the runtime kernel an `EventBus` wrapper over `entt::dispatcher` that
-  is queued-only (no `trigger` in the API), pumps at exactly two main-thread
-  points per frame (post-command-drain and post-simulation), and accepts
-  publishes from worker threads via an internal thread-safe inbox, per
+- Give the runtime kernel a `KernelEventBus` that is queued-only (no
+  synchronous dispatch API), pumps at exactly two main-thread points per frame
+  (post-command-drain and post-simulation), and accepts publishes from worker
+  threads via an internal thread-safe inbox, per
   [ADR-0024](../../docs/adr/0024-kernel-module-architecture.md) D7.
 
 ## Non-goals
@@ -23,8 +48,9 @@ depends_on: []
 
 ## Context
 - Owner/layer: `runtime` (kernel spine per ADR-0024 D9).
-- `entt::dispatcher` is not thread-safe; workers must never touch it. The
-  inbox is merged into the dispatcher at the next pump.
+- Immediate dispatcher implementations are not worker-safe; workers must only
+  publish into the event bus inbox. The inbox is swapped into a bounded pump
+  batch at the next main-thread pump.
 - Delivery semantics (ADR-0024 D7): events published during a pump deliver at
   the **next** pump, never recursively within the current one — cascades are
   bounded and ordered.
@@ -35,19 +61,6 @@ depends_on: []
   (fixed-step simulation) in `src/runtime/Runtime.Engine.cpp`. If `ARCH-007`
   has not landed yet, pump A anchors to the same pre-sim location the drain
   will occupy; the two tasks are independently landable.
-
-## Status
-
-- **Retired 2026-07-09 at `CPUContracted`.** Commit/PR: pending local change
-  set. `Operational` is owned by `ARCH-012`.
-- Implementation, focused contract tests, sanitizer-focused cross-thread
-  coverage, module inventory regeneration, layering, task policy, and the
-  default CPU-supported CTest gate all pass locally. The default gate passed
-  with 3616/3616 tests passing.
-- The local `Runtime.EngineTarget.*` target-state sketch was preserved under
-  [`docs/architecture/sketches/`](../../docs/architecture/sketches/) with
-  `.txt` suffixes so source/module tooling no longer treats it as a
-  production `Extrinsic.Runtime.Engine` module.
 
 ## Required changes
 - [x] New kernel event-bus module (interface `.cppm` + implementation
@@ -61,7 +74,7 @@ depends_on: []
 - [x] Diagnostics: per-pump delivered-event counters exposed for tests.
 
 ## Tests
-- [x] Unit/contract tests (headless, `contract;runtime` labels): subscribe →
+- [x] Unit/contract tests (headless, `unit;runtime` labels): subscribe →
       publish → delivered at next pump, not at publish time.
 - [x] Cascade-bounding test: listener publishes during pump; delivery happens
       at the following pump only.
@@ -79,8 +92,8 @@ depends_on: []
 ## Acceptance criteria
 - [x] The kernel event API exposes no synchronous dispatch path.
 - [x] Both pumps run in `Engine::RunFrame()` at the ADR-0024 positions.
-- [x] All listed tests pass under the default CPU gate.
-- [x] The cross-thread test passes under sanitizers.
+- [x] All listed tests pass under the default CPU gate; the cross-thread test
+      passes under sanitizers.
 - [x] `Operational` follow-up is owned by `ARCH-012`.
 
 ## Verification
@@ -99,5 +112,5 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Migrating existing dispatcher call sites in this task.
 
 ## Maturity
-- Target: `CPUContracted` (headless contract tests under the default CPU
-  gate). `Operational` owned by `ARCH-012`.
+- Target achieved: `CPUContracted` (headless contract tests under the default
+  CPU gate). `Operational` remains owned by `ARCH-012`.

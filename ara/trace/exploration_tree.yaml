@@ -3880,3 +3880,456 @@ tree:
       suite passed 30/30, the object-space normal Vulkan bake smoke passed
       1/1, and the default CPU-supported gate passed 3103/3103.
     status: resolved
+  - id: N168
+    type: experiment
+    title: "Retire ADR-0024 seams and Runtime.Engine decomposition"
+    provenance: ai-executed
+    timestamp: "2026-07-09T00:46"
+    evidence:
+      - "tasks/done/ARCH-007-kernel-command-bus-single-drain-point.md"
+      - "tasks/done/ARCH-008-kernel-event-bus-queued-only.md"
+      - "tasks/done/ARCH-009-kernel-jobservice-snapshot-in-result-out.md"
+      - "tasks/done/ARCH-010-kernel-worldregistry-deferred-world-ops.md"
+      - "tasks/done/ARCH-011-runtimemodule-contract-service-registry.md"
+      - "tasks/done/ARCH-012-clusteringmodule-proving-extraction.md"
+      - "tasks/done/ARCH-013-post-seam-collision-rereview.md"
+      - "tasks/done/RUNTIME-146-extract-engine-config-boot-module.md"
+      - "tasks/done/RUNTIME-147-extract-asset-import-pipeline-subsystem.md"
+      - "tasks/done/RUNTIME-148-extract-scene-document-subsystem.md"
+      - "tasks/done/RUNTIME-149-extract-engine-config-control-subsystem.md"
+      - "tasks/done/RUNTIME-150-split-engine-frame-loop-implementation-unit.md"
+      - "tasks/done/RUNTIME-151-slim-engine-interface-and-remove-entt-leak.md"
+      - "src/runtime/Runtime.Engine.cppm"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "src/runtime/Runtime.StableEntityLookup.cppm"
+      - "src/runtime/Runtime.StableEntityLookup.cpp"
+      - "cmake --preset ci"
+      - "cmake --build --preset ci --target IntrinsicRuntimeContractTests"
+      - "build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='SelectionStableLookupComposition.*:SelectionSnapshotExtraction.*:RuntimeSceneLifecycle.*'"
+      - "ctest --test-dir build/ci --output-on-failure -R 'SelectionStableLookupComposition|SelectionSnapshotExtraction|RuntimeSceneLifecycle' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "python3 tools/docs/check_docs_sync.py --root ."
+      - "git diff --check"
+    result: >
+      Implemented and retired the ADR-0024 seam tasks and the
+      `Runtime.Engine` decomposition chain through RUNTIME-151. The final
+      slice moved StableId signal ownership into `StableEntityLookupSceneBinding`,
+      removed EnTT declarations from `Runtime.Engine.cppm`, split frame-loop
+      helpers into `Extrinsic.Runtime.Engine:FrameLoop`, extracted config boot,
+      asset import, scene document, and config-control surfaces, refreshed task
+      records/session brief/module inventory, and reran verification. Focused
+      StableId/selection/scene-lifecycle tests passed 16/16, `IntrinsicTests`
+      built, the final default CPU-supported CTest gate passed 3638/3638, and
+      strict structural/docs/diff checks passed with only the existing
+      root-hygiene warning-mode entries.
+    status: resolved
+  - id: N169
+    type: decision
+    title: "Stop after RUNTIME-151 Engine cleanup"
+    provenance: ai-executed
+    timestamp: "2026-07-09T00:46"
+    also_depends_on: [N168]
+    choice: >
+      Stop the task loop after retiring RUNTIME-151 because the user's stated
+      goal was a clean `Runtime.Engine.cppm` and `Runtime.Engine.cpp`, and the
+      `Runtime.Engine` decomposition chain RUNTIME-146 through RUNTIME-151 is
+      now complete.
+    alternatives:
+      - "Continue into unrelated scheduler substrate tasks such as CORE-005, CORE-007, or CORE-008."
+      - "Attempt an additional EnTT removal from `Runtime.Engine.cpp` without an open scoped task."
+    evidence:
+      - "tasks/backlog/README.md"
+      - "tasks/backlog/runtime/README.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "rg -n \"entt\" src/runtime/Runtime.Engine.cppm"
+      - "rg -n \"ConnectStableEntityLookupTracking|DisconnectStableEntityLookupTracking|OnStableId|StableIdConstructConnection|StableIdUpdateConnection|StableIdDestroyConnection\" src/runtime/Runtime.Engine.cppm src/runtime/Runtime.Engine.cpp"
+    status: resolved
+  - id: N170
+    type: experiment
+    title: "RUNTIME-129 CPUContracted GPU queue participant"
+    provenance: ai-executed
+    timestamp: "2026-07-09T01:44"
+    also_depends_on: [N168, N169]
+    evidence:
+      - "src/runtime/Runtime.ObjectSpaceNormalBakeGpuQueue.cppm"
+      - "src/runtime/Runtime.ObjectSpaceNormalBakeGpuQueue.cpp"
+      - "src/runtime/Runtime.ObjectSpaceNormalBakeQueue.cppm"
+      - "src/runtime/Runtime.ObjectSpaceNormalBakeQueue.cpp"
+      - "src/runtime/Runtime.Engine.cppm"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "tests/contract/runtime/Test.ObjectSpaceNormalBakeGpuQueue.cpp"
+      - "tasks/backlog/runtime/RUNTIME-129-schedule-gpu-normal-bake-after-import.md"
+      - "docs/api/generated/module_inventory.md"
+      - "cmake --build --preset ci --target IntrinsicRuntimeContractTests"
+      - "build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='RuntimeObjectSpaceNormalBakeGpuQueue.*:RuntimeObjectSpaceNormalBakeSubmission.*:RuntimeObjectSpaceNormalBakeQueue.*:RuntimeJobService.GpuQueue*'"
+      - "ctest --test-dir build/ci --output-on-failure -R 'ObjectSpaceNormalBake|AssetImportFormatCoverage|SelectedMeshTextureBake|RuntimeJobService' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "python3 tools/docs/check_docs_sync.py --root . --strict"
+      - "tools/ci/run_clean_workshop_review.sh . --strict"
+      - "git diff --check"
+    result: >
+      Added the `Runtime.ObjectSpaceNormalBakeGpuQueue` module as the
+      `JobService` `GpuQueue` participant for object-space normal bake
+      submissions. The slice moved queue ownership out of `Runtime.Engine`,
+      retained pending submissions for render-thread draining, recorded injected
+      graphics bake plans, promoted cache entries by ready frame, drained ready
+      completions into material bindings, discarded superseded submissions, and
+      bound already-ready content-key matches without duplicate command
+      recording. Focused runtime normal-bake/JobService coverage passed,
+      `IntrinsicTests` built, the default CPU-supported CTest gate passed
+      3643/3643, and strict task/layering/test-layout/docs/diff checks passed.
+    status: resolved
+  - id: N171
+    type: decision
+    title: "Keep RUNTIME-129 open after Slice B substrate"
+    provenance: ai-executed
+    timestamp: "2026-07-09T01:44"
+    also_depends_on: [N170]
+    choice: >
+      Keep RUNTIME-129 in backlog at the verified `CPUContracted` Slice B
+      substrate state instead of retiring it, because the production Vulkan
+      geometry-buffer/pipeline/dilation plan provider and opt-in GPU smoke proof
+      remain open.
+    alternatives:
+      - "Retire RUNTIME-129 after CPU/null participant coverage only."
+      - "Claim Operational maturity without an actually-run Vulkan smoke."
+      - "Start a broad Vulkan provider implementation without a fresh scoped plan."
+    evidence:
+      - "tasks/backlog/runtime/RUNTIME-129-schedule-gpu-normal-bake-after-import.md"
+      - "src/runtime/Runtime.ObjectSpaceNormalBakeGpuQueue.cppm"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+    status: resolved
+  - id: N172
+    type: experiment
+    title: "RUNTIME-154 and RUNTIME-155 Engine cleanup"
+    provenance: ai-executed
+    timestamp: "2026-07-09T03:30"
+    also_depends_on: [N168, N169]
+    evidence:
+      - "src/runtime/Runtime.ReferenceSceneControl.cppm"
+      - "src/runtime/Runtime.ReferenceSceneControl.cpp"
+      - "src/runtime/Runtime.InputActions.cppm"
+      - "src/runtime/Runtime.InputActions.cpp"
+      - "src/runtime/Runtime.Engine.cppm"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "src/runtime/Runtime.Engine.FrameLoop.cppm"
+      - "tests/contract/runtime/Test.RuntimeEngineLayering.cpp"
+      - "tests/contract/runtime/Test.RuntimeInputActions.cpp"
+      - "tasks/done/RUNTIME-154-extract-reference-scene-control.md"
+      - "tasks/done/RUNTIME-155-extract-runtime-input-action-registry.md"
+      - "docs/api/generated/module_inventory.md"
+      - "cmake --build --preset ci --target IntrinsicRuntimeContractTests"
+      - "cmake --build --preset ci --target IntrinsicRuntimeIntegrationTests"
+      - "ctest --test-dir build/ci --output-on-failure -R 'RuntimeInputActions|RuntimeEngineLayering' --timeout 90"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+      - "python3 tools/docs/check_docs_sync.py --root . --strict"
+      - "git diff --check"
+    result: >
+      Retired RUNTIME-154 and RUNTIME-155 at Operational. Reference-scene
+      provider lifecycle state now lives in `Runtime.ReferenceSceneControl`,
+      and runtime input-action API/state/dispatch now lives in
+      `Runtime.InputActions`; `Runtime.Engine` delegates both surfaces and the
+      private frame-loop partition no longer contains the input-action dispatch
+      loop. Focused runtime action/layering coverage passed, `IntrinsicTests`
+      built, the default CPU-supported CTest gate passed 3644/3644, and strict
+      task/layering/test-layout/docs/diff checks passed. `Runtime.Engine.cppm`
+      ended at 595 lines and `Runtime.Engine.cpp` at 1811 lines.
+    status: resolved
+  - id: N173
+    type: decision
+    title: "Stop after retiring RUNTIME-155"
+    provenance: ai-executed
+    timestamp: "2026-07-09T03:30"
+    also_depends_on: [N172]
+    choice: >
+      Stop this turn after RUNTIME-154 and RUNTIME-155 because both scoped
+      Engine-cleanup tasks were implemented, verified, and retired; any further
+      Engine cleanup should start from a fresh inspection and a new task slice.
+    alternatives:
+      - "Open another Engine decomposition task immediately without a fresh hotspot review."
+      - "Continue editing Engine after the full CPU gate without a task contract."
+    evidence:
+      - "tasks/done/RUNTIME-154-extract-reference-scene-control.md"
+      - "tasks/done/RUNTIME-155-extract-runtime-input-action-registry.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "wc -l src/runtime/Runtime.Engine.cppm src/runtime/Runtime.Engine.cpp"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+    status: resolved
+  - id: N174
+    type: experiment
+    title: "RUNTIME-156 runtime-module schedule extraction"
+    provenance: ai-executed
+    timestamp: "2026-07-09T04:02"
+    also_depends_on: [N172, N173]
+    evidence:
+      - "src/runtime/Runtime.ModuleSchedule.cppm"
+      - "src/runtime/Runtime.ModuleSchedule.cpp"
+      - "src/runtime/Runtime.Engine.cppm"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "src/runtime/CMakeLists.txt"
+      - "tests/contract/runtime/Test.RuntimeEngineLayering.cpp"
+      - "src/runtime/README.md"
+      - "docs/api/generated/module_inventory.md"
+      - "tasks/done/RUNTIME-156-extract-runtime-module-schedule.md"
+      - "tasks/backlog/runtime/README.md"
+      - "tasks/backlog/README.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "cmake --build --preset ci --target IntrinsicRuntimeContractTests"
+      - "cmake --build --preset ci --target IntrinsicRuntimeIntegrationTests"
+      - "ctest --test-dir build/ci --output-on-failure -R 'RuntimeModule|RuntimeEngineLayering' --timeout 90"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+      - "python3 tools/docs/check_docs_sync.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "python3 tools/agents/check_task_state_links.py --root ."
+      - "git diff --check"
+    result: >
+      Retired RUNTIME-156 at Operational. `Extrinsic.Runtime.ModuleSchedule`
+      now owns runtime-module sim-system/frame-hook records, deterministic
+      dependency ordering, frame-hook ordering, fixed-step `FrameGraph` pass
+      insertion/context construction, and frame-hook dispatch. `Runtime.Engine`
+      still owns module objects, built-in service provisioning,
+      `OnRegister`/`OnResolve` sequencing, and shutdown calls while delegating
+      schedule storage/finalization/dispatch. Focused runtime-module/layering
+      coverage passed 19/19, `IntrinsicTests` built, the default
+      CPU-supported CTest gate passed 3644/3644, and strict task/layering/
+      test-layout/docs/diff checks passed. `Runtime.Engine.cppm` ended at 573
+      lines and `Runtime.Engine.cpp` at 1636 lines.
+    status: resolved
+  - id: N175
+    type: decision
+    title: "Stop after RUNTIME-156 Engine cleanup"
+    provenance: ai-executed
+    timestamp: "2026-07-09T04:02"
+    also_depends_on: [N174]
+    choice: >
+      Stop this turn after retiring RUNTIME-156 because the next verified
+      cleanup slice moved the remaining runtime-module contribution policy out
+      of `Runtime.Engine`, and further cleanup should start from a fresh hotspot
+      review plus a new task contract.
+    alternatives:
+      - "Open another Engine decomposition task immediately without reviewing remaining hot spots."
+      - "Keep editing Engine internals after the full CPU gate without a task file."
+    evidence:
+      - "tasks/done/RUNTIME-156-extract-runtime-module-schedule.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "wc -l src/runtime/Runtime.Engine.cppm src/runtime/Runtime.Engine.cpp src/runtime/Runtime.ModuleSchedule.cppm src/runtime/Runtime.ModuleSchedule.cpp"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+    status: resolved
+  - id: N176
+    type: experiment
+    title: "RUNTIME-157 through RUNTIME-163 Engine cleanup"
+    provenance: ai-executed
+    timestamp: "2026-07-09T06:43"
+    also_depends_on: [N174, N175]
+    evidence:
+      - "src/runtime/Runtime.SelectionReadback.cppm"
+      - "src/runtime/Runtime.SelectionReadback.cpp"
+      - "src/runtime/Runtime.FramePacingDiagnostics.cppm"
+      - "src/runtime/Runtime.FramePacingDiagnostics.cpp"
+      - "src/runtime/Runtime.ImGuiEditorBridge.cppm"
+      - "src/runtime/Runtime.ImGuiEditorBridge.cpp"
+      - "src/runtime/Runtime.JobServiceGpuQueueBridge.cppm"
+      - "src/runtime/Runtime.JobServiceGpuQueueBridge.cpp"
+      - "src/runtime/Runtime.ObjectSpaceNormalBakeService.cppm"
+      - "src/runtime/Runtime.ObjectSpaceNormalBakeService.cpp"
+      - "src/runtime/Gizmos/Runtime.GizmoFrameService.cppm"
+      - "src/runtime/Gizmos/Runtime.GizmoFrameService.cpp"
+      - "src/runtime/Runtime.RenderExtractionService.cppm"
+      - "src/runtime/Runtime.RenderExtractionService.cpp"
+      - "tasks/done/RUNTIME-157-extract-selection-readback-state.md"
+      - "tasks/done/RUNTIME-158-extract-frame-pacing-diagnostics.md"
+      - "tasks/done/RUNTIME-159-extract-imgui-editor-bridge.md"
+      - "tasks/done/RUNTIME-160-extract-jobservice-gpu-queue-bridge.md"
+      - "tasks/done/RUNTIME-161-extract-object-space-normal-bake-service.md"
+      - "tasks/done/RUNTIME-162-extract-gizmo-frame-service.md"
+      - "tasks/done/RUNTIME-163-extract-render-extraction-service.md"
+      - "cmake --build --preset ci --target IntrinsicRuntimeContractTests"
+      - "cmake --build --preset ci --target IntrinsicRuntimeIntegrationTests"
+      - "ctest --test-dir build/ci --output-on-failure -R 'RuntimeRenderExtraction|RenderWorldPool|RuntimeSandboxAcceptance' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180"
+      - "ctest --test-dir build/ci --output-on-failure -R 'RuntimeEngineLayering' --timeout 180"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+      - "python3 tools/docs/check_docs_sync.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "git diff --check"
+    result: >
+      Retired RUNTIME-157 through RUNTIME-163 at Operational. Selection
+      readback/refinement, frame-pacing diagnostics, ImGui editor bridge,
+      JobService GPU queue bridge, object-space normal bake service, gizmo
+      frame service, and render-extraction service ownership moved out of
+      `Runtime.Engine`. `Runtime.Engine.cppm` ended at 484 lines and
+      `Runtime.Engine.cpp` at 1576 lines. Focused runtime/layering coverage
+      passed, `IntrinsicTests` built, the default CPU-supported CTest gate
+      passed 3646/3646, and strict task/docs/layering/test-layout/diff checks
+      passed with only pre-existing warning-mode root/task-state findings.
+    status: resolved
+  - id: N177
+    type: decision
+    title: "Commit accumulated Engine service seams"
+    provenance: ai-executed
+    timestamp: "2026-07-09T06:43"
+    also_depends_on: [N168, N170, N172, N174, N176]
+    choice: >
+      Committed the accumulated ADR-0024 and Runtime.Engine decomposition work
+      with message `runtime: extract Engine service seams`.
+    alternatives:
+      - "Leave the verified Engine decomposition batch uncommitted."
+      - "Split the already-staged accumulated work into multiple commits after the user requested a commit."
+    evidence:
+      - "git commit -m 'runtime: extract Engine service seams'"
+    status: resolved
+  - id: N178
+    type: experiment
+    title: "RUNTIME-164 asset residency service extraction"
+    provenance: ai-executed
+    timestamp: "2026-07-09T07:16"
+    also_depends_on: [N176, N177]
+    evidence:
+      - "src/runtime/Runtime.AssetResidencyService.cppm"
+      - "src/runtime/Runtime.AssetResidencyService.cpp"
+      - "src/runtime/Runtime.Engine.cppm"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "src/runtime/Runtime.Engine.FrameLoop.cppm"
+      - "tests/contract/runtime/Test.RuntimeEngineLayering.cpp"
+      - "tasks/done/RUNTIME-164-extract-asset-residency-service.md"
+      - "cmake --build --preset ci --target IntrinsicRuntimeContractTests"
+      - "ctest --test-dir build/ci --output-on-failure -R 'RuntimeEngineLayering|RuntimeAssetModelTextureHandoff|RuntimeAssetModelSceneHandoff|AssetImportFormatCoverage|RuntimeRenderExtraction|ObjectSpaceNormalBake' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+      - "python3 tools/docs/check_docs_sync.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "tools/ci/run_clean_workshop_review.sh . --strict"
+      - "git diff --check"
+    result: >
+      Retired RUNTIME-164 at Operational. `Extrinsic.Runtime.AssetResidencyService`
+      now owns GPU asset cache construction, fallback bootstrap delegation, cache
+      asset-event listener wiring, model texture/model scene handoff ownership,
+      pending material-binding re-resolution, and asset-residency teardown
+      ordering. `Runtime.Engine` keeps lifecycle/frame ordering and public asset
+      service/GPU cache facades. Focused runtime asset/import/render/object-space
+      normal bake and Engine-layering coverage passed 93/93, `IntrinsicTests`
+      built, the default CPU-supported CTest gate passed 3646/3646, strict
+      task/docs/layering/test-layout/diff checks passed, and only pre-existing
+      warning-mode root/task-state findings remained.
+    status: resolved
+  - id: N179
+    type: decision
+    title: "Stop after RUNTIME-164 Engine cleanup"
+    provenance: ai-executed
+    timestamp: "2026-07-09T07:16"
+    also_depends_on: [N178]
+    choice: >
+      Stop this turn after retiring RUNTIME-164 because the next verified
+      cleanup slice moved the asset-residency ownership cluster out of
+      `Runtime.Engine`; further cleanup should start from a fresh hotspot scan
+      and task contract.
+    alternatives:
+      - "Open another Runtime.Engine cleanup task immediately after the full CPU gate."
+      - "Broaden RUNTIME-164 to move render extraction or asset import ownership, which its task forbids."
+    evidence:
+      - "tasks/done/RUNTIME-164-extract-asset-residency-service.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "rg -n 'm_GpuAssetCache|m_GpuAssetCacheListener|m_AssetModelTextureHandoff|m_AssetModelSceneHandoff' src/runtime/Runtime.Engine.cppm src/runtime/Runtime.Engine.cpp src/runtime/Runtime.Engine.FrameLoop.cppm"
+    status: resolved
+  - id: N180
+    type: decision
+    title: "Commit RUNTIME-164 asset residency extraction"
+    provenance: ai-executed
+    timestamp: "2026-07-09T07:21"
+    also_depends_on: [N178, N179]
+    choice: >
+      Committed the verified RUNTIME-164 asset-residency extraction with
+      message `runtime: extract asset residency service`.
+    alternatives:
+      - "Leave the verified RUNTIME-164 extraction uncommitted."
+      - "Create another runtime cleanup slice before committing the completed task."
+    evidence:
+      - "git commit -m 'runtime: extract asset residency service'"
+      - "git status --short --branch"
+    status: resolved
+  - id: N181
+    type: experiment
+    title: "RUNTIME-165 async work service extraction"
+    provenance: ai-executed
+    timestamp: "2026-07-09T07:46"
+    also_depends_on: [N178, N180]
+    evidence:
+      - "src/runtime/Runtime.AsyncWorkService.cppm"
+      - "src/runtime/Runtime.AsyncWorkService.cpp"
+      - "src/runtime/Runtime.Engine.cppm"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "src/runtime/Runtime.Engine.FrameLoop.cppm"
+      - "tests/contract/runtime/Test.RuntimeEngineLayering.cpp"
+      - "tasks/done/RUNTIME-165-extract-async-work-service.md"
+      - "cmake --build --preset ci --target IntrinsicRuntimeContractTests"
+      - "ctest --test-dir build/ci --output-on-failure -R 'RuntimeEngineLayering|RuntimeDerivedJobEngineWiring|RuntimeStreamingExecutor|DerivedJob|StreamingExecutor|RuntimeAssetImportFormatCoverage|RuntimeSceneLifecycle' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+      - "python3 tools/docs/check_docs_sync.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "tools/ci/run_clean_workshop_review.sh . --strict"
+      - "git diff --check"
+      - "git diff --cached --check"
+    result: >
+      Retired RUNTIME-165 at Operational. `Extrinsic.Runtime.AsyncWorkService`
+      now owns the live `StreamingExecutor` and `DerivedJobRegistry`, centralizes
+      completion/readback drains, count-limited main-thread apply, background
+      pumping, shutdown draining, reset ordering, and derived-job facade
+      delegation. `Runtime.Engine` keeps lifecycle/frame ordering and dependent
+      subsystem wiring while no longer importing/storing the raw executor/registry
+      or branching the frame-loop maintenance hook over both concrete types.
+      Focused runtime async/job/import/scene/layering coverage passed 56/56,
+      `IntrinsicTests` built, the default CPU-supported CTest gate passed
+      3646/3646, strict task/docs/layering/test-layout/diff checks passed, and
+      only pre-existing warning-mode root/task-state findings remained.
+    status: resolved
+  - id: N182
+    type: decision
+    title: "Commit RUNTIME-165 async work extraction"
+    provenance: ai-executed
+    timestamp: "2026-07-09T07:46"
+    also_depends_on: [N181]
+    choice: >
+      Committed the verified RUNTIME-165 async-work extraction with message
+      `runtime: extract async work service`.
+    alternatives:
+      - "Leave the verified RUNTIME-165 extraction uncommitted after the user requested a commit."
+      - "Open another runtime cleanup slice before committing the completed task."
+    evidence:
+      - "git commit -m 'runtime: extract async work service'"
+      - "git status --short --branch"
+    status: resolved

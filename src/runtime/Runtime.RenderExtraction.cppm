@@ -88,7 +88,7 @@ export namespace Extrinsic::Runtime
 
     struct RuntimeRenderExtractionStats
     {
-        WorldHandle World{};
+        WorldHandle World{DefaultWorldHandle};
         std::uint32_t CandidateRenderableCount{0};
         std::uint32_t SubmittedTransformCount{0};
         std::uint32_t SubmittedVisualizationCount{0};
@@ -375,20 +375,13 @@ export namespace Extrinsic::Runtime
         // `RuntimeRenderSnapshotBatch` so the renderer surfaces them on
         // `RenderWorld::Selection`. Null leaves the selection snapshot empty.
         [[nodiscard]] RuntimeRenderExtractionStats ExtractAndSubmit(
-            WorldHandle world,
             ECS::Scene::Registry& scene,
             Graphics::IRenderer& renderer,
             Graphics::GpuAssetCache* gpuAssets = nullptr,
             const SelectionController* selection = nullptr,
             std::uint32_t runtimeSnapshotStorageSlot = 0u,
-            std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos = {});
-        [[nodiscard]] RuntimeRenderExtractionStats ExtractAndSubmit(
-            ECS::Scene::Registry& scene,
-            Graphics::IRenderer& renderer,
-            Graphics::GpuAssetCache* gpuAssets = nullptr,
-            const SelectionController* selection = nullptr,
-            std::uint32_t runtimeSnapshotStorageSlot = 0u,
-            std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos = {});
+            std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos = {},
+            WorldHandle world = DefaultWorldHandle);
         // Scene replacement boundary: free scene-owned renderable sidecars,
         // collapse deferred retire queues, clear per-entity extraction settings
         // and bindings, and submit an empty snapshot. Adapter registrations stay

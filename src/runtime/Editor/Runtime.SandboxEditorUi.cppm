@@ -33,12 +33,18 @@ import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.RHI.Device;
+import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.ClusteringModule;
+import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KMeansGpuJobQueue;
+import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressivePresentationExtraction;
@@ -52,6 +58,7 @@ import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.ServiceRegistry;
 import Geometry.Graph.Vertex.Normals;
 import Geometry.HalfedgeMesh.Vertices.Normals;
 import Geometry.PointCloud.Normals;
@@ -1892,6 +1899,17 @@ export namespace Extrinsic::Runtime
         }
     };
 
+    struct SandboxEditorKMeansCommandSurface
+    {
+        std::function<CommandCorrelationId(RunKMeans)> Submit{};
+        bool Required{false};
+
+        [[nodiscard]] bool Available() const noexcept
+        {
+            return static_cast<bool>(Submit);
+        }
+    };
+
     struct SandboxEditorKMeansGpuCommandSurface
     {
         std::function<RuntimeKMeansGpuJobSubmission(RuntimeKMeansGpuJobRequest)>
@@ -2119,10 +2137,20 @@ export namespace Extrinsic::Runtime
         Visualization,
     };
 
+    enum class SandboxEditorSelectedAnalysisCacheConsumer : std::uint8_t
+    {
+        Inspector,
+        MeshDomainWindow,
+        GraphDomainWindow,
+        PointCloudDomainWindow,
+    };
+
     struct SandboxEditorSelectedModelCacheKey
     {
         SandboxEditorSelectedModelCacheSection Section{
             SandboxEditorSelectedModelCacheSection::SelectedAnalysis};
+        SandboxEditorSelectedAnalysisCacheConsumer SelectedAnalysisConsumer{
+            SandboxEditorSelectedAnalysisCacheConsumer::Inspector};
         SandboxEditorVisualizationTarget VisualizationTarget{
             SandboxEditorVisualizationTarget::Entity};
         std::uint32_t PrimaryStableId{0u};
@@ -2188,7 +2216,8 @@ export namespace Extrinsic::Runtime
 
     struct SandboxEditorSelectedModelCache
     {
-        SandboxEditorSelectedAnalysisCacheEntry SelectedAnalysis{};
+        std::array<SandboxEditorSelectedAnalysisCacheEntry, 4u>
+            SelectedAnalysis{};
         std::array<SandboxEditorVisualizationModelCacheEntry, 4u>
             Visualization{};
         SandboxEditorSelectedModelCacheStats Counters{};
@@ -2280,6 +2309,7 @@ export namespace Extrinsic::Runtime
         SandboxEditorPrimitiveViewCommandSurface PrimitiveViewCommands{};
         SandboxEditorVisualizationAdapterBindingCommandSurface VisualizationAdapterBindings{};
         std::uint64_t VisualizationAdapterBindingRevision{0u};
+        SandboxEditorKMeansCommandSurface KMeansCommands{};
         SandboxEditorKMeansGpuCommandSurface KMeansGpuCommands{};
         SandboxEditorDerivedJobCommandSurface DerivedJobCommands{};
         SandboxEditorMethodResultSinks MethodResultSinks{};
@@ -2776,8 +2806,10 @@ export namespace Extrinsic::Runtime
         std::optional<SandboxEditorFileImportResult> m_LastImportResult{};
         std::optional<SandboxEditorSceneFileResult> m_LastSceneFileResult{};
         std::optional<SandboxEditorKMeansResult> m_LastKMeansResult{};
+        ClusteringService* m_ClusteringService{};
+        KernelEventSubscription m_KMeansCompletionSubscription{};
         std::unique_ptr<RuntimeKMeansGpuJobQueue> m_KMeansGpuJobs{};
-        RuntimeGpuJobParticipantHandle m_KMeansGpuParticipant{};
+        GpuQueueParticipantHandle m_KMeansGpuParticipant{};
         std::optional<SandboxEditorMeshDenoiseResult>
             m_LastMeshDenoiseResult{};
         std::optional<SandboxEditorMeshCurvatureResult>

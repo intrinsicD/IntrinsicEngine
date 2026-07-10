@@ -3,8 +3,32 @@ id: RUNTIME-147
 theme: F
 depends_on: []
 maturity_target: Operational
+completed: 2026-07-08
 ---
 # RUNTIME-147 — Extract the runtime asset-import pipeline out of Engine
+
+## Status
+
+- Retired on 2026-07-08 at `Operational`.
+- PR: pending. Commit: pending local change.
+- Runtime now owns `Extrinsic.Runtime.AssetImportPipeline`, an engine-owned
+  import subsystem that carries the import/reimport/queue/cancel facade,
+  ingest-state records, import event log, `RUNTIME-144` registries, decode
+  helpers, materialization helpers, and import dirty-state marking.
+- `Runtime.Engine.cppm` now exposes only
+  `Engine::GetAssetImportPipeline()` / `const` accessors for this surface;
+  `Runtime.Engine.cpp` delegates platform drop routing to the pipeline and no
+  longer defines the moved import helpers.
+- Sandbox default policies, Sandbox editor UI, and runtime import tests now use
+  the pipeline accessor directly, with no compatibility import facade left on
+  `Engine`.
+- Verified locally with the `ci` preset, which enables
+  `INTRINSIC_ENABLE_SANITIZERS=ON`: focused runtime import/editor tests passed
+  31/31, `IntrinsicRuntimeContractTests` and `IntrinsicTests` built, the full
+  default CPU-supported CTest gate passed 3638/3638, strict layering,
+  test-layout, task-policy, docs-link, docs-sync, and diff-whitespace checks
+  passed, and the module inventory was regenerated. Root hygiene remains in
+  warning mode for pre-existing `ara/` and `imgui.ini` root entries.
 
 ## Goal
 - Move the entire asset-import facade — request/queue/reimport/cancel
@@ -73,10 +97,17 @@ maturity_target: Operational
   the contract/integration tests that drive imports through `Engine`.
 - `Engine::HandleWindowDropEvent` stays in `Engine` (platform event routing)
   and delegates to the pipeline.
+- ARCH-013 re-review (2026-07-08): Decision re-scoped. The mechanical
+  extraction remains valid, but `Engine::GetAssetImportPipeline()` is a
+  transitional composition-root accessor, not a new cross-module dependency
+  pattern. The moved pipeline should be shaped so a later Resolve-phase service
+  or import module can expose narrow capabilities through `ServiceRegistry`;
+  app/default policy registration should continue to happen from composition
+  code, and ADR-0024's parked asset-boundary question remains owned here.
 - Part of the `Runtime.Engine` decomposition series (`RUNTIME-146..151`).
   This is the largest slice of the series; land it via the slice plan below.
 
-- Transitional facade (ADR-0024): the `Engine::Get{X}()` accessor this task adds is a **transitional landing**, not the end state. Per ADR-0024 D9/D12 and the [kernel target-state](../../../docs/architecture/kernel-target-state.md) scorecard (`Engine::GetX()` domain-facade accessors = 0), its conversion to a RuntimeModule / Resolve-phase service is owned by `ARCH-013` (per-subsystem decision) and tracked by `ARCH-014`. This task extracts the subsystem; it does not make the accessor permanent.
+- Transitional facade (ADR-0024): the `Engine::Get{X}()` accessor this task adds is a **transitional landing**, not the end state. Per ADR-0024 D9/D12 and the [kernel target-state](../../docs/architecture/kernel-target-state.md) scorecard (`Engine::GetX()` domain-facade accessors = 0), its conversion to a RuntimeModule / Resolve-phase service is owned by `ARCH-013` (per-subsystem decision) and tracked by `ARCH-014`. This task extracts the subsystem; it does not make the accessor permanent.
 ## Slice plan
 - **Slice A (mechanical extraction).** Create
   `src/runtime/Runtime.AssetImportPipeline.{cppm,cpp}`; move types, state,
@@ -90,62 +121,71 @@ maturity_target: Operational
   `Engine`. Defers nothing.
 
 ## Required changes
-- [ ] Add `Extrinsic.Runtime.AssetImportPipeline` interface + implementation
+- [x] Add `Extrinsic.Runtime.AssetImportPipeline` interface + implementation
       units under `src/runtime/`, registered in `src/runtime/CMakeLists.txt`.
-- [ ] Move the public methods, private methods, member state, exported
+- [x] Move the public methods, private methods, member state, exported
       types, and anonymous-namespace helpers listed in Context.
-- [ ] Construct/destroy the pipeline in `Engine::Initialize()` /
+- [x] Construct/destroy the pipeline in `Engine::Initialize()` /
       `Engine::Shutdown()` preserving current ordering relative to
       `StreamingExecutor`, `AssetService`, and `GpuAssetCache` teardown.
-- [ ] Wire the engine-owned `EditorCommandHistory` into the pipeline and
+- [x] Wire the engine-owned `EditorCommandHistory` into the pipeline and
       preserve the `MarkDirty` calls on every successful scene-changing
       import path (sync, reimport, dropped-file apply, queued applies).
-- [ ] Add `Engine::GetAssetImportPipeline()` (and `const` overload).
-- [ ] Slice A: keep delegating `Engine` methods; Slice B: migrate all call
+- [x] Add `Engine::GetAssetImportPipeline()` (and `const` overload).
+- [x] Slice A: keep delegating `Engine` methods; Slice B: migrate all call
       sites and delete the delegations.
-- [ ] Keep registration-before-`Initialize()` behavior working for the
+- [x] Keep registration-before-`Initialize()` behavior working for the
       three registries (stash-and-apply, as `SetImGuiEditorCallback` does)
       or document in the task file why registration now requires
       `Initialize()` first and update `SandboxDefaultPolicies` accordingly.
 
 ## Tests
-- [ ] Existing import/ingest contract tests pass with only import/name
+- [x] Existing import/ingest contract tests pass with only import/name
       updates (`Test.RuntimeSandboxAcceptance`, ingest queue/cancel tests,
       `Test.SandboxEditorUi`, policy/processor registration tests).
-- [ ] Default CPU gate stays green:
+- [x] Default CPU gate stays green:
       `ctest --test-dir build/ci -LE 'gpu|vulkan|slow|flaky-quarantine'`.
-- [ ] One new contract test proving `GetAssetImportPipeline()` exposes the
+- [x] One new contract test proving `GetAssetImportPipeline()` exposes the
       same event-log/queue-snapshot state the `Engine` facade returned
       before the move (guards the delegation removal in Slice B).
-- [ ] A contract test (new or extended) asserting the
+- [x] A contract test (new or extended) asserting the
       `EditorCommandHistory` document state reads dirty after a
       successful scene-changing import driven through the pipeline, and
       stays unmarked after a failed import (guards the dirty-state
       coupling across Slice B).
 
 ## Docs
-- [ ] Update `src/runtime/README.md` module list for the new module.
-- [ ] Regenerate module inventories per `intrinsicengine-docs-sync`.
-- [ ] Update `tasks/backlog/runtime/README.md` status line on retirement.
+- [x] Update `src/runtime/README.md` module list for the new module.
+- [x] Regenerate module inventories per `intrinsicengine-docs-sync`.
+- [x] Update `tasks/backlog/runtime/README.md` status line on retirement.
 
 ## Acceptance criteria
-- [ ] `Runtime.Engine.cppm` no longer declares any import/ingest/registry
+- [x] `Runtime.Engine.cppm` no longer declares any import/ingest/registry
       method or member listed in Context; `Runtime.Engine.cpp` shrinks by
       at least the moved helper block (~2,500+ lines total).
-- [ ] All import behavior verified by the existing test suite is unchanged.
-- [ ] Document dirty-state marking for imports behaves identically before
+- [x] All import behavior verified by the existing test suite is unchanged.
+- [x] Document dirty-state marking for imports behaves identically before
       and after Slice B (covered by the named contract test).
-- [ ] Teardown ordering is preserved (no new shutdown races; existing
+- [x] Teardown ordering is preserved (no new shutdown races; existing
       shutdown-path tests pass).
-- [ ] CPU gate and layering check pass after each slice.
+- [x] CPU gate and layering check pass after each slice.
 
 ## Verification
+Completed 2026-07-08:
+
 ```bash
 cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='RuntimeAssetImportFormatCoverage.*:SandboxEditorUi.*Import*:SandboxEditorUi.*Reimport*:SandboxEditorUi.*AssetImport*'
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/repo/check_layering.py --root src --strict
-python3 tools/ci/touched_scope.py --root . --base-ref origin/main --build-dir build/ci --run
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root .
+python3 tools/repo/check_root_hygiene.py --root .
+git diff --check
 ```
 
 ## Forbidden changes

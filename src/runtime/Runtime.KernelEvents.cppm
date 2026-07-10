@@ -10,198 +10,175 @@ module;
 #include <utility>
 #include <vector>
 
-#include <entt/signal/dispatcher.hpp>
-
 export module Extrinsic.Runtime.KernelEvents;
 
 import Extrinsic.Core.FrameGraph;
 
 // ============================================================
-// ARCH-008 - queued-only runtime kernel event bus.
+// ARCH-008 — Queued-only kernel event bus with two pump points.
 //
-// ADR-0024 D7: synchronous event dispatch is not part of the
-// kernel API. Publishers enqueue typed events from any thread;
-// the Engine pumps the bus at the two documented main-thread
-// points. Events published while a pump is delivering are held
-// for the next pump, bounding cascades and keeping teardown
-// two-phase by construction.
+// ADR-0024 D7: kernel events are always queued. Publish is
+// thread-safe and allowed from workers through an inbox; listeners
+// run only on the thread that calls Pump(). Engine owns exactly two
+// Pump() calls per frame: post-command-drain and post-simulation.
 //
-// This wrapper owns the entt::dispatcher instance. Runtime code
-// never reaches dispatcher::trigger through this API.
+// Events published during a Pump() are deferred to the next pump by
+// construction: Pump() swaps out the batch that existed at entry and
+// never recursively drains the live inbox.
+//
+// This is the runtime-kernel bus. It intentionally does not rename
+// or absorb the asset-layer `Extrinsic.Asset.EventBus`.
 // ============================================================
 
 namespace Extrinsic::Runtime
 {
-    export class EventBus;
-
-    export using EventTypeKey = std::size_t;
+    export using KernelEventTypeKey = std::size_t;
 
     export template <typename TEvent>
-    [[nodiscard]] consteval std::string_view EventTypeNameOf() noexcept
+    [[nodiscard]] consteval std::string_view KernelEventTypeNameOf() noexcept
     {
 #if defined(__clang__) || defined(__GNUC__)
         return __PRETTY_FUNCTION__;
 #elif defined(_MSC_VER)
         return __FUNCSIG__;
 #else
-        return "EventTypeNameOf<unknown>";
+        return "KernelEventTypeNameOf<unknown>";
 #endif
     }
 
-    export struct EventSubscriptionHandle
+    export struct KernelEventSubscription
     {
-        std::uint64_t Value{0};
+        std::uint64_t      Value{0};
+        KernelEventTypeKey EventType{0};
 
-        [[nodiscard]] bool IsValid() const noexcept { return Value != 0; }
-        [[nodiscard]] friend bool operator==(EventSubscriptionHandle,
-                                             EventSubscriptionHandle) noexcept = default;
+        [[nodiscard]] bool IsValid() const noexcept
+        {
+            return Value != 0 && EventType != 0;
+        }
+        [[nodiscard]] friend bool operator==(KernelEventSubscription,
+                                             KernelEventSubscription) noexcept = default;
     };
 
-    export struct EventBusStats
-    {
-        std::uint64_t PumpCount{0};
-        std::uint64_t LastPumpPublished{0};
-        std::uint64_t LastPumpDelivered{0};
-        std::uint64_t TotalPublished{0};
-        std::uint64_t TotalDelivered{0};
-        std::uint64_t ActiveSubscriptions{0};
-        std::uint64_t Unsubscribed{0};
-    };
-
-    export class EventBus
+    export class KernelEventEnvelope
     {
     public:
-        EventBus() = default;
-        ~EventBus();
-
-        EventBus(const EventBus&)            = delete;
-        EventBus& operator=(const EventBus&) = delete;
+        KernelEventEnvelope() = default;
 
         template <typename TEvent>
-        [[nodiscard]] EventSubscriptionHandle Subscribe(
-            std::function<void(const TEvent&)> callback)
+        [[nodiscard]] static KernelEventEnvelope Make(TEvent payload)
         {
-            if (!callback)
-            {
-                return {};
-            }
-
-            const EventSubscriptionHandle handle{m_NextSubscription++};
-            auto subscription = std::make_unique<TypedSubscription<TEvent>>(
-                *this,
-                handle,
-                EventTypeNameOf<TEvent>(),
-                std::move(callback));
-
-            auto& typed = *subscription;
-            m_Dispatcher.sink<TEvent>().template connect<
-                &TypedSubscription<TEvent>::OnEvent>(typed);
-            m_Subscriptions.emplace(handle.Value, std::move(subscription));
-            UpdateActiveSubscriptionCount();
-            return handle;
+            return KernelEventEnvelope(Core::TypeToken<TEvent>(),
+                                       std::make_shared<const TEvent>(std::move(payload)),
+                                       KernelEventTypeNameOf<TEvent>());
         }
 
-        void Unsubscribe(EventSubscriptionHandle handle);
-
-        template <typename TEvent>
-        void Publish(TEvent event)
+        [[nodiscard]] bool IsValid() const noexcept
         {
-            auto payload = std::make_shared<const TEvent>(std::move(event));
-            EnqueuePending(PendingEvent{
-                Core::TypeToken<TEvent>(),
-                EventTypeNameOf<TEvent>(),
-                [payload = std::move(payload)](entt::dispatcher& dispatcher)
-                {
-                    dispatcher.enqueue<TEvent>(*payload);
-                },
-                [](entt::dispatcher& dispatcher)
-                {
-                    dispatcher.update<TEvent>();
-                }});
+            return static_cast<bool>(m_Payload);
         }
-
-        // Main-thread pump. Merges the thread-safe inbox into the
-        // dispatcher, delivers that bounded batch, and leaves events
-        // published by listeners for the next Pump() call.
-        void Pump();
-
-        [[nodiscard]] EventBusStats Stats() const;
-        [[nodiscard]] std::size_t PendingCount() const;
+        [[nodiscard]] std::string_view TypeName() const noexcept
+        {
+            return m_TypeName;
+        }
 
     private:
-        struct PendingEvent
-        {
-            EventTypeKey Type{0};
-            std::string_view TypeName{};
-            std::function<void(entt::dispatcher&)> Enqueue{};
-            std::function<void(entt::dispatcher&)> Update{};
-        };
+        friend class KernelEventBus;
 
-        struct SubscriptionBase
+        KernelEventEnvelope(KernelEventTypeKey     type,
+                            std::shared_ptr<const void> payload,
+                            std::string_view      typeName)
+            : m_Type(type), m_Payload(std::move(payload)), m_TypeName(typeName)
         {
-            EventSubscriptionHandle Handle{};
-            EventTypeKey Type{0};
-            std::string_view TypeName{};
-            bool Active{true};
+        }
 
-            virtual ~SubscriptionBase() = default;
-            virtual void Disconnect(entt::dispatcher& dispatcher) = 0;
-        };
+        KernelEventTypeKey        m_Type{0};
+        std::shared_ptr<const void> m_Payload{};
+        std::string_view          m_TypeName{};
+    };
+
+    export struct KernelEventBusStats
+    {
+        std::uint64_t PublishedEvents{0};
+        std::uint64_t Pumps{0};
+        std::uint64_t LastPumpEvents{0};
+        std::uint64_t DeliveredEvents{0};
+        std::uint64_t LastPumpDeliveredEvents{0};
+        std::uint64_t ListenerInvocations{0};
+        std::uint64_t LastPumpListenerInvocations{0};
+    };
+
+    export class KernelEventBus
+    {
+    public:
+        KernelEventBus() = default;
+        KernelEventBus(const KernelEventBus&)            = delete;
+        KernelEventBus& operator=(const KernelEventBus&) = delete;
 
         template <typename TEvent>
-        struct TypedSubscription final : SubscriptionBase
+        [[nodiscard]] KernelEventSubscription Subscribe(
+            std::function<void(const TEvent&)> listener)
         {
-            EventBus& Owner;
-            std::function<void(const TEvent&)> Callback;
+            if (!listener)
+                return {};
 
-            TypedSubscription(EventBus& owner,
-                              EventSubscriptionHandle handle,
-                              std::string_view typeName,
-                              std::function<void(const TEvent&)> callback)
-                : Owner(owner), Callback(std::move(callback))
-            {
-                Handle = handle;
-                Type = Core::TypeToken<TEvent>();
-                TypeName = typeName;
-            }
+            return SubscribeErased(
+                Core::TypeToken<TEvent>(),
+                KernelEventTypeNameOf<TEvent>(),
+                [h = std::move(listener)](const void* payload)
+                { h(*static_cast<const TEvent*>(payload)); });
+        }
 
-            void OnEvent(const TEvent& event)
-            {
-                if (!Active)
-                {
-                    return;
-                }
+        void Unsubscribe(KernelEventSubscription subscription);
 
-                Owner.RecordDelivery();
-                Callback(event);
-            }
+        template <typename TEvent>
+        void Publish(TEvent payload)
+        {
+            Publish(KernelEventEnvelope::Make<TEvent>(std::move(payload)));
+        }
 
-            void Disconnect(entt::dispatcher& dispatcher) override
-            {
-                dispatcher.sink<TEvent>().template disconnect<
-                    &TypedSubscription<TEvent>::OnEvent>(*this);
-            }
+        void Publish(KernelEventEnvelope envelope);
+
+        // Main-thread pump. Delivers only the batch present at pump entry.
+        // Publishes from listeners or worker threads land in the next pump.
+        [[nodiscard]] std::uint64_t Pump();
+
+        [[nodiscard]] KernelEventBusStats Stats() const;
+
+    private:
+        using ErasedListener = std::function<void(const void*)>;
+
+        struct SubscriberRecord
+        {
+            KernelEventSubscription Handle{};
+            ErasedListener          Listener{};
+            std::string_view        TypeName{};
         };
 
-        void EnqueuePending(PendingEvent pending);
-        void RecordDelivery() noexcept;
-        void CleanupPendingUnsubscriptions();
-        void UpdateActiveSubscriptionCount();
+        struct ListenerSnapshot
+        {
+            KernelEventSubscription Handle{};
+            ErasedListener          Listener{};
+        };
 
-        entt::dispatcher m_Dispatcher{};
+        [[nodiscard]] KernelEventSubscription SubscribeErased(
+            KernelEventTypeKey type,
+            std::string_view typeName,
+            ErasedListener listener);
+        [[nodiscard]] std::vector<ListenerSnapshot> SnapshotListeners(
+            KernelEventTypeKey type) const;
+        [[nodiscard]] bool IsSubscribed(KernelEventSubscription subscription) const;
 
-        mutable std::mutex m_InboxMutex{};
-        std::vector<PendingEvent> m_Inbox{};
+        mutable std::mutex m_InboxMutex;
+        std::vector<KernelEventEnvelope> m_Inbox;
 
-        mutable std::mutex m_StatsMutex{};
-        EventBusStats m_Stats{};
-
+        mutable std::mutex m_SubscriptionMutex;
+        std::unordered_map<KernelEventTypeKey, std::vector<SubscriberRecord>>
+            m_Subscribers;
         std::uint64_t m_NextSubscription{1};
-        std::unordered_map<std::uint64_t, std::unique_ptr<SubscriptionBase>>
-            m_Subscriptions{};
-        std::vector<EventSubscriptionHandle> m_PendingUnsubscriptions{};
+
+        mutable std::mutex m_StatsMutex;
+        KernelEventBusStats m_Stats{};
 
         bool m_Pumping{false};
-        std::uint64_t m_DeliveriesThisPump{0};
     };
 }

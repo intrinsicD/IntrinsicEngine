@@ -49,7 +49,7 @@ retirement log.
   `CI-003..008` have removed avoidable software duplication.
 - Compile-hotspot source ownership is intentionally outside the process queue:
   `ARCH-006` owns Sandbox editor/UI and `Sandbox.cppm`, `RUNTIME-146..151` own
-  `Runtime.Engine`, and `RUNTIME-152` owns `Runtime.RenderExtraction`.
+  `Runtime.Engine`, and `RUNTIME-166` owns `Runtime.RenderExtraction`.
 - Dependency order: `PROC-001` first (every other task edits docs that are
   mirrored into skills), then `PROC-005`, `PROC-002`, and `PROC-007`
   (independent of each other), then `PROC-003`, then `PROC-004`, then

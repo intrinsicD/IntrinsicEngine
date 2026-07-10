@@ -54,13 +54,19 @@ import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Device;
+import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.ClusteringModule;
+import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.ImGuiAdapter;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.KMeansBackend;
 import Extrinsic.Runtime.KMeansGpuBackend;
 import Extrinsic.Runtime.KMeansGpuJobQueue;
@@ -73,9 +79,11 @@ import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RegistrationAlignment;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.RenderArtifactPublication;
+import Extrinsic.Runtime.SceneDocument;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Graph;
@@ -106,7 +114,8 @@ namespace Extrinsic::Runtime
 {
     void SandboxEditorSelectedModelCache::Clear() noexcept
     {
-        SelectedAnalysis.Valid = false;
+        for (SandboxEditorSelectedAnalysisCacheEntry& entry : SelectedAnalysis)
+            entry.Valid = false;
         for (SandboxEditorVisualizationModelCacheEntry& entry : Visualization)
             entry.Valid = false;
         ++Counters.Invalidations;
@@ -116,7 +125,12 @@ namespace Extrinsic::Runtime
         const noexcept
     {
         SandboxEditorSelectedModelCacheStats stats = Counters;
-        stats.Entries = SelectedAnalysis.Valid ? 1u : 0u;
+        for (const SandboxEditorSelectedAnalysisCacheEntry& entry :
+             SelectedAnalysis)
+        {
+            if (entry.Valid)
+                ++stats.Entries;
+        }
         for (const SandboxEditorVisualizationModelCacheEntry& entry :
              Visualization)
         {
@@ -630,6 +644,23 @@ namespace Extrinsic::Runtime
                 return GS::Domain::PointCloud;
             }
             return GS::Domain::None;
+        }
+
+        [[nodiscard]] SandboxEditorSelectedAnalysisCacheConsumer
+        SelectedAnalysisCacheConsumerForWindowKind(
+            const SandboxEditorDomainWindowKind kind) noexcept
+        {
+            switch (kind)
+            {
+            case SandboxEditorDomainWindowKind::Mesh:
+                return SandboxEditorSelectedAnalysisCacheConsumer::MeshDomainWindow;
+            case SandboxEditorDomainWindowKind::Graph:
+                return SandboxEditorSelectedAnalysisCacheConsumer::GraphDomainWindow;
+            case SandboxEditorDomainWindowKind::PointCloud:
+                return SandboxEditorSelectedAnalysisCacheConsumer::
+                    PointCloudDomainWindow;
+            }
+            return SandboxEditorSelectedAnalysisCacheConsumer::Inspector;
         }
 
         [[nodiscard]] const char* DomainWindowTitle(
@@ -4817,6 +4848,9 @@ namespace Extrinsic::Runtime
             const ECS::EntityHandle entity,
             const SandboxEditorGeometryDomainModel& geometry,
             const SandboxEditorSelectedModelCacheSection section,
+            const SandboxEditorSelectedAnalysisCacheConsumer
+                selectedAnalysisConsumer =
+                    SandboxEditorSelectedAnalysisCacheConsumer::Inspector,
             const SandboxEditorVisualizationTarget visualizationTarget =
                 SandboxEditorVisualizationTarget::Entity)
         {
@@ -4824,6 +4858,7 @@ namespace Extrinsic::Runtime
                 SelectionController::ToStableEntityId(entity);
             return SandboxEditorSelectedModelCacheKey{
                 .Section = section,
+                .SelectedAnalysisConsumer = selectedAnalysisConsumer,
                 .VisualizationTarget = visualizationTarget,
                 .PrimaryStableId = stableId,
                 .SelectedStableIds =
@@ -4900,6 +4935,17 @@ namespace Extrinsic::Runtime
                 ++context.ModelBuildStats->VisualizationModelCacheMisses;
         }
 
+        [[nodiscard]] SandboxEditorSelectedAnalysisCacheEntry*
+        ResolveSelectedAnalysisCacheEntry(
+            SandboxEditorSelectedModelCache& cache,
+            const SandboxEditorSelectedAnalysisCacheConsumer consumer)
+        {
+            const std::size_t index = static_cast<std::size_t>(consumer);
+            return index < cache.SelectedAnalysis.size()
+                ? &cache.SelectedAnalysis[index]
+                : nullptr;
+        }
+
         [[nodiscard]] SandboxEditorSelectedAnalysisModel
         BuildSelectedAnalysisModelUncached(
             const SandboxEditorContext& context,
@@ -4943,10 +4989,26 @@ namespace Extrinsic::Runtime
             const GS::ConstSourceView& sourceView,
             const SandboxEditorRenderHintModel& renderHints,
             const SandboxEditorGeometryDomainModel& geometry,
-            const std::uint32_t stableId)
+            const std::uint32_t stableId,
+            const SandboxEditorSelectedAnalysisCacheConsumer consumer =
+                SandboxEditorSelectedAnalysisCacheConsumer::Inspector)
         {
             SandboxEditorSelectedModelCache* cache = context.SelectedModelCache;
             if (cache == nullptr)
+            {
+                return BuildSelectedAnalysisModelUncached(
+                    context,
+                    raw,
+                    entity,
+                    sourceView,
+                    renderHints,
+                    geometry,
+                    stableId);
+            }
+
+            SandboxEditorSelectedAnalysisCacheEntry* entry =
+                ResolveSelectedAnalysisCacheEntry(*cache, consumer);
+            if (entry == nullptr)
             {
                 return BuildSelectedAnalysisModelUncached(
                     context,
@@ -4964,12 +5026,12 @@ namespace Extrinsic::Runtime
                     raw,
                     entity,
                     geometry,
-                    SandboxEditorSelectedModelCacheSection::SelectedAnalysis);
-            if (cache->SelectedAnalysis.Valid &&
-                cache->SelectedAnalysis.Key == key)
+                    SandboxEditorSelectedModelCacheSection::SelectedAnalysis,
+                    consumer);
+            if (entry->Valid && entry->Key == key)
             {
                 RecordSelectedAnalysisCacheHit(context);
-                return cache->SelectedAnalysis.Model;
+                return entry->Model;
             }
 
             RecordSelectedAnalysisCacheMiss(context);
@@ -4982,7 +5044,7 @@ namespace Extrinsic::Runtime
                     renderHints,
                     geometry,
                     stableId);
-            cache->SelectedAnalysis = SandboxEditorSelectedAnalysisCacheEntry{
+            *entry = SandboxEditorSelectedAnalysisCacheEntry{
                 .Valid = true,
                 .Key = key,
                 .Model = model,
@@ -5250,6 +5312,132 @@ namespace Extrinsic::Runtime
                 return SandboxEditorKMeansBackend::VulkanCompute;
             }
             return SandboxEditorKMeansBackend::CpuReference;
+        }
+
+        [[nodiscard]] ClusteringDomain ToRuntimeClusteringDomain(
+            const SandboxEditorGeometryProcessingDomain domain) noexcept
+        {
+            switch (domain)
+            {
+            case SandboxEditorGeometryProcessingDomain::MeshVertices:
+                return ClusteringDomain::MeshVertices;
+            case SandboxEditorGeometryProcessingDomain::GraphVertices:
+                return ClusteringDomain::GraphVertices;
+            case SandboxEditorGeometryProcessingDomain::PointCloudPoints:
+                return ClusteringDomain::PointCloudPoints;
+            case SandboxEditorGeometryProcessingDomain::None:
+            case SandboxEditorGeometryProcessingDomain::MeshEdges:
+            case SandboxEditorGeometryProcessingDomain::MeshHalfedges:
+            case SandboxEditorGeometryProcessingDomain::MeshFaces:
+            case SandboxEditorGeometryProcessingDomain::GraphEdges:
+            case SandboxEditorGeometryProcessingDomain::GraphHalfedges:
+                return ClusteringDomain::PointCloudPoints;
+            }
+            return ClusteringDomain::PointCloudPoints;
+        }
+
+        [[nodiscard]] SandboxEditorGeometryProcessingDomain
+        ToSandboxEditorGeometryProcessingDomain(
+            const ClusteringDomain domain) noexcept
+        {
+            switch (domain)
+            {
+            case ClusteringDomain::MeshVertices:
+                return SandboxEditorGeometryProcessingDomain::MeshVertices;
+            case ClusteringDomain::GraphVertices:
+                return SandboxEditorGeometryProcessingDomain::GraphVertices;
+            case ClusteringDomain::PointCloudPoints:
+                return SandboxEditorGeometryProcessingDomain::PointCloudPoints;
+            }
+            return SandboxEditorGeometryProcessingDomain::None;
+        }
+
+        [[nodiscard]] ClusteringBackend ToRuntimeClusteringBackend(
+            const SandboxEditorKMeansBackend backend) noexcept
+        {
+            switch (backend)
+            {
+            case SandboxEditorKMeansBackend::CpuReference:
+                return ClusteringBackend::CpuReference;
+            case SandboxEditorKMeansBackend::VulkanCompute:
+                return ClusteringBackend::VulkanCompute;
+            }
+            return ClusteringBackend::CpuReference;
+        }
+
+        [[nodiscard]] SandboxEditorKMeansBackend ToSandboxEditorKMeansBackend(
+            const ClusteringBackend backend) noexcept
+        {
+            switch (backend)
+            {
+            case ClusteringBackend::CpuReference:
+                return SandboxEditorKMeansBackend::CpuReference;
+            case ClusteringBackend::VulkanCompute:
+                return SandboxEditorKMeansBackend::VulkanCompute;
+            }
+            return SandboxEditorKMeansBackend::CpuReference;
+        }
+
+        [[nodiscard]] SandboxEditorCommandStatus ToSandboxEditorCommandStatus(
+            const KMeansRunStatus status) noexcept
+        {
+            switch (status)
+            {
+            case KMeansRunStatus::Queued:
+                return SandboxEditorCommandStatus::Pending;
+            case KMeansRunStatus::Applied:
+                return SandboxEditorCommandStatus::Applied;
+            case KMeansRunStatus::MissingScene:
+                return SandboxEditorCommandStatus::MissingScene;
+            case KMeansRunStatus::InvalidProcessingParameters:
+                return SandboxEditorCommandStatus::InvalidProcessingParameters;
+            case KMeansRunStatus::StaleEntity:
+                return SandboxEditorCommandStatus::StaleEntity;
+            case KMeansRunStatus::UnsupportedGeometryDomain:
+                return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+            case KMeansRunStatus::GeometryProcessingFailed:
+            case KMeansRunStatus::StaleSource:
+            case KMeansRunStatus::StaleWorld:
+            case KMeansRunStatus::ModuleUnavailable:
+                return SandboxEditorCommandStatus::GeometryProcessingFailed;
+            }
+            return SandboxEditorCommandStatus::GeometryProcessingFailed;
+        }
+
+        [[nodiscard]] SandboxEditorKMeansResult
+        MakeSandboxEditorKMeansResult(
+            const KMeansRunCompleted& completed)
+        {
+            const SandboxEditorGeometryProcessingDomain domain =
+                ToSandboxEditorGeometryProcessingDomain(completed.Domain);
+            const SandboxEditorKMeansBackend requested =
+                ToSandboxEditorKMeansBackend(completed.RequestedBackend);
+            const SandboxEditorKMeansBackend actual =
+                ToSandboxEditorKMeansBackend(completed.ActualBackend);
+            return SandboxEditorKMeansResult{
+                .Status = ToSandboxEditorCommandStatus(completed.Status),
+                .Domain = domain,
+                .LabelCount = completed.LabelCount,
+                .ClusterCount = completed.ClusterCount,
+                .Iterations = completed.Iterations,
+                .Converged = completed.Converged,
+                .Inertia = completed.Inertia,
+                .MaxDistanceIndex = completed.MaxDistanceIndex,
+                .RequestedBackend = requested,
+                .ActualBackend = actual,
+                .RequestedBackendId = KMeansBackendId(requested),
+                .RequestedBackendDisplayName =
+                    KMeansBackendDisplayName(requested),
+                .BackendId = KMeansBackendId(actual),
+                .BackendDisplayName = KMeansBackendDisplayName(actual),
+                .FellBackToCpu = completed.FellBackToCpu,
+                .BackendFallbackReason =
+                    completed.FellBackToCpu
+                        ? "K-Means request ran on the runtime CPU reference job lane."
+                        : std::string{},
+                .Error = completed.Error,
+                .Message = completed.Message,
+            };
         }
 
         [[nodiscard]] SandboxEditorKMeansBackend KMeansBackendFromIndex(
@@ -5630,6 +5818,41 @@ namespace Extrinsic::Runtime
                 result.Message += std::to_string(handle.Index);
                 result.Message += ":";
                 result.Message += std::to_string(handle.Generation);
+                result.Message += ")";
+            }
+            result.Message += ".";
+            return result;
+        }
+
+        [[nodiscard]] SandboxEditorKMeansResult MakePendingRuntimeKMeansResult(
+            const SandboxEditorKMeansCommand& command,
+            const CommandCorrelationId correlation,
+            const std::uint32_t pointCount)
+        {
+            const SandboxEditorKMeansBackend actual =
+                SandboxEditorKMeansBackend::CpuReference;
+            SandboxEditorKMeansResult result{
+                .Status = SandboxEditorCommandStatus::Pending,
+                .Domain = command.Domain,
+                .LabelCount = pointCount,
+                .ClusterCount = std::min(command.ClusterCount, pointCount),
+                .RequestedBackend = command.Backend,
+                .ActualBackend = actual,
+                .RequestedBackendId = KMeansBackendId(command.Backend),
+                .RequestedBackendDisplayName =
+                    KMeansBackendDisplayName(command.Backend),
+                .BackendId = KMeansBackendId(actual),
+                .BackendDisplayName = KMeansBackendDisplayName(actual),
+                .FellBackToCpu =
+                    command.Backend ==
+                    SandboxEditorKMeansBackend::VulkanCompute,
+                .Error = Core::ErrorCode::Success,
+            };
+            result.Message = "K-Means runtime job queued";
+            if (correlation.IsValid())
+            {
+                result.Message += " (command ";
+                result.Message += std::to_string(correlation.Value);
                 result.Message += ")";
             }
             result.Message += ".";
@@ -12538,6 +12761,7 @@ namespace Extrinsic::Runtime
                     *selected,
                     geometry,
                     SandboxEditorSelectedModelCacheSection::Visualization,
+                    SandboxEditorSelectedAnalysisCacheConsumer::Inspector,
                     target);
 
             if (entry->Valid && entry->Key == key)
@@ -12585,7 +12809,7 @@ namespace Extrinsic::Runtime
                             if (route.has_value() &&
                                 IsModelTextureImportPayload(route->PayloadKind))
                             {
-                                auto queued = engine.QueueModelTextureImport(
+                                auto queued = engine.GetAssetImportPipeline().QueueModelTextureImport(
                                     RuntimeAssetImportRequest{
                                         .Path = command.Path,
                                         .PayloadKind = route->PayloadKind,
@@ -12611,7 +12835,7 @@ namespace Extrinsic::Runtime
                                 };
                             }
 
-                            auto imported = engine.ImportAssetFromPath(
+                            auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(
                                 RuntimeAssetImportRequest{
                                     .Path = command.Path,
                                     .PayloadKind = command.PayloadKind,
@@ -12654,19 +12878,20 @@ namespace Extrinsic::Runtime
                     .ClearCompleted =
                         [&engine]()
                         {
-                            return engine.ClearCompletedAssetImports();
+                            return engine.GetAssetImportPipeline().ClearCompletedAssetImports();
                         },
                     .Cancel =
                         [&engine](const RuntimeAssetIngestHandle operation)
                         {
-                            return engine.CancelAssetImport(operation);
+                            return engine.GetAssetImportPipeline().CancelAssetImport(operation);
                         },
                 },
                 .SceneFileCommands = SandboxEditorSceneFileCommandSurface{
                     .New =
                         [&engine]()
                         {
-                            Core::Result created = engine.NewSceneDocument();
+                            Core::Result created =
+                                engine.GetSceneDocument().NewSceneDocument();
                             if (!created.has_value())
                             {
                                 return SandboxEditorSceneFileResult{
@@ -12688,7 +12913,9 @@ namespace Extrinsic::Runtime
                     .Save =
                         [&engine](const SandboxEditorSceneFileCommand& command)
                         {
-                            auto queued = engine.QueueSceneSaveToPath(command.Path);
+                            auto queued =
+                                engine.GetSceneDocument().QueueSceneSaveToPath(
+                                    command.Path);
                             if (!queued.has_value())
                             {
                                 return SandboxEditorSceneFileResult{
@@ -12714,7 +12941,9 @@ namespace Extrinsic::Runtime
                     .Load =
                         [&engine](const SandboxEditorSceneFileCommand& command)
                         {
-                            auto queued = engine.QueueSceneLoadFromPath(command.Path);
+                            auto queued =
+                                engine.GetSceneDocument().QueueSceneLoadFromPath(
+                                    command.Path);
                             if (!queued.has_value())
                             {
                                 return SandboxEditorSceneFileResult{
@@ -12740,7 +12969,8 @@ namespace Extrinsic::Runtime
                     .Close =
                         [&engine]()
                         {
-                            Core::Result closed = engine.CloseSceneDocument();
+                            Core::Result closed =
+                                engine.GetSceneDocument().CloseSceneDocument();
                             if (!closed.has_value())
                             {
                                 return SandboxEditorSceneFileResult{
@@ -12795,21 +13025,22 @@ namespace Extrinsic::Runtime
                             engine.CancelDerivedJob(handle);
                         },
                 },
-                .AssetImportQueue = engine.GetAssetImportQueueSnapshot(),
+                .AssetImportQueue = engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot(),
                 .RenderGraphStats = &engine.GetRenderer().GetLastRenderGraphStats(),
-                .RenderRecipeRuntimeState = &engine.GetRenderRecipeState(),
+                .RenderRecipeRuntimeState =
+                    &engine.GetConfigControl().GetRenderRecipeState(),
                 .PreviewRenderRecipeDocument =
                     [&engine](const std::string& document,
                               const std::string& sourceId)
                     {
-                        return engine.PreviewRenderRecipeConfigDocument(
+                        return engine.GetConfigControl().PreviewRenderRecipeConfigDocument(
                             document,
                             sourceId);
                     },
                 .ApplyRenderRecipePreview =
                     [&engine](const Graphics::RenderRecipeConfigLoadResult& loadResult)
                     {
-                        return engine.ApplyRenderRecipeConfigPreview(
+                        return engine.GetConfigControl().ApplyRenderRecipeConfigPreview(
                             loadResult,
                             RuntimeRenderRecipeActivationSource::Editor);
                     },
@@ -20368,7 +20599,8 @@ namespace Extrinsic::Runtime
                 sourceView,
                 model.RenderHints,
                 geometry,
-                model.SelectedStableId);
+                model.SelectedStableId,
+                SelectedAnalysisCacheConsumerForWindowKind(kind));
         model.PropertyCatalog = std::move(selectedAnalysis.PropertyCatalog);
         model.BoundState = std::move(selectedAnalysis.BoundState);
         model.TextureBake = std::move(selectedAnalysis.TextureBake);
@@ -22164,6 +22396,17 @@ namespace Extrinsic::Runtime
             : GK::Initialization::Random;
         params.Compute = ToKMeansGeometryBackend(command.Backend);
 
+        if (context.KMeansCommands.Required &&
+            !context.KMeansCommands.Available())
+        {
+            return MakeKMeansResult(
+                SandboxEditorCommandStatus::GeometryProcessingFailed,
+                command.Domain,
+                command.Backend,
+                Core::ErrorCode::InvalidState,
+                "Runtime clustering module is not composed; K-Means is unavailable.");
+        }
+
         std::string gpuQueueFallbackReason{};
         if (command.Backend == SandboxEditorKMeansBackend::VulkanCompute &&
             context.KMeansGpuCommands.Available())
@@ -22198,6 +22441,38 @@ namespace Extrinsic::Runtime
             gpuQueueFallbackReason = submission.Diagnostic.empty()
                 ? "K-Means Vulkan compute execution is unavailable; ran CPU reference."
                 : submission.Diagnostic + " Ran CPU reference.";
+        }
+
+        if (context.KMeansCommands.Available())
+        {
+            const CommandCorrelationId correlation =
+                context.KMeansCommands.Submit(RunKMeans{
+                    .StableEntityId = command.StableEntityId,
+                    .Domain = ToRuntimeClusteringDomain(command.Domain),
+                    .ClusterCount = command.ClusterCount,
+                    .MaxIterations = command.MaxIterations,
+                    .Seed = command.Seed,
+                    .UseHierarchicalInitialization =
+                        command.UseHierarchicalInitialization,
+                    .Backend = ToRuntimeClusteringBackend(command.Backend),
+                });
+            if (!correlation.IsValid())
+            {
+                return MakeKMeansResult(
+                    SandboxEditorCommandStatus::GeometryProcessingFailed,
+                    command.Domain,
+                    command.Backend,
+                    Core::ErrorCode::InvalidState,
+                    "Runtime clustering command submission was rejected.");
+            }
+
+            SandboxEditorKMeansResult pending =
+                MakePendingRuntimeKMeansResult(
+                    command,
+                    correlation,
+                    static_cast<std::uint32_t>(points->size()));
+            pending.BackendFallbackReason = std::move(gpuQueueFallbackReason);
+            return pending;
         }
 
         if (context.DerivedJobCommands.Available())
@@ -24322,8 +24597,8 @@ namespace Extrinsic::Runtime
             engine.GetDevice(),
             engine.GetRenderer().GetBufferManager(),
             engine.GetDevice().GetTransferQueue());
-        m_KMeansGpuParticipant = engine.RegisterRuntimeGpuJobParticipant(
-            RuntimeGpuJobParticipantDesc{
+        m_KMeansGpuParticipant = engine.Jobs().RegisterGpuQueueParticipant(
+            GpuQueueParticipantDesc{
                 .DebugName = "SandboxEditor.KMeansGpu",
                 .RecordFrameCommands =
                     [this](RHI::ICommandContext& commandContext)
@@ -24358,8 +24633,12 @@ namespace Extrinsic::Runtime
     {
         if (m_Engine != nullptr && m_KMeansGpuParticipant.IsValid())
         {
-            m_Engine->UnregisterRuntimeGpuJobParticipant(
-                m_KMeansGpuParticipant);
+            m_Engine->Jobs().UnregisterGpuQueueParticipant(
+                m_KMeansGpuParticipant,
+                [engine = m_Engine]
+                {
+                    engine->GetDevice().WaitIdle();
+                });
         }
         m_KMeansGpuParticipant = {};
         m_KMeansGpuJobs.reset();
@@ -24370,13 +24649,30 @@ namespace Extrinsic::Runtime
         Detach();
         m_Engine = &engine;
         AttachKMeansGpuQueue(engine);
+        m_ClusteringService = engine.Services().Find<ClusteringService>();
+        if (m_ClusteringService != nullptr &&
+            m_ClusteringService->Available())
+        {
+            m_KMeansCompletionSubscription =
+                m_ClusteringService->SubscribeRunCompleted(
+                    [this](const KMeansRunCompleted& completed)
+                    {
+                        m_LastKMeansResult =
+                            MakeSandboxEditorKMeansResult(completed);
+                        m_SelectedModelCache.Clear();
+                    });
+        }
+        else
+        {
+            m_ClusteringService = nullptr;
+        }
         engine.SetImGuiEditorCallback(
             [this]
             {
                 if (m_Engine == nullptr)
                     return;
                 const std::optional<RuntimeAssetImportEvent>& runtimeImport =
-                    m_Engine->GetLastAssetImportEvent();
+                    m_Engine->GetAssetImportPipeline().GetLastAssetImportEvent();
                 if (runtimeImport.has_value() &&
                     runtimeImport->Sequence != m_LastObservedRuntimeImportSequence)
                 {
@@ -24385,7 +24681,7 @@ namespace Extrinsic::Runtime
                     m_LastObservedRuntimeImportSequence = runtimeImport->Sequence;
                 }
                 const std::optional<RuntimeSceneFileEvent>& runtimeSceneFile =
-                    m_Engine->GetLastSceneFileEvent();
+                    m_Engine->GetSceneDocument().GetLastSceneFileEvent();
                 if (runtimeSceneFile.has_value() &&
                     runtimeSceneFile->Sequence !=
                         m_LastObservedRuntimeSceneFileSequence)
@@ -24397,6 +24693,15 @@ namespace Extrinsic::Runtime
                 }
                 SandboxEditorContext context = BuildContextFromEngine(*m_Engine);
                 context.SelectedModelCache = &m_SelectedModelCache;
+                context.KMeansCommands.Required = true;
+                if (m_ClusteringService != nullptr)
+                {
+                    context.KMeansCommands.Submit =
+                        [service = m_ClusteringService](RunKMeans request)
+                        {
+                            return service->RunKMeans(std::move(request));
+                        };
+                }
                 context.KMeansGpuCommands = SandboxEditorKMeansGpuCommandSurface{
                     .Submit =
                         [this](RuntimeKMeansGpuJobRequest request)
@@ -24594,19 +24899,19 @@ namespace Extrinsic::Runtime
                 context.RenderArtifacts = &m_RenderArtifactRegistry;
                 context.RenderRecipeCommandsAvailable = true;
                 context.EngineConfigControlState =
-                    &m_Engine->GetEngineConfigControlState();
+                    &m_Engine->GetConfigControl().GetEngineConfigControlState();
                 context.PreviewEngineConfigDocument =
                     [this](const std::string& document,
                            const std::string& sourceId)
                     {
-                        return m_Engine->PreviewEngineConfigControlDocument(
+                        return m_Engine->GetConfigControl().PreviewEngineConfigControlDocument(
                             document,
                             sourceId);
                     };
                 context.ApplyEngineConfigHotSubset =
                     [this](const Core::Config::EngineConfigLoadResult& loadResult)
                     {
-                        return m_Engine->ApplyEngineConfigHotSubset(
+                        return m_Engine->GetConfigControl().ApplyEngineConfigHotSubset(
                             loadResult,
                             RuntimeConfigControlSource::Editor);
                     };
@@ -24793,12 +25098,22 @@ namespace Extrinsic::Runtime
     {
         if (m_Engine != nullptr)
         {
+            if (m_ClusteringService != nullptr &&
+                m_KMeansCompletionSubscription.IsValid())
+            {
+                m_ClusteringService->Unsubscribe(
+                    m_KMeansCompletionSubscription);
+            }
+            m_KMeansCompletionSubscription = {};
+            m_ClusteringService = nullptr;
             DetachKMeansGpuQueue();
             m_Engine->SetImGuiEditorCallback({});
             m_Engine = nullptr;
         }
         else
         {
+            m_KMeansCompletionSubscription = {};
+            m_ClusteringService = nullptr;
             m_KMeansGpuParticipant = {};
             m_KMeansGpuJobs.reset();
         }

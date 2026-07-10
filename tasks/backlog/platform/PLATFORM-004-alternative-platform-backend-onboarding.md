@@ -69,6 +69,10 @@ depends_on: []
   (superseding the brief sketch in `src/platform/README.md`), covering the
   module/naming conventions above, the promotion-trigger criteria, the
   test-label conventions, and the non-negotiable `platform -> core` rule.
+- ARCH-013 re-review (2026-07-08): Decision unchanged. Platform backend
+  onboarding is unaffected by the runtime kernel seams; input capture remains
+  a runtime/editor snapshot consumer above platform, while `platform` continues
+  to expose only window/input ports and backend-local surface helpers.
 
 ## Required changes
 - [ ] This task remains planning-only. No source or build changes.

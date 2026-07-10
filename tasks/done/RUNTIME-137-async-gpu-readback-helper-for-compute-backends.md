@@ -3,15 +3,35 @@ id: RUNTIME-137
 theme: F
 depends_on:
   - ARCH-009
+maturity_target: Operational
+completed: 2026-07-09
 ---
 # RUNTIME-137 — Async GPU readback helper + pooled destination for compute backends
+
+## Status
+
+- Retired on 2026-07-09 at `Operational`.
+- PR: pending. Commit: pending local change.
+- Runtime now owns `Extrinsic.Runtime.AsyncBufferReadback`, a pooled
+  `Graphics.GpuTransfer` readback wrapper used by `KMeansGpuAsyncReadbacks` to
+  drain labels/distances/centroids without `IDevice::ReadBuffer`.
+- `JobService` now owns the `GpuQueue` participant registry. Engine installs
+  one renderer frame-command bridge to `JobService::RecordGpuQueueFrameCommands`,
+  drains `JobService::DrainGpuQueueCompletedTransfers()` during Maintenance, and
+  shuts participants down through `JobService::ShutdownGpuQueueParticipants(...)`
+  after unregistering the bridge and performing the required device-idle wait.
+- `SandboxEditorUi` registers `RuntimeKMeansGpuJobQueue` through
+  `engine.Jobs().RegisterGpuQueueParticipant(...)`; `Runtime.Engine.cppm` no
+  longer exports `RuntimeGpuJobParticipant*` types or registration functions.
 
 ## Goal
 - Provide a thin, ergonomic async-readback helper that geometry/method GPU
   compute backends adopt in place of the synchronous `RHI::IDevice::ReadBuffer`
   path, so a backend can drain its GPU results without a full-device
   `vkDeviceWaitIdle`, and pool the readback destination so repeated solves do not
-  allocate a fresh host buffer per drain.
+  allocate a fresh host buffer per drain. The helper also becomes the runtime
+  substrate for the `JobService` `GpuQueue` target so modules submit GPU-backed
+  work through the kernel job seam rather than owning bespoke queues.
 
 ## Non-goals
 - No change to the `RHI::IDevice::ReadBuffer` contract or the Vulkan backend's
@@ -43,49 +63,61 @@ depends_on:
 - This is the highest-leverage audit follow-up because it unblocks *every*
   geometry compute backend (the pending k-means backend included) from starting
   on the stalling pattern.
+- ARCH-013 re-review (2026-07-08): Decision re-scoped. `ARCH-009` retired with
+  `JobService` and left `GpuQueue` execution explicitly deferred here; this
+  task must provide/adapt the readback helper as that `GpuQueue` execution
+  substrate, not as a second module-owned scheduler. The remaining explicit
+  `RuntimeKMeansGpuJobQueue` participant path is also owned here: it should
+  migrate behind the `JobService` GPU target or a narrow runtime service, not
+  stay wired through `Engine`/editor-specific hooks.
 
 ## Required changes
-- [ ] Add a runtime helper (e.g. `Extrinsic.Runtime.AsyncBufferReadback`) that
+- [x] Add a runtime helper (e.g. `Extrinsic.Runtime.AsyncBufferReadback`) that
       wraps enqueue → poll(`IsDelivered`) → deferred-collect over
       `Graphics.GpuTransfer::ScheduleReadback` / `Runtime.GpuReadbackJob`, taking
       a source `RHI::BufferHandle` + byte range and returning a ticket/handle the
       caller polls and collects without any `WaitIdle`.
-- [ ] Let the caller supply a reusable destination span/buffer (or pool the
+- [x] Adapt/register the helper as the `JobService` `GpuQueue` target so module
+      GPU work receives the same world-scoped cancellation, completion-gate, and
+      maintenance semantics as CPU jobs.
+- [x] Let the caller supply a reusable destination span/buffer (or pool the
       destination by a stable key) so repeated readbacks reuse host storage
       instead of allocating a `std::vector` per submit.
-- [ ] Route the helper's barrier as `ShaderWrite → TransferRead` on the source
+- [x] Route the helper's barrier as `ShaderWrite → TransferRead` on the source
       and keep the collect on the render/main thread per the existing transfer
       contract; do not introduce a new stall.
-- [ ] Document the helper as the sanctioned readback path for compute backends;
+- [x] Document the helper as the sanctioned readback path for compute backends;
       keep `IDevice::ReadBuffer` as the explicit-stall escape hatch.
 
 ## Tests
-- [ ] Default CPU-gate contract test: the helper enqueues a readback and reports
+- [x] Default CPU-gate contract test: the helper enqueues a readback and reports
       not-ready without blocking on a null/non-operational device, and collects
       deterministically when the mock transfer marks delivery — no `WaitIdle`
       invoked on the mock device.
-- [ ] Contract test: the pooled/caller-supplied destination is reused across
+- [x] Contract test: the pooled/caller-supplied destination is reused across
       repeated submits (no per-submit allocation of a fresh destination).
-- [ ] Opt-in `gpu;vulkan` smoke: a recorded compute write drained through the
+- [x] Opt-in `gpu;vulkan` smoke: a recorded compute write drained through the
       helper returns the expected bytes and asserts the device is not idled by
       the drain (reuses an existing readback smoke harness where possible).
-- [ ] `ctest ... -LE 'gpu|vulkan|slow|flaky-quarantine'` default gate stays green.
+- [x] `ctest ... -LE 'gpu|vulkan|slow|flaky-quarantine'` default gate stays green.
 
 ## Docs
-- [ ] Document the helper in `src/runtime/README.md` and cross-link
+- [x] Document the helper in `src/runtime/README.md` and cross-link
       `docs/reviews/2026-07-01-gpu-geometry-backend-io-audit.md` Finding 1 and
       `docs/migration/kmeans-gpu-vulkan-compute-proposal.md` §6.
-- [ ] Note in `docs/architecture/algorithm-variant-dispatch.md` that GPU backends
+- [x] Note in `docs/architecture/algorithm-variant-dispatch.md` that GPU backends
       should collect results through this helper, not `IDevice::ReadBuffer`.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` if a module surface is added.
+- [x] Regenerate `docs/api/generated/module_inventory.md` if a module surface is added.
 
 ## Acceptance criteria
-- [ ] A geometry/method GPU backend can drain results through one small helper
+- [x] A geometry/method GPU backend can drain results through one small helper
       call with no `vkDeviceWaitIdle` and no per-drain host allocation.
-- [ ] Default CPU gate proves the enqueue/poll/collect contract on a
+- [x] Module GPU jobs can route through the `JobService` `GpuQueue` target
+      without owning a bespoke render-thread/readback queue.
+- [x] Default CPU gate proves the enqueue/poll/collect contract on a
       non-operational device with honest not-ready reporting.
-- [ ] No new layering violation; runtime keeps composing existing facilities.
-- [ ] `IDevice::ReadBuffer` behavior is unchanged.
+- [x] No new layering violation; runtime keeps composing existing facilities.
+- [x] `IDevice::ReadBuffer` behavior is unchanged.
 
 ## Verification
 ```bash
@@ -101,6 +133,23 @@ cmake --preset ci-vulkan
 cmake --build --preset ci-vulkan --target IntrinsicTests
 ctest --test-dir build/ci-vulkan --output-on-failure -R 'AsyncBufferReadback|GpuReadback|BufferReadback' -L 'gpu' --timeout 120
 ```
+
+Completed verification (2026-07-09):
+
+```bash
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='RuntimeJobService.*:AsyncBufferReadback.*:GpuReadbackJob.*:KMeansGpuBackend.*:SandboxEditorUi.KMeansVulkanRequestQueuesGpuJobWhenSurfaceAccepts'
+cmake --build --preset ci --target IntrinsicRuntimeIntegrationTests
+build/ci/bin/IntrinsicRuntimeIntegrationTests --gtest_filter='RuntimeEngineLayering.*'
+ctest --test-dir build/ci --output-on-failure -R 'AsyncBufferReadback|GpuReadback|RuntimeJobService|KMeansGpuBackend|SandboxEditorUi' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+ctest --test-dir build/ci --output-on-failure -R 'AsyncBufferReadback|GpuReadback|BufferReadback|KMeansGpu' -L 'gpu' -L 'vulkan' --timeout 120
+```
+
+Results: focused runtime GTest passed 33/33; `RuntimeEngineLayering.*` passed
+11/11; focused CTest passed 169/169; full default CPU-supported CTest passed
+3640/3640; opt-in `gpu;vulkan` smoke passed 5/5.
 
 ## Forbidden changes
 - Mixing mechanical file moves with semantic refactors.

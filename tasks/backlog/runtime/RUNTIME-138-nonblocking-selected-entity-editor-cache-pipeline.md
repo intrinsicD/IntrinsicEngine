@@ -24,6 +24,14 @@ maturity_target: Operational
 - Desired frame model: poll input, read cached UI/editor state, enqueue commands/job requests, apply only cheap frame-critical changes, extract/render from committed state, then drain/apply bounded async completions and launch background work.
 - The ECS registry is single-threaded. Async workers must operate on generation-stamped immutable snapshots captured on the main thread, and main-thread apply must discard stale results.
 - `StreamingExecutor` and `DerivedJobRegistry` already provide persistent async worker execution, generation-aware main-thread apply, dependency edges, snapshots, and previous-output retention. This task should reuse that shape instead of adding a parallel ad hoc scheduler.
+- ARCH-013 re-review (2026-07-08): Decision confirmed with a re-scope note.
+  The `ARCH-007` and `ARCH-009` gates held until `CommandBus` and `JobService`
+  retired. Remaining slices must express "enqueue request, snapshot on the
+  main thread, apply bounded current results" through `CommandBus`/`JobService`
+  semantics or through the existing derived-job/streaming surfaces only where
+  they preserve the same snapshot/result/bounded-apply contract. No new
+  selected-editor bespoke queue or immediate dispatcher trigger path is
+  allowed.
 
 ## Control surfaces
 - Config: optional diagnostic/config knobs for editor timing capture and async apply budget may be added if needed, but defaults must keep the sandbox responsive without user configuration.
@@ -45,7 +53,8 @@ maturity_target: Operational
 - [x] Slice B: make editor model construction visibility-gated so hidden panels and closed domain windows do not build selected-entity models; build only the visible model section requested by the current ImGui window/section.
 - [x] Slice B: prevent open domain windows from rebuilding shared selected-entity models independently; either share one per-frame cached model view or request section-specific cached submodels.
 - [x] Slice C partial: add a selected-entity editor model cache for steady selected inspector analysis and visualization models, keyed by stable selected ids, selection generation, refined-primitive generation for primitive-sensitive analysis, geometry domain/count shape, vertex-channel binding generation, geometry source/property metadata signature, selected render-lane hint signature for bound-state rows, progressive presentation binding generation for selected analysis, command-history revision, viewport, visualization target, visualization command availability, effective visualization config/spatial-debug signature for visualization model entries, and visualization adapter binding revision for visualization model entries.
-- [ ] Slice C: extend the selected-entity editor model cache with remaining entity/source value/non-vertex binding generations, viewport/config revision where relevant, and the visible section/window key.
+- [x] Slice C partial: partition selected-analysis cache entries by visible inspector/domain-window consumer and include that visible consumer in the selected-model cache key.
+- [ ] Slice C: extend the selected-entity editor model cache with remaining entity/source value/non-vertex binding generations and viewport/config revision where relevant.
 - [ ] Slice C: ensure cache-hit frames reuse immutable model data and perform no selected geometry/property scans or scratch-buffer allocations.
 - [ ] Slice D: split cheap metadata queries from heavy derivations. Property catalogs may enumerate names/domains/counts/value kinds, but full normal/color resolver scans, scalar domain scans, color packing validation, and UV finite checks must not run for every candidate property every frame.
 - [ ] Slice E: route heavy selected-entity derivations through `DerivedJobRegistry`/`StreamingExecutor` or a runtime editor-analysis registry with the same contract: immutable input snapshot, worker execution, generation validation, bounded main-thread apply, stale-result discard, previous-output retention, and observable pending/ready/failure state.
@@ -59,6 +68,7 @@ maturity_target: Operational
 ## Tests
 - [x] Add contract tests proving hidden inspector/domain sections do not build selected-entity property, progressive, texture-bake, or visualization models.
 - [x] Add contract tests proving steady selected cache-hit frames skip property-catalog, vertex-channel target, progressive, bound-state, UV diagnostics, texture-bake, and visualization model builders, and proving selection-generation, refined-primitive generation, geometry source/property metadata signature, selected render-lane hint signature, progressive presentation binding generation, effective visualization config/spatial-debug signature, and visualization adapter binding revision changes invalidate matching same-entity cache entries.
+- [x] Add contract tests proving inspector and visible domain-window selected-analysis cache entries are partitioned by window/consumer key and cached domain-window hits skip selected-analysis rebuilds.
 - [x] Add contract tests proving cache-hit selected frames do not rebuild property catalogs, do not call full vertex-channel resolvers, and do not allocate geometry-sized scratch buffers.
 - [x] Add contract tests proving cache-hit selected frames perform zero UV texcoord finite-check scans and zero texture-bake source-row enumeration.
 - [x] Add contract tests proving selected model-build timing diagnostics are populated on visible cache-miss work and stay zero for hidden or cache-hit heavy submodels.
@@ -115,12 +125,12 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'Sa
 - Renderer-specific GPU work pruning was retired by `GRAPHICS-113`.
 - ImGui overlay copy/upload cleanup was retired by `GRAPHICS-114`, after
   `GRAPHICS-110` resolved in-flight upload-buffer safety.
-- Current implementation state (2026-07-05): partial `CPUContracted` Slice C.
+- Current implementation state (2026-07-09): partial `CPUContracted` Slice C.
   The editor visibility-gates selected-entity model sections, shares per-frame
   domain-window models, exposes deterministic model-build/cache counters and
   nanosecond selected model-build timing diagnostics, and
-  now keeps a persistent selected-model cache for steady inspector analysis and
-  visualization frames. Frame stats count full vertex-channel resolver scans
+  now keeps a persistent selected-model cache for steady inspector analysis,
+  per-domain-window selected analysis, and visualization frames. Frame stats count full vertex-channel resolver scans
   and scratch-buffer allocation bytes, UV texcoord finite-check element scans,
   texture-bake source-row enumeration, and render-extraction scalar
   visualization adapter value scans. The selected-model cache-hit tests can
@@ -135,8 +145,9 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'Sa
   refined-primitive generation for primitive-sensitive selected analysis, a
   runtime-computed metadata signature over selected geometry source/property
   descriptors, a selected render-lane hint signature for bound-state rows, and
-  the runtime-owned progressive presentation binding generation for selected
-  inspector analysis; the visualization model cache key also includes the
+  the runtime-owned progressive presentation binding generation plus the
+  visible inspector/domain-window consumer for selected analysis; the
+  visualization model cache key also includes the
   runtime-owned visualization adapter binding revision. Visualization model
   entries also include an effective visualization-config/spatial-debug
   signature, so direct `VisualizationConfig`, `VisualizationLaneOverrides`, or

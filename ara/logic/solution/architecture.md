@@ -26,3 +26,10 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Evidence**: [docs/adr/0021-progressive-entity-render-data-pipeline.md], [tasks/done/RUNTIME-110-progressive-entity-render-data-pipeline.md]
+
+## A05: Engine-Owned Asset Residency Service
+- **Decision**: `Runtime.Engine` keeps asset lifecycle/frame ordering and public asset/GPU-cache compatibility facades, while GPU asset cache construction/listener ownership, fallback bootstrap delegation, model texture/model scene handoff ownership, maintenance ticks, and teardown ordering live behind `Extrinsic.Runtime.AssetResidencyService`.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [src/runtime/Runtime.AssetResidencyService.cppm], [src/runtime/Runtime.AssetResidencyService.cpp], [tasks/done/RUNTIME-164-extract-asset-residency-service.md]
+- **From staging**: O07

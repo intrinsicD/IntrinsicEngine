@@ -1,85 +1,148 @@
 module;
 
-#include <cstddef>
-#include <cstdlib>
+#include <cstdint>
+#include <span>
+#include <string>
 #include <string_view>
-#include <unordered_map>
+#include <utility>
 
 module Extrinsic.Runtime.ServiceRegistry;
 
-import Extrinsic.Core.Logging;
-
 namespace Extrinsic::Runtime
 {
-    void ServiceRegistry::ProvideErased(std::size_t      type,
-                                        std::string_view typeName,
-                                        void*            service)
+    void ServiceRegistry::BeginRegistration()
     {
-        if (service == nullptr)
-        {
-            Core::Log::Error(
-                "[ServiceRegistry] Rejected Provide of a null '{}' service.",
-                typeName);
-            return;
-        }
-
-        // Re-Provide replaces: two modules providing the same service type is
-        // a composition decision the app owns (last provider wins), logged so
-        // an accidental double-provide is never silent.
-        const auto [it, inserted] =
-            m_Services.try_emplace(type, Entry{service, typeName});
-        if (!inserted)
-        {
-            Core::Log::Warn(
-                "[ServiceRegistry] Service '{}' re-provided; replacing the "
-                "previously provided reference.",
-                typeName);
-            it->second = Entry{service, typeName};
-        }
+        Reset();
+        m_Phase = ServiceRegistryPhase::Registration;
     }
 
-    void* ServiceRegistry::RequireErased(std::size_t type, std::string_view typeName)
+    void ServiceRegistry::BeginResolution()
+    {
+        m_Phase = ServiceRegistryPhase::Resolution;
+    }
+
+    void ServiceRegistry::Lock() noexcept
+    {
+        m_Phase = ServiceRegistryPhase::Locked;
+    }
+
+    void ServiceRegistry::Reset()
+    {
+        m_Services.clear();
+        m_BootErrors.clear();
+        m_Stats = ServiceRegistryStats{};
+        m_Phase = ServiceRegistryPhase::Registration;
+    }
+
+    Core::Result ServiceRegistry::ProvideErased(
+        const ServiceTypeKey type,
+        const std::string_view typeName,
+        void* const instance,
+        const std::string_view provider)
+    {
+        if (m_Phase != ServiceRegistryPhase::Registration)
+        {
+            RecordBootError("ServiceRegistry Provide<" +
+                            std::string(typeName) +
+                            "> called outside registration phase by " +
+                            std::string(provider.empty() ? "<unnamed>" : provider));
+            return Core::Err(Core::ErrorCode::InvalidState);
+        }
+
+        if (instance == nullptr)
+        {
+            RecordBootError("ServiceRegistry Provide<" +
+                            std::string(typeName) +
+                            "> received a null service from " +
+                            std::string(provider.empty() ? "<unnamed>" : provider));
+            return Core::Err(Core::ErrorCode::InvalidArgument);
+        }
+
+        if (const auto existing = m_Services.find(type);
+            existing != m_Services.end())
+        {
+            RecordBootError("ServiceRegistry duplicate Provide<" +
+                            std::string(typeName) +
+                            "> from " +
+                            std::string(provider.empty() ? "<unnamed>" : provider) +
+                            "; already provided by " +
+                            existing->second.Provider);
+            return Core::Err(Core::ErrorCode::InvalidState);
+        }
+
+        m_Services.emplace(
+            type,
+            ServiceRecord{
+                .Instance = instance,
+                .TypeName = std::string(typeName),
+                .Provider = std::string(provider.empty() ? "<unnamed>" : provider),
+            });
+        m_Stats.ProvidedServices =
+            static_cast<std::uint32_t>(m_Services.size());
+        return Core::Ok();
+    }
+
+    const ServiceRegistry::ServiceRecord* ServiceRegistry::FindErased(
+        const ServiceTypeKey type) const noexcept
     {
         const auto it = m_Services.find(type);
         if (it == m_Services.end())
-        {
-            // Fail-closed (ADR-0024 D3): a missing required service is a
-            // composition-root defect surfaced loudly at boot — naming the
-            // requesting module and the missing type — never a null-deref at
-            // frame 400. The build is -fno-exceptions, so there is no throw
-            // path to unwind; the process aborts by design.
-            const std::string_view requester =
-                m_ActiveRequester.empty() ? std::string_view{"<unknown>"}
-                                          : m_ActiveRequester;
-            Core::Log::Error(
-                "[ServiceRegistry] Module '{}' requires service '{}', which no "
-                "module provided; aborting boot.",
-                requester,
-                typeName);
-            std::abort();
-        }
-        return it->second.Service;
+            return nullptr;
+        return &it->second;
     }
 
-    void* ServiceRegistry::FindErased(std::size_t type) noexcept
+    void ServiceRegistry::RecordMissingRequirement(
+        const std::string_view requester,
+        const std::string_view typeName)
     {
-        const auto it = m_Services.find(type);
-        return it == m_Services.end() ? nullptr : it->second.Service;
+        m_Stats.MissingRequirements += 1u;
+        RecordBootError("ServiceRegistry missing Require<" +
+                        std::string(typeName) +
+                        "> requested by " +
+                        std::string(requester.empty() ? "<unnamed>" : requester));
     }
 
-    void ServiceRegistry::SetActiveRequester(std::string_view moduleName) noexcept
+    void ServiceRegistry::RecordBootError(std::string message)
     {
-        m_ActiveRequester = moduleName;
+        m_BootErrors.push_back(std::move(message));
+        m_Stats.BootErrors = static_cast<std::uint32_t>(m_BootErrors.size());
     }
 
-    std::size_t ServiceRegistry::ServiceCount() const noexcept
+    Core::Result ServiceRegistry::ValidateBoot() const noexcept
     {
-        return m_Services.size();
+        if (m_BootErrors.empty())
+            return Core::Ok();
+        return Core::Err(Core::ErrorCode::InvalidState);
     }
 
-    void ServiceRegistry::Clear() noexcept
+    bool ServiceRegistry::HasBootErrors() const noexcept
     {
-        m_Services.clear();
-        m_ActiveRequester = {};
+        return !m_BootErrors.empty();
+    }
+
+    std::string_view ServiceRegistry::LastBootError() const noexcept
+    {
+        if (m_BootErrors.empty())
+            return {};
+        return m_BootErrors.back();
+    }
+
+    std::span<const std::string> ServiceRegistry::BootErrors() const noexcept
+    {
+        return m_BootErrors;
+    }
+
+    ServiceRegistryStats ServiceRegistry::Stats() const noexcept
+    {
+        ServiceRegistryStats stats = m_Stats;
+        stats.ProvidedServices =
+            static_cast<std::uint32_t>(m_Services.size());
+        stats.BootErrors = static_cast<std::uint32_t>(m_BootErrors.size());
+        return stats;
+    }
+
+    ServiceRegistryPhase ServiceRegistry::Phase() const noexcept
+    {
+        return m_Phase;
     }
 }

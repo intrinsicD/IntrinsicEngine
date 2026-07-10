@@ -1,43 +1,23 @@
 module;
 
 #include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <span>
+#include <string>
 #include <string_view>
 #include <unordered_map>
+#include <vector>
 
 export module Extrinsic.Runtime.ServiceRegistry;
 
+import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameGraph;
-
-// ============================================================
-// ARCH-011 — two-phase kernel service registry (ADR-0024 D3).
-//
-// The escape hatch for always-present synchronous infrastructure
-// one module needs from another. Providers publish a reference
-// during the register phase (`Provide` in `OnRegister`); consumers
-// bind it during the resolve phase (`Require`/`Find` in
-// `OnResolve`). A `Require` of an unprovided service is a
-// fail-closed boot error naming the requesting module and the
-// missing service type — never a null-deref at frame 400
-// (ADR-0024 D3). Direct module-to-module pointers stay forbidden;
-// this registry is the sanctioned, ordered channel.
-//
-// The registry stores borrowed references only: the providing
-// module owns the lifetime, the registry is a lookup table, not an
-// owner. Type identity uses the same compile-time FNV-1a
-// `Core::TypeToken` the FrameGraph and CommandBus use (no RTTI —
-// the build is -fno-rtti). A missing `Require` aborts the process
-// (-fno-exceptions — there is no throw path to unwind), which is
-// the intended fail-closed boot behavior.
-//
-// Layering: kernel substrate per ADR-0024 D9 — no domain nouns.
-// ============================================================
 
 namespace Extrinsic::Runtime
 {
-    // Compile-time, allocation-free diagnostics name for a service type.
-    // The returned view points at the compiler's function-signature literal
-    // (static storage duration) and contains the type name; precise
-    // formatting is compiler-specific and only used for boot diagnostics.
+    export using ServiceTypeKey = std::size_t;
+
     export template <typename TService>
     [[nodiscard]] consteval std::string_view ServiceTypeNameOf() noexcept
     {
@@ -50,69 +30,93 @@ namespace Extrinsic::Runtime
 #endif
     }
 
+    export enum class ServiceRegistryPhase : std::uint8_t
+    {
+        Registration,
+        Resolution,
+        Locked,
+    };
+
+    export struct ServiceRegistryStats
+    {
+        std::uint32_t ProvidedServices{0};
+        std::uint32_t MissingRequirements{0};
+        std::uint32_t BootErrors{0};
+    };
+
     export class ServiceRegistry
     {
     public:
         ServiceRegistry() = default;
-
-        ServiceRegistry(const ServiceRegistry&)            = delete;
+        ServiceRegistry(const ServiceRegistry&) = delete;
         ServiceRegistry& operator=(const ServiceRegistry&) = delete;
 
-        // Register phase (`OnRegister`). Publishes a borrowed reference the
-        // provider keeps alive for the engine's lifetime. Re-providing a type
-        // replaces the previous entry (a logged composition decision).
+        void BeginRegistration();
+        void BeginResolution();
+        void Lock() noexcept;
+        void Reset();
+
         template <typename TService>
-        void Provide(TService& service)
+        [[nodiscard]] Core::Result Provide(
+            TService& service,
+            std::string_view provider = {})
         {
-            ProvideErased(Core::TypeToken<TService>(),
-                          ServiceTypeNameOf<TService>(),
-                          static_cast<void*>(&service));
+            return ProvideErased(Core::TypeToken<TService>(),
+                                 ServiceTypeNameOf<TService>(),
+                                 &service,
+                                 provider);
         }
 
-        // Resolve phase (`OnResolve`). Fail-closed: aborts boot with a
-        // diagnostic naming the active requester and the missing type when
-        // no module provided `TService`.
         template <typename TService>
-        [[nodiscard]] TService& Require()
+        [[nodiscard]] TService* Find() const noexcept
         {
-            return *static_cast<TService*>(
-                RequireErased(Core::TypeToken<TService>(),
-                              ServiceTypeNameOf<TService>()));
+            const ServiceRecord* record =
+                FindErased(Core::TypeToken<TService>());
+            if (record == nullptr)
+                return nullptr;
+            return static_cast<TService*>(record->Instance);
         }
 
-        // Optional dependency (contribute-if-present). Returns nullptr when
-        // no module provided `TService`; callers branch on it, never deref
-        // blindly.
         template <typename TService>
-        [[nodiscard]] TService* Find() noexcept
+        [[nodiscard]] Core::Expected<std::reference_wrapper<TService>> Require(
+            std::string_view requester)
         {
-            return static_cast<TService*>(FindErased(Core::TypeToken<TService>()));
+            if (TService* service = Find<TService>(); service != nullptr)
+                return std::ref(*service);
+
+            RecordMissingRequirement(requester, ServiceTypeNameOf<TService>());
+            return Core::Err<std::reference_wrapper<TService>>(
+                Core::ErrorCode::ResourceNotFound);
         }
 
-        // The Engine sets the module currently in its resolve phase so a
-        // failed `Require` names the requester. Set around each module's
-        // `OnResolve` and cleared afterward; tests set it directly.
-        void SetActiveRequester(std::string_view moduleName) noexcept;
-
-        [[nodiscard]] std::size_t ServiceCount() const noexcept;
-
-        // Drop every provided reference (the providers still own the
-        // objects). The Engine clears before a re-`Initialize()` so a reused
-        // engine re-runs two-phase startup from an empty registry.
-        void Clear() noexcept;
+        [[nodiscard]] Core::Result ValidateBoot() const noexcept;
+        [[nodiscard]] bool HasBootErrors() const noexcept;
+        [[nodiscard]] std::string_view LastBootError() const noexcept;
+        [[nodiscard]] std::span<const std::string> BootErrors() const noexcept;
+        [[nodiscard]] ServiceRegistryStats Stats() const noexcept;
+        [[nodiscard]] ServiceRegistryPhase Phase() const noexcept;
 
     private:
-        void  ProvideErased(std::size_t type, std::string_view typeName, void* service);
-        [[nodiscard]] void* RequireErased(std::size_t type, std::string_view typeName);
-        [[nodiscard]] void* FindErased(std::size_t type) noexcept;
-
-        struct Entry
+        struct ServiceRecord
         {
-            void*            Service{nullptr};
-            std::string_view TypeName{};
+            void* Instance{};
+            std::string TypeName{};
+            std::string Provider{};
         };
 
-        std::unordered_map<std::size_t, Entry> m_Services{};
-        std::string_view                       m_ActiveRequester{};
+        [[nodiscard]] Core::Result ProvideErased(ServiceTypeKey type,
+                                                 std::string_view typeName,
+                                                 void* instance,
+                                                 std::string_view provider);
+        [[nodiscard]] const ServiceRecord* FindErased(
+            ServiceTypeKey type) const noexcept;
+        void RecordMissingRequirement(std::string_view requester,
+                                      std::string_view typeName);
+        void RecordBootError(std::string message);
+
+        std::unordered_map<ServiceTypeKey, ServiceRecord> m_Services{};
+        std::vector<std::string> m_BootErrors{};
+        ServiceRegistryPhase m_Phase{ServiceRegistryPhase::Registration};
+        ServiceRegistryStats m_Stats{};
     };
 }

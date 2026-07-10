@@ -242,6 +242,7 @@ if(TARGET ExtrinsicRuntime)
         Test.MeshGeometryPacker.cpp
         Test.MeshPrimitiveViewPacker.cpp
         Test.MeshPrimitiveViewExtraction.cpp
+        Test.ObjectSpaceNormalBakeGpuQueue.cpp
         Test.ObjectSpaceNormalBakeQueue.cpp
         Test.ObjectSpaceNormalBakeSubmission.cpp
         Test.ProgressivePoissonGpuBackend.cpp
@@ -265,10 +266,11 @@ if(TARGET ExtrinsicRuntime)
         Test.RuntimeInputActions.cpp
         Test.RuntimeRenderRecipeActivation.cpp
         Test.RuntimeCameraFocusCommand.cpp
+        Test.ClusteringModule.cpp
         Test.RuntimeCommandBus.cpp
         Test.RuntimeJobService.cpp
         Test.RuntimeKernelEvents.cpp
-        Test.RuntimeModuleContract.cpp
+        Test.RuntimeModule.cpp
         Test.RuntimeWorldRegistry.cpp
         Test.RuntimeEcsSystemBundle.cpp
         Test.RuntimeReferenceScene.cpp

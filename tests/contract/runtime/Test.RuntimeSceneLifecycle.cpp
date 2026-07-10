@@ -25,6 +25,7 @@ import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.SceneDocument;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 
@@ -280,7 +281,7 @@ TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSid
     EXPECT_FLOAT_EQ(std::get<float>(translatedPoints.SizeSource), 4.0f);
     ASSERT_TRUE(engine.GetVisualizationAdapterBinding(stableId).has_value());
 
-    const auto reset = engine.NewSceneDocument();
+    const auto reset = engine.GetSceneDocument().NewSceneDocument();
     ASSERT_TRUE(reset.has_value()) << static_cast<int>(reset.error());
 
     EXPECT_FALSE(scene.Raw().valid(entity));
@@ -303,7 +304,7 @@ TEST(RuntimeSceneLifecycle, QueuedSceneSaveWritesSnapshotAndMarksHistoryOnComple
         [](Runtime::Engine& runningEngine)
         {
             const std::optional<Runtime::RuntimeSceneFileEvent>& event =
-                runningEngine.GetLastSceneFileEvent();
+                runningEngine.GetSceneDocument().GetLastSceneFileEvent();
             return event.has_value() &&
                    event->Operation == Runtime::RuntimeSceneFileOperation::Save;
         });
@@ -322,11 +323,12 @@ TEST(RuntimeSceneLifecycle, QueuedSceneSaveWritesSnapshotAndMarksHistoryOnComple
     EXPECT_TRUE(dirty.Succeeded());
     EXPECT_TRUE(engine.GetEditorCommandHistory().Snapshot().Dirty);
 
-    auto queued = engine.QueueSceneSaveToPath(savedScene.Path.string());
+    auto queued =
+        engine.GetSceneDocument().QueueSceneSaveToPath(savedScene.Path.string());
     ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
     EXPECT_TRUE(queued->Task.IsValid());
     EXPECT_EQ(queued->Operation, Runtime::RuntimeSceneFileOperation::Save);
-    EXPECT_FALSE(engine.GetLastSceneFileEvent().has_value());
+    EXPECT_FALSE(engine.GetSceneDocument().GetLastSceneFileEvent().has_value());
 
     scene.Raw().get<ECSC::MetaData>(saved).EntityName = "Mutated After Queue";
     const ECS::EntityHandle late = scene.Create();
@@ -340,7 +342,7 @@ TEST(RuntimeSceneLifecycle, QueuedSceneSaveWritesSnapshotAndMarksHistoryOnComple
 
     EXPECT_LT(app->Frames(), 256u);
     const std::optional<Runtime::RuntimeSceneFileEvent>& event =
-        engine.GetLastSceneFileEvent();
+        engine.GetSceneDocument().GetLastSceneFileEvent();
     ASSERT_TRUE(event.has_value());
     EXPECT_EQ(event->Operation, Runtime::RuntimeSceneFileOperation::Save);
     EXPECT_EQ(event->Task, queued->Task);
@@ -376,7 +378,9 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadInvalidDocumentFailsClosed)
     auto application = std::make_unique<WaitForConditionApplication>(
         [](Runtime::Engine& runningEngine)
         {
-            return runningEngine.GetLastSceneFileEvent().has_value();
+            return runningEngine.GetSceneDocument()
+                .GetLastSceneFileEvent()
+                .has_value();
         });
     WaitForConditionApplication* app = application.get();
     Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
@@ -387,11 +391,13 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadInvalidDocumentFailsClosed)
     scene.Raw().emplace<Sel::SelectableTag>(original);
     engine.GetSelectionController().SetSelectedEntity(scene, original);
 
-    auto queued = engine.QueueSceneLoadFromPath(invalidScene.Path.string());
+    auto queued =
+        engine.GetSceneDocument().QueueSceneLoadFromPath(
+            invalidScene.Path.string());
     ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
     EXPECT_TRUE(queued->Task.IsValid());
     EXPECT_EQ(queued->Operation, Runtime::RuntimeSceneFileOperation::Load);
-    EXPECT_FALSE(engine.GetLastSceneFileEvent().has_value());
+    EXPECT_FALSE(engine.GetSceneDocument().GetLastSceneFileEvent().has_value());
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
         << "explicit Null window backend must keep Engine::Run() drivable";
@@ -399,7 +405,7 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadInvalidDocumentFailsClosed)
 
     EXPECT_LT(app->Frames(), 256u);
     const std::optional<Runtime::RuntimeSceneFileEvent>& event =
-        engine.GetLastSceneFileEvent();
+        engine.GetSceneDocument().GetLastSceneFileEvent();
     ASSERT_TRUE(event.has_value());
     EXPECT_EQ(event->Operation, Runtime::RuntimeSceneFileOperation::Load);
     EXPECT_EQ(event->Task, queued->Task);
@@ -423,7 +429,7 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadAppliesParsedSceneOnMainThread)
         [](Runtime::Engine& runningEngine)
         {
             const std::optional<Runtime::RuntimeSceneFileEvent>& event =
-                runningEngine.GetLastSceneFileEvent();
+                runningEngine.GetSceneDocument().GetLastSceneFileEvent();
             return event.has_value() && event->Succeeded();
         });
     WaitForConditionApplication* app = application.get();
@@ -438,10 +444,12 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadAppliesParsedSceneOnMainThread)
     scene.Raw().emplace<Sel::SelectableTag>(original);
     engine.GetSelectionController().SetSelectedEntity(scene, original);
 
-    auto queued = engine.QueueSceneLoadFromPath(validScene.Path.string());
+    auto queued =
+        engine.GetSceneDocument().QueueSceneLoadFromPath(
+            validScene.Path.string());
     ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
     EXPECT_TRUE(queued->Task.IsValid());
-    EXPECT_FALSE(engine.GetLastSceneFileEvent().has_value());
+    EXPECT_FALSE(engine.GetSceneDocument().GetLastSceneFileEvent().has_value());
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
         << "explicit Null window backend must keep Engine::Run() drivable";
@@ -449,7 +457,7 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadAppliesParsedSceneOnMainThread)
 
     EXPECT_LT(app->Frames(), 256u);
     const std::optional<Runtime::RuntimeSceneFileEvent>& event =
-        engine.GetLastSceneFileEvent();
+        engine.GetSceneDocument().GetLastSceneFileEvent();
     ASSERT_TRUE(event.has_value());
     EXPECT_TRUE(event->Succeeded());
     ASSERT_TRUE(event->LoadResult.has_value());

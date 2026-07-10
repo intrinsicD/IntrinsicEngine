@@ -1,0 +1,44 @@
+module;
+
+#include <functional>
+#include <memory>
+
+export module Extrinsic.Runtime.ImGuiEditorBridge;
+
+import Extrinsic.Graphics.ImGuiOverlaySystem;
+import Extrinsic.Graphics.Renderer;
+import Extrinsic.Platform.Window;
+import Extrinsic.Runtime.ImGuiAdapter;
+
+export namespace Extrinsic::Runtime
+{
+    class ImGuiEditorBridge
+    {
+    public:
+        ImGuiEditorBridge() = default;
+        ~ImGuiEditorBridge();
+
+        ImGuiEditorBridge(const ImGuiEditorBridge&) = delete;
+        ImGuiEditorBridge& operator=(const ImGuiEditorBridge&) = delete;
+        ImGuiEditorBridge(ImGuiEditorBridge&&) = delete;
+        ImGuiEditorBridge& operator=(ImGuiEditorBridge&&) = delete;
+
+        void Initialize(Platform::IWindow& window, Graphics::IRenderer& renderer);
+        void Shutdown(Graphics::IRenderer* renderer) noexcept;
+
+        void SetEditorCallback(std::function<void()> callback);
+        void BeginFrame(double deltaSeconds);
+        void EndFrame();
+
+        [[nodiscard]] bool IsInitialized() const noexcept;
+        [[nodiscard]] bool WantsMouseCapture() const noexcept;
+        [[nodiscard]] bool WantsKeyboardCapture() const noexcept;
+        [[nodiscard]] const ImGuiAdapterDiagnostics* Diagnostics() const noexcept;
+        [[nodiscard]] const ImGuiAdapter& Adapter() const noexcept;
+
+    private:
+        Graphics::ImGuiOverlaySystem m_Overlay{};
+        std::function<void()>        m_EditorCallback{};
+        std::unique_ptr<ImGuiAdapter> m_Adapter{};
+    };
+}

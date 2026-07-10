@@ -3,8 +3,35 @@ id: ARCH-009
 theme: F
 depends_on:
   - ARCH-008
+maturity_target: CPUContracted
+completed: 2026-07-08
 ---
 # ARCH-009 — Kernel JobService: snapshot-in/result-out background jobs
+
+## Status
+
+- Retired on 2026-07-08 at `CPUContracted`.
+- PR: pending. Commit: pending local change.
+- The code landed as `Extrinsic.Runtime.JobService` plus the small
+  `Extrinsic.Runtime.WorldHandle` token module. `Engine` now exposes
+  `Engine::Jobs()`, drains JobService completions before event pump B, and
+  reaps terminal job records in Maintenance.
+- The landed API keeps the iron rule from ADR-0024 D8: worker functions
+  receive only `JobCancellation` and return a `JobResultEnvelope`; they do
+  not receive the kernel event bus, ECS scenes, component references, or live
+  world references. Only the service publishes completion events after token
+  and world-scope checks at the main-thread gate.
+- `GpuQueue` is reserved in the public target enum and intentionally rejected
+  in this slice. GPU-job execution remains deferred to `RUNTIME-137`.
+- Verified locally with the `ci` preset, which enables
+  `INTRINSIC_ENABLE_SANITIZERS=ON`: configure passed, the focused
+  `IntrinsicRuntimeContractTests` target built, all seven
+  `RuntimeJobService.*` contract tests passed directly and through CTest,
+  `IntrinsicTests` built, and the full default CPU-supported CTest gate
+  passed 3623/3623.
+- `Operational` use of the JobService remains owned by `ARCH-012`, which
+  composes command -> job -> event -> commit through a real
+  `ClusteringModule` flow.
 
 ## Goal
 - Give the runtime kernel a `JobService` for multi-frame background work on
@@ -48,15 +75,6 @@ depends_on:
   `ARCH-010` wires world-teardown cancellation onto this.
 - Depends on `ARCH-008` for the worker→main-thread completion channel.
 
-## Status
-- **Retired 2026-07-09 at `CPUContracted`.** Commit/PR: pending local change
-  set on branch `codex/arch-009-jobservice`.
-- Focused `RuntimeJobService|RuntimeKernelEvents` contract tests and the full
-  default CPU-supported gate pass locally under the sanitizer-enabled `ci`
-  preset. The default gate passed with 3621/3621 tests passing.
-- `Operational` is owned by `ARCH-012`; `GpuQueue` integration is deferred to
-  `RUNTIME-137`.
-
 ## Required changes
 - [x] New `Extrinsic.Runtime.JobService` module (interface `.cppm` +
       implementation `.cpp`): `JobDesc { DebugName, Target, Scope(WorldHandle),
@@ -77,7 +95,7 @@ depends_on:
 - [x] Diagnostics: in-flight/completed/cancelled counters.
 
 ## Tests
-- [x] Unit/contract tests (headless, `contract;runtime` labels): submit → work
+- [x] Contract tests (headless, `contract;runtime` labels): submit → work
       runs on a pool thread → gate publishes → completion event delivered
       at pump B → commit handler runs on the main thread.
 - [x] Cancellation test: cancel before start (work never runs) and cancel
@@ -103,6 +121,9 @@ depends_on:
 ## Verification
 ```bash
 cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='RuntimeJobService.*'
+ctest --test-dir build/ci --output-on-failure -R 'RuntimeJobService' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/repo/check_layering.py --root src --strict
@@ -118,4 +139,5 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Creating a second worker pool.
 
 ## Maturity
-- Target: `CPUContracted`. `Operational` owned by `ARCH-012`.
+- Target achieved: `CPUContracted`. `Operational` remains owned by
+  `ARCH-012`; GPU execution remains deferred to `RUNTIME-137`.

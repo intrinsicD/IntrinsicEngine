@@ -74,8 +74,10 @@ import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.TextureUpload;
 import Extrinsic.RHI.Types;
+import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.ProgressivePresentationExtraction;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -3147,7 +3149,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedOffOriginObjTriangleAutoFramesAtC
         "f 1/1 2/2 3/3\n",
     };
 
-    auto imported = engine.ImportAssetFromPath(
+    auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(
         Extrinsic::Runtime::RuntimeAssetImportRequest{
             .Path = obj.Path.string(),
             .PayloadKind = Assets::AssetPayloadKind::Mesh,
@@ -3328,7 +3330,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedObjWithoutAuthoredUvsSamplesGener
         "f 1 2 3\n",
     };
 
-    auto imported = engine.ImportAssetFromPath(
+    auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(
         Extrinsic::Runtime::RuntimeAssetImportRequest{
             .Path = obj.Path.string(),
             .PayloadKind = Assets::AssetPayloadKind::Mesh,

@@ -36,6 +36,7 @@ import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Platform.Input;
+import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetMeshNormals;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
@@ -626,7 +627,7 @@ namespace Extrinsic::Runtime
                     RuntimeImportEntityAuthoringPolicyDesc desc)
                 {
                     const RuntimeImportEntityAuthoringPolicyHandle handle =
-                        engine.RegisterImportEntityAuthoringPolicy(
+                        engine.GetAssetImportPipeline().RegisterImportEntityAuthoringPolicy(
                             std::move(desc));
                     if (handle.IsValid())
                         registration.ImportEntityAuthoringPolicies.push_back(
@@ -739,7 +740,7 @@ namespace Extrinsic::Runtime
             RuntimeSandboxDefaultPolicyRegistration& registration)
         {
             const RuntimeImportCompletedHandlerHandle handle =
-                engine.RegisterImportCompletedHandler(
+                engine.GetAssetImportPipeline().RegisterImportCompletedHandler(
                     RuntimeImportCompletedHandlerDesc{
                         .DebugName = "Sandbox.DefaultImportCompletedUx",
                         .PayloadKind = Assets::AssetPayloadKind::Unknown,
@@ -784,7 +785,7 @@ namespace Extrinsic::Runtime
             RuntimeSandboxDefaultPolicyRegistration& registration)
         {
             const RuntimePostImportProcessorHandle handle =
-                engine.RegisterPostImportProcessor(
+                engine.GetAssetImportPipeline().RegisterPostImportProcessor(
                     RuntimePostImportProcessorDesc{
                         .DebugName = "Sandbox.DirectMeshGeneratedNormal",
                         .PayloadKind = Assets::AssetPayloadKind::Mesh,
@@ -898,17 +899,19 @@ namespace Extrinsic::Runtime
         for (const RuntimePostImportProcessorHandle handle :
              registration.PostImportProcessors)
         {
-            engine.UnregisterPostImportProcessor(handle);
+            engine.GetAssetImportPipeline().UnregisterPostImportProcessor(handle);
         }
         for (const RuntimeImportEntityAuthoringPolicyHandle handle :
              registration.ImportEntityAuthoringPolicies)
         {
-            engine.UnregisterImportEntityAuthoringPolicy(handle);
+            engine.GetAssetImportPipeline().UnregisterImportEntityAuthoringPolicy(
+                handle);
         }
         for (const RuntimeImportCompletedHandlerHandle handle :
              registration.ImportCompletedHandlers)
         {
-            engine.UnregisterImportCompletedHandler(handle);
+            engine.GetAssetImportPipeline().UnregisterImportCompletedHandler(
+                handle);
         }
         for (const RuntimeInputActionHandle handle : registration.InputActions)
         {

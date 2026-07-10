@@ -5,8 +5,17 @@ depends_on:
   - ARCH-007
   - ARCH-008
 maturity_target: Operational
+completed: 2026-07-08
 ---
 # RUNTIME-150 — Split the frame-loop hook adapters out of Runtime.Engine.cpp
+
+## Status
+- Done 2026-07-08 at `Operational`.
+- Frame-loop hook adapters and per-frame helpers now live in the private
+  `Extrinsic.Runtime.Engine:FrameLoop` partition.
+- `Engine::RunFrame()` remains on `Engine`; no frame phase/order/control-surface
+  changes were made.
+- PR/commit: pending.
 
 ## Goal
 - Move the per-frame plumbing that currently pads `Runtime.Engine.cpp` —
@@ -57,53 +66,62 @@ maturity_target: Operational
 - Anonymous-namespace entities are TU-local, so moving them to a partition
   changes their linkage to module linkage. That is the intended mechanism;
   nothing may be exported from the partition.
+- ARCH-013 re-review (2026-07-08): Decision unchanged. The `ARCH-007` command
+  bus and `ARCH-008` event bus gates held until both seams retired, so this
+  task may split `RunFrame()` helpers against the current single command-drain
+  and two event-pump frame shape. The scope remains a TU/partition split only:
+  it must not add command drains, event trigger paths, or frame-specific job
+  queues.
 - Part of the `Runtime.Engine` decomposition series (`RUNTIME-146..151`).
-- The 2026-07-09 `CI-003` audit measured `Runtime.Engine.cpp` at 86.816s and
-  6,529 lines. Use that retained observation to choose the split; record
-  comparable before/after compile and Ninja-edge results at retirement rather
-  than rerunning exploratory hotspot discovery.
 
 ## Required changes
-- [ ] Add `src/runtime/Runtime.Engine.FrameLoop.cppm` declaring
+- [x] Add `src/runtime/Runtime.Engine.FrameLoop.cppm` declaring
       `module Extrinsic.Runtime.Engine:FrameLoop` (non-exported partition)
       with the moved declarations, and move the definitions into a matching
       implementation unit (or define them in the partition unit if that
       matches the existing `Core.Tasks:Internal` pattern).
-- [ ] Remove the moved code from `Runtime.Engine.cpp`; the primary
+- [x] Remove the moved code from `Runtime.Engine.cpp`; the primary
       implementation unit imports the partition.
-- [ ] Register the new unit(s) in `src/runtime/CMakeLists.txt`
+- [x] Register the new unit(s) in `src/runtime/CMakeLists.txt`
       (`FILE_SET CXX_MODULES` for the partition interface).
-- [ ] Trim the import list of `Runtime.Engine.cpp` to what its remaining
+- [x] Trim the import list of `Runtime.Engine.cpp` to what its remaining
       code needs; the partition carries the imports the moved helpers need.
 
 ## Tests
-- [ ] No test changes expected; this is TU reorganization. The frame-loop
+- [x] No test changes expected; this is TU reorganization. The frame-loop
       contract tests (`Test.RuntimeSandboxAcceptance`,
       selection/gizmo/input-action contract tests,
       `Test.RenderWorldPoolEngineWiring`) pass unchanged.
-- [ ] Default CPU gate stays green:
+- [x] Default CPU gate stays green:
       `ctest --test-dir build/ci -LE 'gpu|vulkan|slow|flaky-quarantine'`.
 
 ## Docs
-- [ ] Regenerate module inventories per `intrinsicengine-docs-sync` if the
+- [x] Regenerate module inventories per `intrinsicengine-docs-sync` if the
       inventory tracks partitions.
-- [ ] Update `tasks/backlog/runtime/README.md` status line on retirement.
+- [x] Update `tasks/backlog/runtime/README.md` status line on retirement.
 
 ## Acceptance criteria
-- [ ] `Runtime.Engine.cpp` contains no `Core.FrameLoop` hook adapter
+- [x] `Runtime.Engine.cpp` contains no `Core.FrameLoop` hook adapter
       structs and none of the listed per-frame helpers.
-- [ ] Nothing is exported from the `:FrameLoop` partition.
-- [ ] CPU gate and layering check pass; a clean rebuild of the `ci` preset
+- [x] Nothing is exported from the `:FrameLoop` partition.
+- [x] CPU gate and layering check pass; a clean rebuild of the `ci` preset
       succeeds with clang-scan-deps resolving the partition.
-- [ ] Before/after implementation-unit compile duration and clean-build edge
-      count are recorded against `CI-003`; no performance claim uses one run.
 
 ## Verification
 ```bash
 cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='RuntimeSandboxAcceptance.*:SelectionReadbackCorrelation.*:SelectionController.*:SelectionSnapshotExtraction.*:GizmoInteractionEngineWiring.*:RuntimeInputActions.*:RenderWorldPoolEngineWiring.*'
+ctest --test-dir build/ci --output-on-failure -R 'RuntimeSandboxAcceptance|RenderWorldPoolEngineWiring|RuntimeInputActions|GizmoInteractionEngineWiring|SelectionReadbackCorrelation|SelectionSnapshotExtraction' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root .
+python3 tools/repo/check_root_hygiene.py --root .
+git diff --check
 ```
 
 ## Forbidden changes

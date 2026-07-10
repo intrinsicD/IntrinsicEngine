@@ -2,8 +2,28 @@
 id: ARCH-007
 theme: F
 depends_on: []
+maturity_target: CPUContracted
+completed: 2026-07-08
 ---
 # ARCH-007 — Kernel command bus with a single pre-sim drain point
+
+## Status
+
+- Retired on 2026-07-08 at `CPUContracted`.
+- PR: #1010. Commit: `977244dc` merge.
+- The code landed as the
+  `Extrinsic.Runtime.CommandBus` module plus Engine pre-sim drain wiring,
+  headless runtime contract tests, runtime architecture docs, and regenerated
+  module inventory.
+- Local authoring could not run the preset build because that environment's
+  egress policy blocked the vcpkg-tool download. CI later compiled the full
+  PR under `pr-fast` / `ci-linux-clang` / `ci-vulkan`; all nine
+  `RuntimeCommandBus.*` contract tests passed. The only remaining CI failures
+  were pre-existing `main` defects tracked independently as `BUG-063` and
+  `BUG-064`, so ARCH-007's own acceptance evidence is positive.
+- `Operational` use of the command bus remains owned by `ARCH-012`, which
+  composes a real `ClusteringModule` flow through command → job → event →
+  commit.
 
 ## Goal
 - Give the runtime kernel a `CommandBus`: plain-data command payloads with
@@ -33,10 +53,8 @@ depends_on: []
 - Fail-closed rule: enqueueing a command type with no registered handler must
   surface a loud diagnostic at drain time, not silently drop.
 
-## Status
+## Implementation Notes
 
-- **Retired 2026-07-08 at `CPUContracted`.** Commit/PR: pull request #1010
-  (merge commit: `977244d`). `Operational` owned by `ARCH-012`.
 - 2026-07-08: implementation landed on branch
   `claude/research-repo-comparison-vy5x0l` (module, Engine wiring, contract
   tests, docs). Compiler/CTest verification could not run in the authoring
@@ -111,16 +129,10 @@ depends_on: []
 
 ## Acceptance criteria
 - [x] `CommandBus` exists as a kernel module with no domain nouns and no
-      imports above `runtime` substrate needs (imports: `Core.FrameGraph`,
-      `Core.Logging`, `ECS.Scene.Registry`; layering gate green).
+      imports above `runtime` substrate needs.
 - [x] Drain point runs in `Engine::RunFrame()` pre-sim; no other execution
       path exists.
-- [x] All nine `RuntimeCommandBus.*` contract tests passed inside the
-      default CPU gate in three consecutive PR #1010 CI rounds (heads
-      `e732e69`, `5d0c773`, `635915a`). The gate *as a whole* was red in
-      those rounds solely from the pre-existing, diff-independent defects
-      `BUG-063`/`BUG-064` (both also red on `main`); no CommandBus test
-      ever failed.
+- [x] All listed tests pass under the default CPU gate.
 - [x] `Operational` follow-up is owned by `ARCH-012`.
 
 ## Verification
@@ -139,5 +151,5 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Mixing mechanical file moves with this semantic addition.
 
 ## Maturity
-- Target: `CPUContracted` (headless contract tests under the default CPU
-  gate). `Operational` owned by `ARCH-012`.
+- Target achieved: `CPUContracted` (headless contract tests under the default
+  CPU gate). `Operational` remains owned by `ARCH-012`.

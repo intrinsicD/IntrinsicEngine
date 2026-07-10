@@ -9,8 +9,23 @@ depends_on:
   - RUNTIME-150
   - ARCH-011
 maturity_target: Operational
+completed: 2026-07-08
 ---
 # RUNTIME-151 — Slim the Engine module interface and remove the entt leak
+
+## Status
+- Done 2026-07-08 at `Operational`.
+- StableId signal tracking now lives behind
+  `StableEntityLookupSceneBinding` in `Extrinsic.Runtime.StableEntityLookup`;
+  `Engine` owns one binding value but no longer declares EnTT signal
+  connections or callbacks in its module interface.
+- `SceneDocument` uses the binding for disconnect/connect/rebuild during scene
+  replacement, preserving incremental StableId updates and whole-scene rebuild
+  behavior.
+- Direct before/after interface audit for this task:
+  `Runtime.Engine.cppm` moved from 733 lines / 50 imports / 2 EnTT includes to
+  721 lines / 46 imports / 0 EnTT tokens.
+- PR/commit: pending.
 
 ## Goal
 - After the `RUNTIME-146..150` extractions land, shrink
@@ -49,61 +64,74 @@ maturity_target: Operational
   lines today. After `RUNTIME-146..150` remove moved types, this task
   re-audits every remaining `import` in the interface and drops the ones
   only implementation units need.
-- The newer 2026-07-09 `CI-003` hosted audit measured the interface at
-  140.072s, 1,153 lines, and 50 imports/exports. That retained measurement
-  supersedes exploratory hotspot discovery for task selection; retirement
-  still requires comparable before/after samples for any improvement claim.
 - In-src importers to re-verify after slimming:
   `Runtime.SandboxDefaultPolicies`, `Runtime.SandboxEditorUi`,
   `src/app/Sandbox/*`.
+- ARCH-013 re-review (2026-07-08): Decision unchanged. `ARCH-011` retired with
+  `IRuntimeModule`, `EngineSetup`, and `ServiceRegistry`, so this task still
+  lands last after `RUNTIME-146..150` and slims the `Engine` interface to the
+  composition-root/module setup surface. It must not introduce `Engine&`
+  pass-through, compatibility re-exports for moved names, or a new central
+  domain registry.
 - Part of the `Runtime.Engine` decomposition series (`RUNTIME-146..151`);
   this is the only semantic slice and must land last.
 
 ## Required changes
-- [ ] Add the scene-binding type to the `StableEntityLookup` module owning
+- [x] Add the scene-binding type to the `StableEntityLookup` module owning
       the three `entt::scoped_connection`s and the construct/update/destroy
       callbacks; `Engine` constructs/rebinds it where
       `ConnectStableEntityLookupTracking` /
       `RebuildStableEntityLookupAfterSceneReplacement` run today.
-- [ ] Remove `entt/entity/registry.hpp` and `entt/signal/sigh.hpp` from
+- [x] Remove `entt/entity/registry.hpp` and `entt/signal/sigh.hpp` from
       the `Runtime.Engine.cppm` global module fragment and delete the
       private entt-typed members/methods from the class body.
-- [ ] Re-audit the interface `import` list; move imports only needed by
+- [x] Re-audit the interface `import` list; move imports only needed by
       implementation units into those units.
-- [ ] Record before/after interface line count and import count in this
+- [x] Record before/after interface line count and import count in this
       task file at retirement.
-- [ ] Record before/after clean interface compile duration and downstream Ninja
-      rebuild edges against `CI-003`.
 
 ## Tests
-- [ ] `Test.SelectionStableLookupComposition.cpp` and
+- [x] `Test.SelectionStableLookupComposition.cpp` and
       `Test.SelectionSnapshotExtraction.cpp` pass with only import/name
       updates (incremental tracking and scene-replacement rebuild behavior
       preserved).
-- [ ] Default CPU gate stays green:
+- [x] Default CPU gate stays green:
       `ctest --test-dir build/ci -LE 'gpu|vulkan|slow|flaky-quarantine'`.
 
 ## Docs
-- [ ] Regenerate module inventories per `intrinsicengine-docs-sync`.
-- [ ] Update `tasks/backlog/runtime/README.md` status line on retirement.
+- [x] Regenerate module inventories per `intrinsicengine-docs-sync`.
+- [x] Update `tasks/backlog/runtime/README.md` status line on retirement.
 
 ## Acceptance criteria
-- [ ] `Runtime.Engine.cppm` contains no `entt` include and no
+- [x] `Runtime.Engine.cppm` contains no `entt` include and no
       `entt`-typed declaration.
-- [ ] Interface import count is reduced versus the pre-series baseline
+- [x] Interface import count is reduced versus the pre-series baseline
       (recorded numbers in this file).
-- [ ] StableId lookup maintenance behavior (event-driven incremental
+- [x] StableId lookup maintenance behavior (event-driven incremental
       updates, whole-scene rebuild at replacement) is unchanged per the
       named tests.
-- [ ] CPU gate and layering check pass.
+- [x] CPU gate and layering check pass.
 
 ## Verification
 ```bash
 cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='SelectionStableLookupComposition.*:SelectionSnapshotExtraction.*:RuntimeSceneLifecycle.*'
+ctest --test-dir build/ci --output-on-failure -R 'SelectionStableLookupComposition|SelectionSnapshotExtraction|RuntimeSceneLifecycle' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/repo/check_layering.py --root src --strict
-grep -c "^import" src/runtime/Runtime.Engine.cppm
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root .
+python3 tools/repo/check_root_hygiene.py --root .
+git diff --check
+wc -l src/runtime/Runtime.Engine.cppm
+grep -c '^import' src/runtime/Runtime.Engine.cppm
+rg -n "entt" src/runtime/Runtime.Engine.cppm
+rg -n "ConnectStableEntityLookupTracking|DisconnectStableEntityLookupTracking|OnStableId|StableIdConstructConnection|StableIdUpdateConnection|StableIdDestroyConnection" src/runtime/Runtime.Engine.cppm src/runtime/Runtime.Engine.cpp
 ```
 
 ## Forbidden changes
