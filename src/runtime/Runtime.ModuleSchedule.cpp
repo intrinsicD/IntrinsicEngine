@@ -211,8 +211,22 @@ namespace Extrinsic::Runtime
             context.Graph.AddPass(
                 passName,
                 record.Desc.Options,
-                [setup = record.Desc.Setup](Core::FrameGraphBuilder& builder)
+                [setup = record.Desc.Setup,
+                 signalLabels = record.Desc.SignalLabels,
+                 waitForSignals = record.Desc.WaitForSignals](
+                    Core::FrameGraphBuilder& builder)
                 {
+                    // BUG-072: translate the declarative wait/signal labels into
+                    // real per-tick FrameGraph edges. Without this the labels
+                    // affected only FinalizeForBoot's boot-time insertion order,
+                    // and per-tick ordering silently relied on that insertion
+                    // order surviving execution (which only holds while passes
+                    // are MainThreadOnly / non-parallel). Declaring them here
+                    // means order is expressed once, in signal space.
+                    for (const Core::Hash::StringID label : signalLabels)
+                        builder.Signal(label);
+                    for (const Core::Hash::StringID label : waitForSignals)
+                        builder.WaitFor(label);
                     if (setup)
                         setup(builder);
                 },

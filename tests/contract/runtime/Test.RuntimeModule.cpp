@@ -161,11 +161,11 @@ namespace
             if (auto registered = setup.RegisterSimSystem(
                     Runtime::SimSystemDesc{
                         .Name = "Producer",
+                        // BUG-072: order via the declarative SignalLabels field
+                        // alone — RegisterSimSystemsForTick now derives the
+                        // per-tick Signal edge from it, so no manual b.Signal is
+                        // needed in Setup.
                         .SignalLabels = {producerSignal},
-                        .Setup = [producerSignal](Core::FrameGraphBuilder& b)
-                        {
-                            b.Signal(producerSignal);
-                        },
                         .Execute = [this](Runtime::SimSystemContext&)
                         {
                             m_State.ProducerRuns += 1u;
@@ -260,11 +260,9 @@ namespace
             if (auto registered = setup.RegisterSimSystem(
                     Runtime::SimSystemDesc{
                         .Name = "Consumer",
+                        // BUG-072: wait via the declarative WaitForSignals field
+                        // alone; the per-tick WaitFor edge is now derived from it.
                         .WaitForSignals = {producerSignal},
-                        .Setup = [producerSignal](Core::FrameGraphBuilder& b)
-                        {
-                            b.WaitFor(producerSignal);
-                        },
                         .Execute = [this](Runtime::SimSystemContext&)
                         {
                             m_State.ConsumerRuns += 1u;
