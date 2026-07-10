@@ -1,6 +1,7 @@
 module;
 
 #include <cstdint>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -9,6 +10,7 @@ export module Extrinsic.Runtime.ModuleSchedule;
 
 import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameGraph;
+import Extrinsic.Core.Hash;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.JobService;
@@ -57,7 +59,14 @@ namespace Extrinsic::Runtime
         void RegisterFrameHook(std::string moduleName,
                                FramePhase phase,
                                RuntimeFrameHook hook);
-        [[nodiscard]] Core::Result FinalizeForBoot();
+        // `externalSignals` are signal labels provided by producers registered
+        // outside this schedule (e.g. the promoted baseline ECS bundle, which is
+        // appended to the fixed-step FrameGraph directly). A sim-system waiting
+        // on one of these is satisfied without an intra-schedule ordering edge —
+        // the external producer is ordered ahead per-tick — instead of failing
+        // closed as an unprovided signal.
+        [[nodiscard]] Core::Result FinalizeForBoot(
+            std::span<const Core::Hash::StringID> externalSignals);
         void RegisterSimSystemsForTick(
             RuntimeModuleSimSystemScheduleContext context) const;
         void RunFrameHooks(

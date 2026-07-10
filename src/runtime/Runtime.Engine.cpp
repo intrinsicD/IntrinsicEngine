@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -34,6 +35,7 @@ import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameClock;
 import Extrinsic.Core.FrameGraph;
+import Extrinsic.Core.Hash;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.Core.Logging;
 import Extrinsic.Core.IOBackend;
@@ -330,8 +332,15 @@ namespace Extrinsic::Runtime
         // register phase left resolve-registered systems appended after the
         // sort — unordered and skipping the duplicate/cycle/unprovided-signal
         // validation in FinalizeForBoot.
+        //
+        // Seed the promoted baseline ECS bundle's signals as externally
+        // provided so a module may wait on e.g. "TransformUpdate" without boot
+        // failing — the bundle is appended to the fixed-step FrameGraph ahead of
+        // module systems (BUG-069), so the per-tick WaitFor edge resolves.
+        const std::array<Core::Hash::StringID, 3> baselineSignals =
+            PromotedEcsSystemBundleSignalLabels();
         if (Core::Result finalizeResult =
-                m_RuntimeModuleSchedule.FinalizeForBoot();
+                m_RuntimeModuleSchedule.FinalizeForBoot(baselineSignals);
             !finalizeResult.has_value())
         {
             Core::Log::Error(

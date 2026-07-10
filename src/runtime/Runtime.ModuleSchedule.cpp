@@ -4,6 +4,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -19,7 +20,7 @@ namespace Extrinsic::Runtime
     namespace
     {
         [[nodiscard]] bool HasLabel(
-            const std::vector<Core::Hash::StringID>& labels,
+            std::span<const Core::Hash::StringID> labels,
             const Core::Hash::StringID needle) noexcept
         {
             return std::find(labels.begin(), labels.end(), needle) != labels.end();
@@ -79,7 +80,8 @@ namespace Extrinsic::Runtime
         });
     }
 
-    Core::Result RuntimeModuleSchedule::FinalizeForBoot()
+    Core::Result RuntimeModuleSchedule::FinalizeForBoot(
+        std::span<const Core::Hash::StringID> externalSignals)
     {
         std::sort(m_SimSystems.begin(),
                   m_SimSystems.end(),
@@ -133,6 +135,14 @@ namespace Extrinsic::Runtime
 
                 if (!matched)
                 {
+                    // Satisfied by a producer registered outside this schedule
+                    // (e.g. the baseline ECS bundle's "TransformUpdate"). No
+                    // intra-schedule edge is needed — the external producer is
+                    // ordered ahead per-tick and the per-tick FrameGraph WaitFor
+                    // edge (BUG-072) enforces it.
+                    if (HasLabel(externalSignals, waitLabel))
+                        continue;
+
                     Core::Log::Error(
                         "[RuntimeModule] Sim system '{}.{}' waits for unprovided signal {}.",
                         m_SimSystems[waiter].ModuleName,

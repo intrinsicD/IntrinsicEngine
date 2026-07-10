@@ -536,7 +536,7 @@ TEST(RuntimeModuleSchedule, DuplicateSimSystemIdentityFailsClosed)
     schedule.RegisterSimSystem("Module", Runtime::SimSystemDesc{.Name = "dup"});
     schedule.RegisterSimSystem("Module", Runtime::SimSystemDesc{.Name = "dup"});
 
-    const Core::Result result = schedule.FinalizeForBoot();
+    const Core::Result result = schedule.FinalizeForBoot({});
     ASSERT_FALSE(result.has_value());
     EXPECT_EQ(result.error(), Core::ErrorCode::InvalidArgument);
 }
@@ -547,7 +547,7 @@ TEST(RuntimeModuleSchedule, DistinctIdentitiesUnderOneModuleFinalizeOk)
     schedule.RegisterSimSystem("Module", Runtime::SimSystemDesc{.Name = "a"});
     schedule.RegisterSimSystem("Module", Runtime::SimSystemDesc{.Name = "b"});
 
-    EXPECT_TRUE(schedule.FinalizeForBoot().has_value());
+    EXPECT_TRUE(schedule.FinalizeForBoot({}).has_value());
 }
 
 TEST(RuntimeModuleSchedule, CyclicSimSystemSignalsFailClosed)
@@ -565,7 +565,7 @@ TEST(RuntimeModuleSchedule, CyclicSimSystemSignalsFailClosed)
         Runtime::SimSystemDesc{
             .Name = "b", .WaitForSignals = {signalA}, .SignalLabels = {signalB}});
 
-    const Core::Result result = schedule.FinalizeForBoot();
+    const Core::Result result = schedule.FinalizeForBoot({});
     ASSERT_FALSE(result.has_value());
     EXPECT_EQ(result.error(), Core::ErrorCode::InvalidState);
 }
@@ -579,7 +579,7 @@ TEST(RuntimeModuleSchedule, UnprovidedWaitSignalFailsClosed)
         "Module",
         Runtime::SimSystemDesc{.Name = "waiter", .WaitForSignals = {missing}});
 
-    const Core::Result result = schedule.FinalizeForBoot();
+    const Core::Result result = schedule.FinalizeForBoot({});
     ASSERT_FALSE(result.has_value());
     EXPECT_EQ(result.error(), Core::ErrorCode::InvalidState);
 }
@@ -596,5 +596,28 @@ TEST(RuntimeModuleSchedule, SignalOrderedScheduleFinalizesOk)
         "Module",
         Runtime::SimSystemDesc{.Name = "consumer", .WaitForSignals = {ready}});
 
-    EXPECT_TRUE(schedule.FinalizeForBoot().has_value());
+    EXPECT_TRUE(schedule.FinalizeForBoot({}).has_value());
+}
+
+TEST(RuntimeModuleSchedule, WaitOnExternalBaselineSignalIsSatisfied)
+{
+    // BUG-069/BUG-072: a module may wait on a signal emitted by the baseline ECS
+    // bundle (registered outside the schedule) when that label is seeded as
+    // externally provided; boot fails closed only when it is not seeded.
+    const Core::Hash::StringID baseline{"TransformUpdate"};
+
+    Runtime::RuntimeModuleSchedule seeded;
+    seeded.RegisterSimSystem(
+        "Module",
+        Runtime::SimSystemDesc{.Name = "consumer", .WaitForSignals = {baseline}});
+    const std::array<Core::Hash::StringID, 1> external{baseline};
+    EXPECT_TRUE(seeded.FinalizeForBoot(external).has_value());
+
+    Runtime::RuntimeModuleSchedule bare;
+    bare.RegisterSimSystem(
+        "Module",
+        Runtime::SimSystemDesc{.Name = "consumer", .WaitForSignals = {baseline}});
+    const Core::Result result = bare.FinalizeForBoot({});
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidState);
 }
