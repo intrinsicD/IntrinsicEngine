@@ -400,6 +400,42 @@ namespace
         void OnShutdown(Runtime::RuntimeModuleShutdownContext&) override {}
     };
 
+    class DuplicateSimSystemModule final : public Runtime::IRuntimeModule
+    {
+    public:
+        [[nodiscard]] std::string_view Name() const noexcept override
+        {
+            return "DuplicateSimSystem";
+        }
+
+        [[nodiscard]] Core::Result OnRegister(
+            Runtime::EngineSetup& setup) override
+        {
+            if (Core::Result first = setup.RegisterSimSystem(
+                    Runtime::SimSystemDesc{
+                        .Name = "Duplicate",
+                        .Execute = [](Runtime::SimSystemContext&) {},
+                    });
+                !first.has_value())
+            {
+                return first;
+            }
+            return setup.RegisterSimSystem(
+                Runtime::SimSystemDesc{
+                    .Name = "Duplicate",
+                    .Execute = [](Runtime::SimSystemContext&) {},
+                });
+        }
+
+        [[nodiscard]] Core::Result OnResolve(
+            Runtime::EngineSetup&) override
+        {
+            return Core::Ok();
+        }
+
+        void OnShutdown(Runtime::RuntimeModuleShutdownContext&) override {}
+    };
+
     class ModuleHarnessApplication final : public Runtime::IApplication
     {
     public:
@@ -546,6 +582,19 @@ TEST(RuntimeModule, MissingRequiredServiceTerminatesEngineBoot)
     Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(app));
     engine.AddModule(std::make_unique<MissingRequireModule>());
 
+    EXPECT_DEATH(engine.Initialize(), "");
+}
+
+TEST(RuntimeModule, DuplicateSimSystemIdentityTerminatesEngineBootBeforeRun)
+{
+    ModuleHarnessState state{};
+    auto app = std::make_unique<ModuleHarnessApplication>(state);
+    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(app));
+    engine.AddModule(std::make_unique<DuplicateSimSystemModule>());
+
+    // FinalizeForBoot exposes InvalidArgument to direct callers. Engine boot
+    // intentionally translates any invalid finalized schedule into its global
+    // fail-closed initialization policy, so no fixed-step pass can execute.
     EXPECT_DEATH(engine.Initialize(), "");
 }
 

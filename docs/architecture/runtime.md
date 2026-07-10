@@ -48,8 +48,13 @@ Runtime modules compose through `Engine::AddModule(...)` before
 kernel command, event, job, world, service, sim-system, and frame-hook seams; it
 does not expose `Engine&`. Module sim systems join the fixed-step `FrameGraph`
 with declared wait/signal labels so registration order does not decide pass
-order. Module shutdown runs after `RuntimeShutdownAnnounced` has been published
-and pumped.
+order. Before any per-tick passes can be appended, schedule finalization rejects
+duplicate `(module, system)` identities with `InvalidArgument` and rejects
+cyclic or unprovided signal dependencies with `InvalidState`. The schedule seam
+returns these errors for direct contract testing; `Engine::Initialize()` logs
+the error and terminates boot under the engine's fail-closed initialization
+policy, so an invalid schedule cannot execute even once (BUG-070). Module
+shutdown runs after `RuntimeShutdownAnnounced` has been published and pumped.
 
 `Extrinsic.Runtime.ClusteringModule` is the first extracted domain module on
 this contract. Sandbox composes it from app startup, not from the kernel engine:

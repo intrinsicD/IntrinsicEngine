@@ -31,9 +31,6 @@ regressed hardening that main had shipped as the closed `BUG-066`.
 - [`BUG-068` — AssetModelSceneHandoff not rebound on active-world change](BUG-068-asset-scene-handoff-not-rebound-on-active-world-change.md):
   the extracted world-maintenance path drops main's scene-borrower rebind → a
   dangling `Scene&` and use-after-free on world switch/teardown. HIGH.
-- [`BUG-070` — RuntimeModule schedule dropped BUG-066 fail-closed guards](BUG-070-runtime-module-schedule-failclosed-guards-regressed.md):
-  duplicate pass identities no longer rejected (both execute), cycle/unprovided
-  signal now `std::terminate()` instead of a recoverable error; tests deleted. MEDIUM.
 - [`BUG-071` — Sim-systems registered during OnResolve bypass FinalizeForBoot](BUG-071-onresolve-sim-systems-bypass-finalizeforboot.md):
   late-registered systems escape ordering and signal/cycle/duplicate validation. MEDIUM.
 - [`BUG-073` — Object-space normal bake may be sampled before its GPU write completes](BUG-073-object-space-normal-bake-read-before-gpu-write.md):
@@ -49,6 +46,12 @@ regressed hardening that main had shipped as the closed `BUG-066`.
 ---
 
 ## Verified / Closed
+
+- Closed 2026-07-10: [`BUG-070` — RuntimeModule schedule dropped BUG-066 fail-closed guards](../../done/BUG-070-runtime-module-schedule-failclosed-guards-regressed.md).
+  Schedule finalization again returns deterministic errors for duplicate
+  identities, cycles, and unprovided signals. Direct contracts pin each error,
+  and a real-engine death test proves invalid duplicates terminate boot before
+  any fixed-step pass can execute.
 
 - Closed 2026-07-10: [`BUG-072` — Declarative sim-system signal fields create no per-tick FrameGraph edge](../../done/BUG-072-declarative-sim-signal-fields-no-per-tick-edge.md).
   `WaitForSignals` and `SignalLabels` now materialize as named edges in every

@@ -18,6 +18,11 @@ maturity_target: CPUContracted
   (typed `StringID` signals; `PassName` is identity/diagnostics, not routing),
   and row 6 was N/A. No findings or follow-up tasks.
 - `Operational` remains owned by `ARCH-012`.
+- Regression audit 2026-07-10: recovery merge `76528e6` dropped the duplicate,
+  cycle, and unprovided-signal guards delivered here. [`BUG-070`](BUG-070-runtime-module-schedule-failclosed-guards-regressed.md)
+  restored the recoverable schedule errors, added real engine-boot death
+  coverage for the retained fail-closed initialization policy, and records the
+  regression explicitly.
 
 ## Goal
 - Restore the ARCH-011 contract so module-registered simulation systems have a

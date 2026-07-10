@@ -8,6 +8,16 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-070`](BUG-070-runtime-module-schedule-failclosed-guards-regressed.md) —
+runtime-module fail-closed schedule regression retired on 2026-07-10 at
+`CPUContracted`. Commit `7e77e47f` restored recoverable `InvalidArgument` for
+duplicate `(module, system)` identities and `InvalidState` for cycles or
+unprovided waits before any per-tick pass is appended. Direct contracts pin all
+three cases; a real `Engine::Initialize()` death test proves the retained global
+boot policy terminates an invalid duplicate schedule before execution. The
+runtime architecture and `BUG-066` record now state the restored contract.
+Focused runtime-module, default CPU, and strict structural gates pass.
+
 [`BUG-072`](BUG-072-declarative-sim-signal-fields-no-per-tick-edge.md) —
 declarative runtime-module signal regression retired on 2026-07-10 at
 `CPUContracted`. Commit `f45371c6` translates every `WaitForSignals` and
