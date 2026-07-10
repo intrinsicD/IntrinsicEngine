@@ -10,6 +10,48 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   sandbox frame-pacing capture needs a display (GLFW: DISPLAY missing →
   zero frames → "no samples"); needs xvfb or a documented environment skip.
 
+### From the review of merge `76528e6` ("Merge recovered runtime service extractions")
+
+The recovery merge adopted the extraction branch's parallel runtime-kernel
+implementation wholesale over main's, and mechanically it is clean (layering,
+task-policy, doc-links, docs-sync, test-layout all green). But static review
+plus focused subsystem review surfaced the following. `BUG-067`/`BUG-068` are
+memory/correctness-unsafe; the module-schedule set (`BUG-069`..`BUG-072`)
+regressed hardening that main had shipped as the closed `BUG-066`.
+
+- [`BUG-067` — JobService completion state lost-update race](BUG-067-jobservice-completion-state-lost-update-race.md):
+  a worker stores `AwaitingGate` outside the lock after enqueue, so a same-tick
+  drain's terminal state is clobbered → job stuck non-terminal (record leak,
+  phantom stats, poller hang). HIGH.
+- [`BUG-068` — AssetModelSceneHandoff not rebound on active-world change](BUG-068-asset-scene-handoff-not-rebound-on-active-world-change.md):
+  the extracted world-maintenance path drops main's scene-borrower rebind → a
+  dangling `Scene&` and use-after-free on world switch/teardown. HIGH.
+- [`BUG-069` — RuntimeModule sim-systems scheduled before the baseline ECS bundle](BUG-069-runtime-module-systems-scheduled-before-ecs-bundle.md):
+  bundle/module order reversed from main; a module reading `WorldMatrix` or
+  waiting on `TransformUpdate` reads stale data or fails to compile. HIGH (latent).
+- [`BUG-070` — RuntimeModule schedule dropped BUG-066 fail-closed guards](BUG-070-runtime-module-schedule-failclosed-guards-regressed.md):
+  duplicate pass identities no longer rejected (both execute), cycle/unprovided
+  signal now `std::terminate()` instead of a recoverable error; tests deleted. MEDIUM.
+- [`BUG-071` — Sim-systems registered during OnResolve bypass FinalizeForBoot](BUG-071-onresolve-sim-systems-bypass-finalizeforboot.md):
+  late-registered systems escape ordering and signal/cycle/duplicate validation. MEDIUM.
+- [`BUG-072` — Declarative sim-system signal fields create no per-tick FrameGraph edge](BUG-072-declarative-sim-signal-fields-no-per-tick-edge.md):
+  `WaitForSignals`/`SignalLabels` affect only boot-time insertion order; the
+  durable fix for `BUG-069`. MEDIUM.
+- [`BUG-073` — Object-space normal bake may be sampled before its GPU write completes](BUG-073-object-space-normal-bake-read-before-gpu-write.md):
+  `ReadyFrame` gates on a bare CPU frame counter with no fence; read-before-write
+  when frames-in-flight > 1. MEDIUM (suspected).
+- [`BUG-074` — Orphaned GpuAssetCache slot causes per-entity bake retry livelock](BUG-074-object-space-normal-bake-orphaned-cache-slot-livelock.md):
+  a failed bake submission leaks its pending cache slot → infinite retry. LOW (suspected).
+- [`BUG-075` — A world can be made active while its destroy is pending](BUG-075-worldregistry-activate-while-destroy-pending.md):
+  `RequestSetActiveWorld` checks only `Contains` → active-and-destroy-announced
+  state. LOW (suspected).
+- [`BUG-076` — AsyncWorkService::ShutdownAndDrain does not drain the derived job registry](BUG-076-asyncworkservice-shutdown-skips-derived-job-registry.md):
+  shutdown drains only the executor; registry quiesce is implicit. LOW.
+- [`BUG-077` — Architecture backlog index links retired ARCH tasks (strict gate red)](BUG-077-architecture-backlog-index-links-retired-arch-tasks.md):
+  the merge retired ARCH-007..013 (all seven kernel seam tasks) but left them
+  linked as active → `check_task_state_links --strict` red, 7 findings (was green
+  pre-merge). LOW (mechanical).
+
 
 ---
 
