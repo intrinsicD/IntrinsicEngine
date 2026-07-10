@@ -28,7 +28,8 @@ Opened from the 2026-07-03 main-loop/task-graph/render-graph review
   behind a generic section mechanism).
 - [`ARCH-006`](ARCH-006-sandbox-editor-content-out-of-runtime.md) — move
   Sandbox application editor content from `runtime` to `app` (sliced
-  migration; planning slice first).
+  migration; planning slice first) and own the top `.cppm` compile-hotspot
+  candidates for `Runtime.SandboxEditorUi.cppm` / `Sandbox.cppm`.
 
 Opened from the 2026-07-08 kernel/module architecture decision record
 ([`docs/adr/0024-kernel-module-architecture.md`](../../../docs/adr/0024-kernel-module-architecture.md));

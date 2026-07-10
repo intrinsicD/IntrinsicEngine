@@ -76,3 +76,25 @@ observations:
     promoted_to: "logic/solution/architecture.md:A05"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O08
+    timestamp: "2026-07-10T10:59"
+    provenance: ai-suggested
+    content: "Recommended module posture: keep C++23 modules for stable architectural seams and layering evidence, but stop treating `.cppm` as a default header replacement; slim exported interfaces, move non-trivial bodies/import-heavy implementation to `.cpp`, and consider ordinary private headers or non-module `.cpp` for volatile leaf code."
+    context: "AI inspected IntrinsicEngine core policy, CI-007, module counts, most-imported modules, and existing compile-hotspot backlog entries before answering the user's module-strategy question."
+    potential_type: architecture
+    bound_to: [N183]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O09
+    timestamp: "2026-07-10T10:59"
+    provenance: ai-suggested
+    content: "Header-conversion priority should distinguish high-fanout API modules from low-fanout private seams: Runtime.SandboxEditorUi and Runtime.RenderExtraction are compile hotspots but should retain tiny public module facades, while Engine.FrameLoop, Sandbox, runtime services, and editor/GPU job queues are stronger candidates for private headers or source-local implementation seams."
+    context: "AI computed module compile-time, fanout, size, import-count, and volatility metrics to answer the user's request for the ten best `.cppm` files to become headers."
+    potential_type: heuristic
+    bound_to: [N183, N184]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false

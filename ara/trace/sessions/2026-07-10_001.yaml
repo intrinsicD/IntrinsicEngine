@@ -1,0 +1,107 @@
+session:
+  id: "2026-07-10_001"
+  date: "2026-07-10"
+  started: "2026-07-10T10:59"
+  last_turn: "2026-07-10T10:59"
+  turn_count: 4
+  summary: "Opened a module-strategy reassessment, ranked `.cppm` header-conversion candidates, and seeded ARCH-006/RUNTIME-167..174 module-surface diet task records."
+
+events_logged:
+  - turn: 1
+    type: question
+    id: "N183"
+    routing: direct
+    provenance: user
+    summary: "Asked whether pervasive C++23 module use was the right direction given painful compile times."
+  - turn: 1
+    type: observation
+    id: "O08"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Recommended modules as stable architectural seams, not default header replacements."
+  - turn: 2
+    type: experiment
+    id: "N184"
+    routing: direct
+    provenance: ai-executed
+    summary: "Computed candidate metrics from Ninja logs, module fanout, interface size/imports, and 30-day volatility."
+  - turn: 2
+    type: observation
+    id: "O09"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Recommended low-fanout private seams before high-fanout API modules for header conversion."
+  - turn: 3
+    type: decision
+    id: "N185"
+    routing: direct
+    provenance: ai-executed
+    summary: "Updated ARCH-006 and opened RUNTIME-167 through RUNTIME-174 as module-surface diet tasks."
+  - turn: 4
+    type: decision
+    id: "N186"
+    routing: direct
+    provenance: user
+    summary: "Requested committing all current module-surface task seed changes."
+
+ai_actions:
+  - turn: 1
+    action: "Read core skill, CI-007 task, module distribution, most-imported modules, and compile-hotspot backlog references."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/staging/observations.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/sessions/2026-07-10_001.yaml"
+  - turn: 2
+    action: "Parsed local Ninja logs, module imports, file sizes, and git volatility to rank `.cppm` header-conversion candidates."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/staging/observations.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/sessions/2026-07-10_001.yaml"
+  - turn: 3
+    action: "Created backlog tasks for module-surface privatization, updated task indexes, regenerated session brief, and ran strict task validators."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/backlog/architecture/ARCH-006-sandbox-editor-content-out-of-runtime.md"
+      - "tasks/backlog/runtime/RUNTIME-167-privatize-engine-frameloop-surface.md"
+      - "tasks/backlog/runtime/RUNTIME-168-privatize-sandbox-default-policies-surface.md"
+      - "tasks/backlog/runtime/RUNTIME-169-privatize-render-extraction-service-surface.md"
+      - "tasks/backlog/runtime/RUNTIME-170-privatize-object-space-normal-gpu-queue-surface.md"
+      - "tasks/backlog/runtime/RUNTIME-171-privatize-asset-residency-service-surface.md"
+      - "tasks/backlog/runtime/RUNTIME-172-privatize-scene-document-surface.md"
+      - "tasks/backlog/runtime/RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md"
+      - "tasks/backlog/runtime/RUNTIME-174-privatize-imgui-editor-bridge-surface.md"
+      - "tasks/backlog/runtime/README.md"
+      - "tasks/backlog/architecture/README.md"
+      - "tasks/SESSION-BRIEF.md"
+  - turn: 4
+    action: "Ran pre-commit task/doc validators and prepared all current changes for commit."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/sessions/2026-07-10_001.yaml"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "User asked whether choosing `.cppm` C++ modules mostly everywhere was the right direction because compile time is painful."
+  - turn: 2
+    excerpt: "User asked whether metrics are ready and requested the ten best `.cppm` candidates to become headers."
+  - turn: 3
+    excerpt: "User asked to create tasks for the identified header-conversion candidates."
+  - turn: 4
+    excerpt: "User asked to commit all changes."
+
+open_threads:
+  - "Decide whether to open a scoped module-surface diet task after CI-007 telemetry lands."
+
+ai_suggestions_pending:
+  - "Keep modules for stable layer/package APIs; slim exported `.cppm` files and move volatile/private implementation behind `.cpp` or ordinary private headers where appropriate."

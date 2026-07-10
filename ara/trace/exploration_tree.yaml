@@ -4333,3 +4333,74 @@ tree:
       - "git commit -m 'runtime: extract async work service'"
       - "git status --short --branch"
     status: resolved
+  - id: N183
+    type: question
+    title: "Reassess pervasive C++ module use"
+    provenance: user
+    timestamp: "2026-07-10T10:59"
+    description: >
+      User asked whether starting IntrinsicEngine with `.cppm` C++ modules
+      mostly everywhere was the right direction given painful compile times, and
+      referenced active CI-007 module-safe persistent ccache work.
+    status: open
+    children:
+      - id: N184
+        type: experiment
+        title: "Rank header-conversion module candidates"
+        provenance: ai-executed
+        timestamp: "2026-07-10T10:59"
+        evidence:
+          - "Parsed build/ci/.ninja_log, build/dev/.ninja_log, and build/ci-vulkan/.ninja_log for .cppm object durations."
+          - "Scanned src/tests/methods/benchmarks module imports with relative partition import resolution."
+          - "Counted 30-day .cppm volatility with git log --since='30 days ago'."
+        result: >
+          Identified ten primary candidates for removing or privatizing exported
+          module surfaces: Runtime.SandboxEditorUi, Runtime.Engine:FrameLoop,
+          Sandbox, Runtime.SandboxDefaultPolicies,
+          Runtime.RenderExtractionService,
+          Runtime.ObjectSpaceNormalBakeGpuQueue,
+          Runtime.AssetResidencyService, Runtime.SceneDocument,
+          Runtime.KMeansGpuJobQueue, and Runtime.ImGuiEditorBridge.
+        status: resolved
+      - id: N185
+        type: decision
+        title: "Open module-surface diet tasks"
+        provenance: ai-executed
+        timestamp: "2026-07-10T10:59"
+        choice: >
+          Updated ARCH-006 to own the SandboxEditorUi/Sandbox hot path and
+          opened RUNTIME-167 through RUNTIME-174 for the runtime-owned
+          low-fanout module surfaces identified by the triage.
+        alternatives:
+          - "Open duplicate tasks for SandboxEditorUi and Sandbox.cppm despite ARCH-006 already owning that path."
+          - "Create one umbrella task for all runtime candidates instead of independently reviewable leaves."
+        evidence:
+          - "tasks/backlog/architecture/ARCH-006-sandbox-editor-content-out-of-runtime.md"
+          - "tasks/backlog/runtime/RUNTIME-167-privatize-engine-frameloop-surface.md"
+          - "tasks/backlog/runtime/RUNTIME-168-privatize-sandbox-default-policies-surface.md"
+          - "tasks/backlog/runtime/RUNTIME-169-privatize-render-extraction-service-surface.md"
+          - "tasks/backlog/runtime/RUNTIME-170-privatize-object-space-normal-gpu-queue-surface.md"
+          - "tasks/backlog/runtime/RUNTIME-171-privatize-asset-residency-service-surface.md"
+          - "tasks/backlog/runtime/RUNTIME-172-privatize-scene-document-surface.md"
+          - "tasks/backlog/runtime/RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md"
+          - "tasks/backlog/runtime/RUNTIME-174-privatize-imgui-editor-bridge-surface.md"
+          - "python3 tools/agents/check_task_policy.py --root . --strict"
+          - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+        status: resolved
+      - id: N186
+        type: decision
+        title: "Commit module-surface task seed"
+        provenance: user
+        timestamp: "2026-07-10T10:59"
+        choice: >
+          User requested committing all current changes after the module-surface
+          diet tasks and trace updates were created.
+        alternatives:
+          - "Leave the task seed uncommitted."
+          - "Commit only task files and exclude the local trace updates."
+        evidence:
+          - "python3 tools/agents/check_task_policy.py --root . --strict"
+          - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+          - "python3 tools/docs/check_doc_links.py --root ."
+          - "git diff --check"
+        status: resolved

@@ -55,6 +55,12 @@ depends_on:
   24,807 lines, `Test.SandboxEditorUi.cpp` took 96.017s, and the 54-line
   `Sandbox.cppm` importer took 92.724s. These measurements are retained in
   `CI-003`; do not repeat exploratory benchmarking before slicing this task.
+- The 2026-07-10 local triage ranked the same hot path as the strongest
+  `.cppm` privatization candidate: `Runtime.SandboxEditorUi.cppm` still has
+  one production consumer, roughly 51 imports, and very high churn, while
+  `Sandbox.cppm` remains a one-consumer app module whose compile cost is
+  dominated by importing the editor shell. This task is the owner for those two
+  candidates; do not open a duplicate header-conversion task for them.
 
 ## Required changes
 - [ ] Slice 0 (planning, this file): inventory `Runtime.SandboxEditorUi`
@@ -73,6 +79,11 @@ depends_on:
       `Test.SandboxEditorUi.cpp` coverage along the same panel-family boundaries
       so moves create independently compilable units rather than one equally
       large app-side translation unit.
+- [ ] As part of the shell/content split, reduce
+      `Runtime.SandboxEditorUi.cppm` to a tiny generic editor-shell contract and
+      decide whether `src/app/Sandbox/Sandbox.cppm` should remain a module or
+      become app-private header/source glue; record the decision and metrics in
+      this task before the final slice.
 - [ ] Final slice: `src/runtime/Editor` contains no method/sandbox-specific
       panel code; update module inventories.
 
@@ -97,6 +108,9 @@ depends_on:
 - [ ] Record before/after interface lines/imports, top translation-unit compile
       durations, and clean build edges against the `CI-003` baseline; no
       compile-time claim is made from one run.
+- [ ] The `Runtime.SandboxEditorUi` and `Extrinsic.Sandbox` module surfaces are
+      either measurably slimmed or explicitly retired to private header/source
+      glue without changing app-to-runtime dependency direction.
 
 ## Verification
 ```bash

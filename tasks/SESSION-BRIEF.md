@@ -16,6 +16,7 @@ the authoritative open/unblocked view.
 - blocked by `RUNTIME-129`: `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/backlog/rendering/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
 - unblocked: `RUNTIME-129` — Schedule GPU object-space normal bake jobs after import (tasks/backlog/runtime/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
 - unblocked: `RUNTIME-139` — Static AoS storage and shader operational path (tasks/backlog/runtime/RUNTIME-139-static-aos-storage-shader-operational.md)
+- unblocked: `RUNTIME-170` — Privatize the object-space normal GPU queue surface (tasks/backlog/runtime/RUNTIME-170-privatize-object-space-normal-gpu-queue-surface.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
@@ -31,6 +32,13 @@ the authoritative open/unblocked view.
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
 - unblocked: `RUNTIME-166` — Slim and partition the RenderExtraction module (tasks/backlog/runtime/RUNTIME-166-slim-render-extraction-module.md)
+- unblocked: `RUNTIME-167` — Privatize the Engine frame-loop surface (tasks/backlog/runtime/RUNTIME-167-privatize-engine-frameloop-surface.md)
+- unblocked: `RUNTIME-168` — Privatize the Sandbox default policies surface (tasks/backlog/runtime/RUNTIME-168-privatize-sandbox-default-policies-surface.md)
+- unblocked: `RUNTIME-169` — Privatize the RenderExtractionService surface (tasks/backlog/runtime/RUNTIME-169-privatize-render-extraction-service-surface.md)
+- unblocked: `RUNTIME-171` — Privatize the AssetResidencyService surface (tasks/backlog/runtime/RUNTIME-171-privatize-asset-residency-service-surface.md)
+- unblocked: `RUNTIME-172` — Privatize the SceneDocument surface (tasks/backlog/runtime/RUNTIME-172-privatize-scene-document-surface.md)
+- unblocked: `RUNTIME-173` — Privatize the K-Means GPU job queue surface (tasks/backlog/runtime/RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md)
+- unblocked: `RUNTIME-174` — Privatize the ImGuiEditorBridge surface (tasks/backlog/runtime/RUNTIME-174-privatize-imgui-editor-bridge-surface.md)
 - unblocked: `UI-034` — Decentralized editor window contribution, capture contract, and property-plot widgets (tasks/backlog/ui/UI-034-framework24-editor-interaction-layout-conventions.md)
 
 ## Theme G — Active bugs

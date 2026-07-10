@@ -177,6 +177,35 @@ three largest exported-interface hotspots:
   exported import surface, and split independent implementation domains without
   changing extraction behavior.
 
+### Module-surface diet candidates (seeded 2026-07-10)
+
+Opened from the `.cppm` compile-time triage. These tasks target low-fanout
+module surfaces whose public build-graph value is lower than their interface
+compile cost. They preserve behavior and ownership; they are not feature tasks.
+`ARCH-006` owns the top Sandbox editor/app hot path, and `RUNTIME-166` owns the
+main `Runtime.RenderExtraction` module slimming.
+
+- [`RUNTIME-167`](RUNTIME-167-privatize-engine-frameloop-surface.md) —
+  privatize the `Runtime.Engine:FrameLoop` partition after `RUNTIME-150`.
+- [`RUNTIME-168`](RUNTIME-168-privatize-sandbox-default-policies-surface.md) —
+  privatize the Sandbox default policy module after `RUNTIME-144`.
+- [`RUNTIME-169`](RUNTIME-169-privatize-render-extraction-service-surface.md) —
+  keep `RenderExtractionService` Engine-owned but remove its standalone module
+  surface after `RUNTIME-163`.
+- [`RUNTIME-170`](RUNTIME-170-privatize-object-space-normal-gpu-queue-surface.md) —
+  make the object-space normal bake GPU queue a service-private seam after
+  `RUNTIME-161`; production Vulkan wiring remains `RUNTIME-129`.
+- [`RUNTIME-171`](RUNTIME-171-privatize-asset-residency-service-surface.md) —
+  privatize the Engine-owned asset residency service after `RUNTIME-164`.
+- [`RUNTIME-172`](RUNTIME-172-privatize-scene-document-surface.md) —
+  reduce or retire the exported scene document orchestration surface after
+  `RUNTIME-148`.
+- [`RUNTIME-173`](RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md) —
+  move the K-Means GPU job queue behind the editor/module integration seam after
+  `RUNTIME-137`.
+- [`RUNTIME-174`](RUNTIME-174-privatize-imgui-editor-bridge-surface.md) —
+  privatize the Engine-owned ImGui editor bridge after `RUNTIME-159`.
+
 ### bcg geometry-processing port integration (seeded 2026-06-26)
 
 Core/runtime work paired with the `bcg_code_base` geometry port gaps tracked in
