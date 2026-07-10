@@ -270,15 +270,6 @@ namespace Extrinsic::Runtime
             }
         }
 
-        if (Core::Result finalizeResult =
-                m_RuntimeModuleSchedule.FinalizeForBoot();
-            !finalizeResult.has_value())
-        {
-            Core::Log::Error(
-                "[RuntimeModule] Sim system schedule finalize failed: {}",
-                Core::Error::ToString(finalizeResult.error()));
-            std::terminate();
-        }
     }
 
     void Engine::ResolveRuntimeModulesForBoot()
@@ -332,6 +323,22 @@ namespace Extrinsic::Runtime
             std::terminate();
         }
         m_ServiceRegistry.Lock();
+
+        // BUG-071: finalize the schedule after BOTH the register and resolve
+        // phases. OnResolve can register sim-systems (the resolve EngineSetup
+        // wires the sim-system registrar), so finalizing at the end of the
+        // register phase left resolve-registered systems appended after the
+        // sort — unordered and skipping the duplicate/cycle/unprovided-signal
+        // validation in FinalizeForBoot.
+        if (Core::Result finalizeResult =
+                m_RuntimeModuleSchedule.FinalizeForBoot();
+            !finalizeResult.has_value())
+        {
+            Core::Log::Error(
+                "[RuntimeModule] Sim system schedule finalize failed: {}",
+                Core::Error::ToString(finalizeResult.error()));
+            std::terminate();
+        }
     }
 
     void Engine::RegisterRuntimeModuleSimSystemsForTick(
