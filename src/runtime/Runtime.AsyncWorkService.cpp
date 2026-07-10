@@ -20,9 +20,29 @@ namespace Extrinsic::Runtime
 
     void AsyncWorkService::ShutdownAndDrain()
     {
+        // BUG-076: quiesce the derived registry alongside the executor. The
+        // registry runs its background work on the streaming executor, so shut
+        // the executor down first to finish/join all threaded work, then drain
+        // the registry's completion and readback queues so no derived result is
+        // left in-flight. Draining only the executor left this asymmetric with
+        // the DrainCompletions()/PumpBackground() paths, which prefer the
+        // registry.
+        //
+        // DrainReadbacks can promote a WaitingForReadback job to ReadyForApply
+        // after the executor already ran its final ApplyMainThreadResults(), so
+        // apply once more after draining — otherwise a newly-ready main-thread
+        // result is silently dropped when Reset() destroys the registry. The
+        // executor is already shut down, so no new background work is produced
+        // and a single drain→apply pass reaches quiescence.
         if (m_StreamingExecutor)
         {
             m_StreamingExecutor->ShutdownAndDrain();
+        }
+        if (m_DerivedJobRegistry)
+        {
+            m_DerivedJobRegistry->DrainCompletions();
+            m_DerivedJobRegistry->DrainReadbacks();
+            m_DerivedJobRegistry->ApplyMainThreadResults();
         }
     }
 

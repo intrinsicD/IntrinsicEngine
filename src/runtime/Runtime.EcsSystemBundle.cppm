@@ -1,10 +1,12 @@
 module;
 
+#include <array>
 #include <cstdint>
 
 export module Extrinsic.Runtime.EcsSystemBundle;
 
 import Extrinsic.Core.FrameGraph;
+import Extrinsic.Core.Hash;
 import Extrinsic.ECS.Scene.Registry;
 
 // ============================================================
@@ -70,6 +72,16 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] PromotedEcsSystemBundleStats RegisterPromotedEcsSystemBundle(
         Core::FrameGraph& graph,
         ECS::Scene::Registry& scene);
+
+    // The named signals the promoted bundle emits into the fixed-step
+    // FrameGraph (`TransformUpdate`, `WorldBoundsUpdate`, `RenderSync`). Runtime
+    // composition seeds these into `RuntimeModuleSchedule::FinalizeForBoot` as
+    // externally-provided signalers, so a module sim-system may declare
+    // `WaitForSignals` on a baseline signal without boot failing — the bundle is
+    // registered before module systems each substep (BUG-069), so the per-tick
+    // FrameGraph WaitFor edge resolves against it (BUG-072).
+    [[nodiscard]] std::array<Core::Hash::StringID, 3>
+        PromotedEcsSystemBundleSignalLabels();
 
     // BUG-024 — Observables for the runtime-owned pre-render transform
     // flush. `WorldUpdatedObserved` counts entities whose world matrix was

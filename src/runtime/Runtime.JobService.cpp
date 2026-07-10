@@ -186,12 +186,18 @@ namespace Extrinsic::Runtime
 
             {
                 std::lock_guard lock(state->Mutex);
+                // BUG-067: publish AwaitingGate under the same lock as the
+                // enqueue, before the completion becomes visible to the drain.
+                // Storing it after the unlock lets a same-tick DrainCompletions
+                // publish/drop the job and set a terminal state that this store
+                // would then clobber back to AwaitingGate, wedging the job
+                // non-terminal forever (record leak, phantom stats, hung poller).
+                job->State.store(JobState::AwaitingGate, std::memory_order_release);
                 state->CompletionQueue.push_back(SharedState::CompletionRecord{
                     .Job = job,
                     .Result = std::move(result),
                 });
             }
-            job->State.store(JobState::AwaitingGate, std::memory_order_release);
         });
 
         return job->Token;

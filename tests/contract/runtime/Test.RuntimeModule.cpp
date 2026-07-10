@@ -20,6 +20,7 @@ import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.ModuleSchedule;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
@@ -160,11 +161,11 @@ namespace
             if (auto registered = setup.RegisterSimSystem(
                     Runtime::SimSystemDesc{
                         .Name = "Producer",
+                        // BUG-072: order via the declarative SignalLabels field
+                        // alone — RegisterSimSystemsForTick now derives the
+                        // per-tick Signal edge from it, so no manual b.Signal is
+                        // needed in Setup.
                         .SignalLabels = {producerSignal},
-                        .Setup = [producerSignal](Core::FrameGraphBuilder& b)
-                        {
-                            b.Signal(producerSignal);
-                        },
                         .Execute = [this](Runtime::SimSystemContext&)
                         {
                             m_State.ProducerRuns += 1u;
@@ -259,11 +260,9 @@ namespace
             if (auto registered = setup.RegisterSimSystem(
                     Runtime::SimSystemDesc{
                         .Name = "Consumer",
+                        // BUG-072: wait via the declarative WaitForSignals field
+                        // alone; the per-tick WaitFor edge is now derived from it.
                         .WaitForSignals = {producerSignal},
-                        .Setup = [producerSignal](Core::FrameGraphBuilder& b)
-                        {
-                            b.WaitFor(producerSignal);
-                        },
                         .Execute = [this](Runtime::SimSystemContext&)
                         {
                             m_State.ConsumerRuns += 1u;
@@ -525,4 +524,100 @@ TEST(RuntimeModule, RegistrationOrderDoesNotChangeHooksOrSchedule)
     EXPECT_EQ(providerFirst.SystemTrace[1], consumerFirst.SystemTrace[1]);
     EXPECT_EQ(providerFirst.SystemTrace[0], "Z.Provider.Producer");
     EXPECT_EQ(providerFirst.SystemTrace[1], "A.Consumer.Consumer");
+}
+
+// BUG-070: restore the fail-closed guards the recovery merge dropped from the
+// module schedule (equivalent to the deleted DuplicateSystemPassNamesFailClosed
+// and CyclicSystemSignalsFailClosed coverage), now exercised directly through
+// the recoverable FinalizeForBoot() result.
+TEST(RuntimeModuleSchedule, DuplicateSimSystemIdentityFailsClosed)
+{
+    Runtime::RuntimeModuleSchedule schedule;
+    schedule.RegisterSimSystem("Module", Runtime::SimSystemDesc{.Name = "dup"});
+    schedule.RegisterSimSystem("Module", Runtime::SimSystemDesc{.Name = "dup"});
+
+    const Core::Result result = schedule.FinalizeForBoot({});
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidArgument);
+}
+
+TEST(RuntimeModuleSchedule, DistinctIdentitiesUnderOneModuleFinalizeOk)
+{
+    Runtime::RuntimeModuleSchedule schedule;
+    schedule.RegisterSimSystem("Module", Runtime::SimSystemDesc{.Name = "a"});
+    schedule.RegisterSimSystem("Module", Runtime::SimSystemDesc{.Name = "b"});
+
+    EXPECT_TRUE(schedule.FinalizeForBoot({}).has_value());
+}
+
+TEST(RuntimeModuleSchedule, CyclicSimSystemSignalsFailClosed)
+{
+    const Core::Hash::StringID signalA{"RuntimeModuleSchedule.CycleA"};
+    const Core::Hash::StringID signalB{"RuntimeModuleSchedule.CycleB"};
+
+    Runtime::RuntimeModuleSchedule schedule;
+    schedule.RegisterSimSystem(
+        "Module",
+        Runtime::SimSystemDesc{
+            .Name = "a", .WaitForSignals = {signalB}, .SignalLabels = {signalA}});
+    schedule.RegisterSimSystem(
+        "Module",
+        Runtime::SimSystemDesc{
+            .Name = "b", .WaitForSignals = {signalA}, .SignalLabels = {signalB}});
+
+    const Core::Result result = schedule.FinalizeForBoot({});
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidState);
+}
+
+TEST(RuntimeModuleSchedule, UnprovidedWaitSignalFailsClosed)
+{
+    const Core::Hash::StringID missing{"RuntimeModuleSchedule.Missing"};
+
+    Runtime::RuntimeModuleSchedule schedule;
+    schedule.RegisterSimSystem(
+        "Module",
+        Runtime::SimSystemDesc{.Name = "waiter", .WaitForSignals = {missing}});
+
+    const Core::Result result = schedule.FinalizeForBoot({});
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidState);
+}
+
+TEST(RuntimeModuleSchedule, SignalOrderedScheduleFinalizesOk)
+{
+    const Core::Hash::StringID ready{"RuntimeModuleSchedule.Ready"};
+
+    Runtime::RuntimeModuleSchedule schedule;
+    schedule.RegisterSimSystem(
+        "Module",
+        Runtime::SimSystemDesc{.Name = "producer", .SignalLabels = {ready}});
+    schedule.RegisterSimSystem(
+        "Module",
+        Runtime::SimSystemDesc{.Name = "consumer", .WaitForSignals = {ready}});
+
+    EXPECT_TRUE(schedule.FinalizeForBoot({}).has_value());
+}
+
+TEST(RuntimeModuleSchedule, WaitOnExternalBaselineSignalIsSatisfied)
+{
+    // BUG-069/BUG-072: a module may wait on a signal emitted by the baseline ECS
+    // bundle (registered outside the schedule) when that label is seeded as
+    // externally provided; boot fails closed only when it is not seeded.
+    const Core::Hash::StringID baseline{"TransformUpdate"};
+
+    Runtime::RuntimeModuleSchedule seeded;
+    seeded.RegisterSimSystem(
+        "Module",
+        Runtime::SimSystemDesc{.Name = "consumer", .WaitForSignals = {baseline}});
+    const std::array<Core::Hash::StringID, 1> external{baseline};
+    EXPECT_TRUE(seeded.FinalizeForBoot(external).has_value());
+
+    Runtime::RuntimeModuleSchedule bare;
+    bare.RegisterSimSystem(
+        "Module",
+        Runtime::SimSystemDesc{.Name = "consumer", .WaitForSignals = {baseline}});
+    const Core::Result result = bare.FinalizeForBoot({});
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidState);
 }

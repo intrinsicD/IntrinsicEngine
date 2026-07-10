@@ -470,5 +470,6 @@ namespace Extrinsic::Runtime
         void RefreshActiveWorldScenePointer() noexcept;
         void ApplyWorldRegistryMaintenance();
         void RebuildStableEntityLookupAfterSceneReplacement();
+        void BindActiveSceneAssetHandoffs();
     };
 }

@@ -54,8 +54,17 @@ namespace Extrinsic::Runtime
 
     Core::Result WorldRegistry::RequestSetActiveWorld(WorldHandle world)
     {
-        if (!Contains(world))
+        const WorldRecord* record = Find(world);
+        if (record == nullptr)
             return Core::Err(Core::ErrorCode::ResourceNotFound);
+
+        // BUG-075: a world with a pending or announced destroy must not become
+        // active. Otherwise a single ApplyMaintenance can apply the activation
+        // and then announce-destroy the now-active world; the active-world guard
+        // in the destroy sweep then refuses to free it, leaving it stuck
+        // active + destroy-announced after listeners were told it is dying.
+        if (record->Lifecycle != WorldLifecycle::Live)
+            return Core::Err(Core::ErrorCode::ResourceBusy);
 
         if (world == m_ActiveWorld)
         {
@@ -139,7 +148,13 @@ namespace Extrinsic::Runtime
         {
             const WorldHandle requested = *m_PendingActiveWorld;
             m_PendingActiveWorld.reset();
-            if (Contains(requested) && requested != m_ActiveWorld)
+            // BUG-075: re-validate lifecycle at apply time — a destroy may have
+            // been requested after the activation was queued. Only a Live world
+            // may be promoted to active; otherwise drop the stale activation.
+            const WorldRecord* requestedRecord = Find(requested);
+            if (requestedRecord != nullptr &&
+                requestedRecord->Lifecycle == WorldLifecycle::Live &&
+                requested != m_ActiveWorld)
             {
                 const WorldHandle previous = m_ActiveWorld;
                 const std::string previousName{DebugName(previous)};
