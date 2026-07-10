@@ -43,9 +43,17 @@ The stable `ci.gate-latency.github-ubuntu-24.04.v1` profile uses
 The measured total is the sum of those phases, not whole-job time.
 
 Gate, preset, compiler, sanitizer, runner image, cold/warm cache state, selected
-test count, Ninja command-edge count, ccache counts, vcpkg cache state, phase
-return codes, and unavailable-counter flags belong in `diagnostics`. Cold and
-warm results are different populations for baseline comparison.
+test count, Ninja command-edge count, ccache hit/miss counts, ccache cache size,
+ccache error count, vcpkg cache state, phase return codes, and
+unavailable-counter flags belong in `diagnostics`. Cold and warm results are
+different populations for baseline comparison.
+
+When a gate requires ccache telemetry, `ccache_stats_required` is true and
+`ccache_stats_health` is `healthy`, `invalid`, or `errors_reported`.
+Missing/malformed required stats produce result status `error`; a valid payload
+with a nonzero ccache error count produces status `failed`. Optional gates use
+`not_requested` with `ccache_stats_available=false` rather than fabricating
+zero-valued available counters.
 
 The multi-run baseline report uses the distinct ID
 `ci.gate-latency.github-ubuntu-24.04.v1.aggregate-baseline`. It links back to

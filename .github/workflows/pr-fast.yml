@@ -8,13 +8,23 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   pr-fast:
     runs-on: ubuntu-24.04
+    env:
+      CCACHE_DIR: ${{ runner.temp }}/intrinsic-pr-fast-ccache
+      CCACHE_CONFIGPATH: ${{ runner.temp }}/intrinsic-pr-fast-ccache.conf
+      CCACHE_MAXSIZE: 2G
+      INTRINSIC_CCACHE_MAXSIZE_DISPLAY: 2.0 GB
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install system dependencies
         run: |
@@ -24,7 +34,16 @@ jobs:
             ninja-build \
             clang-20 \
             clang-tools-20 \
+            ccache=4.9.1-1 \
             python3
+
+      - name: Configure ccache pilot
+        run: |
+          mkdir -p "$CCACHE_DIR"
+          ccache --set-config=max_size="$CCACHE_MAXSIZE"
+          ccache --set-config=direct_mode=false
+          ccache --set-config=depend_mode=false
+          ccache --show-config
 
       - name: Cache vcpkg binary packages
         id: vcpkg-cache
@@ -50,12 +69,46 @@ jobs:
             --json-out build/ci/ci-timing/phases/configure.json \
             -- cmake --preset ci
 
+      - name: Detect configured compiler and cache identity
+        id: toolchain
+        run: |
+          python3 tools/ci/ccache_ci.py configured-identity \
+            --build-dir build/ci \
+            --expected-sanitizer combined-project-default
+
+      - name: Restore compatible ccache store
+        id: ccache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-v1-${{ runner.os }}-${{ runner.arch }}-pr-fast-${{ steps.toolchain.outputs.compiler-key }}-${{ steps.toolchain.outputs.scan-deps-key }}-${{ steps.toolchain.outputs.ccache-key }}-preset-ci-sanitizer-${{ steps.toolchain.outputs.sanitizer }}-${{ hashFiles('.github/workflows/pr-fast.yml', 'CMakeLists.txt', 'CMakePresets.json', 'cmake/**/*.cmake', 'tools/ci/ccache_ci.py', 'tools/setup/bootstrap_vcpkg.sh', 'tools/vcpkg/**', 'vcpkg.json', 'vcpkg-configuration.json') }}-${{ github.sha }}
+          restore-keys: |
+            ccache-v1-${{ runner.os }}-${{ runner.arch }}-pr-fast-${{ steps.toolchain.outputs.compiler-key }}-${{ steps.toolchain.outputs.scan-deps-key }}-${{ steps.toolchain.outputs.ccache-key }}-preset-ci-sanitizer-${{ steps.toolchain.outputs.sanitizer }}-${{ hashFiles('.github/workflows/pr-fast.yml', 'CMakeLists.txt', 'CMakePresets.json', 'cmake/**/*.cmake', 'tools/ci/ccache_ci.py', 'tools/setup/bootstrap_vcpkg.sh', 'tools/vcpkg/**', 'vcpkg.json', 'vcpkg-configuration.json') }}-
+
+      - name: Validate ccache pilot mode
+        run: |
+          python3 tools/ci/ccache_ci.py check-config \
+            --build-dir build/ci \
+            --repo-root . \
+            --expected-cache-dir "$CCACHE_DIR" \
+            --expected-max-size "$INTRINSIC_CCACHE_MAXSIZE_DISPLAY"
+
+      - name: Zero ccache stats
+        run: ccache --zero-stats
+
       - name: Build PR-fast test aggregate
         run: |
           python3 tools/ci/time_command.py \
             --label "Build PR-fast test aggregate" \
             --json-out build/ci/ci-timing/phases/build.json \
             -- cmake --build --preset ci --target IntrinsicPrFastTests
+
+      - name: Collect ccache stats
+        id: ccache-stats
+        if: always()
+        run: |
+          python3 tools/ci/ccache_ci.py write-stats \
+            --output build/ci/ci-timing/ccache/stats.json
 
       - name: Run unit and contract tests
         run: |
@@ -71,6 +124,10 @@ jobs:
         if: always()
         run: |
           context_args=()
+          cache_state=cold
+          if [ -n '${{ steps.ccache-restore.outputs.cache-matched-key }}' ]; then
+            cache_state=warm
+          fi
           if selected_tests="$(ctest --test-dir build/ci --show-only=json-v1 -L "unit|contract" -LE "gpu|vulkan|slow|flaky-quarantine" | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')"; then
             context_args+=(--selected-test-count "$selected_tests")
           fi
@@ -83,10 +140,13 @@ jobs:
             --test-json build/ci/ci-timing/phases/test.json \
             --gate pr-fast \
             --preset ci \
-            --compiler clang-20 \
+            --compiler '${{ steps.toolchain.outputs.compiler }}' \
+            --sanitizer '${{ steps.toolchain.outputs.sanitizer }}' \
             --runner-image ubuntu-24.04 \
             --commit '${{ github.sha }}' \
-            --cache-state cold \
+            --cache-state "$cache_state" \
+            --ccache-stats-json build/ci/ci-timing/ccache/stats.json \
+            --require-ccache-stats \
             --vcpkg-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
             --job-url 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}' \
             "${context_args[@]}" \
@@ -115,3 +175,10 @@ jobs:
 
       - name: Validate layering (strict mode)
         run: python3 tools/repo/check_layering.py --root src --strict
+
+      - name: Save validated ccache store
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ steps.ccache-restore.outputs.cache-primary-key }}

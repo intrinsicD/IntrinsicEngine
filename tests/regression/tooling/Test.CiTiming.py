@@ -11,7 +11,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TIME_COMMAND = REPO_ROOT / "tools" / "ci" / "time_command.py"
 AGGREGATOR = REPO_ROOT / "tools" / "ci" / "aggregate_gate_timing.py"
-MANIFEST_VALIDATOR = REPO_ROOT / "tools" / "benchmark" / "validate_benchmark_manifests.py"
+MANIFEST_VALIDATOR = (
+    REPO_ROOT / "tools" / "benchmark" / "validate_benchmark_manifests.py"
+)
 RESULT_VALIDATOR = REPO_ROOT / "tools" / "benchmark" / "validate_benchmark_results.py"
 BASELINE_VALIDATOR = REPO_ROOT / "tools" / "ci" / "validate_gate_timing_baseline.py"
 CI_MANIFEST_ROOT = REPO_ROOT / "benchmarks" / "ci"
@@ -40,7 +42,73 @@ def _write_phase(path: Path, elapsed_seconds: float, returncode: int = 0) -> Non
     )
 
 
+def _write_ccache_stats(path: Path, error_count: int = 0) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "summary": {
+                    "hit_count": 0,
+                    "miss_count": 0,
+                    "cache_size_kib": 128,
+                    "error_count": error_count,
+                },
+                "raw": {},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
 class CiTimingTests(unittest.TestCase):
+    @staticmethod
+    def _run_fixture_aggregator(
+        tmp_path: Path,
+        extra_args: list[str] | None = None,
+    ) -> tuple[subprocess.CompletedProcess[str], dict[str, object]]:
+        configure = tmp_path / "configure.json"
+        build = tmp_path / "build.json"
+        test = tmp_path / "test.json"
+        output = tmp_path / "result.json"
+        _write_phase(configure, 1.0)
+        _write_phase(build, 2.0)
+        _write_phase(test, 0.5)
+        command = [
+            sys.executable,
+            str(AGGREGATOR),
+            "--configure-json",
+            str(configure),
+            "--build-json",
+            str(build),
+            "--test-json",
+            str(test),
+            "--gate",
+            "fixture",
+            "--preset",
+            "ci",
+            "--compiler",
+            "clang-20",
+            "--runner-image",
+            "ubuntu-24.04",
+            "--commit",
+            "0123456789abcdef",
+            "--cache-state",
+            "cold",
+        ]
+        command.extend(extra_args or [])
+        command.extend(["--output", str(output)])
+        completed = subprocess.run(
+            command,
+            cwd=REPO_ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        payload = json.loads(output.read_text(encoding="utf-8"))
+        return completed, payload
+
     def test_manifest_passes_strict_validation(self) -> None:
         manifest = (
             CI_MANIFEST_ROOT
@@ -134,11 +202,13 @@ class CiTimingTests(unittest.TestCase):
             build = tmp_path / "build.json"
             test = tmp_path / "test.json"
             test_second = tmp_path / "test-second.json"
+            ccache_stats = tmp_path / "ccache-stats.json"
             output = tmp_path / "result" / "result.json"
             _write_phase(configure, 1.25)
             _write_phase(build, 2.5)
             _write_phase(test, 0.125)
             _write_phase(test_second, 0.25)
+            _write_ccache_stats(ccache_stats)
 
             result = subprocess.run(
                 [
@@ -168,10 +238,9 @@ class CiTimingTests(unittest.TestCase):
                     "42",
                     "--ninja-edge-count",
                     "123",
-                    "--ccache-hit-count",
-                    "0",
-                    "--ccache-miss-count",
-                    "0",
+                    "--ccache-stats-json",
+                    str(ccache_stats),
+                    "--require-ccache-stats",
                     "--vcpkg-cache-hit",
                     "true",
                     "--timestamp-utc",
@@ -187,7 +256,9 @@ class CiTimingTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
             payload = json.loads(output.read_text(encoding="utf-8"))
-            self.assertEqual(payload["benchmark_id"], "ci.gate-latency.github-ubuntu-24.04.v1")
+            self.assertEqual(
+                payload["benchmark_id"], "ci.gate-latency.github-ubuntu-24.04.v1"
+            )
             self.assertEqual(payload["backend"], "external_baseline")
             self.assertEqual(payload["metrics"]["configure_time_ms"], 1250)
             self.assertEqual(payload["metrics"]["build_time_ms"], 2500)
@@ -195,6 +266,12 @@ class CiTimingTests(unittest.TestCase):
             self.assertEqual(payload["metrics"]["total_time_ms"], 4125)
             self.assertEqual(payload["diagnostics"]["selected_test_count"], 42)
             self.assertEqual(payload["diagnostics"]["ninja_edge_count"], 123)
+            self.assertEqual(payload["diagnostics"]["ccache_cache_size_kib"], 128)
+            self.assertEqual(payload["diagnostics"]["ccache_error_count"], 0)
+            self.assertTrue(payload["diagnostics"]["ccache_stats_available"])
+            self.assertTrue(payload["diagnostics"]["ccache_stats_required"])
+            self.assertEqual(payload["diagnostics"]["ccache_stats_health"], "healthy")
+            self.assertEqual(payload["diagnostics"]["ccache_stats_errors"], [])
             self.assertEqual(payload["diagnostics"]["phase_report_counts"]["test"], 2)
             self.assertEqual(payload["status"], "passed")
 
@@ -212,7 +289,9 @@ class CiTimingTests(unittest.TestCase):
                 stderr=subprocess.PIPE,
                 check=False,
             )
-            self.assertEqual(validation.returncode, 0, msg=validation.stdout + validation.stderr)
+            self.assertEqual(
+                validation.returncode, 0, msg=validation.stdout + validation.stderr
+            )
 
     def test_aggregator_fails_closed_and_preserves_diagnostics(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -261,6 +340,116 @@ class CiTimingTests(unittest.TestCase):
             self.assertEqual(payload["metrics"]["test_time_ms"], 0)
             self.assertEqual(len(payload["diagnostics"]["phase_errors"]), 1)
             self.assertFalse(payload["diagnostics"]["selected_test_count_available"])
+
+    def test_aggregator_reports_optional_absent_ccache_stats(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            result, payload = self._run_fixture_aggregator(Path(tmp))
+
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        self.assertEqual(payload["status"], "passed")
+        self.assertFalse(payload["diagnostics"]["ccache_stats_available"])
+        self.assertFalse(payload["diagnostics"]["ccache_stats_required"])
+        self.assertEqual(payload["diagnostics"]["ccache_stats_health"], "not_requested")
+        self.assertEqual(payload["diagnostics"]["ccache_stats_errors"], [])
+
+    def test_aggregator_marks_missing_required_ccache_stats_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            missing = tmp_path / "missing-ccache-stats.json"
+            result, payload = self._run_fixture_aggregator(
+                tmp_path,
+                [
+                    "--ccache-stats-json",
+                    str(missing),
+                    "--require-ccache-stats",
+                ],
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(payload["status"], "error")
+        self.assertFalse(payload["diagnostics"]["ccache_stats_available"])
+        self.assertTrue(payload["diagnostics"]["ccache_stats_required"])
+        self.assertEqual(payload["diagnostics"]["ccache_stats_health"], "invalid")
+        self.assertIn(
+            "missing ccache stats JSON",
+            payload["diagnostics"]["ccache_stats_errors"][0],
+        )
+
+    def test_aggregator_marks_required_ccache_stats_without_path_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            result, payload = self._run_fixture_aggregator(
+                Path(tmp),
+                ["--require-ccache-stats"],
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(payload["status"], "error")
+        self.assertFalse(payload["diagnostics"]["ccache_stats_available"])
+        self.assertTrue(payload["diagnostics"]["ccache_stats_required"])
+        self.assertIn(
+            "--ccache-stats-json was not provided",
+            payload["diagnostics"]["ccache_stats_errors"][0],
+        )
+
+    def test_aggregator_marks_malformed_required_ccache_stats_error(self) -> None:
+        malformed_payloads = (
+            {"schema_version": 2, "summary": {}, "raw": {}},
+            {
+                "schema_version": 1,
+                "summary": {
+                    "hit_count": True,
+                    "miss_count": 0,
+                    "cache_size_kib": 0,
+                    "error_count": 0,
+                },
+                "raw": {},
+            },
+        )
+        for malformed in malformed_payloads:
+            with self.subTest(malformed=malformed):
+                with tempfile.TemporaryDirectory() as tmp:
+                    tmp_path = Path(tmp)
+                    stats = tmp_path / "ccache-stats.json"
+                    stats.write_text(json.dumps(malformed), encoding="utf-8")
+                    result, payload = self._run_fixture_aggregator(
+                        tmp_path,
+                        [
+                            "--ccache-stats-json",
+                            str(stats),
+                            "--require-ccache-stats",
+                        ],
+                    )
+
+                self.assertEqual(result.returncode, 1)
+                self.assertEqual(payload["status"], "error")
+                self.assertFalse(payload["diagnostics"]["ccache_stats_available"])
+                self.assertEqual(
+                    payload["diagnostics"]["ccache_stats_health"], "invalid"
+                )
+                self.assertTrue(payload["diagnostics"]["ccache_stats_errors"])
+
+    def test_aggregator_marks_reported_ccache_errors_failed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            stats = tmp_path / "ccache-stats.json"
+            _write_ccache_stats(stats, error_count=3)
+            result, payload = self._run_fixture_aggregator(
+                tmp_path,
+                [
+                    "--ccache-stats-json",
+                    str(stats),
+                    "--require-ccache-stats",
+                ],
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(payload["status"], "failed")
+        self.assertTrue(payload["diagnostics"]["ccache_stats_available"])
+        self.assertEqual(payload["diagnostics"]["ccache_error_count"], 3)
+        self.assertEqual(
+            payload["diagnostics"]["ccache_stats_health"], "errors_reported"
+        )
+        self.assertEqual(payload["diagnostics"]["ccache_stats_errors"], [])
 
     def test_historical_baseline_statistics_validate(self) -> None:
         payload = json.loads(CI_BASELINE.read_text(encoding="utf-8"))

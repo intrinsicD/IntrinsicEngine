@@ -38,9 +38,16 @@ The CI-003 pre-optimization baseline is
 It contains five GitHub Actions API samples for each required gate and both
 sanitizer matrix legs. Median and p95 use the nearest-rank method; with five
 samples p95 is the observed maximum. All baseline compiles are cold because
-ccache was absent, while the vcpkg binary-package cache was warm. No warm-
-compile population existed, and the baseline records that absence rather than
-combining cache states.
+ccache was absent, while the vcpkg binary-package cache was warm. The `pr-fast`
+ccache pilot persists only ccache's external content store, reports hit/miss,
+cache-size, error, and availability diagnostics, and treats both exact and
+compatible-prefix restores as warm samples. Each immutable saved key includes
+the configured compiler/scanner, pinned ccache, preset, sanitizer identity,
+toolchain/dependency-input hash, and commit SHA. Ccache 4.9.1 passes `.cppm`
+compiles through; cacheable C++ consumers run with direct and depend modes off
+and hash a deterministic digest of every repository module interface through
+`CCACHE_EXTRAFILES`. No warm-compile population existed in the CI-003 baseline,
+and the baseline records that absence rather than combining cache states.
 
 Every population uses the same five pull-request commits. The retained run/job
 IDs were checked against all 30 jobs and 25 workflow runs through the

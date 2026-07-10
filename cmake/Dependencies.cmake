@@ -2,19 +2,54 @@
 # Dependencies
 # ------------------------------------------------------------------------------
 
-find_program(CCACHE_PROGRAM ccache)
-if(CCACHE_PROGRAM)
+option(INTRINSIC_ENABLE_CCACHE "Use ccache as the C/C++ compiler launcher when available" ON)
+
+if(INTRINSIC_ENABLE_CCACHE)
+    find_program(CCACHE_PROGRAM ccache)
+endif()
+
+if(INTRINSIC_ENABLE_CCACHE AND CCACHE_PROGRAM)
     message(STATUS "Using CCache: ${CCACHE_PROGRAM}")
-    # BUG-015: this repository builds C++23 named modules with clang. In ccache's
-    # default direct/preprocessor modes the hash of a module-consuming TU can miss
-    # imported BMI contents, so a module interface layout change can reuse an
-    # object compiled against the old layout. Use depend mode and disable direct
-    # mode for preset builds so ccache keys module importers through
-    # compiler-generated dependency data instead of a direct source hash.
+    # CI-007: ccache 4.9.1 passes C++23 module interfaces through and cannot use
+    # depend mode while direct mode is disabled. Cache implementation/importer
+    # units in preprocessor mode, and include one deterministic digest of every
+    # repository module interface in each cache key. Existing interface files are
+    # configure dependencies and CONFIGURE_DEPENDS catches additions/removals, so
+    # the digest is refreshed before an interface-changing incremental build.
+    file(GLOB_RECURSE _intrinsic_ccache_module_interfaces
+        CONFIGURE_DEPENDS
+        LIST_DIRECTORIES false
+        "${CMAKE_SOURCE_DIR}/src/*.cppm"
+        "${CMAKE_SOURCE_DIR}/methods/*.cppm"
+        "${CMAKE_SOURCE_DIR}/benchmarks/*.cppm"
+        "${CMAKE_SOURCE_DIR}/tests/*.cppm")
+    list(SORT _intrinsic_ccache_module_interfaces)
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+        ${_intrinsic_ccache_module_interfaces})
+
+    set(_intrinsic_ccache_module_digest "schema_version=1\n")
+    foreach(_intrinsic_module_interface IN LISTS _intrinsic_ccache_module_interfaces)
+        file(SHA256 "${_intrinsic_module_interface}" _intrinsic_module_hash)
+        file(RELATIVE_PATH _intrinsic_module_relative
+            "${CMAKE_SOURCE_DIR}" "${_intrinsic_module_interface}")
+        string(APPEND _intrinsic_ccache_module_digest
+            "${_intrinsic_module_hash}  ${_intrinsic_module_relative}\n")
+    endforeach()
+    set(_intrinsic_ccache_module_digest_path
+        "${CMAKE_BINARY_DIR}/intrinsic-ccache-module-interfaces.txt")
+    file(WRITE "${_intrinsic_ccache_module_digest_path}"
+        "${_intrinsic_ccache_module_digest}")
+
     set(_intrinsic_ccache_launcher
-        "${CMAKE_COMMAND}" -E env CCACHE_DEPEND=1 CCACHE_NODIRECT=1 "${CCACHE_PROGRAM}")
+        "${CMAKE_COMMAND}" -E env
+        CCACHE_NODEPEND=1
+        CCACHE_NODIRECT=1
+        "CCACHE_EXTRAFILES=${_intrinsic_ccache_module_digest_path}"
+        "${CCACHE_PROGRAM}")
     set(CMAKE_CXX_COMPILER_LAUNCHER ${_intrinsic_ccache_launcher})
     set(CMAKE_C_COMPILER_LAUNCHER ${_intrinsic_ccache_launcher})
+elseif(NOT INTRINSIC_ENABLE_CCACHE)
+    message(STATUS "CCache disabled by INTRINSIC_ENABLE_CCACHE=OFF")
 endif()
 
 if(UNIX AND NOT APPLE AND NOT EXISTS "/usr/include/X11/extensions/Xrandr.h")

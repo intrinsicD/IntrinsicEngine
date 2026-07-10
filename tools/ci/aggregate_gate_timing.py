@@ -14,6 +14,13 @@ METHOD_ID = "ci.gate-latency"
 DATASET_ID = "github.hosted.ubuntu_24_04.x86_64"
 RESULT_SCHEMA_VERSION = 1
 PHASE_NAMES = ("configure", "build", "test")
+CCACHE_STATS_SCHEMA_VERSION = 1
+CCACHE_SUMMARY_FIELDS = (
+    "hit_count",
+    "miss_count",
+    "cache_size_kib",
+    "error_count",
+)
 
 
 def _timestamp_utc() -> str:
@@ -49,11 +56,63 @@ def _read_phase(path: Path) -> tuple[dict[str, object] | None, str | None]:
 
     elapsed = payload.get("elapsed_seconds")
     returncode = payload.get("returncode")
-    if isinstance(elapsed, bool) or not isinstance(elapsed, (int, float)) or elapsed < 0:
+    if (
+        isinstance(elapsed, bool)
+        or not isinstance(elapsed, (int, float))
+        or elapsed < 0
+    ):
         return None, f"phase report has invalid elapsed_seconds: {path}"
     if isinstance(returncode, bool) or not isinstance(returncode, int):
         return None, f"phase report has invalid returncode: {path}"
     return payload, None
+
+
+def _read_ccache_stats(path: Path) -> tuple[dict[str, int] | None, str | None]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None, f"missing ccache stats JSON: {path}"
+    except UnicodeError as exc:
+        return None, f"invalid ccache stats encoding {path}: {exc}"
+    except json.JSONDecodeError as exc:
+        return None, f"invalid ccache stats JSON {path}: {exc}"
+    except OSError as exc:
+        return None, f"could not read ccache stats JSON {path}: {exc}"
+
+    if not isinstance(payload, dict):
+        return None, f"ccache stats root must be an object: {path}"
+
+    schema_version = payload.get("schema_version")
+    if (
+        isinstance(schema_version, bool)
+        or not isinstance(schema_version, int)
+        or schema_version != CCACHE_STATS_SCHEMA_VERSION
+    ):
+        return (
+            None,
+            "ccache stats schema_version must be integer "
+            f"{CCACHE_STATS_SCHEMA_VERSION}: {path}",
+        )
+
+    summary = payload.get("summary")
+    if not isinstance(summary, dict):
+        return None, f"ccache stats summary must be an object: {path}"
+
+    validated: dict[str, int] = {}
+    for field in CCACHE_SUMMARY_FIELDS:
+        value = summary.get(field)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            return (
+                None,
+                f"ccache stats summary.{field} must be a non-negative integer: {path}",
+            )
+        validated[field] = value
+
+    raw = payload.get("raw")
+    if not isinstance(raw, dict):
+        return None, f"ccache stats raw counters must be an object: {path}"
+
+    return validated, None
 
 
 def _append_summary(result: dict[str, object]) -> None:
@@ -70,18 +129,25 @@ def _append_summary(result: dict[str, object]) -> None:
         summary.write("| Phase | Duration |\n")
         summary.write("| --- | ---: |\n")
         for phase in PHASE_NAMES:
-            summary.write(f"| {phase} | {metrics[f'{phase}_time_ms'] / 1000.0:.3f} s |\n")
-        summary.write(f"| measured total | {metrics['total_time_ms'] / 1000.0:.3f} s |\n\n")
+            summary.write(
+                f"| {phase} | {metrics[f'{phase}_time_ms'] / 1000.0:.3f} s |\n"
+            )
+        summary.write(
+            f"| measured total | {metrics['total_time_ms'] / 1000.0:.3f} s |\n\n"
+        )
         summary.write(f"- status: `{result['status']}`\n")
         summary.write(f"- cache state: `{diagnostics['cache_state']}`\n")
         summary.write(f"- selected tests: `{diagnostics['selected_test_count']}`\n")
-        summary.write(f"- Ninja command edges: `{diagnostics['ninja_edge_count']}`\n\n")
+        summary.write(f"- Ninja command edges: `{diagnostics['ninja_edge_count']}`\n")
+        summary.write(f"- ccache stats: `{diagnostics['ccache_stats_health']}`\n\n")
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     for phase in PHASE_NAMES:
-        parser.add_argument(f"--{phase}-json", type=Path, action="append", required=True)
+        parser.add_argument(
+            f"--{phase}-json", type=Path, action="append", required=True
+        )
     parser.add_argument("--gate", required=True)
     parser.add_argument("--preset", required=True)
     parser.add_argument("--compiler", required=True)
@@ -91,8 +157,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cache-state", choices=("cold", "warm"), required=True)
     parser.add_argument("--selected-test-count", type=_nonnegative_int)
     parser.add_argument("--ninja-edge-count", type=_nonnegative_int)
-    parser.add_argument("--ccache-hit-count", type=_nonnegative_int)
-    parser.add_argument("--ccache-miss-count", type=_nonnegative_int)
+    parser.add_argument("--ccache-stats-json", type=Path)
+    parser.add_argument("--require-ccache-stats", action="store_true")
     parser.add_argument("--vcpkg-cache-hit", type=_parse_bool)
     parser.add_argument("--job-url")
     parser.add_argument("--timestamp-utc", default=None)
@@ -122,7 +188,10 @@ def main() -> int:
     phase_times_ms = {
         phase: int(
             round(
-                sum(float(payload["elapsed_seconds"]) for payload in phase_payloads[phase])
+                sum(
+                    float(payload["elapsed_seconds"])
+                    for payload in phase_payloads[phase]
+                )
                 * 1000.0
             )
         )
@@ -133,12 +202,38 @@ def main() -> int:
         for phase in PHASE_NAMES
     }
 
-    if phase_errors:
+    ccache_stats: dict[str, int] | None = None
+    ccache_stats_errors: list[str] = []
+    if args.ccache_stats_json is None:
+        if args.require_ccache_stats:
+            ccache_stats_errors.append(
+                "ccache stats are required but --ccache-stats-json was not provided"
+            )
+    else:
+        ccache_stats, ccache_stats_error = _read_ccache_stats(args.ccache_stats_json)
+        if ccache_stats_error:
+            ccache_stats_errors.append(ccache_stats_error)
+
+    ccache_stats_available = ccache_stats is not None
+    ccache_values = ccache_stats or {field: 0 for field in CCACHE_SUMMARY_FIELDS}
+    if ccache_stats_errors:
+        ccache_stats_health = "invalid"
+    elif not ccache_stats_available:
+        ccache_stats_health = "not_requested"
+    elif ccache_values["error_count"] > 0:
+        ccache_stats_health = "errors_reported"
+    else:
+        ccache_stats_health = "healthy"
+
+    if phase_errors or ccache_stats_errors:
         status = "error"
-    elif any(
-        code != 0
-        for returncodes in phase_returncodes.values()
-        for code in returncodes
+    elif (
+        any(
+            code != 0
+            for returncodes in phase_returncodes.values()
+            for code in returncodes
+        )
+        or ccache_values["error_count"] > 0
     ):
         status = "failed"
     else:
@@ -156,11 +251,14 @@ def main() -> int:
         "selected_test_count_available": args.selected_test_count is not None,
         "ninja_edge_count": args.ninja_edge_count or 0,
         "ninja_edge_count_available": args.ninja_edge_count is not None,
-        "ccache_hit_count": args.ccache_hit_count or 0,
-        "ccache_miss_count": args.ccache_miss_count or 0,
-        "ccache_stats_available": (
-            args.ccache_hit_count is not None and args.ccache_miss_count is not None
-        ),
+        "ccache_hit_count": ccache_values["hit_count"],
+        "ccache_miss_count": ccache_values["miss_count"],
+        "ccache_cache_size_kib": ccache_values["cache_size_kib"],
+        "ccache_error_count": ccache_values["error_count"],
+        "ccache_stats_available": ccache_stats_available,
+        "ccache_stats_required": args.require_ccache_stats,
+        "ccache_stats_health": ccache_stats_health,
+        "ccache_stats_errors": ccache_stats_errors,
         "vcpkg_cache_hit": args.vcpkg_cache_hit or False,
         "vcpkg_cache_state_available": args.vcpkg_cache_hit is not None,
         "phase_order": list(PHASE_NAMES),
@@ -197,11 +295,17 @@ def main() -> int:
     }
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    args.output.write_text(
+        json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     _append_summary(result)
 
     for error in phase_errors:
         print(f"ERROR: {error}")
+    for error in ccache_stats_errors:
+        print(f"ERROR: {error}")
+    if ccache_stats_available and ccache_values["error_count"] > 0:
+        print(f"FAILED: ccache reported {ccache_values['error_count']} error(s)")
     print(f"Wrote {args.output} ({status})")
     return 0 if status == "passed" else 1
 

@@ -164,6 +164,38 @@ CI workflows run the same bootstrap before configure and cache
 therefore starts a new binary-cache line while older archives remain available
 through restore keys.
 
+The `pr-fast` workflow also pilots a separate ccache store at
+`${{ runner.temp }}/intrinsic-pr-fast-ccache`. That cache is deliberately outside
+the repository and build tree; `build/`, CMake state, Ninja metadata, object
+directories, Clang BMI files, and the ccache config file are not cached. Ccache
+4.9.1 passes named-module interface compiles through. Cacheable implementation
+and importer units therefore use preprocessor mode with direct and depend modes
+disabled, while `CCACHE_EXTRAFILES` adds a CMake-generated digest of every
+repository `.cppm` to each key. CMake regenerates that digest when an existing
+interface changes or the interface inventory changes, deliberately invalidating
+all keyed consumers rather than risking stale BMI/layout reuse. The workflow
+validates the generated launcher and digest, zeros statistics immediately before
+compilation, and reports hit/miss, cache-size, error, availability, and health
+diagnostics in the CI gate-latency result. Only an exact-key or
+compatibility-prefix content store is restored; each successful commit saves a
+new immutable SHA-suffixed key after all guards pass. To clear the pilot, delete
+GitHub Actions caches whose key starts
+with `ccache-v1-Linux-X64-pr-fast-`; do not delete or repoint the vcpkg binary
+cache as a ccache rollback. If a cached or incremental module build produces
+unexplained SEGV, vtable, ASan, or compiler frontend symptoms, follow the
+stale-build triage playbook at
+`tools/agents/skills/intrinsicengine-stale-build-triage/SKILL.md`
+before changing engine source.
+
+For a local clean no-ccache comparison build, keep the `ci` preset inputs but
+configure a separate tree with `-DINTRINSIC_ENABLE_CCACHE=OFF`, for example:
+
+```bash
+cmake --preset ci -B build/ci-no-ccache -DINTRINSIC_ENABLE_CCACHE=OFF
+cmake --build build/ci-no-ccache --target IntrinsicTests
+ctest --test-dir build/ci-no-ccache --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+```
+
 Initial cache-backed configure steps in CI run through
 `tools/ci/time_command.py`, which records the wall-clock configure duration in
 the GitHub step summary. When `actions/cache` reports an exact vcpkg
