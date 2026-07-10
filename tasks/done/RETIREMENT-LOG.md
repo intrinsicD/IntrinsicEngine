@@ -8,6 +8,19 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-078`](BUG-078-coretasks-counterevent-rearm-uaf.md) — Core.Tasks
+`CounterEvent` rearm coroutine lifetime race retired on 2026-07-10 at
+`CPUContracted`. A legal early-resume interleaving let one worker complete and
+destroy a detached task frame while the worker that originally called
+`resume()` still inspected the same handle with `done()`, producing an ASan
+heap-use-after-free. Detached task frames now self-destroy through
+non-suspending final suspend, and `Scheduler::Reschedule()` treats each handle
+as a single-use resumption token with no post-resume access. The deterministic
+regression waits for a frame-owned destructor sentinel before the original
+`await_suspend()` returns and passed 100 repetitions; the default CPU gate and
+the CI-007 clean no-ccache comparison also pass. `BUG-079` owns the adjacent
+abandoned-parked-continuation reclamation gap.
+
 [`CI-003`](CI-003-ci-gate-timing-observability-and-cancellation.md) — CI gate
 latency observability and stale-run cancellation retired on 2026-07-09 at
 `CPUContracted`. The stable

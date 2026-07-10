@@ -109,6 +109,13 @@ zero count. A caller that observes readiness may destroy the event immediately,
 so a signaler that reaches zero must not read any event members after the
 successful zero transition.
 
+Task coroutine handles published to the scheduler are single-use resumption
+tokens. `Scheduler::Reschedule()` resumes a handle but must not inspect
+`done()` or destroy the frame after `resume()` returns, because the coroutine
+may park, another worker may unpark it, and the frame may complete before the
+original resume call unwinds. Completed task frames self-destroy through the
+task promise's non-suspending final suspend.
+
 ## Engine config fields
 
 `Extrinsic.Core.Config.Engine` exports `EngineConfig`, the value type runtime

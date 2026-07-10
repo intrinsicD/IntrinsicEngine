@@ -88,8 +88,7 @@ export class Job;
         {
             Job get_return_object() noexcept;
             std::suspend_always initial_suspend() noexcept { return {}; }
-            // Keep the frame alive so the scheduler can destroy it after observing done().
-            std::suspend_always final_suspend() noexcept { return {}; }
+            std::suspend_never final_suspend() noexcept { return {}; }
 
             void return_void() noexcept
             {

@@ -24,6 +24,70 @@ namespace
         resumedCount->fetch_add(1, std::memory_order_release);
         co_return;
     }
+
+    struct FrameDestructionCounter
+    {
+        std::atomic<int>* Count = nullptr;
+
+        ~FrameDestructionCounter()
+        {
+            Count->fetch_add(1, std::memory_order_release);
+            Count->notify_all();
+        }
+    };
+
+    struct ParkThenSignalBeforeAwaitSuspendReturns
+    {
+        CounterEvent* Event = nullptr;
+        std::atomic<int>* SuspendedCount = nullptr;
+        std::atomic<int>* DestroyedCount = nullptr;
+        std::atomic<bool>* ResumeCompletedBeforeSuspendReturn = nullptr;
+
+        [[nodiscard]] bool await_ready() const noexcept { return false; }
+
+        [[nodiscard]] bool await_suspend(std::coroutine_handle<> handle) const
+        {
+            CounterEvent* event = Event;
+            std::atomic<int>* suspendedCount = SuspendedCount;
+            std::atomic<int>* destroyedCount = DestroyedCount;
+            std::atomic<bool>* resumeCompletedBeforeSuspendReturn = ResumeCompletedBeforeSuspendReturn;
+
+            const bool parked = Scheduler::ParkCurrentFiberIfNotReady(event->Token(), handle);
+            suspendedCount->fetch_add(1, std::memory_order_release);
+            suspendedCount->notify_all();
+            if (!parked)
+                return false;
+
+            std::thread signaler([event] {
+                event->Signal();
+            });
+            signaler.join();
+
+            while (destroyedCount->load(std::memory_order_acquire) == 0)
+                destroyedCount->wait(0, std::memory_order_acquire);
+            resumeCompletedBeforeSuspendReturn->store(true, std::memory_order_release);
+
+            return true;
+        }
+
+        void await_resume() const noexcept
+        {
+        }
+    };
+
+    Job WaitForCounterAndForceResumeBeforeSuspendReturns(CounterEvent* event,
+                                                          std::atomic<int>* suspendedCount,
+                                                          std::atomic<int>* resumedCount,
+                                                          std::atomic<int>* destroyedCount,
+                                                          std::atomic<bool>* resumeCompletedBeforeSuspendReturn) noexcept
+    {
+        FrameDestructionCounter destructionCounter{destroyedCount};
+        co_await ParkThenSignalBeforeAwaitSuspendReturns{
+            event, suspendedCount, destroyedCount, resumeCompletedBeforeSuspendReturn};
+        resumedCount->fetch_add(1, std::memory_order_release);
+        resumedCount->notify_all();
+        co_return;
+    }
 }
 
 TEST(CoreTasks, BasicDispatch) {
@@ -295,6 +359,34 @@ TEST(CoreTasks, CounterEventCanBeRearmedAfterReady)
 
     EXPECT_TRUE(event.IsReady());
     EXPECT_EQ(resumedCount.load(std::memory_order_acquire), 2);
+
+    Scheduler::Shutdown();
+}
+
+TEST(CoreTasks, CounterEventResumeBeforeAwaitSuspendReturnsDoesNotTouchDestroyedFrame)
+{
+    Scheduler::Initialize(4);
+
+    CounterEvent event{1};
+    std::atomic<int> suspendedCount = 0;
+    std::atomic<int> resumedCount = 0;
+    std::atomic<int> destroyedCount = 0;
+    std::atomic<bool> resumeCompletedBeforeSuspendReturn = false;
+
+    Scheduler::Dispatch(WaitForCounterAndForceResumeBeforeSuspendReturns(
+        &event, &suspendedCount, &resumedCount, &destroyedCount,
+        &resumeCompletedBeforeSuspendReturn));
+
+    while (suspendedCount.load(std::memory_order_acquire) < 1)
+        suspendedCount.wait(0, std::memory_order_acquire);
+
+    Scheduler::WaitForAll();
+
+    EXPECT_TRUE(event.IsReady());
+    EXPECT_EQ(suspendedCount.load(std::memory_order_acquire), 1);
+    EXPECT_EQ(resumedCount.load(std::memory_order_acquire), 1);
+    EXPECT_EQ(destroyedCount.load(std::memory_order_acquire), 1);
+    EXPECT_TRUE(resumeCompletedBeforeSuspendReturn.load(std::memory_order_acquire));
 
     Scheduler::Shutdown();
 }

@@ -9,6 +9,11 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   `ci-vulkan` is red on every recent run across all branches because the
   sandbox frame-pacing capture needs a display (GLFW: DISPLAY missing →
   zero frames → "no samples"); needs xvfb or a documented environment skip.
+- [`BUG-079` — CoreTasks abandoned wait continuation leaks coroutine frame](BUG-079-coretasks-abandoned-wait-continuation-leak.md):
+  wait-token release and scheduler shutdown discard parked raw coroutine
+  handles without an exactly-once frame-reclamation contract; leak detection is
+  disabled in the default sanitizer configuration, so deterministic destructor
+  sentinel coverage is required.
 
 ### From the review of merge `76528e6` ("Merge recovered runtime service extractions")
 
@@ -56,6 +61,13 @@ regressed hardening that main had shipped as the closed `BUG-066`.
 ---
 
 ## Verified / Closed
+
+- Closed 2026-07-10: [`BUG-078` — CoreTasks CounterEvent rearm can race coroutine destruction](../../done/BUG-078-coretasks-counterevent-rearm-uaf.md).
+  Detached task frames now self-destroy at final suspend, and scheduler workers
+  never inspect or destroy a handle after `resume()` returns. A deterministic
+  unit regression forces another worker to resume and destroy the frame before
+  the original `await_suspend()` unwinds; its destructor sentinel passed 100
+  repetitions under the sanitizer-enabled `ci` preset.
 
 - Closed 2026-07-09: [`BUG-063` — Streaming-import contract tests flaky on main](../../done/BUG-063-streaming-import-contract-tests-flaky-on-main.md).
   Three parallel format-coverage CTest processes shared

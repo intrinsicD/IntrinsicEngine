@@ -35,8 +35,6 @@ namespace Extrinsic::Core::Tasks
                 return;
 
             h.resume();
-            if (h.done())
-                h.destroy();
         }));
     }
 
