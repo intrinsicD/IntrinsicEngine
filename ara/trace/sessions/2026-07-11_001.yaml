@@ -1,0 +1,41 @@
+session:
+  id: "2026-07-11_001"
+  date: "2026-07-11"
+  started: "2026-07-11T00:23"
+  last_turn: "2026-07-11T00:24"
+  turn_count: 1
+  summary: "Reported CI-007 incomplete, validated cold sample 4, and dispatched cold sample 5 as the warm-cache seed."
+
+events_logged:
+  - turn: 1
+    type: experiment
+    id: "N194"
+    routing: direct
+    provenance: ai-executed
+    summary: "Advanced the hosted cold cohort to four validated passes and launched cold sample 5."
+
+ai_actions:
+  - turn: 1
+    action: "Checked hosted status after the monitor-agent capacity failure, downloaded and strictly validated cold sample 4, deleted only its branch-scoped ccache entry, and dispatched cold sample 5."
+    provenance: ai-executed
+    files_changed:
+      - "ara/logic/solution/heuristics.md"
+      - "ara/staging/observations.yaml"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "ara/trace/sessions/2026-07-10_001.yaml"
+      - "ara/trace/sessions/2026-07-11_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "User asked whether the current task was done; CI-007 still required one cold sample, five warm samples, a real interface-change run, and retirement or rollback."
+
+open_threads:
+  - "Finish CI-007 cold sample 5, five warm samples, the full-gate interface-change run, and the retain/rollback decision."
+  - "After CI-007, select backlog work and resolve whether model training means GEOM-058 or a new neural/LLM workflow."
+
+ai_suggestions_pending:
+  - "Treat GEOM-058 Gaussian-mixture fitting as the provisional repo-native model-training target unless the user specifies a neural or LLM model."

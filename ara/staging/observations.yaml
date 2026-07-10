@@ -98,3 +98,47 @@ observations:
     promoted_to: null
     crystallized_via: null
     stale: false
+  - id: O10
+    timestamp: "2026-07-10T13:24"
+    provenance: ai-executed
+    content: "A task coroutine handle published to `Scheduler::Reschedule()` is a single-use resumption token; after `resume()` returns, scheduler code must not inspect `done()` or destroy the frame because another worker may have resumed and completed the frame first."
+    context: "BUG-078 diagnosis and fix for an ASan heap-use-after-free in `CoreTasks.CounterEventCanBeRearmedAfterReady`."
+    potential_type: constraint
+    bound_to: [N188, N189]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K03"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O11
+    timestamp: "2026-07-10T17:17"
+    provenance: ai-executed
+    content: "Short comparative runtime smokes should individually time an odd number of interleaved baseline/probe pairs, gate on the median paired ratio, and retain every raw sample; this prevents a minority of scheduler stalls from flipping a strict threshold while keeping ignored outliers auditable."
+    context: "BUG-080 corrected the UV-atlas promotion smoke after one scheduler stall contaminated a three-call fast block mean and false-failed the unchanged per-fixture threshold."
+    potential_type: heuristic
+    bound_to: [N190, N191]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H01"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O12
+    timestamp: "2026-07-10T20:16"
+    provenance: ai-executed
+    content: "When a historical CI latency baseline differs in workflow generation, selected tests, or Ninja edge count, use separate same-generation cold and warm populations with exact shape and dependency-cache state; do not claim acceleration across the drift."
+    context: "CI-007 Slice C found the CI-003 pr-fast population had 3,526 selected tests while the current workflow reports 3,549 tests and 1,955 edges, so the task committed a contemporaneous five-cold/five-warm comparison rule."
+    potential_type: heuristic
+    bound_to: [N193, N194]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H02"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O13
+    timestamp: "2026-07-10T20:16"
+    provenance: ai-suggested
+    content: "GEOM-058 is the strongest repository-native interpretation of local model training because it explicitly defines deterministic Gaussian-mixture `FitEM` fitting and recovery tests; neural-rendering and LLM training lack an implemented task, dataset, runner, evaluation contract, and checkpoint policy."
+    context: "Read-only repository and hardware discovery for the user's request to train the model after backlog implementation."
+    potential_type: claim
+    bound_to: [N195]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false

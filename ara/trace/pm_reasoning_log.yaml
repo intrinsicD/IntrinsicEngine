@@ -727,3 +727,35 @@ entries:
       - "Routed the user's commit request as N186 because it changes repository artifact state after validation."
       - "Recorded pre-commit task/doc validators as evidence; no C++ build was required because the change is task/documentation/trace only."
       - "Did not stage a new observation; this turn publishes the existing task seed."
+  - turn: "2026-07-10_001#5"
+    notes:
+      - "Routed CI-007 Slice B as N187 because the turn produced a concrete probe, workflow/docs/task edits, and empirical verification."
+      - "Did not stage a new claim; the safety result is artifact-backed by the probe output and task evidence, while hosted warm-run performance remains open."
+      - "Kept Slice C as an open thread because publishing the workflow branch and collecting hosted samples are external to this local implementation turn."
+  - turn: "2026-07-10_001#6"
+    notes:
+      - "Routed the clean no-ccache full-gate attempt as N188 because it produced concrete CMake/task/bug artifacts plus build and CTest evidence."
+      - "Did not stage a claim that ccache is safe at full-gate scope because the clean gate is blocked by BUG-078 and hosted warm-run evidence is still missing."
+      - "Recorded BUG-078 as an open thread rather than treating the ASan failure as CI-007 evidence, because the stack is in Core.Tasks and the isolated rerun passed."
+  - turn: "2026-07-10_001#7"
+    notes:
+      - "Routed BUG-078 as N189 because the turn produced a source fix, regression test, task/docs updates, focused repeat evidence, and full CPU/no-ccache gate evidence."
+      - "Crystallized O10 to K03 via artifact commitment because the scheduler handle-ownership rule is now encoded in `Core.Tasks` source, `src/core/README.md`, and BUG-078 evidence."
+      - "Kept CI-007 open because local clean parity now passes but hosted warm/cold cache-hit and wall-time samples remain uncollected."
+  - turn: "2026-07-10_001#8"
+    notes:
+      - "Routed BUG-080 verification and retirement as N190 because the turn independently audited 25 retained runs, ran strict per-run validation and the full CPU gate, retired the task, and produced commit 0eb9616f."
+      - "Routed the recursive parent-root validator attempt as dead end N191 because duplicate benchmark IDs across independent repetitions are expected; the durable task command now validates each run root separately."
+      - "Staged O11 and crystallized it to H01 via artifact commitment because the paired-median rule is encoded in benchmark code, manifest, policy docs, raw diagnostics, and the retired task evidence."
+      - "Removed resolved BUG-078 and module-task-seeding threads; CI-007 hosted warm/cold evidence remains the only open session thread."
+  - turn: "2026-07-10_001#9"
+    notes:
+      - "Routed the rejected runner.temp workflow context as dead end N192 because hosted dispatch supplied a concrete parser failure and a committed correction."
+      - "Routed the contemporaneous cold-cohort choice as N193 and staged/crystallized O12 to H02 because the CI-003 gate shape drift is measured and the task now commits to exact-shape populations."
+      - "Kept N194 open after four passing cold samples; the fifth cold, warm cohort, interface-change run, and retain/rollback decision remain outstanding."
+      - "Opened N195 and staged O13 without promotion because GEOM-058 is the evidence-backed provisional training interpretation, not a user-confirmed target."
+  - turn: "2026-07-11_001#1"
+    notes:
+      - "Answered the status request with the explicit incomplete CI-007 checklist rather than reporting the four passing cold samples as task completion."
+      - "Advanced N194 by independently validating cold sample 4 and dispatching cold sample 5 after deleting only the branch-scoped ccache entry."
+      - "Did not crystallize O13; the model-training target remains unconfirmed and no training artifact has been produced."

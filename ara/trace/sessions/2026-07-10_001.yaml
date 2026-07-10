@@ -2,9 +2,9 @@ session:
   id: "2026-07-10_001"
   date: "2026-07-10"
   started: "2026-07-10T10:59"
-  last_turn: "2026-07-10T10:59"
-  turn_count: 4
-  summary: "Opened a module-strategy reassessment, ranked `.cppm` header-conversion candidates, and seeded ARCH-006/RUNTIME-167..174 module-surface diet task records."
+  last_turn: "2026-07-10T22:15"
+  turn_count: 9
+  summary: "Opened module-surface diet tasks, fixed BUG-078 and BUG-080, then made CI-007 dispatchable and collected four passing hosted cold-cache samples."
 
 events_logged:
   - turn: 1
@@ -43,6 +43,84 @@ events_logged:
     routing: direct
     provenance: user
     summary: "Requested committing all current module-surface task seed changes."
+  - turn: 5
+    type: experiment
+    id: "N187"
+    routing: direct
+    provenance: ai-executed
+    summary: "Implemented and verified CI-007 Slice B's hermetic module invalidation probe for the `pr-fast` ccache pilot."
+  - turn: 6
+    type: experiment
+    id: "N188"
+    routing: direct
+    provenance: ai-executed
+    summary: "Attempted CI-007's clean no-ccache full gate, added an explicit ccache opt-out, and recorded BUG-078 after an unrelated Core.Tasks ASan race."
+  - turn: 7
+    type: experiment
+    id: "N189"
+    routing: direct
+    provenance: ai-executed
+    summary: "Fixed BUG-078's Core.Tasks coroutine-frame race and reran default plus no-ccache CPU gates."
+  - turn: 7
+    type: observation
+    id: "O10"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized scheduler reschedule handle ownership as constraint K03."
+  - turn: 8
+    type: experiment
+    id: "N190"
+    routing: direct
+    provenance: ai-executed
+    summary: "Recovered, verified, retired, and committed BUG-080's paired comparative-smoke timing correction."
+  - turn: 8
+    type: dead_end
+    id: "N191"
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected parent-root validation for repeated benchmark runs because duplicate benchmark IDs are intentional across runs."
+  - turn: 8
+    type: observation
+    id: "O11"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized robust paired comparative-smoke timing as heuristic H01."
+  - turn: 9
+    type: dead_end
+    id: "N192"
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected runner.temp in job-level GitHub Actions env after dispatch failed parsing."
+  - turn: 9
+    type: decision
+    id: "N193"
+    routing: direct
+    provenance: ai-executed
+    summary: "Chose an exact-shape contemporaneous five-cold/five-warm CI-007 comparison."
+  - turn: 9
+    type: experiment
+    id: "N194"
+    routing: direct
+    provenance: ai-executed
+    summary: "Published CI-007 and collected four passing hosted cold samples with zero ccache errors and interface parity."
+  - turn: 9
+    type: question
+    id: "N195"
+    routing: direct
+    provenance: ai-suggested
+    summary: "Opened the unresolved meaning of the user's requested local model training."
+  - turn: 9
+    type: observation
+    id: "O12"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized exact-shape cold/warm CI comparison as heuristic H02."
+  - turn: 9
+    type: observation
+    id: "O13"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged GEOM-058 as the strongest repo-native training interpretation."
 
 ai_actions:
   - turn: 1
@@ -87,6 +165,68 @@ ai_actions:
       - "ara/trace/pm_reasoning_log.yaml"
       - "ara/trace/sessions/session_index.yaml"
       - "ara/trace/sessions/2026-07-10_001.yaml"
+  - turn: 5
+    action: "Added the ccache module invalidation probe, wired it into `pr-fast`, updated CI cache docs/task evidence, and ran focused plus default CPU verification."
+    provenance: ai-executed
+    files_changed:
+      - ".github/workflows/pr-fast.yml"
+      - "docs/benchmarking/ci-policy.md"
+      - "docs/build-troubleshooting.md"
+      - "tasks/active/CI-007-module-safe-persistent-ccache-pilot.md"
+      - "tests/regression/tooling/Test.CcacheModuleInvalidationProbe.py"
+      - "tests/regression/tooling/Test.CcacheWorkflow.py"
+      - "tools/ci/ccache_module_invalidation_probe.py"
+  - turn: 6
+    action: "Added a CMake ccache opt-out, ran the clean no-ccache build/gate attempt, created BUG-078 for the ASan scheduler race, regenerated the session brief, and reran focused tooling/structural checks."
+    provenance: ai-executed
+    files_changed:
+      - "cmake/Dependencies.cmake"
+      - "docs/build-troubleshooting.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "tasks/active/CI-007-module-safe-persistent-ccache-pilot.md"
+      - "tasks/backlog/bugs/BUG-078-coretasks-counterevent-rearm-uaf.md"
+      - "tasks/backlog/bugs/index.md"
+      - "tests/regression/tooling/Test.CcacheWorkflow.py"
+  - turn: 7
+    action: "Promoted BUG-078 to active, fixed Core.Tasks coroutine-frame ownership, added regression coverage, updated docs/task evidence, reran default and no-ccache CPU gates, and ran structural review checks."
+    provenance: ai-executed
+    files_changed:
+      - "src/core/Core.Tasks.Dispatch.cpp"
+      - "src/core/Core.Tasks.cppm"
+      - "tests/unit/core/Test.CoreTasks.cpp"
+      - "src/core/README.md"
+      - "tasks/active/BUG-078-coretasks-counterevent-rearm-uaf.md"
+      - "tasks/active/CI-007-module-safe-persistent-ccache-pilot.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "ara/logic/solution/constraints.md"
+  - turn: 8
+    action: "Recovered the terminated BUG-080 session, audited 25 retained benchmark runs, corrected the repeated-result validation command, ran the post-fix default CPU gate, retired the task, and committed the tenth requested slice."
+    provenance: ai-executed
+    files_changed:
+      - "benchmarks/geometry/Bench.UvAtlasSmoke.hpp"
+      - "benchmarks/geometry/Bench_UvAtlasSmoke.cpp"
+      - "benchmarks/geometry/README.md"
+      - "benchmarks/geometry/manifests/geometry_uv_atlas_fast_staged_promotion_smoke.yaml"
+      - "benchmarks/runners/BenchmarkSmokeRunner.cpp"
+      - "docs/benchmarking/metrics.md"
+      - "tasks/done/BUG-080-uv-atlas-promotion-smoke-timing-flake.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+      - "ara/logic/solution/heuristics.md"
+  - turn: 9
+    action: "Fixed CI-007's hosted workflow parser failure, committed and pushed the evidence branch, then dispatched and validated four exact-shape cold samples while preserving raw artifacts."
+    provenance: ai-executed
+    files_changed:
+      - ".github/workflows/pr-fast.yml"
+      - "docs/build-troubleshooting.md"
+      - "tasks/active/CI-007-module-safe-persistent-ccache-pilot.md"
+      - "tests/regression/tooling/Test.CcacheWorkflow.py"
+      - "ara/logic/solution/heuristics.md"
+      - "ara/staging/observations.yaml"
+      - "ara/trace/exploration_tree.yaml"
+  - turn: 9
+    action: "Audited candidate training targets and local hardware; found GEOM-058 runnable after implementation while neural-rendering and LLM training lack repository contracts."
+    provenance: ai-executed
+    files_changed: []
 
 claims_touched: []
 
@@ -99,9 +239,21 @@ key_context:
     excerpt: "User asked to create tasks for the identified header-conversion candidates."
   - turn: 4
     excerpt: "User asked to commit all changes."
+  - turn: 5
+    excerpt: "User asked to use the agentic workflow to continue active tasks; CI-007 was the actionable active task and CI-004 remained blocked on hosted publication."
+  - turn: 6
+    excerpt: "User asked to continue active tasks; CI-007 Slice C local clean/no-ccache evidence was attempted, but the clean CPU gate exposed an unrelated Core.Tasks ASan race now tracked as BUG-078."
+  - turn: 7
+    excerpt: "User asked to continue active tasks; BUG-078 was fixed locally and CI-007's clean no-ccache comparison now passes, leaving hosted warm/cold samples as the remaining CI-007 evidence."
+  - turn: 8
+    excerpt: "User asked to continue after the previous Codex session terminated; repository artifacts and the session transcript recovered BUG-080 as the tenth and final requested task commit."
+  - turn: 9
+    excerpt: "User asked to implement backlog tasks with the agentic workflow and then train the model locally; active-first policy selected CI-007 before backlog promotion."
 
 open_threads:
-  - "Decide whether to open a scoped module-surface diet task after CI-007 telemetry lands."
+  - "Finish CI-007 cold sample 5, five warm samples, the full-gate interface-change run, and the retain/rollback decision."
+  - "After CI-007, select backlog work and resolve whether model training means GEOM-058 or a new neural/LLM workflow."
 
 ai_suggestions_pending:
   - "Keep modules for stable layer/package APIs; slim exported `.cppm` files and move volatile/private implementation behind `.cpp` or ordinary private headers where appropriate."
+  - "Treat GEOM-058 Gaussian-mixture fitting as the provisional repo-native model-training target unless the user specifies a neural or LLM model."

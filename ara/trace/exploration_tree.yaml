@@ -4387,20 +4387,207 @@ tree:
           - "python3 tools/agents/check_task_policy.py --root . --strict"
           - "python3 tools/agents/validate_tasks.py --root tasks --strict"
         status: resolved
-      - id: N186
-        type: decision
-        title: "Commit module-surface task seed"
-        provenance: user
-        timestamp: "2026-07-10T10:59"
-        choice: >
-          User requested committing all current changes after the module-surface
-          diet tasks and trace updates were created.
-        alternatives:
-          - "Leave the task seed uncommitted."
-          - "Commit only task files and exclude the local trace updates."
-        evidence:
-          - "python3 tools/agents/check_task_policy.py --root . --strict"
-          - "python3 tools/agents/validate_tasks.py --root tasks --strict"
-          - "python3 tools/docs/check_doc_links.py --root ."
-          - "git diff --check"
-        status: resolved
+  - id: N186
+    type: decision
+    title: "Commit module-surface task seed"
+    provenance: user
+    timestamp: "2026-07-10T10:59"
+    choice: >
+      User requested committing all current changes after the module-surface
+      diet tasks and trace updates were created.
+    alternatives:
+      - "Leave the task seed uncommitted."
+      - "Commit only task files and exclude the local trace updates."
+    evidence:
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "git diff --check"
+    status: resolved
+  - id: N187
+    type: experiment
+    title: "CI-007 module-safe ccache Slice B"
+    provenance: ai-executed
+    timestamp: "2026-07-10T12:39"
+    evidence:
+      - "tools/ci/ccache_module_invalidation_probe.py"
+      - ".github/workflows/pr-fast.yml"
+      - "tests/regression/tooling/Test.CcacheModuleInvalidationProbe.py"
+      - "python3 tools/ci/ccache_module_invalidation_probe.py --work-dir /tmp/intrinsic-ci007-module-probe --output /tmp/ci007-module-probe.json"
+      - "python3 tests/regression/tooling/Test.CcacheModuleInvalidationProbe.py -v"
+      - "python3 tests/regression/tooling/Test.CcacheWorkflow.py -v"
+      - "python3 tests/regression/tooling/Test.CiTiming.py -v"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j$(nproc)"
+    result: >
+      Added and wired a hermetic C++23 module invalidation probe for the
+      `pr-fast` ccache pilot. The probe exercised empty-cache, restored
+      unchanged, restored interface-change, and clean no-ccache scenarios; the
+      changed cached output `29:7` matched the clean output `29:7` with zero
+      ccache errors. Focused tooling regressions passed and the default CPU
+      gate passed 3,654/3,654.
+    status: resolved
+  - id: N188
+    type: experiment
+    title: "CI-007 clean no-ccache full-gate attempt"
+    provenance: ai-executed
+    timestamp: "2026-07-10T13:00"
+    also_depends_on: [N187]
+    evidence:
+      - "cmake/Dependencies.cmake"
+      - "tasks/active/CI-007-module-safe-persistent-ccache-pilot.md"
+      - "tasks/backlog/bugs/BUG-078-coretasks-counterevent-rearm-uaf.md"
+      - "cmake --preset ci -B build/ci-no-ccache -DINTRINSIC_ENABLE_CCACHE=OFF"
+      - "rg -n 'LAUNCHER = .*ccache|CCACHE_DEPEND|CCACHE_NODIRECT' build/ci-no-ccache/build.ninja"
+      - "cmake --build build/ci-no-ccache --target IntrinsicTests"
+      - "ctest --test-dir build/ci-no-ccache --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j$(nproc)"
+      - "ctest --test-dir build/ci-no-ccache --output-on-failure -R '^CoreTasks\\.CounterEventCanBeRearmedAfterReady$' --timeout 60"
+      - "python3 tests/regression/tooling/Test.CcacheWorkflow.py -v"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+    result: >
+      Added explicit `INTRINSIC_ENABLE_CCACHE=OFF` support after `CCACHE_PROGRAM`
+      and `CMAKE_IGNORE_PATH` attempts still resolved `/usr/bin/ccache`. The
+      no-ccache configure reported ccache disabled, the Ninja graph had no
+      ccache launcher references, and the clean build completed. The clean full
+      CPU CTest gate failed 1/3,613 on an ASan `Scheduler::Reschedule`
+      coroutine use-after-free in `CoreTasks.CounterEventCanBeRearmedAfterReady`;
+      the isolated rerun passed 1/1. Recorded the failure as BUG-078, kept
+      CI-007's clean full-gate checkbox open, and verified focused ccache
+      tooling plus task/docs structural checks.
+    status: resolved
+  - id: N189
+    type: experiment
+    title: "BUG-078 Core.Tasks coroutine lifetime fix"
+    provenance: ai-executed
+    timestamp: "2026-07-10T13:24"
+    also_depends_on: [N188]
+    evidence:
+      - "src/core/Core.Tasks.Dispatch.cpp"
+      - "src/core/Core.Tasks.cppm"
+      - "tests/unit/core/Test.CoreTasks.cpp"
+      - "src/core/README.md"
+      - "tasks/active/BUG-078-coretasks-counterevent-rearm-uaf.md"
+      - "cmake --build --preset ci --target IntrinsicCoreWrapperUnitTests"
+      - "ctest --test-dir build/ci --output-on-failure -R '^CoreTasks\\.' --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -R '^CoreTasks\\.CounterEventCanBeRearmedAfterReady$' --repeat until-fail:200 --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -R '^CoreTasks\\.CounterEventResumeBeforeAwaitSuspendReturnsDoesNotTouchDestroyedFrame$' --repeat until-fail:100 --timeout 60"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j$(nproc)"
+      - "cmake --build build/ci-no-ccache --target IntrinsicTests"
+      - "ctest --test-dir build/ci-no-ccache --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j$(nproc)"
+    result: >
+      Promoted BUG-078 to active and fixed the Core.Tasks coroutine-frame race
+      by making completed `Job` frames self-destroy and removing post-resume
+      `done()`/`destroy()` ownership from `Scheduler::Reschedule()`. Added a
+      regression test that forces a continuation to resume before
+      `await_suspend` returns. Focused CoreTasks gates passed, the default
+      CPU-supported gate passed 3,655/3,655, and CI-007's explicit no-ccache
+      comparison passed 3,614/3,614.
+    status: resolved
+  - id: N190
+    type: experiment
+    title: "BUG-080 paired timing robustness verification"
+    provenance: ai-executed
+    timestamp: "2026-07-10T17:17"
+    evidence:
+      - "benchmarks/geometry/Bench_UvAtlasSmoke.cpp"
+      - "benchmarks/geometry/manifests/geometry_uv_atlas_fast_staged_promotion_smoke.yaml"
+      - "tasks/done/BUG-080-uv-atlas-promotion-smoke-timing-flake.md"
+      - "25 retained runs under /tmp/bug080-uv-bench"
+      - "python3 tools/benchmark/validate_benchmark_results.py --root /tmp/bug080-uv-bench/<run> --strict"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "commit 0eb9616f"
+    result: >
+      Recovered and completed BUG-080's comparative-smoke timing correction.
+      Twenty-five loaded-host runs produced 475/475 passing result files; all
+      raw sample arrays had length five, mean paired ratios ranged from
+      0.341487 to 0.352590, and the worst robust fixture ratio was 0.604228
+      against the unchanged 1.25 threshold. Strict per-run result validation
+      passed, the post-fix default CPU gate passed 3,658/3,658 in 389.50 s,
+      and the task was retired in commit 0eb9616f as commit ten of ten.
+    status: resolved
+  - id: N191
+    type: dead_end
+    title: "Reject parent-root validation for repeated benchmark runs"
+    provenance: ai-executed
+    timestamp: "2026-07-10T17:17"
+    also_depends_on: [N190]
+    hypothesis: >
+      One recursive strict-validation invocation rooted above all 25 retained
+      run directories can validate the full repetition set.
+    failure_mode: >
+      The result validator correctly requires each benchmark ID to be unique
+      within one root, so repeated run directories intentionally contain
+      duplicate IDs and the parent-root invocation fails.
+    lesson: >
+      Validate each run directory independently, then use a separate aggregate
+      audit for cross-run status, sample-shape, policy, and distribution checks.
+    status: resolved
+  - id: N192
+    type: dead_end
+    title: "Reject runner.temp in GitHub job-level env"
+    provenance: ai-executed
+    timestamp: "2026-07-10T20:16"
+    hypothesis: >
+      The `pr-fast` workflow can use `${{ runner.temp }}` directly in the job-level
+      environment for its external ccache paths.
+    failure_mode: >
+      GitHub rejected workflow dispatch with HTTP 422 because the `runner`
+      context is unavailable while job-level `env` expressions are parsed.
+    lesson: >
+      Use a fixed runner-local `/tmp` path at job scope, or populate a dynamic
+      runner path from a step; cover the parser constraint in workflow tests.
+    status: resolved
+  - id: N193
+    type: decision
+    title: "Use a contemporaneous CI-007 cold cohort"
+    provenance: ai-executed
+    timestamp: "2026-07-10T20:16"
+    choice: >
+      Compare five unchanged-SHA warm runs with five same-generation cold runs
+      whose ccache entry is deleted between runs, while preserving the warm
+      vcpkg cache and exact gate shape.
+    alternatives:
+      - "Compare only against the historical CI-003 cold population despite its smaller test and edge counts."
+      - "Make a speed claim from one cold and one warm run."
+    evidence:
+      - "tasks/active/CI-007-module-safe-persistent-ccache-pilot.md"
+      - "benchmarks/baselines/ci_gate_latency_github_ubuntu_24_04_v1.json"
+      - "Cold cohort shape: 3,549 selected tests and 1,955 Ninja edges."
+      - "CI-003 shape: 3,526 selected tests and a prior workflow generation."
+    status: resolved
+  - id: N194
+    type: experiment
+    title: "CI-007 hosted cold cohort"
+    provenance: ai-executed
+    timestamp: "2026-07-10T20:16"
+    also_depends_on: [N192, N193]
+    evidence:
+      - "commit 5394e51b"
+      - "GitHub Actions run 29113978973"
+      - "GitHub Actions run 29115473396"
+      - "GitHub Actions run 29117419922"
+      - "GitHub Actions run 29119188858"
+      - "GitHub Actions run 29127596925 (cold sample 5 in progress)"
+      - "/tmp/ci007-evidence/<run-id>/ci-gate-timing-pr-fast/result.json"
+      - "/tmp/ci007-evidence/<run-id>/ci-ccache-module-invalidation-pr-fast/module-invalidation-probe.json"
+    result: >
+      Hosted cold samples 1-4 passed at the same SHA with identical Clang 20,
+      preset, sanitizer, Ubuntu runner, warm-vcpkg, 3,549-test, and 1,955-edge
+      shape. Build times were 1,111,716; 1,510,259; 1,391,575; and 1,406,634 ms.
+      Every sample reported 0 ccache hits, 575 misses, 0 errors, and successful
+      cached-versus-clean interface-change parity. Cold sample 5 is running and
+      will seed the warm cohort if all gates pass.
+    status: open
+  - id: N195
+    type: question
+    title: "Identify the intended locally trained model"
+    provenance: ai-suggested
+    timestamp: "2026-07-10T20:16"
+    description: >
+      Determine whether the user's "train the model" goal means the backlog's
+      GEOM-058 Gaussian-mixture `FitEM` model, a not-yet-implemented neural
+      rendering model, or a new local LLM fine-tuning workflow. Repository and
+      hardware discovery currently favor GEOM-058, but the intended durable
+      training output remains unspecified.
+    status: open

@@ -78,8 +78,15 @@ sessions:
     open_threads: 2
   - id: "2026-07-10_001"
     date: "2026-07-10"
-    summary: "Opened a module-strategy reassessment, ranked `.cppm` header-conversion candidates, and seeded ARCH-006/RUNTIME-167..174 module-surface diet task records."
-    turn_count: 4
-    events_count: 6
+    summary: "Opened module-surface diet tasks, fixed BUG-078 and BUG-080, then made CI-007 dispatchable and collected four passing hosted cold-cache samples."
+    turn_count: 9
+    events_count: 19
     claims_touched: []
-    open_threads: 1
+    open_threads: 2
+  - id: "2026-07-11_001"
+    date: "2026-07-11"
+    summary: "Reported CI-007 incomplete, validated cold sample 4, and dispatched cold sample 5 as the warm-cache seed."
+    turn_count: 1
+    events_count: 1
+    claims_touched: []
+    open_threads: 2

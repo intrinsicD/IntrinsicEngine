@@ -13,3 +13,10 @@
 - **Crystallized via**: artifact-commitment
 - **Evidence**: [tests/contract/runtime/Test.MeshPrimitiveViewExtraction.cpp], [tasks/done/RUNTIME-124-per-channel-partial-uploads.md], [tasks/done/RUNTIME-126-gpu-readback-jobs-and-property-writeback.md]
 - **From staging**: O06
+
+## K03: Scheduler Reschedule Handle Ownership
+- **Constraint**: A task coroutine handle published to `Scheduler::Reschedule()` is a single-use resumption token. The scheduler may resume it but must not call `done()` or `destroy()` after `resume()` returns; completed task frames self-destroy through `Job::promise_type::final_suspend()` because `await_suspend` may publish the handle to a wait token that another worker resumes and completes before the original resume call unwinds.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [src/core/Core.Tasks.Dispatch.cpp], [src/core/Core.Tasks.cppm], [tests/unit/core/Test.CoreTasks.cpp], [src/core/README.md], [tasks/active/BUG-078-coretasks-counterevent-rearm-uaf.md]
+- **From staging**: O10
