@@ -48,8 +48,9 @@ regressed hardening that main had shipped as the closed `BUG-066`.
 - [`BUG-076` — AsyncWorkService::ShutdownAndDrain does not drain the derived job registry](BUG-076-asyncworkservice-shutdown-skips-derived-job-registry.md):
   shutdown drains only the executor; registry quiesce is implicit. LOW.
 - [`BUG-077` — Architecture backlog index links retired ARCH tasks (strict gate red)](BUG-077-architecture-backlog-index-links-retired-arch-tasks.md):
-  the merge retired ARCH-010/011/012/013 but left them linked as active →
-  `check_task_state_links --strict` red (was green pre-merge). LOW (mechanical).
+  the merge retired ARCH-007..013 (all seven kernel seam tasks) but left them
+  linked as active → `check_task_state_links --strict` red, 7 findings (was green
+  pre-merge). LOW (mechanical).
 
 
 ---
