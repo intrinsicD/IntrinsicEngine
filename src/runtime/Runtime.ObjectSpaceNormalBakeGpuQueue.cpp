@@ -221,6 +221,14 @@ namespace Extrinsic::Runtime
             if (!recorded.has_value())
             {
                 ++m_Diagnostics.RecordFailures;
+                // BUG-074: BeginObjectSpaceNormalBakeGpuSubmission opened a
+                // pending cache slot for this asset. Dropping the ticket without
+                // failing the slot leaves it pending forever, so every future
+                // re-schedule of the same entity hits ResourceBusy ->
+                // CacheRejected -> requeue, livelocking. NotifyFailed retires the
+                // pending lease and lets a later schedule start clean.
+                m_Dependencies.GpuAssets->NotifyFailed(
+                    submitted.Ticket.GeneratedTextureAsset);
                 continue;
             }
 
@@ -234,6 +242,10 @@ namespace Extrinsic::Runtime
             if (!markedReady.has_value())
             {
                 ++m_Diagnostics.ReadyFrameFailures;
+                // BUG-074: retire the pending cache slot on the ready-frame
+                // failure path too (see the record-failure path above).
+                m_Dependencies.GpuAssets->NotifyFailed(
+                    submitted.Ticket.GeneratedTextureAsset);
                 continue;
             }
 
