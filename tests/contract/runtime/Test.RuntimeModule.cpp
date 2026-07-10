@@ -4,6 +4,8 @@
 #include <array>
 #include <chrono>
 #include <cstdint>
+#include <entt/entity/registry.hpp>
+#include <glm/glm.hpp>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -15,6 +17,10 @@ import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameGraph;
 import Extrinsic.Core.Hash;
+import Extrinsic.ECS.Component.Transform;
+import Extrinsic.ECS.Component.Transform.WorldMatrix;
+import Extrinsic.ECS.Scene.Bootstrap;
+import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.JobService;
@@ -28,6 +34,7 @@ import Extrinsic.Runtime.WorldRegistry;
 namespace Core = Extrinsic::Core;
 namespace CoreConfig = Extrinsic::Core::Config;
 namespace Runtime = Extrinsic::Runtime;
+namespace Components = Extrinsic::ECS::Components;
 
 namespace
 {
@@ -89,6 +96,13 @@ namespace
         std::uint32_t VariableTicks{0};
         std::uint32_t ProducerRuns{0};
         std::uint32_t ConsumerRuns{0};
+        Extrinsic::ECS::EntityHandle BaselineProbeEntity{};
+        std::uint32_t SimTickMutations{0};
+        std::uint32_t BaselineReaderRuns{0};
+        float CurrentSubstepExpectedX{0.0f};
+        float LastObservedWorldX{0.0f};
+        bool BaselineReaderMissingWorld{false};
+        bool BaselineReaderObservedStale{false};
         SharedProbeService* ResolvedService{};
         int ResolvedServiceValue{0};
         std::vector<std::string> FirstHookTrace{};
@@ -275,6 +289,44 @@ namespace
                 return registered;
             }
 
+            const Core::Hash::StringID transformUpdate{"TransformUpdate"};
+            if (auto registered = setup.RegisterSimSystem(
+                    Runtime::SimSystemDesc{
+                        .Name = "BaselineWorldMatrixConsumer",
+                        .WaitForSignals = {transformUpdate},
+                        .Setup = [](Core::FrameGraphBuilder& builder)
+                        {
+                            builder.Read<
+                                Components::Transform::WorldMatrix>();
+                        },
+                        .Execute = [this](Runtime::SimSystemContext& context)
+                        {
+                            m_State.BaselineReaderRuns += 1u;
+                            auto& raw = context.ActiveWorld.Raw();
+                            if (!raw.all_of<
+                                    Components::Transform::WorldMatrix>(
+                                    m_State.BaselineProbeEntity))
+                            {
+                                m_State.BaselineReaderMissingWorld = true;
+                                return;
+                            }
+
+                            m_State.LastObservedWorldX =
+                                raw.get<Components::Transform::WorldMatrix>(
+                                       m_State.BaselineProbeEntity)
+                                    .Matrix[3][0];
+                            if (m_State.LastObservedWorldX !=
+                                m_State.CurrentSubstepExpectedX)
+                            {
+                                m_State.BaselineReaderObservedStale = true;
+                            }
+                        },
+                    });
+                !registered.has_value())
+            {
+                return registered;
+            }
+
             for (const Runtime::FramePhase phase :
                  {Runtime::FramePhase::AfterCommandDrain,
                   Runtime::FramePhase::UiBuild,
@@ -357,10 +409,26 @@ namespace
 
         void OnInitialize(Runtime::Engine& engine) override
         {
+            m_State.BaselineProbeEntity =
+                Extrinsic::ECS::Scene::CreateDefault(
+                    engine.GetScene(), "BaselineTransformProbe");
             engine.Commands().Enqueue(ProbeCommand{23});
         }
 
-        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnSimTick(Runtime::Engine& engine, double) override
+        {
+            m_State.SimTickMutations += 1u;
+            m_State.CurrentSubstepExpectedX =
+                10.0f + static_cast<float>(m_State.SimTickMutations);
+
+            auto& raw = engine.GetScene().Raw();
+            raw.get<Components::Transform::Component>(
+                   m_State.BaselineProbeEntity)
+                .Position = glm::vec3(
+                    m_State.CurrentSubstepExpectedX, 0.0f, 0.0f);
+            raw.emplace_or_replace<Components::Transform::IsDirtyTag>(
+                m_State.BaselineProbeEntity);
+        }
 
         void OnVariableTick(Runtime::Engine& engine,
                             double,
@@ -508,6 +576,19 @@ TEST(RuntimeModule, EngineComposesTestModulesThroughSetupSurface)
     EXPECT_TRUE(state.ConsumerShutdownSawAnnounce);
     ASSERT_FALSE(state.ShutdownTrace.empty());
     EXPECT_EQ(state.ShutdownTrace.front(), "event:shutdown");
+}
+
+TEST(RuntimeModule, BaselineTransformConsumerObservesCurrentSubstepWorldMatrix)
+{
+    const ModuleHarnessState state = RunModuleHarness(true);
+
+    EXPECT_FALSE(state.TimedOut);
+    ASSERT_GE(state.BaselineReaderRuns, 1u);
+    EXPECT_EQ(state.BaselineReaderRuns, state.SimTickMutations);
+    EXPECT_FALSE(state.BaselineReaderMissingWorld);
+    EXPECT_FALSE(state.BaselineReaderObservedStale);
+    EXPECT_FLOAT_EQ(state.LastObservedWorldX,
+                    state.CurrentSubstepExpectedX);
 }
 
 TEST(RuntimeModule, RegistrationOrderDoesNotChangeHooksOrSchedule)

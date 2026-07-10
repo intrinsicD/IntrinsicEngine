@@ -108,6 +108,13 @@ runtime shutdown announce event has pumped. Module sim systems declare
 wait/signal labels on `SimSystemDesc` so pass ordering is data-driven rather
 than dependent on `AddModule` order.
 
+The fixed-step composition appends the promoted baseline ECS bundle before
+module sim systems. That bundle provides `TransformUpdate`, so a module that
+consumes the current substep's `Transform::WorldMatrix` declares
+`WaitForSignals = {"TransformUpdate"}` and the matching `Read<WorldMatrix>`
+hazard; it must not rely on module registration order or synthesize a duplicate
+baseline signal.
+
 This surface is not required for a one-caller, synchronous probe that still fits
 the floor. Add it when a second caller, a backend split, scheduled work,
 persisted config, command routing, UI control, or telemetry-backed diagnostics

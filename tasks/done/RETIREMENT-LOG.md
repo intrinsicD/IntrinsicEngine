@@ -8,6 +8,18 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-069`](BUG-069-runtime-module-systems-scheduled-before-ecs-bundle.md) —
+runtime-module baseline ECS ordering regression retired on 2026-07-10 at
+`CPUContracted`. Runtime registers the promoted ECS bundle before module sim
+systems, seeds its external signal labels during boot finalization, and derives
+the declarative wait/signal edges in each fixed-step `FrameGraph`. A real-engine
+contract mutates a transform in `OnSimTick` and proves a module declaring both
+`WaitForSignals = {"TransformUpdate"}` and `Read<WorldMatrix>` compiles and
+observes the current substep's matrix. The focused runtime selector and default
+CPU gate pass. Implementation commits are `3102e60f`, `c3794716`, `aead3bb0`,
+and `f45371c6`; `BUG-072` owns the remaining durable signal-unification audit
+and explicit parallel-pass regression.
+
 [`BUG-077`](BUG-077-architecture-backlog-index-links-retired-arch-tasks.md) —
 architecture backlog state-link regression retired on 2026-07-10. Commit
 `09183ea1` promoted the `Retired seam tasks` lead-in in

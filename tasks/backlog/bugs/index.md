@@ -31,9 +31,6 @@ regressed hardening that main had shipped as the closed `BUG-066`.
 - [`BUG-068` — AssetModelSceneHandoff not rebound on active-world change](BUG-068-asset-scene-handoff-not-rebound-on-active-world-change.md):
   the extracted world-maintenance path drops main's scene-borrower rebind → a
   dangling `Scene&` and use-after-free on world switch/teardown. HIGH.
-- [`BUG-069` — RuntimeModule sim-systems scheduled before the baseline ECS bundle](BUG-069-runtime-module-systems-scheduled-before-ecs-bundle.md):
-  bundle/module order reversed from main; a module reading `WorldMatrix` or
-  waiting on `TransformUpdate` reads stale data or fails to compile. HIGH (latent).
 - [`BUG-070` — RuntimeModule schedule dropped BUG-066 fail-closed guards](BUG-070-runtime-module-schedule-failclosed-guards-regressed.md):
   duplicate pass identities no longer rejected (both execute), cycle/unprovided
   signal now `std::terminate()` instead of a recoverable error; tests deleted. MEDIUM.
@@ -55,6 +52,13 @@ regressed hardening that main had shipped as the closed `BUG-066`.
 ---
 
 ## Verified / Closed
+
+- Closed 2026-07-10: [`BUG-069` — RuntimeModule sim-systems scheduled before the baseline ECS bundle](../../done/BUG-069-runtime-module-systems-scheduled-before-ecs-bundle.md).
+  Runtime now registers the promoted ECS bundle before module sim systems,
+  accepts its external signal labels at boot, and materializes declarative
+  waits per tick. A real-engine regression proves a module waiting on
+  `TransformUpdate` observes the current substep's `WorldMatrix`. `BUG-072`
+  owns the remaining durable signal-unification audit.
 
 - Closed 2026-07-10: [`BUG-077` — Architecture backlog index links retired ARCH tasks](../../done/BUG-077-architecture-backlog-index-links-retired-arch-tasks.md).
   Commit `09183ea1` promoted the `Retired seam tasks` lead-in to a recognized

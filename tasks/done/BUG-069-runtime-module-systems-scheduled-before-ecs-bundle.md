@@ -5,10 +5,20 @@ depends_on: []
 ---
 # BUG-069 — RuntimeModule sim-systems scheduled before the baseline ECS bundle
 
+## Status
+- Completed 2026-07-10 at `CPUContracted` on branch `main` in this workspace.
+- Implementation commits: `3102e60f`, `c3794716`, `aead3bb0`, and
+  `f45371c6`; the retirement commit adds the missing real-engine regression and
+  synchronizes task state.
+- Commit: implementation commits above; retirement closure is this local task
+  commit.
+- Durable call-site-independent signal unification remains owned by `BUG-072`.
+
 ## Goal
 - Guarantee that module-registered sim-systems which consume baseline ECS
   outputs (`Transform::WorldMatrix`, the `TransformUpdate` signal) are scheduled
-  **after** the promoted baseline bundle, independent of call-site order.
+  **after** the promoted baseline bundle by composing the bundle first each
+  fixed substep, independent of module add/registration order.
 
 ## Non-goals
 - No change to the core `FrameGraph` sequential RAW/WAR/WAW hazard model.
@@ -20,10 +30,11 @@ depends_on: []
   `src/runtime/Runtime.ModuleSchedule.*`.
 - Introduced by merge `76528e6`. Pre-merge main (with the `BUG-066` fix)
   registered the promoted ECS bundle **first** then module systems
-  (`c476ea6:src/runtime/Runtime.Engine.cpp:676` then `:684`). The merged tree
-  reverses it: `RunFixedStepSimulationTicks` calls `registerModuleSystems`
-  (`Runtime.Engine.FrameLoop.cppm:378`) **before** `RegisterPromotedEcsSystemBundle`
-  (`:383`), per the RUNTIME-091 "bundle last" comment.
+  (`c476ea6:src/runtime/Runtime.Engine.cpp:676` then `:684`). At discovery, the
+  merged tree reversed it: `RunFixedStepSimulationTicks` called
+  `registerModuleSystems` (`Runtime.Engine.FrameLoop.cppm:378`) **before**
+  `RegisterPromotedEcsSystemBundle` (`:383`), per the RUNTIME-091 "bundle last"
+  comment.
 - The core `FrameGraph` orients every resource hazard edge (RAW/WAW/WAR) from the
   earlier-inserted pass to the later-inserted pass
   (`src/core/Core.Dag.TaskGraph.cpp:274-321`); the topological sort therefore
@@ -53,33 +64,33 @@ depends_on: []
   call-site or insertion order at all.
 
 ## Required changes
-- [ ] Move `RegisterPromotedEcsSystemBundle(frameGraph, scene)` to run before
+- [x] Move `RegisterPromotedEcsSystemBundle(frameGraph, scene)` to run before
       `registerModuleSystems(...)` in `RunFixedStepSimulationTicks`
       (`Runtime.Engine.FrameLoop.cppm`).
-- [ ] Reconcile the conflicting ordering rationale: update the RUNTIME-091
+- [x] Reconcile the conflicting ordering rationale: update the RUNTIME-091
       comment and any doc that states "bundle last" to reflect the `BUG-066`
       "bundle-first / baseline-produces, modules-consume" rule.
 
 ## Tests
-- [ ] Add a contract test: a runtime module that `Read<Transform::WorldMatrix>`
+- [x] Add a contract test: a runtime module that `Read<Transform::WorldMatrix>`
       (or `WaitFor("TransformUpdate")`) is scheduled after the baseline bundle
       and observes the current substep's world matrix (not the previous one),
       and its substep compiles.
-- [ ] `ctest --test-dir build/ci --output-on-failure -R 'RuntimeModule|EcsSystemBundle' --timeout 60`.
-- [ ] Default CPU gate.
+- [x] `ctest --test-dir build/ci --output-on-failure -R 'RuntimeModule|EcsSystemBundle' --timeout 60`.
+- [x] Default CPU gate.
 
 ## Docs
-- [ ] Update `docs/architecture/runtime.md` and the feature-module playbook to
+- [x] Update `docs/architecture/runtime.md` and the feature-module playbook to
       state that the baseline bundle runs before module sim-systems and is the
       source of the baseline `TransformUpdate` signal modules may wait on.
 
 ## Acceptance criteria
-- [ ] A module consuming a baseline ECS output schedules after the baseline
+- [x] A module consuming a baseline ECS output schedules after the baseline
       bundle and reads current-substep data.
-- [ ] A module `WaitFor("TransformUpdate")` compiles (finds a prior signaler).
-- [ ] Code comments and architecture docs agree on the bundle/module order.
-- [ ] Default CPU gate and strict structural checks pass.
-- [ ] Durable signal-unification is owned by `BUG-072`.
+- [x] A module `WaitFor("TransformUpdate")` compiles (finds a prior signaler).
+- [x] Code comments and architecture docs agree on the bundle/module order.
+- [x] Default CPU gate and strict structural checks pass.
+- [x] Durable signal-unification is owned by `BUG-072`.
 
 ## Verification
 ```bash
@@ -91,6 +102,32 @@ python3 tools/repo/check_layering.py --root src --strict
 python3 tools/docs/check_docs_sync.py --root . --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+Closure verification on 2026-07-10:
+
+- `IntrinsicRuntimeContractTests` built with the Clang 23 `ci` preset.
+- `RuntimeModule.BaselineTransformConsumerObservesCurrentSubstepWorldMatrix`
+  passed through the real `Engine::RunFixedStepSimulationTicks` path. The test
+  mutates a transform in `OnSimTick`, declares both a `TransformUpdate` wait and
+  a `Read<Transform::WorldMatrix>` hazard, and proves the module sees the
+  current substep's translation rather than the prior matrix; the focused
+  binary also passed 20 consecutive repetitions.
+- The focused `RuntimeModule|EcsSystemBundle` CTest selector passed 18/18.
+- The default CPU-supported gate passed 3,656/3,656 in 60.93 s. An earlier run
+  in which an unrelated CUDA extension build restarted mid-gate was discarded
+  after starving only the benchmark smoke past its 60-second timeout.
+- Strict layering, docs synchronization, task policy, task-state links, test
+  layout, documentation links, PR-contract mapping, session-brief freshness,
+  and diff-whitespace checks passed.
+
+## Completion
+
+- Completed: 2026-07-10. Maturity: `CPUContracted`.
+- Outcome: baseline ECS producers are registered before module consumers, the
+  external baseline signal is accepted at boot and materialized per tick, and
+  the real-engine regression pins current-substep `WorldMatrix` visibility.
+- Follow-up: `BUG-072` owns the remaining durable signal-unification audit and
+  explicit parallel-pass regression.
 
 ## Forbidden changes
 - Do not change core `FrameGraph` hazard orientation.
