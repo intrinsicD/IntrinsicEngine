@@ -5,11 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-063` — Streaming-import contract tests flaky on main](BUG-063-streaming-import-contract-tests-flaky-on-main.md):
-  `RuntimeAssetImportFormatCoverage` streaming-queue tests fail on `main`
-  since ≥2026-07-07 (markdown-only merges included) and on PR #1010's head
-  while all other tests pass — timing-sensitive frame-budget waits on slow
-  shared runners are the likely axis.
 - [`BUG-064` — ci-vulkan FramePacingDiagnosticCapture cannot run headless](BUG-064-ci-vulkan-framepacing-headless-display.md):
   `ci-vulkan` is red on every recent run across all branches because the
   sandbox frame-pacing capture needs a display (GLFW: DISPLAY missing →
@@ -19,6 +14,14 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 ---
 
 ## Verified / Closed
+
+- Closed 2026-07-09: [`BUG-063` — Streaming-import contract tests flaky on main](../../done/BUG-063-streaming-import-contract-tests-flaky-on-main.md).
+  Three parallel format-coverage CTest processes shared
+  `assetio004_triangle.bin`; the fast representative test could remove it while
+  the two streaming decoders still needed it, producing terminal
+  `AssetDecodeFailed` results. Each fixture now owns a distinct matching glTF
+  buffer URI/path; the exact three-process repro and broader repeated contract
+  coverage pass.
 
 - Closed 2026-07-09: [`BUG-066` — RuntimeModule system order followed module registration order](../../done/BUG-066-runtime-module-system-registration-order.md).
   `ModuleRegistrationSink` now canonicalizes unique system pass names under

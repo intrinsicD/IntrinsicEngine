@@ -316,13 +316,16 @@ namespace
         return out;
     }
 
-    [[nodiscard]] std::string TriangleGltfJson()
+    [[nodiscard]] std::string TriangleGltfJson(
+        const std::string_view bufferUri)
     {
         constexpr std::string_view pngBase64 =
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=";
         return std::string(R"json({
   "asset": {"version": "2.0"},
-  "buffers": [{"uri": "assetio004_triangle.bin", "byteLength": 44}],
+  "buffers": [{"uri": ")json")
+            + std::string(bufferUri)
+            + std::string(R"json(", "byteLength": 44}],
   "bufferViews": [
     {"buffer": 0, "byteOffset": 0, "byteLength": 36, "target": 34962},
     {"buffer": 0, "byteOffset": 36, "byteLength": 6, "target": 34963}
@@ -1282,6 +1285,7 @@ TEST(RuntimeAssetImportFormatCoverage, RepresentativePromotedFormatsMaterializeD
 {
     const std::vector<std::byte> pngBytes = TinyPngBytes();
     const std::vector<std::byte> binBytes = TriangleBufferBytes();
+    constexpr std::string_view modelBinName = "assetio004_triangle.bin";
 
     TempAssetFile meshFile(
         "assetio004_mesh.obj",
@@ -1308,9 +1312,11 @@ TEST(RuntimeAssetImportFormatCoverage, RepresentativePromotedFormatsMaterializeD
         "1 0 0\n"
         "2 0 0\n");
     TempAssetFile modelBin(
-        "assetio004_triangle.bin",
+        modelBinName,
         std::span<const std::byte>(binBytes.data(), binBytes.size()));
-    TempAssetFile modelFile("assetio004_triangle.gltf", TriangleGltfJson());
+    TempAssetFile modelFile(
+        "assetio004_triangle.gltf",
+        TriangleGltfJson(modelBinName));
     TempAssetFile textureFile(
         "assetio004_albedo.png",
         std::span<const std::byte>(pngBytes.data(), pngBytes.size()));
@@ -1400,13 +1406,15 @@ TEST(RuntimeAssetImportFormatCoverage, DroppedModelSceneAndTextureImportThroughS
 {
     const std::vector<std::byte> pngBytes = TinyPngBytes();
     const std::vector<std::byte> binBytes = TriangleBufferBytes();
+    constexpr std::string_view modelBinName =
+        "assetio142_drop_triangle.bin";
 
     TempAssetFile modelBin(
-        "assetio004_triangle.bin",
+        modelBinName,
         std::span<const std::byte>(binBytes.data(), binBytes.size()));
     TempAssetFile modelFile(
         "assetio142_drop_triangle.gltf",
-        TriangleGltfJson());
+        TriangleGltfJson(modelBinName));
     TempAssetFile textureFile(
         "assetio142_drop_albedo.png",
         std::span<const std::byte>(pngBytes.data(), pngBytes.size()));
@@ -1521,13 +1529,15 @@ TEST(RuntimeAssetImportFormatCoverage, ManualModelSceneAndTextureImportQueueComp
 {
     const std::vector<std::byte> pngBytes = TinyPngBytes();
     const std::vector<std::byte> binBytes = TriangleBufferBytes();
+    constexpr std::string_view modelBinName =
+        "assetio142_manual_triangle.bin";
 
     TempAssetFile modelBin(
-        "assetio004_triangle.bin",
+        modelBinName,
         std::span<const std::byte>(binBytes.data(), binBytes.size()));
     TempAssetFile modelFile(
         "assetio142_manual_triangle.gltf",
-        TriangleGltfJson());
+        TriangleGltfJson(modelBinName));
     TempAssetFile textureFile(
         "assetio142_manual_albedo.png",
         std::span<const std::byte>(pngBytes.data(), pngBytes.size()));

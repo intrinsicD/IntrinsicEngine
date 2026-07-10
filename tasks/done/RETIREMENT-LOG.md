@@ -8,6 +8,19 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-063`](BUG-063-streaming-import-contract-tests-flaky-on-main.md) —
+streaming-import contract-test flake retired on 2026-07-09. The two streaming
+tests and the representative promoted-format test used the same external glTF
+buffer path, so parallel CTest execution let the representative fixture remove
+the buffer while background model-scene decoders still needed it. This produced
+terminal `DecodeFailed`/`AssetDecodeFailed` results rather than exhausting the
+256-frame wait budget. `TriangleGltfJson` now accepts its external-buffer URI
+and all three fixtures use distinct matching paths. The exact `-j 3` repro
+failed both streaming tests before the fix and passed 25 repetitions per test
+afterward; the full 16-test format-coverage group passed 25 repetitions, and the
+combined stacked default CPU gate passed 3635/3635. No production streaming
+behavior changed.
+
 [`BUG-066`](BUG-066-runtime-module-system-registration-order.md) —
 RuntimeModule system ordering regression retired to `tasks/done/` on
 2026-07-09 at `CPUContracted`. PR #1013 appended module systems directly to
