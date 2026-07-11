@@ -8,6 +8,31 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`PROC-020`](PROC-020-sandbox-input-lifecycle-skill.md) — sandbox input/lifecycle
+skill (playbook wave 2) retired on 2026-07-11 at `Retired` (docs/skill-surface
+only). Authored
+`tools/agents/skills/intrinsicengine-sandbox-input-lifecycle/SKILL.md`, a
+SKILL.md-only cross-cutting discipline skill capturing the six runtime
+frame-loop wiring pitfalls that regressed repeatedly in `ExtrinsicSandbox`, each
+citing its evidencing retired task(s): ImGui capture must gate camera/gizmo/pick
+input (`BUG-017`, `BUG-036`); window-close must route `WindowCloseEvent` →
+`RequestExit()`, re-check before renderer work, and idle-wait before GPU teardown
+(`BUG-027`, `BUG-037`, `BUG-054`); UI/gizmo edits after the fixed-step bundle
+need `FlushPreRenderTransformState` (`BUG-024`); decode must never block the
+platform poll thread (`BUG-021` drop-import member of the duplicated id); the
+`+Y-down`/orbit-camera sign conventions with a pole-crossing test
+(`BUG-020`, `BUG-039`→`BUG-040` fix-of-a-fix); and HiDPI window-vs-framebuffer
+cursor scaling (`BUG-026`). The wiring vocabulary was cross-checked against the
+live `Runtime.Engine.cpp`/`Runtime.Engine.FrameLoop.cppm`
+(`imguiCapturesInput` from `m_ImGuiEditorBridge.WantsMouseCapture()`,
+`RequestExitFromWindowClose`, `FlushPreRenderTransformState`), and the duplicated
+`BUG-021` id was disambiguated to the drop-import task file. Registered in the
+`intrinsicengine-core` routing table and the skills `README.md` discipline tier
+(eight → nine disciplines; seventeen → eighteen skills). No engine code changed.
+`sync_skills.py --check`, `check_doc_links.py`, and strict `check_task_policy.py`
+pass, and the skill auto-discovers. This completes the playbook wave-2 skill trio
+(`PROC-018`/`PROC-019`/`PROC-020`).
+
 [`PROC-019`](PROC-019-geometry-io-format-skill.md) — geometry-IO format skill
 (playbook wave 2) retired on 2026-07-11 at `Retired` (docs/skill-surface only).
 Authored `tools/agents/skills/intrinsicengine-geometry-io-format/SKILL.md`, a

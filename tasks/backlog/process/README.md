@@ -23,7 +23,6 @@ map.
 - [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](CI-009-heavy-gate-routing-and-runner-evaluation.md)
 - [PROC-010 — Encode P1/P3/P5 research-engine invariants in AGENTS.md + review checklist](PROC-010-encode-research-engine-invariants-in-contract.md)
   (draft for owner review).
-- [PROC-020 — Author the sandbox-input-lifecycle skill (playbook wave 2)](PROC-020-sandbox-input-lifecycle-skill.md)
 - [PROC-024 — Give the research/method track a theme and priority](PROC-024-theme-research-method-track.md)
   (draft for owner review, scheduling half of the `PROC-010` gap).
 
@@ -76,6 +75,12 @@ task-specific policy into `docs/agent/prompt/prompt.md`.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [PROC-020 — Author the sandbox-input-lifecycle skill (playbook wave 2)](../../done/PROC-020-sandbox-input-lifecycle-skill.md)
+  (done 2026-07-11): authored the SKILL.md-only
+  `intrinsicengine-sandbox-input-lifecycle` discipline skill capturing six
+  runtime frame-loop wiring pitfalls (each citing its evidencing retired bug),
+  registered in the `intrinsicengine-core` routing table and the skills
+  `README.md` discipline tier.
 - [PROC-019 — Author the geometry-io-format skill (playbook wave 2)](../../done/PROC-019-geometry-io-format-skill.md)
   (done 2026-07-11): authored the SKILL.md-only
   `intrinsicengine-geometry-io-format` discipline skill distilling the GEOIO-002

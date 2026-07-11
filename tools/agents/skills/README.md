@@ -1,12 +1,12 @@
 # IntrinsicEngine Agent Skills
 
-This folder contains seventeen [Agent Skills](https://agentskills.io). Six of
+This folder contains eighteen [Agent Skills](https://agentskills.io). Six of
 them wrap the IntrinsicEngine `AGENTS.md` contract and the procedure docs
-under `docs/agent/`; eight add IntrinsicEngine-specific cross-cutting workflow
+under `docs/agent/`; nine add IntrinsicEngine-specific cross-cutting workflow
 disciplines (diagnosis, Vulkan frame triage, GPU smoke authoring, stale-build
-triage, import-visibility contract, geometry-IO format, zoom-out, handoff) that
-don't have a single source doc under `docs/agent/`; three are imported
-third-party productivity skills.
+triage, import-visibility contract, geometry-IO format, sandbox input/lifecycle,
+zoom-out, handoff) that don't have a single source doc under `docs/agent/`;
+three are imported third-party productivity skills.
 The skills are designed to load *progressively*: only the metadata (~100 tokens
 per skill) sits in context by default, with full content loaded only when the
 skill's trigger description matches the current task.
@@ -48,7 +48,7 @@ the task template at `tasks/templates/task.md`. The authoritative
 source-to-mirror mapping is `REFERENCE_MAP` in `tools/agents/sync_skills.py`;
 if that map and this table disagree, the map wins.
 
-### Cross-cutting workflow disciplines (eight)
+### Cross-cutting workflow disciplines (nine)
 
 These skills do not wrap a single source doc under `docs/agent/`. They encode
 disciplines that apply across multiple touched scopes. The skill body is
@@ -62,6 +62,7 @@ authoritative for these.
 | `intrinsicengine-stale-build-triage` | Rule out stale C++23-module/ccache artifacts (BMIs) before diagnosing any unexplained SEGV/ASan/vtable/ICE failure; clean-rebuild ladder and staleness signatures. | unexplained SEGV after module changes, PC=0x0 dispatch, "not reproducible", ccache/ICE anomalies |
 | `intrinsicengine-import-visibility-contract` | Acceptance checklist so a "successful" asset import is actually visible and selectable in the sandbox: reference-triangle component parity, count-matched normals/UVs never dropped or overwritten, culling bounds + camera focus for off-origin geometry, non-blocking derived post-processing, and never-silent import logging. Each item cites its evidencing retired bug. | adding/changing an import/materialization path, import "succeeds" but nothing renders or is pickable, dropped normals/UVs, off-origin/culled geometry, silent drop failure |
 | `intrinsicengine-geometry-io-format` | The proven `geometry -> core` importer/exporter slice template distilled from the ~35-slice GEOIO-002 series: anonymous-namespace parsers behind an unchanged `.cppm`, `Core::Expected` readers / `*IOWriteStatus` writers, untrusted-header-count validation bounded against the payload, and `unit;geometry` round-trip / determinism / fail-closed tests with committed or byte-level fixtures. | adding/changing an OBJ/OFF/PLY/STL/PCD/XYZ/TGF importer or exporter, parsing an untrusted header count or binary body, IO diagnostics/fixtures, format-slice closure wording |
+| `intrinsicengine-sandbox-input-lifecycle` | Runtime frame-loop wiring pitfalls that regressed repeatedly: ImGui capture gating camera/gizmo/pick input, window-close routing + re-check-before-render + idle-wait-before-GPU-teardown, the pre-render transform flush for post-fixed-step edits, no blocking decode on the poll thread, and camera/cursor sign + HiDPI conventions. Each pitfall cites its evidencing retired bug. | `Engine::RunFrame` ordering, PollEvents/window-close/exit, ImGui capture gating, click-pick/gizmo drive, camera sign conventions, drag-drop on the poll thread, shutdown/device-idle teardown |
 | `intrinsicengine-zoom-out` | One-shot layer-cake map of an unfamiliar file using the engine's domain vocabulary (`core`/`geometry`/`assets`/`ecs`/`physics`/`graphics/*`/`runtime`/`app`/`methods`) and `.cppm` module surfaces. | user-invoked only (`/intrinsicengine-zoom-out`): "zoom out", "where does this fit" |
 | `intrinsicengine-handoff` | Compact the current conversation into a handoff document for the next agent. Saves to `$TMPDIR`, never into the repo (no in-tree planning docs). | "handoff", "compact this", end-of-session summarization |
 
