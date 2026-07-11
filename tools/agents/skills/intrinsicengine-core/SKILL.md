@@ -153,6 +153,7 @@ Load the specialist skill for the touched scope rather than reading every guide:
 | Adding, changing, or running benchmark harnesses/manifests/baselines | `intrinsicengine-benchmark` |
 | Moving files, changing public APIs/module surfaces, refreshing inventories | `intrinsicengine-docs-sync` |
 | Adding or changing an asset import/materialization path, or an import that "succeeds" but is not visible/selectable in the sandbox | `intrinsicengine-import-visibility-contract` |
+| Adding or changing a geometry importer/exporter (OBJ/OFF/PLY/STL/PCD/XYZ/TGF), parsing an untrusted header count, or defining IO diagnostics/fixtures | `intrinsicengine-geometry-io-format` |
 | Diagnosing a hard bug, validation-layer error, parity mismatch, or perf regression | `intrinsicengine-diagnose` |
 | Debugging a black/wrong frame, VUID cascade, or driver crash on the promoted Vulkan path | `intrinsicengine-vulkan-frame-triage` |
 | Authoring or changing an opt-in `gpu;vulkan` readback smoke, or proving a fix `Operational` | `intrinsicengine-gpu-smoke-authoring` |

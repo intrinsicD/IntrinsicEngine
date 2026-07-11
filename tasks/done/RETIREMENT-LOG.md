@@ -8,6 +8,27 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`PROC-019`](PROC-019-geometry-io-format-skill.md) — geometry-IO format skill
+(playbook wave 2) retired on 2026-07-11 at `Retired` (docs/skill-surface only).
+Authored `tools/agents/skills/intrinsicengine-geometry-io-format/SKILL.md`, a
+SKILL.md-only cross-cutting discipline skill distilling the importer/exporter
+slice shape instantiated ~35 times across the `GEOIO-002A`..`002AG` / `GEOIO-003`
+series: `geometry -> core` layering with parsers in an anonymous namespace behind
+an unchanged `.cppm`, `Core::Expected<...Result>` readers and `*IOWriteStatus`
+writers, strict parsing with untrusted-header-count validation bounded against
+the payload before any reserve/read (origin `BUG-033`), the `Core::ErrorCode`
+reader / `*IOWriteStatus` writer diagnostics taxonomy, `unit;geometry`
+round-trip/determinism/fail-closed tests with committed text and byte-level
+binary fixtures, and the `CPUContracted` closure wording that states whether an
+`Operational` follow-up is owed. The template was verified against three exemplar
+slices before writing (`GEOIO-002B` PLY ASCII exporter, `GEOIO-002D` binary STL
+importer, `GEOIO-002E` binary PLY importer) and cross-checked against the live
+`Geometry.HalfedgeMesh.IO.cppm` public surface. Registered in the
+`intrinsicengine-core` routing table and the skills `README.md` discipline tier
+(seven → eight disciplines; sixteen → seventeen skills). No engine code changed.
+`sync_skills.py --check`, `check_doc_links.py`, and strict `check_task_policy.py`
+pass, and the skill auto-discovers.
+
 [`PROC-018`](PROC-018-import-visibility-contract-skill.md) — import-visibility
 contract skill (playbook wave 2) retired on 2026-07-11 at `Retired`
 (docs/skill-surface only). Authored

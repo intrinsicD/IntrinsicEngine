@@ -59,7 +59,6 @@ the authoritative open/unblocked view.
 - unblocked: `CI-008` — Reduce CTest process overhead without oversubscribing workers (tasks/backlog/process/CI-008-grouped-ctest-and-worker-oversubscription.md)
 - blocked by `CI-005`: `CI-009` — Route heavy gates by lifecycle and evaluate runner scaling (tasks/backlog/process/CI-009-heavy-gate-routing-and-runner-evaluation.md)
 - unblocked: `PROC-010` — Encode P1/P3/P5 research-engine invariants in AGENTS.md + review checklist (tasks/backlog/process/PROC-010-encode-research-engine-invariants-in-contract.md)
-- unblocked: `PROC-019` — Author the geometry-io-format skill (playbook wave 2) (tasks/backlog/process/PROC-019-geometry-io-format-skill.md)
 - unblocked: `PROC-020` — Author the sandbox-input-lifecycle skill (playbook wave 2) (tasks/backlog/process/PROC-020-sandbox-input-lifecycle-skill.md)
 - unblocked: `PROC-024` — Give the research/method track a theme and priority (draft for owner review) (tasks/backlog/process/PROC-024-theme-research-method-track.md)
 
