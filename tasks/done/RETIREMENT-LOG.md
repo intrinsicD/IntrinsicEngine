@@ -8,6 +8,27 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`PROC-018`](PROC-018-import-visibility-contract-skill.md) — import-visibility
+contract skill (playbook wave 2) retired on 2026-07-11 at `Retired`
+(docs/skill-surface only). Authored
+`tools/agents/skills/intrinsicengine-import-visibility-contract/SKILL.md` as a
+SKILL.md-only cross-cutting discipline skill codifying the acceptance checklist
+that turns a decoded import into a genuinely visible, selectable sandbox entity.
+The seven checklist items — reference-triangle render-critical component parity
+(`GeometrySources`/`RenderSurface`/`SelectableTag`/`VisualizationConfig`/`StableId`,
+verified against `Runtime.ReferenceScene.cpp`), count-matched `v:normal`
+(preserved/area-weighted/never-overwritten), resolved `v:texcoord` (authored or
+generated atlas UVs), off-origin culling bounds plus one-shot camera focus,
+non-blocking derived post-processing that never clobbers recomputed attributes,
+deferred generated-normal/texture bindings, and never-silent receipt/queue/
+completion logging — each cite the retired task(s) that proved them
+(`BUG-022`/`023`/`038`/`041`/`043`/`044`/`045`/`047`/`048`/`050`,
+`ASSETIO-006`/`007`/`008`). Registered in the `intrinsicengine-core` routing
+table and the skills `README.md` discipline tier (six → seven disciplines;
+fifteen → sixteen skills). No engine code changed. `sync_skills.py --check`,
+`check_doc_links.py`, and strict `check_task_policy.py` pass, and the skill
+auto-discovers via the `.claude`/`.codex` skill symlinks.
+
 [`PROC-023`](PROC-023-canonicalize-skill-body-content.md) — skill-body
 canonicalization retired on 2026-07-11 at `Retired` (docs/skill-surface only).
 Three source-doc mirror skills had bodies 3–4× their `docs/agent/*` source

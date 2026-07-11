@@ -5,6 +5,22 @@ depends_on: []
 ---
 # PROC-018 — Author the import-visibility-contract skill (playbook wave 2)
 
+## Status
+
+- Completed 2026-07-11 on branch `claude/agentic-workflow-tasks-xakyf9`.
+- Maturity: `Retired` (docs/skill-surface only; no engine code).
+- Commit: this local skill-authoring-and-retirement commit.
+- Outcome: authored
+  `tools/agents/skills/intrinsicengine-import-visibility-contract/SKILL.md` as a
+  SKILL.md-only discipline skill with a seven-item visibility checklist, each
+  item citing its evidencing retired task(s) (`BUG-022`/`023`/`038`/`041`/`043`/
+  `044`/`045`/`047`/`048`/`050`, `ASSETIO-006`/`007`/`008`) and grounded in the
+  code-verified `ReferenceScene` render-critical component set. Registered in the
+  `intrinsicengine-core` routing table and the skills `README.md` discipline
+  tier (six → seven; total fifteen → sixteen). `sync_skills.py --check`,
+  `check_doc_links.py`, and strict `check_task_policy.py` pass; the skill
+  auto-discovers.
+
 ## Goal
 
 - Author `intrinsicengine-import-visibility-contract`: the checklist a new or
@@ -38,25 +54,25 @@ depends_on: []
 
 ## Required changes
 
-- [ ] Author `tools/agents/skills/intrinsicengine-import-visibility-contract/SKILL.md`
+- [x] Author `tools/agents/skills/intrinsicengine-import-visibility-contract/SKILL.md`
       with trigger-rich frontmatter and the checklist above, each item citing
       its evidencing retired task.
-- [ ] Register the skill in the `intrinsicengine-core` routing table and the
+- [x] Register the skill in the `intrinsicengine-core` routing table and the
       skills `README.md` discipline tier.
 
 ## Tests
 
-- [ ] `python3 tools/agents/sync_skills.py --check` passes.
-- [ ] `python3 tools/docs/check_doc_links.py --root .` passes.
+- [x] `python3 tools/agents/sync_skills.py --check` passes.
+- [x] `python3 tools/docs/check_doc_links.py --root .` passes.
 
 ## Docs
 
-- [ ] Skills `README.md` discipline-tier table updated.
+- [x] Skills `README.md` discipline-tier table updated.
 
 ## Acceptance criteria
 
-- [ ] Skill exists with valid frontmatter and is auto-discoverable.
-- [ ] Every checklist item cites a retired task; no aspirational content.
+- [x] Skill exists with valid frontmatter and is auto-discoverable.
+- [x] Every checklist item cites a retired task; no aspirational content.
 
 ## Verification
 
