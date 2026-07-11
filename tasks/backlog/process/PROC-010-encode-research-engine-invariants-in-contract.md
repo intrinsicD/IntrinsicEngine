@@ -5,6 +5,26 @@ depends_on: []
 ---
 # PROC-010 — Encode P1/P3/P5 research-engine invariants in AGENTS.md + review checklist
 
+## Draft review status (2026-07-11)
+
+- **Draft-for-review; nothing applied.** This pass refreshed the proposed
+  wording against current repo state so the owner can approve/reject it cleanly.
+  No change was made to `AGENTS.md`, `docs/agent/review-checklist.md`,
+  `tasks/backlog/README.md`, or any task front-matter — the `Required changes`
+  remain gated on owner sign-off (see `Forbidden changes`).
+- **Sections A and B verified current.** `AGENTS.md` §5 (Coding rules) exists;
+  the P3 reference model `RenderRecipeConfig` (e.g.
+  `src/runtime/Runtime.EngineConfigControl.cpp`) and the P5 reference model
+  `FrameRecipe*` / `docs/architecture/frame-graph.md` are all live terms. The
+  three §5 bullets and three checklist rows below are ready to apply as written
+  on approval.
+- **Section C superseded.** All nine originally-proposed Theme I members have
+  retired; the section is rewritten below to record that and to defer the
+  free `I` theme letter to `PROC-024`. This does not affect the A/B proposal,
+  which is the substance of this task.
+- **Owner decisions required:** (1) apply A + B? (2) confirm C is dropped as
+  recorded? See the consolidated decision list handed to the owner this session.
+
 ## Goal
 - Promote the research-engine design principles from descriptive architecture
   prose into binding, always-on contract invariants + per-PR checklist rows, so
@@ -77,18 +97,31 @@ depends_on: []
 - [ ] Frame/composition changes are expressed as recipe data and stay
       introspectable; the main loop remains an ordered, readable phase list (P5).
 
-### C. (Optional, owner decision) New convergence theme in `tasks/backlog/README.md`
+### C. (Superseded 2026-07-11 — do not create this theme)
+
+The originally-proposed **Theme I — Research control surface** is no longer
+actionable: all nine proposed members have retired to `tasks/done/`
+(`GRAPHICS-106`, `RUNTIME-130`, `CORE-003`, `RUNTIME-131`, `GEOM-052`,
+`GRAPHICS-107`, `RUNTIME-132`, `DOCS-003`, `DOCS-004`). The
+research-control-surface *work* those tasks tracked (config lane, recipe-driven
+frames, backend hooks) has landed under Themes B/F, so a new convergence theme
+for it would have **zero open members** and should not be created. The A/B
+invariants above still capture the durable *design principles*, which is the
+substance of this task.
+
+The distinct concern of giving the paper/method **research track** its own theme
+and priority (open `METHOD-*` / `GEOM-*` tasks — a scheduling axis, not a
+control-surface axis) is owned by `PROC-024`. The free `I` theme letter is
+recommended for that proposal, not for this superseded one.
+
+Original proposal, preserved for the review record:
 
 > ### Theme I — Research control surface (P1)
 > Make the engine fully controllable as research software: a first-class config
 > lane (config files + agents/CLI + UI as co-equal surfaces), recipe-driven frame
 > composition wired end-to-end, and CPU/GPU backend hooks present by convention.
 > Members: `GRAPHICS-106`, `RUNTIME-130`, `CORE-003`, `RUNTIME-131`, `GEOM-052`,
-> `GRAPHICS-107`, `RUNTIME-132`, `DOCS-003`, `DOCS-004`.
-
-If approved, add `"I": "Research control surface"` to `THEME_NAMES` in
-`tools/agents/generate_session_brief.py` and re-home the listed tasks to
-`theme: I`.
+> `GRAPHICS-107`, `RUNTIME-132`, `DOCS-003`, `DOCS-004` (all retired).
 
 ## Required changes
 - [ ] After owner approval, add the three §5 bullets (section A) to `AGENTS.md`.
