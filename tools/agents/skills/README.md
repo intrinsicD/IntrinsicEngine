@@ -89,6 +89,22 @@ authority chain is:
 If a skill body and a source doc disagree, the source doc wins. Resync the
 skill (see "Keeping in sync" below).
 
+### Skill-canonical sections in three mirror skills (PROC-023)
+
+Three of the six source-doc mirror skills carry named sections that **extend
+beyond** their `docs/agent/*` source and have no source counterpart. Those
+sections are **skill-canonical** — the skill body is their authoritative home
+(the discipline-skill model) — while every other section of the skill still
+mirrors its source and defers to it per the chain above. `AGENTS.md` wins on
+anything it covers. Each skill body marks the split with an **Authority
+(PROC-023)** note.
+
+| Skill | Skill-canonical section(s) | Mirrored source |
+| --- | --- | --- |
+| `intrinsicengine-benchmark` | `Anti-patterns` | `benchmark-workflow.md` + `benchmark-review-checklist.md` |
+| `intrinsicengine-method` | knowledge-graph claim→code aid; `How method work maps to the maturity taxonomy` | `method-workflow.md` + `method-review-checklist.md` |
+| `intrinsicengine-docs-sync` | `Decision rules for common cases` | `docs-sync-policy.md` |
+
 The cross-cutting discipline skills have no `docs/agent/` source; their
 SKILL.md bodies are authoritative, but the `AGENTS.md` contract still wins on
 anything it covers.

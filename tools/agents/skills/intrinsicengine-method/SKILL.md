@@ -14,6 +14,15 @@ The core invariant: **the CPU reference backend is the canonical truth for
 correctness**. Optimized and GPU backends are validated *against* the reference,
 never against each other.
 
+> **Authority (PROC-023).** The required-sequence, backend-policy,
+> verification, and review-checklist sections below mirror
+> `references/method-workflow.md` and `references/method-review-checklist.md`;
+> where they restate a source rule, the source doc wins. The **knowledge-graph
+> claim→code aid** (under *Paper claim and formulation*) and the **"How method
+> work maps to the maturity taxonomy"** section have no `docs/agent/*` source
+> and are **skill-canonical**. `AGENTS.md` §6 and `intrinsicengine-task-workflow`
+> (the maturity taxonomy) still win on anything they cover.
+
 ## Required sequence
 
 Implement method work in this order. Earlier steps gate later ones; do not skip.

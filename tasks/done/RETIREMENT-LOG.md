@@ -8,6 +8,24 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`PROC-023`](PROC-023-canonicalize-skill-body-content.md) — skill-body
+canonicalization retired on 2026-07-11 at `Retired` (docs/skill-surface only).
+Three source-doc mirror skills had bodies 3–4× their `docs/agent/*` source
+carrying normative content with no canonical home: `intrinsicengine-benchmark`
+(`Anti-patterns`), `intrinsicengine-method` (the knowledge-graph claim→code aid
+and the "How method work maps to the maturity taxonomy" mapping), and
+`intrinsicengine-docs-sync` (`Decision rules for common cases`). Each body was
+classified section-by-section (mirror vs extends/only-here); the only-here
+sections were resolved by declaring them **skill-canonical** (resolution (b),
+the discipline-skill model) rather than moving content, honoring the task's
+"no content changes" Non-goal. Every affected body now carries an `Authority
+(PROC-023)` note delimiting mirrored-from-source sections (source doc wins) from
+skill-canonical sections (skill body is the home, `AGENTS.md` still wins on
+anything it covers), and the skills `README.md` authority section records the
+model per skill in a table. No `docs/agent/*` source changed, so no `--write`
+re-sync was needed; `sync_skills.py --check`, `check_doc_links.py`, strict
+`check_task_policy.py`, and diff-mode docs-sync all pass.
+
 [`PROC-022`](PROC-022-tool-directory-readme-refresh.md) — tool-directory README
 refresh retired on 2026-07-11 at `Retired` (docs-only). The three
 `tools/*/README.md` files had drifted from their directories: `tools/ci`

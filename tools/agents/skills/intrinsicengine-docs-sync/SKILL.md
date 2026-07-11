@@ -14,6 +14,14 @@ The full source policy is in `references/docs-sync-policy.md`. This SKILL.md
 adds the per-change-type lookup, the validator commands, and decision rules
 for the common cases.
 
+> **Authority (PROC-023).** The required-updates table, quality gates,
+> module-inventory command, and validator sections below mirror
+> `references/docs-sync-policy.md` (the inventory command is `AGENTS.md` §9);
+> where they restate a source rule, the source doc wins. The **Decision rules
+> for common cases** section is a worked application of the policy with no
+> `docs/agent/*` source and is **skill-canonical**. `AGENTS.md` §9 still wins on
+> anything it covers.
+
 ## Required docs updates by change type
 
 | Change type | Required updates |

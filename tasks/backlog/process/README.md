@@ -26,7 +26,6 @@ map.
 - [PROC-018 — Author the import-visibility-contract skill (playbook wave 2)](PROC-018-import-visibility-contract-skill.md)
 - [PROC-019 — Author the geometry-io-format skill (playbook wave 2)](PROC-019-geometry-io-format-skill.md)
 - [PROC-020 — Author the sandbox-input-lifecycle skill (playbook wave 2)](PROC-020-sandbox-input-lifecycle-skill.md)
-- [PROC-023 — Canonicalize skill-body content that outgrew its docs/agent source](PROC-023-canonicalize-skill-body-content.md)
 - [PROC-024 — Give the research/method track a theme and priority](PROC-024-theme-research-method-track.md)
   (draft for owner review, scheduling half of the `PROC-010` gap).
 
@@ -79,6 +78,12 @@ task-specific policy into `docs/agent/prompt/prompt.md`.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [PROC-023 — Canonicalize skill-body content that outgrew its docs/agent source](../../done/PROC-023-canonicalize-skill-body-content.md)
+  (done 2026-07-11): classified the `intrinsicengine-benchmark`, `-method`, and
+  `-docs-sync` skill bodies section-by-section and declared their only-here
+  sections (`Anti-patterns`; knowledge-graph aid + maturity mapping; `Decision
+  rules for common cases`) skill-canonical, with an `Authority (PROC-023)` note
+  in each body and a per-skill model table in the skills `README.md`.
 - [PROC-022 — Refresh tools/* directory READMEs to match their contents](../../done/PROC-022-tool-directory-readme-refresh.md)
   (done 2026-07-11): reconciled `tools/agents`, `tools/ci`, and `tools/repo`
   READMEs to factual current state — every script/config listed with purpose
