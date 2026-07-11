@@ -17,6 +17,8 @@ Repository structure and policy scripts.
 - `check_ui_contract_guard.sh`: UI boundary guard script (canonical path).
 - `check_layering_allowlist_quality.py`: validates layering allowlist entry hygiene (required metadata, duplicate keys, broad legacy wildcard bans, and open task-owner references).
 - `check_test_layout.py`: enforces taxonomy-owned test source layout and forbids legacy wrapper test directories.
+- `check_pr_contract.py`: checks architecture/PR contract coverage (scope, layering, docs-sync, task-state) for local and CI workflows. Runs in `ci-docs.yml`.
+- `check_shader_outputs.py`: validates that a shader compilation output tree contains the expected SPIR-V files; used by shader build/compile tasks to fail closed on an empty or partial compile. Not wired into a workflow gate.
 - `generate_module_inventory.py`: module inventory generator for `src/`; defaults to `docs/api/generated/module_inventory.md`.
 - `export_module_graph.py`: emits a [graphify](https://github.com/safishamsi/graphify)-schema `graph.json` for the C++23 module dependency graph, reusing this directory's own module/layering parsers (graphify's tree-sitter C++ extractor cannot parse module syntax). Edges are tagged `same-layer`/`allowed`/`violation`; the authoritative gate remains `check_layering.py`.
 - `export_method_graph.py`: emits a graphify-schema `graph.json` for the paper → method → code chain from `methods/` (`method.yaml`, `paper.md` headings, method sources). Engine-module import edges reuse `export_module_graph`'s ids so the two graphs merge.
@@ -57,12 +59,8 @@ the method adapter already consumes.
 ## Config files
 
 - `layering_allowlist.yaml`: temporary path-scoped exceptions for `check_layering.py`; each entry must include task and expiry notes, avoid broad wildcards, and point at an open removal owner. The allowlist is currently empty.
+- `root_allowlist.yaml`: the expected repository-root entries consumed by `check_root_hygiene.py` and `check_expected_top_level.py`; build/vendor/IDE artifact directories are ignored rather than listed here.
 
 ## Compatibility entrypoints
 
-To avoid breaking historical docs/scripts during migration, legacy wrappers are temporarily retained at:
-
-- `tools/check_ui_contract_guard.sh`
-- `tools/repo/generate_module_inventory.py`
-
-These wrappers should be removed in the compatibility cleanup phase (RORG-112).
+- `tools/check_ui_contract_guard.sh` (root-level) is a surviving compatibility wrapper that delegates to the canonical `tools/repo/check_ui_contract_guard.sh`. The root-path move wrappers from the reorganization (RORG-071/RORG-112) are otherwise removed; this one entrypoint remains for historical callers.

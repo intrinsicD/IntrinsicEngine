@@ -26,7 +26,6 @@ map.
 - [PROC-018 — Author the import-visibility-contract skill (playbook wave 2)](PROC-018-import-visibility-contract-skill.md)
 - [PROC-019 — Author the geometry-io-format skill (playbook wave 2)](PROC-019-geometry-io-format-skill.md)
 - [PROC-020 — Author the sandbox-input-lifecycle skill (playbook wave 2)](PROC-020-sandbox-input-lifecycle-skill.md)
-- [PROC-022 — Refresh tools/* directory READMEs to match their contents](PROC-022-tool-directory-readme-refresh.md)
 - [PROC-023 — Canonicalize skill-body content that outgrew its docs/agent source](PROC-023-canonicalize-skill-body-content.md)
 - [PROC-024 — Give the research/method track a theme and priority](PROC-024-theme-research-method-track.md)
   (draft for owner review, scheduling half of the `PROC-010` gap).
@@ -80,6 +79,11 @@ task-specific policy into `docs/agent/prompt/prompt.md`.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [PROC-022 — Refresh tools/* directory READMEs to match their contents](../../done/PROC-022-tool-directory-readme-refresh.md)
+  (done 2026-07-11): reconciled `tools/agents`, `tools/ci`, and `tools/repo`
+  READMEs to factual current state — every script/config listed with purpose
+  and CI wiring — and removed stale `Planned moves` / `Compatibility
+  entrypoints` sections referencing the retired RORG-041/071/112 tasks.
 - [PROC-021 — Wire docs-sync and task-state-link validators into CI](../../done/PROC-021-docs-sync-strict-mode-wiring.md)
   (done 2026-07-10): `ci-docs` now enforces strict PR-diff docs synchronization
   and strict task-state links, with full base history, static workflow coverage,

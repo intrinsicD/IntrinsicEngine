@@ -8,6 +8,22 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`PROC-022`](PROC-022-tool-directory-readme-refresh.md) — tool-directory README
+refresh retired on 2026-07-11 at `Retired` (docs-only). The three
+`tools/*/README.md` files had drifted from their directories: `tools/ci`
+documented 2 of 10 scripts, `tools/agents` omitted `check_codex_config.py` and
+`check_todo_active_only.sh` while listing the shipped `validate_method_manifests.py`
+under a "Planned moves" heading, and `tools/repo` omitted `check_pr_contract.py`,
+`check_shader_outputs.py`, and `root_allowlist.yaml`. Each README now lists every
+script and config present with a one-line purpose and its concrete CI wiring
+(cross-checked against `.github/workflows/*.yml`). The stale "Planned moves"
+(RORG-041/071) and "Compatibility entrypoints" (RORG-112, plus the canonical
+`generate_module_inventory.py` mislabeled as a legacy wrapper) sections — all
+referencing `done` tasks — were corrected to current state. A bidirectional
+completeness check (every directory script appears in its README, every README
+entry resolves to an existing file) plus `check_doc_links.py` and strict
+`check_task_policy.py` pass. No script behavior changed.
+
 [`BUG-080`](BUG-080-uv-atlas-promotion-smoke-timing-flake.md) — UV-atlas
 promotion-smoke timing flake retired on 2026-07-10 at `CPUContracted`. Each
 fixture now warms one pair, individually times five fast-staged/xatlas pairs in

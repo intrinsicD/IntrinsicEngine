@@ -62,7 +62,6 @@ the authoritative open/unblocked view.
 - unblocked: `PROC-018` — Author the import-visibility-contract skill (playbook wave 2) (tasks/backlog/process/PROC-018-import-visibility-contract-skill.md)
 - unblocked: `PROC-019` — Author the geometry-io-format skill (playbook wave 2) (tasks/backlog/process/PROC-019-geometry-io-format-skill.md)
 - unblocked: `PROC-020` — Author the sandbox-input-lifecycle skill (playbook wave 2) (tasks/backlog/process/PROC-020-sandbox-input-lifecycle-skill.md)
-- unblocked: `PROC-022` — Refresh tools/* directory READMEs to match their contents (tasks/backlog/process/PROC-022-tool-directory-readme-refresh.md)
 - unblocked: `PROC-023` — Canonicalize skill-body content that outgrew its docs/agent source (tasks/backlog/process/PROC-023-canonicalize-skill-body-content.md)
 - unblocked: `PROC-024` — Give the research/method track a theme and priority (draft for owner review) (tasks/backlog/process/PROC-024-theme-research-method-track.md)
 
