@@ -1,6 +1,6 @@
 ---
 id: METHOD-015
-theme: none
+theme: I
 depends_on: [GEOM-058]
 maturity_target: CPUContracted
 ---

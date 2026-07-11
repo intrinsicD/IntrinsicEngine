@@ -8,6 +8,38 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`PROC-024`](PROC-024-theme-research-method-track.md) — research/method track
+theme retired on 2026-07-11 at `Retired` (task-map/tooling only) after owner
+approval. Created **Theme I — Research method implementation (P1)**: added
+`"I": "Research method implementation"` to `THEME_NAMES` in
+`tools/agents/generate_session_brief.py`, set `theme: I` front-matter on the 16
+open members (`METHOD-003`/`004`/`005`/`006`/`007`/`014`/`015`/`016` and the
+method-readiness seams `GEOM-013`/`014`/`019`/`024`/`058`/`059`/`060`/`061`),
+added the Theme I section with rationale to `tasks/backlog/README.md`, and
+regenerated `tasks/SESSION-BRIEF.md`. The research track (previously entirely
+`Unthemed` while engine-plumbing themes carried explicit priorities — the
+174-`GRAPHICS`-done vs 8-`METHOD`-done imbalance) is now a first-class P1 picker
+target alongside Themes B and C. The `I` letter was freed by `PROC-010`'s
+superseded Theme I. `generate_session_brief.py --check`, strict
+`check_task_policy.py`, strict `check_task_state_links.py`, and
+`check_doc_links.py` pass.
+
+[`PROC-010`](PROC-010-encode-research-engine-invariants-in-contract.md) —
+research-engine invariants retired on 2026-07-11 at `Retired` (contract/docs
+only) after owner approval of sections A and B. Promoted the three
+research-engine design principles into binding, always-on `AGENTS.md` §5
+invariants — **P1** (research pragmatism: smallest construct, plain
+structs/free-functions default, a seam needs a present justification), **P3**
+(config lane is a first-class control surface reachable by files + agents/CLI +
+UI co-equally, via a preview/validate/apply path), and **P5** (recipe-driven
+frames + a readable named-phase main loop) — with three matching per-PR rows in
+`docs/agent/review-checklist.md`, mirrored into `intrinsicengine-review` by
+`sync_skills.py --write`. Section C (a new "Theme I — Research control surface")
+was dropped: all nine proposed members had already retired, so it would have had
+zero open members; the freed `I` letter went to `PROC-024`'s research/method
+track. No engine code changed. `sync_skills.py --check`, `check_doc_links.py`,
+and strict `check_task_policy.py` pass.
+
 [`PROC-020`](PROC-020-sandbox-input-lifecycle-skill.md) — sandbox input/lifecycle
 skill (playbook wave 2) retired on 2026-07-11 at `Retired` (docs/skill-surface
 only). Authored

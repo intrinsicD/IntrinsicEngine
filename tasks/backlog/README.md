@@ -291,16 +291,14 @@ code. `PROC-001` (mirror sync gate), `PROC-002` (ID uniqueness), `PROC-005`
 and `PROC-006` (audit cadence visibility) are retired — see
 [`process/README.md`](process/README.md) and the retirement log.
 
-`PROC-001..009` are all retired. The current open Theme H member encodes the
-research-engine design principles into the contract so they become enforceable
-invariants rather than descriptive prose:
-
-- [`process/PROC-010-encode-research-engine-invariants-in-contract.md`](process/PROC-010-encode-research-engine-invariants-in-contract.md) —
-  promote P1 (research-pragmatism / structs-over-ceremony), P3 (config lane
-  first-class + agent-controllable), and P5 (recipe-driven frames + readable main
-  loop) into always-on `AGENTS.md` §5 invariants + per-PR checklist rows. Carries
-  the proposed contract wording **for owner review** (and the optional
-  "Theme I — Research control surface" convergence theme).
+`PROC-001..009` are all retired. `PROC-010` is also retired: it promoted the
+research-engine design principles `P1` (research pragmatism / structs over
+ceremony), `P3` (config lane first-class + agent-controllable), and `P5`
+(recipe-driven frames + readable main loop) into always-on `AGENTS.md` §5
+invariants with matching per-PR review rows. Its optional "Theme I — Research
+control surface" proposal was dropped (all members had retired); the `I` letter
+instead names the research/method implementation theme created by the retired
+`PROC-024` (see Theme I above and the retirement log).
 
 The CI-latency track is also Theme H because fast, trustworthy agent feedback is
 workflow infrastructure. `CI-003` is retired after capturing the 2026-07-09
@@ -318,6 +316,29 @@ floor and config/command artifact.
 `PROC-011` is retired; the contract now routes architecture questions to the
 canonical architecture index, and task authoring prompts record backend/config
 control-surface intent.
+
+### Theme I — Research method implementation (P1)
+
+Implement the paper/method reference-backend track per the method workflow
+([`/AGENTS.md`](../../AGENTS.md) §6): CPU reference backend first, correctness
+tests, benchmark harness, then optional optimized/GPU parity. The theme also
+covers the geometry method-readiness seams that unblock those methods. Members
+carry their own `depends_on` edges; the picker takes the earliest unblocked
+member.
+
+Rationale: `AGENTS.md` §1 names "geometry processing, and method-driven research
+integration" as co-equal mission, but every open `METHOD-*` / research `GEOM-*`
+task previously sat in the session brief's `Unthemed` section while engine
+plumbing held themes with explicit priorities — the research mission was
+structurally deprioritized by the picker. This theme makes the track a
+first-class, P1 scheduling target alongside Theme B (rendering) and Theme C
+(physics). Origin: `PROC-024` (retired 2026-07-11); the research-engine design
+*invariants* P1/P3/P5 are owned separately by `PROC-010` (`AGENTS.md` §5).
+
+Open members: `METHOD-003`, `METHOD-004`, `METHOD-005`, `METHOD-006` (blocked by
+`GEOM-024`), `METHOD-007`, `METHOD-014`, `METHOD-015` (blocked by `GEOM-058`),
+`METHOD-016`; and the method-readiness seams `GEOM-013`, `GEOM-014`, `GEOM-019`,
+`GEOM-024`, `GEOM-058`, `GEOM-059`, `GEOM-060`, `GEOM-061`.
 
 ## Cross-domain dependency anchors
 

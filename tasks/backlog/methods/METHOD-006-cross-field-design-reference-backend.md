@@ -1,6 +1,6 @@
 ---
 id: METHOD-006
-theme: none
+theme: I
 depends_on: [GEOM-024]
 ---
 # METHOD-006 — Cross-field / frame-field design reference backend

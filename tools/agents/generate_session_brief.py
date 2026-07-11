@@ -35,6 +35,7 @@ THEME_NAMES = {
     "F": "Architecture/runtime/UI foundation seeds",
     "G": "Active bugs",
     "H": "Agentic workflow hardening",
+    "I": "Research method implementation",
     "none": "Unthemed",
 }
 

@@ -5,21 +5,19 @@ depends_on: []
 ---
 # PROC-024 — Give the research/method track a theme and priority (draft for owner review)
 
-## Draft review status (2026-07-11)
+## Status
 
-- **Draft-for-review; nothing applied.** This pass added a concrete
-  `## Proposed decision (for review)` below for the owner to approve/reject. No
-  `theme:` front-matter, `tasks/backlog/README.md` theme map, `THEME_NAMES`, or
-  `tasks/SESSION-BRIEF.md` change was made — those remain gated on sign-off (see
-  `Forbidden changes`).
-- **Rationale re-verified current:** the done corpus is 174 `GRAPHICS-*` vs 8
-  `METHOD-*`, and all 16 open research tasks (8 `METHOD-*` + 8 research `GEOM-*`)
-  sit in the session brief's `Unthemed` section while engine-plumbing themes
-  carry P0/P1 — the structural deprioritization this task flags still holds.
-- **Coordinated with `PROC-010`:** its superseded Theme I frees the `I` theme
-  letter, which this proposal uses.
-- **Owner decision required:** approve the proposed theme + priority as drafted,
-  amend it, or record an explicit decision to keep the track unthemed and why.
+- Completed 2026-07-11 on branch `claude/agentic-workflow-tasks-xakyf9`, after
+  owner approval of the proposed decision below (create Theme I at P1, including
+  the `GEOM-*` method-readiness seams).
+- Maturity: `Retired` (task-map/tooling only; no engine code).
+- Commit: this local apply-and-retirement commit.
+- Applied: added `"I": "Research method implementation"` to `THEME_NAMES` in
+  `tools/agents/generate_session_brief.py`; set `theme: I` front-matter on the
+  16 member tasks; added the Theme I section (with rationale) to
+  `tasks/backlog/README.md`; regenerated `tasks/SESSION-BRIEF.md`. All 16 tasks
+  now render under `## Theme I` and the `Unthemed` research section is empty.
+- Coordinated with `PROC-010`, whose superseded Theme I freed the `I` letter.
 
 ## Goal
 
@@ -85,25 +83,25 @@ applied yet.
 
 ## Required changes
 
-- [ ] Owner decision: dedicated theme letter + priority for the
+- [x] Owner decision: dedicated theme letter + priority for the
       method/research track (or an explicit recorded decision to keep it
       unthemed and why).
-- [ ] If themed: set `theme:` front-matter on the member tasks, add the theme
+- [x] If themed: set `theme:` front-matter on the member tasks, add the theme
       section + rationale to `tasks/backlog/README.md`, and regenerate
       `tasks/SESSION-BRIEF.md`.
 
 ## Tests
 
-- [ ] `python3 tools/agents/generate_session_brief.py --check` passes after
+- [x] `python3 tools/agents/generate_session_brief.py --check` passes after
       regeneration.
 
 ## Docs
 
-- [ ] `tasks/backlog/README.md` theme map updated (or decision recorded).
+- [x] `tasks/backlog/README.md` theme map updated (or decision recorded).
 
 ## Acceptance criteria
 
-- [ ] The research track's scheduling status is an explicit recorded decision
+- [x] The research track's scheduling status is an explicit recorded decision
       rather than a default.
 
 ## Verification

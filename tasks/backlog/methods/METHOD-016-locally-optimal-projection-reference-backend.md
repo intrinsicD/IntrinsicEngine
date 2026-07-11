@@ -1,6 +1,6 @@
 ---
 id: METHOD-016
-theme: none
+theme: I
 depends_on: []
 maturity_target: CPUContracted
 ---

@@ -1,6 +1,6 @@
 ---
 id: GEOM-013
-theme: none
+theme: I
 depends_on: []
 ---
 # GEOM-013 — Feature-preserving dual contouring

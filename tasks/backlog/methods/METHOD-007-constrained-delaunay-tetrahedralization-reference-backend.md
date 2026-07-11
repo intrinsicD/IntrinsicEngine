@@ -1,6 +1,6 @@
 ---
 id: METHOD-007
-theme: none
+theme: I
 depends_on: []
 ---
 # METHOD-007 — Constrained Delaunay tetrahedralization reference backend

@@ -1,6 +1,6 @@
 ---
 id: GEOM-061
-theme: none
+theme: I
 depends_on: []
 maturity_target: CPUContracted
 ---

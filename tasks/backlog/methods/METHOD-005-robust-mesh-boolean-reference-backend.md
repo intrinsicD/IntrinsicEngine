@@ -1,6 +1,6 @@
 ---
 id: METHOD-005
-theme: none
+theme: I
 depends_on: []
 ---
 # METHOD-005 — Robust mesh boolean reference backend

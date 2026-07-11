@@ -1,6 +1,6 @@
 ---
 id: METHOD-003
-theme: none
+theme: I
 depends_on: [GEOM-023]
 ---
 # METHOD-003 — Closest Point Method PDE solver reference backend

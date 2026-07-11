@@ -21,10 +21,6 @@ map.
   (currently active).
 - [CI-008 — Reduce CTest process overhead without oversubscribing workers](CI-008-grouped-ctest-and-worker-oversubscription.md)
 - [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](CI-009-heavy-gate-routing-and-runner-evaluation.md)
-- [PROC-010 — Encode P1/P3/P5 research-engine invariants in AGENTS.md + review checklist](PROC-010-encode-research-engine-invariants-in-contract.md)
-  (draft for owner review).
-- [PROC-024 — Give the research/method track a theme and priority](PROC-024-theme-research-method-track.md)
-  (draft for owner review, scheduling half of the `PROC-010` gap).
 
 `PROC-012` (resolve the duplicate `GEOM-027` ID by renumbering the
 control-surface/KMeans backend-seam task to `GEOM-052`) is retired; see the
@@ -75,6 +71,15 @@ task-specific policy into `docs/agent/prompt/prompt.md`.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [PROC-024 — Give the research/method track a theme and priority](../../done/PROC-024-theme-research-method-track.md)
+  (done 2026-07-11): created **Theme I — Research method implementation (P1)** with
+  the 16 open `METHOD-*`/`GEOM-*` members, so the research mission is a
+  first-class picker target instead of `Unthemed`.
+- [PROC-010 — Encode P1/P3/P5 research-engine invariants in AGENTS.md + review checklist](../../done/PROC-010-encode-research-engine-invariants-in-contract.md)
+  (done 2026-07-11): promoted P1 (research pragmatism), P3 (config-lane control
+  surface), and P5 (recipe-driven frames) into always-on `AGENTS.md` §5 invariants
+  with matching per-PR review rows; the stale Theme I proposal (section C) was
+  dropped since its members had retired.
 - [PROC-020 — Author the sandbox-input-lifecycle skill (playbook wave 2)](../../done/PROC-020-sandbox-input-lifecycle-skill.md)
   (done 2026-07-11): authored the SKILL.md-only
   `intrinsicengine-sandbox-input-lifecycle` discipline skill capturing six
