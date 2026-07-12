@@ -52,6 +52,7 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-075` — A world can be made active while its destroy is pending (tasks/backlog/bugs/BUG-075-worldregistry-activate-while-destroy-pending.md)
 - unblocked: `BUG-076` — AsyncWorkService::ShutdownAndDrain does not drain the derived job registry (tasks/backlog/bugs/BUG-076-asyncworkservice-shutdown-skips-derived-job-registry.md)
 - unblocked: `BUG-079` — CoreTasks abandoned wait continuation leaks coroutine frame (tasks/backlog/bugs/BUG-079-coretasks-abandoned-wait-continuation-leak.md)
+- unblocked: `BUG-081` — Warm-configure CI budget still flakes on hosted-runner variance (tasks/backlog/bugs/BUG-081-warm-configure-budget-runner-variance.md)
 
 ## Theme H — Agentic workflow hardening
 
