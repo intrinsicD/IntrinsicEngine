@@ -21,15 +21,8 @@ map.
   (currently active).
 - [CI-008 — Reduce CTest process overhead without oversubscribing workers](CI-008-grouped-ctest-and-worker-oversubscription.md)
 - [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](CI-009-heavy-gate-routing-and-runner-evaluation.md)
-- [PROC-010 — Encode P1/P3/P5 research-engine invariants in AGENTS.md + review checklist](PROC-010-encode-research-engine-invariants-in-contract.md)
-  (draft for owner review).
-- [PROC-018 — Author the import-visibility-contract skill (playbook wave 2)](PROC-018-import-visibility-contract-skill.md)
-- [PROC-019 — Author the geometry-io-format skill (playbook wave 2)](PROC-019-geometry-io-format-skill.md)
-- [PROC-020 — Author the sandbox-input-lifecycle skill (playbook wave 2)](PROC-020-sandbox-input-lifecycle-skill.md)
-- [PROC-022 — Refresh tools/* directory READMEs to match their contents](PROC-022-tool-directory-readme-refresh.md)
-- [PROC-023 — Canonicalize skill-body content that outgrew its docs/agent source](PROC-023-canonicalize-skill-body-content.md)
-- [PROC-024 — Give the research/method track a theme and priority](PROC-024-theme-research-method-track.md)
-  (draft for owner review, scheduling half of the `PROC-010` gap).
+- [PROC-025 — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality](PROC-025-port-research-ideation-skill-to-other-repos.md)
+  (portable playbook; run from a session scoped to the target repo).
 
 `PROC-012` (resolve the duplicate `GEOM-027` ID by renumbering the
 control-surface/KMeans backend-seam task to `GEOM-052`) is retired; see the
@@ -80,6 +73,44 @@ task-specific policy into `docs/agent/prompt/prompt.md`.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [PROC-024 — Give the research/method track a theme and priority](../../done/PROC-024-theme-research-method-track.md)
+  (done 2026-07-11): created **Theme I — Research method implementation (P1)** with
+  the 16 open `METHOD-*`/`GEOM-*` members, so the research mission is a
+  first-class picker target instead of `Unthemed`.
+- [PROC-010 — Encode P1/P3/P5 research-engine invariants in AGENTS.md + review checklist](../../done/PROC-010-encode-research-engine-invariants-in-contract.md)
+  (done 2026-07-11): promoted P1 (research pragmatism), P3 (config-lane control
+  surface), and P5 (recipe-driven frames) into always-on `AGENTS.md` §5 invariants
+  with matching per-PR review rows; the stale Theme I proposal (section C) was
+  dropped since its members had retired.
+- [PROC-020 — Author the sandbox-input-lifecycle skill (playbook wave 2)](../../done/PROC-020-sandbox-input-lifecycle-skill.md)
+  (done 2026-07-11): authored the SKILL.md-only
+  `intrinsicengine-sandbox-input-lifecycle` discipline skill capturing six
+  runtime frame-loop wiring pitfalls (each citing its evidencing retired bug),
+  registered in the `intrinsicengine-core` routing table and the skills
+  `README.md` discipline tier.
+- [PROC-019 — Author the geometry-io-format skill (playbook wave 2)](../../done/PROC-019-geometry-io-format-skill.md)
+  (done 2026-07-11): authored the SKILL.md-only
+  `intrinsicengine-geometry-io-format` discipline skill distilling the GEOIO-002
+  importer/exporter slice shape (verified against `GEOIO-002B`/`002D`/`002E` and
+  the live IO surface), registered in the `intrinsicengine-core` routing table
+  and the skills `README.md` discipline tier.
+- [PROC-018 — Author the import-visibility-contract skill (playbook wave 2)](../../done/PROC-018-import-visibility-contract-skill.md)
+  (done 2026-07-11): authored the SKILL.md-only
+  `intrinsicengine-import-visibility-contract` discipline skill (seven-item
+  checklist, each item citing its evidencing retired import/visibility bug),
+  registered in the `intrinsicengine-core` routing table and the skills
+  `README.md` discipline tier.
+- [PROC-023 — Canonicalize skill-body content that outgrew its docs/agent source](../../done/PROC-023-canonicalize-skill-body-content.md)
+  (done 2026-07-11): classified the `intrinsicengine-benchmark`, `-method`, and
+  `-docs-sync` skill bodies section-by-section and declared their only-here
+  sections (`Anti-patterns`; knowledge-graph aid + maturity mapping; `Decision
+  rules for common cases`) skill-canonical, with an `Authority (PROC-023)` note
+  in each body and a per-skill model table in the skills `README.md`.
+- [PROC-022 — Refresh tools/* directory READMEs to match their contents](../../done/PROC-022-tool-directory-readme-refresh.md)
+  (done 2026-07-11): reconciled `tools/agents`, `tools/ci`, and `tools/repo`
+  READMEs to factual current state — every script/config listed with purpose
+  and CI wiring — and removed stale `Planned moves` / `Compatibility
+  entrypoints` sections referencing the retired RORG-041/071/112 tasks.
 - [PROC-021 — Wire docs-sync and task-state-link validators into CI](../../done/PROC-021-docs-sync-strict-mode-wiring.md)
   (done 2026-07-10): `ci-docs` now enforces strict PR-diff docs synchronization
   and strict task-state links, with full base history, static workflow coverage,

@@ -5,6 +5,24 @@ depends_on: []
 ---
 # PROC-010 — Encode P1/P3/P5 research-engine invariants in AGENTS.md + review checklist
 
+## Status
+
+- Completed 2026-07-11 on branch `claude/agentic-workflow-tasks-xakyf9`, after
+  owner approval of sections A and B and the decision to drop section C.
+- Maturity: `Retired` (contract/docs only; no engine code).
+- Commit: this local apply-and-retirement commit.
+- Applied: the three research-engine invariants **P1** (research pragmatism),
+  **P3** (config lane as a first-class control surface), and **P5**
+  (recipe-driven frames + readable main loop) are now always-on `AGENTS.md` §5
+  bullets with three matching per-PR rows in `docs/agent/review-checklist.md`
+  (mirrored into `intrinsicengine-review` via `sync_skills.py --write`).
+- Dropped: section C (a new "Theme I — Research control surface") — all nine
+  proposed members had retired, so it would have zero open members. The free
+  `I` theme letter is used by `PROC-024` for the research/method track instead.
+- Verified current before applying: `AGENTS.md` §5 exists; the P3 model
+  `RenderRecipeConfig` and the P5 model `FrameRecipe*` /
+  `docs/architecture/frame-graph.md` are live terms.
+
 ## Goal
 - Promote the research-engine design principles from descriptive architecture
   prose into binding, always-on contract invariants + per-PR checklist rows, so
@@ -67,56 +85,70 @@ depends_on: []
 
 ### B. Add to `docs/agent/review-checklist.md` — three per-PR rows
 
-- [ ] Data-driven additions use plain structs/free functions; any new
+- [x] Data-driven additions use plain structs/free functions; any new
       interface/factory/wrapper/backend seam has a present second caller, a
       layering boundary, a test double, or a config/UI/agent variant axis
       justifying it (P1).
-- [ ] New engine-tunable state is reachable from config files and an agent/CLI
+- [x] New engine-tunable state is reachable from config files and an agent/CLI
       path (not UI-only) and round-trips through the config lane with a
       side-effect-free preview/validate step (P3).
-- [ ] Frame/composition changes are expressed as recipe data and stay
+- [x] Frame/composition changes are expressed as recipe data and stay
       introspectable; the main loop remains an ordered, readable phase list (P5).
 
-### C. (Optional, owner decision) New convergence theme in `tasks/backlog/README.md`
+### C. (Superseded 2026-07-11 — do not create this theme)
+
+The originally-proposed **Theme I — Research control surface** is no longer
+actionable: all nine proposed members have retired to `tasks/done/`
+(`GRAPHICS-106`, `RUNTIME-130`, `CORE-003`, `RUNTIME-131`, `GEOM-052`,
+`GRAPHICS-107`, `RUNTIME-132`, `DOCS-003`, `DOCS-004`). The
+research-control-surface *work* those tasks tracked (config lane, recipe-driven
+frames, backend hooks) has landed under Themes B/F, so a new convergence theme
+for it would have **zero open members** and should not be created. The A/B
+invariants above still capture the durable *design principles*, which is the
+substance of this task.
+
+The distinct concern of giving the paper/method **research track** its own theme
+and priority (open `METHOD-*` / `GEOM-*` tasks — a scheduling axis, not a
+control-surface axis) is owned by `PROC-024`. The free `I` theme letter is
+recommended for that proposal, not for this superseded one.
+
+Original proposal, preserved for the review record:
 
 > ### Theme I — Research control surface (P1)
 > Make the engine fully controllable as research software: a first-class config
 > lane (config files + agents/CLI + UI as co-equal surfaces), recipe-driven frame
 > composition wired end-to-end, and CPU/GPU backend hooks present by convention.
 > Members: `GRAPHICS-106`, `RUNTIME-130`, `CORE-003`, `RUNTIME-131`, `GEOM-052`,
-> `GRAPHICS-107`, `RUNTIME-132`, `DOCS-003`, `DOCS-004`.
-
-If approved, add `"I": "Research control surface"` to `THEME_NAMES` in
-`tools/agents/generate_session_brief.py` and re-home the listed tasks to
-`theme: I`.
+> `GRAPHICS-107`, `RUNTIME-132`, `DOCS-003`, `DOCS-004` (all retired).
 
 ## Required changes
-- [ ] After owner approval, add the three §5 bullets (section A) to `AGENTS.md`.
-- [ ] After owner approval, add the three per-PR rows (section B) to
+- [x] After owner approval, add the three §5 bullets (section A) to `AGENTS.md`.
+- [x] After owner approval, add the three per-PR rows (section B) to
       `docs/agent/review-checklist.md`.
-- [ ] If the owner approves section C, add Theme I to `tasks/backlog/README.md`
-      and `THEME_NAMES`, and re-home the listed tasks' front-matter `theme: I`.
-- [ ] Re-run `python3 tools/agents/sync_skills.py --write` to refresh skill mirrors.
-- [ ] Regenerate `python3 tools/agents/generate_session_brief.py` if theme
-      front-matter changed.
+- [x] Section C declined (all proposed members retired); no `tasks/backlog/README.md`
+      / `THEME_NAMES` / front-matter change made here. The `I` theme letter is used
+      by `PROC-024` for the research/method track instead.
+- [x] Re-run `python3 tools/agents/sync_skills.py --write` to refresh skill mirrors.
+- [x] No theme front-matter changed by this task, so no session-brief regeneration
+      was required here (`PROC-024` owns the research-theme brief update).
 
 ## Tests
-- [ ] `python3 tools/agents/check_task_policy.py --root . --strict` passes.
-- [ ] `python3 tools/docs/check_doc_links.py --root .` passes.
-- [ ] `git diff --quiet -- tools/agents/skills` after `sync_skills.py --write`
+- [x] `python3 tools/agents/check_task_policy.py --root . --strict` passes.
+- [x] `python3 tools/docs/check_doc_links.py --root .` passes.
+- [x] `git diff --quiet -- tools/agents/skills` after `sync_skills.py --write`
       (mirrors are in sync; `ci-docs.yml` enforces this).
 
 ## Docs
-- [ ] `AGENTS.md` §5 carries the three new bullets (section A).
-- [ ] `docs/agent/review-checklist.md` carries the three matching rows (section B).
-- [ ] Skill mirrors regenerated; session brief regenerated if themes changed.
+- [x] `AGENTS.md` §5 carries the three new bullets (section A).
+- [x] `docs/agent/review-checklist.md` carries the three matching rows (section B).
+- [x] Skill mirrors regenerated; session brief regenerated if themes changed.
 
 ## Acceptance criteria
-- [ ] P1/P3/P5 are stated as always-on `AGENTS.md` invariants with matching per-PR
+- [x] P1/P3/P5 are stated as always-on `AGENTS.md` invariants with matching per-PR
       checklist rows.
-- [ ] Skill mirrors and (if changed) the session brief are in sync; `ci-docs`
+- [x] Skill mirrors and (if changed) the session brief are in sync; `ci-docs`
       structural checks pass.
-- [ ] No engine code touched; no CI validator added for these principles.
+- [x] No engine code touched; no CI validator added for these principles.
 
 ## Verification
 ```bash

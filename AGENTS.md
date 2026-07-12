@@ -177,6 +177,21 @@ Every new dependency edge must be justifiable by layer policy and reflected in d
 - CUDA compute support is optional and off by default (`INTRINSIC_ENABLE_CUDA=OFF` in `ci`/`dev` presets); enable it
   only for tasks that explicitly require CUDA seams, using `dev-cuda` or an equivalent configure with a valid
   `CUDAToolkit` install.
+- **Research pragmatism (P1).** This is research-driving software: prefer the smallest construct that does the job.
+  Plain `struct`s and free functions are the default for data-driven code (configs, params/result records, CPU/GPU
+  descriptors, packed buffers). Introduce an interface, factory, wrapper, builder, or backend seam only when a *present*
+  second caller, a layering boundary, a test-double surface, or a config/UI/agent-controllable variant axis requires it
+  — one implementation is not a seam. Robustness means fail-closed and deterministic, not defensive ceremony.
+- **Config lane is a first-class control surface (P3).** Engine-tunable behavior must be reachable through the config
+  tree by config files, agents/CLI, **and** the UI as co-equal surfaces — never UI-only. New tuning state is expressed
+  as serializable config that round-trips to a file and is applied through a side-effect-free preview/validate-then-apply
+  path (the `RenderRecipeConfig` schema-id + version + diagnostics shape is the reference model). UI panels and agents
+  drive the same validated apply path; a UI handler must not poke a subsystem through a private path the config lane
+  cannot reproduce.
+- **Recipe-driven frames and a readable main loop (P5).** Frame composition is data-driven: passes/resources are
+  described by recipe data (`FrameRecipe*`), default recipes are derived/loaded at init, and the engine update loop
+  reads as an ordered list of named phases (see `docs/architecture/frame-graph.md`). Do not hardcode pass order or
+  composition behind imperative branches that the recipe data cannot express or introspect.
 
 ## 6. Method implementation protocol
 

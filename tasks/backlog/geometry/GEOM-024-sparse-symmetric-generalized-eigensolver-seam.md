@@ -1,6 +1,6 @@
 ---
 id: GEOM-024
-theme: none
+theme: I
 depends_on: [GEOM-020]
 ---
 # GEOM-024 — Sparse symmetric generalized eigensolver seam

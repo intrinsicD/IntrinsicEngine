@@ -5,6 +5,18 @@ depends_on: []
 ---
 # PROC-022 — Refresh tools/* directory READMEs to match their contents
 
+## Status
+
+- Completed 2026-07-11 on branch `claude/agentic-workflow-tasks-xakyf9`.
+- Maturity: `Retired` (docs-only; factual-current-state reconciliation).
+- Commit: this local docs-refresh-and-retirement commit.
+- Outcome: all three `tools/*/README.md` files now list every script and config
+  present in their directory with a one-line purpose and CI wiring; stale
+  "Planned moves" (RORG-041/071, both `done`) and "Compatibility entrypoints"
+  (RORG-112 `done`; canonical `generate_module_inventory.py` mislabeled as a
+  wrapper) sections were corrected. A bidirectional completeness check and the
+  `check_doc_links.py` / strict `check_task_policy.py` gates pass.
+
 ## Goal
 
 - Bring `tools/agents/README.md`, `tools/ci/README.md`, and
@@ -30,22 +42,22 @@ depends_on: []
 
 ## Required changes
 
-- [ ] Reconcile each of the three READMEs against `ls` of its directory:
+- [x] Reconcile each of the three READMEs against `ls` of its directory:
       add missing scripts (purpose + where CI invokes them), remove or
       re-label stale "planned" entries.
-- [ ] Cross-check each script's CI claims against `.github/workflows/*.yml`.
+- [x] Cross-check each script's CI claims against `.github/workflows/*.yml`.
 
 ## Tests
 
-- [ ] `python3 tools/docs/check_doc_links.py --root .` passes.
+- [x] `python3 tools/docs/check_doc_links.py --root .` passes.
 
 ## Docs
 
-- [ ] The three READMEs themselves; no other docs owed.
+- [x] The three READMEs themselves; no other docs owed.
 
 ## Acceptance criteria
 
-- [ ] Every script under the three directories appears in its README, and
+- [x] Every script under the three directories appears in its README, and
       every README entry corresponds to an existing script.
 
 ## Verification

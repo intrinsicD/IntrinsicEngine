@@ -1,6 +1,6 @@
 ---
 id: METHOD-014
-theme: none
+theme: I
 depends_on:
   - METHOD-013
 maturity_target: ParityProven

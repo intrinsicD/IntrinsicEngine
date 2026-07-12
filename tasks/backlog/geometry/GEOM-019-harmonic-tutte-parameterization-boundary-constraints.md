@@ -1,6 +1,6 @@
 ---
 id: GEOM-019
-theme: none
+theme: I
 depends_on: [GEOM-018, GEOM-020]
 ---
 # GEOM-019 — Harmonic/Tutte parameterization and boundary constraints

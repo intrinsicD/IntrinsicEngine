@@ -13,6 +13,13 @@ broader `methods/` layer also produces benchmarks, governed by
 The core invariant: **performance claims require baseline comparison**. A
 benchmark without a baseline is a measurement, not a claim.
 
+> **Authority (PROC-023).** The lifecycle, manifest/runner/reporting, and
+> review-checklist sections below mirror `references/benchmark-workflow.md` and
+> `references/benchmark-review-checklist.md`; where they restate a source rule,
+> the source doc wins. The **Anti-patterns** section has no `docs/agent/*`
+> source and is **skill-canonical** (the discipline-skill model). `AGENTS.md`
+> §8 still wins on anything it covers.
+
 ## Benchmark lifecycle
 
 1. **Define benchmark intent.** One of: `smoke`, `correctness`, `performance`,

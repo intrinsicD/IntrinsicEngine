@@ -1,6 +1,6 @@
 ---
 id: METHOD-004
-theme: none
+theme: I
 depends_on: []
 ---
 # METHOD-004 — Walk on Spheres / Walk on Stars PDE solver reference backend

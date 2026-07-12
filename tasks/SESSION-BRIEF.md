@@ -21,6 +21,7 @@ the authoritative open/unblocked view.
 
 - unblocked: `ARCH-006` — Move Sandbox application editor content out of runtime (tasks/backlog/architecture/ARCH-006-sandbox-editor-content-out-of-runtime.md)
 - unblocked: `ARCH-014` — Kernel convergence tracking (umbrella north-star) (tasks/backlog/architecture/ARCH-014-kernel-convergence-tracking.md)
+- unblocked: `ARCH-015` — Runtime module scope: cluster methods by result-consumer contract (grilling + ADR) (tasks/backlog/architecture/ARCH-015-runtime-module-scope-by-result-consumer-contract.md)
 - unblocked: `CORE-005` — Non-blocking TaskGraph submission and completion API (tasks/backlog/architecture/CORE-005-nonblocking-taskgraph-submit-api.md)
 - unblocked: `CORE-006` — Domain-free core task/DAG vocabulary (tasks/backlog/architecture/CORE-006-domain-free-core-task-vocabulary.md)
 - unblocked: `CORE-007` — Scheduler priority, wait, and wake hardening (tasks/backlog/architecture/CORE-007-scheduler-priority-wait-wake-hardening.md)
@@ -58,15 +59,9 @@ the authoritative open/unblocked view.
 - blocked by `CI-005`: `CI-006` — Remove duplicate sanitizer work and calibrate test parallelism (tasks/backlog/process/CI-006-sanitizer-topology-and-test-parallelism.md)
 - unblocked: `CI-008` — Reduce CTest process overhead without oversubscribing workers (tasks/backlog/process/CI-008-grouped-ctest-and-worker-oversubscription.md)
 - blocked by `CI-005`: `CI-009` — Route heavy gates by lifecycle and evaluate runner scaling (tasks/backlog/process/CI-009-heavy-gate-routing-and-runner-evaluation.md)
-- unblocked: `PROC-010` — Encode P1/P3/P5 research-engine invariants in AGENTS.md + review checklist (tasks/backlog/process/PROC-010-encode-research-engine-invariants-in-contract.md)
-- unblocked: `PROC-018` — Author the import-visibility-contract skill (playbook wave 2) (tasks/backlog/process/PROC-018-import-visibility-contract-skill.md)
-- unblocked: `PROC-019` — Author the geometry-io-format skill (playbook wave 2) (tasks/backlog/process/PROC-019-geometry-io-format-skill.md)
-- unblocked: `PROC-020` — Author the sandbox-input-lifecycle skill (playbook wave 2) (tasks/backlog/process/PROC-020-sandbox-input-lifecycle-skill.md)
-- unblocked: `PROC-022` — Refresh tools/* directory READMEs to match their contents (tasks/backlog/process/PROC-022-tool-directory-readme-refresh.md)
-- unblocked: `PROC-023` — Canonicalize skill-body content that outgrew its docs/agent source (tasks/backlog/process/PROC-023-canonicalize-skill-body-content.md)
-- unblocked: `PROC-024` — Give the research/method track a theme and priority (draft for owner review) (tasks/backlog/process/PROC-024-theme-research-method-track.md)
+- unblocked: `PROC-025` — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality (tasks/backlog/process/PROC-025-port-research-ideation-skill-to-other-repos.md)
 
-## Unthemed
+## Theme I — Research method implementation
 
 - unblocked: `GEOM-013` — Feature-preserving dual contouring (tasks/backlog/geometry/GEOM-013-feature-preserving-dual-contouring.md)
 - unblocked: `GEOM-014` — Feature-aware quadric error mesh simplification (tasks/backlog/geometry/GEOM-014-feature-aware-quadric-error-simplification.md)
@@ -76,7 +71,6 @@ the authoritative open/unblocked view.
 - unblocked: `GEOM-059` — Kernel matrices, Nyström approximation, and Gaussian-process interpolation seam (tasks/backlog/geometry/GEOM-059-kernel-matrices-nystroem-gaussian-process.md)
 - unblocked: `GEOM-060` — Permutohedral lattice fast high-dimensional filtering seam (tasks/backlog/geometry/GEOM-060-permutohedral-lattice-highdim-filtering.md)
 - unblocked: `GEOM-061` — Point-cloud grid-downsampling reduction strategies (tasks/backlog/geometry/GEOM-061-grid-downsampling-reduction-strategies.md)
-- unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 - unblocked: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
 - unblocked: `METHOD-004` — Walk on Spheres / Walk on Stars PDE solver reference backend (tasks/backlog/methods/METHOD-004-walk-on-spheres-reference-backend.md)
 - unblocked: `METHOD-005` — Robust mesh boolean reference backend (tasks/backlog/methods/METHOD-005-robust-mesh-boolean-reference-backend.md)
@@ -85,6 +79,10 @@ the authoritative open/unblocked view.
 - unblocked: `METHOD-014` — Progressive Poisson GPU operational parity (tasks/backlog/methods/METHOD-014-progressive-poisson-gpu-operational-parity.md)
 - blocked by `GEOM-058`: `METHOD-015` — Coherent Point Drift registration family reference backend (tasks/backlog/methods/METHOD-015-coherent-point-drift-family-reference-backend.md)
 - unblocked: `METHOD-016` — Locally Optimal Projection (LOP/WLOP) point-cloud consolidation reference backend (tasks/backlog/methods/METHOD-016-locally-optimal-projection-reference-backend.md)
+
+## Unthemed
+
+- unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 
 ## Audits
 

@@ -149,10 +149,14 @@ Load the specialist skill for the touched scope rather than reading every guide:
 | Creating, promoting, retiring, or materially updating files under `tasks/` | `intrinsicengine-task-workflow` |
 | Before committing or reporting completion for a non-trivial change | `intrinsicengine-review` |
 | Changing dependency boundaries, module ownership, source layout, runtime wiring | `intrinsicengine-review` (architecture-review checklist) |
+| Proposing novel, unconventional, cross-domain, or potentially publishable research directions (the ideation front end that feeds the method track) | `intrinsicengine-research-ideation` |
 | Implementing or modifying paper/method work under `methods/` | `intrinsicengine-method` |
 | Adding, changing, or running benchmark harnesses/manifests/baselines | `intrinsicengine-benchmark` |
 | Moving files, changing public APIs/module surfaces, refreshing inventories | `intrinsicengine-docs-sync` |
+| Adding or changing an asset import/materialization path, or an import that "succeeds" but is not visible/selectable in the sandbox | `intrinsicengine-import-visibility-contract` |
+| Adding or changing a geometry importer/exporter (OBJ/OFF/PLY/STL/PCD/XYZ/TGF), parsing an untrusted header count, or defining IO diagnostics/fixtures | `intrinsicengine-geometry-io-format` |
 | Diagnosing a hard bug, validation-layer error, parity mismatch, or perf regression | `intrinsicengine-diagnose` |
+| Sandbox input capture, window-close/exit, edit-flush ordering, camera/cursor sign, or drag-drop poll-thread wiring in `Engine::RunFrame` | `intrinsicengine-sandbox-input-lifecycle` |
 | Debugging a black/wrong frame, VUID cascade, or driver crash on the promoted Vulkan path | `intrinsicengine-vulkan-frame-triage` |
 | Authoring or changing an opt-in `gpu;vulkan` readback smoke, or proving a fix `Operational` | `intrinsicengine-gpu-smoke-authoring` |
 | Unexplained SEGV/ASan/vtable/ICE failure, especially after `.cppm` module changes | `intrinsicengine-stale-build-triage` |

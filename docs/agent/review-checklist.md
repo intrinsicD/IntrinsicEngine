@@ -29,6 +29,16 @@ Use this checklist before commit and PR creation.
 - [ ] Dependency flow follows `AGENTS.md` invariants.
 - [ ] No cross-layer convenience imports introduced.
 - [ ] Runtime wiring remains in `runtime`.
+- [ ] Data-driven additions use plain structs/free functions; any new
+      interface/factory/wrapper/backend seam has a present second caller, a
+      layering boundary, a test double, or a config/UI/agent variant axis
+      justifying it (`AGENTS.md` §5, P1).
+- [ ] New engine-tunable state is reachable from config files and an agent/CLI
+      path (not UI-only) and round-trips through the config lane with a
+      side-effect-free preview/validate step (`AGENTS.md` §5, P3).
+- [ ] Frame/composition changes are expressed as recipe data and stay
+      introspectable; the main loop remains an ordered, readable phase list
+      (`AGENTS.md` §5, P5).
 - [ ] If the change touches a dependency boundary, a renderer subsystem/pass,
       RHI/platform/runtime wiring, a scaffold/parity closure, or a layering
       allowlist entry, run the clean-workshop scorecard

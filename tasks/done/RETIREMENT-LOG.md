@@ -8,6 +8,139 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`PROC-024`](PROC-024-theme-research-method-track.md) — research/method track
+theme retired on 2026-07-11 at `Retired` (task-map/tooling only) after owner
+approval. Created **Theme I — Research method implementation (P1)**: added
+`"I": "Research method implementation"` to `THEME_NAMES` in
+`tools/agents/generate_session_brief.py`, set `theme: I` front-matter on the 16
+open members (`METHOD-003`/`004`/`005`/`006`/`007`/`014`/`015`/`016` and the
+method-readiness seams `GEOM-013`/`014`/`019`/`024`/`058`/`059`/`060`/`061`),
+added the Theme I section with rationale to `tasks/backlog/README.md`, and
+regenerated `tasks/SESSION-BRIEF.md`. The research track (previously entirely
+`Unthemed` while engine-plumbing themes carried explicit priorities — the
+174-`GRAPHICS`-done vs 8-`METHOD`-done imbalance) is now a first-class P1 picker
+target alongside Themes B and C. The `I` letter was freed by `PROC-010`'s
+superseded Theme I. `generate_session_brief.py --check`, strict
+`check_task_policy.py`, strict `check_task_state_links.py`, and
+`check_doc_links.py` pass.
+
+[`PROC-010`](PROC-010-encode-research-engine-invariants-in-contract.md) —
+research-engine invariants retired on 2026-07-11 at `Retired` (contract/docs
+only) after owner approval of sections A and B. Promoted the three
+research-engine design principles into binding, always-on `AGENTS.md` §5
+invariants — **P1** (research pragmatism: smallest construct, plain
+structs/free-functions default, a seam needs a present justification), **P3**
+(config lane is a first-class control surface reachable by files + agents/CLI +
+UI co-equally, via a preview/validate/apply path), and **P5** (recipe-driven
+frames + a readable named-phase main loop) — with three matching per-PR rows in
+`docs/agent/review-checklist.md`, mirrored into `intrinsicengine-review` by
+`sync_skills.py --write`. Section C (a new "Theme I — Research control surface")
+was dropped: all nine proposed members had already retired, so it would have had
+zero open members; the freed `I` letter went to `PROC-024`'s research/method
+track. No engine code changed. `sync_skills.py --check`, `check_doc_links.py`,
+and strict `check_task_policy.py` pass.
+
+[`PROC-020`](PROC-020-sandbox-input-lifecycle-skill.md) — sandbox input/lifecycle
+skill (playbook wave 2) retired on 2026-07-11 at `Retired` (docs/skill-surface
+only). Authored
+`tools/agents/skills/intrinsicengine-sandbox-input-lifecycle/SKILL.md`, a
+SKILL.md-only cross-cutting discipline skill capturing the six runtime
+frame-loop wiring pitfalls that regressed repeatedly in `ExtrinsicSandbox`, each
+citing its evidencing retired task(s): ImGui capture must gate camera/gizmo/pick
+input (`BUG-017`, `BUG-036`); window-close must route `WindowCloseEvent` →
+`RequestExit()`, re-check before renderer work, and idle-wait before GPU teardown
+(`BUG-027`, `BUG-037`, `BUG-054`); UI/gizmo edits after the fixed-step bundle
+need `FlushPreRenderTransformState` (`BUG-024`); decode must never block the
+platform poll thread (`BUG-021` drop-import member of the duplicated id); the
+`+Y-down`/orbit-camera sign conventions with a pole-crossing test
+(`BUG-020`, `BUG-039`→`BUG-040` fix-of-a-fix); and HiDPI window-vs-framebuffer
+cursor scaling (`BUG-026`). The wiring vocabulary was cross-checked against the
+live `Runtime.Engine.cpp`/`Runtime.Engine.FrameLoop.cppm`
+(`imguiCapturesInput` from `m_ImGuiEditorBridge.WantsMouseCapture()`,
+`RequestExitFromWindowClose`, `FlushPreRenderTransformState`), and the duplicated
+`BUG-021` id was disambiguated to the drop-import task file. Registered in the
+`intrinsicengine-core` routing table and the skills `README.md` discipline tier
+(eight → nine disciplines; seventeen → eighteen skills). No engine code changed.
+`sync_skills.py --check`, `check_doc_links.py`, and strict `check_task_policy.py`
+pass, and the skill auto-discovers. This completes the playbook wave-2 skill trio
+(`PROC-018`/`PROC-019`/`PROC-020`).
+
+[`PROC-019`](PROC-019-geometry-io-format-skill.md) — geometry-IO format skill
+(playbook wave 2) retired on 2026-07-11 at `Retired` (docs/skill-surface only).
+Authored `tools/agents/skills/intrinsicengine-geometry-io-format/SKILL.md`, a
+SKILL.md-only cross-cutting discipline skill distilling the importer/exporter
+slice shape instantiated ~35 times across the `GEOIO-002A`..`002AG` / `GEOIO-003`
+series: `geometry -> core` layering with parsers in an anonymous namespace behind
+an unchanged `.cppm`, `Core::Expected<...Result>` readers and `*IOWriteStatus`
+writers, strict parsing with untrusted-header-count validation bounded against
+the payload before any reserve/read (origin `BUG-033`), the `Core::ErrorCode`
+reader / `*IOWriteStatus` writer diagnostics taxonomy, `unit;geometry`
+round-trip/determinism/fail-closed tests with committed text and byte-level
+binary fixtures, and the `CPUContracted` closure wording that states whether an
+`Operational` follow-up is owed. The template was verified against three exemplar
+slices before writing (`GEOIO-002B` PLY ASCII exporter, `GEOIO-002D` binary STL
+importer, `GEOIO-002E` binary PLY importer) and cross-checked against the live
+`Geometry.HalfedgeMesh.IO.cppm` public surface. Registered in the
+`intrinsicengine-core` routing table and the skills `README.md` discipline tier
+(seven → eight disciplines; sixteen → seventeen skills). No engine code changed.
+`sync_skills.py --check`, `check_doc_links.py`, and strict `check_task_policy.py`
+pass, and the skill auto-discovers.
+
+[`PROC-018`](PROC-018-import-visibility-contract-skill.md) — import-visibility
+contract skill (playbook wave 2) retired on 2026-07-11 at `Retired`
+(docs/skill-surface only). Authored
+`tools/agents/skills/intrinsicengine-import-visibility-contract/SKILL.md` as a
+SKILL.md-only cross-cutting discipline skill codifying the acceptance checklist
+that turns a decoded import into a genuinely visible, selectable sandbox entity.
+The seven checklist items — reference-triangle render-critical component parity
+(`GeometrySources`/`RenderSurface`/`SelectableTag`/`VisualizationConfig`/`StableId`,
+verified against `Runtime.ReferenceScene.cpp`), count-matched `v:normal`
+(preserved/area-weighted/never-overwritten), resolved `v:texcoord` (authored or
+generated atlas UVs), off-origin culling bounds plus one-shot camera focus,
+non-blocking derived post-processing that never clobbers recomputed attributes,
+deferred generated-normal/texture bindings, and never-silent receipt/queue/
+completion logging — each cite the retired task(s) that proved them
+(`BUG-022`/`023`/`038`/`041`/`043`/`044`/`045`/`047`/`048`/`050`,
+`ASSETIO-006`/`007`/`008`). Registered in the `intrinsicengine-core` routing
+table and the skills `README.md` discipline tier (six → seven disciplines;
+fifteen → sixteen skills). No engine code changed. `sync_skills.py --check`,
+`check_doc_links.py`, and strict `check_task_policy.py` pass, and the skill
+auto-discovers via the `.claude`/`.codex` skill symlinks.
+
+[`PROC-023`](PROC-023-canonicalize-skill-body-content.md) — skill-body
+canonicalization retired on 2026-07-11 at `Retired` (docs/skill-surface only).
+Three source-doc mirror skills had bodies 3–4× their `docs/agent/*` source
+carrying normative content with no canonical home: `intrinsicengine-benchmark`
+(`Anti-patterns`), `intrinsicengine-method` (the knowledge-graph claim→code aid
+and the "How method work maps to the maturity taxonomy" mapping), and
+`intrinsicengine-docs-sync` (`Decision rules for common cases`). Each body was
+classified section-by-section (mirror vs extends/only-here); the only-here
+sections were resolved by declaring them **skill-canonical** (resolution (b),
+the discipline-skill model) rather than moving content, honoring the task's
+"no content changes" Non-goal. Every affected body now carries an `Authority
+(PROC-023)` note delimiting mirrored-from-source sections (source doc wins) from
+skill-canonical sections (skill body is the home, `AGENTS.md` still wins on
+anything it covers), and the skills `README.md` authority section records the
+model per skill in a table. No `docs/agent/*` source changed, so no `--write`
+re-sync was needed; `sync_skills.py --check`, `check_doc_links.py`, strict
+`check_task_policy.py`, and diff-mode docs-sync all pass.
+
+[`PROC-022`](PROC-022-tool-directory-readme-refresh.md) — tool-directory README
+refresh retired on 2026-07-11 at `Retired` (docs-only). The three
+`tools/*/README.md` files had drifted from their directories: `tools/ci`
+documented 2 of 10 scripts, `tools/agents` omitted `check_codex_config.py` and
+`check_todo_active_only.sh` while listing the shipped `validate_method_manifests.py`
+under a "Planned moves" heading, and `tools/repo` omitted `check_pr_contract.py`,
+`check_shader_outputs.py`, and `root_allowlist.yaml`. Each README now lists every
+script and config present with a one-line purpose and its concrete CI wiring
+(cross-checked against `.github/workflows/*.yml`). The stale "Planned moves"
+(RORG-041/071) and "Compatibility entrypoints" (RORG-112, plus the canonical
+`generate_module_inventory.py` mislabeled as a legacy wrapper) sections — all
+referencing `done` tasks — were corrected to current state. A bidirectional
+completeness check (every directory script appears in its README, every README
+entry resolves to an existing file) plus `check_doc_links.py` and strict
+`check_task_policy.py` pass. No script behavior changed.
+
 [`BUG-080`](BUG-080-uv-atlas-promotion-smoke-timing-flake.md) — UV-atlas
 promotion-smoke timing flake retired on 2026-07-10 at `CPUContracted`. Each
 fixture now warms one pair, individually times five fast-staged/xatlas pairs in
