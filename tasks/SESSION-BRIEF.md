@@ -59,6 +59,7 @@ the authoritative open/unblocked view.
 - blocked by `CI-005`: `CI-006` — Remove duplicate sanitizer work and calibrate test parallelism (tasks/backlog/process/CI-006-sanitizer-topology-and-test-parallelism.md)
 - unblocked: `CI-008` — Reduce CTest process overhead without oversubscribing workers (tasks/backlog/process/CI-008-grouped-ctest-and-worker-oversubscription.md)
 - blocked by `CI-005`: `CI-009` — Route heavy gates by lifecycle and evaluate runner scaling (tasks/backlog/process/CI-009-heavy-gate-routing-and-runner-evaluation.md)
+- unblocked: `PROC-025` — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality (tasks/backlog/process/PROC-025-port-research-ideation-skill-to-other-repos.md)
 
 ## Theme I — Research method implementation
 
