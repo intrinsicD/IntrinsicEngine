@@ -759,3 +759,9 @@ entries:
       - "Answered the status request with the explicit incomplete CI-007 checklist rather than reporting the four passing cold samples as task completion."
       - "Advanced N194 by independently validating cold sample 4 and dispatching cold sample 5 after deleting only the branch-scoped ccache entry."
       - "Did not crystallize O13; the model-training target remains unconfirmed and no training artifact has been produced."
+  - turn: "2026-07-13_001#1"
+    notes:
+      - "Resolved N194 and routed N196 as direct experiments because the turn completed the cold/warm cohorts, repository-interface invalidation, strict artifact validation, and restored-source CPU gate."
+      - "Routed N197 as a direct decision because the predeclared retain/rollback rule selected PR-fast-only retention; expansion remains outside CI-007."
+      - "Staged O14 and O15, then crystallized them to K04 and C01 via artifact commitment because the retired task, policy docs, workflow configuration, and committed evidence table now depend on those statements."
+      - "Kept O08, O09, and O13 unpromoted: this turn neither accepted the module-surface recommendations nor resolved the model-training target."

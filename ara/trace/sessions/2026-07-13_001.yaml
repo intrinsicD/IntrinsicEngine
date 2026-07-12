@@ -1,0 +1,78 @@
+session:
+  id: "2026-07-13_001"
+  date: "2026-07-13"
+  started: "2026-07-13T01:00"
+  last_turn: "2026-07-13T01:00"
+  turn_count: 1
+  summary: "Completed CI-007 hosted evidence, retained module-safe ccache in PR-fast only, tracked the independent configure-budget flake, retired the task, and committed all changes."
+
+events_logged:
+  - turn: 1
+    type: experiment
+    id: "N194"
+    routing: direct
+    provenance: ai-executed
+    summary: "Resolved the five-sample contemporary cold cohort with strict-valid timing and zero-error cache diagnostics."
+  - turn: 1
+    type: experiment
+    id: "N196"
+    routing: direct
+    provenance: ai-executed
+    summary: "Collected five warm samples and a real exported-interface invalidation run, then passed local clean and restored-source CPU gates."
+  - turn: 1
+    type: decision
+    id: "N197"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retained the bounded ccache content store in PR-fast only under the predeclared correctness and timing rule."
+  - turn: 1
+    type: constraint
+    id: "O14"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized coarse whole-interface-digest invalidation as K04 via artifact commitment."
+  - turn: 1
+    type: claim
+    id: "O15"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the same-shape PR-fast latency result as supported claim C01 via artifact commitment."
+
+ai_actions:
+  - turn: 1
+    action: "Downloaded and strictly validated ten unchanged-source timing results and eleven hermetic probes; ran an evidence-only exported-API commit on hosted CI; reverted the marker; tracked the unrelated configure-budget failure as BUG-081; retired CI-007; and created commits 7694b696 and 3e3b3925."
+    provenance: ai-executed
+    files_changed:
+      - "docs/benchmarking/ci-policy.md"
+      - "docs/build-troubleshooting.md"
+      - "tasks/backlog/bugs/BUG-081-warm-configure-budget-runner-variance.md"
+      - "tasks/done/CI-007-module-safe-persistent-ccache-pilot.md"
+      - "tools/ci/README.md"
+  - turn: 1
+    action: "Passed focused ccache/timing regressions, strict benchmark and repository structural checks, a 1,710-action IntrinsicTests build, and the 3,658-test default CPU gate; recorded the resulting research evidence and decision trace."
+    provenance: ai-executed
+    files_changed:
+      - "ara/evidence/tables/ci007_ccache_cohort.md"
+      - "ara/logic/claims.md"
+      - "ara/logic/solution/constraints.md"
+      - "ara/staging/observations.yaml"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "ara/trace/sessions/2026-07-13_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+
+claims_touched:
+  - id: C01
+    action: crystallized
+    turn: 1
+
+key_context:
+  - turn: 1
+    excerpt: "User requested that all changes be committed according to the repository's agentic workflow."
+
+open_threads:
+  - "BUG-081 must collect a comparable warm-configure population before recalibrating the 20-second exact-vcpkg-hit guard."
+  - "Resolve whether model training means GEOM-058 or a new neural/LLM workflow."
+
+ai_suggestions_pending:
+  - "Treat GEOM-058 Gaussian-mixture fitting as the provisional repo-native model-training target unless the user specifies a neural or LLM model."

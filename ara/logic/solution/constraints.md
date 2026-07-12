@@ -18,5 +18,19 @@
 - **Constraint**: A task coroutine handle published to `Scheduler::Reschedule()` is a single-use resumption token. The scheduler may resume it but must not call `done()` or `destroy()` after `resume()` returns; completed task frames self-destroy through `Job::promise_type::final_suspend()` because `await_suspend` may publish the handle to a wait token that another worker resumes and completes before the original resume call unwinds.
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
-- **Evidence**: [src/core/Core.Tasks.Dispatch.cpp], [src/core/Core.Tasks.cppm], [tests/unit/core/Test.CoreTasks.cpp], [src/core/README.md], [tasks/active/BUG-078-coretasks-counterevent-rearm-uaf.md]
+- **Evidence**: [src/core/Core.Tasks.Dispatch.cpp], [src/core/Core.Tasks.cppm], [tests/unit/core/Test.CoreTasks.cpp], [src/core/README.md], [tasks/done/BUG-078-coretasks-counterevent-rearm-uaf.md]
 - **From staging**: O10
+
+## K04: Coarse module-interface cache invalidation
+- **Constraint**: The retained CI ccache path disables direct and depend modes
+  and hashes a deterministic digest of every repository `.cppm` through
+  `CCACHE_EXTRAFILES`. Any module-interface edit therefore invalidates all
+  eligible cached C++ consumers, deliberately trading reuse precision for a
+  fail-closed module-safety boundary; `.cppm` compilation itself remains
+  compiler pass-through.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [ara/evidence/tables/ci007_ccache_cohort.md,
+  tools/ci/ccache_ci.py, .github/workflows/pr-fast.yml,
+  tasks/done/CI-007-module-safe-persistent-ccache-pilot.md]
+- **From staging**: O14

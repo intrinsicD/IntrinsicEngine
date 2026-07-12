@@ -90,3 +90,10 @@ sessions:
     events_count: 1
     claims_touched: []
     open_threads: 2
+  - id: "2026-07-13_001"
+    date: "2026-07-13"
+    summary: "Completed CI-007 hosted evidence, retained module-safe ccache in PR-fast only, tracked the independent configure-budget flake, retired the task, and committed all changes."
+    turn_count: 1
+    events_count: 5
+    claims_touched: [C01]
+    open_threads: 2

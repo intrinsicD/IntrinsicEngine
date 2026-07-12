@@ -4568,17 +4568,17 @@ tree:
       - "GitHub Actions run 29115473396"
       - "GitHub Actions run 29117419922"
       - "GitHub Actions run 29119188858"
-      - "GitHub Actions run 29127596925 (cold sample 5 in progress)"
+      - "GitHub Actions run 29127596925"
       - "/tmp/ci007-evidence/<run-id>/ci-gate-timing-pr-fast/result.json"
       - "/tmp/ci007-evidence/<run-id>/ci-ccache-module-invalidation-pr-fast/module-invalidation-probe.json"
     result: >
-      Hosted cold samples 1-4 passed at the same SHA with identical Clang 20,
-      preset, sanitizer, Ubuntu runner, warm-vcpkg, 3,549-test, and 1,955-edge
-      shape. Build times were 1,111,716; 1,510,259; 1,391,575; and 1,406,634 ms.
-      Every sample reported 0 ccache hits, 575 misses, 0 errors, and successful
-      cached-versus-clean interface-change parity. Cold sample 5 is running and
-      will seed the warm cohort if all gates pass.
-    status: open
+      Five hosted cold samples passed at commit 5394e51b with identical Clang
+      20, ci preset, project-default sanitizer, Ubuntu runner, exact-vcpkg-hit,
+      3,549-test, and 1,955-edge shape. Each reported 0 ccache hits, 575 misses,
+      0 errors, and successful hermetic cached-versus-clean parity. Build
+      median/p95 were 1,406,634/1,510,259 ms; total median/p95 were
+      1,634,116/1,753,939 ms.
+    status: resolved
   - id: N195
     type: question
     title: "Identify the intended locally trained model"
@@ -4591,3 +4591,50 @@ tree:
       hardware discovery currently favor GEOM-058, but the intended durable
       training output remains unspecified.
     status: open
+  - id: N196
+    type: experiment
+    title: "CI-007 warm cohort and repository-interface invalidation"
+    provenance: ai-executed
+    timestamp: "2026-07-13T01:00"
+    also_depends_on: [N193, N194]
+    evidence:
+      - "ara/evidence/tables/ci007_ccache_cohort.md"
+      - "GitHub Actions runs 29208730070, 29209234114, 29209736454, 29210235661, and 29210606175"
+      - "Evidence-only commit 4befbe1e and GitHub Actions run 29211278659"
+      - "Revert commit fd97d4d1"
+      - "tasks/done/CI-007-module-safe-persistent-ccache-pilot.md"
+      - "docs/benchmarking/ci-policy.md"
+      - "cmake --preset ci"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+    result: >
+      Five same-shape warm runs at commit 5394e51b each passed 3,549 tests and
+      the hermetic probe with 575 hits, 0 misses, and 0 errors. Warm build
+      median/p95 were 609,476/630,449 ms, 56.7%/58.3% below the cold cohort;
+      total median/p95 were 856,085/877,683 ms, 47.6%/50.0% lower. A real
+      exported-API edit restored the compatible prior store but produced 0
+      hits, 575 misses, and 0 errors, then passed the hosted gate and parity
+      probe. The clean local interface state passed 3,617 tests; the restored
+      production state subsequently passed 3,658/3,658 tests. The first
+      interface attempt stopped before ccache restore at the independent
+      20-second configure guard and is tracked by BUG-081.
+    status: resolved
+  - id: N197
+    type: decision
+    title: "Retain module-safe ccache in PR-fast only"
+    provenance: ai-executed
+    timestamp: "2026-07-13T01:00"
+    choice: >
+      Retain the bounded external ccache content store in pr-fast only, with
+      direct/depend modes disabled, the full repository module-interface digest
+      in CCACHE_EXTRAFILES, fail-closed telemetry, and the existing clear path.
+    alternatives:
+      - "Roll back ccache despite passing correctness and timing criteria."
+      - "Expand persistent ccache to other gates without separate evidence."
+    evidence:
+      - "N194"
+      - "N196"
+      - "ara/evidence/tables/ci007_ccache_cohort.md"
+      - "tasks/done/CI-007-module-safe-persistent-ccache-pilot.md"
+      - "commit 3e3b3925"
+    status: resolved
