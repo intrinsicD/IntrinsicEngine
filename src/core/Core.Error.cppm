@@ -127,7 +127,6 @@ export namespace Extrinsic::Core
     // Void success type for operations that don't return a value
     struct Unit
     {
-        static constexpr std::uint32_t CcacheEvidenceApiRevision = 1u;
     };
 
     constexpr Unit unit{};
