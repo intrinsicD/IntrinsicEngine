@@ -8,6 +8,24 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`CI-007`](CI-007-module-safe-persistent-ccache-pilot.md) — persistent
+module-safe ccache pilot retired on 2026-07-13 at `Operational`. Retained a
+bounded external ccache store in `pr-fast` only, with direct/depend modes
+disabled, `.cppm` compilation passed through, every repository module
+interface hashed through `CCACHE_EXTRAFILES`, fail-closed identity/statistics
+guards, and no build/BMI state cached. Five comparable hosted cold samples
+(0 hits / 575 misses per run) produced 1,406.634 s build median and 1,510.259 s
+p95; five unchanged warm samples (575 hits / 0 misses) produced 609.476 s
+median and 630.449 s p95, improvements of 56.7% and 58.3%, with every gate and
+hermetic invalidation probe passing and zero ccache errors. Evidence-only
+exported-API commit `4befbe1e` then restored the prior store, safely missed all
+575 eligible objects after the module digest changed, and passed hosted run
+`29211278659`; its clean no-ccache counterpart passed the 3,617-test default
+CPU gate, and `fd97d4d1` removed the marker. No other gate consumes the store;
+future expansion requires a separate task. The unrelated 22.002 s exact-vcpkg
+configure-budget failure that stopped the first interface attempt before
+ccache restore is tracked by `BUG-081`.
+
 [`PROC-024`](PROC-024-theme-research-method-track.md) — research/method track
 theme retired on 2026-07-11 at `Retired` (task-map/tooling only) after owner
 approval. Created **Theme I — Research method implementation (P1)**: added

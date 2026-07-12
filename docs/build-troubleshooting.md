@@ -164,7 +164,7 @@ CI workflows run the same bootstrap before configure and cache
 therefore starts a new binary-cache line while older archives remain available
 through restore keys.
 
-The `pr-fast` workflow also pilots a separate ccache store at
+The `pr-fast` workflow also retains a separate ccache store at
 `/tmp/intrinsic-pr-fast-ccache` on its dedicated Ubuntu runner. That cache is
 deliberately outside the repository and build tree; `build/`, CMake state,
 Ninja metadata, object directories, Clang BMI files, and the ccache config file
@@ -179,8 +179,8 @@ validates the generated launcher and digest, zeros statistics immediately before
 compilation, and reports hit/miss, cache-size, error, availability, and health
 diagnostics in the CI gate-latency result. Only an exact-key or
 compatibility-prefix content store is restored; each successful commit saves a
-new immutable SHA-suffixed key after all guards pass. To clear the pilot, delete
-GitHub Actions caches whose key starts
+new immutable SHA-suffixed key after all guards pass. To clear the retained
+store, delete GitHub Actions caches whose key starts
 with `ccache-v1-Linux-X64-pr-fast-`; do not delete or repoint the vcpkg binary
 cache as a ccache rollback. If a cached or incremental module build produces
 unexplained SEGV, vtable, ASan, or compiler frontend symptoms, follow the
@@ -208,8 +208,9 @@ ctest --test-dir build/ci-no-ccache --output-on-failure -LE 'gpu|vulkan|slow|fla
 Initial cache-backed configure steps in CI run through
 `tools/ci/time_command.py`, which records the wall-clock configure duration in
 the GitHub step summary. When `actions/cache` reports an exact vcpkg
-binary-cache hit, the wrapper enforces the INFRA-001 warm-cache budget by
-failing configure runs that exceed 10 seconds.
+binary-cache hit, the wrapper enforces the current 20-second warm-cache budget.
+`BUG-081` owns population-based recalibration after a 22.002-second hosted
+runner outlier exceeded that guard before compilation.
 
 Version bumps flow through the manifest:
 

@@ -11,9 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`CI-007`](CI-007-module-safe-persistent-ccache-pilot.md) — pilot a bounded
-  external ccache store in `pr-fast`, with module-safe hashing, fail-closed
-  telemetry, and cached-versus-clean interface-change parity.
+- None.
 
 ## History
 

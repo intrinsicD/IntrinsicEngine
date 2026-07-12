@@ -7,20 +7,20 @@ depends_on:
 # CI-007 — Pilot persistent module-safe ccache in CI
 
 ## Status
-- In progress on branch `main` in this workspace; prior local branch
-  `copilot/ci-007-module-safe-ccache` is stale relative to `origin/main`.
-- Owner/agent: Codex CLI continuing the active task.
-- Pilot scope: `pr-fast` only; no other gate consumes the persistent store.
-- Current slice: Slice B hermetic module-interface invalidation probe complete
-  locally after independent audit.
-- Current Slice C evidence ref: `agent/ci-007-hosted-evidence`.
+- Completed 2026-07-13 at `Operational` on branch
+  `agent/ci-007-close-pilot`. Closure commit: this commit.
+- Implementation commits: `ab0f8072` (corrected pilot), `9ae37047` (hermetic
+  invalidation proof), and `5394e51b` (hosted dispatch fix).
+- Hosted evidence ref: `agent/ci-007-hosted-evidence`; evidence-only API commit
+  `4befbe1e` was removed by `fd97d4d1` after the hosted interface-change run.
+- Retained scope: `pr-fast` only; no other gate consumes the persistent store.
+- No higher maturity follow-up is owed for this scoped policy. Any future
+  expansion requires a separate task and comparable correctness/timing proof.
 - The first hosted dispatch attempt on 2026-07-10 was rejected before creating
   a run because GitHub Actions does not expose the `runner` context in job-level
   `env`. The workflow now uses a fixed runner-local `/tmp` path, still outside
   the checkout and build tree, with regression coverage for that parser-level
   constraint.
-- Next verification step: collect Slice C hosted cold/warm/interface-change
-  samples, then retain or roll back the pilot.
 
 ## Goal
 - Persist only ccache's content-addressed store across CI runs and prove that it
@@ -63,13 +63,14 @@ depends_on:
       pilot if configure does not report the expected launcher/mode/digest.
 - [x] Zero statistics before build and publish hit/miss, cache size, errors,
       compile duration, and cold/warm identity through `CI-003`.
-- [ ] Validate three scenarios: empty-cache full build, restored-cache
+- [x] Validate three scenarios: empty-cache full build, restored-cache
       unchanged full build, and restored-cache build after a representative
       exported `.cppm` layout/API change.
 - [x] Add a stale-artifact probe that compares the cached result with a clean
       no-ccache build/test result for the interface-change scenario.
-- [ ] Expand beyond the pilot only after full-gate correctness parity and a
-      five-sample median/p95 comparison; document rollback/clear instructions.
+- [x] Retain only the `pr-fast` pilot after full-gate correctness parity and a
+      five-sample median/p95 comparison; keep expansion to other gates deferred
+      and document rollback/clear instructions.
 
 ## Slice plan
 - **Slice A.** Add the `pr-fast`-only pinned ccache setup, safe cache key,
@@ -91,17 +92,17 @@ depends_on:
       module-interface probe.
 - [x] Run the repository stale-build regression/probe that exercises imported
       class layout or virtual surface changes.
-- [ ] Record cache hit/miss and wall-time distributions against `CI-003`.
+- [x] Record cache hit/miss and wall-time distributions against `CI-003`.
 
 ## Docs
 - [x] Document cache key inputs, safety mode, size cap, clear/rollback
       procedure, and the prohibition on build/BMI caching.
 - [x] Link the stale-build triage playbook from the CI cache documentation.
-- [ ] Regenerate `tasks/SESSION-BRIEF.md` on retirement.
+- [x] Regenerate `tasks/SESSION-BRIEF.md` on retirement.
 
 ## Acceptance criteria
 - [x] CI persists only the ccache store, never build/BMI state.
-- [ ] Warm runs show non-zero safe hits and a baseline-comparable build-time
+- [x] Warm runs show non-zero safe hits and a baseline-comparable build-time
       delta.
 - [x] A `.cppm` interface/layout change invalidates affected importers and
       matches a clean no-cache build/test result.
@@ -246,7 +247,7 @@ python3 tests/regression/tooling/Test.CiTiming.py -v
 python3 tests/regression/tooling/Test.WorkflowConcurrency.py -v
 python3 tools/benchmark/validate_benchmark_manifests.py
 python3 tools/benchmark/validate_benchmark_results.py
-python3 tools/benchmark/compare_baseline.py
+python3 tools/ci/validate_gate_timing_baseline.py
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main
@@ -323,6 +324,48 @@ documentation links and synchronization, the PR contract, session-brief
 freshness, workflow YAML parsing, Python syntax compilation, and Ruff
 format/lint checks also passed. Hosted full-gate warm/cache-hit distributions
 and the five-sample comparison remain Slice C evidence.
+
+## Slice C hosted verification (2026-07-13)
+
+The historical `CI-003` `pr-fast` baseline selected 3,526 tests, while the
+current gate selected 3,549, so Slice C used a contemporaneous cold population
+instead of making a mismatched claim. All ten unchanged-source samples ran at
+commit `5394e51b` on `ubuntu-24.04` with Clang 20, preset `ci`, project-default
+ASan/UBSan, 3,549 selected tests, 1,955 Ninja command edges, and an exact vcpkg
+cache hit. Every gate and hermetic invalidation probe passed with zero ccache
+errors.
+
+| Population | Hosted runs | Per-run cache result | Build samples (ms) | Build median / p95 | Total median / p95 |
+| --- | --- | --- | --- | ---: | ---: |
+| Cold | `29113978973`, `29115473396`, `29117419922`, `29119188858`, `29127596925` | 0 hits / 575 misses | 1,111,716; 1,510,259; 1,391,575; 1,406,634; 1,458,197 | 1,406,634 / 1,510,259 ms | 1,634,116 / 1,753,939 ms |
+| Warm | `29208730070`, `29209234114`, `29209736454`, `29210235661`, `29210606175` | 575 hits / 0 misses | 591,978; 609,476; 630,449; 436,073; 623,089 | 609,476 / 630,449 ms | 856,085 / 877,683 ms |
+
+Warm build median improved by 56.7% and p95 by 58.3%; total median improved by
+47.6% and p95 by 50.0%. This satisfies the predeclared timing rule without
+expanding the store beyond `pr-fast`.
+
+The full-project interface-change scenario used evidence-only commit
+`4befbe1e`, adding `Core::Unit::CcacheEvidenceApiRevision` while leaving every
+importer source unchanged. The fresh local `INTRINSIC_ENABLE_CCACHE=OFF` build
+completed the 1,969-edge `IntrinsicPrFastTests` aggregate, passed its 18-binary
+prerequisite inventory and 3,549/3,549 selected tests, then built
+`IntrinsicTests` and passed the complete 3,617/3,617 CPU gate. Hosted run
+`29211278659` restored the compatible `5394e51b` store, reported `cache_state`
+`warm` but 0 hits / 575 misses / 0 errors after the module digest changed, and
+passed all 3,549 selected tests plus the hermetic cached/clean parity probe.
+Commit `fd97d4d1` removed the evidence marker afterward.
+
+The first interface-evidence attempt, run `29211167225`, failed before ccache
+restore because exact-vcpkg-hit configure took 22.002 s against the independent
+20 s SLO. It exercised no cache/build path and is excluded from the ccache
+population; `BUG-081` records that repeated runner-variance defect rather than
+weakening or hiding the guard.
+
+Every downloaded timing result passed strict benchmark-result validation. The
+retain decision therefore satisfies every safety condition and both timing
+conditions declared above: keep the bounded external ccache store in
+`pr-fast`, retain direct/depend modes disabled and the repository interface
+digest, and preserve the documented clear/rollback procedure.
 
 ## Forbidden changes
 - Caching any configured build directory, BMI, `.o`, or Ninja state directly.

@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `CI-007` — Pilot persistent module-safe ccache in CI (tasks/active/CI-007-module-safe-persistent-ccache-pilot.md)
+- none
 
 ## Theme B — Rendering modernization
 

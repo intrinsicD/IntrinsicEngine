@@ -17,8 +17,6 @@ map.
 
 - [CI-005 — Make PR-fast a real touched-scope feedback gate](CI-005-real-touched-scope-pr-fast-gate.md)
 - [CI-006 — Remove duplicate sanitizer work and calibrate test parallelism](CI-006-sanitizer-topology-and-test-parallelism.md)
-- [CI-007 — Pilot persistent module-safe ccache in CI](../../active/CI-007-module-safe-persistent-ccache-pilot.md)
-  (currently active).
 - [CI-008 — Reduce CTest process overhead without oversubscribing workers](CI-008-grouped-ctest-and-worker-oversubscription.md)
 - [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](CI-009-heavy-gate-routing-and-runner-evaluation.md)
 - [PROC-025 — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality](PROC-025-port-research-ideation-skill-to-other-repos.md)
@@ -32,9 +30,10 @@ retirement log.
 
 - These tasks anchor **Theme H — Agentic workflow hardening**.
 - CI latency order: retired `CI-003` establishes telemetry/cancellation and
-  retired `CI-004` establishes label-derived test build aggregates; `CI-007`
-  and source-hotspot tasks may proceed independently; `CI-005` consumes
-  `CI-004`; `CI-006` consumes the unsanitized fast-preset
+  retired `CI-004` establishes label-derived test build aggregates; retired
+  `CI-007` establishes the bounded module-safe `pr-fast` ccache policy;
+  source-hotspot tasks remain independent; `CI-005` consumes `CI-004`;
+  `CI-006` consumes the unsanitized fast-preset
   decision from `CI-005`; `CI-008` consumes the aggregate metadata from
   `CI-004`; and `CI-009` evaluates lifecycle/runner changes only after
   `CI-003..008` have removed avoidable software duplication.
@@ -73,6 +72,10 @@ task-specific policy into `docs/agent/prompt/prompt.md`.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [CI-007 — Pilot persistent module-safe ccache in CI](../../done/CI-007-module-safe-persistent-ccache-pilot.md)
+  (done 2026-07-13): retained the bounded `pr-fast` ccache store after five
+  cold and five warm hosted samples, zero cache errors, 56.7% lower build
+  median, 58.3% lower build p95, and clean/interface-change parity.
 - [PROC-024 — Give the research/method track a theme and priority](../../done/PROC-024-theme-research-method-track.md)
   (done 2026-07-11): created **Theme I — Research method implementation (P1)** with
   the 16 open `METHOD-*`/`GEOM-*` members, so the research mission is a
