@@ -41,6 +41,10 @@ are retired to `tasks/done/`; `ARCH-014` remains the open umbrella:
   north-star: owns the [kernel target-state](../../../docs/architecture/kernel-target-state.md)
   convergence scorecard and the review/ratchet guardrail; stays open
   until the whole ADR-0024 migration is reached.
+- [`ARCH-015`](ARCH-015-runtime-module-scope-by-result-consumer-contract.md) —
+  grilling + ADR to decide the `IRuntimeModule` scoping rule (cluster methods by
+  shared result-consumer contract, e.g. DBSCAN inside `ClusteringModule`, not a
+  rigid per-algorithm interface). Decision record only; no engine code.
 
 ### Retired seam tasks
 

@@ -21,6 +21,7 @@ the authoritative open/unblocked view.
 
 - unblocked: `ARCH-006` — Move Sandbox application editor content out of runtime (tasks/backlog/architecture/ARCH-006-sandbox-editor-content-out-of-runtime.md)
 - unblocked: `ARCH-014` — Kernel convergence tracking (umbrella north-star) (tasks/backlog/architecture/ARCH-014-kernel-convergence-tracking.md)
+- unblocked: `ARCH-015` — Runtime module scope: cluster methods by result-consumer contract (grilling + ADR) (tasks/backlog/architecture/ARCH-015-runtime-module-scope-by-result-consumer-contract.md)
 - unblocked: `CORE-005` — Non-blocking TaskGraph submission and completion API (tasks/backlog/architecture/CORE-005-nonblocking-taskgraph-submit-api.md)
 - unblocked: `CORE-006` — Domain-free core task/DAG vocabulary (tasks/backlog/architecture/CORE-006-domain-free-core-task-vocabulary.md)
 - unblocked: `CORE-007` — Scheduler priority, wait, and wake hardening (tasks/backlog/architecture/CORE-007-scheduler-priority-wait-wake-hardening.md)
