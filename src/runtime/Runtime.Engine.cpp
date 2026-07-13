@@ -1031,11 +1031,14 @@ namespace Extrinsic::Runtime
             preRenderTransformFlushNeeded ||
             HasPendingPreRenderTransformFlush(*m_Scene);
 
+        const EditorInputCaptureSnapshot editorCapture =
+            m_ImGuiEditorBridge.CaptureSnapshot();
         const bool imguiCapturesMouse =
-            m_ImGuiEditorBridge.WantsMouseCapture();
+            editorCapture.CapturedMouse || editorCapture.WidgetsActive;
         const bool imguiCapturesKeyboard =
-            m_ImGuiEditorBridge.WantsKeyboardCapture();
-        const bool imguiCapturesInput = imguiCapturesMouse || imguiCapturesKeyboard;
+            editorCapture.CapturedKeyboard || editorCapture.WidgetsActive;
+        const bool imguiCapturesInput =
+            editorCapture.CapturesViewportInput();
 
         // ── Phase 4: Build render snapshot ────────────────────────────────
         const auto preRenderSetupBegin = std::chrono::steady_clock::now();
@@ -1541,6 +1544,11 @@ namespace Extrinsic::Runtime
     void Engine::SetImGuiEditorCallback(std::function<void()> callback)
     {
         m_ImGuiEditorBridge.SetEditorCallback(std::move(callback));
+    }
+
+    void Engine::SetImGuiEditorVisible(const bool visible) noexcept
+    {
+        m_ImGuiEditorBridge.SetEditorVisible(visible);
     }
 
     const ImGuiAdapter& Engine::GetImGuiAdapter() const noexcept

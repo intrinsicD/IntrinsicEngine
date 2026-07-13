@@ -163,3 +163,31 @@ TEST(EditorWindowRegistry, DrawCallbackMayUnregisterItself) {
   EXPECT_EQ(draws, 1);
   EXPECT_EQ(registry.Size(), 0u);
 }
+
+TEST(EditorWindowRegistry, VisibilityCommandPreservesWindowOpenState) {
+  Runtime::EditorWindowRegistry registry;
+  int draws = 0;
+  const Runtime::EditorWindowHandle handle = registry.Register(MakeWindow(
+      "mesh.simplify", {"Mesh", "Processing"}, draws, nullptr, true));
+  ASSERT_TRUE(handle.IsValid());
+
+  const Runtime::EditorUiVisibilityCommandResult hidden =
+      Runtime::ApplyEditorUiVisibilityCommand(
+          registry, {Runtime::EditorUiVisibilityCommandKind::Hide});
+  EXPECT_TRUE(hidden.WasVisible);
+  EXPECT_FALSE(hidden.IsVisible);
+  EXPECT_TRUE(hidden.Changed);
+  EXPECT_EQ(registry.DrawOpenWindows(), 0u);
+  EXPECT_EQ(draws, 0);
+  EXPECT_TRUE(registry.IsOpen(handle));
+
+  const Runtime::EditorUiVisibilityCommandResult restored =
+      Runtime::ApplyEditorUiVisibilityCommand(
+          registry, {Runtime::EditorUiVisibilityCommandKind::Toggle});
+  EXPECT_FALSE(restored.WasVisible);
+  EXPECT_TRUE(restored.IsVisible);
+  EXPECT_TRUE(restored.Changed);
+  EXPECT_EQ(registry.DrawOpenWindows(), 1u);
+  EXPECT_EQ(draws, 1);
+  EXPECT_TRUE(registry.IsOpen(handle));
+}

@@ -20,6 +20,7 @@ import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.ImGuiAdapter;
 
 namespace Plat = Extrinsic::Platform;
+namespace Runtime = Extrinsic::Runtime;
 
 using Extrinsic::Graphics::ImGuiOverlaySystem;
 using Extrinsic::Runtime::ImGuiAdapter;
@@ -374,15 +375,16 @@ TEST(ImGuiAdapter, PumpsInputAndResizeReportsFramebufferPixelsWithoutDoubleScali
     }
 }
 
-TEST(ImGuiAdapter, ExposesMouseAndKeyboardCaptureRequests)
+TEST(ImGuiAdapter, SnapshotsCaptureStateOncePerCompletedEditorFrame)
 {
     FakeWindow         window(400, 300);
     ImGuiOverlaySystem overlay;
     ImGuiAdapter       adapter(window, overlay);
 
     ASSERT_TRUE(adapter.Initialize());
-    EXPECT_FALSE(adapter.WantsMouseCapture());
-    EXPECT_FALSE(adapter.WantsKeyboardCapture());
+    EXPECT_FALSE(adapter.CaptureSnapshot().CapturedMouse);
+    EXPECT_FALSE(adapter.CaptureSnapshot().CapturedKeyboard);
+    EXPECT_EQ(adapter.GetDiagnostics().CaptureSnapshots, 0u);
 
     ImGui::SetNextFrameWantCaptureMouse(true);
     ImGui::SetNextFrameWantCaptureKeyboard(true);
@@ -390,8 +392,40 @@ TEST(ImGuiAdapter, ExposesMouseAndKeyboardCaptureRequests)
     adapter.BeginFrame(kFrameDelta);
     adapter.EndFrame();
 
-    EXPECT_TRUE(adapter.WantsMouseCapture());
-    EXPECT_TRUE(adapter.WantsKeyboardCapture());
+    const Runtime::EditorInputCaptureSnapshot snapshot =
+        adapter.CaptureSnapshot();
+    EXPECT_TRUE(snapshot.CapturedMouse);
+    EXPECT_TRUE(snapshot.CapturedKeyboard);
+    EXPECT_TRUE(snapshot.CapturesViewportInput());
+    EXPECT_EQ(adapter.GetDiagnostics().CaptureSnapshots, 1u);
+}
+
+TEST(ImGuiAdapter, HiddenEditorClearsStaleCaptureState)
+{
+    FakeWindow         window(400, 300);
+    ImGuiOverlaySystem overlay;
+    ImGuiAdapter       adapter(window, overlay);
+    std::uint32_t      editorCallbacks = 0u;
+
+    ASSERT_TRUE(adapter.Initialize());
+    adapter.SetEditorCallback([&editorCallbacks] { ++editorCallbacks; });
+    ImGui::SetNextFrameWantCaptureMouse(true);
+    ImGui::SetNextFrameWantCaptureKeyboard(true);
+    adapter.BeginFrame(kFrameDelta);
+    adapter.EndFrame();
+    ASSERT_TRUE(adapter.CaptureSnapshot().CapturesViewportInput());
+    ASSERT_EQ(editorCallbacks, 1u);
+
+    adapter.SetEditorVisible(false);
+    EXPECT_FALSE(adapter.IsEditorVisible());
+    EXPECT_FALSE(adapter.CaptureSnapshot().CapturesViewportInput());
+
+    adapter.BeginFrame(kFrameDelta);
+    adapter.EndFrame();
+    EXPECT_FALSE(adapter.CaptureSnapshot().CapturedMouse);
+    EXPECT_FALSE(adapter.CaptureSnapshot().CapturedKeyboard);
+    EXPECT_FALSE(adapter.CaptureSnapshot().WidgetsActive);
+    EXPECT_EQ(editorCallbacks, 1u);
 }
 
 // --- DPI / font rebuild -------------------------------------------------------

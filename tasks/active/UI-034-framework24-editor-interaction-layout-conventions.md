@@ -11,10 +11,12 @@ maturity_target: CPUContracted
 - Status: in progress.
 - Owner: Codex.
 - Branch: `codex/ui-034-editor-window-contribution`.
-- Progress: Slice A registry/lifecycle contract implemented and focused tests
-  pass; callbacks may safely unregister windows during dispatch.
-- Next verification step: implement Slice B and rerun the focused ImGui adapter,
-  engine-wiring, input-action, and editor-window registry contracts.
+- Progress: Slices A-B implemented. The registry is lazy and mutation-safe;
+  one end-of-editor-frame capture snapshot gates viewport consumers; the global
+  visibility command and unsuppressed `G` action preserve per-window state and
+  clear stale capture immediately.
+- Next verification step: implement Slice C's headless property-plot model and
+  paired ImPlot lifecycle.
 
 ## Goal
 - Adopt the framework24 viewer's interaction/layout model in the Sandbox editor: domains contribute their menu entries and windows through a registration seam instead of a central enum, closed windows cost nothing per frame, viewport input is gated by one explicit UI-capture contract with a global UI-visibility toggle, and any scalar per-element property of the selection can be inspected through generic property-selector plus histogram/plot widgets.
@@ -78,16 +80,16 @@ maturity_target: CPUContracted
 ## Required changes
 - [ ] Add a domain-window registration seam to `Runtime.SandboxEditorUi`: domains register `{menu path, window id, draw callback, open-state}` at composition time; the closed `SandboxEditorDomainWindowKind` enum becomes an implementation detail behind the seam (existing kinds keep working during migration).
 - [ ] Lazy window lifecycle: a closed window contributes no per-frame model-build or draw cost; open/close transitions are observable so domains can drop caches (aligned with, but not owning, `RUNTIME-138`).
-- [ ] Single frame-level capture contract: one editor-owned `{captured_keyboard, captured_mouse, widgets_active}` snapshot derived from ImGui IO once per frame; camera, picking, and viewport input consume only this snapshot (no scattered `WantCapture*` reads).
-- [ ] Global UI-visibility toggle (hotkey plus command) that hides all editor windows while keeping the viewport interactive, mirroring framework24's `g` toggle; per-window open-state survives the toggle.
+- [x] Single frame-level capture contract: one editor-owned `{captured_keyboard, captured_mouse, widgets_active}` snapshot derived from ImGui IO once per frame; camera, picking, and viewport input consume only this snapshot (no scattered `WantCapture*` reads).
+- [x] Global UI-visibility toggle (hotkey plus command) that hides all editor windows while keeping the viewport interactive, mirroring framework24's `g` toggle; per-window open-state survives the toggle.
 - [ ] Generic property widgets in the editor widget library: a property-selector combo over the selection's property catalog (retired `UI-016` seam) and a histogram/plot view for scalar per-element properties (`implot` per the clarification default).
 - [ ] Migrate two exemplar domains (one mesh-processing window, one appearance/visualization window) onto the seam, lazy lifecycle, and property widgets to prove the pattern end to end.
 
 ## Tests
 - [x] Headless/CPU contract tests for the registration seam: registered windows appear in the menu model, unregistered kinds are absent, duplicate registration fails closed.
 - [x] Lazy-lifecycle test: a closed window's draw/model-build callbacks are not invoked across frames (counter probe).
-- [ ] Capture-contract test: synthetic ImGui capture states gate a recorded camera/picking input path; the `BUG-036` leak regression coverage stays green.
-- [ ] Toggle test: global hide runs no window draw callbacks; restore returns the prior open-state.
+- [x] Capture-contract test: synthetic ImGui capture states gate a recorded camera/picking input path; the `BUG-036` leak regression coverage stays green.
+- [x] Toggle test: global hide runs no window draw callbacks; restore returns the prior open-state.
 - [ ] Property-widget model test: the property-catalog-to-plot-model mapping handles empty selection, non-scalar properties (excluded), and NaN-containing properties (filtered, with the filtered count reported) without failures.
 
 ## Docs

@@ -151,4 +151,27 @@ void EditorWindowRegistry::NotifyOpenStateChanged(EditorWindowRecord &record) {
   if (record.Descriptor.OpenStateChanged)
     record.Descriptor.OpenStateChanged(record.Open);
 }
+
+EditorUiVisibilityCommandResult ApplyEditorUiVisibilityCommand(
+    EditorWindowRegistry &registry,
+    const EditorUiVisibilityCommand command) noexcept {
+  const bool wasVisible = registry.IsVisible();
+  switch (command.Kind) {
+  case EditorUiVisibilityCommandKind::Toggle:
+    registry.ToggleVisible();
+    break;
+  case EditorUiVisibilityCommandKind::Show:
+    registry.SetVisible(true);
+    break;
+  case EditorUiVisibilityCommandKind::Hide:
+    registry.SetVisible(false);
+    break;
+  }
+
+  return EditorUiVisibilityCommandResult{
+      .WasVisible = wasVisible,
+      .IsVisible = registry.IsVisible(),
+      .Changed = wasVisible != registry.IsVisible(),
+  };
+}
 } // namespace Extrinsic::Runtime

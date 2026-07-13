@@ -342,6 +342,13 @@ namespace
         return config;
     }
 
+    [[nodiscard]] Extrinsic::Core::Config::EngineConfig NullInputRoutingConfig()
+    {
+        Extrinsic::Core::Config::EngineConfig config = InputRoutingConfig();
+        config.Window.Backend = Extrinsic::Core::Config::WindowBackend::Null;
+        return config;
+    }
+
     [[nodiscard]] Extrinsic::Core::Config::EngineConfig NullWindowHeadlessConfig()
     {
         Extrinsic::Core::Config::EngineConfig config = HeadlessConfig();
@@ -608,7 +615,7 @@ TEST(ImGuiAdapterEngineWiring, UiCaptureSuppressesRuntimeInputConsumers)
 {
     auto app = std::make_unique<UiCapturedInputApplication>();
     auto* appPtr = app.get();
-    Engine engine(InputRoutingConfig(), std::move(app));
+    Engine engine(NullInputRoutingConfig(), std::move(app));
     engine.Initialize();
 
     std::uint32_t editorFrames = 0u;
@@ -634,8 +641,10 @@ TEST(ImGuiAdapterEngineWiring, UiCaptureSuppressesRuntimeInputConsumers)
     ASSERT_NE(appPtr->Controller, nullptr);
     EXPECT_EQ(appPtr->VariableTicks, 2u);
     EXPECT_EQ(editorFrames, 2u);
-    EXPECT_TRUE(engine.GetImGuiAdapter().WantsMouseCapture());
-    EXPECT_TRUE(engine.GetImGuiAdapter().WantsKeyboardCapture());
+    const Runtime::EditorInputCaptureSnapshot capture =
+        engine.GetImGuiAdapter().CaptureSnapshot();
+    EXPECT_TRUE(capture.CapturedMouse);
+    EXPECT_TRUE(capture.CapturedKeyboard);
 
     EXPECT_EQ(appPtr->Controller->Updates, 1u);
     EXPECT_EQ(appPtr->Controller->KeyboardUpdates, 0u);

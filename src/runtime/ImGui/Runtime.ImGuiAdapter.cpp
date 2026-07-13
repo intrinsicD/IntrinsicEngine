@@ -187,6 +187,7 @@ namespace Extrinsic::Runtime
         m_OverlaySystem.Initialize();
 
         m_Diagnostics.Initialized = true;
+        m_CaptureSnapshot = {};
         m_FrameStarted = false;
         m_FontAtlasCache = {};
         m_FontAtlasRevision = 0u;
@@ -298,13 +299,28 @@ namespace Extrinsic::Runtime
         m_Diagnostics.LastEndFrameMicros = 0u;
 
         ImGui::SetCurrentContext(m_Context);
-        if (m_EditorCallback)
+        if (m_EditorVisible && m_EditorCallback)
         {
             const auto callbackBegin = std::chrono::steady_clock::now();
             m_EditorCallback();
             m_Diagnostics.LastEditorCallbackMicros = ElapsedMicros(callbackBegin);
             ++m_Diagnostics.EditorCallbackInvocations;
         }
+
+        if (m_EditorVisible)
+        {
+            const ImGuiIO& io = ImGui::GetIO();
+            m_CaptureSnapshot = EditorInputCaptureSnapshot{
+                .CapturedKeyboard = io.WantCaptureKeyboard,
+                .CapturedMouse = io.WantCaptureMouse,
+                .WidgetsActive = ImGui::IsAnyItemActive(),
+            };
+        }
+        else
+        {
+            m_CaptureSnapshot = {};
+        }
+        ++m_Diagnostics.CaptureSnapshots;
 
         const auto renderBegin = std::chrono::steady_clock::now();
         ImGui::Render();
@@ -510,6 +526,7 @@ namespace Extrinsic::Runtime
         m_OverlaySystem.Shutdown();
         DestroyContext();
         m_Diagnostics.Initialized = false;
+        m_CaptureSnapshot = {};
         m_FontAtlasCache = {};
         m_FontAtlasRevision = 0u;
         m_FrameStarted = false;
@@ -534,6 +551,7 @@ namespace Extrinsic::Runtime
         m_OverlaySystem.Initialize();
 
         m_FrameStarted = false;
+        m_CaptureSnapshot = {};
         m_Diagnostics.ContextRebuilds += 1u;
     }
 
@@ -550,22 +568,11 @@ namespace Extrinsic::Runtime
         m_EditorCallback = std::move(callback);
     }
 
-    bool ImGuiAdapter::WantsMouseCapture() const noexcept
+    void ImGuiAdapter::SetEditorVisible(const bool visible) noexcept
     {
-        if (m_Context == nullptr)
-            return false;
-
-        ImGui::SetCurrentContext(m_Context);
-        return ImGui::GetIO().WantCaptureMouse;
-    }
-
-    bool ImGuiAdapter::WantsKeyboardCapture() const noexcept
-    {
-        if (m_Context == nullptr)
-            return false;
-
-        ImGui::SetCurrentContext(m_Context);
-        return ImGui::GetIO().WantCaptureKeyboard;
+        m_EditorVisible = visible;
+        if (!visible)
+            m_CaptureSnapshot = {};
     }
 
     const char* ImGuiAdapter::ClipboardGet(ImGuiContext* /*ctx*/)

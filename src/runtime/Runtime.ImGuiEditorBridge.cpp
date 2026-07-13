@@ -19,6 +19,7 @@ namespace Extrinsic::Runtime
 
         m_Adapter = std::make_unique<ImGuiAdapter>(window, m_Overlay);
         m_Adapter->Initialize();
+        m_Adapter->SetEditorVisible(m_EditorVisible);
         if (m_EditorCallback)
             m_Adapter->SetEditorCallback(m_EditorCallback);
         renderer.SetImGuiOverlaySystem(&m_Overlay);
@@ -38,6 +39,13 @@ namespace Extrinsic::Runtime
             m_Adapter->SetEditorCallback(m_EditorCallback);
     }
 
+    void ImGuiEditorBridge::SetEditorVisible(const bool visible) noexcept
+    {
+        m_EditorVisible = visible;
+        if (m_Adapter)
+            m_Adapter->SetEditorVisible(visible);
+    }
+
     void ImGuiEditorBridge::BeginFrame(const double deltaSeconds)
     {
         if (m_Adapter)
@@ -55,14 +63,12 @@ namespace Extrinsic::Runtime
         return m_Adapter != nullptr && m_Adapter->IsInitialized();
     }
 
-    bool ImGuiEditorBridge::WantsMouseCapture() const noexcept
+    EditorInputCaptureSnapshot
+    ImGuiEditorBridge::CaptureSnapshot() const noexcept
     {
-        return m_Adapter != nullptr && m_Adapter->WantsMouseCapture();
-    }
-
-    bool ImGuiEditorBridge::WantsKeyboardCapture() const noexcept
-    {
-        return m_Adapter != nullptr && m_Adapter->WantsKeyboardCapture();
+        return m_Adapter != nullptr
+            ? m_Adapter->CaptureSnapshot()
+            : EditorInputCaptureSnapshot{};
     }
 
     const ImGuiAdapterDiagnostics*

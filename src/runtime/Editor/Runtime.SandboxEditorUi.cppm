@@ -40,8 +40,10 @@ import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KMeansGpuJobQueue;
 import Extrinsic.Runtime.KernelEvents;
@@ -2780,6 +2782,14 @@ export namespace Extrinsic::Runtime
         void Attach(Engine& engine);
         void Detach();
 
+        [[nodiscard]] EditorUiVisibilityCommandResult
+        ApplyEditorUiVisibilityCommand(
+            EditorUiVisibilityCommand command) noexcept;
+        [[nodiscard]] bool IsEditorVisible() const noexcept
+        {
+            return m_WindowRegistry.IsVisible();
+        }
+
         [[nodiscard]] bool IsAttached() const noexcept { return m_Engine != nullptr; }
         [[nodiscard]] const SandboxEditorPanelFrame& GetLastFrame() const noexcept
         {
@@ -2791,6 +2801,8 @@ export namespace Extrinsic::Runtime
         void DetachKMeansGpuQueue();
 
         Engine*                 m_Engine{nullptr};
+        EditorWindowRegistry    m_WindowRegistry{};
+        RuntimeInputActionHandle m_UiVisibilityToggleAction{};
         SandboxEditorPanelFrame m_LastFrame{};
         SandboxEditorSelectedModelCache m_SelectedModelCache{};
         std::array<char, 1024>  m_ImportPathBuffer{};

@@ -35,6 +35,22 @@ export struct EditorWindowMenuEntry {
   bool Open{false};
 };
 
+export enum class EditorUiVisibilityCommandKind : std::uint8_t {
+  Toggle,
+  Show,
+  Hide,
+};
+
+export struct EditorUiVisibilityCommand {
+  EditorUiVisibilityCommandKind Kind{EditorUiVisibilityCommandKind::Toggle};
+};
+
+export struct EditorUiVisibilityCommandResult {
+  bool WasVisible{true};
+  bool IsVisible{true};
+  bool Changed{false};
+};
+
 struct EditorWindowRecord {
   EditorWindowHandle Handle{};
   EditorWindowDescriptor Descriptor{};
@@ -73,4 +89,8 @@ private:
   std::uint64_t m_NextHandle{1u};
   bool m_Visible{true};
 };
+
+export [[nodiscard]] EditorUiVisibilityCommandResult
+ApplyEditorUiVisibilityCommand(EditorWindowRegistry &registry,
+                               EditorUiVisibilityCommand command) noexcept;
 } // namespace Extrinsic::Runtime

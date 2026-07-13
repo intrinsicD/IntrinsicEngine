@@ -340,6 +340,7 @@ namespace Extrinsic::Runtime
         // when it is constructed. RunFrame brackets OnVariableTick with the
         // adapter so one ImGuiOverlayFrame is produced per engine frame.
         void SetImGuiEditorCallback(std::function<void()> callback);
+        void SetImGuiEditorVisible(bool visible) noexcept;
         // Read-only access to the runtime-side ImGui adapter (valid after
         // Initialize()). Exposes the produce-path diagnostics for tests; the
         // Engine owns the BeginFrame/EndFrame cadence.

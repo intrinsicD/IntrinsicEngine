@@ -33,6 +33,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t PumpedEventCount{0u};          // platform events forwarded to ImGui IO (cumulative)
         std::uint32_t ContextRebuilds{0u};           // RebuildForDisplayChange cycles performed
         std::uint32_t EditorCallbackInvocations{0u}; // editor hook invocations (cumulative)
+        std::uint32_t CaptureSnapshots{0u};          // completed editor-frame snapshots
         std::uint32_t DisplayWidth{0u};              // reported overlay-frame pixel width
         std::uint32_t DisplayHeight{0u};             // reported overlay-frame pixel height
         std::uint32_t FontAtlasCopyCount{0u};        // CPU atlas payload copies into overlay frames
@@ -49,6 +50,18 @@ export namespace Extrinsic::Runtime
         std::uint64_t LastImGuiRenderMicros{0u};
         std::uint64_t LastDrawDataCopyMicros{0u};
         std::uint64_t LastEndFrameMicros{0u};
+    };
+
+    struct EditorInputCaptureSnapshot
+    {
+        bool CapturedKeyboard{false};
+        bool CapturedMouse{false};
+        bool WidgetsActive{false};
+
+        [[nodiscard]] bool CapturesViewportInput() const noexcept
+        {
+            return CapturedKeyboard || CapturedMouse || WidgetsActive;
+        }
     };
 
     // Runtime-side Dear ImGui platform/renderer adapter (RUNTIME-090, the
@@ -100,10 +113,17 @@ export namespace Extrinsic::Runtime
         // EndFrame so future editor code can issue ImGui panel draws without
         // modifying the adapter.
         void SetEditorCallback(std::function<void()> callback);
+        void SetEditorVisible(bool visible) noexcept;
+        [[nodiscard]] bool IsEditorVisible() const noexcept
+        {
+            return m_EditorVisible;
+        }
 
         [[nodiscard]] bool IsInitialized() const noexcept { return m_Context != nullptr; }
-        [[nodiscard]] bool WantsMouseCapture() const noexcept;
-        [[nodiscard]] bool WantsKeyboardCapture() const noexcept;
+        [[nodiscard]] EditorInputCaptureSnapshot CaptureSnapshot() const noexcept
+        {
+            return m_CaptureSnapshot;
+        }
         [[nodiscard]] const ImGuiAdapterDiagnostics& GetDiagnostics() const noexcept { return m_Diagnostics; }
 
     private:
@@ -122,9 +142,11 @@ export namespace Extrinsic::Runtime
         ImGuiContext*                 m_Context{nullptr};
         std::function<void()>         m_EditorCallback{};
         ImGuiAdapterDiagnostics       m_Diagnostics{};
+        EditorInputCaptureSnapshot    m_CaptureSnapshot{};
         std::string                   m_ClipboardScratch{}; // backing store for ImGui clipboard reads
         Graphics::ImGuiOverlayFontAtlas m_FontAtlasCache{};
         std::uint64_t                 m_FontAtlasRevision{0u};
         bool                          m_FrameStarted{false};
+        bool                          m_EditorVisible{true};
     };
 }

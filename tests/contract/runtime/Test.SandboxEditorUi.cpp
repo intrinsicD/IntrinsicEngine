@@ -63,6 +63,7 @@ import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetImportPipeline;
@@ -70,6 +71,7 @@ import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.ImGuiAdapter;
@@ -1018,6 +1020,21 @@ namespace
         void OnSimTick(Runtime::Engine&, double) override {}
         void OnVariableTick(Runtime::Engine& engine, double, double) override
         {
+            engine.RequestExit();
+        }
+        void OnShutdown(Runtime::Engine&) override {}
+    };
+
+    class ToggleEditorVisibilityApplication final : public Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            const Plat::IWindow& window = engine.GetWindow();
+            auto& input = const_cast<Plat::Input::Context&>(window.GetInput());
+            input.SetKeyState(Plat::Input::Key::G, true);
             engine.RequestExit();
         }
         void OnShutdown(Runtime::Engine&) override {}
@@ -11731,6 +11748,35 @@ TEST(SandboxEditorUi, EngineAttachmentRegistersEditorCallback)
     EXPECT_TRUE(ui.GetLastFrame().FileImport.Enabled);
     EXPECT_FALSE(HasDiagnostic(ui.GetLastFrame().FileImport.Diagnostics,
                                Runtime::SandboxEditorDiagnosticCode::AssetImportUnavailable));
+
+    ui.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorUi, GlobalVisibilityHotkeyUsesTheVisibilityCommandPath)
+{
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<ToggleEditorVisibilityApplication>());
+    engine.Initialize();
+
+    Runtime::SandboxEditorUi ui;
+    ui.Attach(engine);
+    ASSERT_TRUE(ui.IsEditorVisible());
+
+    engine.Run();
+
+    EXPECT_FALSE(ui.IsEditorVisible());
+    EXPECT_FALSE(
+        engine.GetImGuiAdapter().CaptureSnapshot().CapturesViewportInput());
+    const Runtime::EditorUiVisibilityCommandResult restored =
+        ui.ApplyEditorUiVisibilityCommand(
+            Runtime::EditorUiVisibilityCommand{
+                Runtime::EditorUiVisibilityCommandKind::Show});
+    EXPECT_FALSE(restored.WasVisible);
+    EXPECT_TRUE(restored.IsVisible);
+    EXPECT_TRUE(restored.Changed);
+    EXPECT_TRUE(ui.IsEditorVisible());
 
     ui.Detach();
     engine.Shutdown();

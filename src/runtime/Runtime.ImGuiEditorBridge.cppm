@@ -27,12 +27,12 @@ export namespace Extrinsic::Runtime
         void Shutdown(Graphics::IRenderer* renderer) noexcept;
 
         void SetEditorCallback(std::function<void()> callback);
+        void SetEditorVisible(bool visible) noexcept;
         void BeginFrame(double deltaSeconds);
         void EndFrame();
 
         [[nodiscard]] bool IsInitialized() const noexcept;
-        [[nodiscard]] bool WantsMouseCapture() const noexcept;
-        [[nodiscard]] bool WantsKeyboardCapture() const noexcept;
+        [[nodiscard]] EditorInputCaptureSnapshot CaptureSnapshot() const noexcept;
         [[nodiscard]] const ImGuiAdapterDiagnostics* Diagnostics() const noexcept;
         [[nodiscard]] const ImGuiAdapter& Adapter() const noexcept;
 
@@ -40,5 +40,6 @@ export namespace Extrinsic::Runtime
         Graphics::ImGuiOverlaySystem m_Overlay{};
         std::function<void()>        m_EditorCallback{};
         std::unique_ptr<ImGuiAdapter> m_Adapter{};
+        bool                         m_EditorVisible{true};
     };
 }
