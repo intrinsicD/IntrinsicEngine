@@ -9,14 +9,15 @@ depends_on:
 ## Status
 - Status: in progress.
 - Owner: Codex.
-- Branch: `codex/ui-034-editor-window-contribution`.
-- Slices 0-1 and Slice 2A are complete. `Runtime.EditorUiHost` now owns generic
+- Branch: `codex/arch-006-s2b`.
+- Slices 0-2 are complete. `Runtime.EditorUiHost` now owns generic
   callback, registry, and visibility lifecycle, while `Sandbox.cppm` exports
   only the app factory/registration surface and the concrete app lives in
   `Sandbox.cpp`. App-owned registered windows now own K-Means and Progressive
-  Poisson presentation.
-- Next verification step: finish Slice 2 by splitting the K-Means and
-  Progressive Poisson runtime facade from the editor-shell implementation.
+  Poisson presentation, and their runtime command/config/result facade bodies
+  compile separately from the editor shell.
+- Next verification step: Slice 3 moves registration and mesh-processing
+  presentation while preserving their runtime execution/undo/job facades.
 
 ## Goal
 - Restore the documented layering intent that application specifics live in
@@ -212,6 +213,31 @@ Slice 2A evidence (2026-07-13):
 - `ExtrinsicSandbox` and `IntrinsicTests` build; focused `SandboxEditorUi.*`
   coverage passed 144/144 and the default CPU-supported gate passed 3678/3678.
   Strict layering, test-layout, task-policy, docs-link, and diff checks passed.
+
+Slice 2B evidence (2026-07-13):
+- Split the K-Means and Progressive Poisson command/config/result bodies plus
+  K-Means GPU queue lifecycle into the independently compiled private
+  `Runtime.SandboxMethodFacade.cpp` implementation unit. The public
+  `Extrinsic.Runtime.SandboxEditorUi` module surface and Sandbox imports did
+  not change; app-to-runtime remains the only dependency direction.
+- The editor-shell implementation fell from 24,520 to 21,943 lines. The new
+  method facade is 2,911 lines and its private cross-unit declarations are 58
+  lines; the public interface remains 2,959 lines / 53 imports. These are
+  source-shape metrics only, not a compile-time claim.
+- Added a runtime contract assertion that both facade definitions and their
+  CMake source edge live outside the editor-shell implementation. Existing
+  behavioral K-Means and Progressive Poisson contracts remain the behavior
+  gate.
+- `ExtrinsicRuntime`, `IntrinsicRuntimeContractTests`,
+  `IntrinsicRuntimeGraphicsCpuTests`, and `IntrinsicTests` built with the `ci`
+  preset. Focused K-Means/Poisson/app-boundary coverage passed 17/17, headless
+  Sandbox acceptance passed 9/9, and the default CPU-supported gate passed
+  3638/3638. Strict layering, test-layout, task-policy, docs-link,
+  clean-workshop-validator, and diff checks passed. The root-hygiene check
+  completed in warning mode with the existing `ara/` allowlist finding.
+- Regenerated the 386-module API inventory and the session brief; neither
+  generated artifact changed because this slice adds only a private
+  implementation unit and does not change task front matter.
 
 ## Forbidden changes
 - Mixing mechanical moves with semantic refactors in one slice.

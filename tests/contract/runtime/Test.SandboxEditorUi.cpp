@@ -2135,6 +2135,39 @@ TEST(SandboxEditorUi, ExtrinsicSandboxAppStaysRuntimeOnly)
     EXPECT_EQ(sandboxCMake.find("ExtrinsicRHI"), std::string::npos);
 }
 
+TEST(SandboxEditorUi, MethodFacadesCompileSeparatelyFromEditorShell)
+{
+    const std::string editorShell = ReadRepositoryTextFile(
+        "src/runtime/Editor/Runtime.SandboxEditorUi.cpp");
+    const std::string methodFacade = ReadRepositoryTextFile(
+        "src/runtime/Editor/Runtime.SandboxMethodFacade.cpp");
+    const std::string runtimeCMake =
+        ReadRepositoryTextFile("src/runtime/CMakeLists.txt");
+
+    ASSERT_FALSE(editorShell.empty());
+    ASSERT_FALSE(methodFacade.empty());
+    ASSERT_FALSE(runtimeCMake.empty());
+
+    constexpr std::string_view kMeansDefinition =
+        "SandboxEditorKMeansResult ApplySandboxEditorKMeansCommand(";
+    constexpr std::string_view progressivePoissonDefinition =
+        "SandboxEditorProgressivePoissonResult\n"
+        "    ApplySandboxEditorProgressivePoissonCommand(";
+
+    EXPECT_EQ(editorShell.find(kMeansDefinition), std::string::npos);
+    EXPECT_EQ(editorShell.find(progressivePoissonDefinition),
+              std::string::npos);
+    EXPECT_NE(methodFacade.find(kMeansDefinition), std::string::npos);
+    EXPECT_NE(methodFacade.find(progressivePoissonDefinition),
+              std::string::npos);
+    EXPECT_NE(methodFacade.find(
+                  "module Extrinsic.Runtime.SandboxEditorUi;"),
+              std::string::npos);
+    EXPECT_NE(runtimeCMake.find(
+                  "Editor/Runtime.SandboxMethodFacade.cpp"),
+              std::string::npos);
+}
+
 TEST(SandboxEditorUi, HierarchyInspectorModelReportsSelectionRenderHintsAndDomain)
 {
     ECS::Scene::Registry registry;

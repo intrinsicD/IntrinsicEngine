@@ -137,6 +137,10 @@ the K-Means windows for PointCloud, Graph, and Mesh plus the PointCloud and Mesh
 Progressive Poisson windows from the application layer. Their ImGui state and
 result presentation are app-owned, while model construction, command execution,
 job queues, config validation, and result publication remain runtime-owned.
+Those K-Means and Progressive Poisson facade bodies compile in the private
+`Runtime.SandboxMethodFacade.cpp` implementation unit; the public
+`Extrinsic.Runtime.SandboxEditorUi` surface and the app-to-runtime dependency
+direction are unchanged.
 The remaining fixed domain windows stay behind the legacy section table until
 later `ARCH-006` slices relocate them.
 

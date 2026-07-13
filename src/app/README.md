@@ -8,6 +8,8 @@ engine runtime. The canonical entry point is `Sandbox`.
 - `Sandbox/` — reference integration target. Links to `Runtime`, opens a window,
   drives the frame loop with the runtime-owned reference configuration, and owns
   Sandbox-specific editor presentation registered through runtime facades.
+  Method command/config/result implementations remain private runtime units, so
+  app panels do not import their geometry, ECS, graphics, or RHI dependencies.
 
 ## Directory layout
 

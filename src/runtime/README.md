@@ -207,7 +207,10 @@ vertex-property histogram. `ARCH-006` Slice 2 adds a context-aware contribution
 descriptor that supplies a frame-local runtime facade without exposing
 `Engine&`; the Sandbox application uses it for app-owned K-Means and Progressive
 Poisson panels while runtime retains their models, commands, config lane, jobs,
-and result sinks. The remaining fixed domain windows are retained for later
+and result sinks. Slice 2B compiles those method facade bodies separately in
+the private `Runtime.SandboxMethodFacade.cpp` implementation unit, leaving the
+public module and app imports unchanged. The remaining fixed domain windows
+are retained for later
 `ARCH-006` relocation slices. `SandboxEditorUi` routes the unsuppressed `G`
 input action through the same `EditorUiVisibilityCommand` path used by
 programmatic callers. At the end of each visible editor frame, `ImGuiAdapter`
