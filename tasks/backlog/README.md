@@ -261,7 +261,7 @@ Open members (kernel-seam priority set first):
 - [`architecture/CORE-007-scheduler-priority-wait-wake-hardening.md`](architecture/CORE-007-scheduler-priority-wait-wake-hardening.md).
 - [`architecture/CORE-008-compiled-taskgraph-plan-reuse.md`](architecture/CORE-008-compiled-taskgraph-plan-reuse.md).
 - [`architecture/CORE-009-app-owned-config-sections.md`](architecture/CORE-009-app-owned-config-sections.md).
-- [`architecture/ARCH-006-sandbox-editor-content-out-of-runtime.md`](architecture/ARCH-006-sandbox-editor-content-out-of-runtime.md).
+- [`ARCH-006-sandbox-editor-content-out-of-runtime.md`](../active/ARCH-006-sandbox-editor-content-out-of-runtime.md).
 - [`platform/PLATFORM-004-alternative-platform-backend-onboarding.md`](platform/PLATFORM-004-alternative-platform-backend-onboarding.md) (planning-only seed).
 
 ### Theme G — Active bugs

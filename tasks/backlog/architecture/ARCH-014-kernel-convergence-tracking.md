@@ -15,7 +15,7 @@ depends_on: []
 ## Non-goals
 - No implementation of the seams or extractions here — child tasks own that
   work. Retired children remain convergence evidence; open children such as
-  `ARCH-006`, `UI-034`, and `RUNTIME-129` own their implementation. This task
+  `ARCH-006` and `RUNTIME-129` own their implementation. This task
   tracks and enforces; it does not do their work.
 - No re-litigation of ADR-0024 decisions (that is an ADR amendment, not this
   task).
@@ -38,7 +38,10 @@ depends_on: []
   retired on 2026-07-08 at `Operational`: Sandbox composes
   `Runtime::ClusteringModule`, and `Runtime.Engine.cppm` / `.cpp` contain no
   `KMeans` or `Runtime.ClusteringModule` tokens. The Clustering scorecard row
-  is therefore complete.
+  is therefore complete. `UI-034` retired on 2026-07-13 at `CPUContracted`;
+  the generic editor registry, lazy callback lifecycle, one capture snapshot,
+  global visibility command, and property widgets now exist. `ARCH-006` is
+  active to move the remaining Sandbox presentation out of runtime.
 - This task is the umbrella `RORG-031`-style: it references children, keeps
   the scorecard honest, and provides the review guardrail so the kernel does
   not regrow while the migration is in flight.

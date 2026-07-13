@@ -26,7 +26,7 @@ Opened from the 2026-07-03 main-loop/task-graph/render-graph review
 - [`CORE-009`](CORE-009-app-owned-config-sections.md) — app-owned config
   sections out of core `EngineConfig` (Progressive Poisson block moves
   behind a generic section mechanism).
-- [`ARCH-006`](ARCH-006-sandbox-editor-content-out-of-runtime.md) — move
+- [`ARCH-006`](../../active/ARCH-006-sandbox-editor-content-out-of-runtime.md) — move
   Sandbox application editor content from `runtime` to `app` (sliced
   migration; planning slice first) and own the top `.cppm` compile-hotspot
   candidates for `Runtime.SandboxEditorUi.cppm` / `Sandbox.cppm`.

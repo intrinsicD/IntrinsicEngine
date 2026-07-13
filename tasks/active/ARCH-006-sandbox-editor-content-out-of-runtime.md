@@ -6,6 +6,15 @@ depends_on:
 ---
 # ARCH-006 — Move Sandbox application editor content out of runtime
 
+## Status
+- Status: in progress.
+- Owner: Codex.
+- Branch: `codex/ui-034-editor-window-contribution`.
+- Slice 0 is complete: the ownership inventory and five implementation slices
+  below are the migration contract. UI-034 is retired, so Slice 1 is unblocked.
+- Next verification step: extract the generic editor host and privatize the
+  Sandbox application module implementation without moving panel behavior.
+
 ## Goal
 - Restore the documented layering intent that application specifics live in
   `app/`: define and execute a sliced migration of
@@ -42,7 +51,7 @@ depends_on:
   architecture in the same file. Open `RUNTIME-138` (nonblocking selected-
   entity pipeline) still touches the same file; this task must slice around
   it, not duplicate it.
-- Ownership split with `UI-034`: `UI-034` owns the generic domain-window
+- Ownership split with retired `UI-034`: `UI-034` owns the generic domain-window
   registration API, lazy lifecycle, input-capture snapshot, global visibility
   toggle, and generic property widgets. This task owns the full inventory,
   panel-family split, and relocation of Sandbox content into `app/Sandbox`.
@@ -71,8 +80,49 @@ depends_on:
   dominated by importing the editor shell. This task is the owner for those two
   candidates; do not open a duplicate header-conversion task for them.
 
+## Slice 0 inventory (2026-07-13)
+
+Current measured source shape:
+
+| Surface | Lines | Direct module imports | Current owner |
+|---|---:|---:|---|
+| `Runtime.SandboxEditorUi.cppm` | 2,970 | 54 | `runtime/Editor` |
+| `Runtime.SandboxEditorUi.cpp` | 25,539 | 86 | `runtime/Editor` |
+| `Test.SandboxEditorUi.cpp` | 12,254 | n/a | runtime contract tests |
+| `Sandbox.cppm` | 64 | 4 | `app/Sandbox` |
+
+Ownership inventory and destination:
+
+| Inventory | Current shape | Destination |
+|---|---|---|
+| Generic editor host | Engine editor-callback attachment, one global visibility input action, registry draw lifecycle, and detach cleanup are mixed into `SandboxEditorUi::Attach/Detach` near the end of the implementation. | A small `Runtime.EditorUiHost` in `runtime/Editor`, built on the retired UI-034 registry/capture contracts. Contributor callbacks receive no `Engine&`. |
+| Generic reusable widgets | `Runtime.EditorWindowRegistry` and `Runtime.EditorPropertyWidgets` are already independent runtime modules. | Stay in `runtime/Editor`; no competing registry or property-widget layer. |
+| Sandbox presentation and UI state | Fixed menu/window enums, menu rendering, ImGui draw functions, method-control state, result display state, and the application editor controller occupy the anonymous-namespace UI blocks and the current `SandboxEditorUi` class. | `app/Sandbox/Editor`, split into shell, method-panel, and domain-panel units. App code imports runtime modules only. |
+| Runtime panel models and command facades | Exported panel/model/command records plus model builders and `ApplySandboxEditor*` implementations contain ECS, geometry, assets, graphics, scheduling, and undo/redo work. | Stay in runtime, but move out of `runtime/Editor` and split by result-consumer contract. These are the runtime seams app panels call; live subsystem ownership does not move. |
+| Tests | One 12,254-line runtime contract file mixes facade correctness, presentation behavior, and app composition. | Split with the subject: runtime facade contracts remain under runtime tests; app editor composition/presentation coverage moves to app-linked integration units. |
+| Figure/export controls | No standalone figure-export panel exists in the current source. Render-artifact publication/export controls are part of the render-recipe editor. | Move with the shell/render-recipe presentation slice; do not invent a new feature. |
+
+Implementation slice boundaries:
+
+1. **Generic host and private app shell.** Add `Runtime.EditorUiHost`, route the
+   current callback/visibility lifecycle through it, and move `App` lifecycle
+   bodies out of `Sandbox.cppm`. No panel behavior moves in this slice.
+2. **K-Means and Progressive Poisson.** Move their ImGui controls/state into
+   app-owned registered windows; split their runtime models/commands from the
+   editor shell without moving kernels or job ownership.
+3. **Registration and mesh processing.** Move registration, denoise,
+   curvature, remesh, subdivision, simplification, and normals presentation;
+   keep execution/undo/job facades in runtime family units.
+4. **Point-cloud and generic domain panels.** Move outlier-removal plus domain
+   appearance/properties/selection presentation and their app state. The
+   UI-034 registry is the only contribution seam.
+5. **Shell, tests, and retirement.** Move hierarchy/inspector/file/import,
+   frame-graph/render-recipe/artifact, camera, and visualization presentation;
+   split tests, remove the Sandbox-specific class/module from `runtime/Editor`,
+   update docs/inventory, and record final interface/import/build metrics.
+
 ## Required changes
-- [ ] Slice 0 (planning, this file): inventory `Runtime.SandboxEditorUi`
+- [x] Slice 0 (planning, this file): inventory `Runtime.SandboxEditorUi`
       content into (a) generic editor infrastructure that stays in runtime,
       (b) sandbox/method panels that move to app, (c) engine command
       facades the panels call (stay). Record the inventory and the slice

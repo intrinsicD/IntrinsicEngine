@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `ARCH-006` — Move Sandbox application editor content out of runtime (tasks/active/ARCH-006-sandbox-editor-content-out-of-runtime.md)
 
 ## Theme B — Rendering modernization
 
@@ -19,7 +19,6 @@ the authoritative open/unblocked view.
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
-- unblocked: `ARCH-006` — Move Sandbox application editor content out of runtime (tasks/backlog/architecture/ARCH-006-sandbox-editor-content-out-of-runtime.md)
 - unblocked: `ARCH-014` — Kernel convergence tracking (umbrella north-star) (tasks/backlog/architecture/ARCH-014-kernel-convergence-tracking.md)
 - unblocked: `ARCH-015` — Runtime module scope: cluster methods by result-consumer contract (grilling + ADR) (tasks/backlog/architecture/ARCH-015-runtime-module-scope-by-result-consumer-contract.md)
 - unblocked: `CORE-005` — Non-blocking TaskGraph submission and completion API (tasks/backlog/architecture/CORE-005-nonblocking-taskgraph-submit-api.md)

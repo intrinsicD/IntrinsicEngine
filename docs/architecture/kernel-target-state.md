@@ -63,7 +63,8 @@ metric below.
       (done 2026-07-09)
 - [ ] Extension-pass slot contract frozen (D10 validation items checked:
       splatting-lighting participation; order-dependent transparency)
-- [ ] Input capture filter chain — `UI-034` / EditorUiModule extraction
+- [x] Input capture filter chain — `UI-034` (done 2026-07-13 at
+      `CPUContracted`; one end-of-editor-frame snapshot gates viewport input)
 
 ### Kernel is slim (measurable)
 
@@ -107,8 +108,9 @@ metric below.
       composes `Runtime::ClusteringModule`, and `Runtime.Engine.cppm` / `.cpp`
       contain no `KMeans` or `Runtime.ClusteringModule` tokens)
 - [ ] EditorUi (ImGui adapter, dockspace, panel registry, `Pass.ImGui`) —
-      `UI-034` owns the generic registration/capture/widget seam; `ARCH-006`
-      consumes it for the editor-shell split and Sandbox-content relocation
+      retired `UI-034` supplies the generic registration/capture/widget seam;
+      active `ARCH-006` owns the editor-shell split and Sandbox-content
+      relocation
 - [ ] AssetImport pipeline — `RUNTIME-147`
 - [ ] SceneDocument (save/load/new/close) — `RUNTIME-148`
 - [ ] ConfigControl (recipe activation, hot-config apply) — `RUNTIME-149`
@@ -142,8 +144,8 @@ metric below.
 - **Reviewing a runtime PR?** Check it does not regress a scorecard
   invariant (new domain-noun import, new `Engine::GetX()`, new direct
   dispatcher use, new `Engine&` pass-through).
-- **Picking work?** The additive seams `ARCH-007`..`ARCH-011` and the
-  `ARCH-012` ClusteringModule proving extraction are complete. Work from the
-  remaining unchecked rows: `UI-034` owns the generic editor registration and
-  capture seam, `ARCH-006` consumes it for Sandbox-content relocation, and the
-  other domain rows follow through their extraction tasks.
+- **Picking work?** The additive seams `ARCH-007`..`ARCH-011`, the
+  `ARCH-012` ClusteringModule proof, and the retired `UI-034` generic editor
+  seam are complete. Work from the remaining unchecked rows: active `ARCH-006`
+  owns Sandbox-content relocation, and the other domain rows follow through
+  their extraction tasks.
