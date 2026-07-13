@@ -4725,3 +4725,28 @@ tree:
       the 1,457-edge IntrinsicTests build, the 3,679-test default CPU gate, and
       strict scoped structural checks; BUG-067 retired at CPUContracted.
     status: resolved
+  - id: N202
+    type: experiment
+    title: "BUG-064 hosted software-Vulkan frame-pacing closure"
+    provenance: ai-executed
+    timestamp: "2026-07-13T22:21"
+    evidence:
+      - ".github/workflows/ci-vulkan.yml"
+      - "tasks/done/BUG-064-ci-vulkan-framepacing-headless-display.md"
+      - "GitHub Actions run 29277091536"
+      - "GitHub Actions run 29278614647"
+      - "GitHub Actions run 29280699135"
+      - "python3 tools/ci/check_workflow_names.py --root .github/workflows"
+      - "python3 tests/regression/tooling/Test.WorkflowConcurrency.py"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "commit 98e91e26"
+    result: >
+      Scoped Mesa lavapipe 25.2.8 and its Ubuntu ICD to the strict
+      FramePacingDiagnosticCapture under isolated Xvfb without changing test
+      assertions or the broader fixtures' capability skips. Three sequential
+      hosted ci-vulkan runs at exact head 7e735868 passed the capture in 5.74,
+      3.19, and 5.28 seconds; each also completed all 59 broader CTest entries,
+      strict timing-result validation, and artifact upload. BUG-064 retired at
+      Operational in local commit 98e91e26 with all scoped structural checks
+      passing and no remote publication.
+    status: resolved

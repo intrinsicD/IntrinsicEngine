@@ -2,9 +2,9 @@ session:
   id: "2026-07-13_001"
   date: "2026-07-13"
   started: "2026-07-13T01:00"
-  last_turn: "2026-07-13T22:04"
-  turn_count: 3
-  summary: "Completed and published CI-007, reconciled every surviving branch tip into main, and retired BUG-067 with deterministic JobService completion-handoff proof."
+  last_turn: "2026-07-13T22:21"
+  turn_count: 4
+  summary: "Completed and published CI-007, reconciled every surviving branch tip into main, and retired BUG-067 plus BUG-064 with deterministic CPU-race and hosted software-Vulkan evidence."
 
 events_logged:
   - turn: 1
@@ -67,6 +67,12 @@ events_logged:
     routing: crystallized
     provenance: ai-executed
     summary: "Crystallized completion-queue publication as a one-way worker-to-drain state handoff in K05."
+  - turn: 4
+    type: experiment
+    id: "N202"
+    routing: direct
+    provenance: ai-executed
+    summary: "Passed three sequential hosted software-Vulkan frame-pacing captures at one exact head and retired BUG-064 at Operational."
 
 ai_actions:
   - turn: 1
@@ -108,6 +114,14 @@ ai_actions:
       - "tests/contract/runtime/Test.RuntimeJobService.cpp"
       - "tasks/done/BUG-067-jobservice-completion-state-lost-update-race.md"
       - "tasks/done/RETIREMENT-LOG.md"
+  - turn: 4
+    action: "Audited three non-overlapping hosted ci-vulkan runs, recorded the exact Lavapipe/Xvfb capture evidence, retired BUG-064, passed workflow/task/docs gates, and created a local closure commit without pushing."
+    provenance: ai-executed
+    files_changed:
+      - ".github/workflows/ci-vulkan.yml"
+      - "tasks/done/BUG-064-ci-vulkan-framepacing-headless-display.md"
+      - "tasks/backlog/bugs/index.md"
+      - "tasks/done/RETIREMENT-LOG.md"
 
 claims_touched:
   - id: C01
@@ -121,6 +135,8 @@ key_context:
     excerpt: "User requested merging all unmerged branches into main and pushing to the remote immediately."
   - turn: 3
     excerpt: "BUG-067 was completed as an isolated runtime concurrency slice without touching METHOD-016 or pushing/merging the branch."
+  - turn: 4
+    excerpt: "BUG-064 closure required three exact, sequential hosted successes, task retirement, a clean local commit, and no additional push or dispatch."
 
 open_threads:
   - "BUG-081 must collect a comparable warm-configure population before recalibrating the 20-second exact-vcpkg-hit guard."

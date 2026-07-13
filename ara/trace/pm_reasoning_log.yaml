@@ -777,3 +777,9 @@ entries:
       - "Staged O16 and crystallized it to K05 via artifact commitment because the one-way completion-state handoff is now encoded in JobService source, runtime docs, the regression contract, and the retired task."
       - "Kept O08, O09, and O13 unpromoted and non-stale; this turn neither accepted the module-surface recommendations nor resolved the model-training target."
       - "Preserved the two existing open threads because BUG-067 completed without changing BUG-081 or the model-training question."
+  - turn: "2026-07-13_001#4"
+    notes:
+      - "Reserved N202 and turn 4 because the parallel BUG-067 epilogue owns N201 and turn 3; the eventual branch reconciliation can preserve both records without duplicate IDs."
+      - "Routed BUG-064 as experiment N202 because it produced three exact hosted backend runs, workflow/task retirement artifacts, structural verification, and a local completion commit."
+      - "Did not stage a new interpretive observation: the durable result is a bounded hosted-gate journey fact, while the operational proof is already committed in the retired task."
+      - "Kept O08, O09, and O13 unpromoted and non-stale; BUG-064 neither accepts the module-surface recommendations nor resolves the model-training target."
