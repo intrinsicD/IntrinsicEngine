@@ -4638,3 +4638,66 @@ tree:
       - "tasks/done/CI-007-module-safe-persistent-ccache-pilot.md"
       - "commit 3e3b3925"
     status: resolved
+  - id: N198
+    type: decision
+    title: "Integrate every surviving branch tip into main"
+    provenance: user
+    timestamp: "2026-07-13T08:27"
+    choice: >
+      Merge every local and remote branch tip not reachable from `main`, then
+      push the resulting verified history directly to `origin/main`.
+    alternatives:
+      - "Publish only the branch carrying net-new files and leave tree-neutral or superseded tips unreachable from main."
+      - "Leave the branches unpublished."
+    evidence:
+      - "User request on 2026-07-13"
+      - "commit d8c38227"
+    status: resolved
+  - id: N199
+    type: decision
+    title: "Preserve canonical content while closing stale branch ancestry"
+    provenance: ai-executed
+    timestamp: "2026-07-13T08:27"
+    also_depends_on: [N197, N198]
+    choice: >
+      Fast-forwarded `main` through the genuine CI-007 closure, merged the
+      temporary interface-evidence and already-landed BUG-063/066 tips as
+      tree-neutral ancestry, and used the `ours` strategy for the abandoned
+      CI-003..010 taxonomy so its superseded duplicate task IDs did not re-enter
+      the canonical task tree.
+    alternatives:
+      - "Content-merge the abandoned CI taxonomy and reintroduce duplicate CI task IDs."
+      - "Ignore tree-neutral and superseded tips despite the all-branches instruction."
+    evidence:
+      - "commit 59460fa5"
+      - "commit 2b4a69e0"
+      - "commit d8c38227"
+      - "git diff --exit-code agent/ci-007-close-pilot HEAD"
+    status: resolved
+  - id: N200
+    type: experiment
+    title: "All-branch merge rehearsal, verification, and publication"
+    provenance: ai-executed
+    timestamp: "2026-07-13T08:27"
+    also_depends_on: [N198, N199]
+    evidence:
+      - "Disposable worktree merge rehearsal from origin/main"
+      - "cmake --preset ci"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j16"
+      - "python3 tests/regression/tooling/Test.TouchedScope.py"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/agents/check_task_state_links.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "git push origin main:main"
+      - "commit d8c38227"
+    result: >
+      The disposable rehearsal and real merge both completed without content
+      conflicts after rejecting the stale taxonomy content. Every surviving
+      local and remote branch ref became reachable from `main`, the final tree
+      exactly matched the CI-007 closure tip, configure and `IntrinsicTests`
+      build passed with Clang 23, the CPU-supported CTest gate passed
+      3,658/3,658 in 49.19 seconds, touched-scope tooling and strict task/state/
+      docs checks passed, and `origin/main` advanced from e9a54df8 to d8c38227.
+    status: resolved

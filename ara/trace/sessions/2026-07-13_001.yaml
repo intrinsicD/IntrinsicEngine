@@ -2,9 +2,9 @@ session:
   id: "2026-07-13_001"
   date: "2026-07-13"
   started: "2026-07-13T01:00"
-  last_turn: "2026-07-13T01:00"
-  turn_count: 1
-  summary: "Completed CI-007 hosted evidence, retained module-safe ccache in PR-fast only, tracked the independent configure-budget flake, retired the task, and committed all changes."
+  last_turn: "2026-07-13T08:27"
+  turn_count: 2
+  summary: "Completed and published the CI-007 closure, retained module-safe ccache in PR-fast only, tracked the configure-budget flake, and reconciled every surviving branch tip into main without restoring superseded task content."
 
 events_logged:
   - turn: 1
@@ -37,6 +37,24 @@ events_logged:
     routing: crystallized
     provenance: ai-executed
     summary: "Crystallized the same-shape PR-fast latency result as supported claim C01 via artifact commitment."
+  - turn: 2
+    type: decision
+    id: "N198"
+    routing: direct
+    provenance: user
+    summary: "Directed every surviving graph-unmerged branch tip to be integrated into main and pushed."
+  - turn: 2
+    type: decision
+    id: "N199"
+    routing: direct
+    provenance: ai-executed
+    summary: "Preserved canonical CI task content while recording superseded and tree-neutral branch ancestry."
+  - turn: 2
+    type: experiment
+    id: "N200"
+    routing: direct
+    provenance: ai-executed
+    summary: "Rehearsed, verified, and published the complete merge graph at d8c38227 with 3,658 passing CPU tests."
 
 ai_actions:
   - turn: 1
@@ -60,6 +78,14 @@ ai_actions:
       - "ara/trace/pm_reasoning_log.yaml"
       - "ara/trace/sessions/2026-07-13_001.yaml"
       - "ara/trace/sessions/session_index.yaml"
+  - turn: 2
+    action: "Inventoried and classified every local and remote branch outside main, rehearsed the full merge in a disposable worktree, then integrated all distinct tips while retaining the canonical CI task tree."
+    provenance: ai-executed
+    files_changed: []
+  - turn: 2
+    action: "Configured and built IntrinsicTests, passed 3,658 CPU-supported tests plus task/docs/tooling gates, and pushed main at d8c38227 to origin."
+    provenance: ai-executed
+    files_changed: []
 
 claims_touched:
   - id: C01
@@ -69,6 +95,8 @@ claims_touched:
 key_context:
   - turn: 1
     excerpt: "User requested that all changes be committed according to the repository's agentic workflow."
+  - turn: 2
+    excerpt: "User requested merging all unmerged branches into main and pushing to the remote immediately."
 
 open_threads:
   - "BUG-081 must collect a comparable warm-configure population before recalibrating the 20-second exact-vcpkg-hit guard."

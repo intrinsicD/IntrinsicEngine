@@ -92,8 +92,8 @@ sessions:
     open_threads: 2
   - id: "2026-07-13_001"
     date: "2026-07-13"
-    summary: "Completed CI-007 hosted evidence, retained module-safe ccache in PR-fast only, tracked the independent configure-budget flake, retired the task, and committed all changes."
-    turn_count: 1
-    events_count: 5
+    summary: "Completed and published the CI-007 closure, retained module-safe ccache in PR-fast only, tracked the configure-budget flake, and reconciled every surviving branch tip into main without restoring superseded task content."
+    turn_count: 2
+    events_count: 8
     claims_touched: [C01]
     open_threads: 2
