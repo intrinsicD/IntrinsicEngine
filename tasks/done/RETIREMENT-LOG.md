@@ -8,6 +8,20 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-074`](BUG-074-object-space-normal-bake-orphaned-cache-slot-livelock.md) —
+object-space-normal-bake failed-slot retry livelock retired on 2026-07-13 at
+`CPUContracted`. Both command-record and ready-frame-publication failures now
+call `FailGpuProducedTexture` with the generation returned by
+`BeginGpuProducedTexture`; the cache retires only that exact pending generation
+and fails closed for absent, promoted, transfer-owned, or mismatched entries.
+Forced failures prove a second explicit schedule succeeds immediately, while
+direct cache regressions prove stale cleanup preserves a replacement and late
+cleanup does not recreate a destroyed slot. The six-test causal selection
+passed 100 repetitions, broader bake/cache coverage passed 49/49, and the exact
+integrated 3,692-test default CPU gate plus strict structural checks passed.
+The production Vulkan plan provider and end-to-end runtime seam remain owned by
+`RUNTIME-129` before `Operational` can be claimed.
+
 [`BUG-064`](BUG-064-ci-vulkan-framepacing-headless-display.md) — hosted
 frame-pacing capture gate retired on 2026-07-13 at `Operational`. The
 `ci-vulkan` workflow now installs Mesa's lavapipe software Vulkan driver and

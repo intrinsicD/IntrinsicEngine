@@ -282,8 +282,9 @@ Slice 3 evidence (2026-07-13):
   passed 146/146 after the final review fixes; the new structural contract
   pins callback unregistration, immediate/pending result-sink forwarding, and
   the preserved ICP first-use dimensions, while the existing runtime behavior
-  tests exercise asynchronous result publication. The default CPU-supported
-  gate passed 3643/3643 before those app-only review fixes. Strict layering,
+  tests exercise asynchronous result publication. After those review fixes
+  and all ten selected task slices were integrated at `11f56bf5`, the
+  exact-head default CPU-supported gate passed 3692/3692. Strict layering,
   test-layout, task-policy, docs-link, clean-workshop-validator, and diff
   checks passed.
 - Regenerated the 387-module API inventory. Task front matter did not change,

@@ -15,20 +15,15 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   budget and stopped the job before ccache restore or compilation; collect a
   comparable hosted population and set an evidence-backed budget with explicit
   headroom while preserving fail-closed semantics.
-### From the review of merge `76528e6` ("Merge recovered runtime service extractions")
-
-The recovery merge adopted the extraction branch's parallel runtime-kernel
-implementation wholesale over main's, and mechanically it is clean (layering,
-task-policy, doc-links, docs-sync, test-layout all green). But static review
-plus focused subsystem review surfaced the following. `BUG-067` and `BUG-068`
-are now closed. The module-schedule set (`BUG-069`..`BUG-072`) regressed
-hardening that main had shipped as the closed `BUG-066`.
-
-- [`BUG-074` — Orphaned GpuAssetCache slot causes per-entity bake retry livelock](BUG-074-object-space-normal-bake-orphaned-cache-slot-livelock.md):
-  a failed bake submission leaks its pending cache slot → infinite retry. LOW (suspected).
----
 
 ## Verified / Closed
+
+- Closed 2026-07-13: [`BUG-074` — Orphaned GpuAssetCache slot causes per-entity bake retry livelock](../../done/BUG-074-object-space-normal-bake-orphaned-cache-slot-livelock.md).
+  Both post-open failure paths now retire only the exact GPU-produced texture
+  generation they own, so cleanup cannot destroy a replacement or recreate a
+  removed slot. After forced record and ready-frame failures, an explicit
+  second schedule succeeds immediately; the six-test causal selection passed
+  100 repetitions and the complete 3,692-test default CPU gate passed.
 
 - Closed 2026-07-13: [`BUG-064` — ci-vulkan FramePacingDiagnosticCapture cannot run headless](../../done/BUG-064-ci-vulkan-framepacing-headless-display.md).
   The strict capture now runs under isolated Xvfb with Mesa lavapipe rather
