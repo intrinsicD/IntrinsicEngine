@@ -41,6 +41,19 @@ This index is the canonical entry point for method/paper implementation document
 
 ## Geometry Methods
 
+- [`geometry.locally_optimal_projection`](../../methods/geometry/locally_optimal_projection/)
+  is the deterministic CPU reference backend for LOP/WLOP point-cloud
+  consolidation (Lipman et al. 2007; Huang et al. 2009): a projected subset of
+  a noisy, outlier-ridden cloud is attracted to the localized L1 median of the
+  input while density-weighted repulsion keeps it evenly distributed, with no
+  normals and no surface estimation. The public API is
+  `Geometry.PointCloud.Consolidation` (`WlopParams`, `Consolidate` over
+  span/`Cloud`, convergence report). It is delivered by
+  [`METHOD-016`](../../tasks/active/METHOD-016-locally-optimal-projection-reference-backend.md)
+  targeting `CPUContracted`; correctness lives in
+  [`Test.PointCloudConsolidation.cpp`](../../tests/unit/geometry/Test.PointCloudConsolidation.cpp)
+  and the smoke benchmark in
+  [`locally_optimal_projection_reference_smoke.yaml`](../../benchmarks/geometry/manifests/locally_optimal_projection_reference_smoke.yaml).
 - [`geometry.signed_heat`](../../methods/geometry/signed_heat/) is the
   deterministic CPU reference backend for Feng & Crane's Signed Heat Method on
   triangle-mesh surfaces. Given an oriented halfedge curve, it writes
