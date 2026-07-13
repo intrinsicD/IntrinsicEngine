@@ -5,6 +5,11 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-082` — GLFW X11 input-method initialization leaks under LeakSanitizer](BUG-082-glfw-x11-input-method-lsan-leak.md):
+  a GLFW-backed runtime contract passes its assertions but the process exits
+  nonzero for a 408-byte `_XimOpenIM` allocation after engine shutdown; isolate
+  terminate ordering versus an upstream retained global without weakening
+  engine leak detection.
 - [`BUG-081` — Warm-configure CI budget still flakes on hosted-runner variance](BUG-081-warm-configure-budget-runner-variance.md):
   an exact-vcpkg-hit configure took 22.002 s against the recalibrated 20 s
   budget and stopped the job before ccache restore or compilation; collect a

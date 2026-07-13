@@ -52,6 +52,7 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-076` — AsyncWorkService::ShutdownAndDrain does not drain the derived job registry (tasks/backlog/bugs/BUG-076-asyncworkservice-shutdown-skips-derived-job-registry.md)
 - unblocked: `BUG-079` — CoreTasks abandoned wait continuation leaks coroutine frame (tasks/backlog/bugs/BUG-079-coretasks-abandoned-wait-continuation-leak.md)
 - unblocked: `BUG-081` — Warm-configure CI budget still flakes on hosted-runner variance (tasks/backlog/bugs/BUG-081-warm-configure-budget-runner-variance.md)
+- unblocked: `BUG-082` — GLFW X11 input-method initialization leaks under LeakSanitizer (tasks/backlog/bugs/BUG-082-glfw-x11-input-method-lsan-leak.md)
 
 ## Theme H — Agentic workflow hardening
 
