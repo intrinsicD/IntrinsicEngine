@@ -19,12 +19,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   `ci-vulkan` is red on every recent run across all branches because the
   sandbox frame-pacing capture needs a display (GLFW: DISPLAY missing →
   zero frames → "no samples"); needs xvfb or a documented environment skip.
-- [`BUG-079` — CoreTasks abandoned wait continuation leaks coroutine frame](BUG-079-coretasks-abandoned-wait-continuation-leak.md):
-  wait-token release and scheduler shutdown discard parked raw coroutine
-  handles without an exactly-once frame-reclamation contract; leak detection is
-  disabled in the default sanitizer configuration, so deterministic destructor
-  sentinel coverage is required.
-
 ### From the review of merge `76528e6` ("Merge recovered runtime service extractions")
 
 The recovery merge adopted the extraction branch's parallel runtime-kernel
@@ -56,6 +50,12 @@ regressed hardening that main had shipped as the closed `BUG-066`.
 ---
 
 ## Verified / Closed
+
+- Closed 2026-07-13: [`BUG-079` — CoreTasks abandoned wait continuation leaks coroutine frame](../../done/BUG-079-coretasks-abandoned-wait-continuation-leak.md).
+  Wait-token release and scheduler shutdown now transfer parked single-use
+  continuation handles under the wait mutex and destroy their frames after
+  unlocking. Deterministic destructor sentinels failed before the fix, then
+  passed 100 repetitions each under ASan/UBSan and the complete CPU gate.
 
 - Closed 2026-07-10: [`BUG-080` — UV-atlas promotion smoke flakes on one-sided scheduler stalls](../../done/BUG-080-uv-atlas-promotion-smoke-timing-flake.md).
   The promotion gate now times five alternating fast-staged/xatlas pairs per

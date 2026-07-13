@@ -11,6 +11,54 @@ import :Internal;
 
 namespace Extrinsic::Core::Tasks
 {
+    namespace Detail
+    {
+        std::vector<SchedulerContext::ParkedContinuation>
+        TakeParkedContinuationsLocked(SchedulerContext& context,
+                                      SchedulerContext::WaitSlot& slot)
+        {
+            std::vector<SchedulerContext::ParkedContinuation> continuations;
+            continuations.reserve(slot.parkedCount);
+
+            uint32_t node = slot.parkedHead;
+            const uint32_t safetyLimit = slot.parkedCount + 1;
+            uint32_t iterations = 0;
+            while (node != SchedulerContext::InvalidParkedNode)
+            {
+                if (++iterations > safetyLimit)
+                    break;
+                auto& parkedNode = context.parkedNodes[node];
+                const uint32_t next = parkedNode.next;
+                parkedNode.next = SchedulerContext::InvalidParkedNode;
+                continuations.push_back(std::move(parkedNode.continuation));
+                parkedNode.continuation = {};
+                context.freeParkedNodes.push_back(node);
+                node = next;
+            }
+
+            slot.parkedHead = SchedulerContext::InvalidParkedNode;
+            slot.parkedTail = SchedulerContext::InvalidParkedNode;
+            slot.parkedCount = 0;
+            return continuations;
+        }
+
+        void DestroyParkedContinuations(
+            std::vector<SchedulerContext::ParkedContinuation>& continuations) noexcept
+        {
+            for (auto& continuation : continuations)
+            {
+                if (continuation.Alive)
+                    continuation.Alive->store(false, std::memory_order_release);
+
+                const std::coroutine_handle<> handle = continuation.Handle;
+                continuation.Handle = {};
+                continuation.Alive.reset();
+                if (handle)
+                    handle.destroy();
+            }
+        }
+    }
+
     Scheduler::WaitToken Scheduler::AcquireWaitToken()
     {
         if (!s_Ctx)
@@ -43,39 +91,27 @@ namespace Extrinsic::Core::Tasks
         if (!s_Ctx || !token.Valid())
             return;
 
-        std::lock_guard lock(s_Ctx->waitMutex);
-        if (token.Slot >= s_Ctx->waitSlots.size())
-            return;
-
-        auto& slot = s_Ctx->waitSlots[token.Slot];
-        if (!slot.inUse || slot.generation != token.Generation)
-            return;
-
-        slot.inUse = false;
-        uint32_t node = slot.parkedHead;
-        const uint32_t safetyLimit = slot.parkedCount + 1;
-        uint32_t iterations = 0;
-        while (node != Detail::SchedulerContext::InvalidParkedNode)
+        std::vector<Detail::SchedulerContext::ParkedContinuation> abandoned;
         {
-            if (++iterations > safetyLimit)
-                break;
-            auto& parkedNode = s_Ctx->parkedNodes[node];
-            const uint32_t next = parkedNode.next;
-            parkedNode.next = Detail::SchedulerContext::InvalidParkedNode;
-            parkedNode.continuation = {};
-            s_Ctx->freeParkedNodes.push_back(node);
-            node = next;
+            std::lock_guard lock(s_Ctx->waitMutex);
+            if (token.Slot >= s_Ctx->waitSlots.size())
+                return;
+
+            auto& slot = s_Ctx->waitSlots[token.Slot];
+            if (!slot.inUse || slot.generation != token.Generation)
+                return;
+
+            slot.inUse = false;
+            abandoned = Detail::TakeParkedContinuationsLocked(*s_Ctx, slot);
+            slot.ready = false;
+            slot.generation++;
+            if (slot.generation == 0)
+                slot.generation = 1;
+
+            s_Ctx->freeWaitSlots.push_back(token.Slot);
         }
 
-        slot.parkedHead = Detail::SchedulerContext::InvalidParkedNode;
-        slot.parkedTail = Detail::SchedulerContext::InvalidParkedNode;
-        slot.parkedCount = 0;
-        slot.ready = false;
-        slot.generation++;
-        if (slot.generation == 0)
-            slot.generation = 1;
-
-        s_Ctx->freeWaitSlots.push_back(token.Slot);
+        Detail::DestroyParkedContinuations(abandoned);
     }
 
     bool Scheduler::ParkCurrentFiberIfNotReady(WaitToken token, std::coroutine_handle<> h,
@@ -157,26 +193,7 @@ namespace Extrinsic::Core::Tasks
             if (slot.parkedHead == Detail::SchedulerContext::InvalidParkedNode)
                 return 0;
 
-            continuations.reserve(slot.parkedCount);
-            uint32_t node = slot.parkedHead;
-            const uint32_t safetyLimit = slot.parkedCount + 1;
-            uint32_t iterations = 0;
-            while (node != Detail::SchedulerContext::InvalidParkedNode)
-            {
-                if (++iterations > safetyLimit)
-                    break;
-                auto& parkedNode = s_Ctx->parkedNodes[node];
-                const uint32_t next = parkedNode.next;
-                parkedNode.next = Detail::SchedulerContext::InvalidParkedNode;
-                continuations.push_back(std::move(parkedNode.continuation));
-                parkedNode.continuation = {};
-                s_Ctx->freeParkedNodes.push_back(node);
-                node = next;
-            }
-
-            slot.parkedHead = Detail::SchedulerContext::InvalidParkedNode;
-            slot.parkedTail = Detail::SchedulerContext::InvalidParkedNode;
-            slot.parkedCount = 0;
+            continuations = Detail::TakeParkedContinuationsLocked(*s_Ctx, slot);
         }
 
         if (continuations.empty())

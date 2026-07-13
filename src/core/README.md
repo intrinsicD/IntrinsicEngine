@@ -116,6 +116,15 @@ may park, another worker may unpark it, and the frame may complete before the
 original resume call unwinds. Completed task frames self-destroy through the
 task promise's non-suspending final suspend.
 
+Parked continuations are cancelled, not resumed, when their wait token is
+released. The wait registry transfers their single-use handles under its mutex,
+then destroys the coroutine frames after unlocking; this prevents frame
+destructors from running inside registry synchronization. Scheduler shutdown
+first joins all workers, transfers every continuation still parked in the wait
+registry, and destroys those frames before releasing the scheduler context.
+Signal/unpark and cancellation therefore compete for the same registry-owned
+token, so exactly one path can resume or destroy each frame.
+
 ## Engine config fields
 
 `Extrinsic.Core.Config.Engine` exports `EngineConfig`, the value type runtime

@@ -88,6 +88,20 @@ namespace
         resumedCount->notify_all();
         co_return;
     }
+
+    Job WaitForCounterTrackFrameReclamation(CounterEvent* event,
+                                             std::atomic<int>* startedCount,
+                                             std::atomic<int>* resumedCount,
+                                             std::atomic<int>* destroyedCount) noexcept
+    {
+        FrameDestructionCounter destructionCounter{destroyedCount};
+        startedCount->fetch_add(1, std::memory_order_release);
+        startedCount->notify_all();
+        co_await WaitFor(*event);
+        resumedCount->fetch_add(1, std::memory_order_release);
+        resumedCount->notify_all();
+        co_return;
+    }
 }
 
 TEST(CoreTasks, BasicDispatch) {
@@ -389,6 +403,57 @@ TEST(CoreTasks, CounterEventResumeBeforeAwaitSuspendReturnsDoesNotTouchDestroyed
     EXPECT_TRUE(resumeCompletedBeforeSuspendReturn.load(std::memory_order_acquire));
 
     Scheduler::Shutdown();
+}
+
+TEST(CoreTasks, CounterEventReleaseReclaimsParkedFrameWithoutResuming)
+{
+    Scheduler::Initialize(2);
+
+    std::atomic<int> startedCount = 0;
+    std::atomic<int> resumedCount = 0;
+    std::atomic<int> destroyedCount = 0;
+    const uint64_t previousParkCount = Scheduler::GetParkCount();
+
+    {
+        CounterEvent event{1};
+        Scheduler::Dispatch(WaitForCounterTrackFrameReclamation(
+            &event, &startedCount, &resumedCount, &destroyedCount));
+
+        while (startedCount.load(std::memory_order_acquire) == 0)
+            startedCount.wait(0, std::memory_order_acquire);
+        while (Scheduler::ParkCountAtomic().load(std::memory_order_acquire) == previousParkCount)
+            Scheduler::ParkCountAtomic().wait(previousParkCount, std::memory_order_acquire);
+    }
+
+    EXPECT_EQ(resumedCount.load(std::memory_order_acquire), 0);
+    EXPECT_EQ(destroyedCount.load(std::memory_order_acquire), 1);
+
+    Scheduler::Shutdown();
+    EXPECT_EQ(destroyedCount.load(std::memory_order_acquire), 1);
+}
+
+TEST(CoreTasks, SchedulerShutdownReclaimsParkedFrameWithoutResuming)
+{
+    Scheduler::Initialize(2);
+
+    CounterEvent event{1};
+    std::atomic<int> startedCount = 0;
+    std::atomic<int> resumedCount = 0;
+    std::atomic<int> destroyedCount = 0;
+    const uint64_t previousParkCount = Scheduler::GetParkCount();
+
+    Scheduler::Dispatch(WaitForCounterTrackFrameReclamation(
+        &event, &startedCount, &resumedCount, &destroyedCount));
+
+    while (startedCount.load(std::memory_order_acquire) == 0)
+        startedCount.wait(0, std::memory_order_acquire);
+    while (Scheduler::ParkCountAtomic().load(std::memory_order_acquire) == previousParkCount)
+        Scheduler::ParkCountAtomic().wait(previousParkCount, std::memory_order_acquire);
+
+    Scheduler::Shutdown();
+
+    EXPECT_EQ(resumedCount.load(std::memory_order_acquire), 0);
+    EXPECT_EQ(destroyedCount.load(std::memory_order_acquire), 1);
 }
 
 TEST(CoreTasks, StaleWaitTokenUnparkDoesNotResumeNewWaiters)

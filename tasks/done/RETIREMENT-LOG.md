@@ -4430,3 +4430,14 @@ tests passed 15/15, `IntrinsicTests` built, the full default CPU-supported CTest
 gate passed 3675/3675, strict structural/docs checks passed, and the five-frame
 promoted-Vulkan composition smoke completed before the separately tracked
 `BUG-083` LeakSanitizer shutdown finding.
+
+[`BUG-079`](BUG-079-coretasks-abandoned-wait-continuation-leak.md) —
+CoreTasks parked-continuation reclamation retired to `tasks/done/` on
+2026-07-13 at `CPUContracted`. Wait-token release and scheduler shutdown now
+transfer every still-parked single-use coroutine handle under the wait mutex,
+then cancel and destroy the frame after unlocking; normal signal/unpark and
+cancellation therefore cannot both claim the same frame. Frame-owned
+destructor sentinels failed deterministically before the fix, then the release
+and shutdown regressions each passed 100 consecutive ASan/UBSan repetitions,
+all 19 `CoreTasks.*` contracts passed, `IntrinsicTests` built, the full default
+CPU-supported gate passed 3680/3680, and strict structural/docs checks passed.

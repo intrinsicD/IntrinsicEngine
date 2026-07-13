@@ -3,6 +3,9 @@ module;
 #include <memory>
 #include <thread>
 #include <optional>
+#include <iterator>
+#include <mutex>
+#include <vector>
 
 module Extrinsic.Core.Tasks;
 
@@ -44,6 +47,20 @@ namespace Extrinsic::Core::Tasks
             if (t.joinable())
                 t.join();
         }
+
+        std::vector<Detail::SchedulerContext::ParkedContinuation> abandoned;
+        {
+            std::lock_guard lock(s_Ctx->waitMutex);
+            for (auto& slot : s_Ctx->waitSlots)
+            {
+                auto slotContinuations =
+                    Detail::TakeParkedContinuationsLocked(*s_Ctx, slot);
+                abandoned.insert(abandoned.end(),
+                                 std::make_move_iterator(slotContinuations.begin()),
+                                 std::make_move_iterator(slotContinuations.end()));
+            }
+        }
+        Detail::DestroyParkedContinuations(abandoned);
         s_Ctx.reset();
     }
 

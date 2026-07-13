@@ -116,6 +116,14 @@ export namespace Extrinsic::Core::Tasks
         void RecordLatencySample(
             std::array<std::atomic<uint64_t>, SchedulerContext::LatencyBucketCount>& histogram,
             uint64_t latencyNs);
+
+        // Caller must hold SchedulerContext::waitMutex while transferring the
+        // slot's single-use continuation tokens out of the wait registry.
+        [[nodiscard]] std::vector<SchedulerContext::ParkedContinuation>
+        TakeParkedContinuationsLocked(SchedulerContext& context,
+                                      SchedulerContext::WaitSlot& slot);
+        void DestroyParkedContinuations(
+            std::vector<SchedulerContext::ParkedContinuation>& continuations) noexcept;
     }
 
     bool EnqueueInject(LocalTask&& task);
