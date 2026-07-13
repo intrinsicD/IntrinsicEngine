@@ -13,10 +13,10 @@ depends_on: []
   scorecard current and stays open until it is all-green.
 
 ## Non-goals
-- No implementation of the seams or extractions here — those are the child
-  tasks (`ARCH-008`..`ARCH-013`, `RUNTIME-146`..`151`, `ARCH-006`, `UI-034`,
-  `RUNTIME-129`, `RUNTIME-137`). This task tracks and enforces; it does not
-  do their work.
+- No implementation of the seams or extractions here — child tasks own that
+  work. Retired children remain convergence evidence; open children such as
+  `ARCH-006`, `UI-034`, and `RUNTIME-129` own their implementation. This task
+  tracks and enforces; it does not do their work.
 - No re-litigation of ADR-0024 decisions (that is an ADR amendment, not this
   task).
 - Not retired on a slice: this umbrella closes only when the target-state
@@ -32,9 +32,13 @@ depends_on: []
   imports, **27 domain (non-substrate) imports** (measured by the allowlist
   complement in Verification, not a name blocklist), ~13 `Engine::GetX()`
   domain-facade accessors; `OnSimTick`/`OnVariableTick` still present.
-  `ARCH-007` (CommandBus) is the first seam landed; `ARCH-012` (ClusteringModule
-  proving extraction) is still open, so the Clustering scorecard row and the
-  seam `Operational` gate are NOT yet met.
+  Keep this historical baseline fixed for comparison.
+- Current snapshot 2026-07-13: `Runtime.Engine.cppm` has 43 imports and 23
+  domain imports by the same interim allowlist-complement metric. `ARCH-012`
+  retired on 2026-07-08 at `Operational`: Sandbox composes
+  `Runtime::ClusteringModule`, and `Runtime.Engine.cppm` / `.cpp` contain no
+  `KMeans` or `Runtime.ClusteringModule` tokens. The Clustering scorecard row
+  is therefore complete.
 - This task is the umbrella `RORG-031`-style: it references children, keeps
   the scorecard honest, and provides the review guardrail so the kernel does
   not regrow while the migration is in flight.
@@ -42,7 +46,8 @@ depends_on: []
 ## Required changes
 - [ ] After each child seam/extraction merges, update the target-state
       scorecard (flip the invariant boxes that now hold on `main`) and
-      refresh the baseline metric numbers.
+      add or refresh a dated current metric snapshot without rewriting the
+      historical 2026-07-08 baseline.
 - [ ] Seed a ratchet guard as a child `HARDEN` task: a
       `tools/repo/check_kernel_convergence.py` (or an extension of an
       existing structural check) that computes the domain-import count as the
@@ -54,12 +59,16 @@ depends_on: []
       the target-state doc is only an interim approximation. Until it exists,
       the review guardrail below is enforced by reviewers.
 - [ ] Keep the child-task inventory in the target-state doc in sync with the
-      backlog (add extractions discovered during seam work; remove retired
-      rows).
-- [ ] Resolve the two open design pressure points before their owning seam
-      freezes: GPU-job-participant lifecycle (→ `RUNTIME-137`) and
-      world-scoped module state (→ `ARCH-010`); record the decisions in the
-      target-state doc.
+      backlog: add extractions discovered during seam work, retain completed
+      rows as checked evidence, and remove retired tasks from open-work
+      sequencing text.
+- [x] Record the GPU-job-participant lifecycle decision from retired
+      `RUNTIME-137`: `JobService` owns the `GpuQueue` participant registry,
+      frame-command recording, completion draining, and post-idle shutdown.
+- [ ] Require each module extraction to decide whether its durable state is
+      world-scoped or global. `ARCH-010` supplied `WorldRegistry`; it did not
+      make that policy decision for later domain modules. Track those decisions
+      here rather than assigning the open work back to retired `ARCH-010`.
 
 ## Tests
 - [ ] `python3 tools/agents/check_task_policy.py --root . --strict` passes.
@@ -70,7 +79,8 @@ depends_on: []
 
 ## Docs
 - [ ] The target-state doc is the deliverable surface; keep its scorecard and
-      baseline numbers current (this task's ongoing work).
+      dated current metric snapshot synchronized while preserving the baseline
+      numbers (this task's ongoing work).
 - [ ] Regenerate `tasks/SESSION-BRIEF.md` when child gating changes.
 
 ## Acceptance criteria
@@ -94,7 +104,7 @@ This umbrella closes only when ALL of the following hold on `main`:
 grep -cE '^import ' src/runtime/Runtime.Engine.cppm   # total imports (target <= 12)
 # Domain imports = allowlist complement (target 0). Keep SUB in sync as seams land:
 SUB='^import (Extrinsic\.Core\.|Extrinsic\.ECS\.Scene\.(Registry|Handle)|Extrinsic\.RHI\.|Extrinsic\.Platform\.|Extrinsic\.Graphics\.(Renderer|RenderFrameInput|FrameRecipe|RenderWorld)|Extrinsic\.Runtime\.(CommandBus|KernelEvents|JobService|WorldRegistry|Module|ServiceRegistry|RenderExtraction|RenderWorldPool))'
-grep -E '^import ' src/runtime/Runtime.Engine.cppm | grep -vcE "$SUB"   # domain imports (baseline 27)
+grep -E '^import ' src/runtime/Runtime.Engine.cppm | grep -vcE "$SUB"   # target 0; 2026-07-13 snapshot 23
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 python3 tools/agents/generate_session_brief.py

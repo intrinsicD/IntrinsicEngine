@@ -14,7 +14,9 @@ maturity_target: CPUContracted
 - No visual restyle: theme, fonts, and spacing are out of scope (the requirement is layout and control, not appearance).
 - No UI-owned algorithm or simulation state — panels keep dispatching runtime-owned commands (retired `RUNTIME-141` lane); this task must not weaken that boundary.
 - No windowing/platform backend changes.
-- No migration of all existing domain windows in this slice; the seam plus two migrated exemplar domains prove the pattern.
+- No migration of all existing domain windows in this slice; the seam plus two
+  migrated exemplar domains prove the pattern. `ARCH-006` owns the remaining
+  panel-family split and relocation into `app/Sandbox`.
 
 ## Context
 - Owner/layer: `src/runtime/Editor` (`Runtime.SandboxEditorUi`) and the app-side wiring in `src/app/Sandbox`; UI emits commands/events only.
@@ -29,6 +31,12 @@ maturity_target: CPUContracted
   viewport/picking code. Panels issue commands/events through runtime seams
   and may consume module services, but must not own algorithm state or receive
   `Engine&`.
+- Ownership split with `ARCH-006`: this task is the sole owner of the generic
+  registration, lazy-lifecycle, capture, visibility-toggle, and property-widget
+  contracts. `ARCH-006` consumes those contracts for the broader editor-shell
+  split and Sandbox-content relocation; it must not introduce a competing
+  registry. The two exemplar migrations here prove the seam rather than
+  transferring ownership of the full migration to this task.
 
 ## Required changes
 - [ ] Add a domain-window registration seam to `Runtime.SandboxEditorUi`: domains register `{menu path, window id, draw callback, open-state}` at composition time; the closed `SandboxEditorDomainWindowKind` enum becomes an implementation detail behind the seam (existing kinds keep working during migration).

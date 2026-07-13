@@ -48,7 +48,10 @@ design, not a gap.
 
 Each row is a greppable invariant. `ARCH-014` owns keeping this current;
 flip a box when the invariant holds on `main`. Baseline column is the
-2026-07-08 measurement (post-ARCH-007).
+2026-07-08 measurement (post-ARCH-007) and remains fixed for comparison;
+dated current snapshots are refreshed separately. The 2026-07-13 snapshot is
+43 total imports and 23 domain imports by the interim allowlist-complement
+metric below.
 
 ### Kernel seams exist (ADR-0024 D5–D11)
 
@@ -72,7 +75,7 @@ flip a box when the invariant holds on `main`. Baseline column is the
 >
 > ```bash
 > SUB='^import (Extrinsic\.Core\.|Extrinsic\.ECS\.Scene\.(Registry|Handle)|Extrinsic\.RHI\.|Extrinsic\.Platform\.|Extrinsic\.Graphics\.(Renderer|RenderFrameInput|FrameRecipe|RenderWorld)|Extrinsic\.Runtime\.(CommandBus|KernelEvents|JobService|WorldRegistry|Module|ServiceRegistry|RenderExtraction|RenderWorldPool))'
-> grep -E '^import ' src/runtime/Runtime.Engine.cppm | grep -vcE "$SUB"   # domain imports (target 0; baseline 27)
+> grep -E '^import ' src/runtime/Runtime.Engine.cppm | grep -vcE "$SUB"   # target 0; baseline 27; 2026-07-13: 23
 > ```
 >
 > This inline grep is the **interim** metric. The authoritative, maintained
@@ -82,9 +85,10 @@ flip a box when the invariant holds on `main`. Baseline column is the
 
 
 - [ ] `Runtime.Engine.cppm` import count ≤ 12 substrate modules
-      (**baseline 45**)
+      (**baseline 45; 2026-07-13 snapshot 43**)
 - [ ] Domain (non-substrate) imports in `Runtime.Engine.cppm` = 0
-      (**baseline 27**). Measure by **allowlist**, not a blocklist of names:
+      (**baseline 27; 2026-07-13 snapshot 23**). Measure by **allowlist**, not
+      a blocklist of names:
       count every `import` that is *not* kernel substrate (see the metric
       below). A name blocklist silently undercounts as new domain imports
       appear (e.g. `AssetIngestStateMachine`, `Asset.Service`,
@@ -99,12 +103,12 @@ flip a box when the invariant holds on `main`. Baseline column is the
 
 ### Domains are modules (D9) — one row per extracted domain
 
-- [ ] Clustering — `ARCH-012` (proving extraction; **not landed** —
-      `Runtime.KMeans*` still live in `src/runtime/`, `ARCH-012` open/blocked;
-      flipping this row also closes the seam `Operational` gate, so it must
-      not be checked before `ARCH-012` retires)
+- [x] Clustering — `ARCH-012` (done 2026-07-08 at `Operational`; Sandbox
+      composes `Runtime::ClusteringModule`, and `Runtime.Engine.cppm` / `.cpp`
+      contain no `KMeans` or `Runtime.ClusteringModule` tokens)
 - [ ] EditorUi (ImGui adapter, dockspace, panel registry, `Pass.ImGui`) —
-      `ARCH-006` + `UI-034`
+      `UI-034` owns the generic registration/capture/widget seam; `ARCH-006`
+      consumes it for the editor-shell split and Sandbox-content relocation
 - [ ] AssetImport pipeline — `RUNTIME-147`
 - [ ] SceneDocument (save/load/new/close) — `RUNTIME-148`
 - [ ] ConfigControl (recipe activation, hot-config apply) — `RUNTIME-149`
@@ -119,19 +123,17 @@ flip a box when the invariant holds on `main`. Baseline column is the
 - [ ] `InlineModule` builder ships (one-file, one-registration experiments)
 - [ ] An experiment-app template exists that composes kernel + N modules
 
-## Open design pressure points (decide before the owning seam freezes)
+## Design pressure-point status
 
-1. **GPU-job participant lifecycle** is richer than "submit a job": today's
-   `RuntimeGpuJobParticipantDesc` has four callbacks (`RecordFrameCommands`
-   every frame while in flight, `DrainCompletedTransfers`, `HasInFlightWork`,
-   `ShutdownAfterDeviceIdle`). The JobService `GpuQueue` target (`RUNTIME-137`)
-   must absorb that whole lifecycle, or it splits into an extension pass
-   (records) + a job (computes). Pin the shape before `RUNTIME-137` lands.
-2. **World-scoped module state:** `ARCH-010` introduced the kernel
-   `WorldRegistry`, but selection, camera set, undo history, and similar
-   domain state still behave as active-world/global engine state. Each
-   extraction task must decide whether its module state is world-scoped or
-   global before it moves behind `RuntimeModule` services.
+1. **GPU-job participant lifecycle — resolved 2026-07-09.** `RUNTIME-137`
+   retired at `Operational`. `JobService` owns the `GpuQueue` participant
+   registry, delegates frame-command recording, drains completed transfers
+   during Maintenance, and shuts participants down after the device-idle wait.
+2. **World-scoped module state — open per extraction.** `ARCH-010` introduced
+   the kernel `WorldRegistry`; it did not choose policy for selection, camera
+   sets, undo history, or other domain state. Each extraction task must decide
+   whether its durable module state is world-scoped or global before exposing
+   it through `RuntimeModule` services; `ARCH-014` tracks those decisions.
 
 ## How this doc is used
 
@@ -140,8 +142,8 @@ flip a box when the invariant holds on `main`. Baseline column is the
 - **Reviewing a runtime PR?** Check it does not regress a scorecard
   invariant (new domain-noun import, new `Engine::GetX()`, new direct
   dispatcher use, new `Engine&` pass-through).
-- **Picking work?** The unchecked seam rows are the ADR-0024 migration order
-  (with all five additive seams `ARCH-007`..`ARCH-011` landed, `ARCH-012` —
-  the ClusteringModule proving extraction that exercises every seam
-  end-to-end — is next); the unchecked domain rows are the extractions that
-  follow each seam.
+- **Picking work?** The additive seams `ARCH-007`..`ARCH-011` and the
+  `ARCH-012` ClusteringModule proving extraction are complete. Work from the
+  remaining unchecked rows: `UI-034` owns the generic editor registration and
+  capture seam, `ARCH-006` consumes it for Sandbox-content relocation, and the
+  other domain rows follow through their extraction tasks.

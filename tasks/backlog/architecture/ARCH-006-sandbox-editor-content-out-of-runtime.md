@@ -21,16 +21,19 @@ depends_on:
 - No new editor features.
 - Runtime keeps ownership of engine-facing command facades, extraction, and
   lifecycle; panels move, engine seams do not.
-- Not gated on, but should sequence after, the async-lane tasks that touch
-  the same files (`RUNTIME-141`, `RUNTIME-138`) to avoid churn collisions —
-  coordinate slice timing in `tasks/active/README.md` when promoting.
+- Not gated on `RUNTIME-138`, but implementation slices that touch the same
+  editor files should sequence around it to avoid churn collisions; coordinate
+  slice timing in `tasks/active/README.md` when promoting. `RUNTIME-141` has
+  retired and no longer owns overlapping work.
 
 ## Context
 - Owner/layer: boundary decision between `runtime` and `app`.
-- Today `app/Sandbox` is an empty shell (`Sandbox.cppm:20-32` no-op ticks;
-  it only attaches `Runtime::SandboxEditorUi`), while the actual application
-  lives in `src/runtime/Editor/Runtime.SandboxEditorUi.cpp` (18,556 lines),
-  inverting "app depends only on runtime; application specifics belong in
+- Today `app/Sandbox` is a thin composition shell: it registers the Sandbox
+  default runtime policies and `Runtime::ClusteringModule`, attaches
+  `Runtime::SandboxEditorUi`, and otherwise retains no-op application ticks.
+  The editor's application-specific content still lives in
+  `src/runtime/Editor/Runtime.SandboxEditorUi.cpp`, so the remaining ownership
+  still inverts "app depends only on runtime; application specifics belong in
   app/" (`AGENTS.md`, `docs/architecture/runtime.md`).
 - The generic seams the panels use (`SetImGuiEditorCallback`, command
   surfaces, `DerivedJobRegistry`, config-control facade) already exist and
@@ -39,6 +42,12 @@ depends_on:
   architecture in the same file. Open `RUNTIME-138` (nonblocking selected-
   entity pipeline) still touches the same file; this task must slice around
   it, not duplicate it.
+- Ownership split with `UI-034`: `UI-034` owns the generic domain-window
+  registration API, lazy lifecycle, input-capture snapshot, global visibility
+  toggle, and generic property widgets. This task owns the full inventory,
+  panel-family split, and relocation of Sandbox content into `app/Sandbox`.
+  Slice 0 may proceed independently; implementation slices consume the
+  `UI-034` registration seam and must not create a second panel registry.
 - ARCH-013 re-review (2026-07-08): Decision re-scoped onto the retired kernel
   seams. `ARCH-012` proved the first application-specific extraction:
   Sandbox now registers `ClusteringModule` from app startup and the editor
@@ -68,9 +77,10 @@ depends_on:
       (b) sandbox/method panels that move to app, (c) engine command
       facades the panels call (stay). Record the inventory and the slice
       boundaries in this task file before any move.
-- [ ] Slice 1: extract the generic panel-host/editor-shell module in runtime
-      (registration API for panels; no content moves yet); Sandbox attaches
-      through it.
+- [ ] Slice 1: after the `UI-034` registration seam lands, extract/slim the
+      generic panel-host/editor-shell module in runtime and attach Sandbox
+      through that seam. Do not define a second registration API or move
+      additional panel content in this slice.
 - [ ] Slices 2..N: move panel families to `app/Sandbox` one reviewable slice
       at a time (method panels first: K-Means, Poisson, registration,
       mesh-processing, figure export), each slice green on the CPU gate and
