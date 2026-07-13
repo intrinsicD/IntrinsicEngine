@@ -24,19 +24,23 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 The recovery merge adopted the extraction branch's parallel runtime-kernel
 implementation wholesale over main's, and mechanically it is clean (layering,
 task-policy, doc-links, docs-sync, test-layout all green). But static review
-plus focused subsystem review surfaced the following. `BUG-067`/`BUG-068` are
-memory/correctness-unsafe; the module-schedule set (`BUG-069`..`BUG-072`)
-regressed hardening that main had shipped as the closed `BUG-066`.
+plus focused subsystem review surfaced the following. `BUG-067` and `BUG-068`
+are now closed. The module-schedule set (`BUG-069`..`BUG-072`) regressed
+hardening that main had shipped as the closed `BUG-066`.
 
-- [`BUG-067` — JobService completion state lost-update race](BUG-067-jobservice-completion-state-lost-update-race.md):
-  a worker stores `AwaitingGate` outside the lock after enqueue, so a same-tick
-  drain's terminal state is clobbered → job stuck non-terminal (record leak,
-  phantom stats, poller hang). HIGH.
 - [`BUG-074` — Orphaned GpuAssetCache slot causes per-entity bake retry livelock](BUG-074-object-space-normal-bake-orphaned-cache-slot-livelock.md):
   a failed bake submission leaks its pending cache slot → infinite retry. LOW (suspected).
 ---
 
 ## Verified / Closed
+
+- Closed 2026-07-13: [`BUG-067` — JobService completion state lost-update race](../../done/BUG-067-jobservice-completion-state-lost-update-race.md).
+  Production fix `ce1f590c` stores `AwaitingGate` under the completion-queue
+  lock before insertion. A real-service condition-variable interlock now forces
+  the drain/worker-return window without sleeps; restoring the old ordering
+  deterministically reproduces the terminal-state clobber and phantom stats,
+  while the fixed path passes 100 repetitions and the 3,679-test default CPU
+  gate.
 
 - Closed 2026-07-13: [`BUG-073` — Object-space normal bake may be sampled before its GPU write completes](../../done/BUG-073-object-space-normal-bake-read-before-gpu-write.md).
   Ready-frame accounting now has a named `issueFrame + FramesInFlight`

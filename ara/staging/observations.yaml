@@ -164,3 +164,14 @@ observations:
     promoted_to: "logic/claims.md:C01"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O16
+    timestamp: "2026-07-13T22:04"
+    provenance: ai-executed
+    content: "A completion queue insertion is a one-way ownership handoff: the worker must establish AwaitingGate before insertion and perform no state write after publication; only the completion drain may advance a published record to a terminal state."
+    context: "BUG-067 deterministic mutation proof and retirement at the real Runtime.JobService completion seam."
+    potential_type: constraint
+    bound_to: [N201]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K05"
+    crystallized_via: artifact-commitment
+    stale: false

@@ -34,3 +34,16 @@
   tools/ci/ccache_ci.py, .github/workflows/pr-fast.yml,
   tasks/done/CI-007-module-safe-persistent-ccache-pilot.md]
 - **From staging**: O14
+
+## K05: Completion Queue Publication Is a One-Way State Handoff
+- **Constraint**: A JobService worker must store `AwaitingGate` before its
+  completion record becomes visible in the queue and must perform no later
+  state write. After queue publication, only `DrainCompletions` may advance the
+  record to terminal `Published`, `Dropped`, or `Cancelled` state.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [src/runtime/Runtime.JobService.cpp,
+  tests/contract/runtime/Test.RuntimeJobService.cpp,
+  src/runtime/README.md,
+  tasks/done/BUG-067-jobservice-completion-state-lost-update-race.md]
+- **From staging**: O16

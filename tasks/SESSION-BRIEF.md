@@ -42,7 +42,6 @@ the authoritative open/unblocked view.
 ## Theme G — Active bugs
 
 - unblocked: `BUG-064` — ci-vulkan FramePacingDiagnosticCapture cannot run headless (tasks/backlog/bugs/BUG-064-ci-vulkan-framepacing-headless-display.md)
-- unblocked: `BUG-067` — JobService completion state lost-update race (tasks/backlog/bugs/BUG-067-jobservice-completion-state-lost-update-race.md)
 - unblocked: `BUG-074` — Orphaned GpuAssetCache slot causes per-entity bake retry livelock (tasks/backlog/bugs/BUG-074-object-space-normal-bake-orphaned-cache-slot-livelock.md)
 - unblocked: `BUG-081` — Warm-configure CI budget still flakes on hosted-runner variance (tasks/backlog/bugs/BUG-081-warm-configure-budget-runner-variance.md)
 - unblocked: `BUG-082` — GLFW X11 input-method initialization leaks under LeakSanitizer (tasks/backlog/bugs/BUG-082-glfw-x11-input-method-lsan-leak.md)

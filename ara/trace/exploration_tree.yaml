@@ -4701,3 +4701,27 @@ tree:
       3,658/3,658 in 49.19 seconds, touched-scope tooling and strict task/state/
       docs checks passed, and `origin/main` advanced from e9a54df8 to d8c38227.
     status: resolved
+  - id: N201
+    type: experiment
+    title: "BUG-067 deterministic completion-handoff verification"
+    provenance: ai-executed
+    timestamp: "2026-07-13T22:04"
+    evidence:
+      - "src/runtime/Runtime.JobService.cpp"
+      - "src/runtime/Runtime.JobService.cppm"
+      - "tests/contract/runtime/Test.RuntimeJobService.cpp"
+      - "tasks/done/BUG-067-jobservice-completion-state-lost-update-race.md"
+      - "ctest --test-dir build/ci --output-on-failure -R '^RuntimeJobService\\.' --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure --repeat until-fail:100 -R '^RuntimeJobService\\.CompletionQueuePublicationCannotClobberTerminalState$' --timeout 60"
+      - "cmake --build --preset ci --target IntrinsicTests -j2"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+    result: >
+      Added a constructor-injected post-publication hook and condition-variable
+      interlock at the real JobService seam. Mutating only the AwaitingGate
+      store back after queue publication failed deterministically in 35 ms:
+      the worker clobbered Published back to AwaitingGate, leaving InFlight=1,
+      AwaitingGate=1, IsComplete=false, and ReapCompleted=0. Restoring the
+      production ordering passed 100 repetitions, all 10 JobService contracts,
+      the 1,457-edge IntrinsicTests build, the 3,679-test default CPU gate, and
+      strict scoped structural checks; BUG-067 retired at CPUContracted.
+    status: resolved

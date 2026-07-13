@@ -8,6 +8,22 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-067`](BUG-067-jobservice-completion-state-lost-update-race.md) —
+JobService completion-state lost-update race retired on 2026-07-13 at
+`CPUContracted`. Production fix `ce1f590c` stores `AwaitingGate` while holding
+the completion-queue mutex and before insertion, making queue visibility the
+one-way handoff from worker-owned state transitions to drain-owned terminal
+transitions. This slice added an explicit constructor-injected test hook after
+queue publication and a real-service condition-variable interlock that pauses
+the worker while `DrainCompletions` publishes. Mutating only the store back to
+the historical post-publication location deterministically regressed the state
+from `Published` to `AwaitingGate`, left one phantom in-flight/awaiting job, and
+made reap return zero; the fixed path passed 100 repetitions, all 10 JobService
+contracts, and the 3,679-test default CPU gate. The remaining state stores were
+audited: all worker terminal exits precede queue visibility, `Running` precedes
+work, cancellation only sets a flag, and only the drain writes state after
+publication.
+
 [`BUG-073`](BUG-073-object-space-normal-bake-read-before-gpu-write.md) —
 object-space-normal-bake ready-frame accounting retired on 2026-07-13 at
 `CPUContracted`. Production correction `fdeb0a6b` replaced the unsafe fixed

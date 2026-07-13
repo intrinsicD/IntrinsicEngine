@@ -64,6 +64,56 @@ namespace
         SchedulerScope& operator=(const SchedulerScope&) = delete;
     };
 
+    class CompletionQueueInterlock final
+    {
+    public:
+        ~CompletionQueueInterlock()
+        {
+            ReleaseWorker();
+        }
+
+        void PauseWorker(const Runtime::JobToken token)
+        {
+            std::unique_lock lock(m_Mutex);
+            m_QueuedToken = token;
+            m_WorkerPaused = true;
+            m_Condition.notify_all();
+            m_Condition.wait(lock, [this] { return m_ReleaseWorker; });
+        }
+
+        [[nodiscard]] bool WaitForWorkerPause(
+            const std::chrono::milliseconds timeout = 2s)
+        {
+            std::unique_lock lock(m_Mutex);
+            return m_Condition.wait_for(
+                lock,
+                timeout,
+                [this] { return m_WorkerPaused; });
+        }
+
+        [[nodiscard]] Runtime::JobToken QueuedToken() const
+        {
+            std::lock_guard lock(m_Mutex);
+            return m_QueuedToken;
+        }
+
+        void ReleaseWorker()
+        {
+            {
+                std::lock_guard lock(m_Mutex);
+                m_ReleaseWorker = true;
+            }
+            m_Condition.notify_all();
+        }
+
+    private:
+        mutable std::mutex m_Mutex{};
+        std::condition_variable m_Condition{};
+        Runtime::JobToken m_QueuedToken{};
+        bool m_WorkerPaused{false};
+        bool m_ReleaseWorker{false};
+    };
+
     template <typename Predicate>
     [[nodiscard]] bool WaitUntil(Predicate&& predicate,
                                  const std::chrono::milliseconds timeout = 2s)
@@ -291,6 +341,54 @@ TEST(RuntimeJobService, SubmitRunsOnPoolThreadAndPublishesAtGate)
     // could be clobbered back to AwaitingGate, wedging the job forever.
     EXPECT_EQ(jobs.GetState(token), Runtime::JobState::Published);
     EXPECT_EQ(jobs.ReapCompleted(), 1u);
+}
+
+TEST(RuntimeJobService, CompletionQueuePublicationCannotClobberTerminalState)
+{
+    SchedulerScope scheduler{1};
+    CompletionQueueInterlock interlock;
+    Runtime::JobService jobs(Runtime::JobServiceTestHooks{
+        .AfterCompletionQueued =
+            [&](const Runtime::JobToken token)
+            {
+                interlock.PauseWorker(token);
+            },
+    });
+    Runtime::KernelEventBus events;
+
+    const Runtime::JobToken token = jobs.Submit(
+        Runtime::MakeCpuJobDesc<JobProbeResult>(
+            "forced completion publication interleaving",
+            Runtime::DefaultWorldHandle,
+            [](const Runtime::JobCancellation&)
+            {
+                return JobProbeResult{.Value = 23};
+            },
+            [](const JobProbeResult& result)
+            {
+                return JobProbeCompleted{.Value = result.Value};
+            }));
+
+    ASSERT_TRUE(token.IsValid());
+    ASSERT_TRUE(interlock.WaitForWorkerPause());
+    EXPECT_EQ(interlock.QueuedToken(), token);
+    EXPECT_EQ(jobs.GetState(token), Runtime::JobState::AwaitingGate);
+
+    // The worker is paused after queue visibility. Drain to a terminal state
+    // before letting it return; the worker must have no later state write.
+    EXPECT_EQ(jobs.DrainCompletions(events), 1u);
+    EXPECT_EQ(jobs.GetState(token), Runtime::JobState::Published);
+
+    interlock.ReleaseWorker();
+    Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+
+    EXPECT_EQ(jobs.GetState(token), Runtime::JobState::Published);
+    EXPECT_TRUE(jobs.IsComplete(token));
+    const Runtime::JobServiceStats terminalStats = jobs.Stats();
+    EXPECT_EQ(terminalStats.InFlightJobs, 0u);
+    EXPECT_EQ(terminalStats.AwaitingGateJobs, 0u);
+    EXPECT_EQ(jobs.ReapCompleted(), 1u);
+    EXPECT_EQ(jobs.Stats().InFlightJobs, 0u);
 }
 
 TEST(RuntimeJobService, GpuQueueParticipantRecordsDrainsAndUnregisters)

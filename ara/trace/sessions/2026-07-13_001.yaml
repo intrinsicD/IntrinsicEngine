@@ -2,9 +2,9 @@ session:
   id: "2026-07-13_001"
   date: "2026-07-13"
   started: "2026-07-13T01:00"
-  last_turn: "2026-07-13T08:27"
-  turn_count: 2
-  summary: "Completed and published the CI-007 closure, retained module-safe ccache in PR-fast only, tracked the configure-budget flake, and reconciled every surviving branch tip into main without restoring superseded task content."
+  last_turn: "2026-07-13T22:04"
+  turn_count: 3
+  summary: "Completed and published CI-007, reconciled every surviving branch tip into main, and retired BUG-067 with deterministic JobService completion-handoff proof."
 
 events_logged:
   - turn: 1
@@ -55,6 +55,18 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Rehearsed, verified, and published the complete merge graph at d8c38227 with 3,658 passing CPU tests."
+  - turn: 3
+    type: experiment
+    id: "N201"
+    routing: direct
+    provenance: ai-executed
+    summary: "Forced the JobService worker/drain completion race, proved the historical lost update by mutation, and retired BUG-067 after 100 repeats and 3,679 passing CPU tests."
+  - turn: 3
+    type: constraint
+    id: "O16"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized completion-queue publication as a one-way worker-to-drain state handoff in K05."
 
 ai_actions:
   - turn: 1
@@ -86,6 +98,16 @@ ai_actions:
     action: "Configured and built IntrinsicTests, passed 3,658 CPU-supported tests plus task/docs/tooling gates, and pushed main at d8c38227 to origin."
     provenance: ai-executed
     files_changed: []
+  - turn: 3
+    action: "Added and mutation-checked a deterministic real-JobService completion interlock, audited all state writes, documented the handoff invariant, retired BUG-067, passed focused/repeat/full/structural gates, and created the isolated local completion commit."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.JobService.cpp"
+      - "src/runtime/Runtime.JobService.cppm"
+      - "src/runtime/README.md"
+      - "tests/contract/runtime/Test.RuntimeJobService.cpp"
+      - "tasks/done/BUG-067-jobservice-completion-state-lost-update-race.md"
+      - "tasks/done/RETIREMENT-LOG.md"
 
 claims_touched:
   - id: C01
@@ -97,6 +119,8 @@ key_context:
     excerpt: "User requested that all changes be committed according to the repository's agentic workflow."
   - turn: 2
     excerpt: "User requested merging all unmerged branches into main and pushing to the remote immediately."
+  - turn: 3
+    excerpt: "BUG-067 was completed as an isolated runtime concurrency slice without touching METHOD-016 or pushing/merging the branch."
 
 open_threads:
   - "BUG-081 must collect a comparable warm-configure population before recalibrating the 20-second exact-vcpkg-hit guard."

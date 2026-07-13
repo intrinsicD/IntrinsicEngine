@@ -86,11 +86,13 @@ namespace Extrinsic::Runtime
         std::uint32_t NextTokenIndex{0u};
         std::uint32_t NextGpuQueueParticipantIndex{0u};
         JobServiceStats Stats{};
+        JobServiceTestHooks TestHooks{};
     };
 
-    JobService::JobService()
+    JobService::JobService(JobServiceTestHooks testHooks)
         : m_State(std::make_shared<SharedState>())
     {
+        m_State->TestHooks = std::move(testHooks);
     }
 
     JobService::~JobService() = default;
@@ -186,18 +188,18 @@ namespace Extrinsic::Runtime
 
             {
                 std::lock_guard lock(state->Mutex);
-                // BUG-067: publish AwaitingGate under the same lock as the
-                // enqueue, before the completion becomes visible to the drain.
-                // Storing it after the unlock lets a same-tick DrainCompletions
-                // publish/drop the job and set a terminal state that this store
-                // would then clobber back to AwaitingGate, wedging the job
-                // non-terminal forever (record leak, phantom stats, hung poller).
+                // Queue insertion is the publication point. AwaitingGate must
+                // already be visible before the drain can take this record;
+                // after insertion, only the drain may advance its state.
                 job->State.store(JobState::AwaitingGate, std::memory_order_release);
                 state->CompletionQueue.push_back(SharedState::CompletionRecord{
                     .Job = job,
                     .Result = std::move(result),
                 });
             }
+
+            if (state->TestHooks.AfterCompletionQueued)
+                state->TestHooks.AfterCompletionQueued(job->Token);
         });
 
         return job->Token;

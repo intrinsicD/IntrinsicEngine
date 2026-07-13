@@ -771,3 +771,9 @@ entries:
       - "Routed the rehearsal, build, 3,658-test gate, structural checks, and successful remote update as experiment N200."
       - "Did not stage a new interpretive observation; this turn established repository journey facts and publication evidence rather than a new general claim."
       - "Kept O08, O09, and O13 unpromoted and non-stale because their bound module-strategy and model-training threads remain open and have not accumulated three idle session-days."
+  - turn: "2026-07-13_001#3"
+    notes:
+      - "Routed BUG-067 as experiment N201 because the turn produced a deterministic mutation failure, restored-order repeat proof, code/tests/docs/task retirement, full CPU gate evidence, and an isolated local commit."
+      - "Staged O16 and crystallized it to K05 via artifact commitment because the one-way completion-state handoff is now encoded in JobService source, runtime docs, the regression contract, and the retired task."
+      - "Kept O08, O09, and O13 unpromoted and non-stale; this turn neither accepted the module-surface recommendations nor resolved the model-training target."
+      - "Preserved the two existing open threads because BUG-067 completed without changing BUG-081 or the model-training question."

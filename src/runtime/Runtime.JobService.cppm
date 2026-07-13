@@ -191,10 +191,18 @@ namespace Extrinsic::Runtime
         std::uint64_t ReapedJobs{0};
     };
 
+    export struct JobServiceTestHooks
+    {
+        // Invoked on the worker after its completion record becomes drainable
+        // and the completion-queue mutex has been released. Contract tests use
+        // this to force main-thread drain/worker-return interleavings.
+        std::function<void(JobToken)> AfterCompletionQueued{};
+    };
+
     export class JobService
     {
     public:
-        JobService();
+        explicit JobService(JobServiceTestHooks testHooks = {});
         ~JobService();
 
         JobService(const JobService&) = delete;
