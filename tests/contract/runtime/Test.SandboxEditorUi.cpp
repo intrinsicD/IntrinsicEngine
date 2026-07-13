@@ -1302,7 +1302,7 @@ TEST(SandboxEditorUi, DefaultDrawStartsWithOnlyMenuBarVisible)
 
     EXPECT_TRUE(ImGuiWindowExists("##MainMenuBar"));
 
-    constexpr std::array<std::string_view, 33> kClosedByDefaultWindows{{
+    constexpr std::array<std::string_view, 28> kClosedByDefaultWindows{{
         "Sandbox Editor",
         "Scene Hierarchy",
         "Inspector",
@@ -1316,26 +1316,21 @@ TEST(SandboxEditorUi, DefaultDrawStartsWithOnlyMenuBarVisible)
         "PointCloud / Appearance",
         "PointCloud / Properties",
         "PointCloud / Selection",
-        "PointCloud / Processing / K-Means",
         "PointCloud / Processing / Vertices / Normals",
         "PointCloud / Processing / Remove Outliers",
-        "PointCloud / Processing / Progressive Poisson",
         "Graph / Appearance",
         "Graph / Properties",
         "Graph / Selection",
-        "Graph / Processing / K-Means",
         "Graph / Processing / Vertices / Normals",
         "Mesh / Appearance",
         "Mesh / Properties",
         "Mesh / Selection",
-        "Mesh / Processing / K-Means",
         "Mesh / Processing / Denoise",
         "Mesh / Processing / Curvature",
         "Mesh / Processing / Remesh",
         "Mesh / Processing / Subdivide",
         "Mesh / Processing / Simplify",
         "Mesh / Processing / Vertices / Normals",
-        "Mesh / Processing / Progressive Poisson",
     }};
 
     for (const std::string_view title : kClosedByDefaultWindows)
@@ -1348,7 +1343,10 @@ TEST(SandboxEditorUi, DomainMenusUseAppearanceAndFocusedProcessingWindows)
 {
     const std::string editorSource =
         ReadRepositoryTextFile("src/runtime/Editor/Runtime.SandboxEditorUi.cpp");
+    const std::string methodPanelSource = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp");
     ASSERT_FALSE(editorSource.empty());
+    ASSERT_FALSE(methodPanelSource.empty());
 
     const std::string_view appearanceWindow = SourceRange(
         editorSource,
@@ -1386,7 +1384,7 @@ TEST(SandboxEditorUi, DomainMenusUseAppearanceAndFocusedProcessingWindows)
               std::string::npos);
     EXPECT_NE(editorSource.find("DrawDomainVisualizationControls(model, context);"),
               std::string::npos);
-    EXPECT_NE(editorSource.find("ProcessingKMeans"), std::string::npos);
+    EXPECT_EQ(editorSource.find("ProcessingKMeans"), std::string::npos);
     EXPECT_NE(editorSource.find("ProcessingDenoise"), std::string::npos);
     EXPECT_NE(editorSource.find("ProcessingCurvature"), std::string::npos);
     EXPECT_NE(editorSource.find("ProcessingRemesh"), std::string::npos);
@@ -1400,8 +1398,25 @@ TEST(SandboxEditorUi, DomainMenusUseAppearanceAndFocusedProcessingWindows)
               std::string::npos);
     EXPECT_NE(editorSource.find("ProcessingPointCloudOutlierRemoval"),
               std::string::npos);
-    EXPECT_NE(editorSource.find("ProcessingProgressivePoisson"),
+    EXPECT_EQ(editorSource.find("ProcessingProgressivePoisson"),
               std::string::npos);
+    EXPECT_NE(methodPanelSource.find("pointcloud.processing.kmeans"),
+              std::string::npos);
+    EXPECT_NE(methodPanelSource.find("graph.processing.kmeans"),
+              std::string::npos);
+    EXPECT_NE(methodPanelSource.find("mesh.processing.kmeans"),
+              std::string::npos);
+    EXPECT_NE(
+        methodPanelSource.find(
+            "pointcloud.processing.progressive_poisson"),
+        std::string::npos);
+    EXPECT_NE(methodPanelSource.find("mesh.processing.progressive_poisson"),
+              std::string::npos);
+    EXPECT_NE(methodPanelSource.find("ApplySandboxEditorKMeansCommand"),
+              std::string::npos);
+    EXPECT_NE(
+        methodPanelSource.find("ApplySandboxEditorProgressivePoissonCommand"),
+        std::string::npos);
 }
 
 TEST(SandboxEditorUi, RenderGraphPanelModelCopiesRendererStats)
@@ -2062,12 +2077,18 @@ TEST(SandboxEditorUi, ExtrinsicSandboxAppStaysRuntimeOnly)
         ReadRepositoryTextFile("src/app/Sandbox/Sandbox.cpp");
     const std::string sandboxMain =
         ReadRepositoryTextFile("src/app/Sandbox/main.cpp");
+    const std::string methodPanelsModule = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm");
+    const std::string methodPanelsImplementation = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp");
     const std::string sandboxCMake =
         ReadRepositoryTextFile("src/app/Sandbox/CMakeLists.txt");
 
     ASSERT_FALSE(sandboxModule.empty());
     ASSERT_FALSE(sandboxImplementation.empty());
     ASSERT_FALSE(sandboxMain.empty());
+    ASSERT_FALSE(methodPanelsModule.empty());
+    ASSERT_FALSE(methodPanelsImplementation.empty());
     ASSERT_FALSE(sandboxCMake.empty());
 
     EXPECT_NE(sandboxModule.find("import Extrinsic.Runtime.Engine;"),
@@ -2098,6 +2119,11 @@ TEST(SandboxEditorUi, ExtrinsicSandboxAppStaysRuntimeOnly)
         EXPECT_EQ(sandboxImplementation.find(forbidden), std::string::npos)
             << forbidden;
         EXPECT_EQ(sandboxMain.find(forbidden), std::string::npos)
+            << forbidden;
+        EXPECT_EQ(methodPanelsModule.find(forbidden), std::string::npos)
+            << forbidden;
+        EXPECT_EQ(methodPanelsImplementation.find(forbidden),
+                  std::string::npos)
             << forbidden;
     }
 
@@ -4607,7 +4633,8 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigFacade)
         Runtime::ApplySandboxEditorProgressivePoissonConfigCommand(
             configContext,
             Runtime::SandboxEditorProgressivePoissonConfigCommand{
-                .Config = config,
+                .Config = Runtime::MakeSandboxEditorProgressivePoissonConfig(
+                    config),
                 .SourceId = "test-progressive-poisson-config",
             });
 
@@ -4620,6 +4647,18 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigFacade)
               Core::Config::ProgressivePoissonPlaygroundChannel::Phase);
     EXPECT_EQ(controlState.ActiveConfig.Sandbox.ProgressivePoisson.Backend,
               Core::Config::ProgressivePoissonPlaygroundBackend::VulkanCompute);
+    EXPECT_TRUE(
+        controlState.ActiveConfig.Sandbox.ProgressivePoisson.AutoRunOnEdit);
+    EXPECT_DOUBLE_EQ(
+        controlState.ActiveConfig.Sandbox.ProgressivePoisson.DebounceSeconds,
+        0.2);
+
+    const std::optional<Runtime::SandboxEditorProgressivePoissonConfig>
+        activeConfig =
+            Runtime::GetSandboxEditorProgressivePoissonConfig(configContext);
+    ASSERT_TRUE(activeConfig.has_value());
+    EXPECT_TRUE(activeConfig->AutoRunOnEdit);
+    EXPECT_DOUBLE_EQ(activeConfig->DebounceSeconds, 0.2);
 
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
@@ -11829,6 +11868,44 @@ TEST(SandboxEditorUi, ExternalWindowContributionNeedsNoLegacySwitchEntry)
 
     EXPECT_TRUE(ui.UnregisterEditorWindow(handle));
     EXPECT_EQ(ui.BuildEditorWindowMenuModel().size(), 2u);
+}
+
+TEST(SandboxEditorUi, ContextWindowContributionReceivesRuntimeFacade)
+{
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+
+    Runtime::SandboxEditorUi ui;
+    int drawCalls = 0;
+    bool receivedScene = false;
+    const Runtime::EditorWindowHandle handle = ui.RegisterEditorWindow(
+        Runtime::SandboxEditorWindowDescriptor{
+            .Id = "test.context_window",
+            .MenuPath = {"View"},
+            .Title = "Context Window",
+            .OpenByDefault = true,
+            .Draw =
+                [&drawCalls, &receivedScene](
+                    bool&,
+                    const Runtime::SandboxEditorContext& context)
+                {
+                    ++drawCalls;
+                    receivedScene = context.Scene != nullptr;
+                },
+        });
+    ASSERT_TRUE(handle.IsValid());
+
+    ui.Attach(engine);
+    engine.Run();
+
+    EXPECT_EQ(drawCalls, 1);
+    EXPECT_TRUE(receivedScene);
+
+    EXPECT_TRUE(ui.UnregisterEditorWindow(handle));
+    ui.Detach();
+    engine.Shutdown();
 }
 
 TEST(SandboxEditorUi, ClosedRegisteredExemplarsBuildNoDomainModels)

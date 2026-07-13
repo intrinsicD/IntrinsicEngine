@@ -11,11 +11,14 @@ lifecycle hooks, but engine feature wiring, frame phases, and subsystem behavior
 belong in `Runtime` or lower engine layers. The executable obtains its default
 configuration through `Runtime` and should not import lower layers directly.
 
-The sandbox app attaches the promoted runtime-owned `SandboxEditorUi` content
-controller through application lifecycle hooks. That controller delegates
-generic callback/registry/visibility lifecycle to `Runtime.EditorUiHost` while
-ARCH-006 moves presentation into this directory. The app also installs the sandbox default runtime
-policy bundle through `Runtime::RegisterSandboxDefaultRuntimePolicies(engine)`.
+The sandbox app attaches the transitional runtime-owned `SandboxEditorUi` shell
+through application lifecycle hooks. That shell delegates generic
+callback/registry/visibility lifecycle to `Runtime.EditorUiHost` while ARCH-006
+moves presentation into this directory. `Sandbox.Editor.MethodPanels` now owns
+the K-Means and Progressive Poisson ImGui controls and registers five domain
+windows through the shell's context-aware contribution facade. The app also
+installs the sandbox default runtime policy bundle through
+`Runtime::RegisterSandboxDefaultRuntimePolicies(engine)`.
 It unregisters the returned handles during shutdown before the engine tears down.
 The app remains a runtime-only consumer: the editor shell registers with
 `Engine::SetImGuiEditorCallback`, reads scene and selection state through
@@ -45,9 +48,10 @@ The promoted EditorUI also exposes stable top-level ImGui menu slots for
 `PointCloud`, `Graph`, and `Mesh`. Their submenu items open selected-entity
 domain windows for render-hint status, visualization/spatial-debug controls,
 primitive-selection details, and processing-discovery affordances. These
-windows are an EditorUI workflow only: they reuse `SandboxEditorUi` models and
-runtime-owned command surfaces, and the sandbox app still does not own
-selection, ECS mutation, rendering, or asset state.
+windows are an EditorUI workflow only: app-owned panels reuse
+`SandboxEditorUi` models and runtime-owned command surfaces, and the sandbox app
+still does not own selection, ECS mutation, method jobs, rendering, or asset
+state.
 
 With the standard reference configuration, runtime creates `ReferenceTriangle`
 through `Extrinsic.Runtime.ReferenceScene::TriangleProvider` as an ordinary

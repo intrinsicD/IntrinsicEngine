@@ -10,11 +10,13 @@ depends_on:
 - Status: in progress.
 - Owner: Codex.
 - Branch: `codex/ui-034-editor-window-contribution`.
-- Slices 0-1 are complete. `Runtime.EditorUiHost` now owns generic callback,
-  registry, and visibility lifecycle, while `Sandbox.cppm` exports only the app
-  factory/registration surface and the concrete app lives in `Sandbox.cpp`.
-- Next verification step: move K-Means and Progressive Poisson presentation
-  through app-owned registered windows while runtime retains execution facades.
+- Slices 0-1 and Slice 2A are complete. `Runtime.EditorUiHost` now owns generic
+  callback, registry, and visibility lifecycle, while `Sandbox.cppm` exports
+  only the app factory/registration surface and the concrete app lives in
+  `Sandbox.cpp`. App-owned registered windows now own K-Means and Progressive
+  Poisson presentation.
+- Next verification step: finish Slice 2 by splitting the K-Means and
+  Progressive Poisson runtime facade from the editor-shell implementation.
 
 ## Goal
 - Restore the documented layering intent that application specifics live in
@@ -192,6 +194,24 @@ Slice 1 evidence (2026-07-13):
   plus Sandbox editor coverage passed 145/145.
 - `IntrinsicTests` built and the default CPU-supported gate passed 3677/3677;
   strict layering, test-layout, task-policy, docs-link, and diff checks passed.
+
+Slice 2A evidence (2026-07-13):
+- Added the 29-line / 1-import `Sandbox.Editor.MethodPanels` interface and its
+  independently compiled app implementation. It registers PointCloud, Graph,
+  and Mesh K-Means plus PointCloud and Mesh Progressive Poisson windows through
+  the existing registry; callbacks receive `SandboxEditorContext`, not
+  `Engine&`.
+- Removed the five fixed domain-window slots and their K-Means/Progressive
+  Poisson ImGui controls/state from `Runtime.SandboxEditorUi`. App panels retain
+  one lazy per-domain model per frame and call runtime-owned model, command,
+  config, job, and result-publication facades.
+- The runtime implementation fell from 25,539 to 24,520 lines and the fixed
+  domain-window count fell from 42 to 36. The new app implementation is 1,193
+  lines after the cache-preserving review fix; no compile-time claim is made
+  from these source metrics.
+- `ExtrinsicSandbox` and `IntrinsicTests` build; focused `SandboxEditorUi.*`
+  coverage passed 144/144 and the default CPU-supported gate passed 3678/3678.
+  Strict layering, test-layout, task-policy, docs-link, and diff checks passed.
 
 ## Forbidden changes
 - Mixing mechanical moves with semantic refactors in one slice.

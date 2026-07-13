@@ -4,6 +4,7 @@ module;
 
 module Extrinsic.Sandbox;
 
+import Extrinsic.Sandbox.Editor.MethodPanels;
 import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SandboxEditorUi;
@@ -14,6 +15,7 @@ public:
   void OnInitialize(Runtime::Engine &engine) override {
     m_DefaultPolicies = Runtime::RegisterSandboxDefaultRuntimePolicies(engine);
     m_EditorUi.Attach(engine);
+    m_MethodPanels.Register(m_EditorUi);
   }
 
   void OnSimTick(Runtime::Engine &engine, double fixedDt) override {
@@ -29,12 +31,14 @@ public:
   }
 
   void OnShutdown(Runtime::Engine &engine) override {
+    m_MethodPanels.Unregister();
     m_EditorUi.Detach();
     Runtime::UnregisterSandboxDefaultRuntimePolicies(engine, m_DefaultPolicies);
   }
 
 private:
   Runtime::SandboxEditorUi m_EditorUi{};
+  Editor::MethodPanels m_MethodPanels{};
   Runtime::RuntimeSandboxDefaultPolicyRegistration m_DefaultPolicies{};
 };
 

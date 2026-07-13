@@ -119,8 +119,10 @@ generic Engine callback attachment, the registry, and the unsuppressed global
 `G` visibility action; its parameterless frame callback does not pass
 `Engine&` to contributors. During the ARCH-006 migration,
 `SandboxEditorUi::{Register,Unregister}EditorWindow` delegates to that host as
-the compatibility composition surface. Registered paths are merged into the
-menu tree without adding legacy enum or draw-switch entries. `ImGuiAdapter` records one
+the compatibility composition surface. Sandbox-aware contributions receive a
+frame-local `SandboxEditorContext` facade, never `Engine&`; registered paths are
+merged into the menu tree without adding legacy enum or draw-switch entries.
+`ImGuiAdapter` records one
 `EditorInputCaptureSnapshot` after the visible editor callback; camera, gizmo,
 picking, and viewport routing consume that snapshot rather than reading ImGui
 capture flags independently. Its ImGui context owns a paired ImPlot context.
@@ -130,8 +132,13 @@ the manifest-managed `implot` dependency remain private to runtime.
 `SandboxEditorUi` registers `Mesh / Appearance` and
 `Mesh / Processing / Simplify` as the first two registry-owned windows; they
 share one lazy mesh-domain model per frame, and Appearance embeds the generic
-vertex-property histogram. The remaining fixed domain windows stay behind the
-legacy section table until `ARCH-006` relocates Sandbox-owned editor content.
+vertex-property histogram. `Extrinsic.Sandbox.Editor.MethodPanels` registers
+the K-Means windows for PointCloud, Graph, and Mesh plus the PointCloud and Mesh
+Progressive Poisson windows from the application layer. Their ImGui state and
+result presentation are app-owned, while model construction, command execution,
+job queues, config validation, and result publication remain runtime-owned.
+The remaining fixed domain windows stay behind the legacy section table until
+later `ARCH-006` slices relocate them.
 
 The internal `RuntimeFrameContext` record carries the data that must survive
 between those phases: frame delta, fixed-step interpolation alpha, render frame

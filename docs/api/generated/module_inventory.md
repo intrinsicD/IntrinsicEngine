@@ -8,7 +8,7 @@ Root scanned: `src`
 
 | Layer | Module Count |
 |---|---:|
-| `app` | 1 |
+| `app` | 2 |
 | `assets` | 12 |
 | `core` | 41 |
 | `ecs` | 28 |
@@ -26,6 +26,7 @@ Root scanned: `src`
 
 | Module | File | Layer |
 |---|---|---|
+| `Extrinsic.Sandbox.Editor.MethodPanels` | `src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm` | `app` |
 | `Extrinsic.Sandbox` | `src/app/Sandbox/Sandbox.cppm` | `app` |
 | `Extrinsic.Asset.EventBus` | `src/assets/Asset.EventBus.cppm` | `assets` |
 | `Extrinsic.Asset.GeometryIOBridge` | `src/assets/Asset.GeometryIOBridge.cppm` | `assets` |
@@ -412,4 +413,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugClosestFace` | `src/runtime/SpatialDebug/Runtime.SpatialDebugClosestFace.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **385**
+Total modules: **386**

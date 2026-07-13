@@ -203,8 +203,12 @@ stable ids and structured menu paths, then remove the returned handle through
 their individual open states. `Mesh / Appearance` and
 `Mesh / Processing / Simplify` are the first registry-owned exemplars and share
 one lazy mesh-domain model per frame; Appearance also hosts the generic scalar
-vertex-property histogram. The remaining fixed domain windows are retained for
-the `ARCH-006` Sandbox-content relocation. `SandboxEditorUi` routes the unsuppressed `G`
+vertex-property histogram. `ARCH-006` Slice 2 adds a context-aware contribution
+descriptor that supplies a frame-local runtime facade without exposing
+`Engine&`; the Sandbox application uses it for app-owned K-Means and Progressive
+Poisson panels while runtime retains their models, commands, config lane, jobs,
+and result sinks. The remaining fixed domain windows are retained for later
+`ARCH-006` relocation slices. `SandboxEditorUi` routes the unsuppressed `G`
 input action through the same `EditorUiVisibilityCommand` path used by
 programmatic callers. At the end of each visible editor frame, `ImGuiAdapter`
 records one `EditorInputCaptureSnapshot` containing keyboard capture, mouse

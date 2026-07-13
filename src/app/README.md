@@ -6,15 +6,18 @@ engine runtime. The canonical entry point is `Sandbox`.
 ## Applications
 
 - `Sandbox/` — reference integration target. Links to `Runtime`, opens a window,
-  and drives the frame loop with the runtime-owned reference configuration. Used
-  to validate the composition root end-to-end without adding specialized app
-  behavior.
+  drives the frame loop with the runtime-owned reference configuration, and owns
+  Sandbox-specific editor presentation registered through runtime facades.
 
 ## Directory layout
 
 ```text
 Sandbox/
+  Editor/
+    Sandbox.MethodPanels.cppm
+    Sandbox.MethodPanels.cpp
   Sandbox.cppm
+  Sandbox.cpp
   main.cpp
   CMakeLists.txt
 ```

@@ -258,26 +258,6 @@ namespace Extrinsic::Runtime
                 PointNormals::OrientationMode::MinimumSpanningTree,
             }};
 
-        inline constexpr std::array<SandboxEditorProgressivePoissonChannel, 4>
-            kProgressivePoissonChannels{{
-                SandboxEditorProgressivePoissonChannel::Level,
-                SandboxEditorProgressivePoissonChannel::Phase,
-                SandboxEditorProgressivePoissonChannel::SplatRadius,
-                SandboxEditorProgressivePoissonChannel::PrefixVisible,
-            }};
-
-        inline constexpr std::array<SandboxEditorProgressivePoissonBackend, 2>
-            kProgressivePoissonBackends{{
-                SandboxEditorProgressivePoissonBackend::CpuReference,
-                SandboxEditorProgressivePoissonBackend::VulkanCompute,
-            }};
-
-        inline constexpr std::array<SandboxEditorKMeansBackend, 2>
-            kKMeansBackends{{
-                SandboxEditorKMeansBackend::CpuReference,
-                SandboxEditorKMeansBackend::VulkanCompute,
-            }};
-
         inline constexpr std::array<SandboxEditorMeshDenoiseStage, 1>
             kMeshDenoiseStages{{
                 SandboxEditorMeshDenoiseStage::FullBilateral,
@@ -338,17 +318,6 @@ namespace Extrinsic::Runtime
             }
             return "unknown";
         }
-
-        struct KMeansUiState
-        {
-            std::optional<SandboxEditorKMeansResult>* LastResult{nullptr};
-            SandboxEditorGeometryProcessingDomain* Domain{nullptr};
-            std::int32_t* Backend{nullptr};
-            std::int32_t* ClusterCount{nullptr};
-            std::int32_t* MaxIterations{nullptr};
-            std::int32_t* Seed{nullptr};
-            bool* UseHierarchicalInitialization{nullptr};
-        };
 
         struct MeshDenoiseUiState
         {
@@ -448,35 +417,6 @@ namespace Extrinsic::Runtime
             bool* SwapSourceTarget{nullptr};
         };
 
-        struct ProgressivePoissonUiState
-        {
-            std::optional<SandboxEditorProgressivePoissonResult>*
-                LastResult{nullptr};
-            std::optional<SandboxEditorProgressivePoissonConfigResult>*
-                LastConfigResult{nullptr};
-            std::int32_t* Dimension{nullptr};
-            std::int32_t* GridWidth{nullptr};
-            std::int32_t* MaxLevels{nullptr};
-            float* HashLoadFactor{nullptr};
-            float* RadiusAlpha{nullptr};
-            bool* RandomizeGridOrigin{nullptr};
-            std::int32_t* GridOriginSeed{nullptr};
-            bool* ShuffleWithinLevels{nullptr};
-            std::int32_t* ShuffleSeed{nullptr};
-            std::int32_t* PrefixCount{nullptr};
-            std::int32_t* Channel{nullptr};
-            std::int32_t* Backend{nullptr};
-            std::int32_t* MeshSurfaceSampleCount{nullptr};
-            std::int32_t* MeshSurfaceSampleSeed{nullptr};
-            float* MeshSurfaceMinTriangleArea{nullptr};
-            bool* MeshSurfaceInterpolateNormals{nullptr};
-            bool* AutoRunOnEdit{nullptr};
-            float* DebounceSeconds{nullptr};
-            bool* AutoRunPending{nullptr};
-            double* LastEditTime{nullptr};
-            std::uint32_t* PendingStableEntityId{nullptr};
-        };
-
         struct TextureBakeUiState
         {
             std::optional<SandboxEditorUvRegenerationCommandResult>*
@@ -498,18 +438,16 @@ namespace Extrinsic::Runtime
             Render = 0,
             Properties = 1,
             Selection = 2,
-            ProcessingKMeans = 3,
-            ProcessingDenoise = 4,
-            ProcessingCurvature = 5,
-            ProcessingRemesh = 6,
-            ProcessingSubdivide = 7,
-            ProcessingSimplify = 8,
-            ProcessingMeshVertexNormals = 9,
-            ProcessingGraphVertexNormals = 10,
-            ProcessingPointCloudVertexNormals = 11,
-            ProcessingPointCloudOutlierRemoval = 12,
-            ProcessingProgressivePoisson = 13,
-            Count = 14,
+            ProcessingDenoise = 3,
+            ProcessingCurvature = 4,
+            ProcessingRemesh = 5,
+            ProcessingSubdivide = 6,
+            ProcessingSimplify = 7,
+            ProcessingMeshVertexNormals = 8,
+            ProcessingGraphVertexNormals = 9,
+            ProcessingPointCloudVertexNormals = 10,
+            ProcessingPointCloudOutlierRemoval = 11,
+            Count = 12,
         };
 
         static_assert(
@@ -678,8 +616,6 @@ namespace Extrinsic::Runtime
                 case DomainWindowSection::Render: return "Mesh / Appearance";
                 case DomainWindowSection::Properties: return "Mesh / Properties";
                 case DomainWindowSection::Selection: return "Mesh / Selection";
-                case DomainWindowSection::ProcessingKMeans:
-                    return "Mesh / Processing / K-Means";
                 case DomainWindowSection::ProcessingDenoise:
                     return "Mesh / Processing / Denoise";
                 case DomainWindowSection::ProcessingCurvature:
@@ -692,8 +628,6 @@ namespace Extrinsic::Runtime
                     return "Mesh / Processing / Simplify";
                 case DomainWindowSection::ProcessingMeshVertexNormals:
                     return "Mesh / Processing / Vertices / Normals";
-                case DomainWindowSection::ProcessingProgressivePoisson:
-                    return "Mesh / Processing / Progressive Poisson";
                 case DomainWindowSection::ProcessingGraphVertexNormals:
                 case DomainWindowSection::ProcessingPointCloudVertexNormals:
                 case DomainWindowSection::ProcessingPointCloudOutlierRemoval:
@@ -706,8 +640,6 @@ namespace Extrinsic::Runtime
                 case DomainWindowSection::Render: return "Graph / Appearance";
                 case DomainWindowSection::Properties: return "Graph / Properties";
                 case DomainWindowSection::Selection: return "Graph / Selection";
-                case DomainWindowSection::ProcessingKMeans:
-                    return "Graph / Processing / K-Means";
                 case DomainWindowSection::ProcessingGraphVertexNormals:
                     return "Graph / Processing / Vertices / Normals";
                 case DomainWindowSection::ProcessingDenoise:
@@ -718,7 +650,6 @@ namespace Extrinsic::Runtime
                 case DomainWindowSection::ProcessingMeshVertexNormals:
                 case DomainWindowSection::ProcessingPointCloudVertexNormals:
                 case DomainWindowSection::ProcessingPointCloudOutlierRemoval:
-                case DomainWindowSection::ProcessingProgressivePoisson:
                 case DomainWindowSection::Count: break;
                 }
                 break;
@@ -728,14 +659,10 @@ namespace Extrinsic::Runtime
                 case DomainWindowSection::Render: return "PointCloud / Appearance";
                 case DomainWindowSection::Properties: return "PointCloud / Properties";
                 case DomainWindowSection::Selection: return "PointCloud / Selection";
-                case DomainWindowSection::ProcessingKMeans:
-                    return "PointCloud / Processing / K-Means";
                 case DomainWindowSection::ProcessingPointCloudVertexNormals:
                     return "PointCloud / Processing / Vertices / Normals";
                 case DomainWindowSection::ProcessingPointCloudOutlierRemoval:
                     return "PointCloud / Processing / Remove Outliers";
-                case DomainWindowSection::ProcessingProgressivePoisson:
-                    return "PointCloud / Processing / Progressive Poisson";
                 case DomainWindowSection::ProcessingDenoise:
                 case DomainWindowSection::ProcessingCurvature:
                 case DomainWindowSection::ProcessingRemesh:
@@ -5457,16 +5384,6 @@ namespace Extrinsic::Runtime
                 .Error = completed.Error,
                 .Message = completed.Message,
             };
-        }
-
-        [[nodiscard]] SandboxEditorKMeansBackend KMeansBackendFromIndex(
-            const std::int32_t index) noexcept
-        {
-            const std::int32_t clamped = std::clamp(
-                index,
-                0,
-                static_cast<std::int32_t>(kKMeansBackends.size() - 1u));
-            return kKMeansBackends[static_cast<std::size_t>(clamped)];
         }
 
         [[nodiscard]] std::optional<GK::KMeansResult> RunKMeansForSandbox(
@@ -13364,10 +13281,6 @@ namespace Extrinsic::Runtime
                     const std::vector<SandboxEditorGeometryProcessingMenuItem>
                         menuItems =
                             GetSandboxEditorGeometryProcessingMenuItems(kind);
-                    if (ImGui::MenuItem("K-Means"))
-                    {
-                        openProcessing(DomainWindowSection::ProcessingKMeans);
-                    }
                     const bool hasDenoiseLeaf =
                         std::any_of(
                             menuItems.begin(),
@@ -13443,13 +13356,6 @@ namespace Extrinsic::Runtime
                         openProcessing(
                             DomainWindowSection::
                                 ProcessingPointCloudOutlierRemoval);
-                    }
-                    if ((kind == SandboxEditorDomainWindowKind::Mesh ||
-                         kind == SandboxEditorDomainWindowKind::PointCloud) &&
-                        ImGui::MenuItem("Progressive Poisson"))
-                    {
-                        openProcessing(
-                            DomainWindowSection::ProcessingProgressivePoisson);
                     }
                     std::vector<std::string_view> fixedProcessingChildren{};
                     for (const SandboxEditorGeometryProcessingMenuItem& item : menuItems)
@@ -15041,194 +14947,6 @@ namespace Extrinsic::Runtime
             DrawPrimitiveDetails(model.Primitive);
         }
 
-        [[nodiscard]] bool ContainsKMeansDomain(
-            const std::vector<SandboxEditorGeometryProcessingDomain>& domains,
-            const SandboxEditorGeometryProcessingDomain domain)
-        {
-            return std::find(domains.begin(), domains.end(), domain) != domains.end();
-        }
-
-        void DrawKMeansResultStatus(
-            const std::optional<SandboxEditorKMeansResult>& lastResult)
-        {
-            if (!lastResult.has_value())
-            {
-                ImGui::TextDisabled("Last K-Means run: none");
-                return;
-            }
-
-            const SandboxEditorKMeansResult& result = *lastResult;
-            ImGui::Text("Last K-Means run: %s",
-                        DebugNameForSandboxEditorCommandStatus(result.Status));
-            ImGui::Text("Domain: %s",
-                        DebugNameForSandboxEditorGeometryProcessingDomain(
-                            result.Domain));
-            if (!result.BackendId.empty())
-            {
-                if (!result.BackendDisplayName.empty())
-                {
-                    ImGui::Text("Backend: %s (%s)",
-                                result.BackendDisplayName.c_str(),
-                                result.BackendId.c_str());
-                }
-                else
-                {
-                    ImGui::Text("Backend: %s", result.BackendId.c_str());
-                }
-            }
-            if (!result.RequestedBackendId.empty() &&
-                result.RequestedBackendId != result.BackendId)
-            {
-                if (!result.RequestedBackendDisplayName.empty())
-                {
-                    ImGui::Text("Requested backend: %s (%s)",
-                                result.RequestedBackendDisplayName.c_str(),
-                                result.RequestedBackendId.c_str());
-                }
-                else
-                {
-                    ImGui::Text("Requested backend: %s",
-                                result.RequestedBackendId.c_str());
-                }
-            }
-            if (result.Succeeded())
-            {
-                ImGui::Text("Labels: %u  clusters: %u  iterations: %u",
-                            result.LabelCount,
-                            result.ClusterCount,
-                            result.Iterations);
-                ImGui::Text("Converged: %s  inertia: %.6f",
-                            result.Converged ? "yes" : "no",
-                            result.Inertia);
-            }
-            if (!result.BackendFallbackReason.empty())
-            {
-                ImGui::TextWrapped(
-                    "Backend fallback: %s",
-                    result.BackendFallbackReason.c_str());
-            }
-            if (!result.Message.empty())
-                ImGui::TextWrapped("%s", result.Message.c_str());
-        }
-
-        void DrawKMeansExecutionControls(
-            const SandboxEditorDomainWindowModel& model,
-            const SandboxEditorContext& context,
-            const SandboxEditorGeometryProcessingModel& processing,
-            KMeansUiState* kmeansState)
-        {
-            ImGui::SeparatorText("K-Means execution");
-            if (processing.KMeansDomains.empty())
-            {
-                ImGui::TextDisabled("K-Means is unavailable for this selection.");
-                return;
-            }
-            if (kmeansState == nullptr ||
-                kmeansState->LastResult == nullptr ||
-                kmeansState->Domain == nullptr ||
-                kmeansState->Backend == nullptr ||
-                kmeansState->ClusterCount == nullptr ||
-                kmeansState->MaxIterations == nullptr ||
-                kmeansState->Seed == nullptr ||
-                kmeansState->UseHierarchicalInitialization == nullptr)
-            {
-                ImGui::TextDisabled("K-Means execution controls are not bound.");
-                return;
-            }
-
-            if (!ContainsKMeansDomain(processing.KMeansDomains,
-                                      *kmeansState->Domain))
-            {
-                *kmeansState->Domain = processing.KMeansDomains.front();
-            }
-
-            const char* currentDomain =
-                DebugNameForSandboxEditorGeometryProcessingDomain(
-                    *kmeansState->Domain);
-            if (ImGui::BeginCombo("Domain##KMeans", currentDomain))
-            {
-                for (const SandboxEditorGeometryProcessingDomain domain :
-                     processing.KMeansDomains)
-                {
-                    const bool selected = *kmeansState->Domain == domain;
-                    if (ImGui::Selectable(
-                            DebugNameForSandboxEditorGeometryProcessingDomain(domain),
-                            selected))
-                    {
-                        *kmeansState->Domain = domain;
-                    }
-                    if (selected)
-                        ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndCombo();
-            }
-
-            *kmeansState->Backend = std::clamp(
-                *kmeansState->Backend,
-                0,
-                static_cast<std::int32_t>(kKMeansBackends.size() - 1u));
-            const SandboxEditorKMeansBackend backend =
-                KMeansBackendFromIndex(*kmeansState->Backend);
-            if (ImGui::BeginCombo(
-                    "Backend##KMeans",
-                    DebugNameForSandboxEditorKMeansBackend(backend)))
-            {
-                for (std::size_t i = 0u; i < kKMeansBackends.size(); ++i)
-                {
-                    const bool selected =
-                        *kmeansState->Backend ==
-                        static_cast<std::int32_t>(i);
-                    if (ImGui::Selectable(
-                            DebugNameForSandboxEditorKMeansBackend(
-                                kKMeansBackends[i]),
-                            selected))
-                    {
-                        *kmeansState->Backend =
-                            static_cast<std::int32_t>(i);
-                    }
-                    if (selected)
-                        ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndCombo();
-            }
-
-            ImGui::DragInt("Clusters##KMeans", kmeansState->ClusterCount, 1.0f, 1, 1024);
-            ImGui::DragInt("Max iterations##KMeans", kmeansState->MaxIterations, 1.0f, 1, 4096);
-            ImGui::DragInt("Seed##KMeans", kmeansState->Seed, 1.0f, 0, 1'000'000);
-            *kmeansState->ClusterCount =
-                std::clamp(*kmeansState->ClusterCount, 1, 1024);
-            *kmeansState->MaxIterations =
-                std::clamp(*kmeansState->MaxIterations, 1, 4096);
-            *kmeansState->Seed =
-                std::clamp(*kmeansState->Seed, 0, 1'000'000);
-            ImGui::Checkbox("Hierarchical initialization##KMeans",
-                            kmeansState->UseHierarchicalInitialization);
-
-            if (ImGui::Button("Run K-Means##KMeans"))
-            {
-                *kmeansState->LastResult = ApplySandboxEditorKMeansCommand(
-                    context,
-                    SandboxEditorKMeansCommand{
-                        .StableEntityId = model.SelectedStableId,
-                        .Domain = *kmeansState->Domain,
-                        .ClusterCount = static_cast<std::uint32_t>(
-                            *kmeansState->ClusterCount),
-                        .MaxIterations = static_cast<std::uint32_t>(
-                            *kmeansState->MaxIterations),
-                        .Seed = static_cast<std::uint32_t>(*kmeansState->Seed),
-                        .UseHierarchicalInitialization =
-                            *kmeansState->UseHierarchicalInitialization,
-                        .Backend = KMeansBackendFromIndex(*kmeansState->Backend),
-                    });
-            }
-
-            const std::optional<SandboxEditorKMeansResult>& result =
-                kmeansState->LastResult->has_value()
-                    ? *kmeansState->LastResult
-                    : processing.LastKMeansResult;
-            DrawKMeansResultStatus(result);
-        }
-
         [[nodiscard]] SandboxEditorMeshDenoiseStage MeshDenoiseStageFromIndex(
             const std::int32_t index) noexcept
         {
@@ -16604,680 +16322,10 @@ namespace Extrinsic::Runtime
             DrawPointCloudOutlierRemovalResultStatus(result);
         }
 
-        [[nodiscard]] SandboxEditorProgressivePoissonChannel
-        ProgressivePoissonChannelFromIndex(const std::int32_t index) noexcept
-        {
-            const std::int32_t clamped = std::clamp(
-                index,
-                0,
-                static_cast<std::int32_t>(
-                    kProgressivePoissonChannels.size() - 1u));
-            return kProgressivePoissonChannels[
-                static_cast<std::size_t>(clamped)];
-        }
-
-        [[nodiscard]] std::int32_t ProgressivePoissonChannelIndex(
-            const SandboxEditorProgressivePoissonChannel channel) noexcept
-        {
-            for (std::size_t i = 0u; i < kProgressivePoissonChannels.size(); ++i)
-            {
-                if (kProgressivePoissonChannels[i] == channel)
-                {
-                    return static_cast<std::int32_t>(i);
-                }
-            }
-            return 0;
-        }
-
-        [[nodiscard]] SandboxEditorProgressivePoissonBackend
-        ProgressivePoissonBackendFromIndex(const std::int32_t index) noexcept
-        {
-            const std::int32_t clamped = std::clamp(
-                index,
-                0,
-                static_cast<std::int32_t>(
-                    kProgressivePoissonBackends.size() - 1u));
-            return kProgressivePoissonBackends[
-                static_cast<std::size_t>(clamped)];
-        }
-
-        [[nodiscard]] std::int32_t ProgressivePoissonBackendIndex(
-            const SandboxEditorProgressivePoissonBackend backend) noexcept
-        {
-            for (std::size_t i = 0u; i < kProgressivePoissonBackends.size(); ++i)
-            {
-                if (kProgressivePoissonBackends[i] == backend)
-                {
-                    return static_cast<std::int32_t>(i);
-                }
-            }
-            return 0;
-        }
-
-        void DrawProgressivePoissonTooltip(const char* text)
-        {
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
-            {
-                ImGui::SetTooltip("%s", text);
-            }
-        }
-
-        void SyncProgressivePoissonUiStateFromConfig(
-            ProgressivePoissonUiState& state,
-            const Core::Config::ProgressivePoissonPlaygroundConfig& config)
-        {
-            *state.Dimension = static_cast<std::int32_t>(config.Dimension);
-            *state.GridWidth = static_cast<std::int32_t>(config.GridWidth);
-            *state.MaxLevels = static_cast<std::int32_t>(config.MaxLevels);
-            *state.HashLoadFactor = static_cast<float>(config.HashLoadFactor);
-            *state.RadiusAlpha = static_cast<float>(config.RadiusAlpha);
-            *state.RandomizeGridOrigin = config.RandomizeGridOrigin;
-            *state.GridOriginSeed = static_cast<std::int32_t>(config.GridOriginSeed);
-            *state.ShuffleWithinLevels = config.ShuffleWithinLevels;
-            *state.ShuffleSeed = static_cast<std::int32_t>(config.ShuffleSeed);
-            *state.PrefixCount = static_cast<std::int32_t>(config.PrefixCount);
-            *state.Channel = ProgressivePoissonChannelIndex(
-                MakeSandboxEditorProgressivePoissonChannel(config.Channel));
-            if (state.Backend != nullptr)
-            {
-                *state.Backend = ProgressivePoissonBackendIndex(
-                    MakeSandboxEditorProgressivePoissonBackend(config.Backend));
-            }
-            if (state.MeshSurfaceSampleCount != nullptr)
-            {
-                *state.MeshSurfaceSampleCount =
-                    static_cast<std::int32_t>(config.MeshSurfaceSampleCount);
-            }
-            if (state.MeshSurfaceSampleSeed != nullptr)
-            {
-                *state.MeshSurfaceSampleSeed =
-                    static_cast<std::int32_t>(config.MeshSurfaceSampleSeed);
-            }
-            if (state.MeshSurfaceMinTriangleArea != nullptr)
-            {
-                *state.MeshSurfaceMinTriangleArea =
-                    static_cast<float>(config.MeshSurfaceMinTriangleArea);
-            }
-            if (state.MeshSurfaceInterpolateNormals != nullptr)
-            {
-                *state.MeshSurfaceInterpolateNormals =
-                    config.MeshSurfaceInterpolateNormals;
-            }
-            if (state.AutoRunOnEdit != nullptr)
-            {
-                *state.AutoRunOnEdit = config.AutoRunOnEdit;
-            }
-            if (state.DebounceSeconds != nullptr)
-            {
-                *state.DebounceSeconds =
-                    static_cast<float>(config.DebounceSeconds);
-            }
-        }
-
-        [[nodiscard]] SandboxEditorProgressivePoissonConfig
-        BuildProgressivePoissonConfigFromUiState(
-            const ProgressivePoissonUiState& state)
-        {
-            SandboxEditorProgressivePoissonConfig config{
-                .Dimension = static_cast<std::uint32_t>(*state.Dimension),
-                .GridWidth = static_cast<std::uint32_t>(*state.GridWidth),
-                .MaxLevels = static_cast<std::uint32_t>(*state.MaxLevels),
-                .HashLoadFactor = *state.HashLoadFactor,
-                .RadiusAlpha = *state.RadiusAlpha,
-                .RandomizeGridOrigin = *state.RandomizeGridOrigin,
-                .GridOriginSeed = static_cast<std::uint32_t>(*state.GridOriginSeed),
-                .ShuffleWithinLevels = *state.ShuffleWithinLevels,
-                .ShuffleSeed = static_cast<std::uint32_t>(*state.ShuffleSeed),
-                .PrefixCount = static_cast<std::uint32_t>(*state.PrefixCount),
-                .Channel = ProgressivePoissonChannelFromIndex(*state.Channel),
-                .Backend = state.Backend == nullptr
-                    ? SandboxEditorProgressivePoissonBackend::CpuReference
-                    : ProgressivePoissonBackendFromIndex(*state.Backend),
-            };
-            if (state.MeshSurfaceSampleCount != nullptr)
-            {
-                config.MeshSurfaceSampleCount =
-                    static_cast<std::uint32_t>(*state.MeshSurfaceSampleCount);
-            }
-            if (state.MeshSurfaceSampleSeed != nullptr)
-            {
-                config.MeshSurfaceSampleSeed =
-                    static_cast<std::uint32_t>(*state.MeshSurfaceSampleSeed);
-            }
-            if (state.MeshSurfaceMinTriangleArea != nullptr)
-            {
-                config.MeshSurfaceMinTriangleArea =
-                    static_cast<double>(*state.MeshSurfaceMinTriangleArea);
-            }
-            if (state.MeshSurfaceInterpolateNormals != nullptr)
-            {
-                config.MeshSurfaceInterpolateNormals =
-                    *state.MeshSurfaceInterpolateNormals;
-            }
-            return config;
-        }
-
-        [[nodiscard]] Core::Config::ProgressivePoissonPlaygroundConfig
-        BuildCoreProgressivePoissonConfigFromUiState(
-            const ProgressivePoissonUiState& state,
-            const Core::Config::ProgressivePoissonPlaygroundConfig& defaults)
-        {
-            Core::Config::ProgressivePoissonPlaygroundConfig config =
-                MakeCoreProgressivePoissonPlaygroundConfig(
-                    BuildProgressivePoissonConfigFromUiState(state),
-                    defaults);
-            if (state.AutoRunOnEdit != nullptr)
-            {
-                config.AutoRunOnEdit = *state.AutoRunOnEdit;
-            }
-            if (state.DebounceSeconds != nullptr)
-            {
-                config.DebounceSeconds =
-                    static_cast<double>(*state.DebounceSeconds);
-            }
-            return config;
-        }
-
-        void DrawProgressivePoissonResultStatus(
-            const std::optional<SandboxEditorProgressivePoissonResult>&
-                lastResult)
-        {
-            if (!lastResult.has_value())
-            {
-                ImGui::TextDisabled("Last progressive Poisson run: none");
-                return;
-            }
-
-            const SandboxEditorProgressivePoissonResult& result =
-                *lastResult;
-            ImGui::Text(
-                "Last progressive Poisson run: %s",
-                DebugNameForSandboxEditorCommandStatus(result.Status));
-            ImGui::Text(
-                "Channel: %s",
-                DebugNameForSandboxEditorProgressivePoissonChannel(
-                    result.Channel));
-            if (!result.BackendId.empty())
-            {
-                if (!result.BackendDisplayName.empty())
-                {
-                    ImGui::Text("Backend: %s (%s)",
-                                result.BackendDisplayName.c_str(),
-                                result.BackendId.c_str());
-                }
-                else
-                {
-                    ImGui::Text("Backend: %s", result.BackendId.c_str());
-                }
-            }
-            if (!result.RequestedBackendId.empty() &&
-                result.RequestedBackendId != result.BackendId)
-            {
-                if (!result.RequestedBackendDisplayName.empty())
-                {
-                    ImGui::Text("Requested backend: %s (%s)",
-                                result.RequestedBackendDisplayName.c_str(),
-                                result.RequestedBackendId.c_str());
-                }
-                else
-                {
-                    ImGui::Text("Requested backend: %s",
-                                result.RequestedBackendId.c_str());
-                }
-            }
-            if (result.Succeeded())
-            {
-                ImGui::Text("Accepted %u / %u  prefix %u  levels %u",
-                            result.AcceptedCount,
-                            result.InputCount,
-                            result.PrefixCount,
-                            result.LevelCount);
-                ImGui::Text("Base radius %.6f  alpha %.6f",
-                            static_cast<double>(result.BaseRadius),
-                            static_cast<double>(result.UsedAlpha));
-                ImGui::TextWrapped(
-                    "Level counts: %s",
-                    FormatProgressivePoissonLevelCounts(
-                        result.LevelAcceptedCounts)
-                        .c_str());
-                if (result.AlphaDefaulted ||
-                    result.ClampedGridWidth ||
-                    result.ClampedMaxLevels)
-                {
-                    ImGui::Text("Defaults: alpha=%s grid=%s levels=%s",
-                                result.AlphaDefaulted ? "yes" : "no",
-                                result.ClampedGridWidth ? "yes" : "no",
-                                result.ClampedMaxLevels ? "yes" : "no");
-                }
-                if (result.MeshSurfaceSamplingUsed)
-                {
-                    ImGui::Text(
-                        "Surface samples %u  triangles %u/%u  area %.6f",
-                        result.MeshSurfaceSampleCount,
-                        result.MeshSurfaceAcceptedTriangleCount,
-                        result.MeshSurfaceTotalFaceCount,
-                        result.MeshSurfaceArea);
-                }
-            }
-            if (!result.BackendFallbackReason.empty())
-            {
-                ImGui::TextWrapped(
-                    "Backend fallback: %s",
-                    result.BackendFallbackReason.c_str());
-            }
-            if (!result.Message.empty())
-                ImGui::TextWrapped("%s", result.Message.c_str());
-        }
-
-        void DrawProgressivePoissonControls(
-            const SandboxEditorDomainWindowModel& model,
-            const SandboxEditorContext& context,
-            const SandboxEditorGeometryProcessingModel& processing,
-            ProgressivePoissonUiState* poissonState)
-        {
-            ImGui::SeparatorText("Progressive Poisson");
-            const bool meshInput =
-                model.Kind == SandboxEditorDomainWindowKind::Mesh;
-            const bool progressivePoissonAvailable = meshInput
-                ? processing.MeshProgressivePoissonAvailable
-                : processing.PointCloudProgressivePoissonAvailable;
-            if (!progressivePoissonAvailable)
-            {
-                ImGui::TextDisabled("Progressive Poisson is unavailable for this selection.");
-                return;
-            }
-            if (poissonState == nullptr ||
-                poissonState->LastResult == nullptr ||
-                poissonState->LastConfigResult == nullptr ||
-                poissonState->Dimension == nullptr ||
-                poissonState->GridWidth == nullptr ||
-                poissonState->MaxLevels == nullptr ||
-                poissonState->HashLoadFactor == nullptr ||
-                poissonState->RadiusAlpha == nullptr ||
-                poissonState->RandomizeGridOrigin == nullptr ||
-                poissonState->GridOriginSeed == nullptr ||
-                poissonState->ShuffleWithinLevels == nullptr ||
-                poissonState->ShuffleSeed == nullptr ||
-                poissonState->PrefixCount == nullptr ||
-                poissonState->Channel == nullptr ||
-                poissonState->AutoRunOnEdit == nullptr ||
-                poissonState->DebounceSeconds == nullptr ||
-                poissonState->AutoRunPending == nullptr ||
-                poissonState->LastEditTime == nullptr ||
-                poissonState->PendingStableEntityId == nullptr ||
-                (meshInput &&
-                 (poissonState->MeshSurfaceSampleCount == nullptr ||
-                  poissonState->MeshSurfaceSampleSeed == nullptr ||
-                  poissonState->MeshSurfaceMinTriangleArea == nullptr ||
-                  poissonState->MeshSurfaceInterpolateNormals == nullptr)))
-            {
-                ImGui::TextDisabled("Progressive Poisson controls are not bound.");
-                return;
-            }
-
-            const bool configFacadeAvailable =
-                context.EngineConfigControlState != nullptr &&
-                context.PreviewEngineConfigDocument &&
-                context.ApplyEngineConfigHotSubset &&
-                context.EngineConfigCommandsAvailable;
-            if (!configFacadeAvailable)
-            {
-                ImGui::TextDisabled(
-                    "Progressive Poisson requires engine config-control.");
-                return;
-            }
-
-            const Core::Config::ProgressivePoissonPlaygroundConfig&
-                activeConfig =
-                    context.EngineConfigControlState->ActiveConfig.Sandbox
-                        .ProgressivePoisson;
-            SyncProgressivePoissonUiStateFromConfig(*poissonState, activeConfig);
-
-            *poissonState->Dimension =
-                *poissonState->Dimension <= 2 ? 2 : 3;
-            bool configChanged = false;
-            if (ImGui::BeginCombo(
-                    "Dimension##ProgressivePoisson",
-                    *poissonState->Dimension == 2 ? "2D" : "3D"))
-            {
-                if (ImGui::Selectable("2D##ProgressivePoisson", *poissonState->Dimension == 2))
-                {
-                    *poissonState->Dimension = 2;
-                    configChanged = true;
-                }
-                if (*poissonState->Dimension == 2)
-                    ImGui::SetItemDefaultFocus();
-                if (ImGui::Selectable("3D##ProgressivePoisson", *poissonState->Dimension == 3))
-                {
-                    *poissonState->Dimension = 3;
-                    configChanged = true;
-                }
-                if (*poissonState->Dimension == 3)
-                    ImGui::SetItemDefaultFocus();
-                ImGui::EndCombo();
-            }
-            DrawProgressivePoissonTooltip(
-                "Input dimensionality used by the reference sampler.");
-
-            *poissonState->GridWidth =
-                std::clamp(*poissonState->GridWidth, 1, 4096);
-            *poissonState->MaxLevels =
-                std::clamp(*poissonState->MaxLevels, 1, 32);
-            *poissonState->HashLoadFactor =
-                std::clamp(*poissonState->HashLoadFactor, 0.01f, 16.0f);
-            if (!std::isfinite(*poissonState->RadiusAlpha))
-                *poissonState->RadiusAlpha = -1.0f;
-            *poissonState->GridOriginSeed =
-                std::clamp(*poissonState->GridOriginSeed,
-                           0,
-                           std::numeric_limits<std::int32_t>::max());
-            *poissonState->ShuffleSeed =
-                std::clamp(*poissonState->ShuffleSeed,
-                           0,
-                           std::numeric_limits<std::int32_t>::max());
-            *poissonState->PrefixCount =
-                std::clamp(*poissonState->PrefixCount, 0, 10'000'000);
-            *poissonState->Channel = std::clamp(
-                *poissonState->Channel,
-                0,
-                static_cast<std::int32_t>(
-                    kProgressivePoissonChannels.size() - 1u));
-            if (poissonState->Backend != nullptr)
-            {
-                *poissonState->Backend = std::clamp(
-                    *poissonState->Backend,
-                    0,
-                    static_cast<std::int32_t>(
-                        kProgressivePoissonBackends.size() - 1u));
-            }
-            if (meshInput)
-            {
-                *poissonState->MeshSurfaceSampleCount =
-                    std::clamp(*poissonState->MeshSurfaceSampleCount,
-                               1,
-                               10'000'000);
-                *poissonState->MeshSurfaceSampleSeed =
-                    std::clamp(*poissonState->MeshSurfaceSampleSeed,
-                               0,
-                               std::numeric_limits<std::int32_t>::max());
-                if (!std::isfinite(
-                        *poissonState->MeshSurfaceMinTriangleArea) ||
-                    *poissonState->MeshSurfaceMinTriangleArea <= 0.0f)
-                {
-                    *poissonState->MeshSurfaceMinTriangleArea = 1.0e-14f;
-                }
-            }
-            *poissonState->DebounceSeconds =
-                std::clamp(*poissonState->DebounceSeconds, 0.0f, 10.0f);
-
-            configChanged |=
-                ImGui::DragInt("Grid width##ProgressivePoisson", poissonState->GridWidth, 1.0f, 1, 4096);
-            DrawProgressivePoissonTooltip(
-                "Spatial hash grid width used before method-side clamping.");
-            configChanged |=
-                ImGui::DragInt("Max levels##ProgressivePoisson", poissonState->MaxLevels, 1.0f, 1, 32);
-            DrawProgressivePoissonTooltip(
-                "Maximum progressive hierarchy levels to emit.");
-            configChanged |= ImGui::DragFloat(
-                "Hash load##ProgressivePoisson",
-                poissonState->HashLoadFactor,
-                0.01f,
-                0.01f,
-                16.0f);
-            DrawProgressivePoissonTooltip(
-                "Target hash load factor used by the CPU reference backend.");
-            configChanged |= ImGui::DragFloat(
-                "Radius alpha##ProgressivePoisson",
-                poissonState->RadiusAlpha,
-                0.01f,
-                -1.0f,
-                0.999f);
-            DrawProgressivePoissonTooltip(
-                "Negative values keep the reference backend's default radius alpha.");
-            configChanged |= ImGui::Checkbox(
-                "Randomize grid origin##ProgressivePoisson",
-                poissonState->RandomizeGridOrigin);
-            DrawProgressivePoissonTooltip(
-                "Jitter the grid origin with the configured seed.");
-            configChanged |= ImGui::DragInt(
-                "Grid seed##ProgressivePoisson",
-                poissonState->GridOriginSeed,
-                1.0f,
-                0,
-                std::numeric_limits<std::int32_t>::max());
-            DrawProgressivePoissonTooltip(
-                "Seed for grid-origin randomization.");
-            configChanged |= ImGui::Checkbox(
-                "Shuffle within levels##ProgressivePoisson",
-                poissonState->ShuffleWithinLevels);
-            DrawProgressivePoissonTooltip(
-                "Shuffle accepted samples inside each progressive level.");
-            configChanged |= ImGui::DragInt(
-                "Shuffle seed##ProgressivePoisson",
-                poissonState->ShuffleSeed,
-                1.0f,
-                0,
-                std::numeric_limits<std::int32_t>::max());
-            DrawProgressivePoissonTooltip(
-                "Seed for deterministic level-local shuffling.");
-            configChanged |= ImGui::DragInt(
-                "Prefix count##ProgressivePoisson",
-                poissonState->PrefixCount,
-                1.0f,
-                0,
-                10'000'000);
-            DrawProgressivePoissonTooltip(
-                "Visible prefix count; zero shows all accepted points.");
-            configChanged |= ImGui::Checkbox(
-                "Auto run on edit##ProgressivePoisson",
-                poissonState->AutoRunOnEdit);
-            DrawProgressivePoissonTooltip(
-                "Rerun the sampler after knob edits settle.");
-            configChanged |= ImGui::DragFloat(
-                "Debounce seconds##ProgressivePoisson",
-                poissonState->DebounceSeconds,
-                0.01f,
-                0.0f,
-                10.0f);
-            DrawProgressivePoissonTooltip(
-                "Delay after the last edit before auto-running.");
-
-            if (meshInput)
-            {
-                ImGui::SeparatorText("Surface input");
-                configChanged |= ImGui::DragInt(
-                    "Surface samples##ProgressivePoisson",
-                    poissonState->MeshSurfaceSampleCount,
-                    1.0f,
-                    1,
-                    10'000'000);
-                DrawProgressivePoissonTooltip(
-                    "Number of deterministic points sampled from the mesh surface.");
-                configChanged |= ImGui::DragInt(
-                    "Surface seed##ProgressivePoisson",
-                    poissonState->MeshSurfaceSampleSeed,
-                    1.0f,
-                    0,
-                    std::numeric_limits<std::int32_t>::max());
-                DrawProgressivePoissonTooltip(
-                    "Seed for deterministic mesh surface sampling.");
-                configChanged |= ImGui::InputFloat(
-                    "Min triangle area##ProgressivePoisson",
-                    poissonState->MeshSurfaceMinTriangleArea,
-                    0.0f,
-                    0.0f,
-                    "%.3e");
-                DrawProgressivePoissonTooltip(
-                    "Triangles below this area are rejected before sampling.");
-                if (!std::isfinite(
-                        *poissonState->MeshSurfaceMinTriangleArea) ||
-                    *poissonState->MeshSurfaceMinTriangleArea <= 0.0f)
-                {
-                    *poissonState->MeshSurfaceMinTriangleArea = 1.0e-14f;
-                }
-                configChanged |= ImGui::Checkbox(
-                    "Interpolate normals##ProgressivePoisson",
-                    poissonState->MeshSurfaceInterpolateNormals);
-                DrawProgressivePoissonTooltip(
-                    "Interpolate vertex normals onto sampled surface points.");
-            }
-
-            const SandboxEditorProgressivePoissonChannel channel =
-                ProgressivePoissonChannelFromIndex(*poissonState->Channel);
-            if (ImGui::BeginCombo(
-                    "Color channel##ProgressivePoisson",
-                    DebugNameForSandboxEditorProgressivePoissonChannel(channel)))
-            {
-                for (std::size_t i = 0u;
-                     i < kProgressivePoissonChannels.size();
-                     ++i)
-                {
-                    const bool selected =
-                        *poissonState->Channel ==
-                        static_cast<std::int32_t>(i);
-                    if (ImGui::Selectable(
-                            DebugNameForSandboxEditorProgressivePoissonChannel(
-                                kProgressivePoissonChannels[i]),
-                            selected))
-                    {
-                        *poissonState->Channel =
-                            static_cast<std::int32_t>(i);
-                        configChanged = true;
-                    }
-                    if (selected)
-                        ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndCombo();
-            }
-            DrawProgressivePoissonTooltip(
-                "Scalar property used for point color visualization.");
-
-            if (poissonState->Backend != nullptr)
-            {
-                const SandboxEditorProgressivePoissonBackend backend =
-                    ProgressivePoissonBackendFromIndex(*poissonState->Backend);
-                if (ImGui::BeginCombo(
-                        "Backend##ProgressivePoisson",
-                        DebugNameForSandboxEditorProgressivePoissonBackend(
-                            backend)))
-                {
-                    for (std::size_t i = 0u;
-                         i < kProgressivePoissonBackends.size();
-                         ++i)
-                    {
-                        const bool selected =
-                            *poissonState->Backend ==
-                            static_cast<std::int32_t>(i);
-                        if (ImGui::Selectable(
-                                DebugNameForSandboxEditorProgressivePoissonBackend(
-                                    kProgressivePoissonBackends[i]),
-                                selected))
-                        {
-                            *poissonState->Backend =
-                                static_cast<std::int32_t>(i);
-                            configChanged = true;
-                        }
-                        if (selected)
-                            ImGui::SetItemDefaultFocus();
-                    }
-                    ImGui::EndCombo();
-                }
-                DrawProgressivePoissonTooltip(
-                    "Requested method backend; the result readout reports the actual backend and any CPU fallback.");
-            }
-
-            auto applyConfig = [&]() -> SandboxEditorProgressivePoissonConfigResult
-            {
-                const Core::Config::ProgressivePoissonPlaygroundConfig config =
-                    BuildCoreProgressivePoissonConfigFromUiState(
-                        *poissonState,
-                        activeConfig);
-                return ApplySandboxEditorProgressivePoissonConfigCommand(
-                    context,
-                    SandboxEditorProgressivePoissonConfigCommand{
-                        .Config = config,
-                        .SourceId = "sandbox.progressive_poisson",
-                    });
-            };
-
-            auto runSampler = [&]()
-            {
-                *poissonState->LastResult =
-                    ApplySandboxEditorProgressivePoissonCommand(
-                        context,
-                        SandboxEditorProgressivePoissonCommand{
-                            .StableEntityId = model.SelectedStableId,
-                            .Config = BuildProgressivePoissonConfigFromUiState(
-                                *poissonState),
-                        });
-                *poissonState->AutoRunPending = false;
-                *poissonState->PendingStableEntityId = 0u;
-            };
-
-            if (configChanged)
-            {
-                *poissonState->LastConfigResult = applyConfig();
-                if ((*poissonState->LastConfigResult)->Succeeded() &&
-                    *poissonState->AutoRunOnEdit)
-                {
-                    *poissonState->AutoRunPending = true;
-                    *poissonState->PendingStableEntityId =
-                        model.SelectedStableId;
-                    *poissonState->LastEditTime = ImGui::GetTime();
-                }
-                else
-                {
-                    *poissonState->AutoRunPending = false;
-                    *poissonState->PendingStableEntityId = 0u;
-                }
-            }
-
-            if (ImGui::Button("Run Progressive Poisson##ProgressivePoisson"))
-            {
-                *poissonState->LastConfigResult = applyConfig();
-                if ((*poissonState->LastConfigResult)->Succeeded())
-                {
-                    runSampler();
-                }
-            }
-
-            if (*poissonState->AutoRunPending &&
-                *poissonState->PendingStableEntityId == model.SelectedStableId)
-            {
-                const double elapsed =
-                    ImGui::GetTime() - *poissonState->LastEditTime;
-                if (*poissonState->AutoRunOnEdit &&
-                    elapsed >= static_cast<double>(*poissonState->DebounceSeconds))
-                {
-                    runSampler();
-                }
-            }
-            else if (*poissonState->AutoRunPending)
-            {
-                *poissonState->AutoRunPending = false;
-                *poissonState->PendingStableEntityId = 0u;
-            }
-
-            if (poissonState->LastConfigResult->has_value() &&
-                !(*poissonState->LastConfigResult)->Succeeded())
-            {
-                ImGui::TextWrapped(
-                    "%s",
-                    (*poissonState->LastConfigResult)->Message.c_str());
-            }
-
-            const std::optional<SandboxEditorProgressivePoissonResult>& result =
-                poissonState->LastResult->has_value()
-                    ? *poissonState->LastResult
-                    : processing.LastProgressivePoissonResult;
-            DrawProgressivePoissonResultStatus(result);
-        }
-
         void DrawDomainProcessingWindow(
             const SandboxEditorDomainWindowModel& model,
             const SandboxEditorContext& context,
             const DomainWindowSection section,
-            KMeansUiState* kmeansState,
             MeshDenoiseUiState* denoiseState,
             MeshCurvatureUiState* curvatureState,
             MeshRemeshUiState* remeshState,
@@ -17286,8 +16334,7 @@ namespace Extrinsic::Runtime
             MeshVertexNormalsUiState* meshNormalsState,
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
-            PointCloudOutlierRemovalUiState* pointCloudOutlierState,
-            ProgressivePoissonUiState* progressivePoissonState)
+            PointCloudOutlierRemovalUiState* pointCloudOutlierState)
         {
             DrawDomainWindowHeader(model);
 
@@ -17302,9 +16349,6 @@ namespace Extrinsic::Runtime
 
             switch (section)
             {
-            case DomainWindowSection::ProcessingKMeans:
-                DrawKMeansExecutionControls(model, context, processing, kmeansState);
-                break;
             case DomainWindowSection::ProcessingDenoise:
                 DrawMeshDenoiseControls(
                     model,
@@ -17368,13 +16412,6 @@ namespace Extrinsic::Runtime
                     processing,
                     pointCloudOutlierState);
                 break;
-            case DomainWindowSection::ProcessingProgressivePoisson:
-                DrawProgressivePoissonControls(
-                    model,
-                    context,
-                    processing,
-                    progressivePoissonState);
-                break;
             case DomainWindowSection::Render:
             case DomainWindowSection::Properties:
             case DomainWindowSection::Selection:
@@ -17391,7 +16428,6 @@ namespace Extrinsic::Runtime
             std::array<bool, Detail::kSandboxEditorDomainWindowCount>&
                 domainWindowOpen,
             std::array<std::optional<SandboxEditorDomainWindowModel>, 3>& domainModelCache,
-            KMeansUiState* kmeansState,
             MeshDenoiseUiState* denoiseState,
             MeshCurvatureUiState* curvatureState,
             MeshRemeshUiState* remeshState,
@@ -17401,7 +16437,6 @@ namespace Extrinsic::Runtime
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
             PointCloudOutlierRemovalUiState* pointCloudOutlierState,
-            ProgressivePoissonUiState* progressivePoissonState,
             TextureBakeUiState* textureBakeState)
         {
             const std::size_t slot = DomainWindowSlotIndex(kind, section);
@@ -17433,7 +16468,6 @@ namespace Extrinsic::Runtime
                 case DomainWindowSection::Selection:
                     DrawDomainSelectionWindow(model);
                     break;
-                case DomainWindowSection::ProcessingKMeans:
                 case DomainWindowSection::ProcessingDenoise:
                 case DomainWindowSection::ProcessingCurvature:
                 case DomainWindowSection::ProcessingRemesh:
@@ -17443,12 +16477,10 @@ namespace Extrinsic::Runtime
                 case DomainWindowSection::ProcessingGraphVertexNormals:
                 case DomainWindowSection::ProcessingPointCloudVertexNormals:
                 case DomainWindowSection::ProcessingPointCloudOutlierRemoval:
-                case DomainWindowSection::ProcessingProgressivePoisson:
                     DrawDomainProcessingWindow(
                         model,
                         context,
                         section,
-                        kmeansState,
                         denoiseState,
                         curvatureState,
                         remeshState,
@@ -17457,8 +16489,7 @@ namespace Extrinsic::Runtime
                         normalsState,
                         graphNormalsState,
                         pointCloudNormalsState,
-                        pointCloudOutlierState,
-                        progressivePoissonState);
+                        pointCloudOutlierState);
                     break;
                 case DomainWindowSection::Count:
                     break;
@@ -17471,7 +16502,6 @@ namespace Extrinsic::Runtime
             const SandboxEditorContext* context,
             std::array<bool, Detail::kSandboxEditorDomainWindowCount>*
                 domainWindowOpen,
-            KMeansUiState* kmeansState,
             MeshDenoiseUiState* denoiseState,
             MeshCurvatureUiState* curvatureState,
             MeshRemeshUiState* remeshState,
@@ -17481,7 +16511,6 @@ namespace Extrinsic::Runtime
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
             PointCloudOutlierRemovalUiState* pointCloudOutlierState,
-            ProgressivePoissonUiState* progressivePoissonState,
             TextureBakeUiState* textureBakeState)
         {
             if (context == nullptr || domainWindowOpen == nullptr)
@@ -17494,11 +16523,10 @@ namespace Extrinsic::Runtime
                 SandboxEditorDomainWindowKind::Graph,
                 SandboxEditorDomainWindowKind::Mesh,
             };
-            constexpr std::array<DomainWindowSection, 14> kSections{
+            constexpr std::array<DomainWindowSection, 12> kSections{
                 DomainWindowSection::Render,
                 DomainWindowSection::Properties,
                 DomainWindowSection::Selection,
-                DomainWindowSection::ProcessingKMeans,
                 DomainWindowSection::ProcessingDenoise,
                 DomainWindowSection::ProcessingCurvature,
                 DomainWindowSection::ProcessingRemesh,
@@ -17508,7 +16536,6 @@ namespace Extrinsic::Runtime
                 DomainWindowSection::ProcessingGraphVertexNormals,
                 DomainWindowSection::ProcessingPointCloudVertexNormals,
                 DomainWindowSection::ProcessingPointCloudOutlierRemoval,
-                DomainWindowSection::ProcessingProgressivePoisson,
             };
             for (const SandboxEditorDomainWindowKind kind : kKinds)
             {
@@ -17526,7 +16553,6 @@ namespace Extrinsic::Runtime
                         section,
                         *domainWindowOpen,
                         domainModelCache,
-                        kmeansState,
                         denoiseState,
                         curvatureState,
                         remeshState,
@@ -17536,7 +16562,6 @@ namespace Extrinsic::Runtime
                         graphNormalsState,
                         pointCloudNormalsState,
                         pointCloudOutlierState,
-                        progressivePoissonState,
                         textureBakeState);
                 }
             }
@@ -18098,7 +17123,6 @@ namespace Extrinsic::Runtime
                 panelWindowOpen,
             std::array<bool, Detail::kSandboxEditorDomainWindowCount>*
                 domainWindowOpen,
-            KMeansUiState* kmeansState,
             MeshDenoiseUiState* denoiseState,
             MeshCurvatureUiState* curvatureState,
             MeshRemeshUiState* remeshState,
@@ -18108,7 +17132,6 @@ namespace Extrinsic::Runtime
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
             PointCloudOutlierRemovalUiState* pointCloudOutlierState,
-            ProgressivePoissonUiState* progressivePoissonState,
             TextureBakeUiState* textureBakeState,
             RegistrationUiState* registrationState,
             EditorWindowRegistry* windowRegistry)
@@ -18117,7 +17140,6 @@ namespace Extrinsic::Runtime
             DrawDomainWindows(
                 context,
                 domainWindowOpen,
-                kmeansState,
                 denoiseState,
                 curvatureState,
                 remeshState,
@@ -18127,7 +17149,6 @@ namespace Extrinsic::Runtime
                 graphNormalsState,
                 pointCloudNormalsState,
                 pointCloudOutlierState,
-                progressivePoissonState,
                 textureBakeState);
             if (windowRegistry != nullptr)
                 (void)windowRegistry->DrawOpenWindows();
@@ -20515,6 +19536,8 @@ namespace Extrinsic::Runtime
             .MeshSurfaceSampleSeed = config.MeshSurfaceSampleSeed,
             .MeshSurfaceMinTriangleArea = config.MeshSurfaceMinTriangleArea,
             .MeshSurfaceInterpolateNormals = config.MeshSurfaceInterpolateNormals,
+            .AutoRunOnEdit = config.AutoRunOnEdit,
+            .DebounceSeconds = config.DebounceSeconds,
         };
     }
 
@@ -20540,6 +19563,8 @@ namespace Extrinsic::Runtime
         out.MeshSurfaceSampleSeed = config.MeshSurfaceSampleSeed;
         out.MeshSurfaceMinTriangleArea = config.MeshSurfaceMinTriangleArea;
         out.MeshSurfaceInterpolateNormals = config.MeshSurfaceInterpolateNormals;
+        out.AutoRunOnEdit = config.AutoRunOnEdit;
+        out.DebounceSeconds = config.DebounceSeconds;
         return out;
     }
 
@@ -22993,7 +22018,10 @@ namespace Extrinsic::Runtime
 
         Core::Config::EngineConfig candidate =
             context.EngineConfigControlState->ActiveConfig;
-        candidate.Sandbox.ProgressivePoisson = command.Config;
+        candidate.Sandbox.ProgressivePoisson =
+            MakeCoreProgressivePoissonPlaygroundConfig(
+                command.Config,
+                candidate.Sandbox.ProgressivePoisson);
         const std::string document =
             Core::Config::SerializeEngineConfig(candidate);
         const std::string sourceId = command.SourceId.empty()
@@ -23029,6 +22057,17 @@ namespace Extrinsic::Runtime
                 ? "Progressive Poisson config unchanged."
                 : "Progressive Poisson config applied.";
         return result;
+    }
+
+    std::optional<SandboxEditorProgressivePoissonConfig>
+    GetSandboxEditorProgressivePoissonConfig(
+        const SandboxEditorContext& context) noexcept
+    {
+        if (context.EngineConfigControlState == nullptr)
+            return std::nullopt;
+        return MakeSandboxEditorProgressivePoissonConfig(
+            context.EngineConfigControlState->ActiveConfig.Sandbox
+                .ProgressivePoisson);
     }
 
     SandboxEditorMeshDenoiseResult ApplySandboxEditorMeshDenoiseCommand(
@@ -24784,8 +23823,6 @@ namespace Extrinsic::Runtime
                        nullptr,
                        nullptr,
                        nullptr,
-                       nullptr,
-                       nullptr,
                        nullptr);
     }
 
@@ -24798,6 +23835,27 @@ namespace Extrinsic::Runtime
         EditorWindowDescriptor descriptor)
     {
         return m_Host.RegisterWindow(std::move(descriptor));
+    }
+
+    EditorWindowHandle SandboxEditorUi::RegisterEditorWindow(
+        SandboxEditorWindowDescriptor descriptor)
+    {
+        auto draw = std::move(descriptor.Draw);
+        return RegisterEditorWindow(
+            EditorWindowDescriptor{
+                .Id = std::move(descriptor.Id),
+                .MenuPath = std::move(descriptor.MenuPath),
+                .Title = std::move(descriptor.Title),
+                .OpenByDefault = descriptor.OpenByDefault,
+                .Draw =
+                    [this, draw = std::move(draw)](bool& open)
+                    {
+                        if (draw && m_ActiveEditorContext != nullptr)
+                            draw(open, *m_ActiveEditorContext);
+                    },
+                .OpenStateChanged =
+                    std::move(descriptor.OpenStateChanged),
+            });
     }
 
     bool SandboxEditorUi::UnregisterEditorWindow(
@@ -24942,9 +24000,7 @@ namespace Extrinsic::Runtime
                     nullptr,
                     nullptr,
                     nullptr,
-                    nullptr,
                     &simplifyState,
-                    nullptr,
                     nullptr,
                     nullptr,
                     nullptr,
@@ -25294,16 +24350,6 @@ namespace Extrinsic::Runtime
                     BuildModelRequestFromOpenPanels(&m_PanelWindowOpen);
                 m_LastFrame = BuildSandboxEditorPanelFrame(context, modelRequest);
                 context.ModelBuildStats = &m_LastFrame.ModelBuildStats;
-                KMeansUiState kmeansState{
-                    .LastResult = &m_LastKMeansResult,
-                    .Domain = &m_KMeansDomain,
-                    .Backend = &m_KMeansBackend,
-                    .ClusterCount = &m_KMeansClusterCount,
-                    .MaxIterations = &m_KMeansMaxIterations,
-                    .Seed = &m_KMeansSeed,
-                    .UseHierarchicalInitialization =
-                        &m_KMeansUseHierarchicalInitialization,
-                };
                 MeshDenoiseUiState denoiseState{
                     .LastResult = &m_LastMeshDenoiseResult,
                     .Stage = &m_MeshDenoiseStage,
@@ -25382,41 +24428,6 @@ namespace Extrinsic::Runtime
                     .SearchRadius = &m_PointCloudOutlierSearchRadius,
                     .MinNeighbors = &m_PointCloudOutlierMinNeighbors,
                 };
-                ProgressivePoissonUiState progressivePoissonState{
-                    .LastResult = &m_LastProgressivePoissonResult,
-                    .LastConfigResult =
-                        &m_LastProgressivePoissonConfigResult,
-                    .Dimension = &m_ProgressivePoissonDimension,
-                    .GridWidth = &m_ProgressivePoissonGridWidth,
-                    .MaxLevels = &m_ProgressivePoissonMaxLevels,
-                    .HashLoadFactor = &m_ProgressivePoissonHashLoadFactor,
-                    .RadiusAlpha = &m_ProgressivePoissonRadiusAlpha,
-                    .RandomizeGridOrigin =
-                        &m_ProgressivePoissonRandomizeGridOrigin,
-                    .GridOriginSeed = &m_ProgressivePoissonGridOriginSeed,
-                    .ShuffleWithinLevels =
-                        &m_ProgressivePoissonShuffleWithinLevels,
-                    .ShuffleSeed = &m_ProgressivePoissonShuffleSeed,
-                    .PrefixCount = &m_ProgressivePoissonPrefixCount,
-                    .Channel = &m_ProgressivePoissonChannel,
-                    .Backend = &m_ProgressivePoissonBackend,
-                    .MeshSurfaceSampleCount =
-                        &m_ProgressivePoissonMeshSurfaceSampleCount,
-                    .MeshSurfaceSampleSeed =
-                        &m_ProgressivePoissonMeshSurfaceSampleSeed,
-                    .MeshSurfaceMinTriangleArea =
-                        &m_ProgressivePoissonMeshSurfaceMinTriangleArea,
-                    .MeshSurfaceInterpolateNormals =
-                        &m_ProgressivePoissonMeshSurfaceInterpolateNormals,
-                    .AutoRunOnEdit = &m_ProgressivePoissonAutoRunOnEdit,
-                    .DebounceSeconds =
-                        &m_ProgressivePoissonDebounceSeconds,
-                    .AutoRunPending =
-                        &m_ProgressivePoissonAutoRunPending,
-                    .LastEditTime = &m_ProgressivePoissonLastEditTime,
-                    .PendingStableEntityId =
-                        &m_ProgressivePoissonPendingStableEntityId,
-                };
                 TextureBakeUiState textureBakeState{
                     .LastUvRegenerationResult =
                         &m_LastUvRegenerationResult,
@@ -25454,7 +24465,6 @@ namespace Extrinsic::Runtime
                     &m_LastSceneFileResult,
                     &m_PanelWindowOpen,
                     &m_DomainWindowOpen,
-                    &kmeansState,
                     &denoiseState,
                     &curvatureState,
                     &remeshState,
@@ -25464,7 +24474,6 @@ namespace Extrinsic::Runtime
                     &graphNormalsState,
                     &pointCloudNormalsState,
                     &pointCloudOutlierState,
-                    &progressivePoissonState,
                     &textureBakeState,
                     &registrationState,
                     &m_Host.Windows());

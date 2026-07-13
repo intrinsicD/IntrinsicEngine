@@ -72,7 +72,7 @@ import Geometry.UvAtlas;
 namespace Extrinsic::Runtime::Detail
 {
     inline constexpr std::size_t kSandboxEditorPanelWindowCount = 11u;
-    inline constexpr std::size_t kSandboxEditorDomainWindowCount = 42u;
+    inline constexpr std::size_t kSandboxEditorDomainWindowCount = 36u;
 }
 
 export namespace Extrinsic::Runtime
@@ -456,6 +456,8 @@ export namespace Extrinsic::Runtime
         std::uint32_t MeshSurfaceSampleSeed{1337u};
         double MeshSurfaceMinTriangleArea{1.0e-14};
         bool MeshSurfaceInterpolateNormals{true};
+        bool AutoRunOnEdit{true};
+        double DebounceSeconds{0.25};
     };
 
     [[nodiscard]] SandboxEditorProgressivePoissonConfig
@@ -525,7 +527,7 @@ export namespace Extrinsic::Runtime
 
     struct SandboxEditorProgressivePoissonConfigCommand
     {
-        Core::Config::ProgressivePoissonPlaygroundConfig Config{};
+        SandboxEditorProgressivePoissonConfig Config{};
         std::string SourceId{"sandbox.progressive_poisson"};
     };
 
@@ -2390,6 +2392,16 @@ export namespace Extrinsic::Runtime
         bool MeshSimplifyKernelAvailable{true};
     };
 
+    struct SandboxEditorWindowDescriptor
+    {
+        std::string Id{};
+        std::vector<std::string> MenuPath{};
+        std::string Title{};
+        bool OpenByDefault{false};
+        std::function<void(bool&, const SandboxEditorContext&)> Draw{};
+        std::function<void(bool)> OpenStateChanged{};
+    };
+
     struct SandboxEditorTransformEditCommand
     {
         std::uint32_t StableEntityId{0u};
@@ -2758,6 +2770,10 @@ export namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorProgressivePoissonConfigCommand& command);
 
+    [[nodiscard]] std::optional<SandboxEditorProgressivePoissonConfig>
+    GetSandboxEditorProgressivePoissonConfig(
+        const SandboxEditorContext& context) noexcept;
+
     [[nodiscard]] SandboxEditorRenderRecipeEditorModel
     BuildSandboxEditorRenderRecipeEditorModel(
         const SandboxEditorContext& context);
@@ -2785,6 +2801,8 @@ export namespace Extrinsic::Runtime
 
         [[nodiscard]] EditorWindowHandle RegisterEditorWindow(
             EditorWindowDescriptor descriptor);
+        [[nodiscard]] EditorWindowHandle RegisterEditorWindow(
+            SandboxEditorWindowDescriptor descriptor);
         [[nodiscard]] bool UnregisterEditorWindow(EditorWindowHandle handle);
         [[nodiscard]] EditorUiVisibilityCommandResult
         ApplyEditorUiVisibilityCommand(
@@ -2870,8 +2888,6 @@ export namespace Extrinsic::Runtime
             m_LastPointCloudOutlierRemovalResult{};
         std::optional<SandboxEditorProgressivePoissonResult>
             m_LastProgressivePoissonResult{};
-        std::optional<SandboxEditorProgressivePoissonConfigResult>
-            m_LastProgressivePoissonConfigResult{};
         std::optional<SandboxEditorUvRegenerationCommandResult>
             m_LastUvRegenerationResult{};
         std::optional<SandboxEditorRegistrationResult>
@@ -2882,13 +2898,6 @@ export namespace Extrinsic::Runtime
         SandboxEditorRenderRecipeEditorState m_RenderRecipeState{};
         RenderArtifactRegistry m_RenderArtifactRegistry{};
         std::array<char, 8192> m_RenderRecipeDraftBuffer{};
-        SandboxEditorGeometryProcessingDomain m_KMeansDomain{
-            SandboxEditorGeometryProcessingDomain::None};
-        std::int32_t m_KMeansClusterCount{8};
-        std::int32_t m_KMeansMaxIterations{32};
-        std::int32_t m_KMeansSeed{42};
-        bool m_KMeansUseHierarchicalInitialization{true};
-        std::int32_t m_KMeansBackend{0};
         std::int32_t m_MeshDenoiseStage{0};
         std::int32_t m_MeshDenoiseNormalIterations{5};
         std::int32_t m_MeshDenoiseVertexIterations{10};
@@ -2936,27 +2945,6 @@ export namespace Extrinsic::Runtime
         float m_PointCloudOutlierStdDevMultiplier{1.0f};
         float m_PointCloudOutlierSearchRadius{0.0f};
         std::int32_t m_PointCloudOutlierMinNeighbors{4};
-        std::int32_t m_ProgressivePoissonDimension{3};
-        std::int32_t m_ProgressivePoissonGridWidth{4};
-        std::int32_t m_ProgressivePoissonMaxLevels{16};
-        float m_ProgressivePoissonHashLoadFactor{0.25f};
-        float m_ProgressivePoissonRadiusAlpha{-1.0f};
-        bool m_ProgressivePoissonRandomizeGridOrigin{true};
-        std::int32_t m_ProgressivePoissonGridOriginSeed{1337};
-        bool m_ProgressivePoissonShuffleWithinLevels{true};
-        std::int32_t m_ProgressivePoissonShuffleSeed{0x51ed270b};
-        std::int32_t m_ProgressivePoissonPrefixCount{0};
-        std::int32_t m_ProgressivePoissonChannel{0};
-        std::int32_t m_ProgressivePoissonBackend{0};
-        std::int32_t m_ProgressivePoissonMeshSurfaceSampleCount{4096};
-        std::int32_t m_ProgressivePoissonMeshSurfaceSampleSeed{1337};
-        float m_ProgressivePoissonMeshSurfaceMinTriangleArea{1.0e-14f};
-        bool m_ProgressivePoissonMeshSurfaceInterpolateNormals{true};
-        bool m_ProgressivePoissonAutoRunOnEdit{true};
-        float m_ProgressivePoissonDebounceSeconds{0.25f};
-        bool m_ProgressivePoissonAutoRunPending{false};
-        double m_ProgressivePoissonLastEditTime{0.0};
-        std::uint32_t m_ProgressivePoissonPendingStableEntityId{0u};
         std::int32_t m_TextureBakeSourceIndex{0};
         std::int32_t m_TextureBakeTargetSemanticIndex{0};
         std::int32_t m_TextureBakeEncoderIndex{0};

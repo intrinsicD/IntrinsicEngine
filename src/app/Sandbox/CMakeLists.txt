@@ -8,8 +8,10 @@ target_sources(ExtrinsicSandbox
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Sandbox.cppm
+        Editor/Sandbox.MethodPanels.cppm
         PRIVATE
         Sandbox.cpp
+        Editor/Sandbox.MethodPanels.cpp
         main.cpp
 )
 
