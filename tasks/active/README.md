@@ -11,7 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-- None.
+- `METHOD-016` — Locally Optimal Projection (LOP/WLOP) point-cloud
+  consolidation reference backend
+  ([task file](METHOD-016-locally-optimal-projection-reference-backend.md));
+  in-progress on branch `claude/geometry-processing-research-edptdx`.
 
 ## History
 

@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `METHOD-016` — Locally Optimal Projection (LOP/WLOP) point-cloud consolidation reference backend (tasks/active/METHOD-016-locally-optimal-projection-reference-backend.md)
 
 ## Theme B — Rendering modernization
 
@@ -79,7 +79,6 @@ the authoritative open/unblocked view.
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
 - unblocked: `METHOD-014` — Progressive Poisson GPU operational parity (tasks/backlog/methods/METHOD-014-progressive-poisson-gpu-operational-parity.md)
 - blocked by `GEOM-058`: `METHOD-015` — Coherent Point Drift registration family reference backend (tasks/backlog/methods/METHOD-015-coherent-point-drift-family-reference-backend.md)
-- unblocked: `METHOD-016` — Locally Optimal Projection (LOP/WLOP) point-cloud consolidation reference backend (tasks/backlog/methods/METHOD-016-locally-optimal-projection-reference-backend.md)
 
 ## Unthemed
 

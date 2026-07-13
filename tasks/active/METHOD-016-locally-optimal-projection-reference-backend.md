@@ -6,6 +6,29 @@ maturity_target: CPUContracted
 ---
 # METHOD-016 — Locally Optimal Projection (LOP/WLOP) point-cloud consolidation reference backend
 
+## Status
+
+- in-progress; owner: agent session on branch `claude/geometry-processing-research-edptdx`.
+- Paper intake runs as real multi-source literature research (deep-research
+  harness) before the reference implementation; the digest lands in the method
+  package `paper.md` with citations.
+- Next verification step: full `ci` preset build + CPU gate in CI on the pushed
+  branch (local vcpkg bootstrap is egress-blocked in this environment, BUG-065);
+  local verification uses the structural checks plus a standalone clang-20
+  numerical sanity harness of the WLOP update math.
+
+## Slice plan
+
+- **Slice A (this task's original scope).** Method package
+  `methods/geometry/locally_optimal_projection/`, geometry module
+  `Geometry.PointCloud.Consolidation` (CPU reference), correctness tests,
+  smoke benchmark manifest. Closes `CPUContracted`.
+- **Slice B (session extension, user-requested end-to-end).** Sandbox editor
+  integration: new `SandboxEditorGeometryProcessingAlgorithm` entry for the
+  point-cloud domain with params panel, execution dispatch, and diagnostics
+  readout, following the existing point-cloud algorithm pattern. Editor-model
+  coverage stays inside the default CPU gate; no GPU/optimized backend.
+
 ## Goal
 - Add a CPU reference method package for parameterization-free point-cloud consolidation via Locally Optimal Projection: project a noisy, outlier-ridden raw cloud onto a cleaner, more uniformly distributed point set without estimating normals or a surface first.
 
