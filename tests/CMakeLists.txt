@@ -232,6 +232,7 @@ if(TARGET ExtrinsicRuntime)
         Test.AssetModelSceneHandoff.cpp
         Test.AssetModelTextureHandoff.cpp
         Test.AssetModelTextureIO.cpp
+        Test.AsyncWorkService.cpp
         Test.DerivedJobGraph.cpp
         Test.EditorCommandHistory.cpp
         Test.EditorPropertyWidgets.cpp

@@ -31,9 +31,12 @@ namespace Extrinsic::Runtime
         // DrainReadbacks can promote a WaitingForReadback job to ReadyForApply
         // after the executor already ran its final ApplyMainThreadResults(), so
         // apply once more after draining — otherwise a newly-ready main-thread
-        // result is silently dropped when Reset() destroys the registry. The
-        // executor is already shut down, so no new background work is produced
-        // and a single drain→apply pass reaches quiescence.
+        // result is silently dropped when Reset() destroys the registry. After
+        // that drain→apply pass, cancel every survivor (notably a readback that
+        // is still unavailable). Otherwise later polling could resume its
+        // callback after this shutdown boundary. The executor is already shut
+        // down, so the snapshot is stable and cancellation makes every record
+        // terminal before this method returns.
         if (m_StreamingExecutor)
         {
             m_StreamingExecutor->ShutdownAndDrain();
@@ -43,6 +46,13 @@ namespace Extrinsic::Runtime
             m_DerivedJobRegistry->DrainCompletions();
             m_DerivedJobRegistry->DrainReadbacks();
             m_DerivedJobRegistry->ApplyMainThreadResults();
+
+            const DerivedJobQueueSnapshot survivors =
+                m_DerivedJobRegistry->SnapshotAll();
+            for (const DerivedJobSnapshot& survivor : survivors.Entries)
+            {
+                m_DerivedJobRegistry->Cancel(survivor.Handle);
+            }
         }
     }
 
