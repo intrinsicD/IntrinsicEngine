@@ -28,6 +28,14 @@ map.
 - [GEOM-062 — Point-set projection and weighting kernels seam](GEOM-062-point-set-projection-weighting-kernels.md)
   (reusable `Geometry.PointCloud.Kernels`: radial weights, LOP repulsion, WLOP
   density weights; gates the `methods/METHOD-016..018` LOP consolidation family).
+- [GEOM-063 — Unified parameterization Strategy × Backend surface](GEOM-063-parameterization-strategy-backend-surface.md)
+  (consolidates Tutte/Harmonic/LSCM behind one `Geometry.Parameterization`
+  `ParameterizeMesh` dispatch with backend telemetry and shared diagnostics;
+  the surface the `methods/METHOD-021..024` SOTA variants plug into).
+- [GEOM-064 — Parameterization optimization kernels seam](GEOM-064-parameterization-optimization-kernels.md)
+  (reusable `Geometry.Parameterization.Optimize`: local rotation fit,
+  symmetric-Dirichlet energy/proxy, injective line search; gates ARAP
+  `methods/METHOD-021` and SLIM `methods/METHOD-022`).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ### bcg_code_base geometry-processing port gaps (seeded 2026-06-26)
@@ -83,8 +91,20 @@ the runtime SpatialDebug closest-face consumer in `RUNTIME-135`.
   `Geometry.Sparse::SparseBiCGSTAB`.
 - GEOM-024 (generalized symmetric eigensolver, Spectra-backed, gated on
   GEOM-020) is the remaining solver-seam gap in this family and gates
-  METHOD-006 variant B. Promote it only when METHOD-006 is the
-  next-priority method.
+  METHOD-006 variant B and the Spectral Conformal Parameterization method
+  `methods/METHOD-024`. Promote it when either becomes the next-priority
+  spectral method.
+- GEOM-063 and GEOM-064 are the parameterization-family seams that realize
+  Packs 3–4 of the
+  [parameterization/mapping roadmap](../../../docs/architecture/parameterization-mapping-roadmap.md).
+  GEOM-063 makes `Geometry.Parameterization` a `Strategy` × `Backend` dispatch
+  surface (the KMeans/`algorithm-variant-dispatch.md` idiom) consolidating the
+  existing LSCM/Tutte/Harmonic solvers so the SOTA variants (ARAP/SLIM/BFF/SCP,
+  `methods/METHOD-021..024`) are choosable through one API; GEOM-064 factors the
+  local/global rotation-fit, symmetric-Dirichlet energy/proxy, and injective
+  line search that ARAP (`METHOD-021`), SLIM (`METHOD-022`), and the optimized
+  backend (`METHOD-025`) share, so no variant re-derives that nonlinear-solve
+  core privately.
 - GEOM-021 is a module-hygiene follow-up for retired GEOM-006: it keeps the
   `Geometry.MeshSoup` public module interface declarative by moving
   non-trivial validation/container bodies into a matching implementation unit

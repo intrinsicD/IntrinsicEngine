@@ -28,6 +28,7 @@ This index tracks long-lived architecture decisions for IntrinsicEngine.
 22. [0022 — Vertex storage: uniform SoA with per-channel streaming](0022-vertex-storage-soa-per-channel-streaming.md)
 23. [0023 — CPU↔GPU transfer foundation: async readback ring, buffer-transfer math, and a transfer facade](0023-cpu-gpu-transfer-foundation.md)
 24. [0024 — Kernel/module runtime architecture and communication contract](0024-kernel-module-architecture.md)
+25. [0025 — Parameterization UV view: derived second view, not a separate entity](0025-parameterization-uv-view-and-split-view.md)
 
 ## Conventions
 

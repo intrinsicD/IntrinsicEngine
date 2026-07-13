@@ -230,6 +230,23 @@ ported algorithms are retired `UI-024`/`UI-025`/`UI-026` under the UI backlog.
   progressive-Poisson playground; the Sandbox panel is `ui/UI-035`; coordinate
   with active `ARCH-006` Slice 4.
 
+### Parameterization family integration (Theme I, seeded 2026-07-13)
+
+- [`RUNTIME-176 — Parameterization runtime facade, config lane, backend adapter, and UV view model`](RUNTIME-176-parameterization-runtime-config-integration.md)
+  is the engine-integration leaf for the parameterization method family
+  (`methods/METHOD-021..026` on the `geometry/GEOM-063` surface): a
+  `ParameterizationConfig` section in the `Core.Config.Engine` tree, an
+  `EngineConfigControl` hot-apply path, the
+  `ApplySandboxEditorParameterizationCommand` editor facade writing UVs back as
+  `v:texcoord` via `GeometrySources`, the `Runtime.ParameterizationBackend` RHI
+  fallback adapter, and a pointer-free `SandboxEditorParameterizationViewModel`
+  the UV split view draws. Gated on `geometry/GEOM-063`; the GPU job-queue leg is
+  gated on `methods/METHOD-026`. Mirrors `RUNTIME-175`/`RUNTIME-134`; the Sandbox
+  panel + UV split view is `ui/UI-036`; the optional GPU-shaded UV target is
+  `rendering/GRAPHICS-122`; the derived-view rendering decision is
+  [ADR-0025](../../../docs/adr/0025-parameterization-uv-view-and-split-view.md).
+  Coordinate with active `ARCH-006` Slice 4.
+
 ### CPU→GPU vertex-attribute overhaul (Theme B)
 
 A reusable, flexible, fast CPU→GPU vertex-attribute pipeline. Today each

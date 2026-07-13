@@ -344,9 +344,17 @@ CLOP (blocked by `METHOD-016`/`GEOM-058`/`GEOM-062`), `METHOD-018`
 EAR/anisotropic (blocked by `METHOD-016`/`GEOM-062`), `METHOD-019` optimized CPU
 (blocked by `METHOD-016`/`017`/`018`), `METHOD-020` GPU (blocked by
 `METHOD-019`), and its engine-integration leaves `RUNTIME-175` (blocked by
-`METHOD-016`) and `UI-035` (blocked by `RUNTIME-175`); and the method-readiness
-seams `GEOM-013`, `GEOM-014`, `GEOM-019`, `GEOM-024`, `GEOM-058`, `GEOM-059`,
-`GEOM-060`, `GEOM-061`, `GEOM-062`.
+`METHOD-016`) and `UI-035` (blocked by `RUNTIME-175`); the parameterization
+family on the `GEOM-063` shared surface — `METHOD-021` ARAP (blocked by
+`GEOM-063`/`GEOM-064`), `METHOD-022` SLIM (blocked by
+`GEOM-063`/`GEOM-064`/`METHOD-021`), `METHOD-023` BFF (blocked by `GEOM-063`),
+`METHOD-024` SCP (blocked by `GEOM-063`/`GEOM-024`), `METHOD-025` optimized CPU
+(blocked by `METHOD-021`/`022`), `METHOD-026` GPU (blocked by `METHOD-025`), and
+its engine-integration leaves `RUNTIME-176` (blocked by `GEOM-063`), `UI-036`
+(blocked by `RUNTIME-176`), and the optional `GRAPHICS-122` (blocked by
+`UI-036`); and the method-readiness seams `GEOM-013`, `GEOM-014`, `GEOM-019`,
+`GEOM-024`, `GEOM-058`, `GEOM-059`, `GEOM-060`, `GEOM-061`, `GEOM-062`,
+`GEOM-063`, `GEOM-064`.
 
 ## Cross-domain dependency anchors
 

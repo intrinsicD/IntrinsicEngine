@@ -27,6 +27,15 @@ The current promoted geometry layer already provides useful parameterization and
 
 The gaps below come from the [`src/geometry` gap analysis](../reviews/2026-05-12-src-geometry-gap-analysis.md), especially the parameterization/mapping, diagnostics, reproducibility, and benchmark sections.
 
+## Family surface and shared optimization seam
+
+The solvers above ship as disjoint entry points (`ComputeLSCM`, `ComputeHarmonic`) with per-method params structs and no shared control surface. Before adding the state-of-the-art variants, consolidate them behind one dispatch surface so every variant is choosable through one API and one config/UI/agent surface — the same `Strategy` × `Backend` idiom (`docs/architecture/algorithm-variant-dispatch.md`) the LOP consolidation family and `Geometry.KMeans` use.
+
+- Family surface: [`GEOM-063`](../../tasks/backlog/geometry/GEOM-063-parameterization-strategy-backend-surface.md) — `Geometry.Parameterization::ParameterizeMesh(mesh, params)` with a `ParameterizationStrategy` axis (`Tutte`/`Harmonic`/`Lscm` now, `Scp`/`Arap`/`Slim`/`Bff` reserved), a `Backend { CPU, GPU }` axis with `RequestedBackend`/`ActualBackend`/`FellBackToCPU` telemetry, and the `GEOM-018` diagnostics in every result. Behavior-preserving: the existing solvers become strategy bodies; reserved strategies fail closed until their method task lands.
+- Shared optimization seam: [`GEOM-064`](../../tasks/backlog/geometry/GEOM-064-parameterization-optimization-kernels.md) — `Geometry.Parameterization.Optimize` with the per-triangle local rotation fit, the symmetric-Dirichlet energy/gradient plus PSD proxy, and the injectivity-preserving line search that ARAP (Pack 3), SLIM (Pack 4), and the optimized backend (Pack 7) share, so no variant re-derives the nonlinear-solve core privately.
+
+The rendering/interaction decision for the interactive UV view is recorded in [ADR-0025](../adr/0025-parameterization-uv-view-and-split-view.md): the UV layout is a derived second view of the mesh entity (shared topology/`StableId`/`v:texcoord`), not a separate ECS entity.
+
 ## Pack 1 — Distortion and map-quality diagnostics
 
 Follow-up task: [`GEOM-018`](../../tasks/done/GEOM-018-parameterization-distortion-map-quality-diagnostics.md).
@@ -115,19 +124,21 @@ Forbidden shortcuts:
 
 ## Pack 3 — ARAP parameterization and local/global optimization
 
+Follow-up task: [`METHOD-021`](../../tasks/backlog/methods/METHOD-021-arap-parameterization-reference-backend.md) (adds the `Arap` strategy to the family surface).
+
 Scope:
 
 - Add ARAP parameterization after Pack 1 diagnostics and Pack 2 boundary records exist.
 - Define local/global iteration records, rotation-fit diagnostics, and convergence status.
+- Paper: Liu, Zhang, Xu, Gotsman & Gortler, "A Local/Global Approach to Mesh Parameterization" (SGP 2008).
 
-Primary home: `src/geometry` for the generic ARAP solver; paper-specific variants under `methods/geometry` when tied to a paper contract.
+Primary home: `src/geometry` — the `Arap` strategy on the `Geometry.Parameterization` family surface (Pack "Family surface"), with the paper claim capture under `methods/geometry/arap_parameterization`.
 
 Dependencies:
 
-- Pack 1 distortion diagnostics.
-- Pack 2 boundary constraints and initial embedding.
-- `Geometry.Linalg` for per-triangle local rotations/polar decomposition.
-- Future generic optimization framework if ARAP/SLIM share enough nonlinear solve structure to justify it.
+- Pack 1 distortion diagnostics; Pack 2 boundary constraints and initial (Tutte) embedding via the surface.
+- The `GEOM-063` dispatch surface and the `GEOM-064` optimization kernels seam — the "future generic optimization framework" this pack originally contemplated, now factored out because ARAP, SLIM, and the optimized backend share it.
+- `Geometry.Linalg` for per-triangle local rotations/polar decomposition (behind `GEOM-064`).
 
 Correctness and benchmarks:
 
@@ -137,24 +148,56 @@ Correctness and benchmarks:
 
 ## Pack 4 — SLIM and advanced distortion energies
 
+Follow-up task: [`METHOD-022`](../../tasks/backlog/methods/METHOD-022-slim-injective-parameterization-reference-backend.md) (adds the flip-free `Slim` strategy).
+
 Scope:
 
-- Add SLIM-style injective mapping and advanced distortion energies only after the ARAP/local-global seam and diagnostics are in place.
-- Treat SLIM paper-specific claims as method-workflow work when parity against a reference implementation is required.
+- Add SLIM-style locally-injective mapping and advanced distortion energies after the ARAP/local-global seam and diagnostics are in place.
+- Treat SLIM paper-specific claims as method-workflow work with parity against the ARAP reference on developable input.
+- Paper: Rabinovich, Poranne, Panozzo & Sorkine-Hornung, "Scalable Locally Injective Mappings" (TOG 2017).
 
-Primary home: `methods/geometry` for paper claim capture and parity; reusable energy records may be promoted to `src/geometry` if shared by ARAP, SLIM, and map-quality diagnostics.
+Primary home: the `Slim` strategy on the `Geometry.Parameterization` family surface, with paper claim capture under `methods/geometry/slim_parameterization`. The reusable energy/proxy/line-search records live in the `GEOM-064` seam, shared with ARAP.
 
 Dependencies:
 
-- Pack 1 diagnostics.
-- Pack 3 local/global optimization seam.
-- Robust invalid/flipped element policy.
+- Pack 1 diagnostics; the `GEOM-063` surface; the `GEOM-064` optimization kernels (symmetric-Dirichlet energy/proxy + injective line search); an injective (Tutte/ARAP) start.
+- Robust invalid/flipped element policy (SLIM guarantees zero flips from an injective start and reports `min_signed_area`).
 
 Correctness and benchmarks:
 
 - Injectivity/regression fixtures with known difficult boundaries.
 - Energy monotonicity and line-search diagnostics where applicable.
 - Backend parity reports before any optimized backend is added.
+
+## Pack 4b — Spectral conformal parameterization (SCP)
+
+Follow-up task: [`METHOD-024`](../../tasks/backlog/methods/METHOD-024-spectral-conformal-parameterization-reference-backend.md) (adds the pin-free conformal `Scp` strategy).
+
+Scope:
+
+- Add a pin-free conformal map recovered as the smallest non-trivial generalized eigenvector of the conformal-energy matrix against a boundary-area matrix — lower distortion than two-point-pinned LSCM.
+- Paper: Mullen, Tong, Alliez & Desbrun, "Spectral Conformal Parameterization" (SGP 2008).
+
+Primary home: the `Scp` strategy on the family surface, with paper claim capture under `methods/geometry/spectral_conformal`.
+
+Dependencies:
+
+- The `GEOM-063` surface; the [`GEOM-024`](../../tasks/backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md) generalized symmetric eigensolver seam (shared with `METHOD-006`); the DEC cotangent/area operators; boundary-loop helpers.
+
+## Pack 4c — Boundary First Flattening (BFF) and interactive control
+
+Follow-up task: [`METHOD-023`](../../tasks/backlog/methods/METHOD-023-boundary-first-flattening-reference-backend.md) (adds the controllable-conformal `Bff` strategy).
+
+Scope:
+
+- Add an interactive conformal flattening that lets the caller prescribe boundary data — target boundary lengths or target exterior angles (curvature) — with optional interior cone singularities, via the Dirichlet-to-Neumann boundary reduction. This is the state-of-the-art *controllable* conformal method and the basis for the interactive UV editing in the engine-integration pack.
+- Paper: Sawhney & Crane, "Boundary First Flattening" (TOG 2018).
+
+Primary home: the `Bff` strategy on the family surface, with paper claim capture under `methods/geometry/boundary_first_flattening`.
+
+Dependencies:
+
+- The `GEOM-063` surface; the DEC cotangent Laplacian; `Geometry.Sparse` LDLT for the interior solves; boundary-loop helpers. No eigensolver (that is Pack 4b).
 
 ## Pack 5 — Atlas segmentation, seam generation, and chart packing
 
@@ -212,6 +255,22 @@ Correctness and benchmarks:
 - Barycentric map fixture over a triangle/square mesh with known interpolation.
 - Composition/inverse-consistency diagnostics on small synthetic correspondences.
 
+## Pack 7 — Engine integration and interactive UV view
+
+Implementation tasks: [`RUNTIME-176`](../../tasks/backlog/runtime/RUNTIME-176-parameterization-runtime-config-integration.md), [`UI-036`](../../tasks/backlog/ui/UI-036-sandbox-parameterization-editor-and-uv-split-view.md), optional [`GRAPHICS-122`](../../tasks/backlog/rendering/GRAPHICS-122-uv-view-offscreen-render-target.md); decision record [ADR-0025](../adr/0025-parameterization-uv-view-and-split-view.md).
+
+This pack is outside `src/geometry` — it wires the geometry family surface into the engine so the parameterization is choosable and controllable from a config file, an agent/CLI, and the UI as co-equal surfaces, and adds the interactive UV view. It follows the LOP-family (`RUNTIME-175`/`UI-035`) and progressive-Poisson (`RUNTIME-134`) integration precedents.
+
+Scope:
+
+- Runtime facade + config lane (`RUNTIME-176`): an `EngineConfig.sandbox.parameterization` section applied through `EngineConfigControl`, an editor command that writes UVs back as `v:texcoord` via `GeometrySources`, a `Runtime.ParameterizationBackend` RHI fallback adapter, and a pointer-free UV view model.
+- Sandbox editor panel + resizable UV split view (`UI-036`): a two-pane controls/UV-layout split (manual splitter, no docking dependency), the 2D UV layout drawn with `ImDrawList` from the view model, a distortion-heatmap overlay, and interactive pin/BFF-boundary/cone control routed through the config lane.
+- Optional GPU-shaded UV target (`GRAPHICS-122`): an offscreen UV render presented via `ImGui::Image` for texel-density/texture/heatmap shading and dense meshes, with a CPU-layout fallback.
+
+Rendering-model decision (ADR-0025): the UV layout is a **derived second view of the mesh entity** (shared topology/`StableId`/`v:texcoord`), not a separate ECS entity, matching how Blender/Houdini/Maya/RizomUV present a UV editor as a second view of the same mesh in UV space. A separate UV entity and a true second viewport are considered and deferred/rejected there.
+
+Layer boundary: geometry stays free of renderer/runtime/assets; `RUNTIME-176` owns composition; `UI-036` is `app -> runtime` only; `GRAPHICS-122` keeps the UV pass in graphics wired by runtime.
+
 ## Cross-pack correctness policy
 
 Parameterization and mapping tasks must make topology, boundary, and degeneracy behavior explicit:
@@ -224,9 +283,12 @@ Parameterization and mapping tasks must make topology, boundary, and degeneracy 
 
 ## Initial priority
 
-The first two implementation packs are:
+The diagnostics ([`GEOM-018`](../../tasks/done/GEOM-018-parameterization-distortion-map-quality-diagnostics.md), retired) and harmonic/Tutte ([`GEOM-019`](../../tasks/backlog/geometry/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md)) foundations exist, so the SOTA-variant program orders as:
 
-1. [`GEOM-018`](../../tasks/done/GEOM-018-parameterization-distortion-map-quality-diagnostics.md) — distortion and map-quality diagnostics. This pack gives all later parameterization and mapping solvers a shared acceptance vocabulary and can harden the existing LSCM quality path without adding a new solver.
-2. [`GEOM-019`](../../tasks/backlog/geometry/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md) — harmonic/Tutte embedding and boundary constraints. This is the smallest new solver family after diagnostics and provides an initialization path for ARAP/SLIM.
+1. [`GEOM-063`](../../tasks/backlog/geometry/GEOM-063-parameterization-strategy-backend-surface.md) — the family dispatch surface, consolidating the existing Tutte/Harmonic/LSCM solvers so every later variant is choosable through one API. Behavior-preserving; no new algorithm.
+2. [`GEOM-064`](../../tasks/backlog/geometry/GEOM-064-parameterization-optimization-kernels.md) — the shared optimization-kernel seam ARAP and SLIM consume.
+3. The SOTA reference variants on the surface: ARAP (`METHOD-021`, Pack 3), SLIM (`METHOD-022`, Pack 4), SCP (`METHOD-024`, Pack 4b), BFF (`METHOD-023`, Pack 4c) — CPU-reference-first, in each task's `depends_on` order.
+4. The optimized CPU (`METHOD-025`) and GPU (`METHOD-026`) backends after reference parity.
+5. Engine integration and the interactive UV view (Pack 7: `RUNTIME-176`, `UI-036`, optional `GRAPHICS-122`).
 
 Later packs should not begin until their prerequisites are retired to `tasks/done/` or recorded as explicit out-of-scope assumptions in the candidate task file.

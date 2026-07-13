@@ -14,6 +14,13 @@ map.
   (LOP/WLOP/CLOP/EAR strategy + CPU/GPU backend picker driving the
   `RUNTIME-175` config-lane apply path; gated on `runtime/RUNTIME-175`;
   coordinate with active `ARCH-006` Slice 4).
+- [UI-036 — Sandbox parameterization editor panel and resizable UV split view](UI-036-sandbox-parameterization-editor-and-uv-split-view.md)
+  (Tutte/Harmonic/LSCM/SCP/ARAP/SLIM/BFF strategy + backend picker and a
+  resizable two-pane controls/UV-layout split view drawn with `ImDrawList`
+  from the `RUNTIME-176` UV view model; gated on `runtime/RUNTIME-176`;
+  derived-view rationale in
+  [ADR-0025](../../../docs/adr/0025-parameterization-uv-view-and-split-view.md);
+  coordinate with active `ARCH-006` Slice 4).
 
 Further UI children open from the deferred triggers recorded by the retired
 RORG-031F seed.
