@@ -5,6 +5,9 @@
 
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
+#include <imgui.h>
+
+#include "TestImGuiFrameScope.hpp"
 
 import Extrinsic.Runtime.EditorPropertyWidgets;
 import Geometry.Properties;
@@ -74,4 +77,35 @@ TEST(EditorPropertyWidgets, PlotModelFiltersNonFiniteSamplesAndReportsRange)
     ASSERT_TRUE(model.HasFiniteRange);
     EXPECT_DOUBLE_EQ(model.Minimum, -2.0);
     EXPECT_DOUBLE_EQ(model.Maximum, 3.0);
+}
+
+TEST(EditorPropertyWidgets, ProviderRebuildsAfterNormalizingSelection)
+{
+    TestSupport::ImGuiFrameScope frame;
+    Runtime::EditorPropertyPlotWidgetState state{};
+    std::vector<std::string> requestedSelections{};
+    const Runtime::EditorScalarPropertyPlotModelProvider provider =
+        [&requestedSelections](const std::string_view selectedProperty)
+        {
+            requestedSelections.emplace_back(selectedProperty);
+            Runtime::EditorScalarPropertyPlotModel model{};
+            model.Options.push_back(Runtime::EditorScalarPropertyOption{
+                .Name = "v:quality",
+                .ValueKind = Geometry::PropertyValueKind::Float,
+                .ElementCount = 3u,
+            });
+            model.SelectedProperty = "v:quality";
+            model.SelectedValueKind = Geometry::PropertyValueKind::Float;
+            return model;
+        };
+
+    ImGui::Begin("Property provider test");
+    const bool changed = Runtime::DrawEditorScalarPropertyPlotWidget(
+        "provider", provider, state);
+    ImGui::End();
+
+    EXPECT_TRUE(changed);
+    EXPECT_EQ(state.SelectedProperty, "v:quality");
+    EXPECT_EQ(requestedSelections,
+              (std::vector<std::string>{"", "v:quality"}));
 }

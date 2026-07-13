@@ -16,6 +16,8 @@ engine runtime. The canonical entry point is `Sandbox`.
 ```text
 Sandbox/
   Editor/
+    Sandbox.DomainPanels.cppm
+    Sandbox.DomainPanels.cpp
     Sandbox.MethodPanels.cppm
     Sandbox.MethodPanels.cpp
     Sandbox.MeshProcessingPanels.cppm

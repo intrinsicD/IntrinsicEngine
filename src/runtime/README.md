@@ -191,7 +191,7 @@ cancel button; cancel remains a lower-level registry command surface.
 first sandbox ImGui frame draws the main menu bar only; `Sandbox Editor`,
 `Scene Hierarchy`, `Inspector`, `Selection Details`, `File / Scene`,
 `File / Import`, `Frame Graph`, `Render Recipes`, `Camera / Render`,
-`Geometry Visualization`, and all PointCloud/Graph/Mesh domain windows stay
+`Geometry Visualization`, and all registered PointCloud/Graph/Mesh windows stay
 closed until toggled from the menu. The open/closed bits live in the attached
 `SandboxEditorUi` instance and do not change panel models, command routing, or
 runtime ownership.
@@ -200,9 +200,10 @@ runtime ownership.
 windows can register through `SandboxEditorUi::RegisterEditorWindow(...)` using
 stable ids and structured menu paths, then remove the returned handle through
 `UnregisterEditorWindow(...)`; closed windows receive no draw callback, and global hide preserves
-their individual open states. `Mesh / Appearance` and
-the app-owned method panels are registry-owned windows; Appearance hosts the
-generic scalar vertex-property histogram. `ARCH-006` Slice 2 adds a context-aware contribution
+their individual open states. All domain and method panels are app-owned,
+registry-contributed windows; Mesh / Appearance hosts the runtime-owned generic
+scalar vertex-property histogram through a model-provider callback. `ARCH-006`
+Slice 2 adds a context-aware contribution
 descriptor that supplies a frame-local runtime facade without exposing
 `Engine&`; the Sandbox application uses it for app-owned K-Means and Progressive
 Poisson panels while runtime retains their models, commands, config lane, jobs,
@@ -213,8 +214,12 @@ menu/controller code, widget state, and result presentation for ICP registration
 mesh denoise/curvature/remesh/subdivide/simplify, and mesh/graph/point-cloud
 vertex normals into `Extrinsic.Sandbox.Editor.MeshProcessingPanels`. Runtime
 retains the corresponding models, commands, history/jobs, stale-result checks,
-and result sinks. Point-cloud outlier removal and the generic fixed domain/shell
-windows are retained for later `ARCH-006` relocation slices.
+and result sinks. Slice 4 moves Appearance, Properties, and Selection for all
+three domains plus PointCloud / Processing / Remove Outliers into
+`Extrinsic.Sandbox.Editor.DomainPanels`. Runtime retains the domain models,
+commands/jobs, UV and outlier result state, and result sinks, but owns no fixed
+domain slots, exemplar registration, or domain presentation state. The generic
+hierarchy/inspector/file/render shell remains for the final relocation slice.
 `SandboxEditorUi` routes the unsuppressed `G`
 input action through the same `EditorUiVisibilityCommand` path used by
 programmatic callers. At the end of each visible editor frame, `ImGuiAdapter`

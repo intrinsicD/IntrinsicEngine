@@ -145,13 +145,30 @@ namespace Extrinsic::Runtime
         const Geometry::ConstPropertySet& properties,
         EditorPropertyPlotWidgetState& state)
     {
+        return DrawEditorScalarPropertyPlotWidget(
+            widgetId,
+            [&properties](const std::string_view selectedProperty)
+            {
+                return BuildEditorScalarPropertyPlotModel(
+                    properties,
+                    selectedProperty);
+            },
+            state);
+    }
+
+    bool DrawEditorScalarPropertyPlotWidget(
+        const std::string_view widgetId,
+        const EditorScalarPropertyPlotModelProvider& buildModel,
+        EditorPropertyPlotWidgetState& state)
+    {
         if (widgetId.empty())
             ImGui::PushID("EditorScalarPropertyPlot");
         else
             ImGui::PushID(widgetId.data(), widgetId.data() + widgetId.size());
 
-        EditorScalarPropertyPlotModel model =
-            BuildEditorScalarPropertyPlotModel(properties, state.SelectedProperty);
+        EditorScalarPropertyPlotModel model = buildModel
+            ? buildModel(state.SelectedProperty)
+            : EditorScalarPropertyPlotModel{};
         bool selectionChanged = false;
         if (state.SelectedProperty != model.SelectedProperty)
         {
@@ -184,9 +201,9 @@ namespace Extrinsic::Runtime
 
         if (selectionChanged)
         {
-            model = BuildEditorScalarPropertyPlotModel(
-                properties,
-                state.SelectedProperty);
+            model = buildModel
+                ? buildModel(state.SelectedProperty)
+                : EditorScalarPropertyPlotModel{};
         }
 
         state.HistogramBins = std::clamp(state.HistogramBins, 1, 256);

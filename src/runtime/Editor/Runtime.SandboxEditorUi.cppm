@@ -72,11 +72,28 @@ import Geometry.UvAtlas;
 namespace Extrinsic::Runtime::Detail
 {
     inline constexpr std::size_t kSandboxEditorPanelWindowCount = 10u;
-    inline constexpr std::size_t kSandboxEditorDomainWindowCount = 12u;
 }
 
 export namespace Extrinsic::Runtime
 {
+    // Runtime-owned editor aliases keep application presentation code on the
+    // app -> runtime boundary while preserving the renderer-facing command
+    // payload types used by Runtime's execution layer.
+    using SandboxEditorSurfaceSourceDomain =
+        Graphics::Components::RenderSurface::SourceDomain;
+    using SandboxEditorEdgeSourceDomain =
+        Graphics::Components::RenderEdges::SourceDomain;
+    using SandboxEditorPointRenderType =
+        Graphics::Components::RenderPoints::RenderType;
+    using SandboxEditorVisualizationColorSource =
+        Graphics::Components::VisualizationConfig::ColorSource;
+    using SandboxEditorVisualizationDomain =
+        Graphics::Components::VisualizationConfig::Domain;
+    using SandboxEditorColormapType = Graphics::Colormap::Type;
+
+    inline constexpr std::size_t kSandboxEditorMaxIsolineValues =
+        Graphics::Components::ScalarFieldConfig::kMaxIsolineValues;
+
     enum class SandboxEditorDiagnosticCode : std::uint8_t
     {
         MissingScene,
@@ -153,10 +170,10 @@ export namespace Extrinsic::Runtime
         ECS::Components::SpatialDebugGeometryKind kind) noexcept;
 
     [[nodiscard]] const char* DebugNameForSandboxEditorVisualizationColorSource(
-        Graphics::Components::VisualizationConfig::ColorSource source) noexcept;
+        SandboxEditorVisualizationColorSource source) noexcept;
 
     [[nodiscard]] const char* DebugNameForSandboxEditorVisualizationDomain(
-        Graphics::Components::VisualizationConfig::Domain domain) noexcept;
+        SandboxEditorVisualizationDomain domain) noexcept;
 
     [[nodiscard]] const char* DebugNameForSandboxEditorVisualizationAdapterBindingKind(
         RenderExtractionCache::VisualizationAdapterBindingKind kind) noexcept;
@@ -1052,20 +1069,20 @@ export namespace Extrinsic::Runtime
     {
         bool HasRenderSurface{false};
         std::string SurfaceDomain{};
-        Graphics::Components::RenderSurface::SourceDomain SurfaceDomainValue{
-            Graphics::Components::RenderSurface::SourceDomain::Vertex};
+        SandboxEditorSurfaceSourceDomain SurfaceDomainValue{
+            SandboxEditorSurfaceSourceDomain::Vertex};
         bool HasRenderEdges{false};
         std::string EdgeDomain{};
-        Graphics::Components::RenderEdges::SourceDomain EdgeDomainValue{
-            Graphics::Components::RenderEdges::SourceDomain::Vertex};
+        SandboxEditorEdgeSourceDomain EdgeDomainValue{
+            SandboxEditorEdgeSourceDomain::Vertex};
         bool        HasUniformEdgeWidth{false};
         float       UniformEdgeWidth{0.0f};
         bool        HasNamedEdgeWidth{false};
         std::string EdgeWidthName{};
         bool HasRenderPoints{false};
         std::string PointRenderType{};
-        Graphics::Components::RenderPoints::RenderType PointRenderTypeValue{
-            Graphics::Components::RenderPoints::RenderType::Sphere};
+        SandboxEditorPointRenderType PointRenderTypeValue{
+            SandboxEditorPointRenderType::Sphere};
         bool        HasUniformPointSize{false};
         float       UniformPointSize{0.0f};
         bool        HasNamedPointSize{false};
@@ -1993,12 +2010,12 @@ export namespace Extrinsic::Runtime
     struct SandboxEditorVisualizationConfigModel
     {
         bool HasConfig{false};
-        Graphics::Components::VisualizationConfig::ColorSource Source{
-            Graphics::Components::VisualizationConfig::ColorSource::Material};
+        SandboxEditorVisualizationColorSource Source{
+            SandboxEditorVisualizationColorSource::Material};
         glm::vec4 Color{1.0f, 0.6f, 0.0f, 1.0f};
         std::string ScalarFieldName{};
-        Graphics::Components::VisualizationConfig::Domain ScalarDomain{
-            Graphics::Components::VisualizationConfig::Domain::Vertex};
+        SandboxEditorVisualizationDomain ScalarDomain{
+            SandboxEditorVisualizationDomain::Vertex};
         std::string ColorBufferName{};
         bool ScalarAutoRange{true};
         float ScalarRangeMin{0.0f};
@@ -2006,12 +2023,11 @@ export namespace Extrinsic::Runtime
         std::uint32_t ScalarBinCount{0u};
         std::uint32_t IsolineCount{0u};
         // UI-032 — scalar styling controls.
-        Graphics::Colormap::Type ScalarColormap{
-            Graphics::Colormap::Type::Viridis};
+        SandboxEditorColormapType ScalarColormap{
+            SandboxEditorColormapType::Viridis};
         float IsolineWidth{1.5f};
         glm::vec4 IsolineColor{0.0f, 0.0f, 0.0f, 1.0f};
-        std::array<float,
-                   Graphics::Components::ScalarFieldConfig::kMaxIsolineValues>
+        std::array<float, kSandboxEditorMaxIsolineValues>
             IsolineValues{};
         std::uint32_t IsolineValueCount{0u};
     };
@@ -2345,6 +2361,8 @@ export namespace Extrinsic::Runtime
             LastPointCloudVertexNormalsResult{nullptr};
         const SandboxEditorPointCloudOutlierRemovalResult*
             LastPointCloudOutlierRemovalResult{nullptr};
+        const SandboxEditorUvRegenerationCommandResult*
+            LastUvRegenerationResult{nullptr};
         const SandboxEditorProgressivePoissonResult*
             LastProgressivePoissonResult{nullptr};
         const SandboxEditorRegistrationResult*
@@ -2442,20 +2460,20 @@ export namespace Extrinsic::Runtime
 
         bool SetSurface{false};
         bool EnableSurface{false};
-        Graphics::Components::RenderSurface::SourceDomain SurfaceDomain{
-            Graphics::Components::RenderSurface::SourceDomain::Vertex};
+        SandboxEditorSurfaceSourceDomain SurfaceDomain{
+            SandboxEditorSurfaceSourceDomain::Vertex};
 
         bool SetEdges{false};
         bool EnableEdges{false};
-        Graphics::Components::RenderEdges::SourceDomain EdgeDomain{
-            Graphics::Components::RenderEdges::SourceDomain::Vertex};
+        SandboxEditorEdgeSourceDomain EdgeDomain{
+            SandboxEditorEdgeSourceDomain::Vertex};
         bool SetUniformEdgeWidth{false};
         float UniformEdgeWidth{1.0f};
 
         bool SetPoints{false};
         bool EnablePoints{false};
-        Graphics::Components::RenderPoints::RenderType PointType{
-            Graphics::Components::RenderPoints::RenderType::Sphere};
+        SandboxEditorPointRenderType PointType{
+            SandboxEditorPointRenderType::Sphere};
         bool SetPointRenderType{false};
         bool SetUniformPointSize{false};
         float UniformPointSize{6.0f};
@@ -2479,12 +2497,12 @@ export namespace Extrinsic::Runtime
         SandboxEditorVisualizationTarget Target{
             SandboxEditorVisualizationTarget::Entity};
         bool EnableConfig{true};
-        Graphics::Components::VisualizationConfig::ColorSource Source{
-            Graphics::Components::VisualizationConfig::ColorSource::UniformColor};
+        SandboxEditorVisualizationColorSource Source{
+            SandboxEditorVisualizationColorSource::UniformColor};
         glm::vec4 Color{1.0f, 0.6f, 0.0f, 1.0f};
         std::string ScalarFieldName{};
-        Graphics::Components::VisualizationConfig::Domain ScalarDomain{
-            Graphics::Components::VisualizationConfig::Domain::Vertex};
+        SandboxEditorVisualizationDomain ScalarDomain{
+            SandboxEditorVisualizationDomain::Vertex};
         std::string ColorBufferName{};
         bool ScalarAutoRange{true};
         float ScalarRangeMin{0.0f};
@@ -2492,12 +2510,11 @@ export namespace Extrinsic::Runtime
         std::uint32_t ScalarBinCount{0u};
         std::uint32_t IsolineCount{0u};
         // UI-032 — scalar styling controls.
-        Graphics::Colormap::Type ScalarColormap{
-            Graphics::Colormap::Type::Viridis};
+        SandboxEditorColormapType ScalarColormap{
+            SandboxEditorColormapType::Viridis};
         float IsolineWidth{1.5f};
         glm::vec4 IsolineColor{0.0f, 0.0f, 0.0f, 1.0f};
-        std::array<float,
-                   Graphics::Components::ScalarFieldConfig::kMaxIsolineValues>
+        std::array<float, kSandboxEditorMaxIsolineValues>
             IsolineValues{};
         std::uint32_t IsolineValueCount{0u};
     };
@@ -2629,6 +2646,12 @@ export namespace Extrinsic::Runtime
         }
     };
 
+    [[nodiscard]] const char* DebugNameForSandboxEditorUvStatus(
+        Geometry::UvAtlas::UvAtlasStatus status) noexcept;
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorUvProvenance(
+        Geometry::UvAtlas::UvAtlasProvenance provenance) noexcept;
+
     [[nodiscard]] SandboxEditorPanelFrame BuildSandboxEditorPanelFrame(
         const SandboxEditorContext& context);
     [[nodiscard]] SandboxEditorPanelFrame BuildSandboxEditorPanelFrame(
@@ -2638,6 +2661,11 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] SandboxEditorDomainWindowModel BuildSandboxEditorDomainWindowModel(
         const SandboxEditorContext& context,
         SandboxEditorDomainWindowKind kind);
+
+    [[nodiscard]] EditorScalarPropertyPlotModel
+    BuildSandboxEditorMeshScalarPropertyPlotModel(
+        const SandboxEditorContext& context,
+        std::string_view selectedProperty = {});
 
     bool SelectSandboxEditorEntity(const SandboxEditorContext& context,
                                    std::uint32_t stableEntityId);
@@ -2833,28 +2861,18 @@ export namespace Extrinsic::Runtime
         }
 
     private:
-        void RegisterExemplarWindows();
-        void DrawRegisteredMeshAppearance(bool& open);
-        [[nodiscard]] const SandboxEditorDomainWindowModel*
-        GetRegisteredMeshWindowModel();
         void AttachKMeansGpuQueue(Engine& engine);
         void DetachKMeansGpuQueue();
 
         Engine*                 m_Engine{nullptr};
         EditorUiHost            m_Host{};
-        EditorWindowHandle      m_MeshAppearanceWindow{};
         const SandboxEditorContext* m_ActiveEditorContext{nullptr};
-        std::optional<SandboxEditorDomainWindowModel>
-            m_RegisteredMeshModelCache{};
-        EditorPropertyPlotWidgetState m_MeshPropertyPlotState{};
         SandboxEditorPanelFrame m_LastFrame{};
         SandboxEditorSelectedModelCache m_SelectedModelCache{};
         std::array<char, 1024>  m_ImportPathBuffer{};
         std::array<char, 1024>  m_ScenePathBuffer{};
         std::array<bool, Detail::kSandboxEditorPanelWindowCount>
             m_PanelWindowOpen{};
-        std::array<bool, Detail::kSandboxEditorDomainWindowCount>
-            m_DomainWindowOpen{};
         Assets::AssetPayloadKind m_ImportPayloadKind{
             Assets::AssetPayloadKind::Unknown};
         std::uint64_t m_LastObservedRuntimeImportSequence{0};
@@ -2896,11 +2914,6 @@ export namespace Extrinsic::Runtime
         SandboxEditorRenderRecipeEditorState m_RenderRecipeState{};
         RenderArtifactRegistry m_RenderArtifactRegistry{};
         std::array<char, 8192> m_RenderRecipeDraftBuffer{};
-        std::int32_t m_PointCloudOutlierMethod{0};
-        std::int32_t m_PointCloudOutlierKNeighbors{16};
-        float m_PointCloudOutlierStdDevMultiplier{1.0f};
-        float m_PointCloudOutlierSearchRadius{0.0f};
-        std::int32_t m_PointCloudOutlierMinNeighbors{4};
         std::int32_t m_TextureBakeSourceIndex{0};
         std::int32_t m_TextureBakeTargetSemanticIndex{0};
         std::int32_t m_TextureBakeEncoderIndex{0};

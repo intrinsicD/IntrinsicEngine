@@ -9,8 +9,8 @@ depends_on:
 ## Status
 - Status: in progress.
 - Owner: Codex.
-- Branch: `codex/arch-006-slice3`.
-- Slices 0-3 are complete. `Runtime.EditorUiHost` now owns generic
+- Branch: `codex/arch-006-finish`.
+- Slices 0-4 are complete. `Runtime.EditorUiHost` now owns generic
   callback, registry, and visibility lifecycle, while `Sandbox.cppm` exports
   only the app factory/registration surface and the concrete app lives in
   `Sandbox.cpp`. App-owned registered windows now own K-Means and Progressive
@@ -20,8 +20,9 @@ depends_on:
   simplification, and mesh/graph/point-cloud normals presentation/controller
   state into app-owned registered windows. The existing runtime model,
   command, undo, derived-job, and result-sink facades remain in runtime.
-- Next slice: move point-cloud outlier removal and the generic domain panels
-  while retaining runtime-owned command/model facades.
+- Next slice: move the remaining hierarchy/inspector/file/import,
+  frame-graph/render-recipe/artifact, camera, and visualization shell
+  presentation, then retire the Sandbox-specific runtime editor surface.
 
 ## Goal
 - Restore the documented layering intent that application specifics live in
@@ -147,6 +148,26 @@ Slice 3 implementation boundary (2026-07-13):
 - Defer point-cloud outlier removal and generic appearance/properties/
   selection panels to Slice 4; defer hierarchy/inspector/file/render shell
   presentation and final runtime Sandbox editor retirement to Slice 5.
+
+Slice 4 implementation boundary (2026-07-14):
+
+- Add one app-owned domain-panel module that registers ten windows through the
+  existing UI-034 registry seam: Appearance, Properties, and Selection for
+  PointCloud, Graph, and Mesh, plus PointCloud / Processing / Remove Outliers.
+  Preserve stable ids, menu paths, titles, closed defaults, controls, lifetime
+  cleanup, result sinks, and the one-model-per-domain-per-frame cache.
+- Remove the final fixed domain slots, exemplar registration, ImGui domain
+  controllers, and domain input/result-presentation state from
+  `Runtime.SandboxEditorUi`. Runtime retains exported models, command/job
+  execution, selected-property model construction, and UV/outlier result
+  delivery.
+- Keep the application boundary runtime-only. Renderer-facing values exposed
+  by the runtime facade use runtime-owned editor aliases, and the generic
+  scalar-property widget accepts a runtime model provider so app code never
+  names or imports lower-layer types.
+- Add app-linked integration coverage for the ten registrations, idempotent
+  registration/destruction, closed-window laziness, and per-frame cache. Defer
+  the remaining editor shell and final runtime surface retirement to Slice 5.
 
 ## Required changes
 - [x] Slice 0 (planning, this file): inventory `Runtime.SandboxEditorUi`
@@ -289,6 +310,43 @@ Slice 3 evidence (2026-07-13):
   checks passed.
 - Regenerated the 387-module API inventory. Task front matter did not change,
   so the generated session brief did not require regeneration.
+
+Slice 4 evidence (2026-07-14):
+- Added the 29-line / 1-import `Sandbox.Editor.DomainPanels` interface and its
+  2,026-line / 9-import app implementation. It owns ten registered windows:
+  Appearance, Properties, and Selection for PointCloud, Graph, and Mesh, plus
+  PointCloud / Processing / Remove Outliers. Destruction, explicit shutdown,
+  and re-registration remove callbacks idempotently.
+- Removed the final fixed domain-window slots, legacy section/draw switches,
+  exemplar registration, ImGui controllers, and presentation state from
+  `Runtime.SandboxEditorUi`. Runtime retains domain models, command/history/job
+  facades, selected-mesh histogram model construction, UV/outlier completion
+  state, and result sinks. Runtime-owned aliases keep app presentation from
+  naming lower-layer graphics types.
+- The runtime implementation fell from 19,895 to 18,707 lines after removing
+  the now-unreachable property-binding and render-hint presentation graph; its
+  interface is 2,928 lines / 53 imports after adding the app-facing aliases and result/model
+  facade fields, and the fixed domain-window and runtime exemplar counts both
+  fell to zero. These are source-shape metrics only; no compile-time claim is
+  made.
+- Added app-linked integration coverage for exact ten-window menu metadata,
+  idempotent re-registration/destructor cleanup, closed-window laziness, and
+  one-build/three-hit same-domain frame caching. Runtime contracts pin fixed
+  slot retirement, result-sink wiring, the selected-mesh histogram provider,
+  and provider selection normalization.
+- Two initial build attempts in the shared worktree overlapped because a prior
+  Ninja process was still active. Their clang module crashes are invalid
+  evidence and are not recorded as source failures. A subsequent clean,
+  serially controlled rebuild with ccache disabled completed all 1,468
+  `IntrinsicTests` build edges, including the runtime contract and app editor
+  integration executables. The focused domain/property/editor coverage passed
+  13/13, the opt-in `ExtrinsicSandbox` executable target built, and the default
+  CPU-supported gate passed 3,697/3,697.
+- Regenerated the 388-module API inventory. Strict layering, test-layout, and
+  task-policy/task-validation, automated clean-workshop, and diff checks
+  passed; the documentation link scan reported no broken relative links. Task
+  front matter did not change beyond the existing branch assignment, so the
+  generated session brief did not require regeneration.
 
 ## Forbidden changes
 - Mixing mechanical moves with semantic refactors in one slice.

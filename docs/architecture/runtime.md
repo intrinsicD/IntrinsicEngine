@@ -133,8 +133,10 @@ capture flags independently. Its ImGui context owns a paired ImPlot context.
 `Extrinsic.Runtime.EditorPropertyWidgets` keeps scalar-property selector and
 finite-sample histogram models CPU-testable while its ImGui/ImPlot draw code and
 the manifest-managed `implot` dependency remain private to runtime.
-`SandboxEditorUi` registers `Mesh / Appearance` as the remaining runtime-owned
-registry exemplar; Appearance embeds the generic vertex-property histogram.
+`SandboxEditorUi` owns no domain-window registrations or fixed domain-window
+state. Domain menu branches are populated only from registered application
+contributions. The generic scalar-property widget remains runtime-owned and
+accepts a runtime model provider, so app presentation never imports geometry.
 `Extrinsic.Sandbox.Editor.MethodPanels` registers
 the K-Means windows for PointCloud, Graph, and Mesh plus the PointCloud and Mesh
 Progressive Poisson windows from the application layer. Their ImGui state and
@@ -147,12 +149,19 @@ models, command validation/execution, undo/history integration, derived-job
 submission, stale-result rejection, and result sinks; the application owns the
 stable registrations, menu paths, lazy per-frame domain-model cache, widget
 state, and result presentation.
+`Extrinsic.Sandbox.Editor.DomainPanels` owns the ten remaining domain windows:
+Appearance, Properties, and Selection for PointCloud, Graph, and Mesh, plus
+PointCloud / Processing / Remove Outliers. It preserves their stable ids, menu
+paths, titles, closed defaults, controls, per-frame lazy model cache, and
+immediate/asynchronous result publication. Runtime retains the exported
+domain models, command/job execution, UV/outlier result state, and result sinks;
+the app module imports runtime only.
 Those K-Means and Progressive Poisson facade bodies compile in the private
 `Runtime.SandboxMethodFacade.cpp` implementation unit; the public
 `Extrinsic.Runtime.SandboxEditorUi` surface and the app-to-runtime dependency
 direction are unchanged.
-Point-cloud outlier removal and the generic domain/editor-shell windows stay
-behind the legacy section table until later `ARCH-006` slices relocate them.
+The hierarchy/inspector/file/render editor-shell presentation remains for the
+final `ARCH-006` slice; the legacy fixed domain section table is retired.
 
 The internal `RuntimeFrameContext` record carries the data that must survive
 between those phases: frame delta, fixed-step interpolation alpha, render frame

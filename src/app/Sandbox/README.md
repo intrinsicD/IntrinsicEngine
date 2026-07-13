@@ -25,7 +25,12 @@ input/result-presentation state, and consumes only runtime models and command
 facades. K-Means and Progressive Poisson command/config/result implementations
 compile in a private runtime facade unit; all other processing commands likewise
 remain runtime-owned, so app panels expose no geometry, ECS, graphics, or RHI
-dependencies. The app also installs the sandbox default runtime policy bundle through
+dependencies. `Sandbox.Editor.DomainPanels` owns the remaining ten domain
+windows: Appearance, Properties, and Selection for PointCloud, Graph, and Mesh,
+plus PointCloud / Processing / Remove Outliers. It preserves their stable ids,
+menu paths, titles, closed-by-default behavior, controls, per-frame domain-model
+cache, and result-sink delivery while importing runtime modules only. The app
+also installs the sandbox default runtime policy bundle through
 `Runtime::RegisterSandboxDefaultRuntimePolicies(engine)`.
 It unregisters the returned handles during shutdown before the engine tears down.
 The app remains a runtime-only consumer: the editor shell registers with
@@ -56,7 +61,9 @@ The promoted EditorUI also exposes stable top-level ImGui menu slots for
 `PointCloud`, `Graph`, and `Mesh`. Their submenu items open selected-entity
 domain windows for render-hint status, visualization/spatial-debug controls,
 primitive-selection details, and processing-discovery affordances. These
-windows are an EditorUI workflow only: app-owned panels reuse
+windows are registered by the app-owned `Sandbox.Editor.DomainPanels` module
+through `Runtime.EditorWindowRegistry`; the runtime shell has no fixed domain
+window slots or presentation state. The panels reuse
 `SandboxEditorUi` models and runtime-owned command surfaces, and the sandbox app
 still does not own selection, ECS mutation, method jobs, rendering, or asset
 state.

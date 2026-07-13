@@ -1,6 +1,7 @@
 module;
 
 #include <cstddef>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -38,6 +39,9 @@ export namespace Extrinsic::Runtime
         int HistogramBins{32};
     };
 
+    using EditorScalarPropertyPlotModelProvider =
+        std::function<EditorScalarPropertyPlotModel(std::string_view)>;
+
     [[nodiscard]] bool IsEditorScalarPropertyKind(
         Geometry::PropertyValueKind kind) noexcept;
 
@@ -51,5 +55,10 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] bool DrawEditorScalarPropertyPlotWidget(
         std::string_view widgetId,
         const Geometry::ConstPropertySet& properties,
+        EditorPropertyPlotWidgetState& state);
+
+    [[nodiscard]] bool DrawEditorScalarPropertyPlotWidget(
+        std::string_view widgetId,
+        const EditorScalarPropertyPlotModelProvider& buildModel,
         EditorPropertyPlotWidgetState& state);
 }

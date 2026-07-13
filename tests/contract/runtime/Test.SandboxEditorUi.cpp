@@ -71,6 +71,7 @@ import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.EditorPropertyWidgets;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigControl;
@@ -1343,16 +1344,22 @@ TEST(SandboxEditorUi, DomainMenusUseAppearanceAndFocusedProcessingWindows)
 {
     const std::string editorSource =
         ReadRepositoryTextFile("src/runtime/Editor/Runtime.SandboxEditorUi.cpp");
+    const std::string editorModule = ReadRepositoryTextFile(
+        "src/runtime/Editor/Runtime.SandboxEditorUi.cppm");
+    const std::string domainPanelSource = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp");
     const std::string methodPanelSource = ReadRepositoryTextFile(
         "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp");
     const std::string meshProcessingPanelSource = ReadRepositoryTextFile(
         "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp");
     ASSERT_FALSE(editorSource.empty());
+    ASSERT_FALSE(editorModule.empty());
+    ASSERT_FALSE(domainPanelSource.empty());
     ASSERT_FALSE(methodPanelSource.empty());
     ASSERT_FALSE(meshProcessingPanelSource.empty());
 
     const std::string_view appearanceWindow = SourceRange(
-        editorSource,
+        domainPanelSource,
         "void DrawDomainRenderWindow(",
         "void DrawDomainVisualizationControls(");
     ASSERT_FALSE(appearanceWindow.empty());
@@ -1366,7 +1373,7 @@ TEST(SandboxEditorUi, DomainMenusUseAppearanceAndFocusedProcessingWindows)
               std::string_view::npos);
 
     const std::string_view propertyWindow = SourceRange(
-        editorSource,
+        domainPanelSource,
         "void DrawDomainPropertyWindow(",
         "void DrawRenderHintStatus(");
     ASSERT_FALSE(propertyWindow.empty());
@@ -1385,7 +1392,10 @@ TEST(SandboxEditorUi, DomainMenusUseAppearanceAndFocusedProcessingWindows)
 
     EXPECT_EQ(editorSource.find("DomainWindowSection::Visualization"),
               std::string::npos);
-    EXPECT_NE(editorSource.find("DrawDomainVisualizationControls(model, context);"),
+    EXPECT_EQ(editorSource.find("DrawDomainVisualizationControls(model, context);"),
+              std::string::npos);
+    EXPECT_NE(domainPanelSource.find(
+                  "DrawDomainVisualizationControls(model, context);"),
               std::string::npos);
     EXPECT_EQ(editorSource.find("ProcessingKMeans"), std::string::npos);
     EXPECT_EQ(editorSource.find("ProcessingDenoise"), std::string::npos);
@@ -1399,10 +1409,47 @@ TEST(SandboxEditorUi, DomainMenusUseAppearanceAndFocusedProcessingWindows)
               std::string::npos);
     EXPECT_EQ(editorSource.find("ProcessingPointCloudVertexNormals"),
               std::string::npos);
-    EXPECT_NE(editorSource.find("ProcessingPointCloudOutlierRemoval"),
+    EXPECT_NE(domainPanelSource.find("DrawPointCloudOutlierRemovalControls"),
               std::string::npos);
     EXPECT_EQ(editorSource.find("ProcessingProgressivePoisson"),
               std::string::npos);
+    for (const std::string_view appOwnedWindowId :
+         {
+             "pointcloud.appearance",
+             "pointcloud.properties",
+             "pointcloud.selection",
+             "pointcloud.processing.remove_outliers",
+             "graph.appearance",
+             "graph.properties",
+             "graph.selection",
+             "mesh.appearance",
+             "mesh.properties",
+             "mesh.selection",
+         })
+    {
+        EXPECT_NE(domainPanelSource.find(appOwnedWindowId),
+                  std::string::npos)
+            << appOwnedWindowId;
+        EXPECT_EQ(editorSource.find(appOwnedWindowId), std::string::npos)
+            << appOwnedWindowId;
+    }
+    for (const std::string_view retiredFixedDomainSymbol :
+         {
+             "DomainWindowSection",
+             "DomainWindowSlotIndex",
+             "kSandboxEditorDomainWindowCount",
+             "m_DomainWindowOpen",
+             "RegisterExemplarWindows",
+             "DrawRegisteredMeshAppearance",
+         })
+    {
+        EXPECT_EQ(editorSource.find(retiredFixedDomainSymbol),
+                  std::string::npos)
+            << retiredFixedDomainSymbol;
+        EXPECT_EQ(editorModule.find(retiredFixedDomainSymbol),
+                  std::string::npos)
+            << retiredFixedDomainSymbol;
+    }
     EXPECT_NE(methodPanelSource.find("pointcloud.processing.kmeans"),
               std::string::npos);
     EXPECT_NE(methodPanelSource.find("graph.processing.kmeans"),
@@ -1456,6 +1503,58 @@ TEST(SandboxEditorUi, DomainMenusUseAppearanceAndFocusedProcessingWindows)
                   std::string::npos)
             << commandFacade;
     }
+}
+
+TEST(SandboxEditorUi, DomainPanelsPreserveLifetimeCacheAndResultPublication)
+{
+    const std::string source = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp");
+    ASSERT_FALSE(source.empty());
+
+    EXPECT_NE(source.find("DomainPanels::~DomainPanels()"),
+              std::string::npos);
+    EXPECT_NE(source.find("m_Impl->Unregister();"), std::string::npos);
+    EXPECT_NE(source.find("EditorUi->UnregisterEditorWindow(handle)"),
+              std::string::npos);
+    EXPECT_NE(source.find("Handles.clear();"), std::string::npos);
+    EXPECT_NE(source.find("EditorUi = nullptr;"), std::string::npos);
+
+    EXPECT_NE(source.find("CachedModelFrame != frame"),
+              std::string::npos);
+    EXPECT_NE(source.find("CachedDomainModels"), std::string::npos);
+    EXPECT_NE(source.find("DomainWindowModelCacheHits"),
+              std::string::npos);
+
+    const std::string_view outlierControls = SourceRange(
+        source,
+        "void DrawPointCloudOutlierRemovalControls(",
+        "void DrawDomainProcessingWindow(");
+    ASSERT_FALSE(outlierControls.empty());
+    EXPECT_NE(outlierControls.find(
+                  "ApplySandboxEditorPointCloudOutlierRemovalCommand"),
+              std::string::npos);
+    EXPECT_NE(outlierControls.find(
+                  "context.MethodResultSinks.PointCloudOutlierRemoval"),
+              std::string::npos);
+
+    const std::string_view textureBakeControls = SourceRange(
+        source,
+        "void DrawTextureBakeControls(",
+        "void DrawRenderHintStatus(");
+    ASSERT_FALSE(textureBakeControls.empty());
+    EXPECT_NE(source.find("context.LastPointCloudOutlierRemovalResult"),
+              std::string::npos);
+    EXPECT_NE(textureBakeControls.find("ApplySandboxEditorUvRegenerationCommand"),
+              std::string::npos);
+    EXPECT_NE(textureBakeControls.find("context->MethodResultSinks.UvRegeneration"),
+              std::string::npos);
+    EXPECT_NE(source.find("context.LastUvRegenerationResult"),
+              std::string::npos);
+
+    EXPECT_NE(source.find("ImVec2(340.0f, 300.0f)"),
+              std::string::npos);
+    EXPECT_NE(source.find("ImGuiCond_FirstUseEver"),
+              std::string::npos);
 }
 
 TEST(SandboxEditorUi, MeshProcessingPanelsPreserveLifetimeAndResultPublication)
@@ -2219,6 +2318,10 @@ TEST(SandboxEditorUi, ExtrinsicSandboxAppStaysRuntimeOnly)
     const std::string meshProcessingPanelsImplementation =
         ReadRepositoryTextFile(
             "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp");
+    const std::string domainPanelsModule = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.DomainPanels.cppm");
+    const std::string domainPanelsImplementation = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp");
     const std::string sandboxCMake =
         ReadRepositoryTextFile("src/app/Sandbox/CMakeLists.txt");
 
@@ -2229,6 +2332,8 @@ TEST(SandboxEditorUi, ExtrinsicSandboxAppStaysRuntimeOnly)
     ASSERT_FALSE(methodPanelsImplementation.empty());
     ASSERT_FALSE(meshProcessingPanelsModule.empty());
     ASSERT_FALSE(meshProcessingPanelsImplementation.empty());
+    ASSERT_FALSE(domainPanelsModule.empty());
+    ASSERT_FALSE(domainPanelsImplementation.empty());
     ASSERT_FALSE(sandboxCMake.empty());
 
     EXPECT_NE(sandboxModule.find("import Extrinsic.Runtime.Engine;"),
@@ -2272,6 +2377,30 @@ TEST(SandboxEditorUi, ExtrinsicSandboxAppStaysRuntimeOnly)
         EXPECT_EQ(meshProcessingPanelsImplementation.find(forbidden),
                   std::string::npos)
             << forbidden;
+        EXPECT_EQ(domainPanelsModule.find(forbidden), std::string::npos)
+            << forbidden;
+        EXPECT_EQ(domainPanelsImplementation.find(forbidden),
+                  std::string::npos)
+            << forbidden;
+    }
+
+    for (const char* forbiddenNamespace :
+         {
+             "Extrinsic::Assets",
+             "Extrinsic::Core",
+             "Extrinsic::ECS",
+             "Extrinsic::Graphics",
+             "Extrinsic::Platform",
+             "Extrinsic::RHI",
+             "Geometry::",
+         })
+    {
+        EXPECT_EQ(domainPanelsModule.find(forbiddenNamespace),
+                  std::string::npos)
+            << forbiddenNamespace;
+        EXPECT_EQ(domainPanelsImplementation.find(forbiddenNamespace),
+                  std::string::npos)
+            << forbiddenNamespace;
     }
 
     EXPECT_NE(sandboxCMake.find("target_link_libraries(ExtrinsicSandbox"),
@@ -2281,6 +2410,10 @@ TEST(SandboxEditorUi, ExtrinsicSandboxAppStaysRuntimeOnly)
     EXPECT_EQ(sandboxCMake.find("ExtrinsicPlatform"), std::string::npos);
     EXPECT_EQ(sandboxCMake.find("ExtrinsicRHI"), std::string::npos);
     EXPECT_NE(sandboxCMake.find("Sandbox.MeshProcessingPanels.cppm"),
+              std::string::npos);
+    EXPECT_NE(sandboxCMake.find("Sandbox.DomainPanels.cppm"),
+              std::string::npos);
+    EXPECT_NE(sandboxCMake.find("ExtrinsicSandboxDomainPanels"),
               std::string::npos);
 }
 
@@ -11982,32 +12115,34 @@ TEST(SandboxEditorUi, EngineAttachmentRegistersEditorCallback)
     engine.Shutdown();
 }
 
-TEST(SandboxEditorUi, RuntimeExemplarRegistersAppearanceOnly)
+TEST(SandboxEditorUi, RuntimeShellStartsWithoutAppOwnedDomainWindows)
 {
     Runtime::SandboxEditorUi ui;
+    EXPECT_TRUE(ui.BuildEditorWindowMenuModel().empty());
+}
 
-    const auto menu = ui.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), 1u);
-    const auto appearance = std::find_if(
-        menu.begin(),
-        menu.end(),
-        [](const Runtime::EditorWindowMenuEntry& entry)
-        {
-            return entry.Id == "mesh.appearance";
-        });
-    const auto simplify = std::find_if(
-        menu.begin(),
-        menu.end(),
-        [](const Runtime::EditorWindowMenuEntry& entry)
-        {
-            return entry.Id == "mesh.processing.simplify";
-        });
+TEST(SandboxEditorUi, MeshScalarPropertyPlotHelperBuildsFromSelectedMesh)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Plot mesh");
+    AddTriangleMeshSource(registry, mesh);
+    SetFloatProperty(
+        registry.Raw().get<GS::Vertices>(mesh).Properties,
+        "v:temperature",
+        {0.25f, 0.5f, 1.0f});
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
-    ASSERT_NE(appearance, menu.end());
-    EXPECT_EQ(appearance->MenuPath, (std::vector<std::string>{"Mesh"}));
-    EXPECT_EQ(appearance->Title, "Appearance");
-    EXPECT_FALSE(appearance->Open);
-    EXPECT_EQ(simplify, menu.end());
+    const Runtime::EditorScalarPropertyPlotModel model =
+        Runtime::BuildSandboxEditorMeshScalarPropertyPlotModel(
+            MakeContext(registry, selection),
+            "v:temperature");
+
+    EXPECT_EQ(model.SelectedProperty, "v:temperature");
+    EXPECT_EQ(model.FiniteSamples,
+              (std::vector<double>{0.25, 0.5, 1.0}));
+    EXPECT_EQ(model.SourceSampleCount, 3u);
+    EXPECT_TRUE(model.HasFiniteRange);
 }
 
 TEST(SandboxEditorUi, ExternalWindowContributionNeedsNoLegacySwitchEntry)
@@ -12044,7 +12179,7 @@ TEST(SandboxEditorUi, ExternalWindowContributionNeedsNoLegacySwitchEntry)
     EXPECT_EQ(drawCalls, 0);
 
     EXPECT_TRUE(ui.UnregisterEditorWindow(handle));
-    EXPECT_EQ(ui.BuildEditorWindowMenuModel().size(), 1u);
+    EXPECT_TRUE(ui.BuildEditorWindowMenuModel().empty());
 }
 
 TEST(SandboxEditorUi, ContextWindowContributionReceivesRuntimeFacade)
@@ -12081,59 +12216,6 @@ TEST(SandboxEditorUi, ContextWindowContributionReceivesRuntimeFacade)
     EXPECT_TRUE(receivedScene);
 
     EXPECT_TRUE(ui.UnregisterEditorWindow(handle));
-    ui.Detach();
-    engine.Shutdown();
-}
-
-TEST(SandboxEditorUi, ClosedRuntimeExemplarBuildsNoDomainModels)
-{
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<OneFrameApplication>());
-    engine.Initialize();
-    const ECS::EntityHandle mesh = MakeSelectable(engine.GetScene(), "Plot mesh");
-    AddTriangleMeshSource(engine.GetScene(), mesh);
-    SetFloatProperty(
-        engine.GetScene().Raw().get<GS::Vertices>(mesh).Properties,
-        "v:temperature",
-        {0.25f, 0.5f, 1.0f});
-    ASSERT_TRUE(
-        engine.GetSelectionController().SetSelectedEntity(engine.GetScene(), mesh));
-
-    Runtime::SandboxEditorUi ui;
-    ui.Attach(engine);
-    engine.Run();
-
-    EXPECT_EQ(ui.GetLastFrame().ModelBuildStats.DomainWindowModelBuilds, 0u);
-    EXPECT_EQ(ui.GetLastFrame().ModelBuildStats.DomainWindowModelCacheHits, 0u);
-
-    ui.Detach();
-    engine.Shutdown();
-}
-
-TEST(SandboxEditorUi, OpenRuntimeAppearanceBuildsOneLazyMeshModel)
-{
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<OneFrameApplication>());
-    engine.Initialize();
-    const ECS::EntityHandle mesh = MakeSelectable(engine.GetScene(), "Plot mesh");
-    AddTriangleMeshSource(engine.GetScene(), mesh);
-    SetFloatProperty(
-        engine.GetScene().Raw().get<GS::Vertices>(mesh).Properties,
-        "v:temperature",
-        {0.25f, 0.5f, 1.0f});
-    ASSERT_TRUE(
-        engine.GetSelectionController().SetSelectedEntity(engine.GetScene(), mesh));
-
-    Runtime::SandboxEditorUi ui;
-    ASSERT_TRUE(ui.SetEditorWindowOpen("mesh.appearance", true));
-    ui.Attach(engine);
-    engine.Run();
-
-    EXPECT_EQ(ui.GetLastFrame().ModelBuildStats.DomainWindowModelBuilds, 1u);
-    EXPECT_EQ(ui.GetLastFrame().ModelBuildStats.DomainWindowModelCacheHits, 0u);
-
     ui.Detach();
     engine.Shutdown();
 }

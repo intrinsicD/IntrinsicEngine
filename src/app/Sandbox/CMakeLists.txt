@@ -1,10 +1,28 @@
-add_executable(ExtrinsicSandbox)
-set_target_properties(ExtrinsicSandbox PROPERTIES CXX_SCAN_FOR_MODULES ON)
-target_compile_options(ExtrinsicSandbox PRIVATE ${INTRINSIC_COMPILE_FLAGS})
-target_compile_features(ExtrinsicSandbox PUBLIC cxx_std_23)
-target_link_options(ExtrinsicSandbox PRIVATE ${INTRINSIC_LINK_FLAGS})
+if(INTRINSIC_BUILD_SANDBOX OR INTRINSIC_BUILD_TESTS)
+    intrinsic_add_module_library(ExtrinsicSandboxDomainPanels)
+    target_sources(ExtrinsicSandboxDomainPanels
+            PUBLIC
+            FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
+            Editor/Sandbox.DomainPanels.cppm
+            PRIVATE
+            Editor/Sandbox.DomainPanels.cpp
+    )
+    target_link_libraries(ExtrinsicSandboxDomainPanels
+            PUBLIC
+            ExtrinsicRuntime
+            PRIVATE
+            imgui_core_lib
+    )
+endif()
 
-target_sources(ExtrinsicSandbox
+if(INTRINSIC_BUILD_SANDBOX AND NOT INTRINSIC_HEADLESS_NO_GLFW)
+    add_executable(ExtrinsicSandbox)
+    set_target_properties(ExtrinsicSandbox PROPERTIES CXX_SCAN_FOR_MODULES ON)
+    target_compile_options(ExtrinsicSandbox PRIVATE ${INTRINSIC_COMPILE_FLAGS})
+    target_compile_features(ExtrinsicSandbox PUBLIC cxx_std_23)
+    target_link_options(ExtrinsicSandbox PRIVATE ${INTRINSIC_LINK_FLAGS})
+
+    target_sources(ExtrinsicSandbox
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Sandbox.cppm
@@ -15,14 +33,16 @@ target_sources(ExtrinsicSandbox
         Editor/Sandbox.MethodPanels.cpp
         Editor/Sandbox.MeshProcessingPanels.cpp
         main.cpp
-)
+    )
 
-target_link_libraries(ExtrinsicSandbox
+    target_link_libraries(ExtrinsicSandbox
         PRIVATE
         ExtrinsicRuntime
-)
+        ExtrinsicSandboxDomainPanels
+    )
 
-include(${CMAKE_SOURCE_DIR}/cmake/CompileShaders.cmake)
+    include(${CMAKE_SOURCE_DIR}/cmake/CompileShaders.cmake)
 
-# Ensure promoted Sandbox runtime shader artifacts are built next to the executable.
-intrinsic_add_glsl_shaders(ExtrinsicSandbox)
+    # Ensure promoted Sandbox runtime shader artifacts are built next to the executable.
+    intrinsic_add_glsl_shaders(ExtrinsicSandbox)
+endif()
