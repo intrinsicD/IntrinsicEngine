@@ -11,8 +11,9 @@ lifecycle hooks, but engine feature wiring, frame phases, and subsystem behavior
 belong in `Runtime` or lower engine layers. The executable obtains its default
 configuration through `Runtime` and should not import lower layers directly.
 
-The sandbox app attaches the transitional runtime-owned `SandboxEditorUi` shell
-through application lifecycle hooks. That shell delegates generic
+The app-owned `Sandbox.Editor.Controller` owns the transitional runtime
+`SandboxEditorUi` shell and all extracted panel-family lifetimes behind one
+attach/detach interface. The shell delegates generic
 callback/registry/visibility lifecycle to `Runtime.EditorUiHost` while ARCH-006
 moves presentation into this directory. `Sandbox.Editor.MethodPanels` now owns
 the K-Means and Progressive Poisson ImGui controls and registers five domain

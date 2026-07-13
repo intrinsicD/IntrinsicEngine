@@ -16,6 +16,8 @@ engine runtime. The canonical entry point is `Sandbox`.
 ```text
 Sandbox/
   Editor/
+    Sandbox.EditorController.cppm
+    Sandbox.EditorController.cpp
     Sandbox.MethodPanels.cppm
     Sandbox.MethodPanels.cpp
     Sandbox.MeshProcessingPanels.cppm
@@ -35,3 +37,9 @@ composition and exposes app-facing helpers such as the reference engine
 configuration. Applications must not import lower engine layers for convenience
 and must not expose types back to the engine. No other engine layer may import
 an application module.
+
+`ExtrinsicSandboxEditor` is the app-owned editor composition library. Its
+`Sandbox.Editor.Controller` module owns the transitional runtime editor shell
+and the Method, Mesh Processing, and Domain panel lifetimes behind one
+idempotent attach/detach interface; the Sandbox executable no longer composes
+those panel families individually.

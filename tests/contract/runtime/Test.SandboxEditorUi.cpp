@@ -2285,6 +2285,10 @@ TEST(SandboxEditorUi, ExtrinsicSandboxAppStaysRuntimeOnly)
         ReadRepositoryTextFile("src/app/Sandbox/Sandbox.cpp");
     const std::string sandboxMain =
         ReadRepositoryTextFile("src/app/Sandbox/main.cpp");
+    const std::string editorControllerModule = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.EditorController.cppm");
+    const std::string editorControllerImplementation = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.EditorController.cpp");
     const std::string methodPanelsModule = ReadRepositoryTextFile(
         "src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm");
     const std::string methodPanelsImplementation = ReadRepositoryTextFile(
@@ -2304,6 +2308,8 @@ TEST(SandboxEditorUi, ExtrinsicSandboxAppStaysRuntimeOnly)
     ASSERT_FALSE(sandboxModule.empty());
     ASSERT_FALSE(sandboxImplementation.empty());
     ASSERT_FALSE(sandboxMain.empty());
+    ASSERT_FALSE(editorControllerModule.empty());
+    ASSERT_FALSE(editorControllerImplementation.empty());
     ASSERT_FALSE(methodPanelsModule.empty());
     ASSERT_FALSE(methodPanelsImplementation.empty());
     ASSERT_FALSE(domainPanelsModule.empty());
@@ -2316,8 +2322,14 @@ TEST(SandboxEditorUi, ExtrinsicSandboxAppStaysRuntimeOnly)
               std::string::npos);
     EXPECT_EQ(sandboxModule.find("import Extrinsic.Runtime.SandboxEditorUi;"),
               std::string::npos);
-    EXPECT_NE(
+    EXPECT_NE(sandboxImplementation.find(
+                  "import Extrinsic.Sandbox.Editor.Controller;"),
+              std::string::npos);
+    EXPECT_EQ(
         sandboxImplementation.find("import Extrinsic.Runtime.SandboxEditorUi;"),
+        std::string::npos);
+    EXPECT_NE(editorControllerImplementation.find(
+                  "import Extrinsic.Runtime.SandboxEditorUi;"),
               std::string::npos);
     EXPECT_NE(sandboxMain.find("import Extrinsic.Runtime.Engine;"),
               std::string::npos);
@@ -2341,6 +2353,11 @@ TEST(SandboxEditorUi, ExtrinsicSandboxAppStaysRuntimeOnly)
         EXPECT_EQ(sandboxImplementation.find(forbidden), std::string::npos)
             << forbidden;
         EXPECT_EQ(sandboxMain.find(forbidden), std::string::npos)
+            << forbidden;
+        EXPECT_EQ(editorControllerModule.find(forbidden), std::string::npos)
+            << forbidden;
+        EXPECT_EQ(editorControllerImplementation.find(forbidden),
+                  std::string::npos)
             << forbidden;
         EXPECT_EQ(methodPanelsModule.find(forbidden), std::string::npos)
             << forbidden;
@@ -2369,6 +2386,8 @@ TEST(SandboxEditorUi, ExtrinsicSandboxAppStaysRuntimeOnly)
     EXPECT_NE(sandboxCMake.find("Sandbox.MeshProcessingPanels.cppm"),
               std::string::npos);
     EXPECT_NE(sandboxCMake.find("Sandbox.DomainPanels.cppm"),
+              std::string::npos);
+    EXPECT_NE(sandboxCMake.find("ExtrinsicSandboxEditor"),
               std::string::npos);
 }
 

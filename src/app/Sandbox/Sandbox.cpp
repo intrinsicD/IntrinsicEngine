@@ -4,22 +4,16 @@ module;
 
 module Extrinsic.Sandbox;
 
-import Extrinsic.Sandbox.Editor.DomainPanels;
-import Extrinsic.Sandbox.Editor.MethodPanels;
-import Extrinsic.Sandbox.Editor.MeshProcessingPanels;
+import Extrinsic.Sandbox.Editor.Controller;
 import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
-import Extrinsic.Runtime.SandboxEditorUi;
 
 namespace Extrinsic::Sandbox {
 class App final : public Runtime::IApplication {
 public:
   void OnInitialize(Runtime::Engine &engine) override {
     m_DefaultPolicies = Runtime::RegisterSandboxDefaultRuntimePolicies(engine);
-    m_EditorUi.Attach(engine);
-    m_MethodPanels.Register(m_EditorUi);
-    m_MeshProcessingPanels.Register(m_EditorUi);
-    m_DomainPanels.Register(m_EditorUi);
+    m_EditorController.Attach(engine);
   }
 
   void OnSimTick(Runtime::Engine &engine, double fixedDt) override {
@@ -35,18 +29,12 @@ public:
   }
 
   void OnShutdown(Runtime::Engine &engine) override {
-    m_DomainPanels.Unregister();
-    m_MeshProcessingPanels.Unregister();
-    m_MethodPanels.Unregister();
-    m_EditorUi.Detach();
+    m_EditorController.Detach();
     Runtime::UnregisterSandboxDefaultRuntimePolicies(engine, m_DefaultPolicies);
   }
 
 private:
-  Runtime::SandboxEditorUi m_EditorUi{};
-  Editor::MethodPanels m_MethodPanels{};
-  Editor::MeshProcessingPanels m_MeshProcessingPanels{};
-  Editor::DomainPanels m_DomainPanels{};
+  Editor::SandboxEditorController m_EditorController{};
   Runtime::RuntimeSandboxDefaultPolicyRegistration m_DefaultPolicies{};
 };
 

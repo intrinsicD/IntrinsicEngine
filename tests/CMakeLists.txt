@@ -310,6 +310,19 @@ if(TARGET ExtrinsicRuntime)
     )
 endif()
 
+# --- Sandbox editor app/runtime integration (ARCH-006) ---
+if(TARGET ExtrinsicSandboxEditor)
+    intrinsic_resolve_test_sources(_sandbox_editor_integration_test_sources
+        SEARCH_DIRS integration/runtime
+        FILES Test.SandboxDomainPanels.cpp
+    )
+    intrinsic_test_object_lib(SandboxEditorIntegrationTestObjs
+        SOURCES
+            ${_sandbox_editor_integration_test_sources}
+        DEPS ExtrinsicSandboxEditor ExtrinsicRuntime
+    )
+endif()
+
 # --- Benchmark/SLO checks ---
 set(_benchmark_test_files
     Test.ArchitectureSLO.cpp
@@ -928,6 +941,14 @@ if(TARGET RuntimeContractTestObjs)
         OBJECTS RuntimeContractTestObjs
         LINK_LIBS ExtrinsicRuntime IntrinsicProgressivePoissonReference
         LABELS contract runtime
+    )
+endif()
+
+if(TARGET SandboxEditorIntegrationTestObjs)
+    intrinsic_test_executable(IntrinsicSandboxEditorIntegrationTests
+        OBJECTS SandboxEditorIntegrationTestObjs
+        LINK_LIBS ExtrinsicSandboxEditor ExtrinsicRuntime
+        LABELS integration runtime
     )
 endif()
 
