@@ -28,6 +28,10 @@ Graphics-owned bridge between `Assets::AssetId` and GPU resources.
   `Tick(currentFrame, ...)` reaches the recorded ready frame. The texture
   descriptor must include `Sampled | ColorTarget`; the future dilation path may
   add `Storage` but the cache does not infer that usage.
+  `FailGpuProducedTexture(id, generation)` retires only the exact pending
+  generation opened by `BeginGpuProducedTexture`; it fails closed for absent,
+  already-promoted, transfer-owned, or mismatched generations, so late failure
+  cleanup cannot recreate a destroyed asset or retire a replacement.
 - KTX/KTX2 is not a current promoted residency path. `Asset.ImportRouter`
   recognizes the extensions, but `Asset.ModelTexturePayload` and
   `Runtime.AssetModelTextureIO` reject KTX/KTX2 with

@@ -455,6 +455,33 @@ namespace Extrinsic::Graphics
         return Core::Ok();
     }
 
+    Core::Result GpuAssetCache::FailGpuProducedTexture(
+        const Assets::AssetId id,
+        const std::uint64_t generation)
+    {
+        if (!id.IsValid() || generation == 0u)
+            return Core::Err(Core::ErrorCode::InvalidArgument);
+
+        std::lock_guard guard(m_Impl->Mutex);
+        const auto it = m_Impl->Slots.find(id);
+        if (it == m_Impl->Slots.end())
+            return Core::Err(Core::ErrorCode::ResourceNotFound);
+
+        Slot& slot = it->second;
+        if (slot.State != GpuAssetState::GpuUploading ||
+            slot.Kind != GpuAssetKind::Texture ||
+            !slot.PendingTexture.IsValid() ||
+            slot.PendingGeneration != generation ||
+            slot.CompletionKind == PendingCompletionKind::TransferToken)
+        {
+            return Core::Err(Core::ErrorCode::InvalidState);
+        }
+
+        m_Impl->RetirePending(slot);
+        slot.State = GpuAssetState::Failed;
+        return Core::Ok();
+    }
+
     Core::Result GpuAssetCache::InitializeFallbackTexture(const GpuTextureFallbackDesc& desc)
     {
         std::lock_guard guard(m_Impl->Mutex);

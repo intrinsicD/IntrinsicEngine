@@ -5,6 +5,7 @@
 #include <utility>
 
 import Extrinsic.Asset.Registry;
+import Extrinsic.Core.Error;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
@@ -25,6 +26,7 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeGpuQueue;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeService;
+import Extrinsic.Runtime.ObjectSpaceNormalBakeSubmission;
 import Extrinsic.Runtime.RenderExtraction;
 
 #include "MockRHI.hpp"
@@ -32,6 +34,7 @@ import Extrinsic.Runtime.RenderExtraction;
 namespace
 {
     namespace Assets = Extrinsic::Assets;
+    namespace Core = Extrinsic::Core;
     namespace Graphics = Extrinsic::Graphics;
     namespace RHI = Extrinsic::RHI;
     namespace Runtime = Extrinsic::Runtime;
@@ -398,7 +401,7 @@ TEST(RuntimeObjectSpaceNormalBakeGpuQueue,
     GpuQueueFixture fx;
     Extrinsic::Tests::MockCommandContext commandContext;
     const Assets::AssetId generated{97u, 1u};
-    bool forceReadyFrameFailure = true;
+    std::uint32_t markReadyCalls = 0u;
     fx.Queue.SetDependencies(
         Runtime::RuntimeObjectSpaceNormalBakeGpuQueueDependencies{
             .GpuAssets = &fx.GpuAssets,
@@ -420,17 +423,25 @@ TEST(RuntimeObjectSpaceNormalBakeGpuQueue,
                         .Plan = std::move(plan),
                     };
                 },
-            .ReadyFrame =
-                [&fx, generated, &forceReadyFrameFailure]
+            .ReadyFrame = [] { return 2u; },
+            .MarkReady =
+                [&markReadyCalls](
+                    Graphics::GpuAssetCache& gpuAssets,
+                    const Runtime::RuntimeObjectSpaceNormalBakeGpuSubmissionTicket&
+                        ticket,
+                    const std::uint64_t readyFrame) -> Core::Result
                 {
-                    if (forceReadyFrameFailure)
+                    if (markReadyCalls++ == 0u)
                     {
-                        forceReadyFrameFailure = false;
-                        // Model the asset disappearing between command
-                        // recording and ready-frame publication.
-                        fx.GpuAssets.NotifyDestroyed(generated);
+                        // Leave the exact pending cache generation intact so
+                        // the queue's failure cleanup is the only operation
+                        // that can release it.
+                        return Core::Err(Core::ErrorCode::InvalidState);
                     }
-                    return 2u;
+                    return Runtime::MarkObjectSpaceNormalBakeGpuSubmissionReady(
+                        gpuAssets,
+                        ticket,
+                        readyFrame);
                 },
             .MaxSubmissionsPerFrame = 1u,
             .MaxBindingsPerDrain = 1u,
@@ -443,6 +454,7 @@ TEST(RuntimeObjectSpaceNormalBakeGpuQueue,
                     .Succeeded());
     fx.Queue.RecordFrameCommands(commandContext);
 
+    EXPECT_EQ(markReadyCalls, 1u);
     EXPECT_EQ(fx.Queue.Diagnostics().ReadyFrameFailures, 1u);
     EXPECT_EQ(fx.Queue.Diagnostics().RecordedSubmissions, 0u);
     EXPECT_EQ(fx.Queue.Queue().PendingSubmissionCount(), 0u);
@@ -455,6 +467,7 @@ TEST(RuntimeObjectSpaceNormalBakeGpuQueue,
                     .Succeeded());
     fx.Queue.RecordFrameCommands(commandContext);
 
+    EXPECT_EQ(markReadyCalls, 2u);
     EXPECT_EQ(fx.Queue.Diagnostics().CacheRejected, 0u);
     EXPECT_EQ(fx.Queue.Diagnostics().RecordedSubmissions, 1u);
     EXPECT_EQ(fx.Queue.Queue().PendingSubmissionCount(), 0u);

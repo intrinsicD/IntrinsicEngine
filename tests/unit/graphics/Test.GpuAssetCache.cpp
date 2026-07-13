@@ -676,6 +676,60 @@ TEST(GpuAssetCache, GpuProducedTextureReadyFrameCanBeSetAfterRecording)
     EXPECT_EQ(fx.Cache.GetState(id), Graphics::GpuAssetState::Ready);
 }
 
+TEST(GpuAssetCache, GpuProducedTextureFailureRequiresMatchingGeneration)
+{
+    CacheFixture fx;
+    const auto id = MakeAssetId(26);
+
+    auto pending = fx.Cache.BeginGpuProducedTexture(
+        Graphics::GpuProducedTextureRequest{
+            .Id = id,
+            .Desc = AnyProducedTextureDesc(),
+            .SamplerDesc = AnySamplerDesc(),
+        });
+    ASSERT_TRUE(pending.has_value());
+
+    auto stale = fx.Cache.FailGpuProducedTexture(id, pending->Generation + 1u);
+    ASSERT_FALSE(stale.has_value());
+    EXPECT_EQ(stale.error(), Core::ErrorCode::InvalidState);
+    EXPECT_EQ(fx.Cache.GetState(id), Graphics::GpuAssetState::GpuUploading);
+
+    ASSERT_TRUE(
+        fx.Cache.FailGpuProducedTexture(id, pending->Generation).has_value());
+    EXPECT_EQ(fx.Cache.GetState(id), Graphics::GpuAssetState::Failed);
+
+    auto retry = fx.Cache.BeginGpuProducedTexture(
+        Graphics::GpuProducedTextureRequest{
+            .Id = id,
+            .Desc = AnyProducedTextureDesc(),
+            .SamplerDesc = AnySamplerDesc(),
+        });
+    ASSERT_TRUE(retry.has_value());
+    EXPECT_GT(retry->Generation, pending->Generation);
+}
+
+TEST(GpuAssetCache, GpuProducedTextureFailureDoesNotRecreateDestroyedSlot)
+{
+    CacheFixture fx;
+    const auto id = MakeAssetId(27);
+
+    auto pending = fx.Cache.BeginGpuProducedTexture(
+        Graphics::GpuProducedTextureRequest{
+            .Id = id,
+            .Desc = AnyProducedTextureDesc(),
+            .SamplerDesc = AnySamplerDesc(),
+        });
+    ASSERT_TRUE(pending.has_value());
+
+    fx.Cache.NotifyDestroyed(id);
+    ASSERT_EQ(fx.Cache.TrackedCount(), 0u);
+
+    auto missing = fx.Cache.FailGpuProducedTexture(id, pending->Generation);
+    ASSERT_FALSE(missing.has_value());
+    EXPECT_EQ(missing.error(), Core::ErrorCode::ResourceNotFound);
+    EXPECT_EQ(fx.Cache.TrackedCount(), 0u);
+}
+
 TEST(GpuAssetCache, GpuProducedTextureRequiresSampledColorTargetUsage)
 {
     CacheFixture fx;

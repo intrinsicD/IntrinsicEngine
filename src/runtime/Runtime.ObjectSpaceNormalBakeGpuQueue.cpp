@@ -225,27 +225,34 @@ namespace Extrinsic::Runtime
                 // pending cache slot for this asset. Dropping the ticket without
                 // failing the slot leaves it pending forever, so every future
                 // re-schedule of the same entity hits ResourceBusy ->
-                // CacheRejected -> requeue, livelocking. NotifyFailed retires the
-                // pending lease and lets a later schedule start clean.
-                m_Dependencies.GpuAssets->NotifyFailed(
-                    submitted.Ticket.GeneratedTextureAsset);
+                // CacheRejected -> requeue, livelocking. Failing the exact cache
+                // generation retires its pending lease without touching a
+                // replacement and lets a later schedule start clean.
+                (void)m_Dependencies.GpuAssets->FailGpuProducedTexture(
+                    submitted.Ticket.GeneratedTextureAsset,
+                    submitted.Ticket.CacheGeneration);
                 continue;
             }
 
             const std::uint64_t readyFrame = m_Dependencies.ReadyFrame
                 ? m_Dependencies.ReadyFrame()
                 : 0u;
-            Core::Result markedReady = MarkObjectSpaceNormalBakeGpuSubmissionReady(
-                *m_Dependencies.GpuAssets,
-                submitted.Ticket,
-                readyFrame);
+            Core::Result markedReady = m_Dependencies.MarkReady
+                ? m_Dependencies.MarkReady(*m_Dependencies.GpuAssets,
+                                           submitted.Ticket,
+                                           readyFrame)
+                : MarkObjectSpaceNormalBakeGpuSubmissionReady(
+                      *m_Dependencies.GpuAssets,
+                      submitted.Ticket,
+                      readyFrame);
             if (!markedReady.has_value())
             {
                 ++m_Diagnostics.ReadyFrameFailures;
                 // BUG-074: retire the pending cache slot on the ready-frame
                 // failure path too (see the record-failure path above).
-                m_Dependencies.GpuAssets->NotifyFailed(
-                    submitted.Ticket.GeneratedTextureAsset);
+                (void)m_Dependencies.GpuAssets->FailGpuProducedTexture(
+                    submitted.Ticket.GeneratedTextureAsset,
+                    submitted.Ticket.CacheGeneration);
                 continue;
             }
 

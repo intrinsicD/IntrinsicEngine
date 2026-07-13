@@ -8,6 +8,7 @@ module;
 
 export module Extrinsic.Runtime.ObjectSpaceNormalBakeGpuQueue;
 
+import Extrinsic.Core.Error;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
 import Extrinsic.RHI.CommandContext;
@@ -47,12 +48,19 @@ export namespace Extrinsic::Runtime
     using RuntimeObjectSpaceNormalBakeReadyFrameProvider =
         std::function<std::uint64_t()>;
 
+    using RuntimeObjectSpaceNormalBakeMarkReady =
+        std::function<Core::Result(
+            Graphics::GpuAssetCache&,
+            const RuntimeObjectSpaceNormalBakeGpuSubmissionTicket&,
+            std::uint64_t)>;
+
     struct RuntimeObjectSpaceNormalBakeGpuQueueDependencies
     {
         Graphics::GpuAssetCache* GpuAssets{};
         RenderExtractionCache* RenderExtraction{};
         RuntimeObjectSpaceNormalBakePlanProvider BuildPlan{};
         RuntimeObjectSpaceNormalBakeReadyFrameProvider ReadyFrame{};
+        RuntimeObjectSpaceNormalBakeMarkReady MarkReady{};
         std::size_t MaxSubmissionsPerFrame{1u};
         std::size_t MaxBindingsPerDrain{8u};
     };

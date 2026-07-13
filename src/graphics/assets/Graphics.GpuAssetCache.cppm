@@ -211,6 +211,10 @@ export namespace Extrinsic::Graphics
             BeginGpuProducedTexture(const GpuProducedTextureRequest& req);
         Core::Result SetGpuProducedTextureReadyFrame(Assets::AssetId id,
                                                      std::uint64_t readyFrame);
+        // Fail only the exact GPU-produced pending generation. This never
+        // creates a missing slot and never retires a newer replacement.
+        Core::Result FailGpuProducedTexture(Assets::AssetId id,
+                                            std::uint64_t generation);
         Core::Result InitializeFallbackTexture(const GpuTextureFallbackDesc& desc = {});
 
         // Force CpuPending (no GPU work yet).  Idempotent for an entry that
