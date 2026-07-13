@@ -191,9 +191,14 @@ tracks exactly one active world, and applies active-world switches or destroy
 requests only at the Maintenance boundary. Destroy is two phase: Maintenance
 publishes `WorldWillBeDestroyed` and cancels jobs scoped to that world, the
 event pumps on a later frame, and only a later Maintenance pass tears the
-registry down. Higher-level preview/readiness/switch UX policy is deliberately
-not in the registry; later runtime modules compose those behaviors through the
-kernel events, jobs, and explicit world handles.
+registry down. After an active-world change is applied, `Engine` refreshes its
+active scene pointer and immediately rebinds scene-borrowing asset handoffs,
+import-pipeline dependencies, selection lookup, and stable-entity lookup. This
+ordering removes references to the previous registry before its deferred
+destruction pass; if no active scene exists, the borrowers and lookups are
+detached. Higher-level preview/readiness/switch UX policy is deliberately not in
+the registry; later runtime modules compose those behaviors through the kernel
+events, jobs, and explicit world handles.
 
 ### Camera focus command
 

@@ -15,7 +15,6 @@ Each active task should include:
   Sandbox editor presentation from runtime to app through the retired UI-034
   contribution seam (`in progress`, owner: Codex, branch:
   `codex/ui-034-editor-window-contribution`).
-
 ## History
 
 Retirement narratives live in the append-only

@@ -3,21 +3,39 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstddef>
+#include <cstdint>
 #include <mutex>
+#include <string_view>
 #include <thread>
+#include <vector>
 
+#include <glm/glm.hpp>
+
+import Extrinsic.Asset.GeometryIOBridge;
+import Extrinsic.Asset.ImportRouter;
+import Extrinsic.Asset.ModelTexturePayload;
+import Extrinsic.Asset.Registry;
+import Extrinsic.Asset.Service;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Tasks;
+import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
+import Geometry.HalfedgeMesh.IO;
+import Geometry.Properties;
 
+namespace Assets = Extrinsic::Assets;
+namespace Core = Extrinsic::Core;
 namespace CoreConfig = Extrinsic::Core::Config;
+namespace ECS = Extrinsic::ECS;
 namespace Runtime = Extrinsic::Runtime;
 
 namespace
@@ -77,6 +95,44 @@ namespace
         return config;
     }
 
+    [[nodiscard]] Geometry::MeshIO::MeshIOResult MakeWorldSwitchTriangleMesh()
+    {
+        Geometry::MeshIO::MeshIOResult mesh{};
+        mesh.SourcePath = "/models/world-switch-triangle.gltf";
+        mesh.BasePath = "/models";
+        mesh.Vertices.Resize(3u);
+        auto positions = mesh.Vertices.GetOrAdd<glm::vec3>(
+            "v:point", glm::vec3{0.0f});
+        positions[0] = glm::vec3{0.0f, 0.0f, 0.0f};
+        positions[1] = glm::vec3{1.0f, 0.0f, 0.0f};
+        positions[2] = glm::vec3{0.0f, 1.0f, 0.0f};
+
+        mesh.Faces.Resize(1u);
+        auto faces = mesh.Faces.GetOrAdd<std::vector<std::uint32_t>>(
+            "f:vertices", {});
+        faces[0] = {0u, 1u, 2u};
+        return mesh;
+    }
+
+    [[nodiscard]] Assets::AssetModelScenePayload MakeWorldSwitchModelPayload()
+    {
+        Assets::AssetModelScenePayload payload{};
+        payload.SourcePath = "/models/world-switch-triangle.gltf";
+        payload.GeometryPayloads.push_back(Assets::AssetGeometryPayload::Make(
+            Assets::AssetPayloadKind::Mesh,
+            MakeWorldSwitchTriangleMesh(),
+            "Geometry::MeshIO::MeshIOResult"));
+        payload.Primitives.push_back(Assets::AssetModelPrimitivePayload{
+            .Name = "WorldSwitchTriangle",
+            .GeometryKind = Assets::AssetPayloadKind::Mesh,
+            .GeometryPayloadIndex = 0u,
+            .MaterialIndex = Assets::kInvalidAssetModelIndex,
+            .VertexCount = 3u,
+            .IndexCount = 3u,
+        });
+        return payload;
+    }
+
     class EngineWorldProbeApplication final : public Runtime::IApplication
     {
     public:
@@ -127,6 +183,80 @@ namespace
         Extrinsic::ECS::Scene::Registry* FirstVariableScene{};
         Extrinsic::ECS::Scene::Registry* SecondVariableScene{};
         std::uint32_t VariableTicks{0};
+    };
+
+    class EngineSceneBorrowerRebindApplication final
+        : public Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Runtime::Engine& engine) override
+        {
+            FirstWorld = engine.ActiveWorld();
+            SecondWorld = engine.Worlds().CreateWorld("scene-borrower-target");
+            SwitchRequested =
+                engine.Worlds().RequestSetActiveWorld(SecondWorld).has_value();
+        }
+
+        void OnSimTick(Runtime::Engine&, double) override {}
+
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            ++VariableTicks;
+            if (VariableTicks == 2u)
+            {
+                DestroyRequested =
+                    engine.Worlds().RequestDestroyWorld(FirstWorld).has_value();
+                auto loaded = engine.GetAssetService().Load<
+                    Assets::AssetModelScenePayload>(
+                    "/virtual/bug-068-world-switch.gltf",
+                    [](std::string_view,
+                       Assets::AssetId)
+                        -> Core::Expected<Assets::AssetModelScenePayload>
+                    {
+                        return MakeWorldSwitchModelPayload();
+                    });
+                LoadSucceeded = loaded.has_value();
+                if (loaded.has_value())
+                    ModelAsset = *loaded;
+                return;
+            }
+
+            if (VariableTicks == 3u)
+            {
+                EntityCountAfterReady =
+                    engine.GetScene().Raw().storage<ECS::EntityHandle>().size();
+                ReloadBeforeDestroySucceeded =
+                    ModelAsset.IsValid() &&
+                    engine.GetAssetService().Reload(ModelAsset).has_value();
+                return;
+            }
+
+            if (VariableTicks == 4u)
+            {
+                OldWorldDestroyed = !engine.Worlds().Contains(FirstWorld);
+                EntityCountAfterFirstReload =
+                    engine.GetScene().Raw().storage<ECS::EntityHandle>().size();
+                ReloadAfterDestroySucceeded =
+                    ModelAsset.IsValid() &&
+                    engine.GetAssetService().Reload(ModelAsset).has_value();
+                engine.RequestExit();
+            }
+        }
+
+        void OnShutdown(Runtime::Engine&) override {}
+
+        Runtime::WorldHandle FirstWorld{};
+        Runtime::WorldHandle SecondWorld{};
+        Assets::AssetId ModelAsset{};
+        std::uint32_t VariableTicks{0};
+        std::size_t EntityCountAfterReady{0u};
+        std::size_t EntityCountAfterFirstReload{0u};
+        bool SwitchRequested{false};
+        bool DestroyRequested{false};
+        bool LoadSucceeded{false};
+        bool ReloadBeforeDestroySucceeded{false};
+        bool OldWorldDestroyed{false};
+        bool ReloadAfterDestroySucceeded{false};
     };
 }
 
@@ -325,6 +455,30 @@ TEST(RuntimeWorldRegistry, EngineBootsFrameZeroWorldAndAppliesSwitchAtMaintenanc
               engine.Worlds().Get(appPtr->CreatedWorld));
     EXPECT_EQ(appPtr->ThirdVariableActive, appPtr->CreatedWorld);
     EXPECT_EQ(appPtr->LastExtractionWorld, appPtr->CreatedWorld);
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeWorldRegistry, EngineRebindsSceneBorrowersBeforeRetiringPreviousWorld)
+{
+    auto app = std::make_unique<EngineSceneBorrowerRebindApplication>();
+    EngineSceneBorrowerRebindApplication* appPtr = app.get();
+
+    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(app));
+    engine.Initialize();
+    engine.Run();
+
+    EXPECT_TRUE(appPtr->SwitchRequested);
+    EXPECT_TRUE(appPtr->DestroyRequested);
+    EXPECT_TRUE(appPtr->LoadSucceeded);
+    EXPECT_TRUE(appPtr->ReloadBeforeDestroySucceeded);
+    EXPECT_TRUE(appPtr->OldWorldDestroyed);
+    EXPECT_TRUE(appPtr->ReloadAfterDestroySucceeded);
+    EXPECT_EQ(engine.ActiveWorld(), appPtr->SecondWorld);
+    EXPECT_FALSE(engine.Worlds().Contains(appPtr->FirstWorld));
+    EXPECT_EQ(appPtr->EntityCountAfterReady, 1u);
+    EXPECT_EQ(appPtr->EntityCountAfterFirstReload, 1u);
+    EXPECT_EQ(engine.GetScene().Raw().storage<ECS::EntityHandle>().size(), 1u);
 
     engine.Shutdown();
 }

@@ -435,8 +435,8 @@ namespace Extrinsic::Runtime
         m_SceneDocument->ClearSceneRuntimeState();
         RefreshActiveWorldScenePointer();
         RebuildStableEntityLookupAfterSceneReplacement();
-        // BUG-068: rebind the scene-borrowing asset subsystems to the new active
-        // scene so they do not keep referencing the previous world's registry.
+        // Scene handoffs borrow the registry by reference. Active-world changes
+        // precede deferred destruction, so rebind before the old world retires.
         BindActiveSceneAssetHandoffs();
     }
 
@@ -447,33 +447,24 @@ namespace Extrinsic::Runtime
 
     void Engine::BindActiveSceneAssetHandoffs()
     {
-        // BUG-068: (re)bind the scene-borrowing asset subsystems to the current
-        // active scene (m_Scene). The AssetModelSceneHandoff holds the scene by
-        // reference and the import pipeline captured the scene pointer plus the
-        // handoff pointers, so on an active-world change they must be rebound;
-        // otherwise they retain a reference to the previous world's registry,
-        // which is freed once that world is destroyed → use-after-free in
-        // AssetResidencyService::TickAssets and asset-event listeners. Only a
-        // non-active world can be destroyed (WorldRegistry), so rebinding to the
-        // new active scene on the change keeps every borrower off the doomed
-        // registry. Called at boot and from ApplyWorldRegistryMaintenance.
-        // (SceneDocument tracks &m_Scene and needs no rebind.)
         if (m_Scene == nullptr)
         {
             m_AssetResidencyService.DestroySceneBorrowers();
-            return;
+            m_SelectionController.SetStableEntityLookup(nullptr);
         }
-
-        m_AssetResidencyService.InitializeSceneHandoffs(
-            *m_AssetService,
-            *m_Scene,
-            *m_Renderer,
-            AssetResidencySceneHandoffOptions{
-                .ObjectSpaceNormalBakeQueue =
-                    &m_ObjectSpaceNormalBakeService.Queue(),
-                .ObjectSpaceNormalBakeGraphicsBackendOperational =
-                    m_Device != nullptr && m_Device->IsOperational(),
-            });
+        else
+        {
+            m_AssetResidencyService.InitializeSceneHandoffs(
+                *m_AssetService,
+                *m_Scene,
+                *m_Renderer,
+                AssetResidencySceneHandoffOptions{
+                    .ObjectSpaceNormalBakeQueue =
+                        &m_ObjectSpaceNormalBakeService.Queue(),
+                    .ObjectSpaceNormalBakeGraphicsBackendOperational =
+                        m_Device != nullptr && m_Device->IsOperational(),
+                });
+        }
 
         m_AssetImportPipeline->SetDependencies(
             AssetImportPipelineDependencies{
@@ -617,6 +608,7 @@ namespace Extrinsic::Runtime
             m_JobService);
 
         // ── 6. World registry / boot ECS scene ───────────────────────────
+        m_WorldRegistry.Clear();
         const WorldHandle bootWorld = m_WorldRegistry.CreateWorld("Main");
         m_Scene = m_WorldRegistry.Get(bootWorld);
         if (m_Scene != nullptr)

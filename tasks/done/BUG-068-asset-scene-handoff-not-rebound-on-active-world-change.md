@@ -5,6 +5,15 @@ depends_on: []
 ---
 # BUG-068 — AssetModelSceneHandoff not rebound on active-world change (UAF)
 
+## Status
+- Completed 2026-07-13 at `CPUContracted` on branch
+  `codex/bug-068-scene-borrower-regression`.
+- Commit: this local completion commit; production rebind originally restored
+  by `c32a7d86`.
+- The engine-level regression deterministically reproduces the stale scene
+  borrow as an ASan heap-use-after-free when the rebind is removed, then passes
+  50 repetitions with the restored ordering and secondary lifecycle guards.
+
 ## Goal
 - Restore the active-scene rebind on world switch/teardown so the
   `AssetModelSceneHandoff` (and any other Initialize-bound scene borrower) never
@@ -34,8 +43,9 @@ depends_on: []
   old world registry was destroyed and recreated it bound to the new active scene.
 - Failure scenario: a runtime module (or teardown) creates+activates a second
   world via WorldRegistry deferred ops; `m_WorldRegistry.ApplyMaintenance(...)`
-  (`:403`) changes the active world and destroys the old world's
-  `ECS::Scene::Registry`. The handoff's `Scene&` now dangles. The next frame,
+  (`:403`) changes the active world, after which the previous world can enter
+  two-phase deferred destruction. Without a switch-pass rebind, the handoff's
+  `Scene&` dangles once that later pass destroys the registry. The next frame,
   `AssetResidencyService::TickAssets` →
   `AssetModelSceneHandoff::ResolvePendingMaterialTextureBindings()`
   (`Runtime.AssetResidencyService.cpp:141-145`, driven from
@@ -48,39 +58,40 @@ depends_on: []
   live and covered by `Test.RuntimeWorldRegistry.cpp`. Memory-unsafe when reached.
 
 ## Required changes
-- [ ] In `ApplyWorldRegistryMaintenance`, reset scene borrowers that hold the
-      old scene by reference **before** the destroyed world's registry is freed,
-      and recreate them bound to the new active scene (restore the
+- [x] In `ApplyWorldRegistryMaintenance`, reset scene borrowers that hold the
+      old scene by reference during the active-world switch pass, **before** a
+      later deferred pass can free that registry, and recreate them bound to
+      the new active scene (restore the
       `RebindActiveSceneRuntimeState` behavior for the extracted services).
-- [ ] Confirm ordering: handoff reset must precede the WorldRegistry
-      `ApplyMaintenance` free of the old registry (or the rebind must be driven
-      by the maintenance callback before the free), not the frame after.
-- [ ] Secondary (same area, lower priority): `Engine::Initialize` calls
+- [x] Confirm ordering: the handoff rebind runs immediately after the active
+      switch is applied, while the previous registry is still protected by the
+      separate two-phase destruction contract, not on a later frame.
+- [x] Secondary (same area, lower priority): `Engine::Initialize` calls
       `m_WorldRegistry.CreateWorld("Main")` (`Runtime.Engine.cpp:541`) without the
       preceding `Clear()` main had; add it so a re-entered `Initialize` cannot
       leak a world.
-- [ ] Secondary: restore `m_SelectionController.SetStableEntityLookup(nullptr)`
+- [x] Secondary: restore `m_SelectionController.SetStableEntityLookup(nullptr)`
       for the null-new-scene case dropped from the maintenance path (benign
       today, but re-align with main).
 
 ## Tests
-- [ ] Add a runtime contract test that creates a second world, activates it (via
+- [x] Add a runtime contract test that creates a second world, activates it (via
       the deferred-op path), destroys the first, then ticks assets and fires an
       asset `Ready`/`Reloaded` event — proving no access to the freed scene and
       that new-world bindings resolve. Run under ASan.
-- [ ] `ctest --test-dir build/ci --output-on-failure -R 'RuntimeWorldRegistry|AssetResidency|SceneLifecycle' --timeout 60`.
-- [ ] Default CPU gate (ideally the ASan-enabled `ci` preset, which enables
-      sanitizers).
+- [x] `ctest --test-dir build/ci --output-on-failure -R 'RuntimeWorldRegistry|AssetResidency|SceneLifecycle' --timeout 60`.
+- [x] Default CPU gate (the ASan/UBSan-enabled `ci` preset).
 
 ## Docs
-- [ ] Document in `src/runtime/README.md` (or the world/scene lifecycle doc) that
+- [x] Document in `src/runtime/README.md` and
+      `docs/architecture/runtime.md` that
       Initialize-bound scene borrowers must be rebound on active-world change.
 
 ## Acceptance criteria
-- [ ] After an active-world switch or teardown, no scene borrower references a
+- [x] After an active-world switch or teardown, no scene borrower references a
       destroyed registry; ASan is clean on the new test.
-- [ ] Material/texture bindings for the newly-activated world are wired.
-- [ ] Default CPU gate and strict structural checks pass.
+- [x] Material/texture bindings for the newly-activated world are wired.
+- [x] Default CPU gate and strict structural checks pass.
 
 ## Verification
 ```bash
@@ -92,6 +103,32 @@ python3 tools/repo/check_layering.py --root src --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
 
+Closure verification on 2026-07-13:
+
+- With the post-maintenance `BindActiveSceneAssetHandoffs()` call deliberately
+  removed, the new real-Engine regression failed deterministically under ASan
+  with a heap-use-after-free in
+  `AssetModelSceneHandoff::DestroyEntities()` after the previous world's
+  registry was destroyed and a model asset was reloaded.
+- Restoring the rebind materialized the model in the replacement world, kept
+  exactly one live entity across reloads before and after old-world teardown,
+  and passed 50 consecutive sanitizer-backed repetitions.
+- The focused `RuntimeWorldRegistry|AssetResidency|SceneLifecycle` selection
+  passed 13/13. `IntrinsicTests` built and the complete default CPU-supported
+  gate passed 3,681/3,681 tests in 552.83 seconds.
+- Strict layering, test-layout, task-policy, documentation-link, and
+  diff-whitespace checks pass.
+
+## Completion
+
+- Completed: 2026-07-13. Maturity: `CPUContracted`.
+- Outcome: active-world maintenance now rebinds every asset/import scene
+  borrower during the switch pass, while the old registry is still protected
+  by deferred destruction. Null-scene lookup detachment and boot-world cleanup
+  are restored as secondary lifecycle guards.
+- This is a CPU/ASan lifetime contract; no backend-operational follow-up is
+  owed.
+
 ## Forbidden changes
 - Do not "fix" this by leaking the old registry or by keeping worlds alive
   indefinitely.
@@ -99,6 +136,6 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Mixing mechanical file moves with semantic refactors.
 
 ## Maturity
-- Target: `CPUContracted` (ASan-verified contract test reproducing the switch);
+- Closed at `CPUContracted` (ASan-verified contract test reproducing the switch);
   no `Operational` follow-up is owed — this is a lifetime correction proven by the
   CPU/ASan contract path, not a backend capability.

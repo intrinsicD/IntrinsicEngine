@@ -32,9 +32,6 @@ regressed hardening that main had shipped as the closed `BUG-066`.
   a worker stores `AwaitingGate` outside the lock after enqueue, so a same-tick
   drain's terminal state is clobbered → job stuck non-terminal (record leak,
   phantom stats, poller hang). HIGH.
-- [`BUG-068` — AssetModelSceneHandoff not rebound on active-world change](BUG-068-asset-scene-handoff-not-rebound-on-active-world-change.md):
-  the extracted world-maintenance path drops main's scene-borrower rebind → a
-  dangling `Scene&` and use-after-free on world switch/teardown. HIGH.
 - [`BUG-071` — Sim-systems registered during OnResolve bypass FinalizeForBoot](BUG-071-onresolve-sim-systems-bypass-finalizeforboot.md):
   late-registered systems escape ordering and signal/cycle/duplicate validation. MEDIUM.
 - [`BUG-073` — Object-space normal bake may be sampled before its GPU write completes](BUG-073-object-space-normal-bake-read-before-gpu-write.md):
@@ -50,6 +47,12 @@ regressed hardening that main had shipped as the closed `BUG-066`.
 ---
 
 ## Verified / Closed
+
+- Closed 2026-07-13: [`BUG-068` — AssetModelSceneHandoff not rebound on active-world change](../../done/BUG-068-asset-scene-handoff-not-rebound-on-active-world-change.md).
+  Active-world maintenance now rebuilds asset/import scene borrowers during
+  the switch pass, before the previous registry can retire. A real-Engine ASan
+  regression failed with the rebind removed, then passed 50 repetitions and
+  the complete CPU gate after restoration.
 
 - Closed 2026-07-13: [`BUG-079` — CoreTasks abandoned wait continuation leaks coroutine frame](../../done/BUG-079-coretasks-abandoned-wait-continuation-leak.md).
   Wait-token release and scheduler shutdown now transfer parked single-use

@@ -4441,3 +4441,16 @@ destructor sentinels failed deterministically before the fix, then the release
 and shutdown regressions each passed 100 consecutive ASan/UBSan repetitions,
 all 19 `CoreTasks.*` contracts passed, `IntrinsicTests` built, the full default
 CPU-supported gate passed 3680/3680, and strict structural/docs checks passed.
+
+[`BUG-068`](BUG-068-asset-scene-handoff-not-rebound-on-active-world-change.md)
+— active-world scene-borrower rebinding retired to `tasks/done/` on 2026-07-13
+at `CPUContracted`. Runtime now rebuilds asset-residency handoffs and import
+pipeline dependencies during the active-world switch Maintenance pass, before
+the previous registry can reach its later deferred-destruction pass; a null
+active scene also detaches stable-entity selection lookup, and initialization
+clears stale worlds before creating the boot world. Removing the rebind made
+the real-Engine model-ready/reload regression fail deterministically with an
+ASan heap-use-after-free after previous-world teardown. Restored code passed
+the regression 50 consecutive times, the focused lifecycle selection 13/13,
+the full default CPU-supported gate 3681/3681, and strict structural/docs
+checks.
