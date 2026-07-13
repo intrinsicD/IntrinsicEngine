@@ -5,6 +5,10 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-084` — First configure can omit the default Vulkan backend](BUG-084-first-configure-backend-selection-order.md):
+  renderer backend selection runs before the platform subdirectory defines
+  and caches the documented default, so a clean configure can omit Vulkan
+  targets that appear on the unchanged second configure.
 - [`BUG-082` — GLFW X11 input-method initialization leaks under LeakSanitizer](BUG-082-glfw-x11-input-method-lsan-leak.md):
   a GLFW-backed runtime contract passes its assertions but the process exits
   nonzero for a 408-byte `_XimOpenIM` allocation after engine shutdown; isolate
