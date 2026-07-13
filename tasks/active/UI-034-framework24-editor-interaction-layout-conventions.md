@@ -11,13 +11,14 @@ maturity_target: CPUContracted
 - Status: in progress.
 - Owner: Codex.
 - Branch: `codex/ui-034-editor-window-contribution`.
-- Progress: Slices A-C implemented. The registry is lazy and mutation-safe;
+- Progress: Slices A-D implemented. The registry is lazy and mutation-safe;
   one end-of-editor-frame capture snapshot gates viewport consumers; the global
   visibility command and unsuppressed `G` action preserve per-window state and
   clear stale capture immediately. The generic scalar-property model filters
-  non-finite values, and ImPlot context lifetime is paired with ImGui.
-- Next verification step: migrate the two Slice D exemplar windows onto the
-  registry and run closure gates.
+  non-finite values, and ImPlot context lifetime is paired with ImGui. Mesh
+  Appearance and Mesh Simplify are registry-owned exemplars that share one lazy
+  mesh model, with the scalar-property histogram rendered in Appearance.
+- Next verification step: run closure gates and retire the task.
 
 ## Goal
 - Adopt the framework24 viewer's interaction/layout model in the Sandbox editor: domains contribute their menu entries and windows through a registration seam instead of a central enum, closed windows cost nothing per frame, viewport input is gated by one explicit UI-capture contract with a global UI-visibility toggle, and any scalar per-element property of the selection can be inspected through generic property-selector plus histogram/plot widgets.
@@ -79,12 +80,12 @@ maturity_target: CPUContracted
   move the remaining fixed content.
 
 ## Required changes
-- [ ] Add a domain-window registration seam to `Runtime.SandboxEditorUi`: domains register `{menu path, window id, draw callback, open-state}` at composition time; the closed `SandboxEditorDomainWindowKind` enum becomes an implementation detail behind the seam (existing kinds keep working during migration).
+- [x] Add a domain-window registration seam to `Runtime.SandboxEditorUi`: domains register `{menu path, window id, draw callback, open-state}` at composition time; the closed `SandboxEditorDomainWindowKind` enum becomes an implementation detail behind the seam (existing kinds keep working during migration).
 - [x] Lazy window lifecycle: a closed window contributes no per-frame model-build or draw cost; open/close transitions are observable so domains can drop caches (aligned with, but not owning, `RUNTIME-138`).
 - [x] Single frame-level capture contract: one editor-owned `{captured_keyboard, captured_mouse, widgets_active}` snapshot derived from ImGui IO once per frame; camera, picking, and viewport input consume only this snapshot (no scattered `WantCapture*` reads).
 - [x] Global UI-visibility toggle (hotkey plus command) that hides all editor windows while keeping the viewport interactive, mirroring framework24's `g` toggle; per-window open-state survives the toggle.
 - [x] Generic property widgets in the editor widget library: a property-selector combo over the selection's property catalog (retired `UI-016` seam) and a histogram/plot view for scalar per-element properties (`implot` per the clarification default).
-- [ ] Migrate two exemplar domains (one mesh-processing window, one appearance/visualization window) onto the seam, lazy lifecycle, and property widgets to prove the pattern end to end.
+- [x] Migrate two exemplar domains (one mesh-processing window, one appearance/visualization window) onto the seam, lazy lifecycle, and property widgets to prove the pattern end to end.
 
 ## Tests
 - [x] Headless/CPU contract tests for the registration seam: registered windows appear in the menu model, unregistered kinds are absent, duplicate registration fails closed.
@@ -98,10 +99,10 @@ maturity_target: CPUContracted
 - [x] Record the `implot` dependency decision in `vcpkg.json` and the dependency notes if the clarification default stands.
 
 ## Acceptance criteria
-- [ ] Adding a new domain window requires no edit to a central enum or switchboard.
-- [ ] Closed windows are provably free per frame (test above).
-- [ ] All viewport input decisions read the single capture snapshot.
-- [ ] The global toggle and both migrated exemplar windows work in the sandbox.
+- [x] Adding a new domain window requires no edit to a central enum or switchboard.
+- [x] Closed windows are provably free per frame (test above).
+- [x] All viewport input decisions read the single capture snapshot.
+- [x] The global toggle and both migrated exemplar windows work in the sandbox.
 - [ ] The default CPU gate stays green; no UI-owned engine state is introduced.
 
 ## Verification

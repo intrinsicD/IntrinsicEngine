@@ -7,6 +7,7 @@ module;
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -40,6 +41,7 @@ import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.EditorPropertyWidgets;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigControl;
@@ -2771,7 +2773,7 @@ export namespace Extrinsic::Runtime
     class SandboxEditorUi
     {
     public:
-        SandboxEditorUi() = default;
+        SandboxEditorUi();
         ~SandboxEditorUi();
 
         SandboxEditorUi(const SandboxEditorUi&)            = delete;
@@ -2782,12 +2784,26 @@ export namespace Extrinsic::Runtime
         void Attach(Engine& engine);
         void Detach();
 
+        [[nodiscard]] EditorWindowHandle RegisterEditorWindow(
+            EditorWindowDescriptor descriptor);
+        [[nodiscard]] bool UnregisterEditorWindow(EditorWindowHandle handle);
         [[nodiscard]] EditorUiVisibilityCommandResult
         ApplyEditorUiVisibilityCommand(
             EditorUiVisibilityCommand command) noexcept;
         [[nodiscard]] bool IsEditorVisible() const noexcept
         {
             return m_WindowRegistry.IsVisible();
+        }
+        [[nodiscard]] std::vector<EditorWindowMenuEntry>
+        BuildEditorWindowMenuModel() const
+        {
+            return m_WindowRegistry.BuildMenuModel();
+        }
+        [[nodiscard]] bool SetEditorWindowOpen(
+            std::string_view id,
+            bool open)
+        {
+            return m_WindowRegistry.SetOpen(id, open);
         }
 
         [[nodiscard]] bool IsAttached() const noexcept { return m_Engine != nullptr; }
@@ -2797,11 +2813,22 @@ export namespace Extrinsic::Runtime
         }
 
     private:
+        void RegisterExemplarWindows();
+        void DrawRegisteredMeshAppearance(bool& open);
+        void DrawRegisteredMeshSimplify(bool& open);
+        [[nodiscard]] const SandboxEditorDomainWindowModel*
+        GetRegisteredMeshWindowModel();
         void AttachKMeansGpuQueue(Engine& engine);
         void DetachKMeansGpuQueue();
 
         Engine*                 m_Engine{nullptr};
         EditorWindowRegistry    m_WindowRegistry{};
+        EditorWindowHandle      m_MeshAppearanceWindow{};
+        EditorWindowHandle      m_MeshSimplifyWindow{};
+        const SandboxEditorContext* m_ActiveEditorContext{nullptr};
+        std::optional<SandboxEditorDomainWindowModel>
+            m_RegisteredMeshModelCache{};
+        EditorPropertyPlotWidgetState m_MeshPropertyPlotState{};
         RuntimeInputActionHandle m_UiVisibilityToggleAction{};
         SandboxEditorPanelFrame m_LastFrame{};
         SandboxEditorSelectedModelCache m_SelectedModelCache{};

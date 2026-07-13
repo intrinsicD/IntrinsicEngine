@@ -196,9 +196,14 @@ closed until toggled from the menu. The open/closed bits live in the attached
 runtime ownership.
 
 `UI-034` adds a migration-safe generic contribution and input contract. Domain
-windows can register with `EditorWindowRegistry` using stable ids and structured
-menu paths; closed windows receive no draw callback, and global hide preserves
-their individual open states. `SandboxEditorUi` routes the unsuppressed `G`
+windows can register through `SandboxEditorUi::RegisterEditorWindow(...)` using
+stable ids and structured menu paths, then remove the returned handle through
+`UnregisterEditorWindow(...)`; closed windows receive no draw callback, and global hide preserves
+their individual open states. `Mesh / Appearance` and
+`Mesh / Processing / Simplify` are the first registry-owned exemplars and share
+one lazy mesh-domain model per frame; Appearance also hosts the generic scalar
+vertex-property histogram. The remaining fixed domain windows are retained for
+the `ARCH-006` Sandbox-content relocation. `SandboxEditorUi` routes the unsuppressed `G`
 input action through the same `EditorUiVisibilityCommand` path used by
 programmatic callers. At the end of each visible editor frame, `ImGuiAdapter`
 records one `EditorInputCaptureSnapshot` containing keyboard capture, mouse

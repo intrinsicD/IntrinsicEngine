@@ -114,13 +114,20 @@ The frame order is:
 Editor UI contribution is data-driven through
 `Extrinsic.Runtime.EditorWindowRegistry`: contributors provide stable ids,
 structured menu paths, open state, and draw callbacks, and closed or globally
-hidden windows receive no callback. `ImGuiAdapter` records one
+hidden windows receive no callback. `SandboxEditorUi::{Register,Unregister}EditorWindow`
+is the composition surface; registered paths are merged into the menu tree
+without adding legacy enum or draw-switch entries. `ImGuiAdapter` records one
 `EditorInputCaptureSnapshot` after the visible editor callback; camera, gizmo,
 picking, and viewport routing consume that snapshot rather than reading ImGui
 capture flags independently. Its ImGui context owns a paired ImPlot context.
 `Extrinsic.Runtime.EditorPropertyWidgets` keeps scalar-property selector and
 finite-sample histogram models CPU-testable while its ImGui/ImPlot draw code and
 the manifest-managed `implot` dependency remain private to runtime.
+`SandboxEditorUi` registers `Mesh / Appearance` and
+`Mesh / Processing / Simplify` as the first two registry-owned windows; they
+share one lazy mesh-domain model per frame, and Appearance embeds the generic
+vertex-property histogram. The remaining fixed domain windows stay behind the
+legacy section table until `ARCH-006` relocates Sandbox-owned editor content.
 
 The internal `RuntimeFrameContext` record carries the data that must survive
 between those phases: frame delta, fixed-step interpolation alpha, render frame

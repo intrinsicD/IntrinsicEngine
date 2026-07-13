@@ -11753,6 +11753,130 @@ TEST(SandboxEditorUi, EngineAttachmentRegistersEditorCallback)
     engine.Shutdown();
 }
 
+TEST(SandboxEditorUi, MeshExemplarsRegisterWithStructuredMenuPaths)
+{
+    Runtime::SandboxEditorUi ui;
+
+    const auto menu = ui.BuildEditorWindowMenuModel();
+    ASSERT_EQ(menu.size(), 2u);
+    const auto appearance = std::find_if(
+        menu.begin(),
+        menu.end(),
+        [](const Runtime::EditorWindowMenuEntry& entry)
+        {
+            return entry.Id == "mesh.appearance";
+        });
+    const auto simplify = std::find_if(
+        menu.begin(),
+        menu.end(),
+        [](const Runtime::EditorWindowMenuEntry& entry)
+        {
+            return entry.Id == "mesh.processing.simplify";
+        });
+
+    ASSERT_NE(appearance, menu.end());
+    EXPECT_EQ(appearance->MenuPath, (std::vector<std::string>{"Mesh"}));
+    EXPECT_EQ(appearance->Title, "Appearance");
+    EXPECT_FALSE(appearance->Open);
+    ASSERT_NE(simplify, menu.end());
+    EXPECT_EQ(
+        simplify->MenuPath,
+        (std::vector<std::string>{"Mesh", "Processing"}));
+    EXPECT_EQ(simplify->Title, "Simplify");
+    EXPECT_FALSE(simplify->Open);
+}
+
+TEST(SandboxEditorUi, ExternalWindowContributionNeedsNoLegacySwitchEntry)
+{
+    Runtime::SandboxEditorUi ui;
+    int drawCalls = 0;
+
+    const Runtime::EditorWindowHandle handle = ui.RegisterEditorWindow(
+        Runtime::EditorWindowDescriptor{
+            .Id = "graph.analysis.curvature",
+            .MenuPath = {"Graph", "Analysis"},
+            .Title = "Curvature",
+            .OpenByDefault = false,
+            .Draw =
+                [&drawCalls](bool&)
+                {
+                    ++drawCalls;
+                },
+        });
+
+    ASSERT_TRUE(handle.IsValid());
+    const auto menu = ui.BuildEditorWindowMenuModel();
+    const auto contributed = std::find_if(
+        menu.begin(),
+        menu.end(),
+        [](const Runtime::EditorWindowMenuEntry& entry)
+        {
+            return entry.Id == "graph.analysis.curvature";
+        });
+    ASSERT_NE(contributed, menu.end());
+    EXPECT_EQ(
+        contributed->MenuPath,
+        (std::vector<std::string>{"Graph", "Analysis"}));
+    EXPECT_EQ(drawCalls, 0);
+
+    EXPECT_TRUE(ui.UnregisterEditorWindow(handle));
+    EXPECT_EQ(ui.BuildEditorWindowMenuModel().size(), 2u);
+}
+
+TEST(SandboxEditorUi, ClosedRegisteredExemplarsBuildNoDomainModels)
+{
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+    const ECS::EntityHandle mesh = MakeSelectable(engine.GetScene(), "Plot mesh");
+    AddTriangleMeshSource(engine.GetScene(), mesh);
+    SetFloatProperty(
+        engine.GetScene().Raw().get<GS::Vertices>(mesh).Properties,
+        "v:temperature",
+        {0.25f, 0.5f, 1.0f});
+    ASSERT_TRUE(
+        engine.GetSelectionController().SetSelectedEntity(engine.GetScene(), mesh));
+
+    Runtime::SandboxEditorUi ui;
+    ui.Attach(engine);
+    engine.Run();
+
+    EXPECT_EQ(ui.GetLastFrame().ModelBuildStats.DomainWindowModelBuilds, 0u);
+    EXPECT_EQ(ui.GetLastFrame().ModelBuildStats.DomainWindowModelCacheHits, 0u);
+
+    ui.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorUi, OpenRegisteredExemplarsShareOneLazyMeshModel)
+{
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+    const ECS::EntityHandle mesh = MakeSelectable(engine.GetScene(), "Plot mesh");
+    AddTriangleMeshSource(engine.GetScene(), mesh);
+    SetFloatProperty(
+        engine.GetScene().Raw().get<GS::Vertices>(mesh).Properties,
+        "v:temperature",
+        {0.25f, 0.5f, 1.0f});
+    ASSERT_TRUE(
+        engine.GetSelectionController().SetSelectedEntity(engine.GetScene(), mesh));
+
+    Runtime::SandboxEditorUi ui;
+    ASSERT_TRUE(ui.SetEditorWindowOpen("mesh.appearance", true));
+    ASSERT_TRUE(ui.SetEditorWindowOpen("mesh.processing.simplify", true));
+    ui.Attach(engine);
+    engine.Run();
+
+    EXPECT_EQ(ui.GetLastFrame().ModelBuildStats.DomainWindowModelBuilds, 1u);
+    EXPECT_EQ(ui.GetLastFrame().ModelBuildStats.DomainWindowModelCacheHits, 1u);
+
+    ui.Detach();
+    engine.Shutdown();
+}
+
 TEST(SandboxEditorUi, GlobalVisibilityHotkeyUsesTheVisibilityCommandPath)
 {
     Runtime::Engine engine(

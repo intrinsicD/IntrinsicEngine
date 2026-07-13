@@ -62,6 +62,7 @@ import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.EditorPropertyWidgets;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigControl;
@@ -4423,6 +4424,22 @@ namespace Extrinsic::Runtime
                     return entity;
             }
             return std::nullopt;
+        }
+
+        [[nodiscard]] const Geometry::PropertySet*
+        ResolveSelectedMeshVertexProperties(
+            const SandboxEditorContext& context)
+        {
+            const std::optional<ECS::EntityHandle> selected =
+                ResolveFirstSelectedEntity(context);
+            if (!selected.has_value() || context.Scene == nullptr)
+                return nullptr;
+
+            const GeometryEntityAvailability availability =
+                BuildGeometryAvailability(context.Scene->Raw(), *selected);
+            return PropertySetForCatalogDomain(
+                availability,
+                SandboxEditorPropertyCatalogDomain::MeshVertices);
         }
 
         [[nodiscard]] std::optional<ECS::EntityHandle> ResolveStableEntity(
@@ -13216,10 +13233,88 @@ namespace Extrinsic::Runtime
                         value.z);
         }
 
+        [[nodiscard]] bool RegisteredMenuPathStartsWith(
+            const EditorWindowMenuEntry& entry,
+            const std::vector<std::string>& path)
+        {
+            return entry.MenuPath.size() >= path.size() &&
+                std::equal(path.begin(), path.end(), entry.MenuPath.begin());
+        }
+
+        void DrawRegisteredWindowMenuTree(
+            EditorWindowRegistry& registry,
+            const std::vector<EditorWindowMenuEntry>& entries,
+            std::vector<std::string>& path);
+
+        void DrawRegisteredWindowMenuLeaves(
+            EditorWindowRegistry& registry,
+            const std::vector<EditorWindowMenuEntry>& entries,
+            const std::vector<std::string>& path)
+        {
+            for (const EditorWindowMenuEntry& entry : entries)
+            {
+                if (entry.MenuPath != path)
+                    continue;
+
+                bool open = entry.Open;
+                if (ImGui::MenuItem(entry.Title.c_str(), nullptr, &open))
+                    (void)registry.SetOpen(entry.Handle, open);
+            }
+        }
+
+        void DrawRegisteredWindowMenuChildren(
+            EditorWindowRegistry& registry,
+            const std::vector<EditorWindowMenuEntry>& entries,
+            std::vector<std::string>& path,
+            const std::span<const std::string_view> excludedChildren = {})
+        {
+            std::vector<std::string> children{};
+            for (const EditorWindowMenuEntry& entry : entries)
+            {
+                if (!RegisteredMenuPathStartsWith(entry, path) ||
+                    entry.MenuPath.size() == path.size())
+                {
+                    continue;
+                }
+
+                const std::string& child = entry.MenuPath[path.size()];
+                if (std::find(excludedChildren.begin(),
+                              excludedChildren.end(),
+                              child) != excludedChildren.end() ||
+                    std::find(children.begin(), children.end(), child) !=
+                        children.end())
+                {
+                    continue;
+                }
+                children.push_back(child);
+            }
+
+            for (const std::string& child : children)
+            {
+                if (!ImGui::BeginMenu(child.c_str()))
+                    continue;
+                path.push_back(child);
+                DrawRegisteredWindowMenuTree(registry, entries, path);
+                path.pop_back();
+                ImGui::EndMenu();
+            }
+        }
+
+        void DrawRegisteredWindowMenuTree(
+            EditorWindowRegistry& registry,
+            const std::vector<EditorWindowMenuEntry>& entries,
+            std::vector<std::string>& path)
+        {
+            DrawRegisteredWindowMenuLeaves(registry, entries, path);
+            DrawRegisteredWindowMenuChildren(registry, entries, path);
+        }
+
         void DrawDomainMenu(
             const SandboxEditorDomainWindowKind kind,
             std::array<bool, Detail::kSandboxEditorDomainWindowCount>*
-                domainWindowOpen)
+                domainWindowOpen,
+            EditorWindowRegistry* windowRegistry,
+            const std::vector<EditorWindowMenuEntry>* registeredEntries)
         {
             if (!ImGui::BeginMenu(DebugNameForSandboxEditorDomainWindowKind(kind)))
                 return;
@@ -13230,13 +13325,27 @@ namespace Extrinsic::Runtime
 
             if (domainWindowOpen != nullptr)
             {
+                std::vector<std::string> registeredPath{
+                    DebugNameForSandboxEditorDomainWindowKind(kind)};
+                if (windowRegistry != nullptr && registeredEntries != nullptr)
+                {
+                    DrawRegisteredWindowMenuLeaves(
+                        *windowRegistry,
+                        *registeredEntries,
+                        registeredPath);
+                }
                 // UI-031: the `Render` section is now the domain-aware Appearance
                 // window (render hints + bound render state + property/attribute
                 // assignment + texture baking).
-                ImGui::MenuItem(
-                    "Appearance",
-                    nullptr,
-                    &(*domainWindowOpen)[DomainWindowSlotIndex(kind, DomainWindowSection::Render)]);
+                if (kind != SandboxEditorDomainWindowKind::Mesh)
+                {
+                    ImGui::MenuItem(
+                        "Appearance",
+                        nullptr,
+                        &(*domainWindowOpen)[DomainWindowSlotIndex(
+                            kind,
+                            DomainWindowSection::Render)]);
+                }
                 ImGui::MenuItem(
                     "Properties",
                     nullptr,
@@ -13308,6 +13417,14 @@ namespace Extrinsic::Runtime
                     {
                         openProcessing(DomainWindowSection::ProcessingSubdivide);
                     }
+                    registeredPath.push_back("Processing");
+                    if (windowRegistry != nullptr && registeredEntries != nullptr)
+                    {
+                        DrawRegisteredWindowMenuLeaves(
+                            *windowRegistry,
+                            *registeredEntries,
+                            registeredPath);
+                    }
                     const bool hasSimplifyLeaf =
                         std::any_of(
                             menuItems.begin(),
@@ -13316,7 +13433,8 @@ namespace Extrinsic::Runtime
                             {
                                 return item.HasSimplifyMethod;
                             });
-                    if (hasSimplifyLeaf && ImGui::MenuItem("Simplify"))
+                    if (kind != SandboxEditorDomainWindowKind::Mesh &&
+                        hasSimplifyLeaf && ImGui::MenuItem("Simplify"))
                     {
                         openProcessing(DomainWindowSection::ProcessingSimplify);
                     }
@@ -13334,11 +13452,12 @@ namespace Extrinsic::Runtime
                         openProcessing(
                             DomainWindowSection::ProcessingProgressivePoisson);
                     }
-                    for (const SandboxEditorGeometryProcessingMenuItem& item :
-                         menuItems)
+                    std::vector<std::string_view> fixedProcessingChildren{};
+                    for (const SandboxEditorGeometryProcessingMenuItem& item : menuItems)
                     {
                         if (item.HasNormalsMethod)
                         {
+                            fixedProcessingChildren.emplace_back(item.Label);
                             if (ImGui::BeginMenu(item.Label))
                             {
                                 if (item.HasNormalsMethod &&
@@ -13363,11 +13482,40 @@ namespace Extrinsic::Runtime
                                         break;
                                     }
                                 }
+                                if (windowRegistry != nullptr &&
+                                    registeredEntries != nullptr)
+                                {
+                                    registeredPath.push_back(item.Label);
+                                    DrawRegisteredWindowMenuTree(
+                                        *windowRegistry,
+                                        *registeredEntries,
+                                        registeredPath);
+                                    registeredPath.pop_back();
+                                }
                                 ImGui::EndMenu();
                             }
                         }
                     }
+                    if (windowRegistry != nullptr && registeredEntries != nullptr)
+                    {
+                        DrawRegisteredWindowMenuChildren(
+                            *windowRegistry,
+                            *registeredEntries,
+                            registeredPath,
+                            fixedProcessingChildren);
+                    }
+                    registeredPath.pop_back();
                     ImGui::EndMenu();
+                }
+                if (windowRegistry != nullptr && registeredEntries != nullptr)
+                {
+                    constexpr std::array<std::string_view, 1>
+                        kFixedDomainChildren{"Processing"};
+                    DrawRegisteredWindowMenuChildren(
+                        *windowRegistry,
+                        *registeredEntries,
+                        registeredPath,
+                        kFixedDomainChildren);
                 }
             }
             else
@@ -13386,7 +13534,9 @@ namespace Extrinsic::Runtime
 
         void DrawPanelWindowMenu(
             std::array<bool, Detail::kSandboxEditorPanelWindowCount>*
-                panelWindowOpen)
+                panelWindowOpen,
+            EditorWindowRegistry* windowRegistry,
+            const std::vector<EditorWindowMenuEntry>* registeredEntries)
         {
             if (!ImGui::BeginMenu("View"))
                 return;
@@ -13404,6 +13554,14 @@ namespace Extrinsic::Runtime
                         PanelWindowTitle(kind),
                         nullptr,
                         &(*panelWindowOpen)[PanelWindowIndex(kind)]);
+                }
+                if (windowRegistry != nullptr && registeredEntries != nullptr)
+                {
+                    std::vector<std::string> registeredPath{"View"};
+                    DrawRegisteredWindowMenuTree(
+                        *windowRegistry,
+                        *registeredEntries,
+                        registeredPath);
                 }
             }
             else
@@ -13427,14 +13585,50 @@ namespace Extrinsic::Runtime
             std::array<bool, Detail::kSandboxEditorPanelWindowCount>*
                 panelWindowOpen,
             std::array<bool, Detail::kSandboxEditorDomainWindowCount>*
-                domainWindowOpen)
+                domainWindowOpen,
+            EditorWindowRegistry* windowRegistry)
         {
             if (!ImGui::BeginMainMenuBar())
                 return;
-            DrawPanelWindowMenu(panelWindowOpen);
-            DrawDomainMenu(SandboxEditorDomainWindowKind::PointCloud, domainWindowOpen);
-            DrawDomainMenu(SandboxEditorDomainWindowKind::Graph, domainWindowOpen);
-            DrawDomainMenu(SandboxEditorDomainWindowKind::Mesh, domainWindowOpen);
+            std::vector<EditorWindowMenuEntry> registeredEntries{};
+            if (windowRegistry != nullptr)
+                registeredEntries = windowRegistry->BuildMenuModel();
+            const std::vector<EditorWindowMenuEntry>* registeredEntriesPtr =
+                windowRegistry != nullptr ? &registeredEntries : nullptr;
+            DrawPanelWindowMenu(
+                panelWindowOpen,
+                windowRegistry,
+                registeredEntriesPtr);
+            DrawDomainMenu(
+                SandboxEditorDomainWindowKind::PointCloud,
+                domainWindowOpen,
+                windowRegistry,
+                registeredEntriesPtr);
+            DrawDomainMenu(
+                SandboxEditorDomainWindowKind::Graph,
+                domainWindowOpen,
+                windowRegistry,
+                registeredEntriesPtr);
+            DrawDomainMenu(
+                SandboxEditorDomainWindowKind::Mesh,
+                domainWindowOpen,
+                windowRegistry,
+                registeredEntriesPtr);
+            if (windowRegistry != nullptr)
+            {
+                std::vector<std::string> rootPath{};
+                constexpr std::array<std::string_view, 4> kFixedRootMenus{
+                    "View",
+                    "PointCloud",
+                    "Graph",
+                    "Mesh",
+                };
+                DrawRegisteredWindowMenuChildren(
+                    *windowRegistry,
+                    registeredEntries,
+                    rootPath,
+                    kFixedRootMenus);
+            }
             ImGui::EndMainMenuBar();
         }
 
@@ -17321,6 +17515,12 @@ namespace Extrinsic::Runtime
             {
                 for (const DomainWindowSection section : kSections)
                 {
+                    const bool registryOwnedExemplar =
+                        kind == SandboxEditorDomainWindowKind::Mesh &&
+                        (section == DomainWindowSection::Render ||
+                         section == DomainWindowSection::ProcessingSimplify);
+                    if (registryOwnedExemplar)
+                        continue;
                     DrawOneDomainWindow(
                         *context,
                         kind,
@@ -17911,9 +18111,10 @@ namespace Extrinsic::Runtime
             PointCloudOutlierRemovalUiState* pointCloudOutlierState,
             ProgressivePoissonUiState* progressivePoissonState,
             TextureBakeUiState* textureBakeState,
-            RegistrationUiState* registrationState)
+            RegistrationUiState* registrationState,
+            EditorWindowRegistry* windowRegistry)
         {
-            DrawMainMenuBar(panelWindowOpen, domainWindowOpen);
+            DrawMainMenuBar(panelWindowOpen, domainWindowOpen, windowRegistry);
             DrawDomainWindows(
                 context,
                 domainWindowOpen,
@@ -17929,6 +18130,8 @@ namespace Extrinsic::Runtime
                 pointCloudOutlierState,
                 progressivePoissonState,
                 textureBakeState);
+            if (windowRegistry != nullptr)
+                (void)windowRegistry->DrawOpenWindows();
 
             if (BeginPanelWindow(panelWindowOpen,
                                  SandboxEditorPanelWindowKind::Registration,
@@ -24583,7 +24786,173 @@ namespace Extrinsic::Runtime
                        nullptr,
                        nullptr,
                        nullptr,
+                       nullptr,
                        nullptr);
+    }
+
+    SandboxEditorUi::SandboxEditorUi()
+    {
+        RegisterExemplarWindows();
+    }
+
+    EditorWindowHandle SandboxEditorUi::RegisterEditorWindow(
+        EditorWindowDescriptor descriptor)
+    {
+        return m_WindowRegistry.Register(std::move(descriptor));
+    }
+
+    bool SandboxEditorUi::UnregisterEditorWindow(
+        const EditorWindowHandle handle)
+    {
+        return m_WindowRegistry.Unregister(handle);
+    }
+
+    void SandboxEditorUi::RegisterExemplarWindows()
+    {
+        m_MeshAppearanceWindow = RegisterEditorWindow(
+            EditorWindowDescriptor{
+                .Id = "mesh.appearance",
+                .MenuPath = {"Mesh"},
+                .Title = "Appearance",
+                .OpenByDefault = false,
+                .Draw =
+                    [this](bool& open)
+                    {
+                        DrawRegisteredMeshAppearance(open);
+                    },
+                .OpenStateChanged =
+                    [this](bool)
+                    {
+                        m_RegisteredMeshModelCache.reset();
+                    },
+            });
+        m_MeshSimplifyWindow = RegisterEditorWindow(
+            EditorWindowDescriptor{
+                .Id = "mesh.processing.simplify",
+                .MenuPath = {"Mesh", "Processing"},
+                .Title = "Simplify",
+                .OpenByDefault = false,
+                .Draw =
+                    [this](bool& open)
+                    {
+                        DrawRegisteredMeshSimplify(open);
+                    },
+                .OpenStateChanged =
+                    [this](bool)
+                    {
+                        m_RegisteredMeshModelCache.reset();
+                    },
+            });
+    }
+
+    const SandboxEditorDomainWindowModel*
+    SandboxEditorUi::GetRegisteredMeshWindowModel()
+    {
+        if (m_ActiveEditorContext == nullptr)
+            return nullptr;
+        if (!m_RegisteredMeshModelCache.has_value())
+        {
+            m_RegisteredMeshModelCache = BuildSandboxEditorDomainWindowModel(
+                *m_ActiveEditorContext,
+                SandboxEditorDomainWindowKind::Mesh);
+        }
+        else if (m_ActiveEditorContext->ModelBuildStats != nullptr)
+        {
+            ++m_ActiveEditorContext->ModelBuildStats->DomainWindowModelCacheHits;
+        }
+        return &*m_RegisteredMeshModelCache;
+    }
+
+    void SandboxEditorUi::DrawRegisteredMeshAppearance(bool& open)
+    {
+        if (!open || m_ActiveEditorContext == nullptr)
+            return;
+
+        ImGui::SetNextWindowSize(ImVec2(340.0f, 300.0f), ImGuiCond_FirstUseEver);
+        if (ImGui::Begin("Mesh / Appearance", &open))
+        {
+            const SandboxEditorDomainWindowModel* model =
+                GetRegisteredMeshWindowModel();
+            if (model != nullptr)
+            {
+                TextureBakeUiState textureBakeState{
+                    .LastUvRegenerationResult = &m_LastUvRegenerationResult,
+                    .SourceIndex = &m_TextureBakeSourceIndex,
+                    .TargetSemanticIndex = &m_TextureBakeTargetSemanticIndex,
+                    .EncoderIndex = &m_TextureBakeEncoderIndex,
+                    .Width = &m_TextureBakeWidth,
+                    .Height = &m_TextureBakeHeight,
+                    .UvResolution = &m_UvAtlasResolution,
+                    .UvPadding = &m_UvAtlasPadding,
+                    .UvTexelsPerUnit = &m_UvAtlasTexelsPerUnit,
+                    .UvForceRegenerate = &m_UvAtlasForceRegenerate,
+                    .UvPreserveAuthored = &m_UvAtlasPreserveAuthored,
+                };
+                DrawDomainRenderWindow(
+                    *model,
+                    *m_ActiveEditorContext,
+                    &textureBakeState);
+
+                const Geometry::PropertySet* properties =
+                    ResolveSelectedMeshVertexProperties(*m_ActiveEditorContext);
+                if (model->DomainMatches && properties != nullptr)
+                {
+                    ImGui::SeparatorText("Property distribution");
+                    (void)DrawEditorScalarPropertyPlotWidget(
+                        "mesh.appearance.properties",
+                        Geometry::ConstPropertySet(*properties),
+                        m_MeshPropertyPlotState);
+                }
+            }
+        }
+        ImGui::End();
+    }
+
+    void SandboxEditorUi::DrawRegisteredMeshSimplify(bool& open)
+    {
+        if (!open || m_ActiveEditorContext == nullptr)
+            return;
+
+        ImGui::SetNextWindowSize(ImVec2(340.0f, 300.0f), ImGuiCond_FirstUseEver);
+        if (ImGui::Begin("Mesh / Processing / Simplify", &open))
+        {
+            const SandboxEditorDomainWindowModel* model =
+                GetRegisteredMeshWindowModel();
+            if (model != nullptr)
+            {
+                MeshSimplifyUiState simplifyState{
+                    .LastResult = &m_LastMeshSimplifyResult,
+                    .Metric = &m_MeshSimplifyMetric,
+                    .TargetFaces = &m_MeshSimplifyTargetFaces,
+                    .MaxError = &m_MeshSimplifyMaxError,
+                    .PreserveBoundary = &m_MeshSimplifyPreserveBoundary,
+                    .FeatureAngleThresholdDegrees =
+                        &m_MeshSimplifyFeatureAngleThresholdDegrees,
+                    .NormalWeight = &m_MeshSimplifyNormalWeight,
+                    .BoundaryWeight = &m_MeshSimplifyBoundaryWeight,
+                    .CurvatureWeight = &m_MeshSimplifyCurvatureWeight,
+                    .PreserveSharpFeatures =
+                        &m_MeshSimplifyPreserveSharpFeatures,
+                    .PreserveUvSeams = &m_MeshSimplifyPreserveUvSeams,
+                };
+                DrawDomainProcessingWindow(
+                    *model,
+                    *m_ActiveEditorContext,
+                    DomainWindowSection::ProcessingSimplify,
+                    nullptr,
+                    nullptr,
+                    nullptr,
+                    nullptr,
+                    nullptr,
+                    &simplifyState,
+                    nullptr,
+                    nullptr,
+                    nullptr,
+                    nullptr,
+                    nullptr);
+            }
+        }
+        ImGui::End();
     }
 
     SandboxEditorUi::~SandboxEditorUi()
@@ -25091,6 +25460,8 @@ namespace Extrinsic::Runtime
                     .TrajectoryStep = &m_RegistrationTrajectoryStep,
                     .SwapSourceTarget = &m_RegistrationSwapSourceTarget,
                 };
+                m_ActiveEditorContext = &context;
+                m_RegisteredMeshModelCache.reset();
                 DrawPanelFrame(
                     m_LastFrame,
                     &context,
@@ -25114,7 +25485,10 @@ namespace Extrinsic::Runtime
                     &pointCloudOutlierState,
                     &progressivePoissonState,
                     &textureBakeState,
-                    &registrationState);
+                    &registrationState,
+                    &m_WindowRegistry);
+                m_RegisteredMeshModelCache.reset();
+                m_ActiveEditorContext = nullptr;
             });
     }
 
@@ -25145,6 +25519,8 @@ namespace Extrinsic::Runtime
             m_KMeansGpuParticipant = {};
             m_KMeansGpuJobs.reset();
         }
+        m_ActiveEditorContext = nullptr;
+        m_RegisteredMeshModelCache.reset();
         m_SelectedModelCache.Clear();
     }
 
