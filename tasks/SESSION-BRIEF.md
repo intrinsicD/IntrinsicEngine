@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `UI-034` — Decentralized editor window contribution, capture contract, and property-plot widgets (tasks/active/UI-034-framework24-editor-interaction-layout-conventions.md)
 
 ## Theme B — Rendering modernization
 
@@ -39,7 +39,6 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-172` — Privatize the SceneDocument surface (tasks/backlog/runtime/RUNTIME-172-privatize-scene-document-surface.md)
 - unblocked: `RUNTIME-173` — Privatize the K-Means GPU job queue surface (tasks/backlog/runtime/RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md)
 - unblocked: `RUNTIME-174` — Privatize the ImGuiEditorBridge surface (tasks/backlog/runtime/RUNTIME-174-privatize-imgui-editor-bridge-surface.md)
-- unblocked: `UI-034` — Decentralized editor window contribution, capture contract, and property-plot widgets (tasks/backlog/ui/UI-034-framework24-editor-interaction-layout-conventions.md)
 
 ## Theme G — Active bugs
 

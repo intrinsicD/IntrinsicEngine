@@ -7,6 +7,13 @@ maturity_target: CPUContracted
 ---
 # UI-034 — Decentralized editor window contribution, capture contract, and property-plot widgets
 
+## Status
+- Status: in progress.
+- Owner: Codex.
+- Branch: `codex/ui-034-editor-window-contribution`.
+- Next verification step: implement Slice A and run the focused editor-window
+  registry contract tests plus strict layering/task-policy checks.
+
 ## Goal
 - Adopt the framework24 viewer's interaction/layout model in the Sandbox editor: domains contribute their menu entries and windows through a registration seam instead of a central enum, closed windows cost nothing per frame, viewport input is gated by one explicit UI-capture contract with a global UI-visibility toggle, and any scalar per-element property of the selection can be inspected through generic property-selector plus histogram/plot widgets.
 
@@ -21,7 +28,12 @@ maturity_target: CPUContracted
 ## Context
 - Owner/layer: `src/runtime/Editor` (`Runtime.SandboxEditorUi`) and the app-side wiring in `src/app/Sandbox`; UI emits commands/events only.
 - Reference model (framework24, `lib_bcg_viewer`): each domain system self-registers its menu and panel handlers on the event dispatcher (`src/bcg_system_gui.cpp` triggers `Event::Gui::RenderMenu` / `Event::Gui::Render`; systems connect and disconnect their render handlers as panels open and close), a per-frame capture snapshot (`gui.captured_keyboard` / `captured_mouse` / `widgets_active`) gates camera/picking input, a global hotkey toggles the whole GUI, and generic property widgets (`include/bcg_viewer_gui.h`: `PropertyContainerCombo`, `PropertyList`, ImPlot-backed `PlotData`) bind panels to the property system instead of bespoke per-feature widgets.
-- Current state: `Runtime.SandboxEditorUi` enumerates a closed `SandboxEditorDomainWindowKind` (42 kinds) — adding a domain window means editing the central registry, and per-window update cost is not uniformly gated by visibility (retired `UI-031` moved model builds behind visibility for its windows; the async cache side is owned by `RUNTIME-138`).
+- Current state: `Runtime.SandboxEditorUi` exposes three domain kinds and uses a
+  private 14-section enum to index a fixed 42-slot open-state array. Adding a
+  domain window still requires edits to the central menu, section enum, and
+  draw switchboard. Per-window update cost is not uniformly gated by
+  visibility (retired `UI-031` moved model builds behind visibility for its
+  windows; the async cache side is owned by `RUNTIME-138`).
 - Precedents to preserve: menu-first defaults (retired `UI-018`), the Properties-as-data-explorer information architecture (retired `UI-031`), input-capture leak regression coverage (retired `BUG-036`), and the property catalog (retired `UI-016`).
 - Clarification (nonblocking): plotting needs an ImPlot equivalent. Default chosen here: add the `implot` vcpkg port next to the existing `imgui` dependency. If a repo-local minimal histogram widget is preferred instead, only the widget-layer checkbox below changes.
 - ARCH-013 re-review (2026-07-08): Decision re-scoped onto ADR-0024 D11. The
@@ -37,6 +49,29 @@ maturity_target: CPUContracted
   split and Sandbox-content relocation; it must not introduce a competing
   registry. The two exemplar migrations here prove the seam rather than
   transferring ownership of the full migration to this task.
+
+## Slice plan
+- **Slice A — registry and lifecycle contract.** Add a generic runtime editor
+  window registry with stable IDs, structured menu paths, explicit open state,
+  duplicate rejection, unregister support, and transition observation. Prove
+  menu discovery and zero callbacks for closed windows in CPU contract tests;
+  keep the existing fixed Sandbox windows operational during migration.
+- **Slice B — capture and visibility contract.** Snapshot
+  `{captured_keyboard, captured_mouse, widgets_active}` once at the end of the
+  editor frame, route camera/gizmo/picking and input-action suppression through
+  that snapshot, and add one command path plus the global `G` input action for
+  registry visibility. Preserve per-window state while hidden and retain the
+  `BUG-036` regression coverage.
+- **Slice C — property widget contract.** Add the `implot` manifest dependency,
+  pair its context with the existing ImGui adapter lifecycle, and add a generic
+  scalar-property selector/plot model that excludes non-scalars and reports
+  filtered non-finite samples. Cover the model headlessly before drawing it.
+- **Slice D — exemplar integration and closure.** Register one mesh-processing
+  window and one appearance/property window through the new seam, including
+  the generic scalar plot in the appearance exemplar. Run focused and default
+  CPU gates, update architecture/dependency docs, and retire the task at
+  `CPUContracted`. `ARCH-006` then consumes the seam to extract the shell and
+  move the remaining fixed content.
 
 ## Required changes
 - [ ] Add a domain-window registration seam to `Runtime.SandboxEditorUi`: domains register `{menu path, window id, draw callback, open-state}` at composition time; the closed `SandboxEditorDomainWindowKind` enum becomes an implementation detail behind the seam (existing kinds keep working during migration).

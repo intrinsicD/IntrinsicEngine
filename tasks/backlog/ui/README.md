@@ -10,7 +10,8 @@ map.
 
 ## Tasks
 
-- [UI-034 — Decentralized editor window contribution, capture contract, and property-plot widgets](UI-034-framework24-editor-interaction-layout-conventions.md)
+- UI-034 is active; see
+  [`tasks/active/UI-034`](../../active/UI-034-framework24-editor-interaction-layout-conventions.md).
   (Theme F; adopts the framework24 viewer interaction/layout conventions —
   domain-window registration seam, lazy window lifecycle, unified input-capture
   contract, global UI toggle, and generic property-plot widgets; ARCH-013
