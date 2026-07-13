@@ -1285,7 +1285,7 @@ TEST(SandboxEditorUi, DefaultDrawStartsWithOnlyMenuBarVisible)
 
     EXPECT_TRUE(ImGuiWindowExists("##MainMenuBar"));
 
-    constexpr std::array<std::string_view, 33> kClosedByDefaultWindows{{
+    constexpr std::array<std::string_view, 34> kClosedByDefaultWindows{{
         "Sandbox Editor",
         "Scene Hierarchy",
         "Inspector",
@@ -1303,6 +1303,7 @@ TEST(SandboxEditorUi, DefaultDrawStartsWithOnlyMenuBarVisible)
         "PointCloud / Processing / Vertices / Normals",
         "PointCloud / Processing / Remove Outliers",
         "PointCloud / Processing / Progressive Poisson",
+        "PointCloud / Processing / Consolidate",
         "Graph / Appearance",
         "Graph / Properties",
         "Graph / Selection",
@@ -1382,6 +1383,8 @@ TEST(SandboxEditorUi, DomainMenusUseAppearanceAndFocusedProcessingWindows)
     EXPECT_NE(editorSource.find("ProcessingPointCloudVertexNormals"),
               std::string::npos);
     EXPECT_NE(editorSource.find("ProcessingPointCloudOutlierRemoval"),
+              std::string::npos);
+    EXPECT_NE(editorSource.find("ProcessingPointCloudConsolidation"),
               std::string::npos);
     EXPECT_NE(editorSource.find("ProcessingProgressivePoisson"),
               std::string::npos);
@@ -3268,6 +3271,19 @@ TEST(SandboxEditorUi, GeometryProcessingSupportedDomainsMatchPromotedEditorContr
     EXPECT_FALSE(Runtime::SupportsSandboxEditorGeometryProcessingDomain(
         Algorithm::ShortestPath,
         Domain::PointCloudPoints));
+
+    const Domain consolidation =
+        Runtime::GetSandboxEditorSupportedGeometryProcessingDomains(
+            Algorithm::PointCloudConsolidation);
+    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        consolidation,
+        Domain::PointCloudPoints));
+    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        consolidation,
+        Domain::MeshVertices));
+    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        consolidation,
+        Domain::GraphVertices));
     EXPECT_STREQ(Runtime::DebugNameForSandboxEditorGeometryProcessingDomain(
                      Domain::GraphVertices),
                  "Graph Nodes");
@@ -3280,6 +3296,9 @@ TEST(SandboxEditorUi, GeometryProcessingSupportedDomainsMatchPromotedEditorContr
     EXPECT_STREQ(Runtime::DebugNameForSandboxEditorGeometryProcessingAlgorithm(
                      Algorithm::Curvature),
                  "Curvature");
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorGeometryProcessingAlgorithm(
+                     Algorithm::PointCloudConsolidation),
+                 "Point Cloud Consolidation");
 }
 
 TEST(SandboxEditorUi, GeometryProcessingMenusExposeDomainElementSubmenus)
@@ -3482,12 +3501,13 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
         Domain::MeshVertices));
     const std::vector<Runtime::SandboxEditorGeometryProcessingEntry> cloudEntries =
         Runtime::ResolveSandboxEditorGeometryProcessingEntries(registry, cloud);
-    ASSERT_EQ(cloudEntries.size(), 11u);
+    ASSERT_EQ(cloudEntries.size(), 12u);
     EXPECT_EQ(cloudEntries[0].Algorithm, Algorithm::KMeans);
     EXPECT_EQ(cloudEntries[1].Algorithm, Algorithm::NormalEstimation);
     EXPECT_EQ(cloudEntries[2].Algorithm, Algorithm::Registration);
     EXPECT_EQ(cloudEntries[6].Algorithm, Algorithm::ProgressivePoissonSampling);
     EXPECT_EQ(cloudEntries[10].Algorithm, Algorithm::SurfaceReconstruction);
+    EXPECT_EQ(cloudEntries[11].Algorithm, Algorithm::PointCloudConsolidation);
     const std::vector<Domain> cloudKMeans =
         Runtime::GetAvailableSandboxEditorKMeansDomains(registry, cloud);
     ASSERT_EQ(cloudKMeans.size(), 1u);
@@ -5585,6 +5605,225 @@ TEST(SandboxEditorUi, PointCloudOutlierRemovalRespectsDeletedSlots)
     EXPECT_EQ(PointCloudPositionCount(registry, cloud), result.KeptCount);
     EXPECT_LE(result.KeptCount, liveCount);
     EXPECT_EQ(registry.Raw().get<GS::Vertices>(cloud).NumDeleted, 0u);
+}
+
+TEST(SandboxEditorUi, PointCloudConsolidationPublishesProjectedPointsWithUndoRedo)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const std::vector<glm::vec3> positions = MakeOutlierClusterPositions();
+    const std::size_t originalCount = positions.size();
+    ASSERT_EQ(originalCount, 53u);
+
+    const ECS::EntityHandle cloud =
+        MakeSelectable(registry, "ConsolidateCloud");
+    AddPointCloudSource(registry, cloud, originalCount);
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(cloud);
+    ASSERT_EQ(PointCloudPositionCount(registry, cloud), originalCount);
+
+    // 20% of the 53 live points rounds to an 11-point projected set.
+    const std::size_t expectedTarget = 11u;
+    const Runtime::SandboxEditorPointCloudConsolidationResult result =
+        Runtime::ApplySandboxEditorPointCloudConsolidationCommand(
+            context,
+            Runtime::SandboxEditorPointCloudConsolidationCommand{
+                .StableEntityId = stableId,
+                .SupportRadius = 0.0f,  // derive 4x average spacing
+                .RepulsionWeight = 0.45f,
+                .Iterations = 4u,
+                .TargetPercentage = 20.0f,
+                .Seed = 42u,
+                .Variant = 0u,
+            });
+
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_EQ(result.InputPointCount, originalCount);
+    EXPECT_EQ(result.ProjectedPointCount, expectedTarget);
+    EXPECT_EQ(result.IterationsRun, 4u);
+    // The published point GeometrySources reflect exactly the projected points.
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud), expectedTarget);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::GpuDirty>(cloud));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(cloud));
+    EXPECT_TRUE(history.IsDirty());
+
+    // Undo restores the original point set; redo re-applies the projection.
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud), originalCount);
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud), expectedTarget);
+
+    context.LastPointCloudConsolidationResult = &result;
+    const Runtime::SandboxEditorDomainWindowModel model =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::PointCloud);
+    EXPECT_TRUE(model.Processing.PointCloudConsolidationAvailable);
+    ASSERT_TRUE(
+        model.Processing.LastPointCloudConsolidationResult.has_value());
+    EXPECT_TRUE(
+        model.Processing.LastPointCloudConsolidationResult->Succeeded());
+}
+
+TEST(SandboxEditorUi,
+     PointCloudConsolidationRequestQueuesDerivedJobAndPublishesOnApply)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    Runtime::StreamingExecutor executor{};
+    Runtime::DerivedJobRegistry jobs{executor};
+    AttachDerivedJobCommands(context, jobs);
+    std::optional<Runtime::SandboxEditorPointCloudConsolidationResult>
+        completedResult{};
+    context.MethodResultSinks.PointCloudConsolidation =
+        [&completedResult](
+            Runtime::SandboxEditorPointCloudConsolidationResult result)
+        {
+            completedResult = std::move(result);
+        };
+
+    const std::vector<glm::vec3> positions = MakeOutlierClusterPositions();
+    const std::size_t originalCount = positions.size();
+    const std::size_t expectedTarget = 11u;  // round(20% of 53)
+    const ECS::EntityHandle cloud =
+        MakeSelectable(registry, "QueuedConsolidateCloud");
+    AddPointCloudSource(registry, cloud, originalCount);
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
+
+    const Runtime::SandboxEditorPointCloudConsolidationResult queued =
+        Runtime::ApplySandboxEditorPointCloudConsolidationCommand(
+            context,
+            Runtime::SandboxEditorPointCloudConsolidationCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(cloud),
+                .SupportRadius = 0.0f,
+                .RepulsionWeight = 0.45f,
+                .Iterations = 4u,
+                .TargetPercentage = 20.0f,
+                .Seed = 42u,
+                .Variant = 0u,
+            });
+
+    EXPECT_EQ(queued.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_EQ(queued.InputPointCount, originalCount);
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud), originalCount);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(cloud));
+
+    Runtime::DerivedJobQueueSnapshot pending = jobs.SnapshotAll();
+    ASSERT_EQ(pending.Entries.size(), 1u);
+    EXPECT_EQ(pending.Entries[0].Name,
+              "Sandbox.PointCloudConsolidation.CPU");
+    EXPECT_EQ(pending.Entries[0].Status, Runtime::DerivedJobStatus::Queued);
+
+    jobs.Pump(1u);
+    jobs.DrainCompletions();
+    EXPECT_FALSE(completedResult.has_value());
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud), originalCount);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(cloud));
+
+    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    ASSERT_TRUE(completedResult.has_value());
+    EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
+    EXPECT_EQ(completedResult->InputPointCount, originalCount);
+    EXPECT_EQ(completedResult->ProjectedPointCount, expectedTarget);
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud),
+              completedResult->ProjectedPointCount);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::GpuDirty>(cloud));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(cloud));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(cloud));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(cloud));
+    EXPECT_TRUE(history.IsDirty());
+
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud), originalCount);
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud),
+              completedResult->ProjectedPointCount);
+}
+
+TEST(SandboxEditorUi, PointCloudConsolidationFailsClosedForInvalidInputs)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    // Missing scene fails closed.
+    const Runtime::SandboxEditorPointCloudConsolidationResult missingScene =
+        Runtime::ApplySandboxEditorPointCloudConsolidationCommand(
+            Runtime::SandboxEditorContext{},
+            Runtime::SandboxEditorPointCloudConsolidationCommand{
+                .StableEntityId = 1u,
+            });
+    EXPECT_EQ(missingScene.Status,
+              Runtime::SandboxEditorCommandStatus::MissingScene);
+
+    // A mesh entity is the wrong domain for point-cloud consolidation.
+    const ECS::EntityHandle mesh =
+        MakeSelectable(registry, "WrongDomainConsolidateMesh");
+    AddDenoiseTetraMeshSource(registry, mesh);
+    const Runtime::SandboxEditorPointCloudConsolidationResult wrongDomain =
+        Runtime::ApplySandboxEditorPointCloudConsolidationCommand(
+            context,
+            Runtime::SandboxEditorPointCloudConsolidationCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+            });
+    EXPECT_EQ(wrongDomain.Status,
+              Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+
+    // Fail-closed: invalid parameters are rejected before any mutation.
+    const std::vector<glm::vec3> positions = MakeOutlierClusterPositions();
+    const std::size_t originalCount = positions.size();
+    const ECS::EntityHandle cloud =
+        MakeSelectable(registry, "InvalidParamConsolidateCloud");
+    AddPointCloudSource(registry, cloud, originalCount);
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(cloud);
+
+    const Runtime::SandboxEditorPointCloudConsolidationResult badRepulsion =
+        Runtime::ApplySandboxEditorPointCloudConsolidationCommand(
+            context,
+            Runtime::SandboxEditorPointCloudConsolidationCommand{
+                .StableEntityId = stableId,
+                .RepulsionWeight = 0.75f,
+            });
+    EXPECT_EQ(badRepulsion.Status,
+              Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
+
+    const Runtime::SandboxEditorPointCloudConsolidationResult badIterations =
+        Runtime::ApplySandboxEditorPointCloudConsolidationCommand(
+            context,
+            Runtime::SandboxEditorPointCloudConsolidationCommand{
+                .StableEntityId = stableId,
+                .Iterations = 0u,
+            });
+    EXPECT_EQ(badIterations.Status,
+              Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
+
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud), originalCount);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(cloud));
+    EXPECT_FALSE(history.IsDirty());
 }
 
 TEST(SandboxEditorUi, MeshDenoiseCommandFailsClosedForInvalidTargetsAndUnavailableKernel)

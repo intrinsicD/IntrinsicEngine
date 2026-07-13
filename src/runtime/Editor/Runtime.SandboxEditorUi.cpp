@@ -99,6 +99,7 @@ import Geometry.Mesh.Conversion;
 import Geometry.MeshOperator;
 import Geometry.MeshSoup;
 import Geometry.PointCloud;
+import Geometry.PointCloud.Consolidation;
 import Geometry.PointCloud.Normals;
 import Geometry.PointCloud.SurfaceSampling;
 import Geometry.PointCloud.Utils;
@@ -434,6 +435,18 @@ namespace Extrinsic::Runtime
             std::int32_t* MinNeighbors{nullptr};
         };
 
+        struct PointCloudConsolidationUiState
+        {
+            std::optional<SandboxEditorPointCloudConsolidationResult>*
+                LastResult{nullptr};
+            float*        SupportRadius{nullptr};  // 0 derives 4x avg spacing.
+            float*        RepulsionWeight{nullptr};
+            std::int32_t* Iterations{nullptr};
+            float*        TargetPercentage{nullptr};
+            std::int32_t* Seed{nullptr};
+            std::int32_t* Variant{nullptr};  // 0 = WLOP, 1 = LOP.
+        };
+
         struct RegistrationUiState
         {
             std::optional<SandboxEditorRegistrationResult>* LastResult{nullptr};
@@ -506,7 +519,8 @@ namespace Extrinsic::Runtime
             ProcessingPointCloudVertexNormals = 11,
             ProcessingPointCloudOutlierRemoval = 12,
             ProcessingProgressivePoisson = 13,
-            Count = 14,
+            ProcessingPointCloudConsolidation = 14,
+            Count = 15,
         };
 
         static_assert(
@@ -694,6 +708,7 @@ namespace Extrinsic::Runtime
                 case DomainWindowSection::ProcessingGraphVertexNormals:
                 case DomainWindowSection::ProcessingPointCloudVertexNormals:
                 case DomainWindowSection::ProcessingPointCloudOutlierRemoval:
+                case DomainWindowSection::ProcessingPointCloudConsolidation:
                 case DomainWindowSection::Count: break;
                 }
                 break;
@@ -715,6 +730,7 @@ namespace Extrinsic::Runtime
                 case DomainWindowSection::ProcessingMeshVertexNormals:
                 case DomainWindowSection::ProcessingPointCloudVertexNormals:
                 case DomainWindowSection::ProcessingPointCloudOutlierRemoval:
+                case DomainWindowSection::ProcessingPointCloudConsolidation:
                 case DomainWindowSection::ProcessingProgressivePoisson:
                 case DomainWindowSection::Count: break;
                 }
@@ -731,6 +747,8 @@ namespace Extrinsic::Runtime
                     return "PointCloud / Processing / Vertices / Normals";
                 case DomainWindowSection::ProcessingPointCloudOutlierRemoval:
                     return "PointCloud / Processing / Remove Outliers";
+                case DomainWindowSection::ProcessingPointCloudConsolidation:
+                    return "PointCloud / Processing / Consolidate";
                 case DomainWindowSection::ProcessingProgressivePoisson:
                     return "PointCloud / Processing / Progressive Poisson";
                 case DomainWindowSection::ProcessingDenoise:
@@ -3251,6 +3269,7 @@ namespace Extrinsic::Runtime
             case SandboxEditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval:
             case SandboxEditorGeometryProcessingAlgorithm::RadiusOutlierRemoval:
             case SandboxEditorGeometryProcessingAlgorithm::ProgressivePoissonSampling:
+            case SandboxEditorGeometryProcessingAlgorithm::PointCloudConsolidation:
                 return false;
             }
             return false;
@@ -9171,6 +9190,338 @@ namespace Extrinsic::Runtime
                 handle);
         }
 
+        [[nodiscard]] SandboxEditorCommandStatus
+        ToSandboxEditorPointCloudConsolidationFailureStatus(
+            const Geometry::PointCloud::Consolidation::ConsolidateStatus
+                status) noexcept
+        {
+            using Status =
+                Geometry::PointCloud::Consolidation::ConsolidateStatus;
+            switch (status)
+            {
+            case Status::InvalidSupportRadius:
+            case Status::InvalidRepulsionWeight:
+            case Status::InvalidIterationCount:
+            case Status::InvalidTargetCount:
+            case Status::InvalidInitialIndices:
+                return SandboxEditorCommandStatus::InvalidProcessingParameters;
+            case Status::Success:
+            case Status::EmptyInput:
+            case Status::InsufficientPoints:
+            case Status::NonFinitePositions:
+            case Status::SpatialIndexBuildFailed:
+            case Status::SpatialIndexQueryFailed:
+                return SandboxEditorCommandStatus::GeometryProcessingFailed;
+            }
+            return SandboxEditorCommandStatus::GeometryProcessingFailed;
+        }
+
+        [[nodiscard]] SandboxEditorPointCloudConsolidationResult
+        MakePointCloudConsolidationBaseResult()
+        {
+            return SandboxEditorPointCloudConsolidationResult{
+                .Status = SandboxEditorCommandStatus::NoChange,
+                .Error = Core::ErrorCode::Success,
+            };
+        }
+
+        void CopyPointCloudConsolidationCounters(
+            const Geometry::PointCloud::Consolidation::ConsolidateResult&
+                source,
+            SandboxEditorPointCloudConsolidationResult& target)
+        {
+            target.InputPointCount = source.Report.InputPointCount;
+            target.ProjectedPointCount = source.Report.ProjectedPointCount;
+            target.IterationsRun = source.Report.IterationsRun;
+            target.EmptyAttractionNeighborhoods =
+                source.Report.EmptyAttractionNeighborhoods;
+            target.EmptyRepulsionNeighborhoods =
+                source.Report.EmptyRepulsionNeighborhoods;
+            target.LastMeanMovement =
+                source.Report.Movement.empty()
+                    ? 0.0
+                    : source.Report.Movement.back().MeanMovement;
+        }
+
+        [[nodiscard]] std::string BuildPointCloudConsolidationSuccessMessage(
+            const SandboxEditorPointCloudConsolidationResult& result)
+        {
+            std::string message = "Consolidated ";
+            message += std::to_string(result.InputPointCount);
+            message += " points into ";
+            message += std::to_string(result.ProjectedPointCount);
+            message += " after ";
+            message += std::to_string(result.IterationsRun);
+            message += " iterations.";
+            return message;
+        }
+
+        [[nodiscard]] SandboxEditorPointCloudConsolidationResult
+        MakePendingPointCloudConsolidationResult(
+            const std::size_t livePointCount,
+            const DerivedJobHandle handle)
+        {
+            SandboxEditorPointCloudConsolidationResult result =
+                MakePointCloudConsolidationBaseResult();
+            result.Status = SandboxEditorCommandStatus::Pending;
+            result.InputPointCount = livePointCount;
+            result.ProjectedPointCount = livePointCount;
+            result.Message = "Point-cloud consolidation CPU job queued";
+            AppendDerivedJobHandleToMessage(result.Message, handle);
+            result.Message += ".";
+            return result;
+        }
+
+        struct SandboxEditorPointCloudConsolidationCpuJobState
+        {
+            std::uint32_t StableEntityId{0u};
+            std::uint64_t GeometryMetadataSignature{0u};
+            std::vector<glm::vec3> SnapshotPositions{};
+            Geometry::PointCloud::Cloud BeforeCloud{};
+            Geometry::PointCloud::Cloud WorkCloud{};
+            Geometry::PointCloud::Cloud AfterCloud{};
+            Geometry::PointCloud::Consolidation::WlopParams Params{};
+            SandboxEditorPointCloudConsolidationResult Result{};
+        };
+
+        [[nodiscard]] DerivedJobApplyValidation
+        ValidatePointCloudConsolidationCpuJobApply(
+            const SandboxEditorContext& context,
+            const SandboxEditorPointCloudConsolidationCpuJobState& job)
+        {
+            if (context.Scene == nullptr)
+                return DerivedJobApplyValidation::MissingEntity;
+
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, job.StableEntityId);
+            if (!entity.has_value())
+                return DerivedJobApplyValidation::MissingEntity;
+
+            const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
+            const GS::SourceAvailability availability =
+                GS::BuildSourceAvailability(view);
+            if (availability.ProvenanceDomain != GS::Domain::PointCloud ||
+                view.VertexSource == nullptr)
+            {
+                return DerivedJobApplyValidation::StaleGeometryGeneration;
+            }
+
+            if (GeometryMetadataSignatureForEntity(raw, *entity) !=
+                job.GeometryMetadataSignature)
+            {
+                return DerivedJobApplyValidation::StaleGeometryGeneration;
+            }
+
+            std::optional<std::vector<glm::vec3>> current =
+                CollectKMeansPositions(view.VertexSource->Properties);
+            if (!current.has_value() ||
+                !SameKMeansInputPositions(*current, job.SnapshotPositions))
+            {
+                return DerivedJobApplyValidation::StaleSourcePropertyGeneration;
+            }
+
+            return DerivedJobApplyValidation::Current;
+        }
+
+        void PublishPointCloudConsolidationResultSink(
+            const SandboxEditorContext& context,
+            SandboxEditorPointCloudConsolidationResult result)
+        {
+            if (context.MethodResultSinks.PointCloudConsolidation)
+            {
+                context.MethodResultSinks.PointCloudConsolidation(
+                    std::move(result));
+            }
+        }
+
+        [[nodiscard]] DerivedJobWorkerResult
+        RunPointCloudConsolidationCpuWorker(
+            const std::shared_ptr<
+                SandboxEditorPointCloudConsolidationCpuJobState>& state)
+        {
+            const Geometry::PointCloud::Consolidation::ConsolidateResult
+                consolidate = Geometry::PointCloud::Consolidation::Consolidate(
+                    state->WorkCloud,
+                    state->Params);
+
+            SandboxEditorPointCloudConsolidationResult& result =
+                state->Result;
+            CopyPointCloudConsolidationCounters(consolidate, result);
+            if (!consolidate.Succeeded())
+            {
+                result.Status =
+                    ToSandboxEditorPointCloudConsolidationFailureStatus(
+                        consolidate.Status);
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message =
+                    "Geometry.PointCloud consolidation failed with ";
+                result.Message +=
+                    Geometry::PointCloud::Consolidation::DebugName(
+                        consolidate.Status);
+                result.Message += ".";
+                return DerivedJobOutput{
+                    .PayloadToken = 0u,
+                    .NormalizedProgress = 1.0f,
+                    .ProgressDeterminate = true,
+                    .Diagnostic = result.Message,
+                };
+            }
+
+            // Consolidation moves points, so authored per-point attributes do
+            // not transfer; the published cloud carries only the projected
+            // positions.
+            state->AfterCloud = Geometry::PointCloud::Cloud{};
+            for (const glm::vec3& position : consolidate.Positions)
+                (void)state->AfterCloud.AddPoint(position);
+            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Error = Core::ErrorCode::Success;
+            return DerivedJobOutput{
+                .PayloadToken = 0u,
+                .NormalizedProgress = 1.0f,
+                .ProgressDeterminate = true,
+                .Diagnostic = "Point-cloud consolidation CPU result ready",
+            };
+        }
+
+        [[nodiscard]] Core::Result PublishPointCloudConsolidationCpuJob(
+            const SandboxEditorContext& context,
+            SandboxEditorPointCloudConsolidationCpuJobState& job)
+        {
+            SandboxEditorPointCloudConsolidationResult result = job.Result;
+            if (!result.Succeeded())
+            {
+                PublishPointCloudConsolidationResultSink(context, result);
+                return Core::Err(ResultErrorOrUnknown(result.Error));
+            }
+
+            const SandboxEditorCommandStatus commitStatus =
+                CommitPointCloudReplacement(
+                    context,
+                    job.StableEntityId,
+                    "Consolidate Point Cloud",
+                    job.BeforeCloud,
+                    job.AfterCloud);
+            if (commitStatus != SandboxEditorCommandStatus::Applied)
+            {
+                result.Status = commitStatus;
+                result.Error = Core::ErrorCode::Unknown;
+                result.Message =
+                    "Point-cloud consolidation publication failed during editor history commit.";
+                PublishPointCloudConsolidationResultSink(context, result);
+                return Core::Err(Core::ErrorCode::Unknown);
+            }
+
+            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Error = Core::ErrorCode::Success;
+            result.Message =
+                BuildPointCloudConsolidationSuccessMessage(result);
+            InvalidateSelectedModelCache(context);
+            PublishPointCloudConsolidationResultSink(context, result);
+            return Core::Ok();
+        }
+
+        [[nodiscard]] DerivedJobDesc MakePointCloudConsolidationCpuJobDesc(
+            const SandboxEditorContext& context,
+            const std::shared_ptr<
+                SandboxEditorPointCloudConsolidationCpuJobState>& state)
+        {
+            return DerivedJobDesc{
+                .Key = DerivedJobKey{
+                    .EntityId = state->StableEntityId,
+                    .Domain = ProgressiveGeometryDomain::Point,
+                    .OutputSemantic = ProgressiveSlotSemantic::Displacement,
+                    .SourcePropertyGeneration =
+                        state->GeometryMetadataSignature,
+                    .OutputName = "point_cloud_consolidation",
+                },
+                .Name = "Sandbox.PointCloudConsolidation.CPU",
+                .RequestedJobDomain = ProgressiveJobDomain::Cpu,
+                .Kind = Core::Dag::TaskKind::GeometryProcess,
+                .Priority = Core::Dag::TaskPriority::Normal,
+                .EstimatedCost = std::max<std::uint32_t>(
+                    1u,
+                    static_cast<std::uint32_t>(
+                        (state->WorkCloud.VertexCount() + 1023u) / 1024u)),
+                .Execute =
+                    [state]() -> DerivedJobWorkerResult
+                    {
+                        return RunPointCloudConsolidationCpuWorker(state);
+                    },
+                .ValidateOnMainThread =
+                    [context, state]()
+                    {
+                        return ValidatePointCloudConsolidationCpuJobApply(
+                            context,
+                            *state);
+                    },
+                .ApplyOnMainThread =
+                    [context, state](DerivedJobApplyContext&) -> Core::Result
+                    {
+                        return PublishPointCloudConsolidationCpuJob(
+                            context,
+                            *state);
+                    },
+            };
+        }
+
+        [[nodiscard]] SandboxEditorPointCloudConsolidationResult
+        SubmitPointCloudConsolidationCpuJob(
+            const SandboxEditorContext& context,
+            const SandboxEditorPointCloudConsolidationCommand& command,
+            const Geometry::PointCloud::Consolidation::WlopParams& params,
+            Geometry::PointCloud::Cloud beforeCloud,
+            Geometry::PointCloud::Cloud workCloud,
+            std::vector<glm::vec3> snapshotPositions,
+            const std::uint64_t geometryMetadataSignature)
+        {
+            auto state = std::make_shared<
+                SandboxEditorPointCloudConsolidationCpuJobState>();
+            state->StableEntityId = command.StableEntityId;
+            state->GeometryMetadataSignature = geometryMetadataSignature;
+            state->SnapshotPositions = std::move(snapshotPositions);
+            state->BeforeCloud = std::move(beforeCloud);
+            state->WorkCloud = std::move(workCloud);
+            state->Params = params;
+            state->Result = MakePointCloudConsolidationBaseResult();
+            state->Result.InputPointCount = state->WorkCloud.VertexCount();
+            state->Result.ProjectedPointCount =
+                state->WorkCloud.VertexCount();
+
+            DerivedJobDesc desc =
+                MakePointCloudConsolidationCpuJobDesc(context, state);
+            if (const std::optional<DerivedJobSnapshot> active =
+                    FindActiveEditorDerivedJob(context, desc.Key))
+            {
+                SandboxEditorPointCloudConsolidationResult pending =
+                    MakePendingPointCloudConsolidationResult(
+                        state->WorkCloud.VertexCount(),
+                        active->Handle);
+                pending.Message = BuildActiveDerivedJobMessage(
+                    "Point-cloud consolidation CPU",
+                    *active);
+                return pending;
+            }
+
+            const DerivedJobHandle handle =
+                context.DerivedJobCommands.Submit(std::move(desc));
+            if (!handle.IsValid())
+            {
+                SandboxEditorPointCloudConsolidationResult result =
+                    MakePointCloudConsolidationBaseResult();
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "Point-cloud consolidation CPU job submission was rejected by the runtime job lane.";
+                return result;
+            }
+
+            return MakePendingPointCloudConsolidationResult(
+                state->WorkCloud.VertexCount(),
+                handle);
+        }
+
         enum class SandboxEditorVertexNormalsCpuJobKind : std::uint8_t
         {
             Mesh,
@@ -11988,6 +12339,10 @@ namespace Extrinsic::Runtime
                 HasAnySandboxEditorGeometryProcessingDomain(
                     model.Capabilities.Domains,
                     SandboxEditorGeometryProcessingDomain::PointCloudPoints);
+            model.PointCloudConsolidationAvailable =
+                HasAnySandboxEditorGeometryProcessingDomain(
+                    model.Capabilities.Domains,
+                    SandboxEditorGeometryProcessingDomain::PointCloudPoints);
             model.PointCloudProgressivePoissonAvailable =
                 HasAnySandboxEditorGeometryProcessingDomain(
                     model.Capabilities.Domains,
@@ -12136,6 +12491,20 @@ namespace Extrinsic::Runtime
                         context.LastPointCloudOutlierRemovalResult->Message.empty()
                             ? "Last point-cloud outlier-removal command failed."
                             : context.LastPointCloudOutlierRemovalResult->Message);
+                }
+            }
+            if (context.LastPointCloudConsolidationResult != nullptr)
+            {
+                model.LastPointCloudConsolidationResult =
+                    *context.LastPointCloudConsolidationResult;
+                if (!context.LastPointCloudConsolidationResult->Succeeded())
+                {
+                    AddDiagnostic(
+                        model.Diagnostics,
+                        SandboxEditorDiagnosticCode::GeometryProcessingFailed,
+                        context.LastPointCloudConsolidationResult->Message.empty()
+                            ? "Last point-cloud consolidation command failed."
+                            : context.LastPointCloudConsolidationResult->Message);
                 }
             }
             if (context.LastProgressivePoissonResult != nullptr)
@@ -13330,6 +13699,13 @@ namespace Extrinsic::Runtime
                     {
                         openProcessing(
                             DomainWindowSection::ProcessingProgressivePoisson);
+                    }
+                    if (kind == SandboxEditorDomainWindowKind::PointCloud &&
+                        ImGui::MenuItem("Consolidate"))
+                    {
+                        openProcessing(
+                            DomainWindowSection::
+                                ProcessingPointCloudConsolidation);
                     }
                     for (const SandboxEditorGeometryProcessingMenuItem& item :
                          menuItems)
@@ -16408,6 +16784,137 @@ namespace Extrinsic::Runtime
             DrawPointCloudOutlierRemovalResultStatus(result);
         }
 
+        void DrawPointCloudConsolidationResultStatus(
+            const std::optional<SandboxEditorPointCloudConsolidationResult>&
+                lastResult)
+        {
+            if (!lastResult.has_value())
+            {
+                ImGui::TextDisabled("Last consolidation: none");
+                return;
+            }
+
+            const SandboxEditorPointCloudConsolidationResult& result =
+                *lastResult;
+            ImGui::Text("Last consolidation: %s",
+                        DebugNameForSandboxEditorCommandStatus(result.Status));
+            if (result.Succeeded())
+            {
+                ImGui::Text("Projected %zu / %zu  iterations %u",
+                            result.ProjectedPointCount,
+                            result.InputPointCount,
+                            result.IterationsRun);
+                ImGui::Text(
+                    "Last mean movement %.6f  empty neighborhoods A %zu / R %zu",
+                    result.LastMeanMovement,
+                    result.EmptyAttractionNeighborhoods,
+                    result.EmptyRepulsionNeighborhoods);
+            }
+            if (!result.Message.empty())
+                ImGui::TextWrapped("%s", result.Message.c_str());
+        }
+
+        void DrawPointCloudConsolidationControls(
+            const SandboxEditorDomainWindowModel& model,
+            const SandboxEditorContext& context,
+            const SandboxEditorGeometryProcessingModel& processing,
+            PointCloudConsolidationUiState* consolidationState)
+        {
+            ImGui::SeparatorText("Consolidate");
+            if (!processing.PointCloudConsolidationAvailable)
+            {
+                ImGui::TextDisabled("Point-cloud consolidation is unavailable for this selection.");
+                return;
+            }
+            if (consolidationState == nullptr ||
+                consolidationState->LastResult == nullptr ||
+                consolidationState->SupportRadius == nullptr ||
+                consolidationState->RepulsionWeight == nullptr ||
+                consolidationState->Iterations == nullptr ||
+                consolidationState->TargetPercentage == nullptr ||
+                consolidationState->Seed == nullptr ||
+                consolidationState->Variant == nullptr)
+            {
+                ImGui::TextDisabled("Point-cloud consolidation controls are not bound.");
+                return;
+            }
+
+            ImGui::TextDisabled("Project a target-sized point set onto the input (WLOP/LOP).");
+            *consolidationState->SupportRadius =
+                std::max(*consolidationState->SupportRadius, 0.0f);
+            ImGui::DragFloat(
+                "Support radius##PointCloudConsolidation",
+                consolidationState->SupportRadius,
+                0.01f,
+                0.0f,
+                1000.0f);
+            ImGui::TextDisabled("0 derives 8x average spacing.");
+            ImGui::SliderFloat(
+                "Repulsion weight##PointCloudConsolidation",
+                consolidationState->RepulsionWeight,
+                0.0f,
+                0.49f);
+            ImGui::SliderInt(
+                "Iterations##PointCloudConsolidation",
+                consolidationState->Iterations,
+                1,
+                100);
+            ImGui::SliderFloat(
+                "Target percentage##PointCloudConsolidation",
+                consolidationState->TargetPercentage,
+                1.0f,
+                100.0f);
+            ImGui::InputInt(
+                "Seed##PointCloudConsolidation",
+                consolidationState->Seed);
+
+            *consolidationState->Variant =
+                std::clamp(*consolidationState->Variant, 0, 1);
+            const bool wlop = *consolidationState->Variant == 0;
+            if (ImGui::BeginCombo(
+                    "Variant##PointCloudConsolidation",
+                    wlop ? "WLOP (density-weighted)" : "LOP (unit weights)"))
+            {
+                if (ImGui::Selectable("WLOP (density-weighted)##PointCloudConsolidation", wlop))
+                    *consolidationState->Variant = 0;
+                if (wlop)
+                    ImGui::SetItemDefaultFocus();
+                if (ImGui::Selectable("LOP (unit weights)##PointCloudConsolidation", !wlop))
+                    *consolidationState->Variant = 1;
+                if (!wlop)
+                    ImGui::SetItemDefaultFocus();
+                ImGui::EndCombo();
+            }
+
+            if (ImGui::Button("Consolidate##PointCloudConsolidation"))
+            {
+                *consolidationState->LastResult =
+                    ApplySandboxEditorPointCloudConsolidationCommand(
+                        context,
+                        SandboxEditorPointCloudConsolidationCommand{
+                            .StableEntityId = model.SelectedStableId,
+                            .SupportRadius =
+                                *consolidationState->SupportRadius,
+                            .RepulsionWeight =
+                                *consolidationState->RepulsionWeight,
+                            .Iterations = static_cast<std::uint32_t>(
+                                *consolidationState->Iterations),
+                            .TargetPercentage =
+                                *consolidationState->TargetPercentage,
+                            .Seed = static_cast<std::uint32_t>(
+                                *consolidationState->Seed),
+                            .Variant = static_cast<std::uint32_t>(
+                                *consolidationState->Variant),
+                        });
+            }
+
+            const std::optional<SandboxEditorPointCloudConsolidationResult>&
+                result = consolidationState->LastResult->has_value()
+                    ? *consolidationState->LastResult
+                    : processing.LastPointCloudConsolidationResult;
+            DrawPointCloudConsolidationResultStatus(result);
+        }
+
         [[nodiscard]] SandboxEditorProgressivePoissonChannel
         ProgressivePoissonChannelFromIndex(const std::int32_t index) noexcept
         {
@@ -17091,6 +17598,7 @@ namespace Extrinsic::Runtime
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
             PointCloudOutlierRemovalUiState* pointCloudOutlierState,
+            PointCloudConsolidationUiState* pointCloudConsolidationState,
             ProgressivePoissonUiState* progressivePoissonState)
         {
             DrawDomainWindowHeader(model);
@@ -17179,6 +17687,13 @@ namespace Extrinsic::Runtime
                     processing,
                     progressivePoissonState);
                 break;
+            case DomainWindowSection::ProcessingPointCloudConsolidation:
+                DrawPointCloudConsolidationControls(
+                    model,
+                    context,
+                    processing,
+                    pointCloudConsolidationState);
+                break;
             case DomainWindowSection::Render:
             case DomainWindowSection::Properties:
             case DomainWindowSection::Selection:
@@ -17205,6 +17720,7 @@ namespace Extrinsic::Runtime
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
             PointCloudOutlierRemovalUiState* pointCloudOutlierState,
+            PointCloudConsolidationUiState* pointCloudConsolidationState,
             ProgressivePoissonUiState* progressivePoissonState,
             TextureBakeUiState* textureBakeState)
         {
@@ -17247,6 +17763,7 @@ namespace Extrinsic::Runtime
                 case DomainWindowSection::ProcessingGraphVertexNormals:
                 case DomainWindowSection::ProcessingPointCloudVertexNormals:
                 case DomainWindowSection::ProcessingPointCloudOutlierRemoval:
+                case DomainWindowSection::ProcessingPointCloudConsolidation:
                 case DomainWindowSection::ProcessingProgressivePoisson:
                     DrawDomainProcessingWindow(
                         model,
@@ -17262,6 +17779,7 @@ namespace Extrinsic::Runtime
                         graphNormalsState,
                         pointCloudNormalsState,
                         pointCloudOutlierState,
+                        pointCloudConsolidationState,
                         progressivePoissonState);
                     break;
                 case DomainWindowSection::Count:
@@ -17285,6 +17803,7 @@ namespace Extrinsic::Runtime
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
             PointCloudOutlierRemovalUiState* pointCloudOutlierState,
+            PointCloudConsolidationUiState* pointCloudConsolidationState,
             ProgressivePoissonUiState* progressivePoissonState,
             TextureBakeUiState* textureBakeState)
         {
@@ -17298,7 +17817,7 @@ namespace Extrinsic::Runtime
                 SandboxEditorDomainWindowKind::Graph,
                 SandboxEditorDomainWindowKind::Mesh,
             };
-            constexpr std::array<DomainWindowSection, 14> kSections{
+            constexpr std::array<DomainWindowSection, 15> kSections{
                 DomainWindowSection::Render,
                 DomainWindowSection::Properties,
                 DomainWindowSection::Selection,
@@ -17313,6 +17832,7 @@ namespace Extrinsic::Runtime
                 DomainWindowSection::ProcessingPointCloudVertexNormals,
                 DomainWindowSection::ProcessingPointCloudOutlierRemoval,
                 DomainWindowSection::ProcessingProgressivePoisson,
+                DomainWindowSection::ProcessingPointCloudConsolidation,
             };
             for (const SandboxEditorDomainWindowKind kind : kKinds)
             {
@@ -17334,6 +17854,7 @@ namespace Extrinsic::Runtime
                         graphNormalsState,
                         pointCloudNormalsState,
                         pointCloudOutlierState,
+                        pointCloudConsolidationState,
                         progressivePoissonState,
                         textureBakeState);
                 }
@@ -17906,6 +18427,7 @@ namespace Extrinsic::Runtime
             GraphVertexNormalsUiState* graphNormalsState,
             PointCloudVertexNormalsUiState* pointCloudNormalsState,
             PointCloudOutlierRemovalUiState* pointCloudOutlierState,
+            PointCloudConsolidationUiState* pointCloudConsolidationState,
             ProgressivePoissonUiState* progressivePoissonState,
             TextureBakeUiState* textureBakeState,
             RegistrationUiState* registrationState)
@@ -17924,6 +18446,7 @@ namespace Extrinsic::Runtime
                 graphNormalsState,
                 pointCloudNormalsState,
                 pointCloudOutlierState,
+                pointCloudConsolidationState,
                 progressivePoissonState,
                 textureBakeState);
 
@@ -19369,6 +19892,7 @@ namespace Extrinsic::Runtime
         case SandboxEditorGeometryProcessingAlgorithm::KernelDensity:
         case SandboxEditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval:
         case SandboxEditorGeometryProcessingAlgorithm::RadiusOutlierRemoval:
+        case SandboxEditorGeometryProcessingAlgorithm::PointCloudConsolidation:
             return Domain::PointCloudPoints;
         case SandboxEditorGeometryProcessingAlgorithm::ProgressivePoissonSampling:
             return Domain::MeshVertices | Domain::PointCloudPoints;
@@ -19417,7 +19941,7 @@ namespace Extrinsic::Runtime
     ResolveSandboxEditorGeometryProcessingEntries(
         const SandboxEditorGeometryProcessingCapabilities capabilities)
     {
-        static constexpr std::array<SandboxEditorGeometryProcessingAlgorithm, 22>
+        static constexpr std::array<SandboxEditorGeometryProcessingAlgorithm, 23>
             kAlgorithmOrder{
                 SandboxEditorGeometryProcessingAlgorithm::KMeans,
                 SandboxEditorGeometryProcessingAlgorithm::NormalEstimation,
@@ -19441,6 +19965,7 @@ namespace Extrinsic::Runtime
                 SandboxEditorGeometryProcessingAlgorithm::Smoothing,
                 SandboxEditorGeometryProcessingAlgorithm::Subdivision,
                 SandboxEditorGeometryProcessingAlgorithm::Repair,
+                SandboxEditorGeometryProcessingAlgorithm::PointCloudConsolidation,
             };
 
         std::vector<SandboxEditorGeometryProcessingEntry> entries{};
@@ -20181,6 +20706,8 @@ namespace Extrinsic::Runtime
             return "Radius Outlier Removal";
         case SandboxEditorGeometryProcessingAlgorithm::ProgressivePoissonSampling:
             return "Progressive Poisson Sampling";
+        case SandboxEditorGeometryProcessingAlgorithm::PointCloudConsolidation:
+            return "Point Cloud Consolidation";
         }
         return "Unknown";
     }
@@ -24326,6 +24853,216 @@ namespace Extrinsic::Runtime
         return result;
     }
 
+    SandboxEditorPointCloudConsolidationResult
+    ApplySandboxEditorPointCloudConsolidationCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorPointCloudConsolidationCommand& command)
+    {
+        SandboxEditorPointCloudConsolidationResult result =
+            MakePointCloudConsolidationBaseResult();
+
+        if (context.Scene == nullptr)
+        {
+            result.Status = SandboxEditorCommandStatus::MissingScene;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Point-cloud consolidation requires an attached scene.";
+            return result;
+        }
+
+        if (!std::isfinite(command.SupportRadius) ||
+            command.SupportRadius < 0.0f ||
+            !std::isfinite(command.RepulsionWeight) ||
+            command.RepulsionWeight < 0.0f ||
+            command.RepulsionWeight >= 0.5f ||
+            command.Iterations == 0u ||
+            !std::isfinite(command.TargetPercentage) ||
+            command.TargetPercentage <= 0.0f ||
+            command.TargetPercentage > 100.0f ||
+            command.Variant > 1u)
+        {
+            result.Status =
+                SandboxEditorCommandStatus::InvalidProcessingParameters;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Point-cloud consolidation requires a non-negative finite support radius, a repulsion weight in [0, 0.5), at least one iteration, a target percentage in (0, 100], and a known variant.";
+            return result;
+        }
+
+        entt::registry& raw = context.Scene->Raw();
+        const std::optional<ECS::EntityHandle> entity =
+            ResolveStableEntity(raw, command.StableEntityId);
+        if (!entity.has_value())
+        {
+            result.Status = SandboxEditorCommandStatus::StaleEntity;
+            result.Error = Core::ErrorCode::ResourceNotFound;
+            result.Message =
+                "Point-cloud consolidation target entity is stale or no longer live.";
+            return result;
+        }
+
+        GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
+        const GS::SourceAvailability availability =
+            GS::BuildSourceAvailability(view);
+        if (availability.ProvenanceDomain != GS::Domain::PointCloud ||
+            view.VertexSource == nullptr)
+        {
+            result.Status =
+                SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Point-cloud consolidation requires selected point-cloud GeometrySources.";
+            return result;
+        }
+
+        // Snapshot the original point property set (including any deleted slots
+        // and the live deletion counter) so undo restores the entity exactly.
+        Geometry::Vertices originalPoints = view.VertexSource->Properties;
+        std::size_t originalNumDeleted = view.VertexSource->NumDeleted;
+        if (!MirrorGeometrySourcePositionsToPointCloudStorage(originalPoints))
+        {
+            result.Status =
+                SandboxEditorCommandStatus::InvalidProcessingParameters;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Point-cloud consolidation requires a count-matched v:position property.";
+            return result;
+        }
+        Geometry::PointCloud::Cloud beforeCloud{
+            originalPoints,
+            originalNumDeleted};
+
+        // Build a separate live-only working cloud (mirrors the UI-027 outlier
+        // path): bind the deletion counter and garbage-collect so consolidation
+        // runs over the live points only.
+        Geometry::Vertices workPoints = view.VertexSource->Properties;
+        std::size_t workNumDeleted = view.VertexSource->NumDeleted;
+        if (!MirrorGeometrySourcePositionsToPointCloudStorage(workPoints))
+        {
+            result.Status =
+                SandboxEditorCommandStatus::InvalidProcessingParameters;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Point-cloud consolidation requires a count-matched v:position property.";
+            return result;
+        }
+        Geometry::PointCloud::Cloud workCloud{workPoints, workNumDeleted};
+        if (workCloud.HasGarbage())
+            workCloud.GarbageCollection();
+
+        std::optional<std::vector<glm::vec3>> snapshotPositions =
+            CollectKMeansPositions(view.VertexSource->Properties);
+        if (!snapshotPositions.has_value())
+        {
+            result.Status =
+                SandboxEditorCommandStatus::InvalidProcessingParameters;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Point-cloud consolidation requires a count-matched v:position property.";
+            return result;
+        }
+
+        float supportRadius = command.SupportRadius;
+        if (supportRadius <= 0.0f)
+        {
+            const std::optional<Geometry::PointCloud::CloudStatistics>
+                statistics = Geometry::PointCloud::ComputeStatistics(
+                    workCloud,
+                    Geometry::PointCloud::StatisticsParams{});
+            if (!statistics.has_value())
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::InvalidProcessingParameters;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message =
+                    "Point-cloud consolidation could not derive a support radius because cloud statistics are unavailable.";
+                return result;
+            }
+            supportRadius = 8.0f * statistics->AverageSpacing;
+        }
+
+        const std::size_t liveCount = workCloud.VertexCount();
+        const std::size_t targetCount =
+            liveCount == 0u
+                ? 0u
+                : std::clamp<std::size_t>(
+                      static_cast<std::size_t>(std::llround(
+                          static_cast<double>(command.TargetPercentage) /
+                          100.0 * static_cast<double>(liveCount))),
+                      1u,
+                      liveCount);
+        const Geometry::PointCloud::Consolidation::WlopParams params{
+            .SupportRadius = supportRadius,
+            .RepulsionWeight = command.RepulsionWeight,
+            .Iterations = command.Iterations,
+            .TargetCount = targetCount,
+            .InitialIndices = {},
+            .Seed = command.Seed,
+            .Method = command.Variant == 1u
+                ? Geometry::PointCloud::Consolidation::Variant::Lop
+                : Geometry::PointCloud::Consolidation::Variant::Wlop,
+        };
+
+        if (context.DerivedJobCommands.Available())
+        {
+            return SubmitPointCloudConsolidationCpuJob(
+                context,
+                command,
+                params,
+                std::move(beforeCloud),
+                std::move(workCloud),
+                std::move(*snapshotPositions),
+                GeometryMetadataSignatureForEntity(raw, *entity));
+        }
+
+        const Geometry::PointCloud::Consolidation::ConsolidateResult
+            consolidate = Geometry::PointCloud::Consolidation::Consolidate(
+                workCloud,
+                params);
+
+        CopyPointCloudConsolidationCounters(consolidate, result);
+
+        if (!consolidate.Succeeded())
+        {
+            result.Status =
+                ToSandboxEditorPointCloudConsolidationFailureStatus(
+                    consolidate.Status);
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message = "Geometry.PointCloud consolidation failed with ";
+            result.Message +=
+                Geometry::PointCloud::Consolidation::DebugName(
+                    consolidate.Status);
+            result.Message += ".";
+            return result;
+        }
+
+        // Consolidation moves points, so authored per-point attributes do not
+        // transfer; the published cloud carries only the projected positions.
+        Geometry::PointCloud::Cloud afterCloud{};
+        for (const glm::vec3& position : consolidate.Positions)
+            (void)afterCloud.AddPoint(position);
+
+        const SandboxEditorCommandStatus status =
+            CommitPointCloudReplacement(
+                context,
+                command.StableEntityId,
+                "Consolidate Point Cloud",
+                beforeCloud,
+                afterCloud);
+        result.Status = status;
+        if (status != SandboxEditorCommandStatus::Applied)
+        {
+            result.Error = Core::ErrorCode::ResourceNotFound;
+            result.Message =
+                "Point-cloud consolidation publication failed; the target entity may no longer be live.";
+            return result;
+        }
+
+        result.Message = BuildPointCloudConsolidationSuccessMessage(result);
+        InvalidateSelectedModelCache(context);
+        return result;
+    }
+
     SandboxEditorRegistrationResult ApplySandboxEditorRegistrationCommand(
         const SandboxEditorContext& context,
         const SandboxEditorRegistrationCommand& command)
@@ -24559,6 +25296,7 @@ namespace Extrinsic::Runtime
     void DrawSandboxEditorPanelFrame(const SandboxEditorPanelFrame& frame)
     {
         DrawPanelFrame(frame,
+                       nullptr,
                        nullptr,
                        nullptr,
                        nullptr,
@@ -24826,6 +25564,14 @@ namespace Extrinsic::Runtime
                             m_LastPointCloudOutlierRemovalResult =
                                 std::move(result);
                     };
+                context.MethodResultSinks.PointCloudConsolidation =
+                    [alive = m_ResultSinksAlive, this](
+                        SandboxEditorPointCloudConsolidationResult result)
+                    {
+                        if (alive && *alive)
+                            m_LastPointCloudConsolidationResult =
+                                std::move(result);
+                    };
                 context.MethodResultSinks.Registration =
                     [alive = m_ResultSinksAlive, this](
                         SandboxEditorRegistrationResult result)
@@ -24872,6 +25618,9 @@ namespace Extrinsic::Runtime
                 if (m_LastPointCloudOutlierRemovalResult.has_value())
                     context.LastPointCloudOutlierRemovalResult =
                         &*m_LastPointCloudOutlierRemovalResult;
+                if (m_LastPointCloudConsolidationResult.has_value())
+                    context.LastPointCloudConsolidationResult =
+                        &*m_LastPointCloudConsolidationResult;
                 if (m_LastProgressivePoissonResult.has_value())
                     context.LastProgressivePoissonResult =
                         &*m_LastProgressivePoissonResult;
@@ -25008,6 +25757,17 @@ namespace Extrinsic::Runtime
                     .SearchRadius = &m_PointCloudOutlierSearchRadius,
                     .MinNeighbors = &m_PointCloudOutlierMinNeighbors,
                 };
+                PointCloudConsolidationUiState pointCloudConsolidationState{
+                    .LastResult = &m_LastPointCloudConsolidationResult,
+                    .SupportRadius = &m_PointCloudConsolidationSupportRadius,
+                    .RepulsionWeight =
+                        &m_PointCloudConsolidationRepulsionWeight,
+                    .Iterations = &m_PointCloudConsolidationIterations,
+                    .TargetPercentage =
+                        &m_PointCloudConsolidationTargetPercentage,
+                    .Seed = &m_PointCloudConsolidationSeed,
+                    .Variant = &m_PointCloudConsolidationVariant,
+                };
                 ProgressivePoissonUiState progressivePoissonState{
                     .LastResult = &m_LastProgressivePoissonResult,
                     .LastConfigResult =
@@ -25088,6 +25848,7 @@ namespace Extrinsic::Runtime
                     &graphNormalsState,
                     &pointCloudNormalsState,
                     &pointCloudOutlierState,
+                    &pointCloudConsolidationState,
                     &progressivePoissonState,
                     &textureBakeState,
                     &registrationState);

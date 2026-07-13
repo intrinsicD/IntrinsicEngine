@@ -69,7 +69,7 @@ import Geometry.UvAtlas;
 namespace Extrinsic::Runtime::Detail
 {
     inline constexpr std::size_t kSandboxEditorPanelWindowCount = 11u;
-    inline constexpr std::size_t kSandboxEditorDomainWindowCount = 42u;
+    inline constexpr std::size_t kSandboxEditorDomainWindowCount = 45u;
 }
 
 export namespace Extrinsic::Runtime
@@ -272,6 +272,7 @@ export namespace Extrinsic::Runtime
         StatisticalOutlierRemoval,
         RadiusOutlierRemoval,
         ProgressivePoissonSampling,
+        PointCloudConsolidation,
     };
 
     struct SandboxEditorGeometryProcessingCapabilities
@@ -1008,6 +1009,39 @@ export namespace Extrinsic::Runtime
         float       DistanceThreshold{0.0f};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SandboxEditorCommandStatus::Applied;
+        }
+    };
+
+    // Explicit point-cloud consolidation (WLOP/LOP). The editor command
+    // projects a target-sized point set and rebuilds the entity's point
+    // GeometrySources from the projected positions with an undoable history
+    // entry.
+    struct SandboxEditorPointCloudConsolidationCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        float         SupportRadius{0.0f};  // 0 derives 4x average spacing.
+        float         RepulsionWeight{0.45f};
+        std::uint32_t Iterations{12u};
+        float         TargetPercentage{20.0f};
+        std::uint32_t Seed{42u};
+        std::uint32_t Variant{0u};  // 0 = WLOP, 1 = LOP.
+    };
+
+    struct SandboxEditorPointCloudConsolidationResult
+    {
+        SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
+        std::size_t   InputPointCount{0};
+        std::size_t   ProjectedPointCount{0};
+        std::uint32_t IterationsRun{0u};
+        std::size_t   EmptyAttractionNeighborhoods{0};
+        std::size_t   EmptyRepulsionNeighborhoods{0};
+        double        LastMeanMovement{0.0};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        std::string   Message{};
 
         [[nodiscard]] bool Succeeded() const noexcept
         {
@@ -1957,6 +1991,8 @@ export namespace Extrinsic::Runtime
             PointCloudVertexNormals{};
         std::function<void(SandboxEditorPointCloudOutlierRemovalResult)>
             PointCloudOutlierRemoval{};
+        std::function<void(SandboxEditorPointCloudConsolidationResult)>
+            PointCloudConsolidation{};
         std::function<void(SandboxEditorRegistrationResult)> Registration{};
     };
 
@@ -2077,6 +2113,7 @@ export namespace Extrinsic::Runtime
         bool GraphVertexNormalsAvailable{false};
         bool PointCloudVertexNormalsAvailable{false};
         bool PointCloudOutlierRemovalAvailable{false};
+        bool PointCloudConsolidationAvailable{false};
         bool PointCloudProgressivePoissonAvailable{false};
         bool MeshProgressivePoissonAvailable{false};
         std::optional<SandboxEditorKMeansResult> LastKMeansResult{};
@@ -2098,6 +2135,8 @@ export namespace Extrinsic::Runtime
             LastPointCloudVertexNormalsResult{};
         std::optional<SandboxEditorPointCloudOutlierRemovalResult>
             LastPointCloudOutlierRemovalResult{};
+        std::optional<SandboxEditorPointCloudConsolidationResult>
+            LastPointCloudConsolidationResult{};
         std::optional<SandboxEditorProgressivePoissonResult>
             LastProgressivePoissonResult{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
@@ -2340,6 +2379,8 @@ export namespace Extrinsic::Runtime
             LastPointCloudVertexNormalsResult{nullptr};
         const SandboxEditorPointCloudOutlierRemovalResult*
             LastPointCloudOutlierRemovalResult{nullptr};
+        const SandboxEditorPointCloudConsolidationResult*
+            LastPointCloudConsolidationResult{nullptr};
         const SandboxEditorProgressivePoissonResult*
             LastProgressivePoissonResult{nullptr};
         const SandboxEditorRegistrationResult*
@@ -2741,6 +2782,11 @@ export namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorPointCloudOutlierRemovalCommand& command);
 
+    SandboxEditorPointCloudConsolidationResult
+    ApplySandboxEditorPointCloudConsolidationCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorPointCloudConsolidationCommand& command);
+
     SandboxEditorRegistrationResult ApplySandboxEditorRegistrationCommand(
         const SandboxEditorContext& context,
         const SandboxEditorRegistrationCommand& command);
@@ -2828,6 +2874,8 @@ export namespace Extrinsic::Runtime
             m_LastPointCloudVertexNormalsResult{};
         std::optional<SandboxEditorPointCloudOutlierRemovalResult>
             m_LastPointCloudOutlierRemovalResult{};
+        std::optional<SandboxEditorPointCloudConsolidationResult>
+            m_LastPointCloudConsolidationResult{};
         std::optional<SandboxEditorProgressivePoissonResult>
             m_LastProgressivePoissonResult{};
         std::optional<SandboxEditorProgressivePoissonConfigResult>
@@ -2896,6 +2944,12 @@ export namespace Extrinsic::Runtime
         float m_PointCloudOutlierStdDevMultiplier{1.0f};
         float m_PointCloudOutlierSearchRadius{0.0f};
         std::int32_t m_PointCloudOutlierMinNeighbors{4};
+        float m_PointCloudConsolidationSupportRadius{0.0f};
+        float m_PointCloudConsolidationRepulsionWeight{0.45f};
+        std::int32_t m_PointCloudConsolidationIterations{12};
+        float m_PointCloudConsolidationTargetPercentage{20.0f};
+        std::int32_t m_PointCloudConsolidationSeed{42};
+        std::int32_t m_PointCloudConsolidationVariant{0};
         std::int32_t m_ProgressivePoissonDimension{3};
         std::int32_t m_ProgressivePoissonGridWidth{4};
         std::int32_t m_ProgressivePoissonMaxLevels{16};
