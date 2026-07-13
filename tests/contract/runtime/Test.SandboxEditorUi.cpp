@@ -2058,18 +2058,24 @@ TEST(SandboxEditorUi, ExtrinsicSandboxAppStaysRuntimeOnly)
 {
     const std::string sandboxModule =
         ReadRepositoryTextFile("src/app/Sandbox/Sandbox.cppm");
+    const std::string sandboxImplementation =
+        ReadRepositoryTextFile("src/app/Sandbox/Sandbox.cpp");
     const std::string sandboxMain =
         ReadRepositoryTextFile("src/app/Sandbox/main.cpp");
     const std::string sandboxCMake =
         ReadRepositoryTextFile("src/app/Sandbox/CMakeLists.txt");
 
     ASSERT_FALSE(sandboxModule.empty());
+    ASSERT_FALSE(sandboxImplementation.empty());
     ASSERT_FALSE(sandboxMain.empty());
     ASSERT_FALSE(sandboxCMake.empty());
 
     EXPECT_NE(sandboxModule.find("import Extrinsic.Runtime.Engine;"),
               std::string::npos);
-    EXPECT_NE(sandboxModule.find("import Extrinsic.Runtime.SandboxEditorUi;"),
+    EXPECT_EQ(sandboxModule.find("import Extrinsic.Runtime.SandboxEditorUi;"),
+              std::string::npos);
+    EXPECT_NE(
+        sandboxImplementation.find("import Extrinsic.Runtime.SandboxEditorUi;"),
               std::string::npos);
     EXPECT_NE(sandboxMain.find("import Extrinsic.Runtime.Engine;"),
               std::string::npos);
@@ -2088,6 +2094,8 @@ TEST(SandboxEditorUi, ExtrinsicSandboxAppStaysRuntimeOnly)
          })
     {
         EXPECT_EQ(sandboxModule.find(forbidden), std::string::npos)
+            << forbidden;
+        EXPECT_EQ(sandboxImplementation.find(forbidden), std::string::npos)
             << forbidden;
         EXPECT_EQ(sandboxMain.find(forbidden), std::string::npos)
             << forbidden;

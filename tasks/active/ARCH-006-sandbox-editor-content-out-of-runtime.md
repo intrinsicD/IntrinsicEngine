@@ -10,10 +10,11 @@ depends_on:
 - Status: in progress.
 - Owner: Codex.
 - Branch: `codex/ui-034-editor-window-contribution`.
-- Slice 0 is complete: the ownership inventory and five implementation slices
-  below are the migration contract. UI-034 is retired, so Slice 1 is unblocked.
-- Next verification step: extract the generic editor host and privatize the
-  Sandbox application module implementation without moving panel behavior.
+- Slices 0-1 are complete. `Runtime.EditorUiHost` now owns generic callback,
+  registry, and visibility lifecycle, while `Sandbox.cppm` exports only the app
+  factory/registration surface and the concrete app lives in `Sandbox.cpp`.
+- Next verification step: move K-Means and Progressive Poisson presentation
+  through app-owned registered windows while runtime retains execution facades.
 
 ## Goal
 - Restore the documented layering intent that application specifics live in
@@ -127,7 +128,7 @@ Implementation slice boundaries:
       (b) sandbox/method panels that move to app, (c) engine command
       facades the panels call (stay). Record the inventory and the slice
       boundaries in this task file before any move.
-- [ ] Slice 1: after the `UI-034` registration seam lands, extract/slim the
+- [x] Slice 1: after the `UI-034` registration seam lands, extract/slim the
       generic panel-host/editor-shell module in runtime and attach Sandbox
       through that seam. Do not define a second registration API or move
       additional panel content in this slice.
@@ -181,6 +182,16 @@ cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+Slice 1 evidence (2026-07-13):
+- Added the 51-line / 2-import `Runtime.EditorUiHost`; its frame callback is
+  parameterless and hidden editors invoke no application callback.
+- `Sandbox.cppm` moved from 64 lines / 4 imports to 12 lines / 1 import; the
+  concrete app lifecycle and editor imports are private to `Sandbox.cpp`.
+- `IntrinsicRuntimeContractTests` and `ExtrinsicSandbox` built; focused host
+  plus Sandbox editor coverage passed 145/145.
+- `IntrinsicTests` built and the default CPU-supported gate passed 3677/3677;
+  strict layering, test-layout, task-policy, docs-link, and diff checks passed.
 
 ## Forbidden changes
 - Mixing mechanical moves with semantic refactors in one slice.

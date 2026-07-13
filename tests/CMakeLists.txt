@@ -235,6 +235,7 @@ if(TARGET ExtrinsicRuntime)
         Test.DerivedJobGraph.cpp
         Test.EditorCommandHistory.cpp
         Test.EditorPropertyWidgets.cpp
+        Test.EditorUiHost.cpp
         Test.EditorWindowRegistry.cpp
         Test.ImGuiAdapter.cpp
         Test.ImGuiAdapterEngineWiring.cpp

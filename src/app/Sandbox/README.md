@@ -4,13 +4,17 @@ This directory contains the `Sandbox` module/files.
 
 `Sandbox` is the generic reference integration target. The executable obtains
 its concrete runtime application through `Sandbox::CreateSandboxApp()` so the
-module-private app implementation remains policy-light: it may observe
+module-private app implementation remains policy-light. `Sandbox.cppm` exports
+only the app factory and runtime-module registration declarations; the concrete
+`App` lifecycle class and its runtime imports live in `Sandbox.cpp`. It may observe
 lifecycle hooks, but engine feature wiring, frame phases, and subsystem behavior
 belong in `Runtime` or lower engine layers. The executable obtains its default
 configuration through `Runtime` and should not import lower layers directly.
 
-The sandbox app attaches the promoted runtime-owned `SandboxEditorUi` shell
-through application lifecycle hooks and installs the sandbox default runtime
+The sandbox app attaches the promoted runtime-owned `SandboxEditorUi` content
+controller through application lifecycle hooks. That controller delegates
+generic callback/registry/visibility lifecycle to `Runtime.EditorUiHost` while
+ARCH-006 moves presentation into this directory. The app also installs the sandbox default runtime
 policy bundle through `Runtime::RegisterSandboxDefaultRuntimePolicies(engine)`.
 It unregisters the returned handles during shutdown before the engine tears down.
 The app remains a runtime-only consumer: the editor shell registers with

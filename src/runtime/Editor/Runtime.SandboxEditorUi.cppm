@@ -42,10 +42,9 @@ import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorPropertyWidgets;
-import Extrinsic.Runtime.EditorWindowRegistry;
+import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigControl;
-import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KMeansGpuJobQueue;
 import Extrinsic.Runtime.KernelEvents;
@@ -2792,21 +2791,24 @@ export namespace Extrinsic::Runtime
             EditorUiVisibilityCommand command) noexcept;
         [[nodiscard]] bool IsEditorVisible() const noexcept
         {
-            return m_WindowRegistry.IsVisible();
+            return m_Host.IsVisible();
         }
         [[nodiscard]] std::vector<EditorWindowMenuEntry>
         BuildEditorWindowMenuModel() const
         {
-            return m_WindowRegistry.BuildMenuModel();
+            return m_Host.BuildWindowMenuModel();
         }
         [[nodiscard]] bool SetEditorWindowOpen(
             std::string_view id,
             bool open)
         {
-            return m_WindowRegistry.SetOpen(id, open);
+            return m_Host.SetWindowOpen(id, open);
         }
 
-        [[nodiscard]] bool IsAttached() const noexcept { return m_Engine != nullptr; }
+        [[nodiscard]] bool IsAttached() const noexcept
+        {
+            return m_Host.IsAttached();
+        }
         [[nodiscard]] const SandboxEditorPanelFrame& GetLastFrame() const noexcept
         {
             return m_LastFrame;
@@ -2822,14 +2824,13 @@ export namespace Extrinsic::Runtime
         void DetachKMeansGpuQueue();
 
         Engine*                 m_Engine{nullptr};
-        EditorWindowRegistry    m_WindowRegistry{};
+        EditorUiHost            m_Host{};
         EditorWindowHandle      m_MeshAppearanceWindow{};
         EditorWindowHandle      m_MeshSimplifyWindow{};
         const SandboxEditorContext* m_ActiveEditorContext{nullptr};
         std::optional<SandboxEditorDomainWindowModel>
             m_RegisteredMeshModelCache{};
         EditorPropertyPlotWidgetState m_MeshPropertyPlotState{};
-        RuntimeInputActionHandle m_UiVisibilityToggleAction{};
         SandboxEditorPanelFrame m_LastFrame{};
         SandboxEditorSelectedModelCache m_SelectedModelCache{};
         std::array<char, 1024>  m_ImportPathBuffer{};

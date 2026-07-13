@@ -52,7 +52,6 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Graphics.Renderer;
-import Extrinsic.Platform.Input;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetImportPipeline;
@@ -63,12 +62,12 @@ import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorPropertyWidgets;
+import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.ImGuiAdapter;
-import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.KMeansBackend;
@@ -24798,13 +24797,13 @@ namespace Extrinsic::Runtime
     EditorWindowHandle SandboxEditorUi::RegisterEditorWindow(
         EditorWindowDescriptor descriptor)
     {
-        return m_WindowRegistry.Register(std::move(descriptor));
+        return m_Host.RegisterWindow(std::move(descriptor));
     }
 
     bool SandboxEditorUi::UnregisterEditorWindow(
         const EditorWindowHandle handle)
     {
-        return m_WindowRegistry.Unregister(handle);
+        return m_Host.UnregisterWindow(handle);
     }
 
     void SandboxEditorUi::RegisterExemplarWindows()
@@ -25020,25 +25019,6 @@ namespace Extrinsic::Runtime
     {
         Detach();
         m_Engine = &engine;
-        engine.SetImGuiEditorVisible(m_WindowRegistry.IsVisible());
-        m_UiVisibilityToggleAction = engine.RegisterInputAction(
-            RuntimeInputActionDesc{
-                .DebugName = "Sandbox.Editor.ToggleVisibility",
-                .Binding = RuntimeInputActionBinding{
-                    .KeyCode = Platform::Input::Key::G,
-                    .Trigger = RuntimeInputActionTrigger::KeyJustPressed,
-                    .SuppressWhenImGuiCapturesKeyboard = false,
-                },
-                .Execute =
-                    [this](const RuntimeInputActionContext&,
-                           RuntimeInputActionServices&) -> Core::Result
-                    {
-                        (void)ApplyEditorUiVisibilityCommand(
-                            EditorUiVisibilityCommand{
-                                EditorUiVisibilityCommandKind::Toggle});
-                        return Core::Ok();
-                    },
-            });
         AttachKMeansGpuQueue(engine);
         m_ClusteringService = engine.Services().Find<ClusteringService>();
         if (m_ClusteringService != nullptr &&
@@ -25057,12 +25037,13 @@ namespace Extrinsic::Runtime
         {
             m_ClusteringService = nullptr;
         }
-        engine.SetImGuiEditorCallback(
-            [this]
+        m_Host.Attach(
+            engine,
+            EditorUiHostDescriptor{
+                .ToggleActionDebugName = "Sandbox.Editor.ToggleVisibility",
+                .DrawFrame = [this]
             {
                 if (m_Engine == nullptr)
-                    return;
-                if (!m_WindowRegistry.IsVisible())
                     return;
                 const std::optional<RuntimeAssetImportEvent>& runtimeImport =
                     m_Engine->GetAssetImportPipeline().GetLastAssetImportEvent();
@@ -25486,18 +25467,18 @@ namespace Extrinsic::Runtime
                     &progressivePoissonState,
                     &textureBakeState,
                     &registrationState,
-                    &m_WindowRegistry);
+                    &m_Host.Windows());
                 m_RegisteredMeshModelCache.reset();
                 m_ActiveEditorContext = nullptr;
+            },
             });
     }
 
     void SandboxEditorUi::Detach()
     {
+        m_Host.Detach();
         if (m_Engine != nullptr)
         {
-            m_Engine->UnregisterInputAction(m_UiVisibilityToggleAction);
-            m_UiVisibilityToggleAction = {};
             if (m_ClusteringService != nullptr &&
                 m_KMeansCompletionSubscription.IsValid())
             {
@@ -25507,13 +25488,10 @@ namespace Extrinsic::Runtime
             m_KMeansCompletionSubscription = {};
             m_ClusteringService = nullptr;
             DetachKMeansGpuQueue();
-            m_Engine->SetImGuiEditorCallback({});
-            m_Engine->SetImGuiEditorVisible(true);
             m_Engine = nullptr;
         }
         else
         {
-            m_UiVisibilityToggleAction = {};
             m_KMeansCompletionSubscription = {};
             m_ClusteringService = nullptr;
             m_KMeansGpuParticipant = {};
@@ -25528,12 +25506,6 @@ namespace Extrinsic::Runtime
     SandboxEditorUi::ApplyEditorUiVisibilityCommand(
         const EditorUiVisibilityCommand command) noexcept
     {
-        EditorUiVisibilityCommandResult result =
-            ::Extrinsic::Runtime::ApplyEditorUiVisibilityCommand(
-            m_WindowRegistry,
-            command);
-        if (m_Engine != nullptr)
-            m_Engine->SetImGuiEditorVisible(result.IsVisible);
-        return result;
+        return m_Host.ApplyVisibilityCommand(command);
     }
 }

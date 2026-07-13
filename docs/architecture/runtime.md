@@ -114,9 +114,13 @@ The frame order is:
 Editor UI contribution is data-driven through
 `Extrinsic.Runtime.EditorWindowRegistry`: contributors provide stable ids,
 structured menu paths, open state, and draw callbacks, and closed or globally
-hidden windows receive no callback. `SandboxEditorUi::{Register,Unregister}EditorWindow`
-is the composition surface; registered paths are merged into the menu tree
-without adding legacy enum or draw-switch entries. `ImGuiAdapter` records one
+hidden windows receive no callback. `Extrinsic.Runtime.EditorUiHost` owns the
+generic Engine callback attachment, the registry, and the unsuppressed global
+`G` visibility action; its parameterless frame callback does not pass
+`Engine&` to contributors. During the ARCH-006 migration,
+`SandboxEditorUi::{Register,Unregister}EditorWindow` delegates to that host as
+the compatibility composition surface. Registered paths are merged into the
+menu tree without adding legacy enum or draw-switch entries. `ImGuiAdapter` records one
 `EditorInputCaptureSnapshot` after the visible editor callback; camera, gizmo,
 picking, and viewport routing consume that snapshot rather than reading ImGui
 capture flags independently. Its ImGui context owns a paired ImPlot context.
