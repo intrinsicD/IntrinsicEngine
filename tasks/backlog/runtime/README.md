@@ -219,6 +219,17 @@ consumer lives here because `runtime` owns composition over `geometry`.
 `Extrinsic.Runtime.SpatialDebugClosestFace`. Editor method windows for the
 ported algorithms are retired `UI-024`/`UI-025`/`UI-026` under the UI backlog.
 
+- [`RUNTIME-175 — Point-cloud consolidation runtime facade, config lane, and backend adapter`](RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
+  is the engine-integration leaf for the LOP consolidation method family
+  (`methods/METHOD-016..020`): a `PointCloudConsolidationConfig` section in the
+  `Core.Config.Engine` tree, an `EngineConfigControl` hot-apply path, the
+  `ApplySandboxEditorPointCloudConsolidationCommand` editor facade with
+  `GeometrySources` writeback, and the `Runtime.ConsolidationBackend` RHI
+  fallback adapter. Gated on `methods/METHOD-016`; the GPU job-queue leg is
+  gated on `methods/METHOD-020`. Mirrors the retired `RUNTIME-134`
+  progressive-Poisson playground; the Sandbox panel is `ui/UI-035`; coordinate
+  with active `ARCH-006` Slice 4.
+
 ### CPU→GPU vertex-attribute overhaul (Theme B)
 
 A reusable, flexible, fast CPU→GPU vertex-attribute pipeline. Today each

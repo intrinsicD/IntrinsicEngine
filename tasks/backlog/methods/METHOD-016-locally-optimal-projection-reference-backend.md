@@ -1,24 +1,27 @@
 ---
 id: METHOD-016
 theme: I
-depends_on: []
+depends_on: [GEOM-062]
 maturity_target: CPUContracted
 ---
 # METHOD-016 — Locally Optimal Projection (LOP/WLOP) point-cloud consolidation reference backend
 
 ## Goal
-- Add a CPU reference method package for parameterization-free point-cloud consolidation via Locally Optimal Projection: project a noisy, outlier-ridden raw cloud onto a cleaner, more uniformly distributed point set without estimating normals or a surface first.
+- Add a CPU reference method package for parameterization-free point-cloud consolidation via Locally Optimal Projection: project a noisy, outlier-ridden raw cloud onto a cleaner, more uniformly distributed point set without estimating normals or a surface first. This task also establishes the shared `Geometry.PointCloud.Consolidation` surface (strategy + backend axis) that the rest of the LOP family extends.
 
 ## Non-goals
 - No normal estimation and no surface reconstruction — consolidation only (reconstruction consumers stay in `Geometry.SurfaceReconstruction`).
-- No edge-aware/anisotropic variants (for example EAR) in this package; they open as follow-up variants.
-- No GPU or optimized backend before reference parity.
+- No CLOP continuous/GMM variant (owned by `METHOD-017`) and no edge-aware/anisotropic variants such as EAR (owned by `METHOD-018`); this task implements only the `Lop`/`Wlop` strategies, but shapes the strategy axis so those slot in.
+- No GPU or optimized backend before reference parity (`METHOD-019` optimized CPU, `METHOD-020` GPU).
+- No runtime/config/UI integration — the engine-facing config lane and editor panel are `RUNTIME-175` / `UI-035`.
 
 ## Context
 - Paper/method: Lipman, Cohen-Or, Levin, Tal-Ezer — "Parameterization-free Projection for Geometry Reconstruction", SIGGRAPH 2007 (LOP); Huang, Li, Zhang, Ascher, Cohen-Or — "Consolidation of Unorganized Point Clouds for Surface Reconstruction", SIGGRAPH Asia 2009 (WLOP).
 - Method package: `methods/geometry/locally_optimal_projection/`.
 - Port source: framework24 `lib_bcg_framework/include/bcg_locally_optimal_projection.h` (untested in bcg; the density weighting and repulsion terms carry over with explicit tests here).
 - Uses `Geometry.KDTree` for neighborhood queries and the existing seeded random subsampling in `Geometry.PointCloud.Utils` for projected-set initialization; uniformity assertions reuse the retired `GEOM-036` sampling-quality metrics.
+- Weighting gate: the attraction/repulsion radial weight `θ`, the repulsion function, and the WLOP density weights come from the shared `Geometry.PointCloud.Kernels` seam (`GEOM-062`) rather than private helpers, so CLOP (`METHOD-017`) and EAR (`METHOD-018`) reuse the same tested weight math.
+- Foundation for the LOP family: this task introduces `Geometry.PointCloud.Consolidation` with the `Strategy` × `Backend` dispatch surface from `docs/architecture/algorithm-variant-dispatch.md` (the `Geometry.KMeans` exemplar). Follow-ups extend the same module: CLOP (`METHOD-017`), EAR/anisotropic (`METHOD-018`), optimized CPU (`METHOD-019`), GPU (`METHOD-020`), and the engine integration (`RUNTIME-175`/`UI-035`).
 - Complements `METHOD-015`: consolidation is the standard preprocessing stage before registration or reconstruction on scanner data.
 
 ## Variants and default selection
@@ -30,6 +33,8 @@ Mark `[x]` next to the variant that should be the public-facing default backend.
 
 Default recommendation: **A**; B falls out of the same implementation with density weights disabled.
 
+These are the two `Strategy` tokens this task ships. The full state-of-the-art LOP family shares the one `ConsolidationParams::Strategy` axis so a caller/config/UI chooses among all of them through one surface: `Lop`/`Wlop` here, `Clop` (`METHOD-017`), and `Ear` plus anisotropic weighting (`METHOD-018`); the `Backend` axis (`CPU`/`GPU`) is owned by `METHOD-019`/`METHOD-020`.
+
 ## Required changes
 
 ### Method package scaffolding
@@ -38,10 +43,11 @@ Default recommendation: **A**; B falls out of the same implementation with densi
 - [ ] Fill `paper.md`.
 
 ### Public API in `src/geometry`
-- [ ] Add module `Geometry.PointCloud.Consolidation` (`.cppm` + `.cpp`): `WlopParams` (support radius `h`, repulsion weight `mu` in [0, 0.5), iteration count, target point count or explicit initial indices, seed, variant token) and `Consolidate(cloud, params)` returning projected positions plus a convergence report.
+- [ ] Add module `Geometry.PointCloud.Consolidation` (`.cppm` + `.cpp`) shaped per the `Strategy` × `Backend` template (`docs/architecture/algorithm-variant-dispatch.md`): a `ConsolidationParams` with a `Strategy` selector (`Lop`/`Wlop` here; extended by follow-ups), a `Backend` request (`CPU`/`GPU`; only `CPU` implemented here), the shared knobs (support radius `h`, repulsion weight `mu` in [0, 0.5), iteration count, target point count or explicit initial indices, seed), and `Consolidate(cloud, params)` returning projected positions plus a convergence `Result` that reports `RequestedBackend`/`ActualBackend`/`FellBackToCPU` and iteration/convergence diagnostics.
+- [ ] Consume the shared `Geometry.PointCloud.Kernels` (`GEOM-062`) for the attraction/repulsion weights and WLOP density weights; no private weight math.
 - [ ] Deterministic: seeded initialization and fixed iteration order; identical `(seed, input, params)` produce bitwise-identical output across runs and thread counts.
 - [ ] Fail-closed on empty or too-small clouds, non-finite positions, `mu` outside [0, 0.5), and non-positive `h`, with explicit failure states.
-- [ ] Register the module in `src/geometry/CMakeLists.txt`.
+- [ ] Register the module in `src/geometry/CMakeLists.txt` (single `IntrinsicGeometry` target; alphabetical placement, no new link dependency).
 
 ### Benchmarks
 - [ ] Smoke benchmark manifest on deterministic synthetic fixtures (noisy plane/sphere with injected outliers) reporting the metrics above; no external datasets.
@@ -80,4 +86,5 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - No `std::rand` or global RNG state.
 
 ## Maturity
-- Target: `CPUContracted`; optimized backends and edge-aware variants open as follow-up method tasks after reference parity.
+- Target: `CPUContracted` for the `Wlop`/`Lop` reference strategies (correctness-first per the method workflow).
+- `Operational` owned by `METHOD-019` (optimized CPU backend) and `METHOD-020` (GPU backend); the CLOP and EAR reference strategies open as `METHOD-017` and `METHOD-018`, and the engine runtime/UI integration as `RUNTIME-175`/`UI-035`.

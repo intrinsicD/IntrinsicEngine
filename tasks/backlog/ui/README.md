@@ -10,7 +10,10 @@ map.
 
 ## Tasks
 
-No UI tasks are currently open.
+- [UI-035 — Sandbox point-cloud consolidation editor panel](UI-035-sandbox-pointcloud-consolidation-editor-panel.md)
+  (LOP/WLOP/CLOP/EAR strategy + CPU/GPU backend picker driving the
+  `RUNTIME-175` config-lane apply path; gated on `runtime/RUNTIME-175`;
+  coordinate with active `ARCH-006` Slice 4).
 
 Further UI children open from the deferred triggers recorded by the retired
 RORG-031F seed.

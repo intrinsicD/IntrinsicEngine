@@ -63,6 +63,7 @@ the authoritative open/unblocked view.
 - unblocked: `GEOM-059` — Kernel matrices, Nyström approximation, and Gaussian-process interpolation seam (tasks/backlog/geometry/GEOM-059-kernel-matrices-nystroem-gaussian-process.md)
 - unblocked: `GEOM-060` — Permutohedral lattice fast high-dimensional filtering seam (tasks/backlog/geometry/GEOM-060-permutohedral-lattice-highdim-filtering.md)
 - unblocked: `GEOM-061` — Point-cloud grid-downsampling reduction strategies (tasks/backlog/geometry/GEOM-061-grid-downsampling-reduction-strategies.md)
+- unblocked: `GEOM-062` — Point-set projection and weighting kernels seam (tasks/backlog/geometry/GEOM-062-point-set-projection-weighting-kernels.md)
 - unblocked: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
 - unblocked: `METHOD-004` — Walk on Spheres / Walk on Stars PDE solver reference backend (tasks/backlog/methods/METHOD-004-walk-on-spheres-reference-backend.md)
 - unblocked: `METHOD-005` — Robust mesh boolean reference backend (tasks/backlog/methods/METHOD-005-robust-mesh-boolean-reference-backend.md)
@@ -70,7 +71,13 @@ the authoritative open/unblocked view.
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
 - unblocked: `METHOD-014` — Progressive Poisson GPU operational parity (tasks/backlog/methods/METHOD-014-progressive-poisson-gpu-operational-parity.md)
 - blocked by `GEOM-058`: `METHOD-015` — Coherent Point Drift registration family reference backend (tasks/backlog/methods/METHOD-015-coherent-point-drift-family-reference-backend.md)
-- unblocked: `METHOD-016` — Locally Optimal Projection (LOP/WLOP) point-cloud consolidation reference backend (tasks/backlog/methods/METHOD-016-locally-optimal-projection-reference-backend.md)
+- blocked by `GEOM-062`: `METHOD-016` — Locally Optimal Projection (LOP/WLOP) point-cloud consolidation reference backend (tasks/backlog/methods/METHOD-016-locally-optimal-projection-reference-backend.md)
+- blocked by `METHOD-016`: `METHOD-017` — Continuous LOP (CLOP) reference backend (tasks/backlog/methods/METHOD-017-continuous-lop-clop-reference-backend.md)
+- blocked by `METHOD-016`: `METHOD-018` — Edge-Aware Resampling (EAR) and anisotropic feature-preserving LOP reference backend (tasks/backlog/methods/METHOD-018-edge-aware-resampling-anisotropic-lop-reference-backend.md)
+- blocked by `METHOD-016`: `METHOD-019` — LOP-family optimized CPU backend and comparison benchmark (tasks/backlog/methods/METHOD-019-lop-family-optimized-cpu-backend.md)
+- blocked by `METHOD-019`: `METHOD-020` — LOP-family GPU (Vulkan compute) backend and parity (tasks/backlog/methods/METHOD-020-lop-family-gpu-vulkan-compute-backend.md)
+- blocked by `METHOD-016`: `RUNTIME-175` — Point-cloud consolidation runtime facade, config lane, and backend adapter (tasks/backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
+- blocked by `RUNTIME-175`: `UI-035` — Sandbox point-cloud consolidation editor panel (tasks/backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md)
 
 ## Unthemed
 

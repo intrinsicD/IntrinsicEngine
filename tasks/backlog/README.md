@@ -338,9 +338,15 @@ first-class, P1 scheduling target alongside Theme B (rendering) and Theme C
 *invariants* P1/P3/P5 are owned separately by `PROC-010` (`AGENTS.md` §5).
 
 Open members: `METHOD-003`, `METHOD-004`, `METHOD-005`, `METHOD-006` (blocked by
-`GEOM-024`), `METHOD-007`, `METHOD-014`, `METHOD-015` (blocked by `GEOM-058`),
-`METHOD-016`; and the method-readiness seams `GEOM-013`, `GEOM-014`, `GEOM-019`,
-`GEOM-024`, `GEOM-058`, `GEOM-059`, `GEOM-060`, `GEOM-061`.
+`GEOM-024`), `METHOD-007`, `METHOD-014`, `METHOD-015` (blocked by `GEOM-058`);
+the LOP consolidation family `METHOD-016` (blocked by `GEOM-062`), `METHOD-017`
+CLOP (blocked by `METHOD-016`/`GEOM-058`/`GEOM-062`), `METHOD-018`
+EAR/anisotropic (blocked by `METHOD-016`/`GEOM-062`), `METHOD-019` optimized CPU
+(blocked by `METHOD-016`/`017`/`018`), `METHOD-020` GPU (blocked by
+`METHOD-019`), and its engine-integration leaves `RUNTIME-175` (blocked by
+`METHOD-016`) and `UI-035` (blocked by `RUNTIME-175`); and the method-readiness
+seams `GEOM-013`, `GEOM-014`, `GEOM-019`, `GEOM-024`, `GEOM-058`, `GEOM-059`,
+`GEOM-060`, `GEOM-061`, `GEOM-062`.
 
 ## Cross-domain dependency anchors
 
