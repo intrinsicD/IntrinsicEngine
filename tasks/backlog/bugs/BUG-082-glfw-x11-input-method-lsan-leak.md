@@ -23,11 +23,14 @@ depends_on: []
   passed, then LeakSanitizer exited nonzero for a direct 408-byte allocation in
   `_XimOpenIM`, reached through `XRegisterIMInstantiateCallback` ->
   `_glfwInitX11` -> `glfwInit` -> `GLFWLifetime::Instanciate`.
-- Exact mixed-backend repro:
-  `build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='EditorWindowRegistry.*:ImGuiAdapter.*:ImGuiAdapterEngineWiring.UiCaptureSuppressesRuntimeInputConsumers:SandboxEditorUi.GlobalVisibilityHotkeyUsesTheVisibilityCommandPath:SandboxEditorUi.EngineAttachmentRegistersEditorCallback'`.
-- Removing the GLFW-backed `ImGuiAdapterEngineWiring` case from the same process
-  yields 21/21 passing tests with no leak report. The engine/UI cases explicitly
-  select the Null backend, so this is isolated from the UI-034 implementation.
+- Exact focused repro:
+  `build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='ImGuiAdapterEngineWiring.RunNormalizesNativeCloseBeforeFirstFrame'`.
+  The test assertions pass, then LeakSanitizer reports the allocation and exits
+  nonzero.
+- The UI-034 capture and editor-visibility contracts explicitly select the Null
+  backend and exit cleanly under the same sanitizer build. This isolates the
+  defect from the editor changes while retaining a focused GLFW-backed runtime
+  reproducer.
 - `src/platform/backends/glfw/Platform.Backend.Glfw.cpp` owns one process-static
   `GLFWLifetime`; its destructor calls `glfwTerminate()`. The remaining work is
   to determine whether shutdown ordering prevents cleanup or Xlib/GLFW retains
@@ -67,6 +70,7 @@ depends_on: []
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicRuntimeContractTests
 build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='ImGuiAdapterEngineWiring.UiCaptureSuppressesRuntimeInputConsumers'
+build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='ImGuiAdapterEngineWiring.RunNormalizesNativeCloseBeforeFirstFrame'
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
