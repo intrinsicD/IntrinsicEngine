@@ -310,7 +310,7 @@ if(TARGET ExtrinsicRuntime)
 endif()
 
 # --- Sandbox editor app/runtime integration (ARCH-006) ---
-if(TARGET ExtrinsicSandboxDomainPanels)
+if(TARGET ExtrinsicSandboxEditor)
     intrinsic_resolve_test_sources(_sandbox_editor_integration_test_sources
         SEARCH_DIRS integration/runtime
         FILES Test.SandboxDomainPanels.cpp
@@ -318,7 +318,7 @@ if(TARGET ExtrinsicSandboxDomainPanels)
     intrinsic_test_object_lib(SandboxEditorIntegrationTestObjs
         SOURCES
             ${_sandbox_editor_integration_test_sources}
-        DEPS ExtrinsicSandboxDomainPanels ExtrinsicRuntime
+        DEPS ExtrinsicSandboxEditor ExtrinsicRuntime
     )
 endif()
 
@@ -945,7 +945,7 @@ endif()
 if(TARGET SandboxEditorIntegrationTestObjs)
     intrinsic_test_executable(IntrinsicSandboxEditorIntegrationTests
         OBJECTS SandboxEditorIntegrationTestObjs
-        LINK_LIBS ExtrinsicSandboxDomainPanels ExtrinsicRuntime
+        LINK_LIBS ExtrinsicSandboxEditor ExtrinsicRuntime
         LABELS integration runtime
     )
 endif()

@@ -1,13 +1,19 @@
 if(INTRINSIC_BUILD_SANDBOX OR INTRINSIC_BUILD_TESTS)
-    intrinsic_add_module_library(ExtrinsicSandboxDomainPanels)
-    target_sources(ExtrinsicSandboxDomainPanels
+    intrinsic_add_module_library(ExtrinsicSandboxEditor)
+    target_sources(ExtrinsicSandboxEditor
             PUBLIC
             FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
+            Editor/Sandbox.EditorController.cppm
             Editor/Sandbox.DomainPanels.cppm
+            Editor/Sandbox.MethodPanels.cppm
+            Editor/Sandbox.MeshProcessingPanels.cppm
             PRIVATE
+            Editor/Sandbox.EditorController.cpp
             Editor/Sandbox.DomainPanels.cpp
+            Editor/Sandbox.MethodPanels.cpp
+            Editor/Sandbox.MeshProcessingPanels.cpp
     )
-    target_link_libraries(ExtrinsicSandboxDomainPanels
+    target_link_libraries(ExtrinsicSandboxEditor
             PUBLIC
             ExtrinsicRuntime
             PRIVATE
@@ -26,19 +32,15 @@ if(INTRINSIC_BUILD_SANDBOX AND NOT INTRINSIC_HEADLESS_NO_GLFW)
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Sandbox.cppm
-        Editor/Sandbox.MethodPanels.cppm
-        Editor/Sandbox.MeshProcessingPanels.cppm
         PRIVATE
         Sandbox.cpp
-        Editor/Sandbox.MethodPanels.cpp
-        Editor/Sandbox.MeshProcessingPanels.cpp
         main.cpp
     )
 
     target_link_libraries(ExtrinsicSandbox
         PRIVATE
         ExtrinsicRuntime
-        ExtrinsicSandboxDomainPanels
+        ExtrinsicSandboxEditor
     )
 
     include(${CMAKE_SOURCE_DIR}/cmake/CompileShaders.cmake)
