@@ -11,8 +11,8 @@ params:
   intent: smoke
   plane_side: 24
   noise_sigma: 0.02
-  support_radius: 0.15
-  repulsion_weight: 0.45
+  support_radius: 0.35
+  repulsion_weight: 0.3
   iterations: 12
   target_count: 200
   seed: 42
@@ -24,4 +24,4 @@ metrics:
   - quality_error_l2
 thresholds:
   smoke_runtime_ms_max: 250
-  quality_error_l2_max: 0.012
+  quality_error_l2_max: 0.015

@@ -42,7 +42,7 @@ export namespace Geometry::PointCloud::Consolidation
     {
         // Support radius h of the compactly supported weight theta; must be
         // positive and finite. There is deliberately no default: h is
-        // data-dependent (a multiple of the input's average spacing), so
+        // data-dependent (typically 6-10x the input's average spacing), so
         // callers derive it from cloud statistics.
         float SupportRadius{0.0f};
         // Repulsion weight mu; valid range [0, 0.5). Zero disables repulsion.

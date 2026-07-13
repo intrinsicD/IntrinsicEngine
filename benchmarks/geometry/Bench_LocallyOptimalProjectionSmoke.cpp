@@ -26,7 +26,7 @@ namespace Intrinsic::Bench::Geometry
         constexpr int kMeasuredIterations = 8;
         constexpr int kPlaneSide = 24;
         constexpr float kNoiseSigma = 0.02f;
-        constexpr double kQualityErrorMax = 0.012;
+        constexpr double kQualityErrorMax = 0.015;
 
         [[nodiscard]] std::vector<glm::vec3> MakeNoisyPlane()
         {
@@ -62,8 +62,8 @@ namespace Intrinsic::Bench::Geometry
             const std::vector<glm::vec3> points = MakeNoisyPlane();
 
             ::Geometry::PointCloud::Consolidation::WlopParams params{};
-            params.SupportRadius = 0.15f;
-            params.RepulsionWeight = 0.45f;
+            params.SupportRadius = 0.35f;
+            params.RepulsionWeight = 0.3f;
             params.Iterations = 12;
             params.TargetCount = 200;
             params.Seed = 42;

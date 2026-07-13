@@ -250,16 +250,26 @@ namespace Geometry::PointCloud::Consolidation
 
         for (std::uint32_t iteration = 0; iteration < params.Iterations; ++iteration)
         {
+            // The first iteration is the papers' L2 initializer: a plain
+            // theta-weighted local mean without the 1/r factor and without
+            // repulsion (Lipman et al. 2007 Sec. 3; restated by Preiner et
+            // al. 2014). The singular Weiszfeld weights only start once the
+            // projected set no longer coincides with input points.
+            const bool medianIteration = iteration > 0u;
+            const bool useRepulsion = medianIteration && mu > 0.0;
+
             KDTree projectedTree;
-            if (!projectedTree.BuildFromPoints(projected).has_value())
+            if (useRepulsion &&
+                !projectedTree.BuildFromPoints(projected).has_value())
             {
                 result.Status = ConsolidateStatus::SpatialIndexBuildFailed;
                 return result;
             }
 
             // WLOP projected-set density weights w_i = 1 + sum theta, refreshed
-            // every iteration because the projected set moves.
-            if (useDensityWeights)
+            // every iteration because the projected set moves; only consumed
+            // by the repulsion term.
+            if (useDensityWeights && useRepulsion)
             {
                 for (std::size_t i = 0; i < projectedCount; ++i)
                 {
@@ -292,7 +302,7 @@ namespace Geometry::PointCloud::Consolidation
 
                 // Attraction: the localized L1 median of the input inside the
                 // support radius, alpha_ij = theta(|x_i - p_j|) / |x_i - p_j|,
-                // divided by v_j under WLOP (Huang et al. 2009 Eq. WLOP;
+                // divided by v_j under WLOP (Huang et al. 2009 Eq. 6;
                 // Lipman et al. 2007 Eq. 6 with v_j = 1).
                 glm::dvec3 attraction(0.0);
                 double attractionWeight = 0.0;
@@ -309,10 +319,14 @@ namespace Geometry::PointCloud::Consolidation
                         const glm::dvec3 p(points[neighbor]);
                         const glm::dvec3 delta = x - p;
                         const double r2 = glm::dot(delta, delta);
-                        const double r = std::sqrt(r2);
-                        if (r < kMinPairDistance)
-                            continue;
-                        double alpha = Theta(r2, invQuarterH2) / r;
+                        double alpha = Theta(r2, invQuarterH2);
+                        if (medianIteration)
+                        {
+                            const double r = std::sqrt(r2);
+                            if (r < kMinPairDistance)
+                                continue;
+                            alpha /= r;
+                        }
                         if (useDensityWeights)
                             alpha /= inputDensity[neighbor];
                         attraction += p * alpha;
@@ -327,9 +341,10 @@ namespace Geometry::PointCloud::Consolidation
                     ++result.Report.EmptyAttractionNeighborhoods;
 
                 // Repulsion: beta_ii' = theta(|x_i - x_i'|) / |x_i - x_i'|
-                // (eta(r) = -r, Huang et al. 2009 Sec. 3.3), scaled by w_i'
+                // (eta(r) = -r, the WLOP replacement for Lipman's original
+                // 1/(3r^3), Huang et al. 2009 Sec. 3.3), scaled by w_i'
                 // under WLOP; pushes projected points apart within h.
-                if (mu > 0.0)
+                if (useRepulsion)
                 {
                     const auto query = projectedTree.QueryRadius(
                         projected[i], params.SupportRadius, neighbors);
