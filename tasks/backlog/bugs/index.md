@@ -30,6 +30,16 @@ hardening that main had shipped as the closed `BUG-066`.
 
 ## Verified / Closed
 
+- Closed 2026-07-13: [`BUG-064` — ci-vulkan FramePacingDiagnosticCapture cannot run headless](../../done/BUG-064-ci-vulkan-framepacing-headless-display.md).
+  The strict capture now runs under isolated Xvfb with Mesa lavapipe rather
+  than producing a zero-frame report or taking a capability skip. Three
+  sequential hosted runs at exact head `7e735868` —
+  [29277091536](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29277091536),
+  [29278614647](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29278614647),
+  and [29280699135](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29280699135) —
+  passed the capture, broader `gpu;vulkan` batch, strict timing-result
+  validation, and artifact upload.
+
 - Closed 2026-07-13: [`BUG-067` — JobService completion state lost-update race](../../done/BUG-067-jobservice-completion-state-lost-update-race.md).
   Production fix `ce1f590c` stores `AwaitingGate` under the completion-queue
   lock before insertion. A real-service condition-variable interlock now forces

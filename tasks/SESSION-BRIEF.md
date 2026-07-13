@@ -9,7 +9,6 @@ the authoritative open/unblocked view.
 ## Active tasks
 
 - `ARCH-006` — Move Sandbox application editor content out of runtime (tasks/active/ARCH-006-sandbox-editor-content-out-of-runtime.md)
-- `BUG-064` — ci-vulkan FramePacingDiagnosticCapture cannot run headless (tasks/active/BUG-064-ci-vulkan-framepacing-headless-display.md)
 
 ## Theme B — Rendering modernization
 

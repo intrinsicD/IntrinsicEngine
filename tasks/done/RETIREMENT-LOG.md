@@ -8,6 +8,21 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-064`](BUG-064-ci-vulkan-framepacing-headless-display.md) — hosted
+frame-pacing capture gate retired on 2026-07-13 at `Operational`. The
+`ci-vulkan` workflow now installs Mesa's lavapipe software Vulkan driver and
+scopes it with an isolated Xvfb server to the strict
+`ExtrinsicSandbox.FramePacingDiagnosticCapture`; all other GPU fixtures retain
+their documented capability-skip behavior, and no diagnostic assertion was
+weakened. Three sequential hosted runs at the same exact head `7e735868` —
+[29277091536](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29277091536),
+[29278614647](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29278614647),
+and [29280699135](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29280699135) —
+executed and passed the strict capture in 5.74 s, 3.19 s, and 5.28 s. Each run
+also passed all 59 broader CTest entries, timing aggregation and strict result
+validation, and artifact upload. The formerly unconditional hosted failure is
+therefore closed without converting the capture into a skip.
+
 [`BUG-067`](BUG-067-jobservice-completion-state-lost-update-race.md) —
 JobService completion-state lost-update race retired on 2026-07-13 at
 `CPUContracted`. Production fix `ce1f590c` stores `AwaitingGate` while holding
