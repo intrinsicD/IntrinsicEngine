@@ -175,3 +175,91 @@ observations:
     promoted_to: "logic/solution/constraints.md:K05"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O17
+    timestamp: "2026-07-13T23:35"
+    provenance: ai-executed
+    content: "Failure cleanup for a GPU-produced texture must carry the generation returned by slot creation and mutate only that exact pending generation; asset-ID-only cleanup is unsafe against destruction and replacement races."
+    context: "BUG-074 review rejected the first asset-ID-only cleanup and committed generation-scoped failure handling plus causal regressions."
+    potential_type: constraint
+    bound_to: [N204, N205]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K06"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O18
+    timestamp: "2026-07-13T23:35"
+    provenance: ai-executed
+    content: "AsyncWorkService shutdown is not quiescent after executor join alone: it must drain and apply ready derived results, then cancel every non-terminal derived-job survivor before returning."
+    context: "BUG-076 deterministic ready and unreadied shutdown regressions and task retirement."
+    potential_type: constraint
+    bound_to: [N204]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K07"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O19
+    timestamp: "2026-07-13T23:35"
+    provenance: ai-executed
+    content: "Runtime module simulation-system schedules must remain mutable through every OnResolve callback and finalize exactly once after all register- and resolve-phase contributions are present."
+    context: "BUG-071 real-engine duplicate-system failure proof and schedule-finalization correction."
+    potential_type: constraint
+    bound_to: [N204]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K08"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O20
+    timestamp: "2026-07-13T23:35"
+    provenance: ai-executed
+    content: "A texture bake recorded into graphics frame F cannot become cache-ready before F + FramesInFlight under the supported fence-slot reuse model; a bare F + 1 CPU frame counter is insufficient."
+    context: "BUG-073 three-frame-in-flight queue/cache/binding regression and readiness-contract documentation."
+    potential_type: constraint
+    bound_to: [N204]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K09"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O21
+    timestamp: "2026-07-13T23:35"
+    provenance: ai-executed
+    content: "Abandoning a parked Core.Tasks wait must transfer its continuation handle under the wait mutex and destroy the detached frame only after unlocking; clearing the token without reclaiming the frame leaks the coroutine."
+    context: "BUG-079 deterministic destructor-sentinel regressions and wait-token/scheduler shutdown fix."
+    potential_type: constraint
+    bound_to: [N204]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K10"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O22
+    timestamp: "2026-07-13T23:35"
+    provenance: ai-executed
+    content: "When the active world changes, asset/import scene handoff borrowers must rebind during the switch pass before the previous registry can retire."
+    context: "BUG-068 real-Engine ASan lifetime regression and active-world maintenance correction."
+    potential_type: constraint
+    bound_to: [N204]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K11"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O23
+    timestamp: "2026-07-13T23:35"
+    provenance: ai-executed
+    content: "World destruction dominates activation: activation must reject destroy-pending or destroy-announced records, and maintenance must revalidate queued activation targets as live."
+    context: "BUG-075 deterministic request-ordering regressions and WorldRegistry lifecycle fix."
+    potential_type: constraint
+    bound_to: [N204]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K12"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O24
+    timestamp: "2026-07-13T23:35"
+    provenance: ai-executed
+    content: "Sandbox method presentation can move to app-owned registered windows while runtime retains models, commands, history, derived jobs, stale-result rejection, and result publication; the app windows must preserve result forwarding and callback lifecycle symmetry."
+    context: "ARCH-006 Slices 2B/3 extraction plus independent review corrections for result sinks, unregistration, and first-use behavior."
+    potential_type: architecture
+    bound_to: [N204, N206]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A06"
+    crystallized_via: artifact-commitment
+    stale: false

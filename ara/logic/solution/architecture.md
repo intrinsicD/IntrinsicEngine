@@ -33,3 +33,19 @@
 - **Crystallized via**: artifact-commitment
 - **Evidence**: [src/runtime/Runtime.AssetResidencyService.cppm], [src/runtime/Runtime.AssetResidencyService.cpp], [tasks/done/RUNTIME-164-extract-asset-residency-service.md]
 - **From staging**: O07
+
+## A06: App-Owned Sandbox Method Presentation Over Runtime Facades
+- **Decision**: Sandbox method presentation and controller state live in
+  app-owned registered windows, while runtime retains method models, command
+  and undo/history execution, derived-job scheduling, stale-result rejection,
+  and result publication. Each app window forwards immediate and pending
+  results through the runtime facade and unregisters every callback when its
+  owner is destroyed.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp,
+  src/runtime/Editor/Runtime.SandboxEditorUi.cpp,
+  tests/contract/runtime/Test.SandboxEditorUi.cpp,
+  docs/architecture/runtime.md,
+  tasks/active/ARCH-006-sandbox-editor-content-out-of-runtime.md]
+- **From staging**: O24

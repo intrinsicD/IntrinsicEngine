@@ -2,9 +2,9 @@ session:
   id: "2026-07-13_001"
   date: "2026-07-13"
   started: "2026-07-13T01:00"
-  last_turn: "2026-07-13T22:21"
-  turn_count: 4
-  summary: "Completed and published CI-007, reconciled every surviving branch tip into main, and retired BUG-067 plus BUG-064 with deterministic CPU-race and hosted software-Vulkan evidence."
+  last_turn: "2026-07-13T23:35"
+  turn_count: 5
+  summary: "Completed and published CI-007, reconciled the branch graph, then integrated and verified a ten-workstream backlog batch with nine bug closures and ARCH-006 Slices 2B/3."
 
 events_logged:
   - turn: 1
@@ -73,6 +73,78 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Passed three sequential hosted software-Vulkan frame-pacing captures at one exact head and retired BUG-064 at Operational."
+  - turn: 5
+    type: decision
+    id: "N203"
+    routing: direct
+    provenance: user
+    summary: "Directed the next ten backlog workstreams through isolated implementation, review, aggregate verification, merge, and push."
+  - turn: 5
+    type: experiment
+    id: "N204"
+    routing: direct
+    provenance: ai-executed
+    summary: "Integrated nine bug workstreams plus ARCH-006 Slices 2B/3 and passed the exact-head 3,692-test aggregate CPU gate."
+  - turn: 5
+    type: dead_end
+    id: "N205"
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected asset-ID-only generated-texture failure cleanup after review exposed destruction/replacement races."
+  - turn: 5
+    type: dead_end
+    id: "N206"
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected app-panel extraction without result forwarding, callback teardown, and first-use behavior parity."
+  - turn: 5
+    type: constraint
+    id: "O17"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized exact-generation generated-texture failure cleanup as K06 via artifact commitment."
+  - turn: 5
+    type: constraint
+    id: "O18"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized derived-work shutdown registry quiescence as K07 via artifact commitment."
+  - turn: 5
+    type: constraint
+    id: "O19"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized post-resolve runtime schedule finalization as K08 via artifact commitment."
+  - turn: 5
+    type: constraint
+    id: "O20"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized frames-in-flight bake readiness accounting as K09 via artifact commitment."
+  - turn: 5
+    type: constraint
+    id: "O21"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized abandoned-wait continuation reclamation as K10 via artifact commitment."
+  - turn: 5
+    type: constraint
+    id: "O22"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized active-world scene-borrower rebinding order as K11 via artifact commitment."
+  - turn: 5
+    type: constraint
+    id: "O23"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized destruction-over-activation world lifecycle ordering as K12 via artifact commitment."
+  - turn: 5
+    type: architecture
+    id: "O24"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized app-owned method presentation over runtime execution facades as A06 via artifact commitment."
 
 ai_actions:
   - turn: 1
@@ -122,6 +194,24 @@ ai_actions:
       - "tasks/done/BUG-064-ci-vulkan-framepacing-headless-display.md"
       - "tasks/backlog/bugs/index.md"
       - "tasks/done/RETIREMENT-LOG.md"
+  - turn: 5
+    action: "Implemented, reviewed, repaired, retired where complete, and integrated the remaining workstreams in the user-selected ten-task batch; advanced ARCH-006 through Slices 2B/3 and pushed main through 29dda890."
+    provenance: ai-executed
+    files_changed:
+      - "src/core/Core.Tasks.WaitToken.cpp"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "src/runtime/Runtime.AsyncWorkService.cpp"
+      - "src/runtime/Runtime.ObjectSpaceNormalBakeGpuQueue.cpp"
+      - "src/graphics/assets/Graphics.GpuAssetCache.cpp"
+      - "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp"
+      - "tests/contract/runtime/Test.ObjectSpaceNormalBakeGpuQueue.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorUi.cpp"
+      - "tasks/active/ARCH-006-sandbox-editor-content-out-of-runtime.md"
+      - "tasks/done/BUG-074-object-space-normal-bake-orphaned-cache-slot-livelock.md"
+  - turn: 5
+    action: "Built IntrinsicTests, passed 3,692/3,692 CPU-supported tests in 364.12 seconds plus strict repository checks, pushed origin/main, and removed all temporary worktrees and local branches."
+    provenance: ai-executed
+    files_changed: []
 
 claims_touched:
   - id: C01
@@ -137,10 +227,13 @@ key_context:
     excerpt: "BUG-067 was completed as an isolated runtime concurrency slice without touching METHOD-016 or pushing/merging the branch."
   - turn: 4
     excerpt: "BUG-064 closure required three exact, sequential hosted successes, task retirement, a clean local commit, and no additional push or dispatch."
+  - turn: 5
+    excerpt: "User requested the next ten backlog tasks be planned, implemented, checked, fixed, committed, merged to main, and iterated through the agentic workflow."
 
 open_threads:
   - "BUG-081 must collect a comparable warm-configure population before recalibrating the 20-second exact-vcpkg-hit guard."
   - "Resolve whether model training means GEOM-058 or a new neural/LLM workflow."
+  - "ARCH-006 Slices 4/5 still own the remaining sandbox presentation extraction and final runtime-shell retirement."
 
 ai_suggestions_pending:
   - "Treat GEOM-058 Gaussian-mixture fitting as the provisional repo-native model-training target unless the user specifies a neural or LLM model."

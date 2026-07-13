@@ -4750,3 +4750,92 @@ tree:
       Operational in local commit 98e91e26 with all scoped structural checks
       passing and no remote publication.
     status: resolved
+  - id: N203
+    type: decision
+    title: "Execute the next ten backlog tasks as an integrated agentic batch"
+    provenance: user
+    timestamp: "2026-07-13T23:35"
+    choice: >
+      Select ten actionable backlog workstreams, plan and implement each on an
+      isolated branch/worktree, review and repair them, integrate them into
+      main, run the aggregate repository gate, and push the result.
+    alternatives:
+      - "Stop after branch cleanup without advancing the backlog."
+      - "Implement the tasks without per-slice review, aggregate verification, or publication."
+    evidence:
+      - "User request on 2026-07-13"
+      - "commits 88f9f677..29dda890"
+    status: resolved
+  - id: N204
+    type: experiment
+    title: "Ten-workstream backlog batch integration and aggregate verification"
+    provenance: ai-executed
+    timestamp: "2026-07-13T23:35"
+    also_depends_on: [N201, N202, N203]
+    evidence:
+      - "tasks/done/BUG-064-ci-vulkan-framepacing-headless-display.md"
+      - "tasks/done/BUG-067-jobservice-completion-state-lost-update-race.md"
+      - "tasks/done/BUG-068-asset-scene-handoff-not-rebound-on-active-world-change.md"
+      - "tasks/done/BUG-071-onresolve-sim-systems-bypass-finalizeforboot.md"
+      - "tasks/done/BUG-073-object-space-normal-bake-read-before-gpu-write.md"
+      - "tasks/done/BUG-074-object-space-normal-bake-orphaned-cache-slot-livelock.md"
+      - "tasks/done/BUG-075-worldregistry-activate-while-destroy-pending.md"
+      - "tasks/done/BUG-076-asyncworkservice-shutdown-skips-derived-job-registry.md"
+      - "tasks/done/BUG-079-coretasks-abandoned-wait-continuation-leak.md"
+      - "tasks/active/ARCH-006-sandbox-editor-content-out-of-runtime.md"
+      - "commits 88f9f677, 94c02fad, 608d5993, 6d6f784a, d318545e, 78215d2c, af16c2b7, 80130b06, 604bed0b, 11f56bf5, and 29dda890"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/agents/check_task_state_links.py --root . --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "git push origin main"
+    result: >
+      Integrated nine bug workstreams and ARCH-006 Slices 2B/3 into main.
+      Deterministic failure-path, race, lifecycle, and readiness regressions
+      passed their focused and repeated gates; BUG-064 additionally passed
+      three exact hosted software-Vulkan runs. Independent review found and
+      repaired generation-unsafe cache cleanup and incomplete editor-panel
+      callback/result wiring. The exact integrated code head 11f56bf5 built
+      1,129/1,129 Ninja edges and passed 3,692/3,692 CPU-supported tests in
+      364.12 seconds. Task/docs/architecture checks passed, BUG-074 retired in
+      the documentation-only commit 29dda890, and main was pushed with all
+      temporary branches and worktrees removed.
+    status: resolved
+  - id: N205
+    type: dead_end
+    title: "Reject asset-ID-only failed generated-texture cleanup"
+    provenance: ai-executed
+    timestamp: "2026-07-13T23:35"
+    also_depends_on: [N204]
+    hypothesis: >
+      A failed object-space-normal-bake submission can safely release its cache
+      slot using only the generated texture asset ID.
+    failure_mode: >
+      Late cleanup can race asset destruction or a replacement submission and
+      either recreate a removed slot or retire a newer pending generation.
+    lesson: >
+      Carry the generation returned by BeginGpuProducedTexture through the
+      submission ticket and fail only that exact pending generation; absent or
+      mismatched entries must fail closed without mutation.
+    status: resolved
+  - id: N206
+    type: dead_end
+    title: "Reject presentation extraction without callback lifecycle parity"
+    provenance: ai-executed
+    timestamp: "2026-07-13T23:35"
+    also_depends_on: [N204]
+    hypothesis: >
+      Moving mesh-processing draw controllers into app-owned registered
+      windows is complete once the panels render and issue runtime commands.
+    failure_mode: >
+      Review found missing immediate/pending result-sink forwarding, missing
+      destructor unregistration, and an unintended ICP first-use size change;
+      asynchronous results could disappear and callbacks could outlive owners.
+    lesson: >
+      A presentation ownership move must preserve command-result forwarding,
+      callback registration/unregistration symmetry, and existing window
+      behavior in addition to compiling the relocated UI.
+    status: resolved

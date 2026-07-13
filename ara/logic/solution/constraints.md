@@ -47,3 +47,95 @@
   src/runtime/README.md,
   tasks/done/BUG-067-jobservice-completion-state-lost-update-race.md]
 - **From staging**: O16
+
+## K06: Generated-Texture Failure Cleanup Is Generation-Scoped
+- **Constraint**: A post-open GPU-produced-texture failure may retire only the
+  exact pending generation returned by `BeginGpuProducedTexture`. Cleanup for
+  an absent, promoted, transfer-owned, or mismatched entry fails closed and
+  must neither recreate a removed slot nor retire a newer replacement.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [src/graphics/assets/Graphics.GpuAssetCache.cpp,
+  src/runtime/Runtime.ObjectSpaceNormalBakeGpuQueue.cpp,
+  tests/unit/graphics/Test.GpuAssetCache.cpp,
+  tests/contract/runtime/Test.ObjectSpaceNormalBakeGpuQueue.cpp,
+  tasks/done/BUG-074-object-space-normal-bake-orphaned-cache-slot-livelock.md]
+- **From staging**: O17
+
+## K07: Derived-Work Shutdown Must Quiesce Its Registry
+- **Constraint**: `AsyncWorkService::ShutdownAndDrain()` must join executor
+  work, drain and apply every newly ready derived result, and then cancel every
+  non-terminal survivor before returning. Executor quiescence alone does not
+  guarantee that readback-gated callbacks cannot resume later.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [src/runtime/Runtime.AsyncWorkService.cpp,
+  tests/contract/runtime/Test.AsyncWorkService.cpp,
+  src/runtime/README.md,
+  tasks/done/BUG-076-asyncworkservice-shutdown-skips-derived-job-registry.md]
+- **From staging**: O18
+
+## K08: Runtime Module Schedules Finalize After Resolve
+- **Constraint**: The runtime simulation-system schedule remains mutable
+  through every module `OnResolve` callback and is finalized exactly once only
+  after all register- and resolve-phase contributions are present. Boot must
+  reject duplicate identities, cycles, and unprovided waits in that complete
+  contribution set.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [tests/contract/runtime/Test.RuntimeModule.cpp,
+  docs/architecture/runtime.md,
+  docs/architecture/feature-module-playbook.md,
+  tasks/done/BUG-071-onresolve-sim-systems-bypass-finalizeforboot.md]
+- **From staging**: O19
+
+## K09: Graphics-Recorded Bake Readiness Includes Every In-Flight Frame
+- **Constraint**: Under the supported fence-slot reuse model, a texture bake
+  recorded into graphics frame `F` cannot become cache-ready before
+  `F + FramesInFlight`. A bare CPU `F + 1` stamp may expose the texture before
+  the recording frame retires.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [src/runtime/Runtime.ObjectSpaceNormalBakeService.cpp,
+  tests/contract/runtime/Test.ObjectSpaceNormalBakeGpuQueue.cpp,
+  src/runtime/README.md,
+  tasks/done/BUG-073-object-space-normal-bake-read-before-gpu-write.md]
+- **From staging**: O20
+
+## K10: Abandoned Waits Reclaim Parked Continuations Outside the Wait Lock
+- **Constraint**: Releasing a parked Core.Tasks wait transfers its continuation
+  handle while holding the wait mutex, clears token ownership once, and
+  destroys the detached coroutine frame only after unlocking. Token release or
+  scheduler shutdown that merely clears the continuation leaks the frame.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [src/core/Core.Tasks.WaitToken.cpp,
+  src/core/Core.Tasks.Lifecycle.cpp,
+  tests/unit/core/Test.CoreTasks.cpp,
+  src/core/README.md,
+  tasks/done/BUG-079-coretasks-abandoned-wait-continuation-leak.md]
+- **From staging**: O21
+
+## K11: Active-World Handoff Borrowers Rebind Before Prior-World Retirement
+- **Constraint**: An active-world switch must rebuild asset/import scene
+  borrowers during the switch maintenance pass, before the previous registry
+  can retire. Keeping the old borrower through retirement creates a dangling
+  scene-registry reference.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [src/runtime/Runtime.Engine.cpp,
+  tests/contract/runtime/Test.RuntimeWorldRegistry.cpp,
+  docs/architecture/runtime.md,
+  tasks/done/BUG-068-asset-scene-handoff-not-rebound-on-active-world-change.md]
+- **From staging**: O22
+
+## K12: World Destruction Dominates Activation
+- **Constraint**: A destroy-pending or destroy-announced world cannot become
+  active. Direct activation rejects it, and maintenance revalidates any queued
+  activation target as `Live` so request ordering cannot produce an
+  active-and-destroying world.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [tests/contract/runtime/Test.RuntimeWorldRegistry.cpp,
+  tasks/done/BUG-075-worldregistry-activate-while-destroy-pending.md]
+- **From staging**: O23
