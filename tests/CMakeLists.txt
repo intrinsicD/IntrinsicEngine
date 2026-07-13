@@ -234,6 +234,7 @@ if(TARGET ExtrinsicRuntime)
         Test.AssetModelTextureIO.cpp
         Test.DerivedJobGraph.cpp
         Test.EditorCommandHistory.cpp
+        Test.EditorWindowRegistry.cpp
         Test.ImGuiAdapter.cpp
         Test.ImGuiAdapterEngineWiring.cpp
         Test.KMeansBackend.cpp

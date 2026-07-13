@@ -11,8 +11,10 @@ maturity_target: CPUContracted
 - Status: in progress.
 - Owner: Codex.
 - Branch: `codex/ui-034-editor-window-contribution`.
-- Next verification step: implement Slice A and run the focused editor-window
-  registry contract tests plus strict layering/task-policy checks.
+- Progress: Slice A registry/lifecycle contract implemented and focused tests
+  pass; callbacks may safely unregister windows during dispatch.
+- Next verification step: implement Slice B and rerun the focused ImGui adapter,
+  engine-wiring, input-action, and editor-window registry contracts.
 
 ## Goal
 - Adopt the framework24 viewer's interaction/layout model in the Sandbox editor: domains contribute their menu entries and windows through a registration seam instead of a central enum, closed windows cost nothing per frame, viewport input is gated by one explicit UI-capture contract with a global UI-visibility toggle, and any scalar per-element property of the selection can be inspected through generic property-selector plus histogram/plot widgets.
@@ -82,8 +84,8 @@ maturity_target: CPUContracted
 - [ ] Migrate two exemplar domains (one mesh-processing window, one appearance/visualization window) onto the seam, lazy lifecycle, and property widgets to prove the pattern end to end.
 
 ## Tests
-- [ ] Headless/CPU contract tests for the registration seam: registered windows appear in the menu model, unregistered kinds are absent, duplicate registration fails closed.
-- [ ] Lazy-lifecycle test: a closed window's draw/model-build callbacks are not invoked across frames (counter probe).
+- [x] Headless/CPU contract tests for the registration seam: registered windows appear in the menu model, unregistered kinds are absent, duplicate registration fails closed.
+- [x] Lazy-lifecycle test: a closed window's draw/model-build callbacks are not invoked across frames (counter probe).
 - [ ] Capture-contract test: synthetic ImGui capture states gate a recorded camera/picking input path; the `BUG-036` leak regression coverage stays green.
 - [ ] Toggle test: global hide runs no window draw callbacks; restore returns the prior open-state.
 - [ ] Property-widget model test: the property-catalog-to-plot-model mapping handles empty selection, non-scalar properties (excluded), and NaN-containing properties (filtered, with the filtered count reported) without failures.

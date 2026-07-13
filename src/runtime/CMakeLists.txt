@@ -40,6 +40,7 @@ target_sources(${target_name}
         Runtime.SelectedMeshTextureBake.cppm
         Runtime.EcsSystemBundle.cppm
         Runtime.EditorCommandHistory.cppm
+        Editor/Runtime.EditorWindowRegistry.cppm
         Runtime.Engine.cppm
         Runtime.Engine.FrameLoop.cppm
         Runtime.EngineConfigBoot.cppm
@@ -123,6 +124,7 @@ target_sources(${target_name}
         Runtime.SelectedMeshTextureBake.cpp
         Runtime.EcsSystemBundle.cpp
         Runtime.EditorCommandHistory.cpp
+        Editor/Runtime.EditorWindowRegistry.cpp
         Runtime.Engine.cpp
         Runtime.EngineConfigBoot.cpp
         Runtime.EngineConfigControl.cpp
