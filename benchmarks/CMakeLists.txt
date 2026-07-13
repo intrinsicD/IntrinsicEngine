@@ -23,6 +23,7 @@ add_executable(IntrinsicBenchmarkSmoke
     runners/BenchmarkSmokeRunner.cpp
     geometry/Bench_ExampleSmoke.cpp
     geometry/Bench_PointCloudFilteringSmoke.cpp
+    geometry/Bench_LocallyOptimalProjectionSmoke.cpp
     geometry/Bench_ProgressivePoissonReferenceSmoke.cpp
     geometry/Bench_QualityMetricsSmoke.cpp
     geometry/Bench_SignedHeatReferenceSmoke.cpp

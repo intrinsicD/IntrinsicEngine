@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 12 |
 | `core` | 41 |
 | `ecs` | 28 |
-| `geometry` | 102 |
+| `geometry` | 103 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 69 |
@@ -175,6 +175,7 @@ Root scanned: `src`
 | `Geometry.Parameterization.Diagnostics` | `src/geometry/Geometry.Parameterization.Diagnostics.cppm` | `geometry` |
 | `Geometry.Parameterization.Harmonic` | `src/geometry/Geometry.Parameterization.Harmonic.cppm` | `geometry` |
 | `Geometry.Plane` | `src/geometry/Geometry.Plane.cppm` | `geometry` |
+| `Geometry.PointCloud.Consolidation` | `src/geometry/Geometry.PointCloud.Consolidation.cppm` | `geometry` |
 | `Geometry.PointCloud.Conversion` | `src/geometry/Geometry.PointCloud.Conversion.cppm` | `geometry` |
 | `Geometry.PointCloud.Features` | `src/geometry/Geometry.PointCloud.Features.cppm` | `geometry` |
 | `Geometry.PointCloud.Fwd` | `src/geometry/Geometry.PointCloud.Fwd.cppm` | `geometry` |
@@ -409,4 +410,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugClosestFace` | `src/runtime/SpatialDebug/Runtime.SpatialDebugClosestFace.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **382**
+Total modules: **383**

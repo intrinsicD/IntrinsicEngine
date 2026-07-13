@@ -32,8 +32,8 @@ map.
 - [METHOD-015 — Coherent Point Drift registration family reference backend](METHOD-015-coherent-point-drift-family-reference-backend.md)
   (variant A rigid default with affine/nonrigid in-package; gated on
   `geometry/GEOM-058` Gaussian-mixture/EM seam).
-- [METHOD-016 — Locally Optimal Projection (LOP/WLOP) consolidation reference backend](METHOD-016-locally-optimal-projection-reference-backend.md)
-  (variant A WLOP default; no solver gate — promotable now).
+- [METHOD-016 — Locally Optimal Projection (LOP/WLOP) consolidation reference backend](../../active/METHOD-016-locally-optimal-projection-reference-backend.md)
+  (variant A WLOP default; no solver gate — promoted to `tasks/active/`).
 
 ## Convergence
 

@@ -17,6 +17,7 @@
 #include "../geometry/Bench.PointCloudFilteringSmoke.hpp"
 #include "../geometry/Bench.ProgressivePoissonReferenceSmoke.hpp"
 #include "../geometry/Bench.QualityMetricsSmoke.hpp"
+#include "../geometry/Bench.LocallyOptimalProjectionSmoke.hpp"
 #include "../geometry/Bench.SignedHeatReferenceSmoke.hpp"
 #include "../geometry/Bench.SurfaceSamplingSmoke.hpp"
 #include "../geometry/Bench.UvAtlasSmoke.hpp"
@@ -402,6 +403,49 @@ auto EmitProgressivePoissonReferenceSmoke(const std::string &commit)
 
   return EmittedBenchmark{kProgressivePoissonReferenceSmokeBenchmarkId,
                           out.str(), metrics.Succeeded};
+}
+
+auto EmitLocallyOptimalProjectionSmoke(const std::string &commit)
+    -> EmittedBenchmark {
+  using namespace Intrinsic::Bench::Geometry;
+
+  const auto metrics = RunLocallyOptimalProjectionSmoke();
+
+  std::ostringstream out;
+  out.setf(std::ios::fixed);
+  out.precision(6);
+  out << "{\n"
+      << "  \"benchmark_id\": \""
+      << EscapeJson(kLocallyOptimalProjectionSmokeBenchmarkId) << "\",\n"
+      << "  \"method\": \"" << EscapeJson(kLocallyOptimalProjectionSmokeMethod)
+      << "\",\n"
+      << "  \"backend\": \"cpu_reference\",\n"
+      << "  \"dataset\": \"" << EscapeJson(kLocallyOptimalProjectionSmokeDataset)
+      << "\",\n"
+      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
+      << "  \"metrics\": {\n"
+      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
+      << "  },\n"
+      << "  \"diagnostics\": {\n"
+      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+      << "    \"mode\": \"smoke\",\n"
+      << "    \"warmup_iterations\": 1,\n"
+      << "    \"measured_iterations\": 8,\n"
+      << "    \"raw_quality_error_l2\": " << metrics.RawQualityErrorL2 << ",\n"
+      << "    \"min_pairwise_distance\": " << metrics.MinPairwiseDistance << ",\n"
+      << "    \"last_mean_movement\": " << metrics.LastMeanMovement << ",\n"
+      << "    \"iterations_run\": " << metrics.IterationsRun << ",\n"
+      << "    \"projected_point_count\": " << metrics.ProjectedPointCount << ",\n"
+      << "    \"empty_attraction_neighborhoods\": "
+      << metrics.EmptyAttractionNeighborhoods << "\n"
+      << "  },\n"
+      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
+      << "\"\n"
+      << "}\n";
+
+  return EmittedBenchmark{kLocallyOptimalProjectionSmokeBenchmarkId, out.str(),
+                          metrics.Succeeded};
 }
 
 auto EmitSignedHeatReferenceSmoke(const std::string &commit)
@@ -1096,6 +1140,7 @@ auto main(int argc, char **argv) -> int {
   emitted.push_back(EmitUvAtlasSmoke(commit));
   emitted.push_back(EmitUvAtlasPromotionSmoke(commit));
   emitted.push_back(EmitProgressivePoissonReferenceSmoke(commit));
+  emitted.push_back(EmitLocallyOptimalProjectionSmoke(commit));
   emitted.push_back(EmitSignedHeatReferenceSmoke(commit));
   emitted.push_back(EmitSurfaceSamplingSmoke(commit));
   emitted.push_back(EmitQualityMetricsSmoke(commit));

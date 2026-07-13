@@ -1,0 +1,33 @@
+id: geometry.locally_optimal_projection
+name: Locally Optimal Projection (LOP/WLOP) Point-Cloud Consolidation
+domain: geometry
+status: reference
+paper:
+  title: "Consolidation of Unorganized Point Clouds for Surface Reconstruction"
+  authors: "Hui Huang, Dan Li, Hao Zhang, Uri Ascher, Daniel Cohen-Or"
+  year: 2009
+  doi: "10.1145/1618452.1618522"
+  url: "https://dl.acm.org/doi/10.1145/1618452.1618522"
+inputs:
+  - "std::span<const glm::vec3> of raw input positions (or a Geometry::PointCloud::Cloud; live points are gathered in slot order)"
+  - "WlopParams: support radius h (> 0, data-dependent, no default), repulsion weight mu in [0, 0.5), iteration count, target point count or explicit initial indices, seed, variant token (Wlop density-weighted default, Lop unit weights)"
+outputs:
+  - "Projected (consolidated) positions as std::vector<glm::vec3>"
+  - "InitialIndices: the input indices that seeded the projected set"
+  - "ConvergenceReport: per-iteration mean/max displacement, input/projected counts, empty-neighborhood diagnostics"
+backends:
+  - cpu_reference
+metrics:
+  - "runtime_ms"
+  - "quality_error_l2"
+correctness_tests:
+  - "../../../tests/unit/geometry/Test.PointCloudConsolidation.cpp"
+benchmarks:
+  - "../../../benchmarks/geometry/manifests/locally_optimal_projection_reference_smoke.yaml"
+known_limitations:
+  - "Consolidation only: no normal estimation and no surface reconstruction (reconstruction consumers stay in Geometry.SurfaceReconstruction)."
+  - "Thin structures and close-by surface sheets closer than the support radius h can merge; h must stay below the local feature separation."
+  - "Strongly anisotropic sampling biases the localized L1 median along the dense direction; WLOP density weights reduce but do not remove the bias."
+  - "Plain LOP (unit weights) inherits input density bias and is more outlier-sensitive; WLOP is the default for raw scan data."
+  - "Fixed iteration count, no adaptive termination: the convergence report exposes per-iteration displacement so callers can judge convergence."
+  - "Degenerate inputs (empty/too-small clouds, non-finite positions, non-positive or non-finite h, mu outside [0, 0.5), zero iterations, invalid target count or initial indices) fail closed with explicit status values."

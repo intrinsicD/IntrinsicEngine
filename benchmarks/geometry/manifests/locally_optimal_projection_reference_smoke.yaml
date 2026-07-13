@@ -1,0 +1,27 @@
+# METHOD-016 — WLOP consolidation CPU reference smoke manifest.
+#
+# Stable benchmark contract for the workload defined by
+# benchmarks/geometry/Bench_LocallyOptimalProjectionSmoke.cpp and emitted by
+# the IntrinsicBenchmarkSmoke runner.
+
+benchmark_id: geometry.locally_optimal_projection.smoke
+method: geometry.locally_optimal_projection
+dataset: builtin.noisy_plane.24x24.sigma2e-2
+params:
+  intent: smoke
+  plane_side: 24
+  noise_sigma: 0.02
+  support_radius: 0.15
+  repulsion_weight: 0.45
+  iterations: 12
+  target_count: 200
+  seed: 42
+  variant: wlop
+  warmup_iterations: 1
+  measured_iterations: 8
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 250
+  quality_error_l2_max: 0.012

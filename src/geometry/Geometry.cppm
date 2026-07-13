@@ -80,6 +80,7 @@ export import Geometry.HalfedgeMesh.AdaptiveRemeshing;
 export import Geometry.ConvexHullBuilder;
 export import Geometry.KMeans;
 export import Geometry.PointCloud;
+export import Geometry.PointCloud.Consolidation;
 export import Geometry.PointCloud.Conversion;
 export import Geometry.PointCloud.Features;
 export import Geometry.PointCloud.Normals;
