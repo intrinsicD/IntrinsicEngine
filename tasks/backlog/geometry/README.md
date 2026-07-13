@@ -25,6 +25,9 @@ map.
 - [GEOM-061 — Point-cloud grid-downsampling reduction strategies](GEOM-061-grid-downsampling-reduction-strategies.md)
   (index-returning per-cell reduction extending retired GEOM-016's voxel
   downsampling; framework24 port-gap follow-up).
+- [GEOM-062 — Point-set projection and weighting kernels seam](GEOM-062-point-set-projection-weighting-kernels.md)
+  (reusable `Geometry.PointCloud.Kernels`: radial weights, LOP repulsion, WLOP
+  density weights; gates the `methods/METHOD-016..018` LOP consolidation family).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ### bcg_code_base geometry-processing port gaps (seeded 2026-06-26)
@@ -47,6 +50,12 @@ and `methods/METHOD-016` (LOP/WLOP consolidation) and the editor task
 `ui/UI-034` (framework24 interaction/layout conventions). Each task file names
 the exact `lib_bcg_framework`/`lib_bcg_viewer` source headers it ports and the
 robustness/determinism contracts the port must add over the originals.
+
+`GEOM-062` (`Geometry.PointCloud.Kernels`) is the follow-on shared-weighting
+seam factored out of the LOP consolidation family so `methods/METHOD-016`
+(WLOP/LOP), `methods/METHOD-017` (CLOP), and `methods/METHOD-018`
+(EAR/anisotropic) reuse one tested radial-weight/repulsion/density-weight core
+instead of each re-deriving the bcg density and repulsion math privately.
 
 The indexed decrease-key heap that backs Dijkstra is a `core` container filed
 under the runtime backlog as `CORE-004`; the paired editor/runtime integration

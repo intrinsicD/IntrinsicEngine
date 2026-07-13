@@ -33,7 +33,19 @@ map.
   (variant A rigid default with affine/nonrigid in-package; gated on
   `geometry/GEOM-058` Gaussian-mixture/EM seam).
 - [METHOD-016 — Locally Optimal Projection (LOP/WLOP) consolidation reference backend](METHOD-016-locally-optimal-projection-reference-backend.md)
-  (variant A WLOP default; no solver gate — promotable now).
+  (variant A WLOP default; establishes the shared `Geometry.PointCloud.Consolidation`
+  strategy×backend surface; gated on `geometry/GEOM-062` kernel seam).
+- [METHOD-017 — Continuous LOP (CLOP) reference backend](METHOD-017-continuous-lop-clop-reference-backend.md)
+  (adds the `Clop` strategy; gated on `METHOD-016`, `geometry/GEOM-058`
+  Gaussian-mixture seam, and `geometry/GEOM-062` kernels).
+- [METHOD-018 — Edge-Aware Resampling (EAR) and anisotropic feature-preserving LOP reference backend](METHOD-018-edge-aware-resampling-anisotropic-lop-reference-backend.md)
+  (adds the `Ear`/anisotropic strategies; gated on `METHOD-016` and
+  `geometry/GEOM-062`; consumes `Geometry.PointCloud.Normals`).
+- [METHOD-019 — LOP-family optimized CPU backend and comparison benchmark](METHOD-019-lop-family-optimized-cpu-backend.md)
+  (adds `cpu_optimized` with parity; gated on `METHOD-016`/`017`/`018`; reuses
+  the `geometry/GEOM-060` permutohedral and `geometry/GEOM-061` grid seams).
+- [METHOD-020 — LOP-family GPU (Vulkan compute) backend and parity](METHOD-020-lop-family-gpu-vulkan-compute-backend.md)
+  (adds `gpu_vulkan_compute` with `gpu;vulkan` parity; gated on `METHOD-019`).
 
 ## Convergence
 
@@ -58,7 +70,19 @@ map.
   port-gap section). METHOD-015's E-step numerics are owned by
   `geometry/GEOM-058` (encoded in `depends_on`), and its optimized nonrigid
   fast path is deferred to the `geometry/GEOM-060` permutohedral seam.
-  METHOD-016 has no solver gate.
+- **LOP consolidation family (METHOD-016..020).** WLOP/LOP (`METHOD-016`),
+  CLOP (`METHOD-017`), and EAR/anisotropic (`METHOD-018`) share one
+  `Geometry.PointCloud.Consolidation` module and its `Strategy` × `Backend`
+  dispatch axis (`docs/architecture/algorithm-variant-dispatch.md`), so every
+  state-of-the-art variant is choosable through one surface. The shared weight
+  math is factored into the `geometry/GEOM-062` `Geometry.PointCloud.Kernels`
+  seam; the optimized CPU (`METHOD-019`) and GPU (`METHOD-020`) backends follow
+  reference parity; and the engine integration — config lane, runtime facade,
+  and Sandbox editor panel — is owned by `runtime/RUNTIME-175` and `ui/UI-035`,
+  mirroring the retired `RUNTIME-134` progressive-Poisson playground. Promote
+  CPU-reference-first in the dependency order encoded in each task's
+  `depends_on`; do not open optimized/GPU/engine slices before the reference
+  variant they extend is implemented, tested, and benchmark-manifested.
 - Forbidden: importing runtime, graphics, platform, app, or live ECS ownership
   into a method package; claiming performance wins without a baseline.
 
