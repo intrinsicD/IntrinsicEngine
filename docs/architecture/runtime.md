@@ -133,20 +133,26 @@ capture flags independently. Its ImGui context owns a paired ImPlot context.
 `Extrinsic.Runtime.EditorPropertyWidgets` keeps scalar-property selector and
 finite-sample histogram models CPU-testable while its ImGui/ImPlot draw code and
 the manifest-managed `implot` dependency remain private to runtime.
-`SandboxEditorUi` registers `Mesh / Appearance` and
-`Mesh / Processing / Simplify` as the first two registry-owned windows; they
-share one lazy mesh-domain model per frame, and Appearance embeds the generic
-vertex-property histogram. `Extrinsic.Sandbox.Editor.MethodPanels` registers
+`SandboxEditorUi` registers `Mesh / Appearance` as the remaining runtime-owned
+registry exemplar; Appearance embeds the generic vertex-property histogram.
+`Extrinsic.Sandbox.Editor.MethodPanels` registers
 the K-Means windows for PointCloud, Graph, and Mesh plus the PointCloud and Mesh
 Progressive Poisson windows from the application layer. Their ImGui state and
 result presentation are app-owned, while model construction, command execution,
 job queues, config validation, and result publication remain runtime-owned.
+`Extrinsic.Sandbox.Editor.MeshProcessingPanels` applies the same boundary to ICP
+registration, mesh denoise/curvature/remesh/subdivide/simplify, and the
+mesh/graph/point-cloud vertex-normal windows. Runtime retains their exported
+models, command validation/execution, undo/history integration, derived-job
+submission, stale-result rejection, and result sinks; the application owns the
+stable registrations, menu paths, lazy per-frame domain-model cache, widget
+state, and result presentation.
 Those K-Means and Progressive Poisson facade bodies compile in the private
 `Runtime.SandboxMethodFacade.cpp` implementation unit; the public
 `Extrinsic.Runtime.SandboxEditorUi` surface and the app-to-runtime dependency
 direction are unchanged.
-The remaining fixed domain windows stay behind the legacy section table until
-later `ARCH-006` slices relocate them.
+Point-cloud outlier removal and the generic domain/editor-shell windows stay
+behind the legacy section table until later `ARCH-006` slices relocate them.
 
 The internal `RuntimeFrameContext` record carries the data that must survive
 between those phases: frame delta, fixed-step interpolation alpha, render frame

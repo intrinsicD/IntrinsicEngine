@@ -17,10 +17,15 @@ callback/registry/visibility lifecycle to `Runtime.EditorUiHost` while ARCH-006
 moves presentation into this directory. `Sandbox.Editor.MethodPanels` now owns
 the K-Means and Progressive Poisson ImGui controls and registers five domain
 windows through the shell's context-aware contribution facade. The app
-continues to import the same runtime module surface; K-Means and Progressive
-Poisson command/config/result implementations now compile in a private runtime
-facade unit without exposing geometry, ECS, graphics, or RHI dependencies to
-the app. The app also installs the sandbox default runtime policy bundle through
+continues to import the same runtime module surface. `Sandbox.Editor.MeshProcessingPanels`
+owns the ICP registration window plus the mesh denoise, curvature, remesh,
+subdivide, simplify, and mesh/graph/point-cloud vertex-normal windows. It
+registers those nine windows under their existing menu paths, owns their ImGui
+input/result-presentation state, and consumes only runtime models and command
+facades. K-Means and Progressive Poisson command/config/result implementations
+compile in a private runtime facade unit; all other processing commands likewise
+remain runtime-owned, so app panels expose no geometry, ECS, graphics, or RHI
+dependencies. The app also installs the sandbox default runtime policy bundle through
 `Runtime::RegisterSandboxDefaultRuntimePolicies(engine)`.
 It unregisters the returned handles during shutdown before the engine tears down.
 The app remains a runtime-only consumer: the editor shell registers with

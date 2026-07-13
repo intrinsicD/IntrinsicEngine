@@ -246,25 +246,12 @@ namespace Extrinsic::Runtime
             MeshAttributeTextureBakeEncoder::Vector3,
         }};
 
-        inline constexpr std::array<GN::AveragingMode, 4>
-            kMeshVertexNormalWeightings{{
-                GN::AveragingMode::UniformFace,
-                GN::AveragingMode::AreaWeighted,
-                GN::AveragingMode::AngleWeighted,
-                GN::AveragingMode::MaxWeighted,
-            }};
-
-        inline constexpr std::array<PointNormals::OrientationMode, 2>
-            kPointCloudNormalOrientations{{
-                PointNormals::OrientationMode::None,
-                PointNormals::OrientationMode::MinimumSpanningTree,
-            }};
-
+        // Validation tables belong to the non-ImGui command facade. The app
+        // owns the matching combo-box presentation tables.
         inline constexpr std::array<SandboxEditorMeshDenoiseStage, 1>
             kMeshDenoiseStages{{
                 SandboxEditorMeshDenoiseStage::FullBilateral,
             }};
-
         inline constexpr std::array<SandboxEditorMeshCurvatureOutput, 4>
             kMeshCurvatureOutputs{{
                 SandboxEditorMeshCurvatureOutput::All,
@@ -272,31 +259,26 @@ namespace Extrinsic::Runtime
                 SandboxEditorMeshCurvatureOutput::Gaussian,
                 SandboxEditorMeshCurvatureOutput::PrincipalDirections,
             }};
-
         inline constexpr std::array<SandboxEditorMeshRemeshMode, 2>
             kMeshRemeshModes{{
                 SandboxEditorMeshRemeshMode::Uniform,
                 SandboxEditorMeshRemeshMode::Adaptive,
             }};
-
         inline constexpr std::array<SandboxEditorMeshRemeshSizingLaw, 2>
             kMeshRemeshSizingLaws{{
                 SandboxEditorMeshRemeshSizingLaw::MeanCurvature,
                 SandboxEditorMeshRemeshSizingLaw::ErrorBoundedTaubin,
             }};
-
         inline constexpr std::array<SandboxEditorMeshSimplifyMetric, 2>
             kMeshSimplifyMetrics{{
                 SandboxEditorMeshSimplifyMetric::ClassicalQEM,
                 SandboxEditorMeshSimplifyMetric::FA_QEM,
             }};
-
         inline constexpr std::array<SandboxEditorICPVariant, 2>
             kSandboxEditorICPVariants{{
                 SandboxEditorICPVariant::PointToPoint,
                 SandboxEditorICPVariant::PointToPlane,
             }};
-
         inline constexpr std::array<SandboxEditorMeshSubdivideOperator, 3>
             kMeshSubdivideOperators{{
                 SandboxEditorMeshSubdivideOperator::Loop,
@@ -321,82 +303,6 @@ namespace Extrinsic::Runtime
             return "unknown";
         }
 
-        struct MeshDenoiseUiState
-        {
-            std::optional<SandboxEditorMeshDenoiseResult>* LastResult{nullptr};
-            std::int32_t* Stage{nullptr};
-            std::int32_t* NormalIterations{nullptr};
-            std::int32_t* VertexIterations{nullptr};
-            float* SigmaSpatial{nullptr};
-            float* SigmaRange{nullptr};
-            bool* PreserveBoundary{nullptr};
-        };
-
-        struct MeshCurvatureUiState
-        {
-            std::optional<SandboxEditorMeshCurvatureResult>* LastResult{nullptr};
-            std::int32_t* Output{nullptr};
-            bool* PublishPrincipalDirections{nullptr};
-        };
-
-        struct MeshRemeshUiState
-        {
-            std::optional<SandboxEditorMeshRemeshResult>* LastResult{nullptr};
-            std::int32_t* Mode{nullptr};
-            std::int32_t* SizingLaw{nullptr};
-            std::int32_t* Iterations{nullptr};
-            float* TargetEdgeLength{nullptr};
-            bool* ProjectToSurface{nullptr};
-        };
-
-        struct MeshSubdivideUiState
-        {
-            std::optional<SandboxEditorMeshSubdivideResult>* LastResult{nullptr};
-            std::int32_t* Operator{nullptr};
-            std::int32_t* Iterations{nullptr};
-            bool* PreserveLoopFeatures{nullptr};
-        };
-
-        struct MeshSimplifyUiState
-        {
-            std::optional<SandboxEditorMeshSimplifyResult>* LastResult{nullptr};
-            std::int32_t* Metric{nullptr};
-            std::int32_t* TargetFaces{nullptr};
-            float* MaxError{nullptr};
-            bool* PreserveBoundary{nullptr};
-            float* FeatureAngleThresholdDegrees{nullptr};
-            float* NormalWeight{nullptr};
-            float* BoundaryWeight{nullptr};
-            float* CurvatureWeight{nullptr};
-            bool* PreserveSharpFeatures{nullptr};
-            bool* PreserveUvSeams{nullptr};
-        };
-
-        struct MeshVertexNormalsUiState
-        {
-            std::optional<SandboxEditorMeshVertexNormalsResult>* LastResult{nullptr};
-            std::int32_t* Weighting{nullptr};
-            glm::vec3* FallbackNormal{nullptr};
-        };
-
-        struct GraphVertexNormalsUiState
-        {
-            std::optional<SandboxEditorGraphVertexNormalsResult>* LastResult{nullptr};
-            glm::vec3* FallbackNormal{nullptr};
-            bool* OrientTowardFallback{nullptr};
-        };
-
-        struct PointCloudVertexNormalsUiState
-        {
-            std::optional<SandboxEditorPointCloudVertexNormalsResult>* LastResult{nullptr};
-            std::int32_t* KNeighbors{nullptr};
-            std::int32_t* MinimumNeighbors{nullptr};
-            bool* UseRadiusSearch{nullptr};
-            float* Radius{nullptr};
-            std::int32_t* Orientation{nullptr};
-            glm::vec3* FallbackNormal{nullptr};
-        };
-
         struct PointCloudOutlierRemovalUiState
         {
             std::optional<SandboxEditorPointCloudOutlierRemovalResult>*
@@ -406,17 +312,6 @@ namespace Extrinsic::Runtime
             float*        StdDevMultiplier{nullptr};
             float*        SearchRadius{nullptr};
             std::int32_t* MinNeighbors{nullptr};
-        };
-
-        struct RegistrationUiState
-        {
-            std::optional<SandboxEditorRegistrationResult>* LastResult{nullptr};
-            std::int32_t* Variant{nullptr};
-            std::int32_t* MaxIterations{nullptr};
-            float* MaxCorrespondenceDistance{nullptr};
-            float* InlierRatio{nullptr};
-            std::int32_t* TrajectoryStep{nullptr};
-            bool* SwapSourceTarget{nullptr};
         };
 
         struct TextureBakeUiState
@@ -440,16 +335,8 @@ namespace Extrinsic::Runtime
             Render = 0,
             Properties = 1,
             Selection = 2,
-            ProcessingDenoise = 3,
-            ProcessingCurvature = 4,
-            ProcessingRemesh = 5,
-            ProcessingSubdivide = 6,
-            ProcessingSimplify = 7,
-            ProcessingMeshVertexNormals = 8,
-            ProcessingGraphVertexNormals = 9,
-            ProcessingPointCloudVertexNormals = 10,
-            ProcessingPointCloudOutlierRemoval = 11,
-            Count = 12,
+            ProcessingPointCloudOutlierRemoval = 3,
+            Count = 4,
         };
 
         static_assert(
@@ -468,7 +355,6 @@ namespace Extrinsic::Runtime
             RenderRecipe,
             CameraRender,
             GeometryVisualization,
-            Registration,
             Count,
         };
 
@@ -489,7 +375,6 @@ namespace Extrinsic::Runtime
                 SandboxEditorPanelWindowKind::RenderRecipe,
                 SandboxEditorPanelWindowKind::CameraRender,
                 SandboxEditorPanelWindowKind::GeometryVisualization,
-                SandboxEditorPanelWindowKind::Registration,
             }};
 
         [[nodiscard]] const char* PanelWindowTitle(
@@ -517,8 +402,6 @@ namespace Extrinsic::Runtime
                 return "Camera / Render";
             case SandboxEditorPanelWindowKind::GeometryVisualization:
                 return "Geometry Visualization";
-            case SandboxEditorPanelWindowKind::Registration:
-                return "ICP Registration";
             case SandboxEditorPanelWindowKind::Count:
                 break;
             }
@@ -618,20 +501,6 @@ namespace Extrinsic::Runtime
                 case DomainWindowSection::Render: return "Mesh / Appearance";
                 case DomainWindowSection::Properties: return "Mesh / Properties";
                 case DomainWindowSection::Selection: return "Mesh / Selection";
-                case DomainWindowSection::ProcessingDenoise:
-                    return "Mesh / Processing / Denoise";
-                case DomainWindowSection::ProcessingCurvature:
-                    return "Mesh / Processing / Curvature";
-                case DomainWindowSection::ProcessingRemesh:
-                    return "Mesh / Processing / Remesh";
-                case DomainWindowSection::ProcessingSubdivide:
-                    return "Mesh / Processing / Subdivide";
-                case DomainWindowSection::ProcessingSimplify:
-                    return "Mesh / Processing / Simplify";
-                case DomainWindowSection::ProcessingMeshVertexNormals:
-                    return "Mesh / Processing / Vertices / Normals";
-                case DomainWindowSection::ProcessingGraphVertexNormals:
-                case DomainWindowSection::ProcessingPointCloudVertexNormals:
                 case DomainWindowSection::ProcessingPointCloudOutlierRemoval:
                 case DomainWindowSection::Count: break;
                 }
@@ -642,15 +511,6 @@ namespace Extrinsic::Runtime
                 case DomainWindowSection::Render: return "Graph / Appearance";
                 case DomainWindowSection::Properties: return "Graph / Properties";
                 case DomainWindowSection::Selection: return "Graph / Selection";
-                case DomainWindowSection::ProcessingGraphVertexNormals:
-                    return "Graph / Processing / Vertices / Normals";
-                case DomainWindowSection::ProcessingDenoise:
-                case DomainWindowSection::ProcessingCurvature:
-                case DomainWindowSection::ProcessingRemesh:
-                case DomainWindowSection::ProcessingSubdivide:
-                case DomainWindowSection::ProcessingSimplify:
-                case DomainWindowSection::ProcessingMeshVertexNormals:
-                case DomainWindowSection::ProcessingPointCloudVertexNormals:
                 case DomainWindowSection::ProcessingPointCloudOutlierRemoval:
                 case DomainWindowSection::Count: break;
                 }
@@ -661,17 +521,8 @@ namespace Extrinsic::Runtime
                 case DomainWindowSection::Render: return "PointCloud / Appearance";
                 case DomainWindowSection::Properties: return "PointCloud / Properties";
                 case DomainWindowSection::Selection: return "PointCloud / Selection";
-                case DomainWindowSection::ProcessingPointCloudVertexNormals:
-                    return "PointCloud / Processing / Vertices / Normals";
                 case DomainWindowSection::ProcessingPointCloudOutlierRemoval:
                     return "PointCloud / Processing / Remove Outliers";
-                case DomainWindowSection::ProcessingDenoise:
-                case DomainWindowSection::ProcessingCurvature:
-                case DomainWindowSection::ProcessingRemesh:
-                case DomainWindowSection::ProcessingSubdivide:
-                case DomainWindowSection::ProcessingSimplify:
-                case DomainWindowSection::ProcessingMeshVertexNormals:
-                case DomainWindowSection::ProcessingGraphVertexNormals:
                 case DomainWindowSection::Count: break;
                 }
                 break;
@@ -5605,77 +5456,6 @@ namespace Extrinsic::Runtime
             message += std::to_string(result.FallbackPointCount);
             message += ").";
             return message;
-        }
-
-        [[nodiscard]] const char* DebugNameForSandboxEditorMeshDenoiseStage(
-            const SandboxEditorMeshDenoiseStage stage) noexcept
-        {
-            switch (stage)
-            {
-            case SandboxEditorMeshDenoiseStage::FullBilateral:
-                return "Full bilateral";
-            }
-            return "Unknown";
-        }
-
-        [[nodiscard]] SandboxEditorMeshCurvatureOutput
-        MeshCurvatureOutputFromIndex(const std::int32_t index) noexcept
-        {
-            const std::int32_t clamped = std::clamp(
-                index,
-                0,
-                static_cast<std::int32_t>(kMeshCurvatureOutputs.size() - 1u));
-            return kMeshCurvatureOutputs[static_cast<std::size_t>(clamped)];
-        }
-
-        [[nodiscard]] SandboxEditorMeshRemeshMode
-        MeshRemeshModeFromIndex(const std::int32_t index) noexcept
-        {
-            const std::int32_t clamped = std::clamp(
-                index,
-                0,
-                static_cast<std::int32_t>(kMeshRemeshModes.size() - 1u));
-            return kMeshRemeshModes[static_cast<std::size_t>(clamped)];
-        }
-
-        [[nodiscard]] SandboxEditorMeshRemeshSizingLaw
-        MeshRemeshSizingLawFromIndex(const std::int32_t index) noexcept
-        {
-            const std::int32_t clamped = std::clamp(
-                index,
-                0,
-                static_cast<std::int32_t>(kMeshRemeshSizingLaws.size() - 1u));
-            return kMeshRemeshSizingLaws[static_cast<std::size_t>(clamped)];
-        }
-
-        [[nodiscard]] SandboxEditorMeshSimplifyMetric
-        MeshSimplifyMetricFromIndex(const std::int32_t index) noexcept
-        {
-            const std::int32_t clamped = std::clamp(
-                index,
-                0,
-                static_cast<std::int32_t>(kMeshSimplifyMetrics.size() - 1u));
-            return kMeshSimplifyMetrics[static_cast<std::size_t>(clamped)];
-        }
-
-        [[nodiscard]] SandboxEditorICPVariant
-        SandboxEditorICPVariantFromIndex(const std::int32_t index) noexcept
-        {
-            const std::int32_t clamped = std::clamp(
-                index,
-                0,
-                static_cast<std::int32_t>(kSandboxEditorICPVariants.size() - 1u));
-            return kSandboxEditorICPVariants[static_cast<std::size_t>(clamped)];
-        }
-
-        [[nodiscard]] SandboxEditorMeshSubdivideOperator
-        MeshSubdivideOperatorFromIndex(const std::int32_t index) noexcept
-        {
-            const std::int32_t clamped = std::clamp(
-                index,
-                0,
-                static_cast<std::int32_t>(kMeshSubdivideOperators.size() - 1u));
-            return kMeshSubdivideOperators[static_cast<std::size_t>(clamped)];
         }
 
         [[nodiscard]] Core::ErrorCode ErrorForDenoiseStatus(
@@ -11393,63 +11173,6 @@ namespace Extrinsic::Runtime
                     &(*domainWindowOpen)[DomainWindowSlotIndex(kind, DomainWindowSection::Selection)]);
                 if (ImGui::BeginMenu("Processing"))
                 {
-                    const auto openProcessing =
-                        [kind, domainWindowOpen](const DomainWindowSection section)
-                        {
-                            (*domainWindowOpen)[DomainWindowSlotIndex(kind, section)] =
-                                true;
-                        };
-                    const std::vector<SandboxEditorGeometryProcessingMenuItem>
-                        menuItems =
-                            GetSandboxEditorGeometryProcessingMenuItems(kind);
-                    const bool hasDenoiseLeaf =
-                        std::any_of(
-                            menuItems.begin(),
-                            menuItems.end(),
-                            [](const SandboxEditorGeometryProcessingMenuItem& item)
-                            {
-                                return item.HasDenoiseMethod;
-                            });
-                    if (hasDenoiseLeaf && ImGui::MenuItem("Denoise"))
-                    {
-                        openProcessing(DomainWindowSection::ProcessingDenoise);
-                    }
-                    const bool hasCurvatureLeaf =
-                        std::any_of(
-                            menuItems.begin(),
-                            menuItems.end(),
-                            [](const SandboxEditorGeometryProcessingMenuItem& item)
-                            {
-                                return item.HasCurvatureMethod;
-                            });
-                    if (hasCurvatureLeaf && ImGui::MenuItem("Curvature"))
-                    {
-                        openProcessing(DomainWindowSection::ProcessingCurvature);
-                    }
-                    const bool hasRemeshLeaf =
-                        std::any_of(
-                            menuItems.begin(),
-                            menuItems.end(),
-                            [](const SandboxEditorGeometryProcessingMenuItem& item)
-                            {
-                                return item.HasRemeshMethod;
-                            });
-                    if (hasRemeshLeaf && ImGui::MenuItem("Remesh"))
-                    {
-                        openProcessing(DomainWindowSection::ProcessingRemesh);
-                    }
-                    const bool hasSubdivideLeaf =
-                        std::any_of(
-                            menuItems.begin(),
-                            menuItems.end(),
-                            [](const SandboxEditorGeometryProcessingMenuItem& item)
-                            {
-                                return item.HasSubdivideMethod;
-                            });
-                    if (hasSubdivideLeaf && ImGui::MenuItem("Subdivide"))
-                    {
-                        openProcessing(DomainWindowSection::ProcessingSubdivide);
-                    }
                     registeredPath.push_back("Processing");
                     if (windowRegistry != nullptr && registeredEntries != nullptr)
                     {
@@ -11458,77 +11181,20 @@ namespace Extrinsic::Runtime
                             *registeredEntries,
                             registeredPath);
                     }
-                    const bool hasSimplifyLeaf =
-                        std::any_of(
-                            menuItems.begin(),
-                            menuItems.end(),
-                            [](const SandboxEditorGeometryProcessingMenuItem& item)
-                            {
-                                return item.HasSimplifyMethod;
-                            });
-                    if (kind != SandboxEditorDomainWindowKind::Mesh &&
-                        hasSimplifyLeaf && ImGui::MenuItem("Simplify"))
-                    {
-                        openProcessing(DomainWindowSection::ProcessingSimplify);
-                    }
                     if (kind == SandboxEditorDomainWindowKind::PointCloud &&
                         ImGui::MenuItem("Remove Outliers"))
                     {
-                        openProcessing(
+                        (*domainWindowOpen)[DomainWindowSlotIndex(
+                            kind,
                             DomainWindowSection::
-                                ProcessingPointCloudOutlierRemoval);
-                    }
-                    std::vector<std::string_view> fixedProcessingChildren{};
-                    for (const SandboxEditorGeometryProcessingMenuItem& item : menuItems)
-                    {
-                        if (item.HasNormalsMethod)
-                        {
-                            fixedProcessingChildren.emplace_back(item.Label);
-                            if (ImGui::BeginMenu(item.Label))
-                            {
-                                if (item.HasNormalsMethod &&
-                                    ImGui::MenuItem("Normals"))
-                                {
-                                    switch (kind)
-                                    {
-                                    case SandboxEditorDomainWindowKind::Mesh:
-                                        openProcessing(
-                                            DomainWindowSection::
-                                                ProcessingMeshVertexNormals);
-                                        break;
-                                    case SandboxEditorDomainWindowKind::Graph:
-                                        openProcessing(
-                                            DomainWindowSection::
-                                                ProcessingGraphVertexNormals);
-                                        break;
-                                    case SandboxEditorDomainWindowKind::PointCloud:
-                                        openProcessing(
-                                            DomainWindowSection::
-                                                ProcessingPointCloudVertexNormals);
-                                        break;
-                                    }
-                                }
-                                if (windowRegistry != nullptr &&
-                                    registeredEntries != nullptr)
-                                {
-                                    registeredPath.push_back(item.Label);
-                                    DrawRegisteredWindowMenuTree(
-                                        *windowRegistry,
-                                        *registeredEntries,
-                                        registeredPath);
-                                    registeredPath.pop_back();
-                                }
-                                ImGui::EndMenu();
-                            }
-                        }
+                                ProcessingPointCloudOutlierRemoval)] = true;
                     }
                     if (windowRegistry != nullptr && registeredEntries != nullptr)
                     {
                         DrawRegisteredWindowMenuChildren(
                             *windowRegistry,
                             *registeredEntries,
-                            registeredPath,
-                            fixedProcessingChildren);
+                            registeredPath);
                     }
                     registeredPath.pop_back();
                     ImGui::EndMenu();
@@ -13068,1232 +12734,6 @@ namespace Extrinsic::Runtime
             DrawPrimitiveDetails(model.Primitive);
         }
 
-        [[nodiscard]] SandboxEditorMeshDenoiseStage MeshDenoiseStageFromIndex(
-            const std::int32_t index) noexcept
-        {
-            const std::int32_t clamped = std::clamp(
-                index,
-                0,
-                static_cast<std::int32_t>(kMeshDenoiseStages.size() - 1u));
-            return kMeshDenoiseStages[static_cast<std::size_t>(clamped)];
-        }
-
-        void DrawMeshDenoiseResultStatus(
-            const std::optional<SandboxEditorMeshDenoiseResult>& lastResult)
-        {
-            if (!lastResult.has_value())
-            {
-                ImGui::TextDisabled("Last denoise run: none");
-                return;
-            }
-
-            const SandboxEditorMeshDenoiseResult& result = *lastResult;
-            ImGui::Text("Last denoise run: %s",
-                        DebugNameForSandboxEditorCommandStatus(result.Status));
-            ImGui::Text("Geometry status: %s",
-                        std::string(Smooth::DebugName(result.DenoiseStatus)).c_str());
-            ImGui::Text("Stage: %s",
-                        DebugNameForSandboxEditorMeshDenoiseStage(result.Stage));
-            if (result.Succeeded())
-            {
-                ImGui::Text("Written: %zu / %zu  moved: %zu  deleted: %zu",
-                            result.WrittenCount,
-                            result.VertexSlotCount,
-                            result.MovedVertexCount,
-                            result.SkippedDeletedVertexCount);
-                ImGui::Text("Iterations: normals=%u  vertices=%u",
-                            result.NormalIterations,
-                            result.VertexIterations);
-                ImGui::Text("Faces: processed=%zu  degenerate=%zu  nonfinite=%zu  deleted=%zu",
-                            result.ProcessedFaceCount,
-                            result.DegenerateFaceCount,
-                            result.NonFiniteFaceCount,
-                            result.SkippedDeletedFaceCount);
-                ImGui::Text("Pinned boundary vertices: %zu",
-                            result.PinnedBoundaryVertexCount);
-                ImGui::Text("Sigma used: spatial=%.6f  range=%.6f",
-                            result.SigmaSpatialUsed,
-                            result.SigmaRangeUsed);
-            }
-            if (!result.Message.empty())
-                ImGui::TextWrapped("%s", result.Message.c_str());
-        }
-
-        void DrawMeshDenoiseControls(
-            const SandboxEditorDomainWindowModel& model,
-            const SandboxEditorContext& context,
-            const SandboxEditorGeometryProcessingModel& processing,
-            MeshDenoiseUiState* denoiseState)
-        {
-            ImGui::SeparatorText("Denoise");
-            if (!processing.MeshDenoiseAvailable)
-            {
-                ImGui::TextDisabled("Mesh denoise is unavailable for this selection.");
-                return;
-            }
-            if (denoiseState == nullptr ||
-                denoiseState->LastResult == nullptr ||
-                denoiseState->Stage == nullptr ||
-                denoiseState->NormalIterations == nullptr ||
-                denoiseState->VertexIterations == nullptr ||
-                denoiseState->SigmaSpatial == nullptr ||
-                denoiseState->SigmaRange == nullptr ||
-                denoiseState->PreserveBoundary == nullptr)
-            {
-                ImGui::TextDisabled("Mesh denoise controls are not bound.");
-                return;
-            }
-
-            *denoiseState->Stage = std::clamp(
-                *denoiseState->Stage,
-                0,
-                static_cast<std::int32_t>(kMeshDenoiseStages.size() - 1u));
-            const SandboxEditorMeshDenoiseStage stage =
-                MeshDenoiseStageFromIndex(*denoiseState->Stage);
-            if (ImGui::BeginCombo(
-                    "Stage##MeshDenoise",
-                    DebugNameForSandboxEditorMeshDenoiseStage(stage)))
-            {
-                for (std::size_t i = 0u; i < kMeshDenoiseStages.size(); ++i)
-                {
-                    const bool selected =
-                        *denoiseState->Stage == static_cast<std::int32_t>(i);
-                    if (ImGui::Selectable(
-                            DebugNameForSandboxEditorMeshDenoiseStage(
-                                kMeshDenoiseStages[i]),
-                            selected))
-                    {
-                        *denoiseState->Stage = static_cast<std::int32_t>(i);
-                    }
-                    if (selected)
-                        ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndCombo();
-            }
-
-            *denoiseState->NormalIterations =
-                std::clamp(*denoiseState->NormalIterations, 1, 4096);
-            *denoiseState->VertexIterations =
-                std::clamp(*denoiseState->VertexIterations, 1, 4096);
-            *denoiseState->SigmaSpatial =
-                std::clamp(*denoiseState->SigmaSpatial, 0.0f, 1.0e6f);
-            *denoiseState->SigmaRange =
-                std::clamp(*denoiseState->SigmaRange, 0.0f, 1.0e6f);
-            ImGui::DragInt(
-                "Normal iterations##MeshDenoise",
-                denoiseState->NormalIterations,
-                1.0f,
-                1,
-                4096);
-            ImGui::DragInt(
-                "Vertex iterations##MeshDenoise",
-                denoiseState->VertexIterations,
-                1.0f,
-                1,
-                4096);
-            ImGui::DragFloat(
-                "Sigma spatial##MeshDenoise",
-                denoiseState->SigmaSpatial,
-                0.01f,
-                0.0f,
-                1.0e6f);
-            ImGui::DragFloat(
-                "Sigma range##MeshDenoise",
-                denoiseState->SigmaRange,
-                0.01f,
-                0.0f,
-                1.0e6f);
-            ImGui::Checkbox(
-                "Preserve boundary##MeshDenoise",
-                denoiseState->PreserveBoundary);
-
-            if (ImGui::Button("Denoise##MeshDenoise"))
-            {
-                *denoiseState->LastResult =
-                    ApplySandboxEditorMeshDenoiseCommand(
-                        context,
-                        SandboxEditorMeshDenoiseCommand{
-                            .StableEntityId = model.SelectedStableId,
-                            .Stage = MeshDenoiseStageFromIndex(
-                                *denoiseState->Stage),
-                            .NormalIterations = static_cast<std::uint32_t>(
-                                *denoiseState->NormalIterations),
-                            .VertexIterations = static_cast<std::uint32_t>(
-                                *denoiseState->VertexIterations),
-                            .SigmaSpatial = static_cast<double>(
-                                *denoiseState->SigmaSpatial),
-                            .SigmaRange = static_cast<double>(
-                                *denoiseState->SigmaRange),
-                            .PreserveBoundary =
-                                *denoiseState->PreserveBoundary,
-                        });
-            }
-
-            const std::optional<SandboxEditorMeshDenoiseResult>& result =
-                denoiseState->LastResult->has_value()
-                    ? *denoiseState->LastResult
-                    : processing.LastMeshDenoiseResult;
-            DrawMeshDenoiseResultStatus(result);
-        }
-
-        void DrawMeshCurvatureResultStatus(
-            const std::optional<SandboxEditorMeshCurvatureResult>& lastResult)
-        {
-            if (!lastResult.has_value())
-            {
-                ImGui::TextDisabled("Last curvature run: none");
-                return;
-            }
-
-            const SandboxEditorMeshCurvatureResult& result = *lastResult;
-            ImGui::Text("Last curvature run: %s",
-                        DebugNameForSandboxEditorCommandStatus(result.Status));
-            ImGui::Text("Output: %s",
-                        DebugNameForSandboxEditorMeshCurvatureOutput(result.Output));
-            if (result.Succeeded())
-            {
-                ImGui::Text("Vertices: %zu  scalar values: %zu  nonfinite scalars: %zu",
-                            result.VertexSlotCount,
-                            result.ScalarWrittenCount,
-                            result.NonFiniteScalarCount);
-                ImGui::Text("Directions: %s  values: %zu  nonfinite: %zu",
-                            result.DirectionsPublished ? "published" : "not published",
-                            result.DirectionWrittenCount,
-                            result.NonFiniteDirectionCount);
-            }
-            if (!result.Message.empty())
-                ImGui::TextWrapped("%s", result.Message.c_str());
-        }
-
-        void DrawMeshCurvatureControls(
-            const SandboxEditorDomainWindowModel& model,
-            const SandboxEditorContext& context,
-            const SandboxEditorGeometryProcessingModel& processing,
-            MeshCurvatureUiState* curvatureState)
-        {
-            ImGui::SeparatorText("Curvature");
-            if (!processing.MeshCurvatureAvailable)
-            {
-                ImGui::TextDisabled("Mesh curvature is unavailable for this selection.");
-                return;
-            }
-            if (curvatureState == nullptr ||
-                curvatureState->LastResult == nullptr ||
-                curvatureState->Output == nullptr ||
-                curvatureState->PublishPrincipalDirections == nullptr)
-            {
-                ImGui::TextDisabled("Mesh curvature controls are not bound.");
-                return;
-            }
-
-            *curvatureState->Output = std::clamp(
-                *curvatureState->Output,
-                0,
-                static_cast<std::int32_t>(kMeshCurvatureOutputs.size() - 1u));
-            const SandboxEditorMeshCurvatureOutput output =
-                MeshCurvatureOutputFromIndex(*curvatureState->Output);
-            if (ImGui::BeginCombo(
-                    "Output##MeshCurvature",
-                    DebugNameForSandboxEditorMeshCurvatureOutput(output)))
-            {
-                for (std::size_t i = 0u; i < kMeshCurvatureOutputs.size(); ++i)
-                {
-                    const bool selected =
-                        *curvatureState->Output ==
-                        static_cast<std::int32_t>(i);
-                    if (ImGui::Selectable(
-                            DebugNameForSandboxEditorMeshCurvatureOutput(
-                                kMeshCurvatureOutputs[i]),
-                            selected))
-                    {
-                        *curvatureState->Output =
-                            static_cast<std::int32_t>(i);
-                    }
-                    if (selected)
-                        ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndCombo();
-            }
-
-            if (!processing.MeshCurvatureDirectionsAvailable)
-                ImGui::BeginDisabled();
-            ImGui::Checkbox(
-                "Principal directions##MeshCurvature",
-                curvatureState->PublishPrincipalDirections);
-            if (!processing.MeshCurvatureDirectionsAvailable)
-                ImGui::EndDisabled();
-
-            if (ImGui::Button("Compute##MeshCurvature"))
-            {
-                *curvatureState->LastResult =
-                    ApplySandboxEditorMeshCurvatureCommand(
-                        context,
-                        SandboxEditorMeshCurvatureCommand{
-                            .StableEntityId = model.SelectedStableId,
-                            .Output = MeshCurvatureOutputFromIndex(
-                                *curvatureState->Output),
-                            .PublishPrincipalDirections =
-                                *curvatureState->PublishPrincipalDirections,
-                        });
-            }
-
-            const std::optional<SandboxEditorMeshCurvatureResult>& result =
-                curvatureState->LastResult->has_value()
-                    ? *curvatureState->LastResult
-                    : processing.LastMeshCurvatureResult;
-            DrawMeshCurvatureResultStatus(result);
-        }
-
-        void DrawMeshRemeshResultStatus(
-            const std::optional<SandboxEditorMeshRemeshResult>& lastResult)
-        {
-            if (!lastResult.has_value())
-            {
-                ImGui::TextDisabled("Last remesh run: none");
-                return;
-            }
-
-            const SandboxEditorMeshRemeshResult& result = *lastResult;
-            ImGui::Text("Last remesh run: %s",
-                        DebugNameForSandboxEditorCommandStatus(result.Status));
-            ImGui::Text("Mode: %s  sizing: %s",
-                        DebugNameForSandboxEditorMeshRemeshMode(result.Mode),
-                        DebugNameForSandboxEditorMeshRemeshSizingLaw(result.SizingLaw));
-            if (result.Succeeded())
-            {
-                ImGui::Text("Vertices: %zu -> %zu  faces: %zu -> %zu",
-                            result.InputVertexCount,
-                            result.OutputVertexCount,
-                            result.InputFaceCount,
-                            result.OutputFaceCount);
-                ImGui::Text("Iterations: %u / %u  splits=%zu  collapses=%zu  flips=%zu",
-                            result.IterationsPerformed,
-                            result.IterationsRequested,
-                            result.SplitCount,
-                            result.CollapseCount,
-                            result.FlipCount);
-            }
-            if (!result.Message.empty())
-                ImGui::TextWrapped("%s", result.Message.c_str());
-        }
-
-        void DrawMeshRemeshControls(
-            const SandboxEditorDomainWindowModel& model,
-            const SandboxEditorContext& context,
-            const SandboxEditorGeometryProcessingModel& processing,
-            MeshRemeshUiState* remeshState)
-        {
-            ImGui::SeparatorText("Remesh");
-            if (!processing.MeshRemeshAvailable)
-            {
-                ImGui::TextDisabled("Mesh remesh is unavailable for this selection.");
-                return;
-            }
-            if (remeshState == nullptr ||
-                remeshState->LastResult == nullptr ||
-                remeshState->Mode == nullptr ||
-                remeshState->SizingLaw == nullptr ||
-                remeshState->Iterations == nullptr ||
-                remeshState->TargetEdgeLength == nullptr ||
-                remeshState->ProjectToSurface == nullptr)
-            {
-                ImGui::TextDisabled("Mesh remesh controls are not bound.");
-                return;
-            }
-
-            *remeshState->Mode = std::clamp(
-                *remeshState->Mode,
-                0,
-                static_cast<std::int32_t>(kMeshRemeshModes.size() - 1u));
-            *remeshState->SizingLaw = std::clamp(
-                *remeshState->SizingLaw,
-                0,
-                static_cast<std::int32_t>(kMeshRemeshSizingLaws.size() - 1u));
-            *remeshState->Iterations =
-                std::clamp(*remeshState->Iterations, 1, 64);
-            *remeshState->TargetEdgeLength =
-                std::clamp(*remeshState->TargetEdgeLength, 0.0f, 1.0e6f);
-
-            const SandboxEditorMeshRemeshMode mode =
-                MeshRemeshModeFromIndex(*remeshState->Mode);
-            if (ImGui::BeginCombo(
-                    "Mode##MeshRemesh",
-                    DebugNameForSandboxEditorMeshRemeshMode(mode)))
-            {
-                for (std::size_t i = 0u; i < kMeshRemeshModes.size(); ++i)
-                {
-                    const SandboxEditorMeshRemeshMode option =
-                        kMeshRemeshModes[i];
-                    const bool available =
-                        option == SandboxEditorMeshRemeshMode::Uniform
-                            ? processing.MeshRemeshUniformAvailable
-                            : processing.MeshRemeshAdaptiveAvailable;
-                    if (!available)
-                        ImGui::BeginDisabled();
-                    const bool selected =
-                        *remeshState->Mode == static_cast<std::int32_t>(i);
-                    if (ImGui::Selectable(
-                            DebugNameForSandboxEditorMeshRemeshMode(option),
-                            selected))
-                    {
-                        *remeshState->Mode = static_cast<std::int32_t>(i);
-                    }
-                    if (selected)
-                        ImGui::SetItemDefaultFocus();
-                    if (!available)
-                        ImGui::EndDisabled();
-                }
-                ImGui::EndCombo();
-            }
-
-            ImGui::DragInt("Iterations##MeshRemesh", remeshState->Iterations, 1.0f, 1, 64);
-            ImGui::DragFloat(
-                "Target edge length##MeshRemesh",
-                remeshState->TargetEdgeLength,
-                0.01f,
-                0.0f,
-                1.0e6f);
-
-            const bool adaptive =
-                mode == SandboxEditorMeshRemeshMode::Adaptive;
-            if (!adaptive)
-                ImGui::BeginDisabled();
-            const SandboxEditorMeshRemeshSizingLaw sizingLaw =
-                MeshRemeshSizingLawFromIndex(*remeshState->SizingLaw);
-            if (ImGui::BeginCombo(
-                    "Sizing law##MeshRemesh",
-                    DebugNameForSandboxEditorMeshRemeshSizingLaw(sizingLaw)))
-            {
-                for (std::size_t i = 0u; i < kMeshRemeshSizingLaws.size(); ++i)
-                {
-                    const SandboxEditorMeshRemeshSizingLaw option =
-                        kMeshRemeshSizingLaws[i];
-                    const bool available =
-                        option !=
-                            SandboxEditorMeshRemeshSizingLaw::ErrorBoundedTaubin ||
-                        processing.MeshRemeshErrorBoundedSizingAvailable;
-                    if (!available)
-                        ImGui::BeginDisabled();
-                    const bool selected =
-                        *remeshState->SizingLaw == static_cast<std::int32_t>(i);
-                    if (ImGui::Selectable(
-                            DebugNameForSandboxEditorMeshRemeshSizingLaw(option),
-                            selected))
-                    {
-                        *remeshState->SizingLaw =
-                            static_cast<std::int32_t>(i);
-                    }
-                    if (selected)
-                        ImGui::SetItemDefaultFocus();
-                    if (!available)
-                        ImGui::EndDisabled();
-                }
-                ImGui::EndCombo();
-            }
-            if (!adaptive)
-                ImGui::EndDisabled();
-
-            if (!processing.MeshRemeshProjectToSurfaceAvailable)
-                ImGui::BeginDisabled();
-            ImGui::Checkbox(
-                "Project to surface##MeshRemesh",
-                remeshState->ProjectToSurface);
-            if (!processing.MeshRemeshProjectToSurfaceAvailable)
-                ImGui::EndDisabled();
-
-            const bool modeAvailable =
-                mode == SandboxEditorMeshRemeshMode::Uniform
-                    ? processing.MeshRemeshUniformAvailable
-                    : processing.MeshRemeshAdaptiveAvailable;
-            const bool sizingAvailable =
-                sizingLaw != SandboxEditorMeshRemeshSizingLaw::ErrorBoundedTaubin ||
-                processing.MeshRemeshErrorBoundedSizingAvailable;
-            const bool projectionAvailable =
-                !*remeshState->ProjectToSurface ||
-                processing.MeshRemeshProjectToSurfaceAvailable;
-            const bool canRun =
-                modeAvailable && sizingAvailable && projectionAvailable;
-            if (!canRun)
-                ImGui::BeginDisabled();
-            if (ImGui::Button("Remesh##MeshRemesh"))
-            {
-                *remeshState->LastResult =
-                    ApplySandboxEditorMeshRemeshCommand(
-                        context,
-                        SandboxEditorMeshRemeshCommand{
-                            .StableEntityId = model.SelectedStableId,
-                            .Mode = mode,
-                            .SizingLaw = sizingLaw,
-                            .Iterations = static_cast<std::uint32_t>(
-                                *remeshState->Iterations),
-                            .TargetEdgeLength = static_cast<double>(
-                                *remeshState->TargetEdgeLength),
-                            .ProjectToSurface =
-                                *remeshState->ProjectToSurface,
-                        });
-            }
-            if (!canRun)
-                ImGui::EndDisabled();
-
-            const std::optional<SandboxEditorMeshRemeshResult>& result =
-                remeshState->LastResult->has_value()
-                    ? *remeshState->LastResult
-                    : processing.LastMeshRemeshResult;
-            DrawMeshRemeshResultStatus(result);
-        }
-
-        void DrawMeshSubdivideResultStatus(
-            const std::optional<SandboxEditorMeshSubdivideResult>& lastResult)
-        {
-            if (!lastResult.has_value())
-            {
-                ImGui::TextDisabled("Last subdivide run: none");
-                return;
-            }
-
-            const SandboxEditorMeshSubdivideResult& result = *lastResult;
-            ImGui::Text("Last subdivide run: %s",
-                        DebugNameForSandboxEditorCommandStatus(result.Status));
-            ImGui::Text("Operator: %s",
-                        DebugNameForSandboxEditorMeshSubdivideOperator(result.Operator));
-            if (result.Succeeded())
-            {
-                ImGui::Text("Vertices: %zu -> %zu  faces: %zu -> %zu",
-                            result.InputVertexCount,
-                            result.OutputVertexCount,
-                            result.InputFaceCount,
-                            result.OutputFaceCount);
-                ImGui::Text("Iterations: %u / %u  Loop features: %s",
-                            result.IterationsPerformed,
-                            result.IterationsRequested,
-                            result.PreserveLoopFeatureEdges ? "yes" : "no");
-            }
-            if (!result.Message.empty())
-                ImGui::TextWrapped("%s", result.Message.c_str());
-        }
-
-        void DrawMeshSubdivideControls(
-            const SandboxEditorDomainWindowModel& model,
-            const SandboxEditorContext& context,
-            const SandboxEditorGeometryProcessingModel& processing,
-            MeshSubdivideUiState* subdivideState)
-        {
-            ImGui::SeparatorText("Subdivide");
-            if (!processing.MeshSubdivideAvailable)
-            {
-                ImGui::TextDisabled("Mesh subdivision is unavailable for this selection.");
-                return;
-            }
-            if (subdivideState == nullptr ||
-                subdivideState->LastResult == nullptr ||
-                subdivideState->Operator == nullptr ||
-                subdivideState->Iterations == nullptr ||
-                subdivideState->PreserveLoopFeatures == nullptr)
-            {
-                ImGui::TextDisabled("Mesh subdivision controls are not bound.");
-                return;
-            }
-
-            *subdivideState->Operator = std::clamp(
-                *subdivideState->Operator,
-                0,
-                static_cast<std::int32_t>(kMeshSubdivideOperators.size() - 1u));
-            *subdivideState->Iterations =
-                std::clamp(*subdivideState->Iterations, 1, 10);
-
-            const SandboxEditorMeshSubdivideOperator op =
-                MeshSubdivideOperatorFromIndex(*subdivideState->Operator);
-            if (ImGui::BeginCombo(
-                    "Operator##MeshSubdivide",
-                    DebugNameForSandboxEditorMeshSubdivideOperator(op)))
-            {
-                for (std::size_t i = 0u; i < kMeshSubdivideOperators.size(); ++i)
-                {
-                    const SandboxEditorMeshSubdivideOperator option =
-                        kMeshSubdivideOperators[i];
-                    const bool available =
-                        option == SandboxEditorMeshSubdivideOperator::Loop
-                            ? processing.MeshSubdivideLoopAvailable
-                            : option ==
-                                      SandboxEditorMeshSubdivideOperator::CatmullClark
-                                  ? processing.MeshSubdivideCatmullClarkAvailable
-                                  : processing.MeshSubdivideSqrt3Available;
-                    if (!available)
-                        ImGui::BeginDisabled();
-                    const bool selected =
-                        *subdivideState->Operator ==
-                        static_cast<std::int32_t>(i);
-                    if (ImGui::Selectable(
-                            DebugNameForSandboxEditorMeshSubdivideOperator(option),
-                            selected))
-                    {
-                        *subdivideState->Operator =
-                            static_cast<std::int32_t>(i);
-                    }
-                    if (selected)
-                        ImGui::SetItemDefaultFocus();
-                    if (!available)
-                        ImGui::EndDisabled();
-                }
-                ImGui::EndCombo();
-            }
-
-            ImGui::DragInt(
-                "Iterations##MeshSubdivide",
-                subdivideState->Iterations,
-                1.0f,
-                1,
-                10);
-
-            const bool loop =
-                op == SandboxEditorMeshSubdivideOperator::Loop;
-            if (!loop)
-                *subdivideState->PreserveLoopFeatures = false;
-            if (!loop ||
-                !processing.MeshSubdivideLoopFeatureEdgesAvailable)
-            {
-                ImGui::BeginDisabled();
-            }
-            ImGui::Checkbox(
-                "Preserve Loop features##MeshSubdivide",
-                subdivideState->PreserveLoopFeatures);
-            if (!loop ||
-                !processing.MeshSubdivideLoopFeatureEdgesAvailable)
-            {
-                ImGui::EndDisabled();
-            }
-
-            const bool operatorAvailable =
-                op == SandboxEditorMeshSubdivideOperator::Loop
-                    ? processing.MeshSubdivideLoopAvailable
-                    : op == SandboxEditorMeshSubdivideOperator::CatmullClark
-                          ? processing.MeshSubdivideCatmullClarkAvailable
-                          : processing.MeshSubdivideSqrt3Available;
-            const bool featureAvailable =
-                !*subdivideState->PreserveLoopFeatures ||
-                processing.MeshSubdivideLoopFeatureEdgesAvailable;
-            const bool canRun = operatorAvailable && featureAvailable;
-            if (!canRun)
-                ImGui::BeginDisabled();
-            if (ImGui::Button("Subdivide##MeshSubdivide"))
-            {
-                *subdivideState->LastResult =
-                    ApplySandboxEditorMeshSubdivideCommand(
-                        context,
-                        SandboxEditorMeshSubdivideCommand{
-                            .StableEntityId = model.SelectedStableId,
-                            .Operator = op,
-                            .Iterations = static_cast<std::uint32_t>(
-                                *subdivideState->Iterations),
-                            .PreserveLoopFeatureEdges =
-                                *subdivideState->PreserveLoopFeatures,
-                        });
-            }
-            if (!canRun)
-                ImGui::EndDisabled();
-
-            const std::optional<SandboxEditorMeshSubdivideResult>& result =
-                subdivideState->LastResult->has_value()
-                    ? *subdivideState->LastResult
-                    : processing.LastMeshSubdivideResult;
-            DrawMeshSubdivideResultStatus(result);
-        }
-
-        void DrawMeshSimplifyResultStatus(
-            const std::optional<SandboxEditorMeshSimplifyResult>& lastResult)
-        {
-            if (!lastResult.has_value())
-            {
-                ImGui::TextDisabled("Last simplify run: none");
-                return;
-            }
-
-            const SandboxEditorMeshSimplifyResult& result = *lastResult;
-            ImGui::Text("Last simplify run: %s",
-                        DebugNameForSandboxEditorCommandStatus(result.Status));
-            ImGui::Text("Metric: %s",
-                        DebugNameForSandboxEditorMeshSimplifyMetric(result.Metric));
-            if (result.Succeeded())
-            {
-                ImGui::Text("Vertices: %zu -> %zu  faces: %zu -> %zu",
-                            result.InputVertexCount,
-                            result.OutputVertexCount,
-                            result.InputFaceCount,
-                            result.OutputFaceCount);
-                ImGui::Text("Collapses: %zu  max error: %.6g",
-                            result.CollapseCount,
-                            result.MaxCollapseError);
-                ImGui::Text("Rejected: topology %zu  quality %zu",
-                            result.CollapsesRejectedTopology,
-                            result.CollapsesRejectedQuality);
-                ImGui::Text("Pinned: sharp features %zu  UV seams %zu",
-                            result.SharpFeatureVerticesPinned,
-                            result.SeamVerticesPinned);
-            }
-            if (!result.Message.empty())
-                ImGui::TextWrapped("%s", result.Message.c_str());
-        }
-
-        void DrawMeshSimplifyControls(
-            const SandboxEditorDomainWindowModel& model,
-            const SandboxEditorContext& context,
-            const SandboxEditorGeometryProcessingModel& processing,
-            MeshSimplifyUiState* simplifyState)
-        {
-            ImGui::SeparatorText("Simplify");
-            if (!processing.MeshSimplifyAvailable)
-            {
-                ImGui::TextDisabled("Mesh simplification is unavailable for this selection.");
-                return;
-            }
-            if (simplifyState == nullptr ||
-                simplifyState->LastResult == nullptr ||
-                simplifyState->Metric == nullptr ||
-                simplifyState->TargetFaces == nullptr ||
-                simplifyState->MaxError == nullptr ||
-                simplifyState->PreserveBoundary == nullptr ||
-                simplifyState->FeatureAngleThresholdDegrees == nullptr ||
-                simplifyState->NormalWeight == nullptr ||
-                simplifyState->BoundaryWeight == nullptr ||
-                simplifyState->CurvatureWeight == nullptr ||
-                simplifyState->PreserveSharpFeatures == nullptr ||
-                simplifyState->PreserveUvSeams == nullptr)
-            {
-                ImGui::TextDisabled("Mesh simplification controls are not bound.");
-                return;
-            }
-
-            *simplifyState->Metric = std::clamp(
-                *simplifyState->Metric,
-                0,
-                static_cast<std::int32_t>(kMeshSimplifyMetrics.size() - 1u));
-            *simplifyState->TargetFaces =
-                std::max(*simplifyState->TargetFaces, 0);
-            *simplifyState->MaxError =
-                std::max(*simplifyState->MaxError, 0.0f);
-
-            const SandboxEditorMeshSimplifyMetric metric =
-                MeshSimplifyMetricFromIndex(*simplifyState->Metric);
-            if (ImGui::BeginCombo(
-                    "Metric##MeshSimplify",
-                    DebugNameForSandboxEditorMeshSimplifyMetric(metric)))
-            {
-                for (std::size_t i = 0u; i < kMeshSimplifyMetrics.size(); ++i)
-                {
-                    const SandboxEditorMeshSimplifyMetric option =
-                        kMeshSimplifyMetrics[i];
-                    const bool selected =
-                        *simplifyState->Metric == static_cast<std::int32_t>(i);
-                    if (ImGui::Selectable(
-                            DebugNameForSandboxEditorMeshSimplifyMetric(option),
-                            selected))
-                    {
-                        *simplifyState->Metric = static_cast<std::int32_t>(i);
-                    }
-                    if (selected)
-                        ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndCombo();
-            }
-
-            ImGui::DragInt(
-                "Target faces##MeshSimplify",
-                simplifyState->TargetFaces,
-                1.0f,
-                0,
-                1000000000);
-            ImGui::DragFloat(
-                "Max error (0 = unlimited)##MeshSimplify",
-                simplifyState->MaxError,
-                0.001f,
-                0.0f,
-                1.0e30f,
-                "%.6g");
-            ImGui::Checkbox("Preserve boundary##MeshSimplify", simplifyState->PreserveBoundary);
-
-            const bool faQem =
-                metric == SandboxEditorMeshSimplifyMetric::FA_QEM;
-            if (!faQem)
-                ImGui::BeginDisabled();
-            if (ImGui::CollapsingHeader("Feature-aware (FA-QEM) weights##MeshSimplify"))
-            {
-                ImGui::DragFloat(
-                    "Feature angle (deg)##MeshSimplify",
-                    simplifyState->FeatureAngleThresholdDegrees,
-                    0.5f,
-                    0.0f,
-                    180.0f,
-                    "%.1f");
-                ImGui::DragFloat(
-                    "Normal weight##MeshSimplify",
-                    simplifyState->NormalWeight,
-                    0.01f,
-                    0.0f,
-                    1000.0f,
-                    "%.3f");
-                ImGui::DragFloat(
-                    "Boundary weight##MeshSimplify",
-                    simplifyState->BoundaryWeight,
-                    0.01f,
-                    0.0f,
-                    1000.0f,
-                    "%.3f");
-                ImGui::DragFloat(
-                    "Curvature weight##MeshSimplify",
-                    simplifyState->CurvatureWeight,
-                    0.01f,
-                    0.0f,
-                    1000.0f,
-                    "%.3f");
-                ImGui::Checkbox(
-                    "Preserve sharp features##MeshSimplify",
-                    simplifyState->PreserveSharpFeatures);
-                ImGui::Checkbox(
-                    "Preserve UV seams##MeshSimplify",
-                    simplifyState->PreserveUvSeams);
-            }
-            if (!faQem)
-                ImGui::EndDisabled();
-
-            const bool canRun =
-                *simplifyState->TargetFaces > 0 ||
-                *simplifyState->MaxError > 0.0f;
-            if (!canRun)
-                ImGui::BeginDisabled();
-            if (ImGui::Button("Simplify##MeshSimplify"))
-            {
-                *simplifyState->LastResult =
-                    ApplySandboxEditorMeshSimplifyCommand(
-                        context,
-                        SandboxEditorMeshSimplifyCommand{
-                            .StableEntityId = model.SelectedStableId,
-                            .Metric = metric,
-                            .TargetFaces = static_cast<std::size_t>(
-                                std::max(*simplifyState->TargetFaces, 0)),
-                            .MaxError = static_cast<double>(
-                                *simplifyState->MaxError),
-                            .PreserveBoundary =
-                                *simplifyState->PreserveBoundary,
-                            .FeatureAngleThresholdDegrees = static_cast<double>(
-                                *simplifyState->FeatureAngleThresholdDegrees),
-                            .NormalWeight = static_cast<double>(
-                                *simplifyState->NormalWeight),
-                            .BoundaryWeight = static_cast<double>(
-                                *simplifyState->BoundaryWeight),
-                            .CurvatureWeight = static_cast<double>(
-                                *simplifyState->CurvatureWeight),
-                            .PreserveSharpFeatures =
-                                *simplifyState->PreserveSharpFeatures,
-                            .PreserveUvSeams =
-                                *simplifyState->PreserveUvSeams,
-                        });
-            }
-            if (!canRun)
-                ImGui::EndDisabled();
-
-            const std::optional<SandboxEditorMeshSimplifyResult>& result =
-                simplifyState->LastResult->has_value()
-                    ? *simplifyState->LastResult
-                    : processing.LastMeshSimplifyResult;
-            DrawMeshSimplifyResultStatus(result);
-        }
-
-        [[nodiscard]] GN::AveragingMode MeshVertexNormalWeightingFromIndex(
-            const std::int32_t index) noexcept
-        {
-            const std::int32_t clamped = std::clamp(
-                index,
-                0,
-                static_cast<std::int32_t>(
-                    kMeshVertexNormalWeightings.size() - 1u));
-            return kMeshVertexNormalWeightings[static_cast<std::size_t>(clamped)];
-        }
-
-        void DrawMeshVertexNormalsResultStatus(
-            const std::optional<SandboxEditorMeshVertexNormalsResult>& lastResult)
-        {
-            if (!lastResult.has_value())
-            {
-                ImGui::TextDisabled("Last normals run: none");
-                return;
-            }
-
-            const SandboxEditorMeshVertexNormalsResult& result = *lastResult;
-            ImGui::Text("Last normals run: %s",
-                        DebugNameForSandboxEditorCommandStatus(result.Status));
-            ImGui::Text("Geometry status: %s",
-                        std::string(GN::DebugName(result.NormalStatus)).c_str());
-            ImGui::Text("Weighting: %s",
-                        std::string(GN::DebugName(result.Weighting)).c_str());
-            if (result.Succeeded())
-            {
-                ImGui::Text("Written: %zu / %zu  valid: %zu  fallback: %zu",
-                            result.WrittenCount,
-                            result.VertexSlotCount,
-                            result.ValidNormalVertexCount,
-                            result.FallbackVertexCount);
-                ImGui::Text("Faces: processed=%zu  degenerate=%zu  nonfinite=%zu  invalid=%zu",
-                            result.ProcessedFaceCount,
-                            result.DegenerateFaceCount,
-                            result.NonFiniteFaceCount,
-                            result.InvalidTopologyFaceCount);
-                ImGui::Text("Corners: degenerate=%zu  deleted faces=%zu  deleted vertices=%zu",
-                            result.DegenerateCornerCount,
-                            result.SkippedDeletedFaceCount,
-                            result.SkippedDeletedVertexCount);
-                ImGui::Text("Fallback repaired: %s",
-                            result.FallbackNormalWasRepaired ? "yes" : "no");
-            }
-            if (!result.Message.empty())
-                ImGui::TextWrapped("%s", result.Message.c_str());
-        }
-
-        void DrawMeshVertexNormalsControls(
-            const SandboxEditorDomainWindowModel& model,
-            const SandboxEditorContext& context,
-            const SandboxEditorGeometryProcessingModel& processing,
-            MeshVertexNormalsUiState* normalsState)
-        {
-            ImGui::SeparatorText("Normals");
-            if (!processing.MeshVertexNormalsAvailable)
-            {
-                ImGui::TextDisabled("Mesh vertex normals are unavailable for this selection.");
-                return;
-            }
-            if (normalsState == nullptr ||
-                normalsState->LastResult == nullptr ||
-                normalsState->Weighting == nullptr ||
-                normalsState->FallbackNormal == nullptr)
-            {
-                ImGui::TextDisabled("Mesh vertex-normal controls are not bound.");
-                return;
-            }
-
-            *normalsState->Weighting = std::clamp(
-                *normalsState->Weighting,
-                0,
-                static_cast<std::int32_t>(
-                    kMeshVertexNormalWeightings.size() - 1u));
-            const GN::AveragingMode currentWeighting =
-                MeshVertexNormalWeightingFromIndex(*normalsState->Weighting);
-            if (ImGui::BeginCombo(
-                    "Weighting##MeshVertexNormals",
-                    std::string(GN::DebugName(currentWeighting)).c_str()))
-            {
-                for (std::size_t i = 0u;
-                     i < kMeshVertexNormalWeightings.size();
-                     ++i)
-                {
-                    const bool selected =
-                        *normalsState->Weighting ==
-                        static_cast<std::int32_t>(i);
-                    if (ImGui::Selectable(
-                            std::string(
-                                GN::DebugName(kMeshVertexNormalWeightings[i]))
-                                .c_str(),
-                            selected))
-                    {
-                        *normalsState->Weighting =
-                            static_cast<std::int32_t>(i);
-                    }
-                    if (selected)
-                        ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndCombo();
-            }
-            ImGui::DragFloat3(
-                "Fallback normal##MeshVertexNormals",
-                &normalsState->FallbackNormal->x,
-                0.01f,
-                -1.0f,
-                1.0f);
-
-            if (ImGui::Button("Recompute##MeshVertexNormals"))
-            {
-                *normalsState->LastResult =
-                    ApplySandboxEditorMeshVertexNormalsCommand(
-                        context,
-                        SandboxEditorMeshVertexNormalsCommand{
-                            .StableEntityId = model.SelectedStableId,
-                            .Weighting = MeshVertexNormalWeightingFromIndex(
-                                *normalsState->Weighting),
-                            .FallbackNormal = *normalsState->FallbackNormal,
-                        });
-            }
-
-            const std::optional<SandboxEditorMeshVertexNormalsResult>& result =
-                normalsState->LastResult->has_value()
-                    ? *normalsState->LastResult
-                    : processing.LastMeshVertexNormalsResult;
-            DrawMeshVertexNormalsResultStatus(result);
-        }
-
-        void DrawGraphVertexNormalsResultStatus(
-            const std::optional<SandboxEditorGraphVertexNormalsResult>& lastResult)
-        {
-            if (!lastResult.has_value())
-            {
-                ImGui::TextDisabled("Last normals run: none");
-                return;
-            }
-
-            const SandboxEditorGraphVertexNormalsResult& result = *lastResult;
-            ImGui::Text("Last normals run: %s",
-                        DebugNameForSandboxEditorCommandStatus(result.Status));
-            ImGui::Text("Geometry status: %s",
-                        std::string(GraphNormals::DebugName(result.NormalStatus)).c_str());
-            if (result.Succeeded())
-            {
-                ImGui::Text("Written: %zu / %zu  valid: %zu  fallback: %zu",
-                            result.WrittenCount,
-                            result.VertexSlotCount,
-                            result.ValidNormalVertexCount,
-                            result.FallbackVertexCount);
-                ImGui::Text("Edges: %zu  invalid=%zu  deleted=%zu",
-                            result.EdgeSlotCount,
-                            result.InvalidEdgeCount,
-                            result.SkippedDeletedEdgeCount);
-                ImGui::Text("Neighborhoods: isolated=%zu  degree1=%zu  collinear=%zu",
-                            result.IsolatedVertexCount,
-                            result.DegreeOneVertexCount,
-                            result.CollinearNeighborhoodCount);
-                ImGui::Text("Positions: duplicate=%zu  nonfinite=%zu",
-                            result.DuplicatePositionCount,
-                            result.NonFinitePositionCount);
-                ImGui::Text("Fallback repaired: %s",
-                            result.FallbackNormalWasRepaired ? "yes" : "no");
-            }
-            if (!result.Message.empty())
-                ImGui::TextWrapped("%s", result.Message.c_str());
-        }
-
-        void DrawGraphVertexNormalsControls(
-            const SandboxEditorDomainWindowModel& model,
-            const SandboxEditorContext& context,
-            const SandboxEditorGeometryProcessingModel& processing,
-            GraphVertexNormalsUiState* normalsState)
-        {
-            ImGui::SeparatorText("Normals");
-            if (!processing.GraphVertexNormalsAvailable)
-            {
-                ImGui::TextDisabled("Graph vertex normals are unavailable for this selection.");
-                return;
-            }
-            if (normalsState == nullptr ||
-                normalsState->LastResult == nullptr ||
-                normalsState->FallbackNormal == nullptr ||
-                normalsState->OrientTowardFallback == nullptr)
-            {
-                ImGui::TextDisabled("Graph vertex-normal controls are not bound.");
-                return;
-            }
-
-            ImGui::DragFloat3(
-                "Fallback normal##GraphVertexNormals",
-                &normalsState->FallbackNormal->x,
-                0.01f,
-                -1.0f,
-                1.0f);
-            ImGui::Checkbox("Orient toward fallback##GraphVertexNormals",
-                            normalsState->OrientTowardFallback);
-
-            if (ImGui::Button("Recompute##GraphVertexNormals"))
-            {
-                *normalsState->LastResult =
-                    ApplySandboxEditorGraphVertexNormalsCommand(
-                        context,
-                        SandboxEditorGraphVertexNormalsCommand{
-                            .StableEntityId = model.SelectedStableId,
-                            .FallbackNormal = *normalsState->FallbackNormal,
-                            .OrientTowardFallback =
-                                *normalsState->OrientTowardFallback,
-                        });
-            }
-
-            const std::optional<SandboxEditorGraphVertexNormalsResult>& result =
-                normalsState->LastResult->has_value()
-                    ? *normalsState->LastResult
-                    : processing.LastGraphVertexNormalsResult;
-            DrawGraphVertexNormalsResultStatus(result);
-        }
-
-        [[nodiscard]] PointNormals::OrientationMode
-        PointCloudNormalOrientationFromIndex(const std::int32_t index) noexcept
-        {
-            const std::int32_t clamped = std::clamp(
-                index,
-                0,
-                static_cast<std::int32_t>(
-                    kPointCloudNormalOrientations.size() - 1u));
-            return kPointCloudNormalOrientations[
-                static_cast<std::size_t>(clamped)];
-        }
-
-        void DrawPointCloudVertexNormalsResultStatus(
-            const std::optional<SandboxEditorPointCloudVertexNormalsResult>& lastResult)
-        {
-            if (!lastResult.has_value())
-            {
-                ImGui::TextDisabled("Last normals run: none");
-                return;
-            }
-
-            const SandboxEditorPointCloudVertexNormalsResult& result =
-                *lastResult;
-            ImGui::Text("Last normals run: %s",
-                        DebugNameForSandboxEditorCommandStatus(result.Status));
-            ImGui::Text("Geometry status: %s",
-                        std::string(PointNormals::DebugName(result.NormalStatus)).c_str());
-            ImGui::Text("Backend: %s  orientation: %s",
-                        std::string(PointNormals::DebugName(result.Backend)).c_str(),
-                        std::string(PointNormals::DebugName(result.Orientation)).c_str());
-            if (result.Succeeded())
-            {
-                ImGui::Text("Written: %zu / %zu  finite: %zu  valid: %zu",
-                            result.WrittenCount,
-                            result.PointSlotCount,
-                            result.FinitePointCount,
-                            result.ValidNormalPointCount);
-                ImGui::Text("Fallback: %zu  tooFew=%zu  degenerate=%zu  collinear=%zu",
-                            result.FallbackPointCount,
-                            result.TooFewNeighborCount,
-                            result.DegenerateNeighborhoodCount,
-                            result.CollinearNeighborhoodCount);
-                ImGui::Text("Positions: duplicate=%zu  nonfinite=%zu  deleted=%zu",
-                            result.DuplicatePositionCount,
-                            result.NonFinitePointCount,
-                            result.SkippedDeletedPointCount);
-                ImGui::Text("Queries: failures=%zu  visited=%zu  distances=%zu",
-                            result.SpatialQueryFailureCount,
-                            result.KNNVisitedNodeCount,
-                            result.KNNDistanceEvaluationCount);
-                ImGui::Text("Flipped: %zu  fallback repaired: %s",
-                            result.FlippedOrientationCount,
-                            result.FallbackNormalWasRepaired ? "yes" : "no");
-            }
-            if (!result.Message.empty())
-                ImGui::TextWrapped("%s", result.Message.c_str());
-        }
-
-        void DrawPointCloudVertexNormalsControls(
-            const SandboxEditorDomainWindowModel& model,
-            const SandboxEditorContext& context,
-            const SandboxEditorGeometryProcessingModel& processing,
-            PointCloudVertexNormalsUiState* normalsState)
-        {
-            ImGui::SeparatorText("Normals");
-            if (!processing.PointCloudVertexNormalsAvailable)
-            {
-                ImGui::TextDisabled("Point-cloud vertex normals are unavailable for this selection.");
-                return;
-            }
-            if (normalsState == nullptr ||
-                normalsState->LastResult == nullptr ||
-                normalsState->KNeighbors == nullptr ||
-                normalsState->MinimumNeighbors == nullptr ||
-                normalsState->UseRadiusSearch == nullptr ||
-                normalsState->Radius == nullptr ||
-                normalsState->Orientation == nullptr ||
-                normalsState->FallbackNormal == nullptr)
-            {
-                ImGui::TextDisabled("Point-cloud vertex-normal controls are not bound.");
-                return;
-            }
-
-            *normalsState->KNeighbors =
-                std::clamp(*normalsState->KNeighbors, 1, 512);
-            *normalsState->MinimumNeighbors =
-                std::clamp(*normalsState->MinimumNeighbors, 1, 512);
-            *normalsState->Orientation = std::clamp(
-                *normalsState->Orientation,
-                0,
-                static_cast<std::int32_t>(
-                    kPointCloudNormalOrientations.size() - 1u));
-            ImGui::DragInt("K##PointCloudVertexNormals", normalsState->KNeighbors, 1.0f, 1, 512);
-            ImGui::DragInt(
-                "Minimum neighbors##PointCloudVertexNormals",
-                normalsState->MinimumNeighbors,
-                1.0f,
-                1,
-                512);
-            ImGui::Checkbox("Use radius##PointCloudVertexNormals", normalsState->UseRadiusSearch);
-            if (*normalsState->UseRadiusSearch)
-            {
-                *normalsState->Radius =
-                    std::max(*normalsState->Radius, 0.001f);
-                ImGui::DragFloat(
-                    "Radius##PointCloudVertexNormals",
-                    normalsState->Radius,
-                    0.01f,
-                    0.001f,
-                    1000.0f);
-            }
-
-            const PointNormals::OrientationMode orientation =
-                PointCloudNormalOrientationFromIndex(
-                    *normalsState->Orientation);
-            if (ImGui::BeginCombo(
-                    "Orientation##PointCloudVertexNormals",
-                    std::string(PointNormals::DebugName(orientation)).c_str()))
-            {
-                for (std::size_t i = 0u;
-                     i < kPointCloudNormalOrientations.size();
-                     ++i)
-                {
-                    const bool selected =
-                        *normalsState->Orientation ==
-                        static_cast<std::int32_t>(i);
-                    if (ImGui::Selectable(
-                            std::string(
-                                PointNormals::DebugName(
-                                    kPointCloudNormalOrientations[i]))
-                                .c_str(),
-                            selected))
-                    {
-                        *normalsState->Orientation =
-                            static_cast<std::int32_t>(i);
-                    }
-                    if (selected)
-                        ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndCombo();
-            }
-            ImGui::DragFloat3(
-                "Fallback normal##PointCloudVertexNormals",
-                &normalsState->FallbackNormal->x,
-                0.01f,
-                -1.0f,
-                1.0f);
-
-            if (ImGui::Button("Recompute##PointCloudVertexNormals"))
-            {
-                *normalsState->LastResult =
-                    ApplySandboxEditorPointCloudVertexNormalsCommand(
-                        context,
-                        SandboxEditorPointCloudVertexNormalsCommand{
-                            .StableEntityId = model.SelectedStableId,
-                            .KNeighbors = static_cast<std::uint32_t>(
-                                *normalsState->KNeighbors),
-                            .MinimumNeighbors = static_cast<std::uint32_t>(
-                                *normalsState->MinimumNeighbors),
-                            .UseRadiusSearch =
-                                *normalsState->UseRadiusSearch,
-                            .Radius = *normalsState->Radius,
-                            .Orientation =
-                                PointCloudNormalOrientationFromIndex(
-                                    *normalsState->Orientation),
-                            .FallbackNormal =
-                                *normalsState->FallbackNormal,
-                        });
-            }
-
-            const std::optional<SandboxEditorPointCloudVertexNormalsResult>&
-                result = normalsState->LastResult->has_value()
-                    ? *normalsState->LastResult
-                    : processing.LastPointCloudVertexNormalsResult;
-            DrawPointCloudVertexNormalsResultStatus(result);
-        }
-
         void DrawPointCloudOutlierRemovalResultStatus(
             const std::optional<SandboxEditorPointCloudOutlierRemovalResult>&
                 lastResult)
@@ -14446,15 +12886,6 @@ namespace Extrinsic::Runtime
         void DrawDomainProcessingWindow(
             const SandboxEditorDomainWindowModel& model,
             const SandboxEditorContext& context,
-            const DomainWindowSection section,
-            MeshDenoiseUiState* denoiseState,
-            MeshCurvatureUiState* curvatureState,
-            MeshRemeshUiState* remeshState,
-            MeshSubdivideUiState* subdivideState,
-            MeshSimplifyUiState* simplifyState,
-            MeshVertexNormalsUiState* meshNormalsState,
-            GraphVertexNormalsUiState* graphNormalsState,
-            PointCloudVertexNormalsUiState* pointCloudNormalsState,
             PointCloudOutlierRemovalUiState* pointCloudOutlierState)
         {
             DrawDomainWindowHeader(model);
@@ -14468,78 +12899,8 @@ namespace Extrinsic::Runtime
                 return;
             }
 
-            switch (section)
-            {
-            case DomainWindowSection::ProcessingDenoise:
-                DrawMeshDenoiseControls(
-                    model,
-                    context,
-                    processing,
-                    denoiseState);
-                break;
-            case DomainWindowSection::ProcessingCurvature:
-                DrawMeshCurvatureControls(
-                    model,
-                    context,
-                    processing,
-                    curvatureState);
-                break;
-            case DomainWindowSection::ProcessingRemesh:
-                DrawMeshRemeshControls(
-                    model,
-                    context,
-                    processing,
-                    remeshState);
-                break;
-            case DomainWindowSection::ProcessingSubdivide:
-                DrawMeshSubdivideControls(
-                    model,
-                    context,
-                    processing,
-                    subdivideState);
-                break;
-            case DomainWindowSection::ProcessingSimplify:
-                DrawMeshSimplifyControls(
-                    model,
-                    context,
-                    processing,
-                    simplifyState);
-                break;
-            case DomainWindowSection::ProcessingMeshVertexNormals:
-                DrawMeshVertexNormalsControls(
-                    model,
-                    context,
-                    processing,
-                    meshNormalsState);
-                break;
-            case DomainWindowSection::ProcessingGraphVertexNormals:
-                DrawGraphVertexNormalsControls(
-                    model,
-                    context,
-                    processing,
-                    graphNormalsState);
-                break;
-            case DomainWindowSection::ProcessingPointCloudVertexNormals:
-                DrawPointCloudVertexNormalsControls(
-                    model,
-                    context,
-                    processing,
-                    pointCloudNormalsState);
-                break;
-            case DomainWindowSection::ProcessingPointCloudOutlierRemoval:
-                DrawPointCloudOutlierRemovalControls(
-                    model,
-                    context,
-                    processing,
-                    pointCloudOutlierState);
-                break;
-            case DomainWindowSection::Render:
-            case DomainWindowSection::Properties:
-            case DomainWindowSection::Selection:
-            case DomainWindowSection::Count:
-                ImGui::TextDisabled("No focused processing controls are available.");
-                break;
-            }
+            DrawPointCloudOutlierRemovalControls(
+                model, context, processing, pointCloudOutlierState);
         }
 
         void DrawOneDomainWindow(
@@ -14549,14 +12910,6 @@ namespace Extrinsic::Runtime
             std::array<bool, Detail::kSandboxEditorDomainWindowCount>&
                 domainWindowOpen,
             std::array<std::optional<SandboxEditorDomainWindowModel>, 3>& domainModelCache,
-            MeshDenoiseUiState* denoiseState,
-            MeshCurvatureUiState* curvatureState,
-            MeshRemeshUiState* remeshState,
-            MeshSubdivideUiState* subdivideState,
-            MeshSimplifyUiState* simplifyState,
-            MeshVertexNormalsUiState* normalsState,
-            GraphVertexNormalsUiState* graphNormalsState,
-            PointCloudVertexNormalsUiState* pointCloudNormalsState,
             PointCloudOutlierRemovalUiState* pointCloudOutlierState,
             TextureBakeUiState* textureBakeState)
         {
@@ -14589,27 +12942,10 @@ namespace Extrinsic::Runtime
                 case DomainWindowSection::Selection:
                     DrawDomainSelectionWindow(model);
                     break;
-                case DomainWindowSection::ProcessingDenoise:
-                case DomainWindowSection::ProcessingCurvature:
-                case DomainWindowSection::ProcessingRemesh:
-                case DomainWindowSection::ProcessingSubdivide:
-                case DomainWindowSection::ProcessingSimplify:
-                case DomainWindowSection::ProcessingMeshVertexNormals:
-                case DomainWindowSection::ProcessingGraphVertexNormals:
-                case DomainWindowSection::ProcessingPointCloudVertexNormals:
                 case DomainWindowSection::ProcessingPointCloudOutlierRemoval:
                     DrawDomainProcessingWindow(
                         model,
                         context,
-                        section,
-                        denoiseState,
-                        curvatureState,
-                        remeshState,
-                        subdivideState,
-                        simplifyState,
-                        normalsState,
-                        graphNormalsState,
-                        pointCloudNormalsState,
                         pointCloudOutlierState);
                     break;
                 case DomainWindowSection::Count:
@@ -14623,14 +12959,6 @@ namespace Extrinsic::Runtime
             const SandboxEditorContext* context,
             std::array<bool, Detail::kSandboxEditorDomainWindowCount>*
                 domainWindowOpen,
-            MeshDenoiseUiState* denoiseState,
-            MeshCurvatureUiState* curvatureState,
-            MeshRemeshUiState* remeshState,
-            MeshSubdivideUiState* subdivideState,
-            MeshSimplifyUiState* simplifyState,
-            MeshVertexNormalsUiState* normalsState,
-            GraphVertexNormalsUiState* graphNormalsState,
-            PointCloudVertexNormalsUiState* pointCloudNormalsState,
             PointCloudOutlierRemovalUiState* pointCloudOutlierState,
             TextureBakeUiState* textureBakeState)
         {
@@ -14644,18 +12972,10 @@ namespace Extrinsic::Runtime
                 SandboxEditorDomainWindowKind::Graph,
                 SandboxEditorDomainWindowKind::Mesh,
             };
-            constexpr std::array<DomainWindowSection, 12> kSections{
+            constexpr std::array<DomainWindowSection, 4> kSections{
                 DomainWindowSection::Render,
                 DomainWindowSection::Properties,
                 DomainWindowSection::Selection,
-                DomainWindowSection::ProcessingDenoise,
-                DomainWindowSection::ProcessingCurvature,
-                DomainWindowSection::ProcessingRemesh,
-                DomainWindowSection::ProcessingSubdivide,
-                DomainWindowSection::ProcessingSimplify,
-                DomainWindowSection::ProcessingMeshVertexNormals,
-                DomainWindowSection::ProcessingGraphVertexNormals,
-                DomainWindowSection::ProcessingPointCloudVertexNormals,
                 DomainWindowSection::ProcessingPointCloudOutlierRemoval,
             };
             for (const SandboxEditorDomainWindowKind kind : kKinds)
@@ -14664,8 +12984,7 @@ namespace Extrinsic::Runtime
                 {
                     const bool registryOwnedExemplar =
                         kind == SandboxEditorDomainWindowKind::Mesh &&
-                        (section == DomainWindowSection::Render ||
-                         section == DomainWindowSection::ProcessingSimplify);
+                        section == DomainWindowSection::Render;
                     if (registryOwnedExemplar)
                         continue;
                     DrawOneDomainWindow(
@@ -14674,14 +12993,6 @@ namespace Extrinsic::Runtime
                         section,
                         *domainWindowOpen,
                         domainModelCache,
-                        denoiseState,
-                        curvatureState,
-                        remeshState,
-                        subdivideState,
-                        simplifyState,
-                        normalsState,
-                        graphNormalsState,
-                        pointCloudNormalsState,
                         pointCloudOutlierState,
                         textureBakeState);
                 }
@@ -15056,181 +13367,6 @@ namespace Extrinsic::Runtime
             }
         }
 
-        void DrawRegistrationResultStatus(
-            const std::optional<SandboxEditorRegistrationResult>& lastResult)
-        {
-            if (!lastResult.has_value())
-            {
-                ImGui::TextDisabled("Last ICP run: none");
-                return;
-            }
-            const SandboxEditorRegistrationResult& result = *lastResult;
-            ImGui::Text("Last ICP run: %s",
-                        DebugNameForSandboxEditorCommandStatus(result.Status));
-            if (result.Succeeded() && result.HasResult)
-            {
-                ImGui::Text("Variant: %s  points: %zu -> %zu",
-                            DebugNameForSandboxEditorICPVariant(result.Variant),
-                            result.SourcePointCount,
-                            result.TargetPointCount);
-                ImGui::Text("Iterations: %zu  final RMSE: %.6g  converged: %s",
-                            result.IterationsPerformed,
-                            result.FinalRMSE,
-                            result.Converged ? "yes" : "no");
-                ImGui::Text("Trajectory step: %zu / %zu  inliers: %zu",
-                            result.AppliedStep,
-                            result.TrajectoryLength,
-                            result.FinalInlierCount);
-            }
-            if (!result.Message.empty())
-                ImGui::TextWrapped("%s", result.Message.c_str());
-        }
-
-        void DrawRegistrationPanelContent(
-            const SandboxEditorContext* context,
-            RegistrationUiState* state)
-        {
-            if (context == nullptr || state == nullptr ||
-                state->LastResult == nullptr || state->Variant == nullptr ||
-                state->MaxIterations == nullptr ||
-                state->MaxCorrespondenceDistance == nullptr ||
-                state->InlierRatio == nullptr ||
-                state->TrajectoryStep == nullptr ||
-                state->SwapSourceTarget == nullptr)
-            {
-                ImGui::TextDisabled("ICP registration controls are not bound.");
-                return;
-            }
-
-            ImGui::TextWrapped(
-                "Aligns a source point cloud onto a target point cloud with ICP "
-                "and drives the source entity Transform along the convergence "
-                "trajectory.");
-
-            std::vector<std::uint32_t> selected{};
-            if (context->Selection != nullptr)
-            {
-                for (const std::uint32_t id :
-                     context->Selection->SelectedStableIds())
-                {
-                    selected.push_back(id);
-                }
-            }
-            if (selected.size() < 2u)
-            {
-                ImGui::TextDisabled(
-                    "Select two point-cloud entities (source + target) to register.");
-                DrawRegistrationResultStatus(*state->LastResult);
-                return;
-            }
-
-            const std::uint32_t sourceId =
-                selected[*state->SwapSourceTarget ? 1u : 0u];
-            const std::uint32_t targetId =
-                selected[*state->SwapSourceTarget ? 0u : 1u];
-            ImGui::Text("Source entity: %u", sourceId);
-            ImGui::Text("Target entity: %u", targetId);
-            ImGui::Checkbox("Swap source / target##ICP",
-                            state->SwapSourceTarget);
-
-            *state->Variant = std::clamp(
-                *state->Variant,
-                0,
-                static_cast<std::int32_t>(
-                    kSandboxEditorICPVariants.size() - 1u));
-            const SandboxEditorICPVariant variant =
-                SandboxEditorICPVariantFromIndex(*state->Variant);
-            if (ImGui::BeginCombo(
-                    "Variant##ICP",
-                    DebugNameForSandboxEditorICPVariant(variant)))
-            {
-                for (std::size_t i = 0u;
-                     i < kSandboxEditorICPVariants.size(); ++i)
-                {
-                    const SandboxEditorICPVariant option =
-                        kSandboxEditorICPVariants[i];
-                    const bool selectedOption =
-                        *state->Variant == static_cast<std::int32_t>(i);
-                    std::string optionLabel =
-                        DebugNameForSandboxEditorICPVariant(option);
-                    optionLabel += "##ICPVariant";
-                    optionLabel += std::to_string(i);
-                    if (ImGui::Selectable(
-                            optionLabel.c_str(),
-                            selectedOption))
-                    {
-                        *state->Variant = static_cast<std::int32_t>(i);
-                    }
-                    if (selectedOption)
-                        ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndCombo();
-            }
-
-            *state->MaxIterations = std::clamp(*state->MaxIterations, 1, 1000);
-            ImGui::DragInt("Max iterations##ICP",
-                           state->MaxIterations,
-                           1.0f,
-                           1,
-                           1000);
-            *state->MaxCorrespondenceDistance =
-                std::max(*state->MaxCorrespondenceDistance, 0.0f);
-            ImGui::DragFloat("Max correspondence distance (0 = unlimited)##ICP",
-                             state->MaxCorrespondenceDistance, 0.01f, 0.0f,
-                             1.0e6f, "%.4f");
-            *state->InlierRatio = std::clamp(*state->InlierRatio, 0.01f, 1.0f);
-            ImGui::DragFloat("Inlier ratio##ICP",
-                             state->InlierRatio,
-                             0.01f,
-                             0.01f,
-                             1.0f,
-                             "%.2f");
-
-            const std::size_t trajectoryLength =
-                state->LastResult->has_value()
-                    ? (*state->LastResult)->TrajectoryLength
-                    : 0u;
-            bool run = ImGui::Button("Run ICP##ICP");
-            // Full-convergence request: MaxIterations >= the completed iteration
-            // count, so TrajectoryPose clamps to the final pose.
-            std::size_t requestedStep =
-                static_cast<std::size_t>(*state->MaxIterations);
-            if (trajectoryLength > 0u)
-            {
-                *state->TrajectoryStep = std::clamp(
-                    *state->TrajectoryStep,
-                    0,
-                    static_cast<std::int32_t>(trajectoryLength));
-                ImGui::SliderInt("Trajectory step##ICP", state->TrajectoryStep, 0,
-                                 static_cast<int>(trajectoryLength));
-                if (ImGui::IsItemDeactivatedAfterEdit())
-                {
-                    run = true;
-                    requestedStep = static_cast<std::size_t>(
-                        std::max(*state->TrajectoryStep, 0));
-                }
-            }
-            if (run)
-            {
-                *state->LastResult = ApplySandboxEditorRegistrationCommand(
-                    *context,
-                    SandboxEditorRegistrationCommand{
-                        .SourceStableEntityId = sourceId,
-                        .TargetStableEntityId = targetId,
-                        .Variant = variant,
-                        .MaxIterations =
-                            static_cast<std::uint32_t>(*state->MaxIterations),
-                        .MaxCorrespondenceDistance = static_cast<double>(
-                            *state->MaxCorrespondenceDistance),
-                        .InlierRatio =
-                            static_cast<double>(*state->InlierRatio),
-                        .TrajectoryStep = requestedStep,
-                    });
-            }
-
-            DrawRegistrationResultStatus(*state->LastResult);
-        }
-
         void DrawPanelFrame(
             const SandboxEditorPanelFrame& frame,
             const SandboxEditorContext* context,
@@ -15244,43 +13380,18 @@ namespace Extrinsic::Runtime
                 panelWindowOpen,
             std::array<bool, Detail::kSandboxEditorDomainWindowCount>*
                 domainWindowOpen,
-            MeshDenoiseUiState* denoiseState,
-            MeshCurvatureUiState* curvatureState,
-            MeshRemeshUiState* remeshState,
-            MeshSubdivideUiState* subdivideState,
-            MeshSimplifyUiState* simplifyState,
-            MeshVertexNormalsUiState* normalsState,
-            GraphVertexNormalsUiState* graphNormalsState,
-            PointCloudVertexNormalsUiState* pointCloudNormalsState,
             PointCloudOutlierRemovalUiState* pointCloudOutlierState,
             TextureBakeUiState* textureBakeState,
-            RegistrationUiState* registrationState,
             EditorWindowRegistry* windowRegistry)
         {
             DrawMainMenuBar(panelWindowOpen, domainWindowOpen, windowRegistry);
             DrawDomainWindows(
                 context,
                 domainWindowOpen,
-                denoiseState,
-                curvatureState,
-                remeshState,
-                subdivideState,
-                simplifyState,
-                normalsState,
-                graphNormalsState,
-                pointCloudNormalsState,
                 pointCloudOutlierState,
                 textureBakeState);
             if (windowRegistry != nullptr)
                 (void)windowRegistry->DrawOpenWindows();
-
-            if (BeginPanelWindow(panelWindowOpen,
-                                 SandboxEditorPanelWindowKind::Registration,
-                                 ImVec2(360.0f, 320.0f)))
-            {
-                DrawRegistrationPanelContent(context, registrationState);
-                ImGui::End();
-            }
 
             if (BeginPanelWindow(panelWindowOpen,
                                  SandboxEditorPanelWindowKind::Shell,
@@ -21276,28 +19387,20 @@ namespace Extrinsic::Runtime
 
     void DrawSandboxEditorPanelFrame(const SandboxEditorPanelFrame& frame)
     {
-        DrawPanelFrame(frame,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr);
+        DrawPanelFrame(
+            frame,
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr);
     }
 
     SandboxEditorUi::SandboxEditorUi()
@@ -21350,23 +19453,6 @@ namespace Extrinsic::Runtime
                     [this](bool& open)
                     {
                         DrawRegisteredMeshAppearance(open);
-                    },
-                .OpenStateChanged =
-                    [this](bool)
-                    {
-                        m_RegisteredMeshModelCache.reset();
-                    },
-            });
-        m_MeshSimplifyWindow = RegisterEditorWindow(
-            EditorWindowDescriptor{
-                .Id = "mesh.processing.simplify",
-                .MenuPath = {"Mesh", "Processing"},
-                .Title = "Simplify",
-                .OpenByDefault = false,
-                .Draw =
-                    [this](bool& open)
-                    {
-                        DrawRegisteredMeshSimplify(open);
                     },
                 .OpenStateChanged =
                     [this](bool)
@@ -21434,51 +19520,6 @@ namespace Extrinsic::Runtime
                         Geometry::ConstPropertySet(*properties),
                         m_MeshPropertyPlotState);
                 }
-            }
-        }
-        ImGui::End();
-    }
-
-    void SandboxEditorUi::DrawRegisteredMeshSimplify(bool& open)
-    {
-        if (!open || m_ActiveEditorContext == nullptr)
-            return;
-
-        ImGui::SetNextWindowSize(ImVec2(340.0f, 300.0f), ImGuiCond_FirstUseEver);
-        if (ImGui::Begin("Mesh / Processing / Simplify", &open))
-        {
-            const SandboxEditorDomainWindowModel* model =
-                GetRegisteredMeshWindowModel();
-            if (model != nullptr)
-            {
-                MeshSimplifyUiState simplifyState{
-                    .LastResult = &m_LastMeshSimplifyResult,
-                    .Metric = &m_MeshSimplifyMetric,
-                    .TargetFaces = &m_MeshSimplifyTargetFaces,
-                    .MaxError = &m_MeshSimplifyMaxError,
-                    .PreserveBoundary = &m_MeshSimplifyPreserveBoundary,
-                    .FeatureAngleThresholdDegrees =
-                        &m_MeshSimplifyFeatureAngleThresholdDegrees,
-                    .NormalWeight = &m_MeshSimplifyNormalWeight,
-                    .BoundaryWeight = &m_MeshSimplifyBoundaryWeight,
-                    .CurvatureWeight = &m_MeshSimplifyCurvatureWeight,
-                    .PreserveSharpFeatures =
-                        &m_MeshSimplifyPreserveSharpFeatures,
-                    .PreserveUvSeams = &m_MeshSimplifyPreserveUvSeams,
-                };
-                DrawDomainProcessingWindow(
-                    *model,
-                    *m_ActiveEditorContext,
-                    DomainWindowSection::ProcessingSimplify,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    &simplifyState,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr);
             }
         }
         ImGui::End();
@@ -21773,76 +19814,6 @@ namespace Extrinsic::Runtime
                     BuildModelRequestFromOpenPanels(&m_PanelWindowOpen);
                 m_LastFrame = BuildSandboxEditorPanelFrame(context, modelRequest);
                 context.ModelBuildStats = &m_LastFrame.ModelBuildStats;
-                MeshDenoiseUiState denoiseState{
-                    .LastResult = &m_LastMeshDenoiseResult,
-                    .Stage = &m_MeshDenoiseStage,
-                    .NormalIterations =
-                        &m_MeshDenoiseNormalIterations,
-                    .VertexIterations =
-                        &m_MeshDenoiseVertexIterations,
-                    .SigmaSpatial = &m_MeshDenoiseSigmaSpatial,
-                    .SigmaRange = &m_MeshDenoiseSigmaRange,
-                    .PreserveBoundary =
-                        &m_MeshDenoisePreserveBoundary,
-                };
-                MeshCurvatureUiState curvatureState{
-                    .LastResult = &m_LastMeshCurvatureResult,
-                    .Output = &m_MeshCurvatureOutput,
-                    .PublishPrincipalDirections =
-                        &m_MeshCurvaturePublishDirections,
-                };
-                MeshRemeshUiState remeshState{
-                    .LastResult = &m_LastMeshRemeshResult,
-                    .Mode = &m_MeshRemeshMode,
-                    .SizingLaw = &m_MeshRemeshSizingLaw,
-                    .Iterations = &m_MeshRemeshIterations,
-                    .TargetEdgeLength = &m_MeshRemeshTargetEdgeLength,
-                    .ProjectToSurface = &m_MeshRemeshProjectToSurface,
-                };
-                MeshSubdivideUiState subdivideState{
-                    .LastResult = &m_LastMeshSubdivideResult,
-                    .Operator = &m_MeshSubdivideOperator,
-                    .Iterations = &m_MeshSubdivideIterations,
-                    .PreserveLoopFeatures =
-                        &m_MeshSubdividePreserveLoopFeatures,
-                };
-                MeshSimplifyUiState simplifyState{
-                    .LastResult = &m_LastMeshSimplifyResult,
-                    .Metric = &m_MeshSimplifyMetric,
-                    .TargetFaces = &m_MeshSimplifyTargetFaces,
-                    .MaxError = &m_MeshSimplifyMaxError,
-                    .PreserveBoundary = &m_MeshSimplifyPreserveBoundary,
-                    .FeatureAngleThresholdDegrees =
-                        &m_MeshSimplifyFeatureAngleThresholdDegrees,
-                    .NormalWeight = &m_MeshSimplifyNormalWeight,
-                    .BoundaryWeight = &m_MeshSimplifyBoundaryWeight,
-                    .CurvatureWeight = &m_MeshSimplifyCurvatureWeight,
-                    .PreserveSharpFeatures =
-                        &m_MeshSimplifyPreserveSharpFeatures,
-                    .PreserveUvSeams = &m_MeshSimplifyPreserveUvSeams,
-                };
-                MeshVertexNormalsUiState normalsState{
-                    .LastResult = &m_LastMeshVertexNormalsResult,
-                    .Weighting = &m_MeshVertexNormalsWeighting,
-                    .FallbackNormal = &m_MeshVertexNormalsFallback,
-                };
-                GraphVertexNormalsUiState graphNormalsState{
-                    .LastResult = &m_LastGraphVertexNormalsResult,
-                    .FallbackNormal = &m_GraphVertexNormalsFallback,
-                    .OrientTowardFallback =
-                        &m_GraphVertexNormalsOrientTowardFallback,
-                };
-                PointCloudVertexNormalsUiState pointCloudNormalsState{
-                    .LastResult = &m_LastPointCloudVertexNormalsResult,
-                    .KNeighbors = &m_PointCloudVertexNormalsK,
-                    .MinimumNeighbors =
-                        &m_PointCloudVertexNormalsMinimumNeighbors,
-                    .UseRadiusSearch =
-                        &m_PointCloudVertexNormalsUseRadius,
-                    .Radius = &m_PointCloudVertexNormalsRadius,
-                    .Orientation = &m_PointCloudVertexNormalsOrientation,
-                    .FallbackNormal = &m_PointCloudVertexNormalsFallback,
-                };
                 PointCloudOutlierRemovalUiState pointCloudOutlierState{
                     .LastResult = &m_LastPointCloudOutlierRemovalResult,
                     .Method = &m_PointCloudOutlierMethod,
@@ -21865,16 +19836,6 @@ namespace Extrinsic::Runtime
                     .UvForceRegenerate = &m_UvAtlasForceRegenerate,
                     .UvPreserveAuthored = &m_UvAtlasPreserveAuthored,
                 };
-                RegistrationUiState registrationState{
-                    .LastResult = &m_LastRegistrationResult,
-                    .Variant = &m_RegistrationVariant,
-                    .MaxIterations = &m_RegistrationMaxIterations,
-                    .MaxCorrespondenceDistance =
-                        &m_RegistrationMaxCorrespondenceDistance,
-                    .InlierRatio = &m_RegistrationInlierRatio,
-                    .TrajectoryStep = &m_RegistrationTrajectoryStep,
-                    .SwapSourceTarget = &m_RegistrationSwapSourceTarget,
-                };
                 m_ActiveEditorContext = &context;
                 m_RegisteredMeshModelCache.reset();
                 DrawPanelFrame(
@@ -21888,17 +19849,8 @@ namespace Extrinsic::Runtime
                     &m_LastSceneFileResult,
                     &m_PanelWindowOpen,
                     &m_DomainWindowOpen,
-                    &denoiseState,
-                    &curvatureState,
-                    &remeshState,
-                    &subdivideState,
-                    &simplifyState,
-                    &normalsState,
-                    &graphNormalsState,
-                    &pointCloudNormalsState,
                     &pointCloudOutlierState,
                     &textureBakeState,
-                    &registrationState,
                     &m_Host.Windows());
                 m_RegisteredMeshModelCache.reset();
                 m_ActiveEditorContext = nullptr;

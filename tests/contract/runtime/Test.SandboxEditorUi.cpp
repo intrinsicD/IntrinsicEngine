@@ -1345,8 +1345,11 @@ TEST(SandboxEditorUi, DomainMenusUseAppearanceAndFocusedProcessingWindows)
         ReadRepositoryTextFile("src/runtime/Editor/Runtime.SandboxEditorUi.cpp");
     const std::string methodPanelSource = ReadRepositoryTextFile(
         "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp");
+    const std::string meshProcessingPanelSource = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp");
     ASSERT_FALSE(editorSource.empty());
     ASSERT_FALSE(methodPanelSource.empty());
+    ASSERT_FALSE(meshProcessingPanelSource.empty());
 
     const std::string_view appearanceWindow = SourceRange(
         editorSource,
@@ -1385,16 +1388,16 @@ TEST(SandboxEditorUi, DomainMenusUseAppearanceAndFocusedProcessingWindows)
     EXPECT_NE(editorSource.find("DrawDomainVisualizationControls(model, context);"),
               std::string::npos);
     EXPECT_EQ(editorSource.find("ProcessingKMeans"), std::string::npos);
-    EXPECT_NE(editorSource.find("ProcessingDenoise"), std::string::npos);
-    EXPECT_NE(editorSource.find("ProcessingCurvature"), std::string::npos);
-    EXPECT_NE(editorSource.find("ProcessingRemesh"), std::string::npos);
-    EXPECT_NE(editorSource.find("ProcessingSubdivide"), std::string::npos);
-    EXPECT_NE(editorSource.find("ProcessingSimplify"), std::string::npos);
-    EXPECT_NE(editorSource.find("ProcessingMeshVertexNormals"),
+    EXPECT_EQ(editorSource.find("ProcessingDenoise"), std::string::npos);
+    EXPECT_EQ(editorSource.find("ProcessingCurvature"), std::string::npos);
+    EXPECT_EQ(editorSource.find("ProcessingRemesh"), std::string::npos);
+    EXPECT_EQ(editorSource.find("ProcessingSubdivide"), std::string::npos);
+    EXPECT_EQ(editorSource.find("ProcessingSimplify"), std::string::npos);
+    EXPECT_EQ(editorSource.find("ProcessingMeshVertexNormals"),
               std::string::npos);
-    EXPECT_NE(editorSource.find("ProcessingGraphVertexNormals"),
+    EXPECT_EQ(editorSource.find("ProcessingGraphVertexNormals"),
               std::string::npos);
-    EXPECT_NE(editorSource.find("ProcessingPointCloudVertexNormals"),
+    EXPECT_EQ(editorSource.find("ProcessingPointCloudVertexNormals"),
               std::string::npos);
     EXPECT_NE(editorSource.find("ProcessingPointCloudOutlierRemoval"),
               std::string::npos);
@@ -1417,6 +1420,136 @@ TEST(SandboxEditorUi, DomainMenusUseAppearanceAndFocusedProcessingWindows)
     EXPECT_NE(
         methodPanelSource.find("ApplySandboxEditorProgressivePoissonCommand"),
         std::string::npos);
+    for (const std::string_view registeredWindowId :
+         {
+             "mesh.processing.denoise",
+             "mesh.processing.curvature",
+             "mesh.processing.remesh",
+             "mesh.processing.subdivide",
+             "mesh.processing.simplify",
+             "mesh.processing.vertices.normals",
+             "graph.processing.vertices.normals",
+             "pointcloud.processing.vertices.normals",
+             "view.registration",
+         })
+    {
+        EXPECT_NE(meshProcessingPanelSource.find(registeredWindowId),
+                  std::string::npos)
+            << registeredWindowId;
+        EXPECT_EQ(editorSource.find(registeredWindowId), std::string::npos)
+            << registeredWindowId;
+    }
+    for (const std::string_view commandFacade :
+         {
+             "ApplySandboxEditorMeshDenoiseCommand",
+             "ApplySandboxEditorMeshCurvatureCommand",
+             "ApplySandboxEditorMeshRemeshCommand",
+             "ApplySandboxEditorMeshSubdivideCommand",
+             "ApplySandboxEditorMeshSimplifyCommand",
+             "ApplySandboxEditorMeshVertexNormalsCommand",
+             "ApplySandboxEditorGraphVertexNormalsCommand",
+             "ApplySandboxEditorPointCloudVertexNormalsCommand",
+             "ApplySandboxEditorRegistrationCommand",
+         })
+    {
+        EXPECT_NE(meshProcessingPanelSource.find(commandFacade),
+                  std::string::npos)
+            << commandFacade;
+    }
+}
+
+TEST(SandboxEditorUi, MeshProcessingPanelsPreserveLifetimeAndResultPublication)
+{
+    const std::string source = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp");
+    ASSERT_FALSE(source.empty());
+
+    struct CommandPublicationContract
+    {
+        std::string_view Begin;
+        std::string_view End;
+        std::string_view Command;
+        std::string_view Sink;
+    };
+    constexpr std::array<CommandPublicationContract, 9>
+        kPublicationContracts{{
+            {"void MeshProcessingPanels::Impl::DrawDenoiseControls(",
+             "void MeshProcessingPanels::Impl::DrawCurvatureControls(",
+             "ApplySandboxEditorMeshDenoiseCommand",
+             "context.MethodResultSinks.MeshDenoise"},
+            {"void MeshProcessingPanels::Impl::DrawCurvatureControls(",
+             "void MeshProcessingPanels::Impl::DrawRemeshControls(",
+             "ApplySandboxEditorMeshCurvatureCommand",
+             "context.MethodResultSinks.MeshCurvature"},
+            {"void MeshProcessingPanels::Impl::DrawRemeshControls(",
+             "void MeshProcessingPanels::Impl::DrawSubdivideControls(",
+             "ApplySandboxEditorMeshRemeshCommand",
+             "context.MethodResultSinks.MeshRemesh"},
+            {"void MeshProcessingPanels::Impl::DrawSubdivideControls(",
+             "void MeshProcessingPanels::Impl::DrawSimplifyControls(",
+             "ApplySandboxEditorMeshSubdivideCommand",
+             "context.MethodResultSinks.MeshSubdivide"},
+            {"void MeshProcessingPanels::Impl::DrawSimplifyControls(",
+             "void MeshProcessingPanels::Impl::DrawMeshNormalsControls(",
+             "ApplySandboxEditorMeshSimplifyCommand",
+             "context.MethodResultSinks.MeshSimplify"},
+            {"void MeshProcessingPanels::Impl::DrawMeshNormalsControls(",
+             "void MeshProcessingPanels::Impl::DrawGraphNormalsControls(",
+             "ApplySandboxEditorMeshVertexNormalsCommand",
+             "context.MethodResultSinks.MeshVertexNormals"},
+            {"void MeshProcessingPanels::Impl::DrawGraphNormalsControls(",
+             "void MeshProcessingPanels::Impl::DrawPointNormalsControls(",
+             "ApplySandboxEditorGraphVertexNormalsCommand",
+             "context.MethodResultSinks.GraphVertexNormals"},
+            {"void MeshProcessingPanels::Impl::DrawPointNormalsControls(",
+             "void MeshProcessingPanels::Impl::DrawRegistrationWindow(",
+             "ApplySandboxEditorPointCloudVertexNormalsCommand",
+             "context.MethodResultSinks.PointCloudVertexNormals"},
+            {"void MeshProcessingPanels::Impl::DrawRegistrationWindow(",
+             "MeshProcessingPanels::MeshProcessingPanels()",
+             "ApplySandboxEditorRegistrationCommand",
+             "context.MethodResultSinks.Registration"},
+        }};
+    for (const CommandPublicationContract& contract :
+         kPublicationContracts)
+    {
+        const std::string_view controls =
+            SourceRange(source, contract.Begin, contract.End);
+        ASSERT_FALSE(controls.empty()) << contract.Begin;
+        EXPECT_NE(controls.find("PublishCommandResult("),
+                  std::string_view::npos)
+            << contract.Begin;
+        EXPECT_NE(controls.find(contract.Command), std::string_view::npos)
+            << contract.Command;
+        EXPECT_NE(controls.find(contract.Sink), std::string_view::npos)
+            << contract.Sink;
+    }
+
+    const std::string_view unregister = SourceRange(
+        source,
+        "void MeshProcessingPanels::Impl::Unregister()",
+        "void MeshProcessingPanels::Impl::RegisterWindow(");
+    ASSERT_FALSE(unregister.empty());
+    EXPECT_NE(unregister.find("EditorUi->UnregisterEditorWindow(handle)"),
+              std::string_view::npos);
+    EXPECT_NE(unregister.find("Handles.clear()"), std::string_view::npos);
+    EXPECT_NE(unregister.find("EditorUi = nullptr"), std::string_view::npos);
+
+    const std::string_view destructor = SourceRange(
+        source,
+        "MeshProcessingPanels::~MeshProcessingPanels()",
+        "void MeshProcessingPanels::Register(");
+    ASSERT_FALSE(destructor.empty());
+    EXPECT_NE(destructor.find("m_Impl->Unregister()"),
+              std::string_view::npos);
+
+    const std::string_view registration = SourceRange(
+        source,
+        "void MeshProcessingPanels::Impl::DrawRegistrationWindow(",
+        "MeshProcessingPanels::MeshProcessingPanels()");
+    ASSERT_FALSE(registration.empty());
+    EXPECT_NE(registration.find("ImVec2(360.0f, 320.0f)"),
+              std::string_view::npos);
 }
 
 TEST(SandboxEditorUi, RenderGraphPanelModelCopiesRendererStats)
@@ -2081,6 +2214,11 @@ TEST(SandboxEditorUi, ExtrinsicSandboxAppStaysRuntimeOnly)
         "src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm");
     const std::string methodPanelsImplementation = ReadRepositoryTextFile(
         "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp");
+    const std::string meshProcessingPanelsModule = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cppm");
+    const std::string meshProcessingPanelsImplementation =
+        ReadRepositoryTextFile(
+            "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp");
     const std::string sandboxCMake =
         ReadRepositoryTextFile("src/app/Sandbox/CMakeLists.txt");
 
@@ -2089,6 +2227,8 @@ TEST(SandboxEditorUi, ExtrinsicSandboxAppStaysRuntimeOnly)
     ASSERT_FALSE(sandboxMain.empty());
     ASSERT_FALSE(methodPanelsModule.empty());
     ASSERT_FALSE(methodPanelsImplementation.empty());
+    ASSERT_FALSE(meshProcessingPanelsModule.empty());
+    ASSERT_FALSE(meshProcessingPanelsImplementation.empty());
     ASSERT_FALSE(sandboxCMake.empty());
 
     EXPECT_NE(sandboxModule.find("import Extrinsic.Runtime.Engine;"),
@@ -2112,6 +2252,7 @@ TEST(SandboxEditorUi, ExtrinsicSandboxAppStaysRuntimeOnly)
              "import Extrinsic.Platform",
              "import Extrinsic.RHI",
              "import Extrinsic.Backends",
+             "import Geometry.",
          })
     {
         EXPECT_EQ(sandboxModule.find(forbidden), std::string::npos)
@@ -2125,6 +2266,12 @@ TEST(SandboxEditorUi, ExtrinsicSandboxAppStaysRuntimeOnly)
         EXPECT_EQ(methodPanelsImplementation.find(forbidden),
                   std::string::npos)
             << forbidden;
+        EXPECT_EQ(meshProcessingPanelsModule.find(forbidden),
+                  std::string::npos)
+            << forbidden;
+        EXPECT_EQ(meshProcessingPanelsImplementation.find(forbidden),
+                  std::string::npos)
+            << forbidden;
     }
 
     EXPECT_NE(sandboxCMake.find("target_link_libraries(ExtrinsicSandbox"),
@@ -2133,6 +2280,8 @@ TEST(SandboxEditorUi, ExtrinsicSandboxAppStaysRuntimeOnly)
     EXPECT_EQ(sandboxCMake.find("ExtrinsicGraphics"), std::string::npos);
     EXPECT_EQ(sandboxCMake.find("ExtrinsicPlatform"), std::string::npos);
     EXPECT_EQ(sandboxCMake.find("ExtrinsicRHI"), std::string::npos);
+    EXPECT_NE(sandboxCMake.find("Sandbox.MeshProcessingPanels.cppm"),
+              std::string::npos);
 }
 
 TEST(SandboxEditorUi, MethodFacadesCompileSeparatelyFromEditorShell)
@@ -11833,12 +11982,12 @@ TEST(SandboxEditorUi, EngineAttachmentRegistersEditorCallback)
     engine.Shutdown();
 }
 
-TEST(SandboxEditorUi, MeshExemplarsRegisterWithStructuredMenuPaths)
+TEST(SandboxEditorUi, RuntimeExemplarRegistersAppearanceOnly)
 {
     Runtime::SandboxEditorUi ui;
 
     const auto menu = ui.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), 2u);
+    ASSERT_EQ(menu.size(), 1u);
     const auto appearance = std::find_if(
         menu.begin(),
         menu.end(),
@@ -11858,12 +12007,7 @@ TEST(SandboxEditorUi, MeshExemplarsRegisterWithStructuredMenuPaths)
     EXPECT_EQ(appearance->MenuPath, (std::vector<std::string>{"Mesh"}));
     EXPECT_EQ(appearance->Title, "Appearance");
     EXPECT_FALSE(appearance->Open);
-    ASSERT_NE(simplify, menu.end());
-    EXPECT_EQ(
-        simplify->MenuPath,
-        (std::vector<std::string>{"Mesh", "Processing"}));
-    EXPECT_EQ(simplify->Title, "Simplify");
-    EXPECT_FALSE(simplify->Open);
+    EXPECT_EQ(simplify, menu.end());
 }
 
 TEST(SandboxEditorUi, ExternalWindowContributionNeedsNoLegacySwitchEntry)
@@ -11900,7 +12044,7 @@ TEST(SandboxEditorUi, ExternalWindowContributionNeedsNoLegacySwitchEntry)
     EXPECT_EQ(drawCalls, 0);
 
     EXPECT_TRUE(ui.UnregisterEditorWindow(handle));
-    EXPECT_EQ(ui.BuildEditorWindowMenuModel().size(), 2u);
+    EXPECT_EQ(ui.BuildEditorWindowMenuModel().size(), 1u);
 }
 
 TEST(SandboxEditorUi, ContextWindowContributionReceivesRuntimeFacade)
@@ -11941,7 +12085,7 @@ TEST(SandboxEditorUi, ContextWindowContributionReceivesRuntimeFacade)
     engine.Shutdown();
 }
 
-TEST(SandboxEditorUi, ClosedRegisteredExemplarsBuildNoDomainModels)
+TEST(SandboxEditorUi, ClosedRuntimeExemplarBuildsNoDomainModels)
 {
     Runtime::Engine engine(
         HeadlessConfig(),
@@ -11967,7 +12111,7 @@ TEST(SandboxEditorUi, ClosedRegisteredExemplarsBuildNoDomainModels)
     engine.Shutdown();
 }
 
-TEST(SandboxEditorUi, OpenRegisteredExemplarsShareOneLazyMeshModel)
+TEST(SandboxEditorUi, OpenRuntimeAppearanceBuildsOneLazyMeshModel)
 {
     Runtime::Engine engine(
         HeadlessConfig(),
@@ -11984,12 +12128,11 @@ TEST(SandboxEditorUi, OpenRegisteredExemplarsShareOneLazyMeshModel)
 
     Runtime::SandboxEditorUi ui;
     ASSERT_TRUE(ui.SetEditorWindowOpen("mesh.appearance", true));
-    ASSERT_TRUE(ui.SetEditorWindowOpen("mesh.processing.simplify", true));
     ui.Attach(engine);
     engine.Run();
 
     EXPECT_EQ(ui.GetLastFrame().ModelBuildStats.DomainWindowModelBuilds, 1u);
-    EXPECT_EQ(ui.GetLastFrame().ModelBuildStats.DomainWindowModelCacheHits, 1u);
+    EXPECT_EQ(ui.GetLastFrame().ModelBuildStats.DomainWindowModelCacheHits, 0u);
 
     ui.Detach();
     engine.Shutdown();

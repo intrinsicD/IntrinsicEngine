@@ -18,6 +18,8 @@ Sandbox/
   Editor/
     Sandbox.MethodPanels.cppm
     Sandbox.MethodPanels.cpp
+    Sandbox.MeshProcessingPanels.cppm
+    Sandbox.MeshProcessingPanels.cpp
   Sandbox.cppm
   Sandbox.cpp
   main.cpp

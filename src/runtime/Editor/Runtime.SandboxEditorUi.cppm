@@ -71,8 +71,8 @@ import Geometry.UvAtlas;
 
 namespace Extrinsic::Runtime::Detail
 {
-    inline constexpr std::size_t kSandboxEditorPanelWindowCount = 11u;
-    inline constexpr std::size_t kSandboxEditorDomainWindowCount = 36u;
+    inline constexpr std::size_t kSandboxEditorPanelWindowCount = 10u;
+    inline constexpr std::size_t kSandboxEditorDomainWindowCount = 12u;
 }
 
 export namespace Extrinsic::Runtime
@@ -2835,7 +2835,6 @@ export namespace Extrinsic::Runtime
     private:
         void RegisterExemplarWindows();
         void DrawRegisteredMeshAppearance(bool& open);
-        void DrawRegisteredMeshSimplify(bool& open);
         [[nodiscard]] const SandboxEditorDomainWindowModel*
         GetRegisteredMeshWindowModel();
         void AttachKMeansGpuQueue(Engine& engine);
@@ -2844,7 +2843,6 @@ export namespace Extrinsic::Runtime
         Engine*                 m_Engine{nullptr};
         EditorUiHost            m_Host{};
         EditorWindowHandle      m_MeshAppearanceWindow{};
-        EditorWindowHandle      m_MeshSimplifyWindow{};
         const SandboxEditorContext* m_ActiveEditorContext{nullptr};
         std::optional<SandboxEditorDomainWindowModel>
             m_RegisteredMeshModelCache{};
@@ -2898,48 +2896,6 @@ export namespace Extrinsic::Runtime
         SandboxEditorRenderRecipeEditorState m_RenderRecipeState{};
         RenderArtifactRegistry m_RenderArtifactRegistry{};
         std::array<char, 8192> m_RenderRecipeDraftBuffer{};
-        std::int32_t m_MeshDenoiseStage{0};
-        std::int32_t m_MeshDenoiseNormalIterations{5};
-        std::int32_t m_MeshDenoiseVertexIterations{10};
-        float m_MeshDenoiseSigmaSpatial{0.0f};
-        float m_MeshDenoiseSigmaRange{0.0f};
-        bool m_MeshDenoisePreserveBoundary{true};
-        std::int32_t m_MeshCurvatureOutput{0};
-        bool m_MeshCurvaturePublishDirections{true};
-        std::int32_t m_MeshRemeshMode{0};
-        std::int32_t m_MeshRemeshSizingLaw{0};
-        std::int32_t m_MeshRemeshIterations{1};
-        float m_MeshRemeshTargetEdgeLength{0.0f};
-        bool m_MeshRemeshProjectToSurface{false};
-        std::int32_t m_MeshSubdivideOperator{0};
-        std::int32_t m_MeshSubdivideIterations{1};
-        bool m_MeshSubdividePreserveLoopFeatures{false};
-        std::int32_t m_MeshSimplifyMetric{1};
-        std::int32_t m_MeshSimplifyTargetFaces{0};
-        float m_MeshSimplifyMaxError{0.0f};
-        bool m_MeshSimplifyPreserveBoundary{true};
-        float m_MeshSimplifyFeatureAngleThresholdDegrees{45.0f};
-        float m_MeshSimplifyNormalWeight{1.0f};
-        float m_MeshSimplifyBoundaryWeight{1.0f};
-        float m_MeshSimplifyCurvatureWeight{1.0f};
-        bool m_MeshSimplifyPreserveSharpFeatures{true};
-        bool m_MeshSimplifyPreserveUvSeams{true};
-        std::int32_t m_RegistrationVariant{0};
-        std::int32_t m_RegistrationMaxIterations{50};
-        float m_RegistrationMaxCorrespondenceDistance{0.0f};
-        float m_RegistrationInlierRatio{0.9f};
-        std::int32_t m_RegistrationTrajectoryStep{0};
-        bool m_RegistrationSwapSourceTarget{false};
-        std::int32_t m_MeshVertexNormalsWeighting{1};
-        glm::vec3 m_MeshVertexNormalsFallback{0.0f, 1.0f, 0.0f};
-        glm::vec3 m_GraphVertexNormalsFallback{0.0f, 0.0f, 1.0f};
-        bool m_GraphVertexNormalsOrientTowardFallback{true};
-        std::int32_t m_PointCloudVertexNormalsK{15};
-        std::int32_t m_PointCloudVertexNormalsMinimumNeighbors{2};
-        bool m_PointCloudVertexNormalsUseRadius{false};
-        float m_PointCloudVertexNormalsRadius{0.0f};
-        std::int32_t m_PointCloudVertexNormalsOrientation{1};
-        glm::vec3 m_PointCloudVertexNormalsFallback{0.0f, 0.0f, 1.0f};
         std::int32_t m_PointCloudOutlierMethod{0};
         std::int32_t m_PointCloudOutlierKNeighbors{16};
         float m_PointCloudOutlierStdDevMultiplier{1.0f};

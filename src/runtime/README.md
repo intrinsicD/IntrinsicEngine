@@ -201,17 +201,21 @@ windows can register through `SandboxEditorUi::RegisterEditorWindow(...)` using
 stable ids and structured menu paths, then remove the returned handle through
 `UnregisterEditorWindow(...)`; closed windows receive no draw callback, and global hide preserves
 their individual open states. `Mesh / Appearance` and
-`Mesh / Processing / Simplify` are the first registry-owned exemplars and share
-one lazy mesh-domain model per frame; Appearance also hosts the generic scalar
-vertex-property histogram. `ARCH-006` Slice 2 adds a context-aware contribution
+the app-owned method panels are registry-owned windows; Appearance hosts the
+generic scalar vertex-property histogram. `ARCH-006` Slice 2 adds a context-aware contribution
 descriptor that supplies a frame-local runtime facade without exposing
 `Engine&`; the Sandbox application uses it for app-owned K-Means and Progressive
 Poisson panels while runtime retains their models, commands, config lane, jobs,
 and result sinks. Slice 2B compiles those method facade bodies separately in
 the private `Runtime.SandboxMethodFacade.cpp` implementation unit, leaving the
-public module and app imports unchanged. The remaining fixed domain windows
-are retained for later
-`ARCH-006` relocation slices. `SandboxEditorUi` routes the unsuppressed `G`
+public module and app imports unchanged. Slice 3 moves the stable registrations,
+menu/controller code, widget state, and result presentation for ICP registration,
+mesh denoise/curvature/remesh/subdivide/simplify, and mesh/graph/point-cloud
+vertex normals into `Extrinsic.Sandbox.Editor.MeshProcessingPanels`. Runtime
+retains the corresponding models, commands, history/jobs, stale-result checks,
+and result sinks. Point-cloud outlier removal and the generic fixed domain/shell
+windows are retained for later `ARCH-006` relocation slices.
+`SandboxEditorUi` routes the unsuppressed `G`
 input action through the same `EditorUiVisibilityCommand` path used by
 programmatic callers. At the end of each visible editor frame, `ImGuiAdapter`
 records one `EditorInputCaptureSnapshot` containing keyboard capture, mouse
@@ -560,8 +564,9 @@ mutating `GeometrySources`.
 
 ### Sandbox Editor ICP Registration
 
-`UI-029` adds an `ICP Registration` top-level panel (a new
-`SandboxEditorPanelWindowKind`, reachable from the `View` menu). The Sandbox
+`UI-029` adds an `ICP Registration` panel reachable from the `View` menu.
+`ARCH-006` Slice 3 preserves that path through the app-owned stable registration
+`view.registration` rather than a fixed runtime window-kind slot. The Sandbox
 EditorUI surface exports `SandboxEditorICPVariant`,
 `SandboxEditorRegistrationCommand`, `SandboxEditorRegistrationResult`, and
 `ApplySandboxEditorRegistrationCommand(...)`. The command reads the source and

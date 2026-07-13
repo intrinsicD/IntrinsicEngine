@@ -9,15 +9,19 @@ depends_on:
 ## Status
 - Status: in progress.
 - Owner: Codex.
-- Branch: `codex/arch-006-s2b`.
-- Slices 0-2 are complete. `Runtime.EditorUiHost` now owns generic
+- Branch: `codex/arch-006-slice3`.
+- Slices 0-3 are complete. `Runtime.EditorUiHost` now owns generic
   callback, registry, and visibility lifecycle, while `Sandbox.cppm` exports
   only the app factory/registration surface and the concrete app lives in
   `Sandbox.cpp`. App-owned registered windows now own K-Means and Progressive
   Poisson presentation, and their runtime command/config/result facade bodies
   compile separately from the editor shell.
-- Next verification step: Slice 3 moves registration and mesh-processing
-  presentation while preserving their runtime execution/undo/job facades.
+- Slice 3 moved ICP plus denoise, curvature, remesh, subdivision,
+  simplification, and mesh/graph/point-cloud normals presentation/controller
+  state into app-owned registered windows. The existing runtime model,
+  command, undo, derived-job, and result-sink facades remain in runtime.
+- Next slice: move point-cloud outlier removal and the generic domain panels
+  while retaining runtime-owned command/model facades.
 
 ## Goal
 - Restore the documented layering intent that application specifics live in
@@ -124,6 +128,25 @@ Implementation slice boundaries:
    frame-graph/render-recipe/artifact, camera, and visualization presentation;
    split tests, remove the Sandbox-specific class/module from `runtime/Editor`,
    update docs/inventory, and record final interface/import/build metrics.
+
+Slice 3 implementation boundary (2026-07-13):
+
+- Add one app-owned mesh-processing panel module that registers nine windows
+  through the existing UI-034 registry seam: ICP; mesh denoise, curvature,
+  remesh, subdivision, and simplification; plus mesh, graph, and point-cloud
+  normals. Preserve the current menu paths, titles, defaults, controls, and
+  per-window lazy domain-model cache.
+- Remove the corresponding fixed window slots, ImGui draw routines, and input
+  state from `Runtime.SandboxEditorUi`. Runtime retains the exported domain
+  models and `ApplySandboxEditor*` facades, including undo/redo, derived-job
+  scheduling, stale-result rejection, and result-sink delivery.
+- Add structural proof that the app module imports runtime only, owns the nine
+  registrations and ImGui controllers, and that the runtime editor shell no
+  longer owns those presentation symbols. Existing runtime facade contracts
+  remain the behavioral proof.
+- Defer point-cloud outlier removal and generic appearance/properties/
+  selection panels to Slice 4; defer hierarchy/inspector/file/render shell
+  presentation and final runtime Sandbox editor retirement to Slice 5.
 
 ## Required changes
 - [x] Slice 0 (planning, this file): inventory `Runtime.SandboxEditorUi`
@@ -238,6 +261,33 @@ Slice 2B evidence (2026-07-13):
 - Regenerated the 386-module API inventory and the session brief; neither
   generated artifact changed because this slice adds only a private
   implementation unit and does not change task front matter.
+
+Slice 3 evidence (2026-07-13):
+- Added the 29-line / 1-import `Sandbox.Editor.MeshProcessingPanels` interface
+  and its 1,763-line / 3-import app implementation. It owns nine registered
+  windows: ICP; mesh denoise, curvature, remesh, subdivision, and
+  simplification; plus mesh, graph, and point-cloud normals. Destruction and
+  normal Sandbox shutdown both unregister callbacks idempotently.
+- Removed the corresponding fixed window slots, menu branches, ImGui draw
+  controllers, and input state from `Runtime.SandboxEditorUi`. Runtime retains
+  all model builders, command/history execution, derived-job scheduling,
+  stale-result rejection, and asynchronous result sinks. Point-cloud outlier
+  removal and the generic domain panels remain explicitly deferred to Slice 4.
+- The runtime implementation fell from 21,943 to 19,895 lines, its interface
+  fell from 2,959 to 2,915 lines, the fixed domain-window count fell from 36
+  to 12, and the runtime exemplar count fell from two to one. These are
+  source-shape metrics only; no compile-time claim is made.
+- `ExtrinsicSandbox`, `IntrinsicRuntimeContractTests`, and `IntrinsicTests`
+  built with the configured presets. Focused `SandboxEditorUi.*` coverage
+  passed 146/146 after the final review fixes; the new structural contract
+  pins callback unregistration, immediate/pending result-sink forwarding, and
+  the preserved ICP first-use dimensions, while the existing runtime behavior
+  tests exercise asynchronous result publication. The default CPU-supported
+  gate passed 3643/3643 before those app-only review fixes. Strict layering,
+  test-layout, task-policy, docs-link, clean-workshop-validator, and diff
+  checks passed.
+- Regenerated the 387-module API inventory. Task front matter did not change,
+  so the generated session brief did not require regeneration.
 
 ## Forbidden changes
 - Mixing mechanical moves with semantic refactors in one slice.
