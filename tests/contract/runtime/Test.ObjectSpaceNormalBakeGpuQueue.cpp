@@ -24,6 +24,7 @@ import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeGpuQueue;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
+import Extrinsic.Runtime.ObjectSpaceNormalBakeService;
 import Extrinsic.Runtime.RenderExtraction;
 
 #include "MockRHI.hpp"
@@ -107,7 +108,7 @@ namespace
             });
     }
 
-    void ConfigureQueue(GpuQueueFixture& fx)
+    void ConfigureQueue(GpuQueueFixture& fx, const std::uint64_t readyFrame = 2u)
     {
         fx.Queue.SetDependencies(
             Runtime::RuntimeObjectSpaceNormalBakeGpuQueueDependencies{
@@ -131,11 +132,60 @@ namespace
                                 .Plan = std::move(plan),
                             };
                     },
-                .ReadyFrame = [] { return 2u; },
+                .ReadyFrame = [readyFrame] { return readyFrame; },
                 .MaxSubmissionsPerFrame = 2u,
                 .MaxBindingsPerDrain = 2u,
             });
     }
+}
+
+TEST(RuntimeObjectSpaceNormalBakeGpuQueue,
+     ReadyFrameAccountingWaitsForEveryInFlightFrameBeforeBinding)
+{
+    GpuQueueFixture fx;
+    fx.Device.GlobalFrameNumber = 40u;
+    fx.Device.FramesInFlight = 3u;
+    const std::uint64_t readyFrame = Runtime::ObjectSpaceNormalBakeReadyFrame(
+        fx.Device.GetGlobalFrameNumber(),
+        fx.Device.GetFramesInFlight());
+    ASSERT_EQ(readyFrame, 43u);
+    ConfigureQueue(fx, readyFrame);
+    Extrinsic::Tests::MockCommandContext commandContext;
+
+    const Runtime::GpuQueueParticipantHandle participant =
+        fx.Jobs.RegisterGpuQueueParticipant(fx.Queue.MakeGpuQueueParticipantDesc());
+    ASSERT_TRUE(participant.IsValid());
+
+    const Assets::AssetId generated{90u, 1u};
+    const auto scheduled = fx.Queue.Queue().Schedule(
+        MakeRequest(17u, 1u, generated),
+        /*graphicsBackendOperational=*/true);
+    ASSERT_TRUE(scheduled.Succeeded());
+
+    fx.Jobs.RecordGpuQueueFrameCommands(commandContext);
+    ASSERT_EQ(fx.GpuAssets.GetState(generated),
+              Graphics::GpuAssetState::GpuUploading);
+
+    for (std::uint64_t frame = 41u; frame < readyFrame; ++frame)
+    {
+        fx.GpuAssets.Tick(frame, fx.Device.GetFramesInFlight());
+        EXPECT_EQ(fx.GpuAssets.GetState(generated),
+                  Graphics::GpuAssetState::GpuUploading)
+            << "frame " << frame;
+        EXPECT_EQ(fx.Jobs.DrainGpuQueueCompletedTransfers(), 1u);
+        EXPECT_FALSE(
+            fx.Extraction.GetMaterialTextureAssetBindings(17u).has_value())
+            << "frame " << frame;
+    }
+
+    fx.GpuAssets.Tick(readyFrame, fx.Device.GetFramesInFlight());
+    ASSERT_EQ(fx.GpuAssets.GetState(generated), Graphics::GpuAssetState::Ready);
+    EXPECT_EQ(fx.Jobs.DrainGpuQueueCompletedTransfers(), 1u);
+
+    const std::optional<Graphics::MaterialTextureAssetBindings> bindings =
+        fx.Extraction.GetMaterialTextureAssetBindings(17u);
+    ASSERT_TRUE(bindings.has_value());
+    EXPECT_EQ(bindings->Normal, generated);
 }
 
 TEST(RuntimeObjectSpaceNormalBakeGpuQueue,

@@ -245,7 +245,13 @@ TEST(RuntimeEngineLayering, ObjectSpaceNormalBakeServiceKeepsGpuQueueComposition
               std::string::npos);
     EXPECT_NE(serviceImpl.find("RuntimeObjectSpaceNormalBakeGpuQueueDependencies"),
               std::string::npos);
-    EXPECT_NE(serviceImpl.find("device->GetGlobalFrameNumber() + 1u"),
+    const auto readyFrameDefinition =
+        serviceImpl.find("ObjectSpaceNormalBakeReadyFrame(");
+    ASSERT_NE(readyFrameDefinition, std::string::npos);
+    EXPECT_NE(serviceImpl.find("ObjectSpaceNormalBakeReadyFrame(",
+                               readyFrameDefinition + 1u),
+              std::string::npos);
+    EXPECT_EQ(serviceImpl.find("device->GetGlobalFrameNumber() + 1u"),
               std::string::npos);
     EXPECT_NE(serviceImpl.find("jobs.RegisterGpuQueueParticipant(m_GpuQueue.MakeGpuQueueParticipantDesc())"),
               std::string::npos);

@@ -8,6 +8,22 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-073`](BUG-073-object-space-normal-bake-read-before-gpu-write.md) —
+object-space-normal-bake ready-frame accounting retired on 2026-07-13 at
+`CPUContracted`. Production correction `fdeb0a6b` replaced the unsafe fixed
+`issueFrame + 1` stamp with `issueFrame + FramesInFlight`; this closure names
+that contract and adds a deterministic three-frame-in-flight regression over
+the real `JobService` queue, `GpuAssetCache`, and material-binding path. The
+texture stays `GpuUploading` and unbound at issue+1/+2, then promotes and binds
+at issue+3; the four-test queue suite passed 100 repetitions under ASan/UBSan.
+The existing graphics Vulkan bake/readback also matched the CPU texel contract
+on an NVIDIA GeForce RTX 3050 with the repository's narrow LSan suppression;
+without it, assertions passed before the known `BUG-083` shutdown leaks caused
+a nonzero sanitizer exit. That run proves the graphics bake, not the exact
+runtime readiness seam: the production Vulkan plan provider and end-to-end
+runtime smoke remain explicitly owned by `RUNTIME-129` before `Operational` can
+be claimed.
+
 [`BUG-071`](BUG-071-onresolve-sim-systems-bypass-finalizeforboot.md) —
 Runtime-module resolve registration finalization retired to `tasks/done/` on
 2026-07-13 at `CPUContracted`. Production commit `a1704053` keeps sim-system

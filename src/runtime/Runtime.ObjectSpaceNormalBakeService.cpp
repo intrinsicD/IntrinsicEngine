@@ -8,6 +8,13 @@ import Extrinsic.RHI.Device;
 
 namespace Extrinsic::Runtime
 {
+    std::uint64_t ObjectSpaceNormalBakeReadyFrame(
+        const std::uint64_t issueFrame,
+        const std::uint32_t framesInFlight) noexcept
+    {
+        return issueFrame + framesInFlight;
+    }
+
     void ObjectSpaceNormalBakeService::SetDependencies(
         ObjectSpaceNormalBakeServiceDependencies deps)
     {
@@ -29,8 +36,9 @@ namespace Extrinsic::Runtime
                         // is bound/sampled. A fixed +1 was a read-before-write
                         // hazard whenever FramesInFlight > 1.
                         return device != nullptr
-                            ? device->GetGlobalFrameNumber() +
-                                  device->GetFramesInFlight()
+                            ? ObjectSpaceNormalBakeReadyFrame(
+                                  device->GetGlobalFrameNumber(),
+                                  device->GetFramesInFlight())
                             : 0u;
                     },
             });

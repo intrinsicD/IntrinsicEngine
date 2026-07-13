@@ -32,14 +32,18 @@ regressed hardening that main had shipped as the closed `BUG-066`.
   a worker stores `AwaitingGate` outside the lock after enqueue, so a same-tick
   drain's terminal state is clobbered → job stuck non-terminal (record leak,
   phantom stats, poller hang). HIGH.
-- [`BUG-073` — Object-space normal bake may be sampled before its GPU write completes](BUG-073-object-space-normal-bake-read-before-gpu-write.md):
-  `ReadyFrame` gates on a bare CPU frame counter with no fence; read-before-write
-  when frames-in-flight > 1. MEDIUM (suspected).
 - [`BUG-074` — Orphaned GpuAssetCache slot causes per-entity bake retry livelock](BUG-074-object-space-normal-bake-orphaned-cache-slot-livelock.md):
   a failed bake submission leaks its pending cache slot → infinite retry. LOW (suspected).
 ---
 
 ## Verified / Closed
+
+- Closed 2026-07-13: [`BUG-073` — Object-space normal bake may be sampled before its GPU write completes](../../done/BUG-073-object-space-normal-bake-read-before-gpu-write.md).
+  Ready-frame accounting now has a named `issueFrame + FramesInFlight`
+  contract. A deterministic three-frame-in-flight regression proves the cache
+  remains uploading and the material remains unbound through issue+1/+2, then
+  promotes and binds at issue+3. The existing graphics Vulkan bake/readback
+  passed on an RTX 3050; runtime `Operational` closure remains `RUNTIME-129`.
 
 - Closed 2026-07-13: [`BUG-071` — Sim-systems registered during OnResolve bypass FinalizeForBoot](../../done/BUG-071-onresolve-sim-systems-bypass-finalizeforboot.md).
   The module schedule now remains mutable through every resolve callback and

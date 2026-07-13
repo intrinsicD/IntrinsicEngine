@@ -1,6 +1,7 @@
 module;
 
 #include <cstddef>
+#include <cstdint>
 
 export module Extrinsic.Runtime.ObjectSpaceNormalBakeService;
 
@@ -13,6 +14,10 @@ import Extrinsic.Runtime.RenderExtraction;
 
 export namespace Extrinsic::Runtime
 {
+    [[nodiscard]] std::uint64_t ObjectSpaceNormalBakeReadyFrame(
+        std::uint64_t issueFrame,
+        std::uint32_t framesInFlight) noexcept;
+
     struct ObjectSpaceNormalBakeServiceDependencies
     {
         Graphics::GpuAssetCache* GpuAssets{};
