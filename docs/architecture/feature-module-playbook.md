@@ -104,9 +104,16 @@ through `EngineSetup`, and add the module to the engine before
 must stay narrow capability surfaces and must not receive `Engine&`. Shared
 synchronous infrastructure should be provided in `OnRegister`, required or found
 from the two-phase `ServiceRegistry` in `OnResolve`, and shut down after the
-runtime shutdown announce event has pumped. Module sim systems declare
-wait/signal labels on `SimSystemDesc` so pass ordering is data-driven rather
-than dependent on `AddModule` order.
+runtime shutdown announce event has pumped. Register dependency-independent
+sim systems and frame hooks in `OnRegister`; registering either contribution in
+`OnResolve` is also legal when it depends on a resolved service or capability.
+The engine keeps the module schedule mutable through every `OnResolve`, then
+finalizes the complete contribution set exactly once: duplicate identities,
+cycles, and unprovided waits fail boot before any fixed-step pass can execute.
+`ServiceRegistry::Provide` remains legal only in `OnRegister`; `OnResolve` is
+the `Require`/`Find` phase. Module sim systems declare wait/signal labels on
+`SimSystemDesc` so pass ordering is data-driven rather than dependent on
+`AddModule` order.
 
 The fixed-step composition appends the promoted baseline ECS bundle before
 module sim systems. That bundle provides `TransformUpdate`, so a module that

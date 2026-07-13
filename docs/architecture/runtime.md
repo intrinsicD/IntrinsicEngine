@@ -51,10 +51,14 @@ with declared wait/signal labels so registration order does not decide pass
 order. Before any per-tick passes can be appended, schedule finalization rejects
 duplicate `(module, system)` identities with `InvalidArgument` and rejects
 cyclic or unprovided signal dependencies with `InvalidState`. The schedule seam
-returns these errors for direct contract testing; `Engine::Initialize()` logs
-the error and terminates boot under the engine's fail-closed initialization
-policy, so an invalid schedule cannot execute even once (BUG-070). Module
-shutdown runs after `RuntimeShutdownAnnounced` has been published and pumped.
+remains open through all `OnResolve` callbacks: sim systems and frame hooks may
+be registered there when their contribution depends on a resolved service, and
+the engine finalizes only after the complete register-plus-resolve contribution
+set has been collected. The seam returns validation errors for direct contract
+testing; `Engine::Initialize()` logs the error and terminates boot under the
+engine's fail-closed initialization policy, so an invalid schedule cannot
+execute even once (BUG-070, BUG-071). Module shutdown runs after
+`RuntimeShutdownAnnounced` has been published and pumped.
 
 `Extrinsic.Runtime.ClusteringModule` is the first extracted domain module on
 this contract. Sandbox composes it from app startup, not from the kernel engine:

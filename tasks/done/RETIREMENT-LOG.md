@@ -8,6 +8,21 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-071`](BUG-071-onresolve-sim-systems-bypass-finalizeforboot.md) —
+Runtime-module resolve registration finalization retired to `tasks/done/` on
+2026-07-13 at `CPUContracted`. Production commit `a1704053` keeps sim-system
+registration legal during `OnResolve` and moves the single schedule
+finalization after every resolve callback, so duplicate identities, cycles,
+and unprovided waits are checked against the complete register-plus-resolve
+set before boot can return. A real `Engine::Initialize()` regression registers
+the same identity across the two phases: it failed five of five repetitions on
+the exact pre-fix parent `7e77e47f` because initialization did not die, then
+passed against the production fix under Clang 23 with ASan/UBSan. Runtime and
+feature-module architecture docs now state the phase contract explicitly. The
+focused runtime-module selection passed 13/13, `IntrinsicTests` built, the full
+default CPU-supported gate passed 3640/3640, and strict structural/docs checks
+passed.
+
 [`BUG-076`](BUG-076-asyncworkservice-shutdown-skips-derived-job-registry.md) —
 derived-job shutdown quiescence retired on 2026-07-13 at `CPUContracted`.
 Production fix `6d6f784a` joins the shared executor, drains completion and

@@ -43,7 +43,6 @@ the authoritative open/unblocked view.
 
 - unblocked: `BUG-064` — ci-vulkan FramePacingDiagnosticCapture cannot run headless (tasks/backlog/bugs/BUG-064-ci-vulkan-framepacing-headless-display.md)
 - unblocked: `BUG-067` — JobService completion state lost-update race (tasks/backlog/bugs/BUG-067-jobservice-completion-state-lost-update-race.md)
-- unblocked: `BUG-071` — Sim-systems registered during OnResolve bypass FinalizeForBoot (tasks/backlog/bugs/BUG-071-onresolve-sim-systems-bypass-finalizeforboot.md)
 - unblocked: `BUG-073` — Object-space normal bake may be sampled before its GPU write completes (tasks/backlog/bugs/BUG-073-object-space-normal-bake-read-before-gpu-write.md)
 - unblocked: `BUG-074` — Orphaned GpuAssetCache slot causes per-entity bake retry livelock (tasks/backlog/bugs/BUG-074-object-space-normal-bake-orphaned-cache-slot-livelock.md)
 - unblocked: `BUG-081` — Warm-configure CI budget still flakes on hosted-runner variance (tasks/backlog/bugs/BUG-081-warm-configure-budget-runner-variance.md)

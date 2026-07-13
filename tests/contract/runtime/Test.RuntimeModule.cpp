@@ -436,6 +436,41 @@ namespace
         void OnShutdown(Runtime::RuntimeModuleShutdownContext&) override {}
     };
 
+    class CrossPhaseDuplicateSimSystemModule final
+        : public Runtime::IRuntimeModule
+    {
+    public:
+        [[nodiscard]] std::string_view Name() const noexcept override
+        {
+            return "CrossPhaseDuplicateSimSystem";
+        }
+
+        [[nodiscard]] Core::Result OnRegister(
+            Runtime::EngineSetup& setup) override
+        {
+            return RegisterDuplicate(setup);
+        }
+
+        [[nodiscard]] Core::Result OnResolve(
+            Runtime::EngineSetup& setup) override
+        {
+            return RegisterDuplicate(setup);
+        }
+
+        void OnShutdown(Runtime::RuntimeModuleShutdownContext&) override {}
+
+    private:
+        [[nodiscard]] static Core::Result RegisterDuplicate(
+            Runtime::EngineSetup& setup)
+        {
+            return setup.RegisterSimSystem(
+                Runtime::SimSystemDesc{
+                    .Name = "DuplicateAcrossBootPhases",
+                    .Execute = [](Runtime::SimSystemContext&) {},
+                });
+        }
+    };
+
     class ModuleHarnessApplication final : public Runtime::IApplication
     {
     public:
@@ -595,6 +630,20 @@ TEST(RuntimeModule, DuplicateSimSystemIdentityTerminatesEngineBootBeforeRun)
     // FinalizeForBoot exposes InvalidArgument to direct callers. Engine boot
     // intentionally translates any invalid finalized schedule into its global
     // fail-closed initialization policy, so no fixed-step pass can execute.
+    EXPECT_DEATH(engine.Initialize(), "");
+}
+
+TEST(RuntimeModule, ResolveRegisteredDuplicateJoinsFullBootValidationSet)
+{
+    ModuleHarnessState state{};
+    auto app = std::make_unique<ModuleHarnessApplication>(state);
+    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(app));
+    engine.AddModule(
+        std::make_unique<CrossPhaseDuplicateSimSystemModule>());
+
+    // BUG-071: the first identity is valid after OnRegister in isolation. The
+    // second arrives through the still-live OnResolve registrar and must be
+    // checked against the complete contribution set before boot can return.
     EXPECT_DEATH(engine.Initialize(), "");
 }
 

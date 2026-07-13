@@ -32,8 +32,6 @@ regressed hardening that main had shipped as the closed `BUG-066`.
   a worker stores `AwaitingGate` outside the lock after enqueue, so a same-tick
   drain's terminal state is clobbered → job stuck non-terminal (record leak,
   phantom stats, poller hang). HIGH.
-- [`BUG-071` — Sim-systems registered during OnResolve bypass FinalizeForBoot](BUG-071-onresolve-sim-systems-bypass-finalizeforboot.md):
-  late-registered systems escape ordering and signal/cycle/duplicate validation. MEDIUM.
 - [`BUG-073` — Object-space normal bake may be sampled before its GPU write completes](BUG-073-object-space-normal-bake-read-before-gpu-write.md):
   `ReadyFrame` gates on a bare CPU frame counter with no fence; read-before-write
   when frames-in-flight > 1. MEDIUM (suspected).
@@ -42,6 +40,13 @@ regressed hardening that main had shipped as the closed `BUG-066`.
 ---
 
 ## Verified / Closed
+
+- Closed 2026-07-13: [`BUG-071` — Sim-systems registered during OnResolve bypass FinalizeForBoot](../../done/BUG-071-onresolve-sim-systems-bypass-finalizeforboot.md).
+  The module schedule now remains mutable through every resolve callback and
+  finalizes the complete register-plus-resolve contribution set before boot
+  returns. A real-engine cross-phase duplicate regression fails five of five
+  times on the exact pre-fix parent and passes on the production fix, while the
+  existing schedule contracts pin cycle and unprovided-signal rejection.
 
 - Closed 2026-07-13: [`BUG-076` — AsyncWorkService::ShutdownAndDrain does not drain the derived job registry](../../done/BUG-076-asyncworkservice-shutdown-skips-derived-job-registry.md).
   Shutdown now joins executor work, drains and applies ready derived results,
