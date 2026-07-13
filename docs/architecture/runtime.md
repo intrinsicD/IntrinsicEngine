@@ -111,6 +111,17 @@ The frame order is:
    deferred `WorldRegistry` active/destroy operations, and finalize the frame
    clock.
 
+Editor UI contribution is data-driven through
+`Extrinsic.Runtime.EditorWindowRegistry`: contributors provide stable ids,
+structured menu paths, open state, and draw callbacks, and closed or globally
+hidden windows receive no callback. `ImGuiAdapter` records one
+`EditorInputCaptureSnapshot` after the visible editor callback; camera, gizmo,
+picking, and viewport routing consume that snapshot rather than reading ImGui
+capture flags independently. Its ImGui context owns a paired ImPlot context.
+`Extrinsic.Runtime.EditorPropertyWidgets` keeps scalar-property selector and
+finite-sample histogram models CPU-testable while its ImGui/ImPlot draw code and
+the manifest-managed `implot` dependency remain private to runtime.
+
 The internal `RuntimeFrameContext` record carries the data that must survive
 between those phases: frame delta, fixed-step interpolation alpha, render frame
 index, render input, extraction stats, and the acquired render-world pool slot.

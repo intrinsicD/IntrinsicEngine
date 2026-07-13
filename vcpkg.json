@@ -15,6 +15,7 @@
         "docking-experimental"
       ]
     },
+    "implot",
     "nlohmann-json",
     "stb",
     "tinygltf",

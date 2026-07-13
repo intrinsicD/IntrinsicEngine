@@ -16,6 +16,7 @@ module;
 #include <vector>
 
 #include <imgui.h>
+#include <implot.h>
 
 module Extrinsic.Runtime.ImGuiAdapter;
 
@@ -183,6 +184,7 @@ namespace Extrinsic::Runtime
         IMGUI_CHECKVERSION();
         m_Context = ImGui::CreateContext();
         ImGui::SetCurrentContext(m_Context);
+        m_PlotContext = ImPlot::CreateContext();
         ConfigureIo();
         m_OverlaySystem.Initialize();
 
@@ -547,6 +549,7 @@ namespace Extrinsic::Runtime
 
         m_Context = ImGui::CreateContext();
         ImGui::SetCurrentContext(m_Context);
+        m_PlotContext = ImPlot::CreateContext();
         ConfigureIo();
         m_OverlaySystem.Initialize();
 
@@ -559,6 +562,11 @@ namespace Extrinsic::Runtime
     {
         if (m_Context == nullptr)
             return;
+        if (m_PlotContext != nullptr)
+        {
+            ImPlot::DestroyContext(m_PlotContext);
+            m_PlotContext = nullptr;
+        }
         ImGui::DestroyContext(m_Context);
         m_Context = nullptr;
     }

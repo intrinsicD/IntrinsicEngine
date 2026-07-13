@@ -40,6 +40,7 @@ target_sources(${target_name}
         Runtime.SelectedMeshTextureBake.cppm
         Runtime.EcsSystemBundle.cppm
         Runtime.EditorCommandHistory.cppm
+        Editor/Runtime.EditorPropertyWidgets.cppm
         Editor/Runtime.EditorWindowRegistry.cppm
         Runtime.Engine.cppm
         Runtime.Engine.FrameLoop.cppm
@@ -124,6 +125,7 @@ target_sources(${target_name}
         Runtime.SelectedMeshTextureBake.cpp
         Runtime.EcsSystemBundle.cpp
         Runtime.EditorCommandHistory.cpp
+        Editor/Runtime.EditorPropertyWidgets.cpp
         Editor/Runtime.EditorWindowRegistry.cpp
         Runtime.Engine.cpp
         Runtime.EngineConfigBoot.cpp
@@ -196,6 +198,7 @@ target_link_libraries(${target_name}
 target_link_libraries(${target_name} PRIVATE
         IntrinsicProgressivePoissonReference
         imgui_core_lib
+        implot::implot
 )
 
 # ASSETIO-001 Slice C.2b keeps concrete model/texture decoder dependencies

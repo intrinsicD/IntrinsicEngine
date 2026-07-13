@@ -9,6 +9,7 @@ module;
 // by `imgui.h` in the matching implementation unit, without including `imgui.h`
 // in this module interface (RUNTIME-090).
 struct ImGuiContext;
+struct ImPlotContext;
 
 export module Extrinsic.Runtime.ImGuiAdapter;
 
@@ -84,7 +85,7 @@ export namespace Extrinsic::Runtime
         ImGuiAdapter(ImGuiAdapter&&)                 = delete;
         ImGuiAdapter& operator=(ImGuiAdapter&&)      = delete;
 
-        // Creates the ImGui context, initializes the overlay system, and
+        // Creates paired ImGui/ImPlot contexts, initializes the overlay system, and
         // configures ImGui IO (display size, framebuffer scale, clipboard,
         // backend flags). Returns false and changes nothing if already
         // initialized.
@@ -120,6 +121,7 @@ export namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] bool IsInitialized() const noexcept { return m_Context != nullptr; }
+        [[nodiscard]] bool HasPlotContext() const noexcept { return m_PlotContext != nullptr; }
         [[nodiscard]] EditorInputCaptureSnapshot CaptureSnapshot() const noexcept
         {
             return m_CaptureSnapshot;
@@ -129,7 +131,7 @@ export namespace Extrinsic::Runtime
     private:
         void PumpEvents();          // translate Platform::Event -> ImGui IO
         void ConfigureIo();         // apply display size / scale / backend flags
-        void DestroyContext();      // tear down the ImGui context only
+        void DestroyContext();      // tear down the paired ImPlot/ImGui contexts
 
         // ImGui clipboard hooks routed through the platform window. Declared as
         // static members (free-function-pointer compatible) so they can reach
@@ -140,6 +142,7 @@ export namespace Extrinsic::Runtime
         Platform::IWindow&            m_Window;
         Graphics::ImGuiOverlaySystem& m_OverlaySystem;
         ImGuiContext*                 m_Context{nullptr};
+        ImPlotContext*                m_PlotContext{nullptr};
         std::function<void()>         m_EditorCallback{};
         ImGuiAdapterDiagnostics       m_Diagnostics{};
         EditorInputCaptureSnapshot    m_CaptureSnapshot{};

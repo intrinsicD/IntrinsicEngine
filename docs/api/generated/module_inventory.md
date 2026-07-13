@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 83 |
+| `runtime` | 84 |
 
 ## Modules
 
@@ -328,6 +328,7 @@ Root scanned: `src`
 | `Extrinsic.Platform.Backend.Null` | `src/platform/backends/null/Platform.Backend.Null.cppm` | `platform` |
 | `Extrinsic.Runtime.CameraControllers` | `src/runtime/Cameras/Runtime.CameraControllers.cppm` | `runtime` |
 | `Extrinsic.Runtime.CameraFocusCommand` | `src/runtime/Cameras/Runtime.CameraFocusCommand.cppm` | `runtime` |
+| `Extrinsic.Runtime.EditorPropertyWidgets` | `src/runtime/Editor/Runtime.EditorPropertyWidgets.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorWindowRegistry` | `src/runtime/Editor/Runtime.EditorWindowRegistry.cppm` | `runtime` |
 | `Extrinsic.Runtime.SandboxEditorUi` | `src/runtime/Editor/Runtime.SandboxEditorUi.cppm` | `runtime` |
 | `Extrinsic.Runtime.GizmoFrameService` | `src/runtime/Gizmos/Runtime.GizmoFrameService.cppm` | `runtime` |
@@ -410,4 +411,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugClosestFace` | `src/runtime/SpatialDebug/Runtime.SpatialDebugClosestFace.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **383**
+Total modules: **384**

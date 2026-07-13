@@ -92,6 +92,7 @@ find_package(EnTT CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(draco CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
+find_package(implot CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 find_package(xatlas CONFIG REQUIRED)
 

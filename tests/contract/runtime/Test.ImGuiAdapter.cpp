@@ -97,6 +97,7 @@ TEST(ImGuiAdapter, InitializeProducesZeroListFrameForEmptyWindow)
 
     ASSERT_TRUE(adapter.Initialize());
     EXPECT_TRUE(adapter.IsInitialized());
+    EXPECT_TRUE(adapter.HasPlotContext());
     EXPECT_TRUE(overlay.IsInitialized());
 
     adapter.BeginFrame(kFrameDelta);
@@ -111,6 +112,11 @@ TEST(ImGuiAdapter, InitializeProducesZeroListFrameForEmptyWindow)
     EXPECT_FALSE(diag.LastFrameUsedUserTexture);
     EXPECT_EQ(diag.DisplayWidth, 1280u);
     EXPECT_EQ(diag.DisplayHeight, 720u);
+
+    adapter.Shutdown();
+    EXPECT_FALSE(adapter.IsInitialized());
+    EXPECT_FALSE(adapter.HasPlotContext());
+    EXPECT_FALSE(overlay.IsInitialized());
 }
 
 TEST(ImGuiAdapter, InitializeRejectsDoubleInitialize)
@@ -441,6 +447,7 @@ TEST(ImGuiAdapter, RebuildForDisplayChangeCyclesOverlayExactlyOnce)
 
     EXPECT_EQ(adapter.GetDiagnostics().ContextRebuilds, 1u);
     EXPECT_TRUE(adapter.IsInitialized());
+    EXPECT_TRUE(adapter.HasPlotContext());
     EXPECT_TRUE(overlay.IsInitialized());
 
     // The adapter still produces frames after a rebuild.
@@ -458,4 +465,5 @@ TEST(ImGuiAdapter, RebuildBeforeInitializeIsUncounted)
     adapter.RebuildForDisplayChange(); // no-op while uninitialized
     EXPECT_EQ(adapter.GetDiagnostics().ContextRebuilds, 0u);
     EXPECT_FALSE(adapter.IsInitialized());
+    EXPECT_FALSE(adapter.HasPlotContext());
 }
