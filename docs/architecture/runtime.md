@@ -195,7 +195,11 @@ tracks exactly one active world, and applies active-world switches or destroy
 requests only at the Maintenance boundary. Destroy is two phase: Maintenance
 publishes `WorldWillBeDestroyed` and cancels jobs scoped to that world, the
 event pumps on a later frame, and only a later Maintenance pass tears the
-registry down. After an active-world change is applied, `Engine` refreshes its
+registry down. Destruction has precedence over activation: requesting activation
+of a destroy-pending or destroy-announced world fails with `ResourceBusy`, and
+Maintenance discards an earlier queued activation if a later destroy request
+means its target is no longer `Live`. After an active-world change is applied,
+`Engine` refreshes its
 active scene pointer and immediately rebinds scene-borrowing asset handoffs,
 import-pipeline dependencies, selection lookup, and stable-entity lookup. This
 ordering removes references to the previous registry before its deferred

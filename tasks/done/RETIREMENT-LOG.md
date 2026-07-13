@@ -8,6 +8,16 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-075`](BUG-075-worldregistry-activate-while-destroy-pending.md) — world
+activation-versus-destruction ordering retired on 2026-07-13 at
+`CPUContracted`. Production fix `80c56dcc` makes destruction authoritative:
+`RequestSetActiveWorld` returns `ResourceBusy` for destroy-pending or
+destroy-announced records, while Maintenance revalidates queued activation
+targets as `Live` so the reverse request ordering cannot produce an
+active-and-destroy-announced world. Both deterministic runtime regressions pass
+under ASan/UBSan together with the complete default CPU gate and strict
+structural checks. No hardware-backed follow-up is owed.
+
 [`CI-007`](CI-007-module-safe-persistent-ccache-pilot.md) — persistent
 module-safe ccache pilot retired on 2026-07-13 at `Operational`. Retained a
 bounded external ccache store in `pr-fast` only, with direct/depend modes

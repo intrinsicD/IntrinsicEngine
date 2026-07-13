@@ -39,14 +39,17 @@ regressed hardening that main had shipped as the closed `BUG-066`.
   when frames-in-flight > 1. MEDIUM (suspected).
 - [`BUG-074` — Orphaned GpuAssetCache slot causes per-entity bake retry livelock](BUG-074-object-space-normal-bake-orphaned-cache-slot-livelock.md):
   a failed bake submission leaks its pending cache slot → infinite retry. LOW (suspected).
-- [`BUG-075` — A world can be made active while its destroy is pending](BUG-075-worldregistry-activate-while-destroy-pending.md):
-  `RequestSetActiveWorld` checks only `Contains` → active-and-destroy-announced
-  state. LOW (suspected).
 - [`BUG-076` — AsyncWorkService::ShutdownAndDrain does not drain the derived job registry](BUG-076-asyncworkservice-shutdown-skips-derived-job-registry.md):
   shutdown drains only the executor; registry quiesce is implicit. LOW.
 ---
 
 ## Verified / Closed
+
+- Closed 2026-07-13: [`BUG-075` — A world can be made active while its destroy is pending](../../done/BUG-075-worldregistry-activate-while-destroy-pending.md).
+  Destruction now wins over activation: direct activation rejects pending or
+  announced destruction, and Maintenance drops a queued activation whose target
+  stopped being live. Two deferred-ordering regressions and the complete CPU
+  gate pass under ASan/UBSan.
 
 - Closed 2026-07-13: [`BUG-068` — AssetModelSceneHandoff not rebound on active-world change](../../done/BUG-068-asset-scene-handoff-not-rebound-on-active-world-change.md).
   Active-world maintenance now rebuilds asset/import scene borrowers during
