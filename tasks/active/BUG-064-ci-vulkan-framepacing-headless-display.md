@@ -5,6 +5,15 @@ depends_on: []
 ---
 # BUG-064 — ci-vulkan FramePacingDiagnosticCapture cannot run headless
 
+## Status
+- Status: in progress.
+- Owner: Codex.
+- Branch: `codex/bug-064-software-vulkan`.
+- Xvfb now provides a display, but hosted-run evidence shows the capture still
+  cannot complete its first renderer frame because the runner has no
+  operational Vulkan implementation. The current slice provisions and scopes
+  Mesa lavapipe to this capture.
+
 ## Goal
 - Make the `ci-vulkan` workflow's `ExtrinsicSandbox.FramePacingDiagnosticCapture`
   either runnable (virtual display) or honestly skipped on runners without
@@ -32,16 +41,18 @@ depends_on: []
   signal value is currently zero.
 - Chosen remedy: keep the existing validator strict and run only
   `ExtrinsicSandbox.FramePacingDiagnosticCapture` under an isolated Xvfb server
-  in `ci-vulkan.yml`. The remaining `gpu;vulkan` batch keeps its current
-  capability-skip behavior; this task does not implicitly promote every smoke
-  onto a hosted software-Vulkan path.
+  with Mesa's lavapipe software Vulkan implementation in `ci-vulkan.yml`. The
+  remaining `gpu;vulkan` batch keeps its current capability-skip behavior; this
+  task does not implicitly promote every smoke onto a hosted software-Vulkan
+  path.
 
 ## Required changes
 - [x] Decide the remedy: (a) run the capture under `xvfb-run` in
       `ci-vulkan.yml`, or (b) add a documented environment skip to the
       validator/test registration when no display is available at
       runtime.
-- [ ] Implement it and verify `ci-vulkan` completes with the test either
+- [x] Implement the display and software-Vulkan provisioning in the workflow.
+- [ ] Verify `ci-vulkan` completes with the test either
       passing or explicitly skipped.
 
 ## Tests
@@ -59,7 +70,7 @@ depends_on: []
 
 ## Verification
 ```bash
-grep -n "xvfb\|DISPLAY" .github/workflows/ci-vulkan.yml
+grep -n "xvfb\|mesa-vulkan\|VK_DRIVER_FILES" .github/workflows/ci-vulkan.yml
 python3 tools/ci/check_workflow_names.py --root .github/workflows
 xvfb-run -a --server-args="-screen 0 1280x720x24" \
   ctest --test-dir build/ci-vulkan --output-on-failure \

@@ -35,6 +35,7 @@ jobs:
             libwayland-dev \
             libxkbcommon-dev \
             libgl1-mesa-dev \
+            mesa-vulkan-drivers \
             libvulkan-dev \
             vulkan-tools \
             spirv-tools \
@@ -83,9 +84,12 @@ jobs:
       # without a Vulkan device the remaining smoke fixtures self-skip via
       # `GTEST_SKIP` and the runtime fallback breadcrumb fires — the gate passes
       # as long as no fixture fails. BUG-064 runs the sandbox frame-pacing
-      # capture separately under Xvfb because that process must execute frames
-      # before it can emit a diagnostic report. `--no-tests=ignore` keeps this
-      # batch green if a future host build trims the fixture set to empty.
+      # capture separately under Xvfb and Mesa's lavapipe software Vulkan
+      # implementation because that process must execute operational renderer
+      # frames before it can emit a diagnostic report. The software driver is
+      # scoped to that capture; the remaining smoke fixtures retain their
+      # capability-skip behavior. `--no-tests=ignore` keeps this batch green if
+      # a future host build trims the fixture set to empty.
       - name: Run gpu;vulkan opt-in fixtures
         run: |
           python3 tools/ci/check_prerequisites.py test-binaries \
@@ -100,7 +104,11 @@ jobs:
             -- ctest --test-dir build/ci-vulkan --output-on-failure -L "gpu" -L "vulkan" -LE "slow|flaky-quarantine" -E "^ExtrinsicSandbox\\.FramePacingDiagnosticCapture$" --no-tests=ignore --timeout 120 -j$(nproc)
 
       - name: Run frame-pacing capture under virtual display
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          VK_DRIVER_FILES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
         run: |
+          test -r "$VK_DRIVER_FILES"
           python3 tools/ci/time_command.py \
             --label "Run frame-pacing capture under virtual display" \
             --json-out build/ci-vulkan/ci-timing/phases/test_frame_pacing.json \

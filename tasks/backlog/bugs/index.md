@@ -15,10 +15,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   budget and stopped the job before ccache restore or compilation; collect a
   comparable hosted population and set an evidence-backed budget with explicit
   headroom while preserving fail-closed semantics.
-- [`BUG-064` — ci-vulkan FramePacingDiagnosticCapture cannot run headless](BUG-064-ci-vulkan-framepacing-headless-display.md):
-  `ci-vulkan` is red on every recent run across all branches because the
-  sandbox frame-pacing capture needs a display (GLFW: DISPLAY missing →
-  zero frames → "no samples"); needs xvfb or a documented environment skip.
 ### From the review of merge `76528e6` ("Merge recovered runtime service extractions")
 
 The recovery merge adopted the extraction branch's parallel runtime-kernel
