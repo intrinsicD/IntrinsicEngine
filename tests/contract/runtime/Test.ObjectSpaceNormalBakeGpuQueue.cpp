@@ -316,3 +316,155 @@ TEST(RuntimeObjectSpaceNormalBakeGpuQueue,
     ASSERT_TRUE(bindings.has_value());
     EXPECT_EQ(bindings->Normal, generated);
 }
+
+TEST(RuntimeObjectSpaceNormalBakeGpuQueue,
+     RecordFailureReleasesCacheSlotAndExplicitRetrySucceeds)
+{
+    GpuQueueFixture fx;
+    Extrinsic::Tests::MockCommandContext commandContext;
+    std::uint32_t planCalls = 0u;
+    fx.Queue.SetDependencies(
+        Runtime::RuntimeObjectSpaceNormalBakeGpuQueueDependencies{
+            .GpuAssets = &fx.GpuAssets,
+            .RenderExtraction = &fx.Extraction,
+            .BuildPlan =
+                [&planCalls](
+                    const Runtime::RuntimeObjectSpaceNormalBakeSubmission&
+                        submission)
+                {
+                    Graphics::ObjectSpaceNormalTextureBakePlan plan =
+                        MakePlan(submission);
+                    if (planCalls++ == 0u)
+                    {
+                        // Keep the cache request valid so BeginGpuProducedTexture
+                        // opens a slot, then invalidate only the record template.
+                        plan.RecordTemplate.Pipeline = {};
+                    }
+                    return Runtime::RuntimeObjectSpaceNormalBakeGpuQueuePlanResult{
+                        .Status = Runtime::
+                            RuntimeObjectSpaceNormalBakeGpuQueuePlanStatus::Ready,
+                        .Plan = std::move(plan),
+                    };
+                },
+            .ReadyFrame = [] { return 2u; },
+            .MaxSubmissionsPerFrame = 1u,
+            .MaxBindingsPerDrain = 1u,
+        });
+
+    const Assets::AssetId generated{96u, 1u};
+    const Runtime::RuntimeObjectSpaceNormalBakeRequest request =
+        MakeRequest(17u, 1u, generated);
+    ASSERT_TRUE(fx.Queue.Queue()
+                    .Schedule(request, /*graphicsBackendOperational=*/true)
+                    .Succeeded());
+
+    fx.Queue.RecordFrameCommands(commandContext);
+
+    EXPECT_EQ(planCalls, 1u);
+    EXPECT_EQ(fx.Queue.Diagnostics().RecordFailures, 1u);
+    EXPECT_EQ(fx.Queue.Diagnostics().CacheRejected, 0u);
+    EXPECT_EQ(fx.Queue.Diagnostics().RecordedSubmissions, 0u);
+    EXPECT_EQ(fx.Queue.Queue().PendingSubmissionCount(), 0u);
+    EXPECT_FALSE(fx.Queue.HasInFlightWork());
+    EXPECT_EQ(fx.GpuAssets.GetState(generated),
+              Graphics::GpuAssetState::Failed);
+
+    // Retrying is an explicit scheduling decision. The failed command is not
+    // silently requeued, and the retired cache slot cannot turn this retry into
+    // ResourceBusy -> CacheRejected -> requeue forever.
+    ASSERT_TRUE(fx.Queue.Queue()
+                    .Schedule(request, /*graphicsBackendOperational=*/true)
+                    .Succeeded());
+    fx.Queue.RecordFrameCommands(commandContext);
+
+    EXPECT_EQ(planCalls, 2u);
+    EXPECT_EQ(fx.Queue.Diagnostics().CacheRejected, 0u);
+    EXPECT_EQ(fx.Queue.Diagnostics().RecordedSubmissions, 1u);
+    EXPECT_EQ(fx.Queue.Queue().PendingSubmissionCount(), 0u);
+    EXPECT_TRUE(fx.Queue.HasInFlightWork());
+    EXPECT_EQ(commandContext.DrawIndexedCalls, 1);
+    EXPECT_EQ(fx.GpuAssets.GetState(generated),
+              Graphics::GpuAssetState::GpuUploading);
+
+    fx.GpuAssets.Tick(2u, fx.Device.GetFramesInFlight());
+    ASSERT_EQ(fx.Queue.DrainCompletedTransfers(), 1u);
+    EXPECT_EQ(fx.Queue.Diagnostics().BoundCompletions, 1u);
+    EXPECT_FALSE(fx.Queue.HasInFlightWork());
+}
+
+TEST(RuntimeObjectSpaceNormalBakeGpuQueue,
+     ReadyFrameFailureMarksSlotFailedAndExplicitRetrySucceeds)
+{
+    GpuQueueFixture fx;
+    Extrinsic::Tests::MockCommandContext commandContext;
+    const Assets::AssetId generated{97u, 1u};
+    bool forceReadyFrameFailure = true;
+    fx.Queue.SetDependencies(
+        Runtime::RuntimeObjectSpaceNormalBakeGpuQueueDependencies{
+            .GpuAssets = &fx.GpuAssets,
+            .RenderExtraction = &fx.Extraction,
+            .BuildPlan =
+                [](const Runtime::RuntimeObjectSpaceNormalBakeSubmission&
+                       submission)
+                {
+                    Graphics::ObjectSpaceNormalTextureBakePlan plan =
+                        MakePlan(submission);
+                    return Runtime::RuntimeObjectSpaceNormalBakeGpuQueuePlanResult{
+                        .Status = plan.Succeeded()
+                            ? Runtime::
+                                  RuntimeObjectSpaceNormalBakeGpuQueuePlanStatus::
+                                      Ready
+                            : Runtime::
+                                  RuntimeObjectSpaceNormalBakeGpuQueuePlanStatus::
+                                      Invalid,
+                        .Plan = std::move(plan),
+                    };
+                },
+            .ReadyFrame =
+                [&fx, generated, &forceReadyFrameFailure]
+                {
+                    if (forceReadyFrameFailure)
+                    {
+                        forceReadyFrameFailure = false;
+                        // Model the asset disappearing between command
+                        // recording and ready-frame publication.
+                        fx.GpuAssets.NotifyDestroyed(generated);
+                    }
+                    return 2u;
+                },
+            .MaxSubmissionsPerFrame = 1u,
+            .MaxBindingsPerDrain = 1u,
+        });
+
+    const Runtime::RuntimeObjectSpaceNormalBakeRequest request =
+        MakeRequest(23u, 1u, generated);
+    ASSERT_TRUE(fx.Queue.Queue()
+                    .Schedule(request, /*graphicsBackendOperational=*/true)
+                    .Succeeded());
+    fx.Queue.RecordFrameCommands(commandContext);
+
+    EXPECT_EQ(fx.Queue.Diagnostics().ReadyFrameFailures, 1u);
+    EXPECT_EQ(fx.Queue.Diagnostics().RecordedSubmissions, 0u);
+    EXPECT_EQ(fx.Queue.Queue().PendingSubmissionCount(), 0u);
+    EXPECT_FALSE(fx.Queue.HasInFlightWork());
+    EXPECT_EQ(fx.GpuAssets.GetState(generated),
+              Graphics::GpuAssetState::Failed);
+
+    ASSERT_TRUE(fx.Queue.Queue()
+                    .Schedule(request, /*graphicsBackendOperational=*/true)
+                    .Succeeded());
+    fx.Queue.RecordFrameCommands(commandContext);
+
+    EXPECT_EQ(fx.Queue.Diagnostics().CacheRejected, 0u);
+    EXPECT_EQ(fx.Queue.Diagnostics().RecordedSubmissions, 1u);
+    EXPECT_EQ(fx.Queue.Queue().PendingSubmissionCount(), 0u);
+    EXPECT_TRUE(fx.Queue.HasInFlightWork());
+    EXPECT_EQ(commandContext.DrawIndexedCalls, 2);
+    EXPECT_EQ(fx.GpuAssets.GetState(generated),
+              Graphics::GpuAssetState::GpuUploading);
+
+    fx.GpuAssets.Tick(2u, fx.Device.GetFramesInFlight());
+    ASSERT_EQ(fx.Queue.DrainCompletedTransfers(), 1u);
+    EXPECT_EQ(fx.Queue.Diagnostics().BoundCompletions, 1u);
+    EXPECT_FALSE(fx.Queue.HasInFlightWork());
+}
