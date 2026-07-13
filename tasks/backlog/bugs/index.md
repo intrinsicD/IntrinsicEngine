@@ -39,11 +39,15 @@ regressed hardening that main had shipped as the closed `BUG-066`.
   when frames-in-flight > 1. MEDIUM (suspected).
 - [`BUG-074` — Orphaned GpuAssetCache slot causes per-entity bake retry livelock](BUG-074-object-space-normal-bake-orphaned-cache-slot-livelock.md):
   a failed bake submission leaks its pending cache slot → infinite retry. LOW (suspected).
-- [`BUG-076` — AsyncWorkService::ShutdownAndDrain does not drain the derived job registry](BUG-076-asyncworkservice-shutdown-skips-derived-job-registry.md):
-  shutdown drains only the executor; registry quiesce is implicit. LOW.
 ---
 
 ## Verified / Closed
+
+- Closed 2026-07-13: [`BUG-076` — AsyncWorkService::ShutdownAndDrain does not drain the derived job registry](../../done/BUG-076-asyncworkservice-shutdown-skips-derived-job-registry.md).
+  Shutdown now joins executor work, drains and applies ready derived results,
+  then cancels every non-terminal survivor. Ready and unreadied readback
+  regressions each pass 100 repetitions under ASan/UBSan, and the complete CPU
+  gate passes.
 
 - Closed 2026-07-13: [`BUG-075` — A world can be made active while its destroy is pending](../../done/BUG-075-worldregistry-activate-while-destroy-pending.md).
   Destruction now wins over activation: direct activation rejects pending or

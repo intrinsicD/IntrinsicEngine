@@ -8,6 +8,17 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-076`](BUG-076-asyncworkservice-shutdown-skips-derived-job-registry.md) —
+derived-job shutdown quiescence retired on 2026-07-13 at `CPUContracted`.
+Production fix `6d6f784a` joins the shared executor, drains completion and
+readback queues, applies newly ready results, and then cancels every survivor so
+an unreadied callback cannot resume after `ShutdownAndDrain` returns. The
+unreadied regression failed deterministically against the intermediate
+drain-only ordering, then both ready and unreadied contracts passed 100
+repetitions under ASan/UBSan; the broader 9-test async-work selection, complete
+3684-test default CPU gate, and strict structural checks pass. No
+hardware-backed follow-up is owed.
+
 [`BUG-075`](BUG-075-worldregistry-activate-while-destroy-pending.md) — world
 activation-versus-destruction ordering retired on 2026-07-13 at
 `CPUContracted`. Production fix `80c56dcc` makes destruction authoritative:
