@@ -33,7 +33,7 @@ maturity_target: CPUContracted
 - [ ] Fill `paper.md` with the claim capture (Dirichlet-to-Neumann boundary reduction, direct length/angle boundary control, cone singularities, discrete conformality, interactivity).
 - [ ] Implement the `Bff` strategy body in `Geometry.Parameterization`: assemble the cotangent Laplacian, build/apply the boundary Dirichlet-to-Neumann map, solve for the conjugate boundary quantity under the selected `BoundaryTarget` mode, recover the interior via two `SparseLDLT` solves, and integrate the boundary curve; apply supplied cone curvatures as interior boundary conditions.
 - [ ] Deterministic: identical `(mesh, params)` produce bitwise-identical UVs across runs and thread counts.
-- [ ] Fail-closed on non-disk topology (unless cones make the target valid), non-triangle faces, empty/degenerate meshes, non-finite input, a boundary-target array whose length ≠ boundary-vertex count, and a Gauss–Bonnet-inconsistent prescribed-curvature set (explicit status; no arbitrary projection).
+- [ ] Fail-closed on non-disk topology (cones prescribe interior curvature on a disk; they do not repair topology — cutting a closed mesh through cones stays with the `Geometry.UvAtlas` charting path), non-triangle faces, empty/degenerate meshes, non-finite input, a boundary-target array whose length ≠ boundary-vertex count, and a Gauss–Bonnet-inconsistent prescribed-curvature set (explicit status; no arbitrary projection).
 
 ## Tests
 - [ ] `tests/unit/geometry/Test.BoundaryFirstFlattening.cpp` (`unit;geometry`).

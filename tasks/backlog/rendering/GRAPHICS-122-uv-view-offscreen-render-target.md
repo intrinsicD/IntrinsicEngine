@@ -33,7 +33,7 @@ maturity_target: Operational
 - [ ] `UI-036` renders the GPU target when `GpuShaded` is active and operational, else the CPU layout — one panel, honest mode reporting.
 
 ## Tests
-- [ ] Opt-in `tests/gpu/graphics/Test.UvViewRenderTarget.cpp` labeled `gpu;vulkan`: on a Vulkan-capable host the UV target renders a non-empty image (non-background fraction above a threshold; expected clear color elsewhere) for a parameterized disk mesh, following the readback-smoke authoring pattern.
+- [ ] Opt-in `tests/integration/graphics/Test.UvViewGpuSmoke.cpp` labeled `gpu;vulkan` (mirroring `Test.DefaultRecipeSurfaceGpuSmoke.cpp` / `Test.ImGuiSurfaceGpuSmoke.cpp`): on a Vulkan-capable host the UV target renders a non-empty image (non-background fraction above a threshold; expected clear color elsewhere) for a parameterized disk mesh, following the readback-smoke authoring pattern.
 - [ ] Fallback: on the Null/non-operational device the UV view reports `CpuLayout` mode and the panel uses the `ImDrawList` path (default CPU gate).
 - [ ] Config round-trip: the view render-mode/background-mode toggles round-trip through `Core.Config.EngineLoad` (contract test).
 

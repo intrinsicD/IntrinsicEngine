@@ -2,7 +2,7 @@
 id: METHOD-026
 theme: I
 depends_on: [METHOD-025]
-maturity_target: Operational
+maturity_target: ParityProven
 ---
 # METHOD-026 — Parameterization family GPU (Vulkan compute) backend and parity
 
@@ -33,7 +33,7 @@ maturity_target: Operational
 - [ ] Preserve determinism within the documented GPU parity tolerance; preserve SLIM injectivity on the GPU path.
 
 ## Tests
-- [ ] Opt-in `tests/gpu/geometry/Test.ParameterizationGpuParity.cpp` labeled `gpu;vulkan`: on a Vulkan-capable host the GPU ARAP/SLIM result matches the CPU reference within the documented parity tolerance, with zero flips for SLIM.
+- [ ] Opt-in `tests/integration/runtime/Test.ParameterizationGpuBackendGpuSmoke.cpp` labeled `gpu;vulkan` (mirroring `Test.KMeansGpuBackendGpuSmoke.cpp` — the adapter under test is runtime-owned): on a Vulkan-capable host the GPU ARAP/SLIM result matches the CPU reference within the documented parity tolerance, with zero flips for SLIM.
 - [ ] Fallback: on the Null/non-operational device a `Backend::GPU` request returns `ActualBackend == cpu_*` with `FellBackToCPU == true` (runs in the default CPU gate).
 - [ ] Determinism within tolerance across two GPU runs.
 
@@ -67,4 +67,4 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - No RHI import into `src/geometry`; no private GPU primitive library.
 
 ## Maturity
-- Target: `Operational` on Vulkan-capable hosts (`gpu;vulkan` parity smoke cited); `CPUContracted` fallback everywhere else. This closes the family's Strategy × Backend matrix.
+- Target: `Operational` on Vulkan-capable hosts and `ParityProven` against the CPU reference (mirroring `METHOD-020`). Requires the `ci-vulkan` preset run cited in `Verification`; CPU-only hosts stop at the asserted honest fallback. This closes the family's Strategy × Backend matrix.
