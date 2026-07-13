@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `UI-034` — Decentralized editor window contribution, capture contract, and property-plot widgets (tasks/active/UI-034-framework24-editor-interaction-layout-conventions.md)
+- none
 
 ## Theme B — Rendering modernization
 

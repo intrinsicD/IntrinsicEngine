@@ -4415,3 +4415,18 @@ focused CTest passed 169/169, `IntrinsicTests` built, the full default
 CPU-supported CTest gate passed 3640/3640, the opt-in `gpu;vulkan` readback /
 KMeans smoke selection passed 5/5, and the module inventory/session brief were
 regenerated.
+
+[`UI-034`](UI-034-framework24-editor-interaction-layout-conventions.md) —
+Decentralized editor-window contribution, capture, visibility, and generic
+property-plot contracts retired to `tasks/done/` on 2026-07-13 at
+`CPUContracted`. `Runtime.SandboxEditorUi` now exposes a mutation-safe registry
+with stable IDs, structured menu paths, lazy callbacks, transition observation,
+and an external composition seam. One end-of-editor-frame capture snapshot
+gates viewport consumers, while the global visibility command preserves window
+open state and immediately clears stale capture. Mesh Appearance and Mesh
+Simplify are registry-owned exemplars sharing one lazy mesh model; Appearance
+uses the generic scalar-property selector and ImPlot histogram. Focused editor
+tests passed 15/15, `IntrinsicTests` built, the full default CPU-supported CTest
+gate passed 3675/3675, strict structural/docs checks passed, and the five-frame
+promoted-Vulkan composition smoke completed before the separately tracked
+`BUG-083` LeakSanitizer shutdown finding.

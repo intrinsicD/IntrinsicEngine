@@ -11,10 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`UI-034`](UI-034-framework24-editor-interaction-layout-conventions.md) —
-  decentralized editor window contribution, capture, visibility, and scalar
-  property-plot contracts (`in progress`, owner: Codex, branch:
-  `codex/ui-034-editor-window-contribution`).
+No tasks are currently active.
 
 ## History
 

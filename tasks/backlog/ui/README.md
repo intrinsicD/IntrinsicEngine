@@ -10,13 +10,7 @@ map.
 
 ## Tasks
 
-- UI-034 is active; see
-  [`tasks/active/UI-034`](../../active/UI-034-framework24-editor-interaction-layout-conventions.md).
-  (Theme F; adopts the framework24 viewer interaction/layout conventions —
-  domain-window registration seam, lazy window lifecycle, unified input-capture
-  contract, global UI toggle, and generic property-plot widgets; ARCH-013
-  re-scoped the contribution seam onto the ADR-0024 EditorUiModule/panel
-  registry direction).
+No UI tasks are currently open.
 
 Further UI children open from the deferred triggers recorded by the retired
 RORG-031F seed.
@@ -26,6 +20,11 @@ retired under the runtime backlog as `RUNTIME-135`.
 
 ## Convergence
 
+- UI-034 is retired under Theme F. It adopts the framework24 viewer
+  interaction/layout conventions through the ADR-0024 EditorUiModule/panel
+  registry direction: structured domain-window contributions, lazy window
+  lifecycle, one input-capture snapshot, a global UI toggle, and generic
+  scalar-property plot widgets.
 - RORG-031F is retired as the Theme F planning seed that kept the promoted
   `SandboxEditorUi` inventory and deferred-workflow trigger list aligned while
   concrete UI children were opening and retiring independently.

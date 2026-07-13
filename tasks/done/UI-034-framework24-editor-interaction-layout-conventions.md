@@ -4,21 +4,20 @@ theme: F
 depends_on:
   - ARCH-012
 maturity_target: CPUContracted
+completed: 2026-07-13
 ---
 # UI-034 — Decentralized editor window contribution, capture contract, and property-plot widgets
 
 ## Status
-- Status: in progress.
-- Owner: Codex.
-- Branch: `codex/ui-034-editor-window-contribution`.
-- Progress: Slices A-D implemented. The registry is lazy and mutation-safe;
+- Retired on 2026-07-13 at `CPUContracted`.
+- PR: pending. Commit: pending local change.
+- Slices A-D are complete. The registry is lazy and mutation-safe;
   one end-of-editor-frame capture snapshot gates viewport consumers; the global
   visibility command and unsuppressed `G` action preserve per-window state and
   clear stale capture immediately. The generic scalar-property model filters
   non-finite values, and ImPlot context lifetime is paired with ImGui. Mesh
   Appearance and Mesh Simplify are registry-owned exemplars that share one lazy
   mesh model, with the scalar-property histogram rendered in Appearance.
-- Next verification step: run closure gates and retire the task.
 
 ## Goal
 - Adopt the framework24 viewer's interaction/layout model in the Sandbox editor: domains contribute their menu entries and windows through a registration seam instead of a central enum, closed windows cost nothing per frame, viewport input is gated by one explicit UI-capture contract with a global UI-visibility toggle, and any scalar per-element property of the selection can be inspected through generic property-selector plus histogram/plot widgets.
@@ -103,7 +102,7 @@ maturity_target: CPUContracted
 - [x] Closed windows are provably free per frame (test above).
 - [x] All viewport input decisions read the single capture snapshot.
 - [x] The global toggle and both migrated exemplar windows work in the sandbox.
-- [ ] The default CPU gate stays green; no UI-owned engine state is introduced.
+- [x] The default CPU gate stays green; no UI-owned engine state is introduced.
 
 ## Verification
 ```bash
@@ -114,6 +113,16 @@ python3 tools/repo/check_layering.py --root src --strict
 python3 tools/docs/check_doc_links.py --root .
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+Closure evidence (2026-07-13):
+- `IntrinsicRuntimeContractTests` built; the 15 focused property-widget,
+  registry, and exemplar-integration tests passed.
+- `IntrinsicTests` built and the default CPU-supported gate passed 3675/3675.
+- Strict layering, test-layout, task-policy, docs-link, and diff-whitespace
+  checks passed.
+- `ExtrinsicSandbox` completed a five-frame promoted-Vulkan composition smoke;
+  its nonzero LeakSanitizer shutdown result is tracked separately by `BUG-083`
+  and does not affect this task's CPU-contracted editor seam.
 
 ## Forbidden changes
 - No algorithm or simulation state ownership in UI.
