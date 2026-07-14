@@ -19,7 +19,7 @@
   explicitly owned by follow-up tasks and no parameterization/mapping algorithm
   behavior ships in GEOM-011.
 - Roadmap: [`docs/architecture/parameterization-mapping-roadmap.md`](../../docs/architecture/parameterization-mapping-roadmap.md).
-- Follow-up implementation packs: [`GEOM-018`](GEOM-018-parameterization-distortion-map-quality-diagnostics.md) and [`GEOM-019`](../backlog/geometry/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md).
+- Follow-up implementation packs: [`GEOM-018`](GEOM-018-parameterization-distortion-map-quality-diagnostics.md) and [`GEOM-019`](../done/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md).
 
 ## Context
 - Owning subsystem/layer: `geometry` and `methods/geometry` where paper-specific work applies.
@@ -32,7 +32,7 @@
 - [x] Define candidate task packs for harmonic/Tutte embedding, ARAP parameterization, SLIM, distortion metrics, atlas segmentation, seam generation, chart packing, barycentric map storage, functional maps, and map-quality metrics.
 - [x] For each pack, record dependencies on GEOM-005 through GEOM-009, especially linear algebra, optimization, robust predicates, mesh soup/conversion, diagnostics, and benchmark manifests.
 - [x] Identify which components are generic geometry infrastructure and which are paper-method implementations.
-- [x] Add follow-up task files for the first two implementation packs selected by priority. ([`GEOM-018`](GEOM-018-parameterization-distortion-map-quality-diagnostics.md) and [`GEOM-019`](../backlog/geometry/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md).)
+- [x] Add follow-up task files for the first two implementation packs selected by priority. ([`GEOM-018`](GEOM-018-parameterization-distortion-map-quality-diagnostics.md) and [`GEOM-019`](../done/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md).)
 - [x] Document standard fixtures and correctness checks for disk topology, boundary conditions, flipped triangles, distortion metrics, and degenerate inputs.
 
 ## Tests
@@ -65,4 +65,3 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Do not implement algorithms in this roadmap task.
 - Do not introduce renderer/material/asset dependencies.
 - Do not bypass the method workflow for paper-backed algorithms.
-

@@ -361,7 +361,7 @@ Every family already shares the reference skeleton (`Params → std::optional<Re
 - **Parameterization** = a solver choice (LSCM/Harmonic-Tutte, future ARAP/SLIM)
   + a boundary policy + the already-canonical shared `ParameterizationDiagnostics`
   (conformal/authalic/stretch/flipped/seam metrics). See
-  [`GEOM-019`](../../tasks/backlog/geometry/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md)
+  [`GEOM-019`](../../tasks/done/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md)
   and the [parameterization roadmap](parameterization-mapping-roadmap.md).
 - **The coarse-to-fine schedule is the same object everywhere**: Amberg's
   stiffness list, CPD's σ² annealing, and a voxel/resolution pyramid all reduce to

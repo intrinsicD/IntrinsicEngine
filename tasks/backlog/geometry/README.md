@@ -11,7 +11,6 @@ map.
 
 - [GEOM-013 — Feature-preserving dual contouring](GEOM-013-feature-preserving-dual-contouring.md).
 - [GEOM-014 — Feature-aware quadric error mesh simplification](GEOM-014-feature-aware-quadric-error-simplification.md).
-- [GEOM-019 — Harmonic/Tutte parameterization and boundary constraints](GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md).
 - [GEOM-024 — Sparse symmetric generalized eigensolver seam](GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
   (gates `methods/METHOD-006` variant B; depends on `GEOM-020`; promote when
   METHOD-006 is the next-priority method).
@@ -132,7 +131,8 @@ the runtime SpatialDebug closest-face consumer in `RUNTIME-135`.
   Each lists explicit algorithm variants with a marked default (Manifold DC
   for GEOM-013, FA-QEM for GEOM-014). GEOM-013 (dual contouring) is a
   peer of the existing `Geometry.MarchingCubes`; GEOM-014 (FA-QEM) is an in-place
-  extension of `Geometry.HalfedgeMesh.Simplification`.
+  extension of `Geometry.HalfedgeMesh.Simplification`. Retired GEOM-019
+  supplies the harmonic/Tutte foundation consumed by GEOM-063.
 - GEOM-054 is retired as Slice 0 of the registration-pipeline modularity roadmap in
   [`docs/architecture/geometry-pipeline-modularity.md`](../../../docs/architecture/geometry-pipeline-modularity.md):
   a behavior-preserving refactor of `Geometry.Registration::AlignICP` into named
@@ -173,6 +173,7 @@ split; narratives live in the retirement log.
 - [GEOM-016 — Point-cloud filtering and density diagnostics contracts](../../archive/GEOM-016-point-cloud-filtering-density-contracts.md) (done).
 - [GEOM-017 — Point-cloud descriptors and registration seams](../../archive/GEOM-017-point-cloud-descriptors-registration-seams.md) (done).
 - [GEOM-018 — Parameterization distortion and map-quality diagnostics](../../archive/GEOM-018-parameterization-distortion-map-quality-diagnostics.md) (done).
+- [GEOM-019 — Harmonic/Tutte parameterization and boundary constraints](../../done/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md) (done, `CPUContracted`, 2026-07-15).
 - [GEOM-015 — GJK termination diagnostics and scale-aware tolerance policy](../../archive/GEOM-015-gjk-termination-diagnostics.md) (done).
 - [GEOM-021 — MeshSoup module implementation split](../../archive/GEOM-021-meshsoup-module-implementation-split.md).
 - [GEOM-022 — Remaining geometry module implementation splits](../../archive/GEOM-022-remaining-geometry-module-implementation-splits.md).
@@ -230,6 +231,6 @@ split; narratives live in the retirement log.
 - GEOM-011 is retired in [`tasks/done`](../../archive/GEOM-011-parameterization-mapping-roadmap.md)
   and records the parameterization/mapping method-compliant roadmap in
   [`docs/architecture/parameterization-mapping-roadmap.md`](../../../docs/architecture/parameterization-mapping-roadmap.md).
-  Its first implementation packs are GEOM-018 (distortion/map-quality
-  diagnostics) and GEOM-019 (harmonic/Tutte parameterization and boundary
-  constraints).
+  Its first implementation packs are retired GEOM-018
+  (distortion/map-quality diagnostics) and retired GEOM-019
+  (harmonic/Tutte parameterization and boundary constraints).

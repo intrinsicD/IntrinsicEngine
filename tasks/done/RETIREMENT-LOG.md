@@ -8,6 +8,17 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`GEOM-019`](GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md) —
+harmonic/Tutte parameterization retired on 2026-07-15 at `CPUContracted`.
+Implementation commit `29d7a908` added explicit circle, square, and custom
+boundary policies, cotangent-harmonic and uniform-Tutte weights, structured
+failure states, shared GEOM-018 diagnostics, and a geometry-owned sparse-LDLT
+solve without exposing Eigen. The Clang-23 ASan/UBSan `ci` build completed and
+the exact `Parameterization|Sparse|DEC` selection passed 134/134; layering,
+task, test-layout, and documentation checks remained green. No `Operational`
+follow-up is owed because this is a deterministic CPU geometry solver. Its
+retirement satisfies GEOM-063's remaining dependency.
+
 [`PROC-026`](PROC-026-task-archive-and-micro-template.md) — task archive
 sweep and micro template retired on 2026-07-14. All 661 retired task files
 moved from `tasks/done/` to the frozen `tasks/archive/` with ~1,600 inbound

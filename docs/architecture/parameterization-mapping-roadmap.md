@@ -82,7 +82,7 @@ Forbidden shortcuts:
 
 ## Pack 2 — Harmonic/Tutte embedding and boundary constraints
 
-Follow-up task: [`GEOM-019`](../../tasks/backlog/geometry/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md).
+Retired implementation task: [`GEOM-019`](../../tasks/done/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md).
 
 Scope:
 
@@ -283,7 +283,7 @@ Parameterization and mapping tasks must make topology, boundary, and degeneracy 
 
 ## Initial priority
 
-The diagnostics ([`GEOM-018`](../../tasks/archive/GEOM-018-parameterization-distortion-map-quality-diagnostics.md), retired) and harmonic/Tutte ([`GEOM-019`](../../tasks/backlog/geometry/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md)) foundations exist, so the SOTA-variant program orders as:
+The diagnostics ([`GEOM-018`](../../tasks/archive/GEOM-018-parameterization-distortion-map-quality-diagnostics.md), retired) and harmonic/Tutte ([`GEOM-019`](../../tasks/done/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md), retired) foundations exist, so the SOTA-variant program orders as:
 
 1. [`GEOM-063`](../../tasks/backlog/geometry/GEOM-063-parameterization-strategy-backend-surface.md) — the family dispatch surface, consolidating the existing Tutte/Harmonic/LSCM solvers so every later variant is choosable through one API. Behavior-preserving; no new algorithm.
 2. [`GEOM-064`](../../tasks/backlog/geometry/GEOM-064-parameterization-optimization-kernels.md) — the shared optimization-kernel seam ARAP and SLIM consume.

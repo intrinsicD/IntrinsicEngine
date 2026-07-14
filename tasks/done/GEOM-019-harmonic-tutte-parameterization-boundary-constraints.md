@@ -2,6 +2,7 @@
 id: GEOM-019
 theme: I
 depends_on: [GEOM-018, GEOM-020]
+completed_on: 2026-07-15
 ---
 # GEOM-019 — Harmonic/Tutte parameterization and boundary constraints
 
@@ -16,8 +17,8 @@ depends_on: [GEOM-018, GEOM-020]
 - No benchmark performance claims.
 
 ## Context
-- Status: implemented on branch `claude/intrinsic-engine-framework24-migrate-cew18n`;
-  full `ctest` gate deferred to CI (see Status below).
+- Status: implemented in commit `29d7a908` and verified for retirement on
+  2026-07-15 with the repository `ci` preset and focused CTest gate.
 - Owning subsystem/layer: `geometry` (`geometry -> core` only) plus `benchmarks/geometry` using public geometry APIs only.
 
 ## Status
@@ -34,15 +35,12 @@ depends_on: [GEOM-018, GEOM-020]
   documented fallback clause is not needed; LDLT is used directly.
 - Existing `Geometry.Parameterization::ComputeLSCM` is untouched and covered by a
   reachability test.
-- Verified in-session: `check_layering`, `check_test_layout`, `check_doc_links`,
-  `check_task_policy`, `validate_tasks` pass; module inventory regenerated (530
-  modules); a standalone clang-20 + glm + Eigen sanity check confirms the
-  square-fan harmonic/Tutte center lands exactly at (0.5, 0.5) for both weightings.
-- Deferred to CI: `cmake --preset ci` + `ctest -R 'Parameterization|Sparse'` —
-  the sandbox cannot bootstrap vcpkg (microsoft/vcpkg clone denied by the egress
-  policy), so the full C++23-module build/test must run in CI before this task
-  retires to `tasks/done/`.
-- Spawned by [`GEOM-011`](../../archive/GEOM-011-parameterization-mapping-roadmap.md) and the [parameterization/mapping roadmap](../../../docs/architecture/parameterization-mapping-roadmap.md).
+- Retirement verification: `cmake --preset ci` selected Clang 23 with
+  ASan/UBSan, `IntrinsicTests` built successfully, and the exact
+  `Parameterization|Sparse|DEC` selection passed 134/134. Layering, test-layout,
+  task-policy, task-state, and documentation checks pass; the generated module
+  inventory remains current.
+- Spawned by [`GEOM-011`](../archive/GEOM-011-parameterization-mapping-roadmap.md) and the [parameterization/mapping roadmap](../../docs/architecture/parameterization-mapping-roadmap.md).
 - Existing `Geometry.Parameterization` provides LSCM for disk-topology triangle meshes. This task adds the smallest new solver family after diagnostics: harmonic/Tutte embedding with explicit boundary policies.
 - Depends on GEOM-018 for shared distortion/map-quality diagnostics. If GEOM-018 is not retired when this task starts, record any diagnostic subset used here as an explicit in-task assumption.
 - Depends on retired GEOM-020 for the sparse direct SPD solver seam (`Geometry.Sparse` LDLT/LLT): the fixed-boundary Tutte/harmonic interior system is SPD and should use `Geometry.Sparse::SparseLDLT` by default. The existing `Geometry.Sparse` CG path from GEOM-008 remains an acceptable documented fallback only if a later slice plan records the solver choice and tolerance before implementation.
@@ -74,24 +72,24 @@ depends_on: [GEOM-018, GEOM-020]
       UVs, Custom boundary not fully pinned.
 - [x] Tutte flip-free embedding asserted via `Diagnostics.FlippedElementCount`.
 - [x] LSCM reachability test.
-- [ ] (Deferred to CI) `cmake --preset ci && ctest -R 'Parameterization|Sparse'`
-      — not runnable in the authoring sandbox (vcpkg egress blocked).
+- [x] `cmake --preset ci`, `cmake --build --preset ci --target IntrinsicTests`,
+      and the focused `Parameterization|Sparse|DEC` CTest gate pass (134/134).
 
 ## Docs
-- [x] Updated [`docs/architecture/geometry.md`](../../../docs/architecture/geometry.md)
+- [x] Updated [`docs/architecture/geometry.md`](../../docs/architecture/geometry.md)
       with the harmonic/Tutte solver, weightings, boundary policies, solver seam,
       and failure-state semantics.
 - [x] Regenerated `docs/api/generated/module_inventory.md` (adds
       `Geometry.Parameterization.Harmonic`; 530 modules).
-- [ ] (Not introduced) No new smoke benchmark ID in this slice; the
+- [x] No new smoke benchmark ID was introduced; the
       parameterization-mapping roadmap pack boundary is unchanged.
 
 ## Acceptance criteria
-- [ ] Harmonic/Tutte parameterization is available with explicit boundary policies and deterministic diagnostics.
-- [ ] Unsupported topology, invalid pins, invalid UVs, singular systems, and non-convergence report structured failure states.
-- [ ] GEOM-018 diagnostics are used or an explicit documented subset is provided if GEOM-018 is still open.
-- [ ] Tests cover valid square/circle embeddings, invalid topology, invalid boundary conditions, and LSCM compatibility.
-- [ ] The implementation preserves `geometry -> core` layering and benchmark dependencies remain limited to public geometry/method APIs.
+- [x] Harmonic/Tutte parameterization is available with explicit boundary policies and deterministic diagnostics.
+- [x] Unsupported topology, invalid pins, invalid UVs, singular systems, and solver failure report structured failure states.
+- [x] Retired GEOM-018 diagnostics are embedded in every successful result.
+- [x] Tests cover valid square/circle embeddings, invalid topology, invalid boundary conditions, and LSCM compatibility.
+- [x] The implementation preserves `geometry -> core` layering and benchmark dependencies remain limited to public geometry/method APIs.
 
 ## Verification
 ```bash
@@ -113,5 +111,9 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Do not introduce renderer/runtime/ECS/assets/platform/app dependencies.
 
 ## Maturity
-- Target: `CPUContracted` (deterministic CPU solver verified by the default gate).
+- Reached: `CPUContracted` (deterministic CPU solver verified by the default
+  gate and the focused 134-test parameterization/sparse/DEC selection).
 - No `Operational` follow-up is owed; this task has no backend seam.
+
+Completed: 2026-07-15. Implementation commit: `29d7a908`; retirement metadata
+and final verification are recorded by this GEOM-019 change set.

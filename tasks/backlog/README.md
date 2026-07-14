@@ -357,7 +357,7 @@ family on the `GEOM-063` shared surface — `METHOD-021` ARAP (blocked by
 `METHOD-025`/`RUNTIME-176`; iterative strategies only), and
 its engine-integration leaves `RUNTIME-176` (blocked by `GEOM-063`), `UI-036`
 (blocked by `RUNTIME-176`), and the optional `GRAPHICS-122` (blocked by
-`UI-036`); and the method-readiness seams `GEOM-013`, `GEOM-014`, `GEOM-019`,
+`UI-036`); and the method-readiness seams `GEOM-013`, `GEOM-014`,
 `GEOM-024`, `GEOM-058`, `GEOM-059`, `GEOM-060`, `GEOM-061`, `GEOM-062`,
 `GEOM-063`, `GEOM-064`.
 
