@@ -17,13 +17,15 @@ module;
 
 module Extrinsic.Sandbox.Editor.DomainPanels;
 
+import Extrinsic.Sandbox.Editor.Shell;
+
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorPropertyWidgets;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.ProgressiveRenderData;
-import Extrinsic.Runtime.SandboxEditorUi;
+import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
 
@@ -1776,7 +1778,7 @@ namespace Extrinsic::Sandbox::Editor
             PointCloudOutlierRemoval,
         };
 
-        Runtime::SandboxEditorUi* EditorUi{nullptr};
+        EditorShell* Shell{nullptr};
         std::vector<Runtime::EditorWindowHandle> Handles{};
         int CachedModelFrame{-1};
         std::array<std::optional<Runtime::SandboxEditorDomainWindowModel>, 3u>
@@ -1802,10 +1804,10 @@ namespace Extrinsic::Sandbox::Editor
         bool UvAtlasForceRegenerate{true};
         bool UvAtlasPreserveAuthored{false};
 
-        void Register(Runtime::SandboxEditorUi& editorUi)
+        void Register(EditorShell& editorShell)
         {
             Unregister();
-            EditorUi = &editorUi;
+            Shell = &editorShell;
             RegisterWindow(Runtime::SandboxEditorDomainWindowKind::PointCloud,
                            PanelKind::Appearance,
                            "pointcloud.appearance", {"PointCloud"},
@@ -1852,14 +1854,17 @@ namespace Extrinsic::Sandbox::Editor
 
         void Unregister()
         {
-            if (EditorUi != nullptr)
+            if (Shell != nullptr)
             {
                 for (const Runtime::EditorWindowHandle handle : Handles)
-                    (void)EditorUi->UnregisterEditorWindow(handle);
+                    (void)Shell->UnregisterEditorWindow(handle);
             }
             Handles.clear();
-            EditorUi = nullptr;
+            Shell = nullptr;
             ResetModelCache();
+            LastPointCloudOutlierRemovalResult.reset();
+            LastUvRegenerationResult.reset();
+            MeshPropertyPlotState.SelectedProperty.clear();
         }
 
         void ResetModelCache()
@@ -1878,8 +1883,8 @@ namespace Extrinsic::Sandbox::Editor
             std::string windowTitle)
         {
             const std::string callbackTitle = windowTitle;
-            Handles.push_back(EditorUi->RegisterEditorWindow(
-                Runtime::SandboxEditorWindowDescriptor{
+            Handles.push_back(Shell->RegisterEditorWindow(
+                EditorWindowDescriptor{
                     .Id = std::move(id),
                     .MenuPath = std::move(menuPath),
                     .Title = std::move(menuTitle),
@@ -2014,9 +2019,9 @@ namespace Extrinsic::Sandbox::Editor
         m_Impl->Unregister();
     }
 
-    void DomainPanels::Register(Runtime::SandboxEditorUi& editorUi)
+    void DomainPanels::Register(EditorShell& editorShell)
     {
-        m_Impl->Register(editorUi);
+        m_Impl->Register(editorShell);
     }
 
     void DomainPanels::Unregister()

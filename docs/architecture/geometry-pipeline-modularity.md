@@ -18,15 +18,17 @@ Related canonical policy this design obeys:
   domain you need".
 - [`docs/agent/method-workflow.md`](../agent/method-workflow.md) — the
   CPU-reference-first method contract that any *named paper* stage must follow.
-- Layer contract (`AGENTS.md` §2): `geometry -> core` only; `runtime` owns
-  composition/wiring including UI; `methods` consume the public method API.
+- Layer contract (`AGENTS.md` §2): `geometry -> core` only; `runtime`
+  owns execution facades and generic editor infrastructure; `app` owns
+  Sandbox presentation; `methods` consume the public method API.
 
 ## 1. Problem: geometry and UI are stitched together
 
 Two concrete couplings motivate this work.
 
-**The algorithm catalog and its dispatch live inside the UI.**
-`Runtime.SandboxEditorUi.cpp` (~16.9k lines) defines a
+**Historical baseline: the algorithm catalog and its dispatch lived inside the
+UI.** Before ARCH-006, the now-retired
+`src/runtime/Editor/Runtime.SandboxEditorUi.cpp` (then ~16.9k lines) defined a
 `SandboxEditorGeometryProcessingAlgorithm` enum spanning ~20 algorithm families
 (`Registration`, `Smoothing`, `Remeshing`, `Simplification`, `Parameterization`,
 `SurfaceReconstruction`, denoise/outlier families, …) and drives it through
@@ -39,6 +41,13 @@ algorithm requires editing the god-file in several places. (`Geometry.MeshOperat
 is even imported but only supplies a shared *result* struct
 (`Geometry.MeshOperator.cppm:25`), not an operator abstraction — a signal of an
 abandoned operator migration.)
+
+ARCH-006 has since moved ImGui state, widgets, and registration into
+`Extrinsic.Sandbox.Editor.Shell` and the app-owned panel modules. The
+algorithm catalog, deterministic panel models, and typed command execution
+remain runtime-owned in `Extrinsic.Runtime.SandboxEditorFacades`. The
+remaining modularity concern is therefore the breadth of that runtime facade,
+not runtime ownership of Sandbox presentation.
 
 **Registration is monolithic.** `Geometry::Registration::AlignICP`
 (`Geometry.Registration.cppm:145`) is a single rigid-only free function whose
@@ -146,7 +155,8 @@ family*, not a universal DAG engine.
 | Data-driven **param schema** (key/type/default/label/range) | **geometry-local** initially; promote to `core` on a second consumer | new `Geometry.Registration` descriptor types |
 | GPU-capable overloads + `IDevice::IsOperational()` fallback | **runtime** | `Runtime.RegistrationBackend` (mirrors `Runtime.KMeansBackend`) |
 | Heavy/async execution (large clouds, coarse RANSAC, BVH builds) | **runtime** | `Runtime.DerivedJobGraph` (do not invent a fourth graph system) |
-| UI (thin schema-reflecting adapter) | **runtime** | `Runtime.SandboxEditorUi`; promote to `Runtime.RegistrationEditor.*` if it grows |
+| Runtime panel model + typed command facade | **runtime** | `Extrinsic.Runtime.SandboxEditorFacades`; split focused private implementation units as families grow |
+| UI (thin schema-reflecting adapter) | **app** | `Extrinsic.Sandbox.Editor.MeshProcessingPanels`, registered through `Extrinsic.Sandbox.Editor.Shell` |
 | Serializable pipeline config (files/CLI/agent lane) | **runtime** | route through the `Engine` preview→apply facade with `RuntimeConfigControlSource` |
 | Named papers (TEASER, FGR, CPD, non-rigid) | **methods** | `methods/geometry/…` + `method.yaml`, under the method contract |
 
@@ -465,15 +475,18 @@ is allocated per slice (the `GRAPHICS-072/073/074` series pattern).
    before a second consumer needs it will be flagged by the weekly audit.
    Mitigation: concrete-first (§3.1); Slice 0 changes zero behavior; the shared
    contract is extracted only on the second family's demonstrated need (Slice 7).
-2. **Layering.** Keep the driver + kernels `geometry -> core`; all ECS/`Dirty`/UI
-   and GPU wiring stay in `runtime`; `check_layering.py --strict` gates it. The
+2. **Layering.** Keep the driver + kernels `geometry -> core`; ECS/`Dirty` and
+   GPU wiring stay in `runtime`, while Sandbox UI consumes runtime facade data
+   from `app`; `check_layering.py --strict` gates it. The
    `ParamSchema` must use `core`-or-geometry-local types only — no runtime/UI
    types leaking downward.
-3. **God-file amplification.** A new panel could worsen the 16.9k-line
-   `SandboxEditorUi` coupling. Mitigation: the generic `DrawParamSchema` +
-   controller *reduces* net lines; promote to `Runtime.RegistrationEditor.*` if
-   the controller grows; the clean-workshop review gate catches god-file
-   accumulation.
+3. **Facade re-concentration.** ARCH-006 retired the runtime-owned presentation
+   god-file, but the current `Runtime.SandboxEditorFacades.cpp` still carries
+   a broad catalog/model/command implementation. Mitigation: keep
+   `DrawParamSchema` and controller state in the app panel, keep the typed
+   model/command contract in runtime, and split runtime implementation units by
+   result-consumer family as they grow. The clean-workshop review gate catches
+   renewed god-file accumulation.
 4. **Determinism / reproducibility.** Coarse RANSAC and subsampling introduce
    randomness; geometry-api-style and `AGENTS.md` §7 require seeded,
    platform-documented, order-stable results. `Features::CoarseAlignmentParams`
@@ -504,6 +517,13 @@ is allocated per slice (the `GRAPHICS-072/073/074` series pattern).
 - `Geometry.Registration.cppm:73` / `:145` — `RegistrationParams`/`AlignICP` to extend.
 - `Geometry.PointCloud.Features.cppm:184` — the coarse-align seam to glue in.
 - `Geometry.KMeans.cppm` + [algorithm-variant-dispatch.md](algorithm-variant-dispatch.md) — the Strategy×Backend telemetry to adopt.
-- `Runtime.SandboxEditorUi.cpp:2748` / `:12483` / `:13286` — the parallel `switch(algorithm)` sites to replace with a schema renderer.
+- `src/runtime/Runtime.SandboxEditorFacades.cppm` and
+  `src/runtime/Runtime.SandboxEditorFacades.cpp` — the current runtime-owned
+  algorithm catalog, capability model, and typed command facade.
+- `src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp` — the current
+  app-owned registration presentation/controller.
+- Historical pre-ARCH-006 anchor: the retired
+  `src/runtime/Editor/Runtime.SandboxEditorUi.cpp` contained the parallel
+  `switch(algorithm)` sites that originally motivated this roadmap.
 - `AGENTS.md` §2/§5/§6 — layering, anti-premature-abstraction, method contract.
 - [geometry-api-style.md](geometry-api-style.md) — `Expected`/result-record/deterministic-diagnostics policy.

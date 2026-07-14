@@ -12,8 +12,8 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EditorWindowRegistry;
-import Extrinsic.Runtime.SandboxEditorUi;
 import Extrinsic.Sandbox.Editor.DomainPanels;
+import Extrinsic.Sandbox.Editor.Shell;
 
 namespace Core = Extrinsic::Core;
 namespace Runtime = Extrinsic::Runtime;
@@ -79,12 +79,12 @@ TEST(SandboxDomainPanels, RegistersTheTenAppOwnedWindowsWithStableMenuMetadata)
         {"mesh.selection", {"Mesh"}, "Selection details"},
     }};
 
-    Runtime::SandboxEditorUi editorUi;
+    SandboxEditor::EditorShell editorUi;
     SandboxEditor::DomainPanels panels;
     panels.Register(editorUi);
 
     const auto menu = editorUi.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), expected.size());
+    ASSERT_EQ(menu.size(), expected.size() + 10u);
     for (const ExpectedWindow& expectedWindow : expected)
     {
         const Runtime::EditorWindowMenuEntry* entry =
@@ -98,30 +98,30 @@ TEST(SandboxDomainPanels, RegistersTheTenAppOwnedWindowsWithStableMenuMetadata)
 
 TEST(SandboxDomainPanels, RegistrationIsIdempotentAndLifetimeUnregistersEveryWindow)
 {
-    Runtime::SandboxEditorUi firstUi;
-    Runtime::SandboxEditorUi secondUi;
+    SandboxEditor::EditorShell firstUi;
+    SandboxEditor::EditorShell secondUi;
 
     {
         SandboxEditor::DomainPanels panels;
         panels.Register(firstUi);
-        ASSERT_EQ(firstUi.BuildEditorWindowMenuModel().size(), 10u);
+        ASSERT_EQ(firstUi.BuildEditorWindowMenuModel().size(), 20u);
 
         panels.Register(firstUi);
-        EXPECT_EQ(firstUi.BuildEditorWindowMenuModel().size(), 10u);
+        EXPECT_EQ(firstUi.BuildEditorWindowMenuModel().size(), 20u);
 
         panels.Register(secondUi);
-        EXPECT_TRUE(firstUi.BuildEditorWindowMenuModel().empty());
-        EXPECT_EQ(secondUi.BuildEditorWindowMenuModel().size(), 10u);
+        EXPECT_EQ(firstUi.BuildEditorWindowMenuModel().size(), 10u);
+        EXPECT_EQ(secondUi.BuildEditorWindowMenuModel().size(), 20u);
 
         panels.Unregister();
-        EXPECT_TRUE(secondUi.BuildEditorWindowMenuModel().empty());
+        EXPECT_EQ(secondUi.BuildEditorWindowMenuModel().size(), 10u);
 
         panels.Register(secondUi);
-        ASSERT_EQ(secondUi.BuildEditorWindowMenuModel().size(), 10u);
+        ASSERT_EQ(secondUi.BuildEditorWindowMenuModel().size(), 20u);
     }
 
-    EXPECT_TRUE(firstUi.BuildEditorWindowMenuModel().empty());
-    EXPECT_TRUE(secondUi.BuildEditorWindowMenuModel().empty());
+    EXPECT_EQ(firstUi.BuildEditorWindowMenuModel().size(), 10u);
+    EXPECT_EQ(secondUi.BuildEditorWindowMenuModel().size(), 10u);
 }
 
 TEST(SandboxDomainPanels, ClosedRegisteredWindowsBuildNoDomainModels)
@@ -130,7 +130,7 @@ TEST(SandboxDomainPanels, ClosedRegisteredWindowsBuildNoDomainModels)
         HeadlessConfig(), std::make_unique<OneFrameApplication>());
     engine.Initialize();
 
-    Runtime::SandboxEditorUi editorUi;
+    SandboxEditor::EditorShell editorUi;
     SandboxEditor::DomainPanels panels;
     panels.Register(editorUi);
     editorUi.Attach(engine);
@@ -153,7 +153,7 @@ TEST(SandboxDomainPanels, OpenSameDomainWindowsShareOneModelBuildPerFrame)
         HeadlessConfig(), std::make_unique<OneFrameApplication>());
     engine.Initialize();
 
-    Runtime::SandboxEditorUi editorUi;
+    SandboxEditor::EditorShell editorUi;
     SandboxEditor::DomainPanels panels;
     panels.Register(editorUi);
     for (const std::string_view id :

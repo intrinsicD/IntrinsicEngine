@@ -121,11 +121,12 @@ structured menu paths, open state, and draw callbacks, and closed or globally
 hidden windows receive no callback. `Extrinsic.Runtime.EditorUiHost` owns the
 generic Engine callback attachment, the registry, and the unsuppressed global
 `G` visibility action; its parameterless frame callback does not pass
-`Engine&` to contributors. During the ARCH-006 migration,
-`SandboxEditorUi::{Register,Unregister}EditorWindow` delegates to that host as
-the compatibility composition surface. Sandbox-aware contributions receive a
-frame-local `SandboxEditorContext` facade, never `Engine&`; registered paths are
-merged into the menu tree without adding legacy enum or draw-switch entries.
+`Engine&` to contributors. The app-owned
+`Extrinsic.Sandbox.Editor.Shell` composes that host with the ten core Sandbox
+windows and app panel registrations. Sandbox-aware callbacks receive a
+frame-local `SandboxEditorContext` from
+`Extrinsic.Runtime.SandboxEditorFacades`, never `Engine&`; registered paths are
+merged into the menu tree without a fixed runtime enum or draw-switch table.
 `ImGuiAdapter` records one
 `EditorInputCaptureSnapshot` after the visible editor callback; camera, gizmo,
 picking, and viewport routing consume that snapshot rather than reading ImGui
@@ -133,10 +134,19 @@ capture flags independently. Its ImGui context owns a paired ImPlot context.
 `Extrinsic.Runtime.EditorPropertyWidgets` keeps scalar-property selector and
 finite-sample histogram models CPU-testable while its ImGui/ImPlot draw code and
 the manifest-managed `implot` dependency remain private to runtime.
-`SandboxEditorUi` owns no domain-window registrations or fixed domain-window
-state. Domain menu branches are populated only from registered application
-contributions. The generic scalar-property widget remains runtime-owned and
-accepts a runtime model provider, so app presentation never imports geometry.
+`src/runtime/Editor` contains only these generic host, registry, and property
+widget facilities. The former `Extrinsic.Runtime.SandboxEditorUi` module and
+runtime-owned Sandbox presentation are retired. The surviving
+`Extrinsic.Runtime.SandboxEditorFacades` module is a presentation-free public
+contract for data models, commands, result sinks, and session wiring; its
+app-facing lower-layer type spellings are compatibility aliases rather than
+new ownership boundaries.
+
+`Extrinsic.Sandbox.Editor.Shell` owns hierarchy, inspector, selection,
+file/import, frame-graph, render-recipe/artifact, camera, and visualization
+presentation. All core windows are closed by default and use the shared
+registry. The generic scalar-property widget remains runtime-owned and accepts
+a runtime model provider, so app presentation never imports geometry.
 `Extrinsic.Sandbox.Editor.MethodPanels` registers
 the K-Means windows for PointCloud, Graph, and Mesh plus the PointCloud and Mesh
 Progressive Poisson windows from the application layer. Their ImGui state and
@@ -156,12 +166,10 @@ paths, titles, closed defaults, controls, per-frame lazy model cache, and
 immediate/asynchronous result publication. Runtime retains the exported
 domain models, command/job execution, UV/outlier result state, and result sinks;
 the app module imports runtime only.
-Those K-Means and Progressive Poisson facade bodies compile in the private
-`Runtime.SandboxMethodFacade.cpp` implementation unit; the public
-`Extrinsic.Runtime.SandboxEditorUi` surface and the app-to-runtime dependency
-direction are unchanged.
-The hierarchy/inspector/file/render editor-shell presentation remains for the
-final `ARCH-006` slice; the legacy fixed domain section table is retired.
+K-Means and Progressive Poisson facade bodies compile in the private
+`Runtime.SandboxMethodFacade.cpp` implementation unit, while render-recipe and
+artifact facades compile in their own private implementation unit. The
+app-to-runtime dependency direction is unchanged.
 
 The internal `RuntimeFrameContext` record carries the data that must survive
 between those phases: frame delta, fixed-step interpolation alpha, render frame

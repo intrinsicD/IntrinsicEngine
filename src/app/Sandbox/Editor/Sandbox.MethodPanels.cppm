@@ -4,7 +4,7 @@ module;
 
 export module Extrinsic.Sandbox.Editor.MethodPanels;
 
-import Extrinsic.Runtime.SandboxEditorUi;
+import Extrinsic.Sandbox.Editor.Shell;
 
 export namespace Extrinsic::Sandbox::Editor
 {
@@ -19,7 +19,7 @@ export namespace Extrinsic::Sandbox::Editor
         MethodPanels(MethodPanels&&) = delete;
         MethodPanels& operator=(MethodPanels&&) = delete;
 
-        void Register(Runtime::SandboxEditorUi& editorUi);
+        void Register(EditorShell& editorShell);
         void Unregister();
 
     private:

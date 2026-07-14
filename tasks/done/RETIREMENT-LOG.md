@@ -4551,3 +4551,22 @@ ASan heap-use-after-free after previous-world teardown. Restored code passed
 the regression 50 consecutive times, the focused lifecycle selection 13/13,
 the full default CPU-supported gate 3681/3681, and strict structural/docs
 checks.
+
+[`ARCH-006`](ARCH-006-sandbox-editor-content-out-of-runtime.md) — Sandbox
+editor ownership migration retired to `tasks/done/` on 2026-07-14 at the
+structural `Retired` endpoint. App-owned `Extrinsic.Sandbox.Editor.Shell` and
+its method, mesh-processing, and domain panel modules now own all Sandbox
+windows, menus, ImGui state, and presentation. The former
+`Extrinsic.Runtime.SandboxEditorUi` module is deleted; generic host, registry,
+and property widgets remain under `src/runtime/Editor`, while the surviving
+engine-facing models, commands, jobs, session wiring, and result records are
+presentation-free `Extrinsic.Runtime.SandboxEditorFacades`. Method and
+render-recipe/artifact bodies compile in separate private implementation
+units. The former 12,254-line runtime contract monolith is split into six
+runtime subject files plus app-linked presentation coverage. Of its 150 tests,
+137 suite/name pairs remain exact and 13 presentation tests moved and were
+renamed with their app-owned subject; new visibility and cross-engine reattach
+contracts bring the split total to 152. The focused presentation gate passed
+20/20;
+exact-head build, default CPU gate, and strict
+structural/docs verification are recorded in the retired task.

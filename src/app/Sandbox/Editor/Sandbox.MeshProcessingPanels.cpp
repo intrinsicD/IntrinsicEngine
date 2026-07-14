@@ -15,8 +15,10 @@ module;
 
 module Extrinsic.Sandbox.Editor.MeshProcessingPanels;
 
+import Extrinsic.Sandbox.Editor.Shell;
+
 import Extrinsic.Runtime.EditorWindowRegistry;
-import Extrinsic.Runtime.SandboxEditorUi;
+import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SelectionController;
 
 namespace Extrinsic::Sandbox::Editor
@@ -308,7 +310,7 @@ namespace Extrinsic::Sandbox::Editor
             const Runtime::SandboxEditorDomainWindowModel&,
             const Runtime::SandboxEditorContext&);
 
-        Runtime::SandboxEditorUi* EditorUi{nullptr};
+        EditorShell* Shell{nullptr};
         std::vector<Runtime::EditorWindowHandle> Handles{};
         int CachedModelFrame{-1};
         std::array<
@@ -325,7 +327,7 @@ namespace Extrinsic::Sandbox::Editor
         PointNormalsState PointNormals{};
         RegistrationState Registration{};
 
-        void Register(Runtime::SandboxEditorUi& editorUi);
+        void Register(EditorShell& editorShell);
         void Unregister();
         void RegisterWindow(
             std::string id,
@@ -381,10 +383,10 @@ namespace Extrinsic::Sandbox::Editor
     };
 
     void MeshProcessingPanels::Impl::Register(
-        Runtime::SandboxEditorUi& editorUi)
+        EditorShell& editorShell)
     {
         Unregister();
-        EditorUi = &editorUi;
+        Shell = &editorShell;
         RegisterWindow("mesh.processing.denoise", {"Mesh", "Processing"},
                        "Denoise", &Impl::DrawDenoiseWindow);
         RegisterWindow("mesh.processing.curvature", {"Mesh", "Processing"},
@@ -416,14 +418,23 @@ namespace Extrinsic::Sandbox::Editor
 
     void MeshProcessingPanels::Impl::Unregister()
     {
-        if (EditorUi != nullptr)
+        if (Shell != nullptr)
         {
             for (const Runtime::EditorWindowHandle handle : Handles)
-                (void)EditorUi->UnregisterEditorWindow(handle);
+                (void)Shell->UnregisterEditorWindow(handle);
         }
         Handles.clear();
-        EditorUi = nullptr;
+        Shell = nullptr;
         ResetModelCache();
+        Denoise.LastResult.reset();
+        Curvature.LastResult.reset();
+        Remesh.LastResult.reset();
+        Subdivide.LastResult.reset();
+        Simplify.LastResult.reset();
+        MeshNormals.LastResult.reset();
+        GraphNormals.LastResult.reset();
+        PointNormals.LastResult.reset();
+        Registration.LastResult.reset();
     }
 
     void MeshProcessingPanels::Impl::RegisterWindow(
@@ -432,8 +443,8 @@ namespace Extrinsic::Sandbox::Editor
         std::string title,
         const DrawWindow draw)
     {
-        Handles.push_back(EditorUi->RegisterEditorWindow(
-            Runtime::SandboxEditorWindowDescriptor{
+        Handles.push_back(Shell->RegisterEditorWindow(
+            EditorWindowDescriptor{
                 .Id = std::move(id),
                 .MenuPath = std::move(menuPath),
                 .Title = std::move(title),
@@ -1748,9 +1759,9 @@ namespace Extrinsic::Sandbox::Editor
         m_Impl->Unregister();
     }
 
-    void MeshProcessingPanels::Register(Runtime::SandboxEditorUi& editorUi)
+    void MeshProcessingPanels::Register(EditorShell& editorShell)
     {
-        m_Impl->Register(editorUi);
+        m_Impl->Register(editorShell);
     }
 
     void MeshProcessingPanels::Unregister()

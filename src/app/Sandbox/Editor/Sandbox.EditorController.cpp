@@ -5,15 +5,15 @@ module;
 module Extrinsic.Sandbox.Editor.Controller;
 
 import Extrinsic.Sandbox.Editor.DomainPanels;
+import Extrinsic.Sandbox.Editor.Shell;
 import Extrinsic.Sandbox.Editor.MeshProcessingPanels;
 import Extrinsic.Sandbox.Editor.MethodPanels;
-import Extrinsic.Runtime.SandboxEditorUi;
 
 namespace Extrinsic::Sandbox::Editor
 {
     struct SandboxEditorController::Impl
     {
-        Runtime::SandboxEditorUi EditorUi{};
+        EditorShell Shell{};
         MethodPanels Method{};
         MeshProcessingPanels MeshProcessing{};
         DomainPanels Domain{};
@@ -21,10 +21,10 @@ namespace Extrinsic::Sandbox::Editor
         void Attach(Runtime::Engine& engine)
         {
             Detach();
-            EditorUi.Attach(engine);
-            Method.Register(EditorUi);
-            MeshProcessing.Register(EditorUi);
-            Domain.Register(EditorUi);
+            Shell.Attach(engine);
+            Method.Register(Shell);
+            MeshProcessing.Register(Shell);
+            Domain.Register(Shell);
         }
 
         void Detach()
@@ -32,7 +32,7 @@ namespace Extrinsic::Sandbox::Editor
             Domain.Unregister();
             MeshProcessing.Unregister();
             Method.Unregister();
-            EditorUi.Detach();
+            Shell.Detach();
         }
     };
 
@@ -58,6 +58,6 @@ namespace Extrinsic::Sandbox::Editor
 
     bool SandboxEditorController::IsAttached() const noexcept
     {
-        return m_Impl->EditorUi.IsAttached();
+        return m_Impl->Shell.IsAttached();
     }
 }

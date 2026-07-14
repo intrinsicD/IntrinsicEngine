@@ -167,10 +167,12 @@ derived-job facade delegation now live behind
 ### Compile-hotspot decomposition (seeded 2026-07-09)
 
 The CI-latency audit retained in retired `CI-003` measured the runtime layer's
-three largest exported-interface hotspots:
-`Runtime.SandboxEditorUi.cppm` (159.174s, owned by `ARCH-006`),
-`Runtime.Engine.cppm` (140.072s, owned by `RUNTIME-151` after the mechanical
-`RUNTIME-146..150` splits), and `Runtime.RenderExtraction.cppm` (106.935s).
+three largest exported-interface hotspots. Retired `ARCH-006` removed the
+`Runtime.SandboxEditorUi.cppm` presentation surface (159.174s baseline) and
+replaced it with app-owned `EditorShell` plus presentation-free runtime
+facades. The other measured interfaces were `Runtime.Engine.cppm` (140.072s,
+owned by `RUNTIME-151` after the mechanical `RUNTIME-146..150` splits) and
+`Runtime.RenderExtraction.cppm` (106.935s).
 
 - [`RUNTIME-166`](RUNTIME-166-slim-render-extraction-module.md) — hide
   `RenderExtractionCache` private residency/retire/adapter state, slim the

@@ -6,8 +6,8 @@
 // (`Test.RuntimeSandboxAcceptance.cpp`); this slice drives the runtime `Engine`
 // for a small bounded number of frames on a Vulkan-capable host with the
 // acceptance families (one mesh, one graph, one point cloud) composed into the
-// scene and the same runtime-owned `SandboxEditorUi` shell attached as the
-// `ExtrinsicSandbox` app. It asserts that the default recipe reaches the
+// scene and the same app-owned `SandboxEditorController` composition attached
+// by `ExtrinsicSandbox`. It asserts that the default recipe reaches the
 // canonical `"Present"` pass with no canonical pass falling through the
 // `SkippedUnavailable` branch and with the Vulkan fallback counters stable
 // across the operational frames.
@@ -74,6 +74,7 @@ import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.TextureUpload;
 import Extrinsic.RHI.Types;
+import Extrinsic.Sandbox.Editor.Controller;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.Engine;
@@ -83,7 +84,7 @@ import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
-import Extrinsic.Runtime.SandboxEditorUi;
+import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.Properties;
 
@@ -165,7 +166,7 @@ public:
     }
 
 private:
-    Extrinsic::Runtime::SandboxEditorUi m_EditorUi{};
+    Extrinsic::Sandbox::Editor::SandboxEditorController m_EditorUi{};
     std::uint32_t m_TargetFrames{1u};
     std::uint32_t m_Frames{0u};
 };
@@ -406,7 +407,7 @@ public:
 private:
     static constexpr std::uint32_t kMaxFrames = 48u;
 
-    Extrinsic::Runtime::SandboxEditorUi m_EditorUi{};
+    Extrinsic::Sandbox::Editor::SandboxEditorController m_EditorUi{};
     Assets::AssetId m_GeneratedTexture{};
 };
 
@@ -1906,7 +1907,7 @@ public:
     [[nodiscard]] bool Mutated() const noexcept { return m_Mutated; }
 
 private:
-    Extrinsic::Runtime::SandboxEditorUi m_EditorUi{};
+    Extrinsic::Sandbox::Editor::SandboxEditorController m_EditorUi{};
     std::uint32_t m_MutateFrame{1u};
     std::uint32_t m_TargetFrames{1u};
     std::uint32_t m_Frames{0u};
@@ -2975,7 +2976,7 @@ public:
         Extrinsic::Runtime::SandboxEditorCommandStatus::NoChange};
 
 private:
-    Extrinsic::Runtime::SandboxEditorUi m_EditorUi{};
+    Extrinsic::Sandbox::Editor::SandboxEditorController m_EditorUi{};
     std::uint32_t m_Frames{0u};
 };
 } // namespace
@@ -3686,7 +3687,7 @@ private:
                !engine.GetLastRefinedPrimitiveSelection().has_value();
     }
 
-    Extrinsic::Runtime::SandboxEditorUi m_EditorUi{};
+    Extrinsic::Sandbox::Editor::SandboxEditorController m_EditorUi{};
     EntityHandle m_Triangle{Extrinsic::ECS::InvalidEntityHandle};
     Phase m_Phase{Phase::SubmitTriangleClick};
     std::uint32_t m_Frames{0u};
