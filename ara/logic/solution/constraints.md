@@ -139,3 +139,17 @@
 - **Evidence**: [tests/contract/runtime/Test.RuntimeWorldRegistry.cpp,
   tasks/archive/BUG-075-worldregistry-activate-while-destroy-pending.md]
 - **From staging**: O23
+
+## K13: Sandbox Editor Attachments Invalidate Copied Callback Surfaces
+- **Constraint**: Detaching a `SandboxEditorSession` invalidates every copied
+  command/result callback through an attachment epoch and clears all
+  attachment-scoped frame, cache, result, queue, and recipe state before a
+  different `Engine` may attach. Stale copied surfaces fail closed instead of
+  touching the prior engine or publishing into the new attachment.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [src/runtime/Runtime.SandboxEditorFacades.cpp,
+  tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp,
+  tests/integration/runtime/Test.SandboxEditorPresentation.cpp,
+  tasks/done/ARCH-006-sandbox-editor-content-out-of-runtime.md]
+- **From staging**: O26

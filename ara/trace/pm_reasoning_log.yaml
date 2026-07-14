@@ -790,3 +790,10 @@ entries:
       - "Staged O17 through O24 and crystallized them immediately to K06-K12 and A06 via artifact commitment because merged source, regressions, architecture docs, and task records now depend on each constraint."
       - "Kept O08, O09, and O13 unpromoted and non-stale; this batch neither accepts the module-surface recommendations nor resolves the model-training target."
       - "Added ARCH-006 Slices 4/5 as an open thread because Slice 3 is operational for the moved panels but the parent structural task remains active by design."
+  - turn: "2026-07-14_001#1"
+    notes:
+      - "Routed the final ten-window Shell/controller ownership choice as decision N207 and the exact-head build/test/structural proof as experiment N208."
+      - "Staged O25 and O26, then crystallized them to A07 and K13 via artifact commitment because committed app/runtime modules, lifecycle tests, architecture docs, and the retired task depend on those contracts."
+      - "Updated A06 forensic evidence from the deleted runtime UI/monolithic test paths to the final facade and split-test paths."
+      - "Kept O08 and O09 unpromoted because ARCH-006 supplies partial module-posture evidence but does not settle the general repository-wide conversion policy; O13 remains unpromoted and non-stale after being referenced in the prior session."
+      - "Removed ARCH-006 from open research threads; the completion branch remains local because no upstream publication or PR was requested."

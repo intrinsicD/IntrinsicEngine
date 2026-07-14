@@ -44,8 +44,24 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Evidence**: [src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp,
-  src/runtime/Editor/Runtime.SandboxEditorUi.cpp,
-  tests/contract/runtime/Test.SandboxEditorUi.cpp,
+  src/runtime/Runtime.SandboxEditorFacades.cpp,
+  tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp,
   docs/architecture/runtime.md,
-  tasks/active/ARCH-006-sandbox-editor-content-out-of-runtime.md]
+  tasks/done/ARCH-006-sandbox-editor-content-out-of-runtime.md]
 - **From staging**: O24
+
+## A07: App-Owned Sandbox Presentation Over Generic Runtime Editor Infrastructure
+- **Decision**: Sandbox-specific windows, menus, ImGui state, and draw
+  controllers live in app-owned `EditorShell`, method, mesh-processing, and
+  domain-panel modules. Runtime owns only generic editor host/registry/widgets
+  and presentation-free Sandbox engine contexts, commands, models, jobs,
+  result records, and attachment/session wiring.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [src/app/Sandbox/Editor/Sandbox.EditorShell.cpp,
+  src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp,
+  src/runtime/Runtime.SandboxEditorFacades.cppm,
+  docs/architecture/runtime.md,
+  tasks/done/ARCH-006-sandbox-editor-content-out-of-runtime.md,
+  tests/integration/runtime/Test.SandboxEditorPresentation.cpp]
+- **From staging**: O25

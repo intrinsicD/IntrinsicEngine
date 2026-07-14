@@ -263,3 +263,25 @@ observations:
     promoted_to: "logic/solution/architecture.md:A06"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O25
+    timestamp: "2026-07-14T22:51"
+    provenance: ai-executed
+    content: "Sandbox-specific windows, menus, ImGui state, and presentation belong to app-owned Shell/panel modules; runtime retains generic editor host/registry/widgets plus presentation-free engine command/model/session facades."
+    context: "ARCH-006 Slice 5 implementation, review, exact-head verification, and structural retirement."
+    potential_type: architecture
+    bound_to: [N207, N208]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A07"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O26
+    timestamp: "2026-07-14T22:51"
+    provenance: ai-executed
+    content: "A detachable Sandbox editor session must invalidate copied command/result callbacks with an attachment epoch and clear attachment-scoped state before a different Engine can attach."
+    context: "ARCH-006 session split and cross-engine reattachment/lifecycle contracts."
+    potential_type: constraint
+    bound_to: [N207, N208]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K13"
+    crystallized_via: artifact-commitment
+    stale: false

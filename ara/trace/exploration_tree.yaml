@@ -4839,3 +4839,54 @@ tree:
       callback registration/unregistration symmetry, and existing window
       behavior in addition to compiling the relocated UI.
     status: resolved
+  - id: N207
+    type: decision
+    title: "Retire ARCH-006 at the app-owned Sandbox editor boundary"
+    provenance: ai-executed
+    timestamp: "2026-07-14T22:51"
+    also_depends_on: [N204, N206]
+    choice: >
+      Complete the recorded Slice 5 shape with a ten-window app EditorShell,
+      a concrete controller shared by the app and acceptance fixtures, lean
+      app-owned panel families, a presentation-free runtime session/facade,
+      and subject-split tests; preserve current-main borrowed property access
+      and avoid a broader window repartition or new shared widget seam.
+    alternatives:
+      - "Broaden the mechanical retirement into an eight-Shell/twelve-DomainPanels repartition and inline the controller into the app."
+      - "Restore the retired runtime-owned Sandbox UI or its obsolete public property-plot facade."
+      - "Stop after Slice 4 with Sandbox-specific core presentation still owned by runtime."
+    evidence:
+      - "tasks/done/ARCH-006-sandbox-editor-content-out-of-runtime.md"
+      - "commit 53e48da4"
+      - "commit a40996c9"
+      - "commit abacf6ae"
+      - "commit ba307e67"
+    status: resolved
+  - id: N208
+    type: experiment
+    title: "ARCH-006 exact-head ownership retirement verification"
+    provenance: ai-executed
+    timestamp: "2026-07-14T22:51"
+    also_depends_on: [N204, N206, N207]
+    evidence:
+      - "cmake --preset ci"
+      - "cmake --build --preset ci --target IntrinsicTests -j 2"
+      - "ctest --test-dir build/ci --output-on-failure -R '^(SandboxEditor|SandboxDomainPanels)' --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "tools/ci/run_clean_workshop_review.sh . --strict"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/agents/check_task_state_links.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main --strict"
+      - "commit ba307e67"
+    result: >
+      The Clang-23 ci configure passed; IntrinsicTests completed 1,290 build
+      edges and a warning-free 1,085-edge exact-head rebuild after removing one
+      dead test helper. The focused editor endpoint passed 155/155 tests in
+      15.91 seconds, the default CPU-supported gate passed 3,706/3,706 in
+      379.47 seconds, and layering, test layout, task/state, docs, generated
+      inventory, clean-workshop, PR-contract, and diff checks passed. ARCH-006
+      retired locally on branch codex/arch-006-completion with a clean worktree.
+    status: resolved

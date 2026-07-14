@@ -97,3 +97,10 @@ sessions:
     events_count: 23
     claims_touched: [C01]
     open_threads: 3
+  - id: "2026-07-14_001"
+    date: "2026-07-14"
+    summary: "Retired ARCH-006 by moving all Sandbox presentation into app modules, splitting runtime facades/tests, and passing the warning-free build plus 155 focused and 3,706 CPU tests."
+    turn_count: 1
+    events_count: 4
+    claims_touched: []
+    open_threads: 3

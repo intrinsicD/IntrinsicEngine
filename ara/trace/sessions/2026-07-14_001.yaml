@@ -1,0 +1,64 @@
+session:
+  id: "2026-07-14_001"
+  date: "2026-07-14"
+  started: "2026-07-14T22:51"
+  last_turn: "2026-07-14T22:51"
+  turn_count: 1
+  summary: "Retired ARCH-006 by moving all Sandbox presentation into app modules, splitting runtime facades/tests, and passing the warning-free build plus 155 focused and 3,706 CPU tests."
+
+events_logged:
+  - turn: 1
+    type: decision
+    id: "N207"
+    routing: direct
+    provenance: ai-executed
+    summary: "Completed ARCH-006 with the recorded app-owned ten-window Shell/controller composition and presentation-free runtime session/facade."
+  - turn: 1
+    type: experiment
+    id: "N208"
+    routing: direct
+    provenance: ai-executed
+    summary: "Passed warning-free exact-head builds, 155 focused editor tests, 3,706 CPU-supported tests, and strict structural/docs gates."
+  - turn: 1
+    type: architecture
+    id: "O25"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized complete app-owned Sandbox presentation over generic runtime editor infrastructure as A07."
+  - turn: 1
+    type: constraint
+    id: "O26"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized attachment-epoch invalidation and reset-before-reattach as K13."
+
+ai_actions:
+  - turn: 1
+    action: "Planned, replayed, reconciled, reviewed, and committed ARCH-006 Slice 5 on top of current main; moved remaining Sandbox presentation into app modules, retired the runtime UI module, split runtime implementation/test units, synchronized docs/tasks, and removed one dead test helper."
+    provenance: ai-executed
+    files_changed:
+      - "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp"
+      - "src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp"
+      - "src/runtime/Runtime.SandboxEditorFacades.cpp"
+      - "src/runtime/Runtime.SandboxEditorFacades.cppm"
+      - "tests/contract/runtime/Test.SandboxEditorModels.cpp"
+      - "tests/integration/runtime/Test.SandboxEditorPresentation.cpp"
+      - "tasks/done/ARCH-006-sandbox-editor-content-out-of-runtime.md"
+  - turn: 1
+    action: "Configured with the ci preset, built IntrinsicTests twice to verify the exact head without diagnostics, passed 155/155 focused and 3,706/3,706 CPU-supported tests, ran strict architecture/task/docs validators, and created commits 53e48da4 through ba307e67 on codex/arch-006-completion."
+    provenance: ai-executed
+    files_changed: []
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "User requested the agentic workflow be used to work on the active tasks; ARCH-006 was the sole active task."
+
+open_threads:
+  - "BUG-081 must collect a comparable warm-configure population before recalibrating the 20-second exact-vcpkg-hit guard."
+  - "Resolve whether model training means GEOM-058 or a new neural/LLM workflow."
+  - "The verified ARCH-006 completion branch is local with no upstream, push, or PR because publication was not requested."
+
+ai_suggestions_pending:
+  - "Treat GEOM-058 Gaussian-mixture fitting as the provisional repo-native model-training target unless the user specifies a neural or LLM model."
