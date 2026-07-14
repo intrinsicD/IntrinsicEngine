@@ -3,9 +3,9 @@
 - **Status:** Accepted
 - **Date:** 2026-05-17
 - **Owners:** Graphics (`Graphics.GpuAssetCache`, fallback texture, bindless write batching), Runtime composition (fallback initialization, upload scheduling, `Extrinsic.Runtime.AssetBridges.Texture`)
-- **Related tasks:** [`tasks/done/GRAPHICS-015`](../../tasks/done/GRAPHICS-015-gpu-assets-textures-residency.md), [`GRAPHICS-015Q`](../../tasks/done/GRAPHICS-015Q-texture-residency-backend-clarifications.md)
+- **Related tasks:** [`tasks/done/GRAPHICS-015`](../../tasks/archive/GRAPHICS-015-gpu-assets-textures-residency.md), [`GRAPHICS-015Q`](../../tasks/archive/GRAPHICS-015Q-texture-residency-backend-clarifications.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`docs/architecture/rendering-three-pass.md`](../architecture/rendering-three-pass.md), [`src/graphics/renderer/README.md`](../../src/graphics/renderer/README.md), [`src/graphics/assets/README.md`](../../src/graphics/assets/README.md)
-- **Supersedes:** none. Extracted from the `## Graphics asset residency` GRAPHICS-015Q clarification paragraph in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
+- **Supersedes:** none. Extracted from the `## Graphics asset residency` GRAPHICS-015Q clarification paragraph in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/archive/DOCS-001-reduce-graphics-architecture-prose.md).
 - **Related ADRs:** [ADR-0007](0007-picking-selection-and-outline.md) records the `Picking.Readback` drain pattern reused for bindless descriptor write coalescing in §6. [ADR-0010](0010-postprocess-chain-backend-policy.md) records the histogram readback drain that uses the same pattern. [ADR-0009](0009-visualization-packets-and-overlay-upload.md) records the visualization-atlas residency-deferral policy referenced in §5.
 
 ## Context
@@ -168,8 +168,8 @@ Follow-up tasks required: none from this ADR. Bounded eviction, `RequestStreamin
 
 ## Validation
 
-- [`tasks/done/GRAPHICS-015`](../../tasks/done/GRAPHICS-015-gpu-assets-textures-residency.md) records the underlying `Graphics.GpuAssetCache` contract, `GpuTextureRequest`, `InitializeFallbackTexture` / `GetViewOrFallback`, and `GpuAssetCacheDiagnostics` field set.
-- [`tasks/done/GRAPHICS-015Q`](../../tasks/done/GRAPHICS-015Q-texture-residency-backend-clarifications.md) records the six clarification decisions captured in §§1–6.
+- [`tasks/done/GRAPHICS-015`](../../tasks/archive/GRAPHICS-015-gpu-assets-textures-residency.md) records the underlying `Graphics.GpuAssetCache` contract, `GpuTextureRequest`, `InitializeFallbackTexture` / `GetViewOrFallback`, and `GpuAssetCacheDiagnostics` field set.
+- [`tasks/done/GRAPHICS-015Q`](../../tasks/archive/GRAPHICS-015Q-texture-residency-backend-clarifications.md) records the six clarification decisions captured in §§1–6.
 - `docs/architecture/rendering-three-pass.md` carries the matching "Per `GRAPHICS-015Q`" paragraph next to the existing `GRAPHICS-014Q` paragraph.
 - `src/graphics/renderer/README.md` carries the matching `MaterialSystem` / `GpuAssetCache` ownership-contract bullet listing the five visible decisions.
 - `src/graphics/assets/README.md` carries the matching "Per `GRAPHICS-015Q`" subsection under "Texture residency and fallback policy".

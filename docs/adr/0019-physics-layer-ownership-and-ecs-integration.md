@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-06-05
 - **Owners:** Architecture, Physics, ECS, Runtime, Methods
-- **Related tasks:** [`tasks/done/ARCH-001`](../../tasks/done/ARCH-001-physics-layer-ownership-and-ecs-integration.md), [`tasks/done/HARDEN-064`](../../tasks/done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md), [`tasks/done/METHOD-001`](../../tasks/done/METHOD-001-rigid-body-dynamics-reference-backend.md)
+- **Related tasks:** [`tasks/done/ARCH-001`](../../tasks/archive/ARCH-001-physics-layer-ownership-and-ecs-integration.md), [`tasks/done/HARDEN-064`](../../tasks/archive/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md), [`tasks/done/METHOD-001`](../../tasks/archive/METHOD-001-rigid-body-dynamics-reference-backend.md)
 - **Related docs:** [`docs/architecture/physics.md`](../architecture/physics.md), [`docs/architecture/layering.md`](../architecture/layering.md), [`docs/architecture/ecs.md`](../architecture/ecs.md), [`docs/architecture/runtime.md`](../architecture/runtime.md)
 
 ## Context

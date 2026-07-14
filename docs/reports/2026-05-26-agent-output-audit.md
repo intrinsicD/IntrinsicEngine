@@ -12,25 +12,25 @@ window".
 
 - Date range: 2026-05-18 → 2026-05-26 (8 days; 84 non-merge commits).
 - Tasks covered (10):
-  [`GRAPHICS-074`](../../tasks/done/GRAPHICS-074-default-recipe-selection-outline-and-picking-readback.md)
+  [`GRAPHICS-074`](../../tasks/archive/GRAPHICS-074-default-recipe-selection-outline-and-picking-readback.md)
   (retired 2026-05-21 after Slice D.4),
-  [`GRAPHICS-075`](../../tasks/done/GRAPHICS-075-default-recipe-postprocess-chain-wiring.md)
+  [`GRAPHICS-075`](../../tasks/archive/GRAPHICS-075-default-recipe-postprocess-chain-wiring.md)
   (retired 2026-05-22 after Slice E.2 fixup),
-  [`GRAPHICS-076`](../../tasks/done/GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md)
+  [`GRAPHICS-076`](../../tasks/archive/GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md)
   (now retired; at audit time Slices A/B/C had landed and Slice D was blocked on Vulkan host),
-  [`GRAPHICS-077`](../../tasks/done/GRAPHICS-077-transient-debug-primitive-upload-helper.md)
+  [`GRAPHICS-077`](../../tasks/archive/GRAPHICS-077-transient-debug-primitive-upload-helper.md)
   (active; Slices A/B/C landed, Slice D blocked on Vulkan host),
-  [`GRAPHICS-078`](../../tasks/done/GRAPHICS-078-visualization-overlay-upload-helper.md)
+  [`GRAPHICS-078`](../../tasks/archive/GRAPHICS-078-visualization-overlay-upload-helper.md)
   (active; Slices A/B/C landed, Slice D blocked on Vulkan host),
-  [`RUNTIME-082`](../../tasks/done/RUNTIME-082-spatial-debug-adapters.md)
+  [`RUNTIME-082`](../../tasks/archive/RUNTIME-082-spatial-debug-adapters.md)
   (active; Slices A + B landed),
-  [`GEOM-006`](../../tasks/done/GEOM-006-indexed-mesh-soup-conversion-contracts.md)
+  [`GEOM-006`](../../tasks/archive/GEOM-006-indexed-mesh-soup-conversion-contracts.md)
   (retired 2026-05-21),
-  [`GEOM-007`](../../tasks/done/GEOM-007-robust-predicates-intersection-classification.md)
+  [`GEOM-007`](../../tasks/archive/GEOM-007-robust-predicates-intersection-classification.md)
   (retired 2026-05-22 after Slice 3.3.c),
-  [`GEOM-015`](../../tasks/done/GEOM-015-gjk-termination-diagnostics.md)
+  [`GEOM-015`](../../tasks/archive/GEOM-015-gjk-termination-diagnostics.md)
   (retired 2026-05-22 after Slice 4),
-  [`REVIEW-002`](../../tasks/done/REVIEW-002-recurring-drift-and-inconsistency-audit.md)
+  [`REVIEW-002`](../../tasks/archive/REVIEW-002-recurring-drift-and-inconsistency-audit.md)
   (backlog seed for the recurring drift audit).
 - Sampling: rows 1–9 each spot-checked against 3–5 representative
   substantive commits per task family (geometry, graphics passes,
@@ -60,7 +60,7 @@ Notable substantive commits used as evidence anchors:
 | --- | --- | --- | --- |
 | 1 | Silent scope creep | pass | `git show --stat` on the sampled substantive commits keeps changes inside the named task's required-changes scope. `abd0f4b` (RUNTIME-082 Slice B) touches only `src/runtime/SpatialDebug/`, the matching contract test, and the slice's task-file status block. `fb72656` (GRAPHICS-078 Slice C) is bounded to `src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.{cpp,cppm}`, `Pass.VisualizationOverlay.{cpp,cppm}`, the renderer wiring file, the isoline shader pair, and the contract test. `cd8f51a` (GEOM-015 Slice 2) only touches the three GJK/Support/SDFContact migration call-sites and their tests. No drive-by edits in unrelated layers. |
 | 2 | Decorative comments and docstrings | pass | New comment blocks on `ISpatialDebugAdapter`/`ITransientDebugUploadHelper`/`IVisualizationOverlayUploadHelper` document cross-pass contracts (per-lane independence, BDA-fetch shader vertex layout, buffer-recycling invariants) and ownership/lifetime — these are real WHY notes, not WHAT restatements. The `BvhAdapter(const Geometry::BVH&&) = delete` deletion is documented with a one-line dangling-temporary rationale, exactly the kind of WHY-comment AGENTS.md calls for. Headers add per-field-cluster context (`// GRAPHICS-077 Slice C — independent per-lane buffer leases ...`) but each cluster is followed by a behavioral invariant the cluster encodes; no internal helpers carry multi-paragraph docstrings restating their parameters. |
-| 3 | Premature abstraction | pass | Three new interfaces (`ISpatialDebugAdapter`, `ITransientDebugUploadHelper`, `IVisualizationOverlayUploadHelper`) were added this window; each clears the "two adapters" bar. `ISpatialDebugAdapter` has three concrete implementations in tree by end of window (`BvhAdapter`, `KdTreeAdapter`, `OctreeAdapter`) plus a fourth (`ConvexHullAdapter`) explicitly planned in [`RUNTIME-082`](../../tasks/done/RUNTIME-082-spatial-debug-adapters.md) Slice C. `ITransientDebugUploadHelper` and `IVisualizationOverlayUploadHelper` each have a default in-renderer impl plus a Vulkan-tuned variant explicitly planned in the task files' Slice D under the `gpu;vulkan` host gate — the header comments cite that planned second implementation directly. No `Make*`/`Build*` factory helpers, no single-method interfaces without callers. `Geometry.RobustPredicates` adds free functions for shared numerics (3 call-sites migrate in the same task), not a wrapper layer. |
+| 3 | Premature abstraction | pass | Three new interfaces (`ISpatialDebugAdapter`, `ITransientDebugUploadHelper`, `IVisualizationOverlayUploadHelper`) were added this window; each clears the "two adapters" bar. `ISpatialDebugAdapter` has three concrete implementations in tree by end of window (`BvhAdapter`, `KdTreeAdapter`, `OctreeAdapter`) plus a fourth (`ConvexHullAdapter`) explicitly planned in [`RUNTIME-082`](../../tasks/archive/RUNTIME-082-spatial-debug-adapters.md) Slice C. `ITransientDebugUploadHelper` and `IVisualizationOverlayUploadHelper` each have a default in-renderer impl plus a Vulkan-tuned variant explicitly planned in the task files' Slice D under the `gpu;vulkan` host gate — the header comments cite that planned second implementation directly. No `Make*`/`Build*` factory helpers, no single-method interfaces without callers. `Geometry.RobustPredicates` adds free functions for shared numerics (3 call-sites migrate in the same task), not a wrapper layer. |
 | 4 | Documented-but-not-tested | pass | Every behavioral doc claim has a corresponding test. The "per-lane independent geometric growth" claim in `Graphics.TransientDebugUploadHelper.cppm` is pinned by `PerFrameBufferRecycling*` in `Test.TransientDebugSurfacePass.cpp` (16 tests, 1148 lines). The isoline lane recording shape in `Pass.VisualizationOverlay.cppm` is exercised by `Test.VisualizationOverlayPass.cpp` (14 tests, 1054 lines). The `BackbufferWrittenByNonFinalizer` finding documented in `src/graphics/renderer/README.md` is asserted end-to-end by `Test.RenderGraphValidation.cpp::CompileBackbufferWrittenByNonFinalizerReportsStructuredFinding` (added in `e33c9b3` as Slice C's contract). `ApproxZeroSq`/`ApproxZeroLen` policy claims in `RobustPredicates` are covered by the six new `RobustPredicatesApproxZero*` cases in `Test.RobustPredicates.cpp`. The OctreeAdapter `SplitPoint::Center` exact / `Mean`/`Median` approximate note in `Runtime.SpatialDebugAdapters.cpp:272-278` is exercised against the Center policy by `Test.SpatialDebugAdapters.cpp` (10 tests, 456 lines). |
 | 5 | Defensive validation at internal boundaries | findings | Three new modules in this window initialise non-owning pointers from constructor reference parameters (`BvhAdapter::m_Bvh`, `KdTreeAdapter::m_KdTree`, `OctreeAdapter::m_Octree`; `TransientDebugUploadHelper::m_Device`/`m_BufferManager`; `VisualizationOverlayUploadHelper::m_Device`/`m_BufferManager`), then guard the public methods with an `m_X == nullptr` early-return (`Runtime.SpatialDebugAdapters.cpp:61,163,259`; `Graphics.TransientDebugUploadHelper.cpp:173,229,289`; `Graphics.VisualizationOverlayUploadHelper.cpp:176,274`). The reference-binding constructors plus the deleted rvalue overloads on the adapters make the pointers non-null for the lifetime of the helper; no test exercises the null branch, and the rvalue-rejection contract test verifies the constructor never accepts a temporary. These are textbook Row-5 internal-boundary checks: the precondition is already guaranteed by the caller (renderer composition root for the upload helpers; runtime adapters constructed from a live tree reference). The pattern is consistent across all three new modules — suggesting a shared scaffolding habit rather than a one-off slip. |
 | 6 | Untracked compatibility shims | pass | `git log --since=2026-05-18 -p --no-merges -- '*.cpp' '*.cppm' '*.h'` filtered for added lines containing `TODO\|FIXME\|deprecated\|backcompat\|temporary shim` returned no new shim/back-compat phrasing in source. The only `TODO`-shaped additions are inside `docs/agent/agent-output-review-checklist.md` (`47b1e1f`) and `tasks/backlog/legacy-todo.md` cross-links — both documentation of the audit pattern itself, not in-tree shims. No new entries appear in `tools/repo/layering_allowlist.yaml`. |
@@ -71,7 +71,7 @@ Notable substantive commits used as evidence anchors:
 ## Follow-ups
 
 - **Row 5 (defensive internal-boundary null checks).** Filed as
-  [`HARDEN-070`](../../tasks/done/HARDEN-070-drop-dead-null-guards-on-reference-initialised-helpers.md).
+  [`HARDEN-070`](../../tasks/archive/HARDEN-070-drop-dead-null-guards-on-reference-initialised-helpers.md).
   The pattern repeats across three new modules
   (`SpatialDebugAdapters`, `TransientDebugUploadHelper`,
   `VisualizationOverlayUploadHelper`) and is a low-risk mechanical

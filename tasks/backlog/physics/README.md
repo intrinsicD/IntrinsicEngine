@@ -44,8 +44,8 @@ visualization as physics correctness evidence.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
-- [ARCH-001 - Define physics layer ownership and ECS integration](../../done/ARCH-001-physics-layer-ownership-and-ecs-integration.md) (done 2026-06-05).
-- [ARCH-002 - Physics phenomena roadmap and method selection](../../done/ARCH-002-physics-phenomena-roadmap.md) (done 2026-06-06).
-- [PHYSICS-001 - Physics world state and runtime fixed-step sync](../../done/PHYSICS-001-physics-world-state-and-runtime-sync.md) (done 2026-06-05).
-- [PHYSICS-002 - Collision broadphase/narrowphase contract](../../done/PHYSICS-002-collision-broadphase-narrowphase-contract.md) (done 2026-06-06).
-- [PHYSICS-003 - Constraints, islands, sleep, and solver diagnostics](../../done/PHYSICS-003-constraints-islands-and-solver-diagnostics.md) (done 2026-06-10).
+- [ARCH-001 - Define physics layer ownership and ECS integration](../../archive/ARCH-001-physics-layer-ownership-and-ecs-integration.md) (done 2026-06-05).
+- [ARCH-002 - Physics phenomena roadmap and method selection](../../archive/ARCH-002-physics-phenomena-roadmap.md) (done 2026-06-06).
+- [PHYSICS-001 - Physics world state and runtime fixed-step sync](../../archive/PHYSICS-001-physics-world-state-and-runtime-sync.md) (done 2026-06-05).
+- [PHYSICS-002 - Collision broadphase/narrowphase contract](../../archive/PHYSICS-002-collision-broadphase-narrowphase-contract.md) (done 2026-06-06).
+- [PHYSICS-003 - Constraints, islands, sleep, and solver diagnostics](../../archive/PHYSICS-003-constraints-islands-and-solver-diagnostics.md) (done 2026-06-10).

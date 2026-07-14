@@ -354,7 +354,7 @@ available through the Vulkan 1.2/1.3 feature chain.
   graphics-queue helper, per-subresource layout tracking stays whole-image
   until multi-subresource batching lands, and multi-mip / multi-layer /
   cubemap batching plus opt-in `gpu;vulkan` smoke for those uploads is owned
-  by [`GRAPHICS-018T`](../../../tasks/done/GRAPHICS-018T-texture-upload-batching.md),
+  by [`GRAPHICS-018T`](../../../tasks/archive/GRAPHICS-018T-texture-upload-batching.md),
   not by 018Q. Per `GRAPHICS-018T` slice A.1, the CPU-testable
   per-subresource byte-size and packed full-mip-chain offset math is
   exposed as backend-neutral free functions in

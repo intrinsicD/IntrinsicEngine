@@ -39,7 +39,7 @@ depends_on: []
   split is deliberate: headless tests and alternative platforms
   (Windows/macOS/Wayland) plug in by adding a sibling backend directory
   under `backends/` without touching the interface modules").
-- Predecessor: [`PLATFORM-003`](../../done/PLATFORM-003-explicit-platform-backends.md)
+- Predecessor: [`PLATFORM-003`](../../archive/PLATFORM-003-explicit-platform-backends.md)
   established the explicit `Null` / `Glfw` backend split, the
   `INTRINSIC_PLATFORM_BACKEND=Auto|Null|Glfw` selection policy, and the
   `INTRINSIC_HEADLESS_NO_GLFW` constraint.

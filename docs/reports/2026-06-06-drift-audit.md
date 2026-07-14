@@ -3,7 +3,7 @@
 This is the first calibration run of the repo-state drift audit driven by
 [`docs/agent/drift-audit-checklist.md`](../agent/drift-audit-checklist.md),
 installed by
-[`REVIEW-002`](../../tasks/done/REVIEW-002-recurring-drift-and-inconsistency-audit.md).
+[`REVIEW-002`](../../tasks/archive/REVIEW-002-recurring-drift-and-inconsistency-audit.md).
 It validates that the nine-row checklist is actionable end-to-end against the
 current repo state, as required by `REVIEW-002`.
 
@@ -38,7 +38,7 @@ repo state*.
 
 ## Follow-ups
 
-- Row 7 → [`HARDEN-078 — Track or resolve untracked TODO / temporary markers in promoted src`](../../tasks/done/HARDEN-078-track-untracked-todo-temporary-markers.md).
+- Row 7 → [`HARDEN-078 — Track or resolve untracked TODO / temporary markers in promoted src`](../../tasks/archive/HARDEN-078-track-untracked-todo-temporary-markers.md).
   Records an owning task ID for the `GetStreamingGraph()` temporary bridge and
   resolves/tracks the `Core.Filesystem` TODO. Remediation is **not** done in
   this audit.

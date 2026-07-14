@@ -26,7 +26,7 @@ All feature tracks below target the reorganized `src/` layer layout. The current
 
 - Contract and layering rules: `AGENTS.md` and `docs/agent/contract.md`.
 - Rendering target architecture: `docs/architecture/rendering-target-architecture.md`.
-- Archived hardening tracker: `tasks/done/0001-post-reorganization-hardening-tracker.md`.
+- Archived hardening tracker: `tasks/archive/0001-post-reorganization-hardening-tracker.md`.
 
 ---
 
@@ -49,7 +49,7 @@ Sub-entity select → Geometry processing (interactive operator input)
 
 ## Runtime Architecture Track
 
-Runtime/frame-pipeline execution work is tracked through the structured task system: see the runtime backlog index at [tasks/backlog/runtime/README.md](../tasks/backlog/runtime/README.md) and the completed runtime extraction gate [GRAPHICS-016 — Runtime extraction and graphics handoff](../tasks/done/GRAPHICS-016-runtime-extraction-handoff.md). The default migration intent preserves the current subsystem split while introducing explicit platform, simulation, extraction, render-preparation, submission, and maintenance stages; concrete sequencing lives in the structured GRAPHICS/runtime tasks rather than this roadmap.
+Runtime/frame-pipeline execution work is tracked through the structured task system: see the runtime backlog index at [tasks/backlog/runtime/README.md](../tasks/backlog/runtime/README.md) and the completed runtime extraction gate [GRAPHICS-016 — Runtime extraction and graphics handoff](../tasks/archive/GRAPHICS-016-runtime-extraction-handoff.md). The default migration intent preserves the current subsystem split while introducing explicit platform, simulation, extraction, render-preparation, submission, and maintenance stages; concrete sequencing lives in the structured GRAPHICS/runtime tasks rather than this roadmap.
 
 ### Near-term architecture sequencing
 
@@ -69,7 +69,7 @@ Runtime/frame-pipeline execution work is tracked through the structured task sys
 
 This architecture track is intentionally cross-cutting: it enables later rendering, streaming, and interaction work without reordering the feature roadmap below.
 
-**GPU-driven pipeline plan:** [docs/architecture/gpu-driven-modular-rendering-pipeline-plan.md](architecture/gpu-driven-modular-rendering-pipeline-plan.md) provides the concrete implementation plan for GPU-driven visibility, unified GPU scene topology, and modular rendering boundaries. It is consumed by the structured rendering backlog (see [tasks/backlog/rendering/README.md](../tasks/backlog/rendering/README.md)); the original parity seed is retired as [GRAPHICS-001 — Rendering parity inventory and task index](../tasks/done/GRAPHICS-001-rendering-parity-inventory.md).
+**GPU-driven pipeline plan:** [docs/architecture/gpu-driven-modular-rendering-pipeline-plan.md](architecture/gpu-driven-modular-rendering-pipeline-plan.md) provides the concrete implementation plan for GPU-driven visibility, unified GPU scene topology, and modular rendering boundaries. It is consumed by the structured rendering backlog (see [tasks/backlog/rendering/README.md](../tasks/backlog/rendering/README.md)); the original parity seed is retired as [GRAPHICS-001 — Rendering parity inventory and task index](../tasks/archive/GRAPHICS-001-rendering-parity-inventory.md).
 
 ### Architecture constraints (preserve during all refactor work)
 

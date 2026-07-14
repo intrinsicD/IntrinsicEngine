@@ -313,7 +313,9 @@ The generated `tasks/SESSION-BRIEF.md` is the authoritative open/unblocked
 view of the task tree (derived from task front-matter); consult it before
 picking work. The cross-domain convergence themes and their rationale are
 tracked in `tasks/backlog/README.md`; retirement narratives live in the
-append-only `tasks/done/RETIREMENT-LOG.md`. Keep roadmap details in those
+append-only `tasks/done/RETIREMENT-LOG.md`. Older retired tasks are swept
+from `tasks/done/` to `tasks/archive/` (frozen read-only history; IDs stay
+authoritative for dependency resolution). Keep roadmap details in those
 files rather than expanding this contract with task-specific plans.
 
 ## 12. Review checklist

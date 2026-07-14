@@ -3,9 +3,9 @@
 - **Status:** Accepted
 - **Date:** 2026-05-17
 - **Owners:** Graphics (SelectionSystem reporting seam), Runtime composition (StableEntityId resolution, outline-mask producer)
-- **Related tasks:** [`tasks/done/GRAPHICS-012`](../../tasks/done/GRAPHICS-012-picking-selection-outline.md), [`GRAPHICS-012Q`](../../tasks/done/GRAPHICS-012Q-picking-backend-runtime-clarifications.md)
+- **Related tasks:** [`tasks/done/GRAPHICS-012`](../../tasks/archive/GRAPHICS-012-picking-selection-outline.md), [`GRAPHICS-012Q`](../../tasks/archive/GRAPHICS-012Q-picking-backend-runtime-clarifications.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`docs/architecture/rendering-three-pass.md`](../architecture/rendering-three-pass.md), [`src/graphics/renderer/README.md`](../../src/graphics/renderer/README.md)
-- **Supersedes:** none. Extracted from the `Extrinsic.Graphics.SelectionSystem` bullet in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
+- **Supersedes:** none. Extracted from the `Extrinsic.Graphics.SelectionSystem` bullet in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/archive/DOCS-001-reduce-graphics-architecture-prose.md).
 - **Related ADRs:** [ADR-0006](0006-camera-picking-and-gizmo-runtime-handoff.md) records the producer side (camera controllers, single-shot `PickPixelRequest` scheduling, gizmo handoff); this ADR records the consumer / reporting side (selection ID encoding, drain pattern, runtime ownership of `StableEntityId` resolution and outline-mask production).
 
 ## Context
@@ -75,7 +75,7 @@ Graphics never reads or mutates ECS state and never imports editor selection pol
 
 ### 4. Transparent / special-material picking eligibility
 
-Until the implementation children identified by [`GRAPHICS-025`](../../tasks/done/GRAPHICS-025-hybrid-transparent-special-material-path.md) add transparent / special-material lanes, picking eligibility is restricted to the eight-bucket cull contract documented in `rendering-three-pass.md`:
+Until the implementation children identified by [`GRAPHICS-025`](../../tasks/archive/GRAPHICS-025-hybrid-transparent-special-material-path.md) add transparent / special-material lanes, picking eligibility is restricted to the eight-bucket cull contract documented in `rendering-three-pass.md`:
 
 - `SelectionSurface`, `SelectionLines`, and `SelectionPoints` mirror the opaque `SurfaceOpaque` / `Lines` / `Points` lanes for `Selectable` renderables only.
 - Transparent and special-forward renderables are **not** eligible for ID-pass writes.
@@ -114,8 +114,8 @@ Follow-up tasks required: none from this ADR. `GRAPHICS-025` already tracks the 
 
 ## Validation
 
-- [`tasks/done/GRAPHICS-012`](../../tasks/done/GRAPHICS-012-picking-selection-outline.md) records the underlying `SelectionSystem` reporting surface, the four-domain selection vocabulary, and the `Picking.Readback` resource shape.
-- [`tasks/done/GRAPHICS-012Q`](../../tasks/done/GRAPHICS-012Q-picking-backend-runtime-clarifications.md) records the four clarification decisions captured in §§1–4.
+- [`tasks/done/GRAPHICS-012`](../../tasks/archive/GRAPHICS-012-picking-selection-outline.md) records the underlying `SelectionSystem` reporting surface, the four-domain selection vocabulary, and the `Picking.Readback` resource shape.
+- [`tasks/done/GRAPHICS-012Q`](../../tasks/archive/GRAPHICS-012Q-picking-backend-runtime-clarifications.md) records the four clarification decisions captured in §§1–4.
 - `docs/architecture/rendering-three-pass.md` carries the matching `PrimitiveId` target row, the picking and sub-element selection contract, and the picking notes block authored by `GRAPHICS-012Q`.
 - `src/graphics/renderer/README.md` carries the matching ownership-contract bullet next to the `DebugViewSystem` and `ImGuiOverlaySystem` entries.
 - The default CPU correctness gate (`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) exercises the CPU/null drain through the same `SelectionSystem::PublishPickResult` / `PublishNoHit` seam, so any divergence in packing, drain timing, or counter behavior surfaces without needing a Vulkan device.

@@ -21,7 +21,7 @@ Papers are grouped by gap and ordered within each group by expected leverage for
 - **Gap addressed:** Geodesics and intrinsic geometry pack; SDF utilities; tolerant input for noisy data (P0/P1).
 - **Engine notes:** Reference backend would live next to the existing heat-method modules; new public API would mirror `VectorHeatMethod`. No new dependency beyond the sparse solver seam already on the `GEOM-008` roadmap.
 - **Reference:** [Project page](https://nzfeng.github.io/research/SignedHeatMethod/SignedDistance.pdf), reference implementation in geometry-central's `signed_heat_method` module.
-- **Engine status:** [`METHOD-002`](../../tasks/done/METHOD-002-signed-heat-method-reference-backend.md)
+- **Engine status:** [`METHOD-002`](../../tasks/archive/METHOD-002-signed-heat-method-reference-backend.md)
   delivered the `geometry.signed_heat` CPU reference package at
   [`methods/geometry/signed_heat/`](../../methods/geometry/signed_heat/).
 

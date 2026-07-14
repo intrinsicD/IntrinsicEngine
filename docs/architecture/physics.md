@@ -148,7 +148,7 @@ ECS stores authoring intent only:
   gravity scale, sleep, and CCD intent.
 
 The ECS descriptor surface is present in
-[`HARDEN-064`](../../tasks/done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md)
+[`HARDEN-064`](../../tasks/archive/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md)
 as `Extrinsic.ECS.Component.Collider` and
 `Extrinsic.ECS.Component.RigidBody`. It is a CPU authoring contract only; live
 physics-world state is stored in `Extrinsic.Physics.World`, and runtime
@@ -209,10 +209,10 @@ and contact/event counts where applicable.
 
 ## Follow-Ups
 
-- [`HARDEN-064`](../../tasks/done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) defines ECS collider and rigid-body authoring descriptors.
-- [`METHOD-001`](../../tasks/done/METHOD-001-rigid-body-dynamics-reference-backend.md) defines the CPU reference rigid-body method backend.
-- [`PHYSICS-001`](../../tasks/done/PHYSICS-001-physics-world-state-and-runtime-sync.md) defines the first physics world/state module and runtime bridge at `CPUContracted` maturity.
-- [`PHYSICS-002`](../../tasks/done/PHYSICS-002-collision-broadphase-narrowphase-contract.md) owns collision broadphase/narrowphase contracts.
-- [`PHYSICS-003`](../../tasks/done/PHYSICS-003-constraints-islands-and-solver-diagnostics.md) added constraints, islands, sleep, and solver diagnostics at `CPUContracted`.
-- [`ARCH-002`](../../tasks/done/ARCH-002-physics-phenomena-roadmap.md) records the non-rigid and multi-phenomena roadmap decisions.
-- [`METHOD-009`](../../tasks/done/METHOD-009-particle-spring-reference-backend.md), [`METHOD-010`](../../tasks/done/METHOD-010-xpbd-cloth-shell-reference-backend.md), and [`METHOD-011`](../../tasks/done/METHOD-011-sph-fluid-reference-backend.md) are the first non-rigid physics method-package follow-ups (all three are done). They remain CPU-reference-first and open no GPU backend.
+- [`HARDEN-064`](../../tasks/archive/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) defines ECS collider and rigid-body authoring descriptors.
+- [`METHOD-001`](../../tasks/archive/METHOD-001-rigid-body-dynamics-reference-backend.md) defines the CPU reference rigid-body method backend.
+- [`PHYSICS-001`](../../tasks/archive/PHYSICS-001-physics-world-state-and-runtime-sync.md) defines the first physics world/state module and runtime bridge at `CPUContracted` maturity.
+- [`PHYSICS-002`](../../tasks/archive/PHYSICS-002-collision-broadphase-narrowphase-contract.md) owns collision broadphase/narrowphase contracts.
+- [`PHYSICS-003`](../../tasks/archive/PHYSICS-003-constraints-islands-and-solver-diagnostics.md) added constraints, islands, sleep, and solver diagnostics at `CPUContracted`.
+- [`ARCH-002`](../../tasks/archive/ARCH-002-physics-phenomena-roadmap.md) records the non-rigid and multi-phenomena roadmap decisions.
+- [`METHOD-009`](../../tasks/archive/METHOD-009-particle-spring-reference-backend.md), [`METHOD-010`](../../tasks/archive/METHOD-010-xpbd-cloth-shell-reference-backend.md), and [`METHOD-011`](../../tasks/archive/METHOD-011-sph-fluid-reference-backend.md) are the first non-rigid physics method-package follow-ups (all three are done). They remain CPU-reference-first and open no GPU backend.

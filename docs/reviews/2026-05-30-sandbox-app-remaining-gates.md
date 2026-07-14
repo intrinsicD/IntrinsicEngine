@@ -1,7 +1,7 @@
 # Working Sandbox App — Remaining Gates (2026-05-30)
 
 > **Closed (2026-06-04).** The scoped working-sandbox acceptance path is now
-> retired by [`RUNTIME-095`](../../tasks/done/RUNTIME-095-working-sandbox-acceptance.md)
+> retired by [`RUNTIME-095`](../../tasks/archive/RUNTIME-095-working-sandbox-acceptance.md)
 > at `Operational` on Vulkan-capable hosts. The closing smoke drives the
 > runtime `Engine` for bounded frames with one mesh, one graph, one point cloud,
 > the reference camera, selection/outline state, and the runtime-owned
@@ -15,7 +15,7 @@
 
 This note originally inventoried the **remaining gates** between the 2026-05-30
 branch state and the `ExtrinsicSandbox` acceptance contract defined by
-[`RUNTIME-095`](../../tasks/done/RUNTIME-095-working-sandbox-acceptance.md):
+[`RUNTIME-095`](../../tasks/archive/RUNTIME-095-working-sandbox-acceptance.md):
 render at least one mesh, one graph, and one point cloud through the default
 runtime/graphics path with working camera controls, entity/primitive selection,
 selection outline, and core UI panels.
@@ -84,23 +84,23 @@ evidence for the path that led to that retirement.
 
 | Gate | Task | State | Evidence |
 |---|---|---|---|
-| Retire bootstrap recipe scaffold | [`GRAPHICS-081`](../../tasks/done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) | **DONE** | Scaffold recipe code, pass classes, shaders, tests, and renderer selector/readback hooks removed on 2026-06-02. RUNTIME-095 now depends on the canonical default recipe only. |
+| Retire bootstrap recipe scaffold | [`GRAPHICS-081`](../../tasks/archive/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) | **DONE** | Scaffold recipe code, pass classes, shaders, tests, and renderer selector/readback hooks removed on 2026-06-02. RUNTIME-095 now depends on the canonical default recipe only. |
 
 ### B. Runtime geometry residency (mesh / graph / point cloud)
 
 | Gate | Task | State | Evidence |
 |---|---|---|---|
-| Graph residency extraction wiring | [`RUNTIME-086`](../../tasks/done/RUNTIME-086-geometrysources-graph-residency.md) | **IN PROGRESS** | Slice A packer `Extrinsic.Runtime.GraphGeometryPacker` exists but is **not** imported by `Runtime.RenderExtraction.cpp`. Slice B (extraction wiring) and Slice C (dirty/retire) remain. |
-| Point-cloud residency | [`RUNTIME-087`](../../tasks/done/RUNTIME-087-geometrysources-pointcloud-residency.md) | **OPEN** | No point-cloud packer module exists in `src/runtime/`. |
-| Mesh primitive view lifecycle | [`RUNTIME-088`](../../tasks/done/RUNTIME-088-mesh-primitive-view-lifecycle.md) | **IN PROGRESS** | Slice A landed the standalone edge/vertex derivation packers + control surface; Slice B owns the extraction-cache residency wiring. |
+| Graph residency extraction wiring | [`RUNTIME-086`](../../tasks/archive/RUNTIME-086-geometrysources-graph-residency.md) | **IN PROGRESS** | Slice A packer `Extrinsic.Runtime.GraphGeometryPacker` exists but is **not** imported by `Runtime.RenderExtraction.cpp`. Slice B (extraction wiring) and Slice C (dirty/retire) remain. |
+| Point-cloud residency | [`RUNTIME-087`](../../tasks/archive/RUNTIME-087-geometrysources-pointcloud-residency.md) | **OPEN** | No point-cloud packer module exists in `src/runtime/`. |
+| Mesh primitive view lifecycle | [`RUNTIME-088`](../../tasks/archive/RUNTIME-088-mesh-primitive-view-lifecycle.md) | **IN PROGRESS** | Slice A landed the standalone edge/vertex derivation packers + control surface; Slice B owns the extraction-cache residency wiring. |
 
 ### C. Runtime selection
 
 | Gate | Task | State | Evidence |
 |---|---|---|---|
-| Selection controller + snapshot handoff | [`RUNTIME-089`](../../tasks/done/RUNTIME-089-selection-controller.md) | **OPEN** | No runtime selection module; only graphics-side `Graphics.SelectionSystem.cpp` + `ECS.Component.Selection`. |
-| Stable entity lookup sidecar | [`RUNTIME-092`](../../tasks/done/RUNTIME-092-stable-entity-lookup.md) | **OPEN** | No runtime stable-id/live-entity lookup module. |
-| Primitive selection refinement | [`RUNTIME-093`](../../tasks/done/RUNTIME-093-primitive-selection-refinement.md) | **IN PROGRESS** | Slice A landed the standalone `Extrinsic.Runtime.PrimitiveSelectionRefinement` module (hint-based mesh/graph/point-cloud refinement); `SelectionController` integration owned by Slice B. |
+| Selection controller + snapshot handoff | [`RUNTIME-089`](../../tasks/archive/RUNTIME-089-selection-controller.md) | **OPEN** | No runtime selection module; only graphics-side `Graphics.SelectionSystem.cpp` + `ECS.Component.Selection`. |
+| Stable entity lookup sidecar | [`RUNTIME-092`](../../tasks/archive/RUNTIME-092-stable-entity-lookup.md) | **OPEN** | No runtime stable-id/live-entity lookup module. |
+| Primitive selection refinement | [`RUNTIME-093`](../../tasks/archive/RUNTIME-093-primitive-selection-refinement.md) | **IN PROGRESS** | Slice A landed the standalone `Extrinsic.Runtime.PrimitiveSelectionRefinement` module (hint-based mesh/graph/point-cloud refinement); `SelectionController` integration owned by Slice B. |
 
 Graphics-side picking readback + outline (`GRAPHICS-074`) is **done** and is the
 upstream these runtime gates consume.
@@ -109,21 +109,21 @@ upstream these runtime gates consume.
 
 | Gate | Task | State | Evidence |
 |---|---|---|---|
-| Texture asset bridge | [`RUNTIME-080`](../../tasks/done/RUNTIME-080-asset-bridges-texture.md) | **SUPERSEDED / DONE** | Capability shipped under `ASSETIO-001` as `Extrinsic.Runtime.AssetModelTextureHandoff`; the umbrella was retired without re-implementation on 2026-06-03. |
-| Runtime ImGui platform/renderer adapter | [`RUNTIME-090`](../../tasks/done/RUNTIME-090-imgui-platform-renderer-adapter.md) | **DONE** | `Extrinsic.Runtime.ImGuiAdapter` produces `ImGuiOverlayFrame` records from runtime-owned ImGui frames; `GRAPHICS-079` consumes them through the renderer-owned `Pass.ImGui` path. |
-| Asset model/texture ingest ownership | [`ASSETIO-001`](../../tasks/done/ASSETIO-001-asset-model-texture-ingest-ownership.md) | **DONE** | Retired at `CPUContracted`: promoted asset routing, geometry/model/texture decoder dispatch, texture GPU-residency handoff, model-scene ECS `GeometrySources` materialization, deterministic embedded child texture assets, and material `AssetId` binding records are covered. RUNTIME-095 closes the scoped operational sandbox proof; broader file-format visual coverage remains future work. |
-| Sandbox editor shell + core panels | [`UI-001`](../../tasks/done/UI-001-sandbox-editor-shell-panels.md) | **DONE** | Retired at `CPUContracted`: `Extrinsic.Runtime.SandboxEditorUi` covers scene hierarchy, inspector, selection/refined primitive details, file/import entry command execution through `Engine::ImportAssetFromPath(...)`, camera/controller and mesh primitive-view commands, selected-entity `SpatialDebugBinding` / `VisualizationConfig`, and visualization adapter-binding routing through `RenderExtractionCache`. RUNTIME-095 closes the scoped operational visual/interactive proof with the editor shell attached. |
-| Visualization adapter umbrella | [`RUNTIME-083`](../../tasks/done/RUNTIME-083-visualization-adapters.md) | **DONE** | Slices A-E add the runtime `VisualizationAdapters` umbrella, `PropertyScalarAdapter`, `KMeansLabelAdapter`, `VectorFieldAdapter`, `IsolineAdapter`, `HtexMetadataAdapter`, registry contract, runtime-owned extraction-cache adapter bindings, scalar/non-scalar packet handoff into `RuntimeRenderSnapshotBatch::Visualization*`, deterministic Htex/fragment-bake packet contracts with `RecreateHtex` streaming scheduling, and extraction-side packet/error stats. |
+| Texture asset bridge | [`RUNTIME-080`](../../tasks/archive/RUNTIME-080-asset-bridges-texture.md) | **SUPERSEDED / DONE** | Capability shipped under `ASSETIO-001` as `Extrinsic.Runtime.AssetModelTextureHandoff`; the umbrella was retired without re-implementation on 2026-06-03. |
+| Runtime ImGui platform/renderer adapter | [`RUNTIME-090`](../../tasks/archive/RUNTIME-090-imgui-platform-renderer-adapter.md) | **DONE** | `Extrinsic.Runtime.ImGuiAdapter` produces `ImGuiOverlayFrame` records from runtime-owned ImGui frames; `GRAPHICS-079` consumes them through the renderer-owned `Pass.ImGui` path. |
+| Asset model/texture ingest ownership | [`ASSETIO-001`](../../tasks/archive/ASSETIO-001-asset-model-texture-ingest-ownership.md) | **DONE** | Retired at `CPUContracted`: promoted asset routing, geometry/model/texture decoder dispatch, texture GPU-residency handoff, model-scene ECS `GeometrySources` materialization, deterministic embedded child texture assets, and material `AssetId` binding records are covered. RUNTIME-095 closes the scoped operational sandbox proof; broader file-format visual coverage remains future work. |
+| Sandbox editor shell + core panels | [`UI-001`](../../tasks/archive/UI-001-sandbox-editor-shell-panels.md) | **DONE** | Retired at `CPUContracted`: `Extrinsic.Runtime.SandboxEditorUi` covers scene hierarchy, inspector, selection/refined primitive details, file/import entry command execution through `Engine::ImportAssetFromPath(...)`, camera/controller and mesh primitive-view commands, selected-entity `SpatialDebugBinding` / `VisualizationConfig`, and visualization adapter-binding routing through `RenderExtractionCache`. RUNTIME-095 closes the scoped operational visual/interactive proof with the editor shell attached. |
+| Visualization adapter umbrella | [`RUNTIME-083`](../../tasks/archive/RUNTIME-083-visualization-adapters.md) | **DONE** | Slices A-E add the runtime `VisualizationAdapters` umbrella, `PropertyScalarAdapter`, `KMeansLabelAdapter`, `VectorFieldAdapter`, `IsolineAdapter`, `HtexMetadataAdapter`, registry contract, runtime-owned extraction-cache adapter bindings, scalar/non-scalar packet handoff into `RuntimeRenderSnapshotBatch::Visualization*`, deterministic Htex/fragment-bake packet contracts with `RecreateHtex` streaming scheduling, and extraction-side packet/error stats. |
 
 ### E. Optional / non-blocking
 
-- [`RUNTIME-083`](../../tasks/done/RUNTIME-083-visualization-adapters.md)
+- [`RUNTIME-083`](../../tasks/archive/RUNTIME-083-visualization-adapters.md)
   visualization adapters — optional for acceptance (RUNTIME-095 lists
   visualization/spatial-debug adapters as optional).
 
 ### F. Final acceptance
 
-- [`RUNTIME-095`](../../tasks/done/RUNTIME-095-working-sandbox-acceptance.md)
+- [`RUNTIME-095`](../../tasks/archive/RUNTIME-095-working-sandbox-acceptance.md)
   itself — **DONE** (2026-06-04, `Operational` on Vulkan-capable hosts). Slice 1
   landed 2026-06-03 (`Test.RuntimeSandboxAcceptance.cpp`,
   `integration;runtime;graphics`): CPU/null end-to-end acceptance proving one

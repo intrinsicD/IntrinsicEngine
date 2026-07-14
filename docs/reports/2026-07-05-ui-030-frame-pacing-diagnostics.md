@@ -99,16 +99,16 @@ Sandbox EditorUI CPU work.
   owns the nonblocking selected-entity editor/cache/job pipeline, so UI-030
   does not expand into model-construction rewrites.
 - Retired
-  [`GRAPHICS-110`](../../tasks/done/GRAPHICS-110-imgui-upload-buffer-in-flight-safety.md)
+  [`GRAPHICS-110`](../../tasks/archive/GRAPHICS-110-imgui-upload-buffer-in-flight-safety.md)
   owns ImGui upload buffer in-flight safety.
 - Retired
-  [`GRAPHICS-113`](../../tasks/done/GRAPHICS-113-selection-outline-id-work-pruning.md)
+  [`GRAPHICS-113`](../../tasks/archive/GRAPHICS-113-selection-outline-id-work-pruning.md)
   owns selected-outline ID work pruning.
 - Retired
-  [`GRAPHICS-114`](../../tasks/done/GRAPHICS-114-retained-imgui-overlay-copy-upload-path.md)
+  [`GRAPHICS-114`](../../tasks/archive/GRAPHICS-114-retained-imgui-overlay-copy-upload-path.md)
   owns retained ImGui overlay copy/upload cleanup.
 - Retired
-  [`BUG-056`](../../tasks/done/BUG-056-extrinsic-sandbox-default-vulkan-validation-gate.md)
+  [`BUG-056`](../../tasks/archive/BUG-056-extrinsic-sandbox-default-vulkan-validation-gate.md)
   owns the default `ExtrinsicSandbox` Vulkan validation-gate fallback found by
   this capture.
 

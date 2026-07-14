@@ -56,20 +56,20 @@ No open ECS backlog tasks are currently queued here.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
-- [HARDEN-060 — Promote ECS scene bootstrap contract](../../done/HARDEN-060-ecs-scene-bootstrap-contract.md) (done).
-- [HARDEN-061 — Promote ECS hierarchy and transform system parity](../../done/HARDEN-061-ecs-hierarchy-transform-system-parity.md) (done).
-- [HARDEN-062 — Harden ECS layering and component boundaries](../../done/HARDEN-062-ecs-layering-and-component-boundary-hardening.md) (done).
-- [HARDEN-063 — Define promoted ECS event and command seams](../../done/HARDEN-063-ecs-events-and-command-seams.md) (done).
-- [HARDEN-064 — Define ECS collider and rigid-body authoring contracts](../../done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) (done).
-- [HARDEN-065 — Promote ECS geometry-source population and dirty-domain helpers](../../done/HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md) (done).
-- [HARDEN-066 — Define ECS render-sync/export dirty-tag policy](../../done/HARDEN-066-ecs-render-sync-export-policy.md) (done).
-- [HARDEN-067 — Add ECS world-bounds propagation system](../../done/HARDEN-067-ecs-bounds-propagation-system.md) (done).
-- [HARDEN-068 — Define ECS stable identity and scene metadata contract](../../done/HARDEN-068-ecs-stable-identity-and-scene-metadata.md) (done).
-- [HARDEN-080 — ECS module implementation splits](../../done/HARDEN-080-ecs-module-implementation-splits.md).
-- [HARDEN-081 — ECS legacy component compatibility decisions](../../done/HARDEN-081-ecs-legacy-component-compatibility-decisions.md) (done):
+- [HARDEN-060 — Promote ECS scene bootstrap contract](../../archive/HARDEN-060-ecs-scene-bootstrap-contract.md) (done).
+- [HARDEN-061 — Promote ECS hierarchy and transform system parity](../../archive/HARDEN-061-ecs-hierarchy-transform-system-parity.md) (done).
+- [HARDEN-062 — Harden ECS layering and component boundaries](../../archive/HARDEN-062-ecs-layering-and-component-boundary-hardening.md) (done).
+- [HARDEN-063 — Define promoted ECS event and command seams](../../archive/HARDEN-063-ecs-events-and-command-seams.md) (done).
+- [HARDEN-064 — Define ECS collider and rigid-body authoring contracts](../../archive/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) (done).
+- [HARDEN-065 — Promote ECS geometry-source population and dirty-domain helpers](../../archive/HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md) (done).
+- [HARDEN-066 — Define ECS render-sync/export dirty-tag policy](../../archive/HARDEN-066-ecs-render-sync-export-policy.md) (done).
+- [HARDEN-067 — Add ECS world-bounds propagation system](../../archive/HARDEN-067-ecs-bounds-propagation-system.md) (done).
+- [HARDEN-068 — Define ECS stable identity and scene metadata contract](../../archive/HARDEN-068-ecs-stable-identity-and-scene-metadata.md) (done).
+- [HARDEN-080 — ECS module implementation splits](../../archive/HARDEN-080-ecs-module-implementation-splits.md).
+- [HARDEN-081 — ECS legacy component compatibility decisions](../../archive/HARDEN-081-ecs-legacy-component-compatibility-decisions.md) (done):
   retired remaining legacy `NameTag`, `AxisRotator`, DEC wrapper, and
   feature-token compatibility gaps without moving runtime/graphics ownership
   into ECS.
-- [HARDEN-083 — Geometry source availability and provenance contract](../../done/HARDEN-083-geometry-source-availability-contract.md)
+- [HARDEN-083 — Geometry source availability and provenance contract](../../archive/HARDEN-083-geometry-source-availability-contract.md)
   (done, 2026-06-19, `CPUContracted`): `GeometrySources` now reports CPU
   source capabilities separately from exact active domain and provenance.

@@ -1,6 +1,6 @@
 # Point-cloud Algorithm Roadmap
 
-Status: roadmap / planning note for [`GEOM-010`](../../tasks/done/GEOM-010-point-cloud-algorithm-pack-roadmap.md).
+Status: roadmap / planning note for [`GEOM-010`](../../tasks/archive/GEOM-010-point-cloud-algorithm-pack-roadmap.md).
 
 This document splits point-cloud algorithm work into reviewable packs for `src/geometry` and `methods/geometry`. It describes intended task boundaries; it does not claim the listed algorithms are already implemented.
 
@@ -33,7 +33,7 @@ The gaps below come from the [`src/geometry` gap analysis](../reviews/2026-05-12
 
 ## Pack 1 — Filtering, downsampling, and density diagnostics
 
-Follow-up task: [`GEOM-016`](../../tasks/done/GEOM-016-point-cloud-filtering-density-contracts.md).
+Follow-up task: [`GEOM-016`](../../tasks/archive/GEOM-016-point-cloud-filtering-density-contracts.md).
 
 Scope:
 
@@ -75,7 +75,7 @@ Forbidden shortcuts:
 
 ## Pack 2 — Keypoints, descriptors, matching, and coarse alignment
 
-Follow-up task: [`GEOM-017`](../../tasks/done/GEOM-017-point-cloud-descriptors-registration-seams.md).
+Follow-up task: [`GEOM-017`](../../tasks/archive/GEOM-017-point-cloud-descriptors-registration-seams.md).
 
 Scope:
 
@@ -224,7 +224,7 @@ Point-cloud algorithms must make stochastic and order-sensitive behavior explici
 
 The first two implementation packs are:
 
-1. [`GEOM-016`](../../tasks/done/GEOM-016-point-cloud-filtering-density-contracts.md) — filtering, downsampling, outlier removal, and density diagnostics. This is the smallest unblocked pack because much of the public surface already exists and needs hardening, tests, diagnostics, and smoke benchmarking.
-2. [`GEOM-017`](../../tasks/done/GEOM-017-point-cloud-descriptors-registration-seams.md) — keypoints, descriptors, matching, and coarse registration seams. This unlocks robust/global registration and reconstruction work without prematurely importing paper-specific TEASER/CPD assumptions into `src/geometry`.
+1. [`GEOM-016`](../../tasks/archive/GEOM-016-point-cloud-filtering-density-contracts.md) — filtering, downsampling, outlier removal, and density diagnostics. This is the smallest unblocked pack because much of the public surface already exists and needs hardening, tests, diagnostics, and smoke benchmarking.
+2. [`GEOM-017`](../../tasks/archive/GEOM-017-point-cloud-descriptors-registration-seams.md) — keypoints, descriptors, matching, and coarse registration seams. This unlocks robust/global registration and reconstruction work without prematurely importing paper-specific TEASER/CPD assumptions into `src/geometry`.
 
 Later packs should not begin until their prerequisites are either retired to `tasks/done/` or recorded as explicit out-of-scope assumptions in the candidate task file.

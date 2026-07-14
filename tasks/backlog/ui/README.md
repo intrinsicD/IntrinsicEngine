@@ -163,105 +163,105 @@ retired under the runtime backlog as `RUNTIME-135`.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
-- [RORG-031F — UI integration backlog seed](../../done/RORG-031F-ui-integration.md)
+- [RORG-031F — UI integration backlog seed](../../archive/RORG-031F-ui-integration.md)
   (done, 2026-07-05, `Scaffolded`): planning-only umbrella retired after
   current UI children through `UI-031` were indexed, the remaining deferred
   workflows kept reserved prospective IDs (`UI-009..012`) and external
   triggers, and no concrete UI implementation task remained open.
-- [UI-001 — Sandbox editor shell and core panels](../../done/UI-001-sandbox-editor-shell-panels.md) (done, 2026-06-03, `CPUContracted`).
-- [UI-002 — Sandbox EditorUI domain menu windows](../../done/UI-002-editor-domain-menu-windows.md) (done, 2026-06-07, `CPUContracted`).
-- [UI-003 — Sandbox EditorUI geometry processing capabilities](../../done/UI-003-sandbox-editor-geometry-processing-capabilities.md) (done, 2026-06-07, `CPUContracted`).
-- [UI-004 — Sandbox EditorUI K-Means execution command seam](../../done/UI-004-sandbox-editor-kmeans-execution.md) (done, 2026-06-07, `CPUContracted`).
-- [UI-005 — Sandbox EditorUI visualization property presets](../../done/UI-005-sandbox-editor-visualization-property-presets.md) (done, 2026-06-07, `CPUContracted`).
-- [UI-006 — Sandbox EditorUI render graph diagnostics panel](../../done/UI-006-sandbox-editor-rendergraph-panel.md) (done, 2026-06-08, `CPUContracted`).
-- [UI-007 — Sandbox EditorUI drag/drop import status](../../done/UI-007-sandbox-editor-drag-drop-import.md) (done, 2026-06-08, `CPUContracted`).
-- [UI-008 — Editor file dialog, dirty-state, and debug workflows](../../done/UI-008-editor-file-dialog-dirty-debug-workflows.md) (done, 2026-06-09, `CPUContracted`):
+- [UI-001 — Sandbox editor shell and core panels](../../archive/UI-001-sandbox-editor-shell-panels.md) (done, 2026-06-03, `CPUContracted`).
+- [UI-002 — Sandbox EditorUI domain menu windows](../../archive/UI-002-editor-domain-menu-windows.md) (done, 2026-06-07, `CPUContracted`).
+- [UI-003 — Sandbox EditorUI geometry processing capabilities](../../archive/UI-003-sandbox-editor-geometry-processing-capabilities.md) (done, 2026-06-07, `CPUContracted`).
+- [UI-004 — Sandbox EditorUI K-Means execution command seam](../../archive/UI-004-sandbox-editor-kmeans-execution.md) (done, 2026-06-07, `CPUContracted`).
+- [UI-005 — Sandbox EditorUI visualization property presets](../../archive/UI-005-sandbox-editor-visualization-property-presets.md) (done, 2026-06-07, `CPUContracted`).
+- [UI-006 — Sandbox EditorUI render graph diagnostics panel](../../archive/UI-006-sandbox-editor-rendergraph-panel.md) (done, 2026-06-08, `CPUContracted`).
+- [UI-007 — Sandbox EditorUI drag/drop import status](../../archive/UI-007-sandbox-editor-drag-drop-import.md) (done, 2026-06-08, `CPUContracted`).
+- [UI-008 — Editor file dialog, dirty-state, and debug workflows](../../archive/UI-008-editor-file-dialog-dirty-debug-workflows.md) (done, 2026-06-09, `CPUContracted`):
   path-entry file boundary, dirty-state/undo-redo affordances, new/open/save/close
   command routing, and app-to-runtime-only dependency proof.
-- [UI-013 — Sandbox EditorUI domain render hint controls](../../done/UI-013-domain-render-hint-controls.md) (done, 2026-06-11, `CPUContracted`).
-- [UI-015 — Progressive render-data inspector](../../done/UI-015-progressive-render-data-inspector.md)
+- [UI-013 — Sandbox EditorUI domain render hint controls](../../archive/UI-013-domain-render-hint-controls.md) (done, 2026-06-11, `CPUContracted`).
+- [UI-015 — Progressive render-data inspector](../../archive/UI-015-progressive-render-data-inspector.md)
   (done, 2026-06-16, `CPUContracted`): selected-entity progressive inspector
   models and ImGui rows now expose entity shape, presentation slots, uniform
   defaults, source-property pickers, compatible/incompatible reasons, derived
   jobs, and composition summaries through runtime-owned command/history seams.
-- [UI-016 — Geometry property catalog and binding usability](../../done/UI-016-geometry-property-catalog-and-binding-usability.md)
+- [UI-016 — Geometry property catalog and binding usability](../../archive/UI-016-geometry-property-catalog-and-binding-usability.md)
   (done, 2026-06-17, `CPUContracted`): selected mesh, graph, and point-cloud
   property catalogs now list internal/connectivity/user/generated properties,
   supported value previews, unsupported diagnostics, and compatible binding
   targets without raw property pointers.
-- [UI-017 — Bound render state inspector](../../done/UI-017-bound-render-state-inspector.md)
+- [UI-017 — Bound render state inspector](../../archive/UI-017-bound-render-state-inspector.md)
   (done, 2026-06-17, `CPUContracted`): selected mesh, graph, point-cloud, and
   composition models now expose render lanes, progressive slots, source kind,
   bound defaults/properties/textures, readiness diagnostics, and derived-job
   progress rows.
-- [UI-014 — UV backend and texture bake controls](../../done/UI-014-uv-backend-and-texture-bake-controls.md)
+- [UI-014 — UV backend and texture bake controls](../../archive/UI-014-uv-backend-and-texture-bake-controls.md)
   (done, 2026-06-17, `CPUContracted`): selected-mesh UV diagnostics,
   xatlas-backed regeneration commands, property-catalog-driven bake sources,
   target semantic/encoder/output-size controls, and selected-mesh bake command
   routing are now present in the runtime-owned sandbox editor UI.
-- [UI-018 — Sandbox menu-first UI defaults](../../done/UI-018-sandbox-menu-first-ui.md)
+- [UI-018 — Sandbox menu-first UI defaults](../../archive/UI-018-sandbox-menu-first-ui.md)
   (done, 2026-06-17, `CPUContracted`): sandbox startup now shows only the
   main menu bar; top-level panels open from `View`, while domain windows remain
   closed until opened from the PointCloud/Graph/Mesh menus.
-- [UI-019 — Visualization uniform color edit widget](../../done/UI-019-visualization-uniform-color-edit.md)
+- [UI-019 — Visualization uniform color edit widget](../../archive/UI-019-visualization-uniform-color-edit.md)
   (done, 2026-06-19, `CPUContracted`): selected mesh, graph, point-cloud, and
   top-level geometry visualization windows expose an ImGui color edit widget
   for active uniform-color visualization configs without UI owning renderer or
   asset state.
-- [UI-020 — Visualization lane uniform color controls](../../done/UI-020-visualization-lane-uniform-color.md)
+- [UI-020 — Visualization lane uniform color controls](../../archive/UI-020-visualization-lane-uniform-color.md)
   (done, 2026-06-19, `CPUContracted`): domain visualization windows target
   surface, edge, and point render lanes by source-row presence, and optional
   lane overrides let mesh vertices and graph nodes use independent uniform
   point-lane colors.
-- [UI-021 — Sandbox editor geometry availability migration](../../done/UI-021-sandbox-editor-geometry-availability-migration.md)
+- [UI-021 — Sandbox editor geometry availability migration](../../archive/UI-021-sandbox-editor-geometry-availability-migration.md)
   (done, 2026-06-19, `CPUContracted`): domain windows, visualization targets,
   property catalogs, primitive-view commands, render hints, K-Means affordances,
   and mesh UV/bake diagnostics now consume the runtime availability resolver.
-- [UI-022 — Sandbox EditorUI vertex-normal recompute windows](../../done/UI-022-sandbox-editor-vertex-normal-recompute.md)
+- [UI-022 — Sandbox EditorUI vertex-normal recompute windows](../../archive/UI-022-sandbox-editor-vertex-normal-recompute.md)
   (done, 2026-06-28, `CPUContracted`): mesh, graph, and point-cloud normal
   recompute windows consume domain-owned geometry modules, publish canonical
   `v:normal`, and defer renderer synchronization through `DirtyVertexNormals`.
-- [UI-023 — Sandbox render recipe editing UI](../../done/UI-023-render-recipe-ui-editing.md)
+- [UI-023 — Sandbox render recipe editing UI](../../archive/UI-023-render-recipe-ui-editing.md)
   (done, 2026-06-24, `CPUContracted`): render recipe editor models and ImGui
   rows expose declared renderer slots, binding overrides, view/output recipes,
   validation/preview/activation state, and artifact publish/apply commands
   through runtime-owned seams without UI owning renderer state.
-- [UI-024 — Sandbox EditorUI mesh denoising window](../../done/UI-024-editor-mesh-denoise-window.md)
+- [UI-024 — Sandbox EditorUI mesh denoising window](../../archive/UI-024-editor-mesh-denoise-window.md)
   (done, 2026-06-28, `CPUContracted`): mesh denoise commands consume the
   geometry-owned bilateral denoiser, publish canonical `v:position`, and defer
   renderer synchronization through dirty tags.
-- [UI-025 — Sandbox EditorUI remeshing and subdivision windows](../../done/UI-025-editor-remesh-subdivide-windows.md)
+- [UI-025 — Sandbox EditorUI remeshing and subdivision windows](../../archive/UI-025-editor-remesh-subdivide-windows.md)
   (done, 2026-06-28, `CPUContracted`): remesh/subdivide commands consume
   GEOM-043/GEOM-044 topology operators, replace selected mesh `GeometrySources`
   through undoable runtime command history, and defer renderer synchronization
   through dirty tags.
-- [UI-026 — Sandbox EditorUI curvature analysis window and principal-direction field](../../done/UI-026-editor-curvature-analysis-window.md)
+- [UI-026 — Sandbox EditorUI curvature analysis window and principal-direction field](../../archive/UI-026-editor-curvature-analysis-window.md)
   (done, 2026-06-28, `CPUContracted`): mesh curvature commands consume
   `Geometry.Curvature`, publish canonical scalar/direction properties, and
   feed scalar colormap plus principal-direction visualization adapters.
-- [UI-027 — Sandbox EditorUI point-cloud outlier-removal window](../../done/UI-027-editor-pointcloud-outlier-removal-window.md)
+- [UI-027 — Sandbox EditorUI point-cloud outlier-removal window](../../archive/UI-027-editor-pointcloud-outlier-removal-window.md)
   (done, 2026-06-29, `CPUContracted`): a `PointCloud > Processing > Remove
   Outliers` window drives the `GEOM-016` statistical/radius outlier-removal
   operators, rebuilds the entity's point `GeometrySources` via
   `PopulateFromCloud`, and is undoable through `EditorCommandHistory`.
-- [UI-028 — Sandbox EditorUI mesh simplification window](../../done/UI-028-editor-mesh-simplification-window.md)
+- [UI-028 — Sandbox EditorUI mesh simplification window](../../archive/UI-028-editor-mesh-simplification-window.md)
   (done, 2026-07-05, `CPUContracted`): `Mesh > Processing > Simplify` drives the
   `GEOM-014` classical QEM / FA-QEM simplification kernel through an undoable
   runtime command, preserves UV seam inputs, reports collapse/rejection/pin
   diagnostics, and defers renderer synchronization through geometry dirty tags.
-- [UI-029 — Editor ICP registration panel + convergence visualization](../../done/UI-029-editor-registration-convergence-visualization.md)
+- [UI-029 — Editor ICP registration panel + convergence visualization](../../archive/UI-029-editor-registration-convergence-visualization.md)
   (done, 2026-07-05, `Operational`): the top-level `ICP Registration` panel
   consumes `Runtime.RegistrationAlignment` to align selected point-cloud
   entities, records the per-iteration convergence trajectory, scrubs trajectory
   poses, and routes transform writeback through undoable runtime commands.
-- [UI-030 — Sandbox EditorUI frame-pacing diagnostics](../../done/UI-030-editor-frame-pacing-diagnostics.md)
+- [UI-030 — Sandbox EditorUI frame-pacing diagnostics](../../archive/UI-030-editor-frame-pacing-diagnostics.md)
   (done, 2026-07-05, `Operational`): bounded sandbox captures now emit
   `intrinsic.frame_pacing.v1` JSON with runtime, ImGui producer, render-graph,
   and Vulkan lifecycle timing buckets. The report ranks the default capture as
   present/fallback-frame-lifecycle dominated, rules out editor callback and
   ImGui draw-data copy work as dominant causes, and files `BUG-056` for the
   default sandbox Vulkan validation gate fallback.
-- [UI-031 — Sandbox EditorUI domain-window reorganization](../../done/UI-031-editor-domain-ui-reorganization.md)
+- [UI-031 — Sandbox EditorUI domain-window reorganization](../../archive/UI-031-editor-domain-ui-reorganization.md)
   (done, 2026-07-05, `CPUContracted`): Mesh/Graph/PointCloud domain
   `Appearance` windows now co-locate render hints, visualization, uniform/lane
   color, property/attribute binding, bound-state inspection, and texture-bake

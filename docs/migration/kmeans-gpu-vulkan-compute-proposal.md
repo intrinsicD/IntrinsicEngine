@@ -14,13 +14,13 @@ Related existing work:
 - `docs/architecture/algorithm-variant-dispatch.md` — the CPU-reference + RHI
   overload seam that `Geometry.KMeans` already exemplifies.
 - `docs/architecture/compute-parallel-primitives.md` — GRAPHICS-108 scan/compaction.
-- `tasks/done/GEOM-052-shared-cpu-gpu-backend-seam-kmeans-exemplar.md` — installed
+- `tasks/archive/GEOM-052-shared-cpu-gpu-backend-seam-kmeans-exemplar.md` — installed
   the `{CPU, GPU}` seam and telemetry; explicitly deferred the real GPU kernel.
-- `tasks/done/GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md` — recorded
+- `tasks/archive/GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md` — recorded
   the CUDA remove/keep decision.
 - `tasks/active/METHOD-013-progressive-poisson-disk-gpu-backend.md` — the live
   template for a Vulkan-compute method backend (module shape, slices, tests).
-- `tasks/done/GEOM-056-kmeans-gpu-vulkan-compute-backend.md` — implemented and
+- `tasks/archive/GEOM-056-kmeans-gpu-vulkan-compute-backend.md` — implemented and
   parity-gated this KMeans Vulkan-compute backend.
 
 ---

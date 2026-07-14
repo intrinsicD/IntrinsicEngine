@@ -10,6 +10,10 @@ Tasks move through this lifecycle:
 2. `tasks/active/` — currently in progress or currently blocked work.
 3. `tasks/done/` — completed work with completion metadata; retirement
    narratives are appended to [`done/RETIREMENT-LOG.md`](done/RETIREMENT-LOG.md).
+4. `tasks/archive/` — frozen history: retired tasks periodically swept out of
+   `tasks/done/` to keep the working set small. Archived IDs remain
+   authoritative for dependency resolution and can never be reallocated; the
+   files themselves are read-only (see [`archive/README.md`](archive/README.md)).
 
 Promotion to `tasks/active/` is required only for work that spans more than
 one slice or session. A single-slice task may be worked and retired directly
@@ -59,12 +63,12 @@ None. `tasks/active/` should contain only currently in-progress or blocked task 
 
 Recently archived trackers:
 
-- [ARCH-003 — Cross-domain backlog convergence map](done/ARCH-003-cross-domain-convergence-map.md):
+- [ARCH-003 — Cross-domain backlog convergence map](archive/ARCH-003-cross-domain-convergence-map.md):
   added the convergence map in [`tasks/backlog/README.md`](backlog/README.md)
   and per-category READMEs so agents pick tasks against a shared engine
   direction rather than diverging by category.
-- [RORG-0000 — Repository Reorganization Tracker](done/0000-repo-reorganization-tracker.md)
-- [HARDEN-001 — Post-Reorganization Hardening Tracker](done/0001-post-reorganization-hardening-tracker.md)
+- [RORG-0000 — Repository Reorganization Tracker](archive/0000-repo-reorganization-tracker.md)
+- [HARDEN-001 — Post-Reorganization Hardening Tracker](archive/0001-post-reorganization-hardening-tracker.md)
 
 ## Required task shape
 

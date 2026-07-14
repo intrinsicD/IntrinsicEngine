@@ -28,7 +28,7 @@ This directory contains the `Components` module/files.
 ## Stable identity vs `MetaData`
 
 `HARDEN-068` (see
-[`tasks/done/HARDEN-068-ecs-stable-identity-and-scene-metadata.md`](../../../tasks/done/HARDEN-068-ecs-stable-identity-and-scene-metadata.md))
+[`tasks/archive/HARDEN-068-ecs-stable-identity-and-scene-metadata.md`](../../../tasks/archive/HARDEN-068-ecs-stable-identity-and-scene-metadata.md))
 records the contract for entity-stable identity:
 
 - `Extrinsic.ECS.Component.MetaData` (`ECS.Component.MetaData.cppm`)
@@ -69,7 +69,7 @@ owns the layering allowlist change.
 
 `ECS.Component.Collider` and `ECS.Component.RigidBody` define the ECS-owned
 physics authoring contract from
-[`HARDEN-064`](../../../tasks/done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md).
+[`HARDEN-064`](../../../tasks/archive/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md).
 They intentionally stop at CPU descriptors:
 
 - `Collider::Component` is a list of `ShapeDescriptor` child shapes. The
@@ -91,7 +91,7 @@ ECS-to-physics synchronization bridge.
 ## Render residency boundary
 
 Per
-[`GRAPHICS-028`](../../../tasks/done/GRAPHICS-028-ecs-renderable-residency-bridge.md),
+[`GRAPHICS-028`](../../../tasks/archive/GRAPHICS-028-ecs-renderable-residency-bridge.md),
 render-facing ECS components remain CPU-only. `AssetInstance::Source`,
 `GeometrySources::*`, hierarchy/transform data, and `DirtyTags::*` may identify
 what runtime extraction should consider, but canonical ECS components must not

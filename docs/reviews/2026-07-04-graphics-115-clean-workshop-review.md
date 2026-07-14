@@ -3,7 +3,7 @@
 ## Change under review
 
 - Change: retire
-  [`GRAPHICS-115`](../../tasks/done/GRAPHICS-115-object-space-normal-gpu-dilation.md)
+  [`GRAPHICS-115`](../../tasks/archive/GRAPHICS-115-object-space-normal-gpu-dilation.md)
   by adding graphics-owned object-space normal bake dilation resources,
   ping-pong render/fragment command recording, Vulkan sampled bridge slot
   reservations, and CPU/Vulkan coverage.

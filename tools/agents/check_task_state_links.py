@@ -72,13 +72,19 @@ def lifecycle_state(path: Path, tasks_root: Path) -> str | None:
         return None
     if not relative.parts:
         return None
+    # Swept retired tasks under tasks/archive/ keep done semantics: an
+    # archived task is a done task whose file left the working set.
+    if relative.parts[0] == "archive":
+        return "done"
     return relative.parts[0] if relative.parts[0] in LIFECYCLE_DIRS else None
 
 
 def collect_task_index(tasks_root: Path) -> dict[str, list[TaskRecord]]:
     index: dict[str, list[TaskRecord]] = {}
-    for state in LIFECYCLE_DIRS:
-        root = tasks_root / state
+    # tasks/archive/ holds swept retired tasks; index them as state "done"
+    # so citations of archived IDs keep resolving as retired.
+    for state, dir_name in [(s, s) for s in LIFECYCLE_DIRS] + [("done", "archive")]:
+        root = tasks_root / dir_name
         if not root.is_dir():
             continue
         for path in sorted(root.rglob("*.md")):
@@ -243,8 +249,8 @@ def validate_status_claims(
 
 # Session-start index files must describe current state only: retired-task
 # history belongs in tasks/done/RETIREMENT-LOG.md, not in member lists. Any
-# link into tasks/done/ from these files (other than to the retirement log
-# itself) is regrowth of the pre-PROC-003 history clutter.
+# link into tasks/done/ or tasks/archive/ from these files (other than to the
+# retirement log itself) is regrowth of the pre-PROC-003 history clutter.
 STATE_ONLY_INDEX_FILES = (
     Path("tasks/active/README.md"),
     Path("tasks/backlog/README.md"),
@@ -286,6 +292,7 @@ def validate_state_only_indexes(
     findings: list[Finding] = []
     content_wo_code = strip_fenced_code(content)
     done_root = tasks_root / "done"
+    archive_root = tasks_root / "archive"
     for match in LINK_PATTERN.finditer(content_wo_code):
         raw_link = match.group(1).strip()
         if is_ignored_link(raw_link):
@@ -293,7 +300,7 @@ def validate_state_only_indexes(
         target = normalize_target(md_file, raw_link)
         if target.name == RETIREMENT_LOG_NAME:
             continue
-        if target.is_relative_to(done_root):
+        if target.is_relative_to(done_root) or target.is_relative_to(archive_root):
             line = line_number_for_offset(content_wo_code, match.start())
             findings.append(
                 Finding(
@@ -321,6 +328,7 @@ def validate_category_indexes(
 
     findings: list[Finding] = []
     done_root = tasks_root / "done"
+    archive_root = tasks_root / "archive"
     heading_stack: list[tuple[int, bool]] = []  # (level, done-links allowed)
     in_fence = False
     for line_number, line in enumerate(content.splitlines(), start=1):
@@ -352,7 +360,7 @@ def validate_category_indexes(
             target = normalize_target(md_file, raw_link)
             if target.name == RETIREMENT_LOG_NAME:
                 continue
-            if target.is_relative_to(done_root):
+            if target.is_relative_to(done_root) or target.is_relative_to(archive_root):
                 findings.append(
                     Finding(
                         md_file,

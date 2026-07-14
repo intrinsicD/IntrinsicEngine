@@ -12,7 +12,7 @@
   build improvement, a regressed warm build p95, nonzero ccache errors, or a
   cached/clean correctness mismatch.
 - **Proof**: [ara/evidence/tables/ci007_ccache_cohort.md,
-  tasks/done/CI-007-module-safe-persistent-ccache-pilot.md,
+  tasks/archive/CI-007-module-safe-persistent-ccache-pilot.md,
   docs/benchmarking/ci-policy.md]
 - **Dependencies**: []
 - **Tags**: CI, ccache, C++23 modules, gate latency

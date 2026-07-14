@@ -57,19 +57,19 @@ In addition to the global promotion checklist in
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
-- [PLATFORM-005 — Platform module implementation splits](../../done/PLATFORM-005-platform-module-implementation-splits.md):
+- [PLATFORM-005 — Platform module implementation splits](../../archive/PLATFORM-005-platform-module-implementation-splits.md):
   module-interface hygiene follow-up for `Platform.Input`, `Platform.Backend.Glfw`,
   and `Platform.Backend.Null`; moves non-trivial bodies and backend-only
   includes/imports out of `.cppm` interfaces without changing platform behavior.
-- [HARDEN-067 — Remove stale `src/platform/LinuxGlfwVulkan/` legacy subtree](../../done/HARDEN-067-remove-stale-platform-linuxglfwvulkan.md)
+- [HARDEN-067 — Remove stale `src/platform/LinuxGlfwVulkan/` legacy subtree](../../archive/HARDEN-067-remove-stale-platform-linuxglfwvulkan.md)
   (done 2026-05-15): the orphaned pre-`PLATFORM-003` window/input duplicate
   has been deleted; the explicit-backend split now stands without dead-code
   remnants under `src/platform/`.
-- [PLATFORM-006 — Platform event parity and editor boundary](../../done/PLATFORM-006-platform-event-parity.md)
+- [PLATFORM-006 — Platform event parity and editor boundary](../../archive/PLATFORM-006-platform-event-parity.md)
   (done 2026-06-09, `CPUContracted`): current editor/runtime event contracts
   are explicit for resize/minimize, key/mouse/scroll/cursor, text codepoints,
   clipboard, cursor mode, and dropped paths. Native file dialogs,
   multi-window, non-Linux backend parity, and IME composition remain deferred
   until a concrete runtime/UI task accepts them.
-- [`tasks/done/PLATFORM-003-explicit-platform-backends.md`](../../done/PLATFORM-003-explicit-platform-backends.md)
+- [`tasks/archive/PLATFORM-003-explicit-platform-backends.md`](../../archive/PLATFORM-003-explicit-platform-backends.md)
   — establishment of the explicit backend split.

@@ -42,7 +42,7 @@ depends_on: [GEOM-018, GEOM-020]
   the sandbox cannot bootstrap vcpkg (microsoft/vcpkg clone denied by the egress
   policy), so the full C++23-module build/test must run in CI before this task
   retires to `tasks/done/`.
-- Spawned by [`GEOM-011`](../../done/GEOM-011-parameterization-mapping-roadmap.md) and the [parameterization/mapping roadmap](../../../docs/architecture/parameterization-mapping-roadmap.md).
+- Spawned by [`GEOM-011`](../../archive/GEOM-011-parameterization-mapping-roadmap.md) and the [parameterization/mapping roadmap](../../../docs/architecture/parameterization-mapping-roadmap.md).
 - Existing `Geometry.Parameterization` provides LSCM for disk-topology triangle meshes. This task adds the smallest new solver family after diagnostics: harmonic/Tutte embedding with explicit boundary policies.
 - Depends on GEOM-018 for shared distortion/map-quality diagnostics. If GEOM-018 is not retired when this task starts, record any diagnostic subset used here as an explicit in-task assumption.
 - Depends on retired GEOM-020 for the sparse direct SPD solver seam (`Geometry.Sparse` LDLT/LLT): the fixed-boundary Tutte/harmonic interior system is SPD and should use `Geometry.Sparse::SparseLDLT` by default. The existing `Geometry.Sparse` CG path from GEOM-008 remains an acceptable documented fallback only if a later slice plan records the solver choice and tolerance before implementation.

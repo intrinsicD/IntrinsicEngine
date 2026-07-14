@@ -3,9 +3,9 @@
 - **Status:** Accepted
 - **Date:** 2026-05-17
 - **Owners:** Graphics / Vulkan backend, Runtime composition
-- **Related tasks:** [`tasks/done/GRAPHICS-033`](../../tasks/done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md), [`GRAPHICS-033A`](../../tasks/done/GRAPHICS-033A-vulkan-operational-status-evaluator.md), [`GRAPHICS-033B`](../../tasks/done/GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md), [`GRAPHICS-033C`](../../tasks/done/GRAPHICS-033C-vulkan-minimal-recipe-recording.md), [`GRAPHICS-033E`](../../tasks/done/GRAPHICS-033E-vulkan-operational-gate-barrier-validation.md), [`GRAPHICS-033F`](../../tasks/done/GRAPHICS-033F-vulkan-operational-gate-public-service-reconciliation.md)
+- **Related tasks:** [`tasks/done/GRAPHICS-033`](../../tasks/archive/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md), [`GRAPHICS-033A`](../../tasks/archive/GRAPHICS-033A-vulkan-operational-status-evaluator.md), [`GRAPHICS-033B`](../../tasks/archive/GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md), [`GRAPHICS-033C`](../../tasks/archive/GRAPHICS-033C-vulkan-minimal-recipe-recording.md), [`GRAPHICS-033E`](../../tasks/archive/GRAPHICS-033E-vulkan-operational-gate-barrier-validation.md), [`GRAPHICS-033F`](../../tasks/archive/GRAPHICS-033F-vulkan-operational-gate-public-service-reconciliation.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`src/graphics/vulkan/README.md`](../../src/graphics/vulkan/README.md), [`docs/architecture/rendering-three-pass.md`](../architecture/rendering-three-pass.md), [`docs/migration/nonlegacy-parity-matrix.md`](../migration/nonlegacy-parity-matrix.md)
-- **Supersedes:** none. Extracted from the `## Vulkan operational readiness and runtime fallback` section in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
+- **Supersedes:** none. Extracted from the `## Vulkan operational readiness and runtime fallback` section in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/archive/DOCS-001-reduce-graphics-architecture-prose.md).
 - **Related ADRs:** [ADR-0004](0004-vulkan-backend-bringup-and-fallback.md) records the bring-up sequence, `IsOperational()` predicate, diagnostics snapshots, and fail-closed breadcrumb policy that this gate sits on top of.
 
 ## Context
@@ -137,7 +137,7 @@ Rejected alternative: treating validation messages as logs only. The operational
 
 **Required** for the default operational recipe:
 
-- Vulkan 1.3, or Vulkan 1.2 plus the promoted feature chain already used in [GRAPHICS-018](../../tasks/done/GRAPHICS-018-vulkan-renderer-integration.md).
+- Vulkan 1.3, or Vulkan 1.2 plus the promoted feature chain already used in [GRAPHICS-018](../../tasks/archive/GRAPHICS-018-vulkan-renderer-integration.md).
 - Platform surface extension and `VK_KHR_swapchain`.
 - `synchronization2` / timeline-semaphore support used by existing transfer/frame paths.
 - Dynamic rendering.
@@ -177,7 +177,7 @@ Operational status may drop from `Operational` to a non-operational status on:
 - Required service teardown.
 - Validation-layer failure during resize/recreate.
 
-Runtime must surface the transition through the same diagnostics surface and must not silently replace the already-created renderer/device pair with Null mid-frame. Recovery is explicit: wait idle when possible, recreate swapchain/services, re-evaluate the gate, then invoke the existing [GRAPHICS-018R](../../tasks/done/GRAPHICS-018R-operational-transition.md) `IRenderer::RebuildOperationalResources()` seam on false → true.
+Runtime must surface the transition through the same diagnostics surface and must not silently replace the already-created renderer/device pair with Null mid-frame. Recovery is explicit: wait idle when possible, recreate swapchain/services, re-evaluate the gate, then invoke the existing [GRAPHICS-018R](../../tasks/archive/GRAPHICS-018R-operational-transition.md) `IRenderer::RebuildOperationalResources()` seam on false → true.
 
 Rejected alternative: silently falling back to Null after a runtime device-loss event. That would mask data loss and invalidate renderer-owned GPU handles without a deterministic rebuild boundary.
 
@@ -220,7 +220,7 @@ Positive:
 
 Trade-offs and risks:
 
-- The 9-step checklist is strict: a Vulkan-capable host that fails any one gate still falls back to Null. That is the intended safety boundary, but it means operational coverage requires every implementation child (Impl-A/B/C/D plus the [GRAPHICS-033E](../../tasks/done/GRAPHICS-033E-vulkan-operational-gate-barrier-validation.md) and [GRAPHICS-033F](../../tasks/done/GRAPHICS-033F-vulkan-operational-gate-public-service-reconciliation.md) gate-input fills) to land before a host can flip to `Operational`.
+- The 9-step checklist is strict: a Vulkan-capable host that fails any one gate still falls back to Null. That is the intended safety boundary, but it means operational coverage requires every implementation child (Impl-A/B/C/D plus the [GRAPHICS-033E](../../tasks/archive/GRAPHICS-033E-vulkan-operational-gate-barrier-validation.md) and [GRAPHICS-033F](../../tasks/archive/GRAPHICS-033F-vulkan-operational-gate-public-service-reconciliation.md) gate-input fills) to land before a host can flip to `Operational`.
 - The append-only enum rule blocks renumbering, so adding a gate between two existing reasons is forbidden. Future readers must accept reason ordering that follows authorship date, not topical grouping.
 - Runtime's startup breadcrumb fires once per engine initialization attempt. A consumer that restarts the engine many times per process will see one breadcrumb per restart; this is intentional (so each fallback is observable) but loud in test harnesses that re-initialize.
 
@@ -239,11 +239,11 @@ Follow-up tasks required: none. All planning children identified by `GRAPHICS-03
 
 ## Validation
 
-- [`tasks/done/GRAPHICS-033`](../../tasks/done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md) records the 14 planning decisions captured above, including the gate checklist and reconciliation truth table.
-- [`tasks/done/GRAPHICS-033A`](../../tasks/done/GRAPHICS-033A-vulkan-operational-status-evaluator.md) records the evaluator, status/reason enums, and CPU `contract;graphics` tests for gate order and the reconciliation matrix.
-- [`tasks/done/GRAPHICS-033B`](../../tasks/done/GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md) records the diagnostics snapshot, counters, histogram, startup breadcrumb wiring, and `contract;runtime` requested-Vulkan → Null fallback tests.
-- [`tasks/done/GRAPHICS-033C`](../../tasks/done/GRAPHICS-033C-vulkan-minimal-recipe-recording.md) recorded the bootstrap recording bodies that originally satisfied gate step 6; [`tasks/done/GRAPHICS-081`](../../tasks/done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) retargeted the reason name and gate wording to the canonical default recipe after the bootstrap scaffold retired.
-- [`tasks/done/GRAPHICS-033E`](../../tasks/done/GRAPHICS-033E-vulkan-operational-gate-barrier-validation.md) records the barrier-validation input feeding gate step 7.
-- [`tasks/done/GRAPHICS-033F`](../../tasks/done/GRAPHICS-033F-vulkan-operational-gate-public-service-reconciliation.md) records the public-service reconciliation feeding gate step 8.
-- The retired opt-in `gpu;vulkan` visible-triangle smoke ([`GRAPHICS-033D`](../../tasks/done/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md)) is the canonical end-to-end validation: it asserts `Operational` only after all 9 gate prerequisites are met and that no fallback counters increment during the operational frame.
+- [`tasks/done/GRAPHICS-033`](../../tasks/archive/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md) records the 14 planning decisions captured above, including the gate checklist and reconciliation truth table.
+- [`tasks/done/GRAPHICS-033A`](../../tasks/archive/GRAPHICS-033A-vulkan-operational-status-evaluator.md) records the evaluator, status/reason enums, and CPU `contract;graphics` tests for gate order and the reconciliation matrix.
+- [`tasks/done/GRAPHICS-033B`](../../tasks/archive/GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md) records the diagnostics snapshot, counters, histogram, startup breadcrumb wiring, and `contract;runtime` requested-Vulkan → Null fallback tests.
+- [`tasks/done/GRAPHICS-033C`](../../tasks/archive/GRAPHICS-033C-vulkan-minimal-recipe-recording.md) recorded the bootstrap recording bodies that originally satisfied gate step 6; [`tasks/done/GRAPHICS-081`](../../tasks/archive/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) retargeted the reason name and gate wording to the canonical default recipe after the bootstrap scaffold retired.
+- [`tasks/done/GRAPHICS-033E`](../../tasks/archive/GRAPHICS-033E-vulkan-operational-gate-barrier-validation.md) records the barrier-validation input feeding gate step 7.
+- [`tasks/done/GRAPHICS-033F`](../../tasks/archive/GRAPHICS-033F-vulkan-operational-gate-public-service-reconciliation.md) records the public-service reconciliation feeding gate step 8.
+- The retired opt-in `gpu;vulkan` visible-triangle smoke ([`GRAPHICS-033D`](../../tasks/archive/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md)) is the canonical end-to-end validation: it asserts `Operational` only after all 9 gate prerequisites are met and that no fallback counters increment during the operational frame.
 - The default CPU gate (`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) exercises the evaluator, reconciliation matrix, and startup breadcrumb without a Vulkan device.

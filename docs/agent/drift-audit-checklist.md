@@ -1,7 +1,7 @@
 # Repo-state drift audit checklist
 
 This checklist drives the **repo-state drift audit** introduced by
-[`REVIEW-002`](../../tasks/done/REVIEW-002-recurring-drift-and-inconsistency-audit.md).
+[`REVIEW-002`](../../tasks/archive/REVIEW-002-recurring-drift-and-inconsistency-audit.md).
 It inspects the **whole current tree** (not a window of recent commits) for
 accumulated drift between code, docs, tasks, generated inventories, and tracked
 migration exceptions.

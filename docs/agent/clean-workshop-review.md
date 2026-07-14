@@ -3,7 +3,7 @@
 A lightweight scorecard for catching slow architectural drift — god-object
 growth, boundary leaks, stringly-typed routing, and scaffold accumulation —
 before it becomes an expensive foundation to revisit. Installed by
-[`WORKSHOP-009`](../../tasks/done/WORKSHOP-009-clean-workshop-review-gate.md).
+[`WORKSHOP-009`](../../tasks/archive/WORKSHOP-009-clean-workshop-review-gate.md).
 
 This gate is **not** a per-PR blocker and **not** a replacement for tests or the
 per-PR [`review-checklist.md`](review-checklist.md). It is a focused,

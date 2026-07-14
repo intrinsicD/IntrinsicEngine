@@ -72,95 +72,95 @@ task-specific policy into `docs/agent/prompt/prompt.md`.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
-- [CI-007 — Pilot persistent module-safe ccache in CI](../../done/CI-007-module-safe-persistent-ccache-pilot.md)
+- [CI-007 — Pilot persistent module-safe ccache in CI](../../archive/CI-007-module-safe-persistent-ccache-pilot.md)
   (done 2026-07-13): retained the bounded `pr-fast` ccache store after five
   cold and five warm hosted samples, zero cache errors, 56.7% lower build
   median, 58.3% lower build p95, and clean/interface-change parity.
-- [PROC-024 — Give the research/method track a theme and priority](../../done/PROC-024-theme-research-method-track.md)
+- [PROC-024 — Give the research/method track a theme and priority](../../archive/PROC-024-theme-research-method-track.md)
   (done 2026-07-11): created **Theme I — Research method implementation (P1)** with
   the 16 open `METHOD-*`/`GEOM-*` members, so the research mission is a
   first-class picker target instead of `Unthemed`.
-- [PROC-010 — Encode P1/P3/P5 research-engine invariants in AGENTS.md + review checklist](../../done/PROC-010-encode-research-engine-invariants-in-contract.md)
+- [PROC-010 — Encode P1/P3/P5 research-engine invariants in AGENTS.md + review checklist](../../archive/PROC-010-encode-research-engine-invariants-in-contract.md)
   (done 2026-07-11): promoted P1 (research pragmatism), P3 (config-lane control
   surface), and P5 (recipe-driven frames) into always-on `AGENTS.md` §5 invariants
   with matching per-PR review rows; the stale Theme I proposal (section C) was
   dropped since its members had retired.
-- [PROC-020 — Author the sandbox-input-lifecycle skill (playbook wave 2)](../../done/PROC-020-sandbox-input-lifecycle-skill.md)
+- [PROC-020 — Author the sandbox-input-lifecycle skill (playbook wave 2)](../../archive/PROC-020-sandbox-input-lifecycle-skill.md)
   (done 2026-07-11): authored the SKILL.md-only
   `intrinsicengine-sandbox-input-lifecycle` discipline skill capturing six
   runtime frame-loop wiring pitfalls (each citing its evidencing retired bug),
   registered in the `intrinsicengine-core` routing table and the skills
   `README.md` discipline tier.
-- [PROC-019 — Author the geometry-io-format skill (playbook wave 2)](../../done/PROC-019-geometry-io-format-skill.md)
+- [PROC-019 — Author the geometry-io-format skill (playbook wave 2)](../../archive/PROC-019-geometry-io-format-skill.md)
   (done 2026-07-11): authored the SKILL.md-only
   `intrinsicengine-geometry-io-format` discipline skill distilling the GEOIO-002
   importer/exporter slice shape (verified against `GEOIO-002B`/`002D`/`002E` and
   the live IO surface), registered in the `intrinsicengine-core` routing table
   and the skills `README.md` discipline tier.
-- [PROC-018 — Author the import-visibility-contract skill (playbook wave 2)](../../done/PROC-018-import-visibility-contract-skill.md)
+- [PROC-018 — Author the import-visibility-contract skill (playbook wave 2)](../../archive/PROC-018-import-visibility-contract-skill.md)
   (done 2026-07-11): authored the SKILL.md-only
   `intrinsicengine-import-visibility-contract` discipline skill (seven-item
   checklist, each item citing its evidencing retired import/visibility bug),
   registered in the `intrinsicengine-core` routing table and the skills
   `README.md` discipline tier.
-- [PROC-023 — Canonicalize skill-body content that outgrew its docs/agent source](../../done/PROC-023-canonicalize-skill-body-content.md)
+- [PROC-023 — Canonicalize skill-body content that outgrew its docs/agent source](../../archive/PROC-023-canonicalize-skill-body-content.md)
   (done 2026-07-11): classified the `intrinsicengine-benchmark`, `-method`, and
   `-docs-sync` skill bodies section-by-section and declared their only-here
   sections (`Anti-patterns`; knowledge-graph aid + maturity mapping; `Decision
   rules for common cases`) skill-canonical, with an `Authority (PROC-023)` note
   in each body and a per-skill model table in the skills `README.md`.
-- [PROC-022 — Refresh tools/* directory READMEs to match their contents](../../done/PROC-022-tool-directory-readme-refresh.md)
+- [PROC-022 — Refresh tools/* directory READMEs to match their contents](../../archive/PROC-022-tool-directory-readme-refresh.md)
   (done 2026-07-11): reconciled `tools/agents`, `tools/ci`, and `tools/repo`
   READMEs to factual current state — every script/config listed with purpose
   and CI wiring — and removed stale `Planned moves` / `Compatibility
   entrypoints` sections referencing the retired RORG-041/071/112 tasks.
-- [PROC-021 — Wire docs-sync and task-state-link validators into CI](../../done/PROC-021-docs-sync-strict-mode-wiring.md)
+- [PROC-021 — Wire docs-sync and task-state-link validators into CI](../../archive/PROC-021-docs-sync-strict-mode-wiring.md)
   (done 2026-07-10): `ci-docs` now enforces strict PR-diff docs synchronization
   and strict task-state links, with full base history, static workflow coverage,
   current policy docs, and a fresh generated skill reference.
-- [CI-004 — Build only the test executables selected by each gate](../../done/CI-004-label-derived-test-build-aggregates.md)
+- [CI-004 — Build only the test executables selected by each gate](../../archive/CI-004-label-derived-test-build-aggregates.md)
   (done 2026-07-10): derived gate-specific aggregates from canonical test-label
   metadata, routed PR-fast and Vulkan workflows to exact executable closures,
   and verified hosted edge/time deltas without claiming a PR-fast speedup.
-- [CI-003 — Make CI gate latency observable and cancel stale runs](../../done/CI-003-ci-gate-timing-observability-and-cancellation.md)
+- [CI-003 — Make CI gate latency observable and cancel stale runs](../../archive/CI-003-ci-gate-timing-observability-and-cancellation.md)
   (done 2026-07-09): added the stable per-run timing profile, instrumented and
   cancellation-scoped every compile-heavy workflow, and published the
   API-verified five-sample-per-gate aggregate baseline.
-- [PROC-001 - Skill mirror sync generator and CI gate](../../done/PROC-001-skill-mirror-sync-generator-and-ci-gate.md) (done 2026-06-09).
-- [PROC-002 - Task ID uniqueness validation and allocation rule](../../done/PROC-002-task-id-uniqueness-and-allocation-rule.md) (done 2026-06-09).
-- [PROC-003 - Split task index state from retirement history](../../done/PROC-003-split-task-index-state-from-retirement-history.md) (done 2026-06-09).
-- [PROC-004 - Structured task front-matter and generated session brief](../../done/PROC-004-task-front-matter-and-generated-session-brief.md) (done 2026-06-09).
-- [PROC-005 - Align structural-check mode text with strict CI reality](../../done/PROC-005-align-structural-check-mode-contract-text.md) (done 2026-06-09).
-- [PROC-006 - Audit cadence lapse visibility](../../done/PROC-006-audit-cadence-lapse-visibility.md) (done 2026-06-09).
-- [PROC-007 - Onboarding prompt tightening and loop-mode defaults](../../done/PROC-007-onboarding-prompt-tightening.md) (done 2026-06-09).
-- [PROC-008 - Category README state/history split](../../done/PROC-008-category-readme-state-history-split.md)
+- [PROC-001 - Skill mirror sync generator and CI gate](../../archive/PROC-001-skill-mirror-sync-generator-and-ci-gate.md) (done 2026-06-09).
+- [PROC-002 - Task ID uniqueness validation and allocation rule](../../archive/PROC-002-task-id-uniqueness-and-allocation-rule.md) (done 2026-06-09).
+- [PROC-003 - Split task index state from retirement history](../../archive/PROC-003-split-task-index-state-from-retirement-history.md) (done 2026-06-09).
+- [PROC-004 - Structured task front-matter and generated session brief](../../archive/PROC-004-task-front-matter-and-generated-session-brief.md) (done 2026-06-09).
+- [PROC-005 - Align structural-check mode text with strict CI reality](../../archive/PROC-005-align-structural-check-mode-contract-text.md) (done 2026-06-09).
+- [PROC-006 - Audit cadence lapse visibility](../../archive/PROC-006-audit-cadence-lapse-visibility.md) (done 2026-06-09).
+- [PROC-007 - Onboarding prompt tightening and loop-mode defaults](../../archive/PROC-007-onboarding-prompt-tightening.md) (done 2026-06-09).
+- [PROC-008 - Category README state/history split](../../archive/PROC-008-category-readme-state-history-split.md)
   (done, 2026-06-10): split every category README into open lists and
   history-marked retired sections and extended
   `check_task_state_links.py` to enforce it, with the rendering DAG
   exempted explicitly.
-- [PROC-009 - Import productivity skills into repo skill surface](../../done/PROC-009-import-productivity-skills.md)
+- [PROC-009 - Import productivity skills into repo skill surface](../../archive/PROC-009-import-productivity-skills.md)
   (done, 2026-06-22): imported `teach`, `grilling`, and `grill-me` from
   `mattpocock/skills`, preserved the MIT license/provenance, and documented
   their non-generated maintenance model.
-- [DOCS-005 - Feature-module playbook minimal floor and config command artifact](../../done/DOCS-005-feature-module-playbook-minimal-floor.md)
+- [DOCS-005 - Feature-module playbook minimal floor and config command artifact](../../archive/DOCS-005-feature-module-playbook-minimal-floor.md)
   (done, 2026-06-29): added the one-caller minimal-feature floor, softened the
   full vertical-slice trigger language, and added a serializable config/command
   artifact for UI-backed feature discoverability.
-- [PROC-011 - Route contract to architecture index and authoring checks](../../done/PROC-011-route-contract-to-architecture-index-and-author-checks.md)
+- [PROC-011 - Route contract to architecture index and authoring checks](../../archive/PROC-011-route-contract-to-architecture-index-and-author-checks.md)
   (done, 2026-06-29): routed `AGENTS.md` to the canonical architecture index,
   added backend-axis and config/command lane rows to the architecture checklist,
   and documented optional `## Control surfaces` and `## Backends` task sections.
-- [PROC-015 - Codify recurring diagnosis playbooks as skills (wave 1)](../../done/PROC-015-diagnosis-playbook-skills-wave-1.md)
+- [PROC-015 - Codify recurring diagnosis playbooks as skills (wave 1)](../../archive/PROC-015-diagnosis-playbook-skills-wave-1.md)
   (done, 2026-07-08): authored `intrinsicengine-vulkan-frame-triage`,
   `intrinsicengine-gpu-smoke-authoring`, and
   `intrinsicengine-stale-build-triage` from the retired-task history and
   registered them in the routing surfaces.
-- [PROC-016 - Fix skills/docs mirror drift and dead routings](../../done/PROC-016-skills-docs-mirror-drift-fixes.md)
+- [PROC-016 - Fix skills/docs mirror drift and dead routings](../../archive/PROC-016-skills-docs-mirror-drift-fixes.md)
   (done, 2026-07-08): rewrote the stale skills README, mirrored
   clean-workshop/drift-audit into `intrinsicengine-review`, fixed the
   zoom-out dead route, unified the test-category taxonomy, completed
   `contract.md`'s layering table, and indexed `prompt.md` from `AGENTS.md`.
-- [PROC-017 - Document branch/CI-failure/claiming/batch-seed conventions](../../done/PROC-017-workflow-convention-gaps.md)
+- [PROC-017 - Document branch/CI-failure/claiming/batch-seed conventions](../../archive/PROC-017-workflow-convention-gaps.md)
   (done, 2026-07-08): wrote down branch naming, CI-failure→`BUG-` intake,
   task claiming, and batch-seeding ID rules in `prompt.md`,
   `task-format.md`, and `AGENTS.md` §10.

@@ -7,30 +7,30 @@ and absence of a standing architecture-review gate.
 
 ## Completed execution record (was: suggested order)
 
-1. [`WORKSHOP-001` (done)](../../done/WORKSHOP-001-layer-check-module-and-cmake-aware.md) —
+1. [`WORKSHOP-001` (done)](../../archive/WORKSHOP-001-layer-check-module-and-cmake-aware.md) —
    the architecture guardrail now catches real dependencies (C++23 module
    imports and CMake link edges). Retired 2026-05-17.
-2. [`WORKSHOP-002` (done)](../../done/WORKSHOP-002-remove-platform-window-from-rhi.md) —
+2. [`WORKSHOP-002` (done)](../../archive/WORKSHOP-002-remove-platform-window-from-rhi.md) —
    fixed the `graphics/rhi -> platform` leak. Retired 2026-05-17 jointly
-   with [`ARCH-005`](../../done/ARCH-005-resolve-graphics-platform-layering-violations.md);
+   with [`ARCH-005`](../../archive/ARCH-005-resolve-graphics-platform-layering-violations.md);
    `RHI::IDevice::Initialize` now takes a platform-neutral
    `RHI::DeviceCreateDesc`, `ExtrinsicRHI` no longer links
    `ExtrinsicPlatform`, and the strict layering check runs unguarded in
    `pr-fast` / `ci-linux-clang`.
-3. [`WORKSHOP-003` (done)](../../done/WORKSHOP-003-typed-frame-pass-and-resource-identity.md) and
-   [`WORKSHOP-004` (done)](../../done/WORKSHOP-004-typed-command-router.md) —
+3. [`WORKSHOP-003` (done)](../../archive/WORKSHOP-003-typed-frame-pass-and-resource-identity.md) and
+   [`WORKSHOP-004` (done)](../../archive/WORKSHOP-004-typed-command-router.md) —
    make frame-pass identity typed and remove stringly command routing. Retired
    2026-06-06.
-4. [`WORKSHOP-005` (done)](../../done/WORKSHOP-005-renderer-subsystem-registry.md) and
-   [`WORKSHOP-006` (done)](../../done/WORKSHOP-006-extract-render-prep-pipeline.md) — split
+4. [`WORKSHOP-005` (done)](../../archive/WORKSHOP-005-renderer-subsystem-registry.md) and
+   [`WORKSHOP-006` (done)](../../archive/WORKSHOP-006-extract-render-prep-pipeline.md) — split
    renderer responsibilities before the renderer becomes the new god object.
    Both tasks retired 2026-06-06.
-5. [`WORKSHOP-007` (done)](../../done/WORKSHOP-007-dependency-driven-default-recipe.md) — move
+5. [`WORKSHOP-007` (done)](../../archive/WORKSHOP-007-dependency-driven-default-recipe.md) — move
    the default recipe toward true graph semantics. Retired 2026-06-06.
-6. [`WORKSHOP-008` (done)](../../done/WORKSHOP-008-task-maturity-taxonomy.md) —
+6. [`WORKSHOP-008` (done)](../../archive/WORKSHOP-008-task-maturity-taxonomy.md) —
    prevent "scaffold done" from looking like "capability done." Retired
    2026-05-17; taxonomy lives at [`docs/agent/task-maturity.md`](../../../docs/agent/task-maturity.md).
-7. [`WORKSHOP-009` (done)](../../done/WORKSHOP-009-clean-workshop-review-gate.md) —
+7. [`WORKSHOP-009` (done)](../../archive/WORKSHOP-009-clean-workshop-review-gate.md) —
    added the standing clean-workshop architecture-review gate
    ([`docs/agent/clean-workshop-review.md`](../../../docs/agent/clean-workshop-review.md)
    + `tools/ci/run_clean_workshop_review.sh`) to keep the workshop clean.

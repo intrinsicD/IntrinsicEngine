@@ -19,7 +19,7 @@ depends_on: []
 - Owning subsystem/layer: `geometry` (`geometry -> core` only).
 - Seeded by [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md) Tier 2 #7.
 - Closes the P1 "marching tetrahedra / dual contouring" gap from `docs/reviews/2026-05-12-src-geometry-gap-analysis.md`.
-- Reuses `Geometry.Grid` (sampling), `Geometry.SDF` (oracle), and the dense small-matrix utilities from [`GEOM-008`](../../done/GEOM-008-linear-algebra-solver-infrastructure.md) for the per-cell QEF solve.
+- Reuses `Geometry.Grid` (sampling), `Geometry.SDF` (oracle), and the dense small-matrix utilities from [`GEOM-008`](../../archive/GEOM-008-linear-algebra-solver-infrastructure.md) for the per-cell QEF solve.
 
 ## Variants and default selection
 

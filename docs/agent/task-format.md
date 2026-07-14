@@ -124,13 +124,19 @@ When a task completes:
    opt out with a `<!-- state-link-guard: allow-done-links -->` comment
    directly below their heading.
 
+Retired files stay in `tasks/done/` short-term; they are periodically swept
+to `tasks/archive/` (frozen read-only history — see
+[`tasks/archive/README.md`](../../tasks/archive/README.md)). Archived IDs
+remain authoritative: they resolve `depends_on` references, participate in
+duplicate-ID detection, and can never be reallocated.
+
 ## ID allocation
 
-Task IDs must be unique across `tasks/active/`, `tasks/backlog/`, and
-`tasks/done/`; `tools/agents/validate_tasks.py` enforces this in strict mode
-(a small set of pre-2026-06-09 collisions is grandfathered in place). Before
-opening `<PREFIX>-<N>`, take the highest existing number for that prefix
-across **all three** directories and add one:
+Task IDs must be unique across `tasks/active/`, `tasks/backlog/`,
+`tasks/done/`, and `tasks/archive/`; `tools/agents/validate_tasks.py`
+enforces this in strict mode (a small set of pre-2026-06-09 collisions is
+grandfathered in place). Before opening `<PREFIX>-<N>`, take the highest
+existing number for that prefix across **all four** directories and add one:
 
 ```bash
 grep -rhoE '^# <PREFIX>-[0-9]+' tasks/active tasks/backlog tasks/done | sort -V | tail -1
@@ -141,7 +147,7 @@ number and do not claim a new one.
 
 Prefixes come from the canonical list in `tasks/README.md` §"Task ID
 prefixes"; do not invent a new prefix without adding it there in the same
-change (historical `tasks/done/` entries contain retired prefix variants —
+change (historical `tasks/archive/` entries contain retired prefix variants —
 they are not precedent).
 
 When **batch-seeding** several tasks (e.g. converting review findings into a

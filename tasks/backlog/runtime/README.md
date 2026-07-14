@@ -143,14 +143,14 @@ derived-job facade delegation now live behind
 
 #### Retired decomposition entries
 
-- [RUNTIME-165 — Extract async work service out of Engine](../../done/RUNTIME-165-extract-async-work-service.md)
+- [RUNTIME-165 — Extract async work service out of Engine](../../archive/RUNTIME-165-extract-async-work-service.md)
   (done, 2026-07-09, `Operational`): persistent `StreamingExecutor` /
   `DerivedJobRegistry` ownership, maintenance-lane completion/readback drains,
   count-limited main-thread apply, background pumping, shutdown reset ordering,
   and derived-job facade delegation now live in
   `Extrinsic.Runtime.AsyncWorkService`. `Engine` keeps lifecycle/frame ordering,
   dependent subsystem wiring, and public derived-job compatibility facades.
-- [RUNTIME-164 — Extract asset residency service out of Engine](../../done/RUNTIME-164-extract-asset-residency-service.md)
+- [RUNTIME-164 — Extract asset residency service out of Engine](../../archive/RUNTIME-164-extract-asset-residency-service.md)
   (done, 2026-07-09, `Operational`): GPU asset cache ownership, cache
   asset-event listener wiring, model texture/model scene handoff ownership,
   fallback bootstrap delegation, pending material-binding re-resolution, and
@@ -158,7 +158,7 @@ derived-job facade delegation now live behind
   `Extrinsic.Runtime.AssetResidencyService`. `Engine` keeps lifecycle/frame
   ordering plus public `GetAssetService()` / `GetGpuAssetCache()`
   compatibility facades.
-- [RUNTIME-163 — Extract render extraction service out of Engine](../../done/RUNTIME-163-extract-render-extraction-service.md)
+- [RUNTIME-163 — Extract render extraction service out of Engine](../../archive/RUNTIME-163-extract-render-extraction-service.md)
   (done, 2026-07-09, `Operational`): live render-extraction cache, render-world
   pool, last extraction stats, and frame-index ownership now live in
   `Extrinsic.Runtime.RenderExtractionService`. `Engine` keeps render-frame phase
@@ -343,14 +343,14 @@ these as runtime work when scheduling and review:
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
-- [RUNTIME-146 — Extract engine config boot into a free-standing module](../../done/RUNTIME-146-extract-engine-config-boot-module.md)
+- [RUNTIME-146 — Extract engine config boot into a free-standing module](../../archive/RUNTIME-146-extract-engine-config-boot-module.md)
   (done, 2026-07-08, `Operational`): boot-time config resolution now lives in
   `Extrinsic.Runtime.EngineConfigBoot`, exporting `CreateReferenceEngineConfig()`,
   `EngineConfigBoot*`, and `ResolveEngineConfigForBoot(...)` without importing
   the full `Engine` interface. Sandbox startup and config-control tests import
   the module directly; `Runtime.Engine.cppm`/`.cpp` contain no boot-helper
   declarations or definitions.
-- [RUNTIME-147 — Extract the runtime asset-import pipeline out of Engine](../../done/RUNTIME-147-extract-asset-import-pipeline-subsystem.md)
+- [RUNTIME-147 — Extract the runtime asset-import pipeline out of Engine](../../archive/RUNTIME-147-extract-asset-import-pipeline-subsystem.md)
   (done, 2026-07-08, `Operational`): runtime asset import now lives in
   `Extrinsic.Runtime.AssetImportPipeline`, including the import/reimport/queue/
   cancel facade, ingest records, import event log, default-policy registries,
@@ -358,14 +358,14 @@ split; narratives live in the retirement log.
   dirty-state marking. `Engine` keeps only
   `GetAssetImportPipeline()` and platform drop delegation; Sandbox default
   policies, editor UI, and runtime tests call the pipeline directly.
-- [RUNTIME-148 — Extract the scene-document facade out of Engine](../../done/RUNTIME-148-extract-scene-document-subsystem.md)
+- [RUNTIME-148 — Extract the scene-document facade out of Engine](../../archive/RUNTIME-148-extract-scene-document-subsystem.md)
   (done, 2026-07-08, `Operational`): runtime scene persistence now lives in
   `Extrinsic.Runtime.SceneDocument`, including direct and queued scene
   save/load, new/close document behavior, the scene-file event log, serializable
   scene snapshots, and the replacement cleanup/rebuild ordering. `Engine` keeps
   only `GetSceneDocument()` for this surface; Sandbox editor UI and runtime
   scene lifecycle tests call the document subsystem directly.
-- [RUNTIME-149 — Extract render-recipe and hot-config control out of Engine](../../done/RUNTIME-149-extract-engine-config-control-subsystem.md)
+- [RUNTIME-149 — Extract render-recipe and hot-config control out of Engine](../../archive/RUNTIME-149-extract-engine-config-control-subsystem.md)
   (done, 2026-07-08, `Operational`): runtime render-recipe activation and
   engine-config hot-subset control now live in
   `Extrinsic.Runtime.EngineConfigControl`, including recipe preview/apply/clear,
@@ -373,13 +373,13 @@ split; narratives live in the retirement log.
   rejection, and the active config-control state. `Engine` keeps only
   `GetConfigControl()` for this surface; Sandbox editor UI and runtime
   config-control tests call the subsystem directly.
-- [RUNTIME-150 — Split the frame-loop hook adapters out of Runtime.Engine.cpp](../../done/RUNTIME-150-split-engine-frame-loop-implementation-unit.md)
+- [RUNTIME-150 — Split the frame-loop hook adapters out of Runtime.Engine.cpp](../../archive/RUNTIME-150-split-engine-frame-loop-implementation-unit.md)
   (done, 2026-07-08, `Operational`): runtime frame-loop hook adapters and
   per-frame helpers now live in the private
   `Extrinsic.Runtime.Engine:FrameLoop` partition. `Engine::RunFrame()` remains
   on `Engine`, imports the partition, and preserves frame shape and ordering;
   the partition exports no declarations.
-- [RUNTIME-151 — Slim the Engine module interface and remove the entt leak](../../done/RUNTIME-151-slim-engine-interface-and-remove-entt-leak.md)
+- [RUNTIME-151 — Slim the Engine module interface and remove the entt leak](../../archive/RUNTIME-151-slim-engine-interface-and-remove-entt-leak.md)
   (done, 2026-07-08, `Operational`): StableId signal tracking now lives behind
   `StableEntityLookupSceneBinding` in `Extrinsic.Runtime.StableEntityLookup`;
   `Runtime.Engine.cppm` holds the binding but no EnTT include, token, scoped
@@ -387,148 +387,148 @@ split; narratives live in the retirement log.
   imports / 2 EnTT includes directly before the task to 721 lines / 46 imports
   / 0 EnTT tokens, with lookup, selection, scene-lifecycle, and full CPU gate
   verification passing.
-- [RUNTIME-152 — Extract runtime device bootstrap out of Engine](../../done/RUNTIME-152-extract-runtime-device-bootstrap.md)
+- [RUNTIME-152 — Extract runtime device bootstrap out of Engine](../../archive/RUNTIME-152-extract-runtime-device-bootstrap.md)
   (done, 2026-07-09, `Operational`): runtime device-selection policy, backend
   factory dispatch, Vulkan-requested breadcrumb policy, and GPU asset fallback-
   texture descriptor construction now live in
   `Extrinsic.Runtime.DeviceBootstrap`. `Engine` remains the platform window and
   device-initialize composition caller.
-- [RUNTIME-153 — Extract mesh primitive-view controls out of Engine](../../done/RUNTIME-153-extract-mesh-primitive-view-controls.md)
+- [RUNTIME-153 — Extract mesh primitive-view controls out of Engine](../../archive/RUNTIME-153-extract-mesh-primitive-view-controls.md)
   (done, 2026-07-09, `Operational`): legacy `MeshPrimitiveViewSettings`
   compatibility translation now lives in
   `Extrinsic.Runtime.MeshPrimitiveViewControls`, which applies, clears, and
   reads the authoritative ECS `RenderEdges` / `RenderPoints` components. The
   `Engine` methods remain compatibility facades and no longer import render-
   geometry component policy directly.
-- [RUNTIME-154 — Extract reference-scene lifecycle control out of Engine](../../done/RUNTIME-154-extract-reference-scene-control.md)
+- [RUNTIME-154 — Extract reference-scene lifecycle control out of Engine](../../archive/RUNTIME-154-extract-reference-scene-control.md)
   (done, 2026-07-09, `Operational`): reference-scene lifecycle control now
   lives in `Extrinsic.Runtime.ReferenceSceneControl`, including provider
   registration/resolution, installed population state, camera-seed caching, and
   provider teardown. `Engine` keeps `GetReferenceSceneRegistry()`,
   `IsReferenceSceneInstalled()`, and `GetReferenceCameraSeed()` as delegating
   facades.
-- [RUNTIME-155 — Extract runtime input-action registry out of Engine](../../done/RUNTIME-155-extract-runtime-input-action-registry.md)
+- [RUNTIME-155 — Extract runtime input-action registry out of Engine](../../archive/RUNTIME-155-extract-runtime-input-action-registry.md)
   (done, 2026-07-09, `Operational`): runtime input-action descriptor/service/
   context/handle types, handle allocation, action storage, key-edge trigger
   checks, ImGui keyboard-capture suppression, callback failure logging, and
   per-frame dispatch now live in `Extrinsic.Runtime.InputActions`. `Engine`
   re-exports the API for compatibility and keeps `RegisterInputAction(...)` /
   `UnregisterInputAction(...)` as delegating facades.
-- [RUNTIME-156 — Extract runtime-module schedule out of Engine](../../done/RUNTIME-156-extract-runtime-module-schedule.md)
+- [RUNTIME-156 — Extract runtime-module schedule out of Engine](../../archive/RUNTIME-156-extract-runtime-module-schedule.md)
   (done, 2026-07-09, `Operational`): runtime-module sim-system/frame-hook
   records, deterministic dependency ordering, frame-hook ordering, fixed-step
   pass insertion/context construction, and frame-hook dispatch now live in
   `Extrinsic.Runtime.ModuleSchedule`. `Engine` still owns module objects,
   built-in service provisioning, `OnRegister` / `OnResolve` sequencing, and
   shutdown calls as delegating composition.
-- [RUNTIME-157 — Extract selection readback state out of Engine](../../done/RUNTIME-157-extract-selection-readback-state.md)
+- [RUNTIME-157 — Extract selection readback state out of Engine](../../archive/RUNTIME-157-extract-selection-readback-state.md)
   (done, 2026-07-09, `Operational`): selection pick readback correlation,
   completed readback draining, primitive refinement, and the editor-facing
   refined primitive cache now live in `Extrinsic.Runtime.SelectionReadback`.
   `Engine` keeps public accessors as delegating compatibility facades.
-- [RUNTIME-158 — Extract frame pacing diagnostics out of Engine](../../done/RUNTIME-158-extract-frame-pacing-diagnostics.md)
+- [RUNTIME-158 — Extract frame pacing diagnostics out of Engine](../../archive/RUNTIME-158-extract-frame-pacing-diagnostics.md)
   (done, 2026-07-09, `Operational`): `RuntimeFramePacingDiagnostics` and the
   ImGui/render-graph counter mirroring helpers now live behind
   `Extrinsic.Runtime.FramePacingDiagnostics`; `Engine` keeps the public
   diagnostics accessor and phase timing composition.
-- [RUNTIME-159 — Extract ImGui editor bridge out of Engine](../../done/RUNTIME-159-extract-imgui-editor-bridge.md)
+- [RUNTIME-159 — Extract ImGui editor bridge out of Engine](../../archive/RUNTIME-159-extract-imgui-editor-bridge.md)
   (done, 2026-07-09, `Operational`): runtime Dear ImGui adapter, overlay
   system ownership, editor callbacks, renderer overlay attachment, per-frame
   Begin/End bracketing, capture reads, and diagnostics access now live in
   `Extrinsic.Runtime.ImGuiEditorBridge`.
-- [RUNTIME-160 — Extract JobService GPU queue bridge out of Engine](../../done/RUNTIME-160-extract-jobservice-gpu-queue-bridge.md)
+- [RUNTIME-160 — Extract JobService GPU queue bridge out of Engine](../../archive/RUNTIME-160-extract-jobservice-gpu-queue-bridge.md)
   (done, 2026-07-09, `Operational`): renderer runtime-frame hook ownership,
   JobService GPU-queue command recording, and participant shutdown sequencing
   now live behind `Extrinsic.Runtime.JobServiceGpuQueueBridge`.
-- [RUNTIME-161 — Extract object-space normal bake service out of Engine](../../done/RUNTIME-161-extract-object-space-normal-bake-service.md)
+- [RUNTIME-161 — Extract object-space normal bake service out of Engine](../../archive/RUNTIME-161-extract-object-space-normal-bake-service.md)
   (done, 2026-07-09, `Operational`): object-space normal bake GPU-queue
   ownership, dependency setup, ready-frame callback construction, JobService
   participant registration, diagnostics access, pending-count access, and
   dependency clearing now live in
   `Extrinsic.Runtime.ObjectSpaceNormalBakeService`. `RUNTIME-129` remains open
   for production Vulkan plan-provider and `gpu;vulkan` smoke closure.
-- [RUNTIME-162 — Extract gizmo frame service out of Engine](../../done/RUNTIME-162-extract-gizmo-frame-service.md)
+- [RUNTIME-162 — Extract gizmo frame service out of Engine](../../archive/RUNTIME-162-extract-gizmo-frame-service.md)
   (done, 2026-07-09, `Operational`): transform-gizmo interaction state, undo
   storage, selected-entity scratch, gizmo/selection pointer interlock, and
   transform-gizmo packet building now live in
   `Extrinsic.Runtime.GizmoFrameService`. `Engine` keeps frame ordering plus the
   public gizmo interaction and undo-stack compatibility facades.
-- [RUNTIME-140 — Remove the global scheduler barrier from the import apply path](../../done/RUNTIME-140-remove-global-waitforall-from-import-apply.md)
+- [RUNTIME-140 — Remove the global scheduler barrier from the import apply path](../../archive/RUNTIME-140-remove-global-waitforall-from-import-apply.md)
   (done, 2026-07-05, `CPUContracted`): runtime import materialization now
   drains only the specific `AssetId` load/event through
   `AssetService::CompleteCpuLoadAndFlushEvent(...)`; focused regressions prove
   unrelated scheduler work stays in flight while import apply completes.
-- [RUNTIME-142 — Async model-scene/texture import and scene-file IO](../../done/RUNTIME-142-async-modelscene-texture-scenefile-io.md)
+- [RUNTIME-142 — Async model-scene/texture import and scene-file IO](../../archive/RUNTIME-142-async-modelscene-texture-scenefile-io.md)
   (done, 2026-07-05, `Operational`): dropped model-scene/texture imports,
   Sandbox editor model-scene/texture imports, and Sandbox editor scene
   save/load now queue `StreamingExecutor` work, keep file IO and decode/parse/
   serialize work off the frame callback path, and apply results on the bounded
   main-thread drain. A slow fake IO backend regression proves the frame loop
   advances while queued texture reads remain blocked.
-- [RUNTIME-143 — Multi-subscriber frame-command hook and K-Means decoupling from Engine](../../done/RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md)
+- [RUNTIME-143 — Multi-subscriber frame-command hook and K-Means decoupling from Engine](../../archive/RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md)
   (done, 2026-07-05, `Operational`): `IRenderer` now exposes deterministic
   add/remove runtime frame-command hook registration. Its temporary
   Engine-owned runtime GPU participant seam has been retired by `RUNTIME-137`;
   K-Means GPU queue command recording, maintenance drains, in-flight checks,
   and post-idle teardown now route through the `JobService` `GpuQueue`
   participant registry.
-- [RUNTIME-144 — Post-import processor and import UX-policy seam](../../done/RUNTIME-144-post-import-processor-and-ux-policy-seam.md)
+- [RUNTIME-144 — Post-import processor and import UX-policy seam](../../archive/RUNTIME-144-post-import-processor-and-ux-policy-seam.md)
   (done, 2026-07-06, `Operational`): `Engine` now owns generic post-import
   processor, import-authoring, import-completed, and input-action dispatch
   registries only; `Extrinsic.Runtime.SandboxDefaultPolicies` installs the
   sandbox default direct-mesh generated-normal processor, authoring defaults,
   focus/auto-select import UX, and `F` focus action from the app composition
   side.
-- [RUNTIME-125 — Optional AoS fast lane for static geometry](../../done/RUNTIME-125-aos-static-fast-lane.md)
+- [RUNTIME-125 — Optional AoS fast lane for static geometry](../../archive/RUNTIME-125-aos-static-fast-lane.md)
   (done, 2026-07-02, `CPUContracted`): PR-fast SoA/probe benchmark evidence and
   planning-only storage-lane/promotion contracts landed without allocating an
   AoS GPU lane or selecting shader variants. Operational AoS storage/shaders,
   promote-on-edit behavior, and Vulkan parity remain owned by open follow-up
   `RUNTIME-139`.
-- [RUNTIME-136 — Sandbox method backend selectors](../../done/RUNTIME-136-sandbox-method-backend-selectors.md)
+- [RUNTIME-136 — Sandbox method backend selectors](../../archive/RUNTIME-136-sandbox-method-backend-selectors.md)
   (done, 2026-07-02, `CPUContracted`): the Sandbox exposes CPU/GPU backend
   selectors for K-Means and Progressive Poisson, with requested-vs-actual
   backend readouts and fallback diagnostics.
-- [RUNTIME-135 — SpatialDebug closest-face picking via accelerated mesh query](../../done/RUNTIME-135-spatialdebug-closest-face-picking.md)
+- [RUNTIME-135 — SpatialDebug closest-face picking via accelerated mesh query](../../archive/RUNTIME-135-spatialdebug-closest-face-picking.md)
   (done, 2026-06-28, `CPUContracted`): runtime now has a data-only closest-face
   SpatialDebug overlay consumer that caches the GEOM-039 mesh closest-face
   index by active mesh key/revision and emits deterministic fail-closed overlay
   diagnostics without renderer/RHI/Vulkan or editor/UI ownership.
-- [CORE-004 — Indexed decrease-key min-heap container and Dijkstra adoption](../../done/CORE-004-indexed-decrease-key-heap.md)
+- [CORE-004 — Indexed decrease-key min-heap container and Dijkstra adoption](../../archive/CORE-004-indexed-decrease-key-heap.md)
   (done, 2026-06-28, `CPUContracted`): core now exports
   `Extrinsic.Core.IndexedHeap`, a deterministic fail-closed indexed binary
   min-heap with `TryTop`, `TryPop`, O(log n) `DecreaseKey`, and O(log n)
   `Remove`; geometry Dijkstra now uses it as the live frontier while preserving
   shortest-path and diagnostic parity against the prior lazy priority-queue
   implementation.
-- [RUNTIME-132 — Lift single-use RunFrame hook adapters out of the RunFrame body](../../done/RUNTIME-132-lift-runframe-hook-adapters.md)
+- [RUNTIME-132 — Lift single-use RunFrame hook adapters out of the RunFrame body](../../archive/RUNTIME-132-lift-runframe-hook-adapters.md)
   (done, 2026-06-28): `Engine::RunFrame` now delegates single-use frame-hook
   adapters, fixed-step substeps, camera/gizmo/selection input, BUG-026
   pick-context capture, and completed pick-readback refinement to private
   implementation helpers while preserving the documented frame order.
-- [RUNTIME-128 — Default lit material for material-less imported primitives](../../done/RUNTIME-128-default-lit-material-for-materialless-imports.md)
+- [RUNTIME-128 — Default lit material for material-less imported primitives](../../archive/RUNTIME-128-default-lit-material-for-materialless-imports.md)
   (done, 2026-06-28, `CPUContracted`): model-scene imports now give
   material-less primitives a neutral lit StandardPBR default while preserving
   slot 0 as the unlit missing/invalid material indicator.
-- [RUNTIME-127 — Render artifact publication and apply semantics](../../done/RUNTIME-127-render-artifact-publication.md)
+- [RUNTIME-127 — Render artifact publication and apply semantics](../../archive/RUNTIME-127-render-artifact-publication.md)
   (done, 2026-06-24, `CPUContracted`): runtime now has a render artifact
   registry, lifecycle states, UI-facing status vocabulary, and explicit
   provenance-carrying publish/apply commands for candidate renderer outputs.
-- [RUNTIME-109 — Extensible mesh attribute texture bake pipeline](../../done/RUNTIME-109-extensible-mesh-attribute-texture-bakes.md)
+- [RUNTIME-109 — Extensible mesh attribute texture bake pipeline](../../archive/RUNTIME-109-extensible-mesh-attribute-texture-bakes.md)
   (done, 2026-06-15, `CPUContracted`): generic runtime CPU mesh-attribute
   texture bakes now cover resolved-UV vertex/face scalar, label, vector2,
   vector3/normal, and RGBA outputs with stable generated texture keys.
-- [RUNTIME-120 — Reusable vertex attribute binding resolver](../../done/RUNTIME-120-vertex-attribute-binding-resolver.md)
+- [RUNTIME-120 — Reusable vertex attribute binding resolver](../../archive/RUNTIME-120-vertex-attribute-binding-resolver.md)
   (done, 2026-06-24, `CPUContracted`): runtime now has a CPU-only
   property-to-vertex-channel resolver with fail-closed diagnostics, and the mesh
   packer routes normal and texcoord reads through it without behavior change.
-- [RUNTIME-121 — Per-vertex color channel through the geometry vertex stream](../../done/RUNTIME-121-vertex-color-channel-upload.md)
+- [RUNTIME-121 — Per-vertex color channel through the geometry vertex stream](../../archive/RUNTIME-121-vertex-color-channel-upload.md)
   (done, 2026-06-24, `Operational`): mesh `GeometrySources` now resolve
   count-matched `v:color` into packed unorm8 upload data, publish it through
   `GpuGeometryRecord::ColorBufferBDA`, consume it in the active default-recipe
   GpuScene surface/GBuffer shader path, and prove the path with CPU contracts,
   dirty-reupload coverage, and an opt-in `gpu;vulkan` smoke.
-- [RUNTIME-122 — GPU SoA vertex channel storage and shader fetch](../../done/RUNTIME-122-gpu-soa-vertex-channel-storage-and-shader-fetch.md)
+- [RUNTIME-122 — GPU SoA vertex channel storage and shader fetch](../../archive/RUNTIME-122-gpu-soa-vertex-channel-storage-and-shader-fetch.md)
   (done, 2026-06-24, `Operational`): runtime mesh, graph, point-cloud, and mesh
   primitive-view packers now emit explicit channel streams; graphics stores
   position, texcoord, normal, and color data as managed SoA channel ranges,
@@ -536,104 +536,104 @@ split; narratives live in the retirement log.
   GpuScene surface, depth, selection, line, and point shaders fetch through the
   channel BDAs. Focused CPU coverage, the default CPU gate, structural
   validators, and opt-in `gpu;vulkan` surface plus line/point smokes passed.
-- [RUNTIME-123 — Editor "bind any property as normals / colors"](../../done/RUNTIME-123-editor-bind-property-as-channel.md)
+- [RUNTIME-123 — Editor "bind any property as normals / colors"](../../archive/RUNTIME-123-editor-bind-property-as-channel.md)
   (done, 2026-06-24, `CPUContracted`): runtime now has a
   `VertexChannelBindingSet` ECS descriptor consumed by mesh, graph, and
   point-cloud packers; the Sandbox Editor property catalog exposes normal/color
   binding targets, validates candidate properties through the
   `VertexAttributeBinding` resolver, persists per-entity bindings, and stamps
   `DirtyVertexAttributes` without direct renderer/RHI upload calls.
-- [RUNTIME-124 — Per-channel dirty tracking and partial GPU uploads](../../done/RUNTIME-124-per-channel-partial-uploads.md)
+- [RUNTIME-124 — Per-channel dirty tracking and partial GPU uploads](../../archive/RUNTIME-124-per-channel-partial-uploads.md)
   (done, 2026-06-24, `Operational`): ECS exposes fine-grained vertex-channel
   dirty tags for positions, texcoords, normals, and colors; runtime extraction
   maps resident mesh, graph, and point-cloud edits to `GpuWorld` channel update
   masks; graphics writes only changed SoA channel ranges and preserves full
   uploads for topology, vertex-count, and storage-layout changes.
-- [RUNTIME-126 — GPU readback jobs and result→property write-back in the derived-job graph](../../done/RUNTIME-126-gpu-readback-jobs-and-property-writeback.md)
+- [RUNTIME-126 — GPU readback jobs and result→property write-back in the derived-job graph](../../archive/RUNTIME-126-gpu-readback-jobs-and-property-writeback.md)
   (done, 2026-06-25, `Operational`): runtime readback jobs now park in
   `WaitingForReadback`, resume through `DerivedJobRegistry::DrainReadbacks()`
   after transfer delivery, write dimension-checked bytes into typed geometry
   properties, expose readback diagnostics, and keep follow-up jobs pending until
   write-back apply completes.
-- [RUNTIME-119 — GPU renderable availability snapshot](../../done/RUNTIME-119-gpu-renderable-availability-snapshot.md)
+- [RUNTIME-119 — GPU renderable availability snapshot](../../archive/RUNTIME-119-gpu-renderable-availability-snapshot.md)
   (done, 2026-06-19, `CPUContracted`): `RenderExtractionCache` now exposes a
   read-only GPU availability view keyed by stable entity id, with independent
   surface, edge, and point lane residency plus named-buffer facts.
-- [RUNTIME-118 — Geometry availability consumer migration](../../done/RUNTIME-118-geometry-availability-consumer-migration.md)
+- [RUNTIME-118 — Geometry availability consumer migration](../../archive/RUNTIME-118-geometry-availability-consumer-migration.md)
   (done, 2026-06-19, `CPUContracted`): runtime packers, extraction,
   progressive property resolution, selected bake validation, and primitive
   refinement now consume source/provenance availability instead of using exact
   `ActiveDomain` as the common capability gate.
-- [RUNTIME-117 — Geometry availability and render-lane resolver](../../done/RUNTIME-117-geometry-availability-render-lane-resolver.md)
+- [RUNTIME-117 — Geometry availability and render-lane resolver](../../archive/RUNTIME-117-geometry-availability-render-lane-resolver.md)
   (done, 2026-06-19, `CPUContracted`): runtime now owns the standard resolver
   over ECS source availability plus `RenderSurface`, `RenderEdges`, and
   `RenderPoints`.
-- [RUNTIME-115 — Selected mesh bake command surface](../../done/RUNTIME-115-selected-mesh-bake-command-surface.md)
+- [RUNTIME-115 — Selected mesh bake command surface](../../archive/RUNTIME-115-selected-mesh-bake-command-surface.md)
   (done, 2026-06-17, `CPUContracted`): selected mesh property texture bakes
   now route through a runtime-owned command surface with validation, generated
   texture payload reload, optional progressive binding updates, command-history
   dirtying, synchronous test hooks, and observable derived-job apply/stale
   diagnostics.
-- [RUNTIME-114 — Progressive import enrichment pipeline](../../done/RUNTIME-114-progressive-import-enrichment-pipeline.md)
+- [RUNTIME-114 — Progressive import enrichment pipeline](../../archive/RUNTIME-114-progressive-import-enrichment-pipeline.md)
   (done, 2026-06-16, `CPUContracted`): model-scene mesh leaves can publish raw
   geometry immediately, attach progressive surface bindings, and queue
   observable UV, normal, normal-bake, and albedo-bake jobs through
   `DerivedJobRegistry` while GPU residency remains texture-handoff owned.
-- [RUNTIME-113 — Progressive domain presentation extraction](../../done/RUNTIME-113-progressive-domain-presentation-extraction.md)
+- [RUNTIME-113 — Progressive domain presentation extraction](../../archive/RUNTIME-113-progressive-domain-presentation-extraction.md)
   (done, 2026-06-16, `CPUContracted`): runtime extraction consumes progressive
   presentation descriptors for mesh surface slots, graph vertex/edge property
   buffers, point-cloud property buffers, diagnostics, and previous-output
   retention without blocking on derived jobs.
-- [RUNTIME-112 — Entity derived-job graph and snapshots](../../done/RUNTIME-112-entity-derived-job-graph.md)
+- [RUNTIME-112 — Entity derived-job graph and snapshots](../../archive/RUNTIME-112-entity-derived-job-graph.md)
   (done, 2026-06-16, `CPUContracted`): `StreamingExecutor`-backed derived-job
   registry now exposes entity/global snapshots, explicit dependencies,
   follow-up scheduling, stale/cancel/failure diagnostics, and previous-output
   retention.
-- [RUNTIME-111 — Progressive render-data descriptor contracts](../../done/RUNTIME-111-progressive-render-data-descriptors.md)
+- [RUNTIME-111 — Progressive render-data descriptor contracts](../../archive/RUNTIME-111-progressive-render-data-descriptors.md)
   (done, 2026-06-16, `CPUContracted`): shared mesh/graph/point-cloud
   progressive descriptors, slot/source/readiness/generated-output policy,
   property compatibility diagnostics, and scene serialization now exist without
   raw property pointers or GPU handles.
-- [RUNTIME-110 — Progressive entity render-data pipeline clarification](../../done/RUNTIME-110-progressive-entity-render-data-pipeline.md)
+- [RUNTIME-110 — Progressive entity render-data pipeline clarification](../../archive/RUNTIME-110-progressive-entity-render-data-pipeline.md)
   (done, 2026-06-16, `Scaffolded`): accepted ADR-0021's progressive
   mesh/graph/point-cloud render-data model and split implementation into
   `RUNTIME-111` through `RUNTIME-114`, `UI-015`, and `GRAPHICS-090`.
-- [RUNTIME-101 — Asset ingest state-machine migration](../../done/RUNTIME-101-asset-ingest-state-machine.md)
+- [RUNTIME-101 — Asset ingest state-machine migration](../../archive/RUNTIME-101-asset-ingest-state-machine.md)
   (done, 2026-06-15, `CPUContracted`): promoted the runtime ingest
   request/result state machine for manual import, dropped files, and reimport;
   routed Engine import entry points through shared diagnostics and duplicate/
   stale guards; and kept reimport as same-`AssetId` `AssetService` reload
   without reviving ECS or scene-file asset-source coupling.
-- [RUNTIME-108 — Remove mesh UV normal fallback](../../done/RUNTIME-108-resolved-uv-render-residency.md)
+- [RUNTIME-108 — Remove mesh UV normal fallback](../../archive/RUNTIME-108-resolved-uv-render-residency.md)
   (done, 2026-06-13, `CPUContracted`): mesh surface packing now requires
   count-matched finite `v:texcoord` and never substitutes oct-encoded normals
   into `MeshVertex::U/V`; missing or invalid texture coordinates fail closed
   with explicit runtime extraction diagnostics.
-- [RUNTIME-105 — Remove the deprecated GetStreamingGraph() TaskGraph bridge](../../done/RUNTIME-105-remove-streaming-graph-bridge.md)
+- [RUNTIME-105 — Remove the deprecated GetStreamingGraph() TaskGraph bridge](../../archive/RUNTIME-105-remove-streaming-graph-bridge.md)
   (done, 2026-06-15, `Retired`): deleted the promoted runtime
   `Engine::GetStreamingGraph()` compatibility accessor, the private streaming
   task graph, and the per-frame TaskGraph-to-`StreamingExecutor` conversion.
   `StreamingExecutor` is now the only promoted runtime streaming path.
-- [RUNTIME-103 — Geometry algorithm execution queue](../../done/RUNTIME-103-geometry-algorithm-execution-queue.md)
+- [RUNTIME-103 — Geometry algorithm execution queue](../../archive/RUNTIME-103-geometry-algorithm-execution-queue.md)
   (done, 2026-06-15, `CPUContracted`): value-gated the promoted editor
   geometry-processing path and retained synchronous CPU K-Means as the intended
   endpoint for current workflows. No runtime async algorithm queue or CUDA
   follow-up is owed without a new concrete workload.
-- [RUNTIME-107 — Headless-capable Engine::Run loop coverage](../../done/RUNTIME-107-headless-engine-loop-coverage.md)
+- [RUNTIME-107 — Headless-capable Engine::Run loop coverage](../../archive/RUNTIME-107-headless-engine-loop-coverage.md)
   (done, 2026-06-15, `Operational`): added an explicit
   `WindowBackend::Null` test-facing window backend selector and routed the
   BUG-030 `Engine::Run()` regressions through it so they execute on headless
   hosts instead of skipping.
-- [GRAPHICS-084 — Visualization property-buffer residency](../../done/GRAPHICS-084-visualization-property-buffer-residency.md)
+- [GRAPHICS-084 — Visualization property-buffer residency](../../archive/GRAPHICS-084-visualization-property-buffer-residency.md)
   (done, 2026-06-11, `CPUContracted`): consumed runtime visualization adapter/
   property selections while keeping GPU upload ownership in graphics.
-- [RORG-031C — Runtime composition backlog seed](../../done/RORG-031C-runtime-composition.md)
+- [RORG-031C — Runtime composition backlog seed](../../archive/RORG-031C-runtime-composition.md)
   (done, 2026-06-10): composition-root and lifecycle backlog work for
   `begin_frame`, extraction, prepare, execute, end, shutdown determinism, and
   subsystem wiring; executed via `RUNTIME-099`/`RUNTIME-100`/`RUNTIME-102`
   with `RUNTIME-101` later retired as the independently tracked asset-ingest
   child.
-- [RUNTIME-104 — Derived overlay producer lifecycle](../../done/RUNTIME-104-derived-overlay-producer-lifecycle.md)
+- [RUNTIME-104 — Derived overlay producer lifecycle](../../archive/RUNTIME-104-derived-overlay-producer-lifecycle.md)
   (done, 2026-06-11, `CPUContracted`): classified legacy
   `Graphics.OverlayEntityFactory` behavior for current workflows and retained no
   persistent runtime overlay producer API. Mesh/graph/point child overlays map
@@ -641,85 +641,85 @@ split; narratives live in the retirement log.
   component-driven primitive-view sidecars, and vector-field/isoline overlays use runtime
   visualization packets without child ECS entities. Backend command-shape proof
   is retired by
-  [GRAPHICS-085](../../done/GRAPHICS-085-overlay-packet-backend-parity.md).
-- [RUNTIME-106 — Render component domain composition](../../done/RUNTIME-106-render-component-domain-composition.md)
+  [GRAPHICS-085](../../archive/GRAPHICS-085-overlay-packet-backend-parity.md).
+- [RUNTIME-106 — Render component domain composition](../../archive/RUNTIME-106-render-component-domain-composition.md)
   (done, 2026-06-12, `CPUContracted`): aligned mesh, graph, and point-cloud
   rendering around `RenderSurface`, `RenderEdges`, and `RenderPoints`
   component presence; mesh edge/vertex sidecars are now driven by render
   components rather than `MeshPrimitiveViewSettings`, and unsupported
   point-cloud surface/edge requests fail closed with diagnostics.
-- [RUNTIME-091 — Activate promoted ECS system bundle in fixed-step runtime](../../done/RUNTIME-091-promoted-ecs-system-bundle-activation.md)
+- [RUNTIME-091 — Activate promoted ECS system bundle in fixed-step runtime](../../archive/RUNTIME-091-promoted-ecs-system-bundle-activation.md)
   (done): runtime-owned activation of promoted ECS systems via
   `Extrinsic.Runtime.EcsSystemBundle::RegisterPromotedEcsSystemBundle`, called
   every fixed-step substep before `Core::FrameGraph::Compile` so
   `TransformHierarchy` + `BoundsPropagation` run deterministically before
   render extraction.
-- [RUNTIME-096 — Runtime module implementation splits](../../done/RUNTIME-096-runtime-module-implementation-splits.md):
+- [RUNTIME-096 — Runtime module implementation splits](../../archive/RUNTIME-096-runtime-module-implementation-splits.md):
   module-interface hygiene follow-up for promoted runtime `.cppm` targets found
   by the 2026-06-06 implementation-body audit, including camera controllers,
   gizmo helpers, engine helper functions, and geometry packers.
-- [RUNTIME-097 — Default sandbox ECS-authored white triangle](../../done/RUNTIME-097-default-sandbox-ecs-triangle.md)
+- [RUNTIME-097 — Default sandbox ECS-authored white triangle](../../archive/RUNTIME-097-default-sandbox-ecs-triangle.md)
   (done, 2026-06-07, `CPUContracted`): replaced the default sandbox/reference
   triangle's `ProceduralGeometryRef` bootstrap with ordinary mesh-domain
   `GeometrySources`, selectable/editor-visible components, and a white
   appearance contract while keeping the sandbox app implementation runtime-only.
-- [RUNTIME-098 — Promoted scene serialization and editor command seam](../../done/RUNTIME-098-promoted-scene-serialization.md)
+- [RUNTIME-098 — Promoted scene serialization and editor command seam](../../archive/RUNTIME-098-promoted-scene-serialization.md)
   (done, 2026-06-07, `CPUContracted`): adds backend-neutral JSON scene
   save/load over current sandbox-authored ECS data, runtime `Engine` scene-file
   facades, and Sandbox editor `File / Scene` commands without reviving legacy
   serializer/editor modules.
-- [RUNTIME-099 — Runtime lifecycle composition pipeline](../../done/RUNTIME-099-runtime-lifecycle-composition.md)
+- [RUNTIME-099 — Runtime lifecycle composition pipeline](../../archive/RUNTIME-099-runtime-lifecycle-composition.md)
   (done, 2026-06-09, `CPUContracted`): `Engine::RunFrame()` carries an
   internal `RuntimeFrameContext` and delegates platform/render/maintenance/
   operational/shutdown phase ordering through promoted `Extrinsic.Core.FrameLoop`
   contracts, replacing legacy render orchestration with explicit runtime stage
   order and shutdown determinism.
-- [RUNTIME-100 — Scene manager lifecycle and persistence boundary](../../done/RUNTIME-100-scene-manager-lifecycle.md)
+- [RUNTIME-100 — Scene manager lifecycle and persistence boundary](../../archive/RUNTIME-100-scene-manager-lifecycle.md)
   (done, 2026-06-09, `CPUContracted`): single runtime scene replacement
   boundary, render-extraction/selection/physics reset contracts, and explicit
   supported/deferred/retired persistence decisions beyond `RUNTIME-098`.
-- [RUNTIME-102 — Editor command history and undo/redo seam](../../done/RUNTIME-102-editor-command-history.md)
+- [RUNTIME-102 — Editor command history and undo/redo seam](../../archive/RUNTIME-102-editor-command-history.md)
   (done, 2026-06-09, `CPUContracted`): runtime/editor command history,
   dirty-state source, recursive delete/orphan policy, undo/redo contracts, and
   Sandbox editor document-state model.
-- [RUNTIME-070 — Bootstrap GpuAssetCache fallback texture in Engine::Initialize](../../done/RUNTIME-070-fallback-texture-bootstrap.md):
+- [RUNTIME-070 — Bootstrap GpuAssetCache fallback texture in Engine::Initialize](../../archive/RUNTIME-070-fallback-texture-bootstrap.md):
   runtime-side graphics-bootstrap step initializing the canonical 4×4 magenta
   fallback texture per GRAPHICS-015Q (done).
-- [BUILD-001 — Wire shader compilation to the promoted Sandbox build](../../done/BUILD-001-sandbox-shader-compile-wiring.md):
+- [BUILD-001 — Wire shader compilation to the promoted Sandbox build](../../archive/BUILD-001-sandbox-shader-compile-wiring.md):
   CMake-only task adding `intrinsic_add_glsl_shaders(ExtrinsicSandbox)` so the
   promoted Sandbox build emits SPIR-V binaries; unblocks GRAPHICS-031A pipeline
   loads.
-- [RUNTIME-081 — `Extrinsic.Runtime.CameraControllers`](../../done/RUNTIME-081-camera-controllers.md):
+- [RUNTIME-081 — `Extrinsic.Runtime.CameraControllers`](../../archive/RUNTIME-081-camera-controllers.md):
   Orbit / Fly / FreeLook / TopDown camera controllers producing
   `RenderFrameInput::Camera` (clarified by GRAPHICS-017Q; done).
-- [RUNTIME-080 — `Extrinsic.Runtime.AssetBridges.Texture`](../../done/RUNTIME-080-asset-bridges-texture.md)
+- [RUNTIME-080 — `Extrinsic.Runtime.AssetBridges.Texture`](../../archive/RUNTIME-080-asset-bridges-texture.md)
   _(superseded, retired 2026-06-03)_: texture-typed asset event subscriber
   producing `GpuAssetCache::RequestUpload` calls (clarified by GRAPHICS-015Q).
   The capability shipped under `ASSETIO-001` as
   `Extrinsic.Runtime.AssetModelTextureHandoff`; this umbrella was retired
   without re-implementation.
-- [RUNTIME-082 — `Extrinsic.Runtime.SpatialDebugAdapters`](../../done/RUNTIME-082-spatial-debug-adapters.md)
+- [RUNTIME-082 — `Extrinsic.Runtime.SpatialDebugAdapters`](../../archive/RUNTIME-082-spatial-debug-adapters.md)
   (done 2026-05-27): BVH / KD-tree / Octree / ConvexHull adapters producing
   spatial-debug snapshot records (clarified by GRAPHICS-011Q). All four
   slices landed (umbrella + BvhAdapter → KdTree + Octree adapters →
   ConvexHull adapter + registry → `ExtractAndSubmit` wiring +
   `ECS::Components::SpatialDebugBinding` + cache-owned adapters); retired
   to `tasks/done/`.
-- [RUNTIME-083 — `Extrinsic.Runtime.VisualizationAdapters`](../../done/RUNTIME-083-visualization-adapters.md)
+- [RUNTIME-083 — `Extrinsic.Runtime.VisualizationAdapters`](../../archive/RUNTIME-083-visualization-adapters.md)
   (done 2026-06-02, `CPUContracted`):
   PropertySet / KMeans / Isoline / VectorField / HtexMetadata adapters producing
   visualization packet spans (clarified by GRAPHICS-014Q).
-- [RUNTIME-084 — `Extrinsic.Runtime.GizmoInteraction`](../../done/RUNTIME-084-gizmo-interaction.md)
+- [RUNTIME-084 — `Extrinsic.Runtime.GizmoInteraction`](../../archive/RUNTIME-084-gizmo-interaction.md)
   (done 2026-06-06, `CPUContracted`): transform-gizmo hit testing,
   translate/rotate/scale drag application, undo emission, Engine
   input/camera/selection wiring, and
   `RuntimeRenderSnapshotBatch::TransformGizmos` submission (clarified by
   GRAPHICS-017Q).
-- [RUNTIME-090 — `Extrinsic.Runtime.ImGuiAdapter`](../../done/RUNTIME-090-imgui-platform-renderer-adapter.md)
+- [RUNTIME-090 — `Extrinsic.Runtime.ImGuiAdapter`](../../archive/RUNTIME-090-imgui-platform-renderer-adapter.md)
   (done, 2026-06-02, `CPUContracted`): Dear ImGui platform/renderer adapter
   producing `ImGuiOverlayFrame` records for `ImGuiOverlaySystem::SubmitFrame`
   (clarified by GRAPHICS-013CQ).
-- [RUNTIME-085 — `GeometrySources` mesh residency bridge](../../done/RUNTIME-085-geometrysources-mesh-residency.md)
+- [RUNTIME-085 — `GeometrySources` mesh residency bridge](../../archive/RUNTIME-085-geometrysources-mesh-residency.md)
   (retired to `tasks/done/` 2026-05-28 at `CPUContracted`):
   runtime-authored ECS mesh data (`Vertices`/`Edges`/`Halfedges`/`Faces`) to
   retained `GpuWorld` surface geometry. Promoted from backlog 2026-05-27;
@@ -728,29 +728,29 @@ split; narratives live in the retirement log.
   with fail-closed `MeshPackStatus` taxonomy), Slice B the extraction wiring,
   and Slice C the dirty-domain reupload + deferred-retire ordering.
   `Operational` visual proof is closed by RUNTIME-095.
-- [RUNTIME-086 — `GeometrySources` graph residency bridge](../../done/RUNTIME-086-geometrysources-graph-residency.md):
+- [RUNTIME-086 — `GeometrySources` graph residency bridge](../../archive/RUNTIME-086-geometrysources-graph-residency.md):
   graph nodes/edges to retained point and line geometry. _(retired to
   `tasks/done/` on 2026-05-30 at maturity `CPUContracted`; Slice A — graph
   packer — plus Slices B + C — `RenderExtractionCache` residency wiring — all
   landed.)_
-- [RUNTIME-087 — `GeometrySources` point-cloud residency bridge](../../done/RUNTIME-087-geometrysources-pointcloud-residency.md):
+- [RUNTIME-087 — `GeometrySources` point-cloud residency bridge](../../archive/RUNTIME-087-geometrysources-pointcloud-residency.md):
   point-cloud vertices to retained point geometry. _(retired to `tasks/done/` on
   2026-05-30 at maturity `CPUContracted`; standalone point-cloud packer plus
   `RenderExtractionCache` residency wiring, deferred-retire, and shutdown drain
   landed together.)_
-- [RUNTIME-088 — Mesh primitive view lifecycle](../../done/RUNTIME-088-mesh-primitive-view-lifecycle.md)
+- [RUNTIME-088 — Mesh primitive view lifecycle](../../archive/RUNTIME-088-mesh-primitive-view-lifecycle.md)
   _(done 2026-05-31 at maturity `CPUContracted`: optional mesh edge/vertex render
   views as runtime sidecars over the authoritative mesh `GeometrySources`,
   wired into `RenderExtractionCache`; `Operational` visual proof closed by
   RUNTIME-095.)_
-- [RUNTIME-089 — Runtime selection controller and snapshot handoff](../../done/RUNTIME-089-selection-controller.md)
+- [RUNTIME-089 — Runtime selection controller and snapshot handoff](../../archive/RUNTIME-089-selection-controller.md)
   _(done; retired 2026-05-31 at `CPUContracted`)_: input/pick-result policy,
   selected/hovered state, and `RenderWorld.Selection` submission. Slice A
   (standalone `Extrinsic.Runtime.SelectionController` module) landed at
   `Scaffolded`; Slice B wired `Engine::RunFrame` (pick drain + readback consume)
   and `RenderExtractionCache::ExtractAndSubmit` (`RenderWorld.Selection` mirror)
   to close `CPUContracted`.
-- [RUNTIME-092 — Runtime stable entity lookup sidecar](../../done/RUNTIME-092-stable-entity-lookup.md)
+- [RUNTIME-092 — Runtime stable entity lookup sidecar](../../archive/RUNTIME-092-stable-entity-lookup.md)
   _(done 2026-05-31, `CPUContracted`)_: runtime-owned `StableId`/live-entity
   lookup for selection and editor tooling. Slice A landed the standalone
   `Extrinsic.Runtime.StableEntityLookup` module (`HARDEN-068` Decision-3 deferred
@@ -758,23 +758,23 @@ split; narratives live in the retirement log.
   invalidation; Slice B wired it into `Engine::RunFrame` (per-frame `Rebuild`
   before the pick-readback drain) and routed the `SelectionController` render-id
   resolution seam through the sidecar to close `CPUContracted`.
-- [RUNTIME-093 — Primitive selection refinement](../../done/RUNTIME-093-primitive-selection-refinement.md)
+- [RUNTIME-093 — Primitive selection refinement](../../archive/RUNTIME-093-primitive-selection-refinement.md)
   (done, 2026-06-01, `CPUContracted`): mesh face/edge/vertex, graph edge/node, and
   point-cloud point refinement from graphics primitive hints plus authoritative
   `GeometrySources`, wired into `Engine::RunFrame` via `RefinePickReadbackResult`.
-- [RUNTIME-095 — Working sandbox app acceptance path](../../done/RUNTIME-095-working-sandbox-acceptance.md):
+- [RUNTIME-095 — Working sandbox app acceptance path](../../archive/RUNTIME-095-working-sandbox-acceptance.md):
   done 2026-06-04 at `Operational` on Vulkan-capable hosts; final CPU/null +
   opt-in Vulkan acceptance for mesh, graph, point cloud, camera, selection,
   outline, and UI.
-- [RUNTIME-097 — Default sandbox ECS-authored white triangle](../../done/RUNTIME-097-default-sandbox-ecs-triangle.md)
+- [RUNTIME-097 — Default sandbox ECS-authored white triangle](../../archive/RUNTIME-097-default-sandbox-ecs-triangle.md)
   _(done 2026-06-07 at maturity `CPUContracted`)_: the default visible triangle
   is an ordinary ECS mesh entity using the same runtime extraction and editor
   inspection paths as loaded mesh objects.
-- [RUNTIME-098 — Promoted scene serialization and editor command seam](../../done/RUNTIME-098-promoted-scene-serialization.md)
+- [RUNTIME-098 — Promoted scene serialization and editor command seam](../../archive/RUNTIME-098-promoted-scene-serialization.md)
   _(done 2026-06-07 at maturity `CPUContracted`)_: scene save/load persists
   current sandbox-authored mesh/graph/point-cloud ECS data and is exposed
   through the runtime-owned Sandbox editor scene-file command surface.
-- [GRAPHICS-016 — Runtime extraction and graphics handoff](../../done/GRAPHICS-016-runtime-extraction-handoff.md):
+- [GRAPHICS-016 — Runtime extraction and graphics handoff](../../archive/GRAPHICS-016-runtime-extraction-handoff.md):
   - Runtime owns live ECS access, extraction, sidecar/cache mappings from ECS
     entities and asset/source handles to graphics handles, dirty-domain
     interpretation, deletion events, and compaction/relocation handoff.
@@ -785,6 +785,6 @@ split; narratives live in the retirement log.
     the rendering DAG in
     [`tasks/backlog/rendering/README.md`](../rendering/README.md) for
     downstream ordering.
-- [`GRAPHICS-001 — Rendering parity inventory and task index`](../../done/GRAPHICS-001-rendering-parity-inventory.md) —
+- [`GRAPHICS-001 — Rendering parity inventory and task index`](../../archive/GRAPHICS-001-rendering-parity-inventory.md) —
   retired rendering parity seed; current rendering selection lives in the
   rendering backlog DAG above.

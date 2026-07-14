@@ -1702,7 +1702,7 @@ the legacy `Graphics::CameraComponent` update at
 is authoritative and graphics receives only immutable `CameraViewInput`.
 
 Known gaps relative to legacy and planned camera work are tracked in
-`tasks/done/RUNTIME-081A-camera-legacy-gap-analysis.md`: editor-specific camera
+`tasks/archive/RUNTIME-081A-camera-legacy-gap-analysis.md`: editor-specific camera
 shortcuts and any policy that renders multiple camera outputs in one frame remain
 outside this runtime-controller surface. Transform-gizmo hit testing,
 translate/rotate/scale drag application, undo emission, default input binding,

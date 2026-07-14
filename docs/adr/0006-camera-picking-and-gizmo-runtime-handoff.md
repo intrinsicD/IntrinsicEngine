@@ -3,9 +3,9 @@
 - **Status:** Accepted
 - **Date:** 2026-05-17
 - **Owners:** Runtime composition, Graphics (CameraSnapshots boundary)
-- **Related tasks:** [`tasks/done/GRAPHICS-017`](../../tasks/done/GRAPHICS-017-camera-interaction-and-gizmo-boundaries.md), [`GRAPHICS-017Q`](../../tasks/done/GRAPHICS-017Q-camera-gizmo-runtime-clarifications.md)
+- **Related tasks:** [`tasks/done/GRAPHICS-017`](../../tasks/archive/GRAPHICS-017-camera-interaction-and-gizmo-boundaries.md), [`GRAPHICS-017Q`](../../tasks/archive/GRAPHICS-017Q-camera-gizmo-runtime-clarifications.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`docs/architecture/rendering-three-pass.md`](../architecture/rendering-three-pass.md), [`src/graphics/renderer/README.md`](../../src/graphics/renderer/README.md), [`docs/migration/nonlegacy-parity-matrix.md`](../migration/nonlegacy-parity-matrix.md)
-- **Supersedes:** none. Extracted from the `Extrinsic.Graphics.CameraSnapshots` "Per `GRAPHICS-017Q`" follow-up paragraph in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
+- **Supersedes:** none. Extracted from the `Extrinsic.Graphics.CameraSnapshots` "Per `GRAPHICS-017Q`" follow-up paragraph in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/archive/DOCS-001-reduce-graphics-architecture-prose.md).
 - **Related ADRs:** [ADR-0007](0007-picking-selection-and-outline.md) owns the `Extrinsic.Graphics.SelectionSystem` reporting seam this handoff produces selection inputs for.
 
 ## Context
@@ -165,8 +165,8 @@ Follow-up tasks required: none from this ADR. The matrix-tracked legacy promotio
 
 ## Validation
 
-- [`tasks/done/GRAPHICS-017`](../../tasks/done/GRAPHICS-017-camera-interaction-and-gizmo-boundaries.md) records the underlying data-only graphics contracts (`CameraViewInput`, `PickPixelRequest`, `CameraViewSnapshot`, frustum planes, pick rays, `TransformGizmoRenderPacket`).
-- [`tasks/done/GRAPHICS-017Q`](../../tasks/done/GRAPHICS-017Q-camera-gizmo-runtime-clarifications.md) records the five clarification decisions captured in §§1–5 plus the legacy-promotion-path note in §6.
+- [`tasks/done/GRAPHICS-017`](../../tasks/archive/GRAPHICS-017-camera-interaction-and-gizmo-boundaries.md) records the underlying data-only graphics contracts (`CameraViewInput`, `PickPixelRequest`, `CameraViewSnapshot`, frustum planes, pick rays, `TransformGizmoRenderPacket`).
+- [`tasks/done/GRAPHICS-017Q`](../../tasks/archive/GRAPHICS-017Q-camera-gizmo-runtime-clarifications.md) records the five clarification decisions captured in §§1–5 plus the legacy-promotion-path note in §6.
 - [`docs/migration/nonlegacy-parity-matrix.md`](../migration/nonlegacy-parity-matrix.md) is the single source of truth for the legacy `Graphics.TransformGizmo` / `Graphics.Interaction` feature handoff inventory; this ADR cross-links it instead of duplicating the matrix.
 - `src/graphics/renderer/README.md` carries the matching `Graphics.CameraSnapshots` ownership-contract bullet authored by `GRAPHICS-017Q`.
 - Layering invariant validation: `python3 tools/repo/check_layering.py --root src --strict` continues to pass because graphics does not import `src/platform/`, ECS, or editor code; only data-only `CameraViewInput` / `PickPixelRequest` / `TransformGizmoRenderPacket` cross the seam.
