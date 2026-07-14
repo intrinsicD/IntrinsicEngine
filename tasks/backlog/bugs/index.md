@@ -18,6 +18,12 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Verified / Closed
 
+- Closed 2026-07-14: [`BUG-084` — TransformSyncSystem contract test uses an unqualified test namespace](../../archive/BUG-084-transform-sync-test-mock-device-namespace.md).
+  The two mock-device declarations now name their existing
+  `Extrinsic::Tests` namespace, restoring the sanitizer-enabled graphics CPU
+  contract and aggregate builds. The default CPU-supported gate passed
+  3,698/3,698; no production source changed.
+
 - Closed 2026-07-13: [`BUG-074` — Orphaned GpuAssetCache slot causes per-entity bake retry livelock](../../archive/BUG-074-object-space-normal-bake-orphaned-cache-slot-livelock.md).
   Both post-open failure paths now retire only the exact GPU-produced texture
   generation they own, so cleanup cannot destroy a replacement or recreate a

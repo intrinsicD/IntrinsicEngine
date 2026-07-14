@@ -4562,3 +4562,11 @@ ASan heap-use-after-free after previous-world teardown. Restored code passed
 the regression 50 consecutive times, the focused lifecycle selection 13/13,
 the full default CPU-supported gate 3681/3681, and strict structural/docs
 checks.
+
+[`BUG-084`](../archive/BUG-084-transform-sync-test-mock-device-namespace.md) —
+TransformSyncSystem contract-test namespace repair retired on 2026-07-14 at
+`CPUContracted`. The two mock-device declarations now use the declared
+`Extrinsic::Tests::MockDevice` name, so the sanitizer-enabled graphics CPU
+contract and aggregate test targets compile without changing production code.
+The default CPU-supported CTest gate passed 3,698/3,698, including all nine
+headless Sandbox acceptance tests.

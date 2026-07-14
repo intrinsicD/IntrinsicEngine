@@ -38,7 +38,7 @@ namespace
 
 TEST(TransformSyncSystem, StaleSweepEvictsInstancesMissingFromRecords)
 {
-    Tests::MockDevice device;
+    Extrinsic::Tests::MockDevice device;
     std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
     renderer->Initialize(device);
     auto& gpuWorld = renderer->GetGpuWorld();
@@ -76,7 +76,7 @@ TEST(TransformSyncSystem, StaleSweepEvictsInstancesMissingFromRecords)
 
 TEST(TransformSyncSystem, ShutdownClearsTrackedState)
 {
-    Tests::MockDevice device;
+    Extrinsic::Tests::MockDevice device;
     std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
     renderer->Initialize(device);
     auto& gpuWorld = renderer->GetGpuWorld();
