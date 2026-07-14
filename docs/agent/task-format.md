@@ -2,6 +2,10 @@
 
 Use this template for all new task files under `tasks/`.
 
+Single-slice mechanical work (small fixes, doc/link sweeps, config toggles,
+test-only additions) may use the reduced **micro template** instead — see
+§"Micro tasks" below.
+
 ## Required structure
 
 ```md
@@ -59,15 +63,32 @@ feeds the generated `tasks/SESSION-BRIEF.md`:
 - `theme` (required) — convergence-theme letter from
   `tasks/backlog/README.md`, or `none` for unthemed work.
 - `depends_on` (required, may be `[]`) — task IDs this task is gated by;
-  every entry must resolve to a task file under `tasks/active|backlog|done`.
-  A dependency is satisfied when the referenced task is in `tasks/done/`.
+  every entry must resolve to a task file under
+  `tasks/active|backlog|done|archive`. A dependency is satisfied when the
+  referenced task is in `tasks/done/` or `tasks/archive/`.
 - `maturity_target` (optional) — intended stop-state per
   [`task-maturity.md`](task-maturity.md).
+- `template: micro` (optional) — marks a micro task (see §"Micro tasks").
 
 `tools/agents/validate_tasks.py --strict` enforces the schema for open tasks;
 retired tasks under `tasks/done/` are exempt. After opening, retiring, or
 re-gating a task, regenerate the session brief with
 `python3 tools/agents/generate_session_brief.py`.
+
+## Micro tasks
+
+Seed from [`tasks/templates/task-micro.md`](../../tasks/templates/task-micro.md)
+and set `template: micro` in the front-matter; `validate_tasks.py` then
+requires only `## Goal`, `## Acceptance criteria` (with checkbox todos), and
+`## Verification`.
+
+Micro tasks are for **single-slice mechanical work only**: small fixes,
+doc/link sweeps, config toggles, test-only additions. They are **not**
+allowed for work that changes dependency boundaries, module ownership,
+public module surfaces (`.cppm`), methods/benchmarks, or anything with an
+ambiguous maturity stop-state — that work uses the full template (or the
+method/bug/review variants). Retirement rules are unchanged: checkboxes
+closed, completion date, commit/PR reference, retirement-log entry.
 
 ## Optional `## Control surfaces` and `## Backends` fields
 

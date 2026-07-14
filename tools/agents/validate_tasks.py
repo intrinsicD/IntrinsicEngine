@@ -36,6 +36,22 @@ ACTIONABLE_TODO_SECTIONS = [
     "Acceptance criteria",
 ]
 
+# Micro tasks (`template: micro` in the front-matter, seeded from
+# tasks/templates/task-micro.md) are single-slice mechanical work; they
+# carry a reduced section set. Retirement rules (closed todos, completion
+# date, commit/PR reference) apply unchanged.
+MICRO_TEMPLATE_RE = re.compile(r"^template:\s*micro\s*$", re.MULTILINE)
+
+REQUIRED_SECTIONS_MICRO = [
+    "Goal",
+    "Acceptance criteria",
+    "Verification",
+]
+
+ACTIONABLE_TODO_SECTIONS_MICRO = [
+    "Acceptance criteria",
+]
+
 TODO_RE = re.compile(r"^\s*- \[[ xX]\]\s+.+", re.MULTILINE)
 OPEN_TODO_RE = re.compile(r"^\s*- \[ \]\s+.+", re.MULTILINE)
 
@@ -211,14 +227,24 @@ def find_archive_files(root: Path) -> list[Path]:
     return files
 
 
+def is_micro_task(parsed: ParsedTask) -> bool:
+    return bool(parsed.front_matter and MICRO_TEMPLATE_RE.search(parsed.front_matter))
+
+
 def validate_task(parsed: ParsedTask, mode: str) -> list[Finding]:
     findings: list[Finding] = []
     rel_path = parsed.path
 
+    micro = is_micro_task(parsed)
+    required_sections = REQUIRED_SECTIONS_MICRO if micro else REQUIRED_SECTIONS
+    actionable_sections = (
+        ACTIONABLE_TODO_SECTIONS_MICRO if micro else ACTIONABLE_TODO_SECTIONS
+    )
+
     if not parsed.task_id:
         findings.append(Finding("error", rel_path, "missing task header with ID (`# <ID> — <title>`)."))
 
-    missing_sections = [name for name in REQUIRED_SECTIONS if name not in parsed.sections]
+    missing_sections = [name for name in required_sections if name not in parsed.sections]
     if missing_sections:
         findings.append(
             Finding(
@@ -235,7 +261,7 @@ def validate_task(parsed: ParsedTask, mode: str) -> list[Finding]:
     if is_active and "Acceptance criteria" not in parsed.sections:
         findings.append(Finding("error", rel_path, "active task must include `## Acceptance criteria`."))
 
-    for section in ACTIONABLE_TODO_SECTIONS:
+    for section in actionable_sections:
         body = parsed.section_bodies.get(section, "")
         if section in parsed.sections and not TODO_RE.search(body):
             findings.append(
@@ -247,7 +273,7 @@ def validate_task(parsed: ParsedTask, mode: str) -> list[Finding]:
             )
 
     if is_done:
-        for section in ACTIONABLE_TODO_SECTIONS:
+        for section in actionable_sections:
             body = parsed.section_bodies.get(section, "")
             if OPEN_TODO_RE.search(body):
                 findings.append(
