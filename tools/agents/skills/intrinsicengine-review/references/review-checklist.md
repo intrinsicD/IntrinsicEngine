@@ -29,6 +29,11 @@ Use this checklist before commit and PR creation.
 - [ ] Dependency flow follows `AGENTS.md` invariants.
 - [ ] No cross-layer convenience imports introduced.
 - [ ] Runtime wiring remains in `runtime`.
+- [ ] New abstraction surface (interfaces, forwarding facades,
+      registration/scheduling frameworks, event/command hops, dependency
+      structs) passes the justified-complexity keep-list in
+      `tools/agents/skills/intrinsicengine-right-sizing/SKILL.md`; anything
+      flagged as ceremony carries a right-sizing plan or follow-up task.
 - [ ] Data-driven additions use plain structs/free functions; any new
       interface/factory/wrapper/backend seam has a present second caller, a
       layering boundary, a test double, or a config/UI/agent variant axis
