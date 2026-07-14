@@ -762,8 +762,9 @@ namespace Geometry::Simplification
         // Phase 1b (FA_QEM): classify the protected feature skeleton.
         //
         // The classification is taken once from the input mesh and held fixed
-        // for the run: the reference metric protects the input feature set, and
-        // recomputing per collapse would be both costlier and less predictable.
+        // for the run: this scoped paper-inspired adaptation protects the input
+        // feature set, and recomputing per collapse would be both costlier and
+        // less predictable.
         // -----------------------------------------------------------------
 
         std::vector<FeatureKind> vertexFeature(nV, FeatureKind::None);
@@ -797,10 +798,11 @@ namespace Geometry::Simplification
                         vertexFeature[vi] = FeatureKind::Line;
                     }
 
-                    // Boundary-curvature term: when the boundary is collapsible,
-                    // promote high-curvature boundary corners to immovable. The
-                    // boundary/curvature weights tighten the effective angle
-                    // threshold so larger weights protect gentler corners.
+                    // Boundary turning-angle mechanism: when the boundary is
+                    // collapsible, promote high-turning-angle boundary vertices
+                    // to immovable corners. The boundary/curvature weights
+                    // tighten the threshold so larger weights protect gentler
+                    // corners. This is pinning, not an additive quadric term.
                     if (!params.PreserveBoundary && mesh.IsBoundary(vh))
                     {
                         const double weight =
@@ -1220,6 +1222,9 @@ namespace Geometry::Simplification
         };
 
         // Compute directed collapse: evaluate cost of collapsing FromVertex(h) into ToVertex(h)
+        std::size_t topologyRejectionCount = 0u;
+        std::size_t qualityRejectionCount = 0u;
+
         auto computeDirectedCollapse = [&](HalfedgeHandle hCollapse) -> CollapseCandidate
         {
             CollapseCandidate best;
@@ -1230,6 +1235,7 @@ namespace Geometry::Simplification
 
             if (!mesh.IsCollapseOk(hCollapse))
             {
+                ++topologyRejectionCount;
                 return best;
             }
 
@@ -1269,6 +1275,7 @@ namespace Geometry::Simplification
             {
                 if (!isCollapseLegal(hCollapse, candidatePosition))
                 {
+                    ++qualityRejectionCount;
                     continue;
                 }
 
@@ -1345,12 +1352,12 @@ namespace Geometry::Simplification
             }
             if (!mesh.IsCollapseOk(top.Halfedge))
             {
-                ++result.CollapsesRejectedTopology;
+                ++topologyRejectionCount;
                 continue;
             }
             if (!isCollapseLegal(top.Halfedge, top.Position))
             {
-                ++result.CollapsesRejectedQuality;
+                ++qualityRejectionCount;
                 continue;
             }
 
@@ -1514,6 +1521,8 @@ namespace Geometry::Simplification
             }
         }
 
+        result.CollapsesRejectedTopology = topologyRejectionCount;
+        result.CollapsesRejectedQuality = qualityRejectionCount;
         return result;
     }
 

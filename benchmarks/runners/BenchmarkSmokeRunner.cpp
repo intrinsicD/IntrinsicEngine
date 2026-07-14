@@ -18,6 +18,7 @@
 #include "../geometry/Bench.ProgressivePoissonReferenceSmoke.hpp"
 #include "../geometry/Bench.QualityMetricsSmoke.hpp"
 #include "../geometry/Bench.SignedHeatReferenceSmoke.hpp"
+#include "../geometry/Bench.SimplificationQualitySmoke.hpp"
 #include "../geometry/Bench.SurfaceSamplingSmoke.hpp"
 #include "../geometry/Bench.UvAtlasSmoke.hpp"
 #include "../physics/Bench.ParticleSpringReferenceSmoke.hpp"
@@ -484,6 +485,66 @@ auto EmitSurfaceSamplingSmoke(const std::string &commit) -> EmittedBenchmark {
       << "}\n";
 
   return EmittedBenchmark{kSurfaceSamplingSmokeBenchmarkId, out.str(),
+                          metrics.Succeeded};
+}
+
+auto EmitSimplificationQualitySmoke(const std::string &commit)
+    -> EmittedBenchmark {
+  using namespace Intrinsic::Bench::Geometry;
+
+  const auto metrics = RunSimplificationQualitySmoke();
+
+  std::ostringstream out;
+  out.setf(std::ios::fixed);
+  out.precision(9);
+  out << "{\n"
+      << "  \"benchmark_id\": \""
+      << EscapeJson(kSimplificationQualitySmokeBenchmarkId) << "\",\n"
+      << "  \"method\": \""
+      << EscapeJson(kSimplificationQualitySmokeMethod) << "\",\n"
+      << "  \"backend\": \"cpu_reference\",\n"
+      << "  \"dataset\": \""
+      << EscapeJson(kSimplificationQualitySmokeDataset) << "\",\n"
+      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
+      << "  \"metrics\": {\n"
+      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << ",\n"
+      << "    \"quality_error_linf\": " << metrics.QualityErrorLinf
+      << "\n"
+      << "  },\n"
+      << "  \"diagnostics\": {\n"
+      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+      << "    \"mode\": \"correctness_smoke\",\n"
+      << "    \"warmup_iterations\": 1,\n"
+      << "    \"measured_iterations\": 2,\n"
+      << "    \"adoption_claim\": false,\n"
+      << "    \"paper_scope\": \"scoped paper-inspired adaptation, not equation-level parity\",\n"
+      << "    \"feature_aware_rms_distance\": "
+      << metrics.FeatureAwareRmsDistance << ",\n"
+      << "    \"classical_rms_distance\": "
+      << metrics.ClassicalRmsDistance << ",\n"
+      << "    \"feature_aware_max_distance\": "
+      << metrics.FeatureAwareMaxDistance << ",\n"
+      << "    \"classical_max_distance\": "
+      << metrics.ClassicalMaxDistance << ",\n"
+      << "    \"sensitivity_control_max_distance\": "
+      << metrics.SensitivityControlMaxDistance << ",\n"
+      << "    \"sample_count\": " << metrics.SampleCount << ",\n"
+      << "    \"target_face_count\": " << metrics.TargetFaceCount << ",\n"
+      << "    \"feature_aware_final_face_count\": "
+      << metrics.FeatureAwareFinalFaceCount << ",\n"
+      << "    \"classical_final_face_count\": "
+      << metrics.ClassicalFinalFaceCount << ",\n"
+      << "    \"feature_aware_pinned_vertex_count\": "
+      << metrics.FeatureAwarePinnedVertexCount << ",\n"
+      << "    \"feature_aware_quality_rejection_count\": "
+      << metrics.FeatureAwareQualityRejectionCount << "\n"
+      << "  },\n"
+      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
+      << "\"\n"
+      << "}\n";
+
+  return EmittedBenchmark{kSimplificationQualitySmokeBenchmarkId, out.str(),
                           metrics.Succeeded};
 }
 
@@ -1097,6 +1158,7 @@ auto main(int argc, char **argv) -> int {
   emitted.push_back(EmitUvAtlasPromotionSmoke(commit));
   emitted.push_back(EmitProgressivePoissonReferenceSmoke(commit));
   emitted.push_back(EmitSignedHeatReferenceSmoke(commit));
+  emitted.push_back(EmitSimplificationQualitySmoke(commit));
   emitted.push_back(EmitSurfaceSamplingSmoke(commit));
   emitted.push_back(EmitQualityMetricsSmoke(commit));
   emitted.push_back(EmitPointCloudFilteringSmoke(commit));

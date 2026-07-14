@@ -1,0 +1,27 @@
+# GEOM-014 — scoped paper-inspired FA-QEM adaptation quality smoke.
+#
+# Quality, not speed, is the gate. Both variants must reach the same 24-face
+# target. quality_error_l2 and quality_error_linf are the positive regressions
+# of FA-QEM's sampled original-surface-to-result-surface RMS and maximum
+# distances relative to the classical quadric-only path. A translated-result
+# control verifies that the deterministic surface sampler is sensitive.
+
+benchmark_id: geometry.simplification.fa_qem_quality.smoke
+method: geometry.halfedge.simplification.fa_qem_adaptation
+dataset: builtin.tessellated_cube_n4
+params:
+  intent: correctness
+  target_face_count: 24
+  barycentric_resolution: 4
+  placement_policy: keep_survivor
+  warmup_iterations: 1
+  measured_iterations: 2
+  adoption_claim: false
+metrics:
+  - runtime_ms
+  - quality_error_l2
+  - quality_error_linf
+thresholds:
+  smoke_runtime_ms_max: 5000
+  quality_error_l2_max: 1.0e-6
+  quality_error_linf_max: 1.0e-6

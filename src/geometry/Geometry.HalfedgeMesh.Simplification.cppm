@@ -15,20 +15,23 @@ export namespace Geometry::Simplification
     // Error-metric selection (GEOM-014)
     // =========================================================================
     //
-    // ClassicalQEM reproduces the pre-GEOM-014 behaviour exactly: the collapse
-    // cost is the configured quadric error only, with no sharp-feature pinning
-    // and no normal-consistency penalty.
+    // ClassicalQEM selects the legacy quadric-only contract: the collapse cost
+    // is the configured quadric error, with no GEOM-014 feature pinning or
+    // normal-consistency penalty.
     //
-    // FA_QEM (Feature-Aware QEM, Cao et al. 2025; the new default) augments the
-    // configured quadric with three feature-preserving terms that are otherwise
+    // FA_QEM is a scoped, paper-inspired adaptation of Bhosikar, Savalia,
+    // Tiwari, and Bhowmick (arXiv:2605.14029, 2026), and is the new default. It
+    // does not reproduce that paper's multi-term quadric equations or optimal
+    // placement formulation. The engine adaptation augments the configured
+    // quadric path with three feature-preserving mechanisms that are otherwise
     // off:
     //   * sharp-feature pinning  — corner vertices where >= 3 feature edges meet
     //     are immovable; feature-line vertices may only collapse along the line,
     //   * normal-consistency penalty — collapses that swing adjacent face
     //     normals cost more (NormalWeight),
-    //   * boundary-curvature constraint — boundary vertices gain a curvature-
-    //     weighted constraint quadric when PreserveBoundary is false
-    //     (BoundaryWeight, CurvatureWeight).
+    //   * boundary turning-angle pinning — when PreserveBoundary is false, the
+    //     product BoundaryWeight*CurvatureWeight tightens the turning-angle
+    //     threshold used to promote boundary vertices to immovable corners.
     // FA_QEM never makes a collapse *cheaper* than ClassicalQEM, so the existing
     // quality guards (normal cones, Hausdorff, aspect ratio) keep their meaning.
     enum class Metric
@@ -104,14 +107,16 @@ export namespace Geometry::Simplification
     // Error metric (Params::Metric):
     //   * Metric::ClassicalQEM — quadric error only (Garland & Heckbert 1997
     //     family, including the probabilistic-quadric extensions configured via
-    //     QuadricOptions). No feature pinning. This is the previous behaviour and
-    //     remains reachable verbatim for parity comparison.
-    //   * Metric::FA_QEM — Feature-Aware QEM (Cao et al., 2025); the default.
-    //     Adds sharp-feature corner/line pinning, a normal-consistency cost
-    //     penalty, and a curvature-weighted boundary constraint on top of the
-    //     configured quadric. See the Metric enum and Params field comments for
-    //     the weights. FA_QEM only ever raises a collapse cost, so all existing
-    //     quality guards keep their meaning.
+    //     QuadricOptions). No GEOM-014 feature pinning. This is the legacy
+    //     quadric-only contract retained for parity comparison.
+    //   * Metric::FA_QEM — the default, scoped paper-inspired adaptation of
+    //     Bhosikar et al. (arXiv:2605.14029, 2026). Adds sharp-feature
+    //     corner/line pinning, a normal-consistency cost penalty, and boundary
+    //     turning-angle pinning; it is not an equation-level implementation of
+    //     the paper's multi-term quadric and optimal placement formulation.
+    //     See the Metric enum and Params field comments for the weights. FA_QEM
+    //     only ever raises a collapse cost, so existing quality guards retain
+    //     their meaning.
     // Variants C (intrinsic-error metric) and D (line-quadric) from the GEOM-014
     // survey are intentionally not implemented here; they are follow-up tasks.
 
@@ -122,8 +127,7 @@ export namespace Geometry::Simplification
 
         // Error-metric selection. FA_QEM (the default since GEOM-014) adds the
         // feature-aware terms documented on the Metric enum. ClassicalQEM keeps
-        // the quadric-only cost and disables all feature pinning, exactly
-        // reproducing the previous behaviour for callers that opt out.
+        // the legacy quadric-only cost and disables all GEOM-014 feature paths.
         Metric Metric{Metric::FA_QEM};
 
         // FA_QEM only. Dihedral angle (degrees) above which an interior edge is
@@ -138,13 +142,15 @@ export namespace Geometry::Simplification
         // the surrounding face normals. Zero disables the penalty.
         double NormalWeight{1.0};
 
-        // FA_QEM only. Weight of the boundary-curvature constraint quadric added
-        // to boundary vertices when PreserveBoundary is false. Zero disables it.
+        // FA_QEM only. Multiplied by CurvatureWeight to tighten the boundary
+        // turning-angle threshold when PreserveBoundary is false. Zero prevents
+        // corner promotion by this weighted threshold; ordinary feature-line
+        // classification remains controlled by PreserveSharpFeatures.
         double BoundaryWeight{1.0};
 
-        // FA_QEM only. Scales the boundary-curvature constraint by the local
-        // boundary turning angle, so high-curvature boundary corners resist
-        // collapse more than nearly straight boundary segments.
+        // FA_QEM only. Multiplied by BoundaryWeight to tighten the boundary
+        // turning-angle threshold, so high-turning-angle boundary vertices are
+        // promoted to immovable corners before gentler boundary vertices.
         double CurvatureWeight{1.0};
 
         // FA_QEM only. Pin sharp-feature corner and feature-line vertices so
@@ -209,12 +215,14 @@ export namespace Geometry::Simplification
 
         // --- Diagnostics (GEOM-014) ---
 
-        // Collapses popped from the heap but rejected by the topology/link
-        // condition (IsCollapseOk). Non-zero on near-degenerate inputs.
+        // Directed collapse evaluations rejected by the topology/link
+        // condition (IsCollapseOk), including heap construction and local
+        // recomputation after successful collapses.
         std::size_t CollapsesRejectedTopology{0};
 
-        // Collapses popped from the heap but rejected by a quality guard
-        // (boundary/valence/normal/Hausdorff/aspect or an FA_QEM feature pin).
+        // Candidate positions rejected by a quality guard
+        // (boundary/valence/normal/Hausdorff/aspect or an FA_QEM feature pin),
+        // including heap construction and local recomputation.
         std::size_t CollapsesRejectedQuality{0};
 
         // FA_QEM: number of sharp-feature corner / feature-line vertices pinned

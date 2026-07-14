@@ -8,6 +8,21 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`GEOM-014`](GEOM-014-feature-aware-quadric-error-simplification.md) — the
+feature-aware quadric-error simplification adaptation retired on 2026-07-15 at
+`CPUContracted`. Closure corrected its attribution and scoped the implementation
+as paper-inspired rather than equation-level parity, replaced a vacuous
+survivor-vertex quality proxy with deterministic original-surface samples
+queried against each 24-face result surface, added a translated sensitivity
+control, proved the classical metric ignores every feature-aware control, and
+made rejection diagnostics count evaluated candidates. The Clang-23 ASan/UBSan
+`ci` build completed, the exact `Simplification` selection passed 93/93, and
+the manifest-backed `geometry.simplification.fa_qem_quality.smoke` workload
+passed its run/validation pair with strict validation of all 24 manifests and
+20 emitted results. The benchmark is a correctness smoke and makes no paper
+parity, performance, or adoption claim. No `Operational` follow-up is owed
+because the task extends the deterministic CPU geometry kernel in place.
+
 [`GEOM-019`](GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md) —
 harmonic/Tutte parameterization retired on 2026-07-15 at `CPUContracted`.
 Implementation commit `29d7a908` added explicit circle, square, and custom

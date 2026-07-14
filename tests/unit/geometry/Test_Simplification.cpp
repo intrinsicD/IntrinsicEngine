@@ -6,7 +6,6 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
-#include <limits>
 #include <map>
 #include <vector>
 
@@ -124,25 +123,73 @@ namespace
         return mesh;
     }
 
-    // Approximate one-sided Hausdorff distance: max over the simplified mesh's
-    // live vertices of the nearest distance to any original vertex position.
-    double MaxVertexToReferenceDistance(
-        const Geometry::HalfedgeMesh::Mesh& simplified,
-        const std::vector<glm::vec3>& reference)
+    struct SampledSurfaceDistance
     {
-        double worst = 0.0;
-        for (std::size_t i = 0; i < simplified.VerticesSize(); ++i)
+        double MaxDistance{0.0};
+        std::size_t SampleCount{0u};
+        bool Succeeded{false};
+    };
+
+    // Deterministic one-sided surface-distance proxy. Sampling the original
+    // triangle interiors (not only surviving vertices) makes the signal
+    // sensitive to removed corners and missing surface regions when the
+    // simplifier keeps survivor positions unchanged.
+    SampledSurfaceDistance SampleReferenceToResultSurfaceDistance(
+        const Geometry::HalfedgeMesh::Mesh& reference,
+        const Geometry::HalfedgeMesh::Mesh& result)
+    {
+        Geometry::MeshClosestFaceIndex resultIndex;
+        if (!resultIndex.Build(result))
+            return {};
+
+        constexpr int kBarycentricResolution = 4;
+        SampledSurfaceDistance distance{};
+        for (std::size_t fi = 0; fi < reference.FacesSize(); ++fi)
         {
-            const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
-            if (simplified.IsDeleted(v) || simplified.IsIsolated(v))
+            const Geometry::FaceHandle face{static_cast<Geometry::PropertyIndex>(fi)};
+            if (!reference.IsValid(face) || reference.IsDeleted(face))
                 continue;
-            const glm::vec3 p = simplified.Position(v);
-            double nearest = std::numeric_limits<double>::infinity();
-            for (const glm::vec3& r : reference)
-                nearest = std::min(nearest, static_cast<double>(glm::distance(p, r)));
-            worst = std::max(worst, nearest);
+
+            std::vector<glm::vec3> polygon;
+            for (const Geometry::VertexHandle vertex : reference.VerticesAroundFace(face))
+            {
+                if (reference.IsValid(vertex) && !reference.IsDeleted(vertex))
+                    polygon.push_back(reference.Position(vertex));
+            }
+
+            for (std::size_t triangle = 1u; triangle + 1u < polygon.size(); ++triangle)
+            {
+                const glm::vec3 p0 = polygon[0u];
+                const glm::vec3 p1 = polygon[triangle];
+                const glm::vec3 p2 = polygon[triangle + 1u];
+                for (int i = 0; i <= kBarycentricResolution; ++i)
+                {
+                    for (int j = 0; j <= kBarycentricResolution - i; ++j)
+                    {
+                        const int k = kBarycentricResolution - i - j;
+                        const glm::vec3 sample =
+                            (static_cast<float>(i) * p0
+                             + static_cast<float>(j) * p1
+                             + static_cast<float>(k) * p2)
+                            / static_cast<float>(kBarycentricResolution);
+                        const Geometry::MeshClosestFaceResult nearest = resultIndex.Query(sample);
+                        if (!nearest.Found
+                            || nearest.Status != Geometry::MeshClosestFaceStatus::Success
+                            || !std::isfinite(nearest.SquaredDistance)
+                            || nearest.SquaredDistance < 0.0f)
+                        {
+                            return {};
+                        }
+                        distance.MaxDistance = std::max(
+                            distance.MaxDistance,
+                            std::sqrt(static_cast<double>(nearest.SquaredDistance)));
+                        ++distance.SampleCount;
+                    }
+                }
+            }
         }
-        return worst;
+        distance.Succeeded = distance.SampleCount > 0u;
+        return distance;
     }
 
     bool HasLiveVertexNear(
@@ -338,24 +385,70 @@ TEST(Simplification, FeatureAwarePreservesCubeCorners)
         EXPECT_TRUE(HasLiveVertexNear(mesh, corner)) << "corner removed: " << corner.x;
 }
 
-// The classical metric remains reachable and unchanged: it still reduces to the
-// requested face count and reports no feature pins.
+// The classical metric remains a stable quadric-only contract: changing every
+// FA_QEM-specific control must not change its result or compacted topology.
 TEST(Simplification, ClassicalMetricRemainsReachable)
 {
-    auto mesh = MakeTessellatedCube(4);
+    auto baselineMesh = MakeTessellatedCube(4);
+    auto faControlsChangedMesh = MakeTessellatedCube(4);
 
-    Geometry::Simplification::Params params;
-    params.Metric = Geometry::Simplification::Metric::ClassicalQEM;
-    params.TargetFaces = 40;
+    Geometry::Simplification::Params baselineParams;
+    baselineParams.Metric = Geometry::Simplification::Metric::ClassicalQEM;
+    baselineParams.TargetFaces = 40;
 
-    auto result = Geometry::Simplification::Simplify(mesh, params);
-    ASSERT_TRUE(result.has_value());
-    EXPECT_GT(result->CollapseCount, 0u);
-    EXPECT_EQ(result->SharpFeatureVerticesPinned, 0u);
-    EXPECT_EQ(result->SeamVerticesPinned, 0u);
+    Geometry::Simplification::Params faControlsChanged = baselineParams;
+    faControlsChanged.FeatureAngleThresholdDegrees = 1.0;
+    faControlsChanged.NormalWeight = 1.0e6;
+    faControlsChanged.BoundaryWeight = 1.0e6;
+    faControlsChanged.CurvatureWeight = 1.0e6;
+    faControlsChanged.PreserveSharpFeatures = false;
+    faControlsChanged.PreserveUvSeams = false;
 
-    mesh.GarbageCollection();
-    EXPECT_LE(mesh.FaceCount(), 40u);
+    const auto baselineResult =
+        Geometry::Simplification::Simplify(baselineMesh, baselineParams);
+    const auto faControlsChangedResult =
+        Geometry::Simplification::Simplify(faControlsChangedMesh, faControlsChanged);
+    ASSERT_TRUE(baselineResult.has_value());
+    ASSERT_TRUE(faControlsChangedResult.has_value());
+    EXPECT_GT(baselineResult->CollapseCount, 0u);
+    EXPECT_EQ(baselineResult->FinalFaceCount, 40u);
+    EXPECT_EQ(baselineResult->SharpFeatureVerticesPinned, 0u);
+    EXPECT_EQ(baselineResult->SeamVerticesPinned, 0u);
+    EXPECT_EQ(baselineResult->CollapseCount, faControlsChangedResult->CollapseCount);
+    EXPECT_EQ(baselineResult->FinalFaceCount, faControlsChangedResult->FinalFaceCount);
+    EXPECT_DOUBLE_EQ(baselineResult->MaxCollapseError, faControlsChangedResult->MaxCollapseError);
+    EXPECT_EQ(
+        baselineResult->CollapsesRejectedTopology,
+        faControlsChangedResult->CollapsesRejectedTopology);
+    EXPECT_EQ(
+        baselineResult->CollapsesRejectedQuality,
+        faControlsChangedResult->CollapsesRejectedQuality);
+
+    baselineMesh.GarbageCollection();
+    faControlsChangedMesh.GarbageCollection();
+    ASSERT_EQ(baselineMesh.VertexCount(), faControlsChangedMesh.VertexCount());
+    ASSERT_EQ(baselineMesh.FaceCount(), faControlsChangedMesh.FaceCount());
+    for (std::size_t vi = 0; vi < baselineMesh.VerticesSize(); ++vi)
+    {
+        const Geometry::VertexHandle vertex{static_cast<Geometry::PropertyIndex>(vi)};
+        EXPECT_EQ(baselineMesh.IsDeleted(vertex), faControlsChangedMesh.IsDeleted(vertex));
+        if (!baselineMesh.IsDeleted(vertex))
+            EXPECT_EQ(baselineMesh.Position(vertex), faControlsChangedMesh.Position(vertex));
+    }
+    for (std::size_t fi = 0; fi < baselineMesh.FacesSize(); ++fi)
+    {
+        const Geometry::FaceHandle face{static_cast<Geometry::PropertyIndex>(fi)};
+        ASSERT_EQ(baselineMesh.IsDeleted(face), faControlsChangedMesh.IsDeleted(face));
+        if (baselineMesh.IsDeleted(face))
+            continue;
+        std::vector<Geometry::PropertyIndex> baselineVertices;
+        std::vector<Geometry::PropertyIndex> changedVertices;
+        for (const Geometry::VertexHandle vertex : baselineMesh.VerticesAroundFace(face))
+            baselineVertices.push_back(vertex.Index);
+        for (const Geometry::VertexHandle vertex : faControlsChangedMesh.VerticesAroundFace(face))
+            changedVertices.push_back(vertex.Index);
+        EXPECT_EQ(baselineVertices, changedVertices);
+    }
 }
 
 // Same input and params produce identical output (no RNG anywhere in the path).
@@ -388,39 +481,59 @@ TEST(Simplification, FeatureAwareIsDeterministic)
     }
 }
 
-// On a feature-rich fixture, preserving corners must not worsen surface error
-// relative to the classical metric at the same target face count.
+// On a feature-rich fixture, preserving corners must not worsen sampled
+// original-surface-to-result-surface error relative to the classical metric at
+// the same achieved target face count.
 TEST(Simplification, FeatureAwareCornerErrorNotWorseThanClassical)
 {
-    std::vector<glm::vec3> reference;
-    {
-        auto ref = MakeTessellatedCube(4);
-        for (std::size_t i = 0; i < ref.VerticesSize(); ++i)
-        {
-            const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
-            if (!ref.IsDeleted(v))
-                reference.push_back(ref.Position(v));
-        }
-    }
-
-    const std::size_t target = 30;
+    const auto reference = MakeTessellatedCube(4);
+    constexpr std::size_t kTargetFaces = 24u;
 
     auto faqemMesh = MakeTessellatedCube(4);
     Geometry::Simplification::Params faqem;
-    faqem.TargetFaces = target;
-    ASSERT_TRUE(Geometry::Simplification::Simplify(faqemMesh, faqem).has_value());
+    faqem.TargetFaces = kTargetFaces;
+    const auto faqemResult = Geometry::Simplification::Simplify(faqemMesh, faqem);
+    ASSERT_TRUE(faqemResult.has_value());
+    ASSERT_EQ(faqemResult->FinalFaceCount, kTargetFaces);
     faqemMesh.GarbageCollection();
+    ASSERT_EQ(faqemMesh.FaceCount(), kTargetFaces);
 
     auto classicalMesh = MakeTessellatedCube(4);
     Geometry::Simplification::Params classical;
     classical.Metric = Geometry::Simplification::Metric::ClassicalQEM;
-    classical.TargetFaces = target;
-    ASSERT_TRUE(Geometry::Simplification::Simplify(classicalMesh, classical).has_value());
+    classical.TargetFaces = kTargetFaces;
+    const auto classicalResult = Geometry::Simplification::Simplify(classicalMesh, classical);
+    ASSERT_TRUE(classicalResult.has_value());
+    ASSERT_EQ(classicalResult->FinalFaceCount, kTargetFaces);
     classicalMesh.GarbageCollection();
+    ASSERT_EQ(classicalMesh.FaceCount(), kTargetFaces);
 
-    const double faqemError = MaxVertexToReferenceDistance(faqemMesh, reference);
-    const double classicalError = MaxVertexToReferenceDistance(classicalMesh, reference);
-    EXPECT_LE(faqemError, classicalError + 1e-4);
+    const SampledSurfaceDistance faqemError =
+        SampleReferenceToResultSurfaceDistance(reference, faqemMesh);
+    const SampledSurfaceDistance classicalError =
+        SampleReferenceToResultSurfaceDistance(reference, classicalMesh);
+    ASSERT_TRUE(faqemError.Succeeded);
+    ASSERT_TRUE(classicalError.Succeeded);
+    ASSERT_EQ(faqemError.SampleCount, classicalError.SampleCount);
+
+    // Sensitivity control: translating the entire result surface must produce
+    // a clearly non-zero signal, guarding against the previous survivor-vertex
+    // proxy that was identically zero under KeepSurvivor placement.
+    auto translated = MakeTessellatedCube(4);
+    for (std::size_t vi = 0; vi < translated.VerticesSize(); ++vi)
+    {
+        const Geometry::VertexHandle vertex{static_cast<Geometry::PropertyIndex>(vi)};
+        if (!translated.IsDeleted(vertex))
+            translated.Position(vertex) += glm::vec3(0.25f, 0.0f, 0.0f);
+    }
+    const SampledSurfaceDistance controlError =
+        SampleReferenceToResultSurfaceDistance(reference, translated);
+    ASSERT_TRUE(controlError.Succeeded);
+    EXPECT_GT(controlError.MaxDistance, 0.20);
+
+    EXPECT_LE(faqemError.MaxDistance, classicalError.MaxDistance + 1e-6)
+        << "FA-QEM sampled surface error=" << faqemError.MaxDistance
+        << ", classical=" << classicalError.MaxDistance;
 }
 
 // UV seams (texcoord-bearing boundary vertices) stay put when preserve_uv_seams
@@ -457,7 +570,8 @@ TEST(Simplification, FeatureAwarePreservesUvSeams)
         EXPECT_TRUE(HasLiveVertexNear(mesh, p)) << "seam vertex removed";
 }
 
-// Diagnostics counters are populated and self-consistent on a feature mesh.
+// Diagnostics counters include rejected candidate evaluations as well as the
+// protected feature-set cardinality on a feature mesh.
 TEST(Simplification, DiagnosticsCountersPopulated)
 {
     auto mesh = MakeTessellatedCube(4);
@@ -467,6 +581,11 @@ TEST(Simplification, DiagnosticsCountersPopulated)
 
     auto result = Geometry::Simplification::Simplify(mesh, params);
     ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->FinalFaceCount, mesh.FaceCount());
     EXPECT_GE(result->SharpFeatureVerticesPinned, 8u);
     EXPECT_GT(result->SharpFeatureVerticesPinned + result->SeamVerticesPinned, 0u);
+    EXPECT_GT(result->CollapsesRejectedQuality, 0u);
+    EXPECT_GT(
+        result->CollapsesRejectedTopology + result->CollapsesRejectedQuality,
+        0u);
 }

@@ -48,7 +48,11 @@ such as `Intrinsic::Bench::Geometry::kHalfedgeSmokeBenchmarkId` and
 [`Bench.SurfaceSamplingSmoke.hpp`](Bench.SurfaceSamplingSmoke.hpp); manifests
 copy the same strings. `kQualityMetricsSmokeBenchmarkId` from
 [`Bench.QualityMetricsSmoke.hpp`](Bench.QualityMetricsSmoke.hpp) binds the
-point-cloud quality metrics smoke workload. `kPointCloudFilteringSmokeBenchmarkId`
+point-cloud quality metrics smoke workload.
+`kSimplificationQualitySmokeBenchmarkId` from
+[`Bench.SimplificationQualitySmoke.hpp`](Bench.SimplificationQualitySmoke.hpp)
+binds the GEOM-014 FA-QEM adaptation quality comparison.
+`kPointCloudFilteringSmokeBenchmarkId`
 from [`Bench.PointCloudFilteringSmoke.hpp`](Bench.PointCloudFilteringSmoke.hpp)
 binds the GEOM-016 filtering/outlier-removal workload (voxel downsample plus
 statistical and radius outlier removal on a two-cluster + injected-outlier
@@ -114,19 +118,25 @@ exercise the runner and validate the emitted result JSON as part of the
 standard `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine'`
 flow.
 
-## FA-QEM vs classical-QEM simplification quality (GEOM-014, stub)
+## FA-QEM vs classical-QEM simplification quality (GEOM-014)
 
-Planned quality comparison for the feature-aware QEM metric added by GEOM-014.
-This is a **quality-only** comparison — no performance claims — pending the
-compiled smoke runner (owned by the `UI-028` executor follow-up).
+GEOM-014 is a scoped, paper-inspired adaptation of Bhosikar, Savalia, Tiwari,
+and Bhowmick (arXiv:2605.14029, 2026), not an equation-level implementation of
+the paper's multi-term quadric and optimal-placement formulation. Its
+deterministic **quality-only** comparison is manifest-backed by
+[`geometry_simplification_fa_qem_quality_smoke.yaml`](manifests/geometry_simplification_fa_qem_quality_smoke.yaml)
+and runs through `IntrinsicBenchmarkSmoke`; it makes no speedup or paper-parity
+claim.
 
-- Fixtures: the in-repo tessellated-cube and grid-plane fixtures used by
-  `tests/unit/geometry/Test_Simplification.cpp` (no external large datasets).
-- Metric per fixture, at a fixed target face count, for
-  `Metric::ClassicalQEM` vs `Metric::FA_QEM`:
-  - max vertex-to-original-surface distance (one-sided Hausdorff proxy),
-  - sharp-feature vertices retained (`Result::SharpFeatureVerticesPinned`),
-  - collapse-rejection counts (`Result::CollapsesRejected{Topology,Quality}`).
-- Expected qualitative result: on feature-rich inputs FA-QEM retains sharp
-  corners and reports max-surface-distance no worse than classical at the same
-  target, matching `Test_Simplification.FeatureAwareCornerErrorNotWorseThanClassical`.
+- Fixture: built-in 4x4-per-face tessellated cube; both
+  `Metric::ClassicalQEM` and `Metric::FA_QEM` must reach exactly 24 faces.
+- Quality signals: deterministic barycentric samples on the original triangles
+  are queried against each result surface with `Geometry.MeshClosestFace`.
+  `quality_error_l2` and `quality_error_linf` report only the positive FA-QEM
+  regression in RMS and maximum sampled distance relative to classical QEM.
+- Sensitivity and diagnostics: a translated-result control must report a
+  clearly non-zero maximum distance, FA-QEM must retain the sharp feature set,
+  and its evaluated-candidate quality-rejection count must be populated.
+- The matching unit contract is
+  `Simplification.FeatureAwareCornerErrorNotWorseThanClassical`; UV-seam and
+  classical-path isolation remain separate focused unit tests.
