@@ -46,6 +46,27 @@ map.
   the `geometry/GEOM-060` permutohedral and `geometry/GEOM-061` grid seams).
 - [METHOD-020 — LOP-family GPU (Vulkan compute) backend and parity](METHOD-020-lop-family-gpu-vulkan-compute-backend.md)
   (adds `gpu_vulkan_compute` with `gpu;vulkan` parity; gated on `METHOD-019`).
+- [METHOD-021 — ARAP (local/global) parameterization reference backend](METHOD-021-arap-parameterization-reference-backend.md)
+  (adds the `Arap` strategy to the shared `Geometry.Parameterization` surface;
+  gated on `geometry/GEOM-063` dispatch surface and `geometry/GEOM-064`
+  optimization kernels; roadmap Pack 3).
+- [METHOD-022 — SLIM locally-injective parameterization reference backend](METHOD-022-slim-injective-parameterization-reference-backend.md)
+  (adds the flip-free `Slim` strategy; gated on `GEOM-063`, `GEOM-064`, and
+  `METHOD-021`; roadmap Pack 4).
+- [METHOD-023 — Boundary First Flattening (BFF) reference backend](METHOD-023-boundary-first-flattening-reference-backend.md)
+  (adds the controllable-conformal `Bff` strategy with boundary length/angle
+  targets and cones; gated on `GEOM-063`; new SOTA pack).
+- [METHOD-024 — Spectral Conformal Parameterization (SCP) reference backend](METHOD-024-spectral-conformal-parameterization-reference-backend.md)
+  (adds the pin-free conformal `Scp` strategy; gated on `GEOM-063` and the
+  `geometry/GEOM-024` generalized eigensolver seam; new SOTA pack).
+- [METHOD-025 — Parameterization family optimized CPU backend and comparison benchmark](METHOD-025-parameterization-family-optimized-cpu-backend.md)
+  (adds `cpu_optimized` progressive acceleration with parity; gated on
+  `METHOD-021`/`022`).
+- [METHOD-026 — Parameterization family GPU (Vulkan compute) backend and parity](METHOD-026-parameterization-family-gpu-vulkan-compute-backend.md)
+  (adds `gpu_vulkan_compute` for the iterative ARAP/SLIM strategies with
+  `gpu;vulkan` parity; gated on `METHOD-025` and `runtime/RUNTIME-176`, whose
+  facade/job-queue seam it wires into; the linear one-shot strategies
+  (LSCM/SCP/BFF) record no GPU follow-up in their own tasks).
 
 ## Convergence
 
@@ -83,6 +104,29 @@ map.
   CPU-reference-first in the dependency order encoded in each task's
   `depends_on`; do not open optimized/GPU/engine slices before the reference
   variant they extend is implemented, tested, and benchmark-manifested.
+- **Parameterization family (METHOD-021..026).** The state-of-the-art mesh
+  parameterization variants — ARAP (`METHOD-021`), SLIM (`METHOD-022`), BFF
+  (`METHOD-023`), and SCP (`METHOD-024`) — are added as `Strategy` values on the
+  one shared `Geometry.Parameterization` `Strategy` × `Backend` surface
+  (`geometry/GEOM-063`, `docs/architecture/algorithm-variant-dispatch.md`),
+  alongside the existing Tutte/Harmonic (`GEOM-019`) and LSCM strategies, so every
+  variant is choosable through one API and one config/UI/agent surface. The
+  iterative variants share the `geometry/GEOM-064` optimization-kernel seam
+  (local rotation fit, symmetric-Dirichlet energy/proxy, injective line search)
+  and the `GEOM-018` diagnostics; the optimized CPU (`METHOD-025`) and GPU
+  (`METHOD-026`) backends follow reference parity for the iterative strategies
+  (the linear one-shot strategies record no optimized/GPU follow-up); and the
+  engine integration —
+  config lane, runtime facade, the UV view model, and the Sandbox editor panel
+  with a resizable UV split view — is owned by `runtime/RUNTIME-176`,
+  `ui/UI-036`, and the optional `rendering/GRAPHICS-122`, with the derived-view
+  rendering decision recorded in
+  [ADR-0025](../../../docs/adr/0025-parameterization-uv-view-and-split-view.md).
+  This mirrors the LOP consolidation family and the retired `RUNTIME-134`
+  progressive-Poisson playground. Realizes Packs 3–4 of the
+  [parameterization/mapping roadmap](../../../docs/architecture/parameterization-mapping-roadmap.md)
+  plus the new SCP/BFF SOTA packs. Promote CPU-reference-first in each task's
+  `depends_on` order.
 - Forbidden: importing runtime, graphics, platform, app, or live ECS ownership
   into a method package; claiming performance wins without a baseline.
 
