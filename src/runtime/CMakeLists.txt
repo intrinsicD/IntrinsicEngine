@@ -24,6 +24,7 @@ target_sources(${target_name}
         Runtime.JobService.cppm
         Runtime.JobServiceGpuQueueBridge.cppm
         Modules/Clustering/Runtime.ClusteringModule.cppm
+        Modules/SelectedEntityAnalysis/Runtime.SelectedEntityAnalysisModule.cppm
         Runtime.MeshAttributeTextureBake.cppm
         Runtime.MeshPrimitiveViewControls.cppm
         Runtime.MethodFigureExport.cppm
@@ -110,6 +111,7 @@ target_sources(${target_name}
         Runtime.JobService.cpp
         Runtime.JobServiceGpuQueueBridge.cpp
         Modules/Clustering/Runtime.ClusteringModule.cpp
+        Modules/SelectedEntityAnalysis/Runtime.SelectedEntityAnalysisModule.cpp
         Runtime.MeshAttributeTextureBake.cpp
         Runtime.MeshPrimitiveViewControls.cpp
         Runtime.MethodFigureExport.cpp

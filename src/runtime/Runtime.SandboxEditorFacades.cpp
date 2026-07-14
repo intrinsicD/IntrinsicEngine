@@ -83,6 +83,7 @@ import Extrinsic.Runtime.SceneDocument;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.SelectedEntityAnalysisModule;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
@@ -284,6 +285,24 @@ namespace Extrinsic::Runtime
                     PointCloudDomainWindow;
             }
             return SandboxEditorSelectedAnalysisCacheConsumer::Inspector;
+        }
+
+        [[nodiscard]] SelectedEntityAnalysisConsumer
+        ToSelectedEntityAnalysisConsumer(
+            const SandboxEditorSelectedAnalysisCacheConsumer consumer) noexcept
+        {
+            switch (consumer)
+            {
+            case SandboxEditorSelectedAnalysisCacheConsumer::Inspector:
+                return SelectedEntityAnalysisConsumer::Inspector;
+            case SandboxEditorSelectedAnalysisCacheConsumer::MeshDomainWindow:
+                return SelectedEntityAnalysisConsumer::MeshDomainWindow;
+            case SandboxEditorSelectedAnalysisCacheConsumer::GraphDomainWindow:
+                return SelectedEntityAnalysisConsumer::GraphDomainWindow;
+            case SandboxEditorSelectedAnalysisCacheConsumer::PointCloudDomainWindow:
+                return SelectedEntityAnalysisConsumer::PointCloudDomainWindow;
+            }
+            return SelectedEntityAnalysisConsumer::Inspector;
         }
 
 
@@ -1797,7 +1816,7 @@ namespace Extrinsic::Runtime
             const std::vector<SandboxEditorPropertyCatalogRow>& rows,
             const SandboxEditorPropertyCatalogDomain domain,
             const VertexChannel channel,
-            SandboxEditorModelBuildStats* modelBuildStats)
+            const SandboxEditorContext& context)
         {
             SandboxEditorVertexChannelBindingTargetModel model{
                 .Channel = channel,
@@ -1816,15 +1835,39 @@ namespace Extrinsic::Runtime
             {
                 model.HasBinding = true;
                 model.Binding = *binding;
-                model.Resolver = EvaluateVertexChannelBinding(
-                    *properties,
-                    channel,
-                    binding->SourceProperty,
-                    binding->SourceType,
-                    expectedCount,
-                    modelBuildStats);
-                model.Diagnostic =
-                    BuildVertexChannelResolverDiagnostic(model.Resolver);
+                if (context.AsyncSelectedAnalysis != nullptr)
+                {
+                    const SelectedEntityAnalysisView& analysis =
+                        *context.AsyncSelectedAnalysis;
+                    if (analysis.State == SelectedEntityAnalysisState::Ready)
+                    {
+                        const SelectedEntityChannelAnalysis& channelAnalysis =
+                            channel == VertexChannel::Normal
+                            ? analysis.Result.Normal
+                            : analysis.Result.Color;
+                        model.Resolver = channelAnalysis.Resolver;
+                        model.Diagnostic =
+                            BuildVertexChannelResolverDiagnostic(model.Resolver);
+                    }
+                    else
+                    {
+                        model.Diagnostic = analysis.Diagnostic.empty()
+                            ? "selected entity analysis is pending"
+                            : analysis.Diagnostic;
+                    }
+                }
+                else
+                {
+                    model.Resolver = EvaluateVertexChannelBinding(
+                        *properties,
+                        channel,
+                        binding->SourceProperty,
+                        binding->SourceType,
+                        expectedCount,
+                        context.ModelBuildStats);
+                    model.Diagnostic =
+                        BuildVertexChannelResolverDiagnostic(model.Resolver);
+                }
             }
 
             for (const SandboxEditorPropertyCatalogRow& row : rows)
@@ -1854,16 +1897,37 @@ namespace Extrinsic::Runtime
                 }
 
                 option.SourceType = *sourceType;
-                option.Resolver = EvaluateVertexChannelBinding(
-                    *properties,
-                    channel,
-                    row.Name,
-                    *sourceType,
-                    expectedCount,
-                    modelBuildStats);
-                option.Compatible =
-                    SourceTypeAllowedForVertexChannel(channel, *sourceType) &&
-                    option.Resolver.Ok();
+                if (context.AsyncSelectedAnalysis != nullptr)
+                {
+                    const bool sourceTypeAllowed =
+                        SourceTypeAllowedForVertexChannel(channel, *sourceType);
+                    const bool countMatches =
+                        row.ElementCount == expectedCount;
+                    option.Resolver = AttributeBindResult{
+                        .Status = !sourceTypeAllowed
+                            ? AttributeBindStatus::TypeMismatch
+                            : countMatches
+                                ? AttributeBindStatus::Bound
+                                : AttributeBindStatus::CountMismatch,
+                        .FullyPopulated = sourceTypeAllowed && countMatches,
+                        .SourceCount = sourceTypeAllowed && countMatches &&
+                                           row.ElementCount <=
+                                               std::numeric_limits<std::uint32_t>::max()
+                            ? static_cast<std::uint32_t>(row.ElementCount)
+                            : 0u,
+                    };
+                }
+                else
+                {
+                    option.Resolver = EvaluateVertexChannelBinding(
+                        *properties,
+                        channel,
+                        row.Name,
+                        *sourceType,
+                        expectedCount,
+                        context.ModelBuildStats);
+                }
+                option.Compatible = option.Resolver.Ok();
                 if (!option.Compatible)
                 {
                     option.DisabledReason =
@@ -1901,7 +1965,7 @@ namespace Extrinsic::Runtime
                     model.Rows,
                     *domain,
                     VertexChannel::Normal,
-                    context.ModelBuildStats));
+                    context));
             model.VertexChannelTargets.push_back(
                 BuildVertexChannelBindingTargetModel(
                     raw,
@@ -1910,7 +1974,7 @@ namespace Extrinsic::Runtime
                     model.Rows,
                     *domain,
                     VertexChannel::Color,
-                    context.ModelBuildStats));
+                    context));
         }
 
         [[nodiscard]] SandboxEditorPropertyCatalogModel BuildPropertyCatalogModel(
@@ -1931,6 +1995,14 @@ namespace Extrinsic::Runtime
             model.SelectedStableId = SelectionController::ToStableEntityId(entity);
             const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
             model.SelectedDomain = view.ActiveDomain;
+            if (context.AsyncSelectedAnalysis != nullptr)
+            {
+                model.AnalysisState = context.AsyncSelectedAnalysis->State;
+                model.AnalysisGeometryRevision =
+                    context.AsyncSelectedAnalysis->Key.GeometryRevision;
+                model.AnalysisRequestIdentity =
+                    context.AsyncSelectedAnalysis->Key.RequestIdentity;
+            }
 
             const PrimitiveSelectionResult* primitive = nullptr;
             if (context.LastRefinedPrimitive != nullptr &&
@@ -3736,6 +3808,14 @@ namespace Extrinsic::Runtime
             }
             SandboxEditorUvDiagnosticsModel model{};
             model.HasSelectedEntity = true;
+            if (context.AsyncSelectedAnalysis != nullptr)
+            {
+                model.AnalysisState = context.AsyncSelectedAnalysis->State;
+                model.AnalysisGeometryRevision =
+                    context.AsyncSelectedAnalysis->Key.GeometryRevision;
+                model.AnalysisRequestIdentity =
+                    context.AsyncSelectedAnalysis->Key.RequestIdentity;
+            }
             const GS::SourceAvailability availability =
                 GS::BuildSourceAvailability(view);
             model.IsMesh =
@@ -3779,19 +3859,46 @@ namespace Extrinsic::Runtime
                 }
                 else
                 {
-                    model.TexcoordsFinite = true;
-                    SandboxEditorModelBuildStats* stats =
-                        context.ModelBuildStats;
-                    for (const glm::vec2 uv : texcoords.Vector())
+                    if (context.AsyncSelectedAnalysis != nullptr)
                     {
-                        if (stats != nullptr)
-                            ++stats->UvDiagnosticsTexcoordElementsScanned;
-                        if (!std::isfinite(uv.x) || !std::isfinite(uv.y))
+                        const SelectedEntityAnalysisView& analysis =
+                            *context.AsyncSelectedAnalysis;
+                        if (analysis.State ==
+                            SelectedEntityAnalysisState::Ready)
+                        {
+                            model.TexcoordsFinite =
+                                analysis.Result.Uv.TexcoordsFinite;
+                            if (!model.TexcoordsFinite)
+                            {
+                                model.LastFailure =
+                                    "texcoord property contains non-finite values";
+                            }
+                        }
+                        else
                         {
                             model.TexcoordsFinite = false;
-                            model.LastFailure =
-                                "texcoord property contains non-finite values";
-                            break;
+                            model.LastFailure = analysis.Diagnostic.empty()
+                                ? "selected entity analysis is pending"
+                                : analysis.Diagnostic;
+                        }
+                    }
+                    else
+                    {
+                        model.TexcoordsFinite = true;
+                        SandboxEditorModelBuildStats* stats =
+                            context.ModelBuildStats;
+                        for (const glm::vec2 uv : texcoords.Vector())
+                        {
+                            if (stats != nullptr)
+                                ++stats->UvDiagnosticsTexcoordElementsScanned;
+                            if (!std::isfinite(uv.x) ||
+                                !std::isfinite(uv.y))
+                            {
+                                model.TexcoordsFinite = false;
+                                model.LastFailure =
+                                    "texcoord property contains non-finite values";
+                                break;
+                            }
                         }
                     }
                     model.CheckerPreviewAvailable = model.TexcoordsFinite;
@@ -4370,6 +4477,17 @@ namespace Extrinsic::Runtime
                         section,
                         visualizationTarget),
                 .BindingGeneration = VertexBindingGenerationForEntity(raw, entity),
+                .AsyncAnalysisState = context.AsyncSelectedAnalysis != nullptr
+                    ? context.AsyncSelectedAnalysis->State
+                    : SelectedEntityAnalysisState::Missing,
+                .AsyncAnalysisGeometryRevision =
+                    context.AsyncSelectedAnalysis != nullptr
+                    ? context.AsyncSelectedAnalysis->Key.GeometryRevision
+                    : 0u,
+                .AsyncAnalysisRequestIdentity =
+                    context.AsyncSelectedAnalysis != nullptr
+                    ? context.AsyncSelectedAnalysis->Key.RequestIdentity
+                    : 0u,
                 .ProgressiveBindingGeneration =
                     ProgressiveBindingGenerationForEntity(raw, entity, section),
                 .DerivedJobStateSignature = DerivedJobStateSignatureForEntity(
@@ -4480,11 +4598,35 @@ namespace Extrinsic::Runtime
             const SandboxEditorSelectedAnalysisCacheConsumer consumer =
                 SandboxEditorSelectedAnalysisCacheConsumer::Inspector)
         {
-            SandboxEditorSelectedModelCache* cache = context.SelectedModelCache;
+            SandboxEditorContext buildContext = context;
+            SelectedEntityAnalysisView asyncAnalysis{};
+            if (context.SelectedEntityAnalysis != nullptr &&
+                context.SelectedEntityAnalysis->Available() &&
+                context.ActiveWorld.IsValid())
+            {
+                const SelectedEntityAnalysisConsumer asyncConsumer =
+                    ToSelectedEntityAnalysisConsumer(consumer);
+                asyncAnalysis = context.SelectedEntityAnalysis->Query(
+                    context.ActiveWorld, stableId, asyncConsumer);
+                if (asyncAnalysis.State ==
+                        SelectedEntityAnalysisState::Missing ||
+                    asyncAnalysis.State ==
+                        SelectedEntityAnalysisState::Stale ||
+                    asyncAnalysis.State ==
+                        SelectedEntityAnalysisState::Failed)
+                {
+                    asyncAnalysis = context.SelectedEntityAnalysis->Request(
+                        context.ActiveWorld, stableId, asyncConsumer);
+                }
+                buildContext.AsyncSelectedAnalysis = &asyncAnalysis;
+            }
+
+            SandboxEditorSelectedModelCache* cache =
+                buildContext.SelectedModelCache;
             if (cache == nullptr)
             {
                 return BuildSelectedAnalysisModelUncached(
-                    context,
+                    buildContext,
                     raw,
                     entity,
                     sourceView,
@@ -4498,7 +4640,7 @@ namespace Extrinsic::Runtime
             if (entry == nullptr)
             {
                 return BuildSelectedAnalysisModelUncached(
-                    context,
+                    buildContext,
                     raw,
                     entity,
                     sourceView,
@@ -4509,7 +4651,7 @@ namespace Extrinsic::Runtime
 
             const SandboxEditorSelectedModelCacheKey key =
                 BuildSelectedModelCacheKey(
-                    context,
+                    buildContext,
                     raw,
                     entity,
                     geometry,
@@ -4524,7 +4666,7 @@ namespace Extrinsic::Runtime
             RecordSelectedAnalysisCacheMiss(context);
             SandboxEditorSelectedAnalysisModel model =
                 BuildSelectedAnalysisModelUncached(
-                    context,
+                    buildContext,
                     raw,
                     entity,
                     sourceView,
@@ -10310,6 +10452,9 @@ namespace Extrinsic::Runtime
         {
             return SandboxEditorContext{
                 .Scene = &engine.GetScene(),
+                .ActiveWorld = engine.ActiveWorld(),
+                .SelectedEntityAnalysis =
+                    engine.Services().Find<SelectedEntityAnalysisService>(),
                 .Selection = &engine.GetSelectionController(),
                 .CommandHistory = &engine.GetEditorCommandHistory(),
                 .AssetService = &engine.GetAssetService(),

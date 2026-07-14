@@ -61,7 +61,9 @@ import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.SelectedEntityAnalysisModule;
 import Extrinsic.Runtime.ServiceRegistry;
+import Extrinsic.Runtime.WorldHandle;
 import Geometry.Graph.Vertex.Normals;
 import Geometry.HalfedgeMesh.Vertices.Normals;
 import Geometry.PointCloud.Normals;
@@ -1226,6 +1228,10 @@ export namespace Extrinsic::Runtime
         std::uint32_t SelectedStableId{0u};
         ECS::Components::GeometrySources::Domain SelectedDomain{
             ECS::Components::GeometrySources::Domain::None};
+        SelectedEntityAnalysisState AnalysisState{
+            SelectedEntityAnalysisState::Missing};
+        std::uint64_t AnalysisGeometryRevision{0u};
+        std::uint64_t AnalysisRequestIdentity{0u};
         std::vector<SandboxEditorPropertyCatalogRow> Rows{};
         std::vector<SandboxEditorPropertyBindingTargetModel> BindingTargets{};
         std::vector<SandboxEditorVertexChannelBindingTargetModel> VertexChannelTargets{};
@@ -1398,6 +1404,10 @@ export namespace Extrinsic::Runtime
         bool HasTexcoords{false};
         bool TexcoordCountMatchesVertices{false};
         bool TexcoordsFinite{false};
+        SelectedEntityAnalysisState AnalysisState{
+            SelectedEntityAnalysisState::Missing};
+        std::uint64_t AnalysisGeometryRevision{0u};
+        std::uint64_t AnalysisRequestIdentity{0u};
         std::string TexcoordPropertyName{"v:texcoord"};
         std::size_t VertexCount{0u};
         std::size_t TexcoordCount{0u};
@@ -2202,6 +2212,10 @@ export namespace Extrinsic::Runtime
         std::uint64_t RenderHintSignature{0u};
         std::uint64_t VisualizationStateSignature{0u};
         std::uint64_t BindingGeneration{0u};
+        SelectedEntityAnalysisState AsyncAnalysisState{
+            SelectedEntityAnalysisState::Missing};
+        std::uint64_t AsyncAnalysisGeometryRevision{0u};
+        std::uint64_t AsyncAnalysisRequestIdentity{0u};
         std::uint64_t ProgressiveBindingGeneration{0u};
         std::uint64_t DerivedJobStateSignature{0u};
         std::uint64_t CommandHistoryRevision{0u};
@@ -2329,6 +2343,9 @@ export namespace Extrinsic::Runtime
     struct SandboxEditorContext
     {
         ECS::Scene::Registry* Scene{nullptr};
+        WorldHandle ActiveWorld{};
+        SelectedEntityAnalysisService* SelectedEntityAnalysis{nullptr};
+        const SelectedEntityAnalysisView* AsyncSelectedAnalysis{nullptr};
         SelectionController*  Selection{nullptr};
         EditorCommandHistory* CommandHistory{nullptr};
         Assets::AssetService* AssetService{nullptr};

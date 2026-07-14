@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 85 |
+| `runtime` | 86 |
 
 ## Modules
 
@@ -340,6 +340,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.GizmoInteraction` | `src/runtime/Gizmos/Runtime.GizmoInteraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.ImGuiAdapter` | `src/runtime/ImGui/Runtime.ImGuiAdapter.cppm` | `runtime` |
 | `Extrinsic.Runtime.ClusteringModule` | `src/runtime/Modules/Clustering/Runtime.ClusteringModule.cppm` | `runtime` |
+| `Extrinsic.Runtime.SelectedEntityAnalysisModule` | `src/runtime/Modules/SelectedEntityAnalysis/Runtime.SelectedEntityAnalysisModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetGeometryIO` | `src/runtime/Runtime.AssetGeometryIO.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetImportPipeline` | `src/runtime/Runtime.AssetImportPipeline.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetIngestStateMachine` | `src/runtime/Runtime.AssetIngestStateMachine.cppm` | `runtime` |
@@ -417,4 +418,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugClosestFace` | `src/runtime/SpatialDebug/Runtime.SpatialDebugClosestFace.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **390**
+Total modules: **391**

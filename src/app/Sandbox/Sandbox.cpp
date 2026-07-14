@@ -7,6 +7,7 @@ module Extrinsic.Sandbox;
 import Extrinsic.Sandbox.Editor.Controller;
 import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
+import Extrinsic.Runtime.SelectedEntityAnalysisModule;
 
 namespace Extrinsic::Sandbox {
 class App final : public Runtime::IApplication {
@@ -39,6 +40,7 @@ private:
 };
 
 void RegisterSandboxRuntimeModules(Runtime::Engine &engine) {
+  engine.EmplaceModule<Runtime::SelectedEntityAnalysisModule>();
   engine.EmplaceModule<Runtime::ClusteringModule>();
 }
 
