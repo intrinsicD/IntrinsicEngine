@@ -298,6 +298,16 @@ observable to UI, agents, tests, and reproducibility tooling.
 states, UI-facing status vocabulary, and explicit provenance-carrying
 publish/apply commands for candidate renderer outputs.
 
+### Developer-experience seams (seeded 2026-07-14, Theme B)
+
+Opened from the 2026-07 right-sizing audit: the snapshot batch's
+`DebugLines/DebugPoints/DebugTriangles` fields have no runtime writer, so a
+trivially scoped debug primitive costs 8–11 files across 4 layers.
+
+- [RUNTIME-177 — Immediate-mode debug-draw seam for runtime and method code](RUNTIME-177-immediate-mode-debug-draw-seam.md):
+  plain per-frame accumulator + free-function helpers feeding the existing
+  transient-debug pass; no new interfaces, passes, or adapter machinery.
+
 ### Runtime adapter umbrellas (clarified by Q tasks; producer modules)
 
 These open the runtime-side producer/owner umbrellas already clarified by the

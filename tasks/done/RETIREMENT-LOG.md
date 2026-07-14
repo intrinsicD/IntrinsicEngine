@@ -8,6 +8,17 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`PROC-026`](PROC-026-task-archive-and-micro-template.md) — task archive
+sweep and micro template retired on 2026-07-14. All 661 retired task files
+moved from `tasks/done/` to the frozen `tasks/archive/` with ~1,600 inbound
+links rewritten and zero broken links; archived IDs stay authoritative for
+duplicate detection, `depends_on` resolution, and state-link guards
+(`validate_tasks.py`, `generate_session_brief.py`,
+`check_task_state_links.py`). Added `tasks/templates/task-micro.md`
+(`template: micro`) reducing single-slice mechanical tasks to
+Goal/Acceptance criteria/Verification, with strict-validation probes both
+ways. Commits 865a61b and b6d4568.
+
 [`BUG-074`](../archive/BUG-074-object-space-normal-bake-orphaned-cache-slot-livelock.md) —
 object-space-normal-bake failed-slot retry livelock retired on 2026-07-13 at
 `CPUContracted`. Both command-record and ready-frame-publication failures now

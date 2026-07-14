@@ -21,6 +21,8 @@ map.
 - [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](CI-009-heavy-gate-routing-and-runner-evaluation.md)
 - [PROC-025 — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality](PROC-025-port-research-ideation-skill-to-other-repos.md)
   (portable playbook; run from a session scoped to the target repo).
+- [PROC-027 — Audit the validator/tool fleet for rent-paying gates](PROC-027-validator-rent-audit.md)
+- [DOCS-006 — Curated "how this repo is built" agentic-development narrative](DOCS-006-agentic-development-narrative.md)
 
 `PROC-012` (resolve the duplicate `GEOM-027` ID by renumbering the
 control-surface/KMeans backend-seam task to `GEOM-052`) is retired; see the
