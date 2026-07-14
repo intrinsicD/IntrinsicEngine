@@ -130,6 +130,7 @@ export namespace Extrinsic::Core::Tasks
     bool TryPopGlobalInject(LocalTask& outTask);
     bool TryPopLocal(unsigned workerIndex, LocalTask& outTask);
     bool TrySteal(unsigned thiefIndex, LocalTask& outTask);
+    bool TryStealExternal(LocalTask& outTask);
     bool TryPopTask(LocalTask& outTask, std::optional<unsigned> workerIndex);
     void OnTaskDequeuedAndRun(LocalTask& task);
     // Global scheduler state declarations.

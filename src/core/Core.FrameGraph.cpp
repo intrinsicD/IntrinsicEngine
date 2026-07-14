@@ -24,7 +24,7 @@ namespace Extrinsic::Core
         return m_Graph->BuildPlan();
     }
 
-    void         FrameGraph::Reset()    { m_Graph->Reset(); }
+    void         FrameGraph::Reset()    { (void)m_Graph->Reset(); }
 
     uint32_t     FrameGraph::PassCount()           const noexcept { return m_Graph->PassCount(); }
     std::string_view FrameGraph::PassName(uint32_t i) const noexcept { return m_Graph->PassName(i); }

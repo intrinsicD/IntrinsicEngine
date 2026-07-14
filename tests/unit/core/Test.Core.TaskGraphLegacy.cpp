@@ -372,6 +372,10 @@ TEST(CoreTaskGraph, PlanOnlyBuildPlanIsStableAndExecuteIsRejected)
     auto exec = graph.Execute();
     ASSERT_FALSE(exec.has_value());
     EXPECT_EQ(exec.error(), ErrorCode::InvalidState);
+
+    auto submitted = graph.Submit();
+    ASSERT_FALSE(submitted.has_value());
+    EXPECT_EQ(submitted.error(), ErrorCode::InvalidState);
 }
 
 TEST(CoreTaskGraph, PlanOnlyBuildPlanAndResetReuse)
@@ -397,7 +401,7 @@ TEST(CoreTaskGraph, PlanOnlyBuildPlanAndResetReuse)
     EXPECT_EQ((*firstPlan)[0].batch, 0u);
     EXPECT_EQ((*firstPlan)[1].batch, 1u);
 
-    graph.Reset();
+    ASSERT_TRUE(graph.Reset().has_value()) << "Reset failed";
     EXPECT_EQ(graph.PassCount(), 0u);
     EXPECT_TRUE(graph.PassName(0).empty());
 
@@ -512,7 +516,7 @@ TEST(CoreTaskGraph, ResetClearsStatsResourcesAndLabelsAcrossEpochs)
     const auto firstStats = graph.GetScheduleStats();
     EXPECT_GT(firstStats.edgeCount, 0u);
 
-    graph.Reset();
+    ASSERT_TRUE(graph.Reset().has_value()) << "Reset failed";
     EXPECT_EQ(graph.PassCount(), 0u);
     EXPECT_EQ(graph.GetScheduleStats().edgeCount, 0u);
 

@@ -3,7 +3,6 @@ module;
 #include <algorithm>
 #include <atomic>
 #include <chrono>
-#include <cassert>
 #include <iterator>
 #include <mutex>
 #include <cstdint>
@@ -646,19 +645,36 @@ namespace Extrinsic::Core::Dag
                                 MainThreadReadyCompare> MainThreadQueue{};
             std::mutex MainThreadQueueMutex{};
             std::atomic<std::uint32_t> NextInsertionOrder{0u};
-            Core::Tasks::CounterEvent Done{};
+            std::atomic<std::uint32_t> RemainingTasks{0u};
+            Core::Tasks::CounterEvent Done;
+            std::thread::id OwnerThread{};
+            std::chrono::steady_clock::time_point StartedAt{};
             std::function<void(const std::shared_ptr<ExecutionState>&, std::uint32_t)> OnTaskFinished{};
             std::function<void(const std::shared_ptr<ExecutionState>&,
                                const std::vector<std::uint32_t>&)> ScheduleReadyBatch{};
+            std::function<void(const std::shared_ptr<ExecutionState>&, std::uint32_t)> ExecuteAndFinish{};
 
             explicit ExecutionState(std::uint32_t taskCount)
                 : RemainingDeps(taskCount),
                   Dispatched(taskCount),
-                  Done()
+                  RemainingTasks(taskCount),
+                  Done(taskCount),
+                  OwnerThread(std::this_thread::get_id()),
+                  StartedAt(std::chrono::steady_clock::now())
             {
             }
         };
     }
+
+    struct TaskGraphCompletion::Impl
+    {
+        std::shared_ptr<ExecutionState> State{};
+
+        explicit Impl(std::shared_ptr<ExecutionState> state) noexcept
+            : State(std::move(state))
+        {
+        }
+    };
 
     struct TaskGraph::Impl
     {
@@ -684,7 +700,9 @@ namespace Extrinsic::Core::Dag
         std::vector<std::vector<std::uint32_t>> Successors{};
         std::vector<std::uint32_t> InitialInDegree{};
         bool Compiled = false;
-        bool Executing = false;
+        std::atomic<bool> Executing{false};
+        mutable std::mutex ActiveExecutionMutex{};
+        std::weak_ptr<ExecutionState> ActiveExecution{};
 
         // TypeToken → ResourceId stable mapping (reset each epoch).
         std::unordered_map<std::size_t, std::uint32_t> TokenMap{};
@@ -700,13 +718,26 @@ namespace Extrinsic::Core::Dag
 
         // Schedule stats and timings.
         uint64_t LastCompileNs = 0u;
-        uint64_t LastExecuteNs = 0u;
+        std::atomic<uint64_t> LastExecuteNs{0u};
         uint64_t LastCriticalPathNs = 0u;
         ScheduleStats LastStats{};
 
         // The compiled state should not be read/modified while Execute is active.
         // Keep the raw task payload alive for the life of execution.
         bool CanUsePlan() const noexcept { return Compiled && !ExecutionOrder.empty(); }
+
+        bool HasLiveExecution() const
+        {
+            std::scoped_lock lock(ActiveExecutionMutex);
+            const auto active = ActiveExecution.lock();
+            return active && !active->Done.IsReady();
+        }
+
+        void TrackExecution(const std::shared_ptr<ExecutionState>& state)
+        {
+            std::scoped_lock lock(ActiveExecutionMutex);
+            ActiveExecution = state;
+        }
 
         void ClearCompiledState() noexcept
         {
@@ -720,10 +751,93 @@ namespace Extrinsic::Core::Dag
     };
 
     // -----------------------------------------------------------------------
+    // TaskGraphCompletion public implementation
+    // -----------------------------------------------------------------------
+    TaskGraphCompletion::TaskGraphCompletion() noexcept = default;
+    TaskGraphCompletion::~TaskGraphCompletion() = default;
+    TaskGraphCompletion::TaskGraphCompletion(const TaskGraphCompletion&) noexcept = default;
+    TaskGraphCompletion& TaskGraphCompletion::operator=(const TaskGraphCompletion&) noexcept = default;
+    TaskGraphCompletion::TaskGraphCompletion(TaskGraphCompletion&&) noexcept = default;
+    TaskGraphCompletion& TaskGraphCompletion::operator=(TaskGraphCompletion&&) noexcept = default;
+
+    TaskGraphCompletion::TaskGraphCompletion(std::shared_ptr<Impl> impl) noexcept
+        : m_Impl(std::move(impl))
+    {
+    }
+
+    bool TaskGraphCompletion::IsValid() const noexcept
+    {
+        return m_Impl && m_Impl->State;
+    }
+
+    bool TaskGraphCompletion::IsReady() const noexcept
+    {
+        return IsValid() && m_Impl->State->Done.IsReady();
+    }
+
+    Core::Expected<std::uint32_t> TaskGraphCompletion::PumpMainThreadPasses()
+    {
+        if (!IsValid())
+            return Err<std::uint32_t>(ErrorCode::InvalidState);
+
+        const auto state = m_Impl->State;
+        if (std::this_thread::get_id() != state->OwnerThread)
+            return Err<std::uint32_t>(ErrorCode::ThreadViolation);
+
+        std::uint32_t executed = 0u;
+        for (;;)
+        {
+            std::uint32_t passToRun = std::numeric_limits<std::uint32_t>::max();
+            {
+                std::scoped_lock lock(state->MainThreadQueueMutex);
+                if (!state->MainThreadQueue.empty())
+                {
+                    passToRun = state->MainThreadQueue.top().PassIndex;
+                    state->MainThreadQueue.pop();
+                }
+            }
+
+            if (passToRun == std::numeric_limits<std::uint32_t>::max())
+                break;
+
+            state->ExecuteAndFinish(state, passToRun);
+            ++executed;
+        }
+
+        return executed;
+    }
+
+    Core::Result TaskGraphCompletion::Wait()
+    {
+        if (!IsValid())
+            return Err(ErrorCode::InvalidState);
+
+        const auto state = m_Impl->State;
+        if (std::this_thread::get_id() != state->OwnerThread)
+            return Err(ErrorCode::ThreadViolation);
+
+        while (!state->Done.IsReady())
+        {
+            auto pumped = PumpMainThreadPasses();
+            if (!pumped.has_value())
+                return Err(pumped.error());
+            if (*pumped != 0u)
+                continue;
+
+            if (Tasks::Scheduler::TryRunOne())
+                continue;
+
+            state->Done.WaitForProgress();
+        }
+
+        return Ok();
+    }
+
+    // -----------------------------------------------------------------------
     // TaskGraph public implementation
     // -----------------------------------------------------------------------
     TaskGraph::TaskGraph(const TaskGraphExecutionMode mode)
-        : m_Impl(std::make_unique<Impl>())
+        : m_Impl(std::make_shared<Impl>())
     {
         m_Impl->Mode = mode;
     }
@@ -776,7 +890,7 @@ namespace Extrinsic::Core::Dag
 
     Core::Result TaskGraph::Compile()
     {
-        if (m_Impl->Executing)
+        if (m_Impl->Executing.load(std::memory_order_acquire) || m_Impl->HasLiveExecution())
         {
             Log::Error("[TaskGraph] Compile() called while execution is active");
             return Err(ErrorCode::InvalidState);
@@ -836,160 +950,174 @@ namespace Extrinsic::Core::Dag
         return plan;
     }
 
-    Core::Result TaskGraph::Execute()
+    Core::Expected<TaskGraphCompletion> TaskGraph::Submit()
     {
         if (m_Impl->Mode != TaskGraphExecutionMode::ExecuteCallbacks)
         {
-            Log::Error("[TaskGraph] Execute() called on a plan-only graph");
-            return Err(ErrorCode::InvalidState);
+            Log::Error("[TaskGraph] Submit() called on a plan-only graph");
+            return Err<TaskGraphCompletion>(ErrorCode::InvalidState);
+        }
+
+        if (m_Impl->Executing.load(std::memory_order_acquire) || m_Impl->HasLiveExecution())
+        {
+            Log::Error("[TaskGraph] Submit() called while execution is active");
+            return Err<TaskGraphCompletion>(ErrorCode::InvalidState);
         }
 
         if (!m_Impl->CanUsePlan())
         {
             if (auto compileResult = Compile(); !compileResult.has_value())
-                return compileResult;
+                return Err<TaskGraphCompletion>(compileResult.error());
         }
 
-        const bool canDispatch = Tasks::Scheduler::IsInitialized();
-        const auto workerCount = static_cast<std::uint32_t>(Tasks::Scheduler::GetStats().WorkerLocalDepths.size());
-        const bool canUseWorkers = canDispatch && workerCount > 1u;
-        const auto t0 = std::chrono::high_resolution_clock::now();
-        m_Impl->Executing = true;
-
-        auto executeSequential = [&]()
+        bool expectedIdle = false;
+        if (!m_Impl->Executing.compare_exchange_strong(expectedIdle, true,
+                                                       std::memory_order_acq_rel,
+                                                       std::memory_order_acquire))
         {
-            for (const auto passIndex : m_Impl->ExecutionOrder)
-                ExecutePass(passIndex);
-        };
-
-        if (!canUseWorkers || m_Impl->ExecutionOrder.size() <= 1u)
-        {
-            executeSequential();
+            return Err<TaskGraphCompletion>(ErrorCode::InvalidState);
         }
-        else
+
+        const auto impl = m_Impl;
+        const bool canUseWorkers = Tasks::Scheduler::IsInitialized();
+        auto state = std::make_shared<ExecutionState>(
+            static_cast<std::uint32_t>(impl->Passes.size()));
+        impl->TrackExecution(state);
+        for (std::uint32_t i = 0; i < impl->Passes.size(); ++i)
         {
-            auto state = std::make_shared<ExecutionState>(static_cast<std::uint32_t>(m_Impl->Passes.size()));
-            for (std::uint32_t i = 0; i < m_Impl->Passes.size(); ++i)
+            state->RemainingDeps[i].store(impl->InitialInDegree[i], std::memory_order_release);
+            state->Dispatched[i].store(0u, std::memory_order_release);
+        }
+
+        state->ScheduleReadyBatch = [impl, canUseWorkers](const std::shared_ptr<ExecutionState>& state,
+                                                          const std::vector<std::uint32_t>& passIndices)
+        {
+            std::vector<std::uint32_t> workerPasses{};
+            std::vector<ExecutionState::MainThreadReadyEntry> mainThreadPasses{};
+            workerPasses.reserve(passIndices.size());
+            mainThreadPasses.reserve(passIndices.size());
+
+            for (const auto passIndex : passIndices)
             {
-                state->RemainingDeps[i].store(m_Impl->InitialInDegree[i], std::memory_order_release);
-                state->Dispatched[i].store(0u, std::memory_order_release);
-            }
+                if (passIndex >= impl->Passes.size())
+                    continue;
 
-            state->ScheduleReadyBatch = [this, canUseWorkers](const std::shared_ptr<ExecutionState>& state,
-                                                              const std::vector<std::uint32_t>& passIndices)
-            {
-                std::vector<std::uint32_t> workerPasses{};
-                std::vector<ExecutionState::MainThreadReadyEntry> mainThreadPasses{};
-                workerPasses.reserve(passIndices.size());
-                mainThreadPasses.reserve(passIndices.size());
+                if (state->Dispatched[passIndex].exchange(1u, std::memory_order_acq_rel) == 1u)
+                    continue;
 
-                for (const auto passIndex : passIndices)
+                const auto& options = impl->Passes[passIndex].Options;
+                const bool canRunOnWorker = options.AllowParallel &&
+                    !options.MainThreadOnly && canUseWorkers;
+                if (canRunOnWorker)
                 {
-                    if (passIndex >= m_Impl->Passes.size())
-                        continue;
-
-                    if (state->Dispatched[passIndex].exchange(1u, std::memory_order_acq_rel) == 1u)
-                        continue;
-
-                    state->Done.Add();
-
-                    const auto& options = m_Impl->Passes[passIndex].Options;
-                    const bool canRunOnWorker = options.AllowParallel && !options.MainThreadOnly && canUseWorkers;
-                    if (canRunOnWorker)
-                    {
-                        workerPasses.push_back(passIndex);
-                    }
-                    else
-                    {
-                        mainThreadPasses.push_back(ExecutionState::MainThreadReadyEntry{
-                            .Priority = static_cast<std::uint8_t>(options.Priority),
-                            .EstimatedCost = options.EstimatedCost,
-                            .InsertionOrder = state->NextInsertionOrder.fetch_add(1u, std::memory_order_relaxed),
-                            .PassIndex = passIndex,
-                        });
-                    }
+                    workerPasses.push_back(passIndex);
                 }
-
-                if (!mainThreadPasses.empty())
+                else
                 {
-                    std::scoped_lock lock(state->MainThreadQueueMutex);
-                    for (const auto& entry : mainThreadPasses)
-                        state->MainThreadQueue.push(entry);
-                }
-
-                for (const auto passIndex : workerPasses)
-                {
-                    Tasks::Scheduler::Dispatch([this, passIndex, state]()
-                    {
-                        ExecutePass(passIndex);
-                        state->OnTaskFinished(state, passIndex);
+                    mainThreadPasses.push_back(ExecutionState::MainThreadReadyEntry{
+                        .Priority = static_cast<std::uint8_t>(options.Priority),
+                        .EstimatedCost = options.EstimatedCost,
+                        .InsertionOrder = state->NextInsertionOrder.fetch_add(1u, std::memory_order_relaxed),
+                        .PassIndex = passIndex,
                     });
                 }
-            };
+            }
 
-            state->OnTaskFinished = [this](const std::shared_ptr<ExecutionState>& state,
-                                           const std::uint32_t passIndex)
+            if (!mainThreadPasses.empty())
             {
-                if (passIndex >= m_Impl->Passes.size())
-                {
-                    state->Done.Signal();
-                    return;
-                }
+                std::scoped_lock lock(state->MainThreadQueueMutex);
+                for (const auto& entry : mainThreadPasses)
+                    state->MainThreadQueue.push(entry);
+            }
 
+            for (const auto passIndex : workerPasses)
+            {
+                Tasks::Scheduler::Dispatch([passIndex, state]()
+                {
+                    state->ExecuteAndFinish(state, passIndex);
+                });
+            }
+        };
+
+        state->OnTaskFinished = [impl](const std::shared_ptr<ExecutionState>& state,
+                                       const std::uint32_t passIndex)
+        {
+            if (passIndex < impl->Passes.size())
+            {
                 std::vector<std::uint32_t> readySuccessors{};
-                readySuccessors.reserve(m_Impl->Successors[passIndex].size());
-                for (const auto successor : m_Impl->Successors[passIndex])
+                readySuccessors.reserve(impl->Successors[passIndex].size());
+                for (const auto successor : impl->Successors[passIndex])
                 {
                     if (state->RemainingDeps[successor].fetch_sub(1u, std::memory_order_acq_rel) == 1u)
                         readySuccessors.push_back(successor);
                 }
 
                 state->ScheduleReadyBatch(state, readySuccessors);
-                state->Done.Signal();
-            };
+            }
 
-            std::vector<std::uint32_t> initialReady{};
-            initialReady.reserve(m_Impl->Passes.size());
-            for (std::uint32_t i = 0; i < m_Impl->Passes.size(); ++i)
+            const auto remaining = state->RemainingTasks.fetch_sub(1u, std::memory_order_acq_rel);
+            if (remaining == 1u)
             {
-                if (m_Impl->InitialInDegree[i] == 0u)
+                const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::steady_clock::now() - state->StartedAt).count();
+                impl->LastExecuteNs.store(static_cast<std::uint64_t>(elapsed), std::memory_order_release);
+                impl->Executing.store(false, std::memory_order_release);
+            }
+
+            state->Done.Signal();
+        };
+
+        state->ExecuteAndFinish = [impl](const std::shared_ptr<ExecutionState>& state,
+                                         const std::uint32_t passIndex)
+        {
+            if (passIndex < impl->Passes.size() && impl->Passes[passIndex].Execute)
+            {
+                impl->Passes[passIndex].Execute();
+            }
+            else
+            {
+                Log::Warn("[TaskGraph] Submitted pass {} has no execute callback", passIndex);
+            }
+
+            state->OnTaskFinished(state, passIndex);
+        };
+
+        if (impl->Passes.empty())
+        {
+            impl->LastExecuteNs.store(0u, std::memory_order_release);
+            impl->Executing.store(false, std::memory_order_release);
+        }
+        else
+        {
+            std::vector<std::uint32_t> initialReady{};
+            initialReady.reserve(impl->Passes.size());
+            for (std::uint32_t i = 0; i < impl->Passes.size(); ++i)
+            {
+                if (impl->InitialInDegree[i] == 0u)
                     initialReady.push_back(i);
             }
             state->ScheduleReadyBatch(state, initialReady);
-
-            while (!state->Done.IsReady())
-            {
-                std::uint32_t passToRun = std::numeric_limits<std::uint32_t>::max();
-                {
-                    std::scoped_lock lock(state->MainThreadQueueMutex);
-                    if (!state->MainThreadQueue.empty())
-                    {
-                        passToRun = state->MainThreadQueue.top().PassIndex;
-                        state->MainThreadQueue.pop();
-                    }
-                }
-
-                if (passToRun != std::numeric_limits<std::uint32_t>::max())
-                {
-                    ExecutePass(passToRun);
-                    state->OnTaskFinished(state, passToRun);
-                }
-                else
-                {
-                    std::this_thread::yield();
-                }
-            }
         }
 
-        const auto t1 = std::chrono::high_resolution_clock::now();
-        m_Impl->LastExecuteNs = static_cast<std::uint64_t>(
-            std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count());
-        m_Impl->Executing = false;
-        return Ok();
+        return TaskGraphCompletion(std::make_shared<TaskGraphCompletion::Impl>(std::move(state)));
+    }
+
+    Core::Result TaskGraph::Execute()
+    {
+        auto completion = Submit();
+        if (!completion.has_value())
+            return Err(completion.error());
+        return completion->Wait();
     }
 
     void TaskGraph::ExecutePass(uint32_t passIndex)
     {
+        if (m_Impl->Executing.load(std::memory_order_acquire) || m_Impl->HasLiveExecution())
+        {
+            Log::Warn("[TaskGraph] ExecutePass cannot run during a submitted execution");
+            return;
+        }
+
         if (!m_Impl->Compiled)
         {
             Log::Warn("[TaskGraph] ExecutePass requires a compiled graph");
@@ -1011,8 +1139,14 @@ namespace Extrinsic::Core::Dag
         m_Impl->Passes[passIndex].Execute();
     }
 
-GraphExecuteCallback TaskGraph::TakePassExecute(uint32_t passIndex)
+    GraphExecuteCallback TaskGraph::TakePassExecute(uint32_t passIndex)
     {
+        if (m_Impl->Executing.load(std::memory_order_acquire) || m_Impl->HasLiveExecution())
+        {
+            Log::Warn("[TaskGraph] TakePassExecute cannot run during a submitted execution");
+            return {};
+        }
+
         if (!m_Impl->Compiled)
         {
             Log::Warn("[TaskGraph] TakePassExecute requires a compiled graph");
@@ -1027,12 +1161,12 @@ GraphExecuteCallback TaskGraph::TakePassExecute(uint32_t passIndex)
         return closure;
     }
 
-    void TaskGraph::Reset()
+    Core::Result TaskGraph::Reset()
     {
-        if (m_Impl->Executing)
+        if (m_Impl->Executing.load(std::memory_order_acquire) || m_Impl->HasLiveExecution())
         {
-            assert(!m_Impl->Executing && "TaskGraph::Reset() called while Execute is active");
-            return;
+            Log::Error("[TaskGraph] Reset() called while execution is active");
+            return Err(ErrorCode::InvalidState);
         }
 
         m_Impl->Passes.clear();
@@ -1044,9 +1178,10 @@ GraphExecuteCallback TaskGraph::TakePassExecute(uint32_t passIndex)
         m_Impl->NextResourceIdx = 0u;
         m_Impl->NextLabelIdx = 0u;
         m_Impl->LastCompileNs = 0u;
-        m_Impl->LastExecuteNs = 0u;
+        m_Impl->LastExecuteNs.store(0u, std::memory_order_release);
         m_Impl->LastCriticalPathNs = 0u;
         m_Impl->LastStats = ScheduleStats{};
+        return Ok();
     }
 
     std::uint32_t TaskGraph::PassCount() const noexcept
@@ -1067,7 +1202,10 @@ GraphExecuteCallback TaskGraph::TakePassExecute(uint32_t passIndex)
     }
 
     std::uint64_t TaskGraph::LastCompileTimeNs()      const noexcept { return m_Impl->LastCompileNs; }
-    std::uint64_t TaskGraph::LastExecuteTimeNs()      const noexcept { return m_Impl->LastExecuteNs; }
+    std::uint64_t TaskGraph::LastExecuteTimeNs()      const noexcept
+    {
+        return m_Impl->LastExecuteNs.load(std::memory_order_acquire);
+    }
     std::uint64_t TaskGraph::LastCriticalPathTimeNs() const noexcept { return m_Impl->LastCriticalPathNs; }
 
     ScheduleStats TaskGraph::GetScheduleStats() const noexcept
