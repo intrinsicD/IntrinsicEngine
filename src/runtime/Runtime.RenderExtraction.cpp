@@ -2343,655 +2343,693 @@ namespace Extrinsic::Runtime
                 continue;
             }
 
-            const auto& world = transformView.get<ECS::Components::Transform::WorldMatrix>(entity);
+            const auto& worldMatrix =
+                transformView.get<ECS::Components::Transform::WorldMatrix>(entity).Matrix;
 
-            if (const auto* directional = registry.try_get<ECS::Components::Lights::DirectionalLight>(entity))
-            {
-                m_Lights.push_back(MakeDirectionalLight(*directional, world.Matrix));
-            }
-            if (const auto* point = registry.try_get<ECS::Components::Lights::PointLight>(entity))
-            {
-                m_Lights.push_back(MakePointLight(*point, world.Matrix));
-            }
-            if (const auto* spot = registry.try_get<ECS::Components::Lights::SpotLight>(entity))
-            {
-                m_Lights.push_back(MakeSpotLight(*spot, world.Matrix));
-            }
+            ExtractLightsForEntity(registry, entity, worldMatrix);
 
             if (!HasRenderableHint(registry, entity))
             {
                 continue;
             }
 
-            ++stats.CandidateRenderableCount;
-            const std::uint32_t stableId = StableEntityId(entity);
-            m_LiveRenderableKeys.insert(stableId);
-
-            RenderableSidecar* sidecar = EnsureRenderable(stableId, renderer, stats);
-            if (!sidecar)
-            {
-                continue;
-            }
-            ApplyMaterialTextureBindings(
-                stableId,
-                *sidecar,
-                renderer,
-                gpuAssets,
-                stats);
-
-            const bool dirtyTransform = registry.any_of<ECS::Components::DirtyTags::DirtyTransform>(entity);
-            if (dirtyTransform)
-            {
-                ++stats.DirtyTransformCount;
-                registry.remove<ECS::Components::DirtyTags::DirtyTransform>(entity);
-            }
-
-            if (const auto* visualization = registry.try_get<Graphics::Components::VisualizationConfig>(entity))
-            {
-                sidecar->Visualization = *visualization;
-                sidecar->HasVisualization = true;
-            }
-            else
-            {
-                sidecar->HasVisualization = false;
-            }
-            if (const auto* visualizationOverrides =
-                    registry.try_get<Graphics::Components::VisualizationLaneOverrides>(entity))
-            {
-                sidecar->VisualizationOverrides = *visualizationOverrides;
-                sidecar->HasVisualizationOverrides = true;
-            }
-            else
-            {
-                sidecar->HasVisualizationOverrides = false;
-            }
-
-            const ECS::Components::ProceduralGeometryRef* proceduralRef =
-                registry.try_get<ECS::Components::ProceduralGeometryRef>(entity);
-            const ECS::Components::AssetInstance::Source* assetSource =
-                registry.try_get<ECS::Components::AssetInstance::Source>(entity);
-            const bool assetSourcePresent = assetSource != nullptr
-                && NormalizeAssetSource(*assetSource).IsValid();
-
-            bool proceduralBound = false;
-            if (proceduralRef != nullptr)
-            {
-                ++stats.ProceduralRenderablesEnumerated;
-                if (assetSourcePresent)
-                {
-                    ++stats.ProceduralAndAssetSourceConflict;
-                }
-                else
-                {
-                    proceduralBound = BindProceduralGeometry(*proceduralRef,
-                                                              *sidecar,
-                                                              renderer,
-                                                              stats);
-                }
-            }
-
-            // Runtime-authored `GeometrySources` residency. The bridges run
-            // only when the entity has stated no procedural intent and no
-            // asset source at all; both are treated as declared alternatives
-            // the residency bridges must not race against. Source availability
-            // separates provenance from exact-domain detection so a mesh can
-            // still expose its vertex/edge lanes when the full surface source
-            // set is incomplete.
-            const bool sourceEligible = !proceduralBound
-                && proceduralRef == nullptr
-                && assetSource == nullptr;
-            bool meshBoundThisFrame = false;
-            bool meshDomainThisFrame = false;
-            bool graphBoundThisFrame = false;
-            bool graphDomainThisFrame = false;
-            bool pointCloudBoundThisFrame = false;
-            bool pointCloudDomainThisFrame = false;
-            bool pointCloudResidencyDesiredThisFrame = false;
-            // RUNTIME-088 Slice B — captured before `BindMeshGeometry` drains
-            // the mesh dirty tags so the edge/vertex views can repack on the
-            // same dirty frame; `meshViewsResident` records whether the views
-            // were reconciled in the mesh branch (otherwise the post-flip block
-            // releases any lingering views).
-            bool meshDirtyThisFrame = false;
-            bool meshViewsResident = false;
-            bool meshSurfaceLaneReadyThisFrame = false;
-            bool graphLaneReadyThisFrame = false;
-            std::optional<ECS::Components::GeometrySources::ConstSourceView>
-                sourceViewThisFrame{};
-            if (sourceEligible)
-            {
-                namespace GS = ECS::Components::GeometrySources;
-                const GeometryEntityAvailability availability =
-                    BuildGeometryAvailability(registry, entity);
-                const auto& view = availability.SourceView;
-                const GeometryRenderLaneAvailability surfaceLane =
-                    ResolveRenderLaneAvailability(availability, GeometryRenderLane::Surface);
-                const GeometryRenderLaneAvailability edgeLane =
-                    ResolveRenderLaneAvailability(availability, GeometryRenderLane::Edges);
-                const GeometryRenderLaneAvailability pointLane =
-                    ResolveRenderLaneAvailability(availability, GeometryRenderLane::Points);
-                meshSurfaceLaneReadyThisFrame =
-                    availability.Sources.ProvenanceDomain == GS::Domain::Mesh &&
-                    surfaceLane.Ready();
-                graphLaneReadyThisFrame =
-                    availability.Sources.ProvenanceDomain == GS::Domain::Graph &&
-                    (edgeLane.Ready() || pointLane.Ready());
-                sourceViewThisFrame = view;
-                ApplyProgressivePresentationBindings(registry,
-                                                     entity,
-                                                     view,
-                                                     *sidecar,
-                                                     renderer,
-                                                     gpuAssets,
-                                                     stats);
-                if (availability.Sources.ProvenanceDomain == GS::Domain::Mesh)
-                {
-                    namespace D = ECS::Components::DirtyTags;
-                    namespace G = Graphics::Components;
-                    meshDomainThisFrame = true;
-                    const bool wantsSurface = surfaceLane.Requested;
-                    const bool wantsEdges = edgeLane.Requested;
-                    const auto* edgeHint =
-                        registry.try_get<G::RenderEdges>(entity);
-                    const auto* pointHint =
-                        registry.try_get<G::RenderPoints>(entity);
-                    const auto* baseVisualization =
-                        sidecar->HasVisualization ? &sidecar->Visualization : nullptr;
-                    const auto* visualizationOverrides =
-                        sidecar->HasVisualizationOverrides
-                            ? &sidecar->VisualizationOverrides
-                            : nullptr;
-                    const auto* edgeVisualization =
-                        ResolveVisualizationForLane(
-                            baseVisualization,
-                            visualizationOverrides,
-                            VisualizationLane::Edges);
-                    const auto* pointVisualization =
-                        ResolveVisualizationForLane(
-                            baseVisualization,
-                            visualizationOverrides,
-                            VisualizationLane::Points);
-                    const bool wantsPoints = pointLane.Requested;
-                    // Snapshot the mesh dirty state before BindMeshGeometry
-                    // may drain the tags. Primitive edge/point views only pack
-                    // position/topology-derived streams, so normal/color-only
-                    // channel dirtiness does not reupload those sidecars.
-                    meshDirtyThisFrame =
-                        BuildMeshGeometryDirtyPlan(registry, entity).MeshPrimitiveViewDirty;
-                    if (wantsSurface)
-                    {
-                        meshBoundThisFrame = BindMeshGeometry(registry,
-                                                              entity,
-                                                              view,
-                                                              *sidecar,
-                                                              renderer,
-                                                              stats);
-                    }
-
-                    // RUNTIME-106 — mesh render lanes compose through the same
-                    // ECS-facing components as graph/point-cloud domains.
-                    // Surface residency is no longer a prerequisite for edge
-                    // or vertex rendering; the sidecars derive directly from
-                    // the mesh domain view when their components are present.
-                    if (wantsEdges || wantsPoints)
-                    {
-                        const RHI::GpuBounds viewBounds =
-                            ExtractBounds(registry, entity, world.Matrix);
-                        meshViewsResident = true;
-                        const bool edgeSubmitted =
-                            ReconcileMeshPrimitiveView(MeshPrimitiveViewKind::Edge,
-                                                       view,
-                                                       *sidecar,
-                                                       world.Matrix,
-                                                       sidecar->Material.EffectiveSlot,
-                                                       viewBounds,
-                                                       stableId,
-                                                       wantsEdges,
-                                                       edgeHint,
-                                                       nullptr,
-                                                       edgeVisualization,
-                                                       meshDirtyThisFrame,
-                                                       renderer,
-                                                       stats);
-                        const bool pointSubmitted =
-                            ReconcileMeshPrimitiveView(MeshPrimitiveViewKind::Vertex,
-                                                       view,
-                                                       *sidecar,
-                                                       world.Matrix,
-                                                       sidecar->Material.EffectiveSlot,
-                                                       viewBounds,
-                                                       stableId,
-                                                       wantsPoints,
-                                                       nullptr,
-                                                       pointHint,
-                                                       pointVisualization,
-                                                       meshDirtyThisFrame,
-                                                       renderer,
-                                                       stats);
-                        if (!wantsSurface &&
-                            meshDirtyThisFrame &&
-                            (edgeSubmitted || pointSubmitted))
-                        {
-                            registry.remove<D::GpuDirty,
-                                            D::DirtyVertexPositions,
-                                            D::DirtyVertexAttributes,
-                                            D::DirtyVertexTexcoords,
-                                            D::DirtyVertexNormals,
-                                            D::DirtyVertexColors,
-                                            D::DirtyFaceTopology,
-                                            D::DirtyEdgeTopology>(entity);
-                        }
-                    }
-                    else
-                    {
-                        ReleaseMeshPrimitiveView(MeshPrimitiveViewKind::Edge,
-                                                 *sidecar,
-                                                 renderer,
-                                                 stats);
-                        ReleaseMeshPrimitiveView(MeshPrimitiveViewKind::Vertex,
-                                                 *sidecar,
-                                                 renderer,
-                                                 stats);
-                    }
-                }
-                else if (availability.Sources.ProvenanceDomain == GS::Domain::Graph)
-                {
-                    graphDomainThisFrame = true;
-                    graphBoundThisFrame = BindGraphGeometry(registry,
-                                                            entity,
-                                                            view,
-                                                            *sidecar,
-                                                            renderer,
-                                                            stats);
-                }
-                else if (availability.Sources.ProvenanceDomain == GS::Domain::PointCloud)
-                {
-                    pointCloudDomainThisFrame = true;
-                    pointCloudResidencyDesiredThisFrame = pointLane.Ready();
-                    if (pointCloudResidencyDesiredThisFrame)
-                    {
-                        // A point cloud is only renderable through the
-                        // `RenderPoints` hint — `RenderSurface`/`RenderEdges`
-                        // have no faces/edges to draw from a cloud.
-                        pointCloudBoundThisFrame = BindPointCloudGeometry(registry,
-                                                                          entity,
-                                                                          view,
-                                                                          *sidecar,
-                                                                          renderer,
-                                                                          stats);
-                    }
-                    else if (surfaceLane.Requested || edgeLane.Requested)
-                    {
-                        // Unsupported point-cloud lanes fail closed with a
-                        // deterministic diagnostic instead of silently keeping
-                        // or creating stale residency.
-                        ++stats.PointCloudGeometryFailedPack;
-                    }
-                }
-            }
-
-            // Eligibility-flip release: if mesh was uploaded on a prior
-            // frame but the entity no longer selects the mesh source this
-            // frame (gained `ProceduralGeometryRef` / `AssetInstance::Source`,
-            // or lost mesh-domain `GeometrySources` topology), enqueue the
-            // cached upload for the same `framesInFlight` deferred-retire
-            // window the procedural cache uses and increment
-            // `MeshGeometryReleases`. When no other path re-bound the
-            // instance this frame, detach the instance from the queued
-            // mesh slot explicitly so the instance does not observe a
-            // still-live but doomed slot during the retire window (the
-            // procedural path's `SetInstanceGeometry` already covers the
-            // procedural-replacement case). Transient pack failures on a
-            // still-mesh-domain entity do NOT release: the old residency
-            // remains bound so a later frame can recover, mirroring the
-            // dirty-reupload fail-closed contract inside `BindMeshGeometry`.
-            const bool stillMeshAttached =
-                sourceEligible &&
-                meshDomainThisFrame &&
-                meshSurfaceLaneReadyThisFrame;
-            if (!stillMeshAttached && sidecar->MeshGeometry.IsValid())
-            {
-                EnqueueMeshRetire(sidecar->MeshGeometry);
-                const bool replacementBoundThisFrame =
-                    proceduralBound || graphBoundThisFrame || pointCloudBoundThisFrame;
-                // Only detach if nothing else re-bound the instance this frame
-                // (procedural take-over, a graph/point-cloud rebind after a
-                // mesh→graph / mesh→point-cloud domain flip, or a mesh surface
-                // reupload in the surface lane).
-                if (!replacementBoundThisFrame)
-                {
-                    renderer.GetGpuWorld().SetInstanceGeometry(sidecar->Instance,
-                                                                Graphics::GpuGeometryHandle{});
-                    sidecar->Geometry = {};
-                    sidecar->GpuSlot.SetGeometryHandle(Graphics::GpuGeometryHandle{});
-                }
-                sidecar->MeshGeometry = {};
-                ++stats.MeshGeometryReleases;
-            }
-
-            // RUNTIME-086 Slice B — graph-residency eligibility flip, mirroring
-            // the mesh release above. Fires when a previously-uploaded graph
-            // entity gains a procedural/asset source, loses graph-domain
-            // topology, or flips to mesh domain. A transient pack failure on a
-            // still-graph-domain entity does NOT release (old residency stays
-            // bound), matching the dirty-reupload fail-closed contract.
-            const bool stillGraphAttached =
-                sourceEligible &&
-                graphDomainThisFrame &&
-                graphLaneReadyThisFrame;
-            if (!stillGraphAttached && sidecar->GraphGeometry.IsValid())
-            {
-                EnqueueGraphRetire(sidecar->GraphGeometry);
-                ReleaseGraphPointLaneInstance(*sidecar, renderer, stats);
-                if (!proceduralBound && !meshBoundThisFrame && !pointCloudBoundThisFrame)
-                {
-                    renderer.GetGpuWorld().SetInstanceGeometry(sidecar->Instance,
-                                                                Graphics::GpuGeometryHandle{});
-                }
-                sidecar->GraphGeometry = {};
-                sidecar->GraphPackedLines = false;
-                sidecar->GraphPackedPoints = false;
-                ++stats.GraphGeometryReleases;
-            }
-
-            // RUNTIME-087 — point-cloud-residency eligibility flip, mirroring
-            // the mesh/graph releases above. Fires when a previously-uploaded
-            // point-cloud entity gains a procedural/asset source, loses
-            // point-cloud-domain topology, or flips to mesh/graph domain. A
-            // transient pack failure on a still-point-cloud-domain entity does
-            // NOT release (old residency stays bound), matching the
-            // dirty-reupload fail-closed contract.
-            const bool stillPointCloudAttached =
-                sourceEligible &&
-                pointCloudDomainThisFrame &&
-                pointCloudResidencyDesiredThisFrame;
-            if (!stillPointCloudAttached && sidecar->PointCloudGeometry.IsValid())
-            {
-                EnqueuePointCloudRetire(sidecar->PointCloudGeometry);
-                if (!proceduralBound && !meshBoundThisFrame && !graphBoundThisFrame)
-                {
-                    renderer.GetGpuWorld().SetInstanceGeometry(sidecar->Instance,
-                                                                Graphics::GpuGeometryHandle{});
-                }
-                sidecar->PointCloudGeometry = {};
-                ++stats.PointCloudGeometryReleases;
-            }
-
-            // RUNTIME-088 Slice B — when the entity is not a resident mesh this
-            // frame (never mesh-domain, flipped to procedural/asset/another
-            // domain, or its surface residency was released above), drop any
-            // edge/vertex views it may have carried. The in-branch reconcile
-            // above already handles per-view disable while the parent stays a
-            // resident mesh; this covers the parent-level flips.
-            if (!meshViewsResident)
-            {
-                ReleaseMeshPrimitiveView(MeshPrimitiveViewKind::Edge, *sidecar, renderer, stats);
-                ReleaseMeshPrimitiveView(MeshPrimitiveViewKind::Vertex, *sidecar, renderer, stats);
-            }
-
-            if (!proceduralBound && assetSource != nullptr)
-            {
-                ++stats.SourceAssetObservationCount;
-                const RuntimeRenderableAssetGenerationObservation observation = ObserveRenderableAssetGeneration(
-                    sidecar->GpuSlot,
-                    NormalizeAssetSource(*assetSource),
-                    gpuAssets);
-                AccumulateAssetObservationStats(observation, stats);
-            }
-            else if (!proceduralBound && !meshBoundThisFrame && !graphBoundThisFrame
-                     && !pointCloudBoundThisFrame)
-            {
-                sidecar->GpuSlot.ClearSourceAsset();
-            }
-
-            const auto* visualization =
-                sidecar->HasVisualization ? &sidecar->Visualization : nullptr;
-            const auto* visualizationOverrides =
-                sidecar->HasVisualizationOverrides
-                    ? &sidecar->VisualizationOverrides
-                    : nullptr;
-            const auto* surfaceVisualization =
-                ResolveVisualizationForLane(
-                    visualization,
-                    visualizationOverrides,
-                    VisualizationLane::Surface);
-            const auto* edgeVisualization =
-                ResolveVisualizationForLane(
-                    visualization,
-                    visualizationOverrides,
-                    VisualizationLane::Edges);
-            const auto* pointVisualization =
-                ResolveVisualizationForLane(
-                    visualization,
-                    visualizationOverrides,
-                    VisualizationLane::Points);
-            const auto* renderEdges =
-                registry.try_get<Graphics::Components::RenderEdges>(entity);
-            const auto* renderPoints =
-                registry.try_get<Graphics::Components::RenderPoints>(entity);
-            const auto scalarKeyFor =
-                [stableId](const Graphics::Components::VisualizationConfig* config)
-                {
-                    if (IsScalarVisualizationSource(config) &&
-                        !config->ScalarFieldName.empty())
-                    {
-                        return BuildVisualizationPropertySourceKey(
-                            stableId,
-                            "scalar",
-                            config->ScalarFieldName);
-                    }
-                    return std::string{};
-                };
-            const auto colorKeyFor =
-                [stableId](const Graphics::Components::VisualizationConfig* config)
-                {
-                    if (IsColorBufferVisualizationSource(config) &&
-                        !config->ColorBufferName.empty())
-                    {
-                        return BuildVisualizationPropertySourceKey(
-                            stableId,
-                            "color",
-                            config->ColorBufferName);
-                    }
-                    return std::string{};
-                };
-            const bool splitGraphPointLane =
-                graphDomainThisFrame &&
-                graphBoundThisFrame &&
-                renderEdges != nullptr &&
-                renderPoints != nullptr &&
-                EnsureGraphPointLaneInstance(
-                    *sidecar,
-                    stableId,
-                    renderer,
-                    stats);
-            if (!splitGraphPointLane)
-            {
-                ReleaseGraphPointLaneInstance(*sidecar, renderer, stats);
-            }
-
-            const Graphics::Components::VisualizationConfig* primaryVisualization =
-                visualization;
-            const Graphics::Components::RenderEdges* primaryEdges = renderEdges;
-            const Graphics::Components::RenderPoints* primaryPoints = renderPoints;
-            if (meshDomainThisFrame)
-            {
-                primaryVisualization = surfaceVisualization;
-                primaryEdges = nullptr;
-                primaryPoints = nullptr;
-            }
-            else if (graphDomainThisFrame)
-            {
-                if (renderEdges != nullptr)
-                {
-                    primaryVisualization = edgeVisualization;
-                    primaryPoints = nullptr;
-                }
-                else if (renderPoints != nullptr)
-                {
-                    primaryVisualization = pointVisualization;
-                    primaryEdges = nullptr;
-                }
-            }
-            else if (pointCloudDomainThisFrame)
-            {
-                primaryVisualization = pointVisualization;
-                primaryEdges = nullptr;
-            }
-            m_Visualizations.push_back(Graphics::VisualizationSyncRecord{
-                .StableId = stableId,
-                .Material = &sidecar->Material,
-                .GpuSlot = &sidecar->GpuSlot,
-                .Visualization = primaryVisualization,
-                .Edges = primaryEdges,
-                .Points = primaryPoints,
-                .ScalarPropertyBufferSourceKey = scalarKeyFor(primaryVisualization),
-                .ColorPropertyBufferSourceKey = colorKeyFor(primaryVisualization),
-            });
-            if (splitGraphPointLane)
-            {
-                m_Visualizations.push_back(Graphics::VisualizationSyncRecord{
-                    .StableId = stableId,
-                    .GpuSlot = &sidecar->GpuSlot,
-                    .Visualization = pointVisualization,
-                    .Points = renderPoints,
-                    .TargetInstance = sidecar->GraphPointLaneInstance,
-                    .ScalarPropertyBufferSourceKey = scalarKeyFor(pointVisualization),
-                    .ColorPropertyBufferSourceKey = colorKeyFor(pointVisualization),
-                });
-            }
-            if (renderEdges != nullptr && sidecar->MeshEdgeViewInstance.IsValid())
-            {
-                m_Visualizations.push_back(Graphics::VisualizationSyncRecord{
-                    .StableId = stableId,
-                    .GpuSlot = &sidecar->GpuSlot,
-                    .Visualization = edgeVisualization,
-                    .Edges = renderEdges,
-                    .TargetInstance = sidecar->MeshEdgeViewInstance,
-                    .ScalarPropertyBufferSourceKey = scalarKeyFor(edgeVisualization),
-                    .ColorPropertyBufferSourceKey = colorKeyFor(edgeVisualization),
-                });
-            }
-            if (renderPoints != nullptr && sidecar->MeshVertexViewInstance.IsValid())
-            {
-                m_Visualizations.push_back(Graphics::VisualizationSyncRecord{
-                    .StableId = stableId,
-                    .GpuSlot = &sidecar->GpuSlot,
-                    .Visualization = pointVisualization,
-                    .Points = renderPoints,
-                    .TargetInstance = sidecar->MeshVertexViewInstance,
-                    .ScalarPropertyBufferSourceKey = scalarKeyFor(pointVisualization),
-                    .ColorPropertyBufferSourceKey = colorKeyFor(pointVisualization),
-                });
-            }
-            if (sourceViewThisFrame.has_value() &&
-                !m_VisualizationState->Bindings.contains(stableId))
-            {
-                const std::array<const Graphics::Components::VisualizationConfig*, 3u>
-                    configs{surfaceVisualization, edgeVisualization, pointVisualization};
-                for (std::size_t i = 0u; i < configs.size(); ++i)
-                {
-                    bool alreadyAppended = false;
-                    for (std::size_t j = 0u; j < i; ++j)
-                    {
-                        alreadyAppended = alreadyAppended || configs[j] == configs[i];
-                    }
-                    if (alreadyAppended)
-                        continue;
-                    AppendScalarVisualizationPropertyBuffer(
-                        stableId,
-                        *sourceViewThisFrame,
-                        configs[i],
-                        m_VisualizationState->Batch,
-                        stats);
-                    AppendColorVisualizationPropertyBuffer(
-                        stableId,
-                        *sourceViewThisFrame,
-                        configs[i],
-                        m_VisualizationState->Batch,
-                        stats);
-                }
-            }
-            AppendVisualizationAdapters(stableId, *sidecar, stats);
-
-            const bool primaryRenderableSubmitted =
-                proceduralBound ||
-                meshBoundThisFrame ||
-                graphBoundThisFrame ||
-                pointCloudBoundThisFrame ||
-                assetSource != nullptr;
-            if (primaryRenderableSubmitted)
-            {
-                std::uint32_t renderFlags = BuildRenderFlags(registry, entity);
-                if (meshDomainThisFrame)
-                {
-                    renderFlags &= ~(RHI::GpuRender_Line | RHI::GpuRender_Point);
-                    renderFlags &= ~RHI::GpuRender_Unlit;
-                }
-                if (graphDomainThisFrame)
-                {
-                    renderFlags &= ~(RHI::GpuRender_Surface |
-                                     RHI::GpuRender_Line |
-                                     RHI::GpuRender_Point);
-                    renderFlags &= ~RHI::GpuRender_Unlit;
-                    if (renderEdges != nullptr)
-                        renderFlags |= RHI::GpuRender_Line | RHI::GpuRender_Unlit;
-                    else if (renderPoints != nullptr)
-                        renderFlags |= RHI::GpuRender_Point | RHI::GpuRender_Unlit;
-                }
-                if (graphDomainThisFrame && graphBoundThisFrame)
-                {
-                    renderer.GetGpuWorld().SetEntityConfig(
-                        sidecar->Instance,
-                        BuildImmediateLaneConfig(
-                            primaryVisualization,
-                            primaryEdges,
-                            primaryPoints));
-                }
-                if (pointCloudDomainThisFrame && pointCloudBoundThisFrame)
-                {
-                    renderer.GetGpuWorld().SetEntityConfig(
-                        sidecar->Instance,
-                        BuildImmediateLaneConfig(
-                            pointVisualization,
-                            nullptr,
-                            renderPoints));
-                }
-                m_Transforms.push_back(Graphics::TransformSyncRecord{
-                    .StableId = stableId,
-                    .Instance = sidecar->Instance,
-                    .Model = world.Matrix,
-                    .RenderFlags = renderFlags,
-                    .Bounds = ExtractBounds(registry, entity, world.Matrix),
-                    .MaterialSlot = sidecar->Material.EffectiveSlot,
-                    .HasMaterialSlot = true,
-                });
-                if (splitGraphPointLane)
-                {
-                    renderer.GetGpuWorld().SetEntityConfig(
-                        sidecar->GraphPointLaneInstance,
-                        BuildImmediateLaneConfig(
-                            pointVisualization,
-                            nullptr,
-                            renderPoints));
-                    m_Transforms.push_back(Graphics::TransformSyncRecord{
-                        .StableId = stableId,
-                        .Instance = sidecar->GraphPointLaneInstance,
-                        .Model = world.Matrix,
-                        .RenderFlags = RHI::GpuRender_Visible |
-                                       RHI::GpuRender_Opaque |
-                                       RHI::GpuRender_Point |
-                                       RHI::GpuRender_Unlit,
-                        .Bounds = ExtractBounds(registry, entity, world.Matrix),
-                        .MaterialSlot = sidecar->Material.EffectiveSlot,
-                        .HasMaterialSlot = true,
-                    });
-                }
-            }
+            ReconcileRenderableEntity(registry,
+                                      entity,
+                                      worldMatrix,
+                                      renderer,
+                                      gpuAssets,
+                                      stats);
         }
 
         RetireMissingRenderables(m_LiveRenderableKeys, renderer, stats);
 
+        ExtractSpatialDebug(registry, stats);
+
+        FinalizeAndSubmitSnapshot(renderer,
+                                  selection,
+                                  runtimeSnapshotStorageSlot,
+                                  transformGizmos,
+                                  stats);
+
+        m_LastStats = stats;
+        return m_LastStats;
+    }
+
+    void RenderExtractionCache::ExtractLightsForEntity(entt::registry& registry,
+                                                       const entt::entity entity,
+                                                       const glm::mat4& worldMatrix)
+    {
+        if (const auto* directional = registry.try_get<ECS::Components::Lights::DirectionalLight>(entity))
+        {
+            m_Lights.push_back(MakeDirectionalLight(*directional, worldMatrix));
+        }
+        if (const auto* point = registry.try_get<ECS::Components::Lights::PointLight>(entity))
+        {
+            m_Lights.push_back(MakePointLight(*point, worldMatrix));
+        }
+        if (const auto* spot = registry.try_get<ECS::Components::Lights::SpotLight>(entity))
+        {
+            m_Lights.push_back(MakeSpotLight(*spot, worldMatrix));
+        }
+    }
+
+    void RenderExtractionCache::ReconcileRenderableEntity(entt::registry& registry,
+                                                          const entt::entity entity,
+                                                          const glm::mat4& worldMatrix,
+                                                          Graphics::IRenderer& renderer,
+                                                          Graphics::GpuAssetCache* gpuAssets,
+                                                          RuntimeRenderExtractionStats& stats)
+    {
+        ++stats.CandidateRenderableCount;
+        const std::uint32_t stableId = StableEntityId(entity);
+        m_LiveRenderableKeys.insert(stableId);
+
+        RenderableSidecar* sidecar = EnsureRenderable(stableId, renderer, stats);
+        if (!sidecar)
+        {
+            return;
+        }
+        ApplyMaterialTextureBindings(
+            stableId,
+            *sidecar,
+            renderer,
+            gpuAssets,
+            stats);
+
+        const bool dirtyTransform = registry.any_of<ECS::Components::DirtyTags::DirtyTransform>(entity);
+        if (dirtyTransform)
+        {
+            ++stats.DirtyTransformCount;
+            registry.remove<ECS::Components::DirtyTags::DirtyTransform>(entity);
+        }
+
+        if (const auto* visualization = registry.try_get<Graphics::Components::VisualizationConfig>(entity))
+        {
+            sidecar->Visualization = *visualization;
+            sidecar->HasVisualization = true;
+        }
+        else
+        {
+            sidecar->HasVisualization = false;
+        }
+        if (const auto* visualizationOverrides =
+                registry.try_get<Graphics::Components::VisualizationLaneOverrides>(entity))
+        {
+            sidecar->VisualizationOverrides = *visualizationOverrides;
+            sidecar->HasVisualizationOverrides = true;
+        }
+        else
+        {
+            sidecar->HasVisualizationOverrides = false;
+        }
+
+        const ECS::Components::ProceduralGeometryRef* proceduralRef =
+            registry.try_get<ECS::Components::ProceduralGeometryRef>(entity);
+        const ECS::Components::AssetInstance::Source* assetSource =
+            registry.try_get<ECS::Components::AssetInstance::Source>(entity);
+        const bool assetSourcePresent = assetSource != nullptr
+            && NormalizeAssetSource(*assetSource).IsValid();
+
+        bool proceduralBound = false;
+        if (proceduralRef != nullptr)
+        {
+            ++stats.ProceduralRenderablesEnumerated;
+            if (assetSourcePresent)
+            {
+                ++stats.ProceduralAndAssetSourceConflict;
+            }
+            else
+            {
+                proceduralBound = BindProceduralGeometry(*proceduralRef,
+                                                          *sidecar,
+                                                          renderer,
+                                                          stats);
+            }
+        }
+
+        // Runtime-authored `GeometrySources` residency. The bridges run
+        // only when the entity has stated no procedural intent and no
+        // asset source at all; both are treated as declared alternatives
+        // the residency bridges must not race against. Source availability
+        // separates provenance from exact-domain detection so a mesh can
+        // still expose its vertex/edge lanes when the full surface source
+        // set is incomplete.
+        const bool sourceEligible = !proceduralBound
+            && proceduralRef == nullptr
+            && assetSource == nullptr;
+        bool meshBoundThisFrame = false;
+        bool meshDomainThisFrame = false;
+        bool graphBoundThisFrame = false;
+        bool graphDomainThisFrame = false;
+        bool pointCloudBoundThisFrame = false;
+        bool pointCloudDomainThisFrame = false;
+        bool pointCloudResidencyDesiredThisFrame = false;
+        // RUNTIME-088 Slice B — captured before `BindMeshGeometry` drains
+        // the mesh dirty tags so the edge/vertex views can repack on the
+        // same dirty frame; `meshViewsResident` records whether the views
+        // were reconciled in the mesh branch (otherwise the post-flip block
+        // releases any lingering views).
+        bool meshDirtyThisFrame = false;
+        bool meshViewsResident = false;
+        bool meshSurfaceLaneReadyThisFrame = false;
+        bool graphLaneReadyThisFrame = false;
+        std::optional<ECS::Components::GeometrySources::ConstSourceView>
+            sourceViewThisFrame{};
+        if (sourceEligible)
+        {
+            namespace GS = ECS::Components::GeometrySources;
+            const GeometryEntityAvailability availability =
+                BuildGeometryAvailability(registry, entity);
+            const auto& view = availability.SourceView;
+            const GeometryRenderLaneAvailability surfaceLane =
+                ResolveRenderLaneAvailability(availability, GeometryRenderLane::Surface);
+            const GeometryRenderLaneAvailability edgeLane =
+                ResolveRenderLaneAvailability(availability, GeometryRenderLane::Edges);
+            const GeometryRenderLaneAvailability pointLane =
+                ResolveRenderLaneAvailability(availability, GeometryRenderLane::Points);
+            meshSurfaceLaneReadyThisFrame =
+                availability.Sources.ProvenanceDomain == GS::Domain::Mesh &&
+                surfaceLane.Ready();
+            graphLaneReadyThisFrame =
+                availability.Sources.ProvenanceDomain == GS::Domain::Graph &&
+                (edgeLane.Ready() || pointLane.Ready());
+            sourceViewThisFrame = view;
+            ApplyProgressivePresentationBindings(registry,
+                                                 entity,
+                                                 view,
+                                                 *sidecar,
+                                                 renderer,
+                                                 gpuAssets,
+                                                 stats);
+            if (availability.Sources.ProvenanceDomain == GS::Domain::Mesh)
+            {
+                namespace D = ECS::Components::DirtyTags;
+                namespace G = Graphics::Components;
+                meshDomainThisFrame = true;
+                const bool wantsSurface = surfaceLane.Requested;
+                const bool wantsEdges = edgeLane.Requested;
+                const auto* edgeHint =
+                    registry.try_get<G::RenderEdges>(entity);
+                const auto* pointHint =
+                    registry.try_get<G::RenderPoints>(entity);
+                const auto* baseVisualization =
+                    sidecar->HasVisualization ? &sidecar->Visualization : nullptr;
+                const auto* visualizationOverrides =
+                    sidecar->HasVisualizationOverrides
+                        ? &sidecar->VisualizationOverrides
+                        : nullptr;
+                const auto* edgeVisualization =
+                    ResolveVisualizationForLane(
+                        baseVisualization,
+                        visualizationOverrides,
+                        VisualizationLane::Edges);
+                const auto* pointVisualization =
+                    ResolveVisualizationForLane(
+                        baseVisualization,
+                        visualizationOverrides,
+                        VisualizationLane::Points);
+                const bool wantsPoints = pointLane.Requested;
+                // Snapshot the mesh dirty state before BindMeshGeometry
+                // may drain the tags. Primitive edge/point views only pack
+                // position/topology-derived streams, so normal/color-only
+                // channel dirtiness does not reupload those sidecars.
+                meshDirtyThisFrame =
+                    BuildMeshGeometryDirtyPlan(registry, entity).MeshPrimitiveViewDirty;
+                if (wantsSurface)
+                {
+                    meshBoundThisFrame = BindMeshGeometry(registry,
+                                                          entity,
+                                                          view,
+                                                          *sidecar,
+                                                          renderer,
+                                                          stats);
+                }
+
+                // RUNTIME-106 — mesh render lanes compose through the same
+                // ECS-facing components as graph/point-cloud domains.
+                // Surface residency is no longer a prerequisite for edge
+                // or vertex rendering; the sidecars derive directly from
+                // the mesh domain view when their components are present.
+                if (wantsEdges || wantsPoints)
+                {
+                    const RHI::GpuBounds viewBounds =
+                        ExtractBounds(registry, entity, worldMatrix);
+                    meshViewsResident = true;
+                    const bool edgeSubmitted =
+                        ReconcileMeshPrimitiveView(MeshPrimitiveViewKind::Edge,
+                                                   view,
+                                                   *sidecar,
+                                                   worldMatrix,
+                                                   sidecar->Material.EffectiveSlot,
+                                                   viewBounds,
+                                                   stableId,
+                                                   wantsEdges,
+                                                   edgeHint,
+                                                   nullptr,
+                                                   edgeVisualization,
+                                                   meshDirtyThisFrame,
+                                                   renderer,
+                                                   stats);
+                    const bool pointSubmitted =
+                        ReconcileMeshPrimitiveView(MeshPrimitiveViewKind::Vertex,
+                                                   view,
+                                                   *sidecar,
+                                                   worldMatrix,
+                                                   sidecar->Material.EffectiveSlot,
+                                                   viewBounds,
+                                                   stableId,
+                                                   wantsPoints,
+                                                   nullptr,
+                                                   pointHint,
+                                                   pointVisualization,
+                                                   meshDirtyThisFrame,
+                                                   renderer,
+                                                   stats);
+                    if (!wantsSurface &&
+                        meshDirtyThisFrame &&
+                        (edgeSubmitted || pointSubmitted))
+                    {
+                        registry.remove<D::GpuDirty,
+                                        D::DirtyVertexPositions,
+                                        D::DirtyVertexAttributes,
+                                        D::DirtyVertexTexcoords,
+                                        D::DirtyVertexNormals,
+                                        D::DirtyVertexColors,
+                                        D::DirtyFaceTopology,
+                                        D::DirtyEdgeTopology>(entity);
+                    }
+                }
+                else
+                {
+                    ReleaseMeshPrimitiveView(MeshPrimitiveViewKind::Edge,
+                                             *sidecar,
+                                             renderer,
+                                             stats);
+                    ReleaseMeshPrimitiveView(MeshPrimitiveViewKind::Vertex,
+                                             *sidecar,
+                                             renderer,
+                                             stats);
+                }
+            }
+            else if (availability.Sources.ProvenanceDomain == GS::Domain::Graph)
+            {
+                graphDomainThisFrame = true;
+                graphBoundThisFrame = BindGraphGeometry(registry,
+                                                        entity,
+                                                        view,
+                                                        *sidecar,
+                                                        renderer,
+                                                        stats);
+            }
+            else if (availability.Sources.ProvenanceDomain == GS::Domain::PointCloud)
+            {
+                pointCloudDomainThisFrame = true;
+                pointCloudResidencyDesiredThisFrame = pointLane.Ready();
+                if (pointCloudResidencyDesiredThisFrame)
+                {
+                    // A point cloud is only renderable through the
+                    // `RenderPoints` hint — `RenderSurface`/`RenderEdges`
+                    // have no faces/edges to draw from a cloud.
+                    pointCloudBoundThisFrame = BindPointCloudGeometry(registry,
+                                                                      entity,
+                                                                      view,
+                                                                      *sidecar,
+                                                                      renderer,
+                                                                      stats);
+                }
+                else if (surfaceLane.Requested || edgeLane.Requested)
+                {
+                    // Unsupported point-cloud lanes fail closed with a
+                    // deterministic diagnostic instead of silently keeping
+                    // or creating stale residency.
+                    ++stats.PointCloudGeometryFailedPack;
+                }
+            }
+        }
+
+        // Eligibility-flip release: if mesh was uploaded on a prior
+        // frame but the entity no longer selects the mesh source this
+        // frame (gained `ProceduralGeometryRef` / `AssetInstance::Source`,
+        // or lost mesh-domain `GeometrySources` topology), enqueue the
+        // cached upload for the same `framesInFlight` deferred-retire
+        // window the procedural cache uses and increment
+        // `MeshGeometryReleases`. When no other path re-bound the
+        // instance this frame, detach the instance from the queued
+        // mesh slot explicitly so the instance does not observe a
+        // still-live but doomed slot during the retire window (the
+        // procedural path's `SetInstanceGeometry` already covers the
+        // procedural-replacement case). Transient pack failures on a
+        // still-mesh-domain entity do NOT release: the old residency
+        // remains bound so a later frame can recover, mirroring the
+        // dirty-reupload fail-closed contract inside `BindMeshGeometry`.
+        const bool stillMeshAttached =
+            sourceEligible &&
+            meshDomainThisFrame &&
+            meshSurfaceLaneReadyThisFrame;
+        if (!stillMeshAttached && sidecar->MeshGeometry.IsValid())
+        {
+            EnqueueMeshRetire(sidecar->MeshGeometry);
+            const bool replacementBoundThisFrame =
+                proceduralBound || graphBoundThisFrame || pointCloudBoundThisFrame;
+            // Only detach if nothing else re-bound the instance this frame
+            // (procedural take-over, a graph/point-cloud rebind after a
+            // mesh→graph / mesh→point-cloud domain flip, or a mesh surface
+            // reupload in the surface lane).
+            if (!replacementBoundThisFrame)
+            {
+                renderer.GetGpuWorld().SetInstanceGeometry(sidecar->Instance,
+                                                            Graphics::GpuGeometryHandle{});
+                sidecar->Geometry = {};
+                sidecar->GpuSlot.SetGeometryHandle(Graphics::GpuGeometryHandle{});
+            }
+            sidecar->MeshGeometry = {};
+            ++stats.MeshGeometryReleases;
+        }
+
+        // RUNTIME-086 Slice B — graph-residency eligibility flip, mirroring
+        // the mesh release above. Fires when a previously-uploaded graph
+        // entity gains a procedural/asset source, loses graph-domain
+        // topology, or flips to mesh domain. A transient pack failure on a
+        // still-graph-domain entity does NOT release (old residency stays
+        // bound), matching the dirty-reupload fail-closed contract.
+        const bool stillGraphAttached =
+            sourceEligible &&
+            graphDomainThisFrame &&
+            graphLaneReadyThisFrame;
+        if (!stillGraphAttached && sidecar->GraphGeometry.IsValid())
+        {
+            EnqueueGraphRetire(sidecar->GraphGeometry);
+            ReleaseGraphPointLaneInstance(*sidecar, renderer, stats);
+            if (!proceduralBound && !meshBoundThisFrame && !pointCloudBoundThisFrame)
+            {
+                renderer.GetGpuWorld().SetInstanceGeometry(sidecar->Instance,
+                                                            Graphics::GpuGeometryHandle{});
+            }
+            sidecar->GraphGeometry = {};
+            sidecar->GraphPackedLines = false;
+            sidecar->GraphPackedPoints = false;
+            ++stats.GraphGeometryReleases;
+        }
+
+        // RUNTIME-087 — point-cloud-residency eligibility flip, mirroring
+        // the mesh/graph releases above. Fires when a previously-uploaded
+        // point-cloud entity gains a procedural/asset source, loses
+        // point-cloud-domain topology, or flips to mesh/graph domain. A
+        // transient pack failure on a still-point-cloud-domain entity does
+        // NOT release (old residency stays bound), matching the
+        // dirty-reupload fail-closed contract.
+        const bool stillPointCloudAttached =
+            sourceEligible &&
+            pointCloudDomainThisFrame &&
+            pointCloudResidencyDesiredThisFrame;
+        if (!stillPointCloudAttached && sidecar->PointCloudGeometry.IsValid())
+        {
+            EnqueuePointCloudRetire(sidecar->PointCloudGeometry);
+            if (!proceduralBound && !meshBoundThisFrame && !graphBoundThisFrame)
+            {
+                renderer.GetGpuWorld().SetInstanceGeometry(sidecar->Instance,
+                                                            Graphics::GpuGeometryHandle{});
+            }
+            sidecar->PointCloudGeometry = {};
+            ++stats.PointCloudGeometryReleases;
+        }
+
+        // RUNTIME-088 Slice B — when the entity is not a resident mesh this
+        // frame (never mesh-domain, flipped to procedural/asset/another
+        // domain, or its surface residency was released above), drop any
+        // edge/vertex views it may have carried. The in-branch reconcile
+        // above already handles per-view disable while the parent stays a
+        // resident mesh; this covers the parent-level flips.
+        if (!meshViewsResident)
+        {
+            ReleaseMeshPrimitiveView(MeshPrimitiveViewKind::Edge, *sidecar, renderer, stats);
+            ReleaseMeshPrimitiveView(MeshPrimitiveViewKind::Vertex, *sidecar, renderer, stats);
+        }
+
+        if (!proceduralBound && assetSource != nullptr)
+        {
+            ++stats.SourceAssetObservationCount;
+            const RuntimeRenderableAssetGenerationObservation observation = ObserveRenderableAssetGeneration(
+                sidecar->GpuSlot,
+                NormalizeAssetSource(*assetSource),
+                gpuAssets);
+            AccumulateAssetObservationStats(observation, stats);
+        }
+        else if (!proceduralBound && !meshBoundThisFrame && !graphBoundThisFrame
+                 && !pointCloudBoundThisFrame)
+        {
+            sidecar->GpuSlot.ClearSourceAsset();
+        }
+
+        const auto* visualization =
+            sidecar->HasVisualization ? &sidecar->Visualization : nullptr;
+        const auto* visualizationOverrides =
+            sidecar->HasVisualizationOverrides
+                ? &sidecar->VisualizationOverrides
+                : nullptr;
+        const auto* surfaceVisualization =
+            ResolveVisualizationForLane(
+                visualization,
+                visualizationOverrides,
+                VisualizationLane::Surface);
+        const auto* edgeVisualization =
+            ResolveVisualizationForLane(
+                visualization,
+                visualizationOverrides,
+                VisualizationLane::Edges);
+        const auto* pointVisualization =
+            ResolveVisualizationForLane(
+                visualization,
+                visualizationOverrides,
+                VisualizationLane::Points);
+        const auto* renderEdges =
+            registry.try_get<Graphics::Components::RenderEdges>(entity);
+        const auto* renderPoints =
+            registry.try_get<Graphics::Components::RenderPoints>(entity);
+        const auto scalarKeyFor =
+            [stableId](const Graphics::Components::VisualizationConfig* config)
+            {
+                if (IsScalarVisualizationSource(config) &&
+                    !config->ScalarFieldName.empty())
+                {
+                    return BuildVisualizationPropertySourceKey(
+                        stableId,
+                        "scalar",
+                        config->ScalarFieldName);
+                }
+                return std::string{};
+            };
+        const auto colorKeyFor =
+            [stableId](const Graphics::Components::VisualizationConfig* config)
+            {
+                if (IsColorBufferVisualizationSource(config) &&
+                    !config->ColorBufferName.empty())
+                {
+                    return BuildVisualizationPropertySourceKey(
+                        stableId,
+                        "color",
+                        config->ColorBufferName);
+                }
+                return std::string{};
+            };
+        const bool splitGraphPointLane =
+            graphDomainThisFrame &&
+            graphBoundThisFrame &&
+            renderEdges != nullptr &&
+            renderPoints != nullptr &&
+            EnsureGraphPointLaneInstance(
+                *sidecar,
+                stableId,
+                renderer,
+                stats);
+        if (!splitGraphPointLane)
+        {
+            ReleaseGraphPointLaneInstance(*sidecar, renderer, stats);
+        }
+
+        const Graphics::Components::VisualizationConfig* primaryVisualization =
+            visualization;
+        const Graphics::Components::RenderEdges* primaryEdges = renderEdges;
+        const Graphics::Components::RenderPoints* primaryPoints = renderPoints;
+        if (meshDomainThisFrame)
+        {
+            primaryVisualization = surfaceVisualization;
+            primaryEdges = nullptr;
+            primaryPoints = nullptr;
+        }
+        else if (graphDomainThisFrame)
+        {
+            if (renderEdges != nullptr)
+            {
+                primaryVisualization = edgeVisualization;
+                primaryPoints = nullptr;
+            }
+            else if (renderPoints != nullptr)
+            {
+                primaryVisualization = pointVisualization;
+                primaryEdges = nullptr;
+            }
+        }
+        else if (pointCloudDomainThisFrame)
+        {
+            primaryVisualization = pointVisualization;
+            primaryEdges = nullptr;
+        }
+        m_Visualizations.push_back(Graphics::VisualizationSyncRecord{
+            .StableId = stableId,
+            .Material = &sidecar->Material,
+            .GpuSlot = &sidecar->GpuSlot,
+            .Visualization = primaryVisualization,
+            .Edges = primaryEdges,
+            .Points = primaryPoints,
+            .ScalarPropertyBufferSourceKey = scalarKeyFor(primaryVisualization),
+            .ColorPropertyBufferSourceKey = colorKeyFor(primaryVisualization),
+        });
+        if (splitGraphPointLane)
+        {
+            m_Visualizations.push_back(Graphics::VisualizationSyncRecord{
+                .StableId = stableId,
+                .GpuSlot = &sidecar->GpuSlot,
+                .Visualization = pointVisualization,
+                .Points = renderPoints,
+                .TargetInstance = sidecar->GraphPointLaneInstance,
+                .ScalarPropertyBufferSourceKey = scalarKeyFor(pointVisualization),
+                .ColorPropertyBufferSourceKey = colorKeyFor(pointVisualization),
+            });
+        }
+        if (renderEdges != nullptr && sidecar->MeshEdgeViewInstance.IsValid())
+        {
+            m_Visualizations.push_back(Graphics::VisualizationSyncRecord{
+                .StableId = stableId,
+                .GpuSlot = &sidecar->GpuSlot,
+                .Visualization = edgeVisualization,
+                .Edges = renderEdges,
+                .TargetInstance = sidecar->MeshEdgeViewInstance,
+                .ScalarPropertyBufferSourceKey = scalarKeyFor(edgeVisualization),
+                .ColorPropertyBufferSourceKey = colorKeyFor(edgeVisualization),
+            });
+        }
+        if (renderPoints != nullptr && sidecar->MeshVertexViewInstance.IsValid())
+        {
+            m_Visualizations.push_back(Graphics::VisualizationSyncRecord{
+                .StableId = stableId,
+                .GpuSlot = &sidecar->GpuSlot,
+                .Visualization = pointVisualization,
+                .Points = renderPoints,
+                .TargetInstance = sidecar->MeshVertexViewInstance,
+                .ScalarPropertyBufferSourceKey = scalarKeyFor(pointVisualization),
+                .ColorPropertyBufferSourceKey = colorKeyFor(pointVisualization),
+            });
+        }
+        if (sourceViewThisFrame.has_value() &&
+            !m_VisualizationState->Bindings.contains(stableId))
+        {
+            const std::array<const Graphics::Components::VisualizationConfig*, 3u>
+                configs{surfaceVisualization, edgeVisualization, pointVisualization};
+            for (std::size_t i = 0u; i < configs.size(); ++i)
+            {
+                bool alreadyAppended = false;
+                for (std::size_t j = 0u; j < i; ++j)
+                {
+                    alreadyAppended = alreadyAppended || configs[j] == configs[i];
+                }
+                if (alreadyAppended)
+                    continue;
+                AppendScalarVisualizationPropertyBuffer(
+                    stableId,
+                    *sourceViewThisFrame,
+                    configs[i],
+                    m_VisualizationState->Batch,
+                    stats);
+                AppendColorVisualizationPropertyBuffer(
+                    stableId,
+                    *sourceViewThisFrame,
+                    configs[i],
+                    m_VisualizationState->Batch,
+                    stats);
+            }
+        }
+        AppendVisualizationAdapters(stableId, *sidecar, stats);
+
+        const bool primaryRenderableSubmitted =
+            proceduralBound ||
+            meshBoundThisFrame ||
+            graphBoundThisFrame ||
+            pointCloudBoundThisFrame ||
+            assetSource != nullptr;
+        if (primaryRenderableSubmitted)
+        {
+            std::uint32_t renderFlags = BuildRenderFlags(registry, entity);
+            if (meshDomainThisFrame)
+            {
+                renderFlags &= ~(RHI::GpuRender_Line | RHI::GpuRender_Point);
+                renderFlags &= ~RHI::GpuRender_Unlit;
+            }
+            if (graphDomainThisFrame)
+            {
+                renderFlags &= ~(RHI::GpuRender_Surface |
+                                 RHI::GpuRender_Line |
+                                 RHI::GpuRender_Point);
+                renderFlags &= ~RHI::GpuRender_Unlit;
+                if (renderEdges != nullptr)
+                    renderFlags |= RHI::GpuRender_Line | RHI::GpuRender_Unlit;
+                else if (renderPoints != nullptr)
+                    renderFlags |= RHI::GpuRender_Point | RHI::GpuRender_Unlit;
+            }
+            if (graphDomainThisFrame && graphBoundThisFrame)
+            {
+                renderer.GetGpuWorld().SetEntityConfig(
+                    sidecar->Instance,
+                    BuildImmediateLaneConfig(
+                        primaryVisualization,
+                        primaryEdges,
+                        primaryPoints));
+            }
+            if (pointCloudDomainThisFrame && pointCloudBoundThisFrame)
+            {
+                renderer.GetGpuWorld().SetEntityConfig(
+                    sidecar->Instance,
+                    BuildImmediateLaneConfig(
+                        pointVisualization,
+                        nullptr,
+                        renderPoints));
+            }
+            m_Transforms.push_back(Graphics::TransformSyncRecord{
+                .StableId = stableId,
+                .Instance = sidecar->Instance,
+                .Model = worldMatrix,
+                .RenderFlags = renderFlags,
+                .Bounds = ExtractBounds(registry, entity, worldMatrix),
+                .MaterialSlot = sidecar->Material.EffectiveSlot,
+                .HasMaterialSlot = true,
+            });
+            if (splitGraphPointLane)
+            {
+                renderer.GetGpuWorld().SetEntityConfig(
+                    sidecar->GraphPointLaneInstance,
+                    BuildImmediateLaneConfig(
+                        pointVisualization,
+                        nullptr,
+                        renderPoints));
+                m_Transforms.push_back(Graphics::TransformSyncRecord{
+                    .StableId = stableId,
+                    .Instance = sidecar->GraphPointLaneInstance,
+                    .Model = worldMatrix,
+                    .RenderFlags = RHI::GpuRender_Visible |
+                                   RHI::GpuRender_Opaque |
+                                   RHI::GpuRender_Point |
+                                   RHI::GpuRender_Unlit,
+                    .Bounds = ExtractBounds(registry, entity, worldMatrix),
+                    .MaterialSlot = sidecar->Material.EffectiveSlot,
+                    .HasMaterialSlot = true,
+                });
+            }
+        }
+    }
+
+    void RenderExtractionCache::ExtractSpatialDebug(entt::registry& registry,
+                                                    RuntimeRenderExtractionStats& stats)
+    {
         // RUNTIME-082 Slice D — spatial-debug adapter pump. Iterated
         // independently of `HasRenderableHint`: a SpatialDebugBinding may
         // attach to a renderable entity (to visualize its acceleration
@@ -3033,7 +3071,15 @@ namespace Extrinsic::Runtime
             stats.SpatialDebugEmptyNodeSkippedAccumulator += perAdapter.EmptyNodeSkippedCount;
             stats.SpatialDebugDepthCapTruncationAccumulator += perAdapter.DepthCapTruncationCount;
         }
+    }
 
+    void RenderExtractionCache::FinalizeAndSubmitSnapshot(
+        Graphics::IRenderer& renderer,
+        const SelectionController* selection,
+        const std::uint32_t runtimeSnapshotStorageSlot,
+        std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos,
+        RuntimeRenderExtractionStats& stats)
+    {
         stats.SpatialDebugBoundsCount =
             static_cast<std::uint32_t>(m_SpatialDebugBatch.Bounds.size());
         stats.SpatialDebugHierarchyNodeCount =
@@ -3143,9 +3189,6 @@ namespace Extrinsic::Runtime
             batch.SelectionHasHovered        = selection->HasHovered();
         }
         renderer.SubmitRuntimeSnapshots(batch, runtimeSnapshotStorageSlot);
-
-        m_LastStats = stats;
-        return m_LastStats;
     }
 
     void RenderExtractionCache::TickProceduralGeometry(std::uint64_t currentFrame,

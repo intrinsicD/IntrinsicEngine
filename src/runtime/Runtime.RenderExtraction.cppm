@@ -369,6 +369,16 @@ export namespace Extrinsic::Runtime
         RenderExtractionCache(const RenderExtractionCache&) = delete;
         RenderExtractionCache& operator=(const RenderExtractionCache&) = delete;
 
+        // Frame extraction: read the live ECS scene and publish an immutable
+        // snapshot batch for the renderer without handing ECS references to
+        // graphics. Phases in frame order: per-entity light extraction;
+        // per-entity renderable reconciliation (semantic filtering + residency
+        // reconciliation — see `ReconcileRenderableEntity`); retirement of
+        // renderables that left the live set; spatial-debug adapter pump;
+        // stats finalization + snapshot submit. View-frustum/HZB/occlusion
+        // culling is not extraction's job — it stays on the graphics side in
+        // `Graphics::CullingSystem`.
+        //
         // `selection`, when non-null, supplies the runtime-owned selection
         // snapshot (RUNTIME-089 Slice B): its `SelectedStableIds()` /
         // `HoveredStableId()` / `HasHovered()` are attached to the submitted
@@ -758,6 +768,44 @@ export namespace Extrinsic::Runtime
         void AppendVisualizationAdapters(std::uint32_t stableId,
                                          const RenderableSidecar& sidecar,
                                          RuntimeRenderExtractionStats& stats);
+
+        // Extraction phases — private, non-virtual decomposition of
+        // `ExtractAndSubmit` in frame order. Each phase reads live ECS state
+        // and writes only cache-owned scratch/sidecar storage; no phase hands
+        // ECS references to graphics.
+        void ExtractLightsForEntity(entt::registry& registry,
+                                    entt::entity entity,
+                                    const glm::mat4& worldMatrix);
+        // Reconcile one renderable-hinted entity for the frame: validate its
+        // render hints, geometry/asset/material sources and transform, ensure
+        // the persistent GPU sidecar, reconcile geometry residency
+        // (procedural/mesh/graph/point-cloud incl. eligibility-flip releases),
+        // and append dense TransformSync/VisualizationSync records. Entities
+        // whose sources are not renderable or not yet resident are counted in
+        // `stats` but publish no draw candidate; their sidecars may persist so
+        // a later frame can recover residency without a full re-upload.
+        void ReconcileRenderableEntity(entt::registry& registry,
+                                       entt::entity entity,
+                                       const glm::mat4& worldMatrix,
+                                       Graphics::IRenderer& renderer,
+                                       Graphics::GpuAssetCache* gpuAssets,
+                                       RuntimeRenderExtractionStats& stats);
+        // Spatial-debug adapter pump (RUNTIME-082 Slice D): walk
+        // `SpatialDebugBinding` entities independently of renderable hints and
+        // accumulate the shared `SpatialDebugSnapshotBatch`.
+        void ExtractSpatialDebug(entt::registry& registry,
+                                 RuntimeRenderExtractionStats& stats);
+        // Final phase: fold per-frame counters and per-tick retire deltas into
+        // `stats`, assemble the `RuntimeRenderSnapshotBatch` from cache-owned
+        // spans, and submit it. The renderer copies the batch during
+        // `SubmitRuntimeSnapshots`, so the spans only need to stay valid for
+        // the duration of that call.
+        void FinalizeAndSubmitSnapshot(
+            Graphics::IRenderer& renderer,
+            const SelectionController* selection,
+            std::uint32_t runtimeSnapshotStorageSlot,
+            std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos,
+            RuntimeRenderExtractionStats& stats);
 
         // RUNTIME-085 Slice C — runtime-owned deferred-retire queue for mesh
         // upload handles. Mirrors the shape of

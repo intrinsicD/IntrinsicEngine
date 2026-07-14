@@ -253,6 +253,7 @@ if(TARGET ExtrinsicRuntime)
         Test.ProgressivePresentationExtraction.cpp
         Test.ProgressiveRenderData.cpp
         Test.RenderArtifactPublication.cpp
+        Test.RenderExtractionContract.cpp
         Test.GizmoInteraction.cpp
         Test.GizmoInteractionEngineWiring.cpp
         Test.GraphGeometryExtraction.cpp

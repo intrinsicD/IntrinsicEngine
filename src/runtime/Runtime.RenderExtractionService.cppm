@@ -13,6 +13,34 @@ export import Extrinsic.Runtime.RenderWorldPool;
 
 namespace Extrinsic::Runtime
 {
+    // Runtime-owned boundary between the live ECS scene and Graphics.
+    //
+    // The service owns the extraction-side state as one unit:
+    //   - `RenderExtractionCache` — persistent GPU sidecars, geometry
+    //     residency and deferred-retire queues; performs the actual
+    //     extraction in `ExtractAndSubmit`.
+    //   - `RenderWorldPool` — snapshot slot lifecycle (synchronous
+    //     single-slot or pipelined render-N-1 buffering; `ConfigurePool`).
+    //   - Last-frame extraction stats and the extraction frame index.
+    //
+    // Contract:
+    //   - Extraction performs semantic filtering (render hints,
+    //     geometry/asset/material source validation) and residency
+    //     reconciliation. Entities that are not renderable or whose sources
+    //     are not yet resident are never published as draw candidates.
+    //   - View-frustum/HZB/occlusion and pass-specific culling stay in
+    //     `Graphics::CullingSystem`; extraction publishes candidates plus
+    //     bounds/flags, not visibility decisions.
+    //   - The published `RenderWorld` is an immutable snapshot; graphics
+    //     never receives references into live ECS storage (the renderer
+    //     copies the batch during `SubmitRuntimeSnapshots`).
+    //   - Persistent sidecars may outlive a temporarily non-resident
+    //     renderable so a later frame can retry residency without a full
+    //     re-upload; still-broken sources stay fail-closed and unpublished.
+    //   - The visible frame-phase order (AcquireBack → ExtractAndSubmit →
+    //     PublishFront → AcquireFront/AcquirePreviousFront →
+    //     ExtractRenderWorld → PrepareFrame → ExecuteFrame) is owned by the
+    //     Engine frame loop, not by this service.
     export class RenderExtractionService
     {
     public:
