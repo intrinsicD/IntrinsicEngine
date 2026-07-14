@@ -4890,3 +4890,31 @@ tree:
       inventory, clean-workshop, PR-contract, and diff checks passed. ARCH-006
       retired locally on branch codex/arch-006-completion with a clean worktree.
     status: resolved
+  - id: N209
+    type: experiment
+    title: "Backlog readiness and false-open task audit"
+    provenance: ai-executed
+    timestamp: "2026-07-14T23:09"
+    also_depends_on: [N208]
+    evidence:
+      - "tasks/SESSION-BRIEF.md"
+      - "tasks/backlog/README.md"
+      - "tasks/backlog/geometry/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md"
+      - "commit 29d7a908"
+      - "ctest --test-dir build/ci --output-on-failure -R 'Parameterization|Sparse|DEC' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='ImGuiAdapterEngineWiring.RunNormalizesNativeCloseBeforeFirstFrame'"
+      - "build/ci/bin/ExtrinsicSandbox --frame-pacing-report /tmp/bug-083-sandbox-smoke.json --frame-pacing-frames 5"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+    result: >
+      Audited all 69 backlog tasks: 47 are unblocked and 22 blocked. GEOM-019's
+      implementation and tests are already present on the current branch, and
+      its formerly deferred Parameterization/Sparse/DEC gate passed 134/134,
+      so its backlog state is false-open and currently blocks GEOM-063 only on
+      task metadata. The BUG-082 focused GLFW/X11 process passed once under
+      default sanitizer options and six times with leak detection forced; the
+      exact BUG-083 five-frame Vulkan Sandbox smoke wrote five completed-frame
+      samples, ended operational, and exited zero with leak detection forced.
+      BUG-081 remains hosted-population constrained. Strict task-policy and
+      task-schema validation passed, and no production files changed.
+    status: resolved

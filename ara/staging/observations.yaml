@@ -285,3 +285,14 @@ observations:
     promoted_to: "logic/solution/constraints.md:K13"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O27
+    timestamp: "2026-07-14T23:09"
+    provenance: ai-suggested
+    content: "Recommended work order: retire the already-implemented false-open GEOM-019 before starting new code, then promote GEOM-063 as the next substantive slice because it consolidates the existing Tutte/Harmonic/LSCM solvers and opens the parameterization family integration chain."
+    context: "Portfolio audit requested after ARCH-006 retirement; the current host supplied the verification that GEOM-019 previously lacked, while the open sanitizer bugs did not reproduce locally."
+    potential_type: architecture
+    bound_to: [N209]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false

@@ -797,3 +797,9 @@ entries:
       - "Updated A06 forensic evidence from the deleted runtime UI/monolithic test paths to the final facade and split-test paths."
       - "Kept O08 and O09 unpromoted because ARCH-006 supplies partial module-posture evidence but does not settle the general repository-wide conversion policy; O13 remains unpromoted and non-stale after being referenced in the prior session."
       - "Removed ARCH-006 from open research threads; the completion branch remains local because no upstream publication or PR was requested."
+  - turn: "2026-07-14_001#2"
+    notes:
+      - "Routed the 69-task audit and live GEOM-019/BUG-082/BUG-083 checks as experiment N209 because they produced concrete task-state and process-exit evidence."
+      - "Staged O27 rather than recording a decision because GEOM-019 then GEOM-063 is an AI recommendation awaiting user acceptance."
+      - "Did not classify BUG-082 or BUG-083 as dead ends: the clean current-host runs refute local reproducibility, not the environment-specific reports themselves."
+      - "Kept O08, O09, and O13 unpromoted and non-stale because they were referenced in today's prior turn or remain open threads; no closure signal fired."
