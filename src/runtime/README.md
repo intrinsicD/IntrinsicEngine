@@ -200,9 +200,8 @@ runtime ownership.
 windows can register through `SandboxEditorUi::RegisterEditorWindow(...)` using
 stable ids and structured menu paths, then remove the returned handle through
 `UnregisterEditorWindow(...)`; closed windows receive no draw callback, and global hide preserves
-their individual open states. `Mesh / Appearance` and
-the app-owned method panels are registry-owned windows; Appearance hosts the
-generic scalar vertex-property histogram. `ARCH-006` Slice 2 adds a context-aware contribution
+their individual open states. The app-owned domain, method, and mesh-processing
+panels are registry-owned windows. `ARCH-006` Slice 2 adds a context-aware contribution
 descriptor that supplies a frame-local runtime facade without exposing
 `Engine&`; the Sandbox application uses it for app-owned K-Means and Progressive
 Poisson panels while runtime retains their models, commands, config lane, jobs,
@@ -213,8 +212,13 @@ menu/controller code, widget state, and result presentation for ICP registration
 mesh denoise/curvature/remesh/subdivide/simplify, and mesh/graph/point-cloud
 vertex normals into `Extrinsic.Sandbox.Editor.MeshProcessingPanels`. Runtime
 retains the corresponding models, commands, history/jobs, stale-result checks,
-and result sinks. Point-cloud outlier removal and the generic fixed domain/shell
-windows are retained for later `ARCH-006` relocation slices.
+and result sinks. Slice 4 moves the ten Appearance, Properties, Selection, and
+PointCloud Remove Outliers registrations plus their presentation/cache state to
+`Extrinsic.Sandbox.Editor.DomainPanels`. Runtime continues to own the selected-
+domain model, borrowed property view, commands/history, jobs, validation, and
+result sinks. The scene hierarchy, inspector, file/import, frame-graph,
+render-recipe, camera, and visualization presentation remain in the runtime
+shell for the final `ARCH-006` slice.
 `SandboxEditorUi` routes the unsuppressed `G`
 input action through the same `EditorUiVisibilityCommand` path used by
 programmatic callers. At the end of each visible editor frame, `ImGuiAdapter`

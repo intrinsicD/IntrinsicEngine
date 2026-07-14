@@ -133,8 +133,6 @@ capture flags independently. Its ImGui context owns a paired ImPlot context.
 `Extrinsic.Runtime.EditorPropertyWidgets` keeps scalar-property selector and
 finite-sample histogram models CPU-testable while its ImGui/ImPlot draw code and
 the manifest-managed `implot` dependency remain private to runtime.
-`SandboxEditorUi` registers `Mesh / Appearance` as the remaining runtime-owned
-registry exemplar; Appearance embeds the generic vertex-property histogram.
 `Extrinsic.Sandbox.Editor.MethodPanels` registers
 the K-Means windows for PointCloud, Graph, and Mesh plus the PointCloud and Mesh
 Progressive Poisson windows from the application layer. Their ImGui state and
@@ -151,8 +149,15 @@ Those K-Means and Progressive Poisson facade bodies compile in the private
 `Runtime.SandboxMethodFacade.cpp` implementation unit; the public
 `Extrinsic.Runtime.SandboxEditorUi` surface and the app-to-runtime dependency
 direction are unchanged.
-Point-cloud outlier removal and the generic domain/editor-shell windows stay
-behind the legacy section table until later `ARCH-006` slices relocate them.
+`Extrinsic.Sandbox.Editor.DomainPanels` registers the ten Appearance,
+Properties, Selection, and PointCloud Remove Outliers windows. The application
+owns their stable ids, menu paths, lazy per-frame domain-model cache, widget
+state, and result presentation. Runtime retains selected-domain model building,
+property-view lifetime, command/history execution, derived-job scheduling,
+config validation, and asynchronous result publication. The remaining scene
+hierarchy, inspector, file/import, frame-graph, render-recipe, camera, and
+visualization presentation stays in the transitional runtime shell until the
+final `ARCH-006` slice.
 
 The internal `RuntimeFrameContext` record carries the data that must survive
 between those phases: frame delta, fixed-step interpolation alpha, render frame

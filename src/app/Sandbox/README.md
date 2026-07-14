@@ -22,8 +22,13 @@ owns the ICP registration window plus the mesh denoise, curvature, remesh,
 subdivide, simplify, and mesh/graph/point-cloud vertex-normal windows. It
 registers those nine windows under their existing menu paths, owns their ImGui
 input/result-presentation state, and consumes only runtime models and command
-facades. K-Means and Progressive Poisson command/config/result implementations
-compile in a private runtime facade unit; all other processing commands likewise
+facades. `Sandbox.Editor.DomainPanels` registers the existing Appearance,
+Properties, and Selection windows for Mesh, Graph, and PointCloud plus
+PointCloud Remove Outliers. It owns their menu paths, lazy per-frame model
+cache, texture-bake and property-widget draft state, outlier controls, and
+result presentation. K-Means and Progressive Poisson command/config/result
+implementations compile in a private runtime facade unit; all other panel
+models, processing commands, history/jobs, validation, and result sinks likewise
 remain runtime-owned, so app panels expose no geometry, ECS, graphics, or RHI
 dependencies. The app also installs the sandbox default runtime policy bundle through
 `Runtime::RegisterSandboxDefaultRuntimePolicies(engine)`.
@@ -53,10 +58,9 @@ dropped-geometry commands route back to `Engine::GetAssetImportPipeline()`; the
 sandbox app and UI never own asset, ECS, or graphics state.
 
 The promoted EditorUI also exposes stable top-level ImGui menu slots for
-`PointCloud`, `Graph`, and `Mesh`. Their submenu items open selected-entity
-domain windows for render-hint status, visualization/spatial-debug controls,
-primitive-selection details, and processing-discovery affordances. These
-windows are an EditorUI workflow only: app-owned panels reuse
+`PointCloud`, `Graph`, and `Mesh`. App-owned registry contributions supply their
+selected-entity Appearance, Properties, Selection, and focused processing
+windows. These windows are an EditorUI workflow only: app-owned panels reuse
 `SandboxEditorUi` models and runtime-owned command surfaces, and the sandbox app
 still does not own selection, ECS mutation, method jobs, rendering, or asset
 state.
@@ -146,5 +150,12 @@ capture to zero samples.
 ## Contents
 
 - `CMakeLists.txt`
+- `Editor/Sandbox.DomainPanels.cppm`
+- `Editor/Sandbox.DomainPanels.cpp`
+- `Editor/Sandbox.MeshProcessingPanels.cppm`
+- `Editor/Sandbox.MeshProcessingPanels.cpp`
+- `Editor/Sandbox.MethodPanels.cppm`
+- `Editor/Sandbox.MethodPanels.cpp`
+- `Sandbox.cpp`
 - `Sandbox.cppm`
 - `main.cpp`

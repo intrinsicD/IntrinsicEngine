@@ -9,8 +9,8 @@ depends_on:
 ## Status
 - Status: in progress.
 - Owner: Codex.
-- Branch: `codex/arch-006-slice3`.
-- Slices 0-3 are complete. `Runtime.EditorUiHost` now owns generic
+- Branch: `codex/arch-006-completion`.
+- Slices 0-4 are complete. `Runtime.EditorUiHost` now owns generic
   callback, registry, and visibility lifecycle, while `Sandbox.cppm` exports
   only the app factory/registration surface and the concrete app lives in
   `Sandbox.cpp`. App-owned registered windows now own K-Means and Progressive
@@ -20,8 +20,39 @@ depends_on:
   simplification, and mesh/graph/point-cloud normals presentation/controller
   state into app-owned registered windows. The existing runtime model,
   command, undo, derived-job, and result-sink facades remain in runtime.
-- Next slice: move point-cloud outlier removal and the generic domain panels
-  while retaining runtime-owned command/model facades.
+- Slice 4 moved point-cloud outlier removal plus the Mesh/Graph/PointCloud
+  Appearance, Properties, and Selection windows into one app-owned registered
+  panel family. Runtime retains the command/model/job/result facades.
+- Next slice: move the remaining hierarchy/inspector/file/import,
+  frame-graph/render-recipe, camera, and visualization shell presentation;
+  split the tests and retire the Sandbox-specific runtime editor module.
+
+Slice 4 implementation boundary (2026-07-14):
+
+- Add one concrete app-owned domain-panel family that registers the existing
+  Mesh/Graph/PointCloud Appearance, Properties, and Selection windows plus
+  PointCloud Remove Outliers through `Runtime.EditorWindowRegistry`. Preserve
+  stable ids, menu paths, titles, defaults, first-use sizes, widget state, and
+  the shared per-frame domain-model cache.
+- Remove the legacy fixed domain-window table, its menu branches, and the
+  runtime-owned Mesh Appearance exemplar from `Runtime.SandboxEditorUi`.
+  Runtime retains domain-model construction, command/history execution,
+  derived-job scheduling, config validation, and result publication.
+- Keep the remaining Inspector's runtime-local visualization, bound-state, and
+  texture-bake presentation helpers until Slice 5 moves that shell window.
+  This is bounded transitional duplication; do not create a cross-layer shared
+  presentation seam for a single remaining caller.
+- Right-sizing: the concrete panel-family module is an independent compilation
+  unit, not a new interface/service/registry seam. Deleting it would fold the
+  same ImGui controllers and state back into the Sandbox composition unit; the
+  existing UI-034 registry remains the only contribution mechanism. Its blast
+  radius is `ExtrinsicSandbox`, runtime structural contracts, and the app/runtime
+  ownership docs; no lower-layer import or CMake link edge is added. A new
+  abstraction is justified only if a second application needs a shared domain-
+  panel contract.
+- Defer hierarchy/inspector/file/import, frame-graph/render-recipe/artifact,
+  camera, visualization shell presentation, runtime facade relocation, and
+  final test split/retirement to Slice 5.
 
 ## Goal
 - Restore the documented layering intent that application specifics live in
@@ -289,6 +320,40 @@ Slice 3 evidence (2026-07-13):
   checks passed.
 - Regenerated the 387-module API inventory. Task front matter did not change,
   so the generated session brief did not require regeneration.
+
+Slice 4 evidence (2026-07-14):
+- Added the 27-line / 1-import `Sandbox.Editor.DomainPanels` interface and its
+  independently compiled 1,691-line / 9-import app implementation. It owns ten
+  registered windows: Appearance, Properties, and Selection for Mesh, Graph,
+  and PointCloud plus PointCloud Remove Outliers. Destruction and normal
+  Sandbox shutdown both unregister callbacks idempotently.
+- Removed the final 12 fixed domain-window slots, legacy menu branches,
+  runtime-owned Mesh Appearance exemplar, ImGui controllers, and app-specific
+  widget/input state from `Runtime.SandboxEditorUi`. Runtime retains selected-
+  domain model construction, the callback-scoped mesh property view,
+  command/history execution, validation, derived jobs, stale-result checks,
+  and result sinks.
+- Inspector still uses runtime-local copies of its bound-state,
+  visualization, and texture-bake presentation helpers. Slice 5 owns their
+  removal with the Inspector move; this slice deliberately adds no shared
+  cross-layer widget seam.
+- The runtime implementation fell from 19,895 to 18,707 lines and its
+  interface is 2,912 lines / 53 imports. The new Geometry property import
+  supports the borrowed callback-scoped property view, while the now-unused
+  public property-widget import was removed; neither change adds an app
+  dependency edge. These are source-shape metrics only; no compile-time claim
+  is made.
+- `ExtrinsicSandbox`, `IntrinsicRuntimeContractTests`, and `IntrinsicTests`
+  built. Focused `SandboxEditorUi.*` coverage passed 147/147; the default
+  CPU-supported gate passed 3,698/3,698, including all nine headless
+  `RuntimeSandboxAcceptance` tests. The gate first exposed the unrelated
+  baseline test compile defect separately tracked and retired as `BUG-084` in
+  commit `2c8e8215`.
+- Strict layering, test-layout, task-policy, task-link, docs-link,
+  clean-workshop-validator, root-hygiene warning-mode, session-brief, and diff
+  checks passed. Root hygiene retained only the pre-existing non-fatal `ara/`
+  allowlist warning. Regenerated the 388-module API inventory; task front
+  matter did not change, so the generated session brief remains current.
 
 ## Forbidden changes
 - Mixing mechanical moves with semantic refactors in one slice.

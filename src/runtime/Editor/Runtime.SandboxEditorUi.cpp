@@ -303,17 +303,6 @@ namespace Extrinsic::Runtime
             return "unknown";
         }
 
-        struct PointCloudOutlierRemovalUiState
-        {
-            std::optional<SandboxEditorPointCloudOutlierRemovalResult>*
-                LastResult{nullptr};
-            std::int32_t* Method{nullptr};  // 0 = statistical, 1 = radius.
-            std::int32_t* KNeighbors{nullptr};
-            float*        StdDevMultiplier{nullptr};
-            float*        SearchRadius{nullptr};
-            std::int32_t* MinNeighbors{nullptr};
-        };
-
         struct TextureBakeUiState
         {
             std::optional<SandboxEditorUvRegenerationCommandResult>*
@@ -329,19 +318,6 @@ namespace Extrinsic::Runtime
             bool* UvForceRegenerate{nullptr};
             bool* UvPreserveAuthored{nullptr};
         };
-
-        enum class DomainWindowSection : std::uint8_t
-        {
-            Render = 0,
-            Properties = 1,
-            Selection = 2,
-            ProcessingPointCloudOutlierRemoval = 3,
-            Count = 4,
-        };
-
-        static_assert(
-            3u * static_cast<std::size_t>(DomainWindowSection::Count) ==
-            Detail::kSandboxEditorDomainWindowCount);
 
         enum class SandboxEditorPanelWindowKind : std::uint8_t
         {
@@ -487,57 +463,6 @@ namespace Extrinsic::Runtime
                     PointCloudDomainWindow;
             }
             return SandboxEditorSelectedAnalysisCacheConsumer::Inspector;
-        }
-
-        [[nodiscard]] const char* DomainWindowTitle(
-            const SandboxEditorDomainWindowKind kind,
-            const DomainWindowSection section) noexcept
-        {
-            switch (kind)
-            {
-            case SandboxEditorDomainWindowKind::Mesh:
-                switch (section)
-                {
-                case DomainWindowSection::Render: return "Mesh / Appearance";
-                case DomainWindowSection::Properties: return "Mesh / Properties";
-                case DomainWindowSection::Selection: return "Mesh / Selection";
-                case DomainWindowSection::ProcessingPointCloudOutlierRemoval:
-                case DomainWindowSection::Count: break;
-                }
-                break;
-            case SandboxEditorDomainWindowKind::Graph:
-                switch (section)
-                {
-                case DomainWindowSection::Render: return "Graph / Appearance";
-                case DomainWindowSection::Properties: return "Graph / Properties";
-                case DomainWindowSection::Selection: return "Graph / Selection";
-                case DomainWindowSection::ProcessingPointCloudOutlierRemoval:
-                case DomainWindowSection::Count: break;
-                }
-                break;
-            case SandboxEditorDomainWindowKind::PointCloud:
-                switch (section)
-                {
-                case DomainWindowSection::Render: return "PointCloud / Appearance";
-                case DomainWindowSection::Properties: return "PointCloud / Properties";
-                case DomainWindowSection::Selection: return "PointCloud / Selection";
-                case DomainWindowSection::ProcessingPointCloudOutlierRemoval:
-                    return "PointCloud / Processing / Remove Outliers";
-                case DomainWindowSection::Count: break;
-                }
-                break;
-            }
-            return "Domain / Unknown";
-        }
-
-        [[nodiscard]] std::size_t DomainWindowSlotIndex(
-            const SandboxEditorDomainWindowKind kind,
-            const DomainWindowSection section) noexcept
-        {
-            const auto kindIndex = static_cast<std::size_t>(kind);
-            const auto sectionIndex = static_cast<std::size_t>(section);
-            return kindIndex * static_cast<std::size_t>(DomainWindowSection::Count) +
-                   sectionIndex;
         }
 
         [[nodiscard]] std::string ErrorName(const Core::ErrorCode error)
@@ -11128,99 +11053,28 @@ namespace Extrinsic::Runtime
 
         void DrawDomainMenu(
             const SandboxEditorDomainWindowKind kind,
-            std::array<bool, Detail::kSandboxEditorDomainWindowCount>*
-                domainWindowOpen,
             EditorWindowRegistry* windowRegistry,
             const std::vector<EditorWindowMenuEntry>* registeredEntries)
         {
             if (!ImGui::BeginMenu(DebugNameForSandboxEditorDomainWindowKind(kind)))
                 return;
 
-            const bool menuEnabled = domainWindowOpen != nullptr;
-            if (!menuEnabled)
-                ImGui::BeginDisabled();
-
-            if (domainWindowOpen != nullptr)
+            if (windowRegistry != nullptr && registeredEntries != nullptr)
             {
                 std::vector<std::string> registeredPath{
                     DebugNameForSandboxEditorDomainWindowKind(kind)};
-                if (windowRegistry != nullptr && registeredEntries != nullptr)
-                {
-                    DrawRegisteredWindowMenuLeaves(
-                        *windowRegistry,
-                        *registeredEntries,
-                        registeredPath);
-                }
-                // UI-031: the `Render` section is now the domain-aware Appearance
-                // window (render hints + bound render state + property/attribute
-                // assignment + texture baking).
-                if (kind != SandboxEditorDomainWindowKind::Mesh)
-                {
-                    ImGui::MenuItem(
-                        "Appearance",
-                        nullptr,
-                        &(*domainWindowOpen)[DomainWindowSlotIndex(
-                            kind,
-                            DomainWindowSection::Render)]);
-                }
-                ImGui::MenuItem(
-                    "Properties",
-                    nullptr,
-                    &(*domainWindowOpen)[DomainWindowSlotIndex(kind, DomainWindowSection::Properties)]);
-                ImGui::MenuItem(
-                    "Selection details",
-                    nullptr,
-                    &(*domainWindowOpen)[DomainWindowSlotIndex(kind, DomainWindowSection::Selection)]);
-                if (ImGui::BeginMenu("Processing"))
-                {
-                    registeredPath.push_back("Processing");
-                    if (windowRegistry != nullptr && registeredEntries != nullptr)
-                    {
-                        DrawRegisteredWindowMenuLeaves(
-                            *windowRegistry,
-                            *registeredEntries,
-                            registeredPath);
-                    }
-                    if (kind == SandboxEditorDomainWindowKind::PointCloud &&
-                        ImGui::MenuItem("Remove Outliers"))
-                    {
-                        (*domainWindowOpen)[DomainWindowSlotIndex(
-                            kind,
-                            DomainWindowSection::
-                                ProcessingPointCloudOutlierRemoval)] = true;
-                    }
-                    if (windowRegistry != nullptr && registeredEntries != nullptr)
-                    {
-                        DrawRegisteredWindowMenuChildren(
-                            *windowRegistry,
-                            *registeredEntries,
-                            registeredPath);
-                    }
-                    registeredPath.pop_back();
-                    ImGui::EndMenu();
-                }
-                if (windowRegistry != nullptr && registeredEntries != nullptr)
-                {
-                    constexpr std::array<std::string_view, 1>
-                        kFixedDomainChildren{"Processing"};
-                    DrawRegisteredWindowMenuChildren(
-                        *windowRegistry,
-                        *registeredEntries,
-                        registeredPath,
-                        kFixedDomainChildren);
-                }
+                DrawRegisteredWindowMenuTree(
+                    *windowRegistry,
+                    *registeredEntries,
+                    registeredPath);
             }
             else
             {
-                (void)ImGui::MenuItem("Appearance", nullptr, false, false);
-                (void)ImGui::MenuItem("Properties", nullptr, false, false);
-                (void)ImGui::MenuItem("Selection details", nullptr, false, false);
-                if (ImGui::BeginMenu("Processing", false))
-                    ImGui::EndMenu();
+                ImGui::BeginDisabled();
+                (void)ImGui::MenuItem("No registered windows", nullptr, false, false);
+                ImGui::EndDisabled();
             }
 
-            if (!menuEnabled)
-                ImGui::EndDisabled();
             ImGui::EndMenu();
         }
 
@@ -11276,8 +11130,6 @@ namespace Extrinsic::Runtime
         void DrawMainMenuBar(
             std::array<bool, Detail::kSandboxEditorPanelWindowCount>*
                 panelWindowOpen,
-            std::array<bool, Detail::kSandboxEditorDomainWindowCount>*
-                domainWindowOpen,
             EditorWindowRegistry* windowRegistry)
         {
             if (!ImGui::BeginMainMenuBar())
@@ -11293,17 +11145,14 @@ namespace Extrinsic::Runtime
                 registeredEntriesPtr);
             DrawDomainMenu(
                 SandboxEditorDomainWindowKind::PointCloud,
-                domainWindowOpen,
                 windowRegistry,
                 registeredEntriesPtr);
             DrawDomainMenu(
                 SandboxEditorDomainWindowKind::Graph,
-                domainWindowOpen,
                 windowRegistry,
                 registeredEntriesPtr);
             DrawDomainMenu(
                 SandboxEditorDomainWindowKind::Mesh,
-                domainWindowOpen,
                 windowRegistry,
                 registeredEntriesPtr);
             if (windowRegistry != nullptr)
@@ -11322,235 +11171,6 @@ namespace Extrinsic::Runtime
                     kFixedRootMenus);
             }
             ImGui::EndMainMenuBar();
-        }
-
-        [[nodiscard]] bool DomainWindowReady(
-            const SandboxEditorDomainWindowModel& model) noexcept
-        {
-            return model.HasSelectedEntity && model.DomainMatches;
-        }
-
-        [[nodiscard]] bool DomainAppearanceReady(
-            const SandboxEditorDomainWindowModel& model) noexcept
-        {
-            return model.HasSelectedEntity && model.VisualizationTargetAvailable;
-        }
-
-        void DrawDomainWindowHeader(const SandboxEditorDomainWindowModel& model)
-        {
-            ImGui::Text("Expected domain: %s",
-                        DebugNameForSandboxEditorGeometryDomain(model.ExpectedDomain));
-            if (model.HasSelectedEntity)
-            {
-                ImGui::Text("Selected: %s (%u)",
-                            model.SelectedEntity.Name.c_str(),
-                            model.SelectedStableId);
-                ImGui::Text("Selected domain: %s",
-                            DebugNameForSandboxEditorGeometryDomain(model.SelectedDomain));
-            }
-            else
-            {
-                ImGui::TextDisabled("Selected: none");
-            }
-            DrawDiagnostics(model.Diagnostics);
-        }
-
-        void DrawPropertyCatalogRows(
-            const SandboxEditorPropertyCatalogModel& catalog)
-        {
-            ImGui::Text("Properties: %zu", catalog.Rows.size());
-            if (catalog.Rows.empty())
-            {
-                ImGui::TextDisabled("No geometry properties.");
-                return;
-            }
-
-            constexpr ImGuiTableFlags tableFlags =
-                ImGuiTableFlags_Borders |
-                ImGuiTableFlags_RowBg |
-                ImGuiTableFlags_Resizable |
-                ImGuiTableFlags_SizingStretchProp;
-            if (ImGui::BeginTable("PropertyCatalog", 7, tableFlags))
-            {
-                ImGui::TableSetupColumn("Domain");
-                ImGui::TableSetupColumn("Name");
-                ImGui::TableSetupColumn("Kind");
-                ImGui::TableSetupColumn("Count");
-                ImGui::TableSetupColumn("Tags");
-                ImGui::TableSetupColumn("Preview");
-                ImGui::TableSetupColumn("Reason");
-                ImGui::TableHeadersRow();
-
-                for (const SandboxEditorPropertyCatalogRow& row : catalog.Rows)
-                {
-                    ImGui::TableNextRow();
-                    ImGui::TableSetColumnIndex(0);
-                    ImGui::TextUnformatted(
-                        DebugNameForSandboxEditorPropertyCatalogDomain(row.Domain));
-                    ImGui::TableSetColumnIndex(1);
-                    ImGui::TextUnformatted(row.Name.c_str());
-                    ImGui::TableSetColumnIndex(2);
-                    ImGui::Text("%s/%u",
-                                DebugNameForSandboxEditorPropertyCatalogValueKind(
-                                    row.ValueKind),
-                                row.ComponentCount);
-                    ImGui::TableSetColumnIndex(3);
-                    ImGui::Text("%zu", row.ElementCount);
-                    ImGui::TableSetColumnIndex(4);
-                    std::string tags{};
-                    if (row.Bindable)
-                        tags += "bindable ";
-                    if (row.Internal)
-                        tags += "internal ";
-                    if (row.Connectivity)
-                        tags += "connectivity ";
-                    if (row.Generated)
-                        tags += "generated ";
-                    ImGui::TextUnformatted(tags.empty() ? "-" : tags.c_str());
-                    ImGui::TableSetColumnIndex(5);
-                    if (row.Preview.HasValue)
-                    {
-                        ImGui::Text("[%zu] %s",
-                                    row.Preview.ElementIndex,
-                                    row.Preview.Text.c_str());
-                    }
-                    else
-                    {
-                        ImGui::TextDisabled("-");
-                    }
-                    ImGui::TableSetColumnIndex(6);
-                    ImGui::TextDisabled("%s",
-                                        row.UnsupportedReason.empty()
-                                            ? "-"
-                                            : row.UnsupportedReason.c_str());
-                }
-                ImGui::EndTable();
-            }
-        }
-
-        void DrawPropertyBindingTargets(
-            const SandboxEditorPropertyCatalogModel& catalog)
-        {
-            if (catalog.BindingTargets.empty())
-                return;
-
-            ImGui::SeparatorText("Binding targets");
-            for (std::size_t i = 0u; i < catalog.BindingTargets.size(); ++i)
-            {
-                const SandboxEditorPropertyBindingTargetModel& target =
-                    catalog.BindingTargets[i];
-                ImGui::PushID(static_cast<int>(i));
-                ImGui::Text("%s / %s / %s requires %s %zu",
-                            std::string(ToString(target.Lane)).c_str(),
-                            target.PresentationKey.c_str(),
-                            std::string(ToString(target.Semantic)).c_str(),
-                            std::string(ToString(target.ExpectedValueKind)).c_str(),
-                            target.ExpectedElementCount);
-                for (const SandboxEditorProgressivePropertyOptionModel& option :
-                     target.Options)
-                {
-                    if (option.Compatible)
-                    {
-                        ImGui::BulletText("%s",
-                                          option.Descriptor.PropertyName.c_str());
-                    }
-                    else
-                    {
-                        ImGui::BulletText("%s",
-                                          option.Descriptor.PropertyName.c_str());
-                        ImGui::SameLine();
-                        ImGui::TextDisabled("%s",
-                                            option.DisabledReason.c_str());
-                    }
-                }
-                ImGui::PopID();
-            }
-        }
-
-        void DrawVertexChannelBindingTargets(
-            const SandboxEditorPropertyCatalogModel& catalog,
-            const SandboxEditorContext* context)
-        {
-            if (catalog.VertexChannelTargets.empty())
-                return;
-
-            ImGui::SeparatorText("Vertex channels");
-            const bool commandsAvailable =
-                context != nullptr && context->Scene != nullptr;
-            for (std::size_t i = 0u; i < catalog.VertexChannelTargets.size(); ++i)
-            {
-                const SandboxEditorVertexChannelBindingTargetModel& target =
-                    catalog.VertexChannelTargets[i];
-                ImGui::PushID(static_cast<int>(i));
-
-                const char* channelName =
-                    DebugNameForVertexChannel(target.Channel);
-                const std::string currentLabel =
-                    target.HasBinding ? target.Binding.SourceProperty
-                                      : std::string{"Default"};
-                ImGui::Text("%s", channelName);
-                ImGui::SameLine();
-
-                if (!commandsAvailable)
-                    ImGui::BeginDisabled();
-                if (ImGui::BeginCombo("##VertexChannelBinding",
-                                      currentLabel.c_str()))
-                {
-                    if (ImGui::Selectable("Default", !target.HasBinding) &&
-                        commandsAvailable)
-                    {
-                        (void)ApplySandboxEditorVertexChannelBindingCommand(
-                            *context,
-                            SandboxEditorVertexChannelBindingCommand{
-                                .StableEntityId = catalog.SelectedStableId,
-                                .Channel = target.Channel,
-                                .EnableBinding = false,
-                            });
-                    }
-
-                    for (const SandboxEditorVertexChannelBindingOptionModel& option :
-                         target.Options)
-                    {
-                        const bool selected =
-                            target.HasBinding &&
-                            target.Binding.SourceProperty == option.PropertyName;
-                        if (!option.Compatible)
-                            ImGui::BeginDisabled();
-                        const std::string label =
-                            option.PropertyName + " (" +
-                            DebugNameForSandboxEditorPropertyCatalogValueKind(
-                                option.ValueKind) +
-                            ", " + std::to_string(option.ElementCount) + ")";
-                        if (ImGui::Selectable(label.c_str(), selected) &&
-                            option.Compatible &&
-                            commandsAvailable)
-                        {
-                            (void)ApplySandboxEditorVertexChannelBindingCommand(
-                                *context,
-                                SandboxEditorVertexChannelBindingCommand{
-                                    .StableEntityId = catalog.SelectedStableId,
-                                    .Channel = target.Channel,
-                                    .EnableBinding = true,
-                                    .PropertyName = option.PropertyName,
-                                });
-                        }
-                        if (!option.Compatible)
-                        {
-                            ImGui::EndDisabled();
-                            ImGui::SameLine();
-                            ImGui::TextDisabled("%s",
-                                                option.DisabledReason.c_str());
-                        }
-                    }
-                    ImGui::EndCombo();
-                }
-                if (!commandsAvailable)
-                    ImGui::EndDisabled();
-
-                if (target.HasBinding && !target.Diagnostic.empty())
-                    ImGui::TextDisabled("%s", target.Diagnostic.c_str());
-                ImGui::PopID();
-            }
         }
 
         void DrawBoundRenderStateRows(
@@ -11969,274 +11589,6 @@ namespace Extrinsic::Runtime
             DrawDiagnostics(model.Diagnostics);
         }
 
-        // UI-031 Slice D: the domain Properties window is a pure property
-        // explorer — it lists every property and its value preview and does NOT
-        // host render-hint, texture-bake, or property-binding controls (those
-        // moved to the Appearance window). Internal/connectivity/generated
-        // property rows stay visible; unsupported edit/bind states are marked by
-        // the catalog rows rather than hidden.
-        void DrawDomainPropertyWindow(
-            const SandboxEditorDomainWindowModel& model)
-        {
-            DrawDomainWindowHeader(model);
-            if (!DomainWindowReady(model))
-                return;
-            DrawPropertyCatalogRows(model.PropertyCatalog);
-            DrawDiagnostics(model.PropertyCatalog.Diagnostics);
-        }
-
-        void DrawRenderHintStatus(const SandboxEditorRenderHintModel& hints)
-        {
-            ImGui::Text("Surface: %s",
-                        hints.HasRenderSurface ? hints.SurfaceDomain.c_str() : "none");
-            if (hints.HasRenderEdges)
-            {
-                ImGui::Text("Edges: %s", hints.EdgeDomain.c_str());
-                if (hints.HasUniformEdgeWidth)
-                    ImGui::Text("Edge width: %.3f", hints.UniformEdgeWidth);
-                if (hints.HasNamedEdgeWidth)
-                    ImGui::Text("Edge width source: %s", hints.EdgeWidthName.c_str());
-            }
-            else
-            {
-                ImGui::TextDisabled("Edges: none");
-            }
-
-            if (hints.HasRenderPoints)
-            {
-                ImGui::Text("Points: %s", hints.PointRenderType.c_str());
-                if (hints.HasUniformPointSize)
-                    ImGui::Text("Point size: %.3f", hints.UniformPointSize);
-                if (hints.HasNamedPointSize)
-                    ImGui::Text("Point size source: %s", hints.PointSizeName.c_str());
-            }
-            else
-            {
-                ImGui::TextDisabled("Points: none");
-            }
-        }
-
-        [[nodiscard]] bool DrawSurfaceDomainCombo(
-            G::RenderSurface::SourceDomain* domain)
-        {
-            constexpr const char* kItems[]{"Vertex", "Face"};
-            int current =
-                *domain == G::RenderSurface::SourceDomain::Face ? 1 : 0;
-            if (!ImGui::Combo("Surface domain", &current, kItems, 2))
-                return false;
-            *domain = current == 1
-                ? G::RenderSurface::SourceDomain::Face
-                : G::RenderSurface::SourceDomain::Vertex;
-            return true;
-        }
-
-        [[nodiscard]] bool DrawEdgeDomainCombo(
-            G::RenderEdges::SourceDomain* domain)
-        {
-            constexpr const char* kItems[]{"Vertex", "Edge"};
-            int current =
-                *domain == G::RenderEdges::SourceDomain::Edge ? 1 : 0;
-            if (!ImGui::Combo("Edge domain", &current, kItems, 2))
-                return false;
-            *domain = current == 1
-                ? G::RenderEdges::SourceDomain::Edge
-                : G::RenderEdges::SourceDomain::Vertex;
-            return true;
-        }
-
-        [[nodiscard]] bool DrawPointTypeCombo(
-            G::RenderPoints::RenderType* type)
-        {
-            constexpr const char* kItems[]{"Flat", "Sphere", "Surfel"};
-            int current = 1;
-            switch (*type)
-            {
-            case G::RenderPoints::RenderType::Flat:
-                current = 0;
-                break;
-            case G::RenderPoints::RenderType::Sphere:
-                current = 1;
-                break;
-            case G::RenderPoints::RenderType::Surfel:
-                current = 2;
-                break;
-            }
-            if (!ImGui::Combo("Point type", &current, kItems, 3))
-                return false;
-            switch (current)
-            {
-            case 0:
-                *type = G::RenderPoints::RenderType::Flat;
-                break;
-            case 2:
-                *type = G::RenderPoints::RenderType::Surfel;
-                break;
-            case 1:
-            default:
-                *type = G::RenderPoints::RenderType::Sphere;
-                break;
-            }
-            return true;
-        }
-
-        void DrawPointRenderHintControls(
-            const SandboxEditorDomainWindowModel& model,
-            const SandboxEditorContext& context,
-            bool canEditRenderHints);
-
-        void DrawEdgeRenderHintControls(
-            const SandboxEditorDomainWindowModel& model,
-            const SandboxEditorContext& context,
-            const bool canEditRenderHints)
-        {
-            bool edges = model.RenderHints.HasRenderEdges;
-            if (ImGui::Checkbox("Edges", &edges) && canEditRenderHints)
-            {
-                (void)ApplySandboxEditorRenderHintCommand(
-                    context,
-                    SandboxEditorRenderHintCommand{
-                        .StableEntityId = model.SelectedStableId,
-                        .SetEdges = true,
-                        .EnableEdges = edges,
-                        .EdgeDomain = model.RenderHints.EdgeDomainValue,
-                    });
-            }
-
-            if (!model.RenderHints.HasRenderEdges)
-                return;
-
-            G::RenderEdges::SourceDomain edgeDomain =
-                model.RenderHints.EdgeDomainValue;
-            if (DrawEdgeDomainCombo(&edgeDomain) && canEditRenderHints)
-            {
-                (void)ApplySandboxEditorRenderHintCommand(
-                    context,
-                    SandboxEditorRenderHintCommand{
-                        .StableEntityId = model.SelectedStableId,
-                        .SetEdges = true,
-                        .EnableEdges = true,
-                        .EdgeDomain = edgeDomain,
-                    });
-            }
-
-            if (model.RenderHints.HasUniformEdgeWidth)
-            {
-                float edgeWidth = model.RenderHints.UniformEdgeWidth;
-                if (ImGui::DragFloat(
-                        "Edge width", &edgeWidth, 0.05f, 0.1f, 32.0f) &&
-                    canEditRenderHints)
-                {
-                    (void)ApplySandboxEditorRenderHintCommand(
-                        context,
-                        SandboxEditorRenderHintCommand{
-                            .StableEntityId = model.SelectedStableId,
-                            .SetUniformEdgeWidth = true,
-                            .UniformEdgeWidth = edgeWidth,
-                        });
-                }
-            }
-        }
-
-        void DrawMeshRenderHintControls(
-            const SandboxEditorDomainWindowModel& model,
-            const SandboxEditorContext& context,
-            const bool canEditRenderHints)
-        {
-            bool surface = model.RenderHints.HasRenderSurface;
-            if (ImGui::Checkbox("Surface", &surface) && canEditRenderHints)
-            {
-                (void)ApplySandboxEditorRenderHintCommand(
-                    context,
-                    SandboxEditorRenderHintCommand{
-                        .StableEntityId = model.SelectedStableId,
-                        .SetSurface = true,
-                        .EnableSurface = surface,
-                        .SurfaceDomain = model.RenderHints.SurfaceDomainValue,
-                    });
-            }
-
-            if (model.RenderHints.HasRenderSurface)
-            {
-                G::RenderSurface::SourceDomain domain =
-                    model.RenderHints.SurfaceDomainValue;
-                if (DrawSurfaceDomainCombo(&domain) && canEditRenderHints)
-                {
-                    (void)ApplySandboxEditorRenderHintCommand(
-                        context,
-                        SandboxEditorRenderHintCommand{
-                            .StableEntityId = model.SelectedStableId,
-                            .SetSurface = true,
-                            .EnableSurface = true,
-                            .SurfaceDomain = domain,
-                        });
-                }
-            }
-
-            DrawEdgeRenderHintControls(model, context, canEditRenderHints);
-            DrawPointRenderHintControls(model, context, canEditRenderHints);
-        }
-
-        void DrawPointRenderHintControls(
-            const SandboxEditorDomainWindowModel& model,
-            const SandboxEditorContext& context,
-            const bool canEditRenderHints)
-        {
-            bool points = model.RenderHints.HasRenderPoints;
-            if (ImGui::Checkbox("Points", &points) && canEditRenderHints)
-            {
-                (void)ApplySandboxEditorRenderHintCommand(
-                    context,
-                    SandboxEditorRenderHintCommand{
-                        .StableEntityId = model.SelectedStableId,
-                        .SetPoints = true,
-                        .EnablePoints = points,
-                        .PointType = model.RenderHints.PointRenderTypeValue,
-                    });
-            }
-
-            if (!model.RenderHints.HasRenderPoints)
-                return;
-
-            G::RenderPoints::RenderType pointType =
-                model.RenderHints.PointRenderTypeValue;
-            if (DrawPointTypeCombo(&pointType) && canEditRenderHints)
-            {
-                (void)ApplySandboxEditorRenderHintCommand(
-                    context,
-                        SandboxEditorRenderHintCommand{
-                            .StableEntityId = model.SelectedStableId,
-                            .PointType = pointType,
-                            .SetPointRenderType = true,
-                        });
-            }
-
-            if (model.RenderHints.HasUniformPointSize)
-            {
-                float pointSize = model.RenderHints.UniformPointSize;
-                if (ImGui::DragFloat(
-                        "Point size", &pointSize, 0.05f, 0.5f, 32.0f) &&
-                    canEditRenderHints)
-                {
-                    (void)ApplySandboxEditorRenderHintCommand(
-                        context,
-                        SandboxEditorRenderHintCommand{
-                            .StableEntityId = model.SelectedStableId,
-                            .SetUniformPointSize = true,
-                            .UniformPointSize = pointSize,
-                        });
-                }
-            }
-        }
-
-        void DrawGraphRenderHintControls(
-            const SandboxEditorDomainWindowModel& model,
-            const SandboxEditorContext& context,
-            const bool canEditRenderHints)
-        {
-            DrawEdgeRenderHintControls(model, context, canEditRenderHints);
-            DrawPointRenderHintControls(model, context, canEditRenderHints);
-        }
-
         void DrawVisualizationPropertyPresets(
             const std::vector<SandboxEditorVisualizationPropertyInfo>& properties,
             const SandboxEditorVisualizationConfigModel& visualization,
@@ -12539,462 +11891,6 @@ namespace Extrinsic::Runtime
                     next.IsolineValues[next.IsolineValueCount] = seed;
                     next.IsolineValueCount += 1u;
                     submit(next);
-                }
-            }
-        }
-
-        void DrawDomainVisualizationControls(
-            const SandboxEditorDomainWindowModel& model,
-            const SandboxEditorContext& context);
-
-        // UI-031 Slices A/B: the domain `Render` section renders as the
-        // "Appearance" window and co-locates render hints, bound render-state
-        // inspection, visualization controls, property/attribute assignment,
-        // and texture baking.
-        void DrawDomainRenderWindow(const SandboxEditorDomainWindowModel& model,
-                                    const SandboxEditorContext& context,
-                                    TextureBakeUiState* textureBakeState)
-        {
-            DrawDomainWindowHeader(model);
-            ImGui::SeparatorText("Render hint status");
-            DrawRenderHintStatus(model.RenderHints);
-
-            ImGui::SeparatorText("Render controls");
-            const bool canEditRenderHints = DomainAppearanceReady(model);
-            if (!canEditRenderHints)
-                ImGui::BeginDisabled();
-            switch (model.Kind)
-            {
-            case SandboxEditorDomainWindowKind::Mesh:
-                DrawMeshRenderHintControls(model, context, canEditRenderHints);
-                break;
-            case SandboxEditorDomainWindowKind::Graph:
-                DrawGraphRenderHintControls(model, context, canEditRenderHints);
-                break;
-            case SandboxEditorDomainWindowKind::PointCloud:
-                DrawPointRenderHintControls(model, context, canEditRenderHints);
-                break;
-            }
-            if (!canEditRenderHints)
-                ImGui::EndDisabled();
-
-            if (DomainAppearanceReady(model))
-            {
-                ImGui::SeparatorText("Visualization");
-                DrawDomainVisualizationControls(model, context);
-                ImGui::SeparatorText("Bound render state");
-                DrawBoundRenderStateRows(model.BoundState);
-                ImGui::SeparatorText("Property / attribute assignment");
-                DrawPropertyBindingTargets(model.PropertyCatalog);
-                DrawVertexChannelBindingTargets(model.PropertyCatalog, &context);
-                ImGui::SeparatorText("Texture baking");
-                DrawTextureBakeControls(model.TextureBake, &context,
-                                        textureBakeState);
-            }
-        }
-
-        void DrawDomainVisualizationControls(
-            const SandboxEditorDomainWindowModel& model,
-            const SandboxEditorContext& context)
-        {
-            const SandboxEditorVisualizationModel& visualization = model.Visualization;
-
-            if (visualization.SpatialDebug.HasBinding)
-            {
-                ImGui::Text("Spatial debug: %s key=%llu",
-                            DebugNameForSandboxEditorSpatialDebugKind(
-                                visualization.SpatialDebug.Kind),
-                            static_cast<unsigned long long>(
-                                visualization.SpatialDebug.RegistryKey));
-            }
-            else
-            {
-                ImGui::TextDisabled("Spatial debug: disabled");
-            }
-
-            if (visualization.Visualization.HasConfig)
-            {
-                ImGui::Text("Visualization: %s",
-                            DebugNameForSandboxEditorVisualizationColorSource(
-                                visualization.Visualization.Source));
-            }
-            else
-            {
-                ImGui::TextDisabled("Visualization: material/default");
-            }
-
-            const bool canEditVisualization =
-                model.VisualizationTargetAvailable &&
-                model.VisualizationControlsAvailable;
-            if (!canEditVisualization)
-                ImGui::BeginDisabled();
-
-            if (ImGui::Button("Enable BVH debug") && canEditVisualization)
-            {
-                (void)ApplySandboxEditorSpatialDebugBindingCommand(
-                    context,
-                    SandboxEditorSpatialDebugBindingCommand{
-                        .StableEntityId = model.SelectedStableId,
-                        .EnableBinding = true,
-                    });
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Clear debug") && canEditVisualization)
-            {
-                (void)ApplySandboxEditorSpatialDebugBindingCommand(
-                    context,
-                    SandboxEditorSpatialDebugBindingCommand{
-                        .StableEntityId = model.SelectedStableId,
-                        .EnableBinding = false,
-                    });
-            }
-
-            if (ImGui::Button("Uniform color") && canEditVisualization)
-            {
-                (void)ApplySandboxEditorVisualizationConfigCommand(
-                    context,
-                    MakeUniformVisualizationConfigCommandFromModel(
-                        model.SelectedStableId,
-                        visualization.Visualization,
-                        model.VisualizationTarget,
-                        visualization.Visualization.Color));
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Clear vis") && canEditVisualization)
-            {
-                (void)ApplySandboxEditorVisualizationConfigCommand(
-                    context,
-                    SandboxEditorVisualizationConfigCommand{
-                        .StableEntityId = model.SelectedStableId,
-                        .Target = model.VisualizationTarget,
-                        .EnableConfig = false,
-                    });
-            }
-
-            DrawUniformVisualizationColorEdit(
-                visualization.Visualization,
-                context,
-                model.SelectedStableId,
-                model.VisualizationTarget,
-                canEditVisualization);
-
-            DrawScalarVisualizationControls(
-                visualization.Visualization,
-                context,
-                model.SelectedStableId,
-                model.VisualizationTarget,
-                canEditVisualization);
-
-            if (!canEditVisualization)
-                ImGui::EndDisabled();
-
-            DrawVisualizationPropertyPresets(
-                visualization.Properties,
-                visualization.Visualization,
-                context,
-                model.SelectedStableId,
-                model.VisualizationTarget,
-                canEditVisualization);
-        }
-
-        void DrawPrimitiveDetails(const SandboxEditorPrimitiveDetailModel& primitive)
-        {
-            if (!primitive.HasPrimitive)
-            {
-                ImGui::TextDisabled("No refined primitive selection for this domain.");
-                return;
-            }
-
-            const PrimitiveSelectionResult& result = primitive.Primitive;
-            ImGui::Text("Primitive status: %s",
-                        DebugNameForPrimitiveRefineStatus(result.Status));
-            ImGui::Text("Primitive domain/kind: %s / %s",
-                        DebugNameForSandboxEditorGeometryDomain(result.Domain),
-                        DebugNameForSandboxEditorPrimitiveKind(result.Kind));
-            if (primitive.HasFaceId)
-                ImGui::Text("Face id: %u", result.FaceId);
-            if (primitive.HasEdgeId)
-                ImGui::Text("Edge id: %u", result.EdgeId);
-            if (primitive.HasVertexId)
-                ImGui::Text("Vertex id: %u", result.VertexId);
-            if (primitive.HasPointId)
-                ImGui::Text("Point id: %u", result.PointId);
-            if (result.HasHitPosition)
-            {
-                DrawVec3("Local hit", result.LocalHit);
-                DrawVec3("World hit", result.WorldHit);
-            }
-        }
-
-        void DrawDomainSelectionWindow(
-            const SandboxEditorDomainWindowModel& model)
-        {
-            DrawDomainWindowHeader(model);
-            ImGui::SeparatorText("Primitive selection");
-            DrawPrimitiveDetails(model.Primitive);
-        }
-
-        void DrawPointCloudOutlierRemovalResultStatus(
-            const std::optional<SandboxEditorPointCloudOutlierRemovalResult>&
-                lastResult)
-        {
-            if (!lastResult.has_value())
-            {
-                ImGui::TextDisabled("Last outlier removal: none");
-                return;
-            }
-
-            const SandboxEditorPointCloudOutlierRemovalResult& result =
-                *lastResult;
-            ImGui::Text("Last outlier removal: %s",
-                        DebugNameForSandboxEditorCommandStatus(result.Status));
-            ImGui::Text(
-                "Method: %s",
-                result.Method ==
-                        SandboxEditorPointCloudOutlierMethod::Statistical
-                    ? "Statistical"
-                    : "Radius");
-            if (result.Succeeded())
-            {
-                ImGui::Text("Kept %zu / %zu  rejected %zu  non-finite %zu",
-                            result.KeptCount,
-                            result.OriginalCount,
-                            result.RejectedCount,
-                            result.NonFiniteCount);
-                if (result.Method ==
-                    SandboxEditorPointCloudOutlierMethod::Statistical)
-                {
-                    ImGui::Text("Mean %.4f  stddev %.4f  threshold %.4f",
-                                static_cast<double>(result.MeanDistance),
-                                static_cast<double>(result.StdDevDistance),
-                                static_cast<double>(result.DistanceThreshold));
-                }
-            }
-            if (!result.Message.empty())
-                ImGui::TextWrapped("%s", result.Message.c_str());
-        }
-
-        void DrawPointCloudOutlierRemovalControls(
-            const SandboxEditorDomainWindowModel& model,
-            const SandboxEditorContext& context,
-            const SandboxEditorGeometryProcessingModel& processing,
-            PointCloudOutlierRemovalUiState* outlierState)
-        {
-            ImGui::SeparatorText("Remove Outliers");
-            if (!processing.PointCloudOutlierRemovalAvailable)
-            {
-                ImGui::TextDisabled("Point-cloud outlier removal is unavailable for this selection.");
-                return;
-            }
-            if (outlierState == nullptr ||
-                outlierState->LastResult == nullptr ||
-                outlierState->Method == nullptr ||
-                outlierState->KNeighbors == nullptr ||
-                outlierState->StdDevMultiplier == nullptr ||
-                outlierState->SearchRadius == nullptr ||
-                outlierState->MinNeighbors == nullptr)
-            {
-                ImGui::TextDisabled("Point-cloud outlier-removal controls are not bound.");
-                return;
-            }
-
-            *outlierState->Method = std::clamp(*outlierState->Method, 0, 1);
-            const bool statistical = *outlierState->Method == 0;
-            if (ImGui::BeginCombo(
-                    "Method##PointCloudOutlierRemoval",
-                    statistical ? "Statistical" : "Radius"))
-            {
-                if (ImGui::Selectable("Statistical##PointCloudOutlierRemoval", statistical))
-                    *outlierState->Method = 0;
-                if (statistical)
-                    ImGui::SetItemDefaultFocus();
-                if (ImGui::Selectable("Radius##PointCloudOutlierRemoval", !statistical))
-                    *outlierState->Method = 1;
-                if (!statistical)
-                    ImGui::SetItemDefaultFocus();
-                ImGui::EndCombo();
-            }
-
-            if (statistical)
-            {
-                ImGui::TextDisabled("Reject points beyond mean + k*stddev of mean-kNN distance.");
-                *outlierState->KNeighbors =
-                    std::clamp(*outlierState->KNeighbors, 1, 512);
-                *outlierState->StdDevMultiplier =
-                    std::clamp(*outlierState->StdDevMultiplier, 0.0f, 100.0f);
-                ImGui::DragInt(
-                    "K neighbors##PointCloudOutlierRemoval",
-                    outlierState->KNeighbors,
-                    1.0f,
-                    1,
-                    512);
-                ImGui::DragFloat(
-                    "Std-dev multiplier##PointCloudOutlierRemoval",
-                    outlierState->StdDevMultiplier,
-                    0.05f,
-                    0.0f,
-                    100.0f);
-            }
-            else
-            {
-                ImGui::TextDisabled("Reject points with too few neighbors inside the search radius.");
-                *outlierState->SearchRadius =
-                    std::max(*outlierState->SearchRadius, 0.0f);
-                *outlierState->MinNeighbors =
-                    std::clamp(*outlierState->MinNeighbors, 0, 512);
-                ImGui::DragFloat(
-                    "Search radius##PointCloudOutlierRemoval",
-                    outlierState->SearchRadius,
-                    0.01f,
-                    0.0f,
-                    1000.0f);
-                ImGui::DragInt(
-                    "Min neighbors##PointCloudOutlierRemoval",
-                    outlierState->MinNeighbors,
-                    1.0f,
-                    0,
-                    512);
-            }
-
-            if (ImGui::Button("Remove Outliers##PointCloudOutlierRemoval"))
-            {
-                *outlierState->LastResult =
-                    ApplySandboxEditorPointCloudOutlierRemovalCommand(
-                        context,
-                        SandboxEditorPointCloudOutlierRemovalCommand{
-                            .StableEntityId = model.SelectedStableId,
-                            .Method = statistical
-                                ? SandboxEditorPointCloudOutlierMethod::Statistical
-                                : SandboxEditorPointCloudOutlierMethod::Radius,
-                            .KNeighbors = static_cast<std::uint32_t>(
-                                *outlierState->KNeighbors),
-                            .StdDevMultiplier =
-                                *outlierState->StdDevMultiplier,
-                            .SearchRadius = *outlierState->SearchRadius,
-                            .MinNeighbors = static_cast<std::uint32_t>(
-                                *outlierState->MinNeighbors),
-                        });
-            }
-
-            const std::optional<SandboxEditorPointCloudOutlierRemovalResult>&
-                result = outlierState->LastResult->has_value()
-                    ? *outlierState->LastResult
-                    : processing.LastPointCloudOutlierRemovalResult;
-            DrawPointCloudOutlierRemovalResultStatus(result);
-        }
-
-        void DrawDomainProcessingWindow(
-            const SandboxEditorDomainWindowModel& model,
-            const SandboxEditorContext& context,
-            PointCloudOutlierRemovalUiState* pointCloudOutlierState)
-        {
-            DrawDomainWindowHeader(model);
-
-            const SandboxEditorGeometryProcessingModel& processing =
-                model.Processing;
-            DrawDiagnostics(processing.Diagnostics);
-            if (!DomainWindowReady(model) || !processing.HasSelectedEntity)
-            {
-                ImGui::TextDisabled("Select a matching domain entity to inspect processing affordances.");
-                return;
-            }
-
-            DrawPointCloudOutlierRemovalControls(
-                model, context, processing, pointCloudOutlierState);
-        }
-
-        void DrawOneDomainWindow(
-            const SandboxEditorContext& context,
-            const SandboxEditorDomainWindowKind kind,
-            const DomainWindowSection section,
-            std::array<bool, Detail::kSandboxEditorDomainWindowCount>&
-                domainWindowOpen,
-            std::array<std::optional<SandboxEditorDomainWindowModel>, 3>& domainModelCache,
-            PointCloudOutlierRemovalUiState* pointCloudOutlierState,
-            TextureBakeUiState* textureBakeState)
-        {
-            const std::size_t slot = DomainWindowSlotIndex(kind, section);
-            if (!domainWindowOpen[slot])
-                return;
-
-            ImGui::SetNextWindowSize(ImVec2(340.0f, 300.0f), ImGuiCond_FirstUseEver);
-            if (ImGui::Begin(DomainWindowTitle(kind, section), &domainWindowOpen[slot]))
-            {
-                std::optional<SandboxEditorDomainWindowModel>& cached =
-                    domainModelCache[static_cast<std::size_t>(kind)];
-                if (!cached.has_value())
-                {
-                    cached = BuildSandboxEditorDomainWindowModel(context, kind);
-                }
-                else if (context.ModelBuildStats != nullptr)
-                {
-                    ++context.ModelBuildStats->DomainWindowModelCacheHits;
-                }
-                const SandboxEditorDomainWindowModel& model = *cached;
-                switch (section)
-                {
-                case DomainWindowSection::Render:
-                    DrawDomainRenderWindow(model, context, textureBakeState);
-                    break;
-                case DomainWindowSection::Properties:
-                    DrawDomainPropertyWindow(model);
-                    break;
-                case DomainWindowSection::Selection:
-                    DrawDomainSelectionWindow(model);
-                    break;
-                case DomainWindowSection::ProcessingPointCloudOutlierRemoval:
-                    DrawDomainProcessingWindow(
-                        model,
-                        context,
-                        pointCloudOutlierState);
-                    break;
-                case DomainWindowSection::Count:
-                    break;
-                }
-            }
-            ImGui::End();
-        }
-
-        void DrawDomainWindows(
-            const SandboxEditorContext* context,
-            std::array<bool, Detail::kSandboxEditorDomainWindowCount>*
-                domainWindowOpen,
-            PointCloudOutlierRemovalUiState* pointCloudOutlierState,
-            TextureBakeUiState* textureBakeState)
-        {
-            if (context == nullptr || domainWindowOpen == nullptr)
-                return;
-
-            std::array<std::optional<SandboxEditorDomainWindowModel>, 3>
-                domainModelCache{};
-            constexpr std::array<SandboxEditorDomainWindowKind, 3> kKinds{
-                SandboxEditorDomainWindowKind::PointCloud,
-                SandboxEditorDomainWindowKind::Graph,
-                SandboxEditorDomainWindowKind::Mesh,
-            };
-            constexpr std::array<DomainWindowSection, 4> kSections{
-                DomainWindowSection::Render,
-                DomainWindowSection::Properties,
-                DomainWindowSection::Selection,
-                DomainWindowSection::ProcessingPointCloudOutlierRemoval,
-            };
-            for (const SandboxEditorDomainWindowKind kind : kKinds)
-            {
-                for (const DomainWindowSection section : kSections)
-                {
-                    const bool registryOwnedExemplar =
-                        kind == SandboxEditorDomainWindowKind::Mesh &&
-                        section == DomainWindowSection::Render;
-                    if (registryOwnedExemplar)
-                        continue;
-                    DrawOneDomainWindow(
-                        *context,
-                        kind,
-                        section,
-                        *domainWindowOpen,
-                        domainModelCache,
-                        pointCloudOutlierState,
-                        textureBakeState);
                 }
             }
         }
@@ -13378,18 +12274,10 @@ namespace Extrinsic::Runtime
             std::optional<SandboxEditorSceneFileResult>* lastSceneFileResult,
             std::array<bool, Detail::kSandboxEditorPanelWindowCount>*
                 panelWindowOpen,
-            std::array<bool, Detail::kSandboxEditorDomainWindowCount>*
-                domainWindowOpen,
-            PointCloudOutlierRemovalUiState* pointCloudOutlierState,
             TextureBakeUiState* textureBakeState,
             EditorWindowRegistry* windowRegistry)
         {
-            DrawMainMenuBar(panelWindowOpen, domainWindowOpen, windowRegistry);
-            DrawDomainWindows(
-                context,
-                domainWindowOpen,
-                pointCloudOutlierState,
-                textureBakeState);
+            DrawMainMenuBar(panelWindowOpen, windowRegistry);
             if (windowRegistry != nullptr)
                 (void)windowRegistry->DrawOpenWindows();
 
@@ -14434,6 +13322,29 @@ namespace Extrinsic::Runtime
             return "GeometryProcessingFailed";
         }
         return "Unknown";
+    }
+
+    const char* DebugNameForSandboxEditorUvAtlasStatus(
+        const Geometry::UvAtlas::UvAtlasStatus status) noexcept
+    {
+        return Geometry::UvAtlas::ToString(status);
+    }
+
+    const char* DebugNameForSandboxEditorUvAtlasProvenance(
+        const Geometry::UvAtlas::UvAtlasProvenance provenance) noexcept
+    {
+        return Geometry::UvAtlas::ToString(provenance);
+    }
+
+    Geometry::ConstPropertySet
+    ResolveSandboxEditorSelectedMeshVertexProperties(
+        const SandboxEditorContext& context)
+    {
+        const Geometry::PropertySet* properties =
+            ResolveSelectedMeshVertexProperties(context);
+        return properties != nullptr
+            ? Geometry::ConstPropertySet(*properties)
+            : Geometry::ConstPropertySet{};
     }
 
     const char* DebugNameForSandboxEditorRenderRecipeDraftState(
@@ -19398,15 +18309,10 @@ namespace Extrinsic::Runtime
             nullptr,
             nullptr,
             nullptr,
-            nullptr,
-            nullptr,
             nullptr);
     }
 
-    SandboxEditorUi::SandboxEditorUi()
-    {
-        RegisterExemplarWindows();
-    }
+    SandboxEditorUi::SandboxEditorUi() = default;
 
     EditorWindowHandle SandboxEditorUi::RegisterEditorWindow(
         EditorWindowDescriptor descriptor)
@@ -19439,90 +18345,6 @@ namespace Extrinsic::Runtime
         const EditorWindowHandle handle)
     {
         return m_Host.UnregisterWindow(handle);
-    }
-
-    void SandboxEditorUi::RegisterExemplarWindows()
-    {
-        m_MeshAppearanceWindow = RegisterEditorWindow(
-            EditorWindowDescriptor{
-                .Id = "mesh.appearance",
-                .MenuPath = {"Mesh"},
-                .Title = "Appearance",
-                .OpenByDefault = false,
-                .Draw =
-                    [this](bool& open)
-                    {
-                        DrawRegisteredMeshAppearance(open);
-                    },
-                .OpenStateChanged =
-                    [this](bool)
-                    {
-                        m_RegisteredMeshModelCache.reset();
-                    },
-            });
-    }
-
-    const SandboxEditorDomainWindowModel*
-    SandboxEditorUi::GetRegisteredMeshWindowModel()
-    {
-        if (m_ActiveEditorContext == nullptr)
-            return nullptr;
-        if (!m_RegisteredMeshModelCache.has_value())
-        {
-            m_RegisteredMeshModelCache = BuildSandboxEditorDomainWindowModel(
-                *m_ActiveEditorContext,
-                SandboxEditorDomainWindowKind::Mesh);
-        }
-        else if (m_ActiveEditorContext->ModelBuildStats != nullptr)
-        {
-            ++m_ActiveEditorContext->ModelBuildStats->DomainWindowModelCacheHits;
-        }
-        return &*m_RegisteredMeshModelCache;
-    }
-
-    void SandboxEditorUi::DrawRegisteredMeshAppearance(bool& open)
-    {
-        if (!open || m_ActiveEditorContext == nullptr)
-            return;
-
-        ImGui::SetNextWindowSize(ImVec2(340.0f, 300.0f), ImGuiCond_FirstUseEver);
-        if (ImGui::Begin("Mesh / Appearance", &open))
-        {
-            const SandboxEditorDomainWindowModel* model =
-                GetRegisteredMeshWindowModel();
-            if (model != nullptr)
-            {
-                TextureBakeUiState textureBakeState{
-                    .LastUvRegenerationResult = &m_LastUvRegenerationResult,
-                    .SourceIndex = &m_TextureBakeSourceIndex,
-                    .TargetSemanticIndex = &m_TextureBakeTargetSemanticIndex,
-                    .EncoderIndex = &m_TextureBakeEncoderIndex,
-                    .Width = &m_TextureBakeWidth,
-                    .Height = &m_TextureBakeHeight,
-                    .UvResolution = &m_UvAtlasResolution,
-                    .UvPadding = &m_UvAtlasPadding,
-                    .UvTexelsPerUnit = &m_UvAtlasTexelsPerUnit,
-                    .UvForceRegenerate = &m_UvAtlasForceRegenerate,
-                    .UvPreserveAuthored = &m_UvAtlasPreserveAuthored,
-                };
-                DrawDomainRenderWindow(
-                    *model,
-                    *m_ActiveEditorContext,
-                    &textureBakeState);
-
-                const Geometry::PropertySet* properties =
-                    ResolveSelectedMeshVertexProperties(*m_ActiveEditorContext);
-                if (model->DomainMatches && properties != nullptr)
-                {
-                    ImGui::SeparatorText("Property distribution");
-                    (void)DrawEditorScalarPropertyPlotWidget(
-                        "mesh.appearance.properties",
-                        Geometry::ConstPropertySet(*properties),
-                        m_MeshPropertyPlotState);
-                }
-            }
-        }
-        ImGui::End();
     }
 
     SandboxEditorUi::~SandboxEditorUi()
@@ -19766,6 +18588,9 @@ namespace Extrinsic::Runtime
                 if (m_LastPointCloudOutlierRemovalResult.has_value())
                     context.LastPointCloudOutlierRemovalResult =
                         &*m_LastPointCloudOutlierRemovalResult;
+                if (m_LastUvRegenerationResult.has_value())
+                    context.LastUvRegenerationResult =
+                        &*m_LastUvRegenerationResult;
                 if (m_LastProgressivePoissonResult.has_value())
                     context.LastProgressivePoissonResult =
                         &*m_LastProgressivePoissonResult;
@@ -19814,14 +18639,6 @@ namespace Extrinsic::Runtime
                     BuildModelRequestFromOpenPanels(&m_PanelWindowOpen);
                 m_LastFrame = BuildSandboxEditorPanelFrame(context, modelRequest);
                 context.ModelBuildStats = &m_LastFrame.ModelBuildStats;
-                PointCloudOutlierRemovalUiState pointCloudOutlierState{
-                    .LastResult = &m_LastPointCloudOutlierRemovalResult,
-                    .Method = &m_PointCloudOutlierMethod,
-                    .KNeighbors = &m_PointCloudOutlierKNeighbors,
-                    .StdDevMultiplier = &m_PointCloudOutlierStdDevMultiplier,
-                    .SearchRadius = &m_PointCloudOutlierSearchRadius,
-                    .MinNeighbors = &m_PointCloudOutlierMinNeighbors,
-                };
                 TextureBakeUiState textureBakeState{
                     .LastUvRegenerationResult =
                         &m_LastUvRegenerationResult,
@@ -19837,7 +18654,6 @@ namespace Extrinsic::Runtime
                     .UvPreserveAuthored = &m_UvAtlasPreserveAuthored,
                 };
                 m_ActiveEditorContext = &context;
-                m_RegisteredMeshModelCache.reset();
                 DrawPanelFrame(
                     m_LastFrame,
                     &context,
@@ -19848,11 +18664,8 @@ namespace Extrinsic::Runtime
                     &m_LastImportResult,
                     &m_LastSceneFileResult,
                     &m_PanelWindowOpen,
-                    &m_DomainWindowOpen,
-                    &pointCloudOutlierState,
                     &textureBakeState,
                     &m_Host.Windows());
-                m_RegisteredMeshModelCache.reset();
                 m_ActiveEditorContext = nullptr;
             },
             });
@@ -19882,7 +18695,6 @@ namespace Extrinsic::Runtime
             m_KMeansGpuJobs.reset();
         }
         m_ActiveEditorContext = nullptr;
-        m_RegisteredMeshModelCache.reset();
         m_SelectedModelCache.Clear();
     }
 

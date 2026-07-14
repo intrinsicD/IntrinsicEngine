@@ -41,7 +41,6 @@ import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.EditorPropertyWidgets;
 import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigControl;
@@ -66,13 +65,13 @@ import Geometry.Graph.Vertex.Normals;
 import Geometry.HalfedgeMesh.Vertices.Normals;
 import Geometry.PointCloud.Normals;
 import Geometry.PointCloud.Utils;
+import Geometry.Properties;
 import Geometry.Smoothing;
 import Geometry.UvAtlas;
 
 namespace Extrinsic::Runtime::Detail
 {
     inline constexpr std::size_t kSandboxEditorPanelWindowCount = 10u;
-    inline constexpr std::size_t kSandboxEditorDomainWindowCount = 12u;
 }
 
 export namespace Extrinsic::Runtime
@@ -2345,6 +2344,8 @@ export namespace Extrinsic::Runtime
             LastPointCloudVertexNormalsResult{nullptr};
         const SandboxEditorPointCloudOutlierRemovalResult*
             LastPointCloudOutlierRemovalResult{nullptr};
+        const SandboxEditorUvRegenerationCommandResult*
+            LastUvRegenerationResult{nullptr};
         const SandboxEditorProgressivePoissonResult*
             LastProgressivePoissonResult{nullptr};
         const SandboxEditorRegistrationResult*
@@ -2391,6 +2392,12 @@ export namespace Extrinsic::Runtime
         bool MeshSubdivideLoopFeatureEdgesAvailable{true};
         bool MeshSimplifyKernelAvailable{true};
     };
+
+    // Borrowed from the selected mesh and valid only for the current callback;
+    // scene mutation can invalidate the view.
+    [[nodiscard]] Geometry::ConstPropertySet
+    ResolveSandboxEditorSelectedMeshVertexProperties(
+        const SandboxEditorContext& context);
 
     struct SandboxEditorWindowDescriptor
     {
@@ -2629,6 +2636,11 @@ export namespace Extrinsic::Runtime
         }
     };
 
+    [[nodiscard]] const char* DebugNameForSandboxEditorUvAtlasStatus(
+        Geometry::UvAtlas::UvAtlasStatus status) noexcept;
+    [[nodiscard]] const char* DebugNameForSandboxEditorUvAtlasProvenance(
+        Geometry::UvAtlas::UvAtlasProvenance provenance) noexcept;
+
     [[nodiscard]] SandboxEditorPanelFrame BuildSandboxEditorPanelFrame(
         const SandboxEditorContext& context);
     [[nodiscard]] SandboxEditorPanelFrame BuildSandboxEditorPanelFrame(
@@ -2833,28 +2845,18 @@ export namespace Extrinsic::Runtime
         }
 
     private:
-        void RegisterExemplarWindows();
-        void DrawRegisteredMeshAppearance(bool& open);
-        [[nodiscard]] const SandboxEditorDomainWindowModel*
-        GetRegisteredMeshWindowModel();
         void AttachKMeansGpuQueue(Engine& engine);
         void DetachKMeansGpuQueue();
 
         Engine*                 m_Engine{nullptr};
         EditorUiHost            m_Host{};
-        EditorWindowHandle      m_MeshAppearanceWindow{};
         const SandboxEditorContext* m_ActiveEditorContext{nullptr};
-        std::optional<SandboxEditorDomainWindowModel>
-            m_RegisteredMeshModelCache{};
-        EditorPropertyPlotWidgetState m_MeshPropertyPlotState{};
         SandboxEditorPanelFrame m_LastFrame{};
         SandboxEditorSelectedModelCache m_SelectedModelCache{};
         std::array<char, 1024>  m_ImportPathBuffer{};
         std::array<char, 1024>  m_ScenePathBuffer{};
         std::array<bool, Detail::kSandboxEditorPanelWindowCount>
             m_PanelWindowOpen{};
-        std::array<bool, Detail::kSandboxEditorDomainWindowCount>
-            m_DomainWindowOpen{};
         Assets::AssetPayloadKind m_ImportPayloadKind{
             Assets::AssetPayloadKind::Unknown};
         std::uint64_t m_LastObservedRuntimeImportSequence{0};
@@ -2896,11 +2898,6 @@ export namespace Extrinsic::Runtime
         SandboxEditorRenderRecipeEditorState m_RenderRecipeState{};
         RenderArtifactRegistry m_RenderArtifactRegistry{};
         std::array<char, 8192> m_RenderRecipeDraftBuffer{};
-        std::int32_t m_PointCloudOutlierMethod{0};
-        std::int32_t m_PointCloudOutlierKNeighbors{16};
-        float m_PointCloudOutlierStdDevMultiplier{1.0f};
-        float m_PointCloudOutlierSearchRadius{0.0f};
-        std::int32_t m_PointCloudOutlierMinNeighbors{4};
         std::int32_t m_TextureBakeSourceIndex{0};
         std::int32_t m_TextureBakeTargetSemanticIndex{0};
         std::int32_t m_TextureBakeEncoderIndex{0};

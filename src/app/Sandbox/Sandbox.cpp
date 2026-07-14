@@ -4,6 +4,7 @@ module;
 
 module Extrinsic.Sandbox;
 
+import Extrinsic.Sandbox.Editor.DomainPanels;
 import Extrinsic.Sandbox.Editor.MethodPanels;
 import Extrinsic.Sandbox.Editor.MeshProcessingPanels;
 import Extrinsic.Runtime.ClusteringModule;
@@ -18,6 +19,7 @@ public:
     m_EditorUi.Attach(engine);
     m_MethodPanels.Register(m_EditorUi);
     m_MeshProcessingPanels.Register(m_EditorUi);
+    m_DomainPanels.Register(m_EditorUi);
   }
 
   void OnSimTick(Runtime::Engine &engine, double fixedDt) override {
@@ -33,6 +35,7 @@ public:
   }
 
   void OnShutdown(Runtime::Engine &engine) override {
+    m_DomainPanels.Unregister();
     m_MeshProcessingPanels.Unregister();
     m_MethodPanels.Unregister();
     m_EditorUi.Detach();
@@ -43,6 +46,7 @@ private:
   Runtime::SandboxEditorUi m_EditorUi{};
   Editor::MethodPanels m_MethodPanels{};
   Editor::MeshProcessingPanels m_MeshProcessingPanels{};
+  Editor::DomainPanels m_DomainPanels{};
   Runtime::RuntimeSandboxDefaultPolicyRegistration m_DefaultPolicies{};
 };
 

@@ -14,7 +14,7 @@ Each active task should include:
 - [`ARCH-006`](ARCH-006-sandbox-editor-content-out-of-runtime.md) — move
   Sandbox editor presentation from runtime to app through the retired UI-034
   contribution seam (`in progress`, owner: Codex, branch:
-  `codex/ui-034-editor-window-contribution`).
+  `codex/arch-006-completion`).
 
 ## History
 

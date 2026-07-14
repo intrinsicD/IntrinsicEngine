@@ -20,6 +20,8 @@ Sandbox/
     Sandbox.MethodPanels.cpp
     Sandbox.MeshProcessingPanels.cppm
     Sandbox.MeshProcessingPanels.cpp
+    Sandbox.DomainPanels.cppm
+    Sandbox.DomainPanels.cpp
   Sandbox.cppm
   Sandbox.cpp
   main.cpp

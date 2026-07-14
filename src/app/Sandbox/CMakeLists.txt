@@ -8,10 +8,12 @@ target_sources(ExtrinsicSandbox
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Sandbox.cppm
+        Editor/Sandbox.DomainPanels.cppm
         Editor/Sandbox.MethodPanels.cppm
         Editor/Sandbox.MeshProcessingPanels.cppm
         PRIVATE
         Sandbox.cpp
+        Editor/Sandbox.DomainPanels.cpp
         Editor/Sandbox.MethodPanels.cpp
         Editor/Sandbox.MeshProcessingPanels.cpp
         main.cpp
