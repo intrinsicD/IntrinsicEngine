@@ -31,6 +31,42 @@ work.
 `FrameGraph` is the typed Core facade over the default callback-executing task
 graph.
 
+## Submission and completion
+
+`TaskGraph::Submit()` starts dependency-ready callbacks and returns immediately
+with a copyable `TaskGraphCompletion`. Submission state and the graph
+implementation are shared-owned by the completion handle and scheduled
+closures, so a retained handle remains valid even when the submitting
+`TaskGraph` object leaves scope. Callers must retain at least one handle until
+the submission is ready; otherwise owner-thread-only work has no pump surface
+and the surviving graph remains fail-closed as live rather than discarding or
+running those callbacks on an arbitrary thread.
+
+The completion contract is:
+
+- `IsReady()` is a thread-safe poll and may be called from any thread.
+- `PumpMainThreadPasses()` executes every currently ready `MainThreadOnly` or
+  `AllowParallel == false` callback in deterministic priority, estimated-cost,
+  and insertion order. It must run on the thread that called `Submit()` and
+  returns `ThreadViolation` elsewhere.
+- `Wait()` has the same owner-thread requirement. It pumps owner-thread passes,
+  help-executes one scheduler task from the inject queues or worker-local
+  deques, and parks on completion-count progress when no work is available.
+- `Execute()` is exactly the blocking compatibility form: `Submit()` followed
+  by `Wait()`. There is no separate execution path and no yield-spin loop.
+
+When the Core task scheduler is unavailable, ready callbacks remain on the
+owner queue; explicit pumping or `Wait()` therefore provides a deterministic
+single-thread fallback. `Reset()` returns `InvalidState` while a submission is
+live and clears the graph only after completion. A second concurrent
+submission is rejected in the same way.
+
+Each submission owns a counted `CounterEvent`. The event's internal state is
+shared across signal and blocking-wait operations, allowing a signal to notify
+progress after publishing a count transition without racing destruction. The
+final task publishes execution timing and the idle graph state before it
+signals completion.
+
 ## Ownership
 
 - Core owns identifiers, generic task metadata, dependency and hazard

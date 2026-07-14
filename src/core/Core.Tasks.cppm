@@ -74,6 +74,9 @@ export class Job;
                                                std::shared_ptr<std::atomic<bool>> alive = nullptr);
         static std::uint32_t UnparkReady(WaitToken token);
         static void MarkWaitTokenNotReady(WaitToken token);
+        // Execute at most one queued task on the calling thread. External
+        // callers may consume inject work or steal worker-local work.
+        [[nodiscard]] static bool TryRunOne();
         static void WaitForAll();
 
     private:

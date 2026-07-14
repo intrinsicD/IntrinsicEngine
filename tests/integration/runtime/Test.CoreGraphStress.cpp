@@ -265,7 +265,7 @@ TEST(CoreTaskGraphStress, ReusingGraphAcrossEpochsDoesNotGrowRetainedMemory)
         ASSERT_TRUE(graph.Compile().has_value()) << "Compile failed";
         ASSERT_TRUE(graph.Execute().has_value()) << "Execute failed";
         EXPECT_EQ(graph.GetScheduleStats().taskCount, kPasses);
-        graph.Reset();
+        ASSERT_TRUE(graph.Reset().has_value()) << "Reset failed";
     }
 
     const auto endRss = ReadCurrentRssKb();

@@ -83,8 +83,15 @@ namespace Extrinsic::Core::Tasks
         if (TryPopGlobalInject(outTask))
             return true;
 
-        if (workerIndex.has_value() && TrySteal(*workerIndex, outTask))
+        if (workerIndex.has_value())
+        {
+            if (TrySteal(*workerIndex, outTask))
+                return true;
+        }
+        else if (TryStealExternal(outTask))
+        {
             return true;
+        }
 
         return false;
     }
@@ -162,6 +169,54 @@ namespace Extrinsic::Core::Tasks
         }
 
         return false;
+    }
+
+    bool TryStealExternal(LocalTask& outTask)
+    {
+        const auto workerCount = static_cast<unsigned>(s_Ctx->workerStates.size());
+        for (unsigned victimIndex = 0; victimIndex < workerCount; ++victimIndex)
+        {
+            s_Ctx->totalStealAttempts.fetch_add(1, std::memory_order_relaxed);
+            auto& victim = s_Ctx->workerStates[victimIndex];
+            if (!victim.localLock.try_lock())
+            {
+                s_Ctx->queueContentionCount.fetch_add(1, std::memory_order_relaxed);
+                continue;
+            }
+
+            bool stole = false;
+            if (!victim.localDeque.empty())
+            {
+                outTask = std::move(victim.localDeque.front());
+                victim.localDeque.pop_front();
+                victim.stealCount.fetch_add(1, std::memory_order_relaxed);
+                s_Ctx->stealPopCount.fetch_add(1, std::memory_order_relaxed);
+                s_Ctx->successfulStealAttempts.fetch_add(1, std::memory_order_relaxed);
+                stole = true;
+            }
+            victim.localLock.unlock();
+
+            if (stole)
+                return true;
+        }
+
+        return false;
+    }
+
+    bool Scheduler::TryRunOne()
+    {
+        if (!s_Ctx || !s_Ctx->isRunning.load(std::memory_order_acquire))
+            return false;
+
+        LocalTask task;
+        const auto workerIndex = (s_WorkerIndex >= 0)
+            ? std::optional<unsigned>{static_cast<unsigned>(s_WorkerIndex)}
+            : std::nullopt;
+        if (!TryPopTask(task, workerIndex))
+            return false;
+
+        OnTaskDequeuedAndRun(task);
+        return true;
     }
 
     void OnTaskDequeuedAndRun(LocalTask& task)
