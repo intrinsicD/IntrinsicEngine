@@ -31,13 +31,16 @@ completed_on: 2026-07-15
   GEOM-018 `ParameterizationDiagnostics` in the result. The SPD interior system
   is solved with `Geometry.Sparse::SparseLDLT` (the GEOM-020 seam), factored once
   and back-substituted for u and v; no Eigen types cross the public API.
+- Disk topology is validated as a connected manifold with exactly one boundary
+  loop and Euler characteristic one. This rejects punctured positive-genus
+  meshes that a boundary-loop-count-only check would misclassify.
 - GEOM-018 (diagnostics) and GEOM-020 (sparse SPD) are both retired, so the
   documented fallback clause is not needed; LDLT is used directly.
 - Existing `Geometry.Parameterization::ComputeLSCM` is untouched and covered by a
   reachability test.
 - Retirement verification: `cmake --preset ci` selected Clang 23 with
   ASan/UBSan, `IntrinsicTests` built successfully, and the exact
-  `Parameterization|Sparse|DEC` selection passed 134/134. Layering, test-layout,
+  `Parameterization|Sparse|DEC` selection passed 143/143. Layering, test-layout,
   task-policy, task-state, and documentation checks pass; the generated module
   inventory remains current.
 - Spawned by [`GEOM-011`](../archive/GEOM-011-parameterization-mapping-roadmap.md) and the [parameterization/mapping roadmap](../../docs/architecture/parameterization-mapping-roadmap.md).
@@ -65,28 +68,30 @@ completed_on: 2026-07-15
       and uniform weights.
 - [x] Circle-boundary (on-circle + deterministic) and square arc-length boundary
       fixtures.
-- [x] Invalid topology: closed mesh (`NotDiskTopology`), quad mesh
-      (`NotTriangleMesh`). Multiple-loop / degenerate-loop are covered by the
-      single-loop coverage check and the `< 3` boundary guard.
-- [x] Invalid boundary conditions: mismatched arrays, duplicate pins, non-finite
-      UVs, Custom boundary not fully pinned.
-- [x] Tutte flip-free embedding asserted via `Diagnostics.FlippedElementCount`.
+- [x] Invalid topology: closed mesh, two-boundary-loop mesh, and a connected
+      punctured genus-one mesh with one boundary loop (`NotDiskTopology`); quad
+      mesh (`NotTriangleMesh`); fewer than three vertices
+      (`InsufficientVertices`). The malformed `< 3` boundary-loop case remains
+      fail-closed behind the explicit `DegenerateBoundary` guard.
+- [x] Invalid boundary conditions: mismatched arrays, duplicate and deleted
+      pins, non-finite UVs, Custom boundary not fully pinned.
+- [x] Tutte flip-free embedding and finite GEOM-018 distortion diagnostics.
 - [x] LSCM reachability test.
 - [x] `cmake --preset ci`, `cmake --build --preset ci --target IntrinsicTests`,
-      and the focused `Parameterization|Sparse|DEC` CTest gate pass (134/134).
+      and the focused `Parameterization|Sparse|DEC` CTest gate pass (143/143).
 
 ## Docs
 - [x] Updated [`docs/architecture/geometry.md`](../../docs/architecture/geometry.md)
       with the harmonic/Tutte solver, weightings, boundary policies, solver seam,
       and failure-state semantics.
 - [x] Regenerated `docs/api/generated/module_inventory.md` (adds
-      `Geometry.Parameterization.Harmonic`; 530 modules).
+      `Geometry.Parameterization.Harmonic`).
 - [x] No new smoke benchmark ID was introduced; the
       parameterization-mapping roadmap pack boundary is unchanged.
 
 ## Acceptance criteria
 - [x] Harmonic/Tutte parameterization is available with explicit boundary policies and deterministic diagnostics.
-- [x] Unsupported topology, invalid pins, invalid UVs, singular systems, and solver failure report structured failure states.
+- [x] Unsupported topology (including genus-positive one-loop meshes), invalid pins, invalid UVs, singular systems, and solver failure report structured failure states.
 - [x] Retired GEOM-018 diagnostics are embedded in every successful result.
 - [x] Tests cover valid square/circle embeddings, invalid topology, invalid boundary conditions, and LSCM compatibility.
 - [x] The implementation preserves `geometry -> core` layering and benchmark dependencies remain limited to public geometry/method APIs.
@@ -112,7 +117,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 ## Maturity
 - Reached: `CPUContracted` (deterministic CPU solver verified by the default
-  gate and the focused 134-test parameterization/sparse/DEC selection).
+  gate and the focused 143-test parameterization/sparse/DEC selection).
 - No `Operational` follow-up is owed; this task has no backend seam.
 
 Completed: 2026-07-15. Implementation commit: `29d7a908`; retirement metadata

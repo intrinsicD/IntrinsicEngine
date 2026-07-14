@@ -18,9 +18,10 @@ export namespace Geometry::Parameterization
     // Harmonic / Tutte fixed-boundary parameterization (GEOM-019)
     // =========================================================================
     //
-    // Maps a disk-topology triangle mesh into the plane by fixing the boundary
-    // loop to a convex target shape and solving a sparse SPD Laplacian system
-    // for the interior vertices. Two weightings:
+    // Maps a connected disk-topology triangle mesh (one boundary loop and
+    // Euler characteristic one) into the plane by fixing the boundary loop to
+    // a convex target shape and solving a sparse SPD Laplacian system for the
+    // interior vertices. Two weightings:
     //
     //   * WeightType::Cotangent — harmonic map (minimizes Dirichlet energy);
     //     cotangent weights, non-convex (negative) weights optionally clamped.
@@ -52,7 +53,7 @@ export namespace Geometry::Parameterization
         Success,
         EmptyMesh,
         NotTriangleMesh,
-        NotDiskTopology,        // zero or more than one boundary loop
+        NotDiskTopology,        // disconnected/non-manifold, chi != 1, or boundary-loop count != 1
         DegenerateBoundary,     // boundary loop shorter than 3 vertices
         InsufficientVertices,
         MismatchedBoundaryArray,// PinnedVertices.size() != PinnedUVs.size()

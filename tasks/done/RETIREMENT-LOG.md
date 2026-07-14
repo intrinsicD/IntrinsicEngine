@@ -13,11 +13,15 @@ harmonic/Tutte parameterization retired on 2026-07-15 at `CPUContracted`.
 Implementation commit `29d7a908` added explicit circle, square, and custom
 boundary policies, cotangent-harmonic and uniform-Tutte weights, structured
 failure states, shared GEOM-018 diagnostics, and a geometry-owned sparse-LDLT
-solve without exposing Eigen. The Clang-23 ASan/UBSan `ci` build completed and
-the exact `Parameterization|Sparse|DEC` selection passed 134/134; layering,
-task, test-layout, and documentation checks remained green. No `Operational`
-follow-up is owed because this is a deterministic CPU geometry solver. Its
-retirement satisfies GEOM-063's remaining dependency.
+solve without exposing Eigen. Corrective closure validation requires connected
+manifold topology, one boundary loop, and Euler characteristic one, with
+regressions for multiple loops, a punctured genus-one mesh, insufficient
+vertices, deleted pins, and finite distortion diagnostics. The Clang-23
+ASan/UBSan `ci` build completed and the exact `Parameterization|Sparse|DEC`
+selection passed 143/143; layering, task, test-layout, and documentation checks
+remained green. No `Operational` follow-up is owed because this is a
+deterministic CPU geometry solver. Its retirement satisfies GEOM-063's remaining
+dependency.
 
 [`PROC-026`](PROC-026-task-archive-and-micro-template.md) — task archive
 sweep and micro template retired on 2026-07-14. All 661 retired task files

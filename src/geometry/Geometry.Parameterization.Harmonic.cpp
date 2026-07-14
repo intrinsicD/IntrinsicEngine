@@ -100,6 +100,61 @@ namespace Geometry::Parameterization
             return count;
         }
 
+        // A connected orientable triangle mesh with one boundary loop is a
+        // topological disk exactly when its Euler characteristic is one.  The
+        // boundary-loop count alone is insufficient: a punctured positive-
+        // genus surface also has one boundary loop.
+        [[nodiscard]] bool HasDiskTopology(
+            const Mesh& mesh,
+            const std::vector<VertexHandle>& boundaryLoop)
+        {
+            if (boundaryLoop.empty())
+            {
+                return false;
+            }
+
+            std::vector<std::uint8_t> reached(mesh.VerticesSize(), 0u);
+            std::vector<VertexHandle> pending;
+            pending.push_back(boundaryLoop.front());
+            reached[boundaryLoop.front().Index] = 1u;
+
+            while (!pending.empty())
+            {
+                const VertexHandle vertex = pending.back();
+                pending.pop_back();
+
+                for (const HalfedgeHandle halfedge : mesh.HalfedgesAroundVertex(vertex))
+                {
+                    const VertexHandle neighbor = mesh.ToVertex(halfedge);
+                    if (mesh.IsDeleted(neighbor) || reached[neighbor.Index] != 0u)
+                    {
+                        continue;
+                    }
+                    reached[neighbor.Index] = 1u;
+                    pending.push_back(neighbor);
+                }
+            }
+
+            for (std::size_t vi = 0; vi < mesh.VerticesSize(); ++vi)
+            {
+                const VertexHandle vertex{static_cast<PropertyIndex>(vi)};
+                if (mesh.IsDeleted(vertex))
+                {
+                    continue;
+                }
+                if (mesh.IsIsolated(vertex) || !mesh.IsManifold(vertex) || reached[vi] == 0u)
+                {
+                    return false;
+                }
+            }
+
+            const std::int64_t eulerCharacteristic =
+                static_cast<std::int64_t>(mesh.VertexCount())
+                - static_cast<std::int64_t>(mesh.EdgeCount())
+                + static_cast<std::int64_t>(mesh.FaceCount());
+            return eulerCharacteristic == 1;
+        }
+
         [[nodiscard]] double SignedAreaUv(glm::vec2 a, glm::vec2 b, glm::vec2 c) noexcept
         {
             return 0.5 * (static_cast<double>(b.x - a.x) * static_cast<double>(c.y - a.y)
@@ -192,13 +247,17 @@ namespace Geometry::Parameterization
             return result;
         };
 
-        if (mesh.FacesSize() == 0 || mesh.VertexCount() == 0)
+        if (mesh.VertexCount() == 0)
         {
             return fail(HarmonicStatus::EmptyMesh);
         }
         if (mesh.VertexCount() < 3)
         {
             return fail(HarmonicStatus::InsufficientVertices);
+        }
+        if (mesh.FaceCount() == 0)
+        {
+            return fail(HarmonicStatus::EmptyMesh);
         }
 
         // Triangle-mesh precondition.
@@ -248,6 +307,10 @@ namespace Geometry::Parameterization
         if (loop.size() < 3)
         {
             return fail(HarmonicStatus::DegenerateBoundary);
+        }
+        if (!HasDiskTopology(mesh, loop))
+        {
+            return fail(HarmonicStatus::NotDiskTopology);
         }
         result.BoundaryVertexCount = loop.size();
 
