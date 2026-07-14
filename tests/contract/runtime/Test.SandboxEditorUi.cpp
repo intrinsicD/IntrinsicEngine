@@ -2422,6 +2422,36 @@ TEST(SandboxEditorUi, MethodFacadesCompileSeparatelyFromEditorShell)
     EXPECT_NE(runtimeCMake.find(
                   "Editor/Runtime.SandboxMethodFacade.cpp"),
               std::string::npos);
+
+    const std::string_view recordGpuWork = SourceRange(
+        methodFacade,
+        ".RecordFrameCommands =",
+        ".DrainCompletedTransfers =");
+    const std::string_view drainGpuWork = SourceRange(
+        methodFacade,
+        ".DrainCompletedTransfers =",
+        ".HasInFlightWork =");
+    const std::string_view hasInFlightWork = SourceRange(
+        methodFacade,
+        ".HasInFlightWork =",
+        ".ShutdownAfterDeviceIdle =");
+    const std::string_view shutdownAfterIdle = SourceRange(
+        methodFacade,
+        ".ShutdownAfterDeviceIdle =",
+        "            });\n        if (!m_KMeansGpuParticipant.IsValid())");
+    ASSERT_FALSE(recordGpuWork.empty());
+    ASSERT_FALSE(drainGpuWork.empty());
+    ASSERT_FALSE(hasInFlightWork.empty());
+    ASSERT_FALSE(shutdownAfterIdle.empty());
+    EXPECT_NE(recordGpuWork.find("epoch->load"), std::string_view::npos);
+    EXPECT_NE(drainGpuWork.find("epoch->load"), std::string_view::npos);
+    EXPECT_EQ(hasInFlightWork.find("epoch->load"), std::string_view::npos);
+    EXPECT_NE(hasInFlightWork.find("HasInFlightJob()"),
+              std::string_view::npos);
+    EXPECT_EQ(shutdownAfterIdle.find("epoch->load"),
+              std::string_view::npos);
+    EXPECT_NE(shutdownAfterIdle.find("m_KMeansGpuJobs.reset()"),
+              std::string_view::npos);
 }
 
 TEST(SandboxEditorUi, HierarchyInspectorModelReportsSelectionRenderHintsAndDomain)
@@ -12064,6 +12094,229 @@ TEST(SandboxEditorUi, RenderRecipeEditorArtifactPublishAndApplyUseRegistry)
     EXPECT_FALSE(result.Succeeded());
     EXPECT_EQ(result.Status,
               Runtime::SandboxEditorRenderRecipeCommandStatus::MissingArtifactRegistry);
+}
+
+TEST(SandboxEditorSession, UnattachedPrepareFrameFailsClosed)
+{
+    Runtime::SandboxEditorSession session;
+    bool visited = false;
+
+    EXPECT_FALSE(session.IsAttached());
+    EXPECT_FALSE(session.PrepareFrame());
+    EXPECT_FALSE(session.VisitPreparedFrame(
+        [&visited](Runtime::SandboxEditorPreparedFrameView)
+        {
+            visited = true;
+        }));
+    EXPECT_FALSE(visited);
+    EXPECT_FALSE(session.LastFrame().FileImport.Enabled);
+}
+
+TEST(SandboxEditorSession, AttachPrepareDetachBoundsPreparedFrameLifetime)
+{
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<PassiveApplication>());
+    engine.Initialize();
+
+    Runtime::SandboxEditorSession session;
+    session.Attach(engine);
+    EXPECT_TRUE(session.IsAttached());
+    EXPECT_FALSE(session.VisitPreparedFrame(
+        [](Runtime::SandboxEditorPreparedFrameView)
+        {
+        }));
+    ASSERT_TRUE(session.PrepareFrame());
+
+    bool sawPreparedContext = false;
+    ASSERT_TRUE(session.VisitPreparedFrame(
+        [&sawPreparedContext](Runtime::SandboxEditorPreparedFrameView frame)
+        {
+            sawPreparedContext = frame.Context.Scene != nullptr;
+            frame.LastAssetImportResult =
+                Runtime::SandboxEditorFileImportResult{
+                    .Status = Runtime::SandboxEditorCommandStatus::Applied,
+                    .PayloadKind = Assets::AssetPayloadKind::Mesh,
+                };
+            ASSERT_NE(frame.Context.RenderRecipeEditorState, nullptr);
+            frame.Context.RenderRecipeEditorState->DraftRevision = 41u;
+            ASSERT_NE(frame.Context.RenderArtifacts, nullptr);
+            ASSERT_TRUE(frame.Context.RenderArtifacts
+                            ->RegisterArtifact(
+                                MakeSandboxRenderArtifact(
+                                    "session-attachment-artifact"))
+                            .Succeeded());
+        }));
+    EXPECT_TRUE(sawPreparedContext);
+    EXPECT_TRUE(session.LastFrame().FileImport.Enabled);
+
+    session.Detach();
+    EXPECT_FALSE(session.IsAttached());
+    EXPECT_FALSE(session.LastFrame().FileImport.Enabled);
+    EXPECT_FALSE(session.VisitPreparedFrame(
+        [](Runtime::SandboxEditorPreparedFrameView)
+        {
+        }));
+    EXPECT_FALSE(session.PrepareFrame());
+
+    session.Attach(engine);
+    ASSERT_TRUE(session.PrepareFrame());
+    ASSERT_TRUE(session.VisitPreparedFrame(
+        [](Runtime::SandboxEditorPreparedFrameView frame)
+        {
+            EXPECT_FALSE(frame.LastAssetImportResult.has_value());
+            ASSERT_NE(frame.Context.RenderRecipeEditorState, nullptr);
+            EXPECT_EQ(frame.Context.RenderRecipeEditorState->DraftRevision, 0u);
+            ASSERT_NE(frame.Context.RenderArtifacts, nullptr);
+            EXPECT_EQ(frame.Context.RenderArtifacts->Size(), 0u);
+        }));
+
+    session.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
+{
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<PassiveApplication>());
+    engine.Initialize();
+
+    Runtime::SandboxEditorSession session;
+    session.Attach(engine);
+    ASSERT_TRUE(session.PrepareFrame(MakeNoSandboxEditorModelBuildRequest()));
+
+    std::function<void(Runtime::SandboxEditorKMeansResult)> staleResultSink{};
+    std::function<Runtime::SandboxEditorFileImportResult(
+        const Runtime::SandboxEditorFileImportCommand&)>
+        staleImportCommand{};
+    ASSERT_TRUE(session.VisitPreparedFrame(
+        [&](Runtime::SandboxEditorPreparedFrameView frame)
+        {
+            staleResultSink = frame.Context.MethodResultSinks.KMeans;
+            staleImportCommand = frame.Context.AssetImportCommands.Import;
+        }));
+    ASSERT_TRUE(staleResultSink);
+    ASSERT_TRUE(staleImportCommand);
+    const Runtime::SandboxEditorFileImportResult activeImport =
+        staleImportCommand(Runtime::SandboxEditorFileImportCommand{
+            .Path = "/tmp/intrinsic-session-active-command.obj",
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+        });
+    EXPECT_EQ(activeImport.Status,
+              Runtime::SandboxEditorCommandStatus::AssetImportFailed);
+    EXPECT_EQ(activeImport.Error, Core::ErrorCode::FileNotFound);
+
+    session.Detach();
+    session.Attach(engine);
+    ASSERT_TRUE(session.PrepareFrame(MakeNoSandboxEditorModelBuildRequest()));
+
+    std::function<void(Runtime::SandboxEditorKMeansResult)> currentResultSink{};
+    ASSERT_TRUE(session.VisitPreparedFrame(
+        [&](Runtime::SandboxEditorPreparedFrameView frame)
+        {
+            currentResultSink = frame.Context.MethodResultSinks.KMeans;
+        }));
+    ASSERT_TRUE(currentResultSink);
+
+    currentResultSink(Runtime::SandboxEditorKMeansResult{
+        .Message = "current attachment result",
+    });
+    staleResultSink(Runtime::SandboxEditorKMeansResult{
+        .Message = "stale attachment result",
+    });
+    const Runtime::SandboxEditorFileImportResult staleImport =
+        staleImportCommand(Runtime::SandboxEditorFileImportCommand{
+            .Path = "/tmp/intrinsic-session-stale-command.obj",
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+        });
+    EXPECT_EQ(staleImport.Status,
+              Runtime::SandboxEditorCommandStatus::AssetImportFailed);
+    EXPECT_EQ(staleImport.Error, Core::ErrorCode::InvalidState);
+
+    ASSERT_TRUE(session.PrepareFrame(MakeNoSandboxEditorModelBuildRequest()));
+    ASSERT_TRUE(session.VisitPreparedFrame(
+        [](Runtime::SandboxEditorPreparedFrameView frame)
+        {
+            ASSERT_NE(frame.Context.LastKMeansResult, nullptr);
+            EXPECT_EQ(frame.Context.LastKMeansResult->Message,
+                      "current attachment result");
+        }));
+
+    session.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorSession, ReattachObservesEqualSequenceFromDifferentEngine)
+{
+    Runtime::SandboxEditorSession session;
+    std::uint64_t firstSequence = 0u;
+
+    {
+        Runtime::Engine firstEngine(
+            HeadlessConfig(),
+            std::make_unique<PassiveApplication>());
+        firstEngine.Initialize();
+        EXPECT_FALSE(firstEngine.GetAssetImportPipeline()
+                         .ImportAssetFromPath(
+                             Runtime::RuntimeAssetImportRequest{
+                                 .Path =
+                                     "/tmp/intrinsic-session-first-missing.obj",
+                                 .PayloadKind =
+                                     Assets::AssetPayloadKind::Mesh,
+                             })
+                         .has_value());
+        const auto& event = firstEngine.GetAssetImportPipeline()
+                                .GetLastAssetImportEvent();
+        ASSERT_TRUE(event.has_value());
+        firstSequence = event->Sequence;
+
+        session.Attach(firstEngine);
+        ASSERT_TRUE(session.PrepareFrame(
+            MakeNoSandboxEditorModelBuildRequest()));
+        ASSERT_TRUE(session.VisitPreparedFrame(
+            [](Runtime::SandboxEditorPreparedFrameView frame)
+            {
+                ASSERT_NE(frame.Context.LastAssetImportResult, nullptr);
+                EXPECT_EQ(frame.Context.LastAssetImportResult->PayloadKind,
+                          Assets::AssetPayloadKind::Mesh);
+            }));
+        session.Detach();
+        firstEngine.Shutdown();
+    }
+
+    {
+        Runtime::Engine secondEngine(
+            HeadlessConfig(),
+            std::make_unique<PassiveApplication>());
+        secondEngine.Initialize();
+        EXPECT_FALSE(secondEngine.GetAssetImportPipeline()
+                         .ImportAssetFromPath(
+                             Runtime::RuntimeAssetImportRequest{
+                                 .Path =
+                                     "/tmp/intrinsic-session-second-missing.xyz",
+                                 .PayloadKind =
+                                     Assets::AssetPayloadKind::PointCloud,
+                             })
+                         .has_value());
+        const auto& event = secondEngine.GetAssetImportPipeline()
+                                .GetLastAssetImportEvent();
+        ASSERT_TRUE(event.has_value());
+        ASSERT_EQ(event->Sequence, firstSequence);
+
+        session.Attach(secondEngine);
+        ASSERT_TRUE(session.PrepareFrame(
+            MakeNoSandboxEditorModelBuildRequest()));
+        ASSERT_TRUE(session.VisitPreparedFrame(
+            [](Runtime::SandboxEditorPreparedFrameView frame)
+            {
+                ASSERT_NE(frame.Context.LastAssetImportResult, nullptr);
+                EXPECT_EQ(frame.Context.LastAssetImportResult->PayloadKind,
+                          Assets::AssetPayloadKind::PointCloud);
+            }));
+        session.Detach();
+        secondEngine.Shutdown();
+    }
 }
 
 TEST(SandboxEditorUi, EngineAttachmentRegistersEditorCallback)

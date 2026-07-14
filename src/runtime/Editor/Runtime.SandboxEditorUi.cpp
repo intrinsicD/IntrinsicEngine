@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <atomic>
 #include <bit>
 #include <chrono>
 #include <array>
@@ -10814,6 +10815,177 @@ namespace Extrinsic::Runtime
             };
         }
 
+        [[nodiscard]] bool AttachmentEpochIsActive(
+            const std::shared_ptr<std::atomic_bool>& epoch) noexcept
+        {
+            return epoch != nullptr &&
+                epoch->load(std::memory_order_acquire);
+        }
+
+        template <typename Command, typename Fallback>
+        [[nodiscard]] auto GuardAttachmentCommand(
+            Command command,
+            std::shared_ptr<std::atomic_bool> epoch,
+            Fallback fallback)
+        {
+            return [command = std::move(command),
+                    epoch = std::move(epoch),
+                    fallback = std::move(fallback)](
+                       auto&&... args) mutable -> decltype(auto)
+            {
+                if (!AttachmentEpochIsActive(epoch))
+                {
+                    return fallback(
+                        std::forward<decltype(args)>(args)...);
+                }
+                return command(std::forward<decltype(args)>(args)...);
+            };
+        }
+
+        void GuardAttachmentCommandSurfaces(
+            SandboxEditorContext& context,
+            const std::shared_ptr<std::atomic_bool>& epoch)
+        {
+            context.AssetImportCommands.Import = GuardAttachmentCommand(
+                std::move(context.AssetImportCommands.Import),
+                epoch,
+                [](const SandboxEditorFileImportCommand& command)
+                {
+                    return SandboxEditorFileImportResult{
+                        .Status = SandboxEditorCommandStatus::AssetImportFailed,
+                        .PayloadKind = command.PayloadKind,
+                        .Error = Core::ErrorCode::InvalidState,
+                        .Message =
+                            "Asset import failed: editor session attachment expired.",
+                    };
+                });
+            context.AssetImportQueueCommands.ClearCompleted =
+                GuardAttachmentCommand(
+                    std::move(
+                        context.AssetImportQueueCommands.ClearCompleted),
+                    epoch,
+                    []()
+                    {
+                        return std::size_t{0u};
+                    });
+            context.AssetImportQueueCommands.Cancel = GuardAttachmentCommand(
+                std::move(context.AssetImportQueueCommands.Cancel),
+                epoch,
+                [](const RuntimeAssetIngestHandle)
+                {
+                    return Core::Err(Core::ErrorCode::InvalidState);
+                });
+            context.SceneFileCommands.New = GuardAttachmentCommand(
+                std::move(context.SceneFileCommands.New),
+                epoch,
+                []()
+                {
+                    return SandboxEditorSceneFileResult{
+                        .Status = SandboxEditorCommandStatus::SceneNewFailed,
+                        .Operation = SandboxEditorSceneFileOperation::New,
+                        .Error = Core::ErrorCode::InvalidState,
+                        .Message =
+                            "New scene failed: editor session attachment expired.",
+                    };
+                });
+            context.SceneFileCommands.Save = GuardAttachmentCommand(
+                std::move(context.SceneFileCommands.Save),
+                epoch,
+                [](const SandboxEditorSceneFileCommand&)
+                {
+                    return SandboxEditorSceneFileResult{
+                        .Status = SandboxEditorCommandStatus::SceneSaveFailed,
+                        .Operation = SandboxEditorSceneFileOperation::Save,
+                        .Error = Core::ErrorCode::InvalidState,
+                        .Message =
+                            "Scene save failed: editor session attachment expired.",
+                    };
+                });
+            context.SceneFileCommands.Load = GuardAttachmentCommand(
+                std::move(context.SceneFileCommands.Load),
+                epoch,
+                [](const SandboxEditorSceneFileCommand&)
+                {
+                    return SandboxEditorSceneFileResult{
+                        .Status = SandboxEditorCommandStatus::SceneLoadFailed,
+                        .Operation = SandboxEditorSceneFileOperation::Load,
+                        .Error = Core::ErrorCode::InvalidState,
+                        .Message =
+                            "Scene load failed: editor session attachment expired.",
+                    };
+                });
+            context.SceneFileCommands.Close = GuardAttachmentCommand(
+                std::move(context.SceneFileCommands.Close),
+                epoch,
+                []()
+                {
+                    return SandboxEditorSceneFileResult{
+                        .Status = SandboxEditorCommandStatus::SceneCloseFailed,
+                        .Operation = SandboxEditorSceneFileOperation::Close,
+                        .Error = Core::ErrorCode::InvalidState,
+                        .Message =
+                            "Scene close failed: editor session attachment expired.",
+                    };
+                });
+            context.VisualizationAdapterBindings.GetBinding =
+                GuardAttachmentCommand(
+                    std::move(
+                        context.VisualizationAdapterBindings.GetBinding),
+                    epoch,
+                    [](const std::uint32_t)
+                    {
+                        return std::optional<
+                            RenderExtractionCache::
+                                VisualizationAdapterBinding>{};
+                    });
+            context.VisualizationAdapterBindings.SetBinding =
+                GuardAttachmentCommand(
+                    std::move(
+                        context.VisualizationAdapterBindings.SetBinding),
+                    epoch,
+                    [](const std::uint32_t,
+                       RenderExtractionCache::VisualizationAdapterBinding)
+                    {
+                    });
+            context.VisualizationAdapterBindings.ClearBinding =
+                GuardAttachmentCommand(
+                    std::move(
+                        context.VisualizationAdapterBindings.ClearBinding),
+                    epoch,
+                    [](const std::uint32_t)
+                    {
+                    });
+            context.DerivedJobCommands.Submit = GuardAttachmentCommand(
+                std::move(context.DerivedJobCommands.Submit),
+                epoch,
+                [](DerivedJobDesc)
+                {
+                    return DerivedJobHandle{};
+                });
+            context.DerivedJobCommands.Cancel = GuardAttachmentCommand(
+                std::move(context.DerivedJobCommands.Cancel),
+                epoch,
+                [](const DerivedJobHandle)
+                {
+                });
+            context.PreviewRenderRecipeDocument = GuardAttachmentCommand(
+                std::move(context.PreviewRenderRecipeDocument),
+                epoch,
+                [](const std::string&, const std::string&)
+                {
+                    return Graphics::RenderRecipeConfigLoadResult{};
+                });
+            context.ApplyRenderRecipePreview = GuardAttachmentCommand(
+                std::move(context.ApplyRenderRecipePreview),
+                epoch,
+                [](const Graphics::RenderRecipeConfigLoadResult&)
+                {
+                    return RuntimeRenderRecipeApplyResult{
+                        .Status = RuntimeRenderRecipeApplyStatus::Rejected,
+                    };
+                });
+        }
+
         void DrawDiagnostics(const std::vector<SandboxEditorDiagnostic>& diagnostics)
         {
             for (const SandboxEditorDiagnostic& diagnostic : diagnostics)
@@ -18312,52 +18484,20 @@ namespace Extrinsic::Runtime
             nullptr);
     }
 
-    SandboxEditorUi::SandboxEditorUi() = default;
-
-    EditorWindowHandle SandboxEditorUi::RegisterEditorWindow(
-        EditorWindowDescriptor descriptor)
+    SandboxEditorSession::SandboxEditorSession()
     {
-        return m_Host.RegisterWindow(std::move(descriptor));
     }
 
-    EditorWindowHandle SandboxEditorUi::RegisterEditorWindow(
-        SandboxEditorWindowDescriptor descriptor)
+    SandboxEditorSession::~SandboxEditorSession()
     {
-        auto draw = std::move(descriptor.Draw);
-        return RegisterEditorWindow(
-            EditorWindowDescriptor{
-                .Id = std::move(descriptor.Id),
-                .MenuPath = std::move(descriptor.MenuPath),
-                .Title = std::move(descriptor.Title),
-                .OpenByDefault = descriptor.OpenByDefault,
-                .Draw =
-                    [this, draw = std::move(draw)](bool& open)
-                    {
-                        if (draw && m_ActiveEditorContext != nullptr)
-                            draw(open, *m_ActiveEditorContext);
-                    },
-                .OpenStateChanged =
-                    std::move(descriptor.OpenStateChanged),
-            });
-    }
-
-    bool SandboxEditorUi::UnregisterEditorWindow(
-        const EditorWindowHandle handle)
-    {
-        return m_Host.UnregisterWindow(handle);
-    }
-
-    SandboxEditorUi::~SandboxEditorUi()
-    {
-        if (m_ResultSinksAlive)
-            *m_ResultSinksAlive = false;
         Detach();
     }
 
-    void SandboxEditorUi::Attach(Engine& engine)
+    void SandboxEditorSession::Attach(Engine& engine)
     {
         Detach();
         m_Engine = &engine;
+        m_AttachmentEpoch = std::make_shared<std::atomic_bool>(true);
         AttachKMeansGpuQueue(engine);
         m_ClusteringService = engine.Services().Find<ClusteringService>();
         if (m_ClusteringService != nullptr &&
@@ -18365,8 +18505,11 @@ namespace Extrinsic::Runtime
         {
             m_KMeansCompletionSubscription =
                 m_ClusteringService->SubscribeRunCompleted(
-                    [this](const KMeansRunCompleted& completed)
+                    [epoch = m_AttachmentEpoch, this](
+                        const KMeansRunCompleted& completed)
                     {
+                        if (!AttachmentEpochIsActive(epoch))
+                            return;
                         m_LastKMeansResult =
                             Detail::MakeSandboxEditorKMeansCompletionResult(
                                 completed);
@@ -18377,303 +18520,321 @@ namespace Extrinsic::Runtime
         {
             m_ClusteringService = nullptr;
         }
-        m_Host.Attach(
-            engine,
-            EditorUiHostDescriptor{
-                .ToggleActionDebugName = "Sandbox.Editor.ToggleVisibility",
-                .DrawFrame = [this]
-            {
-                if (m_Engine == nullptr)
-                    return;
-                const std::optional<RuntimeAssetImportEvent>& runtimeImport =
-                    m_Engine->GetAssetImportPipeline().GetLastAssetImportEvent();
-                if (runtimeImport.has_value() &&
-                    runtimeImport->Sequence != m_LastObservedRuntimeImportSequence)
-                {
-                    m_LastImportResult =
-                        BuildFileImportResultFromRuntimeEvent(*runtimeImport);
-                    m_LastObservedRuntimeImportSequence = runtimeImport->Sequence;
-                }
-                const std::optional<RuntimeSceneFileEvent>& runtimeSceneFile =
-                    m_Engine->GetSceneDocument().GetLastSceneFileEvent();
-                if (runtimeSceneFile.has_value() &&
-                    runtimeSceneFile->Sequence !=
-                        m_LastObservedRuntimeSceneFileSequence)
-                {
-                    m_LastSceneFileResult =
-                        BuildSceneFileResultFromRuntimeEvent(*runtimeSceneFile);
-                    m_LastObservedRuntimeSceneFileSequence =
-                        runtimeSceneFile->Sequence;
-                }
-                SandboxEditorContext context = BuildContextFromEngine(*m_Engine);
-                context.SelectedModelCache = &m_SelectedModelCache;
-                context.KMeansCommands.Required = true;
-                if (m_ClusteringService != nullptr)
-                {
-                    context.KMeansCommands.Submit =
-                        [service = m_ClusteringService](RunKMeans request)
-                        {
-                            return service->RunKMeans(std::move(request));
-                        };
-                }
-                context.KMeansGpuCommands = SandboxEditorKMeansGpuCommandSurface{
-                    .Submit =
-                        [this](RuntimeKMeansGpuJobRequest request)
-                        {
-                            if (!m_KMeansGpuJobs)
-                            {
-                                return RuntimeKMeansGpuJobSubmission{
-                                    .Status = RuntimeKMeansGpuJobStatus::GpuUnavailable,
-                                    .GpuStatus = KMeansGpuStatus::DeviceUnavailable,
-                                    .Diagnostic =
-                                        "Sandbox editor K-Means GPU job queue is unavailable.",
-                                };
-                            }
-                            return m_KMeansGpuJobs->Submit(std::move(request));
-                        },
-                    .ConsumeCompleted =
-                        [this]() -> std::optional<RuntimeKMeansGpuJobResult>
-                        {
-                            if (!m_KMeansGpuJobs)
-                                return std::nullopt;
-                            return m_KMeansGpuJobs->ConsumeCompleted();
-                        },
-                };
-                if (context.KMeansGpuCommands.Available())
-                {
-                    while (std::optional<RuntimeKMeansGpuJobResult> completed =
-                               context.KMeansGpuCommands.ConsumeCompleted())
-                    {
-                        m_LastKMeansResult =
-                            Detail::PublishSandboxEditorKMeansGpuCompletion(
-                                context,
-                                *completed);
-                    }
-                }
-                m_DerivedJobSnapshot =
-                    m_Engine->GetDerivedJobQueueSnapshot();
-                context.DerivedJobs = &m_DerivedJobSnapshot;
-                context.MethodResultSinks.KMeans =
-                    [alive = m_ResultSinksAlive, this](
-                        SandboxEditorKMeansResult result)
-                    {
-                        if (alive && *alive)
-                            m_LastKMeansResult = std::move(result);
-                    };
-                context.MethodResultSinks.ProgressivePoisson =
-                    [alive = m_ResultSinksAlive, this](
-                        SandboxEditorProgressivePoissonResult result)
-                    {
-                        if (alive && *alive)
-                            m_LastProgressivePoissonResult =
-                                std::move(result);
-                    };
-                context.MethodResultSinks.UvRegeneration =
-                    [alive = m_ResultSinksAlive, this](
-                        SandboxEditorUvRegenerationCommandResult result)
-                    {
-                        if (alive && *alive)
-                            m_LastUvRegenerationResult = std::move(result);
-                    };
-                context.MethodResultSinks.MeshCurvature =
-                    [alive = m_ResultSinksAlive, this](
-                        SandboxEditorMeshCurvatureResult result)
-                    {
-                        if (alive && *alive)
-                            m_LastMeshCurvatureResult = std::move(result);
-                    };
-                context.MethodResultSinks.MeshDenoise =
-                    [alive = m_ResultSinksAlive, this](
-                        SandboxEditorMeshDenoiseResult result)
-                    {
-                        if (alive && *alive)
-                            m_LastMeshDenoiseResult = std::move(result);
-                    };
-                context.MethodResultSinks.MeshRemesh =
-                    [alive = m_ResultSinksAlive, this](
-                        SandboxEditorMeshRemeshResult result)
-                    {
-                        if (alive && *alive)
-                            m_LastMeshRemeshResult = std::move(result);
-                    };
-                context.MethodResultSinks.MeshSubdivide =
-                    [alive = m_ResultSinksAlive, this](
-                        SandboxEditorMeshSubdivideResult result)
-                    {
-                        if (alive && *alive)
-                            m_LastMeshSubdivideResult = std::move(result);
-                    };
-                context.MethodResultSinks.MeshSimplify =
-                    [alive = m_ResultSinksAlive, this](
-                        SandboxEditorMeshSimplifyResult result)
-                    {
-                        if (alive && *alive)
-                            m_LastMeshSimplifyResult = std::move(result);
-                    };
-                context.MethodResultSinks.MeshVertexNormals =
-                    [alive = m_ResultSinksAlive, this](
-                        SandboxEditorMeshVertexNormalsResult result)
-                    {
-                        if (alive && *alive)
-                            m_LastMeshVertexNormalsResult =
-                                std::move(result);
-                    };
-                context.MethodResultSinks.GraphVertexNormals =
-                    [alive = m_ResultSinksAlive, this](
-                        SandboxEditorGraphVertexNormalsResult result)
-                    {
-                        if (alive && *alive)
-                            m_LastGraphVertexNormalsResult =
-                                std::move(result);
-                    };
-                context.MethodResultSinks.PointCloudVertexNormals =
-                    [alive = m_ResultSinksAlive, this](
-                        SandboxEditorPointCloudVertexNormalsResult result)
-                    {
-                        if (alive && *alive)
-                            m_LastPointCloudVertexNormalsResult =
-                                std::move(result);
-                    };
-                context.MethodResultSinks.PointCloudOutlierRemoval =
-                    [alive = m_ResultSinksAlive, this](
-                        SandboxEditorPointCloudOutlierRemovalResult result)
-                    {
-                        if (alive && *alive)
-                            m_LastPointCloudOutlierRemovalResult =
-                                std::move(result);
-                    };
-                context.MethodResultSinks.Registration =
-                    [alive = m_ResultSinksAlive, this](
-                        SandboxEditorRegistrationResult result)
-                    {
-                        if (alive && *alive)
-                            m_LastRegistrationResult = std::move(result);
-                    };
-                context.PendingAssetImportPath =
-                    std::string(m_ImportPathBuffer.data());
-                context.PendingAssetImportPayloadKind =
-                    m_ImportPayloadKind;
-                context.PendingSceneFilePath =
-                    std::string(m_ScenePathBuffer.data());
-                if (m_LastSceneFileResult.has_value())
-                    context.LastSceneFileResult = &*m_LastSceneFileResult;
-                if (m_LastImportResult.has_value())
-                    context.LastAssetImportResult = &*m_LastImportResult;
-                if (m_LastKMeansResult.has_value())
-                    context.LastKMeansResult = &*m_LastKMeansResult;
-                if (m_LastMeshDenoiseResult.has_value())
-                    context.LastMeshDenoiseResult =
-                        &*m_LastMeshDenoiseResult;
-                if (m_LastMeshCurvatureResult.has_value())
-                    context.LastMeshCurvatureResult =
-                        &*m_LastMeshCurvatureResult;
-                if (m_LastMeshRemeshResult.has_value())
-                    context.LastMeshRemeshResult =
-                        &*m_LastMeshRemeshResult;
-                if (m_LastMeshSubdivideResult.has_value())
-                    context.LastMeshSubdivideResult =
-                        &*m_LastMeshSubdivideResult;
-                if (m_LastMeshSimplifyResult.has_value())
-                    context.LastMeshSimplifyResult =
-                        &*m_LastMeshSimplifyResult;
-                if (m_LastMeshVertexNormalsResult.has_value())
-                    context.LastMeshVertexNormalsResult =
-                        &*m_LastMeshVertexNormalsResult;
-                if (m_LastGraphVertexNormalsResult.has_value())
-                    context.LastGraphVertexNormalsResult =
-                        &*m_LastGraphVertexNormalsResult;
-                if (m_LastPointCloudVertexNormalsResult.has_value())
-                    context.LastPointCloudVertexNormalsResult =
-                        &*m_LastPointCloudVertexNormalsResult;
-                if (m_LastPointCloudOutlierRemovalResult.has_value())
-                    context.LastPointCloudOutlierRemovalResult =
-                        &*m_LastPointCloudOutlierRemovalResult;
-                if (m_LastUvRegenerationResult.has_value())
-                    context.LastUvRegenerationResult =
-                        &*m_LastUvRegenerationResult;
-                if (m_LastProgressivePoissonResult.has_value())
-                    context.LastProgressivePoissonResult =
-                        &*m_LastProgressivePoissonResult;
-                if (m_LastRegistrationResult.has_value())
-                    context.LastRegistrationResult =
-                        &*m_LastRegistrationResult;
-                const Core::Extent2D viewport =
-                    context.CameraViewport.Width != 0u &&
-                            context.CameraViewport.Height != 0u
-                        ? context.CameraViewport
-                        : Core::Extent2D{.Width = 1280u, .Height = 720u};
-                const Graphics::RenderFrameInput recipeInput{
-                    .Viewport = viewport,
-                    .Camera = Graphics::CameraViewInput{.Valid = true},
-                };
-                m_RenderRecipeContext = Graphics::RenderRecipeConfigContext{
-                    .Renderer = Graphics::MakeCurrentRendererDescriptor(),
-                    .BaseRecipe = Graphics::MakeCurrentRendererRecipeDescriptor(),
-                    .BaseViewOutput =
-                        Graphics::MakeCurrentRendererViewOutputRecipe(recipeInput),
-                    .BaseBindings = Graphics::MakeCurrentRendererBindingSet(),
-                };
-                context.RenderRecipeContext = &m_RenderRecipeContext;
-                context.RenderRecipeEditorState = &m_RenderRecipeState;
-                context.RenderArtifacts = &m_RenderArtifactRegistry;
-                context.RenderRecipeCommandsAvailable = true;
-                context.EngineConfigControlState =
-                    &m_Engine->GetConfigControl().GetEngineConfigControlState();
-                context.PreviewEngineConfigDocument =
-                    [this](const std::string& document,
-                           const std::string& sourceId)
-                    {
-                        return m_Engine->GetConfigControl().PreviewEngineConfigControlDocument(
-                            document,
-                            sourceId);
-                    };
-                context.ApplyEngineConfigHotSubset =
-                    [this](const Core::Config::EngineConfigLoadResult& loadResult)
-                    {
-                        return m_Engine->GetConfigControl().ApplyEngineConfigHotSubset(
-                            loadResult,
-                            RuntimeConfigControlSource::Editor);
-                    };
-                context.EngineConfigCommandsAvailable = true;
-                const SandboxEditorModelBuildRequest modelRequest =
-                    BuildModelRequestFromOpenPanels(&m_PanelWindowOpen);
-                m_LastFrame = BuildSandboxEditorPanelFrame(context, modelRequest);
-                context.ModelBuildStats = &m_LastFrame.ModelBuildStats;
-                TextureBakeUiState textureBakeState{
-                    .LastUvRegenerationResult =
-                        &m_LastUvRegenerationResult,
-                    .SourceIndex = &m_TextureBakeSourceIndex,
-                    .TargetSemanticIndex = &m_TextureBakeTargetSemanticIndex,
-                    .EncoderIndex = &m_TextureBakeEncoderIndex,
-                    .Width = &m_TextureBakeWidth,
-                    .Height = &m_TextureBakeHeight,
-                    .UvResolution = &m_UvAtlasResolution,
-                    .UvPadding = &m_UvAtlasPadding,
-                    .UvTexelsPerUnit = &m_UvAtlasTexelsPerUnit,
-                    .UvForceRegenerate = &m_UvAtlasForceRegenerate,
-                    .UvPreserveAuthored = &m_UvAtlasPreserveAuthored,
-                };
-                m_ActiveEditorContext = &context;
-                DrawPanelFrame(
-                    m_LastFrame,
-                    &context,
-                    &m_ImportPathBuffer,
-                    &m_ScenePathBuffer,
-                    &m_RenderRecipeDraftBuffer,
-                    &m_ImportPayloadKind,
-                    &m_LastImportResult,
-                    &m_LastSceneFileResult,
-                    &m_PanelWindowOpen,
-                    &textureBakeState,
-                    &m_Host.Windows());
-                m_ActiveEditorContext = nullptr;
-            },
-            });
     }
 
-    void SandboxEditorUi::Detach()
+    bool SandboxEditorSession::PrepareFrame(
+        const SandboxEditorModelBuildRequest& request,
+        std::string pendingAssetImportPath,
+        const Assets::AssetPayloadKind pendingAssetImportPayloadKind,
+        std::string pendingSceneFilePath)
     {
-        m_Host.Detach();
+        m_FramePrepared = false;
+        m_Context = {};
+        m_LastFrame = {};
+        if (m_Engine == nullptr ||
+            !AttachmentEpochIsActive(m_AttachmentEpoch))
+        {
+            return false;
+        }
+        const std::optional<RuntimeAssetImportEvent>& runtimeImport =
+            m_Engine->GetAssetImportPipeline().GetLastAssetImportEvent();
+        if (runtimeImport.has_value() &&
+            runtimeImport->Sequence != m_LastObservedRuntimeImportSequence)
+        {
+            m_LastImportResult =
+                BuildFileImportResultFromRuntimeEvent(*runtimeImport);
+            m_LastObservedRuntimeImportSequence = runtimeImport->Sequence;
+        }
+        const std::optional<RuntimeSceneFileEvent>& runtimeSceneFile =
+            m_Engine->GetSceneDocument().GetLastSceneFileEvent();
+        if (runtimeSceneFile.has_value() &&
+            runtimeSceneFile->Sequence !=
+                m_LastObservedRuntimeSceneFileSequence)
+        {
+            m_LastSceneFileResult =
+                BuildSceneFileResultFromRuntimeEvent(*runtimeSceneFile);
+            m_LastObservedRuntimeSceneFileSequence =
+                runtimeSceneFile->Sequence;
+        }
+        m_Context = BuildContextFromEngine(*m_Engine);
+        SandboxEditorContext& context = m_Context;
+        GuardAttachmentCommandSurfaces(context, m_AttachmentEpoch);
+        context.SelectedModelCache = &m_SelectedModelCache;
+        context.KMeansCommands.Required = true;
+        if (m_ClusteringService != nullptr)
+        {
+            context.KMeansCommands.Submit =
+                [epoch = m_AttachmentEpoch,
+                 service = m_ClusteringService](RunKMeans request)
+                {
+                    if (!AttachmentEpochIsActive(epoch))
+                        return CommandCorrelationId{};
+                    return service->RunKMeans(std::move(request));
+                };
+        }
+        context.KMeansGpuCommands = SandboxEditorKMeansGpuCommandSurface{
+            .Submit =
+                [epoch = m_AttachmentEpoch,
+                 this](RuntimeKMeansGpuJobRequest request)
+                {
+                    if (!AttachmentEpochIsActive(epoch) ||
+                        !m_KMeansGpuJobs)
+                    {
+                        return RuntimeKMeansGpuJobSubmission{
+                            .Status = RuntimeKMeansGpuJobStatus::GpuUnavailable,
+                            .GpuStatus = KMeansGpuStatus::DeviceUnavailable,
+                            .Diagnostic =
+                                "Sandbox editor K-Means GPU job queue is unavailable or its attachment expired.",
+                        };
+                    }
+                    return m_KMeansGpuJobs->Submit(std::move(request));
+                },
+            .ConsumeCompleted =
+                [epoch = m_AttachmentEpoch,
+                 this]() -> std::optional<RuntimeKMeansGpuJobResult>
+                {
+                    if (!AttachmentEpochIsActive(epoch) ||
+                        !m_KMeansGpuJobs)
+                        return std::nullopt;
+                    return m_KMeansGpuJobs->ConsumeCompleted();
+                },
+        };
+        if (context.KMeansGpuCommands.Available())
+        {
+            while (std::optional<RuntimeKMeansGpuJobResult> completed =
+                       context.KMeansGpuCommands.ConsumeCompleted())
+            {
+                m_LastKMeansResult =
+                    Detail::PublishSandboxEditorKMeansGpuCompletion(
+                        context,
+                        *completed);
+            }
+        }
+        m_DerivedJobSnapshot =
+            m_Engine->GetDerivedJobQueueSnapshot();
+        context.DerivedJobs = &m_DerivedJobSnapshot;
+        context.MethodResultSinks.KMeans =
+            [epoch = m_AttachmentEpoch, this](
+                SandboxEditorKMeansResult result)
+            {
+                if (AttachmentEpochIsActive(epoch))
+                    m_LastKMeansResult = std::move(result);
+            };
+        context.MethodResultSinks.ProgressivePoisson =
+            [epoch = m_AttachmentEpoch, this](
+                SandboxEditorProgressivePoissonResult result)
+            {
+                if (AttachmentEpochIsActive(epoch))
+                    m_LastProgressivePoissonResult =
+                        std::move(result);
+            };
+        context.MethodResultSinks.UvRegeneration =
+            [epoch = m_AttachmentEpoch, this](
+                SandboxEditorUvRegenerationCommandResult result)
+            {
+                if (AttachmentEpochIsActive(epoch))
+                    m_LastUvRegenerationResult = std::move(result);
+            };
+        context.MethodResultSinks.MeshCurvature =
+            [epoch = m_AttachmentEpoch, this](
+                SandboxEditorMeshCurvatureResult result)
+            {
+                if (AttachmentEpochIsActive(epoch))
+                    m_LastMeshCurvatureResult = std::move(result);
+            };
+        context.MethodResultSinks.MeshDenoise =
+            [epoch = m_AttachmentEpoch, this](
+                SandboxEditorMeshDenoiseResult result)
+            {
+                if (AttachmentEpochIsActive(epoch))
+                    m_LastMeshDenoiseResult = std::move(result);
+            };
+        context.MethodResultSinks.MeshRemesh =
+            [epoch = m_AttachmentEpoch, this](
+                SandboxEditorMeshRemeshResult result)
+            {
+                if (AttachmentEpochIsActive(epoch))
+                    m_LastMeshRemeshResult = std::move(result);
+            };
+        context.MethodResultSinks.MeshSubdivide =
+            [epoch = m_AttachmentEpoch, this](
+                SandboxEditorMeshSubdivideResult result)
+            {
+                if (AttachmentEpochIsActive(epoch))
+                    m_LastMeshSubdivideResult = std::move(result);
+            };
+        context.MethodResultSinks.MeshSimplify =
+            [epoch = m_AttachmentEpoch, this](
+                SandboxEditorMeshSimplifyResult result)
+            {
+                if (AttachmentEpochIsActive(epoch))
+                    m_LastMeshSimplifyResult = std::move(result);
+            };
+        context.MethodResultSinks.MeshVertexNormals =
+            [epoch = m_AttachmentEpoch, this](
+                SandboxEditorMeshVertexNormalsResult result)
+            {
+                if (AttachmentEpochIsActive(epoch))
+                    m_LastMeshVertexNormalsResult =
+                        std::move(result);
+            };
+        context.MethodResultSinks.GraphVertexNormals =
+            [epoch = m_AttachmentEpoch, this](
+                SandboxEditorGraphVertexNormalsResult result)
+            {
+                if (AttachmentEpochIsActive(epoch))
+                    m_LastGraphVertexNormalsResult =
+                        std::move(result);
+            };
+        context.MethodResultSinks.PointCloudVertexNormals =
+            [epoch = m_AttachmentEpoch, this](
+                SandboxEditorPointCloudVertexNormalsResult result)
+            {
+                if (AttachmentEpochIsActive(epoch))
+                    m_LastPointCloudVertexNormalsResult =
+                        std::move(result);
+            };
+        context.MethodResultSinks.PointCloudOutlierRemoval =
+            [epoch = m_AttachmentEpoch, this](
+                SandboxEditorPointCloudOutlierRemovalResult result)
+            {
+                if (AttachmentEpochIsActive(epoch))
+                    m_LastPointCloudOutlierRemovalResult =
+                        std::move(result);
+            };
+        context.MethodResultSinks.Registration =
+            [epoch = m_AttachmentEpoch, this](
+                SandboxEditorRegistrationResult result)
+            {
+                if (AttachmentEpochIsActive(epoch))
+                    m_LastRegistrationResult = std::move(result);
+            };
+        context.PendingAssetImportPath =
+            std::move(pendingAssetImportPath);
+        context.PendingAssetImportPayloadKind =
+            pendingAssetImportPayloadKind;
+        context.PendingSceneFilePath =
+            std::move(pendingSceneFilePath);
+        if (m_LastSceneFileResult.has_value())
+            context.LastSceneFileResult = &*m_LastSceneFileResult;
+        if (m_LastImportResult.has_value())
+            context.LastAssetImportResult = &*m_LastImportResult;
+        if (m_LastKMeansResult.has_value())
+            context.LastKMeansResult = &*m_LastKMeansResult;
+        if (m_LastMeshDenoiseResult.has_value())
+            context.LastMeshDenoiseResult =
+                &*m_LastMeshDenoiseResult;
+        if (m_LastMeshCurvatureResult.has_value())
+            context.LastMeshCurvatureResult =
+                &*m_LastMeshCurvatureResult;
+        if (m_LastMeshRemeshResult.has_value())
+            context.LastMeshRemeshResult =
+                &*m_LastMeshRemeshResult;
+        if (m_LastMeshSubdivideResult.has_value())
+            context.LastMeshSubdivideResult =
+                &*m_LastMeshSubdivideResult;
+        if (m_LastMeshSimplifyResult.has_value())
+            context.LastMeshSimplifyResult =
+                &*m_LastMeshSimplifyResult;
+        if (m_LastMeshVertexNormalsResult.has_value())
+            context.LastMeshVertexNormalsResult =
+                &*m_LastMeshVertexNormalsResult;
+        if (m_LastGraphVertexNormalsResult.has_value())
+            context.LastGraphVertexNormalsResult =
+                &*m_LastGraphVertexNormalsResult;
+        if (m_LastPointCloudVertexNormalsResult.has_value())
+            context.LastPointCloudVertexNormalsResult =
+                &*m_LastPointCloudVertexNormalsResult;
+        if (m_LastPointCloudOutlierRemovalResult.has_value())
+            context.LastPointCloudOutlierRemovalResult =
+                &*m_LastPointCloudOutlierRemovalResult;
+        if (m_LastUvRegenerationResult.has_value())
+            context.LastUvRegenerationResult =
+                &*m_LastUvRegenerationResult;
+        if (m_LastProgressivePoissonResult.has_value())
+            context.LastProgressivePoissonResult =
+                &*m_LastProgressivePoissonResult;
+        if (m_LastRegistrationResult.has_value())
+            context.LastRegistrationResult =
+                &*m_LastRegistrationResult;
+        const Core::Extent2D viewport =
+            context.CameraViewport.Width != 0u &&
+                    context.CameraViewport.Height != 0u
+                ? context.CameraViewport
+                : Core::Extent2D{.Width = 1280u, .Height = 720u};
+        const Graphics::RenderFrameInput recipeInput{
+            .Viewport = viewport,
+            .Camera = Graphics::CameraViewInput{.Valid = true},
+        };
+        m_RenderRecipeContext = Graphics::RenderRecipeConfigContext{
+            .Renderer = Graphics::MakeCurrentRendererDescriptor(),
+            .BaseRecipe = Graphics::MakeCurrentRendererRecipeDescriptor(),
+            .BaseViewOutput =
+                Graphics::MakeCurrentRendererViewOutputRecipe(recipeInput),
+            .BaseBindings = Graphics::MakeCurrentRendererBindingSet(),
+        };
+        context.RenderRecipeContext = &m_RenderRecipeContext;
+        context.RenderRecipeEditorState = &m_RenderRecipeState;
+        context.RenderArtifacts = &m_RenderArtifactRegistry;
+        context.RenderRecipeCommandsAvailable = true;
+        context.EngineConfigControlState =
+            &m_Engine->GetConfigControl().GetEngineConfigControlState();
+        context.PreviewEngineConfigDocument =
+            [epoch = m_AttachmentEpoch,
+             engine = m_Engine](const std::string& document,
+                                const std::string& sourceId)
+            {
+                if (!AttachmentEpochIsActive(epoch))
+                    return Core::Config::EngineConfigLoadResult{};
+                return engine->GetConfigControl().PreviewEngineConfigControlDocument(
+                    document,
+                    sourceId);
+            };
+        context.ApplyEngineConfigHotSubset =
+            [epoch = m_AttachmentEpoch,
+             engine = m_Engine](
+                const Core::Config::EngineConfigLoadResult& loadResult)
+            {
+                if (!AttachmentEpochIsActive(epoch))
+                {
+                    return RuntimeEngineConfigApplyResult{
+                        .Status = RuntimeEngineConfigApplyStatus::Rejected,
+                        .Source = RuntimeConfigControlSource::Editor,
+                    };
+                }
+                return engine->GetConfigControl().ApplyEngineConfigHotSubset(
+                    loadResult,
+                    RuntimeConfigControlSource::Editor);
+            };
+        context.EngineConfigCommandsAvailable = true;
+        m_LastFrame = BuildSandboxEditorPanelFrame(context, request);
+        context.ModelBuildStats = &m_LastFrame.ModelBuildStats;
+        m_FramePrepared = true;
+        return true;
+    }
+
+    bool SandboxEditorSession::VisitPreparedFrame(
+        const SandboxEditorPreparedFrameVisitor& visitor)
+    {
+        if (!m_FramePrepared || !visitor)
+            return false;
+
+        visitor(SandboxEditorPreparedFrameView{
+            .Context = m_Context,
+            .Frame = m_LastFrame,
+            .LastAssetImportResult = m_LastImportResult,
+            .LastSceneFileResult = m_LastSceneFileResult,
+            .LastUvRegenerationResult = m_LastUvRegenerationResult,
+        });
+        return true;
+    }
+
+    void SandboxEditorSession::Detach()
+    {
+        if (m_AttachmentEpoch != nullptr)
+        {
+            m_AttachmentEpoch->store(false, std::memory_order_release);
+        }
         if (m_Engine != nullptr)
         {
             if (m_ClusteringService != nullptr &&
@@ -18694,8 +18855,151 @@ namespace Extrinsic::Runtime
             m_KMeansGpuParticipant = {};
             m_KMeansGpuJobs.reset();
         }
-        m_ActiveEditorContext = nullptr;
-        m_SelectedModelCache.Clear();
+        m_AttachmentEpoch.reset();
+        ResetAttachmentState();
+    }
+
+    void SandboxEditorSession::ResetAttachmentState()
+    {
+        m_FramePrepared = false;
+        m_Context = {};
+        m_LastFrame = {};
+        m_SelectedModelCache = {};
+        m_LastObservedRuntimeImportSequence = 0u;
+        m_LastObservedRuntimeSceneFileSequence = 0u;
+        m_LastImportResult.reset();
+        m_LastSceneFileResult.reset();
+        m_LastKMeansResult.reset();
+        m_LastMeshDenoiseResult.reset();
+        m_LastMeshCurvatureResult.reset();
+        m_LastMeshRemeshResult.reset();
+        m_LastMeshSubdivideResult.reset();
+        m_LastMeshSimplifyResult.reset();
+        m_LastMeshVertexNormalsResult.reset();
+        m_LastGraphVertexNormalsResult.reset();
+        m_LastPointCloudVertexNormalsResult.reset();
+        m_LastPointCloudOutlierRemovalResult.reset();
+        m_LastProgressivePoissonResult.reset();
+        m_LastUvRegenerationResult.reset();
+        m_LastRegistrationResult.reset();
+        m_DerivedJobSnapshot = {};
+        m_RenderRecipeContext = {};
+        m_RenderRecipeState = {};
+        m_RenderArtifactRegistry = {};
+    }
+
+    SandboxEditorUi::SandboxEditorUi()
+    {
+    }
+
+    EditorWindowHandle SandboxEditorUi::RegisterEditorWindow(
+        EditorWindowDescriptor descriptor)
+    {
+        return m_Host.RegisterWindow(std::move(descriptor));
+    }
+
+    EditorWindowHandle SandboxEditorUi::RegisterEditorWindow(
+        SandboxEditorWindowDescriptor descriptor)
+    {
+        auto draw = std::move(descriptor.Draw);
+        return RegisterEditorWindow(
+            EditorWindowDescriptor{
+                .Id = std::move(descriptor.Id),
+                .MenuPath = std::move(descriptor.MenuPath),
+                .Title = std::move(descriptor.Title),
+                .OpenByDefault = descriptor.OpenByDefault,
+                .Draw =
+                    [this, draw = std::move(draw)](bool& open)
+                    {
+                        if (draw && m_ActivePreparedFrame != nullptr)
+                        {
+                            draw(open, m_ActivePreparedFrame->Context);
+                        }
+                    },
+                .OpenStateChanged =
+                    std::move(descriptor.OpenStateChanged),
+            });
+    }
+
+    bool SandboxEditorUi::UnregisterEditorWindow(
+        const EditorWindowHandle handle)
+    {
+        return m_Host.UnregisterWindow(handle);
+    }
+
+    SandboxEditorUi::~SandboxEditorUi()
+    {
+        Detach();
+    }
+
+    void SandboxEditorUi::Attach(Engine& engine)
+    {
+        Detach();
+        m_Session.Attach(engine);
+        m_Host.Attach(
+            engine,
+            EditorUiHostDescriptor{
+                .ToggleActionDebugName = "Sandbox.Editor.ToggleVisibility",
+                .DrawFrame =
+                    [this]
+                    {
+                        if (!m_Session.IsAttached())
+                            return;
+
+                        if (!m_Session.PrepareFrame(
+                                BuildModelRequestFromOpenPanels(
+                                    &m_PanelWindowOpen),
+                                std::string(m_ImportPathBuffer.data()),
+                                m_ImportPayloadKind,
+                                std::string(m_ScenePathBuffer.data())))
+                        {
+                            return;
+                        }
+
+                        (void)m_Session.VisitPreparedFrame(
+                            [this](SandboxEditorPreparedFrameView frame)
+                            {
+                                m_ActivePreparedFrame = &frame;
+                                TextureBakeUiState textureBakeState{
+                                    .LastUvRegenerationResult =
+                                        &frame.LastUvRegenerationResult,
+                                    .SourceIndex = &m_TextureBakeSourceIndex,
+                                    .TargetSemanticIndex =
+                                        &m_TextureBakeTargetSemanticIndex,
+                                    .EncoderIndex = &m_TextureBakeEncoderIndex,
+                                    .Width = &m_TextureBakeWidth,
+                                    .Height = &m_TextureBakeHeight,
+                                    .UvResolution = &m_UvAtlasResolution,
+                                    .UvPadding = &m_UvAtlasPadding,
+                                    .UvTexelsPerUnit = &m_UvAtlasTexelsPerUnit,
+                                    .UvForceRegenerate =
+                                        &m_UvAtlasForceRegenerate,
+                                    .UvPreserveAuthored =
+                                        &m_UvAtlasPreserveAuthored,
+                                };
+                                DrawPanelFrame(
+                                    frame.Frame,
+                                    &frame.Context,
+                                    &m_ImportPathBuffer,
+                                    &m_ScenePathBuffer,
+                                    &m_RenderRecipeDraftBuffer,
+                                    &m_ImportPayloadKind,
+                                    &frame.LastAssetImportResult,
+                                    &frame.LastSceneFileResult,
+                                    &m_PanelWindowOpen,
+                                    &textureBakeState,
+                                    &m_Host.Windows());
+                                m_ActivePreparedFrame = nullptr;
+                            });
+                    },
+            });
+    }
+
+    void SandboxEditorUi::Detach()
+    {
+        m_ActivePreparedFrame = nullptr;
+        m_Host.Detach();
+        m_Session.Detach();
     }
 
     EditorUiVisibilityCommandResult

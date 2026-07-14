@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <atomic>
 #include <bit>
 #include <chrono>
 #include <array>
@@ -2854,7 +2855,7 @@ namespace Extrinsic::Runtime
     }
 
 
-    void SandboxEditorUi::AttachKMeansGpuQueue(Engine& engine)
+    void SandboxEditorSession::AttachKMeansGpuQueue(Engine& engine)
     {
         DetachKMeansGpuQueue();
         m_KMeansGpuJobs = std::make_unique<RuntimeKMeansGpuJobQueue>(
@@ -2865,15 +2866,20 @@ namespace Extrinsic::Runtime
             GpuQueueParticipantDesc{
                 .DebugName = "SandboxEditor.KMeansGpu",
                 .RecordFrameCommands =
-                    [this](RHI::ICommandContext& commandContext)
+                    [epoch = m_AttachmentEpoch,
+                     this](RHI::ICommandContext& commandContext)
                     {
-                        if (m_KMeansGpuJobs)
+                        if (epoch != nullptr &&
+                            epoch->load(std::memory_order_acquire) &&
+                            m_KMeansGpuJobs)
                             m_KMeansGpuJobs->AdvanceGpuWork(commandContext);
                     },
                 .DrainCompletedTransfers =
-                    [this]()
+                    [epoch = m_AttachmentEpoch, this]()
                     {
-                        if (m_KMeansGpuJobs)
+                        if (epoch != nullptr &&
+                            epoch->load(std::memory_order_acquire) &&
+                            m_KMeansGpuJobs)
                             m_KMeansGpuJobs->DrainCompletedTransfers();
                     },
                 .HasInFlightWork =
@@ -2893,7 +2899,7 @@ namespace Extrinsic::Runtime
             m_KMeansGpuJobs.reset();
     }
 
-    void SandboxEditorUi::DetachKMeansGpuQueue()
+    void SandboxEditorSession::DetachKMeansGpuQueue()
     {
         if (m_Engine != nullptr && m_KMeansGpuParticipant.IsValid())
         {

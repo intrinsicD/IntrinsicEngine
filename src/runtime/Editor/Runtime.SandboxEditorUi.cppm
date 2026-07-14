@@ -3,6 +3,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <array>
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -2797,6 +2798,105 @@ export namespace Extrinsic::Runtime
 
     void DrawSandboxEditorPanelFrame(const SandboxEditorPanelFrame& frame);
 
+    struct SandboxEditorPreparedFrameView
+    {
+        const SandboxEditorContext& Context;
+        const SandboxEditorPanelFrame& Frame;
+        std::optional<SandboxEditorFileImportResult>& LastAssetImportResult;
+        std::optional<SandboxEditorSceneFileResult>& LastSceneFileResult;
+        std::optional<SandboxEditorUvRegenerationCommandResult>&
+            LastUvRegenerationResult;
+    };
+
+    using SandboxEditorPreparedFrameVisitor =
+        std::function<void(SandboxEditorPreparedFrameView)>;
+
+    class SandboxEditorSession
+    {
+    public:
+        SandboxEditorSession();
+        ~SandboxEditorSession();
+
+        SandboxEditorSession(const SandboxEditorSession&) = delete;
+        SandboxEditorSession& operator=(const SandboxEditorSession&) = delete;
+        SandboxEditorSession(SandboxEditorSession&&) = delete;
+        SandboxEditorSession& operator=(SandboxEditorSession&&) = delete;
+
+        void Attach(Engine& engine);
+        void Detach();
+
+        [[nodiscard]] bool PrepareFrame(
+            const SandboxEditorModelBuildRequest& request = {},
+            std::string pendingAssetImportPath = {},
+            Assets::AssetPayloadKind pendingAssetImportPayloadKind =
+                Assets::AssetPayloadKind::Unknown,
+            std::string pendingSceneFilePath = {});
+
+        // References in the prepared-frame view are valid only for the
+        // duration of the visitor invocation.
+        [[nodiscard]] bool VisitPreparedFrame(
+            const SandboxEditorPreparedFrameVisitor& visitor);
+
+        [[nodiscard]] const SandboxEditorPanelFrame& LastFrame() const noexcept
+        {
+            return m_LastFrame;
+        }
+
+        [[nodiscard]] bool IsAttached() const noexcept
+        {
+            return m_Engine != nullptr;
+        }
+
+    private:
+        void AttachKMeansGpuQueue(Engine& engine);
+        void DetachKMeansGpuQueue();
+        void ResetAttachmentState();
+
+        Engine* m_Engine{nullptr};
+        bool m_FramePrepared{false};
+        SandboxEditorContext m_Context{};
+        SandboxEditorPanelFrame m_LastFrame{};
+        SandboxEditorSelectedModelCache m_SelectedModelCache{};
+        std::uint64_t m_LastObservedRuntimeImportSequence{0};
+        std::uint64_t m_LastObservedRuntimeSceneFileSequence{0};
+        std::optional<SandboxEditorFileImportResult> m_LastImportResult{};
+        std::optional<SandboxEditorSceneFileResult> m_LastSceneFileResult{};
+        std::optional<SandboxEditorKMeansResult> m_LastKMeansResult{};
+        ClusteringService* m_ClusteringService{};
+        KernelEventSubscription m_KMeansCompletionSubscription{};
+        std::unique_ptr<RuntimeKMeansGpuJobQueue> m_KMeansGpuJobs{};
+        GpuQueueParticipantHandle m_KMeansGpuParticipant{};
+        std::optional<SandboxEditorMeshDenoiseResult>
+            m_LastMeshDenoiseResult{};
+        std::optional<SandboxEditorMeshCurvatureResult>
+            m_LastMeshCurvatureResult{};
+        std::optional<SandboxEditorMeshRemeshResult>
+            m_LastMeshRemeshResult{};
+        std::optional<SandboxEditorMeshSubdivideResult>
+            m_LastMeshSubdivideResult{};
+        std::optional<SandboxEditorMeshSimplifyResult>
+            m_LastMeshSimplifyResult{};
+        std::optional<SandboxEditorMeshVertexNormalsResult>
+            m_LastMeshVertexNormalsResult{};
+        std::optional<SandboxEditorGraphVertexNormalsResult>
+            m_LastGraphVertexNormalsResult{};
+        std::optional<SandboxEditorPointCloudVertexNormalsResult>
+            m_LastPointCloudVertexNormalsResult{};
+        std::optional<SandboxEditorPointCloudOutlierRemovalResult>
+            m_LastPointCloudOutlierRemovalResult{};
+        std::optional<SandboxEditorProgressivePoissonResult>
+            m_LastProgressivePoissonResult{};
+        std::optional<SandboxEditorUvRegenerationCommandResult>
+            m_LastUvRegenerationResult{};
+        std::optional<SandboxEditorRegistrationResult>
+            m_LastRegistrationResult{};
+        DerivedJobQueueSnapshot m_DerivedJobSnapshot{};
+        std::shared_ptr<std::atomic_bool> m_AttachmentEpoch{};
+        Graphics::RenderRecipeConfigContext m_RenderRecipeContext{};
+        SandboxEditorRenderRecipeEditorState m_RenderRecipeState{};
+        RenderArtifactRegistry m_RenderArtifactRegistry{};
+    };
+
     class SandboxEditorUi
     {
     public:
@@ -2841,62 +2941,18 @@ export namespace Extrinsic::Runtime
         }
         [[nodiscard]] const SandboxEditorPanelFrame& GetLastFrame() const noexcept
         {
-            return m_LastFrame;
+            return m_Session.LastFrame();
         }
 
     private:
-        void AttachKMeansGpuQueue(Engine& engine);
-        void DetachKMeansGpuQueue();
-
-        Engine*                 m_Engine{nullptr};
+        SandboxEditorSession    m_Session{};
         EditorUiHost            m_Host{};
-        const SandboxEditorContext* m_ActiveEditorContext{nullptr};
-        SandboxEditorPanelFrame m_LastFrame{};
-        SandboxEditorSelectedModelCache m_SelectedModelCache{};
         std::array<char, 1024>  m_ImportPathBuffer{};
         std::array<char, 1024>  m_ScenePathBuffer{};
         std::array<bool, Detail::kSandboxEditorPanelWindowCount>
             m_PanelWindowOpen{};
         Assets::AssetPayloadKind m_ImportPayloadKind{
             Assets::AssetPayloadKind::Unknown};
-        std::uint64_t m_LastObservedRuntimeImportSequence{0};
-        std::uint64_t m_LastObservedRuntimeSceneFileSequence{0};
-        std::optional<SandboxEditorFileImportResult> m_LastImportResult{};
-        std::optional<SandboxEditorSceneFileResult> m_LastSceneFileResult{};
-        std::optional<SandboxEditorKMeansResult> m_LastKMeansResult{};
-        ClusteringService* m_ClusteringService{};
-        KernelEventSubscription m_KMeansCompletionSubscription{};
-        std::unique_ptr<RuntimeKMeansGpuJobQueue> m_KMeansGpuJobs{};
-        GpuQueueParticipantHandle m_KMeansGpuParticipant{};
-        std::optional<SandboxEditorMeshDenoiseResult>
-            m_LastMeshDenoiseResult{};
-        std::optional<SandboxEditorMeshCurvatureResult>
-            m_LastMeshCurvatureResult{};
-        std::optional<SandboxEditorMeshRemeshResult>
-            m_LastMeshRemeshResult{};
-        std::optional<SandboxEditorMeshSubdivideResult>
-            m_LastMeshSubdivideResult{};
-        std::optional<SandboxEditorMeshSimplifyResult>
-            m_LastMeshSimplifyResult{};
-        std::optional<SandboxEditorMeshVertexNormalsResult>
-            m_LastMeshVertexNormalsResult{};
-        std::optional<SandboxEditorGraphVertexNormalsResult>
-            m_LastGraphVertexNormalsResult{};
-        std::optional<SandboxEditorPointCloudVertexNormalsResult>
-            m_LastPointCloudVertexNormalsResult{};
-        std::optional<SandboxEditorPointCloudOutlierRemovalResult>
-            m_LastPointCloudOutlierRemovalResult{};
-        std::optional<SandboxEditorProgressivePoissonResult>
-            m_LastProgressivePoissonResult{};
-        std::optional<SandboxEditorUvRegenerationCommandResult>
-            m_LastUvRegenerationResult{};
-        std::optional<SandboxEditorRegistrationResult>
-            m_LastRegistrationResult{};
-        DerivedJobQueueSnapshot m_DerivedJobSnapshot{};
-        std::shared_ptr<bool> m_ResultSinksAlive{std::make_shared<bool>(true)};
-        Graphics::RenderRecipeConfigContext m_RenderRecipeContext{};
-        SandboxEditorRenderRecipeEditorState m_RenderRecipeState{};
-        RenderArtifactRegistry m_RenderArtifactRegistry{};
         std::array<char, 8192> m_RenderRecipeDraftBuffer{};
         std::int32_t m_TextureBakeSourceIndex{0};
         std::int32_t m_TextureBakeTargetSemanticIndex{0};
@@ -2908,5 +2964,6 @@ export namespace Extrinsic::Runtime
         float m_UvAtlasTexelsPerUnit{0.0f};
         bool m_UvAtlasForceRegenerate{true};
         bool m_UvAtlasPreserveAuthored{false};
+        const SandboxEditorPreparedFrameView* m_ActivePreparedFrame{nullptr};
     };
 }
