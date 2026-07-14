@@ -1,24 +1,24 @@
 ---
 id: METHOD-026
 theme: I
-depends_on: [METHOD-025]
+depends_on: [METHOD-025, RUNTIME-176]
 maturity_target: ParityProven
 ---
 # METHOD-026 — Parameterization family GPU (Vulkan compute) backend and parity
 
 ## Goal
-- Add the `gpu_vulkan_compute` backend for the iterative parameterization strategies (ARAP, SLIM), executing the per-triangle local step and the global linear solve on the GPU, with an opt-in `gpu;vulkan` parity smoke against the CPU reference and a GPU-vs-CPU comparison benchmark — completing the family's Strategy × Backend matrix so a caller can request GPU execution through the same surface and fall back honestly when no device is operational.
+- Add the `gpu_vulkan_compute` backend for the iterative parameterization strategies (ARAP, SLIM), executing the per-triangle local step and the global linear solve on the GPU, with an opt-in `gpu;vulkan` parity smoke against the CPU reference and a GPU-vs-CPU comparison benchmark — completing the backend matrix for the iterative strategies, so a caller can request GPU execution through the same surface and fall back honestly when no device is operational. The linear one-shot strategies (LSCM/SCP/BFF) stay CPU-only by recorded decision (see Non-goals).
 
 ## Non-goals
 - No new strategy or numeric change — the GPU path must match the `METHOD-021`/`METHOD-022` reference within a documented parity tolerance and preserve SLIM injectivity.
-- No GPU acceleration of the linear strategies (LSCM/SCP/BFF) in this task.
+- No GPU acceleration of the linear one-shot strategies (LSCM/SCP/BFF) — not in this task and not deferred from it. Their method tasks record no GPU follow-up (a one-shot sparse direct solve/eigensolve gains little from `gpu_vulkan_compute`); if a benchmark ever justifies one, it opens as its own method/backend task.
 - No new GPU primitive library — reuse the shared `Extrinsic.Graphics.ComputeParallelPrimitives` (GRAPHICS-108) and the runtime GPU-queue/readback substrate rather than private CUB-equivalents.
 
 ## Context
 - Owner/layer: a declared method backend adapter in `src/runtime` (the layer allowed to import RHI), behind the `Backend::GPU` request on the `Geometry.Parameterization` surface — geometry stays RHI-free. Mirrors the `Extrinsic.Runtime.KMeansGpuBackend` / `KMeansGpuJobQueue` exemplar and the GEOM-056 opt-in `gpu;vulkan` parity smoke pattern.
 - GPU shape: the local step (per-triangle signed-SVD rotation fit) is embarrassingly parallel; the global step is a sparse SPD solve run as a GPU Jacobi/CG iteration (matching the reference within tolerance). Results drain through `Extrinsic.Runtime.AsyncBufferReadback` (RUNTIME-137), never a device-wide `ReadBuffer` stall.
 - Gating: reference parity (`METHOD-021`/`022`) and the optimized CPU baseline (`METHOD-025`) must exist first; the GPU backend is measured against the `METHOD-025` baseline and the CPU reference oracle. Renderer/runtime code gates on `RHI::IDevice::IsOperational()`; a GPU request on a non-operational device falls back to `cpu_reference`/`cpu_optimized` with honest telemetry.
-- Config/UI: the `Backend::GPU` request is already the surface the `RUNTIME-176` config lane and `UI-036` panel expose; this task makes that request execute on the GPU and wires the runtime GPU job-queue leg reserved by `RUNTIME-176`.
+- Config/UI: the `Backend::GPU` request is already the surface the `RUNTIME-176` config lane and `UI-036` panel expose; this task makes that request execute on the GPU and wires the runtime GPU job-queue leg reserved by `RUNTIME-176` — hence the `depends_on` edge: the runtime facade/config seam must be landed before this task can wire into it.
 
 ## Control surfaces
 - Config/UI/Agent: none new — `gpu_vulkan_compute` is the existing `Backend::GPU`/policy token; this task makes it operational and honest under fallback.
@@ -28,7 +28,7 @@ maturity_target: ParityProven
 
 ## Required changes
 - [ ] Add the runtime GPU backend adapter (mirroring `Runtime.KMeansGpuBackend`/`KMeansGpuJobQueue`) that records the local-step and global-solve compute passes for ARAP/SLIM, uploads mesh topology/positions once, iterates on the GPU, and drains UVs through `AsyncBufferReadback`.
-- [ ] Wire the adapter into the `RUNTIME-176` GPU job-queue leg (JobService `GpuQueue` participant) so the work records inside the renderer frame context with no extra present.
+- [ ] Wire the adapter into the `RUNTIME-176` GPU job-queue leg (JobService `GpuQueue` participant) so the work records inside the renderer frame context with no extra present; if `RUNTIME-176` deferred its `Runtime.ParameterizationGpuJobQueue` second slice, that slice lands with this task.
 - [ ] Gate on `IDevice::IsOperational()`; fall back to CPU with `RequestedBackend == GPU`, `ActualBackend == cpu_*`, `FellBackToCPU == true` when unavailable.
 - [ ] Preserve determinism within the documented GPU parity tolerance; preserve SLIM injectivity on the GPU path.
 
@@ -67,4 +67,4 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - No RHI import into `src/geometry`; no private GPU primitive library.
 
 ## Maturity
-- Target: `Operational` on Vulkan-capable hosts and `ParityProven` against the CPU reference (mirroring `METHOD-020`). Requires the `ci-vulkan` preset run cited in `Verification`; CPU-only hosts stop at the asserted honest fallback. This closes the family's Strategy × Backend matrix.
+- Target: `Operational` on Vulkan-capable hosts and `ParityProven` against the CPU reference (mirroring `METHOD-020`). Requires the `ci-vulkan` preset run cited in `Verification`; CPU-only hosts stop at the asserted honest fallback. This closes the backend matrix for the iterative strategies; the linear strategies record no GPU follow-up in their own tasks.

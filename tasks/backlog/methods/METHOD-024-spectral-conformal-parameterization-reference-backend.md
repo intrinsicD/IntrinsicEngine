@@ -12,7 +12,8 @@ maturity_target: CPUContracted
 ## Non-goals
 - No new parameterization module — SCP is a `Strategy` value on the `Geometry.Parameterization` surface (`GEOM-063`), not a parallel module.
 - No private eigensolver — the generalized symmetric eigenproblem is solved through the `GEOM-024` `Geometry` eigensolver seam; SCP must not embed a private Spectra/LOBPCG path.
-- No optimized/GPU backend before reference parity (`METHOD-026`); no cone/cutting change.
+- No optimized or GPU backend — none is planned for this strategy: the map is a one-shot sparse generalized eigensolve, and the family GPU task `METHOD-026` deliberately covers only the iterative ARAP/SLIM strategies. A future GPU need opens its own method/backend task.
+- No cone/cutting change.
 
 ## Context
 - Paper/method: Mullen, Tong, Alliez & Desbrun, "Spectral Conformal Parameterization", Computer Graphics Forum 27(5), SGP 2008. SCP minimizes the LSCM conformal energy `E_C = E_D − A` (Dirichlet energy minus signed UV area) subject to a boundary-normalization constraint, which is a generalized eigenproblem `E_C x = λ B x` with `B` a boundary mass matrix; the smallest non-trivial eigenvector is the conformal map. Because no vertices are pinned, the map is free of the pin-induced distortion that LSCM incurs.
@@ -24,7 +25,7 @@ maturity_target: CPUContracted
 - Config/UI/Agent: none new — `Scp` becomes selectable on the existing `ParameterizationStrategy` axis; runtime/config-lane and editor surfaces are owned by `RUNTIME-176` / `UI-036`.
 
 ## Backends
-- Backend axis: `cpu_reference` only. `gpu_vulkan_compute` deferred to `METHOD-026`; the eigensolve is a one-shot spectral solve, so no `cpu_optimized` is planned unless a benchmark justifies it.
+- Backend axis: `cpu_reference` only. No `gpu_vulkan_compute` backend is planned — `METHOD-026` covers only the iterative strategies. The eigensolve is a one-shot spectral solve, so no `cpu_optimized` is planned either unless a benchmark justifies it.
 
 ## Required changes
 - [ ] Clone `methods/_template/` to `methods/geometry/spectral_conformal/`.
@@ -42,7 +43,7 @@ maturity_target: CPUContracted
 - [ ] Determinism (including eigenvector sign/normalization convention) and fail-closed cases as listed above.
 
 ## Docs
-- [ ] `methods/geometry/spectral_conformal/README.md` with a backend-status table (`cpu_reference` → `METHOD-024`; GPU → `METHOD-026`), guidance on SCP vs LSCM/BFF (pin-free conformal vs pinned conformal vs controllable conformal), and known limitations (spectral cost, conformal-only).
+- [ ] `methods/geometry/spectral_conformal/README.md` with a backend-status table (`cpu_reference` → `METHOD-024`; optimized/GPU → none planned, recorded decision), guidance on SCP vs LSCM/BFF (pin-free conformal vs pinned conformal vs controllable conformal), and known limitations (spectral cost, conformal-only).
 - [ ] Note the `Scp` strategy and parameters in the `Geometry.Parameterization` interface docs; add the SCP pack to `docs/architecture/parameterization-mapping-roadmap.md`.
 - [ ] Smoke benchmark manifest `benchmarks/geometry/manifests/spectral_conformal_reference_smoke.yaml` (`benchmark_id: geometry.spectral_conformal.smoke`); metrics restricted to the benchmark enum (`runtime_ms`, `quality_error_l2`).
 - [ ] Regenerate `docs/api/generated/module_inventory.md` if the module surface changes.
@@ -70,4 +71,5 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 ## Maturity
 - Target: `CPUContracted` for the `Scp` reference strategy.
-- `Operational` owned by `METHOD-026` (GPU) after reference parity; engine wiring by `RUNTIME-176`/`UI-036`. Blocked until `GEOM-024` retires (promote `GEOM-024` when SCP or `METHOD-006` is the next-priority spectral method).
+- `Operational` owned by `RUNTIME-176`/`UI-036` — the shared facade, config lane, and panel make every implemented strategy reachable in `Engine::Run()`, including `Scp` once this task lands. No GPU follow-up is owed: `METHOD-026` covers only the iterative strategies, and this one-shot spectral strategy stays CPU-only by recorded decision.
+- Blocked until `GEOM-024` retires (promote `GEOM-024` when SCP or `METHOD-006` is the next-priority spectral method).

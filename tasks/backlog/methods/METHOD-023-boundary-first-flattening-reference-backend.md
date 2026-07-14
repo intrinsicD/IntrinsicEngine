@@ -12,7 +12,8 @@ maturity_target: CPUContracted
 ## Non-goals
 - No new parameterization module — BFF is a `Strategy` value on the `Geometry.Parameterization` surface (`GEOM-063`), not a parallel module.
 - No automatic cone-placement solver — cones are caller-supplied here (curvature prescribed at supplied interior vertices); an automatic cone-count/placement optimizer is a named future follow-up, not this task.
-- No optimized/GPU backend before reference parity (`METHOD-026`); no isometric/injective optimization (that is ARAP/SLIM).
+- No optimized or GPU backend — none is planned for this strategy: the flattening is a pair of one-shot sparse LDLT solves, and the family GPU task `METHOD-026` deliberately covers only the iterative ARAP/SLIM strategies. A future GPU need opens its own method/backend task.
+- No isometric/injective optimization (that is ARAP/SLIM).
 
 ## Context
 - Paper/method: Sawhney & Crane, "Boundary First Flattening", ACM TOG 37(1), 2018. BFF reduces flattening to the boundary via the Dirichlet-to-Neumann (Poincaré–Steklov) operator: prescribing either boundary scale factors (from target lengths) or boundary geodesic curvature (from target exterior angles) determines the conjugate quantity, after which the interior is recovered by two sparse cotangent-Laplacian solves and a boundary curve is integrated. Cone singularities are prescribed interior curvature. The result is discretely conformal and the boundary is directly controllable — the property that makes it the interactive-editing method in modern tools.
@@ -25,7 +26,7 @@ maturity_target: CPUContracted
 - Config/UI/Agent: none new in this task — the `BoundaryTarget` mode, boundary target arrays, and cone list are added to the `Bff` strategy payload on the existing surface. The config-lane serialization and the interactive editor controls that drive them are owned by `RUNTIME-176` / `UI-036`.
 
 ## Backends
-- Backend axis: `cpu_reference` only. `gpu_vulkan_compute` deferred to `METHOD-026`; the interior solves are linear and already fast, so no `cpu_optimized` is planned unless a benchmark justifies it.
+- Backend axis: `cpu_reference` only. No `gpu_vulkan_compute` backend is planned — `METHOD-026` covers only the iterative strategies. The interior solves are linear and already fast, so no `cpu_optimized` is planned either unless a benchmark justifies it.
 
 ## Required changes
 - [ ] Clone `methods/_template/` to `methods/geometry/boundary_first_flattening/`.
@@ -44,7 +45,7 @@ maturity_target: CPUContracted
 - [ ] Determinism and fail-closed cases (mismatched target array length, Gauss–Bonnet-inconsistent curvatures) as listed above.
 
 ## Docs
-- [ ] `methods/geometry/boundary_first_flattening/README.md` with a backend-status table (`cpu_reference` → `METHOD-023`; GPU → `METHOD-026`), guidance on BFF's control modes and when conformal+controllable beats SLIM's isometric map, and known limitations (caller-supplied cones only; conformal, not area-preserving).
+- [ ] `methods/geometry/boundary_first_flattening/README.md` with a backend-status table (`cpu_reference` → `METHOD-023`; optimized/GPU → none planned, recorded decision), guidance on BFF's control modes and when conformal+controllable beats SLIM's isometric map, and known limitations (caller-supplied cones only; conformal, not area-preserving).
 - [ ] Note the `Bff` strategy, its `BoundaryTarget` modes, and the cone list in the `Geometry.Parameterization` interface docs; add the BFF pack to `docs/architecture/parameterization-mapping-roadmap.md`.
 - [ ] Smoke benchmark manifest `benchmarks/geometry/manifests/boundary_first_flattening_reference_smoke.yaml` (`benchmark_id: geometry.boundary_first_flattening.smoke`); metrics restricted to the benchmark enum (`runtime_ms`, `quality_error_l2`).
 - [ ] Regenerate `docs/api/generated/module_inventory.md` if the module surface changes.
@@ -73,4 +74,4 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 ## Maturity
 - Target: `CPUContracted` for the `Bff` reference strategy.
-- `Operational` owned by `METHOD-026` (GPU) after reference parity; engine wiring by `RUNTIME-176`/`UI-036`.
+- `Operational` owned by `RUNTIME-176`/`UI-036` — the shared facade, config lane, and panel make every implemented strategy reachable in `Engine::Run()`, including `Bff` once this task lands. No GPU follow-up is owed: `METHOD-026` covers only the iterative strategies, and this one-shot linear strategy stays CPU-only by recorded decision.

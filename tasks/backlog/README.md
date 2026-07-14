@@ -349,7 +349,8 @@ family on the `GEOM-063` shared surface — `METHOD-021` ARAP (blocked by
 `GEOM-063`/`GEOM-064`), `METHOD-022` SLIM (blocked by
 `GEOM-063`/`GEOM-064`/`METHOD-021`), `METHOD-023` BFF (blocked by `GEOM-063`),
 `METHOD-024` SCP (blocked by `GEOM-063`/`GEOM-024`), `METHOD-025` optimized CPU
-(blocked by `METHOD-021`/`022`), `METHOD-026` GPU (blocked by `METHOD-025`), and
+(blocked by `METHOD-021`/`022`), `METHOD-026` GPU (blocked by
+`METHOD-025`/`RUNTIME-176`; iterative strategies only), and
 its engine-integration leaves `RUNTIME-176` (blocked by `GEOM-063`), `UI-036`
 (blocked by `RUNTIME-176`), and the optional `GRAPHICS-122` (blocked by
 `UI-036`); and the method-readiness seams `GEOM-013`, `GEOM-014`, `GEOM-019`,

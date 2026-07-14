@@ -288,7 +288,7 @@ The diagnostics ([`GEOM-018`](../../tasks/done/GEOM-018-parameterization-distort
 1. [`GEOM-063`](../../tasks/backlog/geometry/GEOM-063-parameterization-strategy-backend-surface.md) — the family dispatch surface, consolidating the existing Tutte/Harmonic/LSCM solvers so every later variant is choosable through one API. Behavior-preserving; no new algorithm.
 2. [`GEOM-064`](../../tasks/backlog/geometry/GEOM-064-parameterization-optimization-kernels.md) — the shared optimization-kernel seam ARAP and SLIM consume.
 3. The SOTA reference variants on the surface: ARAP (`METHOD-021`, Pack 3), SLIM (`METHOD-022`, Pack 4), SCP (`METHOD-024`, Pack 4b), BFF (`METHOD-023`, Pack 4c) — CPU-reference-first, in each task's `depends_on` order.
-4. The optimized CPU (`METHOD-025`) and GPU (`METHOD-026`) backends after reference parity.
+4. The optimized CPU (`METHOD-025`) and GPU (`METHOD-026`) backends for the iterative strategies after reference parity; the linear one-shot strategies (LSCM/SCP/BFF) record no optimized/GPU follow-up in their tasks. `METHOD-026` also wires the runtime GPU job-queue leg, so it is additionally gated on `RUNTIME-176`.
 5. Engine integration and the interactive UV view (Pack 7: `RUNTIME-176`, `UI-036`, optional `GRAPHICS-122`).
 
 Later packs should not begin until their prerequisites are retired to `tasks/done/` or recorded as explicit out-of-scope assumptions in the candidate task file.
