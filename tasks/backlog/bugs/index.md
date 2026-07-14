@@ -9,11 +9,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   renderer backend selection runs before the platform subdirectory defines
   and caches the documented default, so a clean configure can omit Vulkan
   targets that appear on the unchanged second configure.
-- [`BUG-082` — GLFW X11 input-method initialization leaks under LeakSanitizer](BUG-082-glfw-x11-input-method-lsan-leak.md):
-  a GLFW-backed runtime contract passes its assertions but the process exits
-  nonzero for a 408-byte `_XimOpenIM` allocation after engine shutdown; isolate
-  terminate ordering versus an upstream retained global without weakening
-  engine leak detection.
 - [`BUG-081` — Warm-configure CI budget still flakes on hosted-runner variance](BUG-081-warm-configure-budget-runner-variance.md):
   an exact-vcpkg-hit configure took 22.002 s against the recalibrated 20 s
   budget and stopped the job before ccache restore or compilation; collect a
@@ -21,6 +16,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   headroom while preserving fail-closed semantics.
 
 ## Verified / Closed
+
+- Closed 2026-07-14: [`BUG-082` — GLFW X11 input-method initialization leaks under LeakSanitizer](../../done/BUG-082-glfw-x11-input-method-lsan-leak.md).
+  The clean exact process reaches `glfwTerminate`, unregisters and closes its
+  XIM, and passes ten leak-on repetitions without a suppression. A standalone
+  regression proves that process-static teardown exits cleanly while a paired
+  unsuppressed 4,096-byte synthetic engine leak remains detectable; no
+  production lifetime or backend-selection semantics changed.
 
 - Closed 2026-07-13: [`BUG-074` — Orphaned GpuAssetCache slot causes per-entity bake retry livelock](../../done/BUG-074-object-space-normal-bake-orphaned-cache-slot-livelock.md).
   Both post-open failure paths now retire only the exact GPU-produced texture

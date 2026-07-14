@@ -67,6 +67,30 @@ Platform owns window/input ports only. It exposes input state/events to runtime;
 it does not create graphics camera snapshots, pick requests, gizmo packets, or
 transform mutations directly.
 
+## GLFW/X11 sanitizer lifetime contract
+
+The GLFW backend owns one process-static `GLFWLifetime`. A 2026-07-13
+LeakSanitizer report attributed 408 bytes to `_XimOpenIM` after an otherwise
+passing runtime contract. The clean exact repro no longer reports the
+allocation, and a debugger trace proves normal process teardown reaches
+`GLFWLifetime::~GLFWLifetime()` -> `glfwTerminate()` ->
+`XUnregisterIMInstantiateCallback()` -> `XCloseIM()` before exit. That evidence
+does not support an engine shutdown-order change or a suppression for the
+GLFW/Xlib path.
+
+`GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl` preserves the diagnosis
+as a Linux + GLFW regression. Its standalone helper wraps `glfwTerminate` and
+uses reverse `atexit` ordering to prove the engine's process-static lifetime
+calls it exactly once before LeakSanitizer's exit sweep. A separate helper mode
+allocates `Bug082SyntheticEngineLeak`; the CMake runner requires that process
+to fail with a LeakSanitizer report for the named 4096-byte allocation before
+accepting the clean GLFW run.
+
+Both subprocesses explicitly use `detect_leaks=1` without a suppression file,
+and the helper deliberately does not link the shared GTest/TestSupport
+sanitizer defaults. The CTest entry reports an environment skip when ASan is
+not active or a usable X11 display is unavailable.
+
 ## Event contract and editor file boundary
 
 `Extrinsic.Platform.Window` exposes the current editor/runtime event contract as

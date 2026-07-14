@@ -4570,3 +4570,14 @@ contracts bring the split total to 152. The focused presentation gate passed
 20/20;
 exact-head build, default CPU gate, and strict
 structural/docs verification are recorded in the retired task.
+
+[`BUG-082`](BUG-082-glfw-x11-input-method-lsan-leak.md) — GLFW/X11 sanitizer
+lifetime diagnosis retired to `tasks/done/` on 2026-07-14 at `CPUContracted`.
+The clean exact process reaches `glfwTerminate`,
+`XUnregisterIMInstantiateCallback`, and `XCloseIM` before exit and passed ten
+leak-on repetitions without using a suppression; the production GLFW source
+has not changed since the original report. A dedicated standalone process now
+wraps the engine-owned static teardown and pairs its clean exit with an
+unsuppressed, named 4,096-byte synthetic engine leak that LeakSanitizer must
+reject. No production lifetime, backend-selection, or sanitizer-suppression
+semantics changed.
