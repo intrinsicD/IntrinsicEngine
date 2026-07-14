@@ -160,7 +160,7 @@ grandfathered in place). Before opening `<PREFIX>-<N>`, take the highest
 existing number for that prefix across **all four** directories and add one:
 
 ```bash
-grep -rhoE '^# <PREFIX>-[0-9]+' tasks/active tasks/backlog tasks/done | sort -V | tail -1
+grep -rhoE '^# <PREFIX>-[0-9]+' tasks/active tasks/backlog tasks/done tasks/archive | sort -V | tail -1
 ```
 
 Letter-suffixed child slices (e.g. `GRAPHICS-033A`) extend their parent's
