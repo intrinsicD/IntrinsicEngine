@@ -51,7 +51,8 @@ The completion contract is:
   returns `ThreadViolation` elsewhere.
 - `Wait()` has the same owner-thread requirement. It pumps owner-thread passes,
   help-executes one scheduler task from the inject queues or worker-local
-  deques, and parks on completion-count progress when no work is available.
+  deques through the external pseudo-thief path, and parks on completion-count
+  progress when no work is available.
 - `Execute()` is exactly the blocking compatibility form: `Submit()` followed
   by `Wait()`. There is no separate execution path and no yield-spin loop.
 
@@ -66,6 +67,18 @@ shared across signal and blocking-wait operations, allowing a signal to notify
 progress after publishing a count transition without racing destruction. The
 final task publishes execution timing and the idle graph state before it
 signals completion.
+
+Worker-eligible pass priority is preserved at dispatch. `Critical` and `High`
+map to the Core scheduler's fixed High lane, `Normal` maps to Normal, and `Low`
+and `Background` map to Low. Workers and external helpers scan those lanes from
+highest to lowest while retaining LIFO owner pops and FIFO victim steals within
+each lane. This is a generic preference under contention, not a realtime,
+fairness, or maximum-latency contract.
+
+Submission execution state owns fixed scheduling/completion methods. Common
+initial-ready and successor-ready batches use inline scratch, with vector
+overflow only for larger fan-out, so pass completion does not construct fresh
+callback wrappers and heap-backed ready vectors on every path.
 
 ## Ownership
 

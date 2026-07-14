@@ -4,6 +4,7 @@ module;
 #include <memory>
 #include <coroutine>
 #include <atomic>
+#include <cstdint>
 
 export module Extrinsic.Core.Tasks;
 
@@ -12,6 +13,15 @@ export import :LocalTask;
 namespace Extrinsic::Core::Tasks
 {
 export class Job;
+
+    // Fixed generic scheduling lanes. Values are ordered from most to least
+    // urgent so the scheduler can scan lanes without dynamic policy state.
+    export enum class DispatchPriority : std::uint8_t
+    {
+        High = 0,
+        Normal,
+        Low,
+    };
 
     export class Scheduler
     {
@@ -49,6 +59,8 @@ export class Job;
             std::uint64_t IdleWaitCount = 0;
             std::uint64_t IdleWaitTotalNs = 0;
             std::uint64_t QueueContentionCount = 0;
+            std::uint64_t WorkerWakeNotifications = 0;
+            std::uint32_t ParkedWorkers = 0;
             double StealSuccessRatio = 0.0;
             std::vector<std::uint32_t> WorkerLocalDepths{};
             std::vector<std::uint64_t> WorkerVictimStealCounts{};
@@ -58,12 +70,23 @@ export class Job;
         static void Shutdown();
 
         template <typename F>
-        static void Dispatch(F&& task) { DispatchInternal(LocalTask(std::forward<F>(task))); }
+        static void Dispatch(F&& task)
+        {
+            Dispatch(DispatchPriority::Normal, std::forward<F>(task));
+        }
+
+        template <typename F>
+        static void Dispatch(DispatchPriority priority, F&& task)
+        {
+            DispatchInternal(LocalTask(std::forward<F>(task)), priority);
+        }
 
         static void Dispatch(Job&& job);
+        static void Dispatch(DispatchPriority priority, Job&& job);
         static void Reschedule(std::coroutine_handle<> h, std::shared_ptr<std::atomic<bool>> alive = nullptr);
 
         [[nodiscard]] static bool IsInitialized() noexcept;
+        [[nodiscard]] static std::uint32_t WorkerCount() noexcept;
         [[nodiscard]] static Stats GetStats();
         [[nodiscard]] static std::uint64_t GetParkCount() noexcept;
         [[nodiscard]] static std::uint64_t GetUnparkCount() noexcept;
@@ -81,7 +104,7 @@ export class Job;
 
     private:
         static void WorkerEntry(unsigned threadIndex);
-        static void DispatchInternal(LocalTask&& task);
+        static void DispatchInternal(LocalTask&& task, DispatchPriority priority);
     };
 
     export class Job

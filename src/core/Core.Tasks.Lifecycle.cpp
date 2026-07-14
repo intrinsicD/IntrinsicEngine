@@ -49,12 +49,13 @@ namespace Extrinsic::Core::Tasks
         }
 
         std::vector<Detail::SchedulerContext::ParkedContinuation> abandoned;
+        for (auto& shard : s_Ctx->waitShards)
         {
-            std::lock_guard lock(s_Ctx->waitMutex);
-            for (auto& slot : s_Ctx->waitSlots)
+            std::lock_guard lock(shard.Mutex);
+            for (auto& slot : shard.Slots)
             {
                 auto slotContinuations =
-                    Detail::TakeParkedContinuationsLocked(*s_Ctx, slot);
+                    Detail::TakeParkedContinuationsLocked(shard, slot);
                 abandoned.insert(abandoned.end(),
                                  std::make_move_iterator(slotContinuations.begin()),
                                  std::make_move_iterator(slotContinuations.end()));
@@ -69,7 +70,6 @@ namespace Extrinsic::Core::Tasks
         return s_Ctx != nullptr;
     }
 
-
     void Scheduler::WaitForAll()
     {
         if (!s_Ctx)
@@ -81,9 +81,10 @@ namespace Extrinsic::Core::Tasks
                 break;
 
             LocalTask task;
-            if (TryPopTask(task, std::nullopt))
+            std::uint8_t lane = static_cast<std::uint8_t>(DispatchPriority::Normal);
+            if (TryPopTask(task, std::nullopt, &lane))
             {
-                OnTaskDequeuedAndRun(task);
+                OnTaskDequeuedAndRun(task, lane);
                 continue;
             }
 

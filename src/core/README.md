@@ -78,7 +78,15 @@ Core owns reusable graph/scheduling primitives, not domain-specific GPU policy.
     live instead of relying on an assertion.
   - Main-thread-only passes are queued in deterministic ready order (priority,
     then estimated cost, then insertion order) while worker-ready passes keep
-    running on scheduler workers.
+    running on scheduler workers. Worker-eligible `Critical`/`High` passes map
+    to the scheduler's High lane, `Normal` maps to Normal, and
+    `Low`/`Background` map to Low. Higher lanes are preferred under contention;
+    this is a bounded generic policy, not a realtime or starvation-free
+    guarantee.
+  - Submission uses fixed execution-state methods instead of per-submit
+    `std::function` wrappers. Initial-ready and successor-ready scratch stays in
+    small inline buffers for the common case and spills to a vector only when a
+    graph exceeds those capacities.
 - **`Extrinsic.Core.FrameGraph`**: ECS-oriented facade over `TaskGraph` with
   typed read/write access declarations plus structural and commit tokens.
 - **`Extrinsic.Core.FrameClock`**: reusable steady-clock frame delta helper with
@@ -132,9 +140,22 @@ park/unpark contract, and destroying the public event releases the token after
 the last in-progress signal or blocking wait retires.
 
 `Scheduler::TryRunOne()` is the neutral external-help seam used by graph
-completion waits. It executes at most one task on the caller, checking inject
-work and then worker-local deques; it does not impose graph or runtime domain
-policy.
+completion waits. It executes at most one task on the caller, scanning fixed
+High, Normal, and Low lanes in order across inject work and worker-local
+deques. External callers use a rotating pseudo-thief cursor so `TryRunOne()`
+and `WaitForAll()` can make progress when work resides only in a worker's local
+deque; they do not impose graph or runtime domain policy. Within each lane,
+workers retain local LIFO execution and thieves take FIFO work.
+
+Dispatch publishes a monotonically increasing work signal after enqueueing.
+Workers increment a parked-worker count before re-checking that signal, which
+closes the enqueue-before-park race; dispatch calls `notify_one()` only when at
+least one worker is parked. The worker-deque `SpinLock` deliberately retains
+its per-unlock notification because contending lockers park with
+`atomic::wait()` after a bounded spin phase, so that notification is required
+for progress. `Scheduler::WorkerCount()` exposes the configured worker count
+without taking every deque lock; detailed queue telemetry remains available
+through `GetStats()`.
 
 Task coroutine handles published to the scheduler are single-use resumption
 tokens. `Scheduler::Reschedule()` resumes a handle but must not inspect
@@ -144,12 +165,13 @@ original resume call unwinds. Completed task frames self-destroy through the
 task promise's non-suspending final suspend.
 
 Parked continuations are cancelled, not resumed, when their wait token is
-released. The wait registry transfers their single-use handles under its mutex,
-then destroys the coroutine frames after unlocking; this prevents frame
-destructors from running inside registry synchronization. Scheduler shutdown
-first joins all workers, transfers every continuation still parked in the wait
-registry, and destroys those frames before releasing the scheduler context.
-Signal/unpark and cancellation therefore compete for the same registry-owned
+released. Wait tokens are distributed round-robin across 16 independent
+registry shards. Each shard transfers a token's single-use handles under its
+own mutex, then destroys the coroutine frames after unlocking; unrelated
+tokens in other shards do not share that synchronization. Scheduler shutdown
+first joins all workers, transfers every continuation still parked from each
+shard, and destroys those frames before releasing the scheduler context.
+Signal/unpark and cancellation therefore compete for the same shard-owned
 token, so exactly one path can resume or destroy each frame.
 
 ## Engine config fields

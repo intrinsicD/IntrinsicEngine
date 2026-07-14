@@ -51,6 +51,9 @@ namespace Extrinsic::Core::Tasks
         stats.IdleWaitCount = s_Ctx->idleWaitCount.load(std::memory_order_relaxed);
         stats.IdleWaitTotalNs = s_Ctx->idleWaitTotalNs.load(std::memory_order_relaxed);
         stats.QueueContentionCount = s_Ctx->queueContentionCount.load(std::memory_order_relaxed);
+        stats.WorkerWakeNotifications =
+            s_Ctx->workerWakeNotificationCount.load(std::memory_order_relaxed);
+        stats.ParkedWorkers = s_Ctx->parkedWorkerCount.load(std::memory_order_relaxed);
 
         if (stats.TotalStealAttempts > 0)
         {
@@ -64,7 +67,10 @@ namespace Extrinsic::Core::Tasks
         for (auto& worker : s_Ctx->workerStates)
         {
             std::lock_guard lock(worker.localLock);
-            stats.WorkerLocalDepths.push_back(static_cast<uint32_t>(worker.localDeque.size()));
+            std::uint32_t localDepth = 0u;
+            for (const auto& lane : worker.localDeques)
+                localDepth += static_cast<std::uint32_t>(lane.size());
+            stats.WorkerLocalDepths.push_back(localDepth);
             stats.WorkerVictimStealCounts.push_back(worker.stealCount.load(std::memory_order_relaxed));
         }
 
@@ -76,6 +82,13 @@ namespace Extrinsic::Core::Tasks
         if (!s_Ctx)
             return 0;
         return s_Ctx->parkCount.load(std::memory_order_acquire);
+    }
+
+    std::uint32_t Scheduler::WorkerCount() noexcept
+    {
+        return s_Ctx
+            ? static_cast<std::uint32_t>(s_Ctx->workerStates.size())
+            : 0u;
     }
 
     uint64_t Scheduler::GetUnparkCount() noexcept

@@ -278,6 +278,7 @@ export namespace Extrinsic::Core::Dag
 
     private:
         friend class TaskGraphBuilder;
+        friend class TaskGraphCompletion;
 
         // Called by the typed AddPass template above.
         uint32_t AddPassInternal(std::string_view name,

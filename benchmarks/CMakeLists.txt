@@ -77,6 +77,36 @@ add_custom_target(IntrinsicBenchmarks
     COMMENT "Running benchmark smoke scaffold"
 )
 
+# CORE-007 — PR-fast scheduler contention/priority benchmark. This stays a
+# separate Core-only executable so scheduler measurements do not inherit the
+# geometry/graphics smoke runner's setup or dependency costs.
+add_executable(IntrinsicSchedulerBenchmarkSmoke
+    core/Bench_SchedulerSmoke.cpp
+)
+set_target_properties(IntrinsicSchedulerBenchmarkSmoke PROPERTIES CXX_SCAN_FOR_MODULES ON)
+target_compile_features(IntrinsicSchedulerBenchmarkSmoke PRIVATE cxx_std_23)
+target_compile_options(IntrinsicSchedulerBenchmarkSmoke PRIVATE ${INTRINSIC_COMPILE_FLAGS})
+target_link_options(IntrinsicSchedulerBenchmarkSmoke PRIVATE ${INTRINSIC_LINK_FLAGS})
+target_link_libraries(IntrinsicSchedulerBenchmarkSmoke
+    PRIVATE
+        IntrinsicConfig
+        ExtrinsicCore
+)
+
+set(INTRINSIC_SCHEDULER_BENCHMARK_SMOKE_OUTPUT
+    "${CMAKE_BINARY_DIR}/benchmark/IntrinsicSchedulerBenchmarkSmoke/result.json"
+    CACHE INTERNAL "Path for the scheduler benchmark smoke JSON output"
+)
+
+add_custom_target(IntrinsicSchedulerBenchmark
+    COMMAND ${CMAKE_COMMAND} -E rm -rf
+        "${CMAKE_BINARY_DIR}/benchmark/IntrinsicSchedulerBenchmarkSmoke"
+    COMMAND $<TARGET_FILE:IntrinsicSchedulerBenchmarkSmoke>
+        ${INTRINSIC_SCHEDULER_BENCHMARK_SMOKE_OUTPUT}
+    DEPENDS IntrinsicSchedulerBenchmarkSmoke
+    COMMENT "Running Core scheduler benchmark smoke"
+)
+
 if(TARGET ExtrinsicRuntime AND TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
     add_executable(IntrinsicKMeansGpuBenchmarkSmoke
         geometry/Bench_KMeansGpuVulkanSmoke.cpp
@@ -109,6 +139,27 @@ if(BUILD_TESTING)
         LABELS benchmark geometry graphics physics
     )
 
+    intrinsic_register_test_executable(
+        TARGET IntrinsicSchedulerBenchmarkSmoke
+        LABELS benchmark core
+    )
+
+    set(_intrinsic_scheduler_bench_smoke_dir
+        "${CMAKE_BINARY_DIR}/benchmark-ctest/IntrinsicSchedulerBenchmarkSmoke")
+    set(_intrinsic_scheduler_bench_smoke_result
+        "${_intrinsic_scheduler_bench_smoke_dir}/result.json")
+
+    add_test(
+        NAME IntrinsicSchedulerBenchmarkSmoke.Run
+        COMMAND $<TARGET_FILE:IntrinsicSchedulerBenchmarkSmoke>
+            "${_intrinsic_scheduler_bench_smoke_result}"
+    )
+    set_tests_properties(IntrinsicSchedulerBenchmarkSmoke.Run PROPERTIES
+        LABELS "benchmark;core"
+        TIMEOUT 30
+        FIXTURES_SETUP IntrinsicSchedulerBenchmarkSmoke
+    )
+
     set(_intrinsic_bench_smoke_test_dir "${CMAKE_BINARY_DIR}/benchmark-ctest/IntrinsicBenchmarkSmokeTest")
 
     add_test(
@@ -123,6 +174,19 @@ if(BUILD_TESTING)
 
     find_package(Python3 COMPONENTS Interpreter QUIET)
     if(Python3_Interpreter_FOUND)
+        add_test(
+            NAME IntrinsicSchedulerBenchmarkSmoke.Validate
+            COMMAND ${Python3_EXECUTABLE}
+                "${CMAKE_SOURCE_DIR}/tools/benchmark/validate_benchmark_results.py"
+                --root "${_intrinsic_scheduler_bench_smoke_dir}"
+                --strict
+        )
+        set_tests_properties(IntrinsicSchedulerBenchmarkSmoke.Validate PROPERTIES
+            LABELS "benchmark;core"
+            TIMEOUT 30
+            FIXTURES_REQUIRED IntrinsicSchedulerBenchmarkSmoke
+        )
+
         add_test(
             NAME IntrinsicBenchmarkSmoke.Validate
             COMMAND ${Python3_EXECUTABLE}

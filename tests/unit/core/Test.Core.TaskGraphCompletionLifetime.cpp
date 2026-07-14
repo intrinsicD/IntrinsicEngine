@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <mutex>
@@ -300,6 +301,117 @@ TEST(CoreTaskGraphCompletionLifetime, ExternalHelperStealsWorkerLocalWork)
     EXPECT_TRUE(childRan.load(std::memory_order_acquire));
     Publish(releaseParent);
     Tasks::Scheduler::WaitForAll();
+}
+
+TEST(CoreTaskGraphCompletionLifetime, WaitForAllStealsWorkerLocalWork)
+{
+    SchedulerFixture scheduler{1};
+    std::atomic<bool> childQueued{false};
+    std::atomic<bool> releaseParent{false};
+    std::atomic<bool> childRan{false};
+
+    Tasks::Scheduler::Dispatch([&]()
+    {
+        Tasks::Scheduler::Dispatch([&]() { Publish(childRan); });
+        Publish(childQueued);
+        WaitUntilPublished(releaseParent);
+    });
+    WaitUntilPublished(childQueued);
+
+    std::thread releaser([&]()
+    {
+        WaitUntilPublished(childRan);
+        Publish(releaseParent);
+    });
+    Tasks::Scheduler::WaitForAll();
+    releaser.join();
+
+    EXPECT_TRUE(childRan.load(std::memory_order_acquire));
+}
+
+TEST(CoreTaskGraphCompletionLifetime, SingleWorkerRetainsLocalProgressAfterFairnessProbe)
+{
+    SchedulerFixture scheduler{1};
+    constexpr std::uint32_t kChildren = 96u;
+    std::atomic<bool> childrenQueued{false};
+    std::atomic<std::uint32_t> childrenCompleted{0u};
+
+    Tasks::Scheduler::Dispatch([&]()
+    {
+        for (std::uint32_t child = 0u; child < kChildren; ++child)
+        {
+            Tasks::Scheduler::Dispatch([&]()
+            {
+                const auto completed =
+                    childrenCompleted.fetch_add(1u, std::memory_order_acq_rel) + 1u;
+                if (completed == kChildren)
+                    childrenCompleted.notify_all();
+            });
+        }
+        Publish(childrenQueued);
+    });
+
+    WaitUntilPublished(childrenQueued);
+    WaitUntilAtLeast(childrenCompleted, kChildren);
+    EXPECT_EQ(childrenCompleted.load(std::memory_order_acquire), kChildren);
+    Tasks::Scheduler::WaitForAll();
+}
+
+TEST(CoreTaskGraphCompletionLifetime, TaskGraphPriorityReachesSchedulerLanes)
+{
+    SchedulerFixture scheduler{1};
+    EXPECT_EQ(Tasks::Scheduler::WorkerCount(), 1u);
+
+    constexpr std::uint32_t kLowPasses = 32u;
+    constexpr std::uint32_t kHighPasses = 8u;
+    constexpr std::uint32_t kPasses = kLowPasses + kHighPasses;
+    std::atomic<bool> blockerStarted{false};
+    std::atomic<bool> releaseBlocker{false};
+    std::atomic<std::uint32_t> nextOrder{0u};
+    std::atomic<std::uint32_t> completed{0u};
+    std::array<std::uint8_t, kPasses> order{};
+
+    Tasks::Scheduler::Dispatch([&]()
+    {
+        Publish(blockerStarted);
+        WaitUntilPublished(releaseBlocker);
+    });
+    WaitUntilPublished(blockerStarted);
+
+    TaskGraph graph;
+    const auto addPasses = [&](const std::uint32_t count,
+                               const TaskPriority priority,
+                               const std::uint8_t classId,
+                               std::string_view prefix)
+    {
+        TaskGraphPassOptions options{};
+        options.Priority = priority;
+        for (std::uint32_t pass = 0u; pass < count; ++pass)
+        {
+            graph.AddPass(std::string(prefix) + std::to_string(pass), options,
+                [](TaskGraphBuilder&) {},
+                [&, classId]()
+                {
+                    const auto index = nextOrder.fetch_add(1u, std::memory_order_acq_rel);
+                    order[index] = classId;
+                    const auto finished = completed.fetch_add(1u, std::memory_order_acq_rel) + 1u;
+                    if (finished == kPasses)
+                        completed.notify_all();
+                });
+        }
+    };
+
+    addPasses(kLowPasses, TaskPriority::Background, 0u, "Low");
+    addPasses(kHighPasses, TaskPriority::Critical, 1u, "High");
+
+    auto submitted = graph.Submit();
+    ASSERT_TRUE(submitted.has_value());
+    Publish(releaseBlocker);
+    WaitUntilAtLeast(completed, kPasses);
+    ASSERT_TRUE(submitted->Wait().has_value());
+
+    for (std::uint32_t index = 0u; index < kHighPasses; ++index)
+        EXPECT_EQ(order[index], 1u) << "low-priority pass ran at index " << index;
 }
 
 TEST(CoreTaskGraphCompletionLifetime, SubmittedIndependentPassesRunInParallel)
