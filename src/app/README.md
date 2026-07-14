@@ -18,12 +18,14 @@ Sandbox/
   Editor/
     Sandbox.EditorController.cppm
     Sandbox.EditorController.cpp
+    Sandbox.EditorShell.cppm
+    Sandbox.EditorShell.cpp
+    Sandbox.DomainPanels.cppm
+    Sandbox.DomainPanels.cpp
     Sandbox.MethodPanels.cppm
     Sandbox.MethodPanels.cpp
     Sandbox.MeshProcessingPanels.cppm
     Sandbox.MeshProcessingPanels.cpp
-    Sandbox.DomainPanels.cppm
-    Sandbox.DomainPanels.cpp
   Sandbox.cppm
   Sandbox.cpp
   main.cpp
@@ -39,7 +41,9 @@ and must not expose types back to the engine. No other engine layer may import
 an application module.
 
 `ExtrinsicSandboxEditor` is the app-owned editor composition library. Its
-`Sandbox.Editor.Controller` module owns the transitional runtime editor shell
-and the Method, Mesh Processing, and Domain panel lifetimes behind one
-idempotent attach/detach interface; the Sandbox executable no longer composes
-those panel families individually.
+`Sandbox.Editor.Controller` module owns the app-side `EditorShell` and the
+Method, Mesh Processing, and Domain panel lifetimes behind one idempotent
+attach/detach interface. `EditorShell` owns the ten core Sandbox windows,
+menus, ImGui state, and frame presentation; runtime exposes only generic editor
+hosting plus data/model/command facades. The Sandbox executable no longer
+composes those panel families individually.

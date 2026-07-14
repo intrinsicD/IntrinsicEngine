@@ -16,8 +16,10 @@ module;
 
 module Extrinsic.Sandbox.Editor.MethodPanels;
 
+import Extrinsic.Sandbox.Editor.Shell;
+
 import Extrinsic.Runtime.EditorWindowRegistry;
-import Extrinsic.Runtime.SandboxEditorUi;
+import Extrinsic.Runtime.SandboxEditorFacades;
 
 namespace Extrinsic::Sandbox::Editor
 {
@@ -222,7 +224,7 @@ namespace Extrinsic::Sandbox::Editor
             std::uint32_t PendingStableEntityId{0u};
         };
 
-        Runtime::SandboxEditorUi* EditorUi{nullptr};
+        EditorShell* Shell{nullptr};
         std::vector<Runtime::EditorWindowHandle> Handles{};
         int CachedModelFrame{-1};
         std::array<
@@ -232,10 +234,10 @@ namespace Extrinsic::Sandbox::Editor
         KMeansState KMeans{};
         ProgressivePoissonState ProgressivePoisson{};
 
-        void Register(Runtime::SandboxEditorUi& editorUi)
+        void Register(EditorShell& editorShell)
         {
             Unregister();
-            EditorUi = &editorUi;
+            Shell = &editorShell;
 
             RegisterKMeansWindow(
                 Runtime::SandboxEditorDomainWindowKind::PointCloud,
@@ -266,16 +268,22 @@ namespace Extrinsic::Sandbox::Editor
 
         void Unregister()
         {
-            if (EditorUi != nullptr)
+            if (Shell != nullptr)
             {
                 for (const Runtime::EditorWindowHandle handle : Handles)
-                    (void)EditorUi->UnregisterEditorWindow(handle);
+                    (void)Shell->UnregisterEditorWindow(handle);
             }
             Handles.clear();
-            EditorUi = nullptr;
+            Shell = nullptr;
             CachedModelFrame = -1;
             for (auto& model : CachedDomainModels)
                 model.reset();
+            KMeans.LastResult.reset();
+            ProgressivePoisson.LastResult.reset();
+            ProgressivePoisson.LastConfigResult.reset();
+            ProgressivePoisson.AutoRunPending = false;
+            ProgressivePoisson.LastEditTime = 0.0;
+            ProgressivePoisson.PendingStableEntityId = 0u;
         }
 
         [[nodiscard]] const Runtime::SandboxEditorDomainWindowModel&
@@ -312,8 +320,8 @@ namespace Extrinsic::Sandbox::Editor
             std::string windowTitle)
         {
             const std::string callbackTitle = windowTitle;
-            Handles.push_back(EditorUi->RegisterEditorWindow(
-                Runtime::SandboxEditorWindowDescriptor{
+            Handles.push_back(Shell->RegisterEditorWindow(
+                EditorWindowDescriptor{
                     .Id = std::move(id),
                     .MenuPath = std::move(menuPath),
                     .Title = "K-Means",
@@ -335,8 +343,8 @@ namespace Extrinsic::Sandbox::Editor
             std::string windowTitle)
         {
             const std::string callbackTitle = windowTitle;
-            Handles.push_back(EditorUi->RegisterEditorWindow(
-                Runtime::SandboxEditorWindowDescriptor{
+            Handles.push_back(Shell->RegisterEditorWindow(
+                EditorWindowDescriptor{
                     .Id = std::move(id),
                     .MenuPath = std::move(menuPath),
                     .Title = "Progressive Poisson",
@@ -1181,9 +1189,9 @@ namespace Extrinsic::Sandbox::Editor
         m_Impl->Unregister();
     }
 
-    void MethodPanels::Register(Runtime::SandboxEditorUi& editorUi)
+    void MethodPanels::Register(EditorShell& editorShell)
     {
-        m_Impl->Register(editorUi);
+        m_Impl->Register(editorShell);
     }
 
     void MethodPanels::Unregister()

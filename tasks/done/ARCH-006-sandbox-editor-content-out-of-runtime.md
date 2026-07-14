@@ -3,14 +3,18 @@ id: ARCH-006
 theme: F
 depends_on:
   - ARCH-012
+maturity_target: Retired
+completed: 2026-07-14
 ---
 # ARCH-006 — Move Sandbox application editor content out of runtime
 
 ## Status
-- Status: in progress.
+- Retired on 2026-07-14 at the structural `Retired` endpoint.
 - Owner: Codex.
-- Branch: `codex/arch-006-completion`.
-- Slices 0-4 are complete. `Runtime.EditorUiHost` now owns generic
+- Completion branch: `codex/arch-006-completion`.
+- Commit/PR: source retirement commit `5b426580`; no PR (direct aggregate-main
+  workflow).
+- Slices 0-5 are complete. `Runtime.EditorUiHost` now owns generic
   callback, registry, and visibility lifecycle, while `Sandbox.cppm` exports
   only the app factory/registration surface and the concrete app lives in
   `Sandbox.cpp`. App-owned registered windows now own K-Means and Progressive
@@ -23,9 +27,11 @@ depends_on:
 - Slice 4 moved point-cloud outlier removal plus the Mesh/Graph/PointCloud
   Appearance, Properties, and Selection windows into one app-owned registered
   panel family. Runtime retains the command/model/job/result facades.
-- Next slice: move the remaining hierarchy/inspector/file/import,
-  frame-graph/render-recipe, camera, and visualization shell presentation;
-  split the tests and retire the Sandbox-specific runtime editor module.
+- Slice 5 moved the remaining hierarchy/inspector/file/import,
+  frame-graph/render-recipe/artifact, camera, and visualization presentation
+  into app-owned `EditorShell`, retired the Sandbox-specific runtime UI module,
+  and split the runtime facade contracts and tests by independently compiled
+  subject families.
 
 Slice 4 implementation boundary (2026-07-14):
 
@@ -52,7 +58,8 @@ Slice 4 implementation boundary (2026-07-14):
   panel contract.
 - Defer hierarchy/inspector/file/import, frame-graph/render-recipe/artifact,
   camera, visualization shell presentation, runtime facade relocation, and
-  final test split/retirement to Slice 5.
+  final test split/retirement to Slice 5. This was the recorded boundary before
+  Slice 5 executed.
 
 ## Goal
 - Restore the documented layering intent that application specifics live in
@@ -76,8 +83,8 @@ Slice 4 implementation boundary (2026-07-14):
 
 ## Context
 - Owner/layer: boundary decision between `runtime` and `app`.
-- Today `app/Sandbox` is a thin composition shell: it registers the Sandbox
-  default runtime policies and `Runtime::ClusteringModule`, attaches
+- At task intake, `app/Sandbox` was a thin composition shell: it registered the
+  Sandbox default runtime policies and `Runtime::ClusteringModule`, attached
   `Runtime::SandboxEditorUi`, and otherwise retains no-op application ticks.
   The editor's application-specific content still lives in
   `src/runtime/Editor/Runtime.SandboxEditorUi.cpp`, so the remaining ownership
@@ -221,44 +228,49 @@ Slice 5 implementation boundary (2026-07-14):
       generic panel-host/editor-shell module in runtime and attach Sandbox
       through that seam. Do not define a second registration API or move
       additional panel content in this slice.
-- [ ] Slices 2..N: move panel families to `app/Sandbox` one reviewable slice
+- [x] Slices 2..N: move panel families to `app/Sandbox` one reviewable slice
       at a time (method panels first: K-Means, Poisson, registration,
       mesh-processing, figure export), each slice green on the CPU gate and
       layering check.
-- [ ] Split the monolithic implementation and matching
+- [x] Split the monolithic implementation and matching
       `Test.SandboxEditorUi.cpp` coverage along the same panel-family boundaries
       so moves create independently compilable units rather than one equally
       large app-side translation unit.
-- [ ] As part of the shell/content split, reduce
+- [x] As part of the shell/content split, reduce
       `Runtime.SandboxEditorUi.cppm` to a tiny generic editor-shell contract and
       decide whether `src/app/Sandbox/Sandbox.cppm` should remain a module or
       become app-private header/source glue; record the decision and metrics in
       this task before the final slice.
-- [ ] Final slice: `src/runtime/Editor` contains no method/sandbox-specific
+- [x] Final slice: `src/runtime/Editor` contains no method/sandbox-specific
       panel code; update module inventories.
 
 ## Tests
-- [ ] Per slice: default CPU gate + `check_layering.py --strict` green.
-- [ ] Existing editor command/contract tests keep passing unmoved or move
+- [x] Per slice: default CPU gate + `check_layering.py --strict` green.
+- [x] Existing editor command/contract tests keep passing unmoved or move
       with their subject per `check_test_layout.py`.
-- [ ] Sandbox smoke (headless null-backend `Engine::Run()` coverage) stays
+- [x] Sandbox smoke (headless null-backend `Engine::Run()` coverage) stays
       green after each slice.
 
 ## Docs
-- [ ] Update `docs/architecture/runtime.md` and `src/app/README.md` /
+- [x] Update `docs/architecture/runtime.md` and `src/app/README.md` /
       `src/runtime/README.md` ownership text as slices land.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` per moved module.
+- [x] Regenerate `docs/api/generated/module_inventory.md` per moved module.
 
 ## Acceptance criteria
-- [ ] `app/Sandbox` owns its panels; `runtime` owns only generic editor
-      infrastructure; `app → runtime` remains the only dependency direction.
-- [ ] No panel behavior change (mechanical moves verified by unchanged
-      tests).
-- [ ] Layering gate green at every slice boundary.
-- [ ] Record before/after interface lines/imports, top translation-unit compile
+- [x] `app/Sandbox` owns its panels; `runtime/Editor` owns only generic editor
+      infrastructure, while presentation-free engine-facing facade contracts
+      remain at the runtime root; `app → runtime` remains the only dependency
+      direction.
+- [x] Normal attached-frame panel content and commands are unchanged by the
+      mechanical moves. Review found and corrected one lifecycle defect:
+      detach now discards attachment-scoped local results and pending Poisson
+      autorun state, matching `SandboxEditorSession` before cross-engine
+      reattach.
+- [x] Layering gate green at every slice boundary.
+- [x] Record before/after interface lines/imports, top translation-unit compile
       durations, and clean build edges against the `CI-003` baseline; no
       compile-time claim is made from one run.
-- [ ] The `Runtime.SandboxEditorUi` and `Extrinsic.Sandbox` module surfaces are
+- [x] The `Runtime.SandboxEditorUi` and `Extrinsic.Sandbox` module surfaces are
       either measurably slimmed or explicitly retired to private header/source
       glue without changing app-to-runtime dependency direction.
 
@@ -386,6 +398,92 @@ Slice 4 evidence (2026-07-14):
   checks passed. Root hygiene retained only the pre-existing non-fatal `ara/`
   allowlist warning. Regenerated the 388-module API inventory; task front
   matter did not change, so the generated session brief remains current.
+
+Slice 5 evidence (2026-07-14):
+- Added the 64-line / 3-import `Extrinsic.Sandbox.Editor.Shell` interface and
+  its 2,730-line / 9-import app-owned implementation. It owns the ten core
+  Sandbox windows, menu and ImGui state, frame-scoped presentation view, and the generic
+  `Runtime.EditorUiHost` / `SandboxEditorSession` attachment lifecycle. The app
+  controller composes this shell with the method, mesh-processing, and domain
+  panel families. The retained lean domain-panel implementation is 1,696 lines /
+  10 imports after adding the shell contribution import and final attachment-
+  reset handling; its Slice 4 boundary was 1,691 lines / 9 imports.
+- The small app controller is retained because the Sandbox application, the
+  app-linked reattachment contract, and the GPU acceptance fixtures all
+  instantiate the same four-family composition. It concentrates the required
+  attach/detach order; deleting it would duplicate that ordering across those
+  callers. Inspector/visualization stays a core Shell window while the domain
+  panels own their distinct Appearance controls; their similar local drawing
+  code does not justify a new shared widget interface in this mechanical slice.
+- Deleted `Extrinsic.Runtime.SandboxEditorUi` and moved the surviving
+  presentation-free engine contracts out of `src/runtime/Editor` as the
+  accurately named `Extrinsic.Runtime.SandboxEditorFacades` module. Its public
+  interface is 2,903 lines / 52 imports because active app panels consume
+  its runtime-owned contexts, models, commands, jobs, and result records;
+  splitting that public API would be a semantic API redesign rather than this
+  ownership move. K-Means/Progressive Poisson bodies compile in the independent
+  2,912-line method unit and render-recipe/artifact bodies in a 620-line /
+  4-import unit; the remaining implementation is 15,719 lines. The lean facade
+  preserves the Slice 4 callback-scoped selected-mesh property resolver and
+  does not restore the rejected public property-widget model facade.
+- `src/runtime/Editor` now contains only the generic `EditorUiHost`,
+  `EditorWindowRegistry`, and `EditorPropertyWidgets` interface/implementation
+  pairs. Runtime sources contain no ImGui Sandbox drawing, fixed Sandbox window
+  inventory, or app menu state.
+- Review-driven lifecycle correction: each app panel family now clears
+  attachment-scoped results, selected-property plot cache, and pending Poisson
+  autorun identity/timing during unregister. A controller cross-engine
+  reattach contract plus structural reset-policy assertions prevent the new
+  session from inheriting prior-engine presentation state.
+- Replaced the 12,254-line monolithic runtime contract file with six
+  independently compiled subject files: models (3,226 lines / 34 tests), scene
+  commands (1,926 / 22), clustering methods (2,117 / 20), mesh methods
+  (3,912 / 41), visualization (1,752 / 14), and session lifecycle (400 / 4).
+  The six runtime files contain 135 tests; the app-linked domain-panel and
+  presentation files contain 4 and 16 tests respectively. Across the endpoint,
+  132 original suite/name pairs remain exact, 15 presentation tests moved or
+  were renamed with their app-owned subject, and 8 endpoint contracts cover
+  session lifetime and domain-panel registration/cache behavior. The obsolete
+  selected-mesh scalar-plot helper regression is intentionally absent, for a
+  conservative focused endpoint inventory of 155 tests. The source retirement
+  run's app-owned subset passed 20/20.
+- `Sandbox.cppm` remains a module: at 12 lines / 1 import it is the narrow
+  app factory/registration boundary between the CLI entry point and private
+  composition, so converting it to a private header would remove no meaningful
+  import fan-out. This is a source-shape decision, not a compile-time claim.
+- Manual clean-workshop scorecard: rows 1-3 pass (ownership, layering, and
+  reviewable decomposition); rows 4-6 are not applicable because no new
+  subsystem, pass, or ownership seam was introduced; row 7 is not applicable
+  at the `Retired` endpoint; row 8 passes with no temporary exception or
+  allowlist entry.
+- A controlled `CCACHE_DISABLE=1` clean build of `IntrinsicTests` completed all
+  2,326 Ninja edges in 1,733.14 seconds. The clean sample measured the final
+  source shape before one review-driven selected-property reset was narrowed;
+  the exact head then rebuilt its 1,085 affected dependency/build edges in
+  19.06 seconds. The clean log contains 1,067 scan edges, 1,067 compile edges,
+  and 47 link edges.
+- The clean sample's relevant top compile edges were the then-2,916-line /
+  52-import `Runtime.SandboxEditorFacades.cppm` at 133.298 seconds and the
+  64-line / 3-import `Sandbox.EditorShell.cppm` at 89.962 seconds. The Ninja log
+  also retained a deleted-output tombstone for the old editor module, so that
+  stale entry was excluded. For comparison only, the task's `CI-003` baseline
+  recorded the old `Runtime.SandboxEditorUi.cppm` at 159.174 seconds, its
+  implementation at 80.264 seconds, the monolithic test at 96.017 seconds, and
+  `Sandbox.cppm` at 92.724 seconds. These are single-host diagnostic samples;
+  no compile-time improvement is claimed. The post-replay facade source metrics
+  above supersede the sampled line count without implying a new timing result.
+- The replayed exact head configured with the `ci` preset, completed the
+  1,290-edge `IntrinsicTests` build, then completed the 1,085 affected-edge
+  rebuild after removing the obsolete test's dead helper with no compiler
+  diagnostics. The focused editor inventory passed 155/155 in 15.91 seconds:
+  135 runtime facade/session contracts plus four domain-panel and sixteen app-
+  presentation contracts. The full default CPU-supported gate passed
+  3,706/3,706 in 379.47 seconds.
+- Strict layering, test-layout, task validation/policy, clean-workshop
+  automation, documentation links, PR-contract mapping, module-inventory
+  generation, and diff checks passed. Replay root hygiene remained non-fatal
+  warning mode for the existing `.ruff_cache/`, `ara/`, and `imgui.ini` root
+  entries; it introduced no task finding.
 
 ## Forbidden changes
 - Mixing mechanical moves with semantic refactors in one slice.

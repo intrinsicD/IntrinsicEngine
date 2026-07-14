@@ -216,31 +216,44 @@ Treat this as a facade; call into a lower-level `Geometry:*` or `Core:*` kernel 
 
 ## 11) UI integration seam (where and how to hook feature UI)
 
-Define UI-facing command/state seams in runtime editor modules, not inside the
-domain algorithm module and not in `src/app/` glue code.
+Define deterministic UI-facing models and command/state seams in runtime facade
+modules, not inside the domain algorithm module. Keep application presentation
+(ImGui state, widgets, and panel registration) in the owning `src/app/`
+editor module; app presentation consumes the runtime seams but does not own
+execution.
 
 ### Placement rules
 
-- **Algorithm UI state + widgets:** `src/runtime/Editor/Runtime.SandboxEditorUi.*`
-  or a future `src/runtime/Editor/Runtime.<Feature>Editor.*` promoted module.
-- **Panel/menu registration:** the promoted `SandboxEditorUi` frame model and
-  ImGui adapter attachment.
-- **Execution trigger:** UI **enqueues a command** on the kernel CommandBus
-  (a `<Feature>Requested` payload), drained pre-sim and handled by the feature's
-  RuntimeModule (ADR-0024 D5). It does not call an `Engine` facade method.
+- **Runtime panel model + typed commands:**
+  `src/runtime/Runtime.SandboxEditorFacades.*` or a focused
+  `src/runtime/Runtime.<Feature>Facade.*` implementation unit.
+- **Algorithm UI state + widgets:**
+  `src/app/Sandbox/Editor/Sandbox.*Panels.*` (or the corresponding owning
+  application editor module).
+- **Panel/menu registration:** app-owned
+  `Extrinsic.Sandbox.Editor.Shell` registers windows through the generic
+  `Extrinsic.Runtime.EditorUiHost` / `EditorWindowRegistry` seam.
+- **Execution trigger:** UI invokes a typed runtime facade command. For a
+  kernel-module feature, that facade enqueues a `<Feature>Requested` payload on
+  the kernel CommandBus, drained pre-sim and handled by the feature's
+  RuntimeModule (ADR-0024 D5). App presentation calls neither `Engine` nor the
+  CommandBus directly.
 - **Background progress/result polling:** runtime/streaming lane, then UI only renders readonly status
 
-Current promoted precedent follows this pattern in
-`Extrinsic.Runtime.SandboxEditorUi`: editor panels expose deterministic frame
-models and typed command surfaces, while execution and ownership stay in
-runtime.
+Current promoted precedent is
+`Extrinsic.Sandbox.Editor.Shell` plus the app-owned method,
+mesh-processing, and domain panel modules. They render deterministic models and
+invoke typed command surfaces from
+`Extrinsic.Runtime.SandboxEditorFacades`, while engine-facing execution,
+history, jobs, and result publication stay in runtime.
 
 ### Data flow contract
 
 Use a one-way command path:
 
 1. UI captures params and validates cheap constraints.
-2. UI enqueues a `FeatureRequested` command on the kernel CommandBus (D5).
+2. UI invokes the typed runtime facade; for a kernel-module feature, the facade
+   enqueues a `FeatureRequested` command on the kernel CommandBus (D5).
 3. Runtime routes to CPU graph / GPU frame graph / async streaming graph.
 4. Runtime publishes `FeatureResult` + diagnostics.
 5. UI renders status/results from immutable snapshots.
@@ -250,24 +263,28 @@ Keep UI callbacks non-blocking: no heavy compute inside ImGui draw functions.
 ### Minimal UI/controller skeleton
 
 ```cpp
-// Runtime.MyFeatureEditor.cpp
-module Extrinsic.Runtime.MyFeatureEditor;
+// Sandbox.MyFeaturePanels.cpp
+module Extrinsic.Sandbox.Editor.MyFeaturePanels;
 
+import Extrinsic.Sandbox.Editor.Shell;
 import Extrinsic.Runtime.MyFeature;
+import Extrinsic.Runtime.SandboxEditorFacades;
 
-namespace Extrinsic::Runtime {
+namespace Extrinsic::Sandbox::Editor {
 
-void MyFeatureController::RegisterPanelsAndMenu() {
-    // Register a panel descriptor with SandboxEditorUi's frame model.
+void MyFeaturePanels::Register(EditorShell& shell) {
+    // Register an app-owned window. Its draw callback receives a
+    // Runtime::SandboxEditorContext prepared by the runtime session.
 }
 
-void MyFeatureController::DrawPanel() {
+void MyFeaturePanels::DrawPanel(
+    const Runtime::SandboxEditorContext& context) {
     // 1) Draw controls
-    // 2) On Apply: enqueue ExecuteMyFeatureAsync(request)
+    // 2) On Apply: invoke the typed runtime command surface
     // 3) Draw progress + diagnostics from readonly result snapshot
 }
 
-} // namespace Extrinsic::Runtime
+} // namespace Extrinsic::Sandbox::Editor
 ```
 
 ### UI performance guardrails
@@ -285,8 +302,8 @@ For each UI-backed feature that has grown past the floor, register all four
 artifacts:
 
 1. **Runtime facade module** (`Extrinsic.Runtime.<Feature>`)
-2. **Editor UI controller/panel** (`Extrinsic.Runtime.<Feature>Editor` or a
-   `SandboxEditorUi` command/window extension)
+2. **Application editor controller/panel**
+   (`Extrinsic.Sandbox.Editor.<Feature>Panels` or an app-shell window)
 3. **Architecture note** in `docs/architecture/` with command/result contract
 4. **Serializable config/command entry** that can be driven by an agent,
    command surface, or config file without going through ImGui

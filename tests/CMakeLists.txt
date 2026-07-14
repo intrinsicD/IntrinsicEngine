@@ -282,7 +282,12 @@ if(TARGET ExtrinsicRuntime)
         Test.RuntimeSceneLifecycle.cpp
         Test.RuntimeSceneSerialization.cpp
         Test.RuntimeVulkanBreadcrumb.cpp
-        Test.SandboxEditorUi.cpp
+        Test.SandboxEditorModels.cpp
+        Test.SandboxEditorSceneCommands.cpp
+        Test.SandboxEditorClusteringMethods.cpp
+        Test.SandboxEditorMeshMethods.cpp
+        Test.SandboxEditorVisualization.cpp
+        Test.SandboxEditorSessionLifecycle.cpp
         Test.SelectedMeshTextureBake.cpp
         Test.SelectionController.cpp
         Test.SelectionReadbackCorrelation.cpp
@@ -314,12 +319,14 @@ endif()
 if(TARGET ExtrinsicSandboxEditor)
     intrinsic_resolve_test_sources(_sandbox_editor_integration_test_sources
         SEARCH_DIRS integration/runtime
-        FILES Test.SandboxDomainPanels.cpp
+        FILES
+            Test.SandboxDomainPanels.cpp
+            Test.SandboxEditorPresentation.cpp
     )
     intrinsic_test_object_lib(SandboxEditorIntegrationTestObjs
         SOURCES
             ${_sandbox_editor_integration_test_sources}
-        DEPS ExtrinsicSandboxEditor ExtrinsicRuntime
+        DEPS ExtrinsicSandboxEditor ExtrinsicRuntime imgui_core_lib
     )
 endif()
 
@@ -629,10 +636,11 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
 endif()
 
 # RUNTIME-095 Slice 3 — opt-in `gpu;vulkan;integration` working-sandbox present
-# smoke. Runtime-owned (drives the `Engine` over an ECS-authored acceptance
-# scene) so it lives next to the Slice 1/2 CPU acceptance test and links the
-# runtime/graphics/Vulkan stack; gated on the promoted Vulkan backend + GLFW
-# platform exactly like the graphics smokes above.
+# smoke. The fixture drives the runtime `Engine` over an ECS-authored
+# acceptance scene and composes the app-owned Sandbox editor controller, so it
+# links the editor plus runtime/graphics/Vulkan stack; it is gated on the
+# promoted Vulkan backend + GLFW platform exactly like the graphics smokes
+# above.
 if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
     set(_runtime_sandbox_acceptance_gpu_smoke_test_files
         Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
@@ -644,7 +652,7 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
     intrinsic_test_object_lib(RuntimeSandboxAcceptanceGpuSmokeTestObjs
         SOURCES
             ${_runtime_sandbox_acceptance_gpu_smoke_test_sources}
-        DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore glm::glm
+        DEPS ExtrinsicSandboxEditor ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore glm::glm
     )
 endif()
 
@@ -1038,7 +1046,7 @@ endif()
 if(TARGET RuntimeSandboxAcceptanceGpuSmokeTestObjs)
     intrinsic_test_executable(IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests
         OBJECTS RuntimeSandboxAcceptanceGpuSmokeTestObjs
-        LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore
+        LINK_LIBS ExtrinsicSandboxEditor ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore
         LABELS gpu vulkan integration runtime graphics
     )
     intrinsic_add_glsl_shaders(IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests)

@@ -14,7 +14,7 @@ module;
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-export module Extrinsic.Runtime.SandboxEditorUi;
+export module Extrinsic.Runtime.SandboxEditorFacades;
 
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.Registry;
@@ -42,7 +42,6 @@ import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.JobService;
@@ -70,13 +69,19 @@ import Geometry.Properties;
 import Geometry.Smoothing;
 import Geometry.UvAtlas;
 
-namespace Extrinsic::Runtime::Detail
-{
-    inline constexpr std::size_t kSandboxEditorPanelWindowCount = 10u;
-}
-
 export namespace Extrinsic::Runtime
 {
+    // Runtime-owned aliases keep application presentation on the
+    // app -> runtime boundary without exposing lower-layer imports in app code.
+    using SandboxEditorAssetPayloadKind = Assets::AssetPayloadKind;
+    using SandboxEditorCameraControllerKind =
+        Core::Config::CameraControllerKind;
+    using SandboxEditorRecipeSlotKind = Graphics::RecipeSlotKind;
+    using SandboxEditorRenderRecipeConfigState =
+        Graphics::RenderRecipeConfigState;
+    using SandboxEditorRenderRecipeConfigDiagnosticCode =
+        Graphics::RenderRecipeConfigDiagnosticCode;
+
     enum class SandboxEditorDiagnosticCode : std::uint8_t
     {
         MissingScene,
@@ -129,6 +134,16 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] const char* DebugNameForSandboxEditorCommandStatus(
         SandboxEditorCommandStatus status) noexcept;
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorAssetPayloadKind(
+        SandboxEditorAssetPayloadKind kind) noexcept;
+
+    [[nodiscard]] std::string_view DebugNameForSandboxEditorRenderRecipeConfigState(
+        SandboxEditorRenderRecipeConfigState state) noexcept;
+
+    [[nodiscard]] std::string_view
+    DebugNameForSandboxEditorRenderRecipeConfigDiagnosticCode(
+        SandboxEditorRenderRecipeConfigDiagnosticCode code) noexcept;
 
     [[nodiscard]] const char* DebugNameForSandboxEditorGeometryDomain(
         ECS::Components::GeometrySources::Domain domain) noexcept;
@@ -2400,16 +2415,6 @@ export namespace Extrinsic::Runtime
     ResolveSandboxEditorSelectedMeshVertexProperties(
         const SandboxEditorContext& context);
 
-    struct SandboxEditorWindowDescriptor
-    {
-        std::string Id{};
-        std::vector<std::string> MenuPath{};
-        std::string Title{};
-        bool OpenByDefault{false};
-        std::function<void(bool&, const SandboxEditorContext&)> Draw{};
-        std::function<void(bool)> OpenStateChanged{};
-    };
-
     struct SandboxEditorTransformEditCommand
     {
         std::uint32_t StableEntityId{0u};
@@ -2796,8 +2801,6 @@ export namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorRenderRecipeCommand& command);
 
-    void DrawSandboxEditorPanelFrame(const SandboxEditorPanelFrame& frame);
-
     struct SandboxEditorPreparedFrameView
     {
         const SandboxEditorContext& Context;
@@ -2828,8 +2831,8 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] bool PrepareFrame(
             const SandboxEditorModelBuildRequest& request = {},
             std::string pendingAssetImportPath = {},
-            Assets::AssetPayloadKind pendingAssetImportPayloadKind =
-                Assets::AssetPayloadKind::Unknown,
+            SandboxEditorAssetPayloadKind pendingAssetImportPayloadKind =
+                SandboxEditorAssetPayloadKind::Unknown,
             std::string pendingSceneFilePath = {});
 
         // References in the prepared-frame view are valid only for the
@@ -2897,73 +2900,4 @@ export namespace Extrinsic::Runtime
         RenderArtifactRegistry m_RenderArtifactRegistry{};
     };
 
-    class SandboxEditorUi
-    {
-    public:
-        SandboxEditorUi();
-        ~SandboxEditorUi();
-
-        SandboxEditorUi(const SandboxEditorUi&)            = delete;
-        SandboxEditorUi& operator=(const SandboxEditorUi&) = delete;
-        SandboxEditorUi(SandboxEditorUi&&)                 = delete;
-        SandboxEditorUi& operator=(SandboxEditorUi&&)      = delete;
-
-        void Attach(Engine& engine);
-        void Detach();
-
-        [[nodiscard]] EditorWindowHandle RegisterEditorWindow(
-            EditorWindowDescriptor descriptor);
-        [[nodiscard]] EditorWindowHandle RegisterEditorWindow(
-            SandboxEditorWindowDescriptor descriptor);
-        [[nodiscard]] bool UnregisterEditorWindow(EditorWindowHandle handle);
-        [[nodiscard]] EditorUiVisibilityCommandResult
-        ApplyEditorUiVisibilityCommand(
-            EditorUiVisibilityCommand command) noexcept;
-        [[nodiscard]] bool IsEditorVisible() const noexcept
-        {
-            return m_Host.IsVisible();
-        }
-        [[nodiscard]] std::vector<EditorWindowMenuEntry>
-        BuildEditorWindowMenuModel() const
-        {
-            return m_Host.BuildWindowMenuModel();
-        }
-        [[nodiscard]] bool SetEditorWindowOpen(
-            std::string_view id,
-            bool open)
-        {
-            return m_Host.SetWindowOpen(id, open);
-        }
-
-        [[nodiscard]] bool IsAttached() const noexcept
-        {
-            return m_Host.IsAttached();
-        }
-        [[nodiscard]] const SandboxEditorPanelFrame& GetLastFrame() const noexcept
-        {
-            return m_Session.LastFrame();
-        }
-
-    private:
-        SandboxEditorSession    m_Session{};
-        EditorUiHost            m_Host{};
-        std::array<char, 1024>  m_ImportPathBuffer{};
-        std::array<char, 1024>  m_ScenePathBuffer{};
-        std::array<bool, Detail::kSandboxEditorPanelWindowCount>
-            m_PanelWindowOpen{};
-        Assets::AssetPayloadKind m_ImportPayloadKind{
-            Assets::AssetPayloadKind::Unknown};
-        std::array<char, 8192> m_RenderRecipeDraftBuffer{};
-        std::int32_t m_TextureBakeSourceIndex{0};
-        std::int32_t m_TextureBakeTargetSemanticIndex{0};
-        std::int32_t m_TextureBakeEncoderIndex{0};
-        std::int32_t m_TextureBakeWidth{64};
-        std::int32_t m_TextureBakeHeight{64};
-        std::int32_t m_UvAtlasResolution{1024};
-        std::int32_t m_UvAtlasPadding{2};
-        float m_UvAtlasTexelsPerUnit{0.0f};
-        bool m_UvAtlasForceRegenerate{true};
-        bool m_UvAtlasPreserveAuthored{false};
-        const SandboxEditorPreparedFrameView* m_ActivePreparedFrame{nullptr};
-    };
 }

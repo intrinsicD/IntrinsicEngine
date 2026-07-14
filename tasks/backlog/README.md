@@ -176,8 +176,9 @@ composition root: the retired non-blocking import-apply fix `RUNTIME-140`,
 the retired async editor method-command lane `RUNTIME-141`, the retired
 non-blocking frame-path fixes `RUNTIME-142`, the retired frame-hook/K-Means
 decoupling seam `RUNTIME-143`, the retired post-import/import-UX/input-action
-composition seam `RUNTIME-144`, remaining composition-root/abstractness seams
-(`CORE-006`, `CORE-009`, `ARCH-006`), scheduler/DAG capability and efficiency
+composition seam `RUNTIME-144`, the retired Sandbox editor ownership seam
+`ARCH-006`, remaining composition-root/abstractness seams (`CORE-006`,
+`CORE-009`), scheduler/DAG capability and efficiency
 (`CORE-005`, `CORE-007`, `CORE-008`). The retired steady-state frame
 efficiency polish `RUNTIME-145` removed the recurring runtime frame-path waste
 called out by the review. The retired correctness fix `BUG-055` (Theme G)
@@ -262,7 +263,6 @@ Open members (kernel-seam priority set first):
 - [`architecture/CORE-007-scheduler-priority-wait-wake-hardening.md`](architecture/CORE-007-scheduler-priority-wait-wake-hardening.md).
 - [`architecture/CORE-008-compiled-taskgraph-plan-reuse.md`](architecture/CORE-008-compiled-taskgraph-plan-reuse.md).
 - [`architecture/CORE-009-app-owned-config-sections.md`](architecture/CORE-009-app-owned-config-sections.md).
-- [`ARCH-006-sandbox-editor-content-out-of-runtime.md`](../active/ARCH-006-sandbox-editor-content-out-of-runtime.md).
 - [`platform/PLATFORM-004-alternative-platform-backend-onboarding.md`](platform/PLATFORM-004-alternative-platform-backend-onboarding.md) (planning-only seed).
 
 ### Theme G — Active bugs

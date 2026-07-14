@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `ARCH-006` — Move Sandbox application editor content out of runtime (tasks/active/ARCH-006-sandbox-editor-content-out-of-runtime.md)
+- none
 
 ## Theme B — Rendering modernization
 

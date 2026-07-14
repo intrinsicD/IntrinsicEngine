@@ -11,11 +11,13 @@ lifecycle hooks, but engine feature wiring, frame phases, and subsystem behavior
 belong in `Runtime` or lower engine layers. The executable obtains its default
 configuration through `Runtime` and should not import lower layers directly.
 
-The app-owned `Sandbox.Editor.Controller` owns the transitional runtime
-`SandboxEditorUi` shell and all extracted panel-family lifetimes behind one
-attach/detach interface. The shell delegates generic
-callback/registry/visibility lifecycle to `Runtime.EditorUiHost` while ARCH-006
-moves presentation into this directory. `Sandbox.Editor.MethodPanels` now owns
+The app-owned `Sandbox.Editor.Controller` owns `Sandbox.Editor.Shell` and all
+panel-family lifetimes behind one attach/detach interface. The shell owns the
+ten core Sandbox windows, menu composition, ImGui state, and frame
+presentation while delegating generic callback/registry/visibility lifecycle
+to `Runtime.EditorUiHost`. Runtime exposes the presentation-free
+`Runtime.SandboxEditorFacades` models, commands, result sinks, and attached
+session. `Sandbox.Editor.MethodPanels` owns
 the K-Means and Progressive Poisson ImGui controls and registers five domain
 windows through the shell's context-aware contribution facade. The app
 continues to import the same runtime module surface. `Sandbox.Editor.MeshProcessingPanels`
@@ -34,7 +36,7 @@ remain runtime-owned, so app panels expose no geometry, ECS, graphics, or RHI
 dependencies. The app also installs the sandbox default runtime policy bundle through
 `Runtime::RegisterSandboxDefaultRuntimePolicies(engine)`.
 It unregisters the returned handles during shutdown before the engine tears down.
-The app remains a runtime-only consumer: the editor shell registers with
+The app remains a runtime-only consumer: `EditorShell` registers with
 `Engine::SetImGuiEditorCallback`, reads scene and selection state through
 runtime APIs, emits selection and local-transform edit commands through
 runtime-owned seams, replaces runtime camera-controller slots through the
@@ -58,11 +60,16 @@ and failure/cancellation diagnostics. Clear-completed and cancellable
 dropped-geometry commands route back to `Engine::GetAssetImportPipeline()`; the
 sandbox app and UI never own asset, ECS, or graphics state.
 
-The promoted EditorUI also exposes stable top-level ImGui menu slots for
-`PointCloud`, `Graph`, and `Mesh`. App-owned registry contributions supply their
-selected-entity Appearance, Properties, Selection, and focused processing
-windows. These windows are an EditorUI workflow only: app-owned panels reuse
-`SandboxEditorUi` models and runtime-owned command surfaces, and the sandbox app
+The promoted editor also exposes stable top-level ImGui menu slots for
+`PointCloud`, `Graph`, and `Mesh`. Their submenu items open selected-entity
+domain windows for render-hint status, visualization/spatial-debug controls,
+primitive-selection details, and processing-discovery affordances. These
+windows are registered by the app-owned `Sandbox.Editor.DomainPanels` module
+through `Sandbox.Editor.Shell`'s contribution facade backed by
+`Runtime.EditorWindowRegistry`; runtime has no fixed Sandbox windows or
+presentation state. The panels reuse `Runtime.SandboxEditorFacades` models,
+the callback-scoped selected-mesh property view, and runtime-owned command
+surfaces, and the sandbox app
 still does not own selection, ECS mutation, method jobs, rendering, or asset
 state.
 
@@ -109,7 +116,7 @@ selection, selection-outline snapshot handoff, and deterministic editor-panel
 models. On Vulkan-capable hosts, the opt-in
 `RuntimeSandboxAcceptanceGpuSmoke.AcceptanceSceneReachesOperationalDefaultRecipePresent`
 smoke drives bounded `Engine::Run()` frames with the same mesh/graph/point-cloud
-scene and the `SandboxEditorUi` attached, then asserts canonical default-recipe
+scene and the app-owned `SandboxEditorController` attached, then asserts canonical default-recipe
 `Present` plus no canonical `SkippedUnavailable` pass.
 
 Run the scoped operational smoke with:

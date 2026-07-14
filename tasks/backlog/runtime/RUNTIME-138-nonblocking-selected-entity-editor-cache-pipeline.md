@@ -19,7 +19,11 @@ maturity_target: Operational
 - Do not claim a responsiveness improvement without before/after diagnostics from the selected-entity path.
 
 ## Context
-- Owning subsystem/layer: `runtime`, primarily `Extrinsic.Runtime.SandboxEditorUi`, `Extrinsic.Runtime.Engine`, `Extrinsic.Runtime.DerivedJobGraph`, `Extrinsic.Runtime.StreamingExecutor`, and selected-entity command/model helpers.
+- Owning subsystem/layer: `runtime`, primarily
+  `Extrinsic.Runtime.SandboxEditorFacades`, `Extrinsic.Runtime.Engine`,
+  `Extrinsic.Runtime.DerivedJobGraph`, `Extrinsic.Runtime.StreamingExecutor`,
+  and selected-entity command/model helpers. App-owned `EditorShell` consumes
+  cached models but owns no live runtime state.
 - Current selected-entity path does actual work inside `ImGuiAdapter::EndFrame()`: broad panel/domain models are rebuilt, property catalogs are enumerated, normal/color candidate bindings allocate scratch buffers and scan all selected vertices/properties, UV diagnostics scan texcoords, and open domain windows duplicate selected-model work.
 - Desired frame model: poll input, read cached UI/editor state, enqueue commands/job requests, apply only cheap frame-critical changes, extract/render from committed state, then drain/apply bounded async completions and launch background work.
 - The ECS registry is single-threaded. Async workers must operate on generation-stamped immutable snapshots captured on the main thread, and main-thread apply must discard stale results.

@@ -4,7 +4,7 @@ module;
 
 export module Extrinsic.Sandbox.Editor.MeshProcessingPanels;
 
-import Extrinsic.Runtime.SandboxEditorUi;
+import Extrinsic.Sandbox.Editor.Shell;
 
 export namespace Extrinsic::Sandbox::Editor
 {
@@ -19,7 +19,7 @@ export namespace Extrinsic::Sandbox::Editor
         MeshProcessingPanels(MeshProcessingPanels&&) = delete;
         MeshProcessingPanels& operator=(MeshProcessingPanels&&) = delete;
 
-        void Register(Runtime::SandboxEditorUi& editorUi);
+        void Register(EditorShell& editorShell);
         void Unregister();
 
     private:

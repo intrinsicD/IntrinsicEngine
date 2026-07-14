@@ -1,0 +1,1926 @@
+// ARCH-006 runtime Sandbox editor SceneCommands contract partition.
+#include <algorithm>
+#include <array>
+#include <chrono>
+#include <cmath>
+#include <cstdint>
+#include <filesystem>
+#include <functional>
+#include <fstream>
+#include <iterator>
+#include <limits>
+#include <memory>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <thread>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <entt/entity/entity.hpp>
+#include <gtest/gtest.h>
+#include <glm/gtc/quaternion.hpp>
+#include "ProgressivePoissonReference.hpp"
+
+import Extrinsic.Asset.ImportRouter;
+import Extrinsic.Asset.ModelTexturePayload;
+import Extrinsic.Asset.Registry;
+import Extrinsic.Asset.Service;
+import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.EngineLoad;
+import Extrinsic.Core.Config.Window;
+import Extrinsic.Core.Error;
+import Extrinsic.Core.Geometry2D;
+import Extrinsic.Core.Logging;
+import Extrinsic.ECS.Component.Culling.Local;
+import Extrinsic.ECS.Component.Culling.World;
+import Extrinsic.ECS.Component.Hierarchy;
+import Extrinsic.ECS.Component.MetaData;
+import Extrinsic.ECS.Component.SpatialDebugBinding;
+import Extrinsic.ECS.Component.StableId;
+import Extrinsic.ECS.Component.Transform;
+import Extrinsic.ECS.Component.Transform.WorldMatrix;
+import Extrinsic.ECS.Component.DirtyTags;
+import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Components.GeometrySourcesPopulate;
+import Extrinsic.ECS.Components.Selection;
+import Extrinsic.ECS.Hierarchy.Mutation;
+import Extrinsic.ECS.Scene.Handle;
+import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.Colormap;
+import Extrinsic.Graphics.Component.VisualizationConfig;
+import Extrinsic.Graphics.Material;
+import Extrinsic.Graphics.Component.RenderGeometry;
+import Extrinsic.Graphics.CurrentRendererContractAdapter;
+import Extrinsic.Graphics.RenderFrameInput;
+import Extrinsic.Graphics.RenderGraph;
+import Extrinsic.Graphics.RenderRecipeConfig;
+import Extrinsic.Graphics.RenderingContract;
+import Extrinsic.Graphics.Renderer;
+import Extrinsic.Platform.Input;
+import Extrinsic.Platform.Window;
+import Extrinsic.RHI.Device;
+import Extrinsic.Runtime.AssetImportPipeline;
+import Extrinsic.Runtime.AssetIngestStateMachine;
+import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.DerivedJobGraph;
+import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.EditorPropertyWidgets;
+import Extrinsic.Runtime.EditorWindowRegistry;
+import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.KMeansGpuJobQueue;
+import Extrinsic.Runtime.MeshAttributeTextureBake;
+import Extrinsic.Runtime.MeshPrimitiveViewPacker;
+import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.PrimitiveSelectionRefinement;
+import Extrinsic.Runtime.RenderArtifactPublication;
+import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.SandboxDefaultPolicies;
+import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.SceneSerialization;
+import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.SelectedMeshTextureBake;
+import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Runtime.VertexAttributeBinding;
+import Extrinsic.Runtime.VertexChannelBindings;
+import Geometry.Graph.Vertex.Normals;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.HalfedgeMesh.Vertices.Normals;
+import Geometry.KMeans;
+import Geometry.PointCloud.Normals;
+import Geometry.Properties;
+import Geometry.Smoothing;
+import Geometry.UvAtlas;
+
+#include "MockRHI.hpp"
+
+namespace Runtime = Extrinsic::Runtime;
+namespace Assets = Extrinsic::Assets;
+namespace Core = Extrinsic::Core;
+namespace ECS = Extrinsic::ECS;
+namespace ECSC = Extrinsic::ECS::Components;
+namespace Dirty = Extrinsic::ECS::Components::DirtyTags;
+namespace GS = Extrinsic::ECS::Components::GeometrySources;
+namespace Sel = Extrinsic::ECS::Components::Selection;
+namespace G = Extrinsic::Graphics::Components;
+namespace Graphics = Extrinsic::Graphics;
+namespace Plat = Extrinsic::Platform;
+namespace PN = Extrinsic::ECS::Components::GeometrySources::PropertyNames;
+namespace GN = Geometry::HalfedgeMesh::VertexNormals;
+namespace GVN = Geometry::Graph::VertexNormals;
+namespace PCN = Geometry::PointCloud::Normals;
+namespace Smooth = Geometry::Smoothing;
+namespace PPR = Intrinsic::Methods::Geometry::ProgressivePoissonReference;
+namespace Tests = Extrinsic::Tests;
+
+namespace
+{
+void InstallSandboxDefaultRuntimePolicies(Runtime::Engine& engine)
+    {
+        (void)Runtime::RegisterSandboxDefaultRuntimePolicies(engine);
+    }
+
+[[nodiscard]] bool HasDiagnostic(
+        const std::vector<Runtime::SandboxEditorDiagnostic>& diagnostics,
+        const Runtime::SandboxEditorDiagnosticCode code)
+    {
+        for (const Runtime::SandboxEditorDiagnostic& diagnostic : diagnostics)
+        {
+            if (diagnostic.Code == code)
+                return true;
+        }
+        return false;
+    }
+
+[[nodiscard]] bool LogSnapshotContains(
+        const Core::Log::LogSnapshot& snapshot,
+        const std::string_view needle)
+    {
+        for (const Core::Log::LogEntry& entry : snapshot.Entries)
+        {
+            if (entry.Message.find(needle) != std::string::npos)
+                return true;
+        }
+        return false;
+    }
+
+[[nodiscard]] bool LogSnapshotContains(
+        const Core::Log::LogSnapshot& snapshot,
+        const Core::Log::Level level,
+        const std::string_view needle)
+    {
+        for (const Core::Log::LogEntry& entry : snapshot.Entries)
+        {
+            if (entry.Lvl == level &&
+                entry.Message.find(needle) != std::string::npos)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+[[nodiscard]] Graphics::RenderRecipeConfigContext
+    MakeRenderRecipeConfigContext()
+    {
+        Graphics::RenderFrameInput input{};
+        input.Viewport = Core::Extent2D{.Width = 1280u, .Height = 720u};
+        input.Camera.Valid = true;
+        return Graphics::RenderRecipeConfigContext{
+            .Renderer = Graphics::MakeCurrentRendererDescriptor(),
+            .BaseRecipe = Graphics::MakeCurrentRendererRecipeDescriptor(),
+            .BaseViewOutput =
+                Graphics::MakeCurrentRendererViewOutputRecipe(input),
+            .BaseBindings = Graphics::MakeCurrentRendererBindingSet(),
+        };
+    }
+
+[[nodiscard]] std::string ValidSandboxRenderRecipeConfig()
+    {
+        return std::string{R"json({
+  "schema": ")json"} + std::string{Graphics::kRenderRecipeConfigSchemaId} +
+               R"json(",
+  "version": 1,
+  "rendererId": ")json" +
+               std::string{Graphics::kCurrentRendererContractId} + R"json(",
+  "revision": "sandbox-ui-test",
+  "recipe": {
+    "recipeId": "current-renderer.user-preview",
+    "fixedCoreName": "Extrinsic.Graphics.FrameRecipe.Default",
+    "slots": [
+      {
+        "name": "lighting",
+        "schemaId": "intrinsic.graphics.lighting/sandbox-preview/v1",
+        "defaults": "sandbox lighting defaults",
+        "requiredCapabilities": ["LightingRecipe"],
+        "allowedBindingRoles": ["light-snapshots", "material-table"],
+        "usedBindingRoles": ["light-snapshots"],
+        "validationRules": ["declared-slot-only"],
+        "fallbackPolicy": "Degrade"
+      }
+    ]
+  },
+  "viewOutput": {
+    "recipeId": "current-renderer.preview-output",
+    "view": "Preview",
+    "viewport": {"width": 640, "height": 360},
+    "renderScale": 1.0,
+    "target": "OffscreenTexture",
+    "captureRequested": true,
+    "readbackRequested": true,
+    "mode": "Headless",
+    "outputs": [
+      {"name": "color", "kind": "Color", "format": "RGBA8_UNORM", "required": true},
+      {"name": "readback", "kind": "ReadbackBuffer", "format": "Host-visible buffer", "required": false}
+    ]
+  },
+  "bindingOverrides": [
+    {
+      "semanticName": "light-snapshots",
+      "slot": "lighting",
+      "sourceDomain": "Scene",
+      "sourceIdentity": "RenderWorld.Lights.SandboxPreview",
+      "sourceRevision": "sandbox-revision",
+      "valueType": "Buffer",
+      "valueFormat": "LightSnapshot",
+      "fallbackPolicy": "Degrade"
+    }
+  ]
+})json";
+    }
+
+[[nodiscard]] Runtime::SandboxEditorContext MakeRenderRecipeEditorContext(
+        Graphics::RenderRecipeConfigContext& recipeContext,
+        Runtime::SandboxEditorRenderRecipeEditorState& editorState,
+        Runtime::RenderArtifactRegistry* artifacts = nullptr,
+        const bool commandsAvailable = true)
+    {
+        return Runtime::SandboxEditorContext{
+            .RenderRecipeContext = &recipeContext,
+            .RenderRecipeEditorState = &editorState,
+            .PreviewRenderRecipeDocument =
+                [&recipeContext](const std::string& document,
+                                 const std::string& sourceId)
+                {
+                    return Graphics::PreviewRenderRecipeConfig(
+                        document,
+                        recipeContext,
+                        Graphics::RenderRecipeConfigParseOptions{
+                            .SourceId = sourceId,
+                        });
+                },
+            .RenderArtifacts = artifacts,
+            .ImGuiAdapterAvailable = true,
+            .RenderRecipeCommandsAvailable = commandsAvailable,
+        };
+    }
+
+[[nodiscard]] Runtime::RenderArtifactDeclaration
+    MakeSandboxRenderArtifact(std::string artifactId)
+    {
+        return Runtime::RenderArtifactDeclaration{
+            .Metadata =
+                Graphics::RenderArtifactMetadata{
+                    .ArtifactId = std::move(artifactId),
+                    .RendererId =
+                        std::string{Graphics::kCurrentRendererContractId},
+                    .SnapshotId = "sandbox-snapshot",
+                    .ViewOutputRecipeId =
+                        std::string{Graphics::kCurrentRendererDefaultViewRecipeId},
+                    .SourceRevisions = {"scene:1"},
+                    .Status = Graphics::RenderArtifactStatus::Available,
+                    .Lifetime = Graphics::RenderArtifactLifetime::Cached,
+                    .Purpose = "color",
+                },
+            .Kind =
+                Runtime::RenderArtifactPublicationKind::CandidateProjectResult,
+            .PayloadUri = "memory://sandbox-render-artifact",
+            .ProducerLabel = "sandbox editor test",
+        };
+    }
+
+[[nodiscard]] const Runtime::SandboxEditorRenderArtifactRow*
+    FindRenderArtifactRow(
+        const Runtime::SandboxEditorRenderRecipeEditorModel& model,
+        const std::string_view artifactId)
+    {
+        const auto it = std::find_if(
+            model.Artifacts.begin(),
+            model.Artifacts.end(),
+            [artifactId](const Runtime::SandboxEditorRenderArtifactRow& row)
+            {
+                return row.ArtifactId == artifactId;
+            });
+        return it == model.Artifacts.end() ? nullptr : &*it;
+    }
+
+[[nodiscard]] std::string ReadRepositoryTextFile(
+        const std::filesystem::path& relativePath)
+    {
+        const std::filesystem::path path =
+            std::filesystem::path{ENGINE_ROOT_DIR} / relativePath;
+        std::ifstream file{path};
+        if (!file)
+            return {};
+        return std::string{std::istreambuf_iterator<char>{file},
+                           std::istreambuf_iterator<char>{}};
+    }
+
+[[nodiscard]] Runtime::SandboxEditorContext MakeContext(
+        ECS::Scene::Registry& registry,
+        Runtime::SelectionController& selection,
+        const bool imguiAvailable = true,
+        const std::optional<Runtime::PrimitiveSelectionResult>* lastPrimitive = nullptr,
+        Extrinsic::RHI::IDevice* device = nullptr)
+    {
+        return Runtime::SandboxEditorContext{
+            .Scene = &registry,
+            .Selection = &selection,
+            .LastRefinedPrimitive = lastPrimitive,
+            .Device = device,
+            .ImGuiAdapterAvailable = imguiAvailable,
+            .AssetImportCommandsAvailable = false,
+            .CameraRenderCommandsAvailable = false,
+            .VisualizationCommandsAvailable = false,
+        };
+    }
+
+class OneFrameApplication final : public Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            engine.RequestExit();
+        }
+        void OnShutdown(Runtime::Engine&) override {}
+    };
+
+class PassiveApplication final : public Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine&, double, double) override {}
+        void OnShutdown(Runtime::Engine&) override {}
+    };
+
+class WaitForAssetImportEventApplication final : public Runtime::IApplication
+    {
+    public:
+        explicit WaitForAssetImportEventApplication(std::uint32_t maxFrames)
+            : m_MaxFrames(maxFrames)
+        {
+        }
+
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            ++m_ObservedFrames;
+            if (engine.GetAssetImportPipeline().GetLastAssetImportEvent().has_value() ||
+                m_ObservedFrames >= m_MaxFrames)
+            {
+                engine.RequestExit();
+            }
+        }
+        void OnShutdown(Runtime::Engine&) override {}
+
+    private:
+        std::uint32_t m_MaxFrames{1u};
+        std::uint32_t m_ObservedFrames{0u};
+    };
+
+class FixedFrameApplication final : public Runtime::IApplication
+    {
+    public:
+        explicit FixedFrameApplication(std::uint32_t maxFrames)
+            : m_MaxFrames(maxFrames)
+        {
+        }
+
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            ++m_ObservedFrames;
+            if (m_ObservedFrames >= m_MaxFrames)
+            {
+                engine.RequestExit();
+            }
+        }
+        void OnShutdown(Runtime::Engine&) override {}
+
+    private:
+        std::uint32_t m_MaxFrames{1u};
+        std::uint32_t m_ObservedFrames{0u};
+    };
+
+class WaitForConditionApplication final : public Runtime::IApplication
+    {
+    public:
+        explicit WaitForConditionApplication(
+            std::function<bool(Runtime::Engine&)> ready,
+            std::uint32_t maxFrames = 512u)
+            : m_Ready(std::move(ready))
+            , m_MaxFrames(maxFrames)
+        {
+        }
+
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            ++m_ObservedFrames;
+            if ((m_Ready && m_Ready(engine)) || m_ObservedFrames >= m_MaxFrames)
+            {
+                engine.RequestExit();
+                return;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        void OnShutdown(Runtime::Engine&) override {}
+
+    private:
+        std::function<bool(Runtime::Engine&)> m_Ready{};
+        std::uint32_t m_MaxFrames{1u};
+        std::uint32_t m_ObservedFrames{0u};
+    };
+
+[[nodiscard]] Extrinsic::Core::Config::EngineConfig HeadlessConfig()
+    {
+        Extrinsic::Core::Config::EngineConfig config{};
+        config.ReferenceScene.Enabled = false;
+        config.Camera.Enabled = false;
+        config.Window.Backend = Core::Config::WindowBackend::Null;
+        return config;
+    }
+
+[[nodiscard]] bool MeshHasVertexProperty(
+        Runtime::Engine& engine,
+        const ECS::EntityHandle entity,
+        const std::string_view propertyName)
+    {
+        if (!engine.GetScene().IsValid(entity))
+        {
+            return false;
+        }
+
+        auto& raw = engine.GetScene().Raw();
+        const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+        return view.Valid() &&
+            view.ActiveDomain == GS::Domain::Mesh &&
+            view.VertexSource != nullptr &&
+            view.VertexSource->Properties.Exists(propertyName);
+    }
+
+[[nodiscard]] bool DirectMeshPostProcessReady(
+        Runtime::Engine& engine,
+        const ECS::EntityHandle entity)
+    {
+        return MeshHasVertexProperty(engine, entity, "v:texcoord") &&
+            MeshHasVertexProperty(engine, entity, "v:normal") &&
+            engine.GetObjectSpaceNormalBakeQueueDiagnosticsForTest()
+                .NonOperationalNoOps > 0u;
+    }
+
+struct TmpFile
+    {
+        std::filesystem::path Path;
+
+        TmpFile(std::string_view name, std::string_view contents)
+            : Path(std::filesystem::temp_directory_path() / std::string(name))
+        {
+            std::ofstream os(Path);
+            os << contents;
+        }
+
+        ~TmpFile()
+        {
+            std::error_code ec;
+            std::filesystem::remove(Path, ec);
+        }
+    };
+
+[[nodiscard]] std::optional<ECS::EntityHandle> FindFirstEntityWithDomain(
+        ECS::Scene::Registry& registry,
+        const GS::Domain domain)
+    {
+        auto& raw = registry.Raw();
+        std::optional<ECS::EntityHandle> found{};
+        raw.view<entt::entity>().each([&](const ECS::EntityHandle entity)
+        {
+            if (!raw.all_of<Sel::SelectableTag>(entity))
+                return;
+            const GS::ConstSourceView source = GS::BuildConstView(raw, entity);
+            if (source.ActiveDomain == domain)
+                found = entity;
+        });
+        return found;
+    }
+
+[[nodiscard]] std::size_t CountEntitiesWithDomain(
+        ECS::Scene::Registry& registry,
+        const GS::Domain domain)
+    {
+        std::size_t count = 0u;
+        auto& raw = registry.Raw();
+        raw.view<entt::entity>().each([&](const ECS::EntityHandle entity)
+        {
+            if (!raw.all_of<Sel::SelectableTag>(entity))
+                return;
+            const GS::ConstSourceView source = GS::BuildConstView(raw, entity);
+            if (source.ActiveDomain == domain)
+                ++count;
+        });
+        return count;
+    }
+}
+TEST(SandboxEditorUi, FileImportCommandRoutesThroughRuntimeOwnedSurface)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    bool commandObserved = false;
+    Runtime::SandboxEditorFileImportCommand observedCommand{};
+    context.AssetImportCommands =
+        Runtime::SandboxEditorAssetImportCommandSurface{
+            .Import =
+                [&](const Runtime::SandboxEditorFileImportCommand& command)
+                {
+                    commandObserved = true;
+                    observedCommand = command;
+                    return Runtime::SandboxEditorFileImportResult{
+                        .Status = Runtime::SandboxEditorCommandStatus::Applied,
+                        .Asset = Assets::AssetId{7u, 2u},
+                        .PayloadKind = Assets::AssetPayloadKind::ModelScene,
+                        .PrimitiveEntitiesCreated = 1u,
+                        .EmbeddedTextureAssetsCreated = 2u,
+                        .TextureUploadRequests = 3u,
+                        .MaterializedModelScene = true,
+                        .Message = "Imported fake model.",
+                    };
+                },
+        };
+    context.PendingAssetImportPath = "assets/models/Duck.gltf";
+    context.PendingAssetImportPayloadKind = Assets::AssetPayloadKind::Graph;
+
+    Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    EXPECT_TRUE(frame.FileImport.Enabled);
+    EXPECT_EQ(frame.FileImport.PendingPath, "assets/models/Duck.gltf");
+    EXPECT_EQ(frame.FileImport.PayloadKind, Assets::AssetPayloadKind::Graph);
+    EXPECT_FALSE(HasDiagnostic(
+        frame.FileImport.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::AssetImportUnavailable));
+
+    const Runtime::SandboxEditorFileImportResult result =
+        Runtime::ApplySandboxEditorFileImportCommand(
+            context,
+            Runtime::SandboxEditorFileImportCommand{
+                .Path = "assets/models/Duck.gltf",
+                .PayloadKind = Assets::AssetPayloadKind::Unknown,
+            });
+
+    EXPECT_TRUE(commandObserved);
+    EXPECT_EQ(observedCommand.Path, "assets/models/Duck.gltf");
+    EXPECT_EQ(observedCommand.PayloadKind, Assets::AssetPayloadKind::Unknown);
+    EXPECT_TRUE(result.Succeeded());
+    EXPECT_EQ(result.Asset, (Assets::AssetId{7u, 2u}));
+    EXPECT_EQ(result.PayloadKind, Assets::AssetPayloadKind::ModelScene);
+    EXPECT_EQ(result.PrimitiveEntitiesCreated, 1u);
+    EXPECT_EQ(result.EmbeddedTextureAssetsCreated, 2u);
+    EXPECT_EQ(result.TextureUploadRequests, 3u);
+    EXPECT_TRUE(result.MaterializedModelScene);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorCommandStatus(result.Status),
+                 "Applied");
+
+    context.LastAssetImportResult = &result;
+    frame = Runtime::BuildSandboxEditorPanelFrame(context);
+    ASSERT_TRUE(frame.FileImport.LastResult.has_value());
+    EXPECT_EQ(frame.FileImport.StatusText, "Imported fake model.");
+    EXPECT_FALSE(HasDiagnostic(
+        frame.FileImport.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::AssetImportFailed));
+
+    Runtime::SandboxEditorContext missingSurface =
+        MakeContext(registry, selection);
+    const Runtime::SandboxEditorFileImportResult missing =
+        Runtime::ApplySandboxEditorFileImportCommand(
+            missingSurface,
+            Runtime::SandboxEditorFileImportCommand{
+                .Path = "assets/models/Duck.gltf",
+            });
+    EXPECT_EQ(missing.Status,
+              Runtime::SandboxEditorCommandStatus::MissingAssetImportCommands);
+    EXPECT_EQ(missing.Error, Core::ErrorCode::InvalidState);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorCommandStatus(
+                     missing.Status),
+                 "MissingAssetImportCommands");
+
+    const Runtime::SandboxEditorFileImportResult empty =
+        Runtime::ApplySandboxEditorFileImportCommand(
+            context,
+            Runtime::SandboxEditorFileImportCommand{});
+    EXPECT_EQ(empty.Status,
+              Runtime::SandboxEditorCommandStatus::AssetImportFailed);
+    EXPECT_EQ(empty.Error, Core::ErrorCode::InvalidPath);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorDiagnosticCode(
+                     Runtime::SandboxEditorDiagnosticCode::AssetImportFailed),
+                 "AssetImportFailed");
+
+    context.LastAssetImportResult = &empty;
+    frame = Runtime::BuildSandboxEditorPanelFrame(context);
+    EXPECT_TRUE(HasDiagnostic(
+        frame.FileImport.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::AssetImportFailed));
+}
+TEST(SandboxEditorUi, FileImportCommandTreatsAsyncPendingAsNonFailure)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    const Runtime::RuntimeAssetIngestHandle queuedHandle{42u, 7u};
+    context.AssetImportCommands =
+        Runtime::SandboxEditorAssetImportCommandSurface{
+            .Import =
+                [queuedHandle](const Runtime::SandboxEditorFileImportCommand&)
+                {
+                    return Runtime::SandboxEditorFileImportResult{
+                        .Status = Runtime::SandboxEditorCommandStatus::Pending,
+                        .Operation = queuedHandle,
+                        .PayloadKind = Assets::AssetPayloadKind::Texture2D,
+                    };
+                },
+        };
+
+    const Runtime::SandboxEditorFileImportResult result =
+        Runtime::ApplySandboxEditorFileImportCommand(
+            context,
+            Runtime::SandboxEditorFileImportCommand{
+                .Path = "assets/textures/albedo.png",
+                .PayloadKind = Assets::AssetPayloadKind::Unknown,
+            });
+
+    EXPECT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_FALSE(result.Succeeded());
+    EXPECT_EQ(result.Operation, queuedHandle);
+    EXPECT_EQ(result.Error, Core::ErrorCode::Success);
+    EXPECT_EQ(result.PayloadKind, Assets::AssetPayloadKind::Texture2D);
+    EXPECT_NE(result.Message.find("Queued"), std::string::npos);
+
+    context.LastAssetImportResult = &result;
+    Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    ASSERT_TRUE(frame.FileImport.LastResult.has_value());
+    EXPECT_EQ(frame.FileImport.LastResult->Status,
+              Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_EQ(frame.FileImport.StatusText, result.Message);
+    EXPECT_FALSE(HasDiagnostic(
+        frame.FileImport.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::AssetImportFailed));
+}
+TEST(SandboxEditorUi, SceneFileCommandRoutesThroughRuntimeOwnedSurface)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    bool saveObserved = false;
+    bool loadObserved = false;
+    bool newObserved = false;
+    bool closeObserved = false;
+    Runtime::SandboxEditorSceneFileCommand observedSave{};
+    Runtime::SandboxEditorSceneFileCommand observedLoad{};
+    context.SceneFileCommands = Runtime::SandboxEditorSceneFileCommandSurface{
+        .New =
+            [&]()
+            {
+                newObserved = true;
+                return Runtime::SandboxEditorSceneFileResult{
+                    .Status = Runtime::SandboxEditorCommandStatus::Applied,
+                    .Operation = Runtime::SandboxEditorSceneFileOperation::New,
+                    .Message = "Created fake scene.",
+                };
+            },
+        .Save =
+            [&](const Runtime::SandboxEditorSceneFileCommand& command)
+            {
+                saveObserved = true;
+                observedSave = command;
+                return Runtime::SandboxEditorSceneFileResult{
+                    .Status = Runtime::SandboxEditorCommandStatus::Applied,
+                    .Operation = Runtime::SandboxEditorSceneFileOperation::Save,
+                    .Stats = Runtime::SceneSerializationStats{
+                        .Entities = 3u,
+                        .MeshEntities = 1u,
+                        .GraphEntities = 1u,
+                        .PointCloudEntities = 1u,
+                    },
+                    .Message = "Saved fake scene.",
+                };
+            },
+        .Load =
+            [&](const Runtime::SandboxEditorSceneFileCommand& command)
+            {
+                loadObserved = true;
+                observedLoad = command;
+                return Runtime::SandboxEditorSceneFileResult{
+                    .Status = Runtime::SandboxEditorCommandStatus::Applied,
+                    .Operation = Runtime::SandboxEditorSceneFileOperation::Load,
+                    .Stats = Runtime::SceneSerializationStats{.Entities = 2u},
+                    .Message = "Loaded fake scene.",
+                };
+            },
+        .Close =
+            [&]()
+            {
+                closeObserved = true;
+                return Runtime::SandboxEditorSceneFileResult{
+                    .Status = Runtime::SandboxEditorCommandStatus::Applied,
+                    .Operation = Runtime::SandboxEditorSceneFileOperation::Close,
+                    .Message = "Closed fake scene.",
+                };
+            },
+    };
+    context.PendingSceneFilePath = "scene.extrinsic.json";
+
+    Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    EXPECT_TRUE(frame.SceneFile.Enabled);
+    EXPECT_TRUE(frame.SceneFile.LifecycleEnabled);
+    EXPECT_TRUE(frame.SceneFile.CanNew);
+    EXPECT_TRUE(frame.SceneFile.CanClose);
+    EXPECT_TRUE(frame.SceneFile.CanSave);
+    EXPECT_TRUE(frame.SceneFile.CanOpen);
+    EXPECT_TRUE(frame.SceneFile.PathEntryEnabled);
+    EXPECT_FALSE(frame.SceneFile.NativeDialogsAvailable);
+    EXPECT_TRUE(frame.SceneFile.FileDialogBoundaryText.find("Native file dialogs") !=
+                std::string::npos);
+    EXPECT_EQ(frame.SceneFile.PendingPath, "scene.extrinsic.json");
+    EXPECT_FALSE(HasDiagnostic(
+        frame.SceneFile.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::SceneFileUnavailable));
+
+    const Runtime::SandboxEditorSceneFileResult save =
+        Runtime::ApplySandboxEditorSceneSaveCommand(
+            context,
+            Runtime::SandboxEditorSceneFileCommand{
+                .Path = "scene.extrinsic.json",
+            });
+    EXPECT_TRUE(saveObserved);
+    EXPECT_EQ(observedSave.Path, "scene.extrinsic.json");
+    EXPECT_TRUE(save.Succeeded());
+    EXPECT_EQ(save.Stats.Entities, 3u);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorCommandStatus(save.Status),
+                 "Applied");
+
+    const Runtime::SandboxEditorSceneFileResult created =
+        Runtime::ApplySandboxEditorNewSceneCommand(context);
+    EXPECT_TRUE(newObserved);
+    EXPECT_TRUE(created.Succeeded());
+    EXPECT_EQ(created.Operation, Runtime::SandboxEditorSceneFileOperation::New);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorCommandStatus(
+                     Runtime::SandboxEditorCommandStatus::SceneNewFailed),
+                 "SceneNewFailed");
+
+    const Runtime::SandboxEditorSceneFileResult load =
+        Runtime::ApplySandboxEditorSceneLoadCommand(
+            context,
+            Runtime::SandboxEditorSceneFileCommand{
+                .Path = "scene.extrinsic.json",
+            });
+    EXPECT_TRUE(loadObserved);
+    EXPECT_EQ(observedLoad.Path, "scene.extrinsic.json");
+    EXPECT_TRUE(load.Succeeded());
+    EXPECT_EQ(load.Stats.Entities, 2u);
+
+    const Runtime::SandboxEditorSceneFileResult closed =
+        Runtime::ApplySandboxEditorCloseSceneCommand(context);
+    EXPECT_TRUE(closeObserved);
+    EXPECT_TRUE(closed.Succeeded());
+    EXPECT_EQ(closed.Operation, Runtime::SandboxEditorSceneFileOperation::Close);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorCommandStatus(
+                     Runtime::SandboxEditorCommandStatus::SceneCloseFailed),
+                 "SceneCloseFailed");
+
+    context.LastSceneFileResult = &load;
+    frame = Runtime::BuildSandboxEditorPanelFrame(context);
+    ASSERT_TRUE(frame.SceneFile.LastResult.has_value());
+    EXPECT_EQ(frame.SceneFile.StatusText, "Loaded fake scene.");
+    EXPECT_FALSE(HasDiagnostic(
+        frame.SceneFile.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::SceneFileFailed));
+
+    Runtime::SandboxEditorContext missingSurface =
+        MakeContext(registry, selection);
+    const Runtime::SandboxEditorSceneFileResult missing =
+        Runtime::ApplySandboxEditorSceneSaveCommand(
+            missingSurface,
+            Runtime::SandboxEditorSceneFileCommand{
+                .Path = "scene.extrinsic.json",
+            });
+    EXPECT_EQ(missing.Status,
+              Runtime::SandboxEditorCommandStatus::MissingSceneFileCommands);
+    EXPECT_EQ(missing.Error, Core::ErrorCode::InvalidState);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorCommandStatus(
+                     missing.Status),
+                 "MissingSceneFileCommands");
+
+    const Runtime::SandboxEditorSceneFileResult emptySave =
+        Runtime::ApplySandboxEditorSceneSaveCommand(
+            context,
+            Runtime::SandboxEditorSceneFileCommand{});
+    EXPECT_EQ(emptySave.Status,
+              Runtime::SandboxEditorCommandStatus::SceneSaveFailed);
+    EXPECT_EQ(emptySave.Error, Core::ErrorCode::InvalidPath);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorDiagnosticCode(
+                     Runtime::SandboxEditorDiagnosticCode::SceneFileFailed),
+                 "SceneFileFailed");
+
+    context.LastSceneFileResult = &emptySave;
+    frame = Runtime::BuildSandboxEditorPanelFrame(context);
+    EXPECT_TRUE(HasDiagnostic(
+        frame.SceneFile.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::SceneFileFailed));
+}
+TEST(SandboxEditorUi, SceneLoadCommandTreatsAsyncPendingAsNonFailure)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    const Runtime::StreamingTaskHandle queuedTask{42u, 7u};
+    context.SceneFileCommands = Runtime::SandboxEditorSceneFileCommandSurface{
+        .Save =
+            [](const Runtime::SandboxEditorSceneFileCommand&)
+            {
+                return Runtime::SandboxEditorSceneFileResult{
+                    .Status = Runtime::SandboxEditorCommandStatus::Applied,
+                    .Operation = Runtime::SandboxEditorSceneFileOperation::Save,
+                };
+            },
+        .Load =
+            [queuedTask](const Runtime::SandboxEditorSceneFileCommand&)
+            {
+                return Runtime::SandboxEditorSceneFileResult{
+                    .Status = Runtime::SandboxEditorCommandStatus::Pending,
+                    .Operation = Runtime::SandboxEditorSceneFileOperation::Load,
+                    .Task = queuedTask,
+                };
+            },
+    };
+
+    const Runtime::SandboxEditorSceneFileResult result =
+        Runtime::ApplySandboxEditorSceneLoadCommand(
+            context,
+            Runtime::SandboxEditorSceneFileCommand{
+                .Path = "scene.extrinsic.json",
+            });
+
+    EXPECT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_FALSE(result.Succeeded());
+    EXPECT_EQ(result.Operation, Runtime::SandboxEditorSceneFileOperation::Load);
+    EXPECT_EQ(result.Task, queuedTask);
+    EXPECT_EQ(result.Error, Core::ErrorCode::Success);
+    EXPECT_NE(result.Message.find("Queued scene open"), std::string::npos);
+
+    context.LastSceneFileResult = &result;
+    Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    ASSERT_TRUE(frame.SceneFile.LastResult.has_value());
+    EXPECT_EQ(frame.SceneFile.LastResult->Status,
+              Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_EQ(frame.SceneFile.StatusText, result.Message);
+    EXPECT_FALSE(HasDiagnostic(
+        frame.SceneFile.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::SceneFileFailed));
+}
+TEST(SandboxEditorUi, SceneSaveCommandTreatsAsyncPendingAsNonFailure)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    const Runtime::StreamingTaskHandle queuedTask{43u, 7u};
+    context.SceneFileCommands = Runtime::SandboxEditorSceneFileCommandSurface{
+        .Save =
+            [queuedTask](const Runtime::SandboxEditorSceneFileCommand&)
+            {
+                return Runtime::SandboxEditorSceneFileResult{
+                    .Status = Runtime::SandboxEditorCommandStatus::Pending,
+                    .Operation = Runtime::SandboxEditorSceneFileOperation::Save,
+                    .Task = queuedTask,
+                };
+            },
+        .Load =
+            [](const Runtime::SandboxEditorSceneFileCommand&)
+            {
+                return Runtime::SandboxEditorSceneFileResult{
+                    .Status = Runtime::SandboxEditorCommandStatus::Applied,
+                    .Operation = Runtime::SandboxEditorSceneFileOperation::Load,
+                };
+            },
+    };
+
+    const Runtime::SandboxEditorSceneFileResult result =
+        Runtime::ApplySandboxEditorSceneSaveCommand(
+            context,
+            Runtime::SandboxEditorSceneFileCommand{
+                .Path = "scene.extrinsic.json",
+            });
+
+    EXPECT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_FALSE(result.Succeeded());
+    EXPECT_EQ(result.Operation, Runtime::SandboxEditorSceneFileOperation::Save);
+    EXPECT_EQ(result.Task, queuedTask);
+    EXPECT_EQ(result.Error, Core::ErrorCode::Success);
+    EXPECT_NE(result.Message.find("Queued scene save"), std::string::npos);
+
+    context.LastSceneFileResult = &result;
+    Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    ASSERT_TRUE(frame.SceneFile.LastResult.has_value());
+    EXPECT_EQ(frame.SceneFile.LastResult->Status,
+              Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_EQ(frame.SceneFile.StatusText, result.Message);
+    EXPECT_FALSE(HasDiagnostic(
+        frame.SceneFile.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::SceneFileFailed));
+}
+TEST(SandboxEditorUi, EngineImportFacadeReportsMissingFile)
+{
+    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+
+    auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(
+        Runtime::RuntimeAssetImportRequest{
+            .Path = "/tmp/intrinsicengine-ui-001-missing.gltf",
+        });
+    EXPECT_FALSE(imported.has_value());
+    EXPECT_EQ(imported.error(), Core::ErrorCode::FileNotFound);
+
+    engine.Shutdown();
+}
+TEST(SandboxEditorUi, EngineImportFacadeMaterializesStandaloneGeometryDomains)
+{
+    TmpFile meshFile(
+        "runtime_dragdrop_import_mesh.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "vt 0 0\n"
+        "vt 1 0\n"
+        "vt 0 1\n"
+        "f 1/1 2/2 3/3\n");
+    TmpFile graphFile(
+        "runtime_dragdrop_import_graph.tgf",
+        "1 0 0 0 first\n"
+        "2 1 0 0 second\n"
+        "#\n"
+        "1 2 1.0 edge\n");
+    TmpFile cloudFile(
+        "runtime_dragdrop_import_cloud.xyz",
+        "0 0 0\n"
+        "1 2 3\n");
+
+    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
+
+    auto mesh = engine.GetAssetImportPipeline().ImportAssetFromPath(
+        Runtime::RuntimeAssetImportRequest{
+            .Path = meshFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+        });
+    ASSERT_TRUE(mesh.has_value()) << static_cast<int>(mesh.error());
+    EXPECT_TRUE(mesh->Asset.IsValid());
+    EXPECT_EQ(mesh->PayloadKind, Assets::AssetPayloadKind::Mesh);
+    EXPECT_EQ(mesh->PrimitiveEntitiesCreated, 1u);
+
+    auto graph = engine.GetAssetImportPipeline().ImportAssetFromPath(
+        Runtime::RuntimeAssetImportRequest{
+            .Path = graphFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Graph,
+        });
+    ASSERT_TRUE(graph.has_value()) << static_cast<int>(graph.error());
+    EXPECT_TRUE(graph->Asset.IsValid());
+    EXPECT_EQ(graph->PayloadKind, Assets::AssetPayloadKind::Graph);
+    EXPECT_EQ(graph->PrimitiveEntitiesCreated, 1u);
+
+    auto cloud = engine.GetAssetImportPipeline().ImportAssetFromPath(
+        Runtime::RuntimeAssetImportRequest{
+            .Path = cloudFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::PointCloud,
+        });
+    ASSERT_TRUE(cloud.has_value()) << static_cast<int>(cloud.error());
+    EXPECT_TRUE(cloud->Asset.IsValid());
+    EXPECT_EQ(cloud->PayloadKind, Assets::AssetPayloadKind::PointCloud);
+    EXPECT_EQ(cloud->PrimitiveEntitiesCreated, 1u);
+
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Graph), 1u);
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::PointCloud), 1u);
+
+    auto& raw = engine.GetScene().Raw();
+    const std::optional<ECS::EntityHandle> meshEntity =
+        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+    EXPECT_TRUE(raw.all_of<G::RenderSurface>(*meshEntity));
+    EXPECT_TRUE(raw.all_of<G::VisualizationConfig>(*meshEntity));
+    ASSERT_TRUE((raw.all_of<ECSC::Culling::Local::Bounds,
+                            ECSC::Culling::World::Bounds>(*meshEntity)));
+    const auto& meshWorld =
+        raw.get<ECSC::Culling::World::Bounds>(*meshEntity);
+    EXPECT_NEAR(meshWorld.WorldBoundingSphere.Center.x, 0.5f, 1.0e-5f);
+    EXPECT_NEAR(meshWorld.WorldBoundingSphere.Center.y, 0.5f, 1.0e-5f);
+    EXPECT_GT(meshWorld.WorldBoundingSphere.Radius, 0.5f);
+
+    const std::optional<ECS::EntityHandle> graphEntity =
+        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Graph);
+    ASSERT_TRUE(graphEntity.has_value());
+    EXPECT_TRUE(raw.all_of<G::RenderEdges>(*graphEntity));
+    EXPECT_TRUE(raw.all_of<G::RenderPoints>(*graphEntity));
+    EXPECT_TRUE(raw.all_of<G::VisualizationConfig>(*graphEntity));
+    ASSERT_TRUE((raw.all_of<ECSC::Culling::Local::Bounds,
+                            ECSC::Culling::World::Bounds>(*graphEntity)));
+    const auto& graphWorld =
+        raw.get<ECSC::Culling::World::Bounds>(*graphEntity);
+    EXPECT_NEAR(graphWorld.WorldBoundingSphere.Center.x, 0.5f, 1.0e-5f);
+    EXPECT_NEAR(graphWorld.WorldBoundingSphere.Center.y, 0.0f, 1.0e-5f);
+    EXPECT_GT(graphWorld.WorldBoundingSphere.Radius, 0.4f);
+
+    const std::optional<ECS::EntityHandle> cloudEntity =
+        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::PointCloud);
+    ASSERT_TRUE(cloudEntity.has_value());
+    EXPECT_TRUE(raw.all_of<G::RenderPoints>(*cloudEntity));
+    EXPECT_TRUE(raw.all_of<G::VisualizationConfig>(*cloudEntity));
+    ASSERT_TRUE((raw.all_of<ECSC::Culling::Local::Bounds,
+                            ECSC::Culling::World::Bounds>(*cloudEntity)));
+    const auto& cloudWorld =
+        raw.get<ECSC::Culling::World::Bounds>(*cloudEntity);
+    EXPECT_NEAR(cloudWorld.WorldBoundingSphere.Center.x, 0.5f, 1.0e-5f);
+    EXPECT_NEAR(cloudWorld.WorldBoundingSphere.Center.y, 1.0f, 1.0e-5f);
+    EXPECT_NEAR(cloudWorld.WorldBoundingSphere.Center.z, 1.5f, 1.0e-5f);
+    EXPECT_GT(cloudWorld.WorldBoundingSphere.Radius, 1.8f);
+
+    const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
+    ASSERT_TRUE(lastEvent.has_value());
+    EXPECT_TRUE(lastEvent->Succeeded());
+    ASSERT_TRUE(lastEvent->Result.has_value());
+    EXPECT_EQ(lastEvent->Result->PayloadKind, Assets::AssetPayloadKind::PointCloud);
+    EXPECT_NE(lastEvent->Path.find("runtime_dragdrop_import_cloud.xyz"),
+              std::string::npos);
+
+    engine.Shutdown();
+}
+TEST(SandboxEditorUi, EngineImportFacadeMaterializesNonManifoldObjAsRenderableMesh)
+{
+    TmpFile meshFile(
+        "runtime_dragdrop_import_nonmanifold.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "v 0 -1 0\n"
+        "v 0.5 0 1\n"
+        "vt 0 0\n"
+        "vt 1 0\n"
+        "vt 0 1\n"
+        "vt 0 -1\n"
+        "vt 0.5 0.5\n"
+        "f 1/1 2/2 3/3\n"
+        "f 2/2 1/1 4/4\n"
+        "f 1/1 2/2 5/5\n");
+
+    std::optional<ECS::EntityHandle> meshEntity{};
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForConditionApplication>(
+            [&meshEntity](Runtime::Engine& runningEngine)
+            {
+                return meshEntity.has_value() &&
+                    DirectMeshPostProcessReady(runningEngine, *meshEntity);
+            }));
+    engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
+
+    auto mesh = engine.GetAssetImportPipeline().ImportAssetFromPath(
+        Runtime::RuntimeAssetImportRequest{
+            .Path = meshFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+        });
+    ASSERT_TRUE(mesh.has_value()) << static_cast<int>(mesh.error());
+    EXPECT_TRUE(mesh->Asset.IsValid());
+    EXPECT_EQ(mesh->PayloadKind, Assets::AssetPayloadKind::Mesh);
+    EXPECT_EQ(mesh->PrimitiveEntitiesCreated, 1u);
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+
+    auto& raw = engine.GetScene().Raw();
+    meshEntity = FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+    EXPECT_TRUE((raw.all_of<ECSC::MetaData,
+                            ECSC::Hierarchy::Component,
+                            ECSC::Transform::Component,
+                            ECSC::Transform::WorldMatrix,
+                            Sel::SelectableTag,
+                            G::RenderSurface,
+                            G::VisualizationConfig,
+                            GS::Vertices,
+                            GS::Edges,
+                            GS::Halfedges,
+                            GS::Faces>(*meshEntity)));
+    EXPECT_EQ(raw.get<G::RenderSurface>(*meshEntity).Domain,
+              G::RenderSurface::SourceDomain::Vertex);
+
+    engine.Run();
+    ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity));
+
+    Runtime::RenderExtractionCache extraction;
+    const auto stats = extraction.ExtractAndSubmit(engine.GetScene(),
+                                                   engine.GetRenderer(),
+                                                   &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.CandidateRenderableCount, 1u);
+    EXPECT_EQ(stats.MeshGeometryUploads, 1u);
+    EXPECT_EQ(stats.MeshGeometryFailedPack, 0u);
+    EXPECT_EQ(stats.MeshGeometryMissingPositions, 0u);
+    EXPECT_EQ(stats.MeshGeometryInvalidTopology, 0u);
+    EXPECT_GE(engine.GetRenderer().GetGpuWorld().GetLiveGeometryCount(), 1u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+TEST(SandboxEditorUi, EngineImportFacadeMaterializesObjWithoutAuthoredTexcoordsAsRenderableMesh)
+{
+    TmpFile meshFile(
+        "runtime_dragdrop_import_missing_uv.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    std::optional<ECS::EntityHandle> meshEntity{};
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForConditionApplication>(
+            [&meshEntity](Runtime::Engine& runningEngine)
+            {
+                return meshEntity.has_value() &&
+                    DirectMeshPostProcessReady(runningEngine, *meshEntity);
+            }));
+    engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
+
+    auto mesh = engine.GetAssetImportPipeline().ImportAssetFromPath(
+        Runtime::RuntimeAssetImportRequest{
+            .Path = meshFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+        });
+    ASSERT_TRUE(mesh.has_value()) << static_cast<int>(mesh.error());
+    EXPECT_TRUE(mesh->Asset.IsValid());
+    EXPECT_EQ(mesh->PayloadKind, Assets::AssetPayloadKind::Mesh);
+    EXPECT_EQ(mesh->PrimitiveEntitiesCreated, 1u);
+
+    meshEntity = FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+
+    engine.Run();
+    ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity));
+
+    auto& raw = engine.GetScene().Raw();
+    ASSERT_TRUE(raw.all_of<G::RenderSurface>(*meshEntity));
+    const GS::ConstSourceView view = GS::BuildConstView(raw, *meshEntity);
+    ASSERT_TRUE(view.Valid());
+    ASSERT_NE(view.VertexSource, nullptr);
+    const auto texcoords = view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(texcoords);
+    ASSERT_EQ(texcoords.Vector().size(), 3u);
+
+    bool sawNonZeroTexcoord = false;
+    for (const glm::vec2 uv : texcoords.Vector())
+    {
+        EXPECT_TRUE(std::isfinite(uv.x));
+        EXPECT_TRUE(std::isfinite(uv.y));
+        sawNonZeroTexcoord = sawNonZeroTexcoord ||
+            std::abs(uv.x) > 1.0e-6f ||
+            std::abs(uv.y) > 1.0e-6f;
+    }
+    EXPECT_TRUE(sawNonZeroTexcoord);
+
+    Runtime::RenderExtractionCache extraction;
+    const auto stats = extraction.ExtractAndSubmit(engine.GetScene(),
+                                                   engine.GetRenderer(),
+                                                   &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.CandidateRenderableCount, 1u);
+    EXPECT_EQ(stats.MeshGeometryUploads, 1u);
+    EXPECT_EQ(stats.MeshGeometryFailedPack, 0u);
+    EXPECT_EQ(stats.MeshGeometryMissingTexcoords, 0u);
+    EXPECT_GE(engine.GetRenderer().GetGpuWorld().GetLiveGeometryCount(), 1u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+TEST(SandboxEditorUi, DuplicateDroppedGeometryImportUsesSingleIngestRecord)
+{
+    TmpFile meshFile(
+        "runtime_duplicate_drop_mesh.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<FixedFrameApplication>(128u));
+    engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
+
+    const std::vector<std::string> droppedPaths{
+        meshFile.Path.string(),
+        meshFile.Path.string(),
+    };
+    engine.GetAssetImportPipeline().ImportDroppedFilePaths(droppedPaths);
+
+    std::vector<Runtime::RuntimeAssetIngestRecord> records =
+        engine.GetAssetImportPipeline().GetAssetIngestRecordsForTest();
+    ASSERT_EQ(records.size(), 1u);
+    EXPECT_EQ(records[0].Request.Source,
+              Runtime::RuntimeAssetIngestSource::DroppedFile);
+    EXPECT_EQ(records[0].Request.Path, meshFile.Path.string());
+    EXPECT_EQ(records[0].Phase, Runtime::RuntimeAssetIngestPhase::Decoding);
+
+    const std::optional<Runtime::RuntimeAssetImportEvent>& duplicateEvent =
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
+    ASSERT_TRUE(duplicateEvent.has_value());
+    EXPECT_FALSE(duplicateEvent->Succeeded());
+    EXPECT_EQ(duplicateEvent->Error, Core::ErrorCode::ResourceBusy);
+    EXPECT_EQ(duplicateEvent->IngestDiagnostic,
+              Runtime::RuntimeAssetIngestDiagnostic::DuplicateActiveRequest);
+
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+
+    engine.Run();
+
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+    records = engine.GetAssetImportPipeline().GetAssetIngestRecordsForTest();
+    ASSERT_EQ(records.size(), 1u);
+    EXPECT_EQ(records[0].Phase, Runtime::RuntimeAssetIngestPhase::Complete);
+    EXPECT_EQ(records[0].Diagnostic, Runtime::RuntimeAssetIngestDiagnostic::None);
+    ASSERT_TRUE(records[0].Result.has_value());
+    EXPECT_EQ(records[0].Result->PrimitiveEntitiesCreated, 1u);
+
+    const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
+    ASSERT_TRUE(lastEvent.has_value());
+    EXPECT_TRUE(lastEvent->Succeeded());
+    EXPECT_EQ(lastEvent->IngestDiagnostic,
+              Runtime::RuntimeAssetIngestDiagnostic::None);
+
+    engine.Shutdown();
+}
+TEST(SandboxEditorUi, DroppedFileQueuePreservesOrderDiagnosticsAndClearCompleted)
+{
+    TmpFile meshFile(
+        "runtime_queue_drop_mesh.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+    const std::filesystem::path missingFile =
+        std::filesystem::temp_directory_path() / "runtime_queue_missing.obj";
+    std::filesystem::remove(missingFile);
+
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<FixedFrameApplication>(128u));
+    engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
+
+    const std::vector<std::string> droppedPaths{
+        meshFile.Path.string(),
+        missingFile.string(),
+    };
+    engine.GetAssetImportPipeline().ImportDroppedFilePaths(droppedPaths);
+
+    Runtime::RuntimeAssetImportQueueSnapshot queue =
+        engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
+    ASSERT_EQ(queue.Entries.size(), 2u);
+    EXPECT_EQ(queue.ActiveCount, 2u);
+    EXPECT_EQ(queue.Entries[0].SourcePath, meshFile.Path.string());
+    EXPECT_EQ(queue.Entries[1].SourcePath, missingFile.string());
+    EXPECT_EQ(queue.Entries[0].Stage,
+              Runtime::RuntimeAssetImportQueueStage::Decoding);
+    EXPECT_TRUE(queue.Entries[0].CanCancel);
+
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+    engine.Run();
+
+    queue = engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
+    ASSERT_EQ(queue.Entries.size(), 2u);
+    EXPECT_EQ(queue.ActiveCount, 0u);
+    EXPECT_EQ(queue.TerminalCount, 2u);
+    EXPECT_TRUE(queue.CanClearCompleted);
+    EXPECT_EQ(queue.Entries[0].SourcePath, meshFile.Path.string());
+    EXPECT_EQ(queue.Entries[0].TerminalStatus,
+              Runtime::RuntimeAssetImportQueueTerminalStatus::Complete);
+    EXPECT_EQ(queue.Entries[1].SourcePath, missingFile.string());
+    EXPECT_EQ(queue.Entries[1].TerminalStatus,
+              Runtime::RuntimeAssetImportQueueTerminalStatus::Failed);
+    EXPECT_FALSE(queue.Entries[1].DiagnosticText.empty());
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+
+    EXPECT_EQ(engine.GetAssetImportPipeline().ClearCompletedAssetImports(), 2u);
+    queue = engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
+    EXPECT_TRUE(queue.Entries.empty());
+
+    engine.Shutdown();
+}
+TEST(SandboxEditorUi, DroppedGeometryQueueCancellationPreventsMainThreadApply)
+{
+    TmpFile meshFile(
+        "runtime_queue_cancel_mesh.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<FixedFrameApplication>(16u));
+    engine.Initialize();
+
+    const std::vector<std::string> droppedPaths{meshFile.Path.string()};
+    engine.GetAssetImportPipeline().ImportDroppedFilePaths(droppedPaths);
+
+    Runtime::RuntimeAssetImportQueueSnapshot queue =
+        engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
+    ASSERT_EQ(queue.Entries.size(), 1u);
+    EXPECT_TRUE(queue.Entries[0].CanCancel);
+    EXPECT_TRUE(engine.GetAssetImportPipeline().CancelAssetImport(queue.Entries[0].Operation).has_value());
+
+    queue = engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
+    ASSERT_EQ(queue.Entries.size(), 1u);
+    EXPECT_EQ(queue.Entries[0].TerminalStatus,
+              Runtime::RuntimeAssetImportQueueTerminalStatus::Cancelled);
+    EXPECT_FALSE(queue.Entries[0].CanCancel);
+    EXPECT_NE(queue.Entries[0].DiagnosticText.find("Cancelled"),
+              std::string::npos);
+
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+    engine.Run();
+
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 0u);
+
+    engine.Shutdown();
+}
+TEST(SandboxEditorUi, DroppedGeometryAssetReimportReloadsSameAssetWithoutDuplicateEntity)
+{
+    TmpFile meshFile(
+        "runtime_drop_reimport_mesh.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForAssetImportEventApplication>(128u));
+    engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
+
+    const std::vector<std::string> droppedPaths{meshFile.Path.string()};
+    engine.GetAssetImportPipeline().ImportDroppedFilePaths(droppedPaths);
+
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+
+    engine.Run();
+
+    const std::optional<Runtime::RuntimeAssetImportEvent>& droppedEvent =
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
+    ASSERT_TRUE(droppedEvent.has_value());
+    ASSERT_TRUE(droppedEvent->Succeeded());
+    ASSERT_TRUE(droppedEvent->Result.has_value());
+    const Assets::AssetId droppedAsset = droppedEvent->Result->Asset;
+    ASSERT_TRUE(droppedAsset.IsValid());
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+    const auto firstTicket =
+        engine.GetAssetService().GetPayloadTicket(droppedAsset);
+    ASSERT_TRUE(firstTicket.has_value());
+
+    {
+        std::ofstream out(meshFile.Path, std::ios::binary | std::ios::trunc);
+        out << "v 0 0 0\n"
+               "v 1 0 0\n"
+               "v 0 1 0\n"
+               "v 0 0 1\n"
+               "f 1 2 3\n"
+               "f 1 3 4\n";
+    }
+
+    auto reimported = engine.GetAssetImportPipeline().ReimportAsset(Runtime::RuntimeAssetReimportRequest{
+        .Asset = droppedAsset,
+    });
+    ASSERT_TRUE(reimported.has_value()) << static_cast<int>(reimported.error());
+    EXPECT_EQ(reimported->Asset, droppedAsset);
+    EXPECT_EQ(reimported->PayloadKind, Assets::AssetPayloadKind::Mesh);
+    EXPECT_EQ(reimported->PrimitiveEntitiesCreated, 0u);
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+
+    const auto secondTicket =
+        engine.GetAssetService().GetPayloadTicket(droppedAsset);
+    ASSERT_TRUE(secondTicket.has_value());
+    EXPECT_EQ(secondTicket->slot, firstTicket->slot);
+    EXPECT_GT(secondTicket->generation, firstTicket->generation);
+
+    const std::vector<Runtime::RuntimeAssetIngestRecord> records =
+        engine.GetAssetImportPipeline().GetAssetIngestRecordsForTest();
+    ASSERT_EQ(records.size(), 2u);
+    EXPECT_EQ(records[0].Request.Source,
+              Runtime::RuntimeAssetIngestSource::DroppedFile);
+    EXPECT_EQ(records[0].Phase, Runtime::RuntimeAssetIngestPhase::Complete);
+    EXPECT_EQ(records[1].Request.Source,
+              Runtime::RuntimeAssetIngestSource::Reimport);
+    EXPECT_EQ(records[1].Request.ExistingAsset, droppedAsset);
+    EXPECT_EQ(records[1].Phase, Runtime::RuntimeAssetIngestPhase::Complete);
+    EXPECT_EQ(records[1].Diagnostic, Runtime::RuntimeAssetIngestDiagnostic::None);
+
+    const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
+    ASSERT_TRUE(lastEvent.has_value());
+    EXPECT_TRUE(lastEvent->Succeeded());
+    EXPECT_EQ(lastEvent->IngestDiagnostic,
+              Runtime::RuntimeAssetIngestDiagnostic::None);
+    ASSERT_TRUE(lastEvent->Result.has_value());
+    EXPECT_EQ(lastEvent->Result->Asset, droppedAsset);
+
+    engine.Shutdown();
+}
+TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesRenderComponents)
+{
+    TmpFile meshFile(
+        "runtime_platform_drop_mesh.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "vt 0 0\n"
+        "vt 1 0\n"
+        "vt 0 1\n"
+        "f 1/1 2/2 3/3\n");
+
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForAssetImportEventApplication>(128u));
+    engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
+
+    engine.DispatchPlatformEventForTest(Plat::WindowDropEvent{
+        .Paths = {meshFile.Path.string()},
+    });
+
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+
+    engine.Run();
+
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+    const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
+    ASSERT_TRUE(lastEvent.has_value());
+    EXPECT_TRUE(lastEvent->Succeeded());
+    ASSERT_TRUE(lastEvent->Result.has_value());
+    EXPECT_EQ(lastEvent->Result->PayloadKind, Assets::AssetPayloadKind::Mesh);
+
+    const std::optional<ECS::EntityHandle> meshEntity =
+        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(*meshEntity);
+    const auto selectedIds = engine.GetSelectionController().SelectedStableIds();
+    ASSERT_EQ(selectedIds.size(), 1u);
+    EXPECT_EQ(selectedIds[0], stableId);
+
+    Runtime::SandboxEditorContext commandContext =
+        MakeContext(engine.GetScene(), engine.GetSelectionController());
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
+                  commandContext,
+                  Runtime::SandboxEditorPrimitiveViewCommand{
+                      .StableEntityId = stableId,
+                      .SetEdgeView = true,
+                      .EnableEdgeView = true,
+                      .SetVertexView = true,
+                      .EnableVertexView = true,
+                      .SetVertexRenderMode = true,
+                      .VertexRenderMode =
+                          Runtime::MeshVertexViewRenderMode::ImpostorSphere,
+                      .SetVertexPointRadius = true,
+                      .VertexPointRadiusPx = 10.0f,
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+
+    auto& raw = engine.GetScene().Raw();
+    ASSERT_TRUE(raw.all_of<G::RenderEdges>(*meshEntity));
+    ASSERT_TRUE(raw.all_of<G::RenderPoints>(*meshEntity));
+    const G::RenderPoints& points = raw.get<G::RenderPoints>(*meshEntity);
+    EXPECT_EQ(points.Type, G::RenderPoints::RenderType::Sphere);
+    ASSERT_NE(std::get_if<float>(&points.SizeSource), nullptr);
+    EXPECT_FLOAT_EQ(*std::get_if<float>(&points.SizeSource), 10.0f);
+
+    Runtime::RenderExtractionCache extraction;
+    const Runtime::RuntimeRenderExtractionStats stats =
+        extraction.ExtractAndSubmit(engine.GetScene(),
+                                    engine.GetRenderer(),
+                                    &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.MeshGeometryUploads, 1u);
+    EXPECT_EQ(stats.MeshEdgeViewUploads, 1u);
+    EXPECT_EQ(stats.MeshVertexViewUploads, 1u);
+    const auto sidecar = extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(sidecar.has_value());
+    const auto config = engine.GetRenderer()
+                            .GetGpuWorld()
+                            .GetEntityConfigForTest(sidecar->MeshVertexViewInstance);
+    EXPECT_EQ(config.Point.PointMode, 1u);
+    EXPECT_FLOAT_EQ(config.Point.PointSize, 10.0f);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+TEST(SandboxEditorUi, PlatformDropNoUvObjUploadsRawSurfaceBeforeDeferredPostProcess)
+{
+    TmpFile meshFile(
+        "runtime_platform_drop_no_uv_mesh.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForAssetImportEventApplication>(128u));
+    engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
+
+    engine.DispatchPlatformEventForTest(Plat::WindowDropEvent{
+        .Paths = {meshFile.Path.string()},
+    });
+
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+
+    engine.Run();
+
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+    const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
+    ASSERT_TRUE(lastEvent.has_value());
+    EXPECT_TRUE(lastEvent->Succeeded());
+    ASSERT_TRUE(lastEvent->Result.has_value());
+    EXPECT_EQ(lastEvent->Result->PayloadKind, Assets::AssetPayloadKind::Mesh);
+    EXPECT_EQ(lastEvent->Result->PrimitiveEntitiesCreated, 1u);
+
+    const Runtime::RuntimeRenderExtractionStats& stats =
+        engine.GetLastRenderExtractionStats();
+    EXPECT_EQ(stats.CandidateRenderableCount, 1u);
+    EXPECT_EQ(stats.MeshGeometryUploads, 1u);
+    EXPECT_EQ(stats.MeshGeometryMissingTexcoords, 1u);
+    EXPECT_EQ(stats.MeshGeometryNonFiniteTexcoords, 0u);
+    EXPECT_EQ(stats.MeshGeometryFailedPack, 0u);
+    EXPECT_EQ(stats.MeshGeometryInvalidTopology, 0u);
+    EXPECT_GE(engine.GetRenderer().GetGpuWorld().GetLiveGeometryCount(), 1u);
+
+    engine.Shutdown();
+}
+TEST(SandboxEditorUi, DroppedFileImportFailureLogsDiagnostics)
+{
+    const std::filesystem::path missingMeshPath =
+        std::filesystem::temp_directory_path() /
+        "runtime_platform_drop_missing_mesh.obj";
+    std::error_code ec;
+    std::filesystem::remove(missingMeshPath, ec);
+
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForAssetImportEventApplication>(128u));
+    engine.Initialize();
+
+    Core::Log::ClearEntries();
+
+    engine.DispatchPlatformEventForTest(Plat::WindowDropEvent{
+        .Paths = {missingMeshPath.string()},
+    });
+
+    const Core::Log::LogSnapshot queuedLogs = Core::Log::TakeSnapshot();
+    EXPECT_TRUE(LogSnapshotContains(queuedLogs, "File drop received"))
+        << "The platform drop boundary must log receipt before deferred import work completes.";
+    EXPECT_TRUE(LogSnapshotContains(queuedLogs, "Queued dropped geometry import"))
+        << "Dropped geometry imports must log that they were queued off the platform polling path.";
+    EXPECT_FALSE(engine.GetAssetImportPipeline().GetLastAssetImportEvent().has_value());
+
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+
+    engine.Run();
+
+    const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
+    ASSERT_TRUE(lastEvent.has_value());
+    EXPECT_FALSE(lastEvent->Succeeded());
+    EXPECT_EQ(lastEvent->RequestedPayloadKind, Assets::AssetPayloadKind::Mesh);
+    EXPECT_EQ(lastEvent->Error, Core::ErrorCode::FileNotFound);
+
+    const Core::Log::LogSnapshot completedLogs = Core::Log::TakeSnapshot();
+    EXPECT_TRUE(LogSnapshotContains(completedLogs, "Asset import failed"));
+    EXPECT_TRUE(LogSnapshotContains(completedLogs, "FileNotFound"));
+    EXPECT_TRUE(LogSnapshotContains(completedLogs, "Mesh"));
+    EXPECT_TRUE(LogSnapshotContains(completedLogs,
+                                    missingMeshPath.filename().string()));
+
+    engine.Shutdown();
+}
+TEST(SandboxEditorUi, PlatformDropEventImportsOffMesh)
+{
+    TmpFile meshFile(
+        "runtime_platform_drop_mesh.off",
+        "OFF\n"
+        "3 1 3\n"
+        "0 0 0\n"
+        "1 0 0\n"
+        "0 1 0\n"
+        "3 0 1 2\n");
+
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForAssetImportEventApplication>(128u));
+    engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
+
+    engine.DispatchPlatformEventForTest(Plat::WindowDropEvent{
+        .Paths = {meshFile.Path.string()},
+    });
+
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+
+    engine.Run();
+
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+    const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
+    ASSERT_TRUE(lastEvent.has_value());
+    EXPECT_TRUE(lastEvent->Succeeded());
+    ASSERT_TRUE(lastEvent->Result.has_value());
+    EXPECT_EQ(lastEvent->Result->PayloadKind, Assets::AssetPayloadKind::Mesh);
+
+    const std::optional<ECS::EntityHandle> meshEntity =
+        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+    const auto selectedIds = engine.GetSelectionController().SelectedStableIds();
+    ASSERT_EQ(selectedIds.size(), 1u);
+    EXPECT_EQ(selectedIds[0],
+              Runtime::SelectionController::ToStableEntityId(*meshEntity));
+
+    engine.Shutdown();
+}
+TEST(SandboxEditorUi, ConfiguredBackendBornClosedLogsZeroFrameRunDiagnostic)
+{
+    const std::string engineSource =
+        ReadRepositoryTextFile("src/runtime/Runtime.Engine.cpp");
+    ASSERT_FALSE(engineSource.empty());
+    EXPECT_NE(engineSource.find("m_Window && m_Window->ShouldClose()"),
+              std::string::npos);
+    EXPECT_NE(engineSource.find("Platform window initialized closed"),
+              std::string::npos);
+    EXPECT_NE(engineSource.find("Engine::Run() will execute zero frames"),
+              std::string::npos);
+}
+TEST(SandboxEditorUi, PlatformCloseEventStopsEngineRunState)
+{
+    Runtime::Engine engine(HeadlessConfig(), std::make_unique<PassiveApplication>());
+    engine.Initialize();
+
+    ASSERT_TRUE(engine.IsRunning());
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+
+    Core::Log::ClearEntries();
+    engine.DispatchPlatformEventForTest(Plat::WindowCloseEvent{});
+
+    const Core::Log::LogSnapshot closeLogs = Core::Log::TakeSnapshot();
+    EXPECT_TRUE(LogSnapshotContains(closeLogs,
+                                    Core::Log::Level::Info,
+                                    "Window close requested"))
+        << "Sandbox window close must leave an [INFO] close breadcrumb.";
+
+    engine.Run();
+
+    EXPECT_FALSE(engine.IsRunning());
+
+    engine.Shutdown();
+}
+TEST(SandboxEditorUi, RenderRecipeEditorDraftValidationPreviewActivationAndCancel)
+{
+    Graphics::RenderRecipeConfigContext recipeContext =
+        MakeRenderRecipeConfigContext();
+    Runtime::SandboxEditorRenderRecipeEditorState editorState{};
+    Runtime::SandboxEditorContext context = MakeRenderRecipeEditorContext(
+        recipeContext,
+        editorState);
+    const std::string validDocument = ValidSandboxRenderRecipeConfig();
+
+    Runtime::SandboxEditorRenderRecipeCommandResult result =
+        Runtime::ApplySandboxEditorRenderRecipeCommand(
+            context,
+            Runtime::SandboxEditorRenderRecipeCommand{
+                .Kind = Runtime::SandboxEditorRenderRecipeCommandKind::UpdateDraft,
+                .Document = validDocument,
+                .SourceId = "valid-preview.json",
+                .Debounced = true,
+            });
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_EQ(result.Status,
+              Runtime::SandboxEditorRenderRecipeCommandStatus::Debounced);
+    EXPECT_EQ(editorState.DraftState,
+              Runtime::SandboxEditorRenderRecipeDraftState::Debounced);
+    EXPECT_EQ(editorState.DraftRevision, 1u);
+
+    result = Runtime::ApplySandboxEditorRenderRecipeCommand(
+        context,
+        Runtime::SandboxEditorRenderRecipeCommand{
+            .Kind = Runtime::SandboxEditorRenderRecipeCommandKind::ValidateDraft,
+            .Document = "{not valid json",
+            .SourceId = "invalid-preview.json",
+        });
+    EXPECT_FALSE(result.Succeeded());
+    EXPECT_EQ(result.Status,
+              Runtime::SandboxEditorRenderRecipeCommandStatus::ValidationFailed);
+    EXPECT_EQ(editorState.DraftState,
+              Runtime::SandboxEditorRenderRecipeDraftState::Rejected);
+    EXPECT_FALSE(result.RecipeDiagnostics.empty());
+
+    result = Runtime::ApplySandboxEditorRenderRecipeCommand(
+        context,
+        Runtime::SandboxEditorRenderRecipeCommand{
+            .Kind = Runtime::SandboxEditorRenderRecipeCommandKind::PreviewDraft,
+            .Document = std::string{R"json({
+  "schema": ")json"} + std::string{Graphics::kRenderRecipeConfigSchemaId} +
+                        R"json(",
+  "version": 1,
+  "rendererId": ")json" +
+                        std::string{Graphics::kCurrentRendererContractId} +
+                        R"json(",
+  "recipe": {"slots": [{"name": "ray-traced-gi"}]}
+})json",
+            .SourceId = "unsupported-preview.json",
+        });
+    EXPECT_FALSE(result.Succeeded());
+    EXPECT_EQ(result.Status,
+              Runtime::SandboxEditorRenderRecipeCommandStatus::PreviewFailed);
+    EXPECT_EQ(editorState.DraftState,
+              Runtime::SandboxEditorRenderRecipeDraftState::Rejected);
+
+    result = Runtime::ApplySandboxEditorRenderRecipeCommand(
+        context,
+        Runtime::SandboxEditorRenderRecipeCommand{
+            .Kind = Runtime::SandboxEditorRenderRecipeCommandKind::PreviewDraft,
+            .Document = validDocument,
+            .SourceId = "valid-preview.json",
+        });
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_EQ(result.Status,
+              Runtime::SandboxEditorRenderRecipeCommandStatus::Previewed);
+    EXPECT_EQ(editorState.DraftState,
+              Runtime::SandboxEditorRenderRecipeDraftState::Previewed);
+    ASSERT_TRUE(editorState.HasLastPreview);
+    EXPECT_TRUE(Graphics::IsConfigUsable(editorState.LastPreview));
+
+    Runtime::SandboxEditorRenderRecipeEditorModel model =
+        Runtime::BuildSandboxEditorRenderRecipeEditorModel(context);
+    EXPECT_TRUE(model.CanActivate);
+    EXPECT_EQ(model.DraftRecipeId, "current-renderer.user-preview");
+
+    result = Runtime::ApplySandboxEditorRenderRecipeCommand(
+        context,
+        Runtime::SandboxEditorRenderRecipeCommand{
+            .Kind =
+                Runtime::SandboxEditorRenderRecipeCommandKind::ActivatePreview,
+        });
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_EQ(result.Status,
+              Runtime::SandboxEditorRenderRecipeCommandStatus::Activated);
+    EXPECT_EQ(editorState.DraftState,
+              Runtime::SandboxEditorRenderRecipeDraftState::Activated);
+    EXPECT_TRUE(editorState.HasActiveOverride);
+    EXPECT_EQ(editorState.ActiveRevision, 1u);
+
+    model = Runtime::BuildSandboxEditorRenderRecipeEditorModel(context);
+    EXPECT_EQ(model.ActiveRecipeId, "current-renderer.user-preview");
+
+    result = Runtime::ApplySandboxEditorRenderRecipeCommand(
+        context,
+        Runtime::SandboxEditorRenderRecipeCommand{
+            .Kind = Runtime::SandboxEditorRenderRecipeCommandKind::CancelDraft,
+        });
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_EQ(result.Status,
+              Runtime::SandboxEditorRenderRecipeCommandStatus::Canceled);
+    EXPECT_EQ(editorState.DraftState,
+              Runtime::SandboxEditorRenderRecipeDraftState::Canceled);
+    EXPECT_TRUE(editorState.DraftDocument.empty());
+    EXPECT_FALSE(editorState.HasLastPreview);
+
+    model = Runtime::BuildSandboxEditorRenderRecipeEditorModel(context);
+    EXPECT_FALSE(model.CanCancel);
+}
+TEST(SandboxEditorUi, RenderRecipeEditorUnchangedDraftIsNoOp)
+{
+    Graphics::RenderRecipeConfigContext recipeContext =
+        MakeRenderRecipeConfigContext();
+    Runtime::SandboxEditorRenderRecipeEditorState editorState{};
+    Runtime::SandboxEditorContext context = MakeRenderRecipeEditorContext(
+        recipeContext,
+        editorState);
+    const std::string validDocument = ValidSandboxRenderRecipeConfig();
+
+    Runtime::SandboxEditorRenderRecipeCommandResult result =
+        Runtime::ApplySandboxEditorRenderRecipeCommand(
+            context,
+            Runtime::SandboxEditorRenderRecipeCommand{
+                .Kind = Runtime::SandboxEditorRenderRecipeCommandKind::UpdateDraft,
+                .Document = validDocument,
+                .SourceId = "stable-draft.json",
+            });
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_EQ(result.Status,
+              Runtime::SandboxEditorRenderRecipeCommandStatus::DraftUpdated);
+    EXPECT_EQ(editorState.DraftRevision, 1u);
+
+    result = Runtime::ApplySandboxEditorRenderRecipeCommand(
+        context,
+        Runtime::SandboxEditorRenderRecipeCommand{
+            .Kind = Runtime::SandboxEditorRenderRecipeCommandKind::UpdateDraft,
+            .Document = validDocument,
+            .SourceId = "stable-draft.json",
+        });
+    EXPECT_TRUE(result.Succeeded());
+    EXPECT_EQ(result.Status,
+              Runtime::SandboxEditorRenderRecipeCommandStatus::NoChange);
+    EXPECT_EQ(editorState.DraftRevision, 1u);
+}
+TEST(SandboxEditorUi, RenderRecipeEditorArtifactPublishAndApplyUseRegistry)
+{
+    Graphics::RenderRecipeConfigContext recipeContext =
+        MakeRenderRecipeConfigContext();
+    Runtime::SandboxEditorRenderRecipeEditorState editorState{};
+    Runtime::RenderArtifactRegistry artifacts;
+    ASSERT_TRUE(artifacts.RegisterArtifact(
+                            MakeSandboxRenderArtifact("sandbox-candidate"))
+                    .Succeeded());
+    Runtime::SandboxEditorContext context = MakeRenderRecipeEditorContext(
+        recipeContext,
+        editorState,
+        &artifacts);
+
+    Runtime::SandboxEditorRenderRecipeCommandResult result =
+        Runtime::ApplySandboxEditorRenderRecipeCommand(
+            context,
+            Runtime::SandboxEditorRenderRecipeCommand{
+                .Kind =
+                    Runtime::SandboxEditorRenderRecipeCommandKind::PublishArtifact,
+                .ArtifactId = "sandbox-candidate",
+                .Provenance = "sandbox editor test",
+            });
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_EQ(result.Status,
+              Runtime::SandboxEditorRenderRecipeCommandStatus::Published);
+    EXPECT_EQ(result.ArtifactState,
+              Runtime::RenderArtifactPublicationState::Published);
+
+    Runtime::SandboxEditorRenderRecipeEditorModel model =
+        Runtime::BuildSandboxEditorRenderRecipeEditorModel(context);
+    const Runtime::SandboxEditorRenderArtifactRow* artifact =
+        FindRenderArtifactRow(model, "sandbox-candidate");
+    ASSERT_NE(artifact, nullptr);
+    EXPECT_FALSE(artifact->CanPublish);
+    EXPECT_TRUE(artifact->CanApply);
+
+    result = Runtime::ApplySandboxEditorRenderRecipeCommand(
+        context,
+        Runtime::SandboxEditorRenderRecipeCommand{
+            .Kind =
+                Runtime::SandboxEditorRenderRecipeCommandKind::ApplyArtifact,
+            .ArtifactId = "sandbox-candidate",
+            .Provenance = "sandbox editor test",
+            .ProjectTarget = "scene.preview.accepted",
+        });
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_EQ(result.Status,
+              Runtime::SandboxEditorRenderRecipeCommandStatus::Applied);
+    EXPECT_TRUE(result.ProjectMutationAuthorized);
+    EXPECT_EQ(result.ArtifactState,
+              Runtime::RenderArtifactPublicationState::Applied);
+
+    Runtime::SandboxEditorContext missingRegistry =
+        MakeRenderRecipeEditorContext(recipeContext, editorState, nullptr);
+    result = Runtime::ApplySandboxEditorRenderRecipeCommand(
+        missingRegistry,
+        Runtime::SandboxEditorRenderRecipeCommand{
+            .Kind =
+                Runtime::SandboxEditorRenderRecipeCommandKind::PublishArtifact,
+            .ArtifactId = "sandbox-candidate",
+            .Provenance = "sandbox editor test",
+        });
+    EXPECT_FALSE(result.Succeeded());
+    EXPECT_EQ(result.Status,
+              Runtime::SandboxEditorRenderRecipeCommandStatus::MissingArtifactRegistry);
+}

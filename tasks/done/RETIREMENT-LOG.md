@@ -4570,3 +4570,24 @@ TransformSyncSystem contract-test namespace repair retired on 2026-07-14 at
 contract and aggregate test targets compile without changing production code.
 The default CPU-supported CTest gate passed 3,698/3,698, including all nine
 headless Sandbox acceptance tests.
+
+[`ARCH-006`](ARCH-006-sandbox-editor-content-out-of-runtime.md) — Sandbox
+editor ownership migration retired to `tasks/done/` on 2026-07-14 at the
+structural `Retired` endpoint. App-owned `Extrinsic.Sandbox.Editor.Shell` and
+its method, mesh-processing, and domain panel modules now own all Sandbox
+windows, menus, ImGui state, and presentation. The former
+`Extrinsic.Runtime.SandboxEditorUi` module is deleted; generic host, registry,
+and property widgets remain under `src/runtime/Editor`, while the surviving
+engine-facing models, commands, jobs, session wiring, and result records are
+presentation-free `Extrinsic.Runtime.SandboxEditorFacades`. Method and
+render-recipe/artifact bodies compile in separate private implementation
+units. The former 12,254-line runtime contract monolith is split into six
+runtime subject files plus app-linked presentation coverage. The endpoint
+inventory contains 155 focused tests: 132 original suite/name pairs remain
+exact, 15 presentation tests moved or were renamed with their app-owned
+subject, and 8 endpoint contracts cover session lifetime and domain-panel
+registration/cache behavior. The obsolete selected-mesh scalar-plot helper
+regression is intentionally absent. The replayed exact-head build passed
+without diagnostics, the focused editor inventory passed 155/155, the full
+default CPU-supported gate passed 3,706/3,706, and strict structural/docs
+evidence is recorded in the retired task.

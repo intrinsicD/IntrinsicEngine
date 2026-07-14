@@ -60,9 +60,11 @@ unchanged.
 
 ## UI And Agent Parity
 
-`SandboxEditorUi` keeps widget/draft-buffer state only. Its preview and
-activation commands call the same facade callbacks supplied by
-`SandboxEditorUi::Attach(Engine&)`:
+`Extrinsic.Sandbox.Editor.Shell` keeps the ImGui widget and draft-buffer
+state. Its `Runtime::SandboxEditorSession` prepares an attachment-guarded
+`SandboxEditorContext` through
+`Extrinsic.Runtime.SandboxEditorFacades`; the shell's preview and
+activation handlers call the same facade callbacks carried by that context:
 
 - preview routes to
   `Engine::GetConfigControl().PreviewRenderRecipeConfigDocument`;

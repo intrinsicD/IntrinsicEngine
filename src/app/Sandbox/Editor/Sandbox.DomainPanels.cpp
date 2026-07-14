@@ -17,13 +17,15 @@ module;
 
 module Extrinsic.Sandbox.Editor.DomainPanels;
 
+import Extrinsic.Sandbox.Editor.Shell;
+
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorPropertyWidgets;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.ProgressiveRenderData;
-import Extrinsic.Runtime.SandboxEditorUi;
+import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
 
@@ -1468,7 +1470,7 @@ struct DomainPanels::Impl {
     PointCloudOutlierRemoval,
   };
 
-  Runtime::SandboxEditorUi *EditorUi{nullptr};
+  EditorShell *Shell{nullptr};
   std::vector<Runtime::EditorWindowHandle> Handles{};
   int CachedModelFrame{-1};
   std::array<std::optional<Runtime::SandboxEditorDomainWindowModel>, 3u>
@@ -1495,7 +1497,7 @@ struct DomainPanels::Impl {
   bool UvAtlasForceRegenerate{true};
   bool UvAtlasPreserveAuthored{false};
 
-  void Register(Runtime::SandboxEditorUi &editorUi);
+  void Register(EditorShell &editorShell);
   void Unregister();
   void RegisterWindow(std::string id, std::vector<std::string> menuPath,
                       std::string title,
@@ -1510,9 +1512,9 @@ struct DomainPanels::Impl {
                   const char *title);
 };
 
-void DomainPanels::Impl::Register(Runtime::SandboxEditorUi &editorUi) {
+void DomainPanels::Impl::Register(EditorShell &editorShell) {
   Unregister();
-  EditorUi = &editorUi;
+  Shell = &editorShell;
 
   RegisterWindow("pointcloud.appearance", {"PointCloud"}, "Appearance",
                  Runtime::SandboxEditorDomainWindowKind::PointCloud,
@@ -1550,13 +1552,16 @@ void DomainPanels::Impl::Register(Runtime::SandboxEditorUi &editorUi) {
 }
 
 void DomainPanels::Impl::Unregister() {
-  if (EditorUi != nullptr) {
+  if (Shell != nullptr) {
     for (const Runtime::EditorWindowHandle handle : Handles)
-      (void)EditorUi->UnregisterEditorWindow(handle);
+      (void)Shell->UnregisterEditorWindow(handle);
   }
   Handles.clear();
-  EditorUi = nullptr;
+  Shell = nullptr;
   ResetModelCache();
+  LastPointCloudOutlierRemovalResult.reset();
+  LastUvRegenerationResult.reset();
+  MeshPropertyPlotState.SelectedProperty.clear();
 }
 
 void DomainPanels::Impl::RegisterWindow(
@@ -1571,7 +1576,7 @@ void DomainPanels::Impl::RegisterWindow(
                                        : title);
 
   Handles.push_back(
-      EditorUi->RegisterEditorWindow(Runtime::SandboxEditorWindowDescriptor{
+      Shell->RegisterEditorWindow(EditorWindowDescriptor{
           .Id = std::move(id),
           .MenuPath = std::move(menuPath),
           .Title = std::move(title),
@@ -1680,8 +1685,8 @@ DomainPanels::DomainPanels() : m_Impl(std::make_unique<Impl>()) {}
 
 DomainPanels::~DomainPanels() { m_Impl->Unregister(); }
 
-void DomainPanels::Register(Runtime::SandboxEditorUi &editorUi) {
-  m_Impl->Register(editorUi);
+void DomainPanels::Register(EditorShell &editorShell) {
+  m_Impl->Register(editorShell);
 }
 
 void DomainPanels::Unregister() { m_Impl->Unregister(); }

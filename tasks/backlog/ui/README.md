@@ -36,7 +36,7 @@ retired under the runtime backlog as `RUNTIME-135`.
   lifecycle, one input-capture snapshot, a global UI toggle, and generic
   scalar-property plot widgets.
 - RORG-031F is retired as the Theme F planning seed that kept the promoted
-  `SandboxEditorUi` inventory and deferred-workflow trigger list aligned while
+  Sandbox editor inventory and deferred-workflow trigger list aligned while
   concrete UI children were opening and retiring independently.
 - UI-027 (retired) was the paired editor command/UI for the `GEOM-016`
   point-cloud outlier-removal operators under **Theme F**, continuing the
@@ -97,7 +97,7 @@ retired under the runtime backlog as `RUNTIME-135`.
   `Frame Graph` diagnostics panel against current `RenderGraphFrameStats`:
   compile/execute counts, queue/timeline stats, command pass statuses,
   diagnostics, and the compiler debug dump are copied through a runtime-owned
-  data model and rendered from the attached `SandboxEditorUi`.
+  data model and rendered from the app-owned `EditorShell`.
 - UI-007 is a retired promoted EditorUI follow-up that exposes drag/drop import
   status and payload hints while runtime/platform own events, decoding,
   `AssetService`, and ECS materialization.
@@ -137,7 +137,7 @@ retired under the runtime backlog as `RUNTIME-135`.
   vertices and graph nodes use point-lane uniform colors independently of edge
   and surface visualization.
 - UI-021 retired the migration that removed the remaining UI-local
-  availability policy from `Runtime.SandboxEditorUi`: domain windows,
+  availability policy from the Sandbox editor presentation: domain windows,
   visualization controls, property catalogs, and processing affordances now
   consume the runtime resolver from `RUNTIME-117`, while preserving provenance
   labels for mesh/graph/point-cloud origins.

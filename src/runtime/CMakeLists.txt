@@ -67,7 +67,7 @@ target_sources(${target_name}
         Runtime.SceneSerialization.cppm
         Cameras/Runtime.CameraControllers.cppm
         Cameras/Runtime.CameraFocusCommand.cppm
-        Editor/Runtime.SandboxEditorUi.cppm
+        Runtime.SandboxEditorFacades.cppm
         Gizmos/Runtime.GizmoFrameService.cppm
         Gizmos/Runtime.GizmoInteraction.cppm
         ImGui/Runtime.ImGuiAdapter.cppm
@@ -150,8 +150,9 @@ target_sources(${target_name}
         Runtime.SceneSerialization.cpp
         Cameras/Runtime.CameraControllers.cpp
         Cameras/Runtime.CameraFocusCommand.cpp
-        Editor/Runtime.SandboxMethodFacade.cpp
-        Editor/Runtime.SandboxEditorUi.cpp
+        Runtime.SandboxMethodFacade.cpp
+        Runtime.SandboxEditorRenderRecipeFacade.cpp
+        Runtime.SandboxEditorFacades.cpp
         Gizmos/Runtime.GizmoFrameService.cpp
         Gizmos/Runtime.GizmoInteraction.cpp
         ImGui/Runtime.ImGuiAdapter.cpp

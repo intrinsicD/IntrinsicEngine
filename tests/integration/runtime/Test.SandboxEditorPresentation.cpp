@@ -1,0 +1,792 @@
+// ARCH-006 Slice 5 app-owned editor presentation and composition coverage.
+#include <algorithm>
+#include <array>
+#include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include <gtest/gtest.h>
+#include <imgui.h>
+#include <imgui_internal.h>
+
+import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.Window;
+import Extrinsic.Core.Error;
+import Extrinsic.Platform.Input;
+import Extrinsic.Platform.Window;
+import Extrinsic.Runtime.AssetImportPipeline;
+import Extrinsic.Runtime.EditorWindowRegistry;
+import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.SandboxDefaultPolicies;
+import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Sandbox.Editor.Controller;
+import Extrinsic.Sandbox.Editor.DomainPanels;
+import Extrinsic.Sandbox.Editor.MeshProcessingPanels;
+import Extrinsic.Sandbox.Editor.MethodPanels;
+import Extrinsic.Sandbox.Editor.Shell;
+
+namespace Core = Extrinsic::Core;
+namespace Plat = Extrinsic::Platform;
+namespace Runtime = Extrinsic::Runtime;
+namespace SandboxEditor = Extrinsic::Sandbox::Editor;
+
+namespace
+{
+    class OneFrameApplication final : public Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            engine.RequestExit();
+        }
+        void OnShutdown(Runtime::Engine&) override {}
+    };
+
+    class WaitForAssetImportEventApplication final : public Runtime::IApplication
+    {
+    public:
+        explicit WaitForAssetImportEventApplication(const std::uint32_t maxFrames)
+            : m_MaxFrames(maxFrames)
+        {
+        }
+
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            ++m_ObservedFrames;
+            if (engine.GetAssetImportPipeline().GetLastAssetImportEvent().has_value() ||
+                m_ObservedFrames >= m_MaxFrames)
+            {
+                engine.RequestExit();
+            }
+        }
+        void OnShutdown(Runtime::Engine&) override {}
+
+    private:
+        std::uint32_t m_MaxFrames{1u};
+        std::uint32_t m_ObservedFrames{0u};
+    };
+
+    struct TmpFile
+    {
+        std::filesystem::path Path;
+
+        TmpFile(const std::string_view name, const std::string_view contents)
+            : Path(std::filesystem::temp_directory_path() / std::string{name})
+        {
+            std::ofstream output{Path};
+            output << contents;
+        }
+
+        ~TmpFile()
+        {
+            std::error_code error;
+            std::filesystem::remove(Path, error);
+        }
+    };
+
+    class ToggleEditorVisibilityApplication final : public Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            const Plat::IWindow& window = engine.GetWindow();
+            auto& input = const_cast<Plat::Input::Context&>(window.GetInput());
+            input.SetKeyState(Plat::Input::Key::G, true);
+            engine.RequestExit();
+        }
+        void OnShutdown(Runtime::Engine&) override {}
+    };
+
+    [[nodiscard]] Core::Config::EngineConfig HeadlessConfig()
+    {
+        Core::Config::EngineConfig config{};
+        config.ReferenceScene.Enabled = false;
+        config.Camera.Enabled = false;
+        config.Window.Backend = Core::Config::WindowBackend::Null;
+        return config;
+    }
+
+    [[nodiscard]] std::string ReadRepositoryTextFile(
+        const std::filesystem::path& relativePath)
+    {
+        const std::filesystem::path path =
+            std::filesystem::path{ENGINE_ROOT_DIR} / relativePath;
+        std::ifstream file{path};
+        if (!file)
+            return {};
+        return std::string{std::istreambuf_iterator<char>{file},
+                           std::istreambuf_iterator<char>{}};
+    }
+
+    [[nodiscard]] bool ImGuiWindowExists(const std::string_view name)
+    {
+        const ImGuiContext* context = ImGui::GetCurrentContext();
+        if (context == nullptr)
+            return false;
+
+        for (const ImGuiWindow* window : context->Windows)
+        {
+            if (window != nullptr && std::string_view{window->Name} == name)
+                return true;
+        }
+        return false;
+    }
+
+    [[nodiscard]] bool HasDiagnostic(
+        const std::vector<Runtime::SandboxEditorDiagnostic>& diagnostics,
+        const Runtime::SandboxEditorDiagnosticCode code)
+    {
+        return std::ranges::any_of(
+            diagnostics,
+            [code](const Runtime::SandboxEditorDiagnostic& diagnostic)
+            {
+                return diagnostic.Code == code;
+            });
+    }
+
+    [[nodiscard]] const Runtime::EditorWindowMenuEntry* FindWindow(
+        const std::vector<Runtime::EditorWindowMenuEntry>& menu,
+        const std::string_view id)
+    {
+        const auto found = std::ranges::find_if(
+            menu,
+            [id](const Runtime::EditorWindowMenuEntry& entry)
+            {
+                return entry.Id == id;
+            });
+        return found == menu.end() ? nullptr : &*found;
+    }
+
+    void RegisterAllAppPanels(
+        SandboxEditor::EditorShell& shell,
+        SandboxEditor::MethodPanels& methodPanels,
+        SandboxEditor::MeshProcessingPanels& meshProcessingPanels,
+        SandboxEditor::DomainPanels& domainPanels)
+    {
+        methodPanels.Register(shell);
+        meshProcessingPanels.Register(shell);
+        domainPanels.Register(shell);
+    }
+}
+
+TEST(SandboxEditorPresentation, DefaultDrawStartsWithOnlyMenuBarVisible)
+{
+    Runtime::Engine engine(
+        HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+
+    SandboxEditor::EditorShell shell;
+    SandboxEditor::MethodPanels methodPanels;
+    SandboxEditor::MeshProcessingPanels meshProcessingPanels;
+    SandboxEditor::DomainPanels domainPanels;
+    RegisterAllAppPanels(shell, methodPanels, meshProcessingPanels, domainPanels);
+    shell.Attach(engine);
+
+    engine.Run();
+
+    EXPECT_TRUE(ImGuiWindowExists("##MainMenuBar"));
+    const auto menu = shell.BuildEditorWindowMenuModel();
+    ASSERT_EQ(menu.size(), 34u);
+    for (const Runtime::EditorWindowMenuEntry& entry : menu)
+    {
+        EXPECT_FALSE(entry.Open) << entry.Id;
+        EXPECT_FALSE(ImGuiWindowExists(entry.Title)) << entry.Id;
+    }
+
+    shell.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWindows)
+{
+    struct ExpectedWindow
+    {
+        std::string_view Id;
+        std::vector<std::string> MenuPath;
+    };
+    const std::array<ExpectedWindow, 24> expected{{
+        {"pointcloud.appearance", {"PointCloud"}},
+        {"pointcloud.properties", {"PointCloud"}},
+        {"pointcloud.selection", {"PointCloud"}},
+        {"pointcloud.processing.remove_outliers", {"PointCloud", "Processing"}},
+        {"graph.appearance", {"Graph"}},
+        {"graph.properties", {"Graph"}},
+        {"graph.selection", {"Graph"}},
+        {"mesh.appearance", {"Mesh"}},
+        {"mesh.properties", {"Mesh"}},
+        {"mesh.selection", {"Mesh"}},
+        {"pointcloud.processing.kmeans", {"PointCloud", "Processing"}},
+        {"graph.processing.kmeans", {"Graph", "Processing"}},
+        {"mesh.processing.kmeans", {"Mesh", "Processing"}},
+        {"pointcloud.processing.progressive_poisson", {"PointCloud", "Processing"}},
+        {"mesh.processing.progressive_poisson", {"Mesh", "Processing"}},
+        {"mesh.processing.denoise", {"Mesh", "Processing"}},
+        {"mesh.processing.curvature", {"Mesh", "Processing"}},
+        {"mesh.processing.remesh", {"Mesh", "Processing"}},
+        {"mesh.processing.subdivide", {"Mesh", "Processing"}},
+        {"mesh.processing.simplify", {"Mesh", "Processing"}},
+        {"mesh.processing.vertices.normals", {"Mesh", "Processing", "Vertices"}},
+        {"graph.processing.vertices.normals", {"Graph", "Processing", "Vertices"}},
+        {"pointcloud.processing.vertices.normals", {"PointCloud", "Processing", "Vertices"}},
+        {"view.registration", {"View"}},
+    }};
+
+    SandboxEditor::EditorShell shell;
+    SandboxEditor::MethodPanels methodPanels;
+    SandboxEditor::MeshProcessingPanels meshProcessingPanels;
+    SandboxEditor::DomainPanels domainPanels;
+    RegisterAllAppPanels(shell, methodPanels, meshProcessingPanels, domainPanels);
+
+    const auto menu = shell.BuildEditorWindowMenuModel();
+    ASSERT_EQ(menu.size(), expected.size() + 10u);
+    for (const ExpectedWindow& expectedWindow : expected)
+    {
+        const Runtime::EditorWindowMenuEntry* entry =
+            FindWindow(menu, expectedWindow.Id);
+        ASSERT_NE(entry, nullptr) << expectedWindow.Id;
+        EXPECT_EQ(entry->MenuPath, expectedWindow.MenuPath)
+            << expectedWindow.Id;
+        EXPECT_FALSE(entry->Open) << expectedWindow.Id;
+    }
+}
+
+TEST(SandboxEditorPresentation, DomainPanelsPreserveLifetimeCacheAndResultPublication)
+{
+    const std::string source = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp");
+    ASSERT_FALSE(source.empty());
+
+    for (const std::string_view required :
+         {"DomainPanels::~DomainPanels()",
+          "m_Impl->Unregister();",
+          "Shell->UnregisterEditorWindow(handle)",
+          "Handles.clear();",
+          "Shell = nullptr;",
+          "CachedModelFrame != frame",
+          "CachedDomainModels",
+          "DomainWindowModelCacheHits",
+          "ApplySandboxEditorPointCloudOutlierRemovalCommand",
+          "ApplySandboxEditorUvRegenerationCommand",
+          "context.LastUvRegenerationResult",
+          "LastPointCloudOutlierRemovalResult.reset();",
+          "LastUvRegenerationResult.reset();",
+          "MeshPropertyPlotState.SelectedProperty.clear();",
+          "ImGuiCond_FirstUseEver"})
+    {
+        EXPECT_NE(source.find(required), std::string::npos) << required;
+    }
+}
+
+TEST(SandboxEditorPresentation, MeshProcessingPanelsPreserveLifetimeAndResultPublication)
+{
+    const std::string source = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp");
+    ASSERT_FALSE(source.empty());
+
+    constexpr std::array<std::string_view, 9> commands{{
+        "ApplySandboxEditorMeshDenoiseCommand",
+        "ApplySandboxEditorMeshCurvatureCommand",
+        "ApplySandboxEditorMeshRemeshCommand",
+        "ApplySandboxEditorMeshSubdivideCommand",
+        "ApplySandboxEditorMeshSimplifyCommand",
+        "ApplySandboxEditorMeshVertexNormalsCommand",
+        "ApplySandboxEditorGraphVertexNormalsCommand",
+        "ApplySandboxEditorPointCloudVertexNormalsCommand",
+        "ApplySandboxEditorRegistrationCommand",
+    }};
+    constexpr std::array<std::string_view, 9> sinks{{
+        "context.MethodResultSinks.MeshDenoise",
+        "context.MethodResultSinks.MeshCurvature",
+        "context.MethodResultSinks.MeshRemesh",
+        "context.MethodResultSinks.MeshSubdivide",
+        "context.MethodResultSinks.MeshSimplify",
+        "context.MethodResultSinks.MeshVertexNormals",
+        "context.MethodResultSinks.GraphVertexNormals",
+        "context.MethodResultSinks.PointCloudVertexNormals",
+        "context.MethodResultSinks.Registration",
+    }};
+    for (const std::string_view required : commands)
+        EXPECT_NE(source.find(required), std::string::npos) << required;
+    for (const std::string_view required : sinks)
+        EXPECT_NE(source.find(required), std::string::npos) << required;
+
+    EXPECT_NE(source.find("MeshProcessingPanels::~MeshProcessingPanels()"),
+              std::string::npos);
+    EXPECT_NE(source.find("m_Impl->Unregister()"), std::string::npos);
+    EXPECT_NE(source.find("Shell->UnregisterEditorWindow(handle)"),
+              std::string::npos);
+    EXPECT_NE(source.find("Handles.clear()"), std::string::npos);
+    EXPECT_NE(source.find("Shell = nullptr"), std::string::npos);
+}
+
+TEST(SandboxEditorPresentation, ExtrinsicSandboxAppStaysRuntimeOnly)
+{
+    constexpr std::array<std::string_view, 13> paths{{
+        "src/app/Sandbox/Sandbox.cppm",
+        "src/app/Sandbox/Sandbox.cpp",
+        "src/app/Sandbox/main.cpp",
+        "src/app/Sandbox/Editor/Sandbox.EditorController.cppm",
+        "src/app/Sandbox/Editor/Sandbox.EditorController.cpp",
+        "src/app/Sandbox/Editor/Sandbox.EditorShell.cppm",
+        "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp",
+        "src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm",
+        "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp",
+        "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cppm",
+        "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp",
+        "src/app/Sandbox/Editor/Sandbox.DomainPanels.cppm",
+        "src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp",
+    }};
+    for (const std::string_view path : paths)
+    {
+        const std::string source = ReadRepositoryTextFile(path);
+        ASSERT_FALSE(source.empty()) << path;
+        for (const std::string_view forbidden :
+             {"import Extrinsic.Asset",
+              "import Extrinsic.Core",
+              "import Extrinsic.ECS",
+              "import Extrinsic.Graphics",
+              "import Extrinsic.Platform",
+              "import Extrinsic.RHI",
+              "import Extrinsic.Backends",
+              "import Geometry."})
+        {
+            EXPECT_EQ(source.find(forbidden), std::string::npos)
+                << path << ": " << forbidden;
+        }
+    }
+
+    const std::string controller = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.EditorController.cpp");
+    const std::string shell = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp");
+    const std::string cmake =
+        ReadRepositoryTextFile("src/app/Sandbox/CMakeLists.txt");
+    EXPECT_NE(controller.find("import Extrinsic.Sandbox.Editor.Shell;"),
+              std::string::npos);
+    EXPECT_EQ(controller.find("import Extrinsic.Runtime.SandboxEditorFacades;"),
+              std::string::npos);
+    EXPECT_NE(shell.find("import Extrinsic.Runtime.SandboxEditorFacades;"),
+              std::string::npos);
+    EXPECT_NE(cmake.find("target_link_libraries(ExtrinsicSandboxEditor"),
+              std::string::npos);
+    EXPECT_NE(cmake.find("ExtrinsicRuntime"), std::string::npos);
+    EXPECT_EQ(cmake.find("ExtrinsicGraphics"), std::string::npos);
+    EXPECT_EQ(cmake.find("ExtrinsicPlatform"), std::string::npos);
+    EXPECT_EQ(cmake.find("ExtrinsicRHI"), std::string::npos);
+}
+
+TEST(SandboxEditorPresentation, RuntimeFacadesCompileSeparatelyFromEditorShell)
+{
+    const std::string appShell = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp");
+    const std::string runtimeFacade = ReadRepositoryTextFile(
+        "src/runtime/Runtime.SandboxEditorFacades.cpp");
+    const std::string methodFacade = ReadRepositoryTextFile(
+        "src/runtime/Runtime.SandboxMethodFacade.cpp");
+    const std::string renderRecipeFacade = ReadRepositoryTextFile(
+        "src/runtime/Runtime.SandboxEditorRenderRecipeFacade.cpp");
+    const std::string runtimeCMake =
+        ReadRepositoryTextFile("src/runtime/CMakeLists.txt");
+    ASSERT_FALSE(appShell.empty());
+    ASSERT_FALSE(runtimeFacade.empty());
+    ASSERT_FALSE(methodFacade.empty());
+    ASSERT_FALSE(renderRecipeFacade.empty());
+
+    constexpr std::string_view kMeansDefinition =
+        "SandboxEditorKMeansResult ApplySandboxEditorKMeansCommand(";
+    constexpr std::string_view poissonDefinition =
+        "ApplySandboxEditorProgressivePoissonCommand(";
+    constexpr std::string_view renderRecipeDefinition =
+        "SandboxEditorRenderRecipeEditorModel\n"
+        "    BuildSandboxEditorRenderRecipeEditorModel(";
+    constexpr std::string_view renderRecipeCommand =
+        "SandboxEditorRenderRecipeCommandResult\n"
+        "    ApplySandboxEditorRenderRecipeCommand(";
+    EXPECT_NE(appShell.find("#include <imgui.h>"), std::string::npos);
+    EXPECT_NE(appShell.find("DrawMainMenuBar("), std::string::npos);
+    EXPECT_EQ(runtimeFacade.find("#include <imgui.h>"), std::string::npos);
+    EXPECT_EQ(runtimeFacade.find("ImGui::"), std::string::npos);
+    EXPECT_EQ(runtimeFacade.find(kMeansDefinition), std::string::npos);
+    EXPECT_EQ(runtimeFacade.find(renderRecipeDefinition), std::string::npos);
+    EXPECT_EQ(runtimeFacade.find(renderRecipeCommand), std::string::npos);
+    EXPECT_NE(methodFacade.find(kMeansDefinition), std::string::npos);
+    EXPECT_NE(methodFacade.find(poissonDefinition), std::string::npos);
+    EXPECT_NE(renderRecipeFacade.find(renderRecipeDefinition), std::string::npos);
+    EXPECT_NE(renderRecipeFacade.find(renderRecipeCommand), std::string::npos);
+    EXPECT_NE(runtimeCMake.find("Runtime.SandboxMethodFacade.cpp"),
+              std::string::npos);
+    EXPECT_NE(runtimeCMake.find("Runtime.SandboxEditorRenderRecipeFacade.cpp"),
+              std::string::npos);
+    EXPECT_NE(methodFacade.find("epoch->load"), std::string::npos);
+    EXPECT_NE(methodFacade.find("HasInFlightJob()"), std::string::npos);
+    EXPECT_NE(methodFacade.find("m_KMeansGpuJobs.reset()"),
+              std::string::npos);
+}
+
+TEST(SandboxEditorPresentation, GeometryProcessingMenusExposeDomainElementSubmenus)
+{
+    using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
+
+    const auto mesh = Runtime::GetSandboxEditorGeometryProcessingMenuItems(
+        Runtime::SandboxEditorDomainWindowKind::Mesh);
+    ASSERT_EQ(mesh.size(), 3u);
+    EXPECT_EQ(mesh[0].Domain, Domain::MeshVertices);
+    EXPECT_STREQ(mesh[0].Label, "Vertices");
+    EXPECT_TRUE(mesh[0].HasNormalsMethod);
+    EXPECT_TRUE(mesh[0].HasDenoiseMethod);
+    EXPECT_TRUE(mesh[0].HasCurvatureMethod);
+    EXPECT_TRUE(mesh[0].HasRemeshMethod);
+    EXPECT_TRUE(mesh[0].HasSubdivideMethod);
+    EXPECT_TRUE(mesh[0].HasSimplifyMethod);
+    EXPECT_EQ(mesh[1].Domain, Domain::MeshEdges);
+    EXPECT_STREQ(mesh[1].Label, "Edges");
+    EXPECT_FALSE(mesh[1].HasNormalsMethod);
+    EXPECT_EQ(mesh[2].Domain, Domain::MeshFaces);
+    EXPECT_STREQ(mesh[2].Label, "Faces");
+    EXPECT_FALSE(mesh[2].HasNormalsMethod);
+
+    const auto graph = Runtime::GetSandboxEditorGeometryProcessingMenuItems(
+        Runtime::SandboxEditorDomainWindowKind::Graph);
+    ASSERT_EQ(graph.size(), 3u);
+    EXPECT_EQ(graph[0].Domain, Domain::GraphVertices);
+    EXPECT_STREQ(graph[0].Label, "Vertices");
+    EXPECT_TRUE(graph[0].HasNormalsMethod);
+    EXPECT_EQ(graph[1].Domain, Domain::GraphEdges);
+    EXPECT_STREQ(graph[1].Label, "Edges");
+    EXPECT_EQ(graph[2].Domain, Domain::GraphHalfedges);
+    EXPECT_STREQ(graph[2].Label, "Halfedges");
+
+    const auto cloud = Runtime::GetSandboxEditorGeometryProcessingMenuItems(
+        Runtime::SandboxEditorDomainWindowKind::PointCloud);
+    ASSERT_EQ(cloud.size(), 1u);
+    EXPECT_EQ(cloud[0].Domain, Domain::PointCloudPoints);
+    EXPECT_STREQ(cloud[0].Label, "Vertices");
+    EXPECT_TRUE(cloud[0].HasNormalsMethod);
+}
+
+TEST(SandboxEditorPresentation, AdapterCallbackDrawsDeterministicMenuOnlyFrame)
+{
+    Runtime::Engine engine(
+        HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+    SandboxEditor::EditorShell shell;
+    shell.Attach(engine);
+
+    engine.Run();
+
+    const auto& diagnostics = engine.GetImGuiAdapter().GetDiagnostics();
+    EXPECT_GE(diagnostics.EditorCallbackInvocations, 1u);
+    EXPECT_GE(diagnostics.FramesProduced, 1u);
+    EXPECT_GE(diagnostics.LastDrawListCount, 1u);
+    EXPECT_TRUE(ImGuiWindowExists("##MainMenuBar"));
+    EXPECT_TRUE(shell.GetLastFrame().FileImport.Enabled);
+
+    shell.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorPresentation, RuntimeImportEventIsReflectedByAppFilePanel)
+{
+    Runtime::Engine engine(
+        HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+    SandboxEditor::EditorShell shell;
+    shell.Attach(engine);
+
+    const auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(
+        Runtime::RuntimeAssetImportRequest{
+            .Path = "/tmp/intrinsic-arch-006-missing.ply",
+            .PayloadKind =
+                Runtime::SandboxEditorAssetPayloadKind::PointCloud,
+        });
+    ASSERT_FALSE(imported.has_value());
+    EXPECT_EQ(imported.error(), Core::ErrorCode::FileNotFound);
+
+    engine.Run();
+
+    ASSERT_TRUE(shell.GetLastFrame().FileImport.LastResult.has_value());
+    EXPECT_FALSE(shell.GetLastFrame().FileImport.LastResult->Succeeded());
+    EXPECT_EQ(shell.GetLastFrame().FileImport.LastResult->PayloadKind,
+              Runtime::SandboxEditorAssetPayloadKind::PointCloud);
+    EXPECT_TRUE(HasDiagnostic(
+        shell.GetLastFrame().FileImport.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::AssetImportFailed));
+
+    shell.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacade)
+{
+    TmpFile cloudFile(
+        "runtime_dragdrop_event_cloud.ply",
+        "ply\n"
+        "format ascii 1.0\n"
+        "element vertex 3\n"
+        "property float x\n"
+        "property float y\n"
+        "property float z\n"
+        "end_header\n"
+        "0 0 0\n"
+        "1 0 0\n"
+        "2 0 0\n");
+
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForAssetImportEventApplication>(128u));
+    engine.Initialize();
+    (void)Runtime::RegisterSandboxDefaultRuntimePolicies(engine);
+
+    SandboxEditor::EditorShell shell;
+    shell.Attach(engine);
+
+    const std::vector<std::string> droppedPaths{cloudFile.Path.string()};
+    engine.GetAssetImportPipeline().ImportDroppedFilePaths(droppedPaths);
+    EXPECT_FALSE(engine.GetAssetImportPipeline().GetLastAssetImportEvent().has_value());
+    ASSERT_FALSE(engine.GetWindow().ShouldClose());
+
+    engine.Run();
+
+    const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
+    ASSERT_TRUE(lastEvent.has_value());
+    EXPECT_TRUE(lastEvent->Succeeded());
+    ASSERT_TRUE(lastEvent->Result.has_value());
+    EXPECT_EQ(lastEvent->Result->PayloadKind,
+              Runtime::SandboxEditorAssetPayloadKind::PointCloud);
+    EXPECT_EQ(lastEvent->Result->PrimitiveEntitiesCreated, 1u);
+
+    ASSERT_TRUE(shell.GetLastFrame().FileImport.LastResult.has_value());
+    EXPECT_TRUE(shell.GetLastFrame().FileImport.LastResult->Succeeded());
+    EXPECT_EQ(shell.GetLastFrame().FileImport.LastResult->PayloadKind,
+              Runtime::SandboxEditorAssetPayloadKind::PointCloud);
+    EXPECT_FALSE(HasDiagnostic(
+        shell.GetLastFrame().FileImport.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::AssetImportFailed));
+
+    shell.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorPresentation, EngineAttachmentRegistersEditorCallback)
+{
+    Runtime::Engine engine(
+        HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+    SandboxEditor::EditorShell shell;
+    shell.Attach(engine);
+    EXPECT_TRUE(shell.IsAttached());
+
+    engine.Run();
+
+    EXPECT_GE(engine.GetImGuiAdapter().GetDiagnostics().EditorCallbackInvocations,
+              1u);
+    EXPECT_TRUE(shell.GetLastFrame().FileImport.Enabled);
+    EXPECT_FALSE(HasDiagnostic(
+        shell.GetLastFrame().FileImport.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::AssetImportUnavailable));
+
+    shell.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorPresentation, ControllerReattachPinsPanelAttachmentResetPolicy)
+{
+    SandboxEditor::SandboxEditorController controller;
+
+    Runtime::Engine firstEngine(
+        HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    firstEngine.Initialize();
+    controller.Attach(firstEngine);
+    ASSERT_TRUE(controller.IsAttached());
+    firstEngine.Run();
+    controller.Detach();
+    EXPECT_FALSE(controller.IsAttached());
+    firstEngine.Shutdown();
+
+    Runtime::Engine secondEngine(
+        HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    secondEngine.Initialize();
+    controller.Attach(secondEngine);
+    ASSERT_TRUE(controller.IsAttached());
+    secondEngine.Run();
+    controller.Detach();
+    EXPECT_FALSE(controller.IsAttached());
+    secondEngine.Shutdown();
+
+    const std::string methodPanels = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp");
+    const std::string meshPanels = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp");
+    const std::string domainPanels = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp");
+    EXPECT_NE(methodPanels.find("KMeans.LastResult.reset();"),
+              std::string::npos);
+    EXPECT_NE(methodPanels.find("ProgressivePoisson.LastResult.reset();"),
+              std::string::npos);
+    EXPECT_NE(methodPanels.find("ProgressivePoisson.LastConfigResult.reset();"),
+              std::string::npos);
+    EXPECT_NE(methodPanels.find("ProgressivePoisson.AutoRunPending = false;"),
+              std::string::npos);
+    EXPECT_NE(methodPanels.find("ProgressivePoisson.LastEditTime = 0.0;"),
+              std::string::npos);
+    EXPECT_NE(methodPanels.find("PendingStableEntityId = 0u;"),
+              std::string::npos);
+    EXPECT_NE(meshPanels.find("Denoise.LastResult.reset();"),
+              std::string::npos);
+    EXPECT_NE(meshPanels.find("Curvature.LastResult.reset();"),
+              std::string::npos);
+    EXPECT_NE(meshPanels.find("Remesh.LastResult.reset();"),
+              std::string::npos);
+    EXPECT_NE(meshPanels.find("Subdivide.LastResult.reset();"),
+              std::string::npos);
+    EXPECT_NE(meshPanels.find("Simplify.LastResult.reset();"),
+              std::string::npos);
+    EXPECT_NE(meshPanels.find("MeshNormals.LastResult.reset();"),
+              std::string::npos);
+    EXPECT_NE(meshPanels.find("GraphNormals.LastResult.reset();"),
+              std::string::npos);
+    EXPECT_NE(meshPanels.find("Registration.LastResult.reset();"),
+              std::string::npos);
+    EXPECT_NE(meshPanels.find("PointNormals.LastResult.reset();"),
+              std::string::npos);
+    EXPECT_NE(domainPanels.find(
+                  "LastPointCloudOutlierRemovalResult.reset();"),
+              std::string::npos);
+    EXPECT_NE(domainPanels.find("LastUvRegenerationResult.reset();"),
+              std::string::npos);
+    EXPECT_NE(domainPanels.find(
+                  "MeshPropertyPlotState.SelectedProperty.clear();"),
+              std::string::npos);
+}
+
+TEST(SandboxEditorPresentation, EditorShellStartsWithOnlyBuiltinWindows)
+{
+    SandboxEditor::EditorShell shell;
+    const auto menu = shell.BuildEditorWindowMenuModel();
+    ASSERT_EQ(menu.size(), 10u);
+    for (const std::string_view id :
+         {"sandbox.shell",
+          "scene.hierarchy",
+          "scene.inspector",
+          "scene.selection",
+          "file.scene",
+          "file.import",
+          "view.frame_graph",
+          "view.render_recipes",
+          "view.camera_render",
+          "view.geometry_visualization"})
+    {
+        EXPECT_NE(FindWindow(menu, id), nullptr) << id;
+    }
+    EXPECT_EQ(FindWindow(menu, "mesh.appearance"), nullptr);
+    EXPECT_EQ(FindWindow(menu, "pointcloud.processing.kmeans"), nullptr);
+}
+
+TEST(SandboxEditorPresentation, ExternalWindowContributionNeedsNoLegacySwitchEntry)
+{
+    SandboxEditor::EditorShell shell;
+    int drawCalls = 0;
+    const Runtime::EditorWindowHandle handle = shell.RegisterEditorWindow(
+        SandboxEditor::EditorWindowDescriptor{
+            .Id = "graph.analysis.curvature",
+            .MenuPath = {"Graph", "Analysis"},
+            .Title = "Curvature",
+            .OpenByDefault = false,
+            .Draw =
+                [&drawCalls](bool&, const Runtime::SandboxEditorContext&)
+                {
+                    ++drawCalls;
+                },
+        });
+    ASSERT_TRUE(handle.IsValid());
+
+    const auto menu = shell.BuildEditorWindowMenuModel();
+    ASSERT_EQ(menu.size(), 11u);
+    const Runtime::EditorWindowMenuEntry* contributed =
+        FindWindow(menu, "graph.analysis.curvature");
+    ASSERT_NE(contributed, nullptr);
+    EXPECT_EQ(contributed->MenuPath,
+              (std::vector<std::string>{"Graph", "Analysis"}));
+    EXPECT_EQ(drawCalls, 0);
+
+    EXPECT_TRUE(shell.UnregisterEditorWindow(handle));
+    EXPECT_EQ(shell.BuildEditorWindowMenuModel().size(), 10u);
+}
+
+TEST(SandboxEditorPresentation, ContextWindowContributionReceivesRuntimeFacade)
+{
+    Runtime::Engine engine(
+        HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+
+    SandboxEditor::EditorShell shell;
+    int drawCalls = 0;
+    bool receivedScene = false;
+    const Runtime::EditorWindowHandle handle = shell.RegisterEditorWindow(
+        SandboxEditor::EditorWindowDescriptor{
+            .Id = "test.context_window",
+            .MenuPath = {"View"},
+            .Title = "Context Window",
+            .OpenByDefault = true,
+            .Draw =
+                [&drawCalls, &receivedScene](
+                    bool&,
+                    const Runtime::SandboxEditorContext& context)
+                {
+                    ++drawCalls;
+                    receivedScene = context.Scene != nullptr;
+                },
+        });
+    ASSERT_TRUE(handle.IsValid());
+
+    shell.Attach(engine);
+    engine.Run();
+
+    EXPECT_EQ(drawCalls, 1);
+    EXPECT_TRUE(receivedScene);
+    EXPECT_TRUE(shell.UnregisterEditorWindow(handle));
+    shell.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorPresentation, GlobalVisibilityHotkeyUsesTheVisibilityCommandPath)
+{
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<ToggleEditorVisibilityApplication>());
+    engine.Initialize();
+
+    SandboxEditor::EditorShell shell;
+    shell.Attach(engine);
+    ASSERT_TRUE(shell.IsEditorVisible());
+
+    engine.Run();
+
+    EXPECT_FALSE(shell.IsEditorVisible());
+    EXPECT_FALSE(
+        engine.GetImGuiAdapter().CaptureSnapshot().CapturesViewportInput());
+    const Runtime::EditorUiVisibilityCommandResult restored =
+        shell.ApplyEditorUiVisibilityCommand(
+            Runtime::EditorUiVisibilityCommand{
+                Runtime::EditorUiVisibilityCommandKind::Show});
+    EXPECT_FALSE(restored.WasVisible);
+    EXPECT_TRUE(restored.IsVisible);
+    EXPECT_TRUE(restored.Changed);
+    EXPECT_TRUE(shell.IsEditorVisible());
+
+    shell.Detach();
+    engine.Shutdown();
+}

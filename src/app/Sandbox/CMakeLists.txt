@@ -4,11 +4,13 @@ if(INTRINSIC_BUILD_SANDBOX OR INTRINSIC_BUILD_TESTS)
             PUBLIC
             FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
             Editor/Sandbox.EditorController.cppm
+            Editor/Sandbox.EditorShell.cppm
             Editor/Sandbox.DomainPanels.cppm
             Editor/Sandbox.MethodPanels.cppm
             Editor/Sandbox.MeshProcessingPanels.cppm
             PRIVATE
             Editor/Sandbox.EditorController.cpp
+            Editor/Sandbox.EditorShell.cpp
             Editor/Sandbox.DomainPanels.cpp
             Editor/Sandbox.MethodPanels.cpp
             Editor/Sandbox.MeshProcessingPanels.cpp

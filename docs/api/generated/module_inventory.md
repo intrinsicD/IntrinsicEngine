@@ -8,7 +8,7 @@ Root scanned: `src`
 
 | Layer | Module Count |
 |---|---:|
-| `app` | 5 |
+| `app` | 6 |
 | `assets` | 12 |
 | `core` | 41 |
 | `ecs` | 28 |
@@ -28,6 +28,7 @@ Root scanned: `src`
 |---|---|---|
 | `Extrinsic.Sandbox.Editor.DomainPanels` | `src/app/Sandbox/Editor/Sandbox.DomainPanels.cppm` | `app` |
 | `Extrinsic.Sandbox.Editor.Controller` | `src/app/Sandbox/Editor/Sandbox.EditorController.cppm` | `app` |
+| `Extrinsic.Sandbox.Editor.Shell` | `src/app/Sandbox/Editor/Sandbox.EditorShell.cppm` | `app` |
 | `Extrinsic.Sandbox.Editor.MeshProcessingPanels` | `src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cppm` | `app` |
 | `Extrinsic.Sandbox.Editor.MethodPanels` | `src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm` | `app` |
 | `Extrinsic.Sandbox` | `src/app/Sandbox/Sandbox.cppm` | `app` |
@@ -335,7 +336,6 @@ Root scanned: `src`
 | `Extrinsic.Runtime.EditorPropertyWidgets` | `src/runtime/Editor/Runtime.EditorPropertyWidgets.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorUiHost` | `src/runtime/Editor/Runtime.EditorUiHost.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorWindowRegistry` | `src/runtime/Editor/Runtime.EditorWindowRegistry.cppm` | `runtime` |
-| `Extrinsic.Runtime.SandboxEditorUi` | `src/runtime/Editor/Runtime.SandboxEditorUi.cppm` | `runtime` |
 | `Extrinsic.Runtime.GizmoFrameService` | `src/runtime/Gizmos/Runtime.GizmoFrameService.cppm` | `runtime` |
 | `Extrinsic.Runtime.GizmoInteraction` | `src/runtime/Gizmos/Runtime.GizmoInteraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.ImGuiAdapter` | `src/runtime/ImGui/Runtime.ImGuiAdapter.cppm` | `runtime` |
@@ -399,6 +399,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.RenderExtractionService` | `src/runtime/Runtime.RenderExtractionService.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderWorldPool` | `src/runtime/Runtime.RenderWorldPool.cppm` | `runtime` |
 | `Extrinsic.Runtime.SandboxDefaultPolicies` | `src/runtime/Runtime.SandboxDefaultPolicies.cppm` | `runtime` |
+| `Extrinsic.Runtime.SandboxEditorFacades` | `src/runtime/Runtime.SandboxEditorFacades.cppm` | `runtime` |
 | `Extrinsic.Runtime.SceneDocument` | `src/runtime/Runtime.SceneDocument.cppm` | `runtime` |
 | `Extrinsic.Runtime.SceneSerialization` | `src/runtime/Runtime.SceneSerialization.cppm` | `runtime` |
 | `Extrinsic.Runtime.SelectedMeshTextureBake` | `src/runtime/Runtime.SelectedMeshTextureBake.cppm` | `runtime` |
@@ -416,4 +417,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugClosestFace` | `src/runtime/SpatialDebug/Runtime.SpatialDebugClosestFace.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **389**
+Total modules: **390**

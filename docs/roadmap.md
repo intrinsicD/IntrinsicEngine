@@ -156,7 +156,7 @@ Undo/redo integration now lives in `Core::CommandHistory`; editor panels should 
 
 ### UI Improvements
 
-> All "complete" claims in this section describe the now-retired **legacy editor** formerly under `src/legacy/EditorUI/`. Promoted editor wiring lives in `Extrinsic.Runtime.SandboxEditorUi` and is attached by `src/app/Sandbox/`; promoted feature coverage is tracked by the migration parity matrix and the sandbox UI tasks, not by reviving the legacy editor.
+> All "complete" claims in this section describe the now-retired **legacy editor** formerly under `src/legacy/EditorUI/`. Promoted Sandbox presentation now lives in `Extrinsic.Sandbox.Editor.Shell` and the app-owned modules under `src/app/Sandbox/Editor/`; engine-facing panel models, typed commands, and session lifecycle remain in `Extrinsic.Runtime.SandboxEditorFacades`, attached through the generic `Extrinsic.Runtime.EditorUiHost`. Promoted feature coverage is tracked by the migration parity matrix and the sandbox UI tasks, not by reviving the legacy editor.
 
 The retired editor UI foundation included programmatic default dock layout (Hierarchy left, Viewport center, Inspector right, Assets/Stats bottom), three theme presets (Dark/Light/High Contrast) via View -> Theme, keyboard shortcut hints on menu items and toolbar buttons, contextual tooltips on View Settings and toolbar controls, enriched status bar (selection mode, entity/sub-element counts, lighting path, active tool, GPU VRAM usage), and a properly nested hierarchy panel with entity type icons and per-entity context menus.
 

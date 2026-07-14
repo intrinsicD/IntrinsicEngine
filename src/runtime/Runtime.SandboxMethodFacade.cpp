@@ -22,11 +22,10 @@ module;
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
-#include <imgui.h>
 
 #include "ProgressivePoissonReference.hpp"
 
-module Extrinsic.Runtime.SandboxEditorUi;
+module Extrinsic.Runtime.SandboxEditorFacades;
 
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.Registry;
@@ -62,13 +61,9 @@ import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.EditorPropertyWidgets;
-import Extrinsic.Runtime.EditorUiHost;
-import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryAvailability;
-import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.KMeansBackend;
@@ -115,7 +110,7 @@ import Geometry.Subdivision;
 import Geometry.UvAtlas;
 
 
-#include "Runtime.SandboxEditorUi.Internal.hpp"
+#include "Runtime.SandboxEditorFacades.Internal.hpp"
 
 namespace Extrinsic::Runtime
 {

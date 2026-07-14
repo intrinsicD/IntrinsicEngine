@@ -66,7 +66,7 @@ filtering state.
 ## Required tests
 
 - Contract tests for capabilities/domain exposure in
-  `tests/contract/runtime/Test.SandboxEditorUi.cpp`.
+  `tests/contract/runtime/Test.SandboxEditorVisualization.cpp`.
 - Runtime extraction tests for visualization packet coverage in
   `tests/integration/runtime/Test.RuntimeRenderExtraction.cpp`.
 - If a future task reintroduces child overlay entities, add lifecycle tests for

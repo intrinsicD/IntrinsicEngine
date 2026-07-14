@@ -17,7 +17,7 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
-import Extrinsic.Runtime.SandboxEditorUi;
+import Extrinsic.Runtime.SandboxEditorFacades;
 
 namespace CoreConfig = Extrinsic::Core::Config;
 namespace Graphics = Extrinsic::Graphics;

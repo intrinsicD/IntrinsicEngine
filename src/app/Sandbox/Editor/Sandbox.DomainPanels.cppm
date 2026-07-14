@@ -4,7 +4,7 @@ module;
 
 export module Extrinsic.Sandbox.Editor.DomainPanels;
 
-import Extrinsic.Runtime.SandboxEditorUi;
+import Extrinsic.Sandbox.Editor.Shell;
 
 export namespace Extrinsic::Sandbox::Editor {
 class DomainPanels final {
@@ -17,7 +17,7 @@ public:
   DomainPanels(DomainPanels &&) = delete;
   DomainPanels &operator=(DomainPanels &&) = delete;
 
-  void Register(Runtime::SandboxEditorUi &editorUi);
+  void Register(EditorShell &editorShell);
   void Unregister();
 
 private:

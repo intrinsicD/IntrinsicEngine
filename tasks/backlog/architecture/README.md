@@ -26,10 +26,6 @@ Opened from the 2026-07-03 main-loop/task-graph/render-graph review
 - [`CORE-009`](CORE-009-app-owned-config-sections.md) — app-owned config
   sections out of core `EngineConfig` (Progressive Poisson block moves
   behind a generic section mechanism).
-- [`ARCH-006`](../../active/ARCH-006-sandbox-editor-content-out-of-runtime.md) — move
-  Sandbox application editor content from `runtime` to `app` (sliced
-  migration; planning slice first) and own the top `.cppm` compile-hotspot
-  candidates for `Runtime.SandboxEditorUi.cppm` / `Sandbox.cppm`.
 
 Opened from the 2026-07-08 kernel/module architecture decision record
 ([`docs/adr/0024-kernel-module-architecture.md`](../../../docs/adr/0024-kernel-module-architecture.md));
@@ -47,6 +43,12 @@ are retired to `tasks/done/`; `ARCH-014` remains the open umbrella:
   rigid per-algorithm interface). Decision record only; no engine code.
 
 ### Retired seam tasks
+
+- [`ARCH-006`](../../done/ARCH-006-sandbox-editor-content-out-of-runtime.md) —
+  moved Sandbox presentation into app-owned editor shell/panel modules,
+  retired `Extrinsic.Runtime.SandboxEditorUi`, retained presentation-free
+  runtime facades, and split the matching implementation and contract tests
+  into independently compiled families (retired 2026-07-14).
 
 - [`ARCH-007`](../../archive/ARCH-007-kernel-command-bus-single-drain-point.md) —
   kernel command bus with a single pre-sim drain point (plain-data payloads,
