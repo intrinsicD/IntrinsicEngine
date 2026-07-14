@@ -37,9 +37,10 @@ Crucially, most of the spine for this already exists; the foundation should
   histogram). There is no general, non-stalling readback path.
 - **Task graph (have).** `Extrinsic.Core.Dag.TaskGraph` +
   `Extrinsic.Core.Dag.Scheduler` are a real dependency DAG with
-  `QueueDomain {Cpu, Gpu, Streaming}`, `DependsOn`, priorities, resource
-  read/write declarations, cycle detection, and `BuildPlan()`
-  (`src/core/Core.Dag.*`). This is the task-graph mechanism.
+  opaque task-kind tokens, `DependsOn`, priorities, resource read/write
+  declarations, cycle detection, and domain-free `BuildPlan()` metadata
+  (`src/core/Core.Dag.*`). Runtime owns the named task-kind taxonomy. This is
+  the task-graph mechanism.
 - **Deferred/chained execution (have).** `Runtime::StreamingExecutor` runs
   `StreamingTaskDesc{ Kind, Priority, DependsOn, Execute, ApplyOnMainThread }` on
   a background pool with a two-phase compute→main-thread-apply model and a
@@ -176,10 +177,10 @@ layer enforces only dimensional compatibility.
 
 ## Alternatives Considered
 
-- **Build a new transfer scheduler / transfer DAG.** Rejected: `Core.Dag.TaskGraph`
-  (with a `Gpu`/`Streaming` `QueueDomain`) and `StreamingExecutor` (with
-  `DependsOn`, priorities, two-phase apply, `WaitingForGpuUpload`) already provide
-  dependency ordering, chaining, and CPU→GPU handoff. A second scheduler would
+- **Build a new transfer scheduler / transfer DAG.** Rejected: the domain-free
+  `Core.Dag.TaskGraph` planning substrate and runtime-owned `StreamingExecutor`
+  (with `DependsOn`, priorities, two-phase apply, `WaitingForGpuUpload`) already
+  provide dependency ordering, chaining, and CPU→GPU handoff. A second scheduler would
   duplicate cancellation, priority, and drain semantics and fragment the frame
   loop.
 - **Keep `IDevice::ReadBuffer` + `WaitIdle` as the readback story.** Rejected as

@@ -13,14 +13,14 @@ using namespace Extrinsic::Core::Dag;
 
 namespace
 {
-    [[nodiscard]] PendingTaskDesc MakeCpuTask(TaskId id)
+    [[nodiscard]] PendingTaskDesc MakeTask(TaskId id)
     {
-        return PendingTaskDesc{.id = id, .domain = QueueDomain::Cpu};
+        return PendingTaskDesc{.id = id};
     }
 
-    [[nodiscard]] std::vector<PlanTask> BuildOrFail(DomainTaskGraph& graph)
+    [[nodiscard]] std::vector<PlanTask> BuildOrFail(TaskPlanGraph& graph)
     {
-        auto plan = graph.BuildPlan(BuildConfig{});
+        auto plan = graph.BuildPlan();
         EXPECT_TRUE(plan.has_value());
         if (!plan.has_value())
             return {};
@@ -40,7 +40,7 @@ namespace
 
 TEST(CoreGraphCompiler, EmptyGraphCompiles)
 {
-    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    auto graph = CreateTaskPlanGraph();
     ASSERT_NE(graph, nullptr);
 
     const auto plan = BuildOrFail(*graph);
@@ -49,10 +49,10 @@ TEST(CoreGraphCompiler, EmptyGraphCompiles)
 
 TEST(CoreGraphCompiler, SingleNodeGraphCompiles)
 {
-    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    auto graph = CreateTaskPlanGraph();
     ASSERT_NE(graph, nullptr);
 
-    ASSERT_TRUE(graph->Submit(MakeCpuTask(TaskId{1, 1})).has_value());
+    ASSERT_TRUE(graph->Submit(MakeTask(TaskId{1, 1})).has_value());
     const auto plan = BuildOrFail(*graph);
     ASSERT_EQ(plan.size(), 1u);
     EXPECT_EQ(plan[0].id, (TaskId{1, 1}));
@@ -61,11 +61,11 @@ TEST(CoreGraphCompiler, SingleNodeGraphCompiles)
 
 TEST(CoreGraphCompiler, IndependentNodesHaveNoOrderingEdges)
 {
-    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    auto graph = CreateTaskPlanGraph();
     ASSERT_NE(graph, nullptr);
 
-    ASSERT_TRUE(graph->Submit(MakeCpuTask(TaskId{1, 1})).has_value());
-    ASSERT_TRUE(graph->Submit(MakeCpuTask(TaskId{2, 1})).has_value());
+    ASSERT_TRUE(graph->Submit(MakeTask(TaskId{1, 1})).has_value());
+    ASSERT_TRUE(graph->Submit(MakeTask(TaskId{2, 1})).has_value());
 
     const auto plan = BuildOrFail(*graph);
     ASSERT_EQ(plan.size(), 2u);
@@ -75,7 +75,7 @@ TEST(CoreGraphCompiler, IndependentNodesHaveNoOrderingEdges)
 
 TEST(CoreGraphCompiler, ExplicitDependenciesProduceTopologicalLayers)
 {
-    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    auto graph = CreateTaskPlanGraph();
     ASSERT_NE(graph, nullptr);
 
     const TaskId a{10, 1};
@@ -87,10 +87,10 @@ TEST(CoreGraphCompiler, ExplicitDependenciesProduceTopologicalLayers)
     const std::array<TaskId, 1> depC{a};
     const std::array<TaskId, 2> depD{b, c};
 
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = a, .domain = QueueDomain::Cpu}).has_value());
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = b, .domain = QueueDomain::Cpu, .dependsOn = std::span<const TaskId>(depB)}).has_value());
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = c, .domain = QueueDomain::Cpu, .dependsOn = std::span<const TaskId>(depC)}).has_value());
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = d, .domain = QueueDomain::Cpu, .dependsOn = std::span<const TaskId>(depD)}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = a}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = b, .dependsOn = std::span<const TaskId>(depB)}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = c, .dependsOn = std::span<const TaskId>(depC)}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = d, .dependsOn = std::span<const TaskId>(depD)}).has_value());
 
     const auto plan = BuildOrFail(*graph);
     ASSERT_EQ(plan.size(), 4u);
@@ -112,37 +112,36 @@ TEST(CoreGraphCompiler, ExplicitDependenciesProduceTopologicalLayers)
 
 TEST(CoreGraphCompiler, MissingDependencyReturnsInvalidArgument)
 {
-    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    auto graph = CreateTaskPlanGraph();
     ASSERT_NE(graph, nullptr);
 
     const TaskId dep[1] = {TaskId{99, 1}};
     ASSERT_TRUE(graph->Submit(PendingTaskDesc{
         .id = TaskId{1, 1},
-        .domain = QueueDomain::Cpu,
         .dependsOn = std::span<const TaskId>(dep, 1),
     }).has_value());
 
-    const auto plan = graph->BuildPlan(BuildConfig{});
+    const auto plan = graph->BuildPlan();
     ASSERT_FALSE(plan.has_value());
     EXPECT_EQ(plan.error(), Extrinsic::Core::ErrorCode::InvalidArgument);
 }
 
 TEST(CoreGraphCompiler, DuplicateTaskIdReturnsInvalidArgument)
 {
-    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    auto graph = CreateTaskPlanGraph();
     ASSERT_NE(graph, nullptr);
 
-    ASSERT_TRUE(graph->Submit(MakeCpuTask(TaskId{1, 1})).has_value());
-    ASSERT_TRUE(graph->Submit(MakeCpuTask(TaskId{1, 1})).has_value());
+    ASSERT_TRUE(graph->Submit(MakeTask(TaskId{1, 1})).has_value());
+    ASSERT_TRUE(graph->Submit(MakeTask(TaskId{1, 1})).has_value());
 
-    const auto plan = graph->BuildPlan(BuildConfig{});
+    const auto plan = graph->BuildPlan();
     ASSERT_FALSE(plan.has_value());
     EXPECT_EQ(plan.error(), Extrinsic::Core::ErrorCode::InvalidArgument);
 }
 
 TEST(CoreGraphCompiler, DeterministicOverRepeatedCompiles)
 {
-    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    auto graph = CreateTaskPlanGraph();
     ASSERT_NE(graph, nullptr);
 
     const std::array<TaskId, 5> ids{TaskId{1, 1}, TaskId{2, 1}, TaskId{3, 1}, TaskId{4, 1}, TaskId{5, 1}};
@@ -150,11 +149,11 @@ TEST(CoreGraphCompiler, DeterministicOverRepeatedCompiles)
     const std::array<TaskId, 1> dep3{ids[0]};
     const std::array<TaskId, 2> dep4{ids[1], ids[2]};
 
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = ids[0], .domain = QueueDomain::Cpu}).has_value());
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = ids[1], .domain = QueueDomain::Cpu, .dependsOn = std::span<const TaskId>(dep2)}).has_value());
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = ids[2], .domain = QueueDomain::Cpu, .dependsOn = std::span<const TaskId>(dep3)}).has_value());
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = ids[3], .domain = QueueDomain::Cpu, .dependsOn = std::span<const TaskId>(dep4)}).has_value());
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = ids[4], .domain = QueueDomain::Cpu}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = ids[0]}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = ids[1], .dependsOn = std::span<const TaskId>(dep2)}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = ids[2], .dependsOn = std::span<const TaskId>(dep3)}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = ids[3], .dependsOn = std::span<const TaskId>(dep4)}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = ids[4]}).has_value());
 
     std::vector<PlanTask> baseline;
     for (int i = 0; i < 100; ++i)
@@ -178,7 +177,7 @@ TEST(CoreGraphCompiler, DeterministicOverRepeatedCompiles)
 
 TEST(CoreGraphCompiler, LargeCycleDiagnosticIsBounded)
 {
-    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    auto graph = CreateTaskPlanGraph();
     ASSERT_NE(graph, nullptr);
 
     constexpr std::uint32_t kTaskCount = 1024u;
@@ -195,12 +194,11 @@ TEST(CoreGraphCompiler, LargeCycleDiagnosticIsBounded)
         ASSERT_TRUE(graph->Submit(PendingTaskDesc{
             .id = ids[i],
             .debugName = name,
-            .domain = QueueDomain::Cpu,
             .dependsOn = std::span<const TaskId>(deps),
         }).has_value());
     }
 
-    const auto plan = graph->BuildPlan(BuildConfig{});
+    const auto plan = graph->BuildPlan();
     ASSERT_FALSE(plan.has_value());
     EXPECT_EQ(plan.error(), Extrinsic::Core::ErrorCode::InvalidState);
 
@@ -214,7 +212,7 @@ TEST(CoreGraphCompiler, LargeCycleDiagnosticIsBounded)
 
 TEST(CoreGraphCompiler, CycleDiagnosticIncludesEdgeReason)
 {
-    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    auto graph = CreateTaskPlanGraph();
     ASSERT_NE(graph, nullptr);
 
     const TaskId a{300, 1};
@@ -226,18 +224,16 @@ TEST(CoreGraphCompiler, CycleDiagnosticIncludesEdgeReason)
     ASSERT_TRUE(graph->Submit(PendingTaskDesc{
         .id = a,
         .debugName = "A",
-        .domain = QueueDomain::Cpu,
         .dependsOn = std::span<const TaskId>(depA),
     }).has_value());
 
     ASSERT_TRUE(graph->Submit(PendingTaskDesc{
         .id = b,
         .debugName = "B",
-        .domain = QueueDomain::Cpu,
         .dependsOn = std::span<const TaskId>(depB),
     }).has_value());
 
-    const auto plan = graph->BuildPlan(BuildConfig{});
+    const auto plan = graph->BuildPlan();
     ASSERT_FALSE(plan.has_value());
     EXPECT_EQ(plan.error(), Extrinsic::Core::ErrorCode::InvalidState);
 
@@ -250,7 +246,7 @@ TEST(CoreGraphCompiler, CycleDiagnosticIncludesEdgeReason)
 
 TEST(CoreGraphCompiler, ResourceHazardRawOrdersWriterBeforeReader)
 {
-    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    auto graph = CreateTaskPlanGraph();
     ASSERT_NE(graph, nullptr);
 
     const TaskId writer{100, 1};
@@ -259,8 +255,8 @@ TEST(CoreGraphCompiler, ResourceHazardRawOrdersWriterBeforeReader)
     const std::array<ResourceAccess, 1> writeAccess{ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Write}};
     const std::array<ResourceAccess, 1> readAccess{ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Read}};
 
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = writer, .domain = QueueDomain::Cpu, .resources = writeAccess}).has_value());
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = reader, .domain = QueueDomain::Cpu, .resources = readAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = writer, .resources = writeAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = reader, .resources = readAccess}).has_value());
 
     const auto plan = BuildOrFail(*graph);
     EXPECT_LT(FindBatchFor(plan, writer), FindBatchFor(plan, reader));
@@ -268,7 +264,7 @@ TEST(CoreGraphCompiler, ResourceHazardRawOrdersWriterBeforeReader)
 
 TEST(CoreGraphCompiler, ResourceHazardWarOrdersReaderBeforeWriter)
 {
-    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    auto graph = CreateTaskPlanGraph();
     ASSERT_NE(graph, nullptr);
 
     const TaskId reader{110, 1};
@@ -277,8 +273,8 @@ TEST(CoreGraphCompiler, ResourceHazardWarOrdersReaderBeforeWriter)
     const std::array<ResourceAccess, 1> readAccess{ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Read}};
     const std::array<ResourceAccess, 1> writeAccess{ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Write}};
 
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = reader, .domain = QueueDomain::Cpu, .resources = readAccess}).has_value());
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = writer, .domain = QueueDomain::Cpu, .resources = writeAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = reader, .resources = readAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = writer, .resources = writeAccess}).has_value());
 
     const auto plan = BuildOrFail(*graph);
     EXPECT_LT(FindBatchFor(plan, reader), FindBatchFor(plan, writer));
@@ -286,7 +282,7 @@ TEST(CoreGraphCompiler, ResourceHazardWarOrdersReaderBeforeWriter)
 
 TEST(CoreGraphCompiler, ResourceHazardRarKeepsReadersParallel)
 {
-    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    auto graph = CreateTaskPlanGraph();
     ASSERT_NE(graph, nullptr);
 
     const TaskId readerA{120, 1};
@@ -294,8 +290,8 @@ TEST(CoreGraphCompiler, ResourceHazardRarKeepsReadersParallel)
     const ResourceId resource{9, 1};
     const std::array<ResourceAccess, 1> readAccess{ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Read}};
 
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = readerA, .domain = QueueDomain::Cpu, .resources = readAccess}).has_value());
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = readerB, .domain = QueueDomain::Cpu, .resources = readAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = readerA, .resources = readAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = readerB, .resources = readAccess}).has_value());
 
     const auto plan = BuildOrFail(*graph);
     EXPECT_EQ(FindBatchFor(plan, readerA), FindBatchFor(plan, readerB));
@@ -303,7 +299,7 @@ TEST(CoreGraphCompiler, ResourceHazardRarKeepsReadersParallel)
 
 TEST(CoreGraphCompiler, ResourceHazardWawOrdersWriters)
 {
-    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    auto graph = CreateTaskPlanGraph();
     ASSERT_NE(graph, nullptr);
 
     const TaskId writerA{122, 1};
@@ -311,8 +307,8 @@ TEST(CoreGraphCompiler, ResourceHazardWawOrdersWriters)
     const ResourceId resource{10, 1};
     const std::array<ResourceAccess, 1> writeAccess{ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Write}};
 
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = writerA, .domain = QueueDomain::Cpu, .resources = writeAccess}).has_value());
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = writerB, .domain = QueueDomain::Cpu, .resources = writeAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = writerA, .resources = writeAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = writerB, .resources = writeAccess}).has_value());
 
     const auto plan = BuildOrFail(*graph);
     EXPECT_LT(FindBatchFor(plan, writerA), FindBatchFor(plan, writerB));
@@ -320,7 +316,7 @@ TEST(CoreGraphCompiler, ResourceHazardWawOrdersWriters)
 
 TEST(CoreGraphCompiler, MultipleReadersSerializeBeforeWriter)
 {
-    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    auto graph = CreateTaskPlanGraph();
     ASSERT_NE(graph, nullptr);
 
     const TaskId readerA{124, 1};
@@ -330,9 +326,9 @@ TEST(CoreGraphCompiler, MultipleReadersSerializeBeforeWriter)
     const std::array<ResourceAccess, 1> readAccess{ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Read}};
     const std::array<ResourceAccess, 1> writeAccess{ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Write}};
 
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = readerA, .domain = QueueDomain::Cpu, .resources = readAccess}).has_value());
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = readerB, .domain = QueueDomain::Cpu, .resources = readAccess}).has_value());
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = writer, .domain = QueueDomain::Cpu, .resources = writeAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = readerA, .resources = readAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = readerB, .resources = readAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = writer, .resources = writeAccess}).has_value());
 
     const auto plan = BuildOrFail(*graph);
     const auto writerBatch = FindBatchFor(plan, writer);
@@ -342,7 +338,7 @@ TEST(CoreGraphCompiler, MultipleReadersSerializeBeforeWriter)
 
 TEST(CoreGraphCompiler, WeakReadDoesNotDelayFollowingWriter)
 {
-    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    auto graph = CreateTaskPlanGraph();
     ASSERT_NE(graph, nullptr);
 
     const TaskId weakReader{127, 1};
@@ -353,8 +349,8 @@ TEST(CoreGraphCompiler, WeakReadDoesNotDelayFollowingWriter)
     const std::array<ResourceAccess, 1> writeAccess{
         ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Write}};
 
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = weakReader, .domain = QueueDomain::Cpu, .resources = weakReadAccess}).has_value());
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = writer, .domain = QueueDomain::Cpu, .resources = writeAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = weakReader, .resources = weakReadAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = writer, .resources = writeAccess}).has_value());
 
     const auto plan = BuildOrFail(*graph);
     EXPECT_EQ(FindBatchFor(plan, weakReader), FindBatchFor(plan, writer));
@@ -362,7 +358,7 @@ TEST(CoreGraphCompiler, WeakReadDoesNotDelayFollowingWriter)
 
 TEST(CoreGraphCompiler, WriteThenWeakReadSerializesWriterBeforeReader)
 {
-    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    auto graph = CreateTaskPlanGraph();
     ASSERT_NE(graph, nullptr);
 
     const TaskId writer{129, 1};
@@ -373,8 +369,8 @@ TEST(CoreGraphCompiler, WriteThenWeakReadSerializesWriterBeforeReader)
     const std::array<ResourceAccess, 1> weakReadAccess{
         ResourceAccess{.resource = resource, .mode = ResourceAccessMode::WeakRead}};
 
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = writer, .domain = QueueDomain::Cpu, .resources = writeAccess}).has_value());
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = weakReader, .domain = QueueDomain::Cpu, .resources = weakReadAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = writer, .resources = writeAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = weakReader, .resources = weakReadAccess}).has_value());
 
     const auto plan = BuildOrFail(*graph);
     EXPECT_LT(FindBatchFor(plan, writer), FindBatchFor(plan, weakReader));
@@ -410,8 +406,8 @@ TEST(CoreGraphCompiler, DuplicateResourceAccessesDoNotDuplicateEdges)
     const auto emitDuplicateAccesses = [](void* producerCtx, void* emitCtx, EmitPendingTaskFn emit) -> Extrinsic::Core::Result
     {
         auto* localCtx = static_cast<DuplicateAccessProducerCtx*>(producerCtx);
-        PendingTaskDesc a{.id = localCtx->writer, .domain = QueueDomain::Cpu, .resources = localCtx->writes};
-        PendingTaskDesc b{.id = localCtx->reader, .domain = QueueDomain::Cpu, .resources = localCtx->reads};
+        PendingTaskDesc a{.id = localCtx->writer, .resources = localCtx->writes};
+        PendingTaskDesc b{.id = localCtx->reader, .resources = localCtx->reads};
         if (!emit(emitCtx, a) || !emit(emitCtx, b))
             return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::InvalidState);
         return Extrinsic::Core::Ok();
@@ -420,13 +416,13 @@ TEST(CoreGraphCompiler, DuplicateResourceAccessesDoNotDuplicateEdges)
     auto scheduler = CreateDagScheduler();
     ASSERT_NE(scheduler, nullptr);
     const auto producer = scheduler->RegisterProducer(
-        ProducerInfo{.name = "duplicate_access_hazards", .subsystemId = 1, .preferredDomain = QueueDomain::Cpu},
+        ProducerInfo{.name = "duplicate_access_hazards", .subsystemId = 1},
         &ctx,
         emitDuplicateAccesses);
     ASSERT_TRUE(producer.has_value());
     ASSERT_TRUE(scheduler->QueryAllPending().has_value());
 
-    const auto plan = scheduler->BuildSchedule(BuildConfig{});
+    const auto plan = scheduler->BuildSchedule();
     ASSERT_TRUE(plan.has_value());
     EXPECT_EQ(scheduler->GetLastStats().edgeCount, 1u);
 }
@@ -455,8 +451,8 @@ TEST(CoreGraphCompiler, ResourceHazardsContributeToEdgeStats)
     const auto emitHazard = [](void* producerCtx, void* emitCtx, EmitPendingTaskFn emit) -> Extrinsic::Core::Result
     {
         auto* localCtx = static_cast<HazardProducerCtx*>(producerCtx);
-        PendingTaskDesc a{.id = localCtx->writer, .domain = QueueDomain::Cpu, .resources = localCtx->write};
-        PendingTaskDesc b{.id = localCtx->reader, .domain = QueueDomain::Cpu, .resources = localCtx->read};
+        PendingTaskDesc a{.id = localCtx->writer, .resources = localCtx->write};
+        PendingTaskDesc b{.id = localCtx->reader, .resources = localCtx->read};
         if (!emit(emitCtx, a) || !emit(emitCtx, b))
             return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::InvalidState);
         return Extrinsic::Core::Ok();
@@ -465,20 +461,20 @@ TEST(CoreGraphCompiler, ResourceHazardsContributeToEdgeStats)
     auto scheduler = CreateDagScheduler();
     ASSERT_NE(scheduler, nullptr);
     const auto producer = scheduler->RegisterProducer(
-        ProducerInfo{.name = "hazard_stats", .subsystemId = 1, .preferredDomain = QueueDomain::Cpu},
+        ProducerInfo{.name = "hazard_stats", .subsystemId = 1},
         &ctx,
         emitHazard);
     ASSERT_TRUE(producer.has_value());
     ASSERT_TRUE(scheduler->QueryAllPending().has_value());
 
-    const auto plan = scheduler->BuildSchedule(BuildConfig{});
+    const auto plan = scheduler->BuildSchedule();
     ASSERT_TRUE(plan.has_value());
     EXPECT_GE(scheduler->GetLastStats().edgeCount, 1u);
 }
 
-TEST(CoreGraphCompiler, DomainTaskGraphReportsExplicitAndHazardEdgeStats)
+TEST(CoreGraphCompiler, TaskPlanGraphReportsExplicitAndHazardEdgeStats)
 {
-    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    auto graph = CreateTaskPlanGraph();
     ASSERT_NE(graph, nullptr);
 
     const TaskId a{200, 1};
@@ -491,15 +487,14 @@ TEST(CoreGraphCompiler, DomainTaskGraphReportsExplicitAndHazardEdgeStats)
     const std::array<ResourceAccess, 1> readAccess{
         ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Read}};
 
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = a, .domain = QueueDomain::Cpu, .resources = writeAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = a, .resources = writeAccess}).has_value());
     ASSERT_TRUE(graph->Submit(PendingTaskDesc{
         .id = b,
-        .domain = QueueDomain::Cpu,
         .dependsOn = std::span<const TaskId>(depB),
     }).has_value());
-    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = c, .domain = QueueDomain::Cpu, .resources = readAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = c, .resources = readAccess}).has_value());
 
-    const auto plan = graph->BuildPlan(BuildConfig{});
+    const auto plan = graph->BuildPlan();
     ASSERT_TRUE(plan.has_value());
 
     const auto stats = graph->GetLastStats();
@@ -510,39 +505,36 @@ TEST(CoreGraphCompiler, DomainTaskGraphReportsExplicitAndHazardEdgeStats)
     EXPECT_GE(stats.layerCount, 2u);
 }
 
-TEST(CoreGraphCompiler, DomainTaskGraphLaneAssignmentRespectsQueueBudgets)
+TEST(CoreGraphCompiler, TaskPlanGraphMatchesDomainFreeGoldenPlan)
 {
-    constexpr uint32_t kTaskCount = 6;
-    const BuildConfig config{
-        .queueBudgetCpu = 2,
-        .queueBudgetGpu = 3,
-        .queueBudgetStreaming = 4,
-    };
+    auto graph = CreateTaskPlanGraph();
+    ASSERT_NE(graph, nullptr);
 
-    auto assertLaneCycling = [&](const QueueDomain domain, const uint32_t expectedLaneModulus)
-    {
-        auto graph = CreateDomainTaskGraph(domain);
-        ASSERT_NE(graph, nullptr);
+    const TaskId root{1000, 1};
+    const TaskId sibling{1001, 1};
+    const TaskId child{1002, 1};
+    const std::array<TaskId, 1> childDependency{root};
 
-        for (uint32_t i = 0; i < kTaskCount; ++i)
-        {
-            ASSERT_TRUE(graph->Submit(PendingTaskDesc{
-                .id = TaskId{1000u + static_cast<uint32_t>(domain) * 100u + i, 1},
-                .domain = domain,
-            }).has_value());
-        }
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = root}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = sibling}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{
+        .id = child,
+        .dependsOn = std::span<const TaskId>(childDependency),
+    }).has_value());
 
-        const auto plan = graph->BuildPlan(config);
-        ASSERT_TRUE(plan.has_value());
-        ASSERT_EQ(plan->size(), kTaskCount);
+    const auto plan = graph->BuildPlan();
+    ASSERT_TRUE(plan.has_value());
+    ASSERT_EQ(plan->size(), 3u);
 
-        for (uint32_t i = 0; i < kTaskCount; ++i)
-            EXPECT_LT((*plan)[i].lane, expectedLaneModulus);
-    };
-
-    assertLaneCycling(QueueDomain::Cpu, config.queueBudgetCpu);
-    assertLaneCycling(QueueDomain::Gpu, config.queueBudgetGpu);
-    assertLaneCycling(QueueDomain::Streaming, config.queueBudgetStreaming);
+    EXPECT_EQ((*plan)[0].id, root);
+    EXPECT_EQ((*plan)[0].topoOrder, 0u);
+    EXPECT_EQ((*plan)[0].batch, 0u);
+    EXPECT_EQ((*plan)[1].id, sibling);
+    EXPECT_EQ((*plan)[1].topoOrder, 1u);
+    EXPECT_EQ((*plan)[1].batch, 0u);
+    EXPECT_EQ((*plan)[2].id, child);
+    EXPECT_EQ((*plan)[2].topoOrder, 2u);
+    EXPECT_EQ((*plan)[2].batch, 1u);
 }
 
 TEST(CoreGraphCompiler, ResourceHazardStress_10000_NodesCompilesDeterministically)
@@ -550,7 +542,7 @@ TEST(CoreGraphCompiler, ResourceHazardStress_10000_NodesCompilesDeterministicall
     constexpr std::uint32_t kTaskCount = 10'000u;
     constexpr ResourceId kResource{7, 1};
 
-    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    auto graph = CreateTaskPlanGraph();
     ASSERT_NE(graph, nullptr);
 
     std::vector<ResourceAccess> accesses{};
@@ -564,7 +556,6 @@ TEST(CoreGraphCompiler, ResourceHazardStress_10000_NodesCompilesDeterministicall
 
         ASSERT_TRUE(graph->Submit(PendingTaskDesc{
             .id = TaskId{i, 1},
-            .domain = QueueDomain::Cpu,
             .resources = std::span<const ResourceAccess>(accesses.data() + i, 1u),
         }).has_value());
     }

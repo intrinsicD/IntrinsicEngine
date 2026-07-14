@@ -11,16 +11,15 @@ import :Compiler;
 
 export namespace Extrinsic::Core::Dag
 {
-    class DomainTaskGraph
+    class TaskPlanGraph
     {
     public:
-        virtual ~DomainTaskGraph() = default;
+        virtual ~TaskPlanGraph() = default;
         virtual Result Submit(const PendingTaskDesc& task) = 0;
-        [[nodiscard]] virtual Expected<std::vector<PlanTask>> BuildPlan(const BuildConfig& config) = 0;
+        [[nodiscard]] virtual Expected<std::vector<PlanTask>> BuildPlan() = 0;
         [[nodiscard]] virtual ScheduleStats GetLastStats() const = 0;
-        [[nodiscard]] virtual QueueDomain Domain() const noexcept = 0;
         virtual void Reset() = 0;
     };
 
-    [[nodiscard]] std::unique_ptr<DomainTaskGraph> CreateDomainTaskGraph(QueueDomain domain);
+    [[nodiscard]] std::unique_ptr<TaskPlanGraph> CreateTaskPlanGraph();
 }

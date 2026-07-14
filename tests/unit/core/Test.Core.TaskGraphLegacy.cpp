@@ -43,9 +43,9 @@ namespace
     }
 }
 
-TEST(CoreTaskGraph, CpuExecuteHonorsResourceAndLabelDependencies)
+TEST(CoreTaskGraph, ExecuteCallbacksHonorsResourceAndLabelDependencies)
 {
-    TaskGraph graph(QueueDomain::Cpu);
+    TaskGraph graph;
     std::vector<std::string> log;
 
     graph.AddPass("Input",
@@ -75,7 +75,6 @@ TEST(CoreTaskGraph, CpuExecuteHonorsResourceAndLabelDependencies)
     for (uint32_t i = 0; i < plan->size(); ++i)
     {
         EXPECT_EQ((*plan)[i].id, (TaskId{i, 1}));
-        EXPECT_EQ((*plan)[i].domain, QueueDomain::Cpu);
         EXPECT_EQ((*plan)[i].topoOrder, i);
     }
 
@@ -86,9 +85,9 @@ TEST(CoreTaskGraph, CpuExecuteHonorsResourceAndLabelDependencies)
     ExpectOrder(log, "Sync", "Render");
 }
 
-TEST(CoreTaskGraph, CpuIndependentPassesStayInInsertionOrder)
+TEST(CoreTaskGraph, IndependentPassesStayInInsertionOrder)
 {
-    TaskGraph graph(QueueDomain::Cpu);
+    TaskGraph graph;
     std::vector<uint32_t> visits;
     constexpr uint32_t kCount = 256;
     visits.reserve(kCount);
@@ -110,7 +109,6 @@ TEST(CoreTaskGraph, CpuIndependentPassesStayInInsertionOrder)
     for (uint32_t i = 0; i < kCount; ++i)
     {
         EXPECT_EQ((*plan)[i].id, (TaskId{i, 1}));
-        EXPECT_EQ((*plan)[i].domain, QueueDomain::Cpu);
         EXPECT_EQ((*plan)[i].topoOrder, i);
         EXPECT_EQ((*plan)[i].batch, 0u);
     }
@@ -123,7 +121,7 @@ TEST(CoreTaskGraph, CpuIndependentPassesStayInInsertionOrder)
 
 TEST(CoreTaskGraph, WaitDependsOnAllPriorSignalers)
 {
-    TaskGraph graph(QueueDomain::Cpu);
+    TaskGraph graph;
     std::vector<std::string> log;
 
     graph.AddPass("SignalA",
@@ -147,7 +145,7 @@ TEST(CoreTaskGraph, WaitDependsOnAllPriorSignalers)
 
 TEST(CoreTaskGraph, WaitWithoutPriorSignalFailsCompile)
 {
-    TaskGraph graph(QueueDomain::Cpu);
+    TaskGraph graph;
 
     const auto kLabel = "NeverSignaled"_id;
 
@@ -171,7 +169,7 @@ TEST(CoreTaskGraph, WaitWithoutPriorSignalFailsCompile)
 
 TEST(CoreTaskGraph, WaitAfterLaterSignalStillFailsCompile)
 {
-    TaskGraph graph(QueueDomain::Cpu);
+    TaskGraph graph;
 
     const auto kLabel = "LateSignal"_id;
 
@@ -195,7 +193,7 @@ TEST(CoreTaskGraph, WaitAfterLaterSignalStillFailsCompile)
 
 TEST(CoreTaskGraph, ExplicitDependencyCanCreateCycleDiagnostic)
 {
-    TaskGraph graph(QueueDomain::Cpu);
+    TaskGraph graph;
 
     graph.AddPass("PassA",
         [](TaskGraphBuilder& b)
@@ -221,9 +219,9 @@ TEST(CoreTaskGraph, ExplicitDependencyCanCreateCycleDiagnostic)
     EXPECT_NE(diagnostic.find("explicit"), std::string::npos);
 }
 
-TEST(CoreTaskGraph, DomainSpecificDependencyReasonAppearsInCycleDiagnostic)
+TEST(CoreTaskGraph, NamedDependencyReasonAppearsInCycleDiagnostic)
 {
-    TaskGraph graph(QueueDomain::Cpu);
+    TaskGraph graph;
 
     graph.AddPass("Producer",
         [](TaskGraphBuilder& b)
@@ -246,12 +244,12 @@ TEST(CoreTaskGraph, DomainSpecificDependencyReasonAppearsInCycleDiagnostic)
     const auto diagnostic = graph.GetScheduleStats().lastDiagnostic;
     EXPECT_NE(diagnostic.find("Producer"), std::string::npos);
     EXPECT_NE(diagnostic.find("Consumer"), std::string::npos);
-    EXPECT_NE(diagnostic.find("domain(transition)"), std::string::npos);
+    EXPECT_NE(diagnostic.find("reason(transition)"), std::string::npos);
 }
 
 TEST(CoreTaskGraph, LabelDependencyCycleIncludesLabelId)
 {
-    TaskGraph graph(QueueDomain::Cpu);
+    TaskGraph graph;
     const auto kLabel = "Gate"_id;
 
     graph.AddPass("SignalGate",
@@ -290,7 +288,7 @@ TEST(CoreTaskGraph, LabelDependencyCycleIncludesLabelId)
 
 TEST(CoreTaskGraph, LargeCycleDiagnosticIsBounded)
 {
-    TaskGraph graph(QueueDomain::Cpu);
+    TaskGraph graph;
     constexpr std::uint32_t kPassCount = 1024u;
 
     for (std::uint32_t i = 0; i < kPassCount; ++i)
@@ -321,7 +319,7 @@ TEST(CoreTaskGraph, LargeCycleDiagnosticIsBounded)
 
 TEST(CoreTaskGraph, IndependentLabelsDoNotInterfere)
 {
-    TaskGraph graph(QueueDomain::Cpu);
+    TaskGraph graph;
     std::vector<std::string> log;
 
     graph.AddPass("SignalAlpha",
@@ -347,9 +345,9 @@ TEST(CoreTaskGraph, IndependentLabelsDoNotInterfere)
     ExpectOrder(log, "SignalBeta", "WaitBeta");
 }
 
-TEST(CoreTaskGraph, GpuDomainBuildPlanIsStableAndExecuteIsRejected)
+TEST(CoreTaskGraph, PlanOnlyBuildPlanIsStableAndExecuteIsRejected)
 {
-    TaskGraph graph(QueueDomain::Gpu);
+    TaskGraph graph(TaskGraphExecutionMode::PlanOnly);
 
     graph.AddPass("Upload",
         [](TaskGraphBuilder& b) { b.Write<Position>(); },
@@ -366,8 +364,6 @@ TEST(CoreTaskGraph, GpuDomainBuildPlanIsStableAndExecuteIsRejected)
     ASSERT_EQ(plan->size(), 2u);
     EXPECT_EQ((*plan)[0].id, (TaskId{0, 1}));
     EXPECT_EQ((*plan)[1].id, (TaskId{1, 1}));
-    EXPECT_EQ((*plan)[0].domain, QueueDomain::Gpu);
-    EXPECT_EQ((*plan)[1].domain, QueueDomain::Gpu);
     EXPECT_EQ((*plan)[0].topoOrder, 0u);
     EXPECT_EQ((*plan)[1].topoOrder, 1u);
     EXPECT_EQ((*plan)[0].batch, 0u);
@@ -378,9 +374,9 @@ TEST(CoreTaskGraph, GpuDomainBuildPlanIsStableAndExecuteIsRejected)
     EXPECT_EQ(exec.error(), ErrorCode::InvalidState);
 }
 
-TEST(CoreTaskGraph, StreamingDomainBuildPlanAndResetReuse)
+TEST(CoreTaskGraph, PlanOnlyBuildPlanAndResetReuse)
 {
-    TaskGraph graph(QueueDomain::Streaming);
+    TaskGraph graph(TaskGraphExecutionMode::PlanOnly);
 
     graph.AddPass("Fetch",
         [](TaskGraphBuilder& b) { b.Write<Acceleration>(); },
@@ -398,8 +394,6 @@ TEST(CoreTaskGraph, StreamingDomainBuildPlanAndResetReuse)
     const auto firstPlan = graph.BuildPlan();
     ASSERT_TRUE(firstPlan.has_value()) << "BuildPlan failed";
     ASSERT_EQ(firstPlan->size(), 2u);
-    EXPECT_EQ((*firstPlan)[0].domain, QueueDomain::Streaming);
-    EXPECT_EQ((*firstPlan)[1].domain, QueueDomain::Streaming);
     EXPECT_EQ((*firstPlan)[0].batch, 0u);
     EXPECT_EQ((*firstPlan)[1].batch, 1u);
 
@@ -416,12 +410,11 @@ TEST(CoreTaskGraph, StreamingDomainBuildPlanAndResetReuse)
     ASSERT_TRUE(secondPlan.has_value()) << "BuildPlan after reset failed";
     ASSERT_EQ(secondPlan->size(), 1u);
     EXPECT_EQ((*secondPlan)[0].id, (TaskId{0, 1}));
-    EXPECT_EQ((*secondPlan)[0].domain, QueueDomain::Streaming);
 }
 
 TEST(CoreTaskGraph, BuildPlanBatchesMatchExecutionLayers)
 {
-    TaskGraph graph(QueueDomain::Cpu);
+    TaskGraph graph;
 
     graph.AddPass("WritePos",
         [](TaskGraphBuilder& b) { b.Write<Position>(); },
@@ -450,7 +443,7 @@ TEST(CoreTaskGraph, BuildPlanBatchesMatchExecutionLayers)
 
 TEST(CoreTaskGraph, ScheduleStatsIncludeExplicitAndHazardEdges)
 {
-    TaskGraph graph(QueueDomain::Cpu);
+    TaskGraph graph;
 
     graph.AddPass("Signal",
         [](TaskGraphBuilder& b) { b.Signal("Gate"_id); },
@@ -482,7 +475,7 @@ TEST(CoreTaskGraph, ScheduleStatsIncludeExplicitAndHazardEdges)
 
 TEST(CoreTaskGraph, TakePassExecuteMovesOnlyTargetClosure)
 {
-    TaskGraph graph(QueueDomain::Streaming);
+    TaskGraph graph(TaskGraphExecutionMode::PlanOnly);
     std::vector<std::string> log;
 
     graph.AddPass("PassA", []([[maybe_unused]] TaskGraphBuilder& b) {}, [&]() { log.emplace_back("A"); });
@@ -504,7 +497,7 @@ TEST(CoreTaskGraph, TakePassExecuteMovesOnlyTargetClosure)
 
 TEST(CoreTaskGraph, ResetClearsStatsResourcesAndLabelsAcrossEpochs)
 {
-    TaskGraph graph(QueueDomain::Cpu);
+    TaskGraph graph;
     std::vector<std::string> log;
 
     graph.AddPass("Writer",
@@ -538,7 +531,7 @@ TEST(CoreTaskGraph, ResetClearsStatsResourcesAndLabelsAcrossEpochs)
 
 TEST(CoreTaskGraph, MainThreadReadyQueueUsesPriorityAndCostOrdering)
 {
-    TaskGraph graph(QueueDomain::Cpu);
+    TaskGraph graph;
     Tasks::Scheduler::Initialize(4);
 
     std::vector<std::string> order;
@@ -610,7 +603,7 @@ TEST(CoreTaskGraph, MainThreadReadyQueueUsesPriorityAndCostOrdering)
 
 TEST(CoreTaskGraph, FailedCompileClearsCompiledState)
 {
-    TaskGraph graph(QueueDomain::Cpu);
+    TaskGraph graph;
 
     graph.AddPass("First", [](TaskGraphBuilder&) {}, []() {});
     graph.AddPass("Second", [](TaskGraphBuilder&) {}, []() {});

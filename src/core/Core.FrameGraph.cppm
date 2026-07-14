@@ -16,10 +16,10 @@ import Extrinsic.Core.Hash;
 import Extrinsic.Core.Memory;
 
 // -----------------------------------------------------------------------
-// Extrinsic::Core::FrameGraph — ECS system execution graph (CPU domain).
+// Extrinsic::Core::FrameGraph — ECS system execution graph.
 //
-// Wraps a Dag::TaskGraph (QueueDomain::Cpu) and layers TypeToken-based
-// ECS component dependency declarations on top of it.
+// Wraps an ExecuteCallbacks Dag::TaskGraph and layers TypeToken-based ECS
+// component dependency declarations on top of it.
 //
 // Dependency model (per frame):
 //   Given systems S_i with declared reads R_i and writes W_i:
@@ -220,8 +220,7 @@ export namespace Extrinsic::Core
 
         // ----- Phase 3: Execute -----
         [[nodiscard]] Core::Result Execute();
-        [[nodiscard]] Core::Expected<std::vector<Dag::PlanTask>> BuildPlan(
-            const Dag::BuildConfig& config = {});
+        [[nodiscard]] Core::Expected<std::vector<Dag::PlanTask>> BuildPlan();
 
         // ----- Reset -----
         void Reset();

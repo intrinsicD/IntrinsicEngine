@@ -57,7 +57,6 @@ namespace Extrinsic::Core::Dag
         //      total ordering.
         [[nodiscard]] Expected<std::vector<PlanTask>> BuildPlanFromTasks(
             TaskList& tasks,
-            const BuildConfig& config,
             ScheduleStats& outStats)
         {
             outStats.lastDiagnostic.clear();
@@ -380,10 +379,6 @@ namespace Extrinsic::Core::Dag
                     enqueue(i);
 
             std::vector<uint32_t> inDeg = inDegree;
-            const auto cpuBudget = std::max<uint32_t>(config.queueBudgetCpu, 1u);
-            const auto gpuBudget = std::max<uint32_t>(config.queueBudgetGpu, 1u);
-            const auto streamBudget = std::max<uint32_t>(config.queueBudgetStreaming, 1u);
-            uint32_t cpuLane = 0, gpuLane = 0, streamLane = 0;
             uint32_t order = 0;
 
             std::vector<PlanTask> plan;
@@ -397,18 +392,9 @@ namespace Extrinsic::Core::Dag
                 ready.pop();
 
                 const auto& task = tasks[entry.index].desc;
-                uint32_t lane = 0;
-                switch (task.domain)
-                {
-                case QueueDomain::Cpu:       lane = cpuLane++ % cpuBudget; break;
-                case QueueDomain::Gpu:       lane = gpuLane++ % gpuBudget; break;
-                case QueueDomain::Streaming: lane = streamLane++ % streamBudget; break;
-                }
 
                 plan.push_back(PlanTask{
                     .id = task.id,
-                    .domain = task.domain,
-                    .lane = lane,
                     .topoOrder = order++,
                     .batch = topoLayer[entry.index],
                 });
@@ -483,12 +469,12 @@ namespace Extrinsic::Core::Dag
                 return Ok();
             }
 
-            Expected<std::vector<PlanTask>> BuildSchedule(const BuildConfig& config) override
+            Expected<std::vector<PlanTask>> BuildSchedule() override
             {
                 m_LastStats = {};
                 m_LastStats.producerCount = static_cast<uint32_t>(m_Producers.size());
 
-                return BuildPlanFromTasks(m_CachedTasks, config, m_LastStats);
+                return BuildPlanFromTasks(m_CachedTasks, m_LastStats);
             }
 
             ScheduleStats GetLastStats() const override
@@ -527,18 +513,16 @@ namespace Extrinsic::Core::Dag
     }
 
     // -----------------------------------------------------------------------
-    // DomainTaskGraph — raw PendingTaskDesc-based submit/plan graph
+    // TaskPlanGraph — raw PendingTaskDesc-based submit/plan graph
     // -----------------------------------------------------------------------
     namespace
     {
-        class DomainTaskGraphImpl final : public DomainTaskGraph
+        class TaskPlanGraphImpl final : public TaskPlanGraph
         {
         public:
-            explicit DomainTaskGraphImpl(QueueDomain domain) : m_Domain(domain) {}
-
             Result Submit(const PendingTaskDesc& task) override
             {
-                if (!task.id.IsValid() || task.domain != m_Domain)
+                if (!task.id.IsValid())
                     return Err(ErrorCode::InvalidArgument);
 
                 m_Tasks.emplace_back();
@@ -546,27 +530,24 @@ namespace Extrinsic::Core::Dag
                 return Ok();
             }
 
-            Expected<std::vector<PlanTask>> BuildPlan(const BuildConfig& config) override
+            Expected<std::vector<PlanTask>> BuildPlan() override
             {
                 m_LastStats = {};
-                return BuildPlanFromTasks(m_Tasks, config, m_LastStats);
+                return BuildPlanFromTasks(m_Tasks, m_LastStats);
             }
 
             ScheduleStats GetLastStats() const override { return m_LastStats; }
 
-            QueueDomain Domain() const noexcept override { return m_Domain; }
-
             void Reset() override { m_Tasks.clear(); m_LastStats = {}; }
 
         private:
-            QueueDomain   m_Domain;
             TaskList      m_Tasks{};
             ScheduleStats m_LastStats{};
         };
     }
 
-    std::unique_ptr<DomainTaskGraph> CreateDomainTaskGraph(QueueDomain domain)
+    std::unique_ptr<TaskPlanGraph> CreateTaskPlanGraph()
     {
-        return std::make_unique<DomainTaskGraphImpl>(domain);
+        return std::make_unique<TaskPlanGraphImpl>();
     }
 }

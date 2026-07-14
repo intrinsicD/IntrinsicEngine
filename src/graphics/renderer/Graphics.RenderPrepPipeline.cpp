@@ -232,7 +232,7 @@ namespace Extrinsic::Graphics
             return result;
         }
 
-        Core::Dag::TaskGraph graph{Core::Dag::QueueDomain::Cpu};
+        Core::Dag::TaskGraph graph{};
         graph.AddPass(
             "RenderPrep.PipelineCommit",
             [] (Core::Dag::TaskGraphBuilder& b)

@@ -20,7 +20,6 @@ export namespace Extrinsic::Core::Dag
     {
         std::string_view name{};
         uint32_t subsystemId = 0;
-        QueueDomain preferredDomain = QueueDomain::Cpu;
     };
 
     using EmitPendingTaskFn = bool(*)(void* emitCtx, const PendingTaskDesc&);
@@ -40,7 +39,7 @@ export namespace Extrinsic::Core::Dag
 
         virtual Result UnregisterProducer(ProducerId producer) = 0;
         virtual Result QueryAllPending() = 0;
-        [[nodiscard]] virtual Expected<std::vector<PlanTask>> BuildSchedule(const BuildConfig& config) = 0;
+        [[nodiscard]] virtual Expected<std::vector<PlanTask>> BuildSchedule() = 0;
         [[nodiscard]] virtual ScheduleStats GetLastStats() const = 0;
         virtual void ResetEpoch() = 0;
         virtual ~DagScheduler() = default;

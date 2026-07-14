@@ -58,7 +58,7 @@ namespace
 
 TEST(CoreTaskGraphStress, OneThousandPassMixedHazardGraphCompilesFast)
 {
-    TaskGraph graph(QueueDomain::Cpu);
+    TaskGraph graph;
     constexpr std::uint32_t kPasses = 1000u;
 
     for (std::uint32_t i = 0u; i < kPasses; ++i)
@@ -110,7 +110,7 @@ TEST(CoreTaskGraphStress, OneThousandPassMixedHazardGraphCompilesFast)
 
 TEST(CoreTaskGraphStress, TenThousandIndependentPassesCompileDeterministically)
 {
-    TaskGraph graph(QueueDomain::Cpu);
+    TaskGraph graph;
     constexpr std::uint32_t kPasses = 10'000u;
 
     for (std::uint32_t i = 0u; i < kPasses; ++i)
@@ -147,7 +147,7 @@ TEST(CoreTaskGraphStress, TenThousandIndependentPassesCompileDeterministically)
 TEST(CoreTaskGraphStress, WideGraphExecutesAcrossWorkerThreads)
 {
     Tasks::Scheduler::Initialize(4);
-    TaskGraph graph(QueueDomain::Cpu);
+    TaskGraph graph;
 
     std::atomic<int> active{0};
     std::atomic<int> maxActive{0};
@@ -171,7 +171,7 @@ TEST(CoreTaskGraphStress, WideGraphExecutesAcrossWorkerThreads)
 
 TEST(CoreTaskGraphStress, DeepGraphExecutionRespectsExactDependencyChain)
 {
-    TaskGraph graph(QueueDomain::Cpu);
+    TaskGraph graph;
     constexpr std::uint32_t kPasses = 500u;
     std::vector<std::uint32_t> executionOrder{};
     executionOrder.reserve(kPasses);
@@ -232,7 +232,7 @@ TEST(CoreTaskGraphStress, ReusingGraphAcrossEpochsDoesNotGrowRetainedMemory)
     if (!baseRss.has_value())
         GTEST_SKIP() << "VmRSS sampling unavailable on this platform";
 
-    TaskGraph graph(QueueDomain::Cpu);
+    TaskGraph graph;
     constexpr int kEpochs = 1000;
     constexpr uint32_t kPasses = 32u;
 

@@ -2,7 +2,7 @@
 
 This document defines the graph architecture contract for the canonical `src/` layout and is the implementation guide for Core/Runtime/Graphics graph work.
 
-## 1. Three graph domains and ownership
+## 1. Three graph systems and ownership
 
 The engine uses three graph systems with strict ownership boundaries:
 
@@ -12,12 +12,12 @@ The engine uses three graph systems with strict ownership boundaries:
 
 ### Layering contract (non-negotiable)
 
-- `Core` owns generic graph compilation substrate: nodes, edges, hazards, labels, topological layers, deterministic planning, CPU execution semantics.
+- `Core` owns generic graph compilation substrate: opaque task-kind tokens, nodes, edges, hazards, labels, topological layers, deterministic planning, and callback execution mechanics. It owns no CPU/GPU/streaming taxonomy, queue budgets, or execution lanes.
 - `Graphics.RenderGraph` may reuse Core substrate, but owns GPU concepts (virtual textures/buffers, usage/state transitions, barrier packets, transient aliasing).
 - `Runtime::Engine` owns **phase orchestration only**. Runtime must not manipulate GPU resources, barriers, Vulkan objects, or pass-level render branching.
 - `Assets` must not import `Graphics`; Graphics consumes Assets through read-only service/cache boundaries.
 
-## 2. Why `Graphics.RenderGraph` is not `Core.TaskGraph(QueueDomain::Gpu)`
+## 2. Why `Graphics.RenderGraph` is not a plan-only `Core.TaskGraph`
 
 `Core.TaskGraph` models **task ordering**. A GPU render graph must additionally model **resource states over time**.
 
@@ -29,7 +29,7 @@ GPU compilation requires resource-aware semantics absent from generic Core sched
 - transient lifetime inference and alias opportunities,
 - queue handoff semantics (future async compute/transfer overlaps).
 
-Therefore, `Graphics.RenderGraph` is a domain-specific graph system that may call Core compiler utilities for topological ordering, but cannot collapse to a plain queue-domain task scheduler.
+Therefore, `Graphics.RenderGraph` is a domain-specific graph system that may call Core compiler utilities for topological ordering, but cannot collapse to a generic plan-only task graph. Graphics owns any GPU queue classification and lane selection required when lowering the compiled render graph.
 
 ## 3. Graph lifecycle states
 

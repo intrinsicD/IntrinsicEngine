@@ -84,6 +84,7 @@ import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
+import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Graph;
@@ -987,7 +988,7 @@ namespace Extrinsic::Runtime
                 },
                 .Name = "Sandbox.KMeans.CPU",
                 .RequestedJobDomain = ProgressiveJobDomain::Cpu,
-                .Kind = Core::Dag::TaskKind::GeometryProcess,
+                .Kind = RuntimeTaskKinds::GeometryProcess,
                 .Priority = Core::Dag::TaskPriority::Normal,
                 .EstimatedCost = std::max<std::uint32_t>(
                     1u,
@@ -2036,7 +2037,7 @@ namespace Extrinsic::Runtime
                     ? "Sandbox.ProgressivePoisson.MeshCPU"
                     : "Sandbox.ProgressivePoisson.CPU",
                 .RequestedJobDomain = ProgressiveJobDomain::Cpu,
-                .Kind = Core::Dag::TaskKind::GeometryProcess,
+                .Kind = RuntimeTaskKinds::GeometryProcess,
                 .Priority = Core::Dag::TaskPriority::Normal,
                 .EstimatedCost = std::max<std::uint32_t>(
                     1u,

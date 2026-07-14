@@ -466,7 +466,7 @@ namespace Extrinsic::Runtime
         const StreamingTaskHandle handle = m_Dependencies.Streaming->Submit(
             StreamingTaskDesc{
                 .Name = "Runtime.SceneSave." + FileNameFromPath(state->Path),
-                .Kind = Core::Dag::TaskKind::AssetDecode,
+                .Kind = RuntimeTaskKinds::AssetDecode,
                 .Priority = Core::Dag::TaskPriority::Normal,
                 .EstimatedCost = 3u,
                 .Execute = [state]() mutable -> StreamingResult
@@ -595,7 +595,7 @@ namespace Extrinsic::Runtime
         const StreamingTaskHandle handle = m_Dependencies.Streaming->Submit(
             StreamingTaskDesc{
                 .Name = "Runtime.SceneLoad." + FileNameFromPath(state->Path),
-                .Kind = Core::Dag::TaskKind::AssetDecode,
+                .Kind = RuntimeTaskKinds::AssetDecode,
                 .Priority = Core::Dag::TaskPriority::Normal,
                 .EstimatedCost = 4u,
                 .Execute = [state]() mutable -> StreamingResult
