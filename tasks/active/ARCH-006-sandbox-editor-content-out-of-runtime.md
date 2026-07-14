@@ -179,6 +179,38 @@ Slice 3 implementation boundary (2026-07-13):
   selection panels to Slice 4; defer hierarchy/inspector/file/render shell
   presentation and final runtime Sandbox editor retirement to Slice 5.
 
+Slice 5 implementation boundary (2026-07-14):
+
+- Add one concrete app-owned `Extrinsic.Sandbox.Editor.Shell` compilation unit
+  for the remaining ten core windows, menu rendering, and ImGui-local state;
+  compose it with the existing method, mesh-processing, and domain panel
+  families through a small app-owned controller. Preserve titles, menu paths,
+  defaults, first-use sizes, commands, and the one prepared runtime context per
+  editor frame.
+- Separate the presentation-free attachment/context lifetime from the old UI
+  class as `Runtime::SandboxEditorSession`. It retains runtime-owned Engine,
+  job/GPU queue, result-sink, cache, and render-recipe state; the app shell
+  receives only a callback-scoped prepared view and never receives or owns live
+  lower-layer subsystem state.
+- Retire `Extrinsic.Runtime.SandboxEditorUi`; move its surviving data-only
+  models, command facades, and session contract to the runtime-root
+  `Extrinsic.Runtime.SandboxEditorFacades` module. Keep the active public DTO
+  surface together for this mechanical ownership slice; split the already
+  independent method and render-recipe implementation bodies, but do not turn
+  a module rename into a semantic API redesign.
+- Split `Test.SandboxEditorUi.cpp` by runtime subject family and move ImGui/app
+  composition contracts to an app-linked integration unit. Preserve original
+  runtime suite/name pairs wherever ownership did not change, then update
+  ownership docs and the generated module inventory before retirement.
+- Right-sizing: `EditorShell` and the app controller are concrete compilation
+  units, not new interfaces or registries. `SandboxEditorSession` is retained
+  because it is load-bearing for attachment epochs, asynchronous result-sink
+  lifetime, GPU queue shutdown, and the `app -> runtime` boundary; moving those
+  live owners into app would violate the repository contract. The blast radius
+  is the Sandbox app target, runtime facade importers, editor tests, and
+  ownership docs. A further public-facade split is justified only by a semantic
+  result-consumer task with independently evolving callers, not by this move.
+
 ## Required changes
 - [x] Slice 0 (planning, this file): inventory `Runtime.SandboxEditorUi`
       content into (a) generic editor infrastructure that stays in runtime,
