@@ -10,7 +10,9 @@ maturity_target: CPUContracted
 - Add the Scalable Locally Injective Mappings (SLIM) variant to the shared parameterization surface: a free-boundary map that minimizes the symmetric-Dirichlet distortion energy while guaranteeing local injectivity (no triangle flips) through a reweighted proxy solve and a flip-preventing line search — the modern general-purpose workhorse strategy for the family.
 
 ## Non-goals
-- No new parameterization module — SLIM is a `Strategy` value on the `Geometry.Parameterization` surface (`GEOM-063`), not a parallel module.
+- No parallel parameterization family — SLIM adds a typed `SlimParams`
+  alternative to the `Geometry.Parameterization` strategy variant from
+  `GEOM-063`.
 - No private optimization math — the reference-Jacobian proxy, the symmetric-Dirichlet energy/gradient, and the injective (flip-free) line search come from `GEOM-064`; SLIM owns the reweighting schedule and convergence policy only.
 - No cutting/cone insertion — SLIM operates on a given disk-topology chart; seams/cones are upstream (`Geometry.UvAtlas`, and BFF cones in `METHOD-023`).
 - No optimized/GPU backend before reference parity (`METHOD-025`/`METHOD-026`).
@@ -18,11 +20,17 @@ maturity_target: CPUContracted
 ## Context
 - Paper/method: Rabinovich, Poranne, Panozzo & Sorkine-Hornung, "Scalable Locally Injective Mappings", ACM TOG 36(2), 2017. SLIM minimizes a flip-preventing distortion energy (here the symmetric Dirichlet energy, which is infinite on degenerate/flipped elements) by iteratively building a convex proxy from a per-triangle reference Jacobian, solving one weighted-Laplacian system, and taking a line search whose maximum step preserves injectivity. Given a locally injective start it stays locally injective.
 - Method package: `methods/geometry/slim_parameterization/` (manifest-only; id `geometry.slim_parameterization`), following the `signed_heat` pattern — the reference lives in the shared `src/geometry` `Geometry.Parameterization` module.
-- Surface gate: `GEOM-063` supplies the `Slim` strategy slot and the shared params/result/diagnostics. Kernel gate: `GEOM-064` supplies the symmetric-Dirichlet energy/gradient, the PSD proxy assembly, and `MaxInjectiveStep`/backtracking. Bootstrap: SLIM initializes from a flip-free embedding — Tutte or the `METHOD-021` ARAP result — obtained through `ParameterizeMesh`; the `depends_on METHOD-021` edge is for the shared local/global infrastructure and the ARAP-warm-start option, not a runtime call into ARAP.
+- Surface gate: `GEOM-063` supplies the typed variant and shared
+  result/diagnostics. This task defines `SlimParams`, adds it to the variant,
+  and implements its visitor branch. Kernel gate: `GEOM-064` supplies the
+  symmetric-Dirichlet energy/gradient, PSD proxy, and injective line search.
+  Bootstrap remains a flip-free Tutte or METHOD-021 ARAP result obtained through
+  `ParameterizeMesh`.
 - ARAP (`METHOD-021`) is the parity companion: on developable input SLIM and ARAP agree within tolerance; SLIM's distinguishing guarantee is zero flips on inputs where ARAP folds. Realizes Pack 4 of the [parameterization/mapping roadmap](../../../docs/architecture/parameterization-mapping-roadmap.md).
 
 ## Control surfaces
-- Config/UI/Agent: none new — `Slim` becomes selectable on the existing `ParameterizationStrategy` axis; runtime/config-lane and editor surfaces are owned by `RUNTIME-176` / `UI-036`.
+- Config/UI/Agent: none new — `SlimParams` becomes a real strategy alternative;
+  `RUNTIME-176` / `UI-036` own its stable config token and editor controls.
 
 ## Backends
 - Backend axis: `cpu_reference` only. `cpu_optimized` (progressive/Anderson acceleration) deferred to `METHOD-025`; `gpu_vulkan_compute` deferred to `METHOD-026`.
@@ -51,7 +59,8 @@ maturity_target: CPUContracted
 - [ ] Regenerate `docs/api/generated/module_inventory.md` if the module surface changes.
 
 ## Acceptance criteria
-- [ ] `Slim` is selectable on the shared `ParameterizationStrategy` axis; it produces a locally injective map from an injective start on all correctness fixtures.
+- [ ] `SlimParams` is selectable on the shared typed strategy variant and
+      produces a locally injective map from an injective start on all fixtures.
 - [ ] All correctness tests pass in the default CPU gate; benchmark smoke manifest validates and runs.
 - [ ] Public API exposes only `std`/`glm`/geometry-owned records; the `GEOM-064` kernels back the proxy/energy/line-search (no private optimization code).
 

@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `GEOM-063` — Unified CPU parameterization strategy dispatch (tasks/active/GEOM-063-unified-cpu-parameterization-strategy-dispatch.md)
 
 ## Theme B — Rendering modernization
 
@@ -59,14 +59,12 @@ the authoritative open/unblocked view.
 ## Theme I — Research method implementation
 
 - unblocked: `GEOM-013` — Feature-preserving dual contouring (tasks/backlog/geometry/GEOM-013-feature-preserving-dual-contouring.md)
-- unblocked: `GEOM-014` — Feature-aware quadric error mesh simplification (tasks/backlog/geometry/GEOM-014-feature-aware-quadric-error-simplification.md)
 - unblocked: `GEOM-024` — Sparse symmetric generalized eigensolver seam (tasks/backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
 - unblocked: `GEOM-058` — Gaussian mixture models and Anderson-accelerated EM seam (tasks/backlog/geometry/GEOM-058-gaussian-mixture-em-anderson-acceleration.md)
 - unblocked: `GEOM-059` — Kernel matrices, Nyström approximation, and Gaussian-process interpolation seam (tasks/backlog/geometry/GEOM-059-kernel-matrices-nystroem-gaussian-process.md)
 - unblocked: `GEOM-060` — Permutohedral lattice fast high-dimensional filtering seam (tasks/backlog/geometry/GEOM-060-permutohedral-lattice-highdim-filtering.md)
 - unblocked: `GEOM-061` — Point-cloud grid-downsampling reduction strategies (tasks/backlog/geometry/GEOM-061-grid-downsampling-reduction-strategies.md)
 - unblocked: `GEOM-062` — Point-set projection and weighting kernels seam (tasks/backlog/geometry/GEOM-062-point-set-projection-weighting-kernels.md)
-- unblocked: `GEOM-063` — Unified parameterization Strategy × Backend surface (tasks/backlog/geometry/GEOM-063-parameterization-strategy-backend-surface.md)
 - unblocked: `GEOM-064` — Parameterization optimization kernels seam (tasks/backlog/geometry/GEOM-064-parameterization-optimization-kernels.md)
 - blocked by `UI-036`: `GRAPHICS-122` — GPU-shaded UV view offscreen render target (optional upgrade) (tasks/backlog/rendering/GRAPHICS-122-uv-view-offscreen-render-target.md)
 - unblocked: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
@@ -88,7 +86,7 @@ the authoritative open/unblocked view.
 - blocked by `METHOD-021`: `METHOD-025` — Parameterization family optimized CPU backend and comparison benchmark (tasks/backlog/methods/METHOD-025-parameterization-family-optimized-cpu-backend.md)
 - blocked by `METHOD-025`: `METHOD-026` — Parameterization family GPU (Vulkan compute) backend and parity (tasks/backlog/methods/METHOD-026-parameterization-family-gpu-vulkan-compute-backend.md)
 - blocked by `METHOD-016`: `RUNTIME-175` — Point-cloud consolidation runtime facade, config lane, and backend adapter (tasks/backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
-- blocked by `GEOM-063`: `RUNTIME-176` — Parameterization runtime facade, config lane, backend adapter, and UV view model (tasks/backlog/runtime/RUNTIME-176-parameterization-runtime-config-integration.md)
+- blocked by `GEOM-063`: `RUNTIME-176` — Parameterization runtime facade, config lane, and UV view model (tasks/backlog/runtime/RUNTIME-176-parameterization-runtime-config-integration.md)
 - blocked by `RUNTIME-175`: `UI-035` — Sandbox point-cloud consolidation editor panel (tasks/backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md)
 - blocked by `RUNTIME-176`: `UI-036` — Sandbox parameterization editor panel and resizable UV split view (tasks/backlog/ui/UI-036-sandbox-parameterization-editor-and-uv-split-view.md)
 

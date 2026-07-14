@@ -10,7 +10,6 @@ map.
 ## Tasks
 
 - [GEOM-013 — Feature-preserving dual contouring](GEOM-013-feature-preserving-dual-contouring.md).
-- [GEOM-014 — Feature-aware quadric error mesh simplification](GEOM-014-feature-aware-quadric-error-simplification.md).
 - [GEOM-024 — Sparse symmetric generalized eigensolver seam](GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
   (gates `methods/METHOD-006` variant B; depends on `GEOM-020`; promote when
   METHOD-006 is the next-priority method).
@@ -27,10 +26,10 @@ map.
 - [GEOM-062 — Point-set projection and weighting kernels seam](GEOM-062-point-set-projection-weighting-kernels.md)
   (reusable `Geometry.PointCloud.Kernels`: radial weights, LOP repulsion, WLOP
   density weights; gates the `methods/METHOD-016..018` LOP consolidation family).
-- [GEOM-063 — Unified parameterization Strategy × Backend surface](GEOM-063-parameterization-strategy-backend-surface.md)
-  (consolidates Tutte/Harmonic/LSCM behind one `Geometry.Parameterization`
-  `ParameterizeMesh` dispatch with backend telemetry and shared diagnostics;
-  the surface the `methods/METHOD-021..024` SOTA variants plug into).
+- [GEOM-063 — Unified CPU parameterization strategy dispatch](../../active/GEOM-063-unified-cpu-parameterization-strategy-dispatch.md)
+  (active; consolidates Harmonic/Tutte and LSCM behind one typed
+  `Geometry.Parameterization::ParameterizeMesh` CPU dispatch with shared
+  diagnostics; concrete method tasks extend the variant when they land).
 - [GEOM-064 — Parameterization optimization kernels seam](GEOM-064-parameterization-optimization-kernels.md)
   (reusable `Geometry.Parameterization.Optimize`: local rotation fit,
   symmetric-Dirichlet energy/proxy, injective line search; gates ARAP
@@ -96,10 +95,11 @@ the runtime SpatialDebug closest-face consumer in `RUNTIME-135`.
 - GEOM-063 and GEOM-064 are the parameterization-family seams that realize
   Packs 3–4 of the
   [parameterization/mapping roadmap](../../../docs/architecture/parameterization-mapping-roadmap.md).
-  GEOM-063 makes `Geometry.Parameterization` a `Strategy` × `Backend` dispatch
-  surface (the KMeans/`algorithm-variant-dispatch.md` idiom) consolidating the
-  existing LSCM/Tutte/Harmonic solvers so the SOTA variants (ARAP/SLIM/BFF/SCP,
-  `methods/METHOD-021..024`) are choosable through one API; GEOM-064 factors the
+  GEOM-063 makes `Geometry.Parameterization` a typed CPU strategy dispatch
+  surface consolidating the existing LSCM and Harmonic/Tutte solvers. The SOTA
+  method tasks (ARAP/SLIM/BFF/SCP, `methods/METHOD-021..024`) add their concrete
+  params types when implemented; backend policy remains with the later
+  strategy-specific/runtime owners. GEOM-064 factors the
   local/global rotation-fit, symmetric-Dirichlet energy/proxy, and injective
   line search that ARAP (`METHOD-021`), SLIM (`METHOD-022`), and the optimized
   backend (`METHOD-025`) share, so no variant re-derives that nonlinear-solve
@@ -126,12 +126,12 @@ the runtime SpatialDebug closest-face consumer in `RUNTIME-135`.
   const-correct lookup, naming normalization, `bool` proxy-storage behavior,
   erased metadata descriptors, and live iterator/upload metadata seams. GEOM-034
   remains the separate architecture-documentation audit follow-up.
-- GEOM-013 and GEOM-014 are seeded by the geometry paper survey
+- GEOM-013 and retired GEOM-014 are seeded by the geometry paper survey
   [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md).
   Each lists explicit algorithm variants with a marked default (Manifold DC
   for GEOM-013, FA-QEM for GEOM-014). GEOM-013 (dual contouring) is a
-  peer of the existing `Geometry.MarchingCubes`; GEOM-014 (FA-QEM) is an in-place
-  extension of `Geometry.HalfedgeMesh.Simplification`. Retired GEOM-019
+  peer of the existing `Geometry.MarchingCubes`; retired GEOM-014 (FA-QEM) is
+  the in-place extension of `Geometry.HalfedgeMesh.Simplification`. Retired GEOM-019
   supplies the harmonic/Tutte foundation consumed by GEOM-063.
 - GEOM-054 is retired as Slice 0 of the registration-pipeline modularity roadmap in
   [`docs/architecture/geometry-pipeline-modularity.md`](../../../docs/architecture/geometry-pipeline-modularity.md):
@@ -170,6 +170,7 @@ split; narratives live in the retirement log.
 - [GEOM-010 — Point-cloud algorithm pack roadmap](../../archive/GEOM-010-point-cloud-algorithm-pack-roadmap.md) (done; roadmap: [`docs/architecture/point-cloud-algorithm-roadmap.md`](../../../docs/architecture/point-cloud-algorithm-roadmap.md)).
 - [GEOM-011 — Parameterization and mapping roadmap](../../archive/GEOM-011-parameterization-mapping-roadmap.md) (done; roadmap: [`docs/architecture/parameterization-mapping-roadmap.md`](../../../docs/architecture/parameterization-mapping-roadmap.md)).
 - [GEOM-012 — Symmetric mesh, graph, and point-cloud domain views](../../archive/GEOM-012-symmetric-domain-views-property-sharing.md) (done).
+- [GEOM-014 — Feature-aware quadric error mesh simplification](../../done/GEOM-014-feature-aware-quadric-error-simplification.md) (done, `CPUContracted`, 2026-07-15).
 - [GEOM-016 — Point-cloud filtering and density diagnostics contracts](../../archive/GEOM-016-point-cloud-filtering-density-contracts.md) (done).
 - [GEOM-017 — Point-cloud descriptors and registration seams](../../archive/GEOM-017-point-cloud-descriptors-registration-seams.md) (done).
 - [GEOM-018 — Parameterization distortion and map-quality diagnostics](../../archive/GEOM-018-parameterization-distortion-map-quality-diagnostics.md) (done).

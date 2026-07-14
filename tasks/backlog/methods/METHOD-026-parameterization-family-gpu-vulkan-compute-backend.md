@@ -15,26 +15,39 @@ maturity_target: ParityProven
 - No new GPU primitive library — reuse the shared `Extrinsic.Graphics.ComputeParallelPrimitives` (GRAPHICS-108) and the runtime GPU-queue/readback substrate rather than private CUB-equivalents.
 
 ## Context
-- Owner/layer: a declared method backend adapter in `src/runtime` (the layer allowed to import RHI), behind the `Backend::GPU` request on the `Geometry.Parameterization` surface — geometry stays RHI-free. Mirrors the `Extrinsic.Runtime.KMeansGpuBackend` / `KMeansGpuJobQueue` exemplar and the GEOM-056 opt-in `gpu;vulkan` parity smoke pattern.
+- Owner/layer: a declared method backend adapter in `src/runtime`, the layer
+  allowed to import RHI. This task introduces the runtime GPU request and
+  requested/actual/fallback telemetry for ARAP/SLIM; the geometry strategy
+  variant stays RHI-free and carries no family-wide GPU token.
 - GPU shape: the local step (per-triangle signed-SVD rotation fit) is embarrassingly parallel; the global step is a sparse SPD solve run as a GPU Jacobi/CG iteration (matching the reference within tolerance). Results drain through `Extrinsic.Runtime.AsyncBufferReadback` (RUNTIME-137), never a device-wide `ReadBuffer` stall.
 - Gating: reference parity (`METHOD-021`/`022`) and the optimized CPU baseline (`METHOD-025`) must exist first; the GPU backend is measured against the `METHOD-025` baseline and the CPU reference oracle. Renderer/runtime code gates on `RHI::IDevice::IsOperational()`; a GPU request on a non-operational device falls back to `cpu_reference`/`cpu_optimized` with honest telemetry.
-- Config/UI: the `Backend::GPU` request is already the surface the `RUNTIME-176` config lane and `UI-036` panel expose; this task makes that request execute on the GPU and wires the runtime GPU job-queue leg reserved by `RUNTIME-176` — hence the `depends_on` edge: the runtime facade/config seam must be landed before this task can wire into it.
+- Config/UI: this task extends the RUNTIME-176 config/result model and UI-036
+  panel with `gpu_vulkan_compute` after the implementation exists, and wires
+  the new runtime GPU job queue. The dependency supplies the CPU facade/config
+  path; it does not reserve an inert GPU request.
 
 ## Control surfaces
-- Config/UI/Agent: none new — `gpu_vulkan_compute` is the existing `Backend::GPU`/policy token; this task makes it operational and honest under fallback.
+- Config/UI/Agent: add the runtime-owned `gpu_vulkan_compute` request for the
+  supported iterative strategies and expose it through the existing validated
+  config apply path; unavailable execution falls back honestly.
 
 ## Backends
 - Backend axis: adds `gpu_vulkan_compute` with `gpu;vulkan` parity; CPU reference/optimized remain the oracles and the fallback.
 
 ## Required changes
 - [ ] Add the runtime GPU backend adapter (mirroring `Runtime.KMeansGpuBackend`/`KMeansGpuJobQueue`) that records the local-step and global-solve compute passes for ARAP/SLIM, uploads mesh topology/positions once, iterates on the GPU, and drains UVs through `AsyncBufferReadback`.
-- [ ] Wire the adapter into the `RUNTIME-176` GPU job-queue leg (JobService `GpuQueue` participant) so the work records inside the renderer frame context with no extra present; if `RUNTIME-176` deferred its `Runtime.ParameterizationGpuJobQueue` second slice, that slice lands with this task.
-- [ ] Gate on `IDevice::IsOperational()`; fall back to CPU with `RequestedBackend == GPU`, `ActualBackend == cpu_*`, `FellBackToCPU == true` when unavailable.
+- [ ] Add and wire a runtime parameterization GPU job queue (JobService
+      `GpuQueue` participant) so work records inside the renderer frame context
+      with no extra present.
+- [ ] Add the runtime/config backend request and requested/actual/fallback
+      result telemetry; gate on `IDevice::IsOperational()` and fall back to CPU
+      when unavailable.
 - [ ] Preserve determinism within the documented GPU parity tolerance; preserve SLIM injectivity on the GPU path.
 
 ## Tests
 - [ ] Opt-in `tests/integration/runtime/Test.ParameterizationGpuBackendGpuSmoke.cpp` labeled `gpu;vulkan` (mirroring `Test.KMeansGpuBackendGpuSmoke.cpp` — the adapter under test is runtime-owned): on a Vulkan-capable host the GPU ARAP/SLIM result matches the CPU reference within the documented parity tolerance, with zero flips for SLIM.
-- [ ] Fallback: on the Null/non-operational device a `Backend::GPU` request returns `ActualBackend == cpu_*` with `FellBackToCPU == true` (runs in the default CPU gate).
+- [ ] Fallback: on the Null/non-operational device the runtime GPU request
+      reports an actual CPU backend and `FellBackToCPU == true` (default gate).
 - [ ] Determinism within tolerance across two GPU runs.
 
 ## Docs

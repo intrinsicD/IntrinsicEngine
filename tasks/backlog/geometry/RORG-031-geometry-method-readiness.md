@@ -21,16 +21,16 @@ depends_on: []
 ## Context
 - Geometry remains a core subsystem target for migration and future
   methods/paper integration; `geometry -> core` only.
-- Open children (all under `tasks/backlog/geometry/`): `GEOM-013` (dual
-  contouring), `GEOM-014` (FA-QEM simplification), `GEOM-024`
+- Open children (under `tasks/backlog/geometry/` unless marked active): `GEOM-013` (dual
+  contouring), `GEOM-024`
   (generalized eigensolver seam, gated on GEOM-020), `GEOM-058`
   (Gaussian mixtures + Anderson-accelerated EM), `GEOM-059`
   (kernels/Nyström/Gaussian-process interpolation), `GEOM-060`
   (permutohedral lattice filtering), `GEOM-061` (grid-downsampling
-  reduction strategies), `GEOM-062` (point-set projection kernels), `GEOM-063`
-  (parameterization dispatch), and `GEOM-064` (parameterization optimization
+  reduction strategies), `GEOM-062` (point-set projection kernels), active
+  `GEOM-063` (typed CPU parameterization dispatch), and `GEOM-064` (parameterization optimization
   kernels).
-- Retired children/foundations: `GEOM-005..012`, `GEOM-015`, `GEOM-016`,
+- Retired children/foundations: `GEOM-005..012`, `GEOM-014..016`,
   `GEOM-017`, `GEOM-019..023`, `GEOM-025..034`, `GEOM-037..052`,
   `GEOM-054`, `GEOM-055`, `GEOIO-002`, and `GEOIO-003`
   (narratives in the retirement log; index in the category README).
@@ -65,9 +65,10 @@ depends_on: []
 
 ## Verification
 ```bash
-for t in GEOM-013 GEOM-014 GEOM-024 GEOM-058 GEOM-059 GEOM-060 GEOM-061 GEOM-062 GEOM-063 GEOM-064; do
+for t in GEOM-013 GEOM-024 GEOM-058 GEOM-059 GEOM-060 GEOM-061 GEOM-062 GEOM-064; do
   ls tasks/backlog/geometry/${t}-*.md >/dev/null || { echo "missing ${t}"; exit 1; }
 done
+ls tasks/active/GEOM-063-*.md >/dev/null || { echo "missing active GEOM-063"; exit 1; }
 python3 tools/agents/validate_tasks.py --root tasks --strict
 python3 tools/docs/check_doc_links.py --root .
 ```

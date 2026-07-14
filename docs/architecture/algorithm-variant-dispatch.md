@@ -4,8 +4,11 @@ Status: canonical template. `Geometry.KMeans` is the first implemented exemplar
 for the CPU-reference plus RHI-visible seam; GEOM-056 adds the opt-in
 Vulkan-compute execution surface behind that seam.
 
-This document describes the Strategy x Backend seam for geometry and method
-algorithms that may later gain GPU execution. The first exemplar is
+This document describes typed strategy dispatch and the optional backend seam
+for geometry and method algorithms. A backend selector is justified only when a
+second implementation exists or an active task owns it; future possibility
+alone does not justify a CPU/GPU token or fallback branch. The first full
+Strategy × Backend exemplar is
 `Geometry.KMeans`: its CPU reference path is implemented in `src/geometry`,
 `Extrinsic.Runtime.KMeansBackend` provides the `RHI::IDevice`-visible
 convenience overload that falls back honestly, and
@@ -19,14 +22,18 @@ honestly when that backend is unavailable.
 
 ## Axes
 
-Dispatchable algorithm families have two independent dimensions:
+Dispatchable algorithm families have a strategy dimension and, when justified
+by real implementations, an independent backend dimension:
 
 | Axis | Mechanism | Meaning |
 |---|---|---|
 | Strategy | `std::variant<...>` or a small enum when no per-strategy payload is needed | Which algorithmic variant runs |
-| Backend | `enum class Backend { CPU, GPU }` | Where execution is requested |
+| Backend (optional) | A small enum owned at the lowest layer that can execute or route every advertised value | Where execution is requested |
 
-The backend enum is intentionally small at this seam:
+Do not expose a backend selector merely to report that the only implementation
+ran. Add requested/actual backend telemetry when a second backend exists or is
+owned by an active task; keep GPU availability and fallback at the RHI-visible
+integration boundary. When that trigger is met, keep the backend enum small:
 
 - `Backend::CPU` maps to the method backend token `cpu_reference` unless a task
   explicitly introduces `cpu_optimized`.
@@ -124,8 +131,8 @@ export namespace Geometry::KMeans
 ```
 
 For families that do not yet need multiple strategy payload types, the strategy
-axis can be a small enum or omitted. Keep the backend and result telemetry the
-same so the family can grow without changing the integration contract.
+axis can be a small enum or omitted. For families with only one real backend,
+omit backend values and telemetry until the reintroduction trigger above is met.
 
 ## CPU Dispatch
 
@@ -181,10 +188,11 @@ namespace Geometry::KMeans
 }
 ```
 
-The CPU entry point may accept a backend request in its params so callers can use
-one config struct everywhere. `Geometry.KMeans` uses the existing
-`KMeansParams::Compute` field for that request. The CPU-only function still
-executes the CPU reference path and reports that fact through `ActualBackend`.
+Once a real backend seam exists, the CPU entry point may accept a backend request
+in its params so callers can use one config struct everywhere.
+`Geometry.KMeans` uses the existing `KMeansParams::Compute` field for that
+request. A CPU-only family without that seam should expose neither the request
+nor synthetic `ActualBackend` telemetry.
 
 ## GPU-Capable Overload
 
@@ -252,9 +260,10 @@ across drains. `IDevice::ReadBuffer` remains the explicit-stall escape hatch. Se
 
 ## Config And Agent Lane
 
-The backend field on the algorithm params is the supported override surface for
-runtime config, CLI, editor, or agent-authored configuration. It is not a
-hardcoded constant inside the algorithm implementation.
+For a family with a justified backend seam, the backend field on the algorithm
+params is the supported override surface for runtime config, CLI, editor, or
+agent-authored configuration. It is not a hardcoded constant inside the
+algorithm implementation.
 
 Recommended flow:
 
@@ -274,17 +283,17 @@ Use this checklist when adding a new dispatchable family:
 
 - Define strategy payload structs only when the algorithm has real strategy
   variants with distinct parameters.
-- Define `Backend::CPU` and `Backend::GPU`; map them to method backend-policy
-  tokens in docs or diagnostics.
-- Put shared config, strategy selection, and requested backend in the params
-  struct.
-- Put output payload, convergence/diagnostics, requested backend,
-  `ActualBackend`, and fallback telemetry in the result struct.
+- Add backend tokens only when a second implementation exists or an active task
+  owns it; map real tokens to method backend policy in docs or diagnostics.
+- Put shared config and strategy selection in the params struct; add a requested
+  backend only after that backend trigger is met.
+- Put output payload and convergence/diagnostics in the result struct; add
+  requested/actual/fallback telemetry only for a real backend seam.
 - Export a CPU-only free function from the owning layer with no RHI dependency.
-- Add a GPU-capable overload only in a layer that may import RHI, using
-  `Extrinsic::RHI::IDevice&`.
-- Gate GPU execution on `IDevice::IsOperational()` and explicit strategy support.
-- Fall back to the CPU reference path with honest telemetry.
+- When GPU execution is owned, add its overload only in a layer that may import
+  RHI, using `Extrinsic::RHI::IDevice&`.
+- Gate an owned GPU path on `IDevice::IsOperational()` and explicit strategy
+  support, and fall back to the CPU reference with honest telemetry.
 - Add CPU unit tests for each strategy and fallback/telemetry tests for any
   RHI-backed overload.
 

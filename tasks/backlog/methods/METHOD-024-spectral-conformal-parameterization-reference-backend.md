@@ -10,7 +10,9 @@ maturity_target: CPUContracted
 - Add the Spectral Conformal Parameterization (SCP) variant to the shared parameterization surface: a free-boundary conformal map that pins **no** vertices — it is recovered as the smallest non-trivial generalized eigenvector of the conformal-energy matrix against a boundary-area matrix — so the family gains a state-of-the-art conformal strategy with lower distortion and no pin-placement artifacts compared to two-point-pinned LSCM.
 
 ## Non-goals
-- No new parameterization module — SCP is a `Strategy` value on the `Geometry.Parameterization` surface (`GEOM-063`), not a parallel module.
+- No parallel parameterization family — SCP adds a typed `ScpParams`
+  alternative to the `Geometry.Parameterization` strategy variant from
+  `GEOM-063`.
 - No private eigensolver — the generalized symmetric eigenproblem is solved through the `GEOM-024` `Geometry` eigensolver seam; SCP must not embed a private Spectra/LOBPCG path.
 - No optimized or GPU backend — none is planned for this strategy: the map is a one-shot sparse generalized eigensolve, and the family GPU task `METHOD-026` deliberately covers only the iterative ARAP/SLIM strategies. A future GPU need opens its own method/backend task.
 - No cone/cutting change.
@@ -18,11 +20,15 @@ maturity_target: CPUContracted
 ## Context
 - Paper/method: Mullen, Tong, Alliez & Desbrun, "Spectral Conformal Parameterization", Computer Graphics Forum 27(5), SGP 2008. SCP minimizes the LSCM conformal energy `E_C = E_D − A` (Dirichlet energy minus signed UV area) subject to a boundary-normalization constraint, which is a generalized eigenproblem `E_C x = λ B x` with `B` a boundary mass matrix; the smallest non-trivial eigenvector is the conformal map. Because no vertices are pinned, the map is free of the pin-induced distortion that LSCM incurs.
 - Method package: `methods/geometry/spectral_conformal/` (manifest-only; id `geometry.spectral_conformal`), following the `signed_heat` pattern — the reference lives in the shared `src/geometry` `Geometry.Parameterization` module.
-- Surface gate: `GEOM-063` supplies the `Scp` strategy slot and the shared params/result/diagnostics. Solver gate: `GEOM-024` (`Geometry` sparse symmetric generalized eigensolver, Spectra-backed, gated on retired `GEOM-020`) supplies the eigen-decomposition — the same seam `METHOD-006` (cross-field design) depends on. Reuses the cotangent Laplacian / area terms from `Geometry.HalfedgeMesh.DEC` for the conformal-energy assembly and `Geometry.HalfedgeMesh.Boundary` for the boundary mass matrix.
+- Surface gate: `GEOM-063` supplies the typed variant and shared
+  result/diagnostics. This task defines `ScpParams`, adds it to the variant, and
+  implements its visitor branch. Solver gate: `GEOM-024` supplies the sparse
+  symmetric generalized eigensolver used by the conformal-energy problem.
 - LSCM (`Lscm` strategy) is the parity companion: on a well-conditioned disk SCP and LSCM agree up to a similarity transform, and SCP reports conformal distortion at or below LSCM. New SOTA pack recorded in `docs/architecture/parameterization-mapping-roadmap.md`.
 
 ## Control surfaces
-- Config/UI/Agent: none new — `Scp` becomes selectable on the existing `ParameterizationStrategy` axis; runtime/config-lane and editor surfaces are owned by `RUNTIME-176` / `UI-036`.
+- Config/UI/Agent: none new — `ScpParams` becomes a real strategy alternative;
+  `RUNTIME-176` / `UI-036` own its stable config token and editor controls.
 
 ## Backends
 - Backend axis: `cpu_reference` only. No `gpu_vulkan_compute` backend is planned — `METHOD-026` covers only the iterative strategies. The eigensolve is a one-shot spectral solve, so no `cpu_optimized` is planned either unless a benchmark justifies it.
@@ -49,7 +55,8 @@ maturity_target: CPUContracted
 - [ ] Regenerate `docs/api/generated/module_inventory.md` if the module surface changes.
 
 ## Acceptance criteria
-- [ ] `Scp` is selectable on the shared `ParameterizationStrategy` axis; the map is pin-free and matches LSCM up to a similarity on the parity fixture.
+- [ ] `ScpParams` is selectable on the shared typed strategy variant; the map
+      is pin-free and matches LSCM up to a similarity on the parity fixture.
 - [ ] All correctness tests pass in the default CPU gate; benchmark smoke manifest validates and runs.
 - [ ] Public API exposes only `std`/`glm`/geometry-owned records; the `GEOM-024` eigensolver backs the spectral solve (no private eigen code).
 

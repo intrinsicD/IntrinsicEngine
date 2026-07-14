@@ -16,18 +16,27 @@ maturity_target: Operational
 
 ## Context
 - Paper/method: Liu, Ye, Chai, Zhao, Wang & Liu, "Progressive Parameterizations", ACM TOG 37(4), SIGGRAPH 2018 — a progressive penalty / reference-update scheme that dramatically reduces the iteration count of ARAP/SLIM-style local/global solves while preserving the target energy, plus optional Anderson acceleration of the fixed-point iteration.
-- Owner/layer: `src/geometry` optimized path behind the same `Geometry.Parameterization` surface (`Backend` selects `cpu_reference` vs `cpu_optimized`); the reference bodies from `METHOD-021`/`METHOD-022` stay the parity oracle. Reuses the `GEOM-064` kernels (local step, proxy, injective line search) — the optimized backend changes the schedule, not the primitives.
-- Backend policy: per `docs/methods/backend-policy.md` and `docs/architecture/algorithm-variant-dispatch.md`, the result must report `RequestedBackend`/`ActualBackend`; `cpu_optimized` is an explicit token distinct from `cpu_reference`.
+- Owner/layer: `src/geometry`; the optimized path applies only to the typed
+  ARAP/SLIM strategy alternatives. This task introduces their real execution
+  policy and requested/actual telemetry when the second CPU implementation
+  lands; it does not add a family-wide backend token to LSCM/SCP/BFF.
+- Backend policy: the METHOD-021/022 reference bodies stay the parity oracle.
+  `cpu_optimized` is an explicit iterative-strategy token distinct from
+  `cpu_reference`, with measurable fallback and parity diagnostics.
 - Benchmark policy: per the benchmark workflow, a speedup claim requires a baseline comparison on declared fixtures; the comparison benchmark records reference and optimized runtime and the parity delta.
 
 ## Control surfaces
-- Config/UI/Agent: none new — `cpu_optimized` is selectable through the existing `Backend`/policy token the `RUNTIME-176` config lane and `UI-036` panel already expose; this task makes that token do real work for the iterative strategies.
+- Config/UI/Agent: this task extends the RUNTIME-176 config/result model and
+  UI-036 panel with `cpu_optimized` only for ARAP/SLIM after the implementation
+  exists; no placeholder choice is exposed beforehand.
 
 ## Backends
 - Backend axis: adds `cpu_optimized` with parity to `cpu_reference`; `gpu_vulkan_compute` deferred to `METHOD-026`.
 
 ## Required changes
-- [ ] Add the progressive/accelerated optimized path for the `Arap` and `Slim` strategies behind the `Backend` axis, reusing `GEOM-064` primitives; keep the reference path unchanged and selectable.
+- [ ] Add the progressive/accelerated optimized path and an explicit
+      reference/optimized execution policy to `ArapParams` and `SlimParams`,
+      reusing GEOM-064 primitives; keep the reference path selectable.
 - [ ] Parity: on the shared fixtures the optimized result matches the reference symmetric-Dirichlet energy and UVs within a documented tolerance, and preserves injectivity for SLIM.
 - [ ] Deterministic: identical `(mesh, params, backend)` produce bitwise-identical output across runs and thread counts.
 - [ ] Report `ActualBackend == cpu_optimized` (and honest fallback to `cpu_reference` when the optimized path declines an input, e.g. a mesh below a size threshold).
@@ -64,4 +73,6 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - No GPU work in this task; no `std::rand` or global RNG state.
 
 ## Maturity
-- Target: `Operational` (CPU) — the optimized backend runs behind the `Backend` axis with parity tests and a baseline benchmark. `gpu_vulkan_compute` is owned by `METHOD-026`.
+- Target: `Operational` (CPU) — the optimized backend runs through the
+  ARAP/SLIM-specific execution policy with parity tests and a baseline
+  benchmark. `gpu_vulkan_compute` is owned by `METHOD-026`.

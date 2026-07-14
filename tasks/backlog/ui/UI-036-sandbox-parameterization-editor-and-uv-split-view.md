@@ -7,7 +7,10 @@ maturity_target: Operational
 # UI-036 — Sandbox parameterization editor panel and resizable UV split view
 
 ## Goal
-- Add the Sandbox editor window that lets a user pick a parameterization strategy (Tutte/Harmonic/LSCM/SCP/ARAP/SLIM/BFF) and a backend (CPU reference/optimized, Vulkan compute), tune the parameters, apply the map to the selected mesh through the validated config apply path, and — in a **resizable split view** in the same window — see the resulting 2D UV layout beside the controls, with a checker/grid background, a per-face distortion heatmap overlay, and honest requested-vs-actual backend and distortion feedback.
+- Add the Sandbox editor window that lists only parameterization strategies
+  implemented at landing, edits their typed parameters through the validated
+  config path, applies the map, and shows the 2D UV layout in a resizable split
+  view with checker/grid and distortion feedback.
 
 ## Non-goals
 - No algorithm, runtime, or config code — the panel is presentation only and calls the `RUNTIME-176` facade/config surface and reads its `SandboxEditorParameterizationViewModel`; it never receives `Engine&` or owns geometry/runtime/asset state.
@@ -17,10 +20,14 @@ maturity_target: Operational
 
 ## Context
 - Owner/layer: `src/app/Sandbox/Editor/` (ImGui panels). `app -> runtime` only; panels import runtime seams, not lower layers.
-- Panel pattern to mirror: `Sandbox.MethodPanels.cpp` (the K-Means panel — a `Backend##` `BeginCombo` selects the variant, Apply calls `Runtime::ApplySandboxEditor...Command`, requested-vs-actual backend + fallback reason are rendered). The **config-lane** exemplar is the progressive-Poisson panel: an editor mirror config type with `Make*` converters and an apply routed through `EngineConfigControl::PreviewEngineConfigControlDocument` / `ApplyEngineConfigHotSubset`. Mirror it so the panel is the config lane's UI surface, not a private path. The UV-controls precedent (checker toggle, atlas diagnostics) is the retired `UI-014` mesh Appearance UV surface.
+- Panel pattern to mirror: `Sandbox.MethodPanels.cpp` for command routing and
+  the progressive-Poisson panel for preview/apply through the config lane. Do
+  not copy K-Means backend controls into this CPU-only surface.
 - Window registration: `UI-034` `Runtime.EditorWindowRegistry` (decentralized `EditorWindowDescriptor` registration, lazy lifecycle, one input-capture snapshot) — register through it, not a central enum. Closed windows cost nothing.
 - Split-view mechanism (per `ADR-0025`): one registered window split into a left **controls** pane and a right **UV layout** pane by a draggable `ImGui` splitter (child regions / `ImGui::Table` with a resizable column, or a stored split ratio with an invisible-button splitter). The UV pane maps the `SandboxEditorParameterizationViewModel` UVs into pane-local coordinates and draws chart fills / triangle edges / seams via `ImGui::GetWindowDrawList()`; the adapter already forwards arbitrary draw lists, so this needs no renderer change.
-- Interactive control: clicking a boundary/interior vertex in the UV pane (nearest `v:texcoord` in pane space) toggles a pin, and BFF exposes the `BoundaryTarget` mode (`AutomaticConformal`/`TargetLengths`/`TargetAngles`) plus cone add/remove; all edits are written into the editor mirror of `ParameterizationConfig` and applied through the `RUNTIME-176` config-routed command (preview → apply), never a private call.
+- Interactive controls are generated only for real config alternatives. Current
+  pin/boundary edits use the RUNTIME-176 validated apply path; future method
+  tasks add ARAP/SLIM/SCP/BFF controls with their concrete payloads.
 - The applied UVs are written back to the selected mesh by the `RUNTIME-176` facade (`v:texcoord` + dirty tag, undoable), so the 3D mesh's checker material and the UV pane update together — this is the `Operational`, visible-in-sandbox proof.
 
 ## Control surfaces
@@ -30,28 +37,32 @@ maturity_target: Operational
 ## Required changes
 - [ ] Add a registered parameterization window in `src/app/Sandbox/Editor/` (mirroring `Sandbox.MethodPanels.cpp`), receiving `SandboxEditorContext`, not `Engine&`, with a draggable two-pane splitter (controls | UV layout) and a persisted-in-panel split ratio.
 - [ ] Strategy selector reflecting the strategies `Geometry.Parameterization` implements; disable/annotate strategies not yet available so the UI never offers an unimplemented variant.
-- [ ] Backend selector (CPU reference / CPU optimized / Vulkan compute) mapping to the `Backend` request, with options disabled/annotated when unavailable (no operational device; optimized/GPU not yet landed).
-- [ ] Parameter widgets for the shared and per-strategy knobs (boundary policy; ARAP/SLIM iterations + tolerance; BFF `BoundaryTarget` mode + boundary targets + cones; SCP options; pinned vertices; seed), edited into the editor mirror of `ParameterizationConfig` and applied through the `RUNTIME-176` config-routed command (preview → apply).
+- [ ] Parameter widgets for each implemented strategy's actual config payload,
+      edited through the RUNTIME-176 preview/apply path; no future-only knobs.
 - [ ] UV layout pane: draw the `SandboxEditorParameterizationViewModel` as 2D triangle edges + chart fills over a toggleable unit-square grid / checker background, with fit-to-pane and zoom/pan; a distortion-heatmap toggle colors faces by the per-face distortion scalar.
-- [ ] Interactive pin toggling in the UV pane and the BFF boundary-mode/cone controls, routed through the config-routed apply (no private subsystem poke).
-- [ ] Render requested-vs-actual backend id, CPU-fallback reason, chosen strategy, and the `ParameterizationDiagnostics` summary (conformal/area/symmetric-Dirichlet/flipped) from `SandboxEditorParameterizationResult`.
+- [ ] Interactive pin/boundary edits route through config apply; later method
+      tasks own controls for their added payloads.
+- [ ] Render chosen strategy, status, and the `ParameterizationDiagnostics`
+      summary from `SandboxEditorParameterizationResult`.
 - [ ] Apply/undo affordances routed through the runtime command so edits are undoable via `EditorCommandHistory`.
 
 ## Tests
 - [ ] Extend the app/editor panel registration coverage (or a headless panel-model test where one exists) to assert the parameterization window registers through the `UI-034` registry and produces a valid apply request from a param set without ImGui frame state.
-- [ ] Backend/strategy gating: the panel does not emit a request for an unimplemented strategy or a GPU backend on a non-operational device (it annotates instead).
+- [ ] Strategy gating: the panel cannot emit an unimplemented strategy token.
 - [ ] View-model mapping: given a `SandboxEditorParameterizationViewModel`, the pane-space projection helper maps every UV inside the pane rect and preserves face count (pure model-level assertion, no ImGui frame).
-- [ ] Result rendering: given a `SandboxEditorParameterizationResult` with `FellBackToCPU`, the panel surfaces the fallback reason (model-level assertion).
+- [ ] Result rendering surfaces status and diagnostics (model-level assertion).
 
 ## Docs
 - [ ] Update the Sandbox editor UI inventory / user-facing sandbox docs with the parameterization window, the UV split view, and its config-lane parity note.
 - [ ] Cross-link the parameterization method-package READMEs to the editor window as the interactive surface; reference `ADR-0025` for the derived-view rationale.
 
 ## Acceptance criteria
-- [ ] Selecting a mesh, choosing a strategy/backend, tuning params, and applying parameterizes the mesh and updates both the 3D checker view and the UV layout pane, undoably.
+- [ ] Selecting a mesh, choosing an implemented strategy, tuning params, and
+      applying updates both the 3D checker view and UV layout pane, undoably.
 - [ ] The controls/UV split is resizable via the draggable splitter; the distortion overlay and grid/checker background toggle correctly.
 - [ ] The panel drives the `RUNTIME-176` validated apply path (no private subsystem poke); config-file and agent drivers stay co-equal.
-- [ ] Requested-vs-actual backend and distortion feedback are shown; unavailable strategies/backends are annotated, not offered.
+- [ ] Strategy status and distortion feedback are shown; unimplemented
+      strategies are not offered.
 - [ ] `app -> runtime` only; the panel owns no engine state.
 
 ## Verification
@@ -68,7 +79,7 @@ Interactive proof (Vulkan-capable host): launch `ExtrinsicSandbox`, select a dis
 ## Forbidden changes
 - No `Engine&` in panel callbacks; no UI ownership of geometry/runtime/asset state.
 - No private apply path that the config file/agent lane cannot reproduce.
-- No offering an unimplemented strategy or a GPU backend on a non-operational device.
+- No offering an unimplemented strategy or placeholder backend selector.
 - No enabling ImGui docking or writing `imgui.ini` in this task (the split is a manual splitter; docking is a separate opt-in if ever wanted).
 
 ## Maturity

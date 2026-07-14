@@ -10,7 +10,9 @@ maturity_target: CPUContracted
 - Add the Boundary First Flattening (BFF) variant to the shared parameterization surface: an interactive conformal (angle-preserving) flattening that lets the caller directly prescribe boundary data — either target boundary lengths or target boundary exterior angles (curvature) — with optional interior cone singularities, so the family gains the state-of-the-art *controllable* conformal strategy that maps directly onto the UI's "full control over the parameterization" requirement.
 
 ## Non-goals
-- No new parameterization module — BFF is a `Strategy` value on the `Geometry.Parameterization` surface (`GEOM-063`), not a parallel module.
+- No parallel parameterization family — BFF adds a typed `BffParams`
+  alternative to the `Geometry.Parameterization` strategy variant from
+  `GEOM-063`.
 - No automatic cone-placement solver — cones are caller-supplied here (curvature prescribed at supplied interior vertices); an automatic cone-count/placement optimizer is a named future follow-up, not this task.
 - No optimized or GPU backend — none is planned for this strategy: the flattening is a pair of one-shot sparse LDLT solves, and the family GPU task `METHOD-026` deliberately covers only the iterative ARAP/SLIM strategies. A future GPU need opens its own method/backend task.
 - No isometric/injective optimization (that is ARAP/SLIM).
@@ -18,7 +20,10 @@ maturity_target: CPUContracted
 ## Context
 - Paper/method: Sawhney & Crane, "Boundary First Flattening", ACM TOG 37(1), 2018. BFF reduces flattening to the boundary via the Dirichlet-to-Neumann (Poincaré–Steklov) operator: prescribing either boundary scale factors (from target lengths) or boundary geodesic curvature (from target exterior angles) determines the conjugate quantity, after which the interior is recovered by two sparse cotangent-Laplacian solves and a boundary curve is integrated. Cone singularities are prescribed interior curvature. The result is discretely conformal and the boundary is directly controllable — the property that makes it the interactive-editing method in modern tools.
 - Method package: `methods/geometry/boundary_first_flattening/` (manifest-only; id `geometry.boundary_first_flattening`), following the `signed_heat` pattern — the reference lives in the shared `src/geometry` `Geometry.Parameterization` module.
-- Surface gate: `GEOM-063` supplies the `Bff` strategy slot and the shared params/result/diagnostics. Reuses the cotangent Laplacian / mass operators from `Geometry.HalfedgeMesh.DEC`, `Geometry.Sparse::SparseLDLT` (`GEOM-020` SPD seam) for the interior solves, and `Geometry.HalfedgeMesh.Boundary` for boundary-loop extraction. No eigensolver needed (that is SCP, `METHOD-024`).
+- Surface gate: `GEOM-063` supplies the typed variant and shared
+  result/diagnostics. This task defines `BffParams`, adds it to the variant, and
+  implements its visitor branch. It reuses the cotangent Laplacian/mass
+  operators, `Geometry.Sparse::SparseLDLT`, and boundary-loop extraction.
 - Control model: the `Bff` strategy payload carries a `BoundaryTarget { AutomaticConformal, TargetLengths, TargetAngles }` mode, the per-boundary-vertex target array for the non-automatic modes, and a caller-supplied cone list (interior vertex ids + prescribed curvature). These are exactly the knobs `RUNTIME-176`/`UI-036` expose for interactive control; the default `AutomaticConformal` mode needs no user input and yields the free-boundary conformal disk.
 - New SOTA pack beyond the original roadmap; recorded as an added pack in `docs/architecture/parameterization-mapping-roadmap.md`.
 
@@ -51,7 +56,8 @@ maturity_target: CPUContracted
 - [ ] Regenerate `docs/api/generated/module_inventory.md` if the module surface changes.
 
 ## Acceptance criteria
-- [ ] `Bff` is selectable on the shared `ParameterizationStrategy` axis with `AutomaticConformal`/`TargetLengths`/`TargetAngles` modes and caller cones.
+- [ ] `BffParams` is selectable on the shared typed strategy variant with
+      `AutomaticConformal`/`TargetLengths`/`TargetAngles` modes and caller cones.
 - [ ] Boundary length/angle control is verified within tolerance; automatic mode is conformal at or below LSCM distortion.
 - [ ] All correctness tests pass in the default CPU gate; benchmark smoke manifest validates and runs.
 - [ ] Public API exposes only `std`/`glm`/geometry-owned records (no Eigen); layering holds (`geometry -> core`).
