@@ -812,6 +812,7 @@ set(_graphics_contract_cpu_test_files
     Test.SelectionPassContracts.cpp
     Test.SelectionSystemContracts.cpp
     Test.SurfacePassContracts.cpp
+    Test.TransformSyncSystem.cpp
     Test.TransientDebugSurfacePass.cpp
     Test.VisualizationOverlayPass.cpp
     Test.VisualizationPropertyBufferResidency.cpp

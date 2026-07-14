@@ -4,9 +4,10 @@
 
 module;
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <span>
-#include <cstdint>
 
 #include <glm/glm.hpp>
 
@@ -40,6 +41,11 @@ export namespace Extrinsic::Graphics
         void Initialize();
         void Shutdown();
         void SyncGpuBuffer(std::span<const TransformSyncRecord> records, GpuWorld& gpuWorld);
+
+        // Test seam: number of instances currently carrying previous-model
+        // state. Lets tests assert the stale sweep evicts entries whose
+        // instance stopped appearing in `records` without a GPU readback.
+        [[nodiscard]] std::size_t GetTrackedInstanceCountForTest() const noexcept;
 
         [[nodiscard]] bool IsInitialized() const noexcept;
 
