@@ -86,6 +86,9 @@ jobs:
           python3 tests/regression/tooling/Test.TestBuildAggregates.py
           python3 tests/regression/tooling/Test_CiPrerequisiteGuards.py
 
+      - name: Validate CMake backend selection stability
+        run: python3 tests/regression/tooling/Test.CMakeBackendSelection.py -v
+
       - name: Validate generated module inventory freshness
         run: |
           python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md

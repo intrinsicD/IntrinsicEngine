@@ -43,7 +43,6 @@ the authoritative open/unblocked view.
 
 - unblocked: `BUG-081` — Warm-configure CI budget still flakes on hosted-runner variance (tasks/backlog/bugs/BUG-081-warm-configure-budget-runner-variance.md)
 - unblocked: `BUG-083` — Vulkan Sandbox shutdown reports driver and DBus leaks under LeakSanitizer (tasks/backlog/bugs/BUG-083-vulkan-sandbox-shutdown-lsan-leaks.md)
-- unblocked: `BUG-084` — First configure can omit the default Vulkan backend (tasks/backlog/bugs/BUG-084-first-configure-backend-selection-order.md)
 
 ## Theme H — Agentic workflow hardening
 

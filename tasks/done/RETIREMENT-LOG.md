@@ -4581,3 +4581,14 @@ wraps the engine-owned static teardown and pairs its clean exit with an
 unsuppressed, named 4,096-byte synthetic engine leak that LeakSanitizer must
 reject. No production lifetime, backend-selection, or sanitizer-suppression
 semantics changed.
+
+[`BUG-084`](BUG-084-first-configure-backend-selection-order.md) — first-configure
+backend selection retired to `tasks/done/` on 2026-07-14 at `CPUContracted`.
+The top-level build now owns cached `EXTRINSIC_PLATFORM` and
+`EXTRINSIC_BACKEND` inputs before renderer/platform subdirectories consume
+them; platform still owns the unchanged `Auto|Null|Glfw` resolution. A
+compiler-free CMake regression proves clean/warm equality for defaults,
+explicit overrides, and headless Null selection while its negative control
+reproduces the former clean-target-OFF / warm-target-ON topology. Fresh real
+`ci` and `dev` build directories both exposed `ExtrinsicBackendsVulkan` on the
+first configure and unchanged second configure.

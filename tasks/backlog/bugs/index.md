@@ -5,10 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-084` — First configure can omit the default Vulkan backend](BUG-084-first-configure-backend-selection-order.md):
-  renderer backend selection runs before the platform subdirectory defines
-  and caches the documented default, so a clean configure can omit Vulkan
-  targets that appear on the unchanged second configure.
 - [`BUG-081` — Warm-configure CI budget still flakes on hosted-runner variance](BUG-081-warm-configure-budget-runner-variance.md):
   an exact-vcpkg-hit configure took 22.002 s against the recalibrated 20 s
   budget and stopped the job before ccache restore or compilation; collect a
@@ -16,6 +12,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   headroom while preserving fail-closed semantics.
 
 ## Verified / Closed
+
+- Closed 2026-07-14: [`BUG-084` — First configure can omit the default Vulkan backend](../../done/BUG-084-first-configure-backend-selection-order.md).
+  Shared graphics/platform cache inputs are now defined before any layer
+  consumes them. A compiler-free regression covers clean/warm defaults,
+  explicit overrides, headless Null selection, and the historical clean-OFF /
+  warm-ON failure; fresh real `ci` and `dev` configures expose the Vulkan target
+  on their first and unchanged second configure.
 
 - Closed 2026-07-14: [`BUG-082` — GLFW X11 input-method initialization leaks under LeakSanitizer](../../done/BUG-082-glfw-x11-input-method-lsan-leak.md).
   The clean exact process reaches `glfwTerminate`, unregisters and closes its

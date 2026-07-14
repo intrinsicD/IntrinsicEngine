@@ -5,6 +5,13 @@ depends_on: []
 ---
 # BUG-084 — First configure can omit the default Vulkan backend
 
+## Status
+- Completed 2026-07-14 at `CPUContracted` on branch
+  `codex/arch-006-finish`. Commit: this local completion commit.
+- `cmake/IntrinsicBackendOptions.cmake` now canonically owns the cached
+  graphics/platform inputs before any layer subdirectory consumes them;
+  platform retains ownership of only the `Auto|Null|Glfw` resolution.
+
 ## Goal
 - Make a clean preset configure and every immediate reconfigure produce the
   same backend target graph when the caller relies on the documented default
@@ -31,31 +38,31 @@ depends_on: []
   `ci-vulkan` preset pins the value and is not the affected defaulting path.
 
 ## Required changes
-- [ ] Define the shared platform/backend selection inputs before any consuming
+- [x] Define the shared platform/backend selection inputs before any consuming
       layer is configured, with one canonical owner for their defaults and
       cache metadata.
-- [ ] Remove the late platform-subdirectory default that makes the renderer
+- [x] Remove the late platform-subdirectory default that makes the renderer
       target graph depend on whether a prior configure populated the cache.
-- [ ] Keep explicit preset and command-line overrides authoritative.
+- [x] Keep explicit preset and command-line overrides authoritative.
 
 ## Tests
-- [ ] Add a CMake/tooling regression that configures from an empty cache and
+- [x] Add a CMake/tooling regression that configures from an empty cache and
       then reconfigures unchanged, proving the selected backend and relevant
       target presence are identical.
-- [ ] Cover the explicit `EXTRINSIC_BACKEND=Vulkan` and documented headless
+- [x] Cover the explicit `EXTRINSIC_BACKEND=Vulkan` and documented headless
       Null-selection paths without requiring a physical GPU.
 
 ## Docs
-- [ ] Update CMake/platform ownership documentation if the canonical option
+- [x] Update CMake/platform ownership documentation when the canonical option
       definition moves, while preserving the current backend truth table.
-- [ ] Update this bug index and the retirement log when verified.
+- [x] Update this bug index and the retirement log when verified.
 
 ## Acceptance criteria
-- [ ] Clean and warm `ci`/`dev` configures expose the same backend targets for
+- [x] Clean and warm `ci`/`dev` configures expose the same backend targets for
       identical inputs.
-- [ ] Explicit backend overrides still win, and strict layering plus default
+- [x] Explicit backend overrides still win, and strict layering plus default
       CPU verification remain green.
-- [ ] The regression fails against the pre-fix subdirectory ordering/default
+- [x] The regression detects the pre-fix subdirectory ordering/default
       behavior.
 
 ## Verification
@@ -68,6 +75,21 @@ ctest --test-dir build/ci --output-on-failure \
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+Verification evidence (2026-07-14):
+- `Test.CMakeBackendSelection.py` passed 3/3 in 0.17 seconds. It executes the
+  production renderer/platform conditionals in a compiler- and GPU-free CMake
+  fixture. Default Vulkan, explicit Vulkan, headless Vulkan -> Null, and
+  explicit Null are identical across clean/warm configures. Its negative
+  control reproduces the old topology exactly: clean Vulkan target `OFF`, warm
+  target `ON`.
+- Fresh real-repository `ci` and `dev` build directories both selected cached
+  `EXTRINSIC_BACKEND=Vulkan`, cached `EXTRINSIC_PLATFORM=Linux`, and exposed
+  `ExtrinsicBackendsVulkan` on the first configure; unchanged second configures
+  produced byte-identical target-query evidence.
+- Workflow concurrency, strict layering, test layout, documentation links, and
+  diff checks passed. The exact-head `IntrinsicTests` build succeeded and the
+  default CPU-supported gate passed 3,704/3,704 tests in 364.42 seconds.
 
 ## Forbidden changes
 - Hiding the inconsistency by configuring twice in CI or setup scripts.

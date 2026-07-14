@@ -217,6 +217,10 @@ option(INTRINSIC_HEADLESS_NO_GLFW
     OFF
 )
 
+# Define shared backend-selection inputs before renderer/platform consumers are
+# configured so a clean and an unchanged warm configure produce the same graph.
+include(cmake/IntrinsicBackendOptions.cmake)
+
 set(INTRINSIC_RELEASE_FLAGS
         $<$<CONFIG:Release>:-O3>
         $<$<CONFIG:RelWithDebInfo>:-O3>

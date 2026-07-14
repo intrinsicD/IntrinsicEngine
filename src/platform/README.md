@@ -20,7 +20,11 @@ explicit backend modules under `backends/`.
   creation policy isolated from `Graphics` and `Runtime` imports.
 
 `Platform.CreateWindow.cpp` is the only selected-backend bridge for the public
-`Extrinsic::Platform::CreateWindow` factory. Configure with:
+`Extrinsic::Platform::CreateWindow` factory. The repository root includes
+[`cmake/IntrinsicBackendOptions.cmake`](../../cmake/IntrinsicBackendOptions.cmake)
+before layer subdirectories are configured; that file owns the cached
+`EXTRINSIC_PLATFORM` and `EXTRINSIC_BACKEND` inputs. Platform CMake owns only
+the `Auto|Null|Glfw` resolution below. Configure with:
 
 ```bash
 cmake --preset ci -DINTRINSIC_PLATFORM_BACKEND=Null
