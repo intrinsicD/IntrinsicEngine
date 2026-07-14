@@ -11,29 +11,29 @@ window closed.
 - Commit range: `b57dd36..HEAD` (the head of `claude/intelligent-wright-QpRVo`).
 - Date range: 2026-05-26 → 2026-05-28 (28 non-merge commits).
 - Tasks covered (11):
-  [`GEOM-008`](../../tasks/done/GEOM-008-linear-algebra-solver-infrastructure.md)
+  [`GEOM-008`](../../tasks/archive/GEOM-008-linear-algebra-solver-infrastructure.md)
   (retired; Slice A linear-algebra + sparse-solver infrastructure),
-  [`GEOM-012`](../../tasks/done/GEOM-012-symmetric-domain-views-property-sharing.md)
+  [`GEOM-012`](../../tasks/archive/GEOM-012-symmetric-domain-views-property-sharing.md)
   (active at the time of this audit; Slices A + B landed — `Geometry.DomainViews`;
   retired to `tasks/done/` on 2026-05-29 after Slice E),
-  [`GEOM-016`](../../tasks/done/GEOM-016-point-cloud-filtering-density-contracts.md)
+  [`GEOM-016`](../../tasks/archive/GEOM-016-point-cloud-filtering-density-contracts.md)
   (backlog filing + LDLT follow-up gating METHOD-002/003),
-  [`RUNTIME-082`](../../tasks/done/RUNTIME-082-spatial-debug-adapters.md)
+  [`RUNTIME-082`](../../tasks/archive/RUNTIME-082-spatial-debug-adapters.md)
   (active; Slice C `ConvexHullAdapter` + registry, Slice D extraction pump),
-  [`RUNTIME-085`](../../tasks/done/RUNTIME-085-geometrysources-mesh-residency.md)
+  [`RUNTIME-085`](../../tasks/archive/RUNTIME-085-geometrysources-mesh-residency.md)
   (active; Slices A–C — `Runtime.MeshGeometryPacker` + residency),
-  [`GRAPHICS-076`](../../tasks/done/GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md)
+  [`GRAPHICS-076`](../../tasks/archive/GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md)
   (retired; default-recipe Vulkan smoke graduated),
-  [`GRAPHICS-077`](../../tasks/done/GRAPHICS-077-transient-debug-primitive-upload-helper.md)
+  [`GRAPHICS-077`](../../tasks/archive/GRAPHICS-077-transient-debug-primitive-upload-helper.md)
   /
-  [`GRAPHICS-078`](../../tasks/done/GRAPHICS-078-visualization-overlay-upload-helper.md)
+  [`GRAPHICS-078`](../../tasks/archive/GRAPHICS-078-visualization-overlay-upload-helper.md)
   (overlay Vulkan smokes + retirement commit refs),
-  [`HARDEN-071`](../../tasks/done/HARDEN-071-rhi-manager-handle-identity.md)
+  [`HARDEN-071`](../../tasks/archive/HARDEN-071-rhi-manager-handle-identity.md)
   (retired; RHI buffer/texture manager handle identity),
-  [`HARDEN-072`](../../tasks/done/HARDEN-072-rhi-surface-fixes-for-default-recipe-pipeline-bringup.md)
+  [`HARDEN-072`](../../tasks/archive/HARDEN-072-rhi-surface-fixes-for-default-recipe-pipeline-bringup.md)
   (retired; push-constant limit + virtual default-arg fix),
   INFRA Option A (seal hot dependency cache; backlog
-  [`INFRA-001`](../../tasks/done/INFRA-001-vcpkg-manifest-mode.md)
+  [`INFRA-001`](../../tasks/archive/INFRA-001-vcpkg-manifest-mode.md)
   tracks the follow-on vcpkg move).
 - Sampling: rows 1–9 spot-checked against representative substantive commits
   per task family, with heavy weight on the new module surfaces introduced this
@@ -69,7 +69,7 @@ Notable substantive commits used as evidence anchors:
 ## Follow-ups
 
 - **Row 5 (defensive internal-boundary null checks).** Folded into the existing
-  [`HARDEN-070`](../../tasks/done/HARDEN-070-drop-dead-null-guards-on-reference-initialised-helpers.md)
+  [`HARDEN-070`](../../tasks/archive/HARDEN-070-drop-dead-null-guards-on-reference-initialised-helpers.md)
   cleanup. `ConvexHullAdapter::Append`'s `m_Hull == nullptr` guard
   (`Runtime.SpatialDebugAdapters.cpp:391`) is the same dead-guard pattern on a
   sibling adapter in the *same file* HARDEN-070 already edits, and HARDEN-070
@@ -95,7 +95,7 @@ Notable substantive commits used as evidence anchors:
   exist). This is intentional infrastructure-ahead-of-consumers: GEOM-008's
   `Why` explicitly delivers the CPU numerical-infrastructure gap and defers the
   consuming algorithm rewrites; the consumers are tracked
-  ([`GEOM-020`](../../tasks/done/GEOM-020-sparse-direct-factorization-seam.md),
+  ([`GEOM-020`](../../tasks/archive/GEOM-020-sparse-direct-factorization-seam.md),
   METHOD-002/003 gated on GEOM-016). Flagged here so the next audit does not
   re-open it as drift, and so the next reviewer re-checks that at least one of
   those consumers has begun wiring `Geometry.Linalg` before the gap ages

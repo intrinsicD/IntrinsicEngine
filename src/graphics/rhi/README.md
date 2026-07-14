@@ -216,10 +216,10 @@ any other exported polymorphic RHI interface):
   3 SelectionOutline, and 4/5 object-space normal bake dilation output/scratch.
   Real bindless texture leases start after those bridge slots.
 
-History: HARDEN-072 (`tasks/done/HARDEN-072-rhi-surface-fixes-for-default-recipe-pipeline-bringup.md`)
+History: HARDEN-072 (`tasks/archive/HARDEN-072-rhi-surface-fixes-for-default-recipe-pipeline-bringup.md`)
 removed default arguments from `CopyTextureToBuffer` after they tripped a related
 clang-20 vtable-mangling bug. BUG-013
-(`tasks/done/BUG-013-backbuffer-readback-contract-vtable-segv.md`) was a
+(`tasks/archive/BUG-013-backbuffer-readback-contract-vtable-segv.md`) was a
 backbuffer-readback contract SEGV traced to stale BMIs after `BindFrameSampledTexture`
 was added; it did **not** reproduce on a clean build — the contract suite is
 green (225/225 in `IntrinsicGraphicsContractCpuTests`) once BMIs are consistent.

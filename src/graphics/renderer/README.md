@@ -1690,7 +1690,7 @@ Concretely:
   `GpuTransfer::DrainCompleted(cmd)`, where the facade observes
   `TransferToken` completion and emits exactly one
   `BufferBarrier(TransferWrite -> readyAccess)`. This closes the
-  [BUG-049](../../../tasks/done/BUG-049-gpuworld-geometry-rebind-upload-barriers.md)
+  [BUG-049](../../../tasks/archive/BUG-049-gpuworld-geometry-rebind-upload-barriers.md)
   barrier class for caller-owned transfers without changing `GpuWorld`'s
   existing one-shot managed-upload barriers.
 - `Graphics.GpuTransfer::UploadInCommand(...)` is the opt-in same-command
@@ -2373,7 +2373,7 @@ Concretely:
   spans plus an optional packed unorm8 color stream; `GpuGeometryRecord`
   publishes the retained channel BDAs for active GpuScene shaders.
 - Per
-  [`GRAPHICS-028`](../../../tasks/done/GRAPHICS-028-ecs-renderable-residency-bridge.md),
+  [`GRAPHICS-028`](../../../tasks/archive/GRAPHICS-028-ecs-renderable-residency-bridge.md),
   renderable ECS residency is a runtime-owned bridge. `Runtime.RenderExtraction`
   may keep entity-keyed sidecars containing graphics-owned values such as
   `GpuSceneSlot`, `GpuInstanceHandle`, material instances, and asset generation
@@ -2387,7 +2387,7 @@ Concretely:
   `GpuWorld::GeometryUploadDesc` uploads, `GpuSceneSlot::NamedBuffers`, or
   per-instance updates according to the active domain packer.
 - Per
-  [`GRAPHICS-030`](../../../tasks/done/GRAPHICS-030-runtime-geometry-residency-bridge.md),
+  [`GRAPHICS-030`](../../../tasks/archive/GRAPHICS-030-runtime-geometry-residency-bridge.md),
   the procedural-source first slice of that bridge keeps `GpuWorld`
   domain-agnostic: a runtime-owned `ProceduralGeometryCache` (lives on
   `RenderExtractionCache`) deduplicates `(Kind, Hash(Params))` keys, the
@@ -2402,7 +2402,7 @@ Concretely:
   changes; `Extrinsic.Graphics.GpuWorld` continues to expose only its
   existing `UploadGeometry`/`FreeGeometry`/`SetInstanceGeometry` API.
 - Per
-  [`GRAPHICS-034`](../../../tasks/done/GRAPHICS-034-asset-backed-mesh-residency-bridge.md),
+  [`GRAPHICS-034`](../../../tasks/archive/GRAPHICS-034-asset-backed-mesh-residency-bridge.md),
   asset-backed mesh residency is also runtime-owned. Runtime normalizes
   `AssetInstance::Source` to `Assets::AssetId`, owns the future
   `AssetGeometryCache`, requests CPU payloads through asset services, and
@@ -2414,7 +2414,7 @@ Concretely:
   recorded by GRAPHICS-034 once the implementation child lands, with runtime
   diagnostics owning all failure and stuck-pending counters.
 - Per
-  [`GRAPHICS-031`](../../../tasks/done/GRAPHICS-031-default-debug-surface-material.md),
+  [`GRAPHICS-031`](../../../tasks/archive/GRAPHICS-031-default-debug-surface-material.md),
   the canonical missing-material fallback is the default debug surface
   material at slot 0 (`Extrinsic::Graphics::kDefaultMaterialSlotIndex`),
   registered by `MaterialSystem::Initialize()` as
@@ -2466,7 +2466,7 @@ Concretely:
   `Material.DefaultDebugUVs` is the type-only checker material added by
   GRAPHICS-088. Implementation children GRAPHICS-031-Impl-A (shader sources +
   pipeline + slot-0 repopulation; landed by
-  [`GRAPHICS-031A`](../../../tasks/done/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md):
+  [`GRAPHICS-031A`](../../../tasks/archive/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md):
   the shaders are authored at
   `assets/shaders/forward/default_debug_surface.vert/frag`,
   `MaterialSystem::Initialize()` registers the four built-in types
@@ -2482,7 +2482,7 @@ Concretely:
   and `RebuildOperationalResources()` republish the same descriptor),
   Impl-B (substitution wiring + the three diagnostics counters; landed
   by
-  [`GRAPHICS-031B`](../../../tasks/done/GRAPHICS-031B-default-debug-surface-substitution-and-diagnostics.md):
+  [`GRAPHICS-031B`](../../../tasks/archive/GRAPHICS-031B-default-debug-surface-substitution-and-diagnostics.md):
   the renderer's snapshot-copy step in
   `Graphics.Renderer.cpp::SubmitRuntimeSnapshots()` mutates
   `m_TransformSyncRecords` in place so that records with

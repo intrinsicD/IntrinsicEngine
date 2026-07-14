@@ -3,9 +3,9 @@
 - **Status:** Accepted
 - **Date:** 2026-05-17
 - **Owners:** Runtime extraction (visualization adapters, packet authorship), Graphics (frozen `Extrinsic.Graphics.VisualizationPackets` validation seam, backend-local overlay upload helper)
-- **Related tasks:** [`tasks/done/GRAPHICS-014`](../../tasks/done/GRAPHICS-014-visualization-attributes-overlays.md), [`GRAPHICS-014Q`](../../tasks/done/GRAPHICS-014Q-visualization-runtime-backend-clarifications.md), [`GRAPHICS-010Q`](../../tasks/done/GRAPHICS-010Q-transient-debug-backend-clarifications.md), [`GRAPHICS-088`](../../tasks/done/GRAPHICS-088-resolved-uv-rendering-and-bake-residency.md)
+- **Related tasks:** [`tasks/done/GRAPHICS-014`](../../tasks/archive/GRAPHICS-014-visualization-attributes-overlays.md), [`GRAPHICS-014Q`](../../tasks/archive/GRAPHICS-014Q-visualization-runtime-backend-clarifications.md), [`GRAPHICS-010Q`](../../tasks/archive/GRAPHICS-010Q-transient-debug-backend-clarifications.md), [`GRAPHICS-088`](../../tasks/archive/GRAPHICS-088-resolved-uv-rendering-and-bake-residency.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`docs/architecture/rendering-three-pass.md`](../architecture/rendering-three-pass.md), [`src/graphics/renderer/README.md`](../../src/graphics/renderer/README.md)
-- **Supersedes:** none. Extracted from the `Extrinsic.Graphics.VisualizationPackets` bullet in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
+- **Supersedes:** none. Extracted from the `Extrinsic.Graphics.VisualizationPackets` bullet in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/archive/DOCS-001-reduce-graphics-architecture-prose.md).
 - **Related ADRs:** [ADR-0008](0008-spatial-debug-visualizer-adapters.md) records the analogous `Extrinsic.Runtime.SpatialDebugAdapters` umbrella for spatial debug visualizers; the `Extrinsic.Runtime.VisualizationAdapters` umbrella in this ADR mirrors that pattern. [ADR-0012](0012-imgui-overlay-and-present-finalization.md) and the transient-debug expansion in `GRAPHICS-010Q` are the sibling backend-local upload helpers whose pattern the visualization overlay upload mirrors.
 
 ## Context
@@ -147,9 +147,9 @@ Follow-up tasks required: none from this ADR. Concrete `Extrinsic.Runtime.Visual
 
 ## Validation
 
-- [`tasks/done/GRAPHICS-014`](../../tasks/done/GRAPHICS-014-visualization-attributes-overlays.md) records the underlying `Extrinsic.Graphics.VisualizationPackets` packet contract, `ValidateVisualizationPackets(...)` validator, `VisualizationDiagnostics` field set, and overlay summary shapes.
-- [`tasks/done/GRAPHICS-014Q`](../../tasks/done/GRAPHICS-014Q-visualization-runtime-backend-clarifications.md) records the four clarification decisions captured in §§1–4.
-- [`tasks/done/GRAPHICS-010Q`](../../tasks/done/GRAPHICS-010Q-transient-debug-backend-clarifications.md) records the two-pipeline-variant policy reused by §5 and the transient-debug backend-local upload pattern referenced by §3.
+- [`tasks/done/GRAPHICS-014`](../../tasks/archive/GRAPHICS-014-visualization-attributes-overlays.md) records the underlying `Extrinsic.Graphics.VisualizationPackets` packet contract, `ValidateVisualizationPackets(...)` validator, `VisualizationDiagnostics` field set, and overlay summary shapes.
+- [`tasks/done/GRAPHICS-014Q`](../../tasks/archive/GRAPHICS-014Q-visualization-runtime-backend-clarifications.md) records the four clarification decisions captured in §§1–4.
+- [`tasks/done/GRAPHICS-010Q`](../../tasks/archive/GRAPHICS-010Q-transient-debug-backend-clarifications.md) records the two-pipeline-variant policy reused by §5 and the transient-debug backend-local upload pattern referenced by §3.
 - `docs/architecture/rendering-three-pass.md` carries the matching visualization attribute and overlay packet contract section authored by `GRAPHICS-014Q`.
 - `src/graphics/renderer/README.md` carries the matching ownership-contract bullet next to the existing `Graphics.VisualizationPackets` entry.
 - The default CPU correctness gate (`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) exercises `ValidateVisualizationPackets(...)`, the `VisualizationDiagnostics` counter set, and the snapshot-drop behavior without a Vulkan device.

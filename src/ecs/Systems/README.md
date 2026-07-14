@@ -73,9 +73,9 @@ the world matrix.
 ## Render sync boundary
 
 Per
-[`GRAPHICS-028`](../../../tasks/done/GRAPHICS-028-ecs-renderable-residency-bridge.md),
+[`GRAPHICS-028`](../../../tasks/archive/GRAPHICS-028-ecs-renderable-residency-bridge.md),
 GPU-handle-touching render residency does not belong in ECS systems.
-Per [`HARDEN-066`](../../../tasks/done/HARDEN-066-ecs-render-sync-export-policy.md),
+Per [`HARDEN-066`](../../../tasks/archive/HARDEN-066-ecs-render-sync-export-policy.md),
 `Extrinsic.ECS.System.RenderSync` is a CPU-only tag-forwarding pass that
 translates `Components::Transform::WorldUpdatedTag` (the producer signal
 emitted by `TransformHierarchy`) into `Components::DirtyTags::DirtyTransform`

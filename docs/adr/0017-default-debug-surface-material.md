@@ -3,9 +3,9 @@
 - **Status:** Accepted
 - **Date:** 2026-05-17
 - **Owners:** Graphics (`Extrinsic.Graphics.MaterialSystem` slot 0 registration, default debug surface shader pair, forward graphics pipeline)
-- **Related tasks:** [`tasks/done/GRAPHICS-031`](../../tasks/done/GRAPHICS-031-default-debug-surface-material.md) (parent planning), [`GRAPHICS-031A`](../../tasks/done/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md) (shader pair + pipeline implementation), [`GRAPHICS-088`](../../tasks/done/GRAPHICS-088-resolved-uv-rendering-and-bake-residency.md) (resolved-UV sampling and dedicated surface vertex normals)
+- **Related tasks:** [`tasks/done/GRAPHICS-031`](../../tasks/archive/GRAPHICS-031-default-debug-surface-material.md) (parent planning), [`GRAPHICS-031A`](../../tasks/archive/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md) (shader pair + pipeline implementation), [`GRAPHICS-088`](../../tasks/archive/GRAPHICS-088-resolved-uv-rendering-and-bake-residency.md) (resolved-UV sampling and dedicated surface vertex normals)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`src/graphics/renderer/README.md`](../../src/graphics/renderer/README.md)
-- **Supersedes:** none. Extracted from the `## Material registry and slot contract` GRAPHICS-031 paragraph (lines 727–746) in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
+- **Supersedes:** none. Extracted from the `## Material registry and slot contract` GRAPHICS-031 paragraph (lines 727–746) in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/archive/DOCS-001-reduce-graphics-architecture-prose.md).
 - **Related ADRs:** [ADR-0018](0018-missing-material-fallback-substitution.md) records the substitution policy that uses this material as the fallback. [ADR-0014](0014-procedural-source-residency-bridge.md) records the original `Triangle` packer whose surface lane now uses the promoted `GRAPHICS-088` vertex format. [ADR-0015](0015-reference-scene-bootstrap.md) records the `TriangleProvider` reference entity that depends on this material to compose a frame.
 
 ## Context
@@ -16,7 +16,7 @@ Three forces shape the decision:
 
 1. Slot 0 must produce a deterministic non-black, non-magenta, immediately-visible surface so missing or fallback materials are obvious to a developer without being confused with the GRAPHICS-015 magenta texture fallback ([ADR-0016](0016-texture-residency-and-asset-cache-policy.md) §3).
 2. Slot 0 must not introduce new descriptor sets, new cull buckets, new passes, or new frame-recipe resources — it has to thread through the existing `SurfaceOpaque` cull bucket and scene-table material data so it is a backend-neutral addition.
-3. The vertex format must match the promoted surface packers: the `Triangle` packer planned by GRAPHICS-030-Impl-A (retired as [GRAPHICS-030A](../../tasks/done/GRAPHICS-030A-procedural-geometry-descriptor-cache.md)) and the runtime mesh packer extended by `GRAPHICS-088` both feed the same surface shader lane, so the [ADR-0015](0015-reference-scene-bootstrap.md) reference triangle and imported meshes compose through slot 0 by default.
+3. The vertex format must match the promoted surface packers: the `Triangle` packer planned by GRAPHICS-030-Impl-A (retired as [GRAPHICS-030A](../../tasks/archive/GRAPHICS-030A-procedural-geometry-descriptor-cache.md)) and the runtime mesh packer extended by `GRAPHICS-088` both feed the same surface shader lane, so the [ADR-0015](0015-reference-scene-bootstrap.md) reference triangle and imported meshes compose through slot 0 by default.
 
 This ADR captures the slot-0 material definition (registration name, type ID, flags, base-color factor, pre-population timing, shader pair, vertex format, pipeline state, cull-bucket reuse) plus the debug-variant naming family. The substitution / diagnostics half lives in [ADR-0018](0018-missing-material-fallback-substitution.md) as a separately traceable decision.
 
@@ -122,8 +122,8 @@ Follow-up tasks required: none from this ADR. The debug-variant family registrat
 
 ## Validation
 
-- [`tasks/done/GRAPHICS-031`](../../tasks/done/GRAPHICS-031-default-debug-surface-material.md) records the parent planning contract captured in §§1–6.
-- [`tasks/done/GRAPHICS-031A`](../../tasks/done/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md) records the shader pair, vertex format, descriptor / push-constant reuse, pipeline state, and cull-bucket reuse implementation captured in §§2–5.
+- [`tasks/done/GRAPHICS-031`](../../tasks/archive/GRAPHICS-031-default-debug-surface-material.md) records the parent planning contract captured in §§1–6.
+- [`tasks/done/GRAPHICS-031A`](../../tasks/archive/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md) records the shader pair, vertex format, descriptor / push-constant reuse, pipeline state, and cull-bucket reuse implementation captured in §§2–5.
 - [ADR-0018](0018-missing-material-fallback-substitution.md) records the substitution / diagnostics half (when and why slot 0 replaces a snapshot record's resolved slot, and which counters increment).
 - `src/graphics/renderer/README.md` carries the matching `Graphics.MaterialSystem` ownership-contract bullet documenting the slot-0 contents.
 - The default CPU correctness gate (`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) exercises the slot-0 registration, the `kMaterialLayoutVersion == 1` SSBO layout consumption, and the `RebuildGpuResources()` byte-identical republish without requiring a Vulkan device.

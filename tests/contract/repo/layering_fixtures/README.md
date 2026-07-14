@@ -5,7 +5,7 @@ contract from [`/AGENTS.md`](../../../../AGENTS.md) covers both C++23 module
 imports (`import Extrinsic.<Layer>.*;`) and CMake `target_link_libraries(...)`
 edges. Run via `tests/regression/tooling/Test.CheckLayering.py` and the
 fixture-only command in
-[`tasks/done/WORKSHOP-001-layer-check-module-and-cmake-aware.md`](../../../../tasks/done/WORKSHOP-001-layer-check-module-and-cmake-aware.md).
+[`tasks/archive/WORKSHOP-001-layer-check-module-and-cmake-aware.md`](../../../../tasks/archive/WORKSHOP-001-layer-check-module-and-cmake-aware.md).
 
 ## Layout
 

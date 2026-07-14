@@ -160,7 +160,7 @@ Confirmed:
 - Layering allowlist metadata is known debt. `HARDEN-069` says every allowlist
   row points at retired `HARDEN-010`, contrary to the intended current-task rule,
   in
-  [tasks/done/HARDEN-069-rebind-legacy-layering-allowlist-to-active-retirement-tasks.md](../../tasks/done/HARDEN-069-rebind-legacy-layering-allowlist-to-active-retirement-tasks.md).
+  [tasks/archive/HARDEN-069-rebind-legacy-layering-allowlist-to-active-retirement-tasks.md](../../tasks/archive/HARDEN-069-rebind-legacy-layering-allowlist-to-active-retirement-tasks.md).
 - Documentation checks miss stale links when link labels are inline-code
   formatted. See
   [tools/docs/check_doc_links.py](../../tools/docs/check_doc_links.py#L75).
@@ -311,7 +311,7 @@ treated as ABI-sensitive and verified with a clean preset rebuild.
 1. [src/graphics/renderer/Graphics.Renderer.cpp](../../src/graphics/renderer/Graphics.Renderer.cpp)
    for pass routing, pass-resource lifetime, and decomposition risk.
 2. [tools/docs/check_doc_links.py](../../tools/docs/check_doc_links.py) plus
-   [HARDEN-069](../../tasks/done/HARDEN-069-rebind-legacy-layering-allowlist-to-active-retirement-tasks.md)
+   [HARDEN-069](../../tasks/archive/HARDEN-069-rebind-legacy-layering-allowlist-to-active-retirement-tasks.md)
    for process checks that currently pass while hiding stale links or allowlist
    metadata debt.
 3. [src/graphics/vulkan/Backends.Vulkan.Device.cpp](../../src/graphics/vulkan/Backends.Vulkan.Device.cpp)

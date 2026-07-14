@@ -7,7 +7,7 @@ merges and does not impose per-commit reviewer load. Each weekly sweep covers
 roughly one week of slices, runs in ≤ 60 minutes, and either records "pass" for
 each row or files a tracked follow-up task.
 
-The audit is driven by [`REVIEW-001`](../../tasks/done/REVIEW-001-human-led-agent-week-review-cadence.md);
+The audit is driven by [`REVIEW-001`](../../tasks/archive/REVIEW-001-human-led-agent-week-review-cadence.md);
 findings are saved under `docs/reports/<YYYY-MM-DD>-agent-output-audit.md`.
 
 ## How to run the audit
@@ -188,5 +188,5 @@ reference rows directly.
   checklist (not replaced by this cadence).
 - [`docs/agent/roles.md`](roles.md) — reviewer ownership for the weekly
   cadence.
-- [`tasks/done/REVIEW-001-human-led-agent-week-review-cadence.md`](../../tasks/done/REVIEW-001-human-led-agent-week-review-cadence.md)
+- [`tasks/archive/REVIEW-001-human-led-agent-week-review-cadence.md`](../../tasks/archive/REVIEW-001-human-led-agent-week-review-cadence.md)
   — driving task; calibration window and acceptance criteria.

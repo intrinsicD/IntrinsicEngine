@@ -157,77 +157,77 @@ the runtime SpatialDebug closest-face consumer in `RUNTIME-135`.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
-- [DOCS-003 — Reconcile algorithm-variant-dispatch.md with reality and define the backend-seam template](../../done/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md) (done).
-- [GEOM-020 — Sparse direct factorization solver seam (LDLT/LLT)](../../done/GEOM-020-sparse-direct-factorization-seam.md) (done).
-- [GEOM-023 — Sparse non-symmetric iterative solver seam (BiCGSTAB)](../../done/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md) (done).
-- [GEOM-049 — Numeric/linear-algebra utilities (RPCA, Eigen map adapters)](../../done/GEOM-049-numeric-linalg-utilities.md) (done).
-- [GEOM-050 — Primitive and curve utilities (Bezier, triangle metrics, sphere fit, AABB)](../../done/GEOM-050-primitive-curve-utilities.md) (done).
-- [GEOIO-002 — Geometry IO parity hardening and exporters](../../done/GEOIO-002-geometry-io-parity-hardening.md) (done).
-- [GEOM-006 — Indexed mesh/soup container and conversion contracts](../../done/GEOM-006-indexed-mesh-soup-conversion-contracts.md) (done).
-- [GEOM-007 — Robust predicates and intersection classification foundation](../../done/GEOM-007-robust-predicates-intersection-classification.md) (done).
-- [GEOM-008 — Geometry linear algebra and solver infrastructure](../../done/GEOM-008-linear-algebra-solver-infrastructure.md) (done).
-- [GEOM-009 — Geometry benchmark manifests, fixtures, and smoke benchmark](../../done/GEOM-009-benchmark-manifests-fixtures-smoke.md) (done).
-- [GEOM-010 — Point-cloud algorithm pack roadmap](../../done/GEOM-010-point-cloud-algorithm-pack-roadmap.md) (done; roadmap: [`docs/architecture/point-cloud-algorithm-roadmap.md`](../../../docs/architecture/point-cloud-algorithm-roadmap.md)).
-- [GEOM-011 — Parameterization and mapping roadmap](../../done/GEOM-011-parameterization-mapping-roadmap.md) (done; roadmap: [`docs/architecture/parameterization-mapping-roadmap.md`](../../../docs/architecture/parameterization-mapping-roadmap.md)).
-- [GEOM-012 — Symmetric mesh, graph, and point-cloud domain views](../../done/GEOM-012-symmetric-domain-views-property-sharing.md) (done).
-- [GEOM-016 — Point-cloud filtering and density diagnostics contracts](../../done/GEOM-016-point-cloud-filtering-density-contracts.md) (done).
-- [GEOM-017 — Point-cloud descriptors and registration seams](../../done/GEOM-017-point-cloud-descriptors-registration-seams.md) (done).
-- [GEOM-018 — Parameterization distortion and map-quality diagnostics](../../done/GEOM-018-parameterization-distortion-map-quality-diagnostics.md) (done).
-- [GEOM-015 — GJK termination diagnostics and scale-aware tolerance policy](../../done/GEOM-015-gjk-termination-diagnostics.md) (done).
-- [GEOM-021 — MeshSoup module implementation split](../../done/GEOM-021-meshsoup-module-implementation-split.md).
-- [GEOM-022 — Remaining geometry module implementation splits](../../done/GEOM-022-remaining-geometry-module-implementation-splits.md).
-- [GEOM-025 — UV atlas backend contract and xatlas default](../../done/GEOM-025-uv-atlas-backend-xatlas.md) (done).
-- [GEOM-026 — Cross-domain vertex normal recomputation contracts](../../done/GEOM-026-cross-domain-vertex-normal-recompute.md) (done).
-- [GEOM-027 — Property name lifetime contract](../../done/GEOM-027-property-name-lifetime-contract.md) (done).
-- [GEOM-028 — Property registry handle safety](../../done/GEOM-028-property-registry-handle-safety.md) (done).
-- [GEOM-029 — Const property set validity contract](../../done/GEOM-029-const-property-set-validity-contract.md) (done).
-- [GEOM-030 — Property set const lookup migration](../../done/GEOM-030-property-set-const-lookup-migration.md) (done).
-- [GEOM-031 — Property set naming normalization](../../done/GEOM-031-property-set-naming-normalization.md) (done).
-- [GEOM-032 — Bool property access contract](../../done/GEOM-032-bool-property-access-contract.md) (done).
-- [GEOM-033 — Erased property metadata catalog](../../done/GEOM-033-erased-property-metadata-catalog.md) (done).
-- [GEOM-034 — Geometry property API documentation audit](../../done/GEOM-034-geometry-property-api-doc-audit.md) (done).
-- [GEOM-037 — SO(3) rotation primitives (Lie machinery)](../../done/GEOM-037-so3-rotation-primitives.md) (done).
-- [GEOM-038 — Rotation averaging: SO(3) means and medians](../../done/GEOM-038-rotation-averaging-means-medians.md) (done).
-- [GEOM-039 — Accelerated mesh closest-face query and consumer adoption](../../done/GEOM-039-accelerated-mesh-closest-face-query.md) (done).
-- [GEOM-054 — Registration pipeline: extract named ICP stages](../../done/GEOM-054-registration-pipeline-stage-extraction.md)
+- [DOCS-003 — Reconcile algorithm-variant-dispatch.md with reality and define the backend-seam template](../../archive/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md) (done).
+- [GEOM-020 — Sparse direct factorization solver seam (LDLT/LLT)](../../archive/GEOM-020-sparse-direct-factorization-seam.md) (done).
+- [GEOM-023 — Sparse non-symmetric iterative solver seam (BiCGSTAB)](../../archive/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md) (done).
+- [GEOM-049 — Numeric/linear-algebra utilities (RPCA, Eigen map adapters)](../../archive/GEOM-049-numeric-linalg-utilities.md) (done).
+- [GEOM-050 — Primitive and curve utilities (Bezier, triangle metrics, sphere fit, AABB)](../../archive/GEOM-050-primitive-curve-utilities.md) (done).
+- [GEOIO-002 — Geometry IO parity hardening and exporters](../../archive/GEOIO-002-geometry-io-parity-hardening.md) (done).
+- [GEOM-006 — Indexed mesh/soup container and conversion contracts](../../archive/GEOM-006-indexed-mesh-soup-conversion-contracts.md) (done).
+- [GEOM-007 — Robust predicates and intersection classification foundation](../../archive/GEOM-007-robust-predicates-intersection-classification.md) (done).
+- [GEOM-008 — Geometry linear algebra and solver infrastructure](../../archive/GEOM-008-linear-algebra-solver-infrastructure.md) (done).
+- [GEOM-009 — Geometry benchmark manifests, fixtures, and smoke benchmark](../../archive/GEOM-009-benchmark-manifests-fixtures-smoke.md) (done).
+- [GEOM-010 — Point-cloud algorithm pack roadmap](../../archive/GEOM-010-point-cloud-algorithm-pack-roadmap.md) (done; roadmap: [`docs/architecture/point-cloud-algorithm-roadmap.md`](../../../docs/architecture/point-cloud-algorithm-roadmap.md)).
+- [GEOM-011 — Parameterization and mapping roadmap](../../archive/GEOM-011-parameterization-mapping-roadmap.md) (done; roadmap: [`docs/architecture/parameterization-mapping-roadmap.md`](../../../docs/architecture/parameterization-mapping-roadmap.md)).
+- [GEOM-012 — Symmetric mesh, graph, and point-cloud domain views](../../archive/GEOM-012-symmetric-domain-views-property-sharing.md) (done).
+- [GEOM-016 — Point-cloud filtering and density diagnostics contracts](../../archive/GEOM-016-point-cloud-filtering-density-contracts.md) (done).
+- [GEOM-017 — Point-cloud descriptors and registration seams](../../archive/GEOM-017-point-cloud-descriptors-registration-seams.md) (done).
+- [GEOM-018 — Parameterization distortion and map-quality diagnostics](../../archive/GEOM-018-parameterization-distortion-map-quality-diagnostics.md) (done).
+- [GEOM-015 — GJK termination diagnostics and scale-aware tolerance policy](../../archive/GEOM-015-gjk-termination-diagnostics.md) (done).
+- [GEOM-021 — MeshSoup module implementation split](../../archive/GEOM-021-meshsoup-module-implementation-split.md).
+- [GEOM-022 — Remaining geometry module implementation splits](../../archive/GEOM-022-remaining-geometry-module-implementation-splits.md).
+- [GEOM-025 — UV atlas backend contract and xatlas default](../../archive/GEOM-025-uv-atlas-backend-xatlas.md) (done).
+- [GEOM-026 — Cross-domain vertex normal recomputation contracts](../../archive/GEOM-026-cross-domain-vertex-normal-recompute.md) (done).
+- [GEOM-027 — Property name lifetime contract](../../archive/GEOM-027-property-name-lifetime-contract.md) (done).
+- [GEOM-028 — Property registry handle safety](../../archive/GEOM-028-property-registry-handle-safety.md) (done).
+- [GEOM-029 — Const property set validity contract](../../archive/GEOM-029-const-property-set-validity-contract.md) (done).
+- [GEOM-030 — Property set const lookup migration](../../archive/GEOM-030-property-set-const-lookup-migration.md) (done).
+- [GEOM-031 — Property set naming normalization](../../archive/GEOM-031-property-set-naming-normalization.md) (done).
+- [GEOM-032 — Bool property access contract](../../archive/GEOM-032-bool-property-access-contract.md) (done).
+- [GEOM-033 — Erased property metadata catalog](../../archive/GEOM-033-erased-property-metadata-catalog.md) (done).
+- [GEOM-034 — Geometry property API documentation audit](../../archive/GEOM-034-geometry-property-api-doc-audit.md) (done).
+- [GEOM-037 — SO(3) rotation primitives (Lie machinery)](../../archive/GEOM-037-so3-rotation-primitives.md) (done).
+- [GEOM-038 — Rotation averaging: SO(3) means and medians](../../archive/GEOM-038-rotation-averaging-means-medians.md) (done).
+- [GEOM-039 — Accelerated mesh closest-face query and consumer adoption](../../archive/GEOM-039-accelerated-mesh-closest-face-query.md) (done).
+- [GEOM-054 — Registration pipeline: extract named ICP stages](../../archive/GEOM-054-registration-pipeline-stage-extraction.md)
   (done, 2026-07-05, `Operational`): `Geometry::Registration::AlignICP` now
   runs through an internal `RunIcpLoop` stage sequence for correspondence,
   rejection, optional robust weighting, transform solve, and convergence, with
   no GEOM-054 public surface change.
-- [GEOM-055 — Registration per-iteration observer](../../done/GEOM-055-registration-iteration-observer.md)
+- [GEOM-055 — Registration per-iteration observer](../../archive/GEOM-055-registration-iteration-observer.md)
   (done, 2026-07-05, `Operational`): `Geometry::Registration::AlignICP` now
   accepts a trailing null-default `IterationObserver` and emits an
   `IterationTrace` once per completed iteration; observed and unobserved runs
   remain numerically identical.
-- [GEOM-040 — Mesh curvature tensor and principal directions](../../done/GEOM-040-curvature-tensor-principal-directions.md) (done).
-- [GEOM-041 — FEM Laplacian mass/stiffness variants and edge-weight modes](../../done/GEOM-041-fem-laplacian-mass-stiffness-variants.md) (done).
-- [GEOM-042 — Mesh normal-based bilateral denoiser](../../done/GEOM-042-mesh-normal-bilateral-denoiser.md) (done).
-- [GEOM-043 — Remeshing surface reprojection and error-bounded adaptive sizing](../../done/GEOM-043-remeshing-reprojection-error-bounded-sizing.md) (done).
-- [GEOM-044 — Sqrt-3 subdivision and Loop feature/crease masks](../../done/GEOM-044-subdivision-sqrt3-loop-feature-masks.md) (done).
-- [GEOM-045 — First-class mesh geometric-quantity accessors](../../done/GEOM-045-first-class-mesh-quantity-accessors.md) (done).
-- [GEOM-046 — Mesh topology utilities](../../done/GEOM-046-mesh-topology-utilities.md) (done).
-- [GEOM-047 — Graph and point-cloud query/noise utilities](../../done/GEOM-047-graph-pointcloud-query-noise-utilities.md) (done).
-- [GEOM-048 — Statistics accumulators and robust estimation kernels](../../done/GEOM-048-statistics-robust-estimation-kernels.md) (done).
-- [GEOM-051 — Property system enhancements](../../done/GEOM-051-property-system-enhancements.md) (done).
-- [GEOM-052 — Shared CPU/GPU backend seam + fix the KMeans phantom GPU exemplar](../../done/GEOM-052-shared-cpu-gpu-backend-seam-kmeans-exemplar.md) (done).
-- [GEOIO-003 — Mesh and point-cloud IO breadth (OFF writer, point-cloud readers)](../../done/GEOIO-003-mesh-pointcloud-io-breadth.md) (done).
-- GEOIO-002 is retired in [`tasks/done`](../../done/GEOIO-002-geometry-io-parity-hardening.md)
+- [GEOM-040 — Mesh curvature tensor and principal directions](../../archive/GEOM-040-curvature-tensor-principal-directions.md) (done).
+- [GEOM-041 — FEM Laplacian mass/stiffness variants and edge-weight modes](../../archive/GEOM-041-fem-laplacian-mass-stiffness-variants.md) (done).
+- [GEOM-042 — Mesh normal-based bilateral denoiser](../../archive/GEOM-042-mesh-normal-bilateral-denoiser.md) (done).
+- [GEOM-043 — Remeshing surface reprojection and error-bounded adaptive sizing](../../archive/GEOM-043-remeshing-reprojection-error-bounded-sizing.md) (done).
+- [GEOM-044 — Sqrt-3 subdivision and Loop feature/crease masks](../../archive/GEOM-044-subdivision-sqrt3-loop-feature-masks.md) (done).
+- [GEOM-045 — First-class mesh geometric-quantity accessors](../../archive/GEOM-045-first-class-mesh-quantity-accessors.md) (done).
+- [GEOM-046 — Mesh topology utilities](../../archive/GEOM-046-mesh-topology-utilities.md) (done).
+- [GEOM-047 — Graph and point-cloud query/noise utilities](../../archive/GEOM-047-graph-pointcloud-query-noise-utilities.md) (done).
+- [GEOM-048 — Statistics accumulators and robust estimation kernels](../../archive/GEOM-048-statistics-robust-estimation-kernels.md) (done).
+- [GEOM-051 — Property system enhancements](../../archive/GEOM-051-property-system-enhancements.md) (done).
+- [GEOM-052 — Shared CPU/GPU backend seam + fix the KMeans phantom GPU exemplar](../../archive/GEOM-052-shared-cpu-gpu-backend-seam-kmeans-exemplar.md) (done).
+- [GEOIO-003 — Mesh and point-cloud IO breadth (OFF writer, point-cloud readers)](../../archive/GEOIO-003-mesh-pointcloud-io-breadth.md) (done).
+- GEOIO-002 is retired in [`tasks/done`](../../archive/GEOIO-002-geometry-io-parity-hardening.md)
   and contributed to **Theme E — Geometry IO completion** as the upstream gate
-  for retired [`ASSETIO-001`](../../done/ASSETIO-001-asset-model-texture-ingest-ownership.md)
+  for retired [`ASSETIO-001`](../../archive/ASSETIO-001-asset-model-texture-ingest-ownership.md)
   and asset-backed mesh residency in **Theme A — Shortest path to sandbox
   visible geometry** (`rendering/GRAPHICS-034`).
-- [GEOM-005](../../done/GEOM-005-api-style-and-numeric-policy.md) is retired in
+- [GEOM-005](../../archive/GEOM-005-api-style-and-numeric-policy.md) is retired in
   `tasks/done` and provides the canonical geometry API/numeric policy for future
   work.
-- GEOM-010 is retired in [`tasks/done`](../../done/GEOM-010-point-cloud-algorithm-pack-roadmap.md)
+- GEOM-010 is retired in [`tasks/done`](../../archive/GEOM-010-point-cloud-algorithm-pack-roadmap.md)
   and records the point-cloud method-compliant roadmap in
   [`docs/architecture/point-cloud-algorithm-roadmap.md`](../../../docs/architecture/point-cloud-algorithm-roadmap.md).
   Its first implementation packs are retired
-  [`GEOM-016`](../../done/GEOM-016-point-cloud-filtering-density-contracts.md)
+  [`GEOM-016`](../../archive/GEOM-016-point-cloud-filtering-density-contracts.md)
   (filtering/density diagnostics) and
-  [`GEOM-017`](../../done/GEOM-017-point-cloud-descriptors-registration-seams.md)
+  [`GEOM-017`](../../archive/GEOM-017-point-cloud-descriptors-registration-seams.md)
   (descriptors/registration seams).
-- GEOM-011 is retired in [`tasks/done`](../../done/GEOM-011-parameterization-mapping-roadmap.md)
+- GEOM-011 is retired in [`tasks/done`](../../archive/GEOM-011-parameterization-mapping-roadmap.md)
   and records the parameterization/mapping method-compliant roadmap in
   [`docs/architecture/parameterization-mapping-roadmap.md`](../../../docs/architecture/parameterization-mapping-roadmap.md).
   Its first implementation packs are GEOM-018 (distortion/map-quality

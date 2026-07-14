@@ -3,9 +3,9 @@
 - **Status:** Accepted
 - **Date:** 2026-05-17
 - **Owners:** Graphics (`Extrinsic.Graphics.PostProcessSystem`)
-- **Related tasks:** [`tasks/done/GRAPHICS-013A`](../../tasks/done/GRAPHICS-013A-postprocess-chain.md), [`GRAPHICS-013AQ`](../../tasks/done/GRAPHICS-013AQ-postprocess-backend-clarifications.md)
+- **Related tasks:** [`tasks/done/GRAPHICS-013A`](../../tasks/archive/GRAPHICS-013A-postprocess-chain.md), [`GRAPHICS-013AQ`](../../tasks/archive/GRAPHICS-013AQ-postprocess-backend-clarifications.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`docs/architecture/rendering-three-pass.md`](../architecture/rendering-three-pass.md), [`src/graphics/renderer/README.md`](../../src/graphics/renderer/README.md)
-- **Supersedes:** none. Extracted from the `Extrinsic.Graphics.PostProcessSystem` bullet in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
+- **Supersedes:** none. Extracted from the `Extrinsic.Graphics.PostProcessSystem` bullet in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/archive/DOCS-001-reduce-graphics-architecture-prose.md).
 - **Related ADRs:** [ADR-0007](0007-picking-selection-and-outline.md) records the `Picking.Readback` drain pattern that the histogram readback in §2 reuses byte-identically.
 
 ## Context
@@ -128,8 +128,8 @@ Follow-up tasks required: none from this ADR.
 
 ## Validation
 
-- [`tasks/done/GRAPHICS-013A`](../../tasks/done/GRAPHICS-013A-postprocess-chain.md) records the underlying `Extrinsic.Graphics.PostProcessSystem` contract, frame-recipe resource declarations, `PostProcessSettings` / `PostProcessPushConstants` shape, and `PostProcessDiagnostics` field set.
-- [`tasks/done/GRAPHICS-013AQ`](../../tasks/done/GRAPHICS-013AQ-postprocess-backend-clarifications.md) records the four clarification decisions captured in §§1–4.
+- [`tasks/done/GRAPHICS-013A`](../../tasks/archive/GRAPHICS-013A-postprocess-chain.md) records the underlying `Extrinsic.Graphics.PostProcessSystem` contract, frame-recipe resource declarations, `PostProcessSettings` / `PostProcessPushConstants` shape, and `PostProcessDiagnostics` field set.
+- [`tasks/done/GRAPHICS-013AQ`](../../tasks/archive/GRAPHICS-013AQ-postprocess-backend-clarifications.md) records the four clarification decisions captured in §§1–4.
 - `docs/architecture/rendering-three-pass.md` carries the matching postprocess chain contract block authored by `GRAPHICS-013AQ`.
 - `src/graphics/renderer/README.md` carries the matching ownership-contract bullet next to the existing `PostProcessSystem` line.
 - The default CPU correctness gate (`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) exercises the retained-vs-transient ownership, the histogram drain pattern, and the AATemp subresource gate without a Vulkan device.

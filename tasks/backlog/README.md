@@ -69,7 +69,8 @@ bake graphics dilation follow-up (`GRAPHICS-115`) are retired — see
 [`rendering/README.md`](rendering/README.md) and the retirement log. Current
 open Theme B leaves include the object-space normal bake runtime scheduling
 follow-up (`RUNTIME-129`), the profile-gated vertex attribute operational
-follow-up (`RUNTIME-139`), and the 2026-07-03 render-graph
+follow-up (`RUNTIME-139`), the immediate-mode debug-draw seam
+(`RUNTIME-177`), and the 2026-07-03 render-graph
 review leaves — pass contribution seam (`GRAPHICS-116`), compile caching
 (`GRAPHICS-117`), placed transient aliasing (`GRAPHICS-118`), and parallel
 command recording (`GRAPHICS-119`); compiler/executor polish (`GRAPHICS-120`)
@@ -295,7 +296,10 @@ and `PROC-006` (audit cadence visibility) are retired — see
 research-engine design principles `P1` (research pragmatism / structs over
 ceremony), `P3` (config lane first-class + agent-controllable), and `P5`
 (recipe-driven frames + readable main loop) into always-on `AGENTS.md` §5
-invariants with matching per-PR review rows. Its optional "Theme I — Research
+invariants with matching per-PR review rows. The 2026-07-14 right-sizing
+review retired `PROC-026` (task archive sweep + micro template) and seeded
+`PROC-027` (validator rent audit) and `DOCS-006` (curated agentic-development
+narrative). Its optional "Theme I — Research
 control surface" proposal was dropped (all members had retired); the `I` letter
 instead names the research/method implementation theme created by the retired
 `PROC-024` (see Theme I above and the retirement log).

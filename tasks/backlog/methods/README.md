@@ -135,65 +135,65 @@ map.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
-- [METHOD-002 — Signed Heat Method reference backend](../../done/METHOD-002-signed-heat-method-reference-backend.md)
+- [METHOD-002 — Signed Heat Method reference backend](../../archive/METHOD-002-signed-heat-method-reference-backend.md)
   (done, 2026-06-28, `CPUContracted`): pathfinder method package for
   `geometry.signed_heat`, with surface Variant A CPU reference, correctness
   tests, smoke benchmark, method docs, and `Geometry.Sparse::SparseLDLT` as the
   default heat/Poisson solver.
-- [METHODS-001 — Pin signed heat as methods-pipeline pathfinder](../../done/METHODS-001-signed-heat-pathfinder.md)
+- [METHODS-001 — Pin signed heat as methods-pipeline pathfinder](../../archive/METHODS-001-signed-heat-pathfinder.md)
   (done, 2026-06-28, `Retired`): records METHOD-002 as the first method to
   drive the full paper-intake → CPU-reference → tests → benchmark → docs
   pipeline and names retired GEOM-020 as the LDLT gate that makes promotion
   deterministic.
-- [METHOD-012 — Progressive Poisson-disk sampling: paper intake + CPU reference backend](../../done/METHOD-012-progressive-poisson-disk-cpu-reference.md)
+- [METHOD-012 — Progressive Poisson-disk sampling: paper intake + CPU reference backend](../../archive/METHOD-012-progressive-poisson-disk-cpu-reference.md)
   (done, 2026-06-28, `CPUContracted`): deterministic CPU reference, manifest,
   docs, correctness tests, and smoke benchmark for progressive Poisson-disk
   subsampling. GPU parity remains owned by
   [`METHOD-014`](METHOD-014-progressive-poisson-gpu-operational-parity.md).
-- [METHOD-013 — Progressive Poisson-disk sampling: GPU backend contract slices](../../done/METHOD-013-progressive-poisson-disk-gpu-backend.md)
+- [METHOD-013 — Progressive Poisson-disk sampling: GPU backend contract slices](../../archive/METHOD-013-progressive-poisson-disk-gpu-backend.md)
   (done, 2026-07-02, `CPUContracted`): Vulkan planning, shader assets,
   recordable dispatch seams, upload/readback-copy ownership, parsed readback
   payloads, and CPU-reference parity diagnostics. Public GPU result return,
   `gpu;vulkan` parity tests, and benchmark metric extension remain owned by
   `METHOD-014`.
-- [METHOD-001 — Rigid-body dynamics reference backend](../../done/METHOD-001-rigid-body-dynamics-reference-backend.md)
+- [METHOD-001 — Rigid-body dynamics reference backend](../../archive/METHOD-001-rigid-body-dynamics-reference-backend.md)
   (done 2026-06-05 at `CPUContracted`; ownership gate accepted by
-  [`ARCH-001`](../../done/ARCH-001-physics-layer-ownership-and-ecs-integration.md)
+  [`ARCH-001`](../../archive/ARCH-001-physics-layer-ownership-and-ecs-integration.md)
   / [ADR-0019](../../../docs/adr/0019-physics-layer-ownership-and-ecs-integration.md);
   ECS authoring side handled by retired
-  [`HARDEN-064`](../../done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md)).
-- [METHOD-008 — Resolve `_example_vector_heat` method manifest placeholders](../../done/METHOD-008-example-vector-heat-manifest-placeholders.md)
+  [`HARDEN-064`](../../archive/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md)).
+- [METHOD-008 — Resolve `_example_vector_heat` method manifest placeholders](../../archive/METHOD-008-example-vector-heat-manifest-placeholders.md)
   (done 2026-06-06, Outcome A): relocated the structure example from
   `methods/geometry/_example_vector_heat/` to `methods/_examples/vector_heat/`
   and resolved its `TODO`/`year: 0` paper placeholders; no CPU reference backend
   (real Vector Heat Method intake remains a future METHOD-* task).
-- [METHOD-009 — Particle and mass-spring reference backend](../../done/METHOD-009-particle-spring-reference-backend.md)
+- [METHOD-009 — Particle and mass-spring reference backend](../../archive/METHOD-009-particle-spring-reference-backend.md)
   (done, 2026-06-10, `CPUContracted`): deterministic particle/mass-spring
   `cpu_reference` backend with stability/energy diagnostics and smoke
   benchmark; physics roadmap follow-up from
-  [`ARCH-002`](../../done/ARCH-002-physics-phenomena-roadmap.md).
-- [METHOD-010 — XPBD cloth and shell reference backend](../../done/METHOD-010-xpbd-cloth-shell-reference-backend.md)
+  [`ARCH-002`](../../archive/ARCH-002-physics-phenomena-roadmap.md).
+- [METHOD-010 — XPBD cloth and shell reference backend](../../archive/METHOD-010-xpbd-cloth-shell-reference-backend.md)
   (done, 2026-06-10, `CPUContracted`): deterministic XPBD cloth/shell
   `cpu_reference` backend with constraint residual/convergence diagnostics
   and smoke benchmark
-  (physics roadmap follow-up from [`ARCH-002`](../../done/ARCH-002-physics-phenomena-roadmap.md)).
-- [METHOD-011 — SPH fluid reference backend](../../done/METHOD-011-sph-fluid-reference-backend.md)
+  (physics roadmap follow-up from [`ARCH-002`](../../archive/ARCH-002-physics-phenomena-roadmap.md)).
+- [METHOD-011 — SPH fluid reference backend](../../archive/METHOD-011-sph-fluid-reference-backend.md)
   (done, 2026-06-10, `CPUContracted`): deterministic WCSPH `cpu_reference`
   backend with density/compression and neighbor diagnostics and smoke
   benchmark
-  (physics roadmap follow-up from [`ARCH-002`](../../done/ARCH-002-physics-phenomena-roadmap.md)).
-- Ordering: [`geometry/GEOM-008`](../../done/GEOM-008-linear-algebra-solver-infrastructure.md)
+  (physics roadmap follow-up from [`ARCH-002`](../../archive/ARCH-002-physics-phenomena-roadmap.md)).
+- Ordering: [`geometry/GEOM-008`](../../archive/GEOM-008-linear-algebra-solver-infrastructure.md)
   retired 2026-05-27 at `CPUContracted` shipping the CSR builder + CG /
   shifted-CG iterative solver. The direct sparse SPD factorization
   (LDLT/LLT) path that METHOD-002 used is available from retired
-  [`geometry/GEOM-020`](../../done/GEOM-020-sparse-direct-factorization-seam.md);
+  [`geometry/GEOM-020`](../../archive/GEOM-020-sparse-direct-factorization-seam.md);
   METHOD-002 is retired at `CPUContracted`.
   METHOD-003's variant-A non-symmetric operator is available from retired
-  [`geometry/GEOM-023`](../../done/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md);
+  [`geometry/GEOM-023`](../../archive/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md);
   METHOD-003 is no longer blocked on the solver seam.
   METHOD-004 needs no solver gate and may proceed against retired
   `GEOM-008` directly. METHOD-005 and METHOD-007 waited on
-  [`geometry/GEOM-007`](../../done/GEOM-007-robust-predicates-intersection-classification.md),
+  [`geometry/GEOM-007`](../../archive/GEOM-007-robust-predicates-intersection-classification.md),
   which retired 2026-05-27, so both are promotable. METHOD-006 step 4's
   sparse symmetric generalized eigensolver is owned by
   [`geometry/GEOM-024`](../geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md).

@@ -40,17 +40,17 @@ and the swapchain finalization step is wired only as a CPU-testable contract:
 
 | Planning parent (done) | Impl-A | Impl-B | Impl-C | Impl-D |
 |---|---|---|---|---|
-| GRAPHICS-029 | done → [GRAPHICS-029A](../../tasks/done/GRAPHICS-029A-reference-scene-skeleton.md) | done → [GRAPHICS-029B](../../tasks/done/GRAPHICS-029B-triangle-provider-and-camera.md) | optional, not opened | n/a |
-| GRAPHICS-030 | done → [GRAPHICS-030A](../../tasks/done/GRAPHICS-030A-procedural-geometry-descriptor-cache.md) | done → [GRAPHICS-030B](../../tasks/done/GRAPHICS-030B-extraction-procedural-geometry-binding.md) | done → [GRAPHICS-030C](../../tasks/done/GRAPHICS-030C-procedural-geometry-retire-ordering.md) | optional (cube/quad packer), not opened |
-| GRAPHICS-031 | done → [GRAPHICS-031A](../../tasks/done/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md) | done → [GRAPHICS-031B](../../tasks/done/GRAPHICS-031B-default-debug-surface-substitution-and-diagnostics.md) | optional (debug variant), not opened | n/a |
-| GRAPHICS-032 | done → [GRAPHICS-032A](../../tasks/done/GRAPHICS-032A-minimal-debug-surface-recipe.md) | done → [GRAPHICS-032B](../../tasks/done/GRAPHICS-032B-minimal-debug-surface-pass-body.md) | done → [GRAPHICS-032C](../../tasks/done/GRAPHICS-032C-minimal-debug-present-pass-and-acceptance.md) | done → [GRAPHICS-032D](../../tasks/done/GRAPHICS-032D-gpu-vulkan-minimal-recipe-smoke.md) |
-| GRAPHICS-033 | done → [GRAPHICS-033A](../../tasks/done/GRAPHICS-033A-vulkan-operational-status-evaluator.md) | done → [GRAPHICS-033B](../../tasks/done/GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md) | done → [GRAPHICS-033C](../../tasks/done/GRAPHICS-033C-vulkan-minimal-recipe-recording.md) | done → [GRAPHICS-033D](../../tasks/done/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md) |
+| GRAPHICS-029 | done → [GRAPHICS-029A](../../tasks/archive/GRAPHICS-029A-reference-scene-skeleton.md) | done → [GRAPHICS-029B](../../tasks/archive/GRAPHICS-029B-triangle-provider-and-camera.md) | optional, not opened | n/a |
+| GRAPHICS-030 | done → [GRAPHICS-030A](../../tasks/archive/GRAPHICS-030A-procedural-geometry-descriptor-cache.md) | done → [GRAPHICS-030B](../../tasks/archive/GRAPHICS-030B-extraction-procedural-geometry-binding.md) | done → [GRAPHICS-030C](../../tasks/archive/GRAPHICS-030C-procedural-geometry-retire-ordering.md) | optional (cube/quad packer), not opened |
+| GRAPHICS-031 | done → [GRAPHICS-031A](../../tasks/archive/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md) | done → [GRAPHICS-031B](../../tasks/archive/GRAPHICS-031B-default-debug-surface-substitution-and-diagnostics.md) | optional (debug variant), not opened | n/a |
+| GRAPHICS-032 | done → [GRAPHICS-032A](../../tasks/archive/GRAPHICS-032A-minimal-debug-surface-recipe.md) | done → [GRAPHICS-032B](../../tasks/archive/GRAPHICS-032B-minimal-debug-surface-pass-body.md) | done → [GRAPHICS-032C](../../tasks/archive/GRAPHICS-032C-minimal-debug-present-pass-and-acceptance.md) | done → [GRAPHICS-032D](../../tasks/archive/GRAPHICS-032D-gpu-vulkan-minimal-recipe-smoke.md) |
+| GRAPHICS-033 | done → [GRAPHICS-033A](../../tasks/archive/GRAPHICS-033A-vulkan-operational-status-evaluator.md) | done → [GRAPHICS-033B](../../tasks/archive/GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md) | done → [GRAPHICS-033C](../../tasks/archive/GRAPHICS-033C-vulkan-minimal-recipe-recording.md) | done → [GRAPHICS-033D](../../tasks/archive/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md) |
 
 Standalone infrastructure / runtime tasks newly opened:
 
-- [BUILD-001](../../tasks/done/BUILD-001-sandbox-shader-compile-wiring.md) — Sandbox shader compile wiring (done).
-- [RUNTIME-070](../../tasks/done/RUNTIME-070-fallback-texture-bootstrap.md) — `GpuAssetCache` fallback texture bootstrap (done).
-- [GRAPHICS-080](../../tasks/done/GRAPHICS-080-enable-promoted-vulkan-by-default.md) — Reference config + `ci-vulkan` preset.
+- [BUILD-001](../../tasks/archive/BUILD-001-sandbox-shader-compile-wiring.md) — Sandbox shader compile wiring (done).
+- [RUNTIME-070](../../tasks/archive/RUNTIME-070-fallback-texture-bootstrap.md) — `GpuAssetCache` fallback texture bootstrap (done).
+- [GRAPHICS-080](../../tasks/archive/GRAPHICS-080-enable-promoted-vulkan-by-default.md) — Reference config + `ci-vulkan` preset.
 
 Beyond-triangle (default-recipe pass operational wiring + runtime adapter umbrellas) newly opened:
 
@@ -118,7 +118,7 @@ derisk the triangle path. They must not outlive the operational default
 recipe. Once `GRAPHICS-070..076` retire and the default-recipe equivalent of
 the `GRAPHICS-033D` `gpu;vulkan` visible-triangle smoke is green, the scaffold
 is deleted by
-[`GRAPHICS-081`](../../tasks/done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md):
+[`GRAPHICS-081`](../../tasks/archive/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md):
 recipe + factory + two pass classes + renderer members + executor branches +
 three diagnostics counters + CMake entries + tests + doc rows all removed.
 `Material.DefaultDebugSurface` at slot 0 (GRAPHICS-031), the reference scene

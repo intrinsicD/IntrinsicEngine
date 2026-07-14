@@ -149,6 +149,7 @@ Load the specialist skill for the touched scope rather than reading every guide:
 | Creating, promoting, retiring, or materially updating files under `tasks/` | `intrinsicengine-task-workflow` |
 | Before committing or reporting completion for a non-trivial change | `intrinsicengine-review` |
 | Changing dependency boundaries, module ownership, source layout, runtime wiring | `intrinsicengine-review` (architecture-review checklist) |
+| Planning or reviewing new abstraction surface (interfaces, service/bridge/registry facades, module frameworks, event/command indirection), a small change fanning out across many files, or suspected over-engineering/glue | `intrinsicengine-right-sizing` |
 | Proposing novel, unconventional, cross-domain, or potentially publishable research directions (the ideation front end that feeds the method track) | `intrinsicengine-research-ideation` |
 | Implementing or modifying paper/method work under `methods/` | `intrinsicengine-method` |
 | Adding, changing, or running benchmark harnesses/manifests/baselines | `intrinsicengine-benchmark` |

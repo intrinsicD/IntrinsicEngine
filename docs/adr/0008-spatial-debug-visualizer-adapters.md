@@ -3,9 +3,9 @@
 - **Status:** Accepted
 - **Date:** 2026-05-17
 - **Owners:** Runtime extraction (adapter ownership), Graphics (frozen `Extrinsic.Graphics.SpatialDebugVisualizers` packet contract)
-- **Related tasks:** [`tasks/done/GRAPHICS-011`](../../tasks/done/GRAPHICS-011-spatial-debug-visualizers.md), [`GRAPHICS-011Q`](../../tasks/done/GRAPHICS-011Q-spatial-debug-adapter-clarifications.md)
+- **Related tasks:** [`tasks/done/GRAPHICS-011`](../../tasks/archive/GRAPHICS-011-spatial-debug-visualizers.md), [`GRAPHICS-011Q`](../../tasks/archive/GRAPHICS-011Q-spatial-debug-adapter-clarifications.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`src/graphics/renderer/README.md`](../../src/graphics/renderer/README.md)
-- **Supersedes:** none. Extracted from the `Extrinsic.Graphics.SpatialDebugVisualizers` bullet in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
+- **Supersedes:** none. Extracted from the `Extrinsic.Graphics.SpatialDebugVisualizers` bullet in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/archive/DOCS-001-reduce-graphics-architecture-prose.md).
 
 ## Context
 
@@ -123,7 +123,7 @@ Follow-up tasks required: none from this ADR. The concrete `Extrinsic.Runtime.Sp
 
 ## Validation
 
-- [`tasks/done/GRAPHICS-011`](../../tasks/done/GRAPHICS-011-spatial-debug-visualizers.md) records the underlying `Extrinsic.Graphics.SpatialDebugVisualizers` packet contract and the canonical truncation budget / diagnostics surface that this ADR keeps frozen.
-- [`tasks/done/GRAPHICS-011Q`](../../tasks/done/GRAPHICS-011Q-spatial-debug-adapter-clarifications.md) records the five clarification decisions captured in §§1–5.
+- [`tasks/done/GRAPHICS-011`](../../tasks/archive/GRAPHICS-011-spatial-debug-visualizers.md) records the underlying `Extrinsic.Graphics.SpatialDebugVisualizers` packet contract and the canonical truncation budget / diagnostics surface that this ADR keeps frozen.
+- [`tasks/done/GRAPHICS-011Q`](../../tasks/archive/GRAPHICS-011Q-spatial-debug-adapter-clarifications.md) records the five clarification decisions captured in §§1–5.
 - `src/graphics/renderer/README.md` carries the matching spatial-debug-visualizer bullet authored by `GRAPHICS-011Q`.
 - The default CPU correctness gate (`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) exercises the data-only packet contract under `tests/unit/graphics/` and any runtime-side adapter integration tests under `tests/integration/runtime/` without requiring a Vulkan device.

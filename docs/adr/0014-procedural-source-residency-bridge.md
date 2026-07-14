@@ -3,9 +3,9 @@
 - **Status:** Accepted
 - **Date:** 2026-05-17
 - **Owners:** Runtime extraction (`Runtime::ProceduralGeometryCache`, packers), ECS (CPU-only `ProceduralGeometryRef` component), Graphics (`GpuWorld` upload seam only)
-- **Related tasks:** [`tasks/done/GRAPHICS-030`](../../tasks/done/GRAPHICS-030-runtime-geometry-residency-bridge.md), [`GRAPHICS-030A`](../../tasks/done/GRAPHICS-030A-procedural-geometry-descriptor-cache.md), [`GRAPHICS-030B`](../../tasks/done/GRAPHICS-030B-extraction-procedural-geometry-binding.md), [`GRAPHICS-030C`](../../tasks/done/GRAPHICS-030C-procedural-geometry-retire-ordering.md)
+- **Related tasks:** [`tasks/done/GRAPHICS-030`](../../tasks/archive/GRAPHICS-030-runtime-geometry-residency-bridge.md), [`GRAPHICS-030A`](../../tasks/archive/GRAPHICS-030A-procedural-geometry-descriptor-cache.md), [`GRAPHICS-030B`](../../tasks/archive/GRAPHICS-030B-extraction-procedural-geometry-binding.md), [`GRAPHICS-030C`](../../tasks/archive/GRAPHICS-030C-procedural-geometry-retire-ordering.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`src/runtime/README.md`](../../src/runtime/README.md)
-- **Supersedes:** none. Extracted from the `## Procedural-source residency bridge` section in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
+- **Supersedes:** none. Extracted from the `## Procedural-source residency bridge` section in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/archive/DOCS-001-reduce-graphics-architecture-prose.md).
 - **Related ADRs:** [ADR-0013](0013-ecs-renderable-residency-bridge.md) records the parent ECS renderable residency bridge contract; this ADR records the procedural-geometry first slice that lands ahead of the asset-backed mesh residency path.
 
 ## Context
@@ -158,6 +158,6 @@ Follow-up tasks required: none from this ADR. `GRAPHICS-034` will replace §8's 
 
 ## Validation
 
-- [`tasks/done/GRAPHICS-030`](../../tasks/done/GRAPHICS-030-runtime-geometry-residency-bridge.md) records the parent planning contract captured in §§1–8.
-- [`tasks/done/GRAPHICS-030A`](../../tasks/done/GRAPHICS-030A-procedural-geometry-descriptor-cache.md), [`030B`](../../tasks/done/GRAPHICS-030B-extraction-procedural-geometry-binding.md), and [`030C`](../../tasks/done/GRAPHICS-030C-procedural-geometry-retire-ordering.md) record the implementation children that land the descriptor surface + cache, the extraction wiring + bind test, and the refcount / free / retire-queue test respectively.
+- [`tasks/done/GRAPHICS-030`](../../tasks/archive/GRAPHICS-030-runtime-geometry-residency-bridge.md) records the parent planning contract captured in §§1–8.
+- [`tasks/done/GRAPHICS-030A`](../../tasks/archive/GRAPHICS-030A-procedural-geometry-descriptor-cache.md), [`030B`](../../tasks/archive/GRAPHICS-030B-extraction-procedural-geometry-binding.md), and [`030C`](../../tasks/archive/GRAPHICS-030C-procedural-geometry-retire-ordering.md) record the implementation children that land the descriptor surface + cache, the extraction wiring + bind test, and the refcount / free / retire-queue test respectively.
 - The default CPU correctness gate (`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) exercises `Runtime::ProceduralGeometryCache`, the closed descriptor surface, the `ExtractAndSubmit` ordering, and the deferred-retire queue without requiring a Vulkan device.

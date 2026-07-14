@@ -12,7 +12,7 @@ without requiring them to read every file.
   rendering selection follows this README's DAG.
 - `RORG-031B`, if encountered in older notes, is **historical/superseded
   planning** that has been retired to
-  `tasks/done/RORG-031B-rendering-pipeline-backlog-seed.md`.
+  `tasks/archive/RORG-031B-rendering-pipeline-backlog-seed.md`.
   It is not the active implementation path and must not be selected as
   next-active work.
 - `GRAPHICS-083` — Graphics/RHI module implementation splits (retired to
@@ -61,41 +61,41 @@ The following list is the minimum dependency order for the rendering backlog.
 Each entry lists the upstream tasks that must be complete (or explicitly
 out-of-scope) before the entry is eligible for "in-progress" selection.
 
-- [GRAPHICS-021 — Rendering backlog workflow cleanup](../../done/GRAPHICS-021-rendering-backlog-workflow-cleanup.md):
+- [GRAPHICS-021 — Rendering backlog workflow cleanup](../../archive/GRAPHICS-021-rendering-backlog-workflow-cleanup.md):
   completed cleanup precondition for further rendering task churn
   (task-format/validator/doc hygiene for the rest of the queue).
-- [GRAPHICS-016 — Runtime extraction and graphics handoff](../../done/GRAPHICS-016-runtime-extraction-handoff.md):
+- [GRAPHICS-016 — Runtime extraction and graphics handoff](../../archive/GRAPHICS-016-runtime-extraction-handoff.md):
   completed first implementation gate for runtime-owned extraction and graphics
   snapshot handoff. Downstream graphics pass work can proceed through
   GRAPHICS-002+ without introducing live ECS ownership into graphics.
-- [GRAPHICS-002 — Render-world / frame-input snapshot contract](../../done/GRAPHICS-002-render-world-contract.md):
+- [GRAPHICS-002 — Render-world / frame-input snapshot contract](../../archive/GRAPHICS-002-render-world-contract.md):
   completed immutable render-world/frame-input snapshot contract gate for
   downstream pass work.
-- [GRAPHICS-003 — Frame recipe and default pipeline](../../done/GRAPHICS-003-frame-recipe-pipeline.md):
+- [GRAPHICS-003 — Frame recipe and default pipeline](../../archive/GRAPHICS-003-frame-recipe-pipeline.md):
   completed reusable default frame recipe and canonical graph-construction gate.
-- [GRAPHICS-004 — GPU-world allocation and lifetime](../../done/GRAPHICS-004-gpu-world-allocation-lifetime.md):
+- [GRAPHICS-004 — GPU-world allocation and lifetime](../../archive/GRAPHICS-004-gpu-world-allocation-lifetime.md):
   completed retained-pool allocation/lifetime gate; depends on GRAPHICS-002.
-- [GRAPHICS-005 — GPU-world compaction](../../done/GRAPHICS-005-gpu-world-compaction.md):
+- [GRAPHICS-005 — GPU-world compaction](../../archive/GRAPHICS-005-gpu-world-compaction.md):
   completed managed-buffer fragmentation, opt-in compaction planning, and
   relocation reporting gate; depends on GRAPHICS-004.
-- [GRAPHICS-006 — Material/shader/pipeline registry](../../done/GRAPHICS-006-material-shader-pipeline-registry.md):
+- [GRAPHICS-006 — Material/shader/pipeline registry](../../archive/GRAPHICS-006-material-shader-pipeline-registry.md):
   depends on GRAPHICS-002.
-- [GRAPHICS-006Q — Material registry clarification backlog](../../done/GRAPHICS-006Q-material-registry-clarifications.md):
+- [GRAPHICS-006Q — Material registry clarification backlog](../../archive/GRAPHICS-006Q-material-registry-clarifications.md):
   completed clarification-only follow-up for GRAPHICS-006 material-slot,
   material-layout, and shader-asset identity decisions.
-- [GRAPHICS-007 — Culling and draw buckets](../../done/GRAPHICS-007-culling-and-draw-buckets.md):
+- [GRAPHICS-007 — Culling and draw buckets](../../archive/GRAPHICS-007-culling-and-draw-buckets.md):
   depends on GRAPHICS-002 and GRAPHICS-004. Owns `CullingPass`
   (source module `Extrinsic.Graphics.Pass.Culling`) command contracts and the
   GPU draw-bucket contracts consumed by the surface, line, point, shadow, and
   selection passes.
-- [GRAPHICS-007Q — Culling bucket clarification follow-ups](../../done/GRAPHICS-007Q-culling-bucket-clarifications.md):
+- [GRAPHICS-007Q — Culling bucket clarification follow-ups](../../archive/GRAPHICS-007Q-culling-bucket-clarifications.md):
   completed clarification-only follow-up for selection bucket specialization,
   `GpuInstanceStatic::VisibilityMask`/`Layer` policy, culling diagnostics
   ownership, and unsupported bucket combinations. Decisions also mirrored in
   `docs/architecture/rendering-three-pass.md`.
-- [GRAPHICS-008 — Depth/surface/G-buffer passes](../../done/GRAPHICS-008-depth-surface-gbuffer-passes.md):
+- [GRAPHICS-008 — Depth/surface/G-buffer passes](../../archive/GRAPHICS-008-depth-surface-gbuffer-passes.md):
   depends on GRAPHICS-003, GRAPHICS-006, and GRAPHICS-007.
-- [GRAPHICS-008Q — Surface pass clarification follow-ups](../../done/GRAPHICS-008Q-surface-pass-clarifications.md):
+- [GRAPHICS-008Q — Surface pass clarification follow-ups](../../archive/GRAPHICS-008Q-surface-pass-clarifications.md):
   completed clarification-only follow-up for alpha-mask depth/G-buffer bucket
   policy (reserved infrastructure until material alpha evaluation lands),
   descriptor-bind seam vs `SceneTableBDA`, renderpass attachment ownership
@@ -103,17 +103,17 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   ops for prepass-on and prepass-off cases), and empty/invalid bucket
   diagnostics. Decisions also mirrored in
   `docs/architecture/rendering-three-pass.md`.
-- [GRAPHICS-009 — Deferred lighting and shadows](../../done/GRAPHICS-009-deferred-lighting-and-shadows.md):
+- [GRAPHICS-009 — Deferred lighting and shadows](../../archive/GRAPHICS-009-deferred-lighting-and-shadows.md):
   depends on GRAPHICS-008.
-- [GRAPHICS-009Q — Lighting and shadow clarification follow-ups](../../done/GRAPHICS-009Q-lighting-shadow-clarifications.md):
+- [GRAPHICS-009Q — Lighting and shadow clarification follow-ups](../../archive/GRAPHICS-009Q-lighting-shadow-clarifications.md):
   completed docs-only follow-up for shadow atlas sizing input, backend sampler binding (global set 0 / binding 1, `sampler2DShadow` with `VK_COMPARE_OP_LESS_OR_EQUAL`), runtime/shadow extraction ownership of texel-snapped cascade view-projection matrices and missing-caster diagnostics, and deferred-lighting push-constant scope (scene-table-only; debug visualization owned by `Pass.DebugView`). Decisions also mirrored in `docs/architecture/rendering-three-pass.md`.
-- [GRAPHICS-010 — Lines, points, and debug primitives](../../done/GRAPHICS-010-lines-points-debug-primitives.md):
+- [GRAPHICS-010 — Lines, points, and debug primitives](../../archive/GRAPHICS-010-lines-points-debug-primitives.md):
   depends on GRAPHICS-002, GRAPHICS-003, and GRAPHICS-007.
-- [GRAPHICS-010Q — Transient debug backend clarification follow-ups](../../done/GRAPHICS-010Q-transient-debug-backend-clarifications.md):
+- [GRAPHICS-010Q — Transient debug backend clarification follow-ups](../../archive/GRAPHICS-010Q-transient-debug-backend-clarifications.md):
   completed docs-only follow-up for transient debug packet upload/routing (per-frame host-visible buffers, not GpuWorld/cull buckets), debug-triangle dedicated debug-surface overlay routing, depth-tested vs overlay pipeline-variant policy, and `InvalidSnapshotRecordCount`-only diagnostics. Decisions also mirrored in `docs/architecture/rendering-three-pass.md` and `src/graphics/renderer/README.md`.
-- [GRAPHICS-011 — Spatial debug visualizers](../../done/GRAPHICS-011-spatial-debug-visualizers.md):
+- [GRAPHICS-011 — Spatial debug visualizers](../../archive/GRAPHICS-011-spatial-debug-visualizers.md):
   depends on GRAPHICS-010.
-- [GRAPHICS-011Q — Spatial debug adapter clarification follow-ups](../../done/GRAPHICS-011Q-spatial-debug-adapter-clarifications.md):
+- [GRAPHICS-011Q — Spatial debug adapter clarification follow-ups](../../archive/GRAPHICS-011Q-spatial-debug-adapter-clarifications.md):
   completed docs-only follow-up for concrete BVH/KD-tree/octree/convex-hull
   adapter ownership (runtime extraction, planned umbrella module
   `Extrinsic.Runtime.SpatialDebugAdapters`), adapter pre-filter policy,
@@ -122,27 +122,27 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   placement (runtime integration tests under `tests/integration/runtime/`).
   Decisions also mirrored in `docs/architecture/graphics.md` and
   `src/graphics/renderer/README.md`.
-- [GRAPHICS-012 — Picking, selection, and outline](../../done/GRAPHICS-012-picking-selection-outline.md):
+- [GRAPHICS-012 — Picking, selection, and outline](../../archive/GRAPHICS-012-picking-selection-outline.md):
   depends on GRAPHICS-002, GRAPHICS-007, GRAPHICS-008, and GRAPHICS-010. Owns
   the logical `PickingPass` stage (split source modules
   `Pass.Selection.EntityId`/`FaceId`/`EdgeId`/`PointId`) and the
   `SelectionOutlinePass` (`Pass.Selection.Outline`); see the Pass module
   naming map in `docs/architecture/rendering-three-pass.md`.
-- [GRAPHICS-012Q — Picking backend/runtime clarification follow-ups](../../done/GRAPHICS-012Q-picking-backend-runtime-clarifications.md):
+- [GRAPHICS-012Q — Picking backend/runtime clarification follow-ups](../../archive/GRAPHICS-012Q-picking-backend-runtime-clarifications.md):
   retired docs-only clarification for shader-side ID encoding, backend
   readback drain, runtime ECS selection resolution, and transparent /
   special forward picking eligibility. Decisions also mirrored in
   `docs/architecture/rendering-three-pass.md`,
   `docs/architecture/graphics.md`, and `src/graphics/renderer/README.md`.
-- [GRAPHICS-013 — Postprocess/debug-view/ImGui/present umbrella index](../../done/GRAPHICS-013-postprocess-debugview-imgui-present.md):
+- [GRAPHICS-013 — Postprocess/debug-view/ImGui/present umbrella index](../../archive/GRAPHICS-013-postprocess-debugview-imgui-present.md):
   retired planning-only umbrella; superseded by the split children
   GRAPHICS-013A/B/C and their retired clarification follow-ups
   GRAPHICS-013AQ/BQ/CQ. Listed here only as a historical pointer; not an
   eligible next-active candidate.
-- [GRAPHICS-013A — Postprocess chain](../../done/GRAPHICS-013A-postprocess-chain.md):
+- [GRAPHICS-013A — Postprocess chain](../../archive/GRAPHICS-013A-postprocess-chain.md):
   depends on GRAPHICS-003 and on GRAPHICS-008/GRAPHICS-009 wherever
   scene-color or HDR inputs are required.
-- [GRAPHICS-013AQ — Postprocess backend clarification follow-ups](../../done/GRAPHICS-013AQ-postprocess-backend-clarifications.md):
+- [GRAPHICS-013AQ — Postprocess backend clarification follow-ups](../../archive/GRAPHICS-013AQ-postprocess-backend-clarifications.md):
   retired docs-only clarification for bloom backend shape (single
   half-resolution mip-chain `PostProcess.BloomScratch` with per-mip
   subviews, capped at six mips), histogram/exposure policy (fixed
@@ -159,9 +159,9 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   `docs/architecture/rendering-three-pass.md`,
   `docs/architecture/graphics.md`, and
   `src/graphics/renderer/README.md`.
-- [GRAPHICS-013B — Debug view and render-target inspection](../../done/GRAPHICS-013B-debug-view-and-render-target-inspection.md):
+- [GRAPHICS-013B — Debug view and render-target inspection](../../archive/GRAPHICS-013B-debug-view-and-render-target-inspection.md):
   depends on GRAPHICS-013A.
-- [GRAPHICS-013BQ — Debug-view backend clarification follow-ups](../../done/GRAPHICS-013BQ-debug-view-backend-clarifications.md):
+- [GRAPHICS-013BQ — Debug-view backend clarification follow-ups](../../archive/GRAPHICS-013BQ-debug-view-backend-clarifications.md):
   retired docs-only clarification for shader visualization modes
   (deterministic mapping from `FrameRecipeResourceKind` plus
   `DebugViewResourceClass` to LDR-color/Reinhard-tonemap/depth-grayscale/
@@ -183,9 +183,9 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   `docs/architecture/rendering-three-pass.md`,
   `docs/architecture/graphics.md`, and
   `src/graphics/renderer/README.md`.
-- [GRAPHICS-013C — ImGui overlay and present/finalization](../../done/GRAPHICS-013C-imgui-overlay-and-present.md):
+- [GRAPHICS-013C — ImGui overlay and present/finalization](../../archive/GRAPHICS-013C-imgui-overlay-and-present.md):
   depends on GRAPHICS-013B.
-- [GRAPHICS-013CQ — ImGui/present backend clarification follow-ups](../../done/GRAPHICS-013CQ-imgui-present-backend-clarifications.md):
+- [GRAPHICS-013CQ — ImGui/present backend clarification follow-ups](../../archive/GRAPHICS-013CQ-imgui-present-backend-clarifications.md):
   retired docs-only clarification for `ImDrawData` -> `ImGuiOverlayFrame`
   translation and submission timing (runtime-side Dear ImGui adapter
   builds the records and calls `SubmitFrame()` after `ImGui::Render()`
@@ -209,10 +209,10 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   rejection of non-present writes to the imported backbuffer).
   Decisions also mirrored in `docs/architecture/rendering-three-pass.md`,
   `docs/architecture/graphics.md`, and `src/graphics/renderer/README.md`.
-- [GRAPHICS-014 — Visualization attributes and overlays](../../done/GRAPHICS-014-visualization-attributes-overlays.md):
+- [GRAPHICS-014 — Visualization attributes and overlays](../../archive/GRAPHICS-014-visualization-attributes-overlays.md):
   depends on GRAPHICS-002 and GRAPHICS-010, and on GRAPHICS-015 wherever
   texture/atlas resources are required.
-- [GRAPHICS-014Q — Visualization runtime/backend clarification follow-ups](../../done/GRAPHICS-014Q-visualization-runtime-backend-clarifications.md):
+- [GRAPHICS-014Q — Visualization runtime/backend clarification follow-ups](../../archive/GRAPHICS-014Q-visualization-runtime-backend-clarifications.md):
   retired docs-only clarification for runtime visualization packet producer
   ownership (`Extrinsic.Runtime.RenderExtraction` is sole owner; concrete
   adapters under planned `Extrinsic.Runtime.VisualizationAdapters` umbrella,
@@ -238,9 +238,9 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   `HtexRecreateRequestCount` and never owns the regeneration algorithm).
   Decisions also mirrored in `docs/architecture/rendering-three-pass.md`,
   `docs/architecture/graphics.md`, and `src/graphics/renderer/README.md`.
-- [GRAPHICS-015 — GPU assets, textures, and residency](../../done/GRAPHICS-015-gpu-assets-textures-residency.md):
+- [GRAPHICS-015 — GPU assets, textures, and residency](../../archive/GRAPHICS-015-gpu-assets-textures-residency.md):
   depends on GRAPHICS-006 wherever material texture references are involved.
-- [GRAPHICS-015Q — Texture residency backend clarification follow-ups](../../done/GRAPHICS-015Q-texture-residency-backend-clarifications.md):
+- [GRAPHICS-015Q — Texture residency backend clarification follow-ups](../../archive/GRAPHICS-015Q-texture-residency-backend-clarifications.md):
   retired docs-only clarification for cache capacity/eviction (stays
   non-evicting in this slice with future eviction routed through the
   frame-anchored retire queue and refusing to evict the fallback lease),
@@ -265,10 +265,10 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   `docs/architecture/rendering-three-pass.md`,
   `src/graphics/renderer/README.md`, and
   `src/graphics/assets/README.md`.
-- [GRAPHICS-017 — Camera, interaction, and gizmo boundaries](../../done/GRAPHICS-017-camera-interaction-and-gizmo-boundaries.md):
+- [GRAPHICS-017 — Camera, interaction, and gizmo boundaries](../../archive/GRAPHICS-017-camera-interaction-and-gizmo-boundaries.md):
   depends on GRAPHICS-012 for picking handoff. Camera packet contracts may be
   defined earlier without blocking.
-- [GRAPHICS-017Q — Camera/gizmo runtime clarification follow-ups](../../done/GRAPHICS-017Q-camera-gizmo-runtime-clarifications.md):
+- [GRAPHICS-017Q — Camera/gizmo runtime clarification follow-ups](../../archive/GRAPHICS-017Q-camera-gizmo-runtime-clarifications.md):
   retired docs-only clarification for runtime camera controller
   ownership (concrete controllers under
   `Extrinsic.Runtime.CameraControllers`, mirroring the
@@ -292,11 +292,11 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   `docs/migration/nonlegacy-parity-matrix.md` editor-handoff rows that
   already cross-link `GRAPHICS-017Q`, with concrete promoted-task IDs
   gated by `GRAPHICS-020`).
-- [GRAPHICS-018 — Vulkan renderer integration](../../done/GRAPHICS-018-vulkan-renderer-integration.md):
+- [GRAPHICS-018 — Vulkan renderer integration](../../archive/GRAPHICS-018-vulkan-renderer-integration.md):
   depends on stable CPU/null contracts from GRAPHICS-002, GRAPHICS-003,
   GRAPHICS-004, GRAPHICS-006, GRAPHICS-007, GRAPHICS-008, GRAPHICS-009, and
   GRAPHICS-013C.
-- [GRAPHICS-018Q — Vulkan integration clarification follow-ups](../../done/GRAPHICS-018Q-vulkan-integration-clarifications.md):
+- [GRAPHICS-018Q — Vulkan integration clarification follow-ups](../../archive/GRAPHICS-018Q-vulkan-integration-clarifications.md):
   retired; nonblocking docs-only follow-up resolving the four remaining
   Vulkan integration decisions —
   texture upload policy (guarded synchronous `WriteTexture()` stays the
@@ -316,73 +316,73 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   breadcrumbs is a separate semantic task only when operational bring-up
   demonstrates many-per-frame firing). It must not be mixed with C++
   behavior work.
-- [GRAPHICS-018T — Vulkan texture upload batching](../../done/GRAPHICS-018T-texture-upload-batching.md):
+- [GRAPHICS-018T — Vulkan texture upload batching](../../archive/GRAPHICS-018T-texture-upload-batching.md):
   retired follow-up to `GRAPHICS-018Q`/`GRAPHICS-026` that landed multi-mip /
   multi-layer / cubemap `VkBufferImageCopy` batching plus opt-in `gpu;vulkan`
   smoke; CPU-only fail-closed correctness path remains via the guarded
   synchronous `WriteTexture()` baseline. Upstream gates GRAPHICS-006,
   GRAPHICS-015, GRAPHICS-018, GRAPHICS-018Q, and GRAPHICS-026 are retired in
   `tasks/done/`.
-- [GRAPHICS-019 — Legacy graphics IO boundaries](../../done/GRAPHICS-019-legacy-graphics-io-boundaries.md):
+- [GRAPHICS-019 — Legacy graphics IO boundaries](../../archive/GRAPHICS-019-legacy-graphics-io-boundaries.md):
   completed planning task that assigns legacy graphics import/export/model/texture
   IO to `assets`, `geometry`, `runtime`, and `graphics/assets` handoff owners;
   final graphics layers must not own file IO or parser/exporter registries.
-- [GRAPHICS-020 — Legacy graphics retirement gates](../../done/GRAPHICS-020-legacy-graphics-retirement-gates.md):
+- [GRAPHICS-020 — Legacy graphics retirement gates](../../archive/GRAPHICS-020-legacy-graphics-retirement-gates.md):
   completed planning gate map for retained legacy graphics/RHI/runtime-rendering
   modules. It records promoted owners, blocker tasks, test evidence, and final
   deletion readiness checks; no legacy source deletion happens in this slice.
-- [GRAPHICS-022 — Rendergraph diagnostics and validation](../../done/GRAPHICS-022-rendergraph-diagnostics-validation.md):
+- [GRAPHICS-022 — Rendergraph diagnostics and validation](../../archive/GRAPHICS-022-rendergraph-diagnostics-validation.md):
   completed follow-on infrastructure hardening task; ordering matches the
   retired GRAPHICS-001 parity seed and it depends on GRAPHICS-003 for
   frame-recipe context while remaining CPU/null testable (no Vulkan
   requirement).
-- [GRAPHICS-027 — Remove rendergraph compile diagnostic string shim](../../done/GRAPHICS-027-remove-rendergraph-diagnostic-shim.md):
+- [GRAPHICS-027 — Remove rendergraph compile diagnostic string shim](../../archive/GRAPHICS-027-remove-rendergraph-diagnostic-shim.md):
   completed follow-up to GRAPHICS-022 that removed the
   `GetLastCompileDiagnostic()` string compatibility shim and the dead
   `CompiledRenderGraph::Diagnostic` field once downstream callers had
   migrated to structured `RenderGraphValidationResult` findings.
   CPU-only, no Vulkan requirement.
-- [GRAPHICS-023 — Shader, material, and texture hot reload](../../done/GRAPHICS-023-shader-material-texture-hot-reload.md):
+- [GRAPHICS-023 — Shader, material, and texture hot reload](../../archive/GRAPHICS-023-shader-material-texture-hot-reload.md):
   retired at `CPUContracted`; promoted shader-path/generation invalidation,
   pipeline recompile diagnostics, material-layout compatibility decisions,
   texture fallback/reload retention, and runtime asset-generation observation
   are CPU-testable without legacy graphics dependencies. Depends on
   GRAPHICS-006 for registry/material/pipeline contracts and GRAPHICS-015 for GPU
   asset/texture residency.
-- [GRAPHICS-023A — GpuSceneSlot asset generation tracking](../../done/GRAPHICS-023A-gpu-scene-slot-asset-generation-tracking.md):
+- [GRAPHICS-023A — GpuSceneSlot asset generation tracking](../../archive/GRAPHICS-023A-gpu-scene-slot-asset-generation-tracking.md):
   completed focused child task that lands the `GpuSceneSlot::SourceAsset` and
   `GpuSceneSlot::LastSeenAssetGeneration` metadata required by completed
   `GRAPHICS-028` for later runtime residency hot-reload comparisons. It does
   not implement runtime polling, file watching, shader reload, or asset ingest.
-- [GRAPHICS-023B — GpuSceneSlot asset rebind decision](../../done/GRAPHICS-023B-gpu-scene-slot-asset-rebind-decision.md):
+- [GRAPHICS-023B — GpuSceneSlot asset rebind decision](../../archive/GRAPHICS-023B-gpu-scene-slot-asset-rebind-decision.md):
   completed focused child task that adds the CPU-only `GpuSceneSlot` decision helper
   for comparing runtime-observed asset generations without importing
   `Graphics.GpuAssetCache` into the renderer component value type.
-- [GRAPHICS-023C — Runtime asset-generation observation bridge](../../done/GRAPHICS-023C-runtime-asset-generation-observation.md):
+- [GRAPHICS-023C — Runtime asset-generation observation bridge](../../archive/GRAPHICS-023C-runtime-asset-generation-observation.md):
   completed focused child task that lets `Runtime.RenderExtraction` observe
   `AssetInstance::Source` against a supplied `Graphics.GpuAssetCache` view and
   classify pending/up-to-date/rebind-required `GpuSceneSlot` states without
   performing upload, file-watching, shader reload, or GPU geometry rebinding.
-- [GRAPHICS-023D — Runtime asset-generation rebind acknowledgment](../../done/GRAPHICS-023D-runtime-asset-generation-rebind-acknowledgment.md):
+- [GRAPHICS-023D — Runtime asset-generation rebind acknowledgment](../../archive/GRAPHICS-023D-runtime-asset-generation-rebind-acknowledgment.md):
   completed focused child task that added the runtime-owned
   `AcknowledgeRenderableAssetRebind` helper closing the
   observe → classify → acknowledge loop opened by `GRAPHICS-023C`. The default
   `ExtractAndSubmit` path still observes without acknowledging; uploads,
   file-watching, shader reload, and texture residency reload remain out of
   scope.
-- [GRAPHICS-024 — Overlays, presentation adjacency, and editor handoff](../../done/GRAPHICS-024-overlays-presentation-editor-handoff.md):
+- [GRAPHICS-024 — Overlays, presentation adjacency, and editor handoff](../../archive/GRAPHICS-024-overlays-presentation-editor-handoff.md):
   completed planning task; recorded the per-row owner matrix for legacy
   overlay/presentation/editor-adjacent behaviors and cross-linked
   GRAPHICS-010/011/014/017 done tasks plus this backlog index. Retirement
   gating in GRAPHICS-020 resolves overlay/presentation modules through
   the matrix in `../../../docs/migration/nonlegacy-parity-matrix.md`.
-- [GRAPHICS-025 — Hybrid, transparent, and special-material forward path](../../done/GRAPHICS-025-hybrid-transparent-special-material-path.md):
+- [GRAPHICS-025 — Hybrid, transparent, and special-material forward path](../../archive/GRAPHICS-025-hybrid-transparent-special-material-path.md):
   retired planning slice; records deferred opaque base + future forward hybrid
   surface overlay semantics, material classifications (`Opaque`, `AlphaMask`,
   `Transparent`, `Unlit`, `SpecialForwardOnly`), `SceneColorHDR`/`SceneDepth`
   resource ownership, optional velocity/history/OIT follow-up boundaries, and
   split points without expanding GRAPHICS-006/007/008/009/013A.
-- [GRAPHICS-028 — ECS renderable-entity to GpuWorld residency bridge](../../done/GRAPHICS-028-ecs-renderable-residency-bridge.md):
+- [GRAPHICS-028 — ECS renderable-entity to GpuWorld residency bridge](../../archive/GRAPHICS-028-ecs-renderable-residency-bridge.md):
   completed planning task that records the runtime-owned residency bridge
   between live ECS queries and `GpuWorld`. Residency state lives in a
   runtime-owned sidecar/cache keyed by stable entity ID and may store
@@ -391,7 +391,7 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   static-vs-dynamic split, dirty-tag drain order, hierarchy decomposition,
   per-domain packers (mesh / graph / point cloud), and primitive-instancing
   policy. Follow-up implementation remains separate from this docs-only slice.
-- [GRAPHICS-029 — Reference scene bootstrap and minimal renderable extraction](../../done/GRAPHICS-029-runtime-reference-scene-bootstrap.md):
+- [GRAPHICS-029 — Reference scene bootstrap and minimal renderable extraction](../../archive/GRAPHICS-029-runtime-reference-scene-bootstrap.md):
   retired planning slice that locks down module placement
   (`Extrinsic.Runtime.ReferenceScene` at `src/runtime/Runtime.ReferenceScene.cppm`),
   bootstrap-seam shape (`IReferenceSceneProvider` + `ReferenceSceneRegistry`,
@@ -409,7 +409,7 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   GRAPHICS-029-Impl-A/B/C are identified but not opened; Impl-B depends on
   GRAPHICS-030-Impl-A landing `ProceduralGeometryRef` for the original
   procedural lane. Sandbox stays policy-light; no GPU-typed ECS components.
-- [GRAPHICS-030 — Procedural-source geometry residency bridge (planning)](../../done/GRAPHICS-030-runtime-geometry-residency-bridge.md):
+- [GRAPHICS-030 — Procedural-source geometry residency bridge (planning)](../../archive/GRAPHICS-030-runtime-geometry-residency-bridge.md):
   retired planning-only first concrete slice of the GRAPHICS-028 contract; locked
   the procedural-geometry descriptor shape (closed `ProceduralGeometryKind` enum
   + POD `ProceduralGeometryParams`), cache identity (`ProceduralGeometryKey =
@@ -429,7 +429,7 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   layering audit confirming `ecs → core` and no new graphics edges.
   Implementation children `GRAPHICS-030-Impl-A/B/C/D` are identified but not
   opened. Asset-backed mesh residency is deferred to GRAPHICS-034.
-- [GRAPHICS-031 — Default debug surface material and missing-material fallback (planning)](../../done/GRAPHICS-031-default-debug-surface-material.md):
+- [GRAPHICS-031 — Default debug surface material and missing-material fallback (planning)](../../archive/GRAPHICS-031-default-debug-surface-material.md):
   retired planning-only first slice of the default-material contract; locked the
   reuse of `kDefaultMaterialSlotIndex = 0u` as the
   `"Material.DefaultDebugSurface"` slot with
@@ -458,7 +458,7 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   repopulation), `GRAPHICS-031-Impl-B` (substitution wiring + diagnostics
   counters), and the optional `GRAPHICS-031-Impl-C` (one additional
   debug variant) are identified but not opened.
-- [GRAPHICS-032 — Minimal surface and present command recording path (planning)](../../done/GRAPHICS-032-minimal-surface-present-command-path.md):
+- [GRAPHICS-032 — Minimal surface and present command recording path (planning)](../../archive/GRAPHICS-032-minimal-surface-present-command-path.md):
   retired planning-only definition of the smallest visible-path command
   recording bodies. It locks `FrameRecipe::MinimalDebugSurface` with label
   `recipe.minimal-debug-surface`, the two-pass order
@@ -471,9 +471,9 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   Implementation child slices (`GRAPHICS-032-Impl-A/B/C/D`) are identified but
   not opened. Vulkan operational-readiness defers to GRAPHICS-033. The
   bootstrap implementation artifacts from this planning track were deleted by
-  [GRAPHICS-081](../../done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md)
+  [GRAPHICS-081](../../archive/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md)
   after the default recipe became canonical.
-- [GRAPHICS-033 — Vulkan operational readiness and runtime fallback diagnostics (planning)](../../done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md):
+- [GRAPHICS-033 — Vulkan operational readiness and runtime fallback diagnostics (planning)](../../archive/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md):
   retired planning-only operational-gate definition for the promoted Vulkan
   backend; locks the ordered gate checklist, single-source
   `EvaluateVulkanOperationalStatus(...)` status seam, append-only status/reason
@@ -484,7 +484,7 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   split, performance characteristics, extensibility, and layering. Implementation
   children `GRAPHICS-033A/B/C/D` and gate follow-ups `GRAPHICS-033E/F` are
   retired; fail-closed behavior is preserved.
-- [GRAPHICS-033A — Vulkan operational-status evaluator surface (done)](../../done/GRAPHICS-033A-vulkan-operational-status-evaluator.md):
+- [GRAPHICS-033A — Vulkan operational-status evaluator surface (done)](../../archive/GRAPHICS-033A-vulkan-operational-status-evaluator.md):
   first implementation child of GRAPHICS-033. Landed the
   `VulkanOperationalStatusCode` / `VulkanOperationalReason` /
   `VulkanOperationalInputs` / `VulkanOperationalStatus` types and
@@ -494,7 +494,7 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   originally-planned `*-vulkan-operational-status-seam.md` backlog entry was
   superseded by the as-landed `*-evaluator.md` filename and has been
   retired. Upstream consumer of GRAPHICS-033B/C/D.
-- [GRAPHICS-033B — Vulkan operational diagnostics snapshot and runtime breadcrumb (done)](../../done/GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md):
+- [GRAPHICS-033B — Vulkan operational diagnostics snapshot and runtime breadcrumb (done)](../../archive/GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md):
   retired second implementation child. Added `VulkanOperationalDiagnosticsSnapshot`
   with the five process-monotonic counters
   (`VulkanFallbackToNullCount`, `VulkanInitFailureCount`,
@@ -504,18 +504,18 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   breadcrumb in `Runtime.Engine`. CPU `contract;graphics` and
   `contract;runtime` tests cover row-by-row counter side effects and
   one-shot breadcrumb emission. Depends on GRAPHICS-033A.
-- [GRAPHICS-033C — Vulkan command recording for the minimal-debug-surface recipe (done)](../../done/GRAPHICS-033C-vulkan-minimal-recipe-recording.md):
+- [GRAPHICS-033C — Vulkan command recording for the minimal-debug-surface recipe (done)](../../archive/GRAPHICS-033C-vulkan-minimal-recipe-recording.md):
   retired third implementation child. Implemented `Pass.Surface.MinimalDebug` and
   `Pass.Present.MinimalDebug` Vulkan recording bodies through the
   GRAPHICS-018R `RebuildOperationalResources()` seam, asserting CPU-mock
   parity against the GRAPHICS-032 contract. The operational reason row was
   renamed to `DefaultRecipeRecordingMissing` by
-  [GRAPHICS-081](../../done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md)
+  [GRAPHICS-081](../../archive/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md)
   when the bootstrap recipe retired; full `Operational` still
   required the follow-up gate items (barrier validation, public service
   reconciliation) before GRAPHICS-033E/F retired. Depends on GRAPHICS-033A,
   GRAPHICS-032 (done), GRAPHICS-031 (done), GRAPHICS-018R (done).
-- [GRAPHICS-033D — Opt-in Vulkan visible-triangle smoke fixture (done)](../../done/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md):
+- [GRAPHICS-033D — Opt-in Vulkan visible-triangle smoke fixture (done)](../../archive/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md):
   retired fourth implementation child. Added
   `tests/integration/graphics/Test.MinimalDebugSurfaceGpuSmoke.cpp` under
   `gpu;vulkan;graphics` labels (excluded from the default CPU gate). On
@@ -523,10 +523,10 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   frame through GLFW + real Vulkan device + surface + swapchain and
   asserted `IsOperational() == true` with no fallback counters or
   breadcrumbs. The fixture was removed by
-  [GRAPHICS-081](../../done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md)
+  [GRAPHICS-081](../../archive/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md)
   after the default-recipe smoke/readback path replaced it. Depends on
   GRAPHICS-033A, GRAPHICS-033B, GRAPHICS-033C.
-- [GRAPHICS-034 — Asset-backed mesh residency from AssetInstance::Source to GpuWorld (done)](../../done/GRAPHICS-034-asset-backed-mesh-residency-bridge.md):
+- [GRAPHICS-034 — Asset-backed mesh residency from AssetInstance::Source to GpuWorld (done)](../../archive/GRAPHICS-034-asset-backed-mesh-residency-bridge.md):
   retired planning-only slice. Recorded the runtime-owned asset-source
   residency contract: `AssetInstance::Source` normalization, separate
   `Runtime::AssetGeometryCache`, `Assets::AssetId` key/refcount semantics,
@@ -543,56 +543,56 @@ under GRAPHICS-029..033 in dependency order so the sandbox can render its first
 visible triangle through the promoted runtime/graphics path. Each leaf is small,
 independently testable (CPU/null where possible), and gated as recorded.
 
-- [GRAPHICS-029A — Reference scene skeleton (interface, registry, config field) (done)](../../done/GRAPHICS-029A-reference-scene-skeleton.md):
+- [GRAPHICS-029A — Reference scene skeleton (interface, registry, config field) (done)](../../archive/GRAPHICS-029A-reference-scene-skeleton.md):
   landed; depended on GRAPHICS-029 (planning) and HARDEN-060 (done). Unblocks
   GRAPHICS-029B.
-- [GRAPHICS-029B — TriangleProvider and reference camera substitution (done)](../../done/GRAPHICS-029B-triangle-provider-and-camera.md):
+- [GRAPHICS-029B — TriangleProvider and reference camera substitution (done)](../../archive/GRAPHICS-029B-triangle-provider-and-camera.md):
   landed; depended on GRAPHICS-029A (done) and GRAPHICS-030A (done) for the
   `ProceduralGeometryRef` type. Unblocks GRAPHICS-030B and GRAPHICS-031A on the
   Theme A triangle-path DAG.
-- [GRAPHICS-030A — Procedural geometry descriptor, cache, and triangle packer (done)](../../done/GRAPHICS-030A-procedural-geometry-descriptor-cache.md):
+- [GRAPHICS-030A — Procedural geometry descriptor, cache, and triangle packer (done)](../../archive/GRAPHICS-030A-procedural-geometry-descriptor-cache.md):
   landed; ECS procedural component + runtime descriptor/cache/packer modules
   live in `src/ecs/Components/ECS.Component.ProceduralGeometryRef.cppm` and
   `src/runtime/Runtime.ProceduralGeometry{,Packer}.cppm`. Unblocks
   GRAPHICS-029B and GRAPHICS-030B.
-- [GRAPHICS-030B — Wire RenderExtraction to the procedural geometry residency bridge (done)](../../done/GRAPHICS-030B-extraction-procedural-geometry-binding.md):
+- [GRAPHICS-030B — Wire RenderExtraction to the procedural geometry residency bridge (done)](../../archive/GRAPHICS-030B-extraction-procedural-geometry-binding.md):
   landed; depended on GRAPHICS-030A (done) and GRAPHICS-029B (done). First
   task that calls `GpuWorld::UploadGeometry()` and `SetInstanceGeometry()`
   from extraction. Unblocks GRAPHICS-030C and provided the residency input that
   the now-retired GRAPHICS-032B bootstrap pass body used before
   GRAPHICS-081 deleted that scaffold.
-- [GRAPHICS-030C — Procedural geometry refcount/free retire ordering (done)](../../done/GRAPHICS-030C-procedural-geometry-retire-ordering.md):
+- [GRAPHICS-030C — Procedural geometry refcount/free retire ordering (done)](../../archive/GRAPHICS-030C-procedural-geometry-retire-ordering.md):
   landed; deferred-retire window, refcount-cancellation resurrection, and
   `RenderExtractionCache::TickProceduralGeometry` maintenance hook are
   wired with `contract;runtime` coverage.
-- [GRAPHICS-031A — Default debug surface shaders and pipeline (done)](../../done/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md):
+- [GRAPHICS-031A — Default debug surface shaders and pipeline (done)](../../archive/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md):
   depends on GRAPHICS-031 (planning) and BUILD-001 (done; Sandbox shader
   compile wiring). Landed by commit `886b197`.
-- [GRAPHICS-031B — Default debug surface substitution and diagnostics counters (done)](../../done/GRAPHICS-031B-default-debug-surface-substitution-and-diagnostics.md):
+- [GRAPHICS-031B — Default debug surface substitution and diagnostics counters (done)](../../archive/GRAPHICS-031B-default-debug-surface-substitution-and-diagnostics.md):
   depends on GRAPHICS-031A. Landed by commit `24ac0b7`.
-- [GRAPHICS-032A — `FrameRecipe::MinimalDebugSurface` recipe and registration (done)](../../done/GRAPHICS-032A-minimal-debug-surface-recipe.md):
+- [GRAPHICS-032A — `FrameRecipe::MinimalDebugSurface` recipe and registration (done)](../../archive/GRAPHICS-032A-minimal-debug-surface-recipe.md):
   depends on GRAPHICS-031A. Landed by commit `3931705`; artifacts retired by
-  [GRAPHICS-081](../../done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md).
-- [GRAPHICS-032B — `Pass.Surface.MinimalDebug` CPU-mock command body (done)](../../done/GRAPHICS-032B-minimal-debug-surface-pass-body.md):
+  [GRAPHICS-081](../../archive/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md).
+- [GRAPHICS-032B — `Pass.Surface.MinimalDebug` CPU-mock command body (done)](../../archive/GRAPHICS-032B-minimal-debug-surface-pass-body.md):
   depends on GRAPHICS-032A and GRAPHICS-030B. Landed by commit `7fff8ca`;
   artifacts retired by
-  [GRAPHICS-081](../../done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md).
-- [GRAPHICS-032C — `Pass.Present.MinimalDebug` body and end-to-end CPU acceptance test (done)](../../done/GRAPHICS-032C-minimal-debug-present-pass-and-acceptance.md):
+  [GRAPHICS-081](../../archive/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md).
+- [GRAPHICS-032C — `Pass.Present.MinimalDebug` body and end-to-end CPU acceptance test (done)](../../archive/GRAPHICS-032C-minimal-debug-present-pass-and-acceptance.md):
   depends on GRAPHICS-032B. Landed by commit `e50c593`; artifacts retired by
-  [GRAPHICS-081](../../done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md).
-- [GRAPHICS-033A — Vulkan operational-status evaluator surface (done)](../../done/GRAPHICS-033A-vulkan-operational-status-evaluator.md):
+  [GRAPHICS-081](../../archive/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md).
+- [GRAPHICS-033A — Vulkan operational-status evaluator surface (done)](../../archive/GRAPHICS-033A-vulkan-operational-status-evaluator.md):
   depends on GRAPHICS-033 (planning). Landed by commit `7a5886d`.
-- [GRAPHICS-033B — Vulkan operational diagnostics snapshot and runtime breadcrumb (done)](../../done/GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md):
+- [GRAPHICS-033B — Vulkan operational diagnostics snapshot and runtime breadcrumb (done)](../../archive/GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md):
   depends on GRAPHICS-033A. Landed by commit `d736d9b`.
-- [GRAPHICS-033C — Vulkan command-recording for `FrameRecipe::MinimalDebugSurface` (done)](../../done/GRAPHICS-033C-vulkan-minimal-recipe-recording.md):
+- [GRAPHICS-033C — Vulkan command-recording for `FrameRecipe::MinimalDebugSurface` (done)](../../archive/GRAPHICS-033C-vulkan-minimal-recipe-recording.md):
   depends on GRAPHICS-032C, GRAPHICS-031B, GRAPHICS-033B, and GRAPHICS-018R
   (done) operational-transition seam; bootstrap recording artifacts retired by
-  [GRAPHICS-081](../../done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md).
-- [GRAPHICS-033D — Opt-in `gpu;vulkan` visible-triangle smoke fixture (done)](../../done/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md):
+  [GRAPHICS-081](../../archive/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md).
+- [GRAPHICS-033D — Opt-in `gpu;vulkan` visible-triangle smoke fixture (done)](../../archive/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md):
   depends on GRAPHICS-033C; originally owned the bootstrap pixel-readback
   driver harness, which is now superseded by the default-recipe smoke/readback
   fixture after GRAPHICS-081.
-- [GRAPHICS-033E — Wire the `BarrierValidationClean` operational gate (done)](../../done/GRAPHICS-033E-vulkan-operational-gate-barrier-validation.md):
+- [GRAPHICS-033E — Wire the `BarrierValidationClean` operational gate (done)](../../archive/GRAPHICS-033E-vulkan-operational-gate-barrier-validation.md):
   done (slice 2 dropped the over-restrictive compile-time clause from the
   producer publish; CPU gate green). Depends on GRAPHICS-033C (recording
   bodies landed) and GRAPHICS-022 (rendergraph validation surface).
@@ -601,7 +601,7 @@ independently testable (CPU/null where possible), and gated as recorded.
   consumed by `VulkanDevice::BuildOperationalInputs()`. Planning-gap fill: the
   parent GRAPHICS-033 planning slice identified Impl-A/B/C/D but did not
   enumerate an explicit child for gates 7/8.
-- [GRAPHICS-033F — Wire the `PublicServiceReconciled` operational gate (done)](../../done/GRAPHICS-033F-vulkan-operational-gate-public-service-reconciliation.md):
+- [GRAPHICS-033F — Wire the `PublicServiceReconciled` operational gate (done)](../../archive/GRAPHICS-033F-vulkan-operational-gate-public-service-reconciliation.md):
   done. Depended on GRAPHICS-033E (per the evaluator's first-failing-gate
   ordering). Backend-internal: re-derive
   `VulkanDevice::HasOperationalSafetyPrerequisites()` from raw live-handle
@@ -613,13 +613,13 @@ independently testable (CPU/null where possible), and gated as recorded.
   default/ci-vulkan gate set passed. Planning-gap fill: the parent
   GRAPHICS-033 planning slice identified Impl-A/B/C/D but did not enumerate
   an explicit child for gates 7/8.
-- [GRAPHICS-032D — Opt-in `gpu;vulkan` smoke for `FrameRecipe::MinimalDebugSurface` (done)](../../done/GRAPHICS-032D-gpu-vulkan-minimal-recipe-smoke.md):
+- [GRAPHICS-032D — Opt-in `gpu;vulkan` smoke for `FrameRecipe::MinimalDebugSurface` (done)](../../archive/GRAPHICS-032D-gpu-vulkan-minimal-recipe-smoke.md):
   depended on GRAPHICS-033C and GRAPHICS-033D; landed as the
   `MinimalDebugSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream`
   sibling sharing the GRAPHICS-033D bounded `engine.Run()` driver helper for
   recipe-selector coverage. Fixture and selector artifacts retired by
-  [GRAPHICS-081](../../done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md).
-- [GRAPHICS-080 — Flip reference config + CI preset to enable promoted Vulkan (done)](../../done/GRAPHICS-080-enable-promoted-vulkan-by-default.md):
+  [GRAPHICS-081](../../archive/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md).
+- [GRAPHICS-080 — Flip reference config + CI preset to enable promoted Vulkan (done)](../../archive/GRAPHICS-080-enable-promoted-vulkan-by-default.md):
   depends on GRAPHICS-033C (done).
   Adds the `ci-vulkan` configure preset and flips
   `CreateReferenceEngineConfig()` so the reference sandbox requests promoted
@@ -629,8 +629,8 @@ independently testable (CPU/null where possible), and gated as recorded.
   with the `VulkanRequestedButNotOperational` breadcrumb.
 
 Cross-layer Theme A leaves outside `rendering/`:
-- [`done/BUILD-001` — Wire shader compilation to the promoted Sandbox build](../../done/BUILD-001-sandbox-shader-compile-wiring.md).
-- [`runtime/RUNTIME-070` — Bootstrap GpuAssetCache fallback texture in Engine::Initialize](../../done/RUNTIME-070-fallback-texture-bootstrap.md) (done).
+- [`done/BUILD-001` — Wire shader compilation to the promoted Sandbox build](../../archive/BUILD-001-sandbox-shader-compile-wiring.md).
+- [`runtime/RUNTIME-070` — Bootstrap GpuAssetCache fallback texture in Engine::Initialize](../../archive/RUNTIME-070-fallback-texture-bootstrap.md) (done).
 
 ### Theme B′ — Default-recipe pass operational wiring (GRAPHICS-070..079)
 
@@ -641,18 +641,18 @@ They depend on the Theme A triangle path at minimum through GRAPHICS-031A
 gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
 `GRAPHICS-033D`.
 
-- [GRAPHICS-070 — Default-recipe `Pass.Forward.Surface` operational wiring (done)](../../done/GRAPHICS-070-default-recipe-forward-surface-pass-wiring.md):
+- [GRAPHICS-070 — Default-recipe `Pass.Forward.Surface` operational wiring (done)](../../archive/GRAPHICS-070-default-recipe-forward-surface-pass-wiring.md):
   depended on GRAPHICS-031A (slot-0 pipeline) and GRAPHICS-030B (residency).
   Landed the `NullRenderer`-owned `ForwardSurfacePass` + pipeline lease,
   `"SurfacePass"` executor routing under the forward lighting path, and the
   default-recipe lighting-path flip so the surface bind/draw shape records
   on the operational CPU/null path. GRAPHICS-072 owns the deferred branch.
-- [GRAPHICS-071 — Default-recipe `Pass.Forward.Line` and `Pass.Forward.Point` wiring (done)](../../done/GRAPHICS-071-default-recipe-forward-line-point-wiring.md):
+- [GRAPHICS-071 — Default-recipe `Pass.Forward.Line` and `Pass.Forward.Point` wiring (done)](../../archive/GRAPHICS-071-default-recipe-forward-line-point-wiring.md):
   depended on GRAPHICS-070. Landed retained line/point `NullRenderer`
   ownership, pipeline leases, executor routing, CPU contract coverage, and the
   documented `forward/line` and `forward/point` canonical retained line/point
   variants.
-- [GRAPHICS-072 — Default-recipe deferred GBuffer + lighting pass wiring (done)](../../done/GRAPHICS-072-default-recipe-deferred-gbuffer-and-lighting-wiring.md):
+- [GRAPHICS-072 — Default-recipe deferred GBuffer + lighting pass wiring (done)](../../archive/GRAPHICS-072-default-recipe-deferred-gbuffer-and-lighting-wiring.md):
   depends on GRAPHICS-070 (done), GRAPHICS-073 (done). Now also owns the
   shadow-atlas deferred-lighting binding (at `set 1, binding 1` per
   `assets/shaders/deferred_lighting.frag`, i.e. binding 1 of the same
@@ -661,7 +661,7 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   the `DepthAttachment → ShaderRead` cross-pass barrier-transition test
   absorbed from GRAPHICS-073 Slice C, since both can only be exercised
   once `Pass.Deferred.Lighting` is recording in the operational executor.
-- [GRAPHICS-073 — Default-recipe `Pass.Shadows` wiring + shadow atlas allocation (done)](../../done/GRAPHICS-073-default-recipe-shadow-pass-wiring.md):
+- [GRAPHICS-073 — Default-recipe `Pass.Shadows` wiring + shadow atlas allocation (done)](../../archive/GRAPHICS-073-default-recipe-shadow-pass-wiring.md):
   depended on GRAPHICS-070. Slice A landed the depth-only shadow pipeline,
   `NullRenderer` ownership, and the `"ShadowPass"` executor branch
   (`SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy);
@@ -675,7 +675,7 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   task's `set 0, binding 1` shorthand to `set 1, binding 1` to match
   `assets/shaders/deferred_lighting.frag` (forward path keeps `set 0,
   binding 1`).
-- [GRAPHICS-074 — Default-recipe selection ID passes, outline pass, and picking readback drain](../../done/GRAPHICS-074-default-recipe-selection-outline-and-picking-readback.md):
+- [GRAPHICS-074 — Default-recipe selection ID passes, outline pass, and picking readback drain](../../archive/GRAPHICS-074-default-recipe-selection-outline-and-picking-readback.md):
   done (retired 2026-05-21 at `Operational` on the CPU/null gate). Slice A
   landed the EntityId selection pipeline + `"PickingPass"` executor route +
   GpuScene-aware `selection/entity_id.{vert,frag}` shader pair (PR #890;
@@ -698,7 +698,7 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   `SelectedIds[16]` to a UBO/bindless tail so the outline push block
   stays <= 128 bytes on hosts at the Vulkan-guaranteed minimum (tracked
   separately, intentionally out-of-scope here).
-- [GRAPHICS-075 — Default-recipe postprocess chain wiring](../../done/GRAPHICS-075-default-recipe-postprocess-chain-wiring.md):
+- [GRAPHICS-075 — Default-recipe postprocess chain wiring](../../archive/GRAPHICS-075-default-recipe-postprocess-chain-wiring.md):
   depended on GRAPHICS-072 (HDR scene color producer). Retired 2026-05-22 at
   `Operational` on the CPU/null gate for all five postprocess stage families
   (ToneMap / Bloom / FXAA + SMAA edge-blend-resolve / Histogram including the
@@ -707,7 +707,7 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   claim and the bloom per-mip subresource barriers are tracked as standing
   follow-ups via the opt-in `gpu;vulkan` smoke and the `ICommandContext::TextureBarrier`
   RHI extension respectively, intentionally out-of-scope of this task.
-- [GRAPHICS-076 — Default-recipe `Pass.DebugView` and canonical `Pass.Present` wiring](../../done/GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md):
+- [GRAPHICS-076 — Default-recipe `Pass.DebugView` and canonical `Pass.Present` wiring](../../archive/GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md):
   depends on GRAPHICS-075 (done). Promoted to `tasks/active/` on 2026-05-23
   with a four-slice plan (canonical present → canonical debug-view →
   non-present-`Backbuffer`-write negative test → default-recipe
@@ -715,12 +715,12 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   #921 + #922 (Slice A follow-up), #923, and #924; Slice D graduated locally
   on 2026-05-28 with `DefaultRecipeSurfaceGpuSmoke` passing normally on a
   Vulkan-capable host after the BUG-012 command-stream fixes.
-- [GRAPHICS-076E — Default-recipe pixel-readback parity harness](../../done/GRAPHICS-076E-default-recipe-pixel-readback.md):
+- [GRAPHICS-076E — Default-recipe pixel-readback parity harness](../../archive/GRAPHICS-076E-default-recipe-pixel-readback.md):
   done 2026-05-29. Follow-up to GRAPHICS-076 Slice D. Adds default-recipe
   four-sample readback parity without reusing bootstrap-only diagnostics;
   the GRAPHICS-076F descriptor-slot fix made the opt-in Vulkan pixel smoke
   green.
-- [GRAPHICS-077 — Backend transient-debug-primitive upload helper](../../done/GRAPHICS-077-transient-debug-primitive-upload-helper.md):
+- [GRAPHICS-077 — Backend transient-debug-primitive upload helper](../../archive/GRAPHICS-077-transient-debug-primitive-upload-helper.md):
   depends on GRAPHICS-072 (uses `SceneColorHDR`/`SceneDepth` LOAD-store).
   Promoted to `tasks/active/` on 2026-05-23 with a four-slice plan
   (recipe/executor scaffold → triangle lane → line + point lanes →
@@ -728,14 +728,14 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   command-stream smoke passed locally on 2026-05-28 with
   `TransientDebugSurfaceGpuSmoke` recording triangle/line/point lanes on an
   operational Vulkan frame.
-- [GRAPHICS-077E — Transient-debug pixel-readback parity harness (done)](../../done/GRAPHICS-077E-transient-debug-pixel-readback.md):
+- [GRAPHICS-077E — Transient-debug pixel-readback parity harness (done)](../../archive/GRAPHICS-077E-transient-debug-pixel-readback.md):
   retired follow-up to GRAPHICS-077 Slice D. Added
   `SetTransientDebugBackbufferReadbackBuffer(...)` and
   `TransientDebugBackbufferReadbackCopyCount`, CPU/null fail-closed contract
   coverage, and an opt-in Vulkan readback/sample-color smoke for triangle,
   line, point, and clear pixels without reusing the canonical surface-readback
   diagnostics.
-- [GRAPHICS-078 — Backend visualization-overlay upload helper](../../done/GRAPHICS-078-visualization-overlay-upload-helper.md):
+- [GRAPHICS-078 — Backend visualization-overlay upload helper](../../archive/GRAPHICS-078-visualization-overlay-upload-helper.md):
   depends on GRAPHICS-077 (mirrors helper pattern) and GRAPHICS-072.
   Promoted to `tasks/active/` on 2026-05-24 with a four-slice plan
   (recipe/executor scaffold → vector-field lane → isoline lane →
@@ -743,114 +743,114 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   landed/CPUContracted and Slice D command-stream smoke passed locally on
   2026-05-28 with `VisualizationOverlaySurfaceGpuSmoke` recording vector-field
   and isoline lanes on an operational Vulkan frame.
-- [GRAPHICS-078E — Visualization-overlay pixel-readback parity harness (done)](../../done/GRAPHICS-078E-visualization-overlay-pixel-readback.md):
+- [GRAPHICS-078E — Visualization-overlay pixel-readback parity harness (done)](../../archive/GRAPHICS-078E-visualization-overlay-pixel-readback.md):
   retired follow-up to GRAPHICS-078 Slice D. Added
   `SetVisualizationOverlayBackbufferReadbackBuffer(...)` and
   `VisualizationOverlayBackbufferReadbackCopyCount`, CPU/null fail-closed
   contract coverage, deterministic placeholder lane geometry, and an opt-in
   Vulkan readback/sample-color smoke for vector-field, isoline, and clear
   pixels without reusing canonical or transient-debug readback diagnostics.
-- [GRAPHICS-085 — Overlay packet backend parity](../../done/GRAPHICS-085-overlay-packet-backend-parity.md):
+- [GRAPHICS-085 — Overlay packet backend parity](../../archive/GRAPHICS-085-overlay-packet-backend-parity.md):
   done 2026-06-11 at `CPUContracted`. Retired the retained overlay packet
   backend proof by composing existing transient debug triangle/line/point and
   visualization vector-field/isoline command routes in one CPU/null frame,
   while keeping selectable overlay-like behavior on ordinary renderable and
   primitive-view selection/outline snapshots. Existing opt-in transient-debug
   and visualization-overlay Vulkan smokes remain the operational evidence path.
-- [GRAPHICS-084 — Visualization property-buffer residency](../../done/GRAPHICS-084-visualization-property-buffer-residency.md):
+- [GRAPHICS-084 — Visualization property-buffer residency](../../archive/GRAPHICS-084-visualization-property-buffer-residency.md):
   done 2026-06-11 at `CPUContracted`. Runtime visualization adapters now emit
   copied scalar/color/vector property-buffer upload descriptors when external
   BDAs are absent; graphics owns validation, `RHI::BufferManager` residency,
   packet BDA publication, dirty-stamp reuse, stale-stamp rejection, upload
   deferral diagnostics, and renderer stats. The opt-in Vulkan operational
   proof is retired by `GRAPHICS-084C`.
-- [GRAPHICS-084C — Visualization property-buffer Vulkan smoke](../../done/GRAPHICS-084C-visualization-property-buffer-vulkan-smoke.md):
+- [GRAPHICS-084C — Visualization property-buffer Vulkan smoke](../../archive/GRAPHICS-084C-visualization-property-buffer-vulkan-smoke.md):
   done 2026-06-11 at `Operational`. The visualization-overlay `gpu;vulkan`
   smoke now submits graphics-owned property-buffer descriptors for vector-field
   position/vector data, verifies renderer property-buffer diagnostics, and
   records `VisualizationOverlayPass` on the promoted Vulkan path after packet
   BDA publication.
-- [GRAPHICS-086 — RHI retirement parity and CUDA decision](../../done/GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md):
+- [GRAPHICS-086 — RHI retirement parity and CUDA decision](../../archive/GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md):
   done 2026-06-11 at `CPUContracted`. The audit maps legacy command helpers,
   persistent descriptors, swapchain/image ownership, and scene-instance
   convenience to promoted RHI/Vulkan/renderer seams, records CUDA as removed
   from the promoted default path, and records that `LEGACY-009` was blocked by
   consumer grep/subtree ordering rather than an unnamed RHI parity gap. The
   final legacy sweep later retired `LEGACY-009`.
-- [GRAPHICS-079 — Default-recipe `Pass.ImGui` wiring](../../done/GRAPHICS-079-default-recipe-imgui-pass-wiring.md)
+- [GRAPHICS-079 — Default-recipe `Pass.ImGui` wiring](../../archive/GRAPHICS-079-default-recipe-imgui-pass-wiring.md)
   (done): depends on GRAPHICS-076 (PresentSource finalization) and
   `runtime/RUNTIME-090` (ImGui adapter producer). It wires the renderer
   `ImGuiPass` executor route + consumer handoff seam, retained font atlas,
   transient upload helper, `FrameRecipe.PresentSource` write topology, and
   per-command bindless user-texture sampling.
-- [GRAPHICS-081 — Retire `FrameRecipe::MinimalDebugSurface` scaffold once default recipe is operational](../../done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md):
+- [GRAPHICS-081 — Retire `FrameRecipe::MinimalDebugSurface` scaffold once default recipe is operational](../../archive/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md):
   done 2026-06-02. Deleted the bootstrap recipe, pass classes, executor
   branches, diagnostics counters, CMake entries, shaders, tests, and module
   inventory rows after GRAPHICS-076E/F made the default-recipe visible-triangle
   readback path canonical.
 
 Cross-layer Theme B′ leaves outside `rendering/`:
-- [`runtime/RUNTIME-080` — Texture asset bridge](../../done/RUNTIME-080-asset-bridges-texture.md) (superseded by `ASSETIO-001`, retired 2026-06-03).
-- [`RUNTIME-081` — Camera controllers](../../done/RUNTIME-081-camera-controllers.md).
-- [`runtime/RUNTIME-082` — Spatial debug adapters](../../done/RUNTIME-082-spatial-debug-adapters.md) (done 2026-05-27).
-- [`runtime/RUNTIME-083` — Visualization adapters](../../done/RUNTIME-083-visualization-adapters.md).
-- [`runtime/RUNTIME-084` — Gizmo interaction](../../done/RUNTIME-084-gizmo-interaction.md) (retired 2026-06-06 at `CPUContracted`).
-- [`runtime/RUNTIME-090` — Dear ImGui platform/renderer adapter](../../done/RUNTIME-090-imgui-platform-renderer-adapter.md) (retired 2026-06-02 at `CPUContracted`; Slice A standalone adapter module plus Slice B `Engine` frame-loop wiring landed).
+- [`runtime/RUNTIME-080` — Texture asset bridge](../../archive/RUNTIME-080-asset-bridges-texture.md) (superseded by `ASSETIO-001`, retired 2026-06-03).
+- [`RUNTIME-081` — Camera controllers](../../archive/RUNTIME-081-camera-controllers.md).
+- [`runtime/RUNTIME-082` — Spatial debug adapters](../../archive/RUNTIME-082-spatial-debug-adapters.md) (done 2026-05-27).
+- [`runtime/RUNTIME-083` — Visualization adapters](../../archive/RUNTIME-083-visualization-adapters.md).
+- [`runtime/RUNTIME-084` — Gizmo interaction](../../archive/RUNTIME-084-gizmo-interaction.md) (retired 2026-06-06 at `CPUContracted`).
+- [`runtime/RUNTIME-090` — Dear ImGui platform/renderer adapter](../../archive/RUNTIME-090-imgui-platform-renderer-adapter.md) (retired 2026-06-02 at `CPUContracted`; Slice A standalone adapter module plus Slice B `Engine` frame-loop wiring landed).
 
 Post-acceptance rendering leaves:
-- [GRAPHICS-088 — Resolved UV rendering and bake texture residency](../../done/GRAPHICS-088-resolved-uv-rendering-and-bake-residency.md):
+- [GRAPHICS-088 — Resolved UV rendering and bake texture residency](../../archive/GRAPHICS-088-resolved-uv-rendering-and-bake-residency.md):
   retired CPU-contracted resolved-UV renderer/material/generic generated-bake
   descriptor contract. Surface materials, generated textures, UV debug
   inspection, and UV-backed fragment bakes now use the canonical texture-
   coordinate channel without graphics-side UV generation.
-- [GRAPHICS-089 — Generated-UV texture sampling Vulkan smoke](../../done/GRAPHICS-089-generated-uv-texture-sampling-vulkan-smoke.md):
+- [GRAPHICS-089 — Generated-UV texture sampling Vulkan smoke](../../archive/GRAPHICS-089-generated-uv-texture-sampling-vulkan-smoke.md):
   retired 2026-06-19 at `Operational` on Vulkan-capable hosts. The opt-in
   runtime sandbox `gpu;vulkan` smoke now imports a mesh that originally lacked
   authored UVs, verifies ASSETIO-008 generated `v:texcoord` materialization,
   uploads a generated albedo texture through `GpuAssetCache`, binds it through
   the material texture path, and samples the generated texture through the
   resolved UV channel.
-- [GRAPHICS-090 — Progressive render-data operational smoke](../../done/GRAPHICS-090-progressive-render-data-operational-smoke.md):
+- [GRAPHICS-090 — Progressive render-data operational smoke](../../archive/GRAPHICS-090-progressive-render-data-operational-smoke.md):
   retired 2026-06-16 at `Operational`; opt-in `gpu;vulkan` coverage now proves
   generated mesh texture slots and graph property-buffer presentation are
   consumed by the promoted renderer without graphics importing live
   runtime/ECS/asset ownership.
-- [GRAPHICS-091 — Unify scalar-field / colormap visualization across surface, line, and point passes](../../done/GRAPHICS-091-unify-scalar-colormap-across-surface-line-point.md):
+- [GRAPHICS-091 — Unify scalar-field / colormap visualization across surface, line, and point passes](../../archive/GRAPHICS-091-unify-scalar-colormap-across-surface-line-point.md):
   retired 2026-06-19 at `Operational` on Vulkan-capable hosts
   (`CPUContracted` elsewhere). The promoted surface, line, and point shader
   paths now share `common/gpu_scene.glsl` visualization color resolution for
   material, uniform, scalar-field, and per-element RGBA modes; CPU/null coverage
   proves matching surface/line/point config, and the opt-in runtime sandbox
   `gpu;vulkan` smoke proves line/point scalar-field colormap pixels.
-- [GRAPHICS-092 — Group per-domain params in `GpuEntityConfig` and add line-width residency](../../done/GRAPHICS-092-group-per-domain-params-and-line-width-residency.md):
+- [GRAPHICS-092 — Group per-domain params in `GpuEntityConfig` and add line-width residency](../../archive/GRAPHICS-092-group-per-domain-params-and-line-width-residency.md):
   retired 2026-06-18 at `Operational` on Vulkan-capable hosts. The task grouped
   point and line fields into `GpuEntityConfig` sub-blocks, added
   `Line.LineWidth` / `Line.LineWidthBDA` residency from
   `RenderEdges::WidthSource`, consumed widths in `forward/line.vert` on the
   `LineQuads` topology, and added an opt-in runtime sandbox `gpu;vulkan`
   configured-line-width smoke.
-- [GRAPHICS-093 — Define forward-line quad topology for retained GpuScene lines (done)](../../done/GRAPHICS-093-forward-line-quad-topology.md):
+- [GRAPHICS-093 — Define forward-line quad topology for retained GpuScene lines (done)](../../archive/GRAPHICS-093-forward-line-quad-topology.md):
   retired 2026-06-18 at `CPUContracted`; appended the non-indexed `LineQuads`
   bucket, switched retained `LinePass` to `DrawIndirectCount()` / `TriangleList`,
   and preserved the indexed `Lines` bucket for edge-id selection. CPU/null dynamic
   line-width consumption and Vulkan operational proof are now covered by
   `GRAPHICS-092`.
-- [GRAPHICS-094 — Consume per-point size BDA in retained point shader (done)](../../done/GRAPHICS-094-retained-point-size-bda-consumption.md):
+- [GRAPHICS-094 — Consume per-point size BDA in retained point shader (done)](../../archive/GRAPHICS-094-retained-point-size-bda-consumption.md):
   retired 2026-06-18 at `CPUContracted`; the retained forward point shader now
   consumes `Point.PointSizeBDA[sourceVertexIndex]` when present and falls back to
   uniform `Point.PointSize`, without changing point color, line width, or legacy
   point paths.
 
 Cross-layer Theme A leaves retired for the full working sandbox path:
-- [`RUNTIME-085` — `GeometrySources` mesh residency bridge](../../done/RUNTIME-085-geometrysources-mesh-residency.md) (retired 2026-05-28 at `CPUContracted`; Slices A–C landed the mesh packer, extraction wiring, and dirty-domain reupload/retire ordering).
-- [`runtime/RUNTIME-086` — `GeometrySources` graph residency bridge](../../done/RUNTIME-086-geometrysources-graph-residency.md) (retired 2026-05-30 at `CPUContracted`; Slice A graph packer plus Slices B + C extraction residency wiring landed).
-- [`runtime/RUNTIME-087` — `GeometrySources` point-cloud residency bridge](../../done/RUNTIME-087-geometrysources-pointcloud-residency.md) (retired 2026-05-30 at `CPUContracted`).
-- [`runtime/RUNTIME-088` — Mesh primitive view lifecycle](../../done/RUNTIME-088-mesh-primitive-view-lifecycle.md) (retired 2026-05-31 at `CPUContracted`; Slice A packers plus Slice B `RenderExtractionCache` sidecar residency wiring landed).
-- [`runtime/RUNTIME-089` — Runtime selection controller and snapshot handoff](../../done/RUNTIME-089-selection-controller.md) (retired 2026-05-31 at `CPUContracted`; Slice A standalone `SelectionController` module, Slice B `Engine::RunFrame` + `RenderExtractionCache::ExtractAndSubmit` wiring).
-- [`runtime/RUNTIME-092` — Runtime stable entity lookup sidecar](../../done/RUNTIME-092-stable-entity-lookup.md) (retired 2026-05-31 at `CPUContracted`; Slice A standalone `StableEntityLookup` module, Slice B `Engine::RunFrame` per-frame rebuild + `SelectionController` render-id seam routing).
-- [`runtime/RUNTIME-093` — Primitive selection refinement](../../done/RUNTIME-093-primitive-selection-refinement.md) (done, 2026-06-01, `CPUContracted`).
-- [`UI-001` — Sandbox editor shell and core panels](../../done/UI-001-sandbox-editor-shell-panels.md) (retired 2026-06-03 at `CPUContracted`).
-- [`runtime/RUNTIME-095` — Working sandbox app acceptance path](../../done/RUNTIME-095-working-sandbox-acceptance.md) (retired 2026-06-04 at `Operational` on Vulkan-capable hosts).
+- [`RUNTIME-085` — `GeometrySources` mesh residency bridge](../../archive/RUNTIME-085-geometrysources-mesh-residency.md) (retired 2026-05-28 at `CPUContracted`; Slices A–C landed the mesh packer, extraction wiring, and dirty-domain reupload/retire ordering).
+- [`runtime/RUNTIME-086` — `GeometrySources` graph residency bridge](../../archive/RUNTIME-086-geometrysources-graph-residency.md) (retired 2026-05-30 at `CPUContracted`; Slice A graph packer plus Slices B + C extraction residency wiring landed).
+- [`runtime/RUNTIME-087` — `GeometrySources` point-cloud residency bridge](../../archive/RUNTIME-087-geometrysources-pointcloud-residency.md) (retired 2026-05-30 at `CPUContracted`).
+- [`runtime/RUNTIME-088` — Mesh primitive view lifecycle](../../archive/RUNTIME-088-mesh-primitive-view-lifecycle.md) (retired 2026-05-31 at `CPUContracted`; Slice A packers plus Slice B `RenderExtractionCache` sidecar residency wiring landed).
+- [`runtime/RUNTIME-089` — Runtime selection controller and snapshot handoff](../../archive/RUNTIME-089-selection-controller.md) (retired 2026-05-31 at `CPUContracted`; Slice A standalone `SelectionController` module, Slice B `Engine::RunFrame` + `RenderExtractionCache::ExtractAndSubmit` wiring).
+- [`runtime/RUNTIME-092` — Runtime stable entity lookup sidecar](../../archive/RUNTIME-092-stable-entity-lookup.md) (retired 2026-05-31 at `CPUContracted`; Slice A standalone `StableEntityLookup` module, Slice B `Engine::RunFrame` per-frame rebuild + `SelectionController` render-id seam routing).
+- [`runtime/RUNTIME-093` — Primitive selection refinement](../../archive/RUNTIME-093-primitive-selection-refinement.md) (done, 2026-06-01, `CPUContracted`).
+- [`UI-001` — Sandbox editor shell and core panels](../../archive/UI-001-sandbox-editor-shell-panels.md) (retired 2026-06-03 at `CPUContracted`).
+- [`runtime/RUNTIME-095` — Working sandbox app acceptance path](../../archive/RUNTIME-095-working-sandbox-acceptance.md) (retired 2026-06-04 at `Operational` on Vulkan-capable hosts).
 
 ### Modernization roadmap (GRAPHICS-035..058)
 
@@ -860,7 +860,7 @@ leaf task is a planning-only slice following the GRAPHICS-029..034 pattern
 (implementation children identified but not opened). Phases are independently
 testable; each phase derisks the next.
 
-- [GRAPHICS-035 — Rendering modernization roadmap (umbrella planning index, done)](../../done/GRAPHICS-035-modernization-roadmap.md):
+- [GRAPHICS-035 — Rendering modernization roadmap (umbrella planning index, done)](../../archive/GRAPHICS-035-modernization-roadmap.md):
   records the agreed phased roadmap (Phase 1 frame structure, Phase 2 shader
   & material modernization, Phase 3 RT & GI, Phase 4 research differentiators,
   Phase 5 frontier). Parent of GRAPHICS-036..058. No implementation, no
@@ -868,103 +868,103 @@ testable; each phase derisks the next.
 
 #### Phase 1 — Modern frame structure
 
-- [GRAPHICS-036 — Pipelined frames and double-buffered render world (done)](../../done/GRAPHICS-036-pipelined-frames-extraction-doublebuffer.md):
+- [GRAPHICS-036 — Pipelined frames and double-buffered render world (done)](../../archive/GRAPHICS-036-pipelined-frames-extraction-doublebuffer.md):
   locks the contract for sim-N / render-N-1 pipelining against an immutable
   double-buffered render world. Owner layers: `runtime` (pool + swap),
   `graphics/renderer` (consumer). Depends on GRAPHICS-002, GRAPHICS-016.
-- [GRAPHICS-037 — Async compute and multi-queue scheduling in the frame graph (done)](../../done/GRAPHICS-037-async-compute-multi-queue-rendergraph.md):
+- [GRAPHICS-037 — Async compute and multi-queue scheduling in the frame graph (done)](../../archive/GRAPHICS-037-async-compute-multi-queue-rendergraph.md):
   locks `QueueAffinity` enum, partitioning, cross-queue timeline-semaphore
   edges, ownership transfer, and CPU-testable null-RHI mocks. Depends on
   GRAPHICS-022, GRAPHICS-018T.
-- [GRAPHICS-038 — HZB and two-phase occlusion culling extension to CullingPass (done)](../../done/GRAPHICS-038-hzb-two-phase-occlusion-culling.md):
+- [GRAPHICS-038 — HZB and two-phase occlusion culling extension to CullingPass (done)](../../archive/GRAPHICS-038-hzb-two-phase-occlusion-culling.md):
   locks HZB resource shape + build pass + phase-1/phase-2 cull shader
   extension preserving the 8-bucket lane contract. Depends on GRAPHICS-007.
-- [GRAPHICS-039 — Clustered light binning (done)](../../done/GRAPHICS-039-clustered-light-binning.md):
+- [GRAPHICS-039 — Clustered light binning (done)](../../archive/GRAPHICS-039-clustered-light-binning.md):
   locks froxel-grid cluster build, light-to-cluster assignment, surface-shader
   consumption, and recipe/resource binding contracts. Depends on GRAPHICS-009.
-- [GRAPHICS-040 — TAA pass and reconstructor/upscaler interface seam (done)](../../done/GRAPHICS-040-taa-and-reconstructor-interface.md):
+- [GRAPHICS-040 — TAA pass and reconstructor/upscaler interface seam (done)](../../archive/GRAPHICS-040-taa-and-reconstructor-interface.md):
   locks sub-pixel jitter, motion-vector buffer, history color buffer, and the
   vendor-agnostic `IReconstructor` seam (DLSS/FSR/XeSS/MetalFX/NRD plug-in
   point). Depends on GRAPHICS-013A, GRAPHICS-036.
 
 #### Phase 2 — Shader & material modernization
 
-- [GRAPHICS-041 — Slang as canonical shading language with module compilation and hot reload (done)](../../done/GRAPHICS-041-slang-shader-pipeline-and-hot-reload.md):
+- [GRAPHICS-041 — Slang as canonical shading language with module compilation and hot reload (done)](../../archive/GRAPHICS-041-slang-shader-pipeline-and-hot-reload.md):
   locks offline Slang compilation under `tools/`, module/generic system,
   hot-reload retire-deadline wiring, autodiff annotation policy. Depends on
   GRAPHICS-006, GRAPHICS-023.
-- [GRAPHICS-042 — PBR feature completeness and IBL (done)](../../done/GRAPHICS-042-pbr-feature-completeness-and-ibl.md):
+- [GRAPHICS-042 — PBR feature completeness and IBL (done)](../../archive/GRAPHICS-042-pbr-feature-completeness-and-ibl.md):
   locks GGX multi-scatter compensation, sheen, anisotropy, clear-coat, and
   split-sum IBL with prefiltered envmap + DFG LUT. Depends on GRAPHICS-006,
   GRAPHICS-009.
-- [GRAPHICS-043 — Visibility buffer recipe and deferred materialization (done)](../../done/GRAPHICS-043-visibility-buffer-deferred-materialization.md):
+- [GRAPHICS-043 — Visibility buffer recipe and deferred materialization (done)](../../archive/GRAPHICS-043-visibility-buffer-deferred-materialization.md):
   locks vis-buffer encoding, tile classification, per-material compute
   materialization kernels with bindless sampling. Depends on GRAPHICS-008,
   GRAPHICS-041, GRAPHICS-044.
-- [GRAPHICS-044 — Meshlet geometry representation in GpuGeometryRecord (done)](../../done/GRAPHICS-044-meshlet-geometry-representation.md):
+- [GRAPHICS-044 — Meshlet geometry representation in GpuGeometryRecord (done)](../../archive/GRAPHICS-044-meshlet-geometry-representation.md):
   locks meshlet table extension on `GpuGeometryRecord` (≤ 64 vertices, ≤ 124
   primitives, bounding sphere + normal cone), authoring-time meshletization
   in `assets/`. Depends on GRAPHICS-004.
 
 #### Phase 3 — Ray tracing and global illumination
 
-- [GRAPHICS-045 — Ray tracing RHI extension (IRayTracingDevice) (done)](../../done/GRAPHICS-045-ray-tracing-rhi-extension.md):
+- [GRAPHICS-045 — Ray tracing RHI extension (IRayTracingDevice) (done)](../../archive/GRAPHICS-045-ray-tracing-rhi-extension.md):
   locks the optional `IRayTracingDevice` capability surface (BLAS/TLAS,
   inline RT in compute, ray pipelines + SBT) and the `GRAPHICS-033`
   operational-gate extension policy. Depends on GRAPHICS-033.
-- [GRAPHICS-046 — Hybrid GI: ReSTIR DI/GI hardware path and software fallback (done)](../../done/GRAPHICS-046-hybrid-gi-restir-and-fallback.md):
+- [GRAPHICS-046 — Hybrid GI: ReSTIR DI/GI hardware path and software fallback (done)](../../archive/GRAPHICS-046-hybrid-gi-restir-and-fallback.md):
   locks `GiPathKind` recipe selection, ReSTIR DI/GI passes + reservoir
   buffers (HW), DDGI probe volume + screen-space probes (SW). Depends on
   GRAPHICS-039, GRAPHICS-045.
-- [GRAPHICS-047 — Virtual Shadow Maps to replace cascade atlas (done)](../../done/GRAPHICS-047-virtual-shadow-maps.md):
+- [GRAPHICS-047 — Virtual Shadow Maps to replace cascade atlas (done)](../../archive/GRAPHICS-047-virtual-shadow-maps.md):
   locks 16K virtual address space, 128² page allocation, page-table
   encoding, and meshlet-cluster caster culling. Depends on GRAPHICS-009,
   GRAPHICS-038, GRAPHICS-044.
 
 #### Phase 4 — Research differentiators
 
-- [GRAPHICS-048 — 3D Gaussian Splatting rasterizer pass over the PointCloud primitive (done)](../../done/GRAPHICS-048-gaussian-splatting-rasterizer.md):
+- [GRAPHICS-048 — 3D Gaussian Splatting rasterizer pass over the PointCloud primitive (done)](../../archive/GRAPHICS-048-gaussian-splatting-rasterizer.md):
   locks extended point record (anisotropic covariance + opacity + SH coeffs),
   tile-based sort + composite, `.gsplat` shipping format. Depends on
   GRAPHICS-014, GRAPHICS-030.
-- [GRAPHICS-049 — Neural radiance cache slot in the GI path (done)](../../done/GRAPHICS-049-neural-radiance-cache-slot.md):
+- [GRAPHICS-049 — Neural radiance cache slot in the GI path (done)](../../archive/GRAPHICS-049-neural-radiance-cache-slot.md):
   locks small-MLP shape, online training pass, cache invalidation, GI
   consumer seam. Depends on GRAPHICS-041, GRAPHICS-046.
-- [GRAPHICS-050 — Neural texture compression with random-access decode (done)](../../done/GRAPHICS-050-neural-texture-compression.md):
+- [GRAPHICS-050 — Neural texture compression with random-access decode (done)](../../archive/GRAPHICS-050-neural-texture-compression.md):
   locks `.ntc` shipping format + per-material decoder Slang module + BCn
   fallback. Depends on GRAPHICS-041, GRAPHICS-042.
-- [GRAPHICS-051 — Differentiable rendering mode (done)](../../done/GRAPHICS-051-differentiable-rendering-mode.md):
+- [GRAPHICS-051 — Differentiable rendering mode (done)](../../archive/GRAPHICS-051-differentiable-rendering-mode.md):
   locks forward+backward render-graph compile, adjoint buffer lifetime,
   `Pass.Loss` + gradient sink, build-time gating to keep production unchanged.
   Depends on GRAPHICS-041.
-- [GRAPHICS-052 — Deltaful GPU-resident scene (done)](../../done/GRAPHICS-052-deltaful-gpu-resident-scene.md):
+- [GRAPHICS-052 — Deltaful GPU-resident scene (done)](../../archive/GRAPHICS-052-deltaful-gpu-resident-scene.md):
   locks per-change delta records, persistent GPU scene buffer, apply-deltas
   pass, full-extract fallback. Promoted from `GRAPHICS-004Q`. Depends on
   GRAPHICS-002, GRAPHICS-004, GRAPHICS-016, GRAPHICS-036.
 
 #### Phase 5 — Frontier
 
-- [GRAPHICS-053 — Mesh shaders RHI extension (IMeshShaderDevice) (done)](../../done/GRAPHICS-053-mesh-shaders-rhi-extension.md):
+- [GRAPHICS-053 — Mesh shaders RHI extension (IMeshShaderDevice) (done)](../../archive/GRAPHICS-053-mesh-shaders-rhi-extension.md):
   locks the optional `IMeshShaderDevice` capability surface (task→mesh
   pipeline, indirect dispatch, payload limits) and recipe-selection
   fallback to `MeshletViaCompute`. Depends on GRAPHICS-033, GRAPHICS-044.
-- [GRAPHICS-054 — Work graphs RHI extension (IWorkGraphDevice) (done, long-horizon)](../../done/GRAPHICS-054-work-graphs-rhi-extension.md):
+- [GRAPHICS-054 — Work graphs RHI extension (IWorkGraphDevice) (done, long-horizon)](../../archive/GRAPHICS-054-work-graphs-rhi-extension.md):
   locks the optional `IWorkGraphDevice` capability surface and recipe-slot
   reservation. Explicitly long-horizon: no implementation children opened
   until backend support and at least one consumer exist. Depends on
   GRAPHICS-053.
-- [GRAPHICS-055 — Streaming Virtual Textures (done)](../../done/GRAPHICS-055-streaming-virtual-textures.md):
+- [GRAPHICS-055 — Streaming Virtual Textures (done)](../../archive/GRAPHICS-055-streaming-virtual-textures.md):
   locks 128² virtual page table, feedback pass, runtime page resolver,
   KTX2/Basis Universal UASTC shipping format. Depends on GRAPHICS-018T,
   GRAPHICS-026, GRAPHICS-041.
-- [GRAPHICS-056 — Virtualized meshes with cluster DAG and continuous LOD (done, bounded scope)](../../done/GRAPHICS-056-virtualized-meshes-cluster-lod.md):
+- [GRAPHICS-056 — Virtualized meshes with cluster DAG and continuous LOD (done, bounded scope)](../../archive/GRAPHICS-056-virtualized-meshes-cluster-lod.md):
   locks DAG record shape + LOD selector pass + HZB integration. Bounded
   scope: explicitly NOT Nanite parity (no SW raster, no cluster-page
   streaming). Depends on GRAPHICS-038, GRAPHICS-044, GRAPHICS-053.
-- [GRAPHICS-057 — DirectStorage-analog GPU decompression hookpoint on the transfer queue (done)](../../done/GRAPHICS-057-directstorage-gpu-decompression.md):
+- [GRAPHICS-057 — DirectStorage-analog GPU decompression hookpoint on the transfer queue (done)](../../archive/GRAPHICS-057-directstorage-gpu-decompression.md):
   locks `IGpuDecompressionTransferQueue` capability surface, GDeflate/Zstd
   payload formats, CPU-fallback rule. Depends on GRAPHICS-018T, GRAPHICS-026.
-- [GRAPHICS-058 — Frame generation pass (done)](../../done/GRAPHICS-058-frame-generation-pass.md):
+- [GRAPHICS-058 — Frame generation pass (done)](../../archive/GRAPHICS-058-frame-generation-pass.md):
   locks `IFrameGenerator` interface (interpolation/extrapolation), reference
   motion-blend interpolator, presentation pacing in `runtime/`. Depends on
   GRAPHICS-013C, GRAPHICS-040.
@@ -980,36 +980,36 @@ those planning slices explicitly keeps its children unopened until its gates are
 or "opened only when actually integrated"). Open them only when their recorded gates hold.
 
 Pipelined frames (GRAPHICS-036):
-- [GRAPHICS-036A (done)](../../done/GRAPHICS-036A-render-world-pool.md) — `Runtime.RenderWorldPool` slot-lifecycle value type (`CPUContracted`).
-- [GRAPHICS-036B (done)](../../done/GRAPHICS-036B-render-world-pool-diagnostics.md) — pool diagnostics mirror on `RuntimeRenderExtractionStats` (`CPUContracted`).
-- [GRAPHICS-036C (done)](../../done/GRAPHICS-036C-render-world-pool-engine-wiring.md) — wired the pool into `Engine::RunFrame` behind default-on `SynchronousExtraction` (`Operational`, 2026-06-04). Depended on 036A/036B.
-- [GRAPHICS-036D (done)](../../done/GRAPHICS-036D-render-world-pool-pipelined-proof.md) — pipelined render-N-1 integration proof (`Operational`, 2026-06-04). Depended on 036C.
+- [GRAPHICS-036A (done)](../../archive/GRAPHICS-036A-render-world-pool.md) — `Runtime.RenderWorldPool` slot-lifecycle value type (`CPUContracted`).
+- [GRAPHICS-036B (done)](../../archive/GRAPHICS-036B-render-world-pool-diagnostics.md) — pool diagnostics mirror on `RuntimeRenderExtractionStats` (`CPUContracted`).
+- [GRAPHICS-036C (done)](../../archive/GRAPHICS-036C-render-world-pool-engine-wiring.md) — wired the pool into `Engine::RunFrame` behind default-on `SynchronousExtraction` (`Operational`, 2026-06-04). Depended on 036A/036B.
+- [GRAPHICS-036D (done)](../../archive/GRAPHICS-036D-render-world-pool-pipelined-proof.md) — pipelined render-N-1 integration proof (`Operational`, 2026-06-04). Depended on 036C.
 
 Async compute / multi-queue (GRAPHICS-037):
-- [GRAPHICS-037A (done)](../../done/GRAPHICS-037A-queue-affinity-rhi-surface.md) — RHI `QueueAffinity` + demotion + null-queue mocks; reconciles the existing framegraph `RenderQueue` (`CPUContracted`, 2026-06-04). Depends on GRAPHICS-037 (planning, done).
-- [GRAPHICS-037B (done)](../../done/GRAPHICS-037B-cross-queue-edge-synthesis.md) — timeline-semaphore cross-queue edge synthesis + `CrossQueueCycle` fail-closed (`CPUContracted`, 2026-06-04). Depends on 037A.
-- [GRAPHICS-037C (done)](../../done/GRAPHICS-037C-ownership-transfer-barriers.md) — queue-family ownership-transfer barriers via the Sync2 compiler (`CPUContracted`, 2026-06-04). Depended on 037B.
-- [GRAPHICS-037D (done)](../../done/GRAPHICS-037D-multi-queue-vulkan-recording.md) — Vulkan multi-queue recording + opt-in `gpu;vulkan` default-recipe async-compute smoke (`Operational`, 2026-06-04). Depended on 037C, GRAPHICS-033 (done).
+- [GRAPHICS-037A (done)](../../archive/GRAPHICS-037A-queue-affinity-rhi-surface.md) — RHI `QueueAffinity` + demotion + null-queue mocks; reconciles the existing framegraph `RenderQueue` (`CPUContracted`, 2026-06-04). Depends on GRAPHICS-037 (planning, done).
+- [GRAPHICS-037B (done)](../../archive/GRAPHICS-037B-cross-queue-edge-synthesis.md) — timeline-semaphore cross-queue edge synthesis + `CrossQueueCycle` fail-closed (`CPUContracted`, 2026-06-04). Depends on 037A.
+- [GRAPHICS-037C (done)](../../archive/GRAPHICS-037C-ownership-transfer-barriers.md) — queue-family ownership-transfer barriers via the Sync2 compiler (`CPUContracted`, 2026-06-04). Depended on 037B.
+- [GRAPHICS-037D (done)](../../archive/GRAPHICS-037D-multi-queue-vulkan-recording.md) — Vulkan multi-queue recording + opt-in `gpu;vulkan` default-recipe async-compute smoke (`Operational`, 2026-06-04). Depended on 037C, GRAPHICS-033 (done).
 
 HZB two-phase occlusion culling (GRAPHICS-038):
-- [GRAPHICS-038A (done)](../../done/GRAPHICS-038A-hzb-resource-and-lifetime.md) — HZB resource + ping-pong lifetime (`CPUContracted`, 2026-06-04). Depended on GRAPHICS-038 (planning, done), GRAPHICS-007 (done).
-- [GRAPHICS-038B (done)](../../done/GRAPHICS-038B-hzb-build-compute.md) — HZB build compute shader + dispatch wiring (`CPUContracted`, 2026-06-04). Depended on 038A.
-- [GRAPHICS-038C (done)](../../done/GRAPHICS-038C-two-phase-cull-shader.md) — phase-1/phase-2 cull shader + per-bucket buffer doubling + counters (`CPUContracted`, 2026-06-04). Depended on 038B, GRAPHICS-007.
-- [GRAPHICS-038D (done)](../../done/GRAPHICS-038D-camera-transition-and-selection-exemption.md) — camera-transition skip heuristic + selection-bucket exemption (`CPUContracted`, 2026-06-04). Depended on 038C.
-- [GRAPHICS-038E (done)](../../done/GRAPHICS-038E-hzb-conservatism-gpu-smoke.md) — opt-in `gpu;vulkan` conservatism smoke (`Operational`, 2026-06-04). Depended on 038D (done), GRAPHICS-033 (done).
+- [GRAPHICS-038A (done)](../../archive/GRAPHICS-038A-hzb-resource-and-lifetime.md) — HZB resource + ping-pong lifetime (`CPUContracted`, 2026-06-04). Depended on GRAPHICS-038 (planning, done), GRAPHICS-007 (done).
+- [GRAPHICS-038B (done)](../../archive/GRAPHICS-038B-hzb-build-compute.md) — HZB build compute shader + dispatch wiring (`CPUContracted`, 2026-06-04). Depended on 038A.
+- [GRAPHICS-038C (done)](../../archive/GRAPHICS-038C-two-phase-cull-shader.md) — phase-1/phase-2 cull shader + per-bucket buffer doubling + counters (`CPUContracted`, 2026-06-04). Depended on 038B, GRAPHICS-007.
+- [GRAPHICS-038D (done)](../../archive/GRAPHICS-038D-camera-transition-and-selection-exemption.md) — camera-transition skip heuristic + selection-bucket exemption (`CPUContracted`, 2026-06-04). Depended on 038C.
+- [GRAPHICS-038E (done)](../../archive/GRAPHICS-038E-hzb-conservatism-gpu-smoke.md) — opt-in `gpu;vulkan` conservatism smoke (`Operational`, 2026-06-04). Depended on 038D (done), GRAPHICS-033 (done).
 
 Clustered light binning (GRAPHICS-039):
-- [GRAPHICS-039A (done)](../../done/GRAPHICS-039A-cluster-grid-build.md) — cluster grid resource + build pass (`CPUContracted`, 2026-06-04). Depended on GRAPHICS-039 (planning, done), GRAPHICS-009 (done).
-- [GRAPHICS-039B (done)](../../done/GRAPHICS-039B-light-cluster-assignment.md) — light-to-cluster assignment + overflow diagnostics (`CPUContracted`, 2026-06-05). Depended on 039A.
-- [GRAPHICS-039C (done)](../../done/GRAPHICS-039C-cluster-surface-shader-integration.md) — surface-shader integration + recipe wiring (`CPUContracted`, 2026-06-05). Depended on 039B, GRAPHICS-008 (done).
-- [GRAPHICS-039D (done)](../../done/GRAPHICS-039D-cluster-async-compute-affinity.md) — async-compute affinity tagging (`CPUContracted`, 2026-06-05). Depended on 039C (done); consumes GRAPHICS-037D (done) for real multi-queue execution.
+- [GRAPHICS-039A (done)](../../archive/GRAPHICS-039A-cluster-grid-build.md) — cluster grid resource + build pass (`CPUContracted`, 2026-06-04). Depended on GRAPHICS-039 (planning, done), GRAPHICS-009 (done).
+- [GRAPHICS-039B (done)](../../archive/GRAPHICS-039B-light-cluster-assignment.md) — light-to-cluster assignment + overflow diagnostics (`CPUContracted`, 2026-06-05). Depended on 039A.
+- [GRAPHICS-039C (done)](../../archive/GRAPHICS-039C-cluster-surface-shader-integration.md) — surface-shader integration + recipe wiring (`CPUContracted`, 2026-06-05). Depended on 039B, GRAPHICS-008 (done).
+- [GRAPHICS-039D (done)](../../archive/GRAPHICS-039D-cluster-async-compute-affinity.md) — async-compute affinity tagging (`CPUContracted`, 2026-06-05). Depended on 039C (done); consumes GRAPHICS-037D (done) for real multi-queue execution.
 
 Clustered light binning children and the CPU/null TAA recipe path are complete.
 
 TAA + reconstructor seam (GRAPHICS-040):
-- [GRAPHICS-040A (done)](../../done/GRAPHICS-040A-jitter-and-motion-vectors.md) — camera jitter + motion-vector buffer (`CPUContracted`, 2026-06-05). Depends on GRAPHICS-040 (planning, done), GRAPHICS-013A (done).
-- [GRAPHICS-040B (done)](../../done/GRAPHICS-040B-reconstructor-interface-and-reference-taa.md) — `IReconstructor` interface + reference TAA (`CPUContracted`, 2026-06-05). Depends on 040A.
-- [GRAPHICS-040C (done)](../../done/GRAPHICS-040C-aa-recipe-selection-and-integration.md) — AA recipe selection + post-chain integration (`Operational`, 2026-06-05). Depends on 040B (done), GRAPHICS-013A/075 (done).
+- [GRAPHICS-040A (done)](../../archive/GRAPHICS-040A-jitter-and-motion-vectors.md) — camera jitter + motion-vector buffer (`CPUContracted`, 2026-06-05). Depends on GRAPHICS-040 (planning, done), GRAPHICS-013A (done).
+- [GRAPHICS-040B (done)](../../archive/GRAPHICS-040B-reconstructor-interface-and-reference-taa.md) — `IReconstructor` interface + reference TAA (`CPUContracted`, 2026-06-05). Depends on 040A.
+- [GRAPHICS-040C (done)](../../archive/GRAPHICS-040C-aa-recipe-selection-and-integration.md) — AA recipe selection + post-chain integration (`Operational`, 2026-06-05). Depends on 040B (done), GRAPHICS-013A/075 (done).
 - GRAPHICS-040D (vendor reconstructor backends) — **not opened**: per GRAPHICS-040 decision 5/10 there is one child per vendor, opened only when that vendor SDK is actually integrated.
 
 ### CPU↔GPU transfer foundation (GRAPHICS-095..098 done)
@@ -1020,29 +1020,29 @@ repeatable, validated, fast, and robust for algorithm and user code. Recorded in
 transfer seams are complete; the remaining cross-layer consumer is the
 runtime-owned readback job/write-back integration listed below.
 
-- [GRAPHICS-095 — CPU-testable buffer transfer math and validation helper](../../done/GRAPHICS-095-buffer-transfer-math-helper.md):
+- [GRAPHICS-095 — CPU-testable buffer transfer math and validation helper](../../archive/GRAPHICS-095-buffer-transfer-math-helper.md):
   completed base layer, target `CPUContracted`. Adds
   `Extrinsic.RHI.BufferTransfer` (sub-range validation, alignment, partial-write
   planning, and typed dimension matching) mirroring `RHI::TextureUpload`.
   CPU-only; no backend.
-- [GRAPHICS-096 — Async GPU→CPU buffer readback ring on `ITransferQueue`](../../done/GRAPHICS-096-async-buffer-readback-ring.md):
+- [GRAPHICS-096 — Async GPU→CPU buffer readback ring on `ITransferQueue`](../../archive/GRAPHICS-096-async-buffer-readback-ring.md):
   completed transfer-queue readback base layer, target `Operational` on Vulkan.
   `DownloadBuffer(...)` returns `ReadbackToken` + `ReadbackSink`, uses a recycled
   host-visible readback ring, and delivers on the `CollectCompleted()` drain
   without caller-thread fence waits.
-- [GRAPHICS-097 — Async GPU→CPU texture readback through the readback ring](../../done/GRAPHICS-097-async-texture-readback.md):
+- [GRAPHICS-097 — Async GPU→CPU texture readback through the readback ring](../../archive/GRAPHICS-097-async-texture-readback.md):
   completed transfer-queue texture readback layer, target `Operational` on
   Vulkan. `DownloadTexture(...)` reuses `RHI::TextureUpload` subresource layout
   in reverse, stages a mip/layer through the GRAPHICS-096 readback ring, and
   leaves source layout transitions caller-owned.
-- [GRAPHICS-098 — High-level `GpuTransfer` facade with correct barrier brackets](../../done/GRAPHICS-098-gpu-transfer-facade.md):
+- [GRAPHICS-098 — High-level `GpuTransfer` facade with correct barrier brackets](../../archive/GRAPHICS-098-gpu-transfer-facade.md):
   completed ergonomic upload-with-barrier / readback-with-barrier helpers over
   the foundation, target `Operational` on Vulkan. Centralizes the
   `TransferWrite → ShaderRead` / `TransferRead` brackets BUG-049 got wrong and
   emits async upload-ready barriers only after transfer-token completion.
 
 Cross-layer leaf outside `rendering/`:
-- [RUNTIME-126 — GPU readback jobs and result→property write-back](../../done/RUNTIME-126-gpu-readback-jobs-and-property-writeback.md):
+- [RUNTIME-126 — GPU readback jobs and result→property write-back](../../archive/RUNTIME-126-gpu-readback-jobs-and-property-writeback.md):
   retired runtime consumer of GRAPHICS-096/098. It wires async readback into
   the existing `DerivedJobRegistry` (RUNTIME-112) so algorithms chain follow-ups
   on GPU results through the same forward (CPU→GPU) binding/scheduling spine
@@ -1058,28 +1058,28 @@ extension slots; shared visibility/grouping and lighting/environment recipes
 produce renderer-neutral products; render outputs become runtime-owned artifacts
 before any explicit publish/apply.
 
-- [GRAPHICS-099 — Rendering contract foundation](../../done/GRAPHICS-099-rendering-contract-foundation.md):
+- [GRAPHICS-099 — Rendering contract foundation](../../archive/GRAPHICS-099-rendering-contract-foundation.md):
   completed CPU-only foundation. Adds `Extrinsic.Graphics.RenderingContract`
   with renderer descriptors, scoped snapshot envelopes, binding intents, shared
   recipe descriptors, view/output recipes, render artifact metadata, validation
   helpers, and contract tests without changing Vulkan output or current renderer
   behavior.
-- [GRAPHICS-100 — Minimal current-renderer contract adapter](../../done/GRAPHICS-100-current-renderer-contract-adapter.md):
+- [GRAPHICS-100 — Minimal current-renderer contract adapter](../../archive/GRAPHICS-100-current-renderer-contract-adapter.md):
   completed CPU-only adapter. It adapts the current renderer path to
   populate/consume the contracts minimally while preserving behavior through
   `Extrinsic.Graphics.CurrentRendererContractAdapter`.
-- [GRAPHICS-101 — Loadable rendering recipe config schema and validation](../../done/GRAPHICS-101-loadable-render-recipe-configs.md):
+- [GRAPHICS-101 — Loadable rendering recipe config schema and validation](../../archive/GRAPHICS-101-loadable-render-recipe-configs.md):
   completed CPU-only config loader. Adds `Extrinsic.Graphics.RenderRecipeConfig`
   with a versioned JSON schema, file loader, dry-run preview API, and
   fail-closed diagnostics for optional recipe configuration constrained to
   renderer-declared extension slots.
-- [GRAPHICS-102 — Shared visibility and lighting recipe execution](../../done/GRAPHICS-102-shared-visibility-lighting-recipe-execution.md):
+- [GRAPHICS-102 — Shared visibility and lighting recipe execution](../../archive/GRAPHICS-102-shared-visibility-lighting-recipe-execution.md):
   completed CPU-only shared recipe execution. Adds
   `Extrinsic.Graphics.SharedRenderRecipeExecution` for renderer-neutral
   visibility/grouping and lighting/environment products, compatibility checks,
   and deterministic diagnostics without backend command buffers or project
   mutation.
-- [GRAPHICS-103 — Vulkan render-graph contract integration](../../done/GRAPHICS-103-vulkan-rendergraph-contract-integration.md):
+- [GRAPHICS-103 — Vulkan render-graph contract integration](../../archive/GRAPHICS-103-vulkan-rendergraph-contract-integration.md):
   completed operational Vulkan/render-graph proof. The current renderer now
   evaluates contract metadata in the frame lifecycle, fail-closes before graph
   execution on incompatibility, reports shared-recipe/artifact diagnostics, and
@@ -1087,11 +1087,11 @@ before any explicit publish/apply.
   coverage.
 
 Cross-layer leaves outside `rendering/`:
-- [`runtime/RUNTIME-127` — Render artifact publication and apply semantics](../../done/RUNTIME-127-render-artifact-publication.md):
+- [`runtime/RUNTIME-127` — Render artifact publication and apply semantics](../../archive/RUNTIME-127-render-artifact-publication.md):
   completed CPU-only runtime artifact registry, lifecycle/status vocabulary, and
   explicit provenance-carrying publish/apply commands for candidate renderer
   outputs.
-- [`ui/UI-023` — Sandbox render recipe editing UI](../../done/UI-023-render-recipe-ui-editing.md):
+- [`ui/UI-023` — Sandbox render recipe editing UI](../../archive/UI-023-render-recipe-ui-editing.md):
   completed CPU-only recipe inspection/editing and artifact lifetime/status
   controls through runtime-owned commands without UI owning renderer state.
 

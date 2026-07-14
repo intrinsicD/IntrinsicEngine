@@ -36,6 +36,22 @@ ACTIONABLE_TODO_SECTIONS = [
     "Acceptance criteria",
 ]
 
+# Micro tasks (`template: micro` in the front-matter, seeded from
+# tasks/templates/task-micro.md) are single-slice mechanical work; they
+# carry a reduced section set. Retirement rules (closed todos, completion
+# date, commit/PR reference) apply unchanged.
+MICRO_TEMPLATE_RE = re.compile(r"^template:\s*micro\s*$", re.MULTILINE)
+
+REQUIRED_SECTIONS_MICRO = [
+    "Goal",
+    "Acceptance criteria",
+    "Verification",
+]
+
+ACTIONABLE_TODO_SECTIONS_MICRO = [
+    "Acceptance criteria",
+]
+
 TODO_RE = re.compile(r"^\s*- \[[ xX]\]\s+.+", re.MULTILINE)
 OPEN_TODO_RE = re.compile(r"^\s*- \[ \]\s+.+", re.MULTILINE)
 
@@ -66,35 +82,35 @@ GRANDFATHERED_DUPLICATE_IDS: dict[str, frozenset[str]] = {
     # Two sandbox bug records opened concurrently under the same number.
     "BUG-021": frozenset(
         {
-            "done/BUG-021-sandbox-camera-scene-table-shader-wiring.md",
-            "done/BUG-021-sandbox-drop-import-blocks-platform-poll.md",
+            "archive/BUG-021-sandbox-camera-scene-table-shader-wiring.md",
+            "archive/BUG-021-sandbox-drop-import-blocks-platform-poll.md",
         }
     ),
     "BUG-022": frozenset(
         {
-            "done/BUG-022-sandbox-nonmanifold-obj-import.md",
-            "done/BUG-022-sandbox-reference-triangle-camera-frustum-visibility.md",
+            "archive/BUG-022-sandbox-nonmanifold-obj-import.md",
+            "archive/BUG-022-sandbox-reference-triangle-camera-frustum-visibility.md",
         }
     ),
     # Three HARDEN streams (ECS parity, sandbox boundary, task policy) each
     # took the next free number without cross-checking the other directories.
     "HARDEN-065": frozenset(
         {
-            "done/HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md",
-            "done/HARDEN-065-sandbox-runtime-boundary.md",
-            "done/HARDEN-065-task-checkbox-todo-policy.md",
+            "archive/HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md",
+            "archive/HARDEN-065-sandbox-runtime-boundary.md",
+            "archive/HARDEN-065-task-checkbox-todo-policy.md",
         }
     ),
     "HARDEN-066": frozenset(
         {
-            "done/HARDEN-066-ecs-render-sync-export-policy.md",
-            "done/HARDEN-066-fix-halfedge-property-test-source-name.md",
+            "archive/HARDEN-066-ecs-render-sync-export-policy.md",
+            "archive/HARDEN-066-fix-halfedge-property-test-source-name.md",
         }
     ),
     "HARDEN-067": frozenset(
         {
-            "done/HARDEN-067-ecs-bounds-propagation-system.md",
-            "done/HARDEN-067-remove-stale-platform-linuxglfwvulkan.md",
+            "archive/HARDEN-067-ecs-bounds-propagation-system.md",
+            "archive/HARDEN-067-remove-stale-platform-linuxglfwvulkan.md",
         }
     ),
 }
@@ -189,14 +205,46 @@ def find_markdown_files(root: Path) -> list[Path]:
     return files
 
 
+def find_archive_files(root: Path) -> list[Path]:
+    """Archived (swept) retired tasks under tasks/archive/.
+
+    Archived tasks are frozen history: they are exempt from per-file format
+    validation (format rules may evolve past them), but their IDs stay
+    authoritative — they participate in duplicate-ID detection and resolve
+    `depends_on` references so retired dependencies keep unblocking backlog
+    tasks after the sweep.
+    """
+    archive_root = root / "archive"
+    if not archive_root.exists():
+        return []
+    files: list[Path] = []
+    for path in sorted(archive_root.rglob("*.md")):
+        if path.name in SKIP_FILENAMES:
+            continue
+        if any(pattern.match(path.name) for pattern in SKIP_PATTERNS):
+            continue
+        files.append(path)
+    return files
+
+
+def is_micro_task(parsed: ParsedTask) -> bool:
+    return bool(parsed.front_matter and MICRO_TEMPLATE_RE.search(parsed.front_matter))
+
+
 def validate_task(parsed: ParsedTask, mode: str) -> list[Finding]:
     findings: list[Finding] = []
     rel_path = parsed.path
 
+    micro = is_micro_task(parsed)
+    required_sections = REQUIRED_SECTIONS_MICRO if micro else REQUIRED_SECTIONS
+    actionable_sections = (
+        ACTIONABLE_TODO_SECTIONS_MICRO if micro else ACTIONABLE_TODO_SECTIONS
+    )
+
     if not parsed.task_id:
         findings.append(Finding("error", rel_path, "missing task header with ID (`# <ID> — <title>`)."))
 
-    missing_sections = [name for name in REQUIRED_SECTIONS if name not in parsed.sections]
+    missing_sections = [name for name in required_sections if name not in parsed.sections]
     if missing_sections:
         findings.append(
             Finding(
@@ -213,7 +261,7 @@ def validate_task(parsed: ParsedTask, mode: str) -> list[Finding]:
     if is_active and "Acceptance criteria" not in parsed.sections:
         findings.append(Finding("error", rel_path, "active task must include `## Acceptance criteria`."))
 
-    for section in ACTIONABLE_TODO_SECTIONS:
+    for section in actionable_sections:
         body = parsed.section_bodies.get(section, "")
         if section in parsed.sections and not TODO_RE.search(body):
             findings.append(
@@ -225,7 +273,7 @@ def validate_task(parsed: ParsedTask, mode: str) -> list[Finding]:
             )
 
     if is_done:
-        for section in ACTIONABLE_TODO_SECTIONS:
+        for section in actionable_sections:
             body = parsed.section_bodies.get(section, "")
             if OPEN_TODO_RE.search(body):
                 findings.append(
@@ -268,16 +316,23 @@ def validate_task(parsed: ParsedTask, mode: str) -> list[Finding]:
     return findings
 
 
-def validate_front_matter(parsed_tasks: list[ParsedTask]) -> list[Finding]:
+def validate_front_matter(
+    parsed_tasks: list[ParsedTask],
+    parsed_archive: list[ParsedTask] | None = None,
+) -> list[Finding]:
     """Open (active/backlog) tasks must carry resolvable YAML front-matter.
 
     Schema: required `id` (equals the title-line ID), `theme` (non-empty
     string), `depends_on` (list of task IDs that exist somewhere under
-    tasks/); optional `maturity_target`. Done tasks are exempt — the brief
-    generator only needs their existence.
+    tasks/, including swept tasks under tasks/archive/); optional
+    `maturity_target`. Done tasks are exempt — the brief generator only
+    needs their existence.
     """
     findings: list[Finding] = []
     known_ids = {parsed.task_id for parsed in parsed_tasks if parsed.task_id}
+    for parsed in parsed_archive or []:
+        if parsed.task_id:
+            known_ids.add(parsed.task_id)
 
     try:
         import yaml
@@ -345,7 +400,7 @@ def validate_front_matter(parsed_tasks: list[ParsedTask]) -> list[Finding]:
                             "error",
                             parsed.path,
                             f"front-matter dependency `{dep}` does not resolve to any task "
-                            "under tasks/active|backlog|done.",
+                            "under tasks/active|backlog|done|archive.",
                         )
                     )
 
@@ -410,12 +465,15 @@ def main() -> int:
     findings: list[Finding] = []
 
     parsed_tasks = [parse_task(file) for file in files]
+    # Archived tasks are frozen history: IDs count (duplicate detection,
+    # `depends_on` resolution), per-file format rules do not.
+    parsed_archive = [parse_task(file) for file in find_archive_files(root)]
 
     for parsed in parsed_tasks:
         findings.extend(validate_task(parsed, mode=mode))
 
-    findings.extend(validate_id_uniqueness(parsed_tasks, root))
-    findings.extend(validate_front_matter(parsed_tasks))
+    findings.extend(validate_id_uniqueness(parsed_tasks + parsed_archive, root))
+    findings.extend(validate_front_matter(parsed_tasks, parsed_archive))
 
     prefix = root.parent
     for finding in findings:

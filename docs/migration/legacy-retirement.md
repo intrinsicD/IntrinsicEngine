@@ -12,18 +12,18 @@ in the source tree, CMake no longer wires legacy targets, and
   `src/ecs`, `src/geometry`, `src/physics`, `src/graphics/*`, `src/platform`,
   `src/runtime`, and `src/app`.
 - Semantic feature decisions were closed by
-  [`LEGACY-011`](../../tasks/done/LEGACY-011-src-legacy-feature-reimplementation-map.md)
+  [`LEGACY-011`](../../tasks/archive/LEGACY-011-src-legacy-feature-reimplementation-map.md)
   and its child tasks; the final removal did not add new engine features.
 - Remaining bare legacy test consumers were retired by
-  [`LEGACY-012`](../../tasks/done/LEGACY-012-migrate-legacy-consumer-tests.md).
+  [`LEGACY-012`](../../tasks/archive/LEGACY-012-migrate-legacy-consumer-tests.md).
 - Subtrees were then removed consumers-first, foundation-last:
-  [`LEGACY-010`](../../tasks/done/LEGACY-010-delete-src-legacy-runtime.md) →
-  [`LEGACY-008`](../../tasks/done/LEGACY-008-delete-src-legacy-graphics.md) →
-  [`LEGACY-001`](../../tasks/done/LEGACY-001-delete-src-legacy-interface.md) /
-  [`LEGACY-006`](../../tasks/done/LEGACY-006-delete-src-legacy-ecs.md) /
-  [`LEGACY-004`](../../tasks/done/LEGACY-004-delete-src-legacy-asset.md) →
-  [`LEGACY-009`](../../tasks/done/LEGACY-009-delete-src-legacy-rhi.md) →
-  [`LEGACY-005`](../../tasks/done/LEGACY-005-delete-src-legacy-core.md).
+  [`LEGACY-010`](../../tasks/archive/LEGACY-010-delete-src-legacy-runtime.md) →
+  [`LEGACY-008`](../../tasks/archive/LEGACY-008-delete-src-legacy-graphics.md) →
+  [`LEGACY-001`](../../tasks/archive/LEGACY-001-delete-src-legacy-interface.md) /
+  [`LEGACY-006`](../../tasks/archive/LEGACY-006-delete-src-legacy-ecs.md) /
+  [`LEGACY-004`](../../tasks/archive/LEGACY-004-delete-src-legacy-asset.md) →
+  [`LEGACY-009`](../../tasks/archive/LEGACY-009-delete-src-legacy-rhi.md) →
+  [`LEGACY-005`](../../tasks/archive/LEGACY-005-delete-src-legacy-core.md).
 - The generated module inventory contains promoted modules only.
 
 ## Historical Notes

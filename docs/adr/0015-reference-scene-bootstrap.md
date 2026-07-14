@@ -3,9 +3,9 @@
 - **Status:** Accepted
 - **Date:** 2026-05-17
 - **Owners:** Runtime composition (`Extrinsic.Runtime.ReferenceScene`, `Engine::Initialize` integration), App (`Sandbox` config selection)
-- **Related tasks:** [`tasks/done/GRAPHICS-029`](../../tasks/done/GRAPHICS-029-runtime-reference-scene-bootstrap.md), [`GRAPHICS-029A`](../../tasks/done/GRAPHICS-029A-reference-scene-skeleton.md), [`GRAPHICS-029B`](../../tasks/done/GRAPHICS-029B-triangle-provider-and-camera.md), [`tasks/done/GRAPHICS-080`](../../tasks/done/GRAPHICS-080-enable-promoted-vulkan-by-default.md)
+- **Related tasks:** [`tasks/done/GRAPHICS-029`](../../tasks/archive/GRAPHICS-029-runtime-reference-scene-bootstrap.md), [`GRAPHICS-029A`](../../tasks/archive/GRAPHICS-029A-reference-scene-skeleton.md), [`GRAPHICS-029B`](../../tasks/archive/GRAPHICS-029B-triangle-provider-and-camera.md), [`tasks/done/GRAPHICS-080`](../../tasks/archive/GRAPHICS-080-enable-promoted-vulkan-by-default.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`src/runtime/README.md`](../../src/runtime/README.md), [`src/app/Sandbox/README.md`](../../src/app/Sandbox/README.md)
-- **Supersedes:** none. Extracted from the `## Reference scene bootstrap` section in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
+- **Supersedes:** none. Extracted from the `## Reference scene bootstrap` section in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/archive/DOCS-001-reduce-graphics-architecture-prose.md).
 - **Related ADRs:** [ADR-0013](0013-ecs-renderable-residency-bridge.md) records the ECS-renderable residency bridge that the reference scene's entities feed into. [ADR-0014](0014-procedural-source-residency-bridge.md) records the procedural-source residency bridge that early `TriangleProvider` slices exercised. [ADR-0005](0005-vulkan-operational-readiness-gate.md) records the Vulkan operational truth table that governs which backend actually runs when the reference sandbox launches with `Render.EnablePromotedVulkanDevice = true`.
 - **Status update:** RUNTIME-097 (2026-06-07) supersedes the default triangle's procedural-source detail: `TriangleProvider` now authors the default `ReferenceTriangle` as selectable mesh-domain `GeometrySources` with a durable `StableId` and white `VisualizationConfig`. The runtime-owned provider, registry, camera seed, no-GPU-typed-ECS-state rule, and app/runtime boundary in this ADR remain in force.
 
@@ -15,7 +15,7 @@ The promoted graphics pipeline needs at least one renderable candidate to valida
 
 - `Runtime.RenderExtraction` observes a live renderable entity.
 - The runtime-owned residency bridge lands the geometry through the selected source lane.
-- The default debug-surface material ([GRAPHICS-031](../../tasks/done/GRAPHICS-031-default-debug-surface-material.md)) composes a frame without crashing on missing geometry.
+- The default debug-surface material ([GRAPHICS-031](../../tasks/archive/GRAPHICS-031-default-debug-surface-material.md)) composes a frame without crashing on missing geometry.
 
 Without a bootstrap, every sandbox / test that wants a "visible triangle" must either author one ad-hoc or wait for the full ECS scene editor to land. That fragments coverage and makes the GRAPHICS-033D opt-in `gpu;vulkan` visible-triangle smoke depend on whichever app happened to author the test entity.
 
@@ -46,7 +46,7 @@ App / sandbox stays policy-light per the app / runtime boundary:
 
 - `Sandbox::main.cpp` does **not** flip the flag.
 - `CreateReferenceEngineConfig()` flips `EngineConfig::ReferenceScene::Enabled = true`.
-- The same helper also sets `Render.EnablePromotedVulkanDevice = true` ([GRAPHICS-080](../../tasks/done/GRAPHICS-080-enable-promoted-vulkan-by-default.md)) so reference sandbox launches **request** the promoted Vulkan backend; the resolved device remains governed by the [ADR-0005](0005-vulkan-operational-readiness-gate.md) reconciliation truth table.
+- The same helper also sets `Render.EnablePromotedVulkanDevice = true` ([GRAPHICS-080](../../tasks/archive/GRAPHICS-080-enable-promoted-vulkan-by-default.md)) so reference sandbox launches **request** the promoted Vulkan backend; the resolved device remains governed by the [ADR-0005](0005-vulkan-operational-readiness-gate.md) reconciliation truth table.
 
 ### 2. `TriangleProvider`: one entity, no GPU-typed ECS state
 
@@ -74,7 +74,7 @@ The entity carries:
 
 Residency state stays in the runtime extraction sidecar per [ADR-0013](0013-ecs-renderable-residency-bridge.md) §1.
 
-**No light is created.** The [GRAPHICS-031](../../tasks/done/GRAPHICS-031-default-debug-surface-material.md) default debug-surface material is unlit by contract, so the first milestone composes through the null renderer without lighting work.
+**No light is created.** The [GRAPHICS-031](../../tasks/archive/GRAPHICS-031-default-debug-surface-material.md) default debug-surface material is unlit by contract, so the first milestone composes through the null renderer without lighting work.
 
 ### 3. Camera authorship is forward-compatible
 
@@ -113,15 +113,15 @@ So the `AGENTS.md` §2 layering invariants and the [ADR-0013](0013-ecs-renderabl
 
 ### 5. Implementation children
 
-- **`GRAPHICS-029-Impl-A`** — skeleton + config plumbing. Retired as [`GRAPHICS-029A`](../../tasks/done/GRAPHICS-029A-reference-scene-skeleton.md).
-- **`GRAPHICS-029-Impl-B`** — `TriangleProvider` + camera seed + contract test. Retired as [`GRAPHICS-029B`](../../tasks/done/GRAPHICS-029B-triangle-provider-and-camera.md).
+- **`GRAPHICS-029-Impl-A`** — skeleton + config plumbing. Retired as [`GRAPHICS-029A`](../../tasks/archive/GRAPHICS-029A-reference-scene-skeleton.md).
+- **`GRAPHICS-029-Impl-B`** — `TriangleProvider` + camera seed + contract test. Retired as [`GRAPHICS-029B`](../../tasks/archive/GRAPHICS-029B-triangle-provider-and-camera.md).
 - **`GRAPHICS-029-Impl-C`** (optional) — additional providers gated on `GRAPHICS-030` / `GRAPHICS-034`. Identified but not opened.
 
 ## Consequences
 
 Positive:
 
-- The reference scene is the canonical single seed for "visible triangle" tests, so the [GRAPHICS-033D](../../tasks/done/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md) opt-in `gpu;vulkan` smoke does not need to author its own entity.
+- The reference scene is the canonical single seed for "visible triangle" tests, so the [GRAPHICS-033D](../../tasks/archive/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md) opt-in `gpu;vulkan` smoke does not need to author its own entity.
 - The opt-in `EngineConfig::ReferenceScene::Enabled` flag means production apps that don't want the entity don't pay for it.
 - The provider returns a `CameraViewInput` seed that the future `CameraControllers` umbrella can adopt as starting state without contract change.
 - No GPU-typed ECS state is attached to the reference entity, so the residency-bridge invariant from [ADR-0013](0013-ecs-renderable-residency-bridge.md) holds in the simplest possible scene.
@@ -148,8 +148,8 @@ Follow-up tasks required: none from this ADR. `GRAPHICS-029-Impl-C` (additional 
 
 ## Validation
 
-- [`tasks/done/GRAPHICS-029`](../../tasks/done/GRAPHICS-029-runtime-reference-scene-bootstrap.md) records the parent planning contract captured in §§1–4.
-- [`tasks/done/GRAPHICS-029A`](../../tasks/done/GRAPHICS-029A-reference-scene-skeleton.md) records the skeleton + config plumbing.
-- [`tasks/done/GRAPHICS-029B`](../../tasks/done/GRAPHICS-029B-triangle-provider-and-camera.md) records the `TriangleProvider` + camera seed + contract test.
-- [`tasks/done/GRAPHICS-080`](../../tasks/done/GRAPHICS-080-enable-promoted-vulkan-by-default.md) records the `Render.EnablePromotedVulkanDevice = true` flip referenced by §1; the resolved backend is governed by [ADR-0005](0005-vulkan-operational-readiness-gate.md).
+- [`tasks/done/GRAPHICS-029`](../../tasks/archive/GRAPHICS-029-runtime-reference-scene-bootstrap.md) records the parent planning contract captured in §§1–4.
+- [`tasks/done/GRAPHICS-029A`](../../tasks/archive/GRAPHICS-029A-reference-scene-skeleton.md) records the skeleton + config plumbing.
+- [`tasks/done/GRAPHICS-029B`](../../tasks/archive/GRAPHICS-029B-triangle-provider-and-camera.md) records the `TriangleProvider` + camera seed + contract test.
+- [`tasks/done/GRAPHICS-080`](../../tasks/archive/GRAPHICS-080-enable-promoted-vulkan-by-default.md) records the `Render.EnablePromotedVulkanDevice = true` flip referenced by §1; the resolved backend is governed by [ADR-0005](0005-vulkan-operational-readiness-gate.md).
 - The default CPU correctness gate (`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) exercises `TriangleProvider` and the runtime extraction observation of the reference entity without requiring a Vulkan device.

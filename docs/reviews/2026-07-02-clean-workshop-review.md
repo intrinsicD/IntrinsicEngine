@@ -3,9 +3,9 @@
 ## Change under review
 
 - Change: implement the selected-frame responsiveness task batch covering
-  [`GRAPHICS-110`](../../tasks/done/GRAPHICS-110-imgui-upload-buffer-in-flight-safety.md),
-  [`GRAPHICS-113`](../../tasks/done/GRAPHICS-113-selection-outline-id-work-pruning.md),
-  [`GRAPHICS-114`](../../tasks/done/GRAPHICS-114-retained-imgui-overlay-copy-upload-path.md),
+  [`GRAPHICS-110`](../../tasks/archive/GRAPHICS-110-imgui-upload-buffer-in-flight-safety.md),
+  [`GRAPHICS-113`](../../tasks/archive/GRAPHICS-113-selection-outline-id-work-pruning.md),
+  [`GRAPHICS-114`](../../tasks/archive/GRAPHICS-114-retained-imgui-overlay-copy-upload-path.md),
   and
   [`RUNTIME-138`](../../tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md).
 - Trigger(s): renderer pass/pipeline shape changed, renderer upload helpers

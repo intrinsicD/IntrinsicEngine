@@ -4,16 +4,16 @@ This is the first calibration audit run against
 [`docs/agent/agent-output-review-checklist.md`](../agent/agent-output-review-checklist.md).
 It validates that the checklist is actionable on a real recent slice of
 agent-authored work, as required by
-[`REVIEW-001`](../../tasks/done/REVIEW-001-human-led-agent-week-review-cadence.md).
+[`REVIEW-001`](../../tasks/archive/REVIEW-001-human-led-agent-week-review-cadence.md).
 
 ## Window
 
 - Date range: 2026-05-14 → 2026-05-15.
 - Tasks covered:
-  [`GRAPHICS-033E`](../../tasks/done/GRAPHICS-033E-vulkan-operational-gate-barrier-validation.md),
-  [`GRAPHICS-033F`](../../tasks/done/GRAPHICS-033F-vulkan-operational-gate-public-service-reconciliation.md),
-  [`HARDEN-066`](../../tasks/done/HARDEN-066-ecs-render-sync-export-policy.md),
-  [`RUNTIME-091`](../../tasks/done/RUNTIME-091-promoted-ecs-system-bundle-activation.md).
+  [`GRAPHICS-033E`](../../tasks/archive/GRAPHICS-033E-vulkan-operational-gate-barrier-validation.md),
+  [`GRAPHICS-033F`](../../tasks/archive/GRAPHICS-033F-vulkan-operational-gate-public-service-reconciliation.md),
+  [`HARDEN-066`](../../tasks/archive/HARDEN-066-ecs-render-sync-export-policy.md),
+  [`RUNTIME-091`](../../tasks/archive/RUNTIME-091-promoted-ecs-system-bundle-activation.md).
 - Commits inspected:
   - `be7decf` GRAPHICS-033E Wire BarrierValidationClean operational gate.
   - `c3fe597` GRAPHICS-033E Use recipe-aware validator only for gate-7 publish.

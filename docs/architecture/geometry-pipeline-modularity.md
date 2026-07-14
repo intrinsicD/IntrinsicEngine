@@ -317,7 +317,7 @@ per-iteration trajectory, and `TrajectoryPose(outcome, index)` yields the
 renderer-facing `glm::mat4` to preview at each step (identity at step 0). The
 Sandbox editor panel that lets a user select two point clouds, run registration,
 and scrub the convergence with a slider is tracked by
-[`UI-029`](../../tasks/done/UI-029-editor-registration-convergence-visualization.md).
+[`UI-029`](../../tasks/archive/UI-029-editor-registration-convergence-visualization.md).
 
 ## 4. How registration decomposes onto existing code
 
@@ -440,13 +440,13 @@ umbrella
 [`RORG-031E`](../../tasks/backlog/geometry/RORG-031-geometry-method-readiness.md);
 the UI slice follows the `UI-024..028` panel pattern under the UI umbrella; the
 method slice cites retired
-[`GEOM-017`](../../tasks/done/GEOM-017-point-cloud-descriptors-registration-seams.md)'s
+[`GEOM-017`](../../tasks/archive/GEOM-017-point-cloud-descriptors-registration-seams.md)'s
 deferred "future robust/global registration method packages" edge.
 
 | Slice | Goal | Behavior change | Task |
 |-------|------|-----------------|------|
-| 0 | Extract the four helpers into a named internal stage sequence (internal convergence helper; no public `.cppm` change) | **none** (bit-for-bit) | [`GEOM-054`](../../tasks/done/GEOM-054-registration-pipeline-stage-extraction.md) |
-| 0-obs | Optional per-iteration observer seam (`IterationTrace`), null by default — zero cost when off; the renderer applies each trace's transform to show the shape under the current solution (§3.4) | additive | [`GEOM-055`](../../tasks/done/GEOM-055-registration-iteration-observer.md) |
+| 0 | Extract the four helpers into a named internal stage sequence (internal convergence helper; no public `.cppm` change) | **none** (bit-for-bit) | [`GEOM-054`](../../tasks/archive/GEOM-054-registration-pipeline-stage-extraction.md) |
+| 0-obs | Optional per-iteration observer seam (`IterationTrace`), null by default — zero cost when off; the renderer applies each trace's transform to show the shape under the current solution (§3.4) | additive | [`GEOM-055`](../../tasks/archive/GEOM-055-registration-iteration-observer.md) |
 | 1 | Swappable `CorrespondenceKind` + `RejectorChain` vector + surface existing `Geometry.Robust` kernels in params | defaults reproduce today exactly | (future) |
 | 2 | Public `ConvergenceCriteria` struct + `TransformKind` enum + `RegistrationResult` backend telemetry + convergence oscillation guard | additive | (future) |
 | 3 | Global/coarse glue: `RegisterCoarse(...)` running the `Features` pipeline + `init` pose param on the fine path | new capability | (future) |

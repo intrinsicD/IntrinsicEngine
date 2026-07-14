@@ -159,7 +159,7 @@ exceptions are allowed only if:
 
 The per-PR `docs/agent/review-checklist.md` catches single-slice
 defects. A weekly human-led sweep — driven by
-[`REVIEW-001`](../../tasks/done/REVIEW-001-human-led-agent-week-review-cadence.md)
+[`REVIEW-001`](../../tasks/archive/REVIEW-001-human-led-agent-week-review-cadence.md)
 and run from [`docs/agent/agent-output-review-checklist.md`](agent-output-review-checklist.md)
 — audits roughly one week of agent-authored commits for patterns the
 per-PR view misses (multi-PR scope drift, decorative comments,
@@ -171,7 +171,7 @@ follow-up tasks. Reviewer ownership rotates; see
 
 A second, *state-scoped* audit complements the window-scoped weekly sweep:
 the repo-state drift audit driven by
-[`REVIEW-002`](../../tasks/done/REVIEW-002-recurring-drift-and-inconsistency-audit.md)
+[`REVIEW-002`](../../tasks/archive/REVIEW-002-recurring-drift-and-inconsistency-audit.md)
 and run from [`docs/agent/drift-audit-checklist.md`](drift-audit-checklist.md).
 Where the weekly sweep reviews roughly one week of *commits*, the drift audit
 inspects the *whole current tree* for accumulated drift between code, docs,

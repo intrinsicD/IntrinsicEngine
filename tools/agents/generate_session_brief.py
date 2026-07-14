@@ -3,8 +3,9 @@
 
 The brief is the machine-derived session-start view of the task tree: the
 currently active tasks plus, per convergence theme, which open backlog tasks
-are unblocked (every `depends_on` entry retired to ``tasks/done/``) and which
-are blocked (with the first unmet dependency). It is committed and freshness-
+are unblocked (every `depends_on` entry retired to ``tasks/done/`` or swept
+to ``tasks/archive/``) and which are blocked (with the first unmet
+dependency). It is committed and freshness-
 checked in CI (``ci-docs.yml``), so bare file-reading clients get the same
 view as tool-running agents.
 
@@ -22,7 +23,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from check_audit_cadence import cadence_status  # noqa: E402
-from validate_tasks import find_markdown_files, parse_task  # noqa: E402
+from validate_tasks import find_archive_files, find_markdown_files, parse_task  # noqa: E402
 
 TITLE_RE = re.compile(r"^#\s+[A-Z]+-\d+[A-Z0-9-]*\s+—\s+(.+)$")
 
@@ -63,10 +64,17 @@ def generate(repo_root: Path) -> str:
     tasks_root = repo_root / "tasks"
     parsed_tasks = [parse_task(p) for p in find_markdown_files(tasks_root)]
 
+    # Retired tasks unblock dependents whether they still sit in tasks/done/
+    # or have been swept to tasks/archive/ — both count as done IDs.
     done_ids = {
         t.task_id
         for t in parsed_tasks
         if t.task_id and "done" in {part.lower() for part in t.path.parts}
+    }
+    done_ids |= {
+        t.task_id
+        for t in (parse_task(p) for p in find_archive_files(tasks_root))
+        if t.task_id
     }
 
     active: list[tuple[str, str, Path]] = []

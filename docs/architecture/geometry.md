@@ -804,7 +804,7 @@ already covers every direction:
 ## Robust predicates
 
 `Geometry.RobustPredicates` is the narrow predicate foundation introduced by
-[`GEOM-007`](../../tasks/done/GEOM-007-robust-predicates-intersection-classification.md)
+[`GEOM-007`](../../tasks/archive/GEOM-007-robust-predicates-intersection-classification.md)
 Slice 1. It is **not** re-exported by the broad `Geometry` umbrella; callers
 must `import Geometry.RobustPredicates;` explicitly. Surface:
 
@@ -845,7 +845,7 @@ Numerical policy and limitations:
 `Geometry::Internal::Config::GJK_EPSILON = 1e-6f` (`src/geometry/Geometry.GJK.cppm`)
 for every termination / progress / duplicate-membership / segment-degeneracy
 test in the simplex evolution.
-[`GEOM-015`](../../tasks/done/GEOM-015-gjk-termination-diagnostics.md)
+[`GEOM-015`](../../tasks/archive/GEOM-015-gjk-termination-diagnostics.md)
 Slice 3 pins the contract for that constant:
 
 - **Normalized workspace.** `GJK_Boolean` and `GJK_Intersection` compute
@@ -900,7 +900,7 @@ Slice 3 pins the contract for that constant:
 ## Intersection classification records
 
 `Geometry.IntersectionClassification` is the records-only sibling module
-introduced by [`GEOM-007`](../../tasks/done/GEOM-007-robust-predicates-intersection-classification.md)
+introduced by [`GEOM-007`](../../tasks/archive/GEOM-007-robust-predicates-intersection-classification.md)
 Slice 2. Like `Geometry.RobustPredicates`, it is **not** re-exported by the
 broad `Geometry` umbrella; callers must `import
 Geometry.IntersectionClassification;` explicitly. The module ships data

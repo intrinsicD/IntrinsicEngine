@@ -253,6 +253,7 @@ if(TARGET ExtrinsicRuntime)
         Test.ProgressivePresentationExtraction.cpp
         Test.ProgressiveRenderData.cpp
         Test.RenderArtifactPublication.cpp
+        Test.RenderExtractionContract.cpp
         Test.GizmoInteraction.cpp
         Test.GizmoInteractionEngineWiring.cpp
         Test.GraphGeometryExtraction.cpp
@@ -811,6 +812,7 @@ set(_graphics_contract_cpu_test_files
     Test.SelectionPassContracts.cpp
     Test.SelectionSystemContracts.cpp
     Test.SurfacePassContracts.cpp
+    Test.TransformSyncSystem.cpp
     Test.TransientDebugSurfacePass.cpp
     Test.VisualizationOverlayPass.cpp
     Test.VisualizationPropertyBufferResidency.cpp

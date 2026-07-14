@@ -1,6 +1,6 @@
 # Parameterization and Mapping Roadmap
 
-Status: roadmap / planning note for [`GEOM-011`](../../tasks/done/GEOM-011-parameterization-mapping-roadmap.md).
+Status: roadmap / planning note for [`GEOM-011`](../../tasks/archive/GEOM-011-parameterization-mapping-roadmap.md).
 
 This document splits parameterization, atlas, distortion, and surface-map work into reviewable packs for `src/geometry` and `methods/geometry`. It describes future task boundaries; it does not claim the listed algorithms are already implemented.
 
@@ -38,7 +38,7 @@ The rendering/interaction decision for the interactive UV view is recorded in [A
 
 ## Pack 1 — Distortion and map-quality diagnostics
 
-Follow-up task: [`GEOM-018`](../../tasks/done/GEOM-018-parameterization-distortion-map-quality-diagnostics.md).
+Follow-up task: [`GEOM-018`](../../tasks/archive/GEOM-018-parameterization-distortion-map-quality-diagnostics.md).
 
 Scope:
 
@@ -203,8 +203,8 @@ Dependencies:
 
 Implementation tasks:
 
-- [`GEOM-025`](../../tasks/done/GEOM-025-uv-atlas-backend-xatlas.md) established the backend-neutral UV atlas contract and initial xatlas default.
-- [`GEOM-057`](../../tasks/done/GEOM-057-fast-uv-atlas-charting-and-packing.md) promotes the fast staged replacement path to the default while keeping xatlas as the visible compatibility fallback.
+- [`GEOM-025`](../../tasks/archive/GEOM-025-uv-atlas-backend-xatlas.md) established the backend-neutral UV atlas contract and initial xatlas default.
+- [`GEOM-057`](../../tasks/archive/GEOM-057-fast-uv-atlas-charting-and-packing.md) promotes the fast staged replacement path to the default while keeping xatlas as the visible compatibility fallback.
 
 Scope:
 
@@ -283,7 +283,7 @@ Parameterization and mapping tasks must make topology, boundary, and degeneracy 
 
 ## Initial priority
 
-The diagnostics ([`GEOM-018`](../../tasks/done/GEOM-018-parameterization-distortion-map-quality-diagnostics.md), retired) and harmonic/Tutte ([`GEOM-019`](../../tasks/backlog/geometry/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md)) foundations exist, so the SOTA-variant program orders as:
+The diagnostics ([`GEOM-018`](../../tasks/archive/GEOM-018-parameterization-distortion-map-quality-diagnostics.md), retired) and harmonic/Tutte ([`GEOM-019`](../../tasks/backlog/geometry/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md)) foundations exist, so the SOTA-variant program orders as:
 
 1. [`GEOM-063`](../../tasks/backlog/geometry/GEOM-063-parameterization-strategy-backend-surface.md) — the family dispatch surface, consolidating the existing Tutte/Harmonic/LSCM solvers so every later variant is choosable through one API. Behavior-preserving; no new algorithm.
 2. [`GEOM-064`](../../tasks/backlog/geometry/GEOM-064-parameterization-optimization-kernels.md) — the shared optimization-kernel seam ARAP and SLIM consume.

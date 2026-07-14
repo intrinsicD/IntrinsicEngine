@@ -3,9 +3,9 @@
 - **Status:** Accepted
 - **Date:** 2026-05-17
 - **Owners:** Graphics / Vulkan backend
-- **Related tasks:** [`tasks/done/GRAPHICS-018`](../../tasks/done/GRAPHICS-018-vulkan-renderer-integration.md), [`GRAPHICS-018Q`](../../tasks/done/GRAPHICS-018Q-vulkan-integration-clarifications.md), [`GRAPHICS-018R`](../../tasks/done/GRAPHICS-018R-operational-transition.md), [`GRAPHICS-018T`](../../tasks/done/GRAPHICS-018T-texture-upload-batching.md), [`GRAPHICS-026`](../../tasks/done/GRAPHICS-026-vulkan-renderer-plumbing-followups.md)
+- **Related tasks:** [`tasks/done/GRAPHICS-018`](../../tasks/archive/GRAPHICS-018-vulkan-renderer-integration.md), [`GRAPHICS-018Q`](../../tasks/archive/GRAPHICS-018Q-vulkan-integration-clarifications.md), [`GRAPHICS-018R`](../../tasks/archive/GRAPHICS-018R-operational-transition.md), [`GRAPHICS-018T`](../../tasks/archive/GRAPHICS-018T-texture-upload-batching.md), [`GRAPHICS-026`](../../tasks/archive/GRAPHICS-026-vulkan-renderer-plumbing-followups.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`src/graphics/vulkan/README.md`](../../src/graphics/vulkan/README.md)
-- **Supersedes:** none. Extracted from the `## Renderer/RHI frame lifecycle` mega-paragraph in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
+- **Supersedes:** none. Extracted from the `## Renderer/RHI frame lifecycle` mega-paragraph in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/archive/DOCS-001-reduce-graphics-architecture-prose.md).
 
 ## Context
 
@@ -56,7 +56,7 @@ This entire bring-up remains backend-local and **does not by itself make Vulkan 
 - Live logical-device / swapchain / per-frame / service state.
 - Safety prerequisites still cleared for canonical renderer pass execution, synchronization / barrier validation, queue-family ownership handling where needed, and public service exposure.
 
-Renderer and runtime code **must** branch on `IDevice::IsOperational()`, not Vulkan-specific diagnostics. The operational-transition reset seam (`IRenderer::RebuildOperationalResources()`, [`GRAPHICS-018R`](../../tasks/done/GRAPHICS-018R-operational-transition.md)) is present and CPU-tested, so a false → true transition produces a single backend-neutral reset/rebind that the renderer can act on without naming Vulkan.
+Renderer and runtime code **must** branch on `IDevice::IsOperational()`, not Vulkan-specific diagnostics. The operational-transition reset seam (`IRenderer::RebuildOperationalResources()`, [`GRAPHICS-018R`](../../tasks/archive/GRAPHICS-018R-operational-transition.md)) is present and CPU-tested, so a false → true transition produces a single backend-neutral reset/rebind that the renderer can act on without naming Vulkan.
 
 ### 4. Diagnostics snapshots (no native types leak)
 
@@ -117,9 +117,9 @@ The internal transfer queue returns invalid `RHI::TransferToken` values with log
 #### 10.1 Texture upload policy
 
 - The guarded synchronous staging-buffer one-subresource `IDevice::WriteTexture()` path stays the **fail-closed correctness baseline**.
-- Runtime / streaming uploads **must** use `RHI::ITransferQueue` (the canonical seam declared by [`GRAPHICS-026`](../../tasks/done/GRAPHICS-026-vulkan-renderer-plumbing-followups.md)), not the blocking graphics-queue helper.
+- Runtime / streaming uploads **must** use `RHI::ITransferQueue` (the canonical seam declared by [`GRAPHICS-026`](../../tasks/archive/GRAPHICS-026-vulkan-renderer-plumbing-followups.md)), not the blocking graphics-queue helper.
 - Per-subresource layout tracking stays whole-image for the batched path.
-- Multi-mip / multi-layer / cubemap batching plus opt-in `gpu;vulkan` smoke landed in [`GRAPHICS-018T`](../../tasks/done/GRAPHICS-018T-texture-upload-batching.md), not in this clarification.
+- Multi-mip / multi-layer / cubemap batching plus opt-in `gpu;vulkan` smoke landed in [`GRAPHICS-018T`](../../tasks/archive/GRAPHICS-018T-texture-upload-batching.md), not in this clarification.
 
 #### 10.2 Sampler anisotropy
 

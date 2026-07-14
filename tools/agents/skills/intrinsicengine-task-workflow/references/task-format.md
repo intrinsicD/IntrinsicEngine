@@ -2,6 +2,10 @@
 
 Use this template for all new task files under `tasks/`.
 
+Single-slice mechanical work (small fixes, doc/link sweeps, config toggles,
+test-only additions) may use the reduced **micro template** instead — see
+§"Micro tasks" below.
+
 ## Required structure
 
 ```md
@@ -59,15 +63,32 @@ feeds the generated `tasks/SESSION-BRIEF.md`:
 - `theme` (required) — convergence-theme letter from
   `tasks/backlog/README.md`, or `none` for unthemed work.
 - `depends_on` (required, may be `[]`) — task IDs this task is gated by;
-  every entry must resolve to a task file under `tasks/active|backlog|done`.
-  A dependency is satisfied when the referenced task is in `tasks/done/`.
+  every entry must resolve to a task file under
+  `tasks/active|backlog|done|archive`. A dependency is satisfied when the
+  referenced task is in `tasks/done/` or `tasks/archive/`.
 - `maturity_target` (optional) — intended stop-state per
   [`task-maturity.md`](../../../../../docs/agent/task-maturity.md).
+- `template: micro` (optional) — marks a micro task (see §"Micro tasks").
 
 `tools/agents/validate_tasks.py --strict` enforces the schema for open tasks;
 retired tasks under `tasks/done/` are exempt. After opening, retiring, or
 re-gating a task, regenerate the session brief with
 `python3 tools/agents/generate_session_brief.py`.
+
+## Micro tasks
+
+Seed from [`tasks/templates/task-micro.md`](../../../../../tasks/templates/task-micro.md)
+and set `template: micro` in the front-matter; `validate_tasks.py` then
+requires only `## Goal`, `## Acceptance criteria` (with checkbox todos), and
+`## Verification`.
+
+Micro tasks are for **single-slice mechanical work only**: small fixes,
+doc/link sweeps, config toggles, test-only additions. They are **not**
+allowed for work that changes dependency boundaries, module ownership,
+public module surfaces (`.cppm`), methods/benchmarks, or anything with an
+ambiguous maturity stop-state — that work uses the full template (or the
+method/bug/review variants). Retirement rules are unchanged: checkboxes
+closed, completion date, commit/PR reference, retirement-log entry.
 
 ## Optional `## Control surfaces` and `## Backends` fields
 
@@ -124,16 +145,22 @@ When a task completes:
    opt out with a `<!-- state-link-guard: allow-done-links -->` comment
    directly below their heading.
 
+Retired files stay in `tasks/done/` short-term; they are periodically swept
+to `tasks/archive/` (frozen read-only history — see
+[`tasks/archive/README.md`](../../../../../tasks/archive/README.md)). Archived IDs
+remain authoritative: they resolve `depends_on` references, participate in
+duplicate-ID detection, and can never be reallocated.
+
 ## ID allocation
 
-Task IDs must be unique across `tasks/active/`, `tasks/backlog/`, and
-`tasks/done/`; `tools/agents/validate_tasks.py` enforces this in strict mode
-(a small set of pre-2026-06-09 collisions is grandfathered in place). Before
-opening `<PREFIX>-<N>`, take the highest existing number for that prefix
-across **all three** directories and add one:
+Task IDs must be unique across `tasks/active/`, `tasks/backlog/`,
+`tasks/done/`, and `tasks/archive/`; `tools/agents/validate_tasks.py`
+enforces this in strict mode (a small set of pre-2026-06-09 collisions is
+grandfathered in place). Before opening `<PREFIX>-<N>`, take the highest
+existing number for that prefix across **all four** directories and add one:
 
 ```bash
-grep -rhoE '^# <PREFIX>-[0-9]+' tasks/active tasks/backlog tasks/done | sort -V | tail -1
+grep -rhoE '^# <PREFIX>-[0-9]+' tasks/active tasks/backlog tasks/done tasks/archive | sort -V | tail -1
 ```
 
 Letter-suffixed child slices (e.g. `GRAPHICS-033A`) extend their parent's
@@ -141,7 +168,7 @@ number and do not claim a new one.
 
 Prefixes come from the canonical list in `tasks/README.md` §"Task ID
 prefixes"; do not invent a new prefix without adding it there in the same
-change (historical `tasks/done/` entries contain retired prefix variants —
+change (historical `tasks/archive/` entries contain retired prefix variants —
 they are not precedent).
 
 When **batch-seeding** several tasks (e.g. converting review findings into a

@@ -16,6 +16,7 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-129` — Schedule GPU object-space normal bake jobs after import (tasks/backlog/runtime/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
 - unblocked: `RUNTIME-139` — Static AoS storage and shader operational path (tasks/backlog/runtime/RUNTIME-139-static-aos-storage-shader-operational.md)
 - unblocked: `RUNTIME-170` — Privatize the object-space normal GPU queue surface (tasks/backlog/runtime/RUNTIME-170-privatize-object-space-normal-gpu-queue-surface.md)
+- unblocked: `RUNTIME-177` — Immediate-mode debug-draw seam for runtime and method code (tasks/backlog/runtime/RUNTIME-177-immediate-mode-debug-draw-seam.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
@@ -51,7 +52,9 @@ the authoritative open/unblocked view.
 - blocked by `CI-005`: `CI-006` — Remove duplicate sanitizer work and calibrate test parallelism (tasks/backlog/process/CI-006-sanitizer-topology-and-test-parallelism.md)
 - unblocked: `CI-008` — Reduce CTest process overhead without oversubscribing workers (tasks/backlog/process/CI-008-grouped-ctest-and-worker-oversubscription.md)
 - blocked by `CI-005`: `CI-009` — Route heavy gates by lifecycle and evaluate runner scaling (tasks/backlog/process/CI-009-heavy-gate-routing-and-runner-evaluation.md)
+- unblocked: `DOCS-006` — Curated "how this repo is built" agentic-development narrative (tasks/backlog/process/DOCS-006-agentic-development-narrative.md)
 - unblocked: `PROC-025` — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality (tasks/backlog/process/PROC-025-port-research-ideation-skill-to-other-repos.md)
+- unblocked: `PROC-027` — Audit the validator/tool fleet for rent-paying gates (tasks/backlog/process/PROC-027-validator-rent-audit.md)
 
 ## Theme I — Research method implementation
 

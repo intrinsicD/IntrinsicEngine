@@ -8,7 +8,18 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
-[`BUG-074`](BUG-074-object-space-normal-bake-orphaned-cache-slot-livelock.md) —
+[`PROC-026`](PROC-026-task-archive-and-micro-template.md) — task archive
+sweep and micro template retired on 2026-07-14. All 661 retired task files
+moved from `tasks/done/` to the frozen `tasks/archive/` with ~1,600 inbound
+links rewritten and zero broken links; archived IDs stay authoritative for
+duplicate detection, `depends_on` resolution, and state-link guards
+(`validate_tasks.py`, `generate_session_brief.py`,
+`check_task_state_links.py`). Added `tasks/templates/task-micro.md`
+(`template: micro`) reducing single-slice mechanical tasks to
+Goal/Acceptance criteria/Verification, with strict-validation probes both
+ways. Commits 865a61b and b6d4568.
+
+[`BUG-074`](../archive/BUG-074-object-space-normal-bake-orphaned-cache-slot-livelock.md) —
 object-space-normal-bake failed-slot retry livelock retired on 2026-07-13 at
 `CPUContracted`. Both command-record and ready-frame-publication failures now
 call `FailGpuProducedTexture` with the generation returned by
@@ -22,7 +33,7 @@ integrated 3,692-test default CPU gate plus strict structural checks passed.
 The production Vulkan plan provider and end-to-end runtime seam remain owned by
 `RUNTIME-129` before `Operational` can be claimed.
 
-[`BUG-064`](BUG-064-ci-vulkan-framepacing-headless-display.md) — hosted
+[`BUG-064`](../archive/BUG-064-ci-vulkan-framepacing-headless-display.md) — hosted
 frame-pacing capture gate retired on 2026-07-13 at `Operational`. The
 `ci-vulkan` workflow now installs Mesa's lavapipe software Vulkan driver and
 scopes it with an isolated Xvfb server to the strict
@@ -37,7 +48,7 @@ also passed all 59 broader CTest entries, timing aggregation and strict result
 validation, and artifact upload. The formerly unconditional hosted failure is
 therefore closed without converting the capture into a skip.
 
-[`BUG-067`](BUG-067-jobservice-completion-state-lost-update-race.md) —
+[`BUG-067`](../archive/BUG-067-jobservice-completion-state-lost-update-race.md) —
 JobService completion-state lost-update race retired on 2026-07-13 at
 `CPUContracted`. Production fix `ce1f590c` stores `AwaitingGate` while holding
 the completion-queue mutex and before insertion, making queue visibility the
@@ -53,7 +64,7 @@ audited: all worker terminal exits precede queue visibility, `Running` precedes
 work, cancellation only sets a flag, and only the drain writes state after
 publication.
 
-[`BUG-073`](BUG-073-object-space-normal-bake-read-before-gpu-write.md) —
+[`BUG-073`](../archive/BUG-073-object-space-normal-bake-read-before-gpu-write.md) —
 object-space-normal-bake ready-frame accounting retired on 2026-07-13 at
 `CPUContracted`. Production correction `fdeb0a6b` replaced the unsafe fixed
 `issueFrame + 1` stamp with `issueFrame + FramesInFlight`; this closure names
@@ -69,7 +80,7 @@ runtime readiness seam: the production Vulkan plan provider and end-to-end
 runtime smoke remain explicitly owned by `RUNTIME-129` before `Operational` can
 be claimed.
 
-[`BUG-071`](BUG-071-onresolve-sim-systems-bypass-finalizeforboot.md) —
+[`BUG-071`](../archive/BUG-071-onresolve-sim-systems-bypass-finalizeforboot.md) —
 Runtime-module resolve registration finalization retired to `tasks/done/` on
 2026-07-13 at `CPUContracted`. Production commit `a1704053` keeps sim-system
 registration legal during `OnResolve` and moves the single schedule
@@ -84,7 +95,7 @@ focused runtime-module selection passed 13/13, `IntrinsicTests` built, the full
 default CPU-supported gate passed 3640/3640, and strict structural/docs checks
 passed.
 
-[`BUG-076`](BUG-076-asyncworkservice-shutdown-skips-derived-job-registry.md) —
+[`BUG-076`](../archive/BUG-076-asyncworkservice-shutdown-skips-derived-job-registry.md) —
 derived-job shutdown quiescence retired on 2026-07-13 at `CPUContracted`.
 Production fix `6d6f784a` joins the shared executor, drains completion and
 readback queues, applies newly ready results, and then cancels every survivor so
@@ -95,7 +106,7 @@ repetitions under ASan/UBSan; the broader 9-test async-work selection, complete
 3684-test default CPU gate, and strict structural checks pass. No
 hardware-backed follow-up is owed.
 
-[`BUG-075`](BUG-075-worldregistry-activate-while-destroy-pending.md) — world
+[`BUG-075`](../archive/BUG-075-worldregistry-activate-while-destroy-pending.md) — world
 activation-versus-destruction ordering retired on 2026-07-13 at
 `CPUContracted`. Production fix `80c56dcc` makes destruction authoritative:
 `RequestSetActiveWorld` returns `ResourceBusy` for destroy-pending or
@@ -105,7 +116,7 @@ active-and-destroy-announced world. Both deterministic runtime regressions pass
 under ASan/UBSan together with the complete default CPU gate and strict
 structural checks. No hardware-backed follow-up is owed.
 
-[`CI-007`](CI-007-module-safe-persistent-ccache-pilot.md) — persistent
+[`CI-007`](../archive/CI-007-module-safe-persistent-ccache-pilot.md) — persistent
 module-safe ccache pilot retired on 2026-07-13 at `Operational`. Retained a
 bounded external ccache store in `pr-fast` only, with direct/depend modes
 disabled, `.cppm` compilation passed through, every repository module
@@ -123,7 +134,7 @@ future expansion requires a separate task. The unrelated 22.002 s exact-vcpkg
 configure-budget failure that stopped the first interface attempt before
 ccache restore is tracked by `BUG-081`.
 
-[`PROC-024`](PROC-024-theme-research-method-track.md) — research/method track
+[`PROC-024`](../archive/PROC-024-theme-research-method-track.md) — research/method track
 theme retired on 2026-07-11 at `Retired` (task-map/tooling only) after owner
 approval. Created **Theme I — Research method implementation (P1)**: added
 `"I": "Research method implementation"` to `THEME_NAMES` in
@@ -139,7 +150,7 @@ superseded Theme I. `generate_session_brief.py --check`, strict
 `check_task_policy.py`, strict `check_task_state_links.py`, and
 `check_doc_links.py` pass.
 
-[`PROC-010`](PROC-010-encode-research-engine-invariants-in-contract.md) —
+[`PROC-010`](../archive/PROC-010-encode-research-engine-invariants-in-contract.md) —
 research-engine invariants retired on 2026-07-11 at `Retired` (contract/docs
 only) after owner approval of sections A and B. Promoted the three
 research-engine design principles into binding, always-on `AGENTS.md` §5
@@ -155,7 +166,7 @@ zero open members; the freed `I` letter went to `PROC-024`'s research/method
 track. No engine code changed. `sync_skills.py --check`, `check_doc_links.py`,
 and strict `check_task_policy.py` pass.
 
-[`PROC-020`](PROC-020-sandbox-input-lifecycle-skill.md) — sandbox input/lifecycle
+[`PROC-020`](../archive/PROC-020-sandbox-input-lifecycle-skill.md) — sandbox input/lifecycle
 skill (playbook wave 2) retired on 2026-07-11 at `Retired` (docs/skill-surface
 only). Authored
 `tools/agents/skills/intrinsicengine-sandbox-input-lifecycle/SKILL.md`, a
@@ -180,7 +191,7 @@ live `Runtime.Engine.cpp`/`Runtime.Engine.FrameLoop.cppm`
 pass, and the skill auto-discovers. This completes the playbook wave-2 skill trio
 (`PROC-018`/`PROC-019`/`PROC-020`).
 
-[`PROC-019`](PROC-019-geometry-io-format-skill.md) — geometry-IO format skill
+[`PROC-019`](../archive/PROC-019-geometry-io-format-skill.md) — geometry-IO format skill
 (playbook wave 2) retired on 2026-07-11 at `Retired` (docs/skill-surface only).
 Authored `tools/agents/skills/intrinsicengine-geometry-io-format/SKILL.md`, a
 SKILL.md-only cross-cutting discipline skill distilling the importer/exporter
@@ -201,7 +212,7 @@ importer, `GEOIO-002E` binary PLY importer) and cross-checked against the live
 `sync_skills.py --check`, `check_doc_links.py`, and strict `check_task_policy.py`
 pass, and the skill auto-discovers.
 
-[`PROC-018`](PROC-018-import-visibility-contract-skill.md) — import-visibility
+[`PROC-018`](../archive/PROC-018-import-visibility-contract-skill.md) — import-visibility
 contract skill (playbook wave 2) retired on 2026-07-11 at `Retired`
 (docs/skill-surface only). Authored
 `tools/agents/skills/intrinsicengine-import-visibility-contract/SKILL.md` as a
@@ -222,7 +233,7 @@ fifteen → sixteen skills). No engine code changed. `sync_skills.py --check`,
 `check_doc_links.py`, and strict `check_task_policy.py` pass, and the skill
 auto-discovers via the `.claude`/`.codex` skill symlinks.
 
-[`PROC-023`](PROC-023-canonicalize-skill-body-content.md) — skill-body
+[`PROC-023`](../archive/PROC-023-canonicalize-skill-body-content.md) — skill-body
 canonicalization retired on 2026-07-11 at `Retired` (docs/skill-surface only).
 Three source-doc mirror skills had bodies 3–4× their `docs/agent/*` source
 carrying normative content with no canonical home: `intrinsicengine-benchmark`
@@ -240,7 +251,7 @@ model per skill in a table. No `docs/agent/*` source changed, so no `--write`
 re-sync was needed; `sync_skills.py --check`, `check_doc_links.py`, strict
 `check_task_policy.py`, and diff-mode docs-sync all pass.
 
-[`PROC-022`](PROC-022-tool-directory-readme-refresh.md) — tool-directory README
+[`PROC-022`](../archive/PROC-022-tool-directory-readme-refresh.md) — tool-directory README
 refresh retired on 2026-07-11 at `Retired` (docs-only). The three
 `tools/*/README.md` files had drifted from their directories: `tools/ci`
 documented 2 of 10 scripts, `tools/agents` omitted `check_codex_config.py` and
@@ -256,7 +267,7 @@ completeness check (every directory script appears in its README, every README
 entry resolves to an existing file) plus `check_doc_links.py` and strict
 `check_task_policy.py` pass. No script behavior changed.
 
-[`BUG-080`](BUG-080-uv-atlas-promotion-smoke-timing-flake.md) — UV-atlas
+[`BUG-080`](../archive/BUG-080-uv-atlas-promotion-smoke-timing-flake.md) — UV-atlas
 promotion-smoke timing flake retired on 2026-07-10 at `CPUContracted`. Each
 fixture now warms one pair, individually times five fast-staged/xatlas pairs in
 alternating order, and gates on the median paired runtime ratio. Median backend
@@ -266,7 +277,7 @@ thresholds are unchanged. Twenty-five loaded-host runs produced 475/475 passing
 result files with a worst robust fixture ratio of 0.604228, and the complete
 3,658-test default CPU gate plus strict benchmark/structural validators pass.
 
-[`BUG-070`](BUG-070-runtime-module-schedule-failclosed-guards-regressed.md) —
+[`BUG-070`](../archive/BUG-070-runtime-module-schedule-failclosed-guards-regressed.md) —
 runtime-module fail-closed schedule regression retired on 2026-07-10 at
 `CPUContracted`. Commit `7e77e47f` restored recoverable `InvalidArgument` for
 duplicate `(module, system)` identities and `InvalidState` for cycles or
@@ -276,7 +287,7 @@ boot policy terminates an invalid duplicate schedule before execution. The
 runtime architecture and `BUG-066` record now state the restored contract.
 Focused runtime-module, default CPU, and strict structural gates pass.
 
-[`BUG-072`](BUG-072-declarative-sim-signal-fields-no-per-tick-edge.md) —
+[`BUG-072`](../archive/BUG-072-declarative-sim-signal-fields-no-per-tick-edge.md) —
 declarative runtime-module signal regression retired on 2026-07-10 at
 `CPUContracted`. Commit `f45371c6` translates every `WaitForSignals` and
 `SignalLabels` entry into real named edges in each fixed-step `FrameGraph`, and
@@ -286,7 +297,7 @@ parallel-capable, declares no manual builder edges, and proves the compiled
 layers and execution remain producer-before-consumer. Focused runtime-module,
 default CPU, and strict structural gates pass; no host or GPU follow-up is owed.
 
-[`PROC-021`](PROC-021-docs-sync-strict-mode-wiring.md) — structural CI
+[`PROC-021`](../archive/PROC-021-docs-sync-strict-mode-wiring.md) — structural CI
 enforcement wiring retired on 2026-07-10 at `Operational`. `ci-docs` now fetches
 full history, compares documentation rules against the pull request base SHA,
 and fails strictly on missing synchronized docs; it also runs the
@@ -297,7 +308,7 @@ skill routing summary now describe current enforcement. Both strict validators,
 the complete local docs-validation equivalent, skill sync, task policy, docs
 links, test layout, and session-brief freshness pass.
 
-[`BUG-069`](BUG-069-runtime-module-systems-scheduled-before-ecs-bundle.md) —
+[`BUG-069`](../archive/BUG-069-runtime-module-systems-scheduled-before-ecs-bundle.md) —
 runtime-module baseline ECS ordering regression retired on 2026-07-10 at
 `CPUContracted`. Runtime registers the promoted ECS bundle before module sim
 systems, seeds its external signal labels during boot finalization, and derives
@@ -309,7 +320,7 @@ CPU gate pass. Implementation commits are `3102e60f`, `c3794716`, `aead3bb0`,
 and `f45371c6`; `BUG-072` owns the remaining durable signal-unification audit
 and explicit parallel-pass regression.
 
-[`BUG-077`](BUG-077-architecture-backlog-index-links-retired-arch-tasks.md) —
+[`BUG-077`](../archive/BUG-077-architecture-backlog-index-links-retired-arch-tasks.md) —
 architecture backlog state-link regression retired on 2026-07-10. Commit
 `09183ea1` promoted the `Retired seam tasks` lead-in in
 `tasks/backlog/architecture/README.md` to a recognized history heading, keeping
@@ -318,7 +329,7 @@ records as active backlog. Strict task-state links pass with zero findings;
 task policy, documentation links, and generated session-brief freshness also
 pass. No task content or retirement decision changed.
 
-[`CI-004`](CI-004-label-derived-test-build-aggregates.md) — gate-specific test
+[`CI-004`](../archive/CI-004-label-derived-test-build-aggregates.md) — gate-specific test
 build aggregates retired on 2026-07-10 at `Operational`. Canonical test-target
 and label metadata now derives `IntrinsicPrFastTests`, `IntrinsicCpuTests`,
 `IntrinsicGpuVulkanTests`, and `IntrinsicPrSmokeTests`; specialized workflows
@@ -330,7 +341,7 @@ fewer edges and 30.4–49.8% lower build time; their main `gpu;vulkan` selectors
 passed, while the unrelated isolated frame-pacing capture remains `BUG-064`.
 Implementation commits are `e741293d`, `bc5c7cea`, and `99c579e0`.
 
-[`BUG-078`](BUG-078-coretasks-counterevent-rearm-uaf.md) — Core.Tasks
+[`BUG-078`](../archive/BUG-078-coretasks-counterevent-rearm-uaf.md) — Core.Tasks
 `CounterEvent` rearm coroutine lifetime race retired on 2026-07-10 at
 `CPUContracted`. A legal early-resume interleaving let one worker complete and
 destroy a detached task frame while the worker that originally called
@@ -343,7 +354,7 @@ regression waits for a frame-owned destructor sentinel before the original
 the CI-007 clean no-ccache comparison also pass. `BUG-079` owns the adjacent
 abandoned-parked-continuation reclamation gap.
 
-[`CI-003`](CI-003-ci-gate-timing-observability-and-cancellation.md) — CI gate
+[`CI-003`](../archive/CI-003-ci-gate-timing-observability-and-cancellation.md) — CI gate
 latency observability and stale-run cancellation retired on 2026-07-09 at
 `CPUContracted`. The stable
 `ci.gate-latency.github-ubuntu-24.04.v1` profile now emits canonical
@@ -358,7 +369,7 @@ the invalid pre-BUG-064 Vulkan test-timing caveat are retained for
 publication remains blocked until the GitHub token has `workflow` scope; the
 completed local commits are `f168f15d`, `78c4b152`, and `fbc3ae9d`.
 
-[`BUG-063`](BUG-063-streaming-import-contract-tests-flaky-on-main.md) —
+[`BUG-063`](../archive/BUG-063-streaming-import-contract-tests-flaky-on-main.md) —
 streaming-import contract-test flake retired on 2026-07-09. The two streaming
 tests and the representative promoted-format test used the same external glTF
 buffer path, so parallel CTest execution let the representative fixture remove
@@ -371,7 +382,7 @@ afterward; the full 16-test format-coverage group passed 25 repetitions, and the
 combined stacked default CPU gate passed 3635/3635. No production streaming
 behavior changed.
 
-[`BUG-066`](BUG-066-runtime-module-system-registration-order.md) —
+[`BUG-066`](../archive/BUG-066-runtime-module-system-registration-order.md) —
 RuntimeModule system ordering regression retired to `tasks/done/` on
 2026-07-09 at `CPUContracted`. PR #1013 appended module systems directly to
 the core FrameGraph, whose RAW/WAR/WAW hazards intentionally follow pass
@@ -385,7 +396,7 @@ new fail-closed cases pass; the default CPU gate passed 3635/3635. Core
 FrameGraph semantics are unchanged, and `Operational` remains owned by
 `ARCH-012`.
 
-[`BUG-065`](BUG-065-vcpkg-egress-blocked-cryptic-403.md) — vcpkg bootstrap
+[`BUG-065`](../archive/BUG-065-vcpkg-egress-blocked-cryptic-403.md) — vcpkg bootstrap
 egress block surfacing as a cryptic `curl: (22) ... 403` retired to
 `tasks/done/` on 2026-07-09. Managed/cloud sessions that allow git-protocol
 clones and the GitHub API but deny general HTTPS GETs to github.com (HTTP 403)
@@ -403,7 +414,7 @@ egress policy itself is environment-level and out of repository scope;
 `docs/build-troubleshooting.md` documents the operator fixes (allow the host, or
 pre-bake vcpkg + a binary cache into the snapshot).
 
-[`ARCH-011`](ARCH-011-runtimemodule-contract-service-registry.md) —
+[`ARCH-011`](../archive/ARCH-011-runtimemodule-contract-service-registry.md) —
 RuntimeModule contract, `EngineSetup`, and two-phase `ServiceRegistry` retired
 to `tasks/done/` on 2026-07-09 at `CPUContracted`. The fifth and final additive
 ADR-0024 kernel seam adds `Extrinsic.Runtime.ServiceRegistry` (compile-time
@@ -437,7 +448,7 @@ the new contract tests before merge. `Operational` remains owned by `ARCH-012`,
 which extracts the ClusteringModule onto these seams end-to-end.
 
 Active
-[`ARCH-010`](ARCH-010-kernel-worldregistry-deferred-world-ops.md) —
+[`ARCH-010`](../archive/ARCH-010-kernel-worldregistry-deferred-world-ops.md) —
 Kernel WorldRegistry with deferred, two-phase world operations — retired on
 2026-07-09 at maturity `CPUContracted`. `Extrinsic.Runtime.WorldRegistry`
 now owns boot-world creation, `WorldHandle` keyed `ECS::Scene::Registry`
@@ -453,7 +464,7 @@ module inventory record the kernel mechanism/policy split. `Operational`
 remains owned by `ARCH-012`.
 
 Active
-[`ARCH-009`](ARCH-009-kernel-jobservice-snapshot-in-result-out.md) —
+[`ARCH-009`](../archive/ARCH-009-kernel-jobservice-snapshot-in-result-out.md) —
 Kernel JobService: snapshot-in/result-out background jobs — retired on
 2026-07-09 at maturity `CPUContracted`. `Extrinsic.Runtime.JobService` now
 provides typed `JobToken`/`WorldHandle` handles, cooperative
@@ -469,7 +480,7 @@ FrameGraph-vs-JobService two-tier rule. `Operational` remains owned by
 `ARCH-012`; `GpuQueue` execution is deferred to `RUNTIME-137`.
 
 Active
-[`RUNTIME-165`](RUNTIME-165-extract-async-work-service.md) —
+[`RUNTIME-165`](../archive/RUNTIME-165-extract-async-work-service.md) —
 Extract async work service out of Engine — retired on 2026-07-09 at maturity
 `Operational`. `Extrinsic.Runtime.AsyncWorkService` now owns the live
 `StreamingExecutor` and `DerivedJobRegistry`, constructs the registry over the
@@ -483,7 +494,7 @@ scene/layering coverage passed 56/56, `IntrinsicTests` built, and the default
 CPU-supported gate passed 3646/3646.
 
 Active
-[`RUNTIME-164`](RUNTIME-164-extract-asset-residency-service.md) —
+[`RUNTIME-164`](../archive/RUNTIME-164-extract-asset-residency-service.md) —
 Extract asset residency service out of Engine — retired on 2026-07-09 at
 maturity `Operational`. `Extrinsic.Runtime.AssetResidencyService` now owns
 `Graphics::GpuAssetCache`, the cache's `AssetEventBus` listener token,
@@ -498,7 +509,7 @@ render-extraction, object-space normal bake, and Engine-layering coverage passed
 3646/3646.
 
 Active
-[`RUNTIME-163`](RUNTIME-163-extract-render-extraction-service.md) —
+[`RUNTIME-163`](../archive/RUNTIME-163-extract-render-extraction-service.md) —
 Extract render extraction service out of Engine — retired on 2026-07-09 at
 maturity `Operational`. `Extrinsic.Runtime.RenderExtractionService` now owns
 the live `RenderExtractionCache`, configured `RenderWorldPool`, last extraction
@@ -510,7 +521,7 @@ sandbox, and Engine-layering coverage passed, `IntrinsicTests` built, and the
 default CPU-supported gate passed 3646/3646.
 
 Active
-[`RUNTIME-162`](RUNTIME-162-extract-gizmo-frame-service.md) —
+[`RUNTIME-162`](../archive/RUNTIME-162-extract-gizmo-frame-service.md) —
 Extract gizmo frame service out of Engine — retired on 2026-07-09 at maturity
 `Operational`. `Extrinsic.Runtime.GizmoFrameService` now owns live
 transform-gizmo interaction state, undo storage, selected-entity scratch,
@@ -523,7 +534,7 @@ Engine-layering coverage passed, `IntrinsicTests` built, and the default
 CPU-supported gate passed 3646/3646.
 
 Active
-[`RUNTIME-161`](RUNTIME-161-extract-object-space-normal-bake-service.md) —
+[`RUNTIME-161`](../archive/RUNTIME-161-extract-object-space-normal-bake-service.md) —
 Extract object-space normal bake service out of Engine — retired on 2026-07-09
 at maturity `Operational`. `Extrinsic.Runtime.ObjectSpaceNormalBakeService`
 now owns object-space normal bake GPU-queue lifetime, dependency setup,
@@ -538,7 +549,7 @@ the default CPU-supported gate passed 3646/3646. `RUNTIME-129` remains the
 owner of production Vulkan plan-provider and `gpu;vulkan` smoke closure.
 
 Active
-[`RUNTIME-160`](RUNTIME-160-extract-jobservice-gpu-queue-bridge.md) —
+[`RUNTIME-160`](../archive/RUNTIME-160-extract-jobservice-gpu-queue-bridge.md) —
 Extract JobService GPU queue bridge out of Engine — retired on 2026-07-09 at
 maturity `Operational`. `Extrinsic.Runtime.JobServiceGpuQueueBridge` now owns
 the renderer runtime-frame hook token, installs the JobService GPU-queue
@@ -553,7 +564,7 @@ object-space normal bake, and Engine-layering coverage passed,
 `IntrinsicTests` built, and the default CPU-supported gate passed 3646/3646.
 
 Active
-[`RUNTIME-159`](RUNTIME-159-extract-imgui-editor-bridge.md) —
+[`RUNTIME-159`](../archive/RUNTIME-159-extract-imgui-editor-bridge.md) —
 Extract ImGui editor bridge out of Engine — retired on 2026-07-09 at maturity
 `Operational`. `Extrinsic.Runtime.ImGuiEditorBridge` now owns the runtime
 `ImGuiAdapter`, shared `Graphics::ImGuiOverlaySystem`, editor callback storage,
@@ -565,7 +576,7 @@ SandboxEditorUi, Engine-layering, and frame-pacing coverage passed,
 `IntrinsicTests` built, and the default CPU-supported gate passed 3646/3646.
 
 Active
-[`RUNTIME-158`](RUNTIME-158-extract-frame-pacing-diagnostics.md) —
+[`RUNTIME-158`](../archive/RUNTIME-158-extract-frame-pacing-diagnostics.md) —
 Extract frame pacing diagnostics out of Engine — retired on 2026-07-09 at
 maturity `Operational`. `Extrinsic.Runtime.FramePacingDiagnostics` now owns
 the exported `RuntimeFramePacingDiagnostics` record and pure ImGui adapter /
@@ -577,7 +588,7 @@ coverage passed, `IntrinsicTests` built, and the default CPU-supported gate
 passed 3646/3646.
 
 Active
-[`RUNTIME-157`](RUNTIME-157-extract-selection-readback-state.md) —
+[`RUNTIME-157`](../archive/RUNTIME-157-extract-selection-readback-state.md) —
 Extract selection readback state out of Engine — retired on 2026-07-09 at
 maturity `Operational`. `Extrinsic.Runtime.SelectionReadback` now owns
 in-flight pick readback context retention, pending pick drain into
@@ -591,7 +602,7 @@ Focused selection/readback/refinement/layering coverage passed,
 `IntrinsicTests` built, and the default CPU-supported gate passed 3646/3646.
 
 Active
-[`RUNTIME-156`](RUNTIME-156-extract-runtime-module-schedule.md) —
+[`RUNTIME-156`](../archive/RUNTIME-156-extract-runtime-module-schedule.md) —
 Extract runtime-module schedule out of Engine — retired on 2026-07-09 at
 maturity `Operational`. `Extrinsic.Runtime.ModuleSchedule` now owns
 runtime-module sim-system/frame-hook records, deterministic dependency
@@ -603,7 +614,7 @@ Focused runtime-module and Engine-layering coverage passed, `IntrinsicTests`
 built, and the default CPU-supported gate passed 3644/3644.
 
 Active
-[`RUNTIME-155`](RUNTIME-155-extract-runtime-input-action-registry.md) —
+[`RUNTIME-155`](../archive/RUNTIME-155-extract-runtime-input-action-registry.md) —
 Extract runtime input-action registry out of Engine — retired on 2026-07-09 at
 maturity `Operational`. `Extrinsic.Runtime.InputActions` now owns the
 input-action descriptor/service/context/handle API, handle allocation,
@@ -616,7 +627,7 @@ dispatch helpers. Focused runtime input-action and Engine-layering coverage
 passed, and the default CPU-supported gate passed 3644/3644.
 
 Active
-[`RUNTIME-154`](RUNTIME-154-extract-reference-scene-control.md) — Extract
+[`RUNTIME-154`](../archive/RUNTIME-154-extract-reference-scene-control.md) — Extract
 reference-scene lifecycle control out of Engine — retired on 2026-07-09 at
 maturity `Operational`. `Extrinsic.Runtime.ReferenceSceneControl` now owns the
 reference-scene registry, provider registration/resolution, installed
@@ -629,7 +640,7 @@ reference-scene, Engine-layering, and runtime sandbox acceptance coverage
 passed, and the default CPU-supported gate passed 3644/3644.
 
 Active
-[`RUNTIME-153`](RUNTIME-153-extract-mesh-primitive-view-controls.md) — Extract
+[`RUNTIME-153`](../archive/RUNTIME-153-extract-mesh-primitive-view-controls.md) — Extract
 mesh primitive-view controls out of Engine — retired on 2026-07-09 at maturity
 `Operational`. `Extrinsic.Runtime.MeshPrimitiveViewControls` now owns the
 legacy `MeshPrimitiveViewSettings` compatibility translation to authoritative
@@ -640,7 +651,7 @@ types directly. Focused mesh primitive-view, scene lifecycle, and Engine-
 layering coverage passed, and the default CPU-supported gate passed 3644/3644.
 
 Active
-[`RUNTIME-152`](RUNTIME-152-extract-runtime-device-bootstrap.md) — Extract
+[`RUNTIME-152`](../archive/RUNTIME-152-extract-runtime-device-bootstrap.md) — Extract
 runtime device bootstrap out of Engine — retired on 2026-07-09 at maturity
 `Operational`. `Extrinsic.Runtime.DeviceBootstrap` now owns runtime
 device-selection policy, backend factory dispatch, Vulkan-requested breadcrumb
@@ -651,7 +662,7 @@ recording startup diagnostics, and wiring renderer-facing services. Focused
 device-selection, Vulkan breadcrumb, and Engine-layering coverage passed.
 
 Active
-[`PROC-014`](PROC-014-task-state-index-done-link-cleanup.md) — Task-state
+[`PROC-014`](../archive/PROC-014-task-state-index-done-link-cleanup.md) — Task-state
 index done-link cleanup — retired on 2026-07-07 at maturity `Retired`. The
 rendering and runtime backlog indexes now cite recently retired tasks from
 live current-state sections as plain code spans instead of direct links into
@@ -660,7 +671,7 @@ live current-state sections as plain code spans instead of direct links into
 changed.
 
 Active
-[`GRAPHICS-121`](GRAPHICS-121-vulkan-resource-sharing-async-compute.md) —
+[`GRAPHICS-121`](../archive/GRAPHICS-121-vulkan-resource-sharing-async-compute.md) —
 Vulkan resource sharing includes async compute — retired on 2026-07-07 at
 maturity `Operational`. The promoted Vulkan backend now creates buffers and
 images with every live render-graph submit queue family: graphics, async
@@ -674,7 +685,7 @@ intersection improved to the existing unrelated 270/272 state
 `ExtrinsicSandbox.FramePacingDiagnosticCapture`).
 
 Active
-[`UI-033`](UI-033-compositional-appearance-domain-windows.md) —
+[`UI-033`](../archive/UI-033-compositional-appearance-domain-windows.md) —
 Compositional Appearance domain windows — retired on 2026-07-07 at maturity
 `CPUContracted`. Sandbox editor `Appearance` windows now use selected-entity
 render-lane availability instead of exact provenance-domain matching, so
@@ -686,7 +697,7 @@ Processing and raw Properties windows remain exact-domain gated. Focused
 3596/3596.
 
 Active
-[`GRAPHICS-120`](GRAPHICS-120-framegraph-compiler-executor-efficiency.md) —
+[`GRAPHICS-120`](../archive/GRAPHICS-120-framegraph-compiler-executor-efficiency.md) —
 Framegraph compiler/executor efficiency and hygiene polish — retired on
 2026-07-06 at maturity `CPUContracted`. The framegraph now treats
 `TextureUsage::ColorAttachmentRead` as a read-only barrier state, keeps
@@ -703,7 +714,7 @@ caching, placed transient aliasing, and parallel command recording remain owned
 by `GRAPHICS-117`, `GRAPHICS-118`, and `GRAPHICS-119`.
 
 Active
-[`BUG-061`](BUG-061-texture-bake-gpu-gate-and-service-context.md) —
+[`BUG-061`](../archive/BUG-061-texture-bake-gpu-gate-and-service-context.md) —
 Texture bake UI misses service context and GPU availability gate — retired on
 2026-07-06 at maturity `CPUContracted`. Live sandbox editor contexts now pass
 `Engine::GetAssetService()` into `SandboxEditorContext`, so selected-mesh
@@ -716,7 +727,7 @@ SandboxEditorUi coverage locks the service/device wiring, operational-device
 success path, and non-operational refusal diagnostics.
 
 Active
-[`RUNTIME-144`](RUNTIME-144-post-import-processor-and-ux-policy-seam.md) —
+[`RUNTIME-144`](../archive/RUNTIME-144-post-import-processor-and-ux-policy-seam.md) —
 Post-import processor and import UX-policy seam — retired on 2026-07-06 at
 maturity `Operational`. `Runtime.Engine` now owns generic post-import
 processor, import-authoring, import-completed, input-action, and runtime GPU
@@ -731,7 +742,7 @@ behavior. GPU re-domaining of the generated-normal bake remains owned by
 `GRAPHICS-104`/`RUNTIME-129`.
 
 Active
-[`RUNTIME-141`](RUNTIME-141-async-editor-method-command-lane.md) — Async
+[`RUNTIME-141`](../archive/RUNTIME-141-async-editor-method-command-lane.md) — Async
 editor method-command lane — retired on 2026-07-05 at maturity `Operational`.
 The Sandbox editor CPU method buttons for K-Means, Progressive Poisson,
 mesh denoise/remesh/subdivide/simplify, ICP registration, mesh curvature,
@@ -748,7 +759,7 @@ by `RUNTIME-138`, and model/texture/scene-file IO remains owned by
 `RUNTIME-142`.
 
 Active
-[`UI-030`](UI-030-editor-frame-pacing-diagnostics.md) — Sandbox EditorUI
+[`UI-030`](../archive/UI-030-editor-frame-pacing-diagnostics.md) — Sandbox EditorUI
 frame-pacing diagnostics — retired on 2026-07-05 at maturity `Operational`.
 `Engine::RunFrame()` now publishes bounded phase timings, ImGui producer
 diagnostics include editor callback and draw-data copy timings, promoted Vulkan
@@ -764,7 +775,7 @@ warnings), now split to open `BUG-056` rather than folded into the diagnostic
 task.
 
 Backlog
-[`GRAPHICS-115`](GRAPHICS-115-object-space-normal-gpu-dilation.md) —
+[`GRAPHICS-115`](../archive/GRAPHICS-115-object-space-normal-gpu-dilation.md) —
 Object-space normal GPU dilation pass — retired on 2026-07-04 at maturity
 `Operational` on Vulkan-capable hosts and `CPUContracted` for backend-neutral
 planning/resource/command contracts. Padded generated-normal bakes now consume
@@ -778,7 +789,7 @@ missing or the backend is non-operational. Focused CPU/null contracts and the
 opt-in `ObjectSpaceNormalTextureBakeGpuSmoke` Vulkan smoke passed.
 
 Backlog
-[`BUG-055`](BUG-055-taskgraph-counterevent-latch-destruction-race.md) —
+[`BUG-055`](../archive/BUG-055-taskgraph-counterevent-latch-destruction-race.md) —
 TaskGraph::Execute / CounterEvent latch-destruction race — retired on
 2026-07-04 at maturity `CPUContracted`. `TaskGraph::Execute()` now keeps its
 parallel completion state alive through shared ownership by the waiting caller
@@ -792,7 +803,7 @@ focused `CoreTaskGraph` repeat gate passed 50/50 under the sanitizer-enabled
 is now unblocked for the future nonblocking submit/completion-token API.
 
 Active
-[`GEOM-057`](GEOM-057-fast-uv-atlas-charting-and-packing.md) — Fast UV atlas
+[`GEOM-057`](../archive/GEOM-057-fast-uv-atlas-charting-and-packing.md) — Fast UV atlas
 charting and packing replacement path — retired on 2026-07-03 at maturity
 `ParityProven`. `Geometry.UvAtlas` now defaults to the geometry-owned
 `FastStaged` backend with deterministic multi-face charting, per-chart solver
@@ -805,7 +816,7 @@ gated by machine-readable benchmark output. Removing xatlas itself remains a
 separate retirement decision.
 
 Active
-[`RUNTIME-125`](RUNTIME-125-aos-static-fast-lane.md) — Optional AoS fast lane
+[`RUNTIME-125`](../archive/RUNTIME-125-aos-static-fast-lane.md) — Optional AoS fast lane
 for static geometry — retired on 2026-07-02 at maturity `CPUContracted`. The
 slice added the PR-fast SoA/interleaved probe benchmark and the planning-only
 storage-lane plus static-to-dynamic promotion contracts, without changing the
@@ -814,7 +825,7 @@ promote-on-edit behavior, and Vulkan parity evidence are split to open follow-up
 `RUNTIME-139`.
 
 Active
-[`METHOD-013`](METHOD-013-progressive-poisson-disk-gpu-backend.md) —
+[`METHOD-013`](../archive/METHOD-013-progressive-poisson-disk-gpu-backend.md) —
 Progressive Poisson-disk sampling: GPU backend contract slices — retired on
 2026-07-02 at maturity `CPUContracted`. The runtime seam now has backend
 selection/fallback telemetry, Vulkan planning and shader assets, recordable
@@ -824,7 +835,7 @@ and CPU-reference parity diagnostics. Public GPU result return,
 follow-up `METHOD-014`.
 
 Active
-[`GRAPHICS-104`](GRAPHICS-104-gpu-object-space-normal-texture-bake.md) —
+[`GRAPHICS-104`](../archive/GRAPHICS-104-gpu-object-space-normal-texture-bake.md) —
 GPU Object-Space Normal Texture Bake — retired on 2026-07-02 at maturity
 `CPUContracted`. The graphics-owned zero-padding raster-bake plan/recording,
 object-space-normal shader/material contract, GPU-produced cache texture
@@ -834,7 +845,7 @@ which is now retired; engine/import render-thread scheduling and material swaps
 remain owned by `RUNTIME-129`.
 
 Backlog
-[`GRAPHICS-110`](GRAPHICS-110-imgui-upload-buffer-in-flight-safety.md) —
+[`GRAPHICS-110`](../archive/GRAPHICS-110-imgui-upload-buffer-in-flight-safety.md) —
 Per-frame/ring ImGui upload buffers for in-flight safety — retired on
 2026-07-02 at maturity `Operational`. The ImGui, transient-debug, and
 visualization-overlay upload helpers now partition host-visible upload storage
@@ -845,60 +856,60 @@ Vulkan-capable host. Retained overlay copy/upload reduction is retired by
 follow-up `GRAPHICS-114`.
 
 Backlog
-[`LEGACY-012`](LEGACY-012-migrate-legacy-consumer-tests.md) — Migrate legacy
+[`LEGACY-012`](../archive/LEGACY-012-migrate-legacy-consumer-tests.md) — Migrate legacy
 consumer tests to promoted coverage — retired on 2026-07-01 at maturity
 `Retired`. The remaining bare legacy test consumers were removed from the
 configured test graph or were already represented by promoted coverage. This
 made the subtree deletion gates mechanical rather than feature-blocked.
 
 Backlog
-[`LEGACY-010`](LEGACY-010-delete-src-legacy-runtime.md) — Delete
+[`LEGACY-010`](../archive/LEGACY-010-delete-src-legacy-runtime.md) — Delete
 `src/legacy/Runtime/` — retired on 2026-07-01 at maturity `Retired`. Runtime
 was deleted first in the final sweep because no other legacy subtree depended on
 it. CMake legacy runtime wiring and legacy allowlist rows are gone.
 
 Backlog
-[`LEGACY-008`](LEGACY-008-delete-src-legacy-graphics.md) — Delete
+[`LEGACY-008`](../archive/LEGACY-008-delete-src-legacy-graphics.md) — Delete
 `src/legacy/Graphics/` — retired on 2026-07-01 at maturity `Retired`. Graphics
 was deleted after Runtime so its legacy-internal consumers were gone before the
 Interface/ECS/Asset/RHI/Core removals. The promoted `src/graphics/*` surfaces
 remain the only graphics implementation roots.
 
 Backlog
-[`LEGACY-001`](LEGACY-001-delete-src-legacy-interface.md) — Delete
+[`LEGACY-001`](../archive/LEGACY-001-delete-src-legacy-interface.md) — Delete
 `src/legacy/Interface/` — retired on 2026-07-01 at maturity `Retired`. The
 Interface subtree was removed after Runtime and Graphics no longer consumed it;
 `Interface::GUI` remains a retired non-promoted endpoint.
 
 Backlog
-[`LEGACY-006`](LEGACY-006-delete-src-legacy-ecs.md) — Delete `src/legacy/ECS/`
+[`LEGACY-006`](../archive/LEGACY-006-delete-src-legacy-ecs.md) — Delete `src/legacy/ECS/`
 — retired on 2026-07-01 at maturity `Retired`. The ECS legacy subtree was
 removed after Runtime and Graphics, leaving `Extrinsic.ECS.*` as the ECS module
 surface.
 
 Backlog
-[`LEGACY-004`](LEGACY-004-delete-src-legacy-asset.md) — Delete
+[`LEGACY-004`](../archive/LEGACY-004-delete-src-legacy-asset.md) — Delete
 `src/legacy/Asset/` — retired on 2026-07-01 at maturity `Retired`. The Asset
 legacy subtree was removed after its legacy Runtime/Graphics consumers were
 gone; promoted `Extrinsic.Asset.*` plus runtime handoff seams own the retained
 asset behavior.
 
 Backlog
-[`LEGACY-009`](LEGACY-009-delete-src-legacy-rhi.md) — Delete `src/legacy/RHI/`
+[`LEGACY-009`](../archive/LEGACY-009-delete-src-legacy-rhi.md) — Delete `src/legacy/RHI/`
 — retired on 2026-07-01 at maturity `Retired`. RHI was removed after Runtime,
 Graphics, Interface, ECS, and Asset no longer consumed it; promoted
 `Extrinsic.RHI.*` and `Extrinsic.Backends.Vulkan` own the retained RHI/backend
 surface.
 
 Backlog
-[`LEGACY-005`](LEGACY-005-delete-src-legacy-core.md) — Delete
+[`LEGACY-005`](../archive/LEGACY-005-delete-src-legacy-core.md) — Delete
 `src/legacy/Core/` — retired on 2026-07-01 at maturity `Retired`. Core was
 removed last after all consumer subtrees and legacy test consumers were gone.
 The generated module inventory now contains promoted modules only, and the
 layering allowlist is empty.
 
 Active
-[`RUNTIME-134`](RUNTIME-134-progressive-poisson-interactive-playground.md) —
+[`RUNTIME-134`](../archive/RUNTIME-134-progressive-poisson-interactive-playground.md) —
 Interactive progressive-Poisson sampling playground in the Sandbox — retired on
 2026-06-30 at maturity `CPUContracted`. The Sandbox now exposes METHOD-012 over
 selected point-cloud and mesh inputs, including GEOM-035 mesh surface sampling,
@@ -912,7 +923,7 @@ GPU backend/parity remains blocked by `GRAPHICS-108` and is owned by
 `METHOD-013`; future Sandbox backend-toggle UI is tracked by `RUNTIME-136`.
 
 Active
-[`PROC-013`](PROC-013-graphify-knowledge-graph-discovery-aid.md) —
+[`PROC-013`](../archive/PROC-013-graphify-knowledge-graph-discovery-aid.md) —
 Knowledge-graph discovery aid (graphify adapters + shared setup) — retired on
 2026-06-29 at maturity `Scaffolded`. The optional graphify discovery path now
 builds a deterministic module DAG plus paper/method/code graph from repository
@@ -924,7 +935,7 @@ smoke, and fixture adapter tests remain deferred until the graph becomes
 load-bearing.
 
 Active
-[`GEOM-053`](GEOM-053-geometry-reuse-deterministic-sampling.md) — Geometry
+[`GEOM-053`](../archive/GEOM-053-geometry-reuse-deterministic-sampling.md) — Geometry
 reuse and deterministic sampling cleanup — retired on 2026-06-29 at maturity
 `CPUContracted`. `Geometry.Random` now owns the shared deterministic seed-mixing
 and Gaussian displacement helper used by graph and point-cloud utilities,
@@ -936,7 +947,7 @@ mesh conversion, normal-estimation, and domain-view adoption remain deferred to
 dedicated compatibility or algorithm slices.
 
 Active
-[`GRAPHICS-107`](GRAPHICS-107-reconcile-framerecipe-renderrecipe-vocabulary.md) —
+[`GRAPHICS-107`](../archive/GRAPHICS-107-reconcile-framerecipe-renderrecipe-vocabulary.md) —
 Reconcile the FrameRecipe vs RenderRecipe vocabularies — retired on 2026-06-28
 at maturity `CPUContracted`. Renderer docs and the canonical frame-graph
 architecture doc now identify `FrameRecipe*` as the live per-frame driver,
@@ -948,7 +959,7 @@ rejection, and fixed-core mutation/disable rollback without adding new contract
 vocabulary or arbitrary pass-graph injection.
 
 Backlog
-[`DOCS-004`](DOCS-004-frame-graph-doc-recipe-config-lane.md) — Promote
+[`DOCS-004`](../archive/DOCS-004-frame-graph-doc-recipe-config-lane.md) — Promote
 frame-graph.md from stub and document the recipe-config lane — retired on
 2026-06-28 as a docs-only synchronization task. `docs/architecture/frame-graph.md`
 now documents `FrameRecipe*` as the live per-frame composition driver,
@@ -959,7 +970,7 @@ binding/output changes. The legacy-background `rendering-three-pass.md` remains
 context only.
 
 Backlog
-[`GEOIO-003`](GEOIO-003-mesh-pointcloud-io-breadth.md) — Mesh and point-cloud
+[`GEOIO-003`](../archive/GEOIO-003-mesh-pointcloud-io-breadth.md) — Mesh and point-cloud
 IO breadth — retired on 2026-06-28 at maturity `CPUContracted`.
 `Geometry::MeshIO::WriteOFF` now provides deterministic ASCII OFF export with
 round-trip, determinism, invalid-topology, bad-path, and non-finite fail-closed
@@ -970,7 +981,7 @@ supported layouts. This is module-level geometry coverage; runtime/assets route
 widening was intentionally left out of scope.
 
 Backlog
-[`UI-026`](UI-026-editor-curvature-analysis-window.md) — Sandbox EditorUI
+[`UI-026`](../archive/UI-026-editor-curvature-analysis-window.md) — Sandbox EditorUI
 curvature analysis window and principal-direction field — retired on
 2026-06-28 at maturity `CPUContracted`. `Mesh > Processing > Curvature` now
 routes through a runtime-owned command/result surface that builds a scratch
@@ -985,7 +996,7 @@ principal-direction vector-field packets when direction properties are present,
 falling back to scalar-only diagnostics for absent or invalid direction data.
 
 Backlog
-[`GEOM-034`](GEOM-034-geometry-property-api-doc-audit.md) — Geometry property
+[`GEOM-034`](../archive/GEOM-034-geometry-property-api-doc-audit.md) — Geometry property
 API documentation audit — retired on 2026-06-28 at maturity `Scaffolded`
 (documentation synchronization endpoint). The audit made
 `docs/architecture/geometry-api-style.md` the coherent source for property
@@ -995,7 +1006,7 @@ wording in `rendering-target-architecture.md` with links to the current
 geometry-owned property/domain-view contracts.
 
 Backlog
-[`GEOM-042`](GEOM-042-mesh-normal-bilateral-denoiser.md) — Mesh normal-based
+[`GEOM-042`](../archive/GEOM-042-mesh-normal-bilateral-denoiser.md) — Mesh normal-based
 bilateral denoiser — retired on 2026-06-28 at maturity `CPUContracted`.
 `Geometry::Smoothing` now exports the two-stage bilateral mesh denoiser with
 face-normal filtering, normal-projection vertex updates, deterministic
@@ -1004,7 +1015,7 @@ non-finite, and invalid-parameter inputs. The default CPU gate passed after the
 landed implementation, unblocking `UI-024`.
 
 Backlog
-[`GEOM-041`](GEOM-041-fem-laplacian-mass-stiffness-variants.md) — FEM
+[`GEOM-041`](../archive/GEOM-041-fem-laplacian-mass-stiffness-variants.md) — FEM
 Laplacian mass/stiffness variants and edge-weight modes — retired on
 2026-06-28 at maturity `CPUContracted`. DEC assembly now has Graph, Fujiwara,
 and ModifiedNormal stiffness modes plus Sum, Barycentric, Voronoi, and
@@ -1012,7 +1023,7 @@ Galerkin mass modes, with `ClampedHalfedgeCotan` in mesh utilities and
 row-sum/symmetry/SPD/fail-closed tests.
 
 Backlog
-[`GEOM-040`](GEOM-040-curvature-tensor-principal-directions.md) — Mesh
+[`GEOM-040`](../archive/GEOM-040-curvature-tensor-principal-directions.md) — Mesh
 curvature tensor and principal directions — retired on 2026-06-28 at maturity
 `CPUContracted`. `Geometry.Curvature` publishes `v:principal_dir1` and
 `v:principal_dir2`, exposes `ComputeCurvatureTensor`, and reuses exported
@@ -1020,7 +1031,7 @@ curvature tensor and principal directions — retired on 2026-06-28 at maturity
 default CPU gate passed. This unblocks `UI-026`.
 
 Active
-[`RUNTIME-128`](RUNTIME-128-default-lit-material-for-materialless-imports.md)
+[`RUNTIME-128`](../archive/RUNTIME-128-default-lit-material-for-materialless-imports.md)
 — Default lit material for material-less imported primitives — retired on
 2026-06-28 at maturity `CPUContracted`. Runtime model-scene materialization now
 binds material-less primitives to a lazily created neutral lit StandardPBR
@@ -1029,7 +1040,7 @@ indicator. The regression is covered by the runtime handoff contract test and
 the default CPU gate.
 
 Active
-[`METHOD-012`](METHOD-012-progressive-poisson-disk-cpu-reference.md) —
+[`METHOD-012`](../archive/METHOD-012-progressive-poisson-disk-cpu-reference.md) —
 Progressive Poisson-disk sampling: paper intake + CPU reference backend —
 retired on 2026-06-28 at maturity `CPUContracted`. The method package now has
 a deterministic CPU reference backend, manifest, docs, correctness tests, and a
@@ -1037,7 +1048,7 @@ smoke benchmark with quality metrics. Method and benchmark manifests validate,
 and the default CPU gate passed, unblocking `METHOD-013` and `RUNTIME-134`.
 
 Backlog
-[`PROC-012`](PROC-012-resolve-duplicate-geom-027-id.md) — Resolve duplicate
+[`PROC-012`](../archive/PROC-012-resolve-duplicate-geom-027-id.md) — Resolve duplicate
 `GEOM-027` task ID — retired on 2026-06-27 at maturity `Retired`. Two files
 declared `id: GEOM-027`: the canonical property-name-lifetime contract (depended
 on by `GEOM-033`/`GEOM-034`) and an unrelated research-control-surface /
@@ -1048,7 +1059,7 @@ title, and every inbound reference in `tasks/backlog/README.md`, `PROC-010`,
 so its dependency graph is intact. `tools/agents/check_task_policy.py --root .
 --strict` now reports 0 findings (was 1), and `check_doc_links.py` reports no
 broken links.
-[`BUG-046`](BUG-046-flaky-coretaskgraph-mainthread-ready-queue-ordering.md) —
+[`BUG-046`](../archive/BUG-046-flaky-coretaskgraph-mainthread-ready-queue-ordering.md) —
 Flaky `CoreTaskGraph.MainThreadReadyQueueUsesPriorityAndCostOrdering` — retired
 on 2026-06-24 at maturity `CPUContracted`. `TaskGraph::Execute()` now collects
 newly-ready successors into a batch and publishes all main-thread-ready entries
@@ -1058,7 +1069,7 @@ uses the fixed `40ms` sleep and the focused repeat run plus default CPU gate
 passed.
 
 Backlog
-[`BUG-049`](BUG-049-gpuworld-geometry-rebind-upload-barriers.md) — GpuWorld
+[`BUG-049`](../archive/BUG-049-gpuworld-geometry-rebind-upload-barriers.md) — GpuWorld
 geometry rebind lacks upload-to-read barriers — retired from stale backlog on
 2026-06-22 at maturity `CPUContracted`; implementation landed in `843e4fb3`.
 The audit confirmed `GpuWorld` tracks one-shot pending upload barriers for
@@ -1068,7 +1079,7 @@ still passes. The task was already complete but remained listed under active
 bugs.
 
 Backlog
-[`BUG-048`](BUG-048-direct-mesh-postprocess-overwrites-recomputed-normals.md) —
+[`BUG-048`](../archive/BUG-048-direct-mesh-postprocess-overwrites-recomputed-normals.md) —
 Direct mesh post-process overwrites recomputed normals — retired from stale
 backlog on 2026-06-22 at maturity `CPUContracted`; implementation landed in
 `843e4fb3`. The audit confirmed direct mesh post-process apply preserves
@@ -1077,7 +1088,7 @@ deferred materialization, while generated normal texture registration remains
 intact. Focused sandbox editor normal recompute regressions still pass.
 
 Backlog
-[`BUG-047`](BUG-047-surface-normal-texture-overrides-vertex-normals.md) —
+[`BUG-047`](../archive/BUG-047-surface-normal-texture-overrides-vertex-normals.md) —
 Surface normal texture overrides vertex-normal shading — retired from stale
 backlog on 2026-06-22 at maturity `CPUContracted`; implementation landed in
 `843e4fb3`. The audit confirmed promoted forward/GBuffer shader contracts use
@@ -1086,7 +1097,7 @@ packed vertex normals for current surface shading and assert absence of
 out of scope for this temporary attribute-normal policy.
 
 Active
-[`BUG-051`](BUG-051-mesh-color-visualization-property-buffer.md) — Mesh color
+[`BUG-051`](../archive/BUG-051-mesh-color-visualization-property-buffer.md) — Mesh color
 visualization lacks automatic property-buffer extraction — retired on
 2026-06-22 at maturity `CPUContracted`. Runtime render extraction now
 auto-emits mesh `glm::vec4` color property-buffer packets from mesh
@@ -1099,7 +1110,7 @@ lookup uses the configured vertex/face/edge domain. The structural vertex-color
 stream and GPU SoA migration remain owned by RUNTIME-121/RUNTIME-122.
 
 Active
-[`BUG-050`](BUG-050-direct-mesh-first-upload-normals.md) — Direct mesh first
+[`BUG-050`](../archive/BUG-050-direct-mesh-first-upload-normals.md) — Direct mesh first
 upload lacks computed normals — retired on 2026-06-22 at maturity
 `CPUContracted`. The geometry-only runtime mesh materialization helper now
 writes explicit or deterministic area-weighted fallback `v:normal` values
@@ -1111,7 +1122,7 @@ and generated normal texture bindings remain data-only until the promoted
 texture path consumes them.
 
 Active
-[`PROC-009`](PROC-009-import-productivity-skills.md) — Import productivity
+[`PROC-009`](../archive/PROC-009-import-productivity-skills.md) — Import productivity
 skills into repo skill surface — retired on 2026-06-22. The repo-local skill
 surface now includes the third-party `teach`, `grilling`, and `grill-me`
 productivity skills imported from `mattpocock/skills` commit
@@ -1126,7 +1137,7 @@ the IntrinsicEngine repo root without an explicit workspace. The existing
 mirrors and passed after the import.
 
 Active
-[`GRAPHICS-098`](GRAPHICS-098-gpu-transfer-facade.md) — High-level
+[`GRAPHICS-098`](../archive/GRAPHICS-098-gpu-transfer-facade.md) — High-level
 `GpuTransfer` facade with correct barrier brackets — retired on 2026-06-22 at
 maturity `Operational` on Vulkan-capable hosts (`CPUContracted` elsewhere).
 `Extrinsic.Graphics.GpuTransfer` now composes existing RHI seams without adding
@@ -1142,7 +1153,7 @@ upload/readback round-trip through the facade without `WaitIdle`. Runtime-owned
 GPU readback jobs and property write-back remain tracked by `RUNTIME-126`.
 
 Active
-[`GRAPHICS-097`](GRAPHICS-097-async-texture-readback.md) — Async GPU-to-CPU
+[`GRAPHICS-097`](../archive/GRAPHICS-097-async-texture-readback.md) — Async GPU-to-CPU
 texture readback through the readback ring on `ITransferQueue` — retired on
 2026-06-22 at maturity `Operational` on Vulkan-capable hosts
 (`CPUContracted` elsewhere). `Extrinsic.RHI.TransferQueue` now exposes
@@ -1163,7 +1174,7 @@ barrier, mip/layer readback, and caller-owned transition back without using
 `WaitIdle`. High-level barrier/facade ergonomics remain owned by GRAPHICS-098.
 
 Active
-[`GRAPHICS-096`](GRAPHICS-096-async-buffer-readback-ring.md) — Async GPU-to-CPU
+[`GRAPHICS-096`](../archive/GRAPHICS-096-async-buffer-readback-ring.md) — Async GPU-to-CPU
 buffer readback ring on `ITransferQueue` — retired on 2026-06-22 at maturity
 `Operational` on Vulkan-capable hosts (`CPUContracted` elsewhere).
 `Extrinsic.RHI.TransferQueue` now exposes `ReadbackToken`, `ReadbackSink`,
@@ -1181,7 +1192,7 @@ Texture readback remains owned by GRAPHICS-097, and high-level barrier/facade
 ergonomics remain owned by GRAPHICS-098.
 
 Active
-[`GRAPHICS-095`](GRAPHICS-095-buffer-transfer-math-helper.md) — CPU-testable
+[`GRAPHICS-095`](../archive/GRAPHICS-095-buffer-transfer-math-helper.md) — CPU-testable
 buffer transfer math and validation helper — retired on 2026-06-22 at maturity
 `CPUContracted`. `Extrinsic.RHI.BufferTransfer` now provides CPU-pure buffer
 sub-range validation, non-power-of-two alignment helpers, destination dirty
@@ -1194,7 +1205,7 @@ GPU readback/upload use remains owned by GRAPHICS-096, GRAPHICS-098, and
 RUNTIME-126.
 
 Active
-[`UI-020`](UI-020-visualization-lane-uniform-color.md) — Visualization lane
+[`UI-020`](../archive/UI-020-visualization-lane-uniform-color.md) — Visualization lane
 uniform color controls — retired on 2026-06-19 at maturity `CPUContracted`.
 The sandbox visualization command/model seam now distinguishes the selected
 entity's default visualization config from optional surface, edge, and point
@@ -1210,7 +1221,7 @@ CPU/null contract tests across `SandboxEditorUi`,
 `RuntimeSceneSerialization`.
 
 Active
-[`UI-019`](UI-019-visualization-uniform-color-edit.md) — Visualization uniform
+[`UI-019`](../archive/UI-019-visualization-uniform-color-edit.md) — Visualization uniform
 color edit widget — retired on 2026-06-19 at maturity `CPUContracted`. Mesh,
 graph, point-cloud, and top-level geometry visualization UI windows now expose
 an ImGui `ColorEdit4` control when the selected entity's
@@ -1222,7 +1233,7 @@ asset ownership to UI. Focused evidence passed the
 contract tests.
 
 Backlog
-[`GRAPHICS-089`](GRAPHICS-089-generated-uv-texture-sampling-vulkan-smoke.md) —
+[`GRAPHICS-089`](../archive/GRAPHICS-089-generated-uv-texture-sampling-vulkan-smoke.md) —
 Generated-UV texture sampling Vulkan smoke — retired on 2026-06-19 at maturity
 `Operational` on Vulkan-capable hosts. The opt-in runtime sandbox
 `gpu;vulkan` smoke now imports an OBJ that omitted authored `vt` coordinates,
@@ -1236,7 +1247,7 @@ shader-side UV fabrication. Final evidence passed `ci-vulkan` configure,
 `gpu;vulkan` CTest, and the default CPU-supported CTest gate.
 
 Backlog
-[`GRAPHICS-091`](GRAPHICS-091-unify-scalar-colormap-across-surface-line-point.md) —
+[`GRAPHICS-091`](../archive/GRAPHICS-091-unify-scalar-colormap-across-surface-line-point.md) —
 Unify scalar-field / colormap visualization across surface, line, and point
 passes — retired on 2026-06-19 at maturity `Operational` on Vulkan-capable
 hosts (`CPUContracted` elsewhere). Promoted surface, line, and point shaders now
@@ -1249,7 +1260,7 @@ the forward/deferred surface pipeline survival checks plus the shared helper
 shader check.
 
 Previously-active
-[`RUNTIME-116`](RUNTIME-116-focus-camera-on-selection-command.md) —
+[`RUNTIME-116`](../archive/RUNTIME-116-focus-camera-on-selection-command.md) —
 Focus-camera-on-selection command (F key) — retired on 2026-06-19 at maturity
 `CPUContracted`. Runtime now owns `Extrinsic.Runtime.CameraFocusCommand`, a
 deterministic command surface that aggregates selected entities' refreshed
@@ -1264,7 +1275,7 @@ follow-up is owed; the thin key binding composes already-operational input and
 camera-controller paths, and the reusable command closes at `CPUContracted`.
 
 Backlog
-[`GRAPHICS-092`](GRAPHICS-092-group-per-domain-params-and-line-width-residency.md) —
+[`GRAPHICS-092`](../archive/GRAPHICS-092-group-per-domain-params-and-line-width-residency.md) —
 Group per-domain params in `GpuEntityConfig` and add line-width residency —
 retired on 2026-06-18 at maturity `Operational` on Vulkan-capable hosts
 (`CPUContracted` elsewhere). `GpuEntityConfig` now groups point and line
@@ -1278,7 +1289,7 @@ edge/point draw lanes remain emitted, and samples the default-recipe
 backbuffer for the configured line overlay.
 
 Backlog
-[`GRAPHICS-094`](GRAPHICS-094-retained-point-size-bda-consumption.md) —
+[`GRAPHICS-094`](../archive/GRAPHICS-094-retained-point-size-bda-consumption.md) —
 Consume per-point size BDA in retained point shader — retired on 2026-06-18
 at maturity `CPUContracted`. The retained forward point shader now resolves
 pixel size from `GpuEntityConfig::Point.PointSizeBDA[sourceVertexIndex]` when
@@ -1290,7 +1301,7 @@ required `Operational` follow-up unless future visual point-size readback smoke
 coverage is explicitly opened.
 
 Backlog
-[`LEGACY-042`](LEGACY-042-retire-legacy-asset-pipeline-test.md) — Retire
+[`LEGACY-042`](../archive/LEGACY-042-retire-legacy-asset-pipeline-test.md) — Retire
 legacy Asset.Pipeline test — retired on 2026-06-18 at maturity
 `CPUContracted`. Legacy `tests/unit/assets/Test_AssetPipeline.cpp` and the
 dedicated `IntrinsicRuntimeTests.AssetPipelineHeadlessGrouped` CTest were
@@ -1306,7 +1317,7 @@ consumers and 83 legacy-internal consumers; `LEGACY-012` owns the remaining
 test cleanup.
 
 Backlog
-[`LEGACY-041`](LEGACY-041-retire-legacy-asset-manager-core-test.md) — Retire
+[`LEGACY-041`](../archive/LEGACY-041-retire-legacy-asset-manager-core-test.md) — Retire
 legacy Asset.Manager core test — retired on 2026-06-18 at maturity
 `CPUContracted`. Legacy `tests/unit/assets/Test_CoreAssets.cpp` was removed
 because it verified the old `Core::Assets::AssetManager`
@@ -1323,7 +1334,7 @@ remains blocked by 15 remaining test consumers and 83 legacy-internal
 consumers; `LEGACY-012` owns the remaining test cleanup.
 
 Backlog
-[`LEGACY-040`](LEGACY-040-retire-legacy-asset-manager-safety-test.md) —
+[`LEGACY-040`](../archive/LEGACY-040-retire-legacy-asset-manager-safety-test.md) —
 Retire legacy Asset.Manager safety test — retired on 2026-06-18 at maturity
 `CPUContracted`. Legacy `tests/unit/assets/Test_CoreAssetSafety.cpp` was
 removed because it verified the old `Core::Assets::AssetManager`
@@ -1339,7 +1350,7 @@ by 20 remaining test consumers and 133 legacy-internal consumers; `LEGACY-012`
 owns the remaining test cleanup.
 
 Backlog
-[`LEGACY-039`](LEGACY-039-retire-legacy-element-selection-test.md) — Retire
+[`LEGACY-039`](../archive/LEGACY-039-retire-legacy-element-selection-test.md) — Retire
 legacy element-selection test — retired on 2026-06-18 at maturity
 `CPUContracted`. Legacy
 `tests/integration/runtime/Test_ElementSelection.cpp` was removed because the
@@ -1352,7 +1363,7 @@ blocked by 11 remaining test consumers; `LEGACY-012` owns the remaining test
 cleanup.
 
 Backlog
-[`LEGACY-038`](LEGACY-038-retire-runtime-selection-modes-test.md) — Retire
+[`LEGACY-038`](../archive/LEGACY-038-retire-runtime-selection-modes-test.md) — Retire
 legacy runtime selection modes test — retired on 2026-06-18 at maturity
 `CPUContracted`. Legacy
 `tests/contract/runtime/Test.RuntimeSelectionModes.cpp` was removed after the
@@ -1365,7 +1376,7 @@ and 37 legacy-internal consumers; `LEGACY-010` remains blocked by 12 remaining
 test consumers; `LEGACY-012` owns the remaining test cleanup.
 
 Backlog
-[`LEGACY-037`](LEGACY-037-retire-legacy-asset-ingest-service-test.md) —
+[`LEGACY-037`](../archive/LEGACY-037-retire-legacy-asset-ingest-service-test.md) —
 Retire legacy AssetIngestService test — retired on 2026-06-18 at maturity
 `CPUContracted`. Legacy
 `tests/unit/assets/Test_AssetIngestService.cpp` was removed instead of migrated
@@ -1382,7 +1393,7 @@ consumers and 83 legacy-internal consumers; `LEGACY-010` remains blocked by 13
 remaining test consumers; `LEGACY-012` owns the remaining test cleanup.
 
 Backlog
-[`LEGACY-036`](LEGACY-036-retire-legacy-event-bus-test.md) — Retire legacy
+[`LEGACY-036`](../archive/LEGACY-036-retire-legacy-event-bus-test.md) — Retire legacy
 EventBus test — retired on 2026-06-18 at maturity `CPUContracted`. Legacy
 `tests/unit/core/Test_EventBus.cpp` was removed instead of migrated because the
 promoted ECS layer owns CPU-only event payloads, not the old
@@ -1395,7 +1406,7 @@ blocked by 14 remaining test consumers; `LEGACY-012` owns the remaining test
 cleanup.
 
 Backlog
-[`LEGACY-035`](LEGACY-035-resolve-legacy-rhi-deferred-destruction-tests.md) —
+[`LEGACY-035`](../archive/LEGACY-035-resolve-legacy-rhi-deferred-destruction-tests.md) —
 Resolve legacy RHI deferred-destruction tests — retired on 2026-06-18 at
 maturity `CPUContracted`. The Vulkan `SafeDestroy*` cases split out of the
 legacy runtime maintenance-lane test were retired as legacy RHI implementation
@@ -1406,7 +1417,7 @@ remains blocked by 17 test consumers and 83 legacy-internal consumers; no new
 legacy RHI test consumer was added.
 
 Backlog
-[`LEGACY-034`](LEGACY-034-resolve-runtime-frame-loop-maintenance-tests.md) —
+[`LEGACY-034`](../archive/LEGACY-034-resolve-runtime-frame-loop-maintenance-tests.md) —
 Resolve legacy runtime frame-loop and maintenance tests — retired on 2026-06-18
 at maturity `CPUContracted`. Legacy
 `tests/unit/runtime/Test_RuntimeFrameLoop.cpp` and
@@ -1423,7 +1434,7 @@ consumers and 83 legacy-internal consumers; `LEGACY-010` remains blocked by 15
 remaining test consumers; `LEGACY-012` owns the remaining test cleanup.
 
 Backlog
-[`LEGACY-033`](LEGACY-033-retire-runtime-engine-config-test.md) — Retire legacy
+[`LEGACY-033`](../archive/LEGACY-033-retire-runtime-engine-config-test.md) — Retire legacy
 RuntimeEngineConfig test — retired on 2026-06-18 at maturity `CPUContracted`.
 Legacy `tests/unit/runtime/Test_RuntimeEngineConfig.cpp` coverage was removed
 instead of migrated because its `Runtime::EngineConfig` scalar validation fields
@@ -1433,7 +1444,7 @@ covered by promoted core/runtime tests. `LEGACY-010` remains blocked by 17
 remaining test consumers; `LEGACY-012` owns the remaining test cleanup.
 
 Backlog
-[`LEGACY-032`](LEGACY-032-resolve-runtime-system-bundles-test.md) — Resolve
+[`LEGACY-032`](../archive/LEGACY-032-resolve-runtime-system-bundles-test.md) — Resolve
 legacy `Runtime.SystemBundles` test migration — retired on 2026-06-18 at
 maturity `CPUContracted`. Legacy
 `tests/unit/runtime/Test_RuntimeSystemBundles.cpp` coverage was removed instead
@@ -1447,7 +1458,7 @@ consumers and 37 legacy-internal consumers; `LEGACY-010` remains blocked by 18
 remaining test consumers; `LEGACY-012` owns the remaining test cleanup.
 
 Backlog
-[`LEGACY-031`](LEGACY-031-retire-ecs-framegraph-systems-test.md) — Retire
+[`LEGACY-031`](../archive/LEGACY-031-retire-ecs-framegraph-systems-test.md) — Retire
 legacy ECS frame-graph systems test — retired on 2026-06-18 at maturity
 `CPUContracted`. Legacy `tests/unit/ecs/Test_FrameGraphSystems.cpp` coverage was
 removed instead of migrated because promoted ECS transform hierarchy, bounds
@@ -1459,7 +1470,7 @@ remains blocked by 23 remaining test consumers and 37 legacy-internal
 consumers; `LEGACY-012` owns the remaining test cleanup.
 
 Backlog
-[`LEGACY-030`](LEGACY-030-retire-ecs-entity-commands-test.md) — Retire legacy
+[`LEGACY-030`](../archive/LEGACY-030-retire-ecs-entity-commands-test.md) — Retire legacy
 ECS entity-command test — retired on 2026-06-18 at maturity `CPUContracted`.
 Duplicate legacy `tests/unit/ecs/Test_EntityCommands.cpp` coverage was removed
 instead of migrated because promoted `Extrinsic.Runtime.EditorCommandHistory`
@@ -1471,7 +1482,7 @@ consumers and 37 legacy-internal consumers; `LEGACY-012` owns the remaining
 test cleanup.
 
 Backlog
-[`LEGACY-029`](LEGACY-029-retire-core-benchmark-test.md) — Retire legacy
+[`LEGACY-029`](../archive/LEGACY-029-retire-core-benchmark-test.md) — Retire legacy
 Core.Benchmark test — retired on 2026-06-18 at maturity `CPUContracted`.
 Legacy-only `tests/benchmark/Test_Benchmark.cpp` coverage for
 `Core.Benchmark::BenchmarkRunner` was removed rather than promoted; its retained
@@ -1482,7 +1493,7 @@ remaining test consumers and 133 legacy-internal consumers; `LEGACY-012` owns
 the remaining test cleanup.
 
 Backlog
-[`LEGACY-028`](LEGACY-028-architecture-slo-test-promoted.md) — Migrate
+[`LEGACY-028`](../archive/LEGACY-028-architecture-slo-test-promoted.md) — Migrate
 ArchitectureSLO test to promoted Core — retired on 2026-06-18 at maturity
 `CPUContracted`. The benchmark/SLO test now imports promoted
 `Extrinsic.Core.FrameGraph`, `Extrinsic.Core.Tasks`, and
@@ -1493,7 +1504,7 @@ remaining test consumers and 133 legacy-internal consumers; `LEGACY-012` owns
 the remaining test cleanup.
 
 Backlog
-[`LEGACY-027`](LEGACY-027-core-memory-test-promoted.md) — Migrate CoreMemory
+[`LEGACY-027`](../archive/LEGACY-027-core-memory-test-promoted.md) — Migrate CoreMemory
 test to promoted Core — retired on 2026-06-18 at maturity `CPUContracted`.
 Retained memory allocator coverage from
 `tests/unit/core/Test_CoreMemory.cpp` now imports promoted
@@ -1506,7 +1517,7 @@ and 133 legacy-internal consumers; `LEGACY-012` owns the remaining test
 cleanup.
 
 Backlog
-[`LEGACY-026`](LEGACY-026-retire-core-dagscheduler-test.md) — Retire legacy
+[`LEGACY-026`](../archive/LEGACY-026-retire-core-dagscheduler-test.md) — Retire legacy
 Core.DAGScheduler test — retired on 2026-06-18 at maturity `CPUContracted`.
 `tests/unit/core/Test_DAGScheduler.cpp` was removed because it only exercised
 the old `Core::DAGScheduler` compatibility API; promoted
@@ -1518,7 +1529,7 @@ remaining test consumers and 133 legacy-internal consumers; `LEGACY-012` owns
 the remaining test cleanup.
 
 Backlog
-[`LEGACY-025`](LEGACY-025-retire-core-inplace-function-test.md) — Retire
+[`LEGACY-025`](../archive/LEGACY-025-retire-core-inplace-function-test.md) — Retire
 legacy Core.InplaceFunction test — retired on 2026-06-18 at maturity
 `CPUContracted`. `tests/unit/core/Test_InplaceFunction.cpp` was removed because
 `Core.InplaceFunction` has no promoted `Extrinsic.Core` endpoint and is
@@ -1528,7 +1539,7 @@ runtime/graphics/RHI consumers are owned by their subtree cleanup tasks.
 legacy-internal consumers; `LEGACY-012` owns the remaining test cleanup.
 
 Backlog
-[`LEGACY-024`](LEGACY-024-retire-core-feature-catalog-tests.md) — Retire
+[`LEGACY-024`](../archive/LEGACY-024-retire-core-feature-catalog-tests.md) — Retire
 legacy Core feature-catalog tests — retired on 2026-06-18 at maturity
 `CPUContracted`. `tests/unit/core/Test_FeatureRegistry.cpp` and
 `tests/unit/core/Test_SystemFeatureCatalog.cpp` were removed because
@@ -1539,7 +1550,7 @@ remaining test consumers and 133 legacy-internal consumers; `LEGACY-012` owns
 the remaining test cleanup.
 
 Backlog
-[`LEGACY-023`](LEGACY-023-retire-core-commands-test.md) — Retire legacy
+[`LEGACY-023`](../archive/LEGACY-023-retire-core-commands-test.md) — Retire legacy
 Core.Commands test — retired on 2026-06-18 at maturity `CPUContracted`.
 `tests/unit/core/Test_CoreCommands.cpp` was removed because `CORE-002` retired
 the legacy global core command service and `RUNTIME-102` owns the promoted
@@ -1549,7 +1560,7 @@ tests. `LEGACY-005` remains blocked by 34 remaining test consumers and 133
 legacy-internal consumers; `LEGACY-012` owns the remaining test cleanup.
 
 Backlog
-[`LEGACY-022`](LEGACY-022-core-framegraph-test-promoted.md) — Migrate
+[`LEGACY-022`](../archive/LEGACY-022-core-framegraph-test-promoted.md) — Migrate
 CoreFrameGraph test to promoted Core — retired on 2026-06-18 at maturity
 `CPUContracted`. `tests/unit/core/Test.CoreFrameGraph.cpp` and
 `tests/unit/core/Test.CoreFrameGraphTypeTokenHelper.cpp` now import promoted
@@ -1562,7 +1573,7 @@ consumers and 133 legacy-internal consumers; `LEGACY-012` owns the remaining
 test cleanup.
 
 Backlog
-[`LEGACY-021`](LEGACY-021-core-profiling-test-promoted.md) — Migrate profiling
+[`LEGACY-021`](../archive/LEGACY-021-core-profiling-test-promoted.md) — Migrate profiling
 test to promoted Core — retired on 2026-06-18 at maturity `CPUContracted`.
 `tests/unit/core/Test.CoreProfiling.cpp` now imports promoted
 `Extrinsic.Core.Telemetry` and `Extrinsic.Core.Hash` instead of bare legacy
@@ -1573,7 +1584,7 @@ passed. `LEGACY-005` remains blocked by 37 remaining test consumers and 133
 legacy-internal consumers; `LEGACY-012` owns the remaining test cleanup.
 
 Backlog
-[`LEGACY-020`](LEGACY-020-core-tasks-test-promoted.md) — Migrate CoreTasks test
+[`LEGACY-020`](../archive/LEGACY-020-core-tasks-test-promoted.md) — Migrate CoreTasks test
 to promoted Core — retired on 2026-06-18 at maturity `CPUContracted`. The full
 `tests/unit/core/Test_CoreTasks.cpp` scheduler, coroutine, `CounterEvent`,
 wait-token, telemetry-export, and job lifetime coverage now imports promoted
@@ -1585,7 +1596,7 @@ blocked by 38 remaining test consumers and 133 legacy-internal consumers;
 `LEGACY-012` owns the remaining test cleanup.
 
 Backlog
-[`LEGACY-019`](LEGACY-019-strong-handle-test-promoted.md) — Migrate
+[`LEGACY-019`](../archive/LEGACY-019-strong-handle-test-promoted.md) — Migrate
 StrongHandle test to promoted Core — retired on 2026-06-18 at maturity
 `CPUContracted`. The full `tests/unit/core/Test_CoreHandle.cpp` coverage now
 imports promoted `Extrinsic.Core.StrongHandle` as
@@ -1597,7 +1608,7 @@ targets and `StrongHandle` CTest filter passed. `LEGACY-005` remains blocked by
 owns the remaining test cleanup.
 
 Backlog
-[`LEGACY-018`](LEGACY-018-retire-interface-panel-registration-test.md) —
+[`LEGACY-018`](../archive/LEGACY-018-retire-interface-panel-registration-test.md) —
 Retire legacy Interface panel-registration test — retired on 2026-06-18 at
 maturity `CPUContracted`. The legacy-only
 `tests/contract/ui/Test_PanelRegistration.cpp` consumer was removed from the
@@ -1608,7 +1619,7 @@ test. `LEGACY-001` now has zero external test consumers and remains blocked by
 six legacy-internal Graphics/Runtime files.
 
 Backlog
-[`LEGACY-017`](LEGACY-017-core-hash-test-promoted.md) — Retire duplicate legacy
+[`LEGACY-017`](../archive/LEGACY-017-core-hash-test-promoted.md) — Retire duplicate legacy
 CoreHash test — retired on 2026-06-18 at maturity `CPUContracted`. Duplicate
 legacy `tests/unit/core/Test_CoreHash.cpp` coverage was deleted in favor of the
 existing promoted `Extrinsic.Core.Hash` coverage, now named
@@ -1618,7 +1629,7 @@ blocked by 40 remaining test consumers and 133 legacy-internal consumers;
 `LEGACY-012` owns the remaining test cleanup.
 
 Backlog
-[`LEGACY-016`](LEGACY-016-log-ring-buffer-test-promoted.md) — Migrate
+[`LEGACY-016`](../archive/LEGACY-016-log-ring-buffer-test-promoted.md) — Migrate
 LogRingBuffer test to promoted Core — retired on 2026-06-18 at maturity
 `CPUContracted`. `tests/unit/core/Test.LogRingBuffer.cpp` now imports promoted
 `Extrinsic.Core.Logging` instead of bare legacy `Core.Logging`, and the touched
@@ -1628,7 +1639,7 @@ target and `LogRingBuffer` CTest filter passed. `LEGACY-005` remains blocked by
 owns the remaining test cleanup.
 
 Backlog
-[`LEGACY-015`](LEGACY-015-core-error-test-promoted.md) — Migrate CoreError test
+[`LEGACY-015`](../archive/LEGACY-015-core-error-test-promoted.md) — Migrate CoreError test
 to promoted Core — retired on 2026-06-18 at maturity `CPUContracted`.
 `tests/unit/core/Test.CoreError.cpp` now imports promoted
 `Extrinsic.Core.Error` instead of bare legacy `Core.Error`, and the touched
@@ -1638,7 +1649,7 @@ remaining test consumers and 133 legacy-internal consumers; `LEGACY-012` owns
 the remaining test cleanup.
 
 Backlog
-[`LEGACY-014`](LEGACY-014-runtimegraph-core-test-import.md) — Remove unused
+[`LEGACY-014`](../archive/LEGACY-014-runtimegraph-core-test-import.md) — Remove unused
 RuntimeGraph legacy Core test import — retired on 2026-06-18 at maturity
 `CPUContracted`. `tests/unit/geometry/Test_RuntimeGraph.cpp` no longer imports
 bare legacy `Core`; the focused geometry target and `RuntimeGraph` CTest filter
@@ -1646,7 +1657,7 @@ passed. `LEGACY-005` remains blocked by 43 remaining test consumers and 133
 legacy-internal consumers; `LEGACY-012` owns the remaining test cleanup.
 
 Backlog
-[`LEGACY-013`](LEGACY-013-promoted-core-import-migration.md) — Migrate
+[`LEGACY-013`](../archive/LEGACY-013-promoted-core-import-migration.md) — Migrate
 promoted Core imports off legacy modules — retired on 2026-06-18 at maturity
 `CPUContracted`. Promoted geometry/runtime now import `Extrinsic.Core.*`
 instead of bare legacy `Core.*`, promoted geometry no longer links
@@ -1658,7 +1669,7 @@ legacy-internal consumers retire through the Runtime-first to Core-last subtree
 deletion order.
 
 Backlog
-[`LEGACY-011`](LEGACY-011-src-legacy-feature-reimplementation-map.md) —
+[`LEGACY-011`](../archive/LEGACY-011-src-legacy-feature-reimplementation-map.md) —
 Value-gated legacy feature reimplementation map — retired on 2026-06-18 at
 maturity `Scaffolded`. Every retained/deferred legacy feature candidate now has
 a named done-task decision or an explicit future trigger, keeping semantic
@@ -1668,7 +1679,7 @@ the promoted-src Core import migration called out by the migration audit, and
 mechanical Runtime-first to Core-last subtree deletion ordering.
 
 Active
-[`UI-018`](UI-018-sandbox-menu-first-ui.md) — Sandbox menu-first UI defaults —
+[`UI-018`](../archive/UI-018-sandbox-menu-first-ui.md) — Sandbox menu-first UI defaults —
 retired on 2026-06-17 at maturity `CPUContracted`. The sandbox editor now
 starts with only the main menu bar visible. Top-level panels open from `View`,
 and PointCloud/Graph/Mesh domain windows remain closed until selected from
@@ -1676,7 +1687,7 @@ their menus, without changing panel models, command routing, or runtime
 ownership.
 
 Active
-[`UI-014`](UI-014-uv-backend-and-texture-bake-controls.md) — UV backend and
+[`UI-014`](../archive/UI-014-uv-backend-and-texture-bake-controls.md) — UV backend and
 texture bake controls — retired on 2026-06-17 at maturity `CPUContracted`.
 The sandbox editor now exposes selected-mesh UV diagnostics, xatlas-backed UV
 regeneration commands, property-catalog-driven bake source controls, generated
@@ -1686,7 +1697,7 @@ headless-safe and routes geometry mutation, bake work, generated texture
 payloads, and binding updates through runtime-owned command/history surfaces.
 
 Active
-[`UI-017`](UI-017-bound-render-state-inspector.md) — Bound render state
+[`UI-017`](../archive/UI-017-bound-render-state-inspector.md) — Bound render state
 inspector — retired on 2026-06-17 at maturity `CPUContracted`. Selected mesh,
 graph, point-cloud, and composition models now expose bound-state rows for
 render lanes, presentation slots, defaults, property buffers, authored and
@@ -1695,7 +1706,7 @@ derived-job/bake progress without UI storing renderer handles, raw property
 pointers, worker state, or live asset-service references.
 
 Active
-[`RUNTIME-115`](RUNTIME-115-selected-mesh-bake-command-surface.md) — Selected
+[`RUNTIME-115`](../archive/RUNTIME-115-selected-mesh-bake-command-surface.md) — Selected
 mesh bake command surface — retired on 2026-06-17 at maturity
 `CPUContracted`. Runtime now owns a selected-mesh texture-bake command surface
 that validates source entity/domain/property, encoder, UV availability,
@@ -1706,7 +1717,7 @@ progressive presentation bindings through `EditorCommandHistory`; stale
 derived-job applies are discarded deterministically.
 
 Active
-[`UI-016`](UI-016-geometry-property-catalog-and-binding-usability.md) —
+[`UI-016`](../archive/UI-016-geometry-property-catalog-and-binding-usability.md) —
 Geometry property catalog and binding usability — retired on 2026-06-17 at
 maturity `CPUContracted`. `Extrinsic.Runtime.SandboxEditorUi` now builds
 selected-entity property catalogs for mesh vertex/edge/halfedge/face, graph
@@ -1717,7 +1728,7 @@ binding targets keep dimension/domain mismatches visible with deterministic
 disabled reasons.
 
 Active
-[`BUG-045`](BUG-045-progressive-raw-mesh-uv-fallback.md) — Progressive raw mesh
+[`BUG-045`](../archive/BUG-045-progressive-raw-mesh-uv-fallback.md) — Progressive raw mesh
 surface UV fallback — retired on 2026-06-17 at maturity `CPUContracted`.
 Raw mesh surface packing now falls back to zero GPU U/V values when imported
 geometry has missing, mismatched, or non-finite `v:texcoord`, while extraction
@@ -1728,7 +1739,7 @@ for real resolved UVs. Existing direct import, dropped-file, progressive
 model-scene, and close-path runtime regressions passed.
 
 Backlog
-[`GRAPHICS-090`](GRAPHICS-090-progressive-render-data-operational-smoke.md) —
+[`GRAPHICS-090`](../archive/GRAPHICS-090-progressive-render-data-operational-smoke.md) —
 Progressive render-data operational smoke — retired on 2026-06-16 at maturity
 `Operational`. The promoted runtime sandbox GPU smoke now exercises a
 progressive scene with mesh defaults/pending slots, a generated mesh texture
@@ -1739,7 +1750,7 @@ binding resolution counters. The `ci-vulkan` target built on this host and the
 introducing live runtime/ECS/AssetService imports into graphics.
 
 Backlog
-[`UI-015`](UI-015-progressive-render-data-inspector.md) — Progressive render-data
+[`UI-015`](../archive/UI-015-progressive-render-data-inspector.md) — Progressive render-data
 inspector — retired on 2026-06-16 at maturity `CPUContracted`. The sandbox
 editor inspector now exposes data-only progressive entity shape, lane/slot
 state, compatible and incompatible property choices, slot default/property
@@ -1749,7 +1760,7 @@ not own geometry algorithms, asset IO, worker state, texture baking, or graphics
 resources.
 
 Backlog
-[`RUNTIME-114`](RUNTIME-114-progressive-import-enrichment-pipeline.md) —
+[`RUNTIME-114`](../archive/RUNTIME-114-progressive-import-enrichment-pipeline.md) —
 Progressive import enrichment pipeline — retired on 2026-06-16 at maturity
 `CPUContracted`. Model-scene mesh leaves can now publish raw decoded geometry
 immediately, attach progressive surface bindings, and queue observable
@@ -1760,7 +1771,7 @@ and material binding residency remain on the existing runtime texture handoff
 path.
 
 Backlog
-[`RUNTIME-113`](RUNTIME-113-progressive-domain-presentation-extraction.md) —
+[`RUNTIME-113`](../archive/RUNTIME-113-progressive-domain-presentation-extraction.md) —
 Progressive domain presentation extraction — retired on 2026-06-16 at maturity
 `CPUContracted`. Runtime extraction now consumes progressive descriptor
 snapshots for mesh surface defaults/texture slots, mesh face-domain diagnostics,
@@ -1769,7 +1780,7 @@ descriptors, pending/failed/unsupported states, and previous-output retention
 without blocking on derived jobs.
 
 Backlog
-[`RUNTIME-112`](RUNTIME-112-entity-derived-job-graph.md) — Entity derived-job
+[`RUNTIME-112`](../archive/RUNTIME-112-entity-derived-job-graph.md) — Entity derived-job
 graph and snapshots — retired on 2026-06-16 at maturity `CPUContracted`.
 Runtime now owns a `StreamingExecutor`-backed derived-job registry with stable
 entity/domain/source/binding keys, explicit dependencies, deterministic
@@ -1778,7 +1789,7 @@ handling, previous-output retention, main-thread apply, and fail-closed GPU
 domain diagnostics.
 
 Backlog
-[`RUNTIME-111`](RUNTIME-111-progressive-render-data-descriptors.md) —
+[`RUNTIME-111`](../archive/RUNTIME-111-progressive-render-data-descriptors.md) —
 Progressive render-data descriptor contracts — retired on 2026-06-16 at
 maturity `CPUContracted`. Runtime now has shared mesh/graph/point-cloud
 presentation descriptors, slot/source/readiness/generated-output policy,
@@ -1786,7 +1797,7 @@ property compatibility diagnostics, and scene serialization for progressive
 bindings while excluding raw property pointers, transient jobs, and GPU handles.
 
 Backlog
-[`RUNTIME-110`](RUNTIME-110-progressive-entity-render-data-pipeline.md) —
+[`RUNTIME-110`](../archive/RUNTIME-110-progressive-entity-render-data-pipeline.md) —
 Progressive entity render-data pipeline clarification — retired on 2026-06-16
 at maturity `Scaffolded`. The accepted planning contract makes mesh, graph,
 and point-cloud leaves equal first-class render-data domains; separates
@@ -1801,7 +1812,7 @@ Implementation is split into `RUNTIME-111` descriptor contracts,
 `GRAPHICS-090` opt-in backend smoke.
 
 Active
-[`BUG-044`](BUG-044-runtime-import-postprocess-queue.md) — Runtime mesh import
+[`BUG-044`](../archive/BUG-044-runtime-import-postprocess-queue.md) — Runtime mesh import
 post-process queue — retired on 2026-06-16 at maturity `CPUContracted`.
 Direct mesh imports now publish decoded raw geometry before derived
 materialization work. Missing normals, missing/invalid UV resolution, atlas
@@ -1813,7 +1824,7 @@ registers the generated normal material binding. Focused direct import,
 model-scene, dropped-file, and mesh-normal runtime contract tests passed.
 
 Active
-[`ASSETIO-008`](ASSETIO-008-default-uv-atlas-materialization.md) — Default UV
+[`ASSETIO-008`](../archive/ASSETIO-008-default-uv-atlas-materialization.md) — Default UV
 atlas materialization for imported meshes — retired on 2026-06-16 at maturity
 `CPUContracted`. Runtime mesh materialization now validates authored UVs through
 the `Geometry.UvAtlas` contract, preserves valid authored coordinates by
@@ -1831,7 +1842,7 @@ UVs. Focused runtime/UV atlas tests, module inventory regeneration, strict
 layering/test-layout/task checks, and doc-link checks passed.
 
 Active
-[`GEOM-025`](GEOM-025-uv-atlas-backend-xatlas.md) — UV atlas backend contract
+[`GEOM-025`](../archive/GEOM-025-uv-atlas-backend-xatlas.md) — UV atlas backend contract
 and xatlas default — retired on 2026-06-16 at maturity `CPUContracted`.
 Geometry now exposes `Geometry.UvAtlas`, a backend-neutral UV atlas API with
 authored-UV validation/preservation, explicit failure/provenance diagnostics,
@@ -1844,7 +1855,7 @@ layer imports or public xatlas headers were introduced. Focused geometry tests,
 and test-layout checks, task checks, and doc-link checks passed.
 
 Active
-[`GEOM-018`](GEOM-018-parameterization-distortion-map-quality-diagnostics.md)
+[`GEOM-018`](../archive/GEOM-018-parameterization-distortion-map-quality-diagnostics.md)
 — Parameterization distortion and map-quality diagnostics — retired on
 2026-06-16 at maturity `CPUContracted`. Geometry now exposes
 `Geometry.Parameterization.Diagnostics`, a deterministic CPU diagnostics
@@ -1858,7 +1869,7 @@ benchmark validation, module inventory regeneration, strict layering/test
 layout/task checks, and doc-link checks passed.
 
 Active
-[`ASSETIO-005`](ASSETIO-005-asset-import-queue-progress.md) — Asset import
+[`ASSETIO-005`](../archive/ASSETIO-005-asset-import-queue-progress.md) — Asset import
 queue and progress UI — retired on 2026-06-16 at maturity `Operational`.
 Runtime now exposes stable AssetIO queue snapshots over the promoted ingest
 state machine, including operation identity, source/path metadata, coarse
@@ -1871,7 +1882,7 @@ the default CPU-supported CTest gate, and strict layering/task/docs checks
 passed.
 
 Active
-[`GRAPHICS-088`](GRAPHICS-088-resolved-uv-rendering-and-bake-residency.md) —
+[`GRAPHICS-088`](../archive/GRAPHICS-088-resolved-uv-rendering-and-bake-residency.md) —
 Resolved UV rendering and bake texture residency — retired on 2026-06-15 at
 maturity `CPUContracted`. Graphics now treats packed mesh UVs as resolved
 texture coordinates for surface material sampling, generated normal/albedo
@@ -1884,7 +1895,7 @@ descriptors; graphics still does not generate UVs or import runtime, ECS,
 sampling proof is deferred to `GRAPHICS-089` after `ASSETIO-008`.
 
 Backlog
-[`RUNTIME-109`](RUNTIME-109-extensible-mesh-attribute-texture-bakes.md) —
+[`RUNTIME-109`](../archive/RUNTIME-109-extensible-mesh-attribute-texture-bakes.md) —
 Extensible mesh attribute texture bake pipeline — retired on 2026-06-15 at
 maturity `CPUContracted`. Runtime now exposes a generic CPU mesh attribute
 texture bake request over resolved UVs for vertex and face source domains,
@@ -1899,7 +1910,7 @@ does not generate UVs; missing-UV import materialization remains under
 `GRAPHICS-088`. Focused runtime bake coverage passed.
 
 Active
-[`RUNTIME-101`](RUNTIME-101-asset-ingest-state-machine.md) — Asset ingest
+[`RUNTIME-101`](../archive/RUNTIME-101-asset-ingest-state-machine.md) — Asset ingest
 state-machine migration — retired on 2026-06-15 at maturity `CPUContracted`.
 Runtime now owns a backend-neutral ingest request/result state machine for
 manual imports, dropped files, and reimport over promoted `AssetService`,
@@ -1913,7 +1924,7 @@ standalone geometry entities or revive scene-file `AssetSourceRef` coupling.
 Focused runtime/import coverage and strict docs/task/layering checks passed.
 
 Backlog
-[`RUNTIME-107`](RUNTIME-107-headless-engine-loop-coverage.md) —
+[`RUNTIME-107`](../archive/RUNTIME-107-headless-engine-loop-coverage.md) —
 Headless-capable `Engine::Run()` loop coverage — retired on 2026-06-15 at
 maturity `Operational`. `Core::Config::WindowConfig` now exposes an explicit
 `WindowBackend` selector: `Configured` preserves the CMake-selected platform
@@ -1927,7 +1938,7 @@ fall back to Null silently. Focused runtime contract/integration coverage
 passed 7/7 with no skips.
 
 Backlog
-[`RUNTIME-103`](RUNTIME-103-geometry-algorithm-execution-queue.md) —
+[`RUNTIME-103`](../archive/RUNTIME-103-geometry-algorithm-execution-queue.md) —
 Geometry algorithm execution queue — retired on 2026-06-15 at maturity
 `CPUContracted`. The value gate found that current promoted editor workflows
 do not justify a runtime async geometry algorithm queue: `UI-004` already
@@ -1942,7 +1953,7 @@ Focused K-Means/SandboxEditorUi runtime coverage and strict task/docs/layering
 checks passed.
 
 Backlog
-[`RUNTIME-105`](RUNTIME-105-remove-streaming-graph-bridge.md) — Remove the
+[`RUNTIME-105`](../archive/RUNTIME-105-remove-streaming-graph-bridge.md) — Remove the
 deprecated `GetStreamingGraph()` TaskGraph bridge — retired on 2026-06-15 at
 maturity `Retired`. The promoted runtime no longer exports
 `Engine::GetStreamingGraph()`, no longer owns a private streaming
@@ -1957,7 +1968,7 @@ runtime frame-loop, streaming-executor, and layering prefixes passed, and the
 default CPU-supported CTest gate passed.
 
 Active
-[`INFRA-001`](INFRA-001-vcpkg-manifest-mode.md) — Move third-party
+[`INFRA-001`](../archive/INFRA-001-vcpkg-manifest-mode.md) — Move third-party
 dependencies to a vcpkg manifest — retired on 2026-06-15 at maturity
 `Operational`. The build now resolves third-party C/C++ packages through the
 root `vcpkg.json` manifest, the repository-local vcpkg toolchain, and
@@ -1972,7 +1983,7 @@ passed. Final GitHub Actions evidence came from `ci-linux-clang` run
 `Configure (ci preset) elapsed: 8.271 s`, with the job concluding success.
 
 Active
-[`BUG-043`](BUG-043-dropped-obj-missing-uvs-invisible.md) — Dropped OBJ without
+[`BUG-043`](../archive/BUG-043-dropped-obj-missing-uvs-invisible.md) — Dropped OBJ without
 UVs loads but is invisible — retired on 2026-06-14 at maturity
 `CPUContracted`. Runtime mesh materialization now preserves valid authored
 `v:texcoord` and writes deterministic finite projection fallback UVs when
@@ -1987,7 +1998,7 @@ CPU-supported CTest gate passed; xatlas-quality default atlas work remains
 owned by `ASSETIO-008` and `GEOM-025`.
 
 Backlog
-[`RUNTIME-108`](RUNTIME-108-resolved-uv-render-residency.md) — Remove mesh UV
+[`RUNTIME-108`](../archive/RUNTIME-108-resolved-uv-render-residency.md) — Remove mesh UV
 normal fallback — retired on 2026-06-13 at maturity `CPUContracted`. Runtime
 mesh surface packing now treats `MeshVertex::U/V` as texture coordinates only:
 `PackMesh` and `BuildSurfaceTriangleFaceMap` require count-matched finite
@@ -1999,7 +2010,7 @@ author UVs. Generated atlas/materialization remains with `ASSETIO-008` and
 texture-bake expansion remains with `RUNTIME-109`.
 
 Active
-[`ASSETIO-007`](ASSETIO-007-direct-mesh-generated-normal-texture.md) —
+[`ASSETIO-007`](../archive/ASSETIO-007-direct-mesh-generated-normal-texture.md) —
 Direct mesh generated normal texture binding — retired on 2026-06-13 at
 maturity `CPUContracted`. Direct mesh imports now use the same default normal
 policy as model-scene imports: authored `v:normal` vectors are preserved when
@@ -2015,7 +2026,7 @@ runtime contract tests passed, `IntrinsicTests` built, and the default
 CPU-supported CTest gate passed.
 
 Active
-[`GRAPHICS-087`](GRAPHICS-087-vertex-color-property-texture-bake.md) —
+[`GRAPHICS-087`](../archive/GRAPHICS-087-vertex-color-property-texture-bake.md) —
 Bake vec3/vec4 vertex color properties to surface albedo textures — retired
 on 2026-06-12 at maturity `CPUContracted`. Runtime now exposes the shared
 `Extrinsic.Runtime.MeshAttributeTextureBake` helper for finite mesh vertex
@@ -2028,7 +2039,7 @@ upload/material binding path and surface shaders consume them via
 `IntrinsicTests` built, and the default CPU-supported CTest gate passed.
 
 Active
-[`BUG-042`](BUG-042-point-sphere-impostor-depth.md) — Promoted impostor
+[`BUG-042`](../archive/BUG-042-point-sphere-impostor-depth.md) — Promoted impostor
 spheres do not intersect surfaces correctly — retired on 2026-06-12 at
 maturity `CPUContracted`. The promoted retained point path now matches the
 legacy shape: the `Points` cull bucket emits six vertices per source point,
@@ -2040,7 +2051,7 @@ passed, including `ForwardPointSphereImpostorsWriteCorrectedDepth`, and the
 default CPU-supported CTest gate passed.
 
 Active
-[`ASSETIO-006`](ASSETIO-006-generated-normal-map-bake.md) — Generated
+[`ASSETIO-006`](../archive/ASSETIO-006-generated-normal-map-bake.md) — Generated
 normal-map bake from mesh vertex normals — retired on 2026-06-12 at maturity
 `CPUContracted`. Runtime now bakes generated linear RGBA8 normal textures from
 named mesh vertex `glm::vec3` properties plus `v:texcoord`, preserves decoded
@@ -2052,7 +2063,7 @@ graphics layer ownership inversions. Focused bake/handoff regressions and the
 default CPU-supported CTest gate passed.
 
 Backlog
-[`BUG-041`](BUG-041-asset-mesh-vertex-normals.md) — Asset mesh vertex normals
+[`BUG-041`](../archive/BUG-041-asset-mesh-vertex-normals.md) — Asset mesh vertex normals
 are lost during runtime materialization — retired on 2026-06-12 at maturity
 `CPUContracted`. Geometry/model decoders already produced `v:normal` payloads
 for formats that supplied normals, but both runtime halfedge materialization
@@ -2069,7 +2080,7 @@ regressions cover explicit OBJ normals, computed fallback normals, model-scene
 handoff, and packer output; the default CPU gate passed.
 
 Backlog
-[`BUG-040`](BUG-040-orbit-camera-vertical-drag-sign.md) — Orbit camera
+[`BUG-040`](../archive/BUG-040-orbit-camera-vertical-drag-sign.md) — Orbit camera
 vertical drag sign — retired on 2026-06-12 at maturity `CPUContracted`. The
 `BUG-039` quaternion orbit fix preserved the legacy algebraic `-yDelta` pitch
 sign, but in the promoted app's screen-space input convention Y grows downward.
@@ -2081,7 +2092,7 @@ axis; fly/free-look signs are unchanged. The focused sign regression,
 `RuntimeCameraControllers` suite, and default CPU gate passed.
 
 Backlog
-[`BUG-039`](BUG-039-orbit-camera-rotation-lock.md) — Orbit camera rotation
+[`BUG-039`](../archive/BUG-039-orbit-camera-rotation-lock.md) — Orbit camera rotation
 lock — retired on 2026-06-12 at maturity `CPUContracted`. The promoted orbit
 controller had reused scalar yaw/pitch state and a fixed world-up view, so a
 large vertical drag clamped at the pitch pole instead of continuing like the
@@ -2094,7 +2105,7 @@ panning behavior. The new runtime contract regression red-gated the lock with
 orbit fix; the full camera-controller suite and default CPU gate passed.
 
 Backlog
-[`BUG-038`](BUG-038-sandbox-dropped-file-diagnostics.md) — Dropped file
+[`BUG-038`](../archive/BUG-038-sandbox-dropped-file-diagnostics.md) — Dropped file
 imports fail silently in the sandbox — retired on 2026-06-12 at maturity
 `CPUContracted`. The event path itself was already wired: focused contracts
 showed runtime platform-drop dispatch and valid dropped OBJ/OFF imports reach
@@ -2110,7 +2121,7 @@ OBJ drop with no logs, then proved receipt/queue/failure breadcrumbs plus a
 failed `RuntimeAssetImportEvent` with payload `Mesh` and `FileNotFound`.
 
 Active
-[`BUG-037`](BUG-037-window-close-stale-run-state.md) — Window close can leave
+[`BUG-037`](../archive/BUG-037-window-close-stale-run-state.md) — Window close can leave
 runtime running — retired on 2026-06-12 at maturity `CPUContracted`. The
 runtime close path now normalizes native `IWindow::ShouldClose()` exits through
 `Engine::RequestExit()` when `Engine::Run()` leaves its outer loop, closing the
@@ -2123,7 +2134,7 @@ red-gating the stale run-state bug before the fix and passing after the runtime
 state normalization. The default CPU-supported correctness gate passed.
 
 Active
-[`BUG-036`](BUG-036-ui-input-capture-leak.md) — UI-captured input leaks into
+[`BUG-036`](../archive/BUG-036-ui-input-capture-leak.md) — UI-captured input leaks into
 engine controls — retired on 2026-06-12 at maturity `CPUContracted`. Dear
 ImGui capture state is now surfaced through `ImGuiAdapter` for both mouse and
 keyboard input, and `Engine::RunFrame()` samples that state once after the UI
@@ -2136,7 +2147,7 @@ the fixed path leaves runtime camera, gizmo, and selection consumers idle under
 UI capture and keeps existing behavior when the UI does not capture input.
 
 Backlog
-[`RUNTIME-106`](RUNTIME-106-render-component-domain-composition.md) — Render
+[`RUNTIME-106`](../archive/RUNTIME-106-render-component-domain-composition.md) — Render
 component domain composition — retired on 2026-06-12 at maturity
 `CPUContracted`. Mesh, graph, and point-cloud rendering now share the promoted
 user-facing composition contract: `GeometrySources::BuildConstView(...)`
@@ -2157,7 +2168,7 @@ engine compatibility translation; the default CPU gate remains the retirement
 gate and no `Operational` follow-up is owed by default.
 
 Backlog
-[`BUG-028`](BUG-028-mesh-primitive-view-ui-rendering.md) — Mesh primitive view
+[`BUG-028`](../archive/BUG-028-mesh-primitive-view-ui-rendering.md) — Mesh primitive view
 UI toggles do not render — retired on 2026-06-11 at maturity `CPUContracted`.
 The promoted mesh edge/vertex view path is runtime extraction-cache sidecar
 state, not legacy ECS `MeshEdgeView` / `MeshVertexView` components. The fix
@@ -2176,7 +2187,7 @@ compilation; broader GPU screenshot proof remains in the working-sandbox
 acceptance lane.
 
 Backlog
-[`UI-013`](UI-013-domain-render-hint-controls.md) — Sandbox EditorUI domain
+[`UI-013`](../archive/UI-013-domain-render-hint-controls.md) — Sandbox EditorUI domain
 render hint controls — retired on 2026-06-11 at maturity `CPUContracted`.
 Promoted mesh, graph, and point-cloud rendering paths were already present in
 runtime extraction and renderer passes; this slice closed the editor workflow
@@ -2191,7 +2202,7 @@ work; this slice stores the promoted component value and keeps graphics free of
 live ECS reads.
 
 Backlog
-[`BUG-026B`](BUG-026B-vulkan-click-pick-readback-smoke.md) — Vulkan
+[`BUG-026B`](../archive/BUG-026B-vulkan-click-pick-readback-smoke.md) — Vulkan
 click-pick readback smoke — retired on 2026-06-11 at maturity `Operational`.
 The opt-in `gpu;vulkan` runtime sandbox smoke now waits for the promoted Vulkan
 device to become operational, submits a real `SelectionController::RequestClickPick`
@@ -2205,7 +2216,7 @@ cache. The run passed on NVIDIA RTX 3050 / NVIDIA driver 590.48.01, upgrading
 the BUG-026 fix to `Operational`.
 
 Backlog
-[`GRAPHICS-086`](GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md) —
+[`GRAPHICS-086`](../archive/GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md) —
 RHI retirement parity and CUDA decision — retired on 2026-06-11 at maturity
 `CPUContracted`. The audit maps legacy `RHI.CommandUtils`,
 `RHI.PersistentDescriptors`, `RHI.Swapchain`/`RHI.Image`, and
@@ -2219,7 +2230,7 @@ concrete workload and verification plan. `LEGACY-009` is now blocked by
 consumer-grep/subtree ordering rather than an unnamed RHI/CUDA parity gap.
 
 Backlog
-[`GRAPHICS-084C`](GRAPHICS-084C-visualization-property-buffer-vulkan-smoke.md) —
+[`GRAPHICS-084C`](../archive/GRAPHICS-084C-visualization-property-buffer-vulkan-smoke.md) —
 visualization property-buffer Vulkan smoke — retired on 2026-06-11 at maturity
 `Operational`. The existing visualization-overlay GPU smoke now submits
 graphics-owned property-buffer upload descriptors for vector-field position and
@@ -2230,7 +2241,7 @@ packet BDA publication succeeds. The task keeps runtime/ECS out of graphics;
 `GRAPHICS-086` later retired the broader RHI/CUDA audit.
 
 Backlog
-[`GRAPHICS-084`](GRAPHICS-084-visualization-property-buffer-residency.md) —
+[`GRAPHICS-084`](../archive/GRAPHICS-084-visualization-property-buffer-residency.md) —
 visualization property-buffer residency — retired on 2026-06-11 at maturity
 `CPUContracted`. Runtime visualization adapters now emit copied CPU property
 arrays as `VisualizationPropertyBufferUploadDescriptor` records when external
@@ -2245,7 +2256,7 @@ operational proof was retired by `GRAPHICS-084C`; this retirement does not
 claim a fresh `gpu;vulkan` host run.
 
 Backlog
-[`GRAPHICS-085`](GRAPHICS-085-overlay-packet-backend-parity.md) — overlay
+[`GRAPHICS-085`](../archive/GRAPHICS-085-overlay-packet-backend-parity.md) — overlay
 packet backend parity — retired on 2026-06-11 at maturity `CPUContracted`.
 The task composes the retained overlay-like backend lanes classified by
 `RUNTIME-104` without adding a runtime/editor overlay creation API or a new
@@ -2261,7 +2272,7 @@ metadata is added. Existing opt-in transient-debug and visualization-overlay
 does not claim a fresh Vulkan host run.
 
 Backlog
-[`RUNTIME-104`](RUNTIME-104-derived-overlay-producer-lifecycle.md) — derived
+[`RUNTIME-104`](../archive/RUNTIME-104-derived-overlay-producer-lifecycle.md) — derived
 overlay producer lifecycle — retired on 2026-06-11 at maturity
 `CPUContracted`. The value gate found no current promoted workflow requiring a
 new persistent runtime overlay producer API. Legacy mesh/graph/point child
@@ -2277,7 +2288,7 @@ handles in components. Backend command-shape proof remains open under
 `GRAPHICS-085`; selected property-buffer residency remains `GRAPHICS-084`.
 
 Backlog
-[`BUG-027`](BUG-027-sandbox-dragdrop-close-mesh-views.md) — sandbox
+[`BUG-027`](../archive/BUG-027-sandbox-dragdrop-close-mesh-views.md) — sandbox
 drag/drop, close, and mesh primitive-view regression — opened and retired on
 2026-06-11 at maturity `CPUContracted`. The reported sandbox path had three
 runtime-wiring failures: direct platform close events reached the engine
@@ -2300,7 +2311,7 @@ close-button timing with frame-loop/layering contracts. A narrow
 events through the same handler installed as the live window listener.
 
 Active
-[`BUG-026`](BUG-026-click-pick-readback-entity-zero-and-depth.md) — viewport
+[`BUG-026`](../archive/BUG-026-click-pick-readback-entity-zero-and-depth.md) — viewport
 click selection dead: render-id zero collision, UINT clear punning, and
 missing depth readback — opened and retired on 2026-06-10 at maturity
 `CPUContracted`. Clicking in the sandbox selected nothing because two
@@ -2336,7 +2347,7 @@ the conventions; `Operational` (real Vulkan click round trip) owned by
 `BUG-026B`.
 
 Backlog
-[`LEGACY-002`](LEGACY-002-seed-src-legacy-retirement-backlog.md) — seed
+[`LEGACY-002`](../archive/LEGACY-002-seed-src-legacy-retirement-backlog.md) — seed
 retirement tasks for remaining `src/legacy/` subtrees — retired to
 `tasks/done/` on 2026-06-10. The deliverables had been complete since
 2026-06-06 (the `LEGACY-003..010` per-subtree deletion tasks, the
@@ -2351,7 +2362,7 @@ by `LEGACY-001` and `LEGACY-004..010`, each gated on its consumer-grep
 prerequisite.
 
 Backlog
-[`HARDEN-082`](HARDEN-082-rebind-legacy-allowlist-umbrella-rows.md) —
+[`HARDEN-082`](../archive/HARDEN-082-rebind-legacy-allowlist-umbrella-rows.md) —
 rebind legacy allowlist umbrella rows to per-subtree owners — opened and
 retired to `tasks/done/` on 2026-06-10 at maturity `Retired`
 (metadata-only governance rebind). All 54
@@ -2367,7 +2378,7 @@ This is the rebinding follow-up that `LEGACY-002`'s context required
 before the seed itself could retire.
 
 Backlog
-[`HARDEN-078`](HARDEN-078-track-untracked-todo-temporary-markers.md) —
+[`HARDEN-078`](../archive/HARDEN-078-track-untracked-todo-temporary-markers.md) —
 track or resolve untracked TODO / temporary markers in promoted src —
 retired to `tasks/done/` on 2026-06-10 at maturity `Retired` (pure marker
 hygiene). The `Core.Filesystem` dead commented `CallbackRegistry` import
@@ -2383,7 +2394,7 @@ return only task-ID-tracked markers. Default CPU gate green at
 retirement.
 
 Backlog
-[`RORG-031A`](RORG-031A-architecture-foundation.md) — architecture
+[`RORG-031A`](../archive/RORG-031A-architecture-foundation.md) — architecture
 foundation backlog seed — retired to `tasks/done/` on 2026-06-10. The
 seed's job was converting the legacy living backlog's architecture items
 into structured, independently executable tasks, and that exists: the
@@ -2397,7 +2408,7 @@ migration/CI dependencies are recorded as gates and front-matter
 by its own task files.
 
 Backlog
-[`PROC-008`](PROC-008-category-readme-state-history-split.md) — category
+[`PROC-008`](../archive/PROC-008-category-readme-state-history-split.md) — category
 README state/history split — retired to `tasks/done/` on 2026-06-10,
 completing Theme H. Slice A mechanically split every
 `tasks/backlog/<category>/README.md` into open lists and verbatim
@@ -2419,7 +2430,7 @@ exactly one finding and was removed. With PROC-001..008 retired, Theme H
 has no open members.
 
 Backlog
-[`METHOD-011`](METHOD-011-sph-fluid-reference-backend.md) — SPH fluid
+[`METHOD-011`](../archive/METHOD-011-sph-fluid-reference-backend.md) — SPH fluid
 reference backend — retired to `tasks/done/` on 2026-06-10 at maturity
 `CPUContracted`. `methods/physics/sph_fluid_reference/` ships the
 deterministic weakly compressible SPH `cpu_reference` backend (Mueller
@@ -2444,7 +2455,7 @@ open members; optimized/GPU backends and runtime integration open as new
 tasks per the roadmap gates.
 
 Backlog
-[`METHOD-010`](METHOD-010-xpbd-cloth-shell-reference-backend.md) — XPBD
+[`METHOD-010`](../archive/METHOD-010-xpbd-cloth-shell-reference-backend.md) — XPBD
 cloth and shell reference backend — retired to `tasks/done/` on 2026-06-10
 at maturity `CPUContracted`. `methods/physics/xpbd_cloth_reference/` ships
 the deterministic XPBD `cpu_reference` backend over triangle-mesh cloth
@@ -2469,7 +2480,7 @@ until a future task names this package as its oracle. Theme C's remaining
 open member is `METHOD-011` (SPH fluid).
 
 Backlog
-[`METHOD-009`](METHOD-009-particle-spring-reference-backend.md) — particle
+[`METHOD-009`](../archive/METHOD-009-particle-spring-reference-backend.md) — particle
 and mass-spring reference backend — retired to `tasks/done/` on 2026-06-10
 at maturity `CPUContracted`. `methods/physics/particle_spring_reference/`
 ships the deterministic `cpu_reference` backend for particle dynamics and
@@ -2491,7 +2502,7 @@ names this package as its oracle. Theme C's remaining open members are
 `METHOD-010` (XPBD cloth/shell) and `METHOD-011` (SPH fluid).
 
 Backlog
-[`RORG-031C`](RORG-031C-runtime-composition.md) — runtime composition
+[`RORG-031C`](../archive/RORG-031C-runtime-composition.md) — runtime composition
 backlog seed — retired to `tasks/done/` on 2026-06-10. The seed's job was
 to replace the unnamed runtime composition narrative gap with concrete
 child tasks, and that is done: `RUNTIME-099` (explicit lifecycle pipeline
@@ -2504,7 +2515,7 @@ machine) was independently tracked after this seed and retired on
 no open members.
 
 Backlog
-[`BUG-025`](BUG-025-contact-manifold-normal-convention.md) — geometry
+[`BUG-025`](../archive/BUG-025-contact-manifold-normal-convention.md) — geometry
 contact manifold normals violate the documented A→B convention — retired to
 `tasks/done/` on 2026-06-10 at maturity `CPUContracted`. Root cause was two
 kernel inversions: `EPA_Solver` negated the closest-face outward normal of
@@ -2523,7 +2534,7 @@ its regression test stay as defense in depth. Geometry label 1263/1263 and
 physics label 21/21 at retirement. Theme G has no open members.
 
 Backlog
-[`BUG-024B`](BUG-024B-sandbox-transform-edit-vulkan-pixel-shift-smoke.md) —
+[`BUG-024B`](../archive/BUG-024B-sandbox-transform-edit-vulkan-pixel-shift-smoke.md) —
 Vulkan pixel-shift smoke for sandbox transform edits — retired to
 `tasks/done/` on 2026-06-10 at maturity `Operational`. The opt-in
 `gpu;vulkan` smoke `RuntimeSandboxAcceptanceGpuSmoke.InspectorTransformEditShiftsReferenceTrianglePixels`
@@ -2536,7 +2547,7 @@ driver 590.48.01 (focused 1/1; full smoke suite 6/6), upgrading the BUG-024
 fix from `CPUContracted` to `Operational`. Theme G has no open members.
 
 Backlog
-[`BUG-024`](BUG-024-sandbox-transform-edit-rendering.md) — sandbox transform
+[`BUG-024`](../archive/BUG-024-sandbox-transform-edit-rendering.md) — sandbox transform
 UI edits do not move rendered triangle — retired to `tasks/done/` on
 2026-06-10 at maturity `CPUContracted`. Root cause: Inspector/gizmo
 transform edits run after the fixed-step ECS bundle, so render extraction
@@ -2554,7 +2565,7 @@ tests in `RuntimeEcsSystemBundle`. Default CPU gate passed 2882/2882 at
 retirement. `Operational` (Vulkan pixel-shift smoke) owned by `BUG-024B`.
 
 Previously-active
-[`PROC-006`](PROC-006-audit-cadence-lapse-visibility.md) — audit cadence
+[`PROC-006`](../archive/PROC-006-audit-cadence-lapse-visibility.md) — audit cadence
 lapse visibility retired to `tasks/done/` on 2026-06-09. The slice added
 `tools/agents/check_audit_cadence.py` (agent-output limit 14d, drift limit
 42d, report-only by default, `--strict` for local use only), a non-blocking
@@ -2565,7 +2576,7 @@ both audit checklists. No PR gate depends on audit recency. Theme H's
 remaining open leaf is `PROC-008` (category README state/history split).
 
 Previously-active
-[`PROC-004`](PROC-004-task-front-matter-and-generated-session-brief.md) —
+[`PROC-004`](../archive/PROC-004-task-front-matter-and-generated-session-brief.md) —
 structured task front-matter + generated session brief retired to
 `tasks/done/` on 2026-06-09 at maturity `Operational`. Slice A gave all 44
 open tasks YAML front-matter (`id`/`theme`/`depends_on`) with strict
@@ -2580,11 +2591,11 @@ had already reduced anchors to open-endpoint entries. The audits surface in
 the brief is owned by `PROC-006`.
 
 Previously-active
-[`PROC-003`](PROC-003-split-task-index-state-from-retirement-history.md),
-[`PROC-007`](PROC-007-onboarding-prompt-tightening.md),
-[`PROC-005`](PROC-005-align-structural-check-mode-contract-text.md),
-[`PROC-002`](PROC-002-task-id-uniqueness-and-allocation-rule.md), and
-[`PROC-001`](PROC-001-skill-mirror-sync-generator-and-ci-gate.md) —
+[`PROC-003`](../archive/PROC-003-split-task-index-state-from-retirement-history.md),
+[`PROC-007`](../archive/PROC-007-onboarding-prompt-tightening.md),
+[`PROC-005`](../archive/PROC-005-align-structural-check-mode-contract-text.md),
+[`PROC-002`](../archive/PROC-002-task-id-uniqueness-and-allocation-rule.md), and
+[`PROC-001`](../archive/PROC-001-skill-mirror-sync-generator-and-ci-gate.md) —
 the first five Theme H agentic-workflow hardening slices retired to
 `tasks/done/` on 2026-06-09 on branch
 `claude/agentic-workflow-analysis-kohifk`. PROC-001 added
@@ -2605,13 +2616,13 @@ cleanup is owned by the follow-up `PROC-008`. Remaining Theme H leaves:
 visibility), `PROC-008`.
 
 Previously-active
-[`HARDEN-079`](../done/HARDEN-079-core-module-implementation-splits.md),
-[`GEOM-021`](../done/GEOM-021-meshsoup-module-implementation-split.md),
-[`GEOM-022`](../done/GEOM-022-remaining-geometry-module-implementation-splits.md),
-[`HARDEN-080`](../done/HARDEN-080-ecs-module-implementation-splits.md),
-[`PLATFORM-005`](../done/PLATFORM-005-platform-module-implementation-splits.md),
-[`GRAPHICS-083`](../done/GRAPHICS-083-graphics-rhi-module-implementation-splits.md), and
-[`RUNTIME-096`](../done/RUNTIME-096-runtime-module-implementation-splits.md) —
+[`HARDEN-079`](../archive/HARDEN-079-core-module-implementation-splits.md),
+[`GEOM-021`](../archive/GEOM-021-meshsoup-module-implementation-split.md),
+[`GEOM-022`](../archive/GEOM-022-remaining-geometry-module-implementation-splits.md),
+[`HARDEN-080`](../archive/HARDEN-080-ecs-module-implementation-splits.md),
+[`PLATFORM-005`](../archive/PLATFORM-005-platform-module-implementation-splits.md),
+[`GRAPHICS-083`](../archive/GRAPHICS-083-graphics-rhi-module-implementation-splits.md), and
+[`RUNTIME-096`](../archive/RUNTIME-096-runtime-module-implementation-splits.md) —
 promoted module implementation split batch retired to `tasks/done/` on
 2026-06-07. The implementation split landed in `bfcd2751`; retirement was
 held until the default CPU gate passed after rebuilding `IntrinsicTests` with
@@ -2621,7 +2632,7 @@ The earlier rendergraph ASan failure was stale incremental C++23 module layout
 state from ccache/module artifacts, not a source defect in the split.
 
 Previously-active
-[`WORKSHOP-007`](../done/WORKSHOP-007-dependency-driven-default-recipe.md) —
+[`WORKSHOP-007`](../archive/WORKSHOP-007-dependency-driven-default-recipe.md) —
 dependency-driven default frame recipe retired to `tasks/done/` on
 2026-06-06. The slice removed blanket previous-pass chaining from
 `BuildDefaultFrameRecipe`, kept explicit pass dependencies as an intentional
@@ -2631,7 +2642,7 @@ resource-derived ordering, side-effect order, barrier packet ordering, and
 picking/selection/debug/postprocess feature combinations.
 
 Previously-active
-[`WORKSHOP-006`](../done/WORKSHOP-006-extract-render-prep-pipeline.md) —
+[`WORKSHOP-006`](../archive/WORKSHOP-006-extract-render-prep-pipeline.md) —
 render-prep pipeline extraction retired to `tasks/done/` on 2026-06-06. The
 slice added the `Extrinsic.Graphics.RenderPrepPipeline` module, moved
 CPU-side `PrepareFrame` prep ordering out of the renderer, retained task-graph
@@ -2640,7 +2651,7 @@ diagnostics, and made renderer lifecycle diagnostics reject `ExecuteFrame`
 after failed prep.
 
 Previously-active
-[`ARCH-001`](../done/ARCH-001-physics-layer-ownership-and-ecs-integration.md)
+[`ARCH-001`](../archive/ARCH-001-physics-layer-ownership-and-ecs-integration.md)
 — physics layer ownership and ECS/runtime integration contract retired to
 `tasks/done/` on 2026-06-05 at maturity `Retired`. The slice accepted
 `src/physics` as the simulation-world layer through ADR-0019 with
@@ -2655,7 +2666,7 @@ runtime-readiness leaf retired on 2026-06-06; `PHYSICS-003` is now the next
 open physics runtime-readiness leaf.
 
 Previously-active
-[`GRAPHICS-040C`](../done/GRAPHICS-040C-aa-recipe-selection-and-integration.md)
+[`GRAPHICS-040C`](../archive/GRAPHICS-040C-aa-recipe-selection-and-integration.md)
 — AA recipe selection + post-chain integration retired to `tasks/done/` on
 2026-06-05 at maturity `Operational`. The slice added the explicit
 `FrameRecipeAAOptions` selector, mode-specific FXAA/SMAA pass compilation,
@@ -2665,7 +2676,7 @@ input/output extent splitting, renderer-side reference-TAA execution, and
 diagnostics. Vendor reconstructor backend children remain unopened.
 
 Previously-active
-[`GRAPHICS-040B`](../done/GRAPHICS-040B-reconstructor-interface-and-reference-taa.md)
+[`GRAPHICS-040B`](../archive/GRAPHICS-040B-reconstructor-interface-and-reference-taa.md)
 — `IReconstructor` interface + reference TAA retired to `tasks/done/` on
 2026-06-05 at maturity `CPUContracted`. The slice added the vendor-free
 `Extrinsic.Graphics.Reconstruction` module with `IReconstructor`,
@@ -2678,7 +2689,7 @@ post-chain integration are retired in `GRAPHICS-040C`; vendor children remain
 unopened.
 
 Previously-active
-[`GRAPHICS-040A`](../done/GRAPHICS-040A-jitter-and-motion-vectors.md) —
+[`GRAPHICS-040A`](../archive/GRAPHICS-040A-jitter-and-motion-vectors.md) —
 camera jitter + motion-vector buffer retired to `tasks/done/` on 2026-06-05 at
 maturity `CPUContracted`. The slice added a deterministic Halton(2,3)×16
 temporal jitter helper, projection-matrix jitter override, authoritative
@@ -2689,7 +2700,7 @@ target gating. Reference TAA reconstruction retired in `GRAPHICS-040B`; recipe
 selection and post-chain integration retired in `GRAPHICS-040C`.
 
 Previously-active
-[`GRAPHICS-039D`](../done/GRAPHICS-039D-cluster-async-compute-affinity.md) —
+[`GRAPHICS-039D`](../archive/GRAPHICS-039D-cluster-async-compute-affinity.md) —
 cluster build/assignment async-compute affinity retired to `tasks/done/` on
 2026-06-05 at maturity `CPUContracted`. The slice tagged
 `ClusterGridBuildPass` and `LightClusterAssignmentPass` with
@@ -2699,7 +2710,7 @@ preserved single-queue correctness, updated the renderer docs, and added
 frame-recipe contract coverage for async-capable and async-absent profiles.
 
 Previously-active
-[`GRAPHICS-039C`](../done/GRAPHICS-039C-cluster-surface-shader-integration.md) —
+[`GRAPHICS-039C`](../archive/GRAPHICS-039C-cluster-surface-shader-integration.md) —
 clustered surface-shader integration + recipe wiring retired to `tasks/done/`
 on 2026-06-05 at maturity `CPUContracted`. The slice added scene-table BDA
 publication for `ClusterLights.Headers` / `ClusterLights.Indices`, cluster-grid
@@ -2711,7 +2722,7 @@ lifecycle assertions for scene-table publication/rebuild survival, and touched
 shader compilation. Async-compute affinity is retired in `GRAPHICS-039D`.
 
 Previously-active
-[`GRAPHICS-039B`](../done/GRAPHICS-039B-light-cluster-assignment.md) —
+[`GRAPHICS-039B`](../archive/GRAPHICS-039B-light-cluster-assignment.md) —
 light-to-cluster assignment + overflow diagnostics retired to `tasks/done/` on
 2026-06-05 at maturity `CPUContracted`. The slice added
 `ClusterLightCellHeader`, retained `ClusterLights.Headers` /
@@ -2725,7 +2736,7 @@ command shape, and diagnostic publication. Surface-shader consumption and
 async-compute affinity remain `GRAPHICS-039C/D`.
 
 Previously-active
-[`GRAPHICS-039A`](../done/GRAPHICS-039A-cluster-grid-build.md) — cluster grid
+[`GRAPHICS-039A`](../archive/GRAPHICS-039A-cluster-grid-build.md) — cluster grid
 resource + build pass retired to `tasks/done/` on 2026-06-04 at maturity
 `CPUContracted`. The slice added the `Extrinsic.Graphics.LightClusters` module,
 the default 80 px tile / 24 logarithmic Z-slice froxel-grid contract, per-cell
@@ -2738,7 +2749,7 @@ resource usage, dispatch shape, and frame-recipe gating. Light assignment,
 shader consumption, and async-compute affinity remain `GRAPHICS-039B/C/D`.
 
 Previously-active
-[`GRAPHICS-038E`](../done/GRAPHICS-038E-hzb-conservatism-gpu-smoke.md) —
+[`GRAPHICS-038E`](../archive/GRAPHICS-038E-hzb-conservatism-gpu-smoke.md) —
 opt-in `gpu;vulkan` HZB conservatism smoke retired to `tasks/done/` on
 2026-06-04 at maturity `Operational` on Vulkan-capable hosts. The slice added a
 test-only HZB conservatism compute shader, a Vulkan smoke that dispatches the
@@ -2750,7 +2761,7 @@ The default CPU/null contracts remain unchanged; production HZB storage-image
 descriptor publication remains future backend descriptor integration.
 
 Previously-active
-[`GRAPHICS-038D`](../done/GRAPHICS-038D-camera-transition-and-selection-exemption.md) —
+[`GRAPHICS-038D`](../archive/GRAPHICS-038D-camera-transition-and-selection-exemption.md) —
 camera-transition skip heuristic and selection-bucket occlusion exemption
 retired to `tasks/done/` on 2026-06-04 at maturity `CPUContracted`. The slice
 added snapshot-carried explicit camera-transition flags, delta-threshold
@@ -2761,7 +2772,7 @@ and renderer/runtime docs sync. `Operational` opt-in GPU/Vulkan conservatism
 proof remains owned by `GRAPHICS-038E`.
 
 Previously-active
-[`GRAPHICS-038C`](../done/GRAPHICS-038C-two-phase-cull-shader.md) —
+[`GRAPHICS-038C`](../archive/GRAPHICS-038C-two-phase-cull-shader.md) —
 phase-1/phase-2 cull shader extension and per-bucket buffer doubling retired
 to `tasks/done/` on 2026-06-04 at maturity `CPUContracted`. The slice added the
 `GpuCullBucketPhases` ABI, phase-1/phase-2 indirect output surfaces per bucket,
@@ -2773,7 +2784,7 @@ HZB reject-list publication, phase-2 recull, and opt-in `gpu;vulkan`
 conservatism proof remain `GRAPHICS-038E`.
 
 Previously-active
-[`GRAPHICS-038B`](../done/GRAPHICS-038B-hzb-build-compute.md) — HZB build
+[`GRAPHICS-038B`](../archive/GRAPHICS-038B-hzb-build-compute.md) — HZB build
 compute shader + dispatch wiring retired to `tasks/done/` on 2026-06-04 at
 maturity `CPUContracted`. The slice added `assets/shaders/hzb_build.comp`, the
 pure HZB build-plan selector, backend-neutral per-mip fallback recording,
@@ -2784,7 +2795,7 @@ Single-pass/SPD-style storage-image publication and opt-in `gpu;vulkan`
 conservatism proof remain owned by `GRAPHICS-038E`.
 
 Previously-active
-[`GRAPHICS-037D`](../done/GRAPHICS-037D-multi-queue-vulkan-recording.md) —
+[`GRAPHICS-037D`](../archive/GRAPHICS-037D-multi-queue-vulkan-recording.md) —
 Vulkan multi-queue recording retired to `tasks/done/` on 2026-06-04 at
 maturity `Operational` on Vulkan-capable hosts. Slices A-D landed
 async-compute/transfer queue-family discovery, Sync2 queue-family token
@@ -2795,7 +2806,7 @@ transfer barriers, default-recipe async histogram routing, and opt-in
 single-queue path through queue-affinity demotion and the default CPU gate.
 
 Previously-active
-[`UI-001`](../done/UI-001-sandbox-editor-shell-panels.md) — sandbox editor shell
+[`UI-001`](../archive/UI-001-sandbox-editor-shell-panels.md) — sandbox editor shell
 and core panels on top of the runtime ImGui adapter/pass stack retired to
 `tasks/done/` on 2026-06-03 at maturity `CPUContracted`. Slices A-D landed the
 promoted editor shell, scene hierarchy, inspector/render-hint fields,
@@ -2809,7 +2820,7 @@ asset/runtime ingest seams. Final file-backed visual/interactive proof remains
 owned by `RUNTIME-095`.
 
 Previously-active
-[`RUNTIME-083`](../done/RUNTIME-083-visualization-adapters.md) —
+[`RUNTIME-083`](../archive/RUNTIME-083-visualization-adapters.md) —
 `Extrinsic.Runtime.VisualizationAdapters` runtime producer umbrella retired to
 `tasks/done/` on 2026-06-02 at maturity `CPUContracted`. Slices A-E landed the
 umbrella module, property-scalar, KMeans/color, vector-field, isoline, Htex
@@ -2821,7 +2832,7 @@ visualization proof remains owned by `RUNTIME-095` or a later visualization
 backend smoke.
 
 Previously-active
-[`GRAPHICS-079`](../done/GRAPHICS-079-default-recipe-imgui-pass-wiring.md) —
+[`GRAPHICS-079`](../archive/GRAPHICS-079-default-recipe-imgui-pass-wiring.md) —
 default-recipe `Pass.ImGui` wiring (Theme A working-sandbox path, the consumer
 half of the ImGui/UI leaves that gate `UI-001`) retired to `tasks/done/` on
 2026-06-02. Slices A/B wired the renderer-side `ImGuiPass` executor route,
@@ -2840,7 +2851,7 @@ full slice chain `8f1374c6`, `61192d50`, `84d16985`, `97d34aba`, `9e283c72`,
 acceptance remains owned by `RUNTIME-095`.
 
 Previously-active
-[`RUNTIME-090`](../done/RUNTIME-090-imgui-platform-renderer-adapter.md) —
+[`RUNTIME-090`](../archive/RUNTIME-090-imgui-platform-renderer-adapter.md) —
 runtime-side Dear ImGui platform/renderer adapter
 (`Extrinsic.Runtime.ImGuiAdapter`, Theme A working-sandbox path stage 4, the
 producer half of the ImGui/UI leaves that gate `UI-001`) retired to
@@ -2871,7 +2882,7 @@ topology, per-command bindless user-texture sampling, and the registered
 `RUNTIME-095`.
 
 Previously-active
-[`RUNTIME-093`](../done/RUNTIME-093-primitive-selection-refinement.md) — runtime
+[`RUNTIME-093`](../archive/RUNTIME-093-primitive-selection-refinement.md) — runtime
 primitive selection refinement for meshes, graphs, and point clouds (Theme A
 working-sandbox path) retired to `tasks/done/` on 2026-06-01 at maturity
 `CPUContracted`. Slice A (PR #959) delivered the standalone
@@ -2901,7 +2912,7 @@ regenerated (no diff). `Operational` interactive selection proof stays owned by
 `RUNTIME-089`, `GRAPHICS-074`, and final sandbox acceptance (`RUNTIME-095`).
 
 Previously-active
-[`RUNTIME-092`](../done/RUNTIME-092-stable-entity-lookup.md) — runtime stable
+[`RUNTIME-092`](../archive/RUNTIME-092-stable-entity-lookup.md) — runtime stable
 entity lookup sidecar (Theme A working-sandbox path) retired to `tasks/done/` on
 2026-05-31 at maturity `CPUContracted`. Slice A landed the standalone
 `Extrinsic.Runtime.StableEntityLookup` module (runtime-owned
@@ -2928,7 +2939,7 @@ regenerated (no diff). `Operational` user-visible selection durability stays
 owned by `RUNTIME-089`, UI tasks, and final sandbox acceptance (`RUNTIME-095`).
 
 Previously-active
-[`RUNTIME-089`](../done/RUNTIME-089-selection-controller.md) — runtime selection
+[`RUNTIME-089`](../archive/RUNTIME-089-selection-controller.md) — runtime selection
 controller and snapshot handoff (Theme A working-sandbox path) retired to
 `tasks/done/` on 2026-05-31 at maturity `CPUContracted`. Slice A landed the
 standalone `Extrinsic.Runtime.SelectionController` module (input-facing
@@ -2956,7 +2967,7 @@ the final working-sandbox acceptance task (`RUNTIME-095`); the real input→pick
 binding is owned by a later editor/UI task.
 
 Previously-active
-[`RUNTIME-088`](../done/RUNTIME-088-mesh-primitive-view-lifecycle.md) — mesh
+[`RUNTIME-088`](../archive/RUNTIME-088-mesh-primitive-view-lifecycle.md) — mesh
 primitive view lifecycle (Theme A working-sandbox path) retired to `tasks/done/`
 on 2026-05-31 at maturity `CPUContracted`. Slice A landed the standalone
 `Extrinsic.Runtime.MeshPrimitiveViewPacker` (edge line-list + vertex point
@@ -2979,7 +2990,7 @@ task-policy/module-inventory checks clean. `Operational` visual proof of the
 three lanes stays owned by `RUNTIME-095`.
 
 Previously-active
-[`RUNTIME-087`](../done/RUNTIME-087-geometrysources-pointcloud-residency.md) —
+[`RUNTIME-087`](../archive/RUNTIME-087-geometrysources-pointcloud-residency.md) —
 `GeometrySources` point-cloud residency bridge (Theme A working-sandbox path)
 retired to `tasks/done/` on 2026-05-30 at maturity `CPUContracted`. Landed as
 one robust slice mirroring `RUNTIME-086`: standalone
@@ -3008,7 +3019,7 @@ doc-links/task-policy/module-inventory checks clean. `Operational` visual proof
 is owned by the final working-sandbox acceptance task (`RUNTIME-095`).
 
 Previously-active
-[`RUNTIME-086`](../done/RUNTIME-086-geometrysources-graph-residency.md) —
+[`RUNTIME-086`](../archive/RUNTIME-086-geometrysources-graph-residency.md) —
 `GeometrySources` graph residency bridge (Theme A working-sandbox path) retired
 to `tasks/done/` on 2026-05-30 at maturity `CPUContracted`. Slice A (standalone
 `Extrinsic.Runtime.GraphGeometryPacker`) landed earlier; Slices B and C landed
@@ -3032,7 +3043,7 @@ doc-links/task-policy/module-inventory checks clean. `Operational` visual proof
 is owned by the final working-sandbox acceptance task.
 
 Previously-active
-[`GEOM-012`](../done/GEOM-012-symmetric-domain-views-property-sharing.md) —
+[`GEOM-012`](../archive/GEOM-012-symmetric-domain-views-property-sharing.md) —
 symmetric mesh/graph/point-cloud domain views retired to `tasks/done/` on
 2026-05-29 after Slice E (conversion/move/consume policy) landed on
 `claude/intrinsicengine-agent-onboarding-YjhiR`. Maturity `CPUContracted`. Slice E
@@ -3050,7 +3061,7 @@ and `PointCloudConversion.ConvertedCloudOutlivesAndDecouplesFromSource`); the
 focused geometry suite passed 181/181 with the layering, test-layout, doc-links,
 and module-inventory (no diff) checks clean.
 
-[`BUG-013`](../done/BUG-013-backbuffer-readback-contract-vtable-segv.md) —
+[`BUG-013`](../archive/BUG-013-backbuffer-readback-contract-vtable-segv.md) —
 backbuffer readback contract SEGV retired to `tasks/done/` on 2026-05-29 as
 **not reproducible on a clean `ci` preset build**. On a freshly-cloned tree the
 two `ConfiguredHandleRecordsReadbackTripletOnce` cases pass through the default
@@ -3060,7 +3071,7 @@ module-BMI artifact after `cc06edef`; the lasting prevention is the
 clean-rebuild rule documented in `src/graphics/rhi/README.md`. Unblocks
 `GRAPHICS-076E` CPU contract closure; no engine/test source was changed.
 
-[`RUNTIME-085`](../done/RUNTIME-085-geometrysources-mesh-residency.md) —
+[`RUNTIME-085`](../archive/RUNTIME-085-geometrysources-mesh-residency.md) —
 `GeometrySources` mesh residency bridge retired to `tasks/done/` on
 2026-05-28 after the Slice D closure check. Slices A–C landed on
 `claude/optimistic-hypatia-yJ5qw` / `claude/intrinsicengine-agent-onboarding-FLLuF`
@@ -3073,21 +3084,21 @@ with only the two pre-existing `IntrinsicBenchmarkSmoke.HalfedgeSmoke.Run`/
 `MeshGeometryExtraction`/`MeshGeometryPackerTest` cases pass. `Operational`
 visual proof is deferred to `RUNTIME-095` (final working-sandbox acceptance).
 
-[`GRAPHICS-077`](../done/GRAPHICS-077-transient-debug-primitive-upload-helper.md) —
+[`GRAPHICS-077`](../archive/GRAPHICS-077-transient-debug-primitive-upload-helper.md) —
 transient-debug upload helper retired to `tasks/done/` on 2026-05-28 after
 Slice D added `TransientDebugSurfaceGpuSmoke`; maturity is `CPUContracted` on
 CPU-only hosts and command-stream `Operational` on Vulkan-capable hosts. Pixel
 readback parity is retired by
-[`GRAPHICS-077E`](../done/GRAPHICS-077E-transient-debug-pixel-readback.md).
+[`GRAPHICS-077E`](../archive/GRAPHICS-077E-transient-debug-pixel-readback.md).
 
-[`GRAPHICS-078`](../done/GRAPHICS-078-visualization-overlay-upload-helper.md) —
+[`GRAPHICS-078`](../archive/GRAPHICS-078-visualization-overlay-upload-helper.md) —
 visualization-overlay upload helper retired to `tasks/done/` on 2026-05-28 after
 Slice D added `VisualizationOverlaySurfaceGpuSmoke`; maturity is
 `CPUContracted` on CPU-only hosts and command-stream `Operational` on
 Vulkan-capable hosts. Pixel readback parity is retired by
-[`GRAPHICS-078E`](../done/GRAPHICS-078E-visualization-overlay-pixel-readback.md).
+[`GRAPHICS-078E`](../archive/GRAPHICS-078E-visualization-overlay-pixel-readback.md).
 
-[`GEOM-015`](../done/GEOM-015-gjk-termination-diagnostics.md) — GJK
+[`GEOM-015`](../archive/GEOM-015-gjk-termination-diagnostics.md) — GJK
 termination diagnostics and scale-aware tolerance policy retired to
 `tasks/done/` on 2026-05-22 after all four slices landed (PRs #915,
 #917, #919). The next slice was picked per the priority rules
@@ -3096,7 +3107,7 @@ no reproducible bugs are open, so the earliest unblocked Theme A leaf
 in [`tasks/backlog/README.md`](../backlog/README.md) won —
 `GRAPHICS-076`, gated only by the retired `GRAPHICS-075`.
 
-[`RUNTIME-082`](../done/RUNTIME-082-spatial-debug-adapters.md) —
+[`RUNTIME-082`](../archive/RUNTIME-082-spatial-debug-adapters.md) —
 `Extrinsic.Runtime.SpatialDebugAdapters` umbrella retired to
 `tasks/done/` on 2026-05-27 after Slice D landed on
 `claude/intrinsicengine-agent-onboarding-xnNIW`
@@ -3106,7 +3117,7 @@ in [`tasks/backlog/README.md`](../backlog/README.md) won —
 CPU/null gate; 2245/2247 overall, the two pre-existing
 `IntrinsicBenchmarkSmoke.HalfedgeSmoke` failures unchanged).
 
-[`GEOM-008`](../done/GEOM-008-linear-algebra-solver-infrastructure.md) —
+[`GEOM-008`](../archive/GEOM-008-linear-algebra-solver-infrastructure.md) —
 Geometry linear algebra and solver infrastructure retired to
 `tasks/done/` on 2026-05-27 after Slice A landed in commit `c1aeafb`
 (merged into the working tree via `cfe2f0c`). Slice A introduced the
@@ -3120,13 +3131,13 @@ default CPU gate (`ctest -LE 'gpu|vulkan|slow|flaky-quarantine'`)
 together with the layering, test-layout, docs-links, task-policy, and
 module-inventory regeneration checks.
 
-[`BUG-035`](../done/BUG-035-vulkan-slot-recycling-smoke.md) — Vulkan
+[`BUG-035`](../archive/BUG-035-vulkan-slot-recycling-smoke.md) — Vulkan
 slot-recycling smoke retired to `tasks/done/` on 2026-06-12 at `Operational`.
 The opt-in `gpu;vulkan` smoke advances the real promoted Vulkan frame loop past
 the retirement window and observes destroyed buffer/texture slots being reused
 with bumped generations through public handles.
 
-[`BUG-034`](../done/BUG-034-vulkan-resource-pool-reclamation.md) — Vulkan
+[`BUG-034`](../archive/BUG-034-vulkan-resource-pool-reclamation.md) — Vulkan
 ResourcePool reclamation retired to `tasks/done/` on 2026-06-12 at
 `CPUContracted`, with `BUG-035` providing the Vulkan operational proof.
 `VulkanDevice` now processes buffer/image/sampler/pipeline pool deletions from
@@ -3135,34 +3146,34 @@ deferred Vulkan-object destruction in the existing deletion queue. The Null
 device slot-recycling contract pins the backend-neutral behavior in the default
 CPU gate.
 
-[`BUG-033`](../done/BUG-033-mesh-io-untrusted-header-counts.md) — mesh IO
+[`BUG-033`](../archive/BUG-033-mesh-io-untrusted-header-counts.md) — mesh IO
 untrusted header-count hardening retired to `tasks/done/` on 2026-06-12 at
 `CPUContracted`. OFF/PLY import now validates declared counts against payload
 before allocation, uses overflow-safe byte checks, rejects invalid PLY list
 count types/counts, and fails closed on degenerate OFF face rows. Malformed
 input regressions pass without aborting.
 
-[`BUG-032`](../done/BUG-032-triangle-edge-point-vulkan-rendering.md) —
+[`BUG-032`](../archive/BUG-032-triangle-edge-point-vulkan-rendering.md) —
 triangle edge/point Vulkan rendering retired to `tasks/done/` on 2026-06-12 at
 `Operational`. The fix aligned `GpuGeometryRecord` ABI stride between C++ and
 GLSL, removed double-applied vertex offsets from GpuScene shaders, propagated
 runtime mesh sidecar point/edge config, and proved visible reference-triangle
 edge/point lanes through Vulkan smoke/readback coverage.
 
-[`BUG-031`](../done/BUG-031-benchmark-smoke-not-in-intrinsictests-aggregate.md)
+[`BUG-031`](../archive/BUG-031-benchmark-smoke-not-in-intrinsictests-aggregate.md)
 — benchmark smoke aggregate wiring retired to `tasks/done/` on 2026-06-12 at
 `CPUContracted`. The current tree registers `IntrinsicBenchmarkSmoke` through
 the shared aggregate target property; building only `IntrinsicTests` produces
 the smoke runner and the benchmark CTest pair passes.
 
-[`BUG-030`](../done/BUG-030-headless-engine-run-tests-red-gate.md) — headless
+[`BUG-030`](../archive/BUG-030-headless-engine-run-tests-red-gate.md) — headless
 `Engine::Run()` red-gate retired to `tasks/done/` on 2026-06-12 at
 `CPUContracted`. Live-window engine-loop tests now guard born-closed windows
 with the house `ShouldClose() -> GTEST_SKIP()` pattern, and `tests/README.md`
 records the rule. The broader headless execution restoration is retired by
 `RUNTIME-107`.
 
-[`BUG-029`](../done/BUG-029-ray-aabb-slab-nan-poisoning.md) — ray/AABB slab
+[`BUG-029`](../archive/BUG-029-ray-aabb-slab-nan-poisoning.md) — ray/AABB slab
 NaN poisoning retired to `tasks/done/` on 2026-06-12 at `CPUContracted`.
 Analytic ray/AABB overlap and raycast now use NaN-free slab intervals for
 axis-parallel/on-boundary rays, sphere raycasts use a finite center-origin
@@ -3237,34 +3248,34 @@ endpoint retired); they are preserved here verbatim for traceability.
   prior children and runs only on hosts with Vulkan + GLFW; its bootstrap
   fixture is retired and the default-recipe fixture is canonical.
 
-[`HARDEN-083`](HARDEN-083-geometry-source-availability-contract.md) —
+[`HARDEN-083`](../archive/HARDEN-083-geometry-source-availability-contract.md) —
 geometry source availability and provenance contract retired to `tasks/done/`
 on 2026-06-19 at `CPUContracted`. `GeometrySources` now reports exact active
 domain, source provenance, and available vertex/node, edge, halfedge, and face
 CPU sources separately; topology markers can explain provenance without
 pretending missing property sets exist.
 
-[`RUNTIME-117`](RUNTIME-117-geometry-availability-render-lane-resolver.md) —
+[`RUNTIME-117`](../archive/RUNTIME-117-geometry-availability-render-lane-resolver.md) —
 geometry availability and render-lane resolver retired to `tasks/done/` on
 2026-06-19 at `CPUContracted`. Runtime now owns the standard resolver over ECS
 source availability plus `RenderSurface`, `RenderEdges`, and `RenderPoints`,
 including property-domain support, element counts, and lane diagnostics.
 
-[`RUNTIME-118`](RUNTIME-118-geometry-availability-consumer-migration.md) —
+[`RUNTIME-118`](../archive/RUNTIME-118-geometry-availability-consumer-migration.md) —
 geometry availability consumer migration retired to `tasks/done/` on
 2026-06-19 at `CPUContracted`. Runtime packers, extraction, progressive
 property resolution, selected bake validation, and primitive-selection
 refinement now consume the availability/provenance model instead of using exact
 `ActiveDomain` as the common capability gate.
 
-[`RUNTIME-119`](RUNTIME-119-gpu-renderable-availability-snapshot.md) — GPU
+[`RUNTIME-119`](../archive/RUNTIME-119-gpu-renderable-availability-snapshot.md) — GPU
 renderable availability snapshot retired to `tasks/done/` on 2026-06-19 at
 `CPUContracted`. `RenderExtractionCache` exposes a read-only
 `GpuRenderableAvailabilityView` keyed by stable entity id, with independent
 surface, edge, and point lane residency plus canonical named-buffer facts while
 ECS remains free of GPU handles and renderer sidecars.
 
-[`UI-021`](UI-021-sandbox-editor-geometry-availability-migration.md) —
+[`UI-021`](../archive/UI-021-sandbox-editor-geometry-availability-migration.md) —
 sandbox editor geometry availability migration retired to `tasks/done/` on
 2026-06-19 at `CPUContracted`. `Runtime.SandboxEditorUi` now consumes
 `Extrinsic.Runtime.GeometryAvailability` for domain windows, visualization
@@ -3272,7 +3283,7 @@ targets, property catalogs, primitive-view commands, render hints, K-Means
 affordances, and mesh UV/bake diagnostics while preserving source provenance
 labels.
 
-[`GEOM-026`](GEOM-026-cross-domain-vertex-normal-recompute.md) — cross-domain
+[`GEOM-026`](../archive/GEOM-026-cross-domain-vertex-normal-recompute.md) — cross-domain
 vertex normal recomputation contracts retired to `tasks/done/` on 2026-06-21
 at `CPUContracted`. Geometry now exposes domain-owned CPU normal recompute
 modules for halfedge meshes, graphs, and point clouds:
@@ -3281,7 +3292,7 @@ modules for halfedge meshes, graphs, and point clouds:
 removed in favor of KDTree/default and supplied-index point-cloud recompute
 overloads that write canonical `v:normal` property data with diagnostics.
 
-[`RUNTIME-120`](RUNTIME-120-vertex-attribute-binding-resolver.md) — reusable
+[`RUNTIME-120`](../archive/RUNTIME-120-vertex-attribute-binding-resolver.md) — reusable
 vertex attribute binding resolver retired to `tasks/done/` on 2026-06-24 at
 `CPUContracted`. Runtime now has the GPU-agnostic
 `Extrinsic.Runtime.VertexAttributeBinding` resolver for count-matched property
@@ -3289,7 +3300,7 @@ to vertex-channel binding, and the mesh packer routes normal and texcoord reads
 through it without changing existing packed output. Follow-up vertex-channel
 work remains tracked by `RUNTIME-121` through `RUNTIME-125`.
 
-[`GRAPHICS-099`](GRAPHICS-099-rendering-contract-foundation.md) — rendering
+[`GRAPHICS-099`](../archive/GRAPHICS-099-rendering-contract-foundation.md) — rendering
 contract foundation retired to `tasks/done/` on 2026-06-24 at
 `CPUContracted`. Graphics now exposes
 `Extrinsic.Graphics.RenderingContract`, a CPU-only public contract vocabulary
@@ -3300,7 +3311,7 @@ Vulkan, shaders, runtime integration, UI, and loadable-file behavior remain
 unchanged; follow-up implementation stays split across `GRAPHICS-100`,
 `GRAPHICS-101`, `GRAPHICS-102`, `RUNTIME-127`, `UI-023`, and `GRAPHICS-103`.
 
-[`GRAPHICS-100`](GRAPHICS-100-current-renderer-contract-adapter.md) — minimal
+[`GRAPHICS-100`](../archive/GRAPHICS-100-current-renderer-contract-adapter.md) — minimal
 current-renderer contract adapter retired to `tasks/done/` on 2026-06-24 at
 `CPUContracted`. Graphics now exposes
 `Extrinsic.Graphics.CurrentRendererContractAdapter`, a data-only adapter that
@@ -3312,7 +3323,7 @@ Renderer execution, Vulkan, shaders, runtime extraction, UI, and loadable
 recipe behavior remain unchanged; operational proof stays owned by
 `GRAPHICS-103`.
 
-[`GRAPHICS-101`](GRAPHICS-101-loadable-render-recipe-configs.md) — loadable
+[`GRAPHICS-101`](../archive/GRAPHICS-101-loadable-render-recipe-configs.md) — loadable
 rendering recipe config schema and validation retired to `tasks/done/` on
 2026-06-24 at `CPUContracted`. Graphics now exposes
 `Extrinsic.Graphics.RenderRecipeConfig`, a CPU-only versioned JSON loader and
@@ -3326,7 +3337,7 @@ fallback-applied states. Runtime activation, UI editing, shared recipe
 execution, Vulkan, shaders, and backend behavior remain deferred to
 `RUNTIME-127`, `UI-023`, `GRAPHICS-102`, and `GRAPHICS-103`.
 
-[`RUNTIME-127`](RUNTIME-127-render-artifact-publication.md) — render artifact
+[`RUNTIME-127`](../archive/RUNTIME-127-render-artifact-publication.md) — render artifact
 publication and apply semantics retired to `tasks/done/` on 2026-06-24 at
 `CPUContracted`. Runtime now exposes
 `Extrinsic.Runtime.RenderArtifactPublication`, a CPU-only registry and command
@@ -3340,7 +3351,7 @@ graphics, or renderers mutate project data implicitly. UI editing remains owned
 by `UI-023`, and image-producing Vulkan/render-graph proof remains owned by
 `GRAPHICS-103`.
 
-[`GRAPHICS-102`](GRAPHICS-102-shared-visibility-lighting-recipe-execution.md) —
+[`GRAPHICS-102`](../archive/GRAPHICS-102-shared-visibility-lighting-recipe-execution.md) —
 shared visibility and lighting recipe execution retired to `tasks/done/` on
 2026-06-24 at `CPUContracted`. Graphics now exposes
 `Extrinsic.Graphics.SharedRenderRecipeExecution`, a CPU-only shared recipe
@@ -3355,7 +3366,7 @@ capabilities or missing produced products deterministically. Backend command
 buffers, Vulkan resources, project mutation, UI activation, and operational
 render-graph proof remain owned by `GRAPHICS-103` and `UI-023`.
 
-[`UI-023`](UI-023-render-recipe-ui-editing.md) — sandbox render recipe editing
+[`UI-023`](../archive/UI-023-render-recipe-ui-editing.md) — sandbox render recipe editing
 UI retired to `tasks/done/` on 2026-06-24 at `CPUContracted`.
 `Extrinsic.Runtime.SandboxEditorUi` now exposes data-only render recipe editor
 models, draft/validation/preview/activation command DTOs, and artifact
@@ -3365,7 +3376,7 @@ overrides, view/output recipe data, draft diagnostics, preview/activation
 state, and render artifact lifecycle rows without UI owning renderer state or
 mutating graphics/backend resources directly.
 
-[`GRAPHICS-103`](GRAPHICS-103-vulkan-rendergraph-contract-integration.md) —
+[`GRAPHICS-103`](../archive/GRAPHICS-103-vulkan-rendergraph-contract-integration.md) —
 Vulkan render-graph contract integration retired to `tasks/done/` on
 2026-06-24 at `Operational`. The current renderer now evaluates the
 contract-first descriptor, scoped snapshot, binding intent, shared recipe,
@@ -3377,7 +3388,7 @@ readback outcomes. Opt-in Vulkan smoke coverage proves a declared output
 artifact can produce non-empty readback-backed evidence through the contract
 path while runtime publication remains runtime-owned.
 
-[`RUNTIME-121`](RUNTIME-121-vertex-color-channel-upload.md) — per-vertex mesh
+[`RUNTIME-121`](../archive/RUNTIME-121-vertex-color-channel-upload.md) — per-vertex mesh
 color channel upload retired to `tasks/done/` on 2026-06-24 at `Operational`.
 Runtime mesh packing now resolves count-matched `v:color` through the reusable
 vertex-attribute resolver into packed unorm8 color data, graphics uploads that
@@ -3390,7 +3401,7 @@ present/absent packer behavior, GpuWorld BDA publication, and
 mesh from `v:color`. Dormant `surface.vert`/`PtrVertexAttr` was deliberately not
 used; RUNTIME-122 owns the later GPU SoA migration.
 
-[`RUNTIME-122`](RUNTIME-122-gpu-soa-vertex-channel-storage-and-shader-fetch.md)
+[`RUNTIME-122`](../archive/RUNTIME-122-gpu-soa-vertex-channel-storage-and-shader-fetch.md)
 — GPU SoA vertex channel storage and shader fetch retired to `tasks/done/` on
 2026-06-24 at `Operational`. Runtime mesh, graph, point-cloud, and mesh
 primitive-view packers now emit explicit per-channel vertex streams; graphics
@@ -3403,7 +3414,7 @@ packer/GpuWorld/shader-contract coverage, the full CPU-supported CTest gate,
 structural validators, and opt-in `gpu;vulkan` runtime sandbox surface plus
 line/point smokes passed.
 
-[`RUNTIME-123`](RUNTIME-123-editor-bind-property-as-channel.md) — editor
+[`RUNTIME-123`](../archive/RUNTIME-123-editor-bind-property-as-channel.md) — editor
 "bind any property as normals / colors" retired to `tasks/done/` on
 2026-06-24 at `CPUContracted`. Runtime now has a
 `VertexChannelBindingSet` ECS descriptor consumed by mesh, graph, and
@@ -3415,7 +3426,7 @@ SandboxEditorUi, mesh/graph/point-cloud packer, and mesh extraction coverage,
 the full CPU-supported CTest gate, structural validators, and regenerated
 module inventory passed.
 
-[`RUNTIME-124`](RUNTIME-124-per-channel-partial-uploads.md) — per-channel dirty
+[`RUNTIME-124`](../archive/RUNTIME-124-per-channel-partial-uploads.md) — per-channel dirty
 tracking and partial GPU uploads retired to `tasks/done/` on 2026-06-24 at
 `Operational`. ECS now has fine-grained vertex-channel dirty tags for
 positions, texcoords, normals, and colors, while the legacy broad
@@ -3430,7 +3441,7 @@ GpuWorld, dirty-tag, editor-command, and render-extraction tests passed, and an
 opt-in `gpu;vulkan` runtime sandbox smoke proves a vertex-color mutation shades
 through the active deferred GpuScene path without a full geometry rebind.
 
-[`RUNTIME-126`](RUNTIME-126-gpu-readback-jobs-and-property-writeback.md) — GPU
+[`RUNTIME-126`](../archive/RUNTIME-126-gpu-readback-jobs-and-property-writeback.md) — GPU
 readback jobs and result→property write-back retired to `tasks/done/` on
 2026-06-25 at `Operational`. `StreamingExecutor` now has a
 `WaitingForReadback` park/resume state, `DerivedJobRegistry` exposes readback
@@ -3443,14 +3454,14 @@ readback job has resumed and applied, preserving existing `SubmitFollowUp` /
 readback streaming integration tests, the full CPU-supported CTest gate, and an
 opt-in `gpu;vulkan` readback round-trip smoke passed.
 
-[`GEOM-027`](GEOM-027-property-name-lifetime-contract.md),
-[`GEOM-028`](GEOM-028-property-registry-handle-safety.md),
-[`GEOM-029`](GEOM-029-const-property-set-validity-contract.md),
-[`GEOM-030`](GEOM-030-property-set-const-lookup-migration.md),
-[`GEOM-031`](GEOM-031-property-set-naming-normalization.md),
-[`GEOM-032`](GEOM-032-bool-property-access-contract.md),
-[`GEOM-033`](GEOM-033-erased-property-metadata-catalog.md), and
-[`GEOM-051`](GEOM-051-property-system-enhancements.md) — geometry property
+[`GEOM-027`](../archive/GEOM-027-property-name-lifetime-contract.md),
+[`GEOM-028`](../archive/GEOM-028-property-registry-handle-safety.md),
+[`GEOM-029`](../archive/GEOM-029-const-property-set-validity-contract.md),
+[`GEOM-030`](../archive/GEOM-030-property-set-const-lookup-migration.md),
+[`GEOM-031`](../archive/GEOM-031-property-set-naming-normalization.md),
+[`GEOM-032`](../archive/GEOM-032-bool-property-access-contract.md),
+[`GEOM-033`](../archive/GEOM-033-erased-property-metadata-catalog.md), and
+[`GEOM-051`](../archive/GEOM-051-property-system-enhancements.md) — geometry property
 system migration blockers retired to `tasks/done/` on 2026-06-28 at
 `CPUContracted`. `Geometry.Properties` now uses a single borrowed
 `std::string_view` name contract, fail-closed handle validity, const-correct
@@ -3460,7 +3471,7 @@ element ranges across mesh, graph, point-cloud, and const domain views. Focused
 property tests cover names, copied handles, invalid handles, const lookup,
 descriptor metadata, bool access, and live ranges.
 
-[`GEOM-043`](GEOM-043-remeshing-reprojection-error-bounded-sizing.md) —
+[`GEOM-043`](../archive/GEOM-043-remeshing-reprojection-error-bounded-sizing.md) —
 remeshing reprojection and error-bounded sizing retired to `tasks/done/` on
 2026-06-28 at `CPUContracted`. Adaptive remeshing now exposes a reference
 projector backed by closest-face queries, error-bounded Taubin-style sizing,
@@ -3468,7 +3479,7 @@ and uniform-remeshing projection options for split/move operations. Focused CPU
 tests prove projection to a frozen reference surface and the error-bounded
 sizing path on representative meshes.
 
-[`GEOM-044`](GEOM-044-subdivision-sqrt3-loop-feature-masks.md) — subdivision
+[`GEOM-044`](../archive/GEOM-044-subdivision-sqrt3-loop-feature-masks.md) — subdivision
 utility migration retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
 Loop subdivision now preserves optional feature-edge masks through crease
 stencils and tag propagation, and the new
@@ -3476,7 +3487,7 @@ stencils and tag propagation, and the new
 subdivision. Focused CPU tests cover the single-triangle Sqrt(3) split and Loop
 feature-mask propagation.
 
-[`GEOM-046`](GEOM-046-mesh-topology-utilities.md) — mesh topology utilities
+[`GEOM-046`](../archive/GEOM-046-mesh-topology-utilities.md) — mesh topology utilities
 retired to `tasks/done/` on 2026-06-28 at `CPUContracted`. `HalfedgeMesh` now
 has polygon-face triangulation, removal safety, Delaunay predicates/flips,
 explicit edge-length cache publication, connected-component labeling and split
@@ -3485,7 +3496,7 @@ deterministic nearest-face queries. Focused CPU tests cover triangulation,
 component labels/splits, adjacency, nearest-face ordering, and the canonical
 `e:length` cache.
 
-[`GEOM-047`](GEOM-047-graph-pointcloud-query-noise-utilities.md) — graph and
+[`GEOM-047`](../archive/GEOM-047-graph-pointcloud-query-noise-utilities.md) — graph and
 point-cloud query/noise utilities retired to `tasks/done/` on 2026-06-28 at
 `CPUContracted`. Graph utilities now publish and validate canonical `e:length`
 edge caches, run closest/K/radius edge queries through deterministic BVH-backed
@@ -3496,7 +3507,7 @@ fail-close on degenerate nonzero-noise requests. Focused CPU tests cover cache
 publication, query ordering against brute force, one-ring search, deterministic
 noise, identity cases, and degenerate diagnostics.
 
-[`CORE-003`](CORE-003-engine-config-file-lane.md) — engine config file lane
+[`CORE-003`](../archive/CORE-003-engine-config-file-lane.md) — engine config file lane
 retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
 `Extrinsic.Core.Config.EngineLoad` now provides a versioned
 `intrinsic.core.engine-config` JSON schema, side-effect-free preview,
@@ -3509,7 +3520,7 @@ tests cover every boot field, file round-trip, invalid-key/value fallback, and
 diagnostics; runtime contract tests cover CLI selection and missing explicit
 path fallback; the sandbox target builds with the new entry-point wiring.
 
-[`GEOM-035`](GEOM-035-mesh-surface-point-sampling.md) — triangle-mesh surface
+[`GEOM-035`](../archive/GEOM-035-mesh-surface-point-sampling.md) — triangle-mesh surface
 point sampling retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
 `Geometry.PointCloud.SurfaceSampling` now samples triangle meshes into
 point-clouds with area-weighted face selection, sqrt-corrected barycentric
@@ -3519,7 +3530,7 @@ geometry tests cover area proportions, determinism, normal handling, and
 invalid-input diagnostics; the benchmark smoke runner includes a CPU-only
 surface-sampling workload and manifest with no performance claim.
 
-[`GEOM-036`](GEOM-036-sampling-quality-metrics.md) — blue-noise and sampling
+[`GEOM-036`](../archive/GEOM-036-sampling-quality-metrics.md) — blue-noise and sampling
 quality metrics retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
 `Geometry.PointCloud.QualityMetrics` now exposes deterministic CPU functions
 for nearest-neighbor distances, NN histograms, coefficient of variation,
@@ -3529,7 +3540,7 @@ geometry tests cover grid, jittered-grid, white-noise, regular-lattice, cloud
 adapter, and fail-closed edge cases; the benchmark smoke runner includes a
 CPU-only quality-metrics workload and manifest with no performance claim.
 
-[`RUNTIME-133`](RUNTIME-133-method-figure-data-export.md) — method figure
+[`RUNTIME-133`](../archive/RUNTIME-133-method-figure-data-export.md) — method figure
 data-export seam retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
 `Extrinsic.Runtime.MethodFigureExport` now serializes copied metric series,
 scalar summaries, run manifests, and point sets to deterministic CSV, JSON,
@@ -3540,7 +3551,7 @@ Focused runtime unit tests cover metric round-trip parsing, byte-identical
 manifest ordering, point-set CSV/PLY output, invalid arrays, duplicate keys,
 and unwritable target paths.
 
-[`RUNTIME-132`](RUNTIME-132-lift-runframe-hook-adapters.md) — RunFrame hook
+[`RUNTIME-132`](../archive/RUNTIME-132-lift-runframe-hook-adapters.md) — RunFrame hook
 adapter readability lift retired to `tasks/done/` on 2026-06-28. The six
 single-use `Core.FrameLoop` hook adapters, fixed-step simulation loop, camera /
 gizmo / selection input helpers, BUG-026 pick-context construction, and
@@ -3552,7 +3563,7 @@ sequence instead of carrying adapter bodies inline. Text-based runtime layering
 contracts were updated to follow the extracted helper body without requiring
 the old inline fixed-step implementation.
 
-[`GRAPHICS-106`](GRAPHICS-106-frame-recipe-override-seam.md) — fail-closed
+[`GRAPHICS-106`](../archive/GRAPHICS-106-frame-recipe-override-seam.md) — fail-closed
 IRenderer frame-recipe override seam retired to `tasks/done/` on 2026-06-28 at
 `CPUContracted`. `IRenderer` now exposes an active frame-recipe override lane
 with side-effect-free projection diagnostics, optional-slot disable semantics,
@@ -3564,7 +3575,7 @@ as postprocess, debug view, picking, and lighting without widening
 graphics contract tests cover projection, live pass omission, and fail-closed
 unknown-slot behavior; the default CPU-supported gate is green.
 
-[`RUNTIME-130`](RUNTIME-130-route-recipe-activation-and-load-default-recipe.md)
+[`RUNTIME-130`](../archive/RUNTIME-130-route-recipe-activation-and-load-default-recipe.md)
 — runtime render-recipe activation and startup default loading retired to
 `tasks/done/` on 2026-06-28 at `Operational`. `Engine` now owns the active
 render-recipe config state, builds recipe-config validation context from the
@@ -3579,7 +3590,7 @@ contract tests cover startup pass omission, missing and invalid fallback
 diagnostics, and editor activation reaching the live frame; the default
 CPU-supported gate is green.
 
-[`RUNTIME-131`](RUNTIME-131-agent-cli-config-control-facade.md) — agent/CLI
+[`RUNTIME-131`](../archive/RUNTIME-131-agent-cli-config-control-facade.md) — agent/CLI
 config-control facade on `Engine` retired to `tasks/done/` on 2026-06-28 at
 `CPUContracted`. `Engine` now exposes typed, ImGui-independent methods for
 render-recipe preview, file preview, document activation, and validated preview
@@ -3595,7 +3606,7 @@ invalid-hot-file preservation, and editor/agent preview parity; the default
 CPU-supported gate is green. This satisfies the `RUNTIME-131` dependency for
 `RUNTIME-134`.
 
-[`UI-022`](UI-022-sandbox-editor-vertex-normal-recompute.md) — Sandbox
+[`UI-022`](../archive/UI-022-sandbox-editor-vertex-normal-recompute.md) — Sandbox
 EditorUI vertex-normal recompute windows retired to `tasks/done/` on
 2026-06-28 at `CPUContracted`. Mesh, graph, and point-cloud
 `Processing > Vertices > Normals` windows now route through runtime-owned
@@ -3608,7 +3619,7 @@ touching unrelated properties or renderer/RHI state. Focused geometry,
 runtime-editor, and dirty-tag extraction tests passed, and K-Means processing
 capability coverage remains green.
 
-[`UI-024`](UI-024-editor-mesh-denoise-window.md) — Sandbox EditorUI mesh
+[`UI-024`](../archive/UI-024-editor-mesh-denoise-window.md) — Sandbox EditorUI mesh
 denoising window retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
 `Mesh > Processing > Denoise` now exposes a runtime-owned command/result
 surface that builds a scratch halfedge mesh from selected mesh
@@ -3622,7 +3633,7 @@ advertising, successful denoise publication, undo/redo exact restoration,
 dirty-tag behavior, wrong-domain and invalid-parameter fail-closed paths, and
 the deterministic unavailable-kernel diagnostic lane.
 
-[`UI-025`](UI-025-editor-remesh-subdivide-windows.md) — Sandbox EditorUI
+[`UI-025`](../archive/UI-025-editor-remesh-subdivide-windows.md) — Sandbox EditorUI
 remeshing and subdivision windows retired to `tasks/done/` on 2026-06-28 at
 `CPUContracted`. `Mesh > Processing > Remesh` now exposes uniform/adaptive
 remeshing controls for target edge length, iterations, project-to-surface, and
@@ -3640,7 +3651,7 @@ advertising, uniform and adaptive remesh, all three subdivision operators,
 undo/redo, dirty tags, wrong-domain and invalid-parameter fail-closed paths,
 and unavailable-kernel diagnostics.
 
-[`GEOM-039`](GEOM-039-accelerated-mesh-closest-face-query.md) — accelerated mesh
+[`GEOM-039`](../archive/GEOM-039-accelerated-mesh-closest-face-query.md) — accelerated mesh
 closest-face query and consumer adoption retired to `tasks/done/` on 2026-06-28
 at `CPUContracted`. `Geometry.MeshClosestFaceIndex` now provides a packaged
 CPU exact nearest/k-nearest/radius face query over a `Geometry.BVH` of per-face
@@ -3656,7 +3667,7 @@ brute-force parity, pruning diagnostics, k-nearest and radius results, subset
 indices, boundary/on-surface queries, degenerate fail-closed behavior, and the
 three adopted consumers.
 
-[`RUNTIME-135`](RUNTIME-135-spatialdebug-closest-face-picking.md) —
+[`RUNTIME-135`](../archive/RUNTIME-135-spatialdebug-closest-face-picking.md) —
 SpatialDebug closest-face picking via accelerated mesh query retired to
 `tasks/done/` on 2026-06-28 at `CPUContracted`. Runtime now exports
 `Extrinsic.Runtime.SpatialDebugClosestFace`, a data-only closest-face overlay
@@ -3669,7 +3680,7 @@ is touched. Runtime contract coverage proves parity with the direct geometry
 query, valid overlay output, rebuild on revision change, no-active/missing-mesh
 fail-closed behavior, and empty/degenerate/non-finite-probe diagnostics.
 
-[`CORE-004`](CORE-004-indexed-decrease-key-heap.md) — indexed decrease-key
+[`CORE-004`](../archive/CORE-004-indexed-decrease-key-heap.md) — indexed decrease-key
 min-heap container and Dijkstra adoption retired to `tasks/done/` on
 2026-06-28 at `CPUContracted`. Core now exports
 `Extrinsic.Core.IndexedHeap`, a generic deterministic indexed binary min-heap
@@ -3682,7 +3693,7 @@ budget-exhaustion diagnostics against the prior priority-queue reference.
 Focused core heap randomized operation parity and geometry shortest-path
 priority-queue parity tests cover the migration.
 
-[`DOCS-003`](DOCS-003-reconcile-algorithm-variant-dispatch-doc.md) —
+[`DOCS-003`](../archive/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md) —
 algorithm variant dispatch documentation reconciliation retired to
 `tasks/done/` on 2026-06-28. `docs/architecture/algorithm-variant-dispatch.md`
 now identifies itself as a target Strategy x Backend template pending
@@ -3694,7 +3705,7 @@ phantom GPU path. The architecture index now records the doc as target guidance
 pending `GEOM-052` before canonical promotion, satisfying the documentation
 gate for `GEOM-052` and `PROC-011`.
 
-[`GEOM-052`](GEOM-052-shared-cpu-gpu-backend-seam-kmeans-exemplar.md) —
+[`GEOM-052`](../archive/GEOM-052-shared-cpu-gpu-backend-seam-kmeans-exemplar.md) —
 shared CPU/GPU backend seam and KMeans exemplar retired to `tasks/done/` on
 2026-06-28 at `CPUContracted`. `Geometry.KMeans::Backend` now exposes
 `CPU`/`GPU` rather than the old phantom GPU token, `KMeansParams::Compute`
@@ -3709,7 +3720,7 @@ kernel is implemented in this slice. Focused geometry and runtime contract tests
 cover CPU telemetry, non-operational GPU requests, operational-but-unimplemented
 GPU requests, and unchanged editor KMeans publication behavior.
 
-[`GEOM-037`](GEOM-037-so3-rotation-primitives.md) — SO(3) rotation primitives
+[`GEOM-037`](../archive/GEOM-037-so3-rotation-primitives.md) — SO(3) rotation primitives
 retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
 `Geometry.Rotation` now owns hat/vee, exp/log, geodesic and chordal distances,
 deterministic seeded random rotations, `ProjectOnSO3`, and optimal-rotation
@@ -3723,7 +3734,7 @@ random rotations, SO(3) projection, optimal-rotation recovery, reflection
 correction, non-finite input, and under-determined fail-closed behavior; existing
 registration tests pass unchanged.
 
-[`GEOM-038`](GEOM-038-rotation-averaging-means-medians.md) — SO(3) rotation
+[`GEOM-038`](../archive/GEOM-038-rotation-averaging-means-medians.md) — SO(3) rotation
 averaging retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
 `Geometry.RotationAveraging` now exposes result/status-returning chordal,
 Karcher, and quaternion L2 means plus geodesic and quaternion Weiszfeld L1
@@ -3738,7 +3749,7 @@ Karcher/slerp parity, median robustness against gross outliers, deterministic
 permutation behavior, and explicit empty/single/antipodal/weight/non-finite
 status handling.
 
-[`GEOM-045`](GEOM-045-first-class-mesh-quantity-accessors.md) — first-class mesh
+[`GEOM-045`](../archive/GEOM-045-first-class-mesh-quantity-accessors.md) — first-class mesh
 geometric-quantity accessors retired to `tasks/done/` on 2026-06-28 at
 `CPUContracted`. `Geometry.HalfedgeMesh.Utils` now exposes property-backed
 `FaceArea`, `FaceAreaVector`, `FaceCentroid`,
@@ -3754,7 +3765,7 @@ publication, linear-field face gradients, origin-safe unit-sphere projection,
 area-times-angle normals, 1-ring PCA normal alignment, and fail-closed invalid
 inputs; focused geodesic tests pass through the promoted gradient path.
 
-[`GEOM-048`](GEOM-048-statistics-robust-estimation-kernels.md) — statistics
+[`GEOM-048`](../archive/GEOM-048-statistics-robust-estimation-kernels.md) — statistics
 accumulators and robust estimation kernels retired to `tasks/done/` on
 2026-06-28 at `CPUContracted`. `Geometry.Statistics` now owns mergeable scalar
 streaming moments, a two-heap running median, generic finite-sample
@@ -3770,7 +3781,7 @@ statistics over double and non-double scalar vectors, robust-kernel analytic
 forms/fail-closed inputs, invalid robust ICP params, and Tukey improvement over
 percentile trimming alone on a gross-outlier registration case.
 
-[`GEOM-049`](GEOM-049-numeric-linalg-utilities.md) — numeric / linear-algebra
+[`GEOM-049`](../archive/GEOM-049-numeric-linalg-utilities.md) — numeric / linear-algebra
 utilities retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
 `Geometry.Linalg` now exports strided Eigen map aliases plus `MapAsMatrix` and
 `MapVectorAsMatrix` adapters for aliasing scalar buffers and fixed-size GLM
@@ -3785,7 +3796,7 @@ invalid-option, or hard SVD-failure inputs. Unit coverage proves strided-map and
 property-map aliasing, the bool fallback, synthetic low-rank-plus-sparse
 recovery, bitwise determinism, and degenerate-input diagnostics.
 
-[`GEOM-050`](GEOM-050-primitive-curve-utilities.md) — primitive and curve
+[`GEOM-050`](../archive/GEOM-050-primitive-curve-utilities.md) — primitive and curve
 utilities retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
 `Geometry.Curve` keeps its existing span-based Bezier evaluators and now also
 exports `BezierCurve`, `GetDegree`, `EvaluateBernstein`, and
@@ -3801,7 +3812,7 @@ exercises Bezier endpoint/linear/Bernstein-vs-de Casteljau behavior, triangle
 analytic metrics and degenerate guards, iterative sphere residual comparison
 against least squares, and AABB cubification/octant tiling.
 
-[`GEOM-020`](GEOM-020-sparse-direct-factorization-seam.md) — sparse direct
+[`GEOM-020`](../archive/GEOM-020-sparse-direct-factorization-seam.md) — sparse direct
 factorization solver seam retired to `tasks/done/` on 2026-06-28 at
 `CPUContracted`. `Geometry.Sparse` now exposes `SparseLDLT` and `SparseLLT`
 solver objects over the existing CSR matrix type, with `factor`, span-based
@@ -3817,7 +3828,7 @@ indefinite/singular diagnostics, multi-RHS solve parity, solve-in-place storage
 reuse, invalid-input rejection, and bit-stable repeated solves from one
 factorization.
 
-[`GEOM-023`](GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md) — sparse
+[`GEOM-023`](../archive/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md) — sparse
 non-symmetric iterative solver seam retired to `tasks/done/` on 2026-06-28 at
 `CPUContracted`. `Geometry.Sparse` now exposes `SparseBiCGSTAB` over the
 existing CSR matrix type, with span-based single-RHS solves and `Eigen::Ref`
@@ -3835,7 +3846,7 @@ repeated solves. METHOD-003 can now promote against
 `Geometry.Sparse::SparseBiCGSTAB` for its non-symmetric closest-point-extension
 operator.
 
-[`METHODS-001`](METHODS-001-signed-heat-pathfinder.md) — signed-heat
+[`METHODS-001`](../archive/METHODS-001-signed-heat-pathfinder.md) — signed-heat
 pathfinder planning task retired to `tasks/done/` on 2026-06-28 at `Retired`.
 The task pins METHOD-002 as the first concrete method to drive the full
 methods pipeline from paper intake through CPU reference, correctness tests,
@@ -3845,7 +3856,7 @@ heat) as the public-facing default, and points future method work at the
 resulting `methods/geometry/signed_heat/` package as the canonical package
 pattern.
 
-[`METHOD-002`](METHOD-002-signed-heat-method-reference-backend.md) — Signed Heat
+[`METHOD-002`](../archive/METHOD-002-signed-heat-method-reference-backend.md) — Signed Heat
 Method reference backend retired to `tasks/done/` on 2026-06-28 at
 `CPUContracted`. `Geometry.SignedHeatMethod` now exposes a CPU reference surface
 backend that computes per-vertex signed distance from an oriented halfedge curve
@@ -3862,7 +3873,7 @@ open-boundary finite diagnostics, invalid-input failure, and bitwise
 determinism. The smoke benchmark emits schema-valid runtime and
 `quality_error_l2` metrics without making a performance claim.
 
-[`DOCS-005`](DOCS-005-feature-module-playbook-minimal-floor.md) —
+[`DOCS-005`](../archive/DOCS-005-feature-module-playbook-minimal-floor.md) —
 feature-module playbook minimal floor and config command artifact retired to
 `tasks/done/` on 2026-06-29 at `Retired`. The playbook now opens with a
 minimal-feature floor for one-caller, synchronous, data-driven research probes;
@@ -3871,7 +3882,7 @@ caller, backend split, scheduled work, persisted config, command routing, UI
 control, or telemetry-backed diagnostics appears; and adds a serializable
 config/command entry to the discoverability artifacts for UI-backed features.
 
-[`PROC-011`](PROC-011-route-contract-to-architecture-index-and-author-checks.md)
+[`PROC-011`](../archive/PROC-011-route-contract-to-architecture-index-and-author-checks.md)
 — contract routing and backend/config authoring checks retired to `tasks/done/`
 on 2026-06-29 at `Retired`. `AGENTS.md` now routes subsystem architecture,
 backend-split, config/command, and recipe/frame-composition design questions to
@@ -3881,7 +3892,7 @@ declared backend axis and round-trippable config/command reachability, while
 the task template and task-format guide carry optional `## Control surfaces`
 and `## Backends` prompts.
 
-[`GEOM-016`](GEOM-016-point-cloud-filtering-density-contracts.md) —
+[`GEOM-016`](../archive/GEOM-016-point-cloud-filtering-density-contracts.md) —
 point-cloud filtering and density diagnostics contracts retired to
 `tasks/done/` on 2026-06-29 at `CPUContracted`. `Geometry.PointCloud.Utils`
 gained explicit `RemoveStatisticalOutliers` and `RemoveRadiusOutliers`
@@ -3897,7 +3908,7 @@ invalid/insufficient/overflow input handling; the
 without a performance claim. CPU-only contract with no backend seam; the editor
 wire-up of these operators is owned by `UI-027`.
 
-[`UI-027`](UI-027-editor-pointcloud-outlier-removal-window.md) — Sandbox
+[`UI-027`](../archive/UI-027-editor-pointcloud-outlier-removal-window.md) — Sandbox
 EditorUI point-cloud outlier-removal window retired to `tasks/done/` on
 2026-06-29 at `CPUContracted`. The `PointCloud > Processing > Remove Outliers`
 window and its undoable editor command drive the `GEOM-016`
@@ -3921,7 +3932,7 @@ a github clone the egress proxy denies, so the `ci` preset cannot configure
 there); the runnable structural checks pass and CI owns the compile + contract
 tests.
 
-[`GRAPHICS-108`](GRAPHICS-108-vulkan-compute-parallel-primitives.md) —
+[`GRAPHICS-108`](../archive/GRAPHICS-108-vulkan-compute-parallel-primitives.md) —
 reusable Vulkan compute parallel primitives retired to `tasks/done/` on
 2026-06-30 at `Operational`. `Extrinsic.Graphics.ComputeParallelPrimitives`
 now owns deterministic CPU references, backend-neutral dispatch/scratch plans,
@@ -3940,7 +3951,7 @@ determinism. The seam remains graphics/RHI-only with no Vulkan handle leakage,
 ECS/runtime/app/platform imports, CUDA path, or method-specific kernels.
 `METHOD-013` is now unblocked for the progressive Poisson Vulkan backend.
 
-[`GEOM-017`](GEOM-017-point-cloud-descriptors-registration-seams.md) —
+[`GEOM-017`](../archive/GEOM-017-point-cloud-descriptors-registration-seams.md) —
 point-cloud descriptor, correspondence, and coarse-registration seams retired to
 `tasks/done/` on 2026-06-30 at `CPUContracted`. The generic geometry layer now
 owns ISS keypoint selection, FPFH descriptor storage, deterministic
@@ -3952,7 +3963,7 @@ fixed explicit C++23 module imports for `Geometry.Properties`, corrected the ICP
 translation oracle, and isolated CTest benchmark smoke output from CI benchmark
 result validation so the full local CI pipeline runs through cleanly.
 
-[`GEOM-056`](GEOM-056-kmeans-gpu-vulkan-compute-backend.md) — KMeans Vulkan
+[`GEOM-056`](../archive/GEOM-056-kmeans-gpu-vulkan-compute-backend.md) — KMeans Vulkan
 compute backend retired to `tasks/done/` on 2026-07-02 at `ParityProven`. The
 runtime layer now owns the explicit `Extrinsic.Runtime.KMeansGpuBackend`
 execution surface: persistent `(n,k)` resource caching, one-time SoA position
@@ -3970,7 +3981,7 @@ gate still reports the unrelated pre-existing
 `SandboxEditorUi.RegistrationCommandAlignsAcrossEntityTransforms` registration
 failure.
 
-[`RUNTIME-136`](RUNTIME-136-sandbox-method-backend-selectors.md) — Sandbox
+[`RUNTIME-136`](../archive/RUNTIME-136-sandbox-method-backend-selectors.md) — Sandbox
 method backend selectors retired to `tasks/done/` on 2026-07-02 at
 `CPUContracted`. The Sandbox UI now exposes CPU reference vs Vulkan compute
 selectors for every currently exposed method with a GPU variant: K-Means and
@@ -3985,7 +3996,7 @@ CPU fallback telemetry; the full CPU gate still reports the unrelated
 pre-existing `SandboxEditorUi.RegistrationCommandAlignsAcrossEntityTransforms`
 registration failure.
 
-[`BUG-052`](BUG-052-sandbox-selection-visualization-regressions.md) — Sandbox
+[`BUG-052`](../archive/BUG-052-sandbox-selection-visualization-regressions.md) — Sandbox
 selection and visualization regressions retired to `tasks/done/` on
 2026-07-02 at `CPUContracted`. Outline-only selected/hovered frames now record
 only the entity-ID pass and skip face/edge/point primitive-picking subpasses
@@ -4001,7 +4012,7 @@ The full CPU-supported gate still reports the unrelated pre-existing
 `SandboxEditorUi.RegistrationCommandAlignsAcrossEntityTransforms` registration
 failure.
 
-[`BUG-053`](BUG-053-sandbox-kmeans-gpu-backend-queue.md) — Sandbox K-Means GPU
+[`BUG-053`](../archive/BUG-053-sandbox-kmeans-gpu-backend-queue.md) — Sandbox K-Means GPU
 backend queue retired to `tasks/done/` on 2026-07-02 at `CPUContracted`.
 Sandbox Vulkan K-Means requests now submit to the runtime-owned
 `Extrinsic.Runtime.KMeansGpuJobQueue` instead of calling the synchronous
@@ -4016,7 +4027,7 @@ the CPU reference, and the synchronous backend overload remains nonblocking.
 Focused runtime contract coverage passed for CPU fallback telemetry and queued
 Sandbox GPU submission routing.
 
-[`GRAPHICS-111`](GRAPHICS-111-float-segmented-reduction-primitive.md) — Float
+[`GRAPHICS-111`](../archive/GRAPHICS-111-float-segmented-reduction-primitive.md) — Float
 segmented/per-key reduction primitive retired to `tasks/done/` on 2026-07-04 at
 `Operational` on Vulkan-capable hosts and `CPUContracted` everywhere else. The
 graphics/renderer `Extrinsic.Graphics.ComputeParallelPrimitives` seam now owns a
@@ -4032,7 +4043,7 @@ reference within the declared tolerance and repeats the same input for bit
 stability. KMeans integration remains a separate consumer task; this slice only
 ships the shared primitive and docs.
 
-[`GRAPHICS-112`](GRAPHICS-112-work-efficient-workgroup-scan.md) —
+[`GRAPHICS-112`](../archive/GRAPHICS-112-work-efficient-workgroup-scan.md) —
 Work-efficient workgroup scan and overflow guard retired to `tasks/done/` on
 2026-07-04 at `Operational` on promoted Vulkan hosts with subgroup arithmetic
 and `CPUContracted` elsewhere. `parallel_prefix_scan.comp` now uses subgroup
@@ -4044,7 +4055,7 @@ dispatch planning contract are unchanged. The Vulkan smoke covers existing
 scan/compaction parity plus local and multiblock overflow fixtures, and the
 architecture/audit docs record the saturation semantics.
 
-[`GRAPHICS-113`](GRAPHICS-113-selection-outline-id-work-pruning.md) —
+[`GRAPHICS-113`](../archive/GRAPHICS-113-selection-outline-id-work-pruning.md) —
 Selection outline ID work pruning retired to `tasks/done/` on 2026-07-04 at
 `Operational` on Vulkan-capable hosts and `CPUContracted` for the default
 frame-recipe/command-route contracts. The implemented path splits outline-only
@@ -4058,7 +4069,7 @@ without local implementation: current graphics seams expose whole
 selected/hovered-only draw narrowing needs a separate filtered indirect
 draw/shader-visible selected-ID contract rather than a safe local pass tweak.
 
-[`GRAPHICS-114`](GRAPHICS-114-retained-imgui-overlay-copy-upload-path.md) —
+[`GRAPHICS-114`](../archive/GRAPHICS-114-retained-imgui-overlay-copy-upload-path.md) —
 Retained ImGui overlay copy/upload path retired to `tasks/done/` on 2026-07-04
 at `Operational` on Vulkan-capable hosts and `CPUContracted` for backend-neutral
 copy/reuse/upload contracts. Runtime `ImGuiAdapterDiagnostics` now reports
@@ -4073,7 +4084,7 @@ CPU/null contracts and the opt-in
 `ImGuiSurfaceGpuSmoke.LargeSelectedEntityPayloadRetainsAtlasOnOperationalVulkan`
 smoke passed.
 
-[`GRAPHICS-116`](GRAPHICS-116-recipe-pass-contribution-seam.md) —
+[`GRAPHICS-116`](../archive/GRAPHICS-116-recipe-pass-contribution-seam.md) —
 Frame-recipe pass contribution seam and typed record-path resolution retired to
 `tasks/done/` on 2026-07-04 at `Operational` for the default renderer
 composition seam. `BuildDefaultFrameRecipe(...)` now delegates through the
@@ -4085,7 +4096,7 @@ through the headless render-graph executor, and omits overlay passes/resources,
 while the default contributed graph matches the compatibility build's compiled
 debug dump.
 
-[`GRAPHICS-117`](GRAPHICS-117-render-graph-compile-cache.md) —
+[`GRAPHICS-117`](../archive/GRAPHICS-117-render-graph-compile-cache.md) —
 Render-graph compile caching and gated debug dump retired to `tasks/done/` on
 2026-07-04 at `Operational` for the default renderer frame recipe. The renderer
 now owns a structural compile key over recipe features, sizing, import shape,
@@ -4099,7 +4110,7 @@ rebinding on reuse, and lazy debug dumps; the PR-fast
 1280x720 recipe rebuild declare+compile baseline and the cached steady-state
 compile-attempt contract.
 
-[`GRAPHICS-118`](GRAPHICS-118-placed-transient-memory-aliasing.md) —
+[`GRAPHICS-118`](../archive/GRAPHICS-118-placed-transient-memory-aliasing.md) —
 Placed transient resource allocation with real memory aliasing retired to
 `tasks/done/` on 2026-07-04 at `Operational` on Vulkan-capable hosts and
 `CPUContracted` for backend-neutral planning/fallback paths. The render-graph
@@ -4111,7 +4122,7 @@ smoke compares aliasing-on readback against aliasing-off output, keeps validatio
 counters stable across the aliasing-on frame, and records the default sandbox
 recipe reduction from 263168 bytes naive/fallback to 197632 bytes placed peak.
 
-[`UI-028`](UI-028-editor-mesh-simplification-window.md) — Sandbox EditorUI mesh
+[`UI-028`](../archive/UI-028-editor-mesh-simplification-window.md) — Sandbox EditorUI mesh
 simplification retired to `tasks/done/` on 2026-07-05 at `CPUContracted`.
 `Mesh > Processing > Simplify` drives the `GEOM-014` classical QEM / FA-QEM
 simplification kernel through a runtime-owned undoable command, replaces the
@@ -4120,7 +4131,7 @@ present, reports collapse/rejection/pin diagnostics, and leaves renderer
 synchronization to geometry dirty tags. Focused geometry/runtime CTest coverage
 passed, including the UV seam regression.
 
-[`UI-031`](UI-031-editor-domain-ui-reorganization.md) — Sandbox EditorUI
+[`UI-031`](../archive/UI-031-editor-domain-ui-reorganization.md) — Sandbox EditorUI
 domain-window reorganization retired to `tasks/done/` on 2026-07-05 at
 `CPUContracted`. Mesh, Graph, and PointCloud `Appearance` windows now co-locate
 render hints, visualization controls, uniform/lane color edits, property and
@@ -4132,7 +4143,7 @@ progressive Poisson, and point-cloud outlier removal instead of the old
 omnibus per-domain processing surface. The broader generation-keyed async
 selected-analysis cache/job pipeline remains owned by `RUNTIME-138`.
 
-[`GEOM-054`](GEOM-054-registration-pipeline-stage-extraction.md) —
+[`GEOM-054`](../archive/GEOM-054-registration-pipeline-stage-extraction.md) —
 Registration pipeline named ICP stage extraction retired to `tasks/done/` on
 2026-07-05 at `Operational`. The implementation landed in `335e05b7` and
 restructures `Geometry::Registration::AlignICP` behind an internal
@@ -4141,7 +4152,7 @@ weighting, transform-solve, and convergence stages. GEOM-054 introduces no
 public `Geometry.Registration` surface change; the later observer seam retired
 under `GEOM-055`.
 
-[`GEOM-055`](GEOM-055-registration-iteration-observer.md) — Registration
+[`GEOM-055`](../archive/GEOM-055-registration-iteration-observer.md) — Registration
 per-iteration observer retired to `tasks/done/` on 2026-07-05 at
 `Operational`. The implementation landed in `811a1677` and exports
 `IterationTrace` plus `IterationObserver` from `Geometry.Registration`;
@@ -4150,7 +4161,7 @@ trace per completed iteration after the cumulative transform is updated.
 Contract tests prove observed and unobserved runs match exactly and trace
 indices/RMSE/final-transform invariants line up with `RegistrationResult`.
 
-[`UI-029`](UI-029-editor-registration-convergence-visualization.md) — Editor
+[`UI-029`](../archive/UI-029-editor-registration-convergence-visualization.md) — Editor
 ICP registration panel and convergence visualization retired to `tasks/done/`
 on 2026-07-05 at `Operational`. The implementation landed in `d3a839cf`,
 `433953e7`, and `2f1abf71`: `Extrinsic.Runtime.RegistrationAlignment` runs
@@ -4161,7 +4172,7 @@ trajectory step scrubs intermediate poses. Focused runtime unit and Sandbox UI
 contract tests cover degenerate input, trajectory capture/scrubbing, successful
 alignment, failure states, undo/redo, and transformed source/target entities.
 
-[`RORG-031F`](RORG-031F-ui-integration.md) — UI integration backlog seed retired
+[`RORG-031F`](../archive/RORG-031F-ui-integration.md) — UI integration backlog seed retired
 to `tasks/done/` on 2026-07-05 at `Scaffolded`. The planning-only umbrella now
 records the promoted `SandboxEditorUi` inventory through retired `UI-031`, keeps
 the remaining deferred workflows reserved as prospective `UI-009..012` tasks
@@ -4170,7 +4181,7 @@ owed for the seed itself. The UI backlog now has no concrete open UI task; futur
 children open directly from their trigger and cite the retired seed or the UI
 backlog README.
 
-[`BUG-057`](BUG-057-entity-scalar-properties-render-black.md) — Entity scalar
+[`BUG-057`](../archive/BUG-057-entity-scalar-properties-render-black.md) — Entity scalar
 properties rendering black retired to `tasks/done/` on 2026-07-05 at
 `CPUContracted`. Runtime scalar property-buffer extraction already produced a
 valid scalar packet, but renderer prep did not pass those packets into
@@ -4179,7 +4190,7 @@ range instead of the computed auto range. Renderer prep now threads scalar
 packets through visualization sync so scalar-field entity configs receive the
 resolved BDA, element count, colormap ID, and computed range.
 
-[`BUG-058`](BUG-058-entity-isolines-render-black.md) — Entity isolines rendering
+[`BUG-058`](../archive/BUG-058-entity-isolines-render-black.md) — Entity isolines rendering
 black retired to `tasks/done/` on 2026-07-05 at `CPUContracted`. The editor
 Isoline preset rides the scalar-field `VisualizationConfig` path, so the same
 missing prepared-config scalar range caused isoline shader config to operate on
@@ -4187,7 +4198,7 @@ the wrong range. The regression now enables isolines and proves the prepared
 entity config receives the computed scalar range plus isoline count, width, and
 color.
 
-[`RUNTIME-140`](RUNTIME-140-remove-global-waitforall-from-import-apply.md) —
+[`RUNTIME-140`](../archive/RUNTIME-140-remove-global-waitforall-from-import-apply.md) —
 Remove global scheduler barrier from import apply retired to `tasks/done/` on
 2026-07-05 at `CPUContracted`. `AssetService` now exposes a per-asset
 completion/flush primitive, and runtime import materialization uses it instead
@@ -4198,7 +4209,7 @@ stage. Focused regressions prove direct asset-service completion and
 remains in flight, with imported payloads and events still delivered exactly
 once.
 
-[`RUNTIME-142`](RUNTIME-142-async-modelscene-texture-scenefile-io.md) — Async
+[`RUNTIME-142`](../archive/RUNTIME-142-async-modelscene-texture-scenefile-io.md) — Async
 model-scene/texture import and scene-file IO retired to `tasks/done/` on
 2026-07-05 at `Operational`. Dropped model-scene/texture imports, Sandbox
 editor model-scene/texture imports, and Sandbox editor scene save/load now
@@ -4207,7 +4218,7 @@ off the frame callback path, and apply results on the bounded main-thread
 drain. A slow fake IO backend regression proves the frame loop advances while
 queued texture reads remain blocked.
 
-[`RUNTIME-143`](RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md) —
+[`RUNTIME-143`](../archive/RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md) —
 Multi-subscriber frame-command hook and K-Means decoupling from Engine retired
 to `tasks/done/` on 2026-07-05 at `Operational`. `IRenderer` now exposes
 deterministic add/remove runtime frame-command hook registration, `Engine`
@@ -4218,7 +4229,7 @@ while attached. `Runtime.Engine.cppm` and `.cpp` are grep-clean for K-Means,
 and the existing Sandbox K-Means GPU command surface continues to submit and
 consume through the attached queue.
 
-[`BUG-059`](BUG-059-curvature-scalar-isoline-viz-black-end-to-end.md) —
+[`BUG-059`](../archive/BUG-059-curvature-scalar-isoline-viz-black-end-to-end.md) —
 Curvature scalar/isoline visualization renders black, diagnosed end to end and
 retired to `tasks/done/` on 2026-07-06 at `CPUContracted`. New regression
 tests mirror the real editor flow (Appearance surface-lane override presets,
@@ -4231,7 +4242,7 @@ quantiles for fields with ≥64 samples (with a dedicated clamp counter), and
 `BuildEntityConfig` sanitizes degenerate/non-finite ranges before the shader
 can normalize every fragment to t=0.
 
-[`UI-032`](UI-032-appearance-scalar-isoline-visualization-controls.md) —
+[`UI-032`](../archive/UI-032-appearance-scalar-isoline-visualization-controls.md) —
 Appearance scalar/isoline visualization controls retired to `tasks/done/` on
 2026-07-06 at `CPUContracted`. The Appearance panel gains colormap selection,
 auto/manual range clamping, binning, isoline count/width/color, and up to
@@ -4243,7 +4254,7 @@ command/model surface, `ScalarFieldConfig`, scene serialization,
 validation, locked by editor-command, extraction, and serialization
 regressions.
 
-[`RUNTIME-145`](RUNTIME-145-runtime-frame-path-efficiency-polish.md) —
+[`RUNTIME-145`](../archive/RUNTIME-145-runtime-frame-path-efficiency-polish.md) —
 Runtime frame-path steady-state efficiency polish retired to `tasks/done/` on
 2026-07-06 at `Operational`. The runtime now maintains `StableEntityLookup`
 incrementally instead of rebuilding it every steady-state frame, recycles
@@ -4255,7 +4266,7 @@ captures. Focused runtime regressions plus the full default CPU gate prove the
 covered frame-path behavior remains unchanged while the recurring idle-frame
 work is removed.
 
-[`BUG-060`](BUG-060-scalar-colormap-lut-1d-view-black-on-gpu.md) —
+[`BUG-060`](../archive/BUG-060-scalar-colormap-lut-1d-view-black-on-gpu.md) —
 Scalar/isoline surface black-output fix retired to `tasks/done/` on
 2026-07-06 at `CPUContracted`. The GPU-only root cause was the colormap LUT
 being created as a 1D image view while all promoted shader consumers sample the
@@ -4266,7 +4277,7 @@ surface-lane Scalar/Isolines preset-equivalent state, alongside the existing
 line/point scalar LUT smoke, so the operational check is deterministic rather
 than a manual UI click.
 
-[`BUG-056`](BUG-056-extrinsic-sandbox-default-vulkan-validation-gate.md) —
+[`BUG-056`](../archive/BUG-056-extrinsic-sandbox-default-vulkan-validation-gate.md) —
 ExtrinsicSandbox default Vulkan validation gate fallback retired to
 `tasks/done/` on 2026-07-06 at `Operational`. The default deferred GBuffer
 fragment now consumes the full shared default-debug-surface vertex interface,
@@ -4279,7 +4290,7 @@ sandbox/ImGui/frame-pacing envelope passes 18/18, and the default sandbox
 fixture now installs the same runtime default policy bundle as the production
 `ExtrinsicSandbox` app before custom smoke apps run.
 
-[`GRAPHICS-119`](GRAPHICS-119-parallel-pass-command-recording.md) — Parallel
+[`GRAPHICS-119`](../archive/GRAPHICS-119-parallel-pass-command-recording.md) — Parallel
 render-pass command recording via the task scheduler retired to `tasks/done/`
 on 2026-07-07 at `Operational`. Render-graph pass recording now fans out by
 compiled topological layer through `Core::Tasks`, acquires backend-neutral
@@ -4291,7 +4302,7 @@ smokes, and benchmark smoke parity is recorded without claiming a performance
 win. Transfer render-graph scheduling remains out of scope because no
 production transfer pass is enabled.
 
-[`PROC-015`](PROC-015-diagnosis-playbook-skills-wave-1.md) — Recurring
+[`PROC-015`](../archive/PROC-015-diagnosis-playbook-skills-wave-1.md) — Recurring
 diagnosis playbooks codified as skills (wave 1) retired to `tasks/done/` on
 2026-07-08. The 2026-07-08 agentic-workflow review mined the 601 retired
 tasks and found three playbooks re-derived across many sessions: Vulkan
@@ -4305,7 +4316,7 @@ and `intrinsicengine-stale-build-triage` — registered in the
 `intrinsicengine-diagnose`. Wave-2 playbooks are seeded as
 `PROC-018`/`PROC-019`/`PROC-020`.
 
-[`PROC-016`](PROC-016-skills-docs-mirror-drift-fixes.md) — Skills/docs mirror
+[`PROC-016`](../archive/PROC-016-skills-docs-mirror-drift-fixes.md) — Skills/docs mirror
 drift and dead routings fixed, retired to `tasks/done/` on 2026-07-08. The
 skills README no longer claims 13 source docs, describes the real
 `sync_skills.py` mechanism instead of a harmful `cp` script, and documents the
@@ -4319,7 +4330,7 @@ table gained the missing `graphics/assets`/`graphics/vulkan`/`platform` rows;
 and `tasks/README.md` now states the single-slice-from-backlog rule.
 Skill-body canonicalization is deferred to `PROC-023`.
 
-[`PROC-017`](PROC-017-workflow-convention-gaps.md) — Undocumented workflow
+[`PROC-017`](../archive/PROC-017-workflow-convention-gaps.md) — Undocumented workflow
 conventions written down, retired to `tasks/done/` on 2026-07-08. Four
 conventions the workflow already practiced now have owning text: branch
 naming and task claiming in `docs/agent/prompt/prompt.md`, CI-failure→`BUG-`
@@ -4328,7 +4339,7 @@ task intake in `prompt.md` §"When CI fails" anchored from `AGENTS.md` §10
 canonical-prefix pointer in `docs/agent/task-format.md` (the
 `GEOM-027`/`PROC-012` collision lesson).
 
-[`BUG-062`](BUG-062-warm-configure-budget-flaky-runner-variance.md) — Warm-
+[`BUG-062`](../archive/BUG-062-warm-configure-budget-flaky-runner-variance.md) — Warm-
 configure CI budget flake closed on 2026-07-08 (PR #1010). The 10 s
 warm-cache configure guard, calibrated at the shared-runner median, killed
 five merge-gating workflows across three PR heads (including a
@@ -4337,7 +4348,7 @@ all seven invocations across six workflows with guard semantics and timing
 telemetry unchanged; three consecutive PR CI rounds then completed every
 configure step without a budget kill.
 
-[`ARCH-007`](ARCH-007-kernel-command-bus-single-drain-point.md) — Kernel
+[`ARCH-007`](../archive/ARCH-007-kernel-command-bus-single-drain-point.md) — Kernel
 command bus with a single pre-sim drain point retired to `tasks/done/` on
 2026-07-08 at `CPUContracted`. Runtime now owns a domain-free
 `Extrinsic.Runtime.CommandBus` with plain-data payloads, correlation IDs,
@@ -4351,7 +4362,7 @@ handler failures, missing handlers, follow-up deferral, history inverse
 re-enqueue, and pending discard. `ARCH-012` later closed the `Operational`
 proof through a real module flow.
 
-[`ARCH-008`](ARCH-008-kernel-event-bus-queued-only.md) — Queued-only kernel
+[`ARCH-008`](../archive/ARCH-008-kernel-event-bus-queued-only.md) — Queued-only kernel
 event bus retired to `tasks/done/` on 2026-07-08 at `CPUContracted`. Runtime
 now owns `Extrinsic.Runtime.KernelEvents`, a domain-free queued event bus with
 typed subscriptions, removable handles, worker-safe publish into an inbox,
@@ -4365,7 +4376,7 @@ unsubscribe behavior, unsubscribe-during-pump safety, and the two engine pump
 positions. `ARCH-012` later closed the `Operational` proof through a real
 module flow.
 
-[`ARCH-012`](ARCH-012-clusteringmodule-proving-extraction.md) —
+[`ARCH-012`](../archive/ARCH-012-clusteringmodule-proving-extraction.md) —
 ClusteringModule proving extraction retired to `tasks/done/` on 2026-07-08 at
 `Operational`. Runtime now owns `Extrinsic.Runtime.ClusteringModule` under
 `src/runtime/Modules/Clustering/`, with `RunKMeans`, `KMeansRunCompleted`,
@@ -4385,7 +4396,7 @@ gate all passed. `Runtime.Engine.cppm` and `Runtime.Engine.cpp` contain no
 `KMeansGpuJobQueue` participant path intentionally remains in runtime/editor
 ownership until `RUNTIME-137` moves GPU dispatch onto the kernel GPU-job target.
 
-[`ARCH-013`](ARCH-013-post-seam-collision-rereview.md) — Post-seam collision
+[`ARCH-013`](../archive/ARCH-013-post-seam-collision-rereview.md) — Post-seam collision
 re-review retired to `tasks/done/` on 2026-07-08 as task-governance work. Every
 front-matter-gated row (`RUNTIME-150`, `RUNTIME-151`, `ARCH-006`, `UI-034`,
 `RUNTIME-137`, `RUNTIME-138`) and every audit row (`RUNTIME-129`,
@@ -4398,7 +4409,7 @@ owned there. The backlog sweep found no additional open task prescribing
 ADR-0024-rejected mechanisms without a recorded justification, and ADR-0024 plus
 the backlog/category READMEs now summarize the result.
 
-[`RUNTIME-146`](RUNTIME-146-extract-engine-config-boot-module.md) — Engine
+[`RUNTIME-146`](../archive/RUNTIME-146-extract-engine-config-boot-module.md) — Engine
 config boot extraction retired to `tasks/done/` on 2026-07-08 at `Operational`.
 Runtime now owns `Extrinsic.Runtime.EngineConfigBoot`, a free-standing module
 exporting `CreateReferenceEngineConfig()`, `EngineConfigBootSource`,
@@ -4411,7 +4422,7 @@ tests passed 11/11, `IntrinsicRuntimeContractTests` and `IntrinsicTests` built,
 the full default CPU-supported CTest gate passed 3636/3636, strict layering and
 test-layout checks passed, and the module inventory was regenerated.
 
-[`RUNTIME-147`](RUNTIME-147-extract-asset-import-pipeline-subsystem.md) —
+[`RUNTIME-147`](../archive/RUNTIME-147-extract-asset-import-pipeline-subsystem.md) —
 Asset-import pipeline extraction retired to `tasks/done/` on 2026-07-08 at
 `Operational`. Runtime now owns `Extrinsic.Runtime.AssetImportPipeline`, an
 engine-owned subsystem carrying the import/reimport/queue/cancel facade, ingest
@@ -4428,7 +4439,7 @@ CPU-supported CTest gate passed 3638/3638, strict layering, test-layout,
 task-policy, docs-link, docs-sync, and diff-whitespace checks passed, and the
 module inventory was regenerated.
 
-[`RUNTIME-149`](RUNTIME-149-extract-engine-config-control-subsystem.md) —
+[`RUNTIME-149`](../archive/RUNTIME-149-extract-engine-config-control-subsystem.md) —
 Render-recipe and hot-config control extraction retired to `tasks/done/` on
 2026-07-08 at `Operational`. Runtime now owns
 `Extrinsic.Runtime.EngineConfigControl`, an engine-owned subsystem carrying
@@ -4444,7 +4455,7 @@ full default CPU-supported CTest gate passed 3638/3638, strict layering,
 test-layout, task-policy, docs-link, docs-sync, and diff-whitespace checks
 passed, and the module inventory was regenerated.
 
-[`RUNTIME-148`](RUNTIME-148-extract-scene-document-subsystem.md) —
+[`RUNTIME-148`](../archive/RUNTIME-148-extract-scene-document-subsystem.md) —
 Scene-document facade extraction retired to `tasks/done/` on 2026-07-08 at
 `Operational`. Runtime now owns `Extrinsic.Runtime.SceneDocument`, an
 engine-owned subsystem carrying direct and queued scene save/load, new/close
@@ -4460,7 +4471,7 @@ CPU-supported CTest gate passed 3638/3638, strict layering, test-layout,
 task-policy, docs-link, docs-sync, and diff-whitespace checks passed, and the
 module inventory was regenerated.
 
-[`RUNTIME-150`](RUNTIME-150-split-engine-frame-loop-implementation-unit.md) —
+[`RUNTIME-150`](../archive/RUNTIME-150-split-engine-frame-loop-implementation-unit.md) —
 Frame-loop partition split retired to `tasks/done/` on 2026-07-08 at
 `Operational`. Runtime now owns the private
 `Extrinsic.Runtime.Engine:FrameLoop` partition carrying `Core.FrameLoop` hook
@@ -4478,7 +4489,7 @@ CPU-supported CTest gate, strict layering, test-layout, task-policy,
 docs-link, docs-sync, root-hygiene warning-mode, and diff-whitespace checks
 passed.
 
-[`RUNTIME-151`](RUNTIME-151-slim-engine-interface-and-remove-entt-leak.md) —
+[`RUNTIME-151`](../archive/RUNTIME-151-slim-engine-interface-and-remove-entt-leak.md) —
 Engine-interface slimming retired to `tasks/done/` on 2026-07-08 at
 `Operational`. Runtime now owns `StableEntityLookupSceneBinding` in
 `Extrinsic.Runtime.StableEntityLookup`; the binding owns the StableId
@@ -4494,7 +4505,7 @@ and `IntrinsicTests` built, the full default CPU-supported CTest gate passed
 3638/3638, strict structural/docs/diff checks passed, and the module inventory
 was regenerated.
 
-[`RUNTIME-137`](RUNTIME-137-async-gpu-readback-helper-for-compute-backends.md) —
+[`RUNTIME-137`](../archive/RUNTIME-137-async-gpu-readback-helper-for-compute-backends.md) —
 Async GPU readback helper and JobService `GpuQueue` substrate retired to
 `tasks/done/` on 2026-07-09 at `Operational`. Runtime now owns
 `Extrinsic.Runtime.AsyncBufferReadback`, a pooled `Graphics.GpuTransfer`
@@ -4513,7 +4524,7 @@ CPU-supported CTest gate passed 3640/3640, the opt-in `gpu;vulkan` readback /
 KMeans smoke selection passed 5/5, and the module inventory/session brief were
 regenerated.
 
-[`UI-034`](UI-034-framework24-editor-interaction-layout-conventions.md) —
+[`UI-034`](../archive/UI-034-framework24-editor-interaction-layout-conventions.md) —
 Decentralized editor-window contribution, capture, visibility, and generic
 property-plot contracts retired to `tasks/done/` on 2026-07-13 at
 `CPUContracted`. `Runtime.SandboxEditorUi` now exposes a mutation-safe registry
@@ -4528,7 +4539,7 @@ gate passed 3675/3675, strict structural/docs checks passed, and the five-frame
 promoted-Vulkan composition smoke completed before the separately tracked
 `BUG-083` LeakSanitizer shutdown finding.
 
-[`BUG-079`](BUG-079-coretasks-abandoned-wait-continuation-leak.md) —
+[`BUG-079`](../archive/BUG-079-coretasks-abandoned-wait-continuation-leak.md) —
 CoreTasks parked-continuation reclamation retired to `tasks/done/` on
 2026-07-13 at `CPUContracted`. Wait-token release and scheduler shutdown now
 transfer every still-parked single-use coroutine handle under the wait mutex,
@@ -4539,7 +4550,7 @@ and shutdown regressions each passed 100 consecutive ASan/UBSan repetitions,
 all 19 `CoreTasks.*` contracts passed, `IntrinsicTests` built, the full default
 CPU-supported gate passed 3680/3680, and strict structural/docs checks passed.
 
-[`BUG-068`](BUG-068-asset-scene-handoff-not-rebound-on-active-world-change.md)
+[`BUG-068`](../archive/BUG-068-asset-scene-handoff-not-rebound-on-active-world-change.md)
 — active-world scene-borrower rebinding retired to `tasks/done/` on 2026-07-13
 at `CPUContracted`. Runtime now rebuilds asset-residency handoffs and import
 pipeline dependencies during the active-world switch Maintenance pass, before

@@ -4,11 +4,11 @@
 
 module;
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <span>
 #include <unordered_map>
-#include <vector>
 #include <glm/glm.hpp>
 
 module Extrinsic.Graphics.TransformSyncSystem;
@@ -19,8 +19,18 @@ namespace Extrinsic::Graphics
 {
     struct TransformSyncSystem::Impl
     {
+        // Generation stamp: entries touched by the current SyncGpuBuffer call
+        // carry the call's generation; the stale sweep erases everything
+        // older in one pass instead of re-scanning `records` per entry.
+        struct PreviousModelEntry
+        {
+            glm::mat4 Model{1.0f};
+            std::uint64_t Generation{0u};
+        };
+
         bool Initialized{false};
-        std::unordered_map<std::uint32_t, glm::mat4> PreviousModelByInstance{};
+        std::uint64_t Generation{0u};
+        std::unordered_map<std::uint32_t, PreviousModelEntry> PreviousModelByInstance{};
     };
 
     TransformSyncSystem::TransformSyncSystem()
@@ -48,6 +58,8 @@ namespace Extrinsic::Graphics
             return;
         }
 
+        const std::uint64_t generation = ++m_Impl->Generation;
+
         for (const TransformSyncRecord& record : records)
         {
             if (!record.Instance.IsValid())
@@ -63,12 +75,14 @@ namespace Extrinsic::Graphics
             if (auto it = m_Impl->PreviousModelByInstance.find(key);
                 it != m_Impl->PreviousModelByInstance.end())
             {
-                prevModel = it->second;
-                it->second = model;
+                prevModel = it->second.Model;
+                it->second.Model = model;
+                it->second.Generation = generation;
             }
             else
             {
-                m_Impl->PreviousModelByInstance.emplace(key, model);
+                m_Impl->PreviousModelByInstance.emplace(
+                    key, Impl::PreviousModelEntry{model, generation});
             }
 
             gpuWorld.SetInstanceTransform(instance, model, prevModel);
@@ -80,32 +94,29 @@ namespace Extrinsic::Graphics
             gpuWorld.SetBounds(instance, record.Bounds);
         }
 
-        std::vector<std::uint32_t> stale;
-        stale.reserve(m_Impl->PreviousModelByInstance.size());
-        for (const auto& [instanceIndex, _] : m_Impl->PreviousModelByInstance)
+        // Single-pass stale sweep: any entry not stamped by this call's
+        // records is no longer live and drops its previous-model state.
+        for (auto it = m_Impl->PreviousModelByInstance.begin();
+             it != m_Impl->PreviousModelByInstance.end();)
         {
-            bool stillLive = false;
-            for (const TransformSyncRecord& record : records)
+            if (it->second.Generation != generation)
             {
-                if (record.Instance.IsValid() && record.Instance.Index == instanceIndex)
-                {
-                    stillLive = true;
-                    break;
-                }
+                it = m_Impl->PreviousModelByInstance.erase(it);
             }
-            if (!stillLive)
+            else
             {
-                stale.push_back(instanceIndex);
+                ++it;
             }
-        }
-        for (const auto idx : stale)
-        {
-            m_Impl->PreviousModelByInstance.erase(idx);
         }
     }
 
     bool TransformSyncSystem::IsInitialized() const noexcept
     {
         return m_Impl->Initialized;
+    }
+
+    std::size_t TransformSyncSystem::GetTrackedInstanceCountForTest() const noexcept
+    {
+        return m_Impl->PreviousModelByInstance.size();
     }
 }
