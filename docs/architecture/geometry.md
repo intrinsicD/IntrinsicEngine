@@ -424,16 +424,19 @@ area ratio and authalic area distortion, symmetric Dirichlet energy/excess,
 stretch, deterministic boundary length distortion, and seam-discontinuity
 placeholders for future chart/map records.
 
-Existing LSCM quality fields in `Geometry.Parameterization` are now populated
-from this shared evaluator, so future harmonic/Tutte, ARAP, atlas, and
-map-storage work can compare against the same metric vocabulary.
+Existing LSCM quality fields and its full diagnostics record are populated from
+this evaluator, as are Harmonic/Tutte results, so the unified dispatch and
+future method/atlas/map-storage work share one metric vocabulary.
 
 ### Harmonic / Tutte parameterization
 
 `Geometry.Parameterization.Harmonic` is the fixed-boundary peer of the free-
-boundary LSCM solver. It maps a disk-topology triangle mesh into the plane by
-pinning the single boundary loop to a convex target and solving a sparse SPD
-Laplacian system for the interior vertices. `HarmonicWeightType` selects the
+boundary LSCM solver. It maps a connected disk-topology triangle mesh into the
+plane by pinning the single boundary loop to a convex target and solving a
+sparse SPD Laplacian system for the interior vertices. Disk validation requires
+one boundary loop, manifold connected vertex topology, and Euler characteristic
+one; a punctured positive-genus surface is rejected even though it has only one
+boundary loop. `HarmonicWeightType` selects the
 weighting — `Cotangent` (harmonic / Dirichlet-energy minimizing, with optional
 non-convex-weight clamping) or `Uniform` (Tutte barycentric, flip-free for a
 convex boundary). `HarmonicBoundaryPolicy` selects the boundary placement —
@@ -442,12 +445,33 @@ boundary, plus optional interior pins). The interior system is assembled with
 per-edge weights and solved through the geometry-owned `Geometry.Sparse` LDLT
 factorization (the GEOM-020 SPD seam, factored once and back-substituted for the
 u and v components); no Eigen types are exposed. The result carries explicit
-failure states (empty / non-triangle / non-disk topology, degenerate boundary,
-mismatched or invalid pins, non-finite UVs, singular system, solver failure) and
+failure states (empty / insufficient-vertex / non-triangle / non-disk topology,
+degenerate boundary, mismatched or invalid pins, non-finite UVs, singular
+system, solver failure) and
 the shared `ParameterizationDiagnostics` (flipped-element and distortion
 metrics). The existing `ComputeLSCM` API is unchanged and remains reachable.
 ARAP/SLIM/ABF, atlas segmentation, seam generation, and chart packing remain out
 of scope.
+
+### Unified CPU parameterization dispatch
+
+`Geometry.Parameterization::ParameterizeMesh` is the typed family entry point
+for the CPU solvers that exist today. `ParameterizationStrategy` is a
+`std::variant<ParameterizationParams, HarmonicParams>`: the first alternative
+selects LSCM, while the second selects cotangent Harmonic or uniform-weight
+Tutte through its own payload. Successful dispatch returns UVs plus the shared
+`ParameterizationDiagnostics`; legacy invalid-input and solver-convergence
+conventions are normalized to `ParameterizationStatus::{Success, InvalidInput,
+SolverFailed}` and failures carry no UV payload. The direct `ComputeLSCM` and
+`ComputeHarmonic` APIs remain reachable and numerically unchanged.
+
+The geometry surface reserves no future strategy or backend token. Each method
+task adds its concrete params alternative when its implementation lands.
+Runtime serializes explicit stable strategy names and converts them to typed
+payloads; it never persists `std::variant::index()`. Optimized/GPU policy and
+requested-versus-actual telemetry enter only with the tasks that own a real
+second implementation, at the applicable strategy or RHI-visible runtime
+boundary.
 
 ### Halfedge Vertex Normal Recompute
 

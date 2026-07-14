@@ -8,6 +8,8 @@ module;
 #include <numeric>
 #include <optional>
 #include <span>
+#include <utility>
+#include <variant>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -20,6 +22,7 @@ import Geometry.HalfedgeMesh;
 import Geometry.DEC;
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.Parameterization.Diagnostics;
+import Geometry.Parameterization.Harmonic;
 
 namespace Geometry::Parameterization
 {
@@ -415,10 +418,10 @@ namespace Geometry::Parameterization
             result.UVs[vi] = glm::vec2(u, v);
         }
 
-        const auto diagnostics = EvaluateParameterizationDiagnostics(mesh, std::span<const glm::vec2>(result.UVs));
-        result.FlippedTriangleCount = diagnostics.FlippedElementCount;
-        result.MeanConformalDistortion = diagnostics.MeanConformalDistortion;
-        result.MaxConformalDistortion = diagnostics.MaxConformalDistortion;
+        result.Diagnostics = EvaluateParameterizationDiagnostics(mesh, std::span<const glm::vec2>(result.UVs));
+        result.FlippedTriangleCount = result.Diagnostics.FlippedElementCount;
+        result.MeanConformalDistortion = result.Diagnostics.MeanConformalDistortion;
+        result.MaxConformalDistortion = result.Diagnostics.MaxConformalDistortion;
 
         return result;
     }
@@ -453,6 +456,71 @@ namespace Geometry::Parameterization
         }
 
         return result;
+    }
+
+    namespace
+    {
+        [[nodiscard]] ParameterizeResult DispatchParameterization(
+            const HalfedgeMesh::Mesh& mesh,
+            const ParameterizationParams& params)
+        {
+            ParameterizeResult result;
+            auto lscm = ComputeLSCM(mesh, params);
+            if (!lscm)
+            {
+                return result;
+            }
+            if (!lscm->Converged)
+            {
+                result.Status = ParameterizationStatus::SolverFailed;
+                return result;
+            }
+
+            result.Status = ParameterizationStatus::Success;
+            result.UVs = std::move(lscm->UVs);
+            result.Diagnostics = lscm->Diagnostics;
+            return result;
+        }
+
+        [[nodiscard]] ParameterizeResult DispatchParameterization(
+            const HalfedgeMesh::Mesh& mesh,
+            const HarmonicParams& params)
+        {
+            ParameterizeResult result;
+            auto harmonic = ComputeHarmonic(mesh, params);
+            if (!harmonic)
+            {
+                result.Status = ParameterizationStatus::SolverFailed;
+                return result;
+            }
+
+            switch (harmonic->Status)
+            {
+            case HarmonicStatus::Success:
+                result.Status = ParameterizationStatus::Success;
+                result.UVs = std::move(harmonic->UVs);
+                result.Diagnostics = harmonic->Diagnostics;
+                return result;
+            case HarmonicStatus::SingularSystem:
+            case HarmonicStatus::SolverFailed:
+                result.Status = ParameterizationStatus::SolverFailed;
+                return result;
+            default:
+                return result;
+            }
+        }
+    } // namespace
+
+    ParameterizeResult ParameterizeMesh(
+        const HalfedgeMesh::Mesh& mesh,
+        const ParameterizationStrategy& strategy)
+    {
+        return std::visit(
+            [&mesh](const auto& params)
+            {
+                return DispatchParameterization(mesh, params);
+            },
+            strategy);
     }
 
 } // namespace Geometry::Parameterization

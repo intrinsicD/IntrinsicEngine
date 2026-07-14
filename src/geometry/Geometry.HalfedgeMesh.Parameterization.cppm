@@ -1,8 +1,10 @@
 module;
 
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <optional>
+#include <variant>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -11,6 +13,8 @@ export module Geometry.Parameterization;
 
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
+export import Geometry.Parameterization.Diagnostics;
+export import Geometry.Parameterization.Harmonic;
 
 export namespace Geometry::Parameterization
 {
@@ -67,6 +71,7 @@ export namespace Geometry::Parameterization
         double MeanConformalDistortion{0.0};   // σ_max / σ_min averaged over faces
         double MaxConformalDistortion{0.0};     // Worst-case triangle distortion
         std::size_t FlippedTriangleCount{0};    // UV triangles with negative signed area
+        ParameterizationDiagnostics Diagnostics{};
 
         // Solver diagnostics
         std::size_t CGIterations{0};
@@ -93,5 +98,37 @@ export namespace Geometry::Parameterization
     [[nodiscard]] std::optional<ParameterizationResult> ComputeLSCM(
         HalfedgeMesh::Mesh& mesh,
         const ParameterizationParams& params = {});
+
+    // =========================================================================
+    // Unified CPU parameterization dispatch
+    // =========================================================================
+    //
+    // The strategy is the concrete parameter payload for an implemented solver.
+    // HarmonicParams with Uniform weights selects the Tutte embedding.
+
+    enum class ParameterizationStatus : std::uint8_t
+    {
+        Success,
+        InvalidInput,
+        SolverFailed,
+    };
+
+    using ParameterizationStrategy = std::variant<ParameterizationParams, HarmonicParams>;
+
+    struct ParameterizeResult
+    {
+        ParameterizationStatus Status{ParameterizationStatus::InvalidInput};
+        std::vector<glm::vec2> UVs{};
+        ParameterizationDiagnostics Diagnostics{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == ParameterizationStatus::Success;
+        }
+    };
+
+    [[nodiscard]] ParameterizeResult ParameterizeMesh(
+        const HalfedgeMesh::Mesh& mesh,
+        const ParameterizationStrategy& strategy);
 
 } // namespace Geometry::Parameterization
