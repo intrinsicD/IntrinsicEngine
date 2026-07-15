@@ -8,6 +8,13 @@ maturity_target: CPUContracted
 ---
 # RUNTIME-170 — Privatize the object-space normal GPU queue surface
 
+## Status
+
+- In progress on 2026-07-16; owner: Codex; branch:
+  `codex/arch-006-completion`.
+- Next gate: replace the standalone exported queue module with service-owned
+  implementation state, then build and run the focused queue/service contract.
+
 ## Goal
 - Keep object-space normal bake GPU queue ownership inside
   `ObjectSpaceNormalBakeService` by replacing
@@ -28,6 +35,22 @@ maturity_target: CPUContracted
   test importer.
 - `RUNTIME-161` extracted the service; this task makes the queue a service
   implementation detail while keeping the public CPU/null queue contract.
+
+## Right-sizing
+
+- Measured current surface: the queue interface is 118 lines with 9 imports,
+  one production importer (`ObjectSpaceNormalBakeService`), and one direct
+  focused-test importer. A no-ccache exact interface-object rebuild took
+  26.73 s on this host; the service interface rebuild took 6.15 s.
+- Simpler alternative: keep one public service module and one service-owned
+  private state implementation. Preserve behavioral coverage through the
+  service boundary or one explicit service test hook; do not replace the
+  retired module with a registry, interface, factory, or private module
+  framework.
+- Blast radius: the queue/service sources, their focused contract and layering
+  assertions, runtime CMake/README, and generated module inventory.
+- Reintroduction trigger: only a present second production owner requiring an
+  independently composed queue lifetime would justify a standalone surface.
 
 ## Required changes
 - [ ] Inventory declarations in `Runtime.ObjectSpaceNormalBakeGpuQueue.cppm`

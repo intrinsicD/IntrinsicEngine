@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `RUNTIME-170` — Privatize the object-space normal GPU queue surface (tasks/active/RUNTIME-170-privatize-object-space-normal-gpu-queue-surface.md)
 
 ## Theme B — Rendering modernization
 
@@ -22,7 +22,6 @@ the authoritative open/unblocked view.
 - blocked by `REVIEW-003`: `GRAPHICS-126` — Bandwidth-priced frame-recipe trace model (tasks/backlog/rendering/GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md)
 - unblocked: `RUNTIME-129` — Schedule GPU object-space normal bake jobs after import (tasks/backlog/runtime/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
 - unblocked: `RUNTIME-139` — Static AoS storage and shader operational path (tasks/backlog/runtime/RUNTIME-139-static-aos-storage-shader-operational.md)
-- unblocked: `RUNTIME-170` — Privatize the object-space normal GPU queue surface (tasks/backlog/runtime/RUNTIME-170-privatize-object-space-normal-gpu-queue-surface.md)
 - unblocked: `RUNTIME-177` — Immediate-mode debug-draw seam for runtime and method code (tasks/backlog/runtime/RUNTIME-177-immediate-mode-debug-draw-seam.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds

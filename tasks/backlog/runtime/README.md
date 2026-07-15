@@ -194,9 +194,10 @@ main `Runtime.RenderExtraction` module slimming.
 - [`RUNTIME-169`](RUNTIME-169-privatize-render-extraction-service-surface.md) —
   keep `RenderExtractionService` Engine-owned but remove its standalone module
   surface after `RUNTIME-163`.
-- [`RUNTIME-170`](RUNTIME-170-privatize-object-space-normal-gpu-queue-surface.md) —
+- [`RUNTIME-170`](../../active/RUNTIME-170-privatize-object-space-normal-gpu-queue-surface.md) —
   make the object-space normal bake GPU queue a service-private seam after
-  `RUNTIME-161`; production Vulkan wiring remains `RUNTIME-129`.
+  `RUNTIME-161`; active on `codex/arch-006-completion`. Production Vulkan
+  wiring remains `RUNTIME-129`.
 - [`RUNTIME-171`](RUNTIME-171-privatize-asset-residency-service-surface.md) —
   privatize the Engine-owned asset residency service after `RUNTIME-164`.
 - [`RUNTIME-172`](RUNTIME-172-privatize-scene-document-surface.md) —
