@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <limits>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -27,6 +28,16 @@ namespace
         (void)mesh.AddTriangle(center, c1, c2);
         (void)mesh.AddTriangle(center, c2, c3);
         (void)mesh.AddTriangle(center, c3, c0);
+        return mesh;
+    }
+
+    Geometry::HalfedgeMesh::Mesh MakeCollinearTriangle()
+    {
+        Geometry::HalfedgeMesh::Mesh mesh;
+        const auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+        const auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+        const auto v2 = mesh.AddVertex({2.0f, 0.0f, 0.0f});
+        (void)mesh.AddTriangle(v0, v1, v2);
         return mesh;
     }
 
@@ -102,6 +113,40 @@ TEST(ParameterizationDispatch, InvalidInputsFailClosedThroughStatus)
     const auto closedResult = Param::ParameterizeMesh(closed, harmonic);
     EXPECT_EQ(closedResult.Status, Param::ParameterizationStatus::InvalidInput);
     EXPECT_TRUE(closedResult.UVs.empty());
+
+    const auto puncturedTorus = MakePuncturedTorus();
+    EXPECT_FALSE(Param::ComputeLSCM(puncturedTorus).has_value());
+    const auto puncturedResult = Param::ParameterizeMesh(puncturedTorus, lscm);
+    EXPECT_EQ(puncturedResult.Status, Param::ParameterizationStatus::InvalidInput);
+    EXPECT_TRUE(puncturedResult.UVs.empty());
+
+    Param::ParameterizationParams nonFiniteParams;
+    nonFiniteParams.PinUV0.x = std::numeric_limits<float>::quiet_NaN();
+    const Param::ParameterizationStrategy nonFinite{nonFiniteParams};
+    const auto validDisk = MakeSquareFan();
+    EXPECT_FALSE(Param::ComputeLSCM(validDisk, nonFiniteParams).has_value());
+    const auto nonFiniteResult = Param::ParameterizeMesh(validDisk, nonFinite);
+    EXPECT_EQ(nonFiniteResult.Status, Param::ParameterizationStatus::InvalidInput);
+    EXPECT_TRUE(nonFiniteResult.UVs.empty());
+}
+
+TEST(ParameterizationDispatch, UnusableDiagnosticsFailClosedWithoutUvs)
+{
+    const auto mesh = MakeCollinearTriangle();
+    const auto direct = Param::ComputeHarmonic(mesh, Param::HarmonicParams{});
+    ASSERT_TRUE(direct.has_value());
+    ASSERT_EQ(direct->Status, Param::HarmonicStatus::Success);
+    ASSERT_EQ(
+        direct->Diagnostics.Status,
+        Param::ParameterizationDiagnosticsStatus::NoEvaluatedFaces);
+
+    const Param::ParameterizationStrategy strategy{Param::HarmonicParams{}};
+    const auto dispatched = Param::ParameterizeMesh(mesh, strategy);
+    EXPECT_EQ(dispatched.Status, Param::ParameterizationStatus::InvalidInput);
+    EXPECT_TRUE(dispatched.UVs.empty());
+    EXPECT_EQ(
+        dispatched.Diagnostics.Status,
+        Param::ParameterizationDiagnosticsStatus::NoEvaluatedFaces);
 }
 
 TEST(ParameterizationDispatch, LscmNonConvergenceIsSolverFailureWithoutUvs)

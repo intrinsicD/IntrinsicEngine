@@ -11,8 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [GEOM-063 — Unified CPU parameterization strategy dispatch](GEOM-063-unified-cpu-parameterization-strategy-dispatch.md)
-  (`in-progress`; owner: Codex; branch: `codex/arch-006-completion`).
+No tasks are currently active.
 
 ## History
 

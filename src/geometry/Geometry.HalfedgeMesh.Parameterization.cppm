@@ -25,7 +25,8 @@ export namespace Geometry::Parameterization
     // Implementation of Lévy, Petitjean, Ray & Maillot, "Least Squares
     // Conformal Maps for Automatic Texture Atlas Generation" (2002).
     //
-    // Given a triangle mesh with disk topology (exactly one boundary loop),
+    // Given a connected manifold triangle mesh with disk topology (one boundary
+    // loop and Euler characteristic one),
     // computes UV coordinates that minimize conformal (angle) distortion.
     // Two boundary vertices are pinned to break translational, rotational,
     // and scale degrees of freedom. The resulting normal-equations system is
@@ -33,7 +34,7 @@ export namespace Geometry::Parameterization
     //
     // Requirements:
     //   - Triangle mesh (all faces must be triangles)
-    //   - Disk topology: exactly one boundary loop
+    //   - Disk topology: connected manifold, one boundary loop, chi = 1
     //   - At least 3 vertices
     //
     // The method minimizes:
@@ -88,9 +89,11 @@ export namespace Geometry::Parameterization
     // Returns nullopt if:
     //   - Mesh is empty or has no faces
     //   - Mesh is not a triangle mesh
-    //   - Mesh does not have disk topology (not exactly one boundary loop)
+    //   - Mesh does not have disk topology (connected manifold, one boundary
+    //     loop, chi = 1)
     //   - Fewer than 3 vertices
     //   - Specified pin vertices are invalid or identical
+    //   - Pin UVs are non-finite or solver tolerance is non-finite/non-positive
     // -------------------------------------------------------------------------
     [[nodiscard]] std::optional<ParameterizationResult> ComputeLSCM(
         const HalfedgeMesh::Mesh& mesh,

@@ -118,7 +118,7 @@ export namespace Geometry::Simplification
     //     only ever raises a collapse cost, so existing quality guards retain
     //     their meaning.
     // Variants C (intrinsic-error metric) and D (line-quadric) from the GEOM-014
-    // survey are intentionally not implemented here; they are follow-up tasks.
+    // survey are intentionally not implemented here and have no concrete owner.
 
     // Configuration for mesh simplification
     struct Params
@@ -153,8 +153,9 @@ export namespace Geometry::Simplification
         // promoted to immovable corners before gentler boundary vertices.
         double CurvatureWeight{1.0};
 
-        // FA_QEM only. Pin sharp-feature corner and feature-line vertices so
-        // aggressive decimation cannot erase them. No effect under ClassicalQEM.
+        // FA_QEM only. Keep sharp-feature corners immovable and constrain
+        // feature-line vertices to collapses along feature edges. No effect
+        // under ClassicalQEM.
         bool PreserveSharpFeatures{true};
 
         // FA_QEM only. When the mesh carries a "v:texcoord" property, treat
@@ -225,8 +226,9 @@ export namespace Geometry::Simplification
         // including heap construction and local recomputation.
         std::size_t CollapsesRejectedQuality{0};
 
-        // FA_QEM: number of sharp-feature corner / feature-line vertices pinned
-        // so they could never be removed. Zero under ClassicalQEM.
+        // FA_QEM: number of immutable sharp-corner vertices. Feature-line
+        // vertices are protected to collapse only along the line, so they are
+        // deliberately not counted as pinned. Zero under ClassicalQEM.
         std::size_t SharpFeatureVerticesPinned{0};
 
         // FA_QEM: number of UV-seam (texcoord-bearing boundary) vertices pinned.

@@ -8,6 +8,7 @@
 // =============================================================================
 
 #include <cmath>
+#include <vector>
 #include <glm/glm.hpp>
 
 // Single equilateral triangle in the XY plane:
@@ -121,6 +122,62 @@ inline Geometry::HalfedgeMesh::Mesh MakeCube(float h = 1.0f, glm::vec3 center = 
     // +Y
     (void)mesh.AddTriangle(v2, v3, v7);
     (void)mesh.AddTriangle(v2, v7, v6);
+    return mesh;
+}
+
+// Periodic 4x4 triangulation of a torus with one triangle removed. It is
+// connected and has exactly one boundary loop, but chi = -1 (genus one), so a
+// boundary-count-only "disk" check accepts it incorrectly.
+inline Geometry::HalfedgeMesh::Mesh MakePuncturedTorus()
+{
+    constexpr int kMajorSegments = 4;
+    constexpr int kMinorSegments = 4;
+    constexpr float kMajorRadius = 2.0f;
+    constexpr float kMinorRadius = 0.5f;
+    constexpr float kTwoPi = 6.28318530717958647692f;
+
+    Geometry::HalfedgeMesh::Mesh mesh;
+    std::vector<std::vector<Geometry::VertexHandle>> vertices(
+        kMajorSegments,
+        std::vector<Geometry::VertexHandle>(kMinorSegments));
+
+    for (int i = 0; i < kMajorSegments; ++i)
+    {
+        const float theta =
+            kTwoPi * static_cast<float>(i) / static_cast<float>(kMajorSegments);
+        for (int j = 0; j < kMinorSegments; ++j)
+        {
+            const float phi =
+                kTwoPi * static_cast<float>(j) / static_cast<float>(kMinorSegments);
+            const float radial = kMajorRadius + kMinorRadius * std::cos(phi);
+            vertices[i][j] = mesh.AddVertex({
+                radial * std::cos(theta),
+                radial * std::sin(theta),
+                kMinorRadius * std::sin(phi),
+            });
+        }
+    }
+
+    Geometry::FaceHandle puncture;
+    for (int i = 0; i < kMajorSegments; ++i)
+    {
+        const int nextI = (i + 1) % kMajorSegments;
+        for (int j = 0; j < kMinorSegments; ++j)
+        {
+            const int nextJ = (j + 1) % kMinorSegments;
+            const auto a = vertices[i][j];
+            const auto b = vertices[nextI][j];
+            const auto c = vertices[nextI][nextJ];
+            const auto d = vertices[i][nextJ];
+            const auto first = mesh.AddTriangle(a, b, c);
+            (void)mesh.AddTriangle(a, c, d);
+            if (i == 0 && j == 0 && first.has_value())
+                puncture = *first;
+        }
+    }
+
+    if (puncture.IsValid())
+        mesh.DeleteFace(puncture);
     return mesh;
 }
 

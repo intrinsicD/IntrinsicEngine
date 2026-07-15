@@ -25,6 +25,7 @@ namespace Intrinsic::Bench::Geometry
         constexpr int kMeasuredIterations = 2;
         constexpr int kBarycentricResolution = 4;
         constexpr std::size_t kTargetFaceCount = 24u;
+        constexpr std::size_t kExpectedPinnedCornerCount = 8u;
         constexpr double kQualityRegressionTolerance = 1.0e-6;
 
         [[nodiscard]] ::Geometry::HalfedgeMesh::Mesh MakeTessellatedCube(
@@ -178,7 +179,7 @@ namespace Intrinsic::Bench::Geometry
             SurfaceDistanceSummary SensitivityControlDistance{};
             std::size_t FeatureAwareFinalFaceCount{0u};
             std::size_t ClassicalFinalFaceCount{0u};
-            std::size_t FeatureAwarePinnedVertexCount{0u};
+            std::size_t FeatureAwarePinnedCornerCount{0u};
             std::size_t FeatureAwareQualityRejectionCount{0u};
             double QualityErrorL2{0.0};
             double QualityErrorLinf{0.0};
@@ -228,7 +229,7 @@ namespace Intrinsic::Bench::Geometry
 
             tick.FeatureAwareFinalFaceCount = featureAwareResult->FinalFaceCount;
             tick.ClassicalFinalFaceCount = classicalResult->FinalFaceCount;
-            tick.FeatureAwarePinnedVertexCount =
+            tick.FeatureAwarePinnedCornerCount =
                 featureAwareResult->SharpFeatureVerticesPinned;
             tick.FeatureAwareQualityRejectionCount =
                 featureAwareResult->CollapsesRejectedQuality;
@@ -250,7 +251,7 @@ namespace Intrinsic::Bench::Geometry
                 && tick.ClassicalFinalFaceCount == kTargetFaceCount
                 && featureAwareMesh.FaceCount() == kTargetFaceCount
                 && classicalMesh.FaceCount() == kTargetFaceCount
-                && tick.FeatureAwarePinnedVertexCount >= 8u
+                && tick.FeatureAwarePinnedCornerCount == kExpectedPinnedCornerCount
                 && tick.FeatureAwareQualityRejectionCount > 0u
                 && tick.SensitivityControlDistance.MaxDistance > 0.20
                 && tick.QualityErrorL2 <= kQualityRegressionTolerance
@@ -265,9 +266,23 @@ namespace Intrinsic::Bench::Geometry
             (void)Tick();
 
         TickResult last{};
+        bool allMeasuredIterationsSucceeded = true;
+        std::size_t failedMeasuredIterationCount = 0u;
+        double worstQualityErrorL2 = 0.0;
+        double worstQualityErrorLinf = 0.0;
         const auto start = std::chrono::steady_clock::now();
         for (int iteration = 0; iteration < kMeasuredIterations; ++iteration)
+        {
             last = Tick();
+            allMeasuredIterationsSucceeded =
+                allMeasuredIterationsSucceeded && last.Succeeded;
+            if (!last.Succeeded)
+                ++failedMeasuredIterationCount;
+            worstQualityErrorL2 =
+                std::max(worstQualityErrorL2, last.QualityErrorL2);
+            worstQualityErrorLinf =
+                std::max(worstQualityErrorLinf, last.QualityErrorLinf);
+        }
         const auto end = std::chrono::steady_clock::now();
 
         const auto totalNanoseconds =
@@ -279,8 +294,8 @@ namespace Intrinsic::Bench::Geometry
 
         SimplificationQualitySmokeMetrics metrics{};
         metrics.RuntimeMilliseconds = meanMilliseconds;
-        metrics.QualityErrorL2 = last.QualityErrorL2;
-        metrics.QualityErrorLinf = last.QualityErrorLinf;
+        metrics.QualityErrorL2 = worstQualityErrorL2;
+        metrics.QualityErrorLinf = worstQualityErrorLinf;
         metrics.FeatureAwareRmsDistance = last.FeatureAwareDistance.RmsDistance;
         metrics.ClassicalRmsDistance = last.ClassicalDistance.RmsDistance;
         metrics.FeatureAwareMaxDistance = last.FeatureAwareDistance.MaxDistance;
@@ -291,11 +306,15 @@ namespace Intrinsic::Bench::Geometry
         metrics.TargetFaceCount = kTargetFaceCount;
         metrics.FeatureAwareFinalFaceCount = last.FeatureAwareFinalFaceCount;
         metrics.ClassicalFinalFaceCount = last.ClassicalFinalFaceCount;
-        metrics.FeatureAwarePinnedVertexCount =
-            last.FeatureAwarePinnedVertexCount;
+        metrics.FeatureAwarePinnedCornerCount =
+            last.FeatureAwarePinnedCornerCount;
         metrics.FeatureAwareQualityRejectionCount =
             last.FeatureAwareQualityRejectionCount;
-        metrics.Succeeded = last.Succeeded;
+        metrics.FailedMeasuredIterationCount = failedMeasuredIterationCount;
+        metrics.Succeeded = allMeasuredIterationsSucceeded
+            && std::isfinite(meanMilliseconds)
+            && meanMilliseconds
+                <= kSimplificationQualitySmokeRuntimeMillisecondsMax;
         return metrics;
     }
 }

@@ -51,7 +51,8 @@ copy the same strings. `kQualityMetricsSmokeBenchmarkId` from
 point-cloud quality metrics smoke workload.
 `kSimplificationQualitySmokeBenchmarkId` from
 [`Bench.SimplificationQualitySmoke.hpp`](Bench.SimplificationQualitySmoke.hpp)
-binds the GEOM-014 FA-QEM adaptation quality comparison.
+binds the GEOM-014 FA-QEM adaptation quality comparison; it requires every
+measured iteration to pass and enforces the manifest's 5000 ms smoke budget.
 `kPointCloudFilteringSmokeBenchmarkId`
 from [`Bench.PointCloudFilteringSmoke.hpp`](Bench.PointCloudFilteringSmoke.hpp)
 binds the GEOM-016 filtering/outlier-removal workload (voxel downsample plus

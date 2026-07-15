@@ -42,8 +42,9 @@ integration boundary. When that trigger is met, keep the backend enum small:
 - External accelerator backends may only enter through a separate method/backend
   task with its own policy and parity gate; they are not Vulkan-path tokens.
 
-Every result must report the backend that actually ran. A requested GPU backend
-that resolves to CPU is a valid fallback only when the result telemetry says so.
+For a family with a backend seam, every result must report the backend that
+actually ran. A requested GPU backend that resolves to CPU is a valid fallback
+only when the result telemetry says so.
 
 ## Layer Boundary
 

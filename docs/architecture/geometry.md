@@ -473,6 +473,12 @@ requested-versus-actual telemetry enter only with the tasks that own a real
 second implementation, at the applicable strategy or RHI-visible runtime
 boundary.
 
+The LSCM preflight now uses the same disk-topology definition as Harmonic/Tutte:
+connected manifold vertex topology, one boundary loop, and Euler characteristic
+one. Invalid numeric LSCM parameters fail before the solve, and dispatch only
+reports `Success` when the shared diagnostics report usable evaluated faces.
+The solver equations and successful-solve numerics are unchanged.
+
 ### Halfedge Vertex Normal Recompute
 
 `Geometry.HalfedgeMesh.Vertices.Normals` owns the geometry-layer CPU contract

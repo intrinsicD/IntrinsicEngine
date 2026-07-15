@@ -47,17 +47,17 @@ map.
 - [METHOD-020 — LOP-family GPU (Vulkan compute) backend and parity](METHOD-020-lop-family-gpu-vulkan-compute-backend.md)
   (adds `gpu_vulkan_compute` with `gpu;vulkan` parity; gated on `METHOD-019`).
 - [METHOD-021 — ARAP (local/global) parameterization reference backend](METHOD-021-arap-parameterization-reference-backend.md)
-  (adds the `Arap` strategy to the shared `Geometry.Parameterization` surface;
-  gated on `geometry/GEOM-063` dispatch surface and `geometry/GEOM-064`
+  (adds its concrete ARAP params alternative to the retired `GEOM-063` typed
+  `Geometry.Parameterization` strategy surface; gated on `geometry/GEOM-064`
   optimization kernels; roadmap Pack 3).
 - [METHOD-022 — SLIM locally-injective parameterization reference backend](METHOD-022-slim-injective-parameterization-reference-backend.md)
-  (adds the flip-free `Slim` strategy; gated on `GEOM-063`, `GEOM-064`, and
-  `METHOD-021`; roadmap Pack 4).
+  (adds its concrete flip-free SLIM params alternative; gated on `GEOM-064`
+  and `METHOD-021`; roadmap Pack 4).
 - [METHOD-023 — Boundary First Flattening (BFF) reference backend](METHOD-023-boundary-first-flattening-reference-backend.md)
-  (adds the controllable-conformal `Bff` strategy with boundary length/angle
-  targets and cones; gated on `GEOM-063`; new SOTA pack).
+  (unblocked; adds its concrete controllable-conformal BFF params alternative
+  with boundary length/angle targets and cones; new SOTA pack).
 - [METHOD-024 — Spectral Conformal Parameterization (SCP) reference backend](METHOD-024-spectral-conformal-parameterization-reference-backend.md)
-  (adds the pin-free conformal `Scp` strategy; gated on `GEOM-063` and the
+  (adds its concrete pin-free conformal SCP params alternative; gated on the
   `geometry/GEOM-024` generalized eigensolver seam; new SOTA pack).
 - [METHOD-025 — Parameterization family optimized CPU backend and comparison benchmark](METHOD-025-parameterization-family-optimized-cpu-backend.md)
   (adds `cpu_optimized` progressive acceleration with parity; gated on
@@ -106,11 +106,11 @@ map.
   variant they extend is implemented, tested, and benchmark-manifested.
 - **Parameterization family (METHOD-021..026).** The state-of-the-art mesh
   parameterization variants — ARAP (`METHOD-021`), SLIM (`METHOD-022`), BFF
-  (`METHOD-023`), and SCP (`METHOD-024`) — are added as `Strategy` values on the
-  one shared `Geometry.Parameterization` `Strategy` × `Backend` surface
-  (`geometry/GEOM-063`, `docs/architecture/algorithm-variant-dispatch.md`),
-  alongside the existing Tutte/Harmonic (`GEOM-019`) and LSCM strategies, so every
-  variant is choosable through one API and one config/UI/agent surface. The
+  (`METHOD-023`), and SCP (`METHOD-024`) — each add a concrete params
+  alternative to the typed CPU strategy variant retired by `geometry/GEOM-063`,
+  alongside the existing LSCM and Tutte/Harmonic (`GEOM-019`) alternatives.
+  No backend token is reserved: optimized/GPU policy enters with the later task
+  that owns a real second implementation. The
   iterative variants share the `geometry/GEOM-064` optimization-kernel seam
   (local rotation fit, symmetric-Dirichlet energy/proxy, injective line search)
   and the `GEOM-018` diagnostics; the optimized CPU (`METHOD-025`) and GPU

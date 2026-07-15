@@ -26,10 +26,6 @@ map.
 - [GEOM-062 — Point-set projection and weighting kernels seam](GEOM-062-point-set-projection-weighting-kernels.md)
   (reusable `Geometry.PointCloud.Kernels`: radial weights, LOP repulsion, WLOP
   density weights; gates the `methods/METHOD-016..018` LOP consolidation family).
-- [GEOM-063 — Unified CPU parameterization strategy dispatch](../../active/GEOM-063-unified-cpu-parameterization-strategy-dispatch.md)
-  (active; consolidates Harmonic/Tutte and LSCM behind one typed
-  `Geometry.Parameterization::ParameterizeMesh` CPU dispatch with shared
-  diagnostics; concrete method tasks extend the variant when they land).
 - [GEOM-064 — Parameterization optimization kernels seam](GEOM-064-parameterization-optimization-kernels.md)
   (reusable `Geometry.Parameterization.Optimize`: local rotation fit,
   symmetric-Dirichlet energy/proxy, injective line search; gates ARAP
@@ -92,10 +88,10 @@ the runtime SpatialDebug closest-face consumer in `RUNTIME-135`.
   METHOD-006 variant B and the Spectral Conformal Parameterization method
   `methods/METHOD-024`. Promote it when either becomes the next-priority
   spectral method.
-- GEOM-063 and GEOM-064 are the parameterization-family seams that realize
+- Retired GEOM-063 and open GEOM-064 are the parameterization-family seams that realize
   Packs 3–4 of the
   [parameterization/mapping roadmap](../../../docs/architecture/parameterization-mapping-roadmap.md).
-  GEOM-063 makes `Geometry.Parameterization` a typed CPU strategy dispatch
+  Retired GEOM-063 makes `Geometry.Parameterization` a typed CPU strategy dispatch
   surface consolidating the existing LSCM and Harmonic/Tutte solvers. The SOTA
   method tasks (ARAP/SLIM/BFF/SCP, `methods/METHOD-021..024`) add their concrete
   params types when implemented; backend policy remains with the later
@@ -175,6 +171,7 @@ split; narratives live in the retirement log.
 - [GEOM-017 — Point-cloud descriptors and registration seams](../../archive/GEOM-017-point-cloud-descriptors-registration-seams.md) (done).
 - [GEOM-018 — Parameterization distortion and map-quality diagnostics](../../archive/GEOM-018-parameterization-distortion-map-quality-diagnostics.md) (done).
 - [GEOM-019 — Harmonic/Tutte parameterization and boundary constraints](../../done/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md) (done, `CPUContracted`, 2026-07-15).
+- [GEOM-063 — Unified CPU parameterization strategy dispatch](../../done/GEOM-063-unified-cpu-parameterization-strategy-dispatch.md) (done, `CPUContracted`, 2026-07-15).
 - [GEOM-015 — GJK termination diagnostics and scale-aware tolerance policy](../../archive/GEOM-015-gjk-termination-diagnostics.md) (done).
 - [GEOM-021 — MeshSoup module implementation split](../../archive/GEOM-021-meshsoup-module-implementation-split.md).
 - [GEOM-022 — Remaining geometry module implementation splits](../../archive/GEOM-022-remaining-geometry-module-implementation-splits.md).

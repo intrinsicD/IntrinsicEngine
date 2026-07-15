@@ -826,7 +826,7 @@ namespace Geometry::Simplification
                     ++seamPinnedCount;
                 }
 
-                if (vertexFeature[vi] != FeatureKind::None)
+                if (vertexFeature[vi] == FeatureKind::Corner)
                 {
                     ++featurePinnedCount;
                 }

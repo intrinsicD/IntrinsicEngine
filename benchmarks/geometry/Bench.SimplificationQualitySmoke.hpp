@@ -11,6 +11,8 @@ namespace Intrinsic::Bench::Geometry
         "geometry.halfedge.simplification.fa_qem_adaptation";
     inline constexpr const char* kSimplificationQualitySmokeDataset =
         "builtin.tessellated_cube_n4";
+    inline constexpr double kSimplificationQualitySmokeRuntimeMillisecondsMax =
+        5000.0;
 
     struct SimplificationQualitySmokeMetrics
     {
@@ -26,8 +28,9 @@ namespace Intrinsic::Bench::Geometry
         std::size_t TargetFaceCount{0u};
         std::size_t FeatureAwareFinalFaceCount{0u};
         std::size_t ClassicalFinalFaceCount{0u};
-        std::size_t FeatureAwarePinnedVertexCount{0u};
+        std::size_t FeatureAwarePinnedCornerCount{0u};
         std::size_t FeatureAwareQualityRejectionCount{0u};
+        std::size_t FailedMeasuredIterationCount{0u};
         bool Succeeded{false};
     };
 

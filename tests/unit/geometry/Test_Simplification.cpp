@@ -378,7 +378,7 @@ TEST(Simplification, FeatureAwarePreservesCubeCorners)
     auto result = Geometry::Simplification::Simplify(mesh, params);
     ASSERT_TRUE(result.has_value());
     EXPECT_GT(result->CollapseCount, 0u);
-    EXPECT_GE(result->SharpFeatureVerticesPinned, 8u);
+    EXPECT_EQ(result->SharpFeatureVerticesPinned, 8u);
 
     mesh.GarbageCollection();
     for (const glm::vec3& corner : kCubeCorners)
@@ -582,7 +582,7 @@ TEST(Simplification, DiagnosticsCountersPopulated)
     auto result = Geometry::Simplification::Simplify(mesh, params);
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result->FinalFaceCount, mesh.FaceCount());
-    EXPECT_GE(result->SharpFeatureVerticesPinned, 8u);
+    EXPECT_EQ(result->SharpFeatureVerticesPinned, 8u);
     EXPECT_GT(result->SharpFeatureVerticesPinned + result->SeamVerticesPinned, 0u);
     EXPECT_GT(result->CollapsesRejectedQuality, 0u);
     EXPECT_GT(

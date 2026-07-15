@@ -8,6 +8,24 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`GEOM-063`](GEOM-063-unified-cpu-parameterization-strategy-dispatch.md) — the
+unified CPU parameterization strategy dispatch retired on 2026-07-15 at
+`CPUContracted`. Right-sizing removed the speculative global backend axis,
+fallback telemetry, reserved future-method tokens, and generic mega-params;
+the landed surface is a typed variant over the two parameter records that
+actually exist, dispatching LSCM and Harmonic/uniform-Tutte through one
+normalized status, UV, and shared-diagnostics result. Direct solver UVs remain
+bitwise-identical and reachable, invalid input and nonconvergence fail closed
+without UV payloads, and future methods add concrete payload alternatives only
+when implemented. Final review aligned LSCM with the shared connected-manifold
+disk preflight, rejected non-finite numeric inputs, and made dispatch reject
+otherwise-successful solves whose diagnostics contain no usable faces. The
+exact single-binary family selection passed 31/31, dispatch-only passed 6/6,
+and the Clang-23 ASan/UBSan CPU-supported gate passed 9250/9250 in 977.67
+seconds. Runtime/config/UI integration remains explicitly owned by
+`RUNTIME-176`; real optimized/GPU policy remains with `METHOD-025`/`METHOD-026`
+when second implementations exist.
+
 [`GEOM-014`](GEOM-014-feature-aware-quadric-error-simplification.md) — the
 feature-aware quadric-error simplification adaptation retired on 2026-07-15 at
 `CPUContracted`. Closure corrected its attribution and scoped the implementation
@@ -16,10 +34,14 @@ survivor-vertex quality proxy with deterministic original-surface samples
 queried against each 24-face result surface, added a translated sensitivity
 control, proved the classical metric ignores every feature-aware control, and
 made rejection diagnostics count evaluated candidates. The Clang-23 ASan/UBSan
-`ci` build completed, the exact `Simplification` selection passed 93/93, and
-the manifest-backed `geometry.simplification.fa_qem_quality.smoke` workload
-passed its run/validation pair with strict validation of all 24 manifests and
-20 emitted results. The benchmark is a correctness smoke and makes no paper
+`ci` build completed, the exact single-binary `Simplification*` selection
+passed 29/29, all 93 registered matches passed in the full gate, and the
+manifest-backed `geometry.simplification.fa_qem_quality.smoke` workload passed
+its run/validation pair with strict validation of all 24 manifests and 20
+emitted results. Review correction made the diagnostic count immutable corners
+only and made the workload enforce every measured iteration plus its 5000 ms
+budget; the emitted result recorded 8 corners, 0 failed iterations, and a
+1255.539 ms mean. The benchmark is a correctness smoke and makes no paper
 parity, performance, or adoption claim. No `Operational` follow-up is owed
 because the task extends the deterministic CPU geometry kernel in place.
 

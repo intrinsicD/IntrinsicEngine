@@ -4,6 +4,7 @@ module;
 #include <cassert>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <numeric>
 #include <optional>
@@ -147,6 +148,70 @@ namespace Geometry::Parameterization
             return info;
         }
 
+        // One boundary loop is not sufficient for disk topology: a punctured
+        // positive-genus surface also has one. Require one connected manifold
+        // component and Euler characteristic one, matching the Harmonic/Tutte
+        // contract wrapped by the unified dispatch.
+        [[nodiscard]] bool HasDiskTopology(
+            const HalfedgeMesh::Mesh& mesh,
+            const std::vector<std::size_t>& boundaryVertices)
+        {
+            if (boundaryVertices.empty())
+                return false;
+
+            std::vector<std::uint8_t> reached(mesh.VerticesSize(), 0u);
+            std::vector<VertexHandle> pending;
+            const VertexHandle start{
+                static_cast<PropertyIndex>(boundaryVertices.front())};
+            pending.push_back(start);
+            reached[start.Index] = 1u;
+
+            while (!pending.empty())
+            {
+                const VertexHandle vertex = pending.back();
+                pending.pop_back();
+                for (const HalfedgeHandle halfedge : mesh.HalfedgesAroundVertex(vertex))
+                {
+                    const VertexHandle neighbor = mesh.ToVertex(halfedge);
+                    if (mesh.IsDeleted(neighbor) || reached[neighbor.Index] != 0u)
+                        continue;
+                    reached[neighbor.Index] = 1u;
+                    pending.push_back(neighbor);
+                }
+            }
+
+            for (std::size_t vi = 0; vi < mesh.VerticesSize(); ++vi)
+            {
+                const VertexHandle vertex{static_cast<PropertyIndex>(vi)};
+                if (mesh.IsDeleted(vertex))
+                    continue;
+                if (mesh.IsIsolated(vertex) || !mesh.IsManifold(vertex)
+                    || reached[vi] == 0u)
+                {
+                    return false;
+                }
+            }
+
+            const std::int64_t eulerCharacteristic =
+                static_cast<std::int64_t>(mesh.VertexCount())
+                - static_cast<std::int64_t>(mesh.EdgeCount())
+                + static_cast<std::int64_t>(mesh.FaceCount());
+            return eulerCharacteristic == 1;
+        }
+
+        [[nodiscard]] bool HasValidNumericParams(
+            const ParameterizationParams& params) noexcept
+        {
+            const auto finiteUv = [](const glm::vec2 uv) noexcept
+            {
+                return std::isfinite(uv.x) && std::isfinite(uv.y);
+            };
+            return finiteUv(params.PinUV0)
+                && finiteUv(params.PinUV1)
+                && std::isfinite(params.SolverTolerance)
+                && params.SolverTolerance > 0.0;
+        }
+
         // Select two boundary vertices maximizing arc length separation
         std::pair<std::size_t, std::size_t> SelectPinVertices(
             const HalfedgeMesh::Mesh& mesh,
@@ -191,7 +256,8 @@ namespace Geometry::Parameterization
         const HalfedgeMesh::Mesh& mesh,
         const ParameterizationParams& params)
     {
-        if (mesh.IsEmpty() || mesh.FaceCount() == 0 || mesh.VertexCount() < 3)
+        if (!HasValidNumericParams(params)
+            || mesh.IsEmpty() || mesh.FaceCount() == 0 || mesh.VertexCount() < 3)
             return std::nullopt;
 
         const std::size_t nV = mesh.VerticesSize();
@@ -209,7 +275,11 @@ namespace Geometry::Parameterization
         }
 
         auto boundary = FindBoundaryLoops(mesh);
-        if (boundary.LoopCount != 1) return std::nullopt;
+        if (boundary.LoopCount != 1
+            || !HasDiskTopology(mesh, boundary.LoopVertices))
+        {
+            return std::nullopt;
+        }
 
         // ------------------------------------------------------------------
         // Step 2: Select pin vertices
@@ -475,10 +545,15 @@ namespace Geometry::Parameterization
                 result.Status = ParameterizationStatus::SolverFailed;
                 return result;
             }
+            result.Diagnostics = lscm->Diagnostics;
+            if (result.Diagnostics.Status
+                != ParameterizationDiagnosticsStatus::Success)
+            {
+                return result;
+            }
 
             result.Status = ParameterizationStatus::Success;
             result.UVs = std::move(lscm->UVs);
-            result.Diagnostics = lscm->Diagnostics;
             return result;
         }
 
@@ -497,9 +572,14 @@ namespace Geometry::Parameterization
             switch (harmonic->Status)
             {
             case HarmonicStatus::Success:
+                result.Diagnostics = harmonic->Diagnostics;
+                if (result.Diagnostics.Status
+                    != ParameterizationDiagnosticsStatus::Success)
+                {
+                    return result;
+                }
                 result.Status = ParameterizationStatus::Success;
                 result.UVs = std::move(harmonic->UVs);
-                result.Diagnostics = harmonic->Diagnostics;
                 return result;
             case HarmonicStatus::SingularSystem:
             case HarmonicStatus::SolverFailed:

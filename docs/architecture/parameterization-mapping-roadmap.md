@@ -29,9 +29,15 @@ The gaps below come from the [`src/geometry` gap analysis](../reviews/2026-05-12
 
 ## Family surface and shared optimization seam
 
-The solvers above ship as disjoint entry points (`ComputeLSCM`, `ComputeHarmonic`) with per-method params structs and no shared control surface. Before adding the state-of-the-art variants, consolidate the implemented CPU solvers behind one typed dispatch surface. Each later method extends that variant with its concrete params type when it lands; runtime config uses explicit stable tokens and converts them to those typed payloads. Backend selection stays at the runtime/method boundary until a second implementation exists.
+The direct solver entry points (`ComputeLSCM`, `ComputeHarmonic`) remain
+available with their per-method params structs. Retired GEOM-063 now also
+consolidates the implemented CPU solvers behind one typed dispatch surface.
+Each later method extends that variant with its concrete params type when it
+lands; runtime config uses explicit stable tokens and converts them to those
+typed payloads. Backend selection stays at the runtime/method boundary until a
+second implementation exists.
 
-- Family surface: active [`GEOM-063`](../../tasks/active/GEOM-063-unified-cpu-parameterization-strategy-dispatch.md) — `Geometry.Parameterization::ParameterizeMesh(mesh, strategy)` with `ParameterizationStrategy = std::variant<ParameterizationParams, HarmonicParams>`, normalized status, and the GEOM-018 diagnostics in every successful result. Tutte is selected through `HarmonicParams::Weights = Uniform`. No unimplemented strategy or backend token is reserved; each method/backend owner extends the surface when its implementation lands.
+- Family surface: retired [`GEOM-063`](../../tasks/done/GEOM-063-unified-cpu-parameterization-strategy-dispatch.md) — `Geometry.Parameterization::ParameterizeMesh(mesh, strategy)` with `ParameterizationStrategy = std::variant<ParameterizationParams, HarmonicParams>`, normalized status, and the GEOM-018 diagnostics in every successful result. Tutte is selected through `HarmonicParams::Weights = Uniform`. No unimplemented strategy or backend token is reserved; each method/backend owner extends the surface when its implementation lands.
 - Shared optimization seam: [`GEOM-064`](../../tasks/backlog/geometry/GEOM-064-parameterization-optimization-kernels.md) — `Geometry.Parameterization.Optimize` with the per-triangle local rotation fit, the symmetric-Dirichlet energy/gradient plus PSD proxy, and the injectivity-preserving line search that ARAP (Pack 3), SLIM (Pack 4), and the optimized backend (Pack 7) share, so no variant re-derives the nonlinear-solve core privately.
 
 The rendering/interaction decision for the interactive UV view is recorded in [ADR-0025](../adr/0025-parameterization-uv-view-and-split-view.md): the UV layout is a derived second view of the mesh entity (shared topology/`StableId`/`v:texcoord`), not a separate ECS entity.
@@ -285,7 +291,7 @@ Parameterization and mapping tasks must make topology, boundary, and degeneracy 
 
 The diagnostics ([`GEOM-018`](../../tasks/archive/GEOM-018-parameterization-distortion-map-quality-diagnostics.md), retired) and harmonic/Tutte ([`GEOM-019`](../../tasks/done/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md), retired) foundations exist, so the SOTA-variant program orders as:
 
-1. Active [`GEOM-063`](../../tasks/active/GEOM-063-unified-cpu-parameterization-strategy-dispatch.md) — the typed CPU family dispatch surface, consolidating existing Harmonic/Tutte and LSCM so later implemented variants can extend one API. Behavior-preserving; no new algorithm or speculative backend token.
+1. Retired [`GEOM-063`](../../tasks/done/GEOM-063-unified-cpu-parameterization-strategy-dispatch.md) — the typed CPU family dispatch surface, consolidating existing Harmonic/Tutte and LSCM so later implemented variants can extend one API. Behavior-preserving; no new algorithm or speculative backend token.
 2. [`GEOM-064`](../../tasks/backlog/geometry/GEOM-064-parameterization-optimization-kernels.md) — the shared optimization-kernel seam ARAP and SLIM consume.
 3. The SOTA reference variants on the surface: ARAP (`METHOD-021`, Pack 3), SLIM (`METHOD-022`, Pack 4), SCP (`METHOD-024`, Pack 4b), BFF (`METHOD-023`, Pack 4c) — CPU-reference-first, in each task's `depends_on` order.
 4. The optimized CPU (`METHOD-025`) and GPU (`METHOD-026`) backends for the iterative strategies after reference parity; the linear one-shot strategies (LSCM/SCP/BFF) record no optimized/GPU follow-up in their tasks. `METHOD-026` also wires the runtime GPU job-queue leg, so it is additionally gated on `RUNTIME-176`.

@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `GEOM-063` — Unified CPU parameterization strategy dispatch (tasks/active/GEOM-063-unified-cpu-parameterization-strategy-dispatch.md)
+- none
 
 ## Theme B — Rendering modernization
 
@@ -79,14 +79,14 @@ the authoritative open/unblocked view.
 - blocked by `METHOD-016`: `METHOD-018` — Edge-Aware Resampling (EAR) and anisotropic feature-preserving LOP reference backend (tasks/backlog/methods/METHOD-018-edge-aware-resampling-anisotropic-lop-reference-backend.md)
 - blocked by `METHOD-016`: `METHOD-019` — LOP-family optimized CPU backend and comparison benchmark (tasks/backlog/methods/METHOD-019-lop-family-optimized-cpu-backend.md)
 - blocked by `METHOD-019`: `METHOD-020` — LOP-family GPU (Vulkan compute) backend and parity (tasks/backlog/methods/METHOD-020-lop-family-gpu-vulkan-compute-backend.md)
-- blocked by `GEOM-063`: `METHOD-021` — ARAP (local/global) parameterization reference backend (tasks/backlog/methods/METHOD-021-arap-parameterization-reference-backend.md)
-- blocked by `GEOM-063`: `METHOD-022` — SLIM locally-injective parameterization reference backend (tasks/backlog/methods/METHOD-022-slim-injective-parameterization-reference-backend.md)
-- blocked by `GEOM-063`: `METHOD-023` — Boundary First Flattening (BFF) reference backend (tasks/backlog/methods/METHOD-023-boundary-first-flattening-reference-backend.md)
-- blocked by `GEOM-063`: `METHOD-024` — Spectral Conformal Parameterization (SCP) reference backend (tasks/backlog/methods/METHOD-024-spectral-conformal-parameterization-reference-backend.md)
+- blocked by `GEOM-064`: `METHOD-021` — ARAP (local/global) parameterization reference backend (tasks/backlog/methods/METHOD-021-arap-parameterization-reference-backend.md)
+- blocked by `GEOM-064`: `METHOD-022` — SLIM locally-injective parameterization reference backend (tasks/backlog/methods/METHOD-022-slim-injective-parameterization-reference-backend.md)
+- unblocked: `METHOD-023` — Boundary First Flattening (BFF) reference backend (tasks/backlog/methods/METHOD-023-boundary-first-flattening-reference-backend.md)
+- blocked by `GEOM-024`: `METHOD-024` — Spectral Conformal Parameterization (SCP) reference backend (tasks/backlog/methods/METHOD-024-spectral-conformal-parameterization-reference-backend.md)
 - blocked by `METHOD-021`: `METHOD-025` — Parameterization family optimized CPU backend and comparison benchmark (tasks/backlog/methods/METHOD-025-parameterization-family-optimized-cpu-backend.md)
 - blocked by `METHOD-025`: `METHOD-026` — Parameterization family GPU (Vulkan compute) backend and parity (tasks/backlog/methods/METHOD-026-parameterization-family-gpu-vulkan-compute-backend.md)
 - blocked by `METHOD-016`: `RUNTIME-175` — Point-cloud consolidation runtime facade, config lane, and backend adapter (tasks/backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
-- blocked by `GEOM-063`: `RUNTIME-176` — Parameterization runtime facade, config lane, and UV view model (tasks/backlog/runtime/RUNTIME-176-parameterization-runtime-config-integration.md)
+- unblocked: `RUNTIME-176` — Parameterization runtime facade, config lane, and UV view model (tasks/backlog/runtime/RUNTIME-176-parameterization-runtime-config-integration.md)
 - blocked by `RUNTIME-175`: `UI-035` — Sandbox point-cloud consolidation editor panel (tasks/backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md)
 - blocked by `RUNTIME-176`: `UI-036` — Sandbox parameterization editor panel and resizable UV split view (tasks/backlog/ui/UI-036-sandbox-parameterization-editor-and-uv-split-view.md)
 

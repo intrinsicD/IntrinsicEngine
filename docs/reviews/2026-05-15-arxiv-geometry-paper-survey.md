@@ -90,18 +90,27 @@ These were considered and intentionally deprioritised:
 - **Mesh Denoising Transformer / DoubleDiffusion.** ML-heavy; the engine should first add a classical bilateral / anisotropic-normal-filtering denoiser baseline alongside the existing `Geometry.HalfedgeMesh.Smoothing` before considering learned variants.
 - **Restricted Delaunay surface reconstruction.** Strong method but overlaps significantly with the planned screened-Poisson + ball-pivoting roadmap in `GEOM-010`; revisit when the point-cloud pack lands.
 
-## Suggested next-step tasks (proposals — not created here)
+## Suggested next-step tasks (historical proposals)
 
-Each of these would live under `tasks/backlog/geometry/` or `tasks/backlog/methods/` per the task-format contract.
+These were proposal-local identifiers at survey time. The entries that later
+became canonical tasks are annotated with their current IDs so this historical
+list does not contradict the live task tree.
 
 1. `METHOD-GEO-Signed-Heat` — Signed Heat Method reference backend on the halfedge mesh, reusing the existing heat-method Laplacian and sparse-solver seam from `GEOM-008`.
 2. `METHOD-GEO-Closest-Point-PDE` — Closest-point-method PDE solver on `Geometry.Grid`, sharing the `ClosestPoint` query interface used by SDF/KD-tree/BVH.
 3. `METHOD-GEO-Walk-on-Spheres` — Baseline WoS / WoSt CPU reference solver for Laplace/Poisson on SDF and mesh inputs, with deterministic seeded RNG; opens the door to a GPU backend.
 4. `METHOD-GEO-Robust-Boolean` — Robust mesh boolean kernel based on Cherchi et al., gated on `GEOM-007`, packaged under `methods/geometry/` for parity comparison.
-5. `GEOM-013` — Cross-field / frame-field design reference module (MIQ-style baseline), with NeurCross / CrossGen as optimised-backend comparison points.
-6. `GEOM-014` — Dual contouring with sharp-feature preservation (power-diagram or QEF-based), targeting the existing `Geometry.MarchingCubes` / `Geometry.SDF` neighbourhood.
-7. `GEOM-015` — FA-QEM extension to `Geometry.HalfedgeMesh.Simplification` (in-place, behind an opt-in flag).
-8. `GEOM-016` — Constrained Delaunay tetrahedralisation reference + `Geometry.TetMesh` container; depends on `GEOM-007`.
+5. Cross-field / frame-field design reference module (proposed as `GEOM-013`,
+   canonical `METHOD-006`) — MIQ-style baseline, with NeurCross / CrossGen as
+   optimised-backend comparison points.
+6. Dual contouring with sharp-feature preservation (proposed as `GEOM-014`,
+   canonical `GEOM-013`) — power-diagram or QEF-based, targeting the existing
+   `Geometry.MarchingCubes` / `Geometry.SDF` neighbourhood.
+7. FA-QEM extension to `Geometry.HalfedgeMesh.Simplification` (proposed as
+   `GEOM-015`, canonical `GEOM-014`) — in-place, behind a selectable metric.
+8. Constrained Delaunay tetrahedralisation reference + `Geometry.TetMesh`
+   container (proposed as `GEOM-016`, canonical `METHOD-007`); depends on
+   `GEOM-007`.
 
 Recommended ordering: Tier 1 items 1-3 unblock the PDE / geodesic surface; Tier 2 item 5 (robust booleans) and Tier 1 item 4 (CDT) both depend on `GEOM-007` and should follow it.
 

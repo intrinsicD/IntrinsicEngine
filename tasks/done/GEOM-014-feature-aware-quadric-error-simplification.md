@@ -17,7 +17,7 @@ completed_on: 2026-07-15
 - No replacement of `Geometry.HalfedgeMesh.Simplification` — this is an in-place extension.
 - No GPU backend.
 - No neural / learned simplification.
-- No progressive-mesh / view-dependent LOD machinery in this task (separate follow-up).
+- No progressive-mesh / view-dependent LOD machinery; no task is owned here.
 
 ## Context
 - Status: implemented in commit `d4aab123` and verified for retirement on
@@ -48,11 +48,14 @@ completed_on: 2026-07-15
   quadric store. Recorded here as the deliberate deviation from the sketch.
 - Retirement verification: `cmake --preset ci` selected Clang 23 with
   ASan/UBSan, `IntrinsicTests` built successfully, and the exact
-  `Simplification` selection passed 93/93. The manifest-backed benchmark run
-  and validation passed 2/2, all 24 benchmark manifests and 20 emitted result
-  payloads validate strictly, and this workload emitted `status: passed` with
-  both variants at 24 faces. Layering, test-layout, task-policy, task-state,
-  and documentation checks pass; the generated module inventory is current.
+  single-binary `Simplification*` selection passed 29/29; all 93 registered
+  `Simplification` matches passed inside the full 9250/9250 CPU gate. The
+  manifest-backed benchmark run and validation passed 2/2, all 24 benchmark
+  manifests and 20 emitted result payloads validate strictly, and this workload
+  emitted `status: passed` with both variants at 24 faces, 8 immutable corners,
+  0 failed measured iterations, and a 1255.539 ms mean below its 5000 ms smoke
+  budget. Layering, test-layout, task-policy, task-state, and documentation
+  checks pass; the generated module inventory is current.
 - Editor/runtime execution wiring retired separately under `UI-028`; its
   `Mesh > Processing > Simplify` path consumes this geometry-owned kernel.
 
@@ -60,7 +63,8 @@ completed_on: 2026-07-15
 
 Mark `[x]` next to the variant that should become the **default error metric**. Other metrics remain selectable via the `Params::metric` enum.
 
-- **A — Classical QEM (Garland & Heckbert, SIGGRAPH 1997).** Plane-distance quadric only. Fastest, smallest code. Current behaviour.
+- **A — Classical QEM (Garland & Heckbert, SIGGRAPH 1997).** Plane-distance
+  quadric only. Fastest, smallest code; retained as the legacy behavior.
 - [x] **B — Scoped adaptation inspired by “Fast and Robust Mesh Simplification
   for Generated and Real-World 3D Assets” (Bhosikar, Savalia, Tiwari, and
   Bhowmick, arXiv:2605.14029, 2026).** The paper jointly encodes geometric
@@ -82,9 +86,10 @@ existing simplification module already uses.
   (`Metric` default `FA_QEM`, `FeatureAngleThresholdDegrees`, `NormalWeight`,
   `BoundaryWeight`, `CurvatureWeight`, `PreserveSharpFeatures`,
   `PreserveUvSeams`), and `Result` diagnostics
-  (`CollapsesRejectedTopology/Quality`, `SharpFeatureVerticesPinned`,
+  (`CollapsesRejectedTopology/Quality`, immutable-corner count
+  `SharpFeatureVerticesPinned`,
   `SeamVerticesPinned`). Variants C (IntrinsicQEM) / D (LineQEM) are documented
-  as out-of-scope follow-ups, not enum stubs.
+  as unowned future possibilities, not enum stubs.
 - [x] Implement the scoped FA-QEM-inspired mechanisms in
   `src/geometry/Geometry.HalfedgeMesh.Simplification.cpp`: geometric quadric
   (existing path), boundary turning-angle pinning, and a normal-consistency
@@ -94,7 +99,7 @@ existing simplification module already uses.
   collapse cost so it combines additively with the quadric error.
 - [x] Keep the classical-QEM path reachable via `Metric::ClassicalQEM` for parity.
 - [x] Confirmed `IntrinsicQEM` / `LineQEM` variants are out of scope; no enum
-  stubs were added without a concrete follow-up owner.
+  stubs were added for unowned possibilities.
 
 ## Tests
 - [x] Extended `tests/unit/geometry/Test_Simplification.cpp` with:
@@ -113,7 +118,8 @@ existing simplification module already uses.
 - [x] `DiagnosticsCountersPopulated`: feature-pin and evaluated-candidate
       quality-rejection counters are populated on the cube.
 - [x] `cmake --preset ci`, `cmake --build --preset ci --target IntrinsicTests`,
-      and the focused `Simplification` CTest gate pass (93/93).
+      and the focused single-binary `Simplification*` gate pass (29/29); all 93
+      registered matches also pass in the full CPU-supported gate.
 
 ## Docs
 - [x] Updated the module comment block at the top of
@@ -142,6 +148,7 @@ existing simplification module already uses.
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -R 'Simplification' --timeout 60
+build/ci/bin/IntrinsicGeometryTests --gtest_filter='Simplification*'
 cmake --build --preset ci --target IntrinsicBenchmarkSmoke
 ctest --test-dir build/ci --output-on-failure -R '^IntrinsicBenchmarkSmoke\.(Run|Validate)$' --timeout 60
 python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
