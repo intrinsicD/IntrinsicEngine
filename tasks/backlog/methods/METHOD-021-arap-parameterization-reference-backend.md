@@ -30,7 +30,9 @@ maturity_target: CPUContracted
 
 ## Control surfaces
 - Config/UI/Agent: none new — `ArapParams` becomes a real strategy alternative;
-  `RUNTIME-176` / `UI-036` own its stable config token and editor controls.
+  this task extends the validated config/result model delivered by retired
+  `RUNTIME-176` and the editor controls delivered by retired `UI-036` with the
+  stable `Arap` token and its concrete parameters.
 
 ## Backends
 - Backend axis: `cpu_reference` only. `cpu_optimized` (progressive acceleration) deferred to `METHOD-025`; `gpu_vulkan_compute` deferred to `METHOD-026`.
@@ -84,4 +86,6 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 ## Maturity
 - Target: `CPUContracted` for the `Arap` reference strategy.
-- `Operational` owned by `METHOD-025` (optimized CPU) and `METHOD-026` (GPU) after reference parity; engine wiring by `RUNTIME-176`/`UI-036`.
+- `Operational` owned by `METHOD-025` and `METHOD-026` after reference parity;
+  those tasks extend the config/apply/view-model and panel paths delivered by
+  retired `RUNTIME-176`/`UI-036` with the optimized-CPU and GPU backend choices.

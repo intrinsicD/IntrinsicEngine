@@ -354,10 +354,11 @@ family on the retired `GEOM-063` shared surface — `METHOD-021` ARAP (blocked b
 `METHOD-023` BFF (retired),
 `METHOD-024` SCP (blocked by `GEOM-024`), `METHOD-025` optimized CPU
 (blocked by `METHOD-021`/`022`), `METHOD-026` GPU (blocked by
-`METHOD-025`/`RUNTIME-176`; iterative strategies only), and
-its engine-integration leaves `RUNTIME-176` (retired), `UI-036`
-(active), and the optional `GRAPHICS-122` (blocked by
-`UI-036`); and the method-readiness seams `GEOM-013`,
+`METHOD-025`; the retired `RUNTIME-176` dependency is satisfied; iterative
+strategies only), and its delivered engine-integration leaves `RUNTIME-176`
+and `UI-036` (both retired 2026-07-15). The optional `GRAPHICS-122` dependency
+is therefore satisfied and that GPU-shaded UV-view upgrade is unblocked and
+selectable. The method-readiness seams are `GEOM-013`,
 `GEOM-024`, `GEOM-058`, `GEOM-059`, `GEOM-060`, `GEOM-061`, `GEOM-062`,
 `GEOM-064`.
 

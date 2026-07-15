@@ -3,27 +3,27 @@ id: UI-036
 theme: I
 depends_on: [RUNTIME-176, BUG-085, BUG-086]
 maturity_target: Operational
+completed_on: 2026-07-15
 ---
 # UI-036 — Sandbox parameterization editor panel and resizable UV split view
 
 ## Status
-- Blocked on `BUG-085` and `BUG-086` on branch
-  `codex/arch-006-completion`; owner: Codex.
-- `RUNTIME-176` is retired at `CPUContracted`; its config, command, history,
-  result, and pointer-free UV view-model seams are the only engine surfaces
-  consumed here.
-- One technical slice extends the existing app-owned
-  `Sandbox.Editor.MethodPanels` module, adds pure presentation/action helpers
-  for headless integration tests, synchronizes app/method docs, and then runs
-  the default CPU plus live Vulkan Sandbox gates before retirement.
-- Live Vulkan selection and LSCM execution exposed `BUG-085`: the promoted
-  ImGui overlay drops draw-command clip rectangles, allowing the UV checker to
-  escape its child pane. Resume retirement after that blocking seam is fixed
-  and the live interaction is replayed.
-- The same replay selected a large dropped mesh and exposed `BUG-086`: the
-  adapter preserves command vertex offsets but does not advertise the ImGui
-  renderer capability, so a draw list above 65,535 vertices asserts instead
-  of splitting safely.
+- Completed on 2026-07-15 at `Operational` maturity on the promoted Vulkan
+  path and `CPUContracted` on CPU/null builds.
+- Commit references: implementation `6502de0b` added the registered parameterization
+  editor, validated config-then-command action, resizable controls/UV split,
+  projection helpers, diagnostics, and tests. Fit correction commit
+  `8e88a48b` kept the optional unit-square reference inside the fitted pane
+  without degrading mesh-only fitting.
+- Shared ImGui repair commit `1766253c` closed the live blockers `BUG-085` and
+  `BUG-086`; those repairs were deliberately batched because they traverse the
+  same runtime adapter, graphics overlay/upload, and pass chain and shared the
+  same live Vulkan replay.
+- Session-local live evidence is
+  `/tmp/ui036-live/parameterize-ran-fixed4.png` for selected-mesh LSCM apply,
+  diagnostics, and contained checker/grid rendering, plus
+  `/tmp/ui036-live/dolphin-dense-selected.png` for the dense selected-mesh
+  replay above the former 16-bit draw-list threshold.
 
 ## Goal
 - Add the Sandbox editor window that lists only parameterization strategies
@@ -86,52 +86,52 @@ maturity_target: Operational
 - Config/Agent: unchanged from `RUNTIME-176` — the panel edits the same `EngineConfig.sandbox.parameterization` section and applies through the tagged `Editor` source, so config files and agents remain co-equal drivers.
 
 ## Required changes
-- [ ] Register `mesh.processing.parameterize_uv` in the existing
+- [x] Register `mesh.processing.parameterize_uv` in the existing
       `Sandbox.Editor.MethodPanels` module, receiving `SandboxEditorContext`,
       not `Engine&`, with a draggable two-pane splitter (controls | UV layout)
       and a session-persistent panel split ratio.
-- [ ] Strategy selector lists exactly the currently implemented
+- [x] Strategy selector lists exactly the currently implemented
       LSCM/Harmonic-Cotangent/Tutte-Uniform/BFF tokens; do not add disabled
       future ARAP/SLIM/SCP or backend entries.
-- [ ] Parameter widgets for each implemented strategy's actual config payload,
+- [x] Parameter widgets for each implemented strategy's actual config payload,
       edited through the RUNTIME-176 preview/apply path; no future-only knobs.
-- [ ] UV layout pane: draw the `SandboxEditorParameterizationViewModel` as 2D
+- [x] UV layout pane: draw the `SandboxEditorParameterizationViewModel` as 2D
       triangle fills/edges over a toggleable unit-square grid/checker
       background, with fit-to-pane and zoom/pan. Show the aggregate diagnostics
       beside the view; do not synthesize chart/seam or per-face heatmap data.
-- [ ] Interactive pin/boundary edits route through config apply; later method
+- [x] Interactive pin/boundary edits route through config apply; later method
       tasks own controls for their added payloads.
-- [ ] Render chosen strategy, status, and the `ParameterizationDiagnostics`
+- [x] Render chosen strategy, status, and the `ParameterizationDiagnostics`
       summary from `SandboxEditorParameterizationResult`.
-- [ ] Apply/undo affordances routed through the runtime command so edits are undoable via `EditorCommandHistory`.
-- [ ] Keep the config draft local until explicit apply; failed preview/apply
+- [x] Apply/undo affordances routed through the runtime command so edits are undoable via `EditorCommandHistory`.
+- [x] Keep the config draft local until explicit apply; failed preview/apply
       preserves the draft and surfaces its diagnostic instead of mutating the
       active config or silently coercing a token.
 
 ## Tests
-- [ ] Extend app/editor integration coverage to assert the parameterization
+- [x] Extend app/editor integration coverage to assert the parameterization
       window registers through the `UI-034` registry and the plain app action
       applies a typed config then invokes the configured runtime command without
       requiring ImGui frame state.
-- [ ] Strategy gating: the panel cannot emit an unimplemented strategy token.
-- [ ] View-model mapping: given a `SandboxEditorParameterizationViewModel`, the pane-space projection helper maps every UV inside the pane rect and preserves face count (pure model-level assertion, no ImGui frame).
-- [ ] Result rendering surfaces status and diagnostics (model-level assertion).
+- [x] Strategy gating: the panel cannot emit an unimplemented strategy token.
+- [x] View-model mapping: given a `SandboxEditorParameterizationViewModel`, the pane-space projection helper maps every UV inside the pane rect and preserves face count (pure model-level assertion, no ImGui frame).
+- [x] Result rendering surfaces status and diagnostics (model-level assertion).
 
 ## Docs
-- [ ] Update the Sandbox editor UI inventory / user-facing sandbox docs with the parameterization window, the UV split view, and its config-lane parity note.
-- [ ] Cross-link the parameterization method-package READMEs to the editor window as the interactive surface; reference `ADR-0025` for the derived-view rationale.
+- [x] Update the Sandbox editor UI inventory / user-facing sandbox docs with the parameterization window, the UV split view, and its config-lane parity note.
+- [x] Cross-link the parameterization method-package READMEs to the editor window as the interactive surface; reference `ADR-0025` for the derived-view rationale.
 
 ## Acceptance criteria
-- [ ] Selecting a mesh, choosing an implemented strategy, tuning params, and
+- [x] Selecting a mesh, choosing an implemented strategy, tuning params, and
       applying updates `v:texcoord`, the UV layout pane, and any already-bound
       3D UV/checker material, undoably; this task does not assign a material.
-- [ ] The controls/UV split is resizable via the draggable splitter; the
+- [x] The controls/UV split is resizable via the draggable splitter; the
       grid/checker background toggles correctly and aggregate distortion
       diagnostics are visible.
-- [ ] The panel drives the `RUNTIME-176` validated apply path (no private subsystem poke); config-file and agent drivers stay co-equal.
-- [ ] Strategy status and aggregate distortion feedback are shown; unimplemented
+- [x] The panel drives the `RUNTIME-176` validated apply path (no private subsystem poke); config-file and agent drivers stay co-equal.
+- [x] Strategy status and aggregate distortion feedback are shown; unimplemented
       strategies are not offered.
-- [ ] `app -> runtime` only; the panel owns no engine state.
+- [x] `app -> runtime` only; the panel owns no engine state.
 
 ## Verification
 ```bash
@@ -146,12 +146,19 @@ python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
-Operational proof: the app integration test opens the registered window inside
-`Engine::Run()`, drives the same plain config-then-command action on a selected
-disk mesh, and verifies the produced ImGui layout plus UV/history state. On a
-Vulkan-capable host, launch `ExtrinsicSandbox`, select a disk mesh, and
-parameterize via `Mesh > Processing > Parameterize (UV)`; cite that run and the
-existing operational Sandbox GPU acceptance smoke in the retirement note.
+
+Completed evidence on 2026-07-15:
+
+- Focused `Parameterization|SandboxEditor|MethodPanel|ImGui` selection:
+  255/255 passed.
+- Default CPU-supported gate: 3,753/3,753 passed.
+- Vulkan ImGui GPU smoke: 3/3 passed.
+- Default-config runtime Vulkan acceptance: 1/1 passed.
+- A validation-enabled production Vulkan replay selected a mesh, applied LSCM,
+  displayed the aggregate diagnostics and contained checker/grid, then selected
+  the dense dolphin mesh without assertion. Session-local screenshots:
+  `/tmp/ui036-live/parameterize-ran-fixed4.png` and
+  `/tmp/ui036-live/dolphin-dense-selected.png`.
 
 ## Forbidden changes
 - No `Engine&` in panel callbacks; no UI ownership of geometry/runtime/asset state.
@@ -162,7 +169,7 @@ existing operational Sandbox GPU acceptance smoke in the retirement note.
   extend the existing method-panel owner.
 
 ## Maturity
-- Target: `Operational` — the window drives the real runtime apply path in
+- Achieved: `Operational` — the window drives the real runtime apply path in
   `Engine::Run()` and renders the UV layout. The integration-labeled app test
   covers registration, config-then-command execution, projection, result
   presentation, and a produced ImGui frame; the live Vulkan Sandbox run is

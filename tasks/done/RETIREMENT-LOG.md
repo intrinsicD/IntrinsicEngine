@@ -8,6 +8,50 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`UI-036`](UI-036-sandbox-parameterization-editor-and-uv-split-view.md) — the
+Sandbox parameterization editor and resizable UV split view retired on
+2026-07-15 at `Operational`. Implementation commit `6502de0b` registered the
+app-owned window, drove the `RUNTIME-176` validated config-then-command path,
+rendered the pointer-free UV view model with checker/grid and aggregate
+diagnostics, and kept strategy inventory limited to implemented methods; fit
+correction `8e88a48b` kept the optional unit square inside the fitted pane.
+Shared ImGui repair `1766253c` closed `BUG-085` and `BUG-086`, deliberately
+batched because both traverse the same adapter/overlay/pass chain and shared
+the same live Vulkan replay. The focused selection passed 255/255, the default
+CPU-supported gate passed 3,753/3,753, the ImGui Vulkan smoke passed 3/3, and
+the runtime acceptance passed 1/1. Validation-enabled production Vulkan
+replays showed the applied LSCM diagnostics and contained checker/grid in
+`/tmp/ui036-live/parameterize-ran-fixed4.png`, then selected the dense dolphin
+mesh without assertion in `/tmp/ui036-live/dolphin-dense-selected.png`.
+`GRAPHICS-122` remains an optional GPU-scale UV target, not a missing maturity
+gate.
+
+[`BUG-086`](BUG-086-imgui-adapter-omits-vtx-offset-capability.md) — the missing
+ImGui vertex-offset renderer capability retired on 2026-07-15 at
+`Operational`. Shared repair commit `1766253c` advertises
+`RendererHasVtxOffset` and preserves non-zero command offsets through the
+runtime adapter, graphics upload, and pass. It was deliberately batched with
+`BUG-085` because both defects occupy the same adapter/overlay/pass chain and
+used one validation-enabled live Vulkan replay. The 255/255 focused selection,
+3,753/3,753 CPU gate, 3/3 ImGui Vulkan smoke, and 1/1 runtime acceptance all
+passed; `/tmp/ui036-live/dolphin-dense-selected.png` records the dense selected
+mesh above the former 65,535-vertex threshold without the assertion.
+`GRAPHICS-122` continues to own optional GPU-scale rendering, not correctness
+of the command-offset contract.
+
+[`BUG-085`](BUG-085-imgui-overlay-drops-command-clip-rectangles.md) — ImGui
+command-clip propagation retired on 2026-07-15 at `Operational`. Shared repair
+commit `1766253c` carries finite framebuffer-relative scissors from the
+runtime adapter through pointer-free overlay/upload records and applies each
+one before its indexed draw, including native Y mirroring for the renderer's
+negative-height Vulkan viewport. It was deliberately batched with `BUG-086`
+because both defects occupy the same adapter/overlay/pass chain and used one
+validation-enabled live Vulkan replay. The 255/255 focused selection,
+3,753/3,753 CPU gate, 3/3 ImGui Vulkan smoke, and 1/1 runtime acceptance all
+passed; `/tmp/ui036-live/parameterize-ran-fixed4.png` records the LSCM result
+with the checker/grid contained inside its UV child pane and no panel-local
+workaround.
+
 [`RUNTIME-176`](RUNTIME-176-parameterization-runtime-config-integration.md) —
 parameterization runtime/config integration retired on 2026-07-15 at
 `CPUContracted`. Implementation commit `e8c3f73e` added stable config tokens

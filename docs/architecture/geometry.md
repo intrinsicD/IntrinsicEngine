@@ -485,8 +485,8 @@ property with undo/redo support and exposes a pointer-free CPU view model of
 UVs, triangle index triples, finite bounds, and aggregate diagnostics. It does
 not synthesize atlas chart/seam records or per-face distortion, and it exposes
 no backend selector while these strategies have only CPU implementations.
-RUNTIME-176 owns this `CPUContracted` boundary; UI-036 owns the visible
-`Operational` split-view proof.
+Retired `RUNTIME-176` delivered this `CPUContracted` boundary; retired
+`UI-036` delivered the visible `Operational` split-view proof.
 
 The LSCM preflight now uses the same disk-topology definition as Harmonic/Tutte:
 connected manifold vertex topology, one boundary loop, and Euler characteristic
@@ -516,11 +516,12 @@ are excluded;
 unsupported topology and inconsistent data fail closed without UV output.
 
 `METHOD-023` owns the `cpu_reference` payload and dispatch branch in
-`Geometry.Parameterization`. `RUNTIME-176` owns stable config tokens, typed
-payload conversion, selected-mesh `v:texcoord` writeback, dirty marking, undo,
-and the pointer-free UV view model. Geometry retains no config, ECS, runtime,
-graphics, platform, or app dependency, and this package makes no performance
-claim. The objective is conformal and does not guarantee area preservation.
+`Geometry.Parameterization`. Retired `RUNTIME-176` delivered stable config
+tokens, typed payload conversion, selected-mesh `v:texcoord` writeback, dirty
+marking, undo, and the pointer-free UV view model. Geometry retains no config,
+ECS, runtime, graphics, platform, or app dependency, and this package makes no
+performance claim. The objective is conformal and does not guarantee area
+preservation.
 
 ### Halfedge Vertex Normal Recompute
 

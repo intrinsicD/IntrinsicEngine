@@ -14,14 +14,6 @@ map.
   (LOP/WLOP/CLOP/EAR strategy + CPU/GPU backend picker driving the
   `RUNTIME-175` config-lane apply path; gated on `runtime/RUNTIME-175`;
   coordinate with active `ARCH-006` Slice 4).
-- [UI-036 — Sandbox parameterization editor panel and resizable UV split view](../../active/UI-036-sandbox-parameterization-editor-and-uv-split-view.md)
-  (implemented LSCM/Harmonic/Tutte/BFF controls and a resizable two-pane
-  controls/UV-layout split view drawn with `ImDrawList` from the retired
-  `RUNTIME-176` CPU view model; active on
-  `codex/arch-006-completion`;
-  derived-view rationale in
-  [ADR-0025](../../../docs/adr/0025-parameterization-uv-view-and-split-view.md);
-  use the app-owned editor structure retired by `ARCH-006`).
 
 Further UI children open from the deferred triggers recorded by the retired
 RORG-031F seed.
@@ -164,6 +156,12 @@ retired under the runtime backlog as `RUNTIME-135`.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [UI-036 — Sandbox parameterization editor panel and resizable UV split view](../../done/UI-036-sandbox-parameterization-editor-and-uv-split-view.md)
+  (done, 2026-07-15, `Operational`): delivered implemented-strategy controls,
+  validated config-lane apply/undo, aggregate diagnostics, and a resizable
+  CPU `ImDrawList` UV view over the pointer-free model delivered by retired
+  `RUNTIME-176`. The optional dense-mesh GPU-shaded upgrade remains selectable
+  as [`GRAPHICS-122`](../rendering/GRAPHICS-122-uv-view-offscreen-render-target.md).
 - [RORG-031F — UI integration backlog seed](../../archive/RORG-031F-ui-integration.md)
   (done, 2026-07-05, `Scaffolded`): planning-only umbrella retired after
   current UI children through `UI-031` were indexed, the remaining deferred

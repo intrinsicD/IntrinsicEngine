@@ -7,30 +7,30 @@ maturity_target: Operational
 # GRAPHICS-122 — GPU-shaded UV view offscreen render target (optional upgrade)
 
 ## Goal
-- Add an optional GPU-rendered UV view: render the selected mesh's UV layout (positions substituted by `(u, v, 0)`) to a dedicated offscreen color target with an orthographic UV-space camera — supporting a checker/texel-density background, a texture background, and a per-face distortion heatmap shaded on the GPU — and expose it to the `UI-036` split view via a bindless `ImGui::Image`, so the UV view scales to dense meshes and gains GPU shading beyond the CPU `ImDrawList` layout.
+- Add an optional GPU-rendered UV view: render the selected mesh's UV layout (positions substituted by `(u, v, 0)`) to a dedicated offscreen color target with an orthographic UV-space camera — supporting a checker/texel-density background, a texture background, and a per-face distortion heatmap shaded on the GPU — and expose it through the split view delivered by retired `UI-036` via a bindless `ImGui::Image`, so the UV view scales to dense meshes and gains GPU shading beyond the CPU `ImDrawList` layout.
 
 ## Non-goals
-- No replacement of the `UI-036` `ImDrawList` layout — that remains the default, dependency-free path; this is an opt-in upgrade for texel-density/texture/heatmap shading and very dense meshes (per `ADR-0025`, Option B).
+- No replacement of the CPU `ImDrawList` layout delivered by retired `UI-036` — that remains the default, dependency-free path; this is an opt-in upgrade for texel-density/texture/heatmap shading and very dense meshes (per `ADR-0025`, Option B).
 - No second scene camera/viewport or multi-view renderer contract change — this is a small dedicated UV render path into an offscreen target, not a general multi-viewport system (that larger lift, `ADR-0025` Option D, stays deferred).
 - No new ECS UV entity — the UV view renders the existing mesh entity's residency in UV space (per `ADR-0025`, the UV view is a derived view, not a separate entity).
 
 ## Context
 - Owner/layer: `src/graphics/renderer` (the offscreen UV pass + ortho UV camera) wired by `src/runtime`; presented through the existing ImGui overlay. The overlay path already forwards per-draw bindless textures (`Graphics.ImGuiOverlaySystem` selects `textureBindlessIndex`), and `ImGui::Image((ImTextureID)bindlessIndex, size)` works end-to-end, so the panel can host the target with no new descriptor plumbing.
 - Render shape: reuse the mesh's `GeometrySources` residency; supply a UV-space vertex position (from `v:texcoord`) and an orthographic camera fit to the UV bounds; draw chart fills + wireframe + a background (grid/checker/texel-density or a bound texture) into an offscreen `RGBA8`/`RGBA16F` target sized to the UV pane. The per-face distortion scalar (from `ParameterizationDiagnostics`) drives an optional heatmap.
-- This is the operational upgrade of the UV split view; the CPU `ImDrawList` layout from `UI-036` is the `Operational` baseline, and this task is gated on it so the panel, view model, and runtime facade already exist.
+- This is the operational upgrade of the UV split view; the CPU `ImDrawList` layout delivered by retired `UI-036` is the `Operational` baseline. Its dependency is satisfied as of 2026-07-15, so the delivered panel, view model, and runtime facade are ready to extend and this task is unblocked/selectable.
 - Recipe/frame composition follows the P5 recipe-driven rule: the UV pass is a named, gated pass, not a hardcoded branch. Scope it as a minimal dedicated target render, not an extension of the main scene recipe's single-camera assumptions.
 
 ## Control surfaces
-- Config/UI/Agent: the UV-view render mode (`CpuLayout` vs `GpuShaded`) and background mode (grid/checker/texel-density/texture) are added to the `EngineConfig.sandbox.parameterization` view sub-section (owned by `RUNTIME-176`, extended here) so the choice round-trips through config/agent/UI; the `UI-036` panel exposes the toggle.
+- Config/UI/Agent: extend the `EngineConfig.sandbox.parameterization` model delivered by retired `RUNTIME-176` with UV-view render mode (`CpuLayout` vs `GpuShaded`) and background mode (grid/checker/texel-density/texture), then extend the panel delivered by retired `UI-036` with the toggle so the choice round-trips through config/agent/UI.
 
 ## Backends
-- Backend axis: `gpu_vulkan_graphics` (a graphics-pipeline UV render). Falls back to the `UI-036` CPU `ImDrawList` layout when no operational device is present, with the mode reported honestly.
+- Backend axis: `gpu_vulkan_graphics` (a graphics-pipeline UV render). Falls back to the CPU `ImDrawList` layout delivered by retired `UI-036` when no operational device is present, with the mode reported honestly.
 
 ## Required changes
 - [ ] Add a dedicated UV-view offscreen render path (ortho UV camera + a gated UV pass) that renders the selected mesh's `v:texcoord`-space geometry + background + optional distortion heatmap to an offscreen target sized to the pane; gate on `RHI::IDevice::IsOperational()`.
-- [ ] Expose the target's bindless index through the runtime UV view model so `UI-036` can `ImGui::Image` it; fall back to the CPU layout on a non-operational device with the active mode reported.
-- [ ] Extend the `RUNTIME-176` parameterization view config with the render-mode and background-mode toggles; route them through the config lane.
-- [ ] `UI-036` renders the GPU target when `GpuShaded` is active and operational, else the CPU layout — one panel, honest mode reporting.
+- [ ] Expose the target's bindless index by extending the delivered runtime UV view model so the delivered panel can `ImGui::Image` it; fall back to the CPU layout on a non-operational device with the active mode reported.
+- [ ] Extend the parameterization view config delivered by retired `RUNTIME-176` with the render-mode and background-mode toggles; route them through the config lane.
+- [ ] Extend the panel delivered by retired `UI-036` to render the GPU target when `GpuShaded` is active and operational, else the CPU layout — one panel, honest mode reporting.
 
 ## Tests
 - [ ] Opt-in `tests/integration/graphics/Test.UvViewGpuSmoke.cpp` labeled `gpu;vulkan` (mirroring `Test.DefaultRecipeSurfaceGpuSmoke.cpp` / `Test.ImGuiSurfaceGpuSmoke.cpp`): on a Vulkan-capable host the UV target renders a non-empty image (non-background fraction above a threshold; expected clear color elsewhere) for a parameterized disk mesh, following the readback-smoke authoring pattern.
@@ -64,4 +64,4 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - No blocking readback on the poll thread; no removal of the CPU `ImDrawList` fallback.
 
 ## Maturity
-- Target: `Operational` on Vulkan-capable hosts (`gpu;vulkan` readback smoke cited); the CPU `ImDrawList` layout from `UI-036` is the fallback everywhere else. This task is an optional upgrade and is not required for the parameterization family to be engine-integrated and choosable.
+- Target: `Operational` on Vulkan-capable hosts (`gpu;vulkan` readback smoke cited); the CPU `ImDrawList` layout delivered by retired `UI-036` is the fallback everywhere else. This task is an optional upgrade and is not required for the parameterization family to be engine-integrated and choosable.

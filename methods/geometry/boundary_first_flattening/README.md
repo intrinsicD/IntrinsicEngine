@@ -46,8 +46,8 @@ configured runtime command converts that validated state to `BffParams`, writes
 selected-mesh `v:texcoord`, marks the mesh dirty, and records undo/redo. Its
 pointer-free UV view model carries UVs, triangle index triples, finite bounds,
 and aggregate diagnostics; it does not invent cones, chart/seam records, or
-per-face distortion. The active
-[`UI-036`](../../../tasks/active/UI-036-sandbox-parameterization-editor-and-uv-split-view.md)
+per-face distortion. The retired
+[`UI-036`](../../../tasks/done/UI-036-sandbox-parameterization-editor-and-uv-split-view.md)
 panel exposes BFF at `Mesh > Processing > Parameterize (UV)` alongside LSCM,
 harmonic cotangent, and uniform Tutte. BFF mode, boundary data, and tolerances
 stay in an explicit draft until the validated runtime config path accepts them;
@@ -56,7 +56,8 @@ the returned layout over optional unit-square grid/checker backgrounds with
 fit, zoom, and pan, while the controls show aggregate last-run diagnostics.
 The `v:texcoord` writeback is observed by an already-bound 3D material that
 samples the UV property, but the panel does not create or bind a UV/checker
-material itself. UI-036 still owns the visible `Operational` proof.
+material itself. `UI-036` delivered the visible `Operational` proof; optional
+`GRAPHICS-122` is now unblocked as the GPU-shaded dense-mesh upgrade.
 
 ## Evidence policy
 

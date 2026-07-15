@@ -5,16 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-086` — ImGui adapter omits the vertex-offset renderer capability](../../active/BUG-086-imgui-adapter-omits-vtx-offset-capability.md):
-  the overlay dataflow already preserves `ImDrawCmd::VtxOffset`, but the
-  runtime adapter does not advertise `RendererHasVtxOffset`; a dense selected
-  UV mesh therefore aborts at ImGui's 65,535-vertex draw-list limit instead of
-  splitting into offset commands.
-- [`BUG-085` — ImGui overlay drops draw-command clip rectangles](../../active/BUG-085-imgui-overlay-drops-command-clip-rectangles.md):
-  the runtime adapter omits `ImDrawCmd::ClipRect` from pointer-free overlay
-  commands and `Pass.ImGui` records no per-command scissor, so custom content
-  can escape nested child/window bounds on promoted Vulkan; discovered by the
-  live `UI-036` LSCM/checker interaction.
 - [`BUG-082` — GLFW X11 input-method initialization leaks under LeakSanitizer](BUG-082-glfw-x11-input-method-lsan-leak.md):
   a GLFW-backed runtime contract passes its assertions but the process exits
   nonzero for a 408-byte `_XimOpenIM` allocation after engine shutdown; isolate
@@ -27,6 +17,19 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   headroom while preserving fail-closed semantics.
 
 ## Verified / Closed
+
+- Closed 2026-07-15: [`BUG-086` — ImGui adapter omits the vertex-offset renderer capability](../../done/BUG-086-imgui-adapter-omits-vtx-offset-capability.md).
+  The runtime adapter now advertises `RendererHasVtxOffset`, and the existing
+  pointer-free overlay/upload/pass path preserves each non-zero command base
+  vertex. A generated draw list above 65,535 vertices and a dense-mesh live
+  Vulkan replay completed without the former Dear ImGui assertion.
+
+- Closed 2026-07-15: [`BUG-085` — ImGui overlay drops draw-command clip rectangles](../../done/BUG-085-imgui-overlay-drops-command-clip-rectangles.md).
+  Runtime now converts finite Dear ImGui clip rectangles to framebuffer
+  scissors, graphics preserves and validates them through upload, and
+  `Pass.ImGui` applies the renderer-convention Y transform before each draw.
+  CPU command-order contracts and the live Vulkan `UI-036` replay verified
+  that checker/grid content remains inside its UV child pane.
 
 - Closed 2026-07-14: [`BUG-084` — TransformSyncSystem contract test uses an unqualified test namespace](../../archive/BUG-084-transform-sync-test-mock-device-namespace.md).
   The two mock-device declarations now name their existing

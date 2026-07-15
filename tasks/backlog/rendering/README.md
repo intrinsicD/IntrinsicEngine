@@ -30,9 +30,10 @@ without requiring them to read every file.
 - [`GRAPHICS-122`](GRAPHICS-122-uv-view-offscreen-render-target.md) — GPU-shaded
   UV view offscreen render target. **Theme I** (parameterization family) optional
   upgrade, not a Theme B modernization leaf: renders the selected mesh's UV-space
-  residency to an offscreen target for `ImGui::Image` in the `UI-036` UV split
-  view, with a CPU `ImDrawList` fallback. Gated on `ui/UI-036`; derived-view
-  rationale in
+  residency to an offscreen target for `ImGui::Image` in the UV split view
+  delivered by retired `UI-036`, with its CPU `ImDrawList` baseline as the
+  fallback. The `UI-036` dependency is satisfied as of 2026-07-15, so
+  `GRAPHICS-122` is unblocked and selectable; derived-view rationale in
   [ADR-0025](../../../docs/adr/0025-parameterization-uv-view-and-split-view.md).
   Not required for the parameterization family to be engine-integrated.
 

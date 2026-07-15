@@ -28,7 +28,9 @@ maturity_target: CPUContracted
 
 ## Control surfaces
 - Config/UI/Agent: none new — `ScpParams` becomes a real strategy alternative;
-  `RUNTIME-176` / `UI-036` own its stable config token and editor controls.
+  this task extends the validated config/result model delivered by retired
+  `RUNTIME-176` and the editor controls delivered by retired `UI-036` with the
+  stable `Scp` token and its concrete parameters.
 
 ## Backends
 - Backend axis: `cpu_reference` only. No `gpu_vulkan_compute` backend is planned — `METHOD-026` covers only the iterative strategies. The eigensolve is a one-shot spectral solve, so no `cpu_optimized` is planned either unless a benchmark justifies it.
@@ -78,5 +80,9 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 ## Maturity
 - Target: `CPUContracted` for the `Scp` reference strategy.
-- `Operational` owned by `RUNTIME-176`/`UI-036` — the shared facade, config lane, and panel make every implemented strategy reachable in `Engine::Run()`, including `Scp` once this task lands. No GPU follow-up is owed: `METHOD-026` covers only the iterative strategies, and this one-shot spectral strategy stays CPU-only by recorded decision.
+- No `Operational` follow-up is owed: this CPU-only task extends the shared
+  facade, config lane, view model, and panel delivered by retired
+  `RUNTIME-176`/`UI-036` with `Scp`; `METHOD-026` covers only iterative
+  strategies, and this one-shot spectral strategy stays CPU-only by recorded
+  decision.
 - Blocked until `GEOM-024` retires (promote `GEOM-024` when SCP or `METHOD-006` is the next-priority spectral method).

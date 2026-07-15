@@ -3,13 +3,15 @@
 - **Status:** Accepted
 - **Date:** 2026-07-13
 - **Owners:** Graphics/Runtime/UI
-- **Related tasks:** GEOM-063, RUNTIME-176, UI-036, GRAPHICS-122
+- **Related tasks:** GEOM-063 (retired), RUNTIME-176 (retired), UI-036
+  (retired), GRAPHICS-122 (optional, unblocked)
 
 ## Context
 
-The end-to-end parameterization family (GEOM-063 dispatch surface; implemented
-LSCM, harmonic/Tutte, and BFF strategies; runtime facade RUNTIME-176; editor
-panel UI-036) produces a per-vertex UV map (`v:texcoord`) for a selected mesh.
+The end-to-end parameterization family (the retired GEOM-063 dispatch surface;
+implemented LSCM, harmonic/Tutte, and BFF strategies; the runtime facade
+delivered by retired RUNTIME-176; and the editor panel delivered by retired
+UI-036) produces a per-vertex UV map (`v:texcoord`) for a selected mesh.
 Unlike point-cloud consolidation, which mutates positions in place and needs no
 new view, a parameterization result is only meaningful when the user can **see
 the 2D UV layout** alongside the 3D mesh, inspect its aggregate diagnostics,
@@ -74,7 +76,7 @@ resizable UV view that is a *different space* (UV) of the same entity.
 
 **Delivery (staged, cheapest first):**
 
-- **First delivery — CPU `ImDrawList` layout in a resizable split window (UI-036).**
+- **Delivered baseline — CPU `ImDrawList` layout in a resizable split window (retired UI-036).**
   A single registered editor window is split by a **manual draggable two-pane
   splitter** (ImGui child regions / a resizable table column with a stored ratio) into
   a controls pane and a UV-layout pane. The UV pane maps a runtime-built,
@@ -90,12 +92,13 @@ resizable UV view that is a *different space* (UV) of the same entity.
   residency in UV space — still a *derived view of the one entity*, not a new entity —
   and falls back to the CPU layout when no device is operational.
 
-**Control** flows through the config lane (RUNTIME-176): stable CPU strategy
-tokens and the typed LSCM pin/solver, harmonic boundary/pin, and BFF boundary-
-mode values are serializable config applied through the validated preview→apply
-path, with the UI-036 panel and agents/config files as co-equal drivers. The
-bounded BFF contract has no cone placement/cutting control, and the config has
-no optimized/GPU backend selector while no such implementation exists.
+**Control** flows through the config lane delivered by retired RUNTIME-176:
+stable CPU strategy tokens and the typed LSCM pin/solver, harmonic boundary/pin,
+and BFF boundary-mode values are serializable config applied through the
+validated preview→apply path, with the retired UI-036 panel and agents/config
+files as co-equal drivers. The bounded BFF contract has no cone
+placement/cutting control, and the config has no optimized/GPU backend selector
+while no such implementation exists.
 
 ## Consequences
 
@@ -107,8 +110,9 @@ no optimized/GPU backend selector while no such implementation exists.
   typical meshes; the GRAPHICS-122 GPU path is the answer for very dense meshes); a
   *docked* splitter (versus the manual two-pane splitter) and a *true* second
   viewport remain future opt-ins, not part of this decision.
-- Follow-ups: GEOM-063 (surface), RUNTIME-176 (facade + config + UV view model),
-  UI-036 (panel + split view), GRAPHICS-122 (optional GPU-shaded target).
+- Delivered baseline: GEOM-063 (surface), RUNTIME-176 (facade + config + UV
+  view model), and UI-036 (panel + split view). GRAPHICS-122 is the optional,
+  now-unblocked GPU-shaded target.
 
 ## Alternatives Considered
 
@@ -133,15 +137,18 @@ no optimized/GPU backend selector while no such implementation exists.
 
 ## Validation
 
-- RUNTIME-176 closes at `CPUContracted`: contract tests assert the additive
+- RUNTIME-176 retired at `CPUContracted`: contract tests assert the additive
   schema-v1 config round-trip, pointer-free UV view model, undoable
   `v:texcoord` writeback, deterministic configured execution, and
   `Editor`/`AgentCli`/`Programmatic` apply-source parity under the Null/default
   runtime path. No backend fallback telemetry is expected for this CPU-only
   family.
-- UI-036 owns `Operational`: the default CPU gate covers window registration,
-  the view-model→pane-space projection, and result rendering (model-level, no
-  ImGui frame); its interactive proof parameterizes a disk mesh and shows the
-  UV layout beside the updated 3D checker on a Vulkan-capable host.
-- GRAPHICS-122: opt-in `gpu;vulkan` readback smoke asserts a non-empty UV target on a
-  Vulkan-capable host and CPU-layout fallback on a non-operational device.
+- UI-036 retired at `Operational`: the default CPU gate covers window
+  registration, the view-model→pane-space projection, result rendering, and a
+  produced ImGui frame. Its production Vulkan replay selected and
+  parameterized a mesh through the registered window, showed the UV layout,
+  kept the checker/grid inside the UV pane, and preserved the updated 3D UV
+  state.
+- GRAPHICS-122 is an optional, now-unblocked upgrade. Its closure still
+  requires an opt-in `gpu;vulkan` readback smoke proving a non-empty UV target
+  on a Vulkan-capable host and CPU-layout fallback on a non-operational device.

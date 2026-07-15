@@ -3,16 +3,23 @@ id: BUG-085
 theme: B
 depends_on: []
 maturity_target: Operational
+completed_on: 2026-07-15
 ---
 # BUG-085 — ImGui overlay drops draw-command clip rectangles
 
 ## Status
-- In progress on branch `codex/arch-006-completion`; owner: Codex.
-- Discovered during the live Vulkan acceptance run for `UI-036`: after an
-  LSCM apply, the UV checkers extended above their child pane and editor
-  window even though the panel pushed an ImGui clip rectangle.
-- Next verification: pin the missing adapter/pass dataflow with CPU contracts,
-  then replay the real `UI-036` panel on promoted Vulkan.
+- Completed on 2026-07-15 at `Operational` maturity on the promoted Vulkan
+  path and `CPUContracted` on CPU/null builds.
+- Commit: shared repair `1766253c` preserves command scissors through the
+  runtime adapter, graphics overlay/upload records, and ImGui pass, including
+  the native Y mirroring required by the renderer's negative-height Vulkan
+  viewport convention.
+- `BUG-085` and `BUG-086` were deliberately batched because both repairs
+  traverse the same adapter/overlay/pass chain and were closed by the same
+  validation-enabled live Vulkan replay.
+- Session-local evidence `/tmp/ui036-live/parameterize-ran-fixed4.png` shows
+  the selected-mesh LSCM result with the checker/grid contained by its UV child
+  pane and no panel-local clipping workaround.
 
 ## Goal
 - Preserve Dear ImGui's per-command framebuffer clip rectangle through the
@@ -30,46 +37,46 @@ maturity_target: Operational
 - Owner/layers: `runtime` translates `ImDrawData` into pointer-free graphics
   records; `graphics/renderer` validates, uploads, and records those records.
   The existing `runtime -> graphics` composition edge remains unchanged.
-- `Runtime.ImGuiAdapter::BuildOverlayDrawCommand(...)` currently copies index,
-  vertex, and texture metadata but drops `ImDrawCmd::ClipRect`.
-  `ImGuiOverlayDrawCommand` and `ImGuiDrawCommandUploadResult` have no clip
-  fields, and `ImGuiPass::Execute(...)` never calls `SetScissor(...)` despite
+- At discovery, `Runtime.ImGuiAdapter::BuildOverlayDrawCommand(...)` copied
+  index, vertex, and texture metadata but dropped `ImDrawCmd::ClipRect`.
+  `ImGuiOverlayDrawCommand` and `ImGuiDrawCommandUploadResult` had no clip
+  fields, and `ImGuiPass::Execute(...)` did not call `SetScissor(...)` despite
   the promoted pipeline declaring dynamic scissor state.
 - Clip conversion follows Dear ImGui's backend contract: subtract
   `ImDrawData::DisplayPos`, multiply by `FramebufferScale`, clamp to the
   framebuffer extent, and reject empty or non-finite rectangles.
 
 ## Required changes
-- [ ] Add a backend-neutral framebuffer scissor record to each
+- [x] Add a backend-neutral framebuffer scissor record to each
   `ImGuiOverlayDrawCommand` and preserve it through `ImGuiUploadHelper`.
-- [ ] Convert each `ImDrawCmd::ClipRect` to a finite, framebuffer-relative,
+- [x] Convert each `ImDrawCmd::ClipRect` to a finite, framebuffer-relative,
   extent-clamped scissor in `Runtime.ImGuiAdapter`.
-- [ ] Apply the scissor before every ImGui draw command, skip empty scissors,
+- [x] Apply the scissor before every ImGui draw command, skip empty scissors,
   and use the submitted display extent for the legacy no-command fallback.
-- [ ] Keep draw/index/texture validation fail-closed and reset no unrelated
+- [x] Keep draw/index/texture validation fail-closed and reset no unrelated
   overlay or renderer behavior.
 
 ## Tests
-- [ ] Extend the runtime ImGui-adapter contract with non-zero display offset,
+- [x] Extend the runtime ImGui-adapter contract with non-zero display offset,
   framebuffer scale, clamping, and empty-clip cases.
-- [ ] Extend graphics upload/pass contracts to prove clip metadata survives
+- [x] Extend graphics upload/pass contracts to prove clip metadata survives
   and exact `SetScissor(...)` calls precede the corresponding indexed draws.
-- [ ] Replay the `UI-036` window, selection, and LSCM action in the production
+- [x] Replay the `UI-036` window, selection, and LSCM action in the production
   promoted-Vulkan Sandbox and verify the checker/grid stay inside the UV pane.
-- [ ] Run the focused runtime/graphics CPU contracts and default CPU gate.
+- [x] Run the focused runtime/graphics CPU contracts and default CPU gate.
 
 ## Docs
-- [ ] Update renderer/runtime ImGui documentation to state that
+- [x] Update renderer/runtime ImGui documentation to state that
   `ImGuiOverlayDrawCommand` carries framebuffer scissors and `Pass.ImGui`
   applies them per command.
-- [ ] Record the discovered cause and verified closure in the bug index and
+- [x] Record the discovered cause and verified closure in the bug index and
   retirement log; refresh generated task/module inventories as required.
 
 ## Acceptance criteria
-- [ ] Nested ImGui child/window clip rectangles survive the pointer-free
+- [x] Nested ImGui child/window clip rectangles survive the pointer-free
   overlay bridge with correct HiDPI/display-offset conversion.
-- [ ] Every recorded ImGui indexed draw uses its non-empty command scissor.
-- [ ] The live `UI-036` checker/grid no longer renders outside the UV pane on
+- [x] Every recorded ImGui indexed draw uses its non-empty command scissor.
+- [x] The live `UI-036` checker/grid no longer renders outside the UV pane on
   a Vulkan-capable host, with validation enabled and no panel-local clipping
   workaround.
 
@@ -83,11 +90,22 @@ cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicGraphicsVulk
 env -u INTRINSIC_ENGINE_CONFIG DISPLAY=:1 ctest --test-dir build/ci-vulkan --output-on-failure -R '^ImGuiSurfaceGpuSmoke\.' -L gpu -L vulkan --timeout 120
 ```
 
+Completed evidence on 2026-07-15:
+
+- Focused `Parameterization|SandboxEditor|MethodPanel|ImGui` selection:
+  255/255 passed.
+- Default CPU-supported gate: 3,753/3,753 passed.
+- Vulkan ImGui GPU smoke: 3/3 passed.
+- Default-config runtime Vulkan acceptance: 1/1 passed.
+- Validation-enabled production Vulkan replay completed with the UV
+  checker/grid contained in its child pane; session-local screenshot:
+  `/tmp/ui036-live/parameterize-ran-fixed4.png`.
+
 ## Maturity
-- Target: `Operational` on Vulkan-capable hosts and `CPUContracted` on
+- Achieved: `Operational` on Vulkan-capable hosts and `CPUContracted` on
   CPU/null builds.
-- Retirement requires both exact CPU command/scissor contracts and a live
-  promoted-Vulkan replay of the originally visible escape.
+- Exact CPU command/scissor contracts and the live promoted-Vulkan replay of
+  the originally visible escape both passed.
 
 ## Forbidden changes
 - Adding CPU polygon clipping to individual panels instead of fixing the

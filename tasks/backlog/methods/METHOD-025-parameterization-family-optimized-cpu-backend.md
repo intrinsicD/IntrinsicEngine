@@ -26,9 +26,10 @@ maturity_target: Operational
 - Benchmark policy: per the benchmark workflow, a speedup claim requires a baseline comparison on declared fixtures; the comparison benchmark records reference and optimized runtime and the parity delta.
 
 ## Control surfaces
-- Config/UI/Agent: this task extends the RUNTIME-176 config/result model and
-  UI-036 panel with `cpu_optimized` only for ARAP/SLIM after the implementation
-  exists; no placeholder choice is exposed beforehand.
+- Config/UI/Agent: this task extends the config/result model delivered by
+  retired `RUNTIME-176` and the panel delivered by retired `UI-036` with
+  `cpu_optimized` only for ARAP/SLIM after the implementation exists; no
+  placeholder choice is exposed beforehand.
 
 ## Backends
 - Backend axis: adds `cpu_optimized` with parity to `cpu_reference`; `gpu_vulkan_compute` deferred to `METHOD-026`.

@@ -88,10 +88,10 @@ activation handlers call the same facade callbacks carried by that context:
   `Engine::GetConfigControl().PreviewEngineConfigControlDocument` and
   `Engine::GetConfigControl().ApplyEngineConfigHotSubset` with
   `RuntimeConfigControlSource::Editor`.
-- UI-036 parameterization strategy and value edits must route through those
-  same engine-config preview/apply methods with
+- The parameterization panel delivered by retired `UI-036` routes strategy and
+  value edits through those same engine-config preview/apply methods with
   `RuntimeConfigControlSource::Editor`; the configured parameterization facade
-  already consumes the resulting live config.
+  consumes the resulting live config.
 
 Agent/CLI callers use the same `EngineConfigControl` methods with
 `RuntimeConfigControlSource::AgentCli` or
@@ -121,6 +121,6 @@ The companion `SandboxEditorParameterizationViewModel` copies the selected
 mesh into UI-safe CPU data: per-vertex UVs, deterministic triangle index
 triples, finite UV bounds, and aggregate last-result diagnostics. It carries no
 raw mesh/property pointers, chart or seam records, or invented per-face
-distortion values. `UI-036` owns turning this model into the visible split UV
-view and therefore owns the `Operational` proof; the runtime/config slice
-closes at `CPUContracted` under the Null/default runtime contracts.
+distortion values. Retired `UI-036` turns this model into the visible split UV
+view and delivered the `Operational` proof; the retired runtime/config slice
+closed at `CPUContracted` under the Null/default runtime contracts.

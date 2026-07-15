@@ -21,10 +21,11 @@ maturity_target: ParityProven
   variant stays RHI-free and carries no family-wide GPU token.
 - GPU shape: the local step (per-triangle signed-SVD rotation fit) is embarrassingly parallel; the global step is a sparse SPD solve run as a GPU Jacobi/CG iteration (matching the reference within tolerance). Results drain through `Extrinsic.Runtime.AsyncBufferReadback` (RUNTIME-137), never a device-wide `ReadBuffer` stall.
 - Gating: reference parity (`METHOD-021`/`022`) and the optimized CPU baseline (`METHOD-025`) must exist first; the GPU backend is measured against the `METHOD-025` baseline and the CPU reference oracle. Renderer/runtime code gates on `RHI::IDevice::IsOperational()`; a GPU request on a non-operational device falls back to `cpu_reference`/`cpu_optimized` with honest telemetry.
-- Config/UI: this task extends the RUNTIME-176 config/result model and UI-036
-  panel with `gpu_vulkan_compute` after the implementation exists, and wires
-  the new runtime GPU job queue. The dependency supplies the CPU facade/config
-  path; it does not reserve an inert GPU request.
+- Config/UI: this task extends the config/result model delivered by retired
+  `RUNTIME-176` and the panel delivered by retired `UI-036` with
+  `gpu_vulkan_compute` after the implementation exists, and wires the new
+  runtime GPU job queue. The satisfied dependency supplies the CPU
+  facade/config path; it does not reserve an inert GPU request.
 
 ## Control surfaces
 - Config/UI/Agent: add the runtime-owned `gpu_vulkan_compute` request for the

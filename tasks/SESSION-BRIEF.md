@@ -8,9 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `BUG-085` — ImGui overlay drops draw-command clip rectangles (tasks/active/BUG-085-imgui-overlay-drops-command-clip-rectangles.md)
-- `BUG-086` — ImGui adapter omits the vertex-offset renderer capability (tasks/active/BUG-086-imgui-adapter-omits-vtx-offset-capability.md)
-- `UI-036` — Sandbox parameterization editor panel and resizable UV split view (tasks/active/UI-036-sandbox-parameterization-editor-and-uv-split-view.md)
+- none
 
 ## Theme B — Rendering modernization
 
@@ -68,7 +66,7 @@ the authoritative open/unblocked view.
 - unblocked: `GEOM-061` — Point-cloud grid-downsampling reduction strategies (tasks/backlog/geometry/GEOM-061-grid-downsampling-reduction-strategies.md)
 - unblocked: `GEOM-062` — Point-set projection and weighting kernels seam (tasks/backlog/geometry/GEOM-062-point-set-projection-weighting-kernels.md)
 - unblocked: `GEOM-064` — Parameterization optimization kernels seam (tasks/backlog/geometry/GEOM-064-parameterization-optimization-kernels.md)
-- blocked by `UI-036`: `GRAPHICS-122` — GPU-shaded UV view offscreen render target (optional upgrade) (tasks/backlog/rendering/GRAPHICS-122-uv-view-offscreen-render-target.md)
+- unblocked: `GRAPHICS-122` — GPU-shaded UV view offscreen render target (optional upgrade) (tasks/backlog/rendering/GRAPHICS-122-uv-view-offscreen-render-target.md)
 - unblocked: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
 - unblocked: `METHOD-004` — Walk on Spheres / Walk on Stars PDE solver reference backend (tasks/backlog/methods/METHOD-004-walk-on-spheres-reference-backend.md)
 - unblocked: `METHOD-005` — Robust mesh boolean reference backend (tasks/backlog/methods/METHOD-005-robust-mesh-boolean-reference-backend.md)
