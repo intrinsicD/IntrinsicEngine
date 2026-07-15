@@ -8,6 +8,16 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-087`](BUG-087-task-validator-documented-root-silent-noop.md) — the
+task-validator root contract retired on 2026-07-16 at `CPUContracted`.
+Implementation commit `998f0e77` standardizes live agent documentation on
+`--root tasks --strict`, makes strict zero-file discovery return nonzero with
+the exact `active`/`backlog`/`done` directories searched, and runs a focused
+Python regression in `ci-docs`. The regression proves the canonical repository
+invocation discovers a nonzero task count and an existing empty task root fails
+closed. Strict task policy/state links, skill-mirror freshness, documentation
+links, workflow policy, and test-layout checks passed.
+
 [`GRAPHICS-122`](GRAPHICS-122-uv-view-offscreen-render-target.md) — the
 optional GPU-shaded parameterization UV view retired on 2026-07-15 at
 `Operational`. Commits `c5655359`, `871d09eb`, `86d0d1d4`, and `d0e173dd`

@@ -15,10 +15,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   14.71 seconds in isolation; collect a timing population and choose an
   evidence-backed PR-fast split or slow-lane classification without weakening
   strict result validation.
-- [`BUG-087` — Documented task-validator root silently validates zero tasks](BUG-087-task-validator-documented-root-silent-noop.md):
-  the canonical `--root .` invocation exits zero after discovering no tasks,
-  while `--root tasks --strict` validates the real tree; correct the root
-  contract and make strict zero-file discovery fail closed.
 - [`BUG-082` — GLFW X11 input-method initialization leaks under LeakSanitizer](BUG-082-glfw-x11-input-method-lsan-leak.md):
   a GLFW-backed runtime contract passes its assertions but the process exits
   nonzero for a 408-byte `_XimOpenIM` allocation after engine shutdown; isolate
@@ -31,6 +27,12 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   headroom while preserving fail-closed semantics.
 
 ## Verified / Closed
+
+- Closed 2026-07-16: [`BUG-087` — Documented task-validator root silently validates zero tasks](../../done/BUG-087-task-validator-documented-root-silent-noop.md).
+  The canonical invocation now names the `tasks` root, strict mode rejects
+  zero-file discovery with every searched lifecycle directory, and a CI-run
+  tooling regression pins both the real repository invocation and an empty
+  task root. Task, mirror, link, and workflow-policy checks passed.
 
 - Closed 2026-07-15: [`BUG-086` — ImGui adapter omits the vertex-offset renderer capability](../../done/BUG-086-imgui-adapter-omits-vtx-offset-capability.md).
   The runtime adapter now advertises `RendererHasVtxOffset`, and the existing

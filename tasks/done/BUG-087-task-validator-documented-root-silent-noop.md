@@ -5,6 +5,11 @@ depends_on: []
 ---
 # BUG-087 — Documented task-validator root silently validates zero tasks
 
+## Status
+- Completed on 2026-07-16 at `CPUContracted` maturity. Implementation commit:
+  `998f0e77`. The canonical root is `tasks`, and strict zero-file
+  discovery now fails with the searched lifecycle directories.
+
 ## Goal
 - Make the documented local task-validation command validate the repository's
   real `tasks/` tree and make a mistaken root fail closed instead of reporting
@@ -31,25 +36,25 @@ depends_on: []
   task files with zero findings in the same session.
 
 ## Required changes
-- [ ] Choose and document one unambiguous root contract for
+- [x] Choose and document one unambiguous root contract for
       `validate_tasks.py` (`--root tasks` or repository-root discovery).
-- [ ] Make strict mode return nonzero when no task Markdown files are found,
+- [x] Make strict mode return nonzero when no task Markdown files are found,
       with a diagnostic that names the searched directories.
-- [ ] Correct every canonical invocation and regenerate the task-workflow skill
+- [x] Correct every canonical invocation and regenerate the task-workflow skill
       mirrors through `tools/agents/sync_skills.py --write`.
 
 ## Tests
-- [ ] Add a tooling regression proving the canonical repository invocation
+- [x] Add a tooling regression proving the canonical repository invocation
       discovers task files and a wrong empty root fails nonzero under `--strict`.
 
 ## Docs
-- [ ] Update `docs/agent/task-format.md` and any other canonical command bundles;
+- [x] Update `docs/agent/task-format.md` and any other canonical command bundles;
       regenerate, rather than hand-edit, generated skill references.
 
 ## Acceptance criteria
-- [ ] The documented command validates a nonzero task count in this repository.
-- [ ] Strict validation cannot succeed after discovering zero task files.
-- [ ] Task-policy, task-state-link, docs-sync, and skill-mirror checks remain
+- [x] The documented command validates a nonzero task count in this repository.
+- [x] Strict validation cannot succeed after discovering zero task files.
+- [x] Task-policy, task-state-link, docs-sync, and skill-mirror checks remain
       green.
 
 ## Verification
