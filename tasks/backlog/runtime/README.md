@@ -234,21 +234,22 @@ ported algorithms are retired `UI-024`/`UI-025`/`UI-026` under the UI backlog.
 
 ### Parameterization family integration (Theme I, seeded 2026-07-13)
 
-- [`RUNTIME-176 — Parameterization runtime facade, config lane, and UV view model`](../../active/RUNTIME-176-parameterization-runtime-config-integration.md)
-  is active on branch `codex/arch-006-completion`.
-  is the engine-integration leaf for the parameterization method family
-  (`methods/METHOD-021..026` on the retired `geometry/GEOM-063` typed CPU
-  strategy surface): a
+- `RUNTIME-176 — Parameterization runtime facade, config lane, and UV view
+  model` is retired; its authoritative task record is under
+  `tasks/done/RUNTIME-176-parameterization-runtime-config-integration.md`.
+  It delivered the engine-integration leaf for the parameterization method
+  family (`methods/METHOD-021..026` on the retired `geometry/GEOM-063` typed
+  CPU strategy surface): a
   `ParameterizationConfig` section in the `Core.Config.Engine` tree, an
   `EngineConfigControl` hot-apply path, the
   `ApplySandboxEditorParameterizationCommand` editor facade writing UVs back as
   `v:texcoord` via `GeometrySources`, plus a pointer-free
-  `SandboxEditorParameterizationViewModel` the UV split view draws. It is now
-  unblocked; no placeholder backend selector lands in its CPU-only slice.
+  `SandboxEditorParameterizationViewModel` the UV split view draws. No
+  placeholder backend selector landed in its CPU-only slice.
   `METHOD-025`/`METHOD-026` own later optimized/GPU extensions. Mirrors
   `RUNTIME-175`/`RUNTIME-134`; the Sandbox
-  panel + UV split view is `ui/UI-036`; the optional GPU-shaded UV target is
-  `rendering/GRAPHICS-122`; the derived-view rendering decision is
+  panel + UV split view `ui/UI-036` is now unblocked; the optional GPU-shaded
+  UV target is `rendering/GRAPHICS-122`; the derived-view rendering decision is
   [ADR-0025](../../../docs/adr/0025-parameterization-uv-view-and-split-view.md).
   Build on the app-owned editor structure retired by `ARCH-006`.
 

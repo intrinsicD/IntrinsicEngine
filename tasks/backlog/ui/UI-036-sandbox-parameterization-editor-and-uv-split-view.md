@@ -10,7 +10,7 @@ maturity_target: Operational
 - Add the Sandbox editor window that lists only parameterization strategies
   implemented at landing, edits their typed parameters through the validated
   config path, applies the map, and shows the 2D UV layout in a resizable split
-  view with checker/grid and distortion feedback.
+  view with checker/grid and aggregate distortion feedback.
 
 ## Non-goals
 - No algorithm, runtime, or config code — the panel is presentation only and calls the `RUNTIME-176` facade/config surface and reads its `SandboxEditorParameterizationViewModel`; it never receives `Engine&` or owns geometry/runtime/asset state.
@@ -24,10 +24,10 @@ maturity_target: Operational
   the progressive-Poisson panel for preview/apply through the config lane. Do
   not copy K-Means backend controls into this CPU-only surface.
 - Window registration: `UI-034` `Runtime.EditorWindowRegistry` (decentralized `EditorWindowDescriptor` registration, lazy lifecycle, one input-capture snapshot) — register through it, not a central enum. Closed windows cost nothing.
-- Split-view mechanism (per `ADR-0025`): one registered window split into a left **controls** pane and a right **UV layout** pane by a draggable `ImGui` splitter (child regions / `ImGui::Table` with a resizable column, or a stored split ratio with an invisible-button splitter). The UV pane maps the `SandboxEditorParameterizationViewModel` UVs into pane-local coordinates and draws chart fills / triangle edges / seams via `ImGui::GetWindowDrawList()`; the adapter already forwards arbitrary draw lists, so this needs no renderer change.
+- Split-view mechanism (per `ADR-0025`): one registered window split into a left **controls** pane and a right **UV layout** pane by a draggable `ImGui` splitter (child regions / `ImGui::Table` with a resizable column, or a stored split ratio with an invisible-button splitter). The UV pane maps the `SandboxEditorParameterizationViewModel` UVs into pane-local coordinates and draws triangle fills/edges via `ImGui::GetWindowDrawList()`; the runtime model does not invent chart/seam records or per-face distortion, and the adapter already forwards arbitrary draw lists, so this needs no renderer change.
 - Interactive controls are generated only for real config alternatives. Current
   pin/boundary edits use the RUNTIME-176 validated apply path; future method
-  tasks add ARAP/SLIM/SCP/BFF controls with their concrete payloads.
+  tasks add ARAP/SLIM/SCP controls with their concrete payloads.
 - The applied UVs are written back to the selected mesh by the `RUNTIME-176` facade (`v:texcoord` + dirty tag, undoable), so the 3D mesh's checker material and the UV pane update together — this is the `Operational`, visible-in-sandbox proof.
 
 ## Control surfaces
@@ -39,7 +39,10 @@ maturity_target: Operational
 - [ ] Strategy selector reflecting the strategies `Geometry.Parameterization` implements; disable/annotate strategies not yet available so the UI never offers an unimplemented variant.
 - [ ] Parameter widgets for each implemented strategy's actual config payload,
       edited through the RUNTIME-176 preview/apply path; no future-only knobs.
-- [ ] UV layout pane: draw the `SandboxEditorParameterizationViewModel` as 2D triangle edges + chart fills over a toggleable unit-square grid / checker background, with fit-to-pane and zoom/pan; a distortion-heatmap toggle colors faces by the per-face distortion scalar.
+- [ ] UV layout pane: draw the `SandboxEditorParameterizationViewModel` as 2D
+      triangle fills/edges over a toggleable unit-square grid/checker
+      background, with fit-to-pane and zoom/pan. Show the aggregate diagnostics
+      beside the view; do not synthesize chart/seam or per-face heatmap data.
 - [ ] Interactive pin/boundary edits route through config apply; later method
       tasks own controls for their added payloads.
 - [ ] Render chosen strategy, status, and the `ParameterizationDiagnostics`
@@ -59,9 +62,11 @@ maturity_target: Operational
 ## Acceptance criteria
 - [ ] Selecting a mesh, choosing an implemented strategy, tuning params, and
       applying updates both the 3D checker view and UV layout pane, undoably.
-- [ ] The controls/UV split is resizable via the draggable splitter; the distortion overlay and grid/checker background toggle correctly.
+- [ ] The controls/UV split is resizable via the draggable splitter; the
+      grid/checker background toggles correctly and aggregate distortion
+      diagnostics are visible.
 - [ ] The panel drives the `RUNTIME-176` validated apply path (no private subsystem poke); config-file and agent drivers stay co-equal.
-- [ ] Strategy status and distortion feedback are shown; unimplemented
+- [ ] Strategy status and aggregate distortion feedback are shown; unimplemented
       strategies are not offered.
 - [ ] `app -> runtime` only; the panel owns no engine state.
 

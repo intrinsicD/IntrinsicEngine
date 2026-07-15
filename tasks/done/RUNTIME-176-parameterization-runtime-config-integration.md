@@ -3,6 +3,7 @@ id: RUNTIME-176
 theme: I
 depends_on: [GEOM-063, METHOD-023]
 maturity_target: CPUContracted
+completed_on: 2026-07-15
 ---
 # RUNTIME-176 — Parameterization runtime facade, config lane, and UV view model
 
@@ -51,8 +52,9 @@ maturity_target: CPUContracted
   config and result model when real optimized/GPU implementations exist.
 
 ## Status
-- Implementation complete locally on branch `codex/arch-006-completion`;
-  owner: Codex. Dependencies `GEOM-063` and `METHOD-023` are retired.
+- Completed on 2026-07-15 at `CPUContracted` on branch
+  `codex/arch-006-completion`; implementation commit: `e8c3f73e`.
+  Dependencies `GEOM-063` and `METHOD-023` are retired.
 - Core config now round-trips stable LSCM, harmonic/Tutte, and BFF values and
   hot-applies the block with `SandboxParameterizationChanged`. The runtime
   facade converts the active config to the typed geometry variant, writes
@@ -76,8 +78,8 @@ maturity_target: CPUContracted
   `n/a`, and no findings.
 - One early Clang 23/ccache module-frontend bus error was ruled out via the
   stale-build triage: a ccache-disabled rebuild succeeded, and subsequent
-  normal cached focused and full builds passed. Next step is the technical
-  commit, followed by separate task retirement at `CPUContracted`.
+  normal cached focused and full builds passed. The technical implementation,
+  evidence, documentation, and retirement record are complete.
 
 ## Required changes
 - [x] Add a `ParameterizationConfig` value struct nested in `SandboxConfig`:

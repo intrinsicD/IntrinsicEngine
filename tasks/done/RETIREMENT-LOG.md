@@ -8,6 +8,23 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-176`](RUNTIME-176-parameterization-runtime-config-integration.md) —
+parameterization runtime/config integration retired on 2026-07-15 at
+`CPUContracted`. Implementation commit `e8c3f73e` added stable config tokens
+and typed LSCM, harmonic/Tutte, and BFF records; schema-v1 round trips and hot
+apply; a configured sandbox facade; undoable storage-aligned `v:texcoord`
+writeback; and a pointer-free UV/triangle/aggregate-diagnostics view model.
+The CPU path preserves deleted vertex tombstones, rejects invalid topology,
+config, narrowing, and solver outcomes without mutating UV state, and keeps
+history closures free of session-owned cache lifetimes. Editor, agent/CLI, and
+programmatic config sources produce identical state and deterministic UVs.
+Focused ASan/UBSan contracts passed 13/13, the combined parameterization/config
+selection passed 56/56, and the default CPU-supported gate passed 3,743/3,743
+in 380.43 seconds. Strict architecture/task/docs checks and independent
+right-sizing review found no blockers. `UI-036` now owns the visible
+`Operational` split-view proof; no speculative optimized/GPU selector or
+backend seam landed.
+
 [`METHOD-023`](METHOD-023-boundary-first-flattening-reference-backend.md) —
 Boundary First Flattening retired on 2026-07-15 at `CPUContracted`.
 Implementation commit `4bf4f67b` added a typed disk-BFF strategy with

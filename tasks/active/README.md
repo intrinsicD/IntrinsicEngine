@@ -11,10 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [RUNTIME-176 — Parameterization runtime facade, config lane, and UV view model](RUNTIME-176-parameterization-runtime-config-integration.md)
-  (`in-progress`; owner: Codex; branch: `codex/arch-006-completion`). The task
-  is right-sized to core config values plus free functions on the existing
-  sandbox-editor facade; next gate is the focused config slice.
+None.
 
 ## History
 

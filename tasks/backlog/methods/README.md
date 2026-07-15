@@ -61,8 +61,9 @@ map.
   `METHOD-021`/`022`).
 - [METHOD-026 — Parameterization family GPU (Vulkan compute) backend and parity](METHOD-026-parameterization-family-gpu-vulkan-compute-backend.md)
   (adds `gpu_vulkan_compute` for the iterative ARAP/SLIM strategies with
-  `gpu;vulkan` parity; gated on `METHOD-025` and `runtime/RUNTIME-176`, whose
-  facade/job-queue seam it wires into; the linear one-shot strategies
+  `gpu;vulkan` parity; gated on `METHOD-025` and builds on retired
+  `runtime/RUNTIME-176`, whose facade it extends with the GPU job-queue seam;
+  the linear one-shot strategies
   (LSCM/SCP/BFF) record no GPU follow-up in their own tasks).
 
 ## Convergence
@@ -120,11 +121,11 @@ map.
   and the `GEOM-018` diagnostics; the optimized CPU (`METHOD-025`) and GPU
   (`METHOD-026`) backends follow reference parity for the iterative strategies
   (the linear one-shot strategies record no optimized/GPU follow-up); and the
-  engine integration —
-  config lane, runtime facade, the UV view model, and the Sandbox editor panel
-  with a resizable UV split view — is owned by `runtime/RUNTIME-176`,
-  `ui/UI-036`, and the optional `rendering/GRAPHICS-122`, with the derived-view
-  rendering decision recorded in
+  engine integration — config lane, runtime facade, the UV view model, and the
+  Sandbox editor panel with a resizable UV split view — has its CPU contract in
+  retired `runtime/RUNTIME-176`; visible operation remains owned by
+  `ui/UI-036`, with the optional `rendering/GRAPHICS-122` upgrade and the
+  derived-view rendering decision recorded in
   [ADR-0025](../../../docs/adr/0025-parameterization-uv-view-and-split-view.md).
   This mirrors the LOP consolidation family and the retired `RUNTIME-134`
   progressive-Poisson playground. Realizes Packs 3–4 of the
