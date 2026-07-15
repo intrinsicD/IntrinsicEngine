@@ -91,6 +91,15 @@ contract/config overlay, and `ProjectFrameRecipeOverride(...)` is
 CPU-contract-tested as the constrained bridge between them. `DOCS-004` is
 retired: canonical `frame-graph.md` now documents the recipe-config lane.
 
+The Issue 445 literature scan seeded a deliberately deferred incubation set:
+`GEOM-066`/`067`, `GRAPHICS-123..126`, and `ASSETIO-009`. Every member lists
+`REVIEW-003` as its first dependency, so none is selectable until the
+architecture-stability/right-sizing audit retires cleanly. The leaves reopen
+only bounded evidence or vertical-pilot slices from the archived Slang,
+meshlet, cluster-LOD, and differentiable-rendering plans; they do not recreate
+those broad umbrellas. Historical FetchContent instructions in the archived
+plans are superseded by the current vcpkg-manifest-only contract.
+
 ### Theme C — Physics readiness (P1)
 
 Define physics layer ownership before any solver code lands; then implement
@@ -256,6 +265,7 @@ its owners.
 
 Open members (kernel-seam priority set first):
 - [`architecture/ARCH-014-kernel-convergence-tracking.md`](architecture/ARCH-014-kernel-convergence-tracking.md) (umbrella north-star; not a slice).
+- [`architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md`](architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) (one-shot post-convergence admission gate; blocked until known architecture/right-sizing/tool-rent work retires).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md`](runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md).
 - [`architecture/CORE-005-nonblocking-taskgraph-submit-api.md`](architecture/CORE-005-nonblocking-taskgraph-submit-api.md).
@@ -360,7 +370,10 @@ strategies only), and its delivered engine-integration/view leaves
 `GRAPHICS-122` delivered the optional GPU-shaded UV target at `Operational`).
 The method-readiness seams are `GEOM-013`,
 `GEOM-024`, `GEOM-058`, `GEOM-059`, `GEOM-060`, `GEOM-061`, `GEOM-062`,
-`GEOM-064`.
+`GEOM-064`. The post-stability Issue 445 research incubations are
+`GEOM-065`, `METHOD-027..031`, and `HARDEN-084`; each is blocked first by
+`REVIEW-003`, and their task files require killing tests or concrete
+two-consumer evidence before opening broader engine integration.
 
 ## Cross-domain dependency anchors
 
@@ -372,6 +385,10 @@ are preserved in the retirement log.
 - **GRAPHICS-035..058 ⇐ Theme A.** Theme A's visible-geometry foundation is
   complete; rendering modernization leaves are now gated by their individual
   task dependencies and the rendering DAG.
+- **Issue 445 incubations ⇐ REVIEW-003.** The deferred Theme B/Theme I tasks
+  created from the 2026-07-15 literature scan remain blocked until the
+  commit-scoped architecture stability and right-sizing audit retires cleanly.
+
 ## Promotion checklist
 
 Before promoting a backlog task to active:

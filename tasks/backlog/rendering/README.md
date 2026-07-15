@@ -24,9 +24,24 @@ without requiring them to read every file.
 
 ## Current open rendering leaves
 
-- No open Theme B modernization leaves. The 2026-07-03 review R13 follow-up
-  `GRAPHICS-119` retired parallel render-pass command recording via the task
-  scheduler on 2026-07-07.
+- The 2026-07-03 review R13 follow-up `GRAPHICS-119` retired parallel
+  render-pass command recording via the task scheduler on 2026-07-07.
+- The following Theme B incubation leaves are deliberately blocked by the
+  architecture-stability gate `REVIEW-003`; they are not eligible for
+  implementation during the current convergence/right-sizing phase:
+  - [`GRAPHICS-123`](GRAPHICS-123-slang-single-kernel-gradient-pilot.md) — one
+    offline Slang → SPIR-V/reflection/gradient pilot; no canonical shader
+    migration or differentiable frame graph.
+  - [`GRAPHICS-124`](GRAPHICS-124-slughorn-world-space-vector-annotation-proof.md) —
+    isolated CPU/offscreen-Vulkan Slughorn coverage proof; no production
+    packet, recipe pass, runtime integration, or ImGui replacement.
+  - [`GRAPHICS-125`](GRAPHICS-125-memory-priced-cluster-hierarchy-evidence.md) —
+    CPU evidence for a public-API-only meshoptimizer hierarchy and MSAH-style
+    packing; no demo-header vendoring, GPU selector, RHI fields, streaming, or
+    mesh-shader implementation.
+  - [`GRAPHICS-126`](GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md) —
+    external-capture-only bandwidth cost model; absent two provenance-complete
+    datasets it closes without instrumentation, scheduling, or recipe changes.
 
 ## Retired cross-domain rendering leaves
 

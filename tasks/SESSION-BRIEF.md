@@ -12,7 +12,14 @@ the authoritative open/unblocked view.
 
 ## Theme B — Rendering modernization
 
+- blocked by `REVIEW-003`: `ASSETIO-009` — Loss-aware MaterialX subset import (tasks/backlog/assets/ASSETIO-009-loss-aware-materialx-subset-import.md)
+- blocked by `REVIEW-003`: `GEOM-066` — meshoptimizer v1.2 geometry oracle and adoption evidence (tasks/backlog/geometry/GEOM-066-meshoptimizer-v1-2-geometry-oracle.md)
+- blocked by `REVIEW-003`: `GEOM-067` — Memory-aware BVH and merged-node evidence (tasks/backlog/geometry/GEOM-067-memory-aware-bvh-merged-node-evidence.md)
 - blocked by `RUNTIME-129`: `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/backlog/rendering/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
+- blocked by `REVIEW-003`: `GRAPHICS-123` — Slang single-kernel gradient pilot (tasks/backlog/rendering/GRAPHICS-123-slang-single-kernel-gradient-pilot.md)
+- blocked by `REVIEW-003`: `GRAPHICS-124` — Slughorn world-space vector annotation proof (tasks/backlog/rendering/GRAPHICS-124-slughorn-world-space-vector-annotation-proof.md)
+- blocked by `REVIEW-003`: `GRAPHICS-125` — Memory-priced cluster hierarchy evidence (tasks/backlog/rendering/GRAPHICS-125-memory-priced-cluster-hierarchy-evidence.md)
+- blocked by `REVIEW-003`: `GRAPHICS-126` — Bandwidth-priced frame-recipe trace model (tasks/backlog/rendering/GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md)
 - unblocked: `RUNTIME-129` — Schedule GPU object-space normal bake jobs after import (tasks/backlog/runtime/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
 - unblocked: `RUNTIME-139` — Static AoS storage and shader operational path (tasks/backlog/runtime/RUNTIME-139-static-aos-storage-shader-operational.md)
 - unblocked: `RUNTIME-170` — Privatize the object-space normal GPU queue surface (tasks/backlog/runtime/RUNTIME-170-privatize-object-space-normal-gpu-queue-surface.md)
@@ -29,6 +36,7 @@ the authoritative open/unblocked view.
 - unblocked: `CORE-009` — App-owned config sections out of core EngineConfig (tasks/backlog/architecture/CORE-009-app-owned-config-sections.md)
 - unblocked: `LEGACY-043` — Retire stale multi-descriptor-set shader sources (tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
+- blocked by `ARCH-014`: `REVIEW-003` — Architecture stability and right-sizing readiness audit (tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
 - unblocked: `RUNTIME-166` — Slim and partition the RenderExtraction module (tasks/backlog/runtime/RUNTIME-166-slim-render-extraction-module.md)
@@ -47,6 +55,7 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-083` — Vulkan Sandbox shutdown reports driver and DBus leaks under LeakSanitizer (tasks/backlog/bugs/BUG-083-vulkan-sandbox-shutdown-lsan-leaks.md)
 - unblocked: `BUG-087` — Documented task-validator root silently validates zero tasks (tasks/backlog/bugs/BUG-087-task-validator-documented-root-silent-noop.md)
 - unblocked: `BUG-088` — Benchmark smoke hard timeout flakes under host contention (tasks/backlog/bugs/BUG-088-benchmark-smoke-hard-timeout-host-contention.md)
+- unblocked: `BUG-089` — Root-hygiene strict mode rejects canonical and ignored state (tasks/backlog/bugs/BUG-089-root-hygiene-rejects-canonical-and-ignored-state.md)
 
 ## Theme H — Agentic workflow hardening
 
@@ -68,6 +77,8 @@ the authoritative open/unblocked view.
 - unblocked: `GEOM-061` — Point-cloud grid-downsampling reduction strategies (tasks/backlog/geometry/GEOM-061-grid-downsampling-reduction-strategies.md)
 - unblocked: `GEOM-062` — Point-set projection and weighting kernels seam (tasks/backlog/geometry/GEOM-062-point-set-projection-weighting-kernels.md)
 - unblocked: `GEOM-064` — Parameterization optimization kernels seam (tasks/backlog/geometry/GEOM-064-parameterization-optimization-kernels.md)
+- blocked by `REVIEW-003`: `GEOM-065` — Invariant-aware scientific-field mip pyramids (tasks/backlog/geometry/GEOM-065-invariant-aware-scientific-field-mip-pyramids.md)
+- blocked by `REVIEW-003`: `HARDEN-084` — Localized CPU/GPU parity signatures (tasks/backlog/methods/HARDEN-084-localized-cpu-gpu-parity-signatures.md)
 - unblocked: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
 - unblocked: `METHOD-004` — Walk on Spheres / Walk on Stars PDE solver reference backend (tasks/backlog/methods/METHOD-004-walk-on-spheres-reference-backend.md)
 - unblocked: `METHOD-005` — Robust mesh boolean reference backend (tasks/backlog/methods/METHOD-005-robust-mesh-boolean-reference-backend.md)
@@ -85,6 +96,11 @@ the authoritative open/unblocked view.
 - blocked by `GEOM-024`: `METHOD-024` — Spectral Conformal Parameterization (SCP) reference backend (tasks/backlog/methods/METHOD-024-spectral-conformal-parameterization-reference-backend.md)
 - blocked by `METHOD-021`: `METHOD-025` — Parameterization family optimized CPU backend and comparison benchmark (tasks/backlog/methods/METHOD-025-parameterization-family-optimized-cpu-backend.md)
 - blocked by `METHOD-025`: `METHOD-026` — Parameterization family GPU (Vulkan compute) backend and parity (tasks/backlog/methods/METHOD-026-parameterization-family-gpu-vulkan-compute-backend.md)
+- blocked by `REVIEW-003`: `METHOD-027` — Adaptive Delaunay/QEF implicit meshing reference (tasks/backlog/methods/METHOD-027-adaptive-delaunay-qef-implicit-meshing.md)
+- blocked by `REVIEW-003`: `METHOD-028` — Confidence-driven spatial guiding for Walk on Stars (tasks/backlog/methods/METHOD-028-confidence-driven-walk-on-stars-guiding.md)
+- blocked by `REVIEW-003`: `METHOD-029` — Discontinuity-aware material derivatives (tasks/backlog/methods/METHOD-029-discontinuity-aware-material-derivatives-and-jacobian-portability.md)
+- blocked by `REVIEW-003`: `METHOD-030` — Neural render proxy path-replay reference (tasks/backlog/methods/METHOD-030-neural-render-proxy-path-replay-reference.md)
+- blocked by `REVIEW-003`: `METHOD-031` — Cross-artifact Jacobian portability prediction (tasks/backlog/methods/METHOD-031-jacobian-portability-predictive-study.md)
 - blocked by `METHOD-016`: `RUNTIME-175` — Point-cloud consolidation runtime facade, config lane, and backend adapter (tasks/backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
 - blocked by `RUNTIME-175`: `UI-035` — Sandbox point-cloud consolidation editor panel (tasks/backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md)
 

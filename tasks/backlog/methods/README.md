@@ -66,6 +66,29 @@ map.
   GPU job-queue seam and extending the panel delivered by retired `UI-036`;
   the linear one-shot strategies
   (LSCM/SCP/BFF) record no GPU follow-up in their own tasks).
+- [METHOD-027 — Adaptive Delaunay/QEF implicit meshing](METHOD-027-adaptive-delaunay-qef-implicit-meshing.md)
+  (post-stability, opt-in method; paper intake and a frozen method contract
+  precede a 2D adversarial killing test and any 3D CPU reference; gated by
+  `REVIEW-003`, `GEOM-013`, and `METHOD-007`).
+- [METHOD-028 — Confidence-driven Walk on Stars guiding](METHOD-028-confidence-driven-walk-on-stars-guiding.md)
+  (post-stability CPU reference and equal-memory variance study; gated by
+  `REVIEW-003` and the base `METHOD-004` WoSt reference).
+- [METHOD-029 — Discontinuity-aware material derivatives](METHOD-029-discontinuity-aware-material-derivatives-and-jacobian-portability.md)
+  (post-stability custom-derivative/optimization evidence on a fixed
+  method-local expression corpus; gated by `REVIEW-003` and the Slang pilot,
+  with no MaterialX or production material-graph surface).
+- [METHOD-030 — Neural Render Proxy path-replay reference](METHOD-030-neural-render-proxy-path-replay-reference.md)
+  (post-stability intake, deterministic path replay, correctness tests, and a
+  validated reference benchmark first; a small CPU proxy may start only after
+  that checkpoint, with no renderer integration).
+- [METHOD-031 — Cross-artifact Jacobian portability prediction](METHOD-031-jacobian-portability-predictive-study.md)
+  (conditional post-stability study over the exact retained `METHOD-029`
+  analytic-C++/Slang-SPIR-V corpus; held-out predictive evidence only, with no
+  compiler, material, or renderer framework).
+- [HARDEN-084 — Localized CPU/GPU parity signatures](HARDEN-084-localized-cpu-gpu-parity-signatures.md)
+  (post-stability two-consumer evidence task, gated by the Progressive Poisson
+  and parameterization GPU paths; no generic parity framework unless both
+  local prototypes meet the frozen localization and overhead gates).
 
 ## Convergence
 

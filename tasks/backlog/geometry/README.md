@@ -30,6 +30,17 @@ map.
   (reusable `Geometry.Parameterization.Optimize`: local rotation fit,
   symmetric-Dirichlet energy/proxy, injective line search; gates ARAP
   `methods/METHOD-021` and SLIM `methods/METHOD-022`).
+- [GEOM-065 — Invariant-aware scientific-field mip pyramids](GEOM-065-invariant-aware-scientific-field-mip-pyramids.md)
+  (post-stability method/evidence-local CPU study for unit normals, discrete
+  labels, and signed scalar fields; blocked by `REVIEW-003`, with no
+  `src/geometry`, asset, or RHI integration).
+- [GEOM-066 — meshoptimizer v1.2 geometry oracle](GEOM-066-meshoptimizer-v1-2-geometry-oracle.md)
+  (post-stability dependency/oracle decision covering tangent frames,
+  simplification comparison, and exact meshlet round-trip; blocked by
+  `REVIEW-003` and the canonical attribute-authority task `GRAPHICS-105`).
+- [GEOM-067 — Memory-aware BVH merged-node evidence](GEOM-067-memory-aware-bvh-merged-node-evidence.md)
+  (post-stability CPU median/SAH/MSAH comparison with exact query parity;
+  blocked by `REVIEW-003`, with no default BVH or RHI change).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ### bcg_code_base geometry-processing port gaps (seeded 2026-06-26)

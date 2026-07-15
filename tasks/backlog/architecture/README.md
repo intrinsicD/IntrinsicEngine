@@ -41,6 +41,12 @@ are retired to `tasks/done/`; `ARCH-014` remains the open umbrella:
   grilling + ADR to decide the `IRuntimeModule` scoping rule (cluster methods by
   shared result-consumer contract, e.g. DBSCAN inside `ClusteringModule`, not a
   rigid per-algorithm interface). Decision record only; no engine code.
+- [`REVIEW-003`](REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) —
+  one-shot, commit-anchored architecture stability and right-sizing audit. It
+  is blocked on the known convergence, privatization, validator, root-hygiene,
+  and process-tool-rent work and is the machine-visible admission gate for
+  deferred post-stability research and rendering ideas; audit findings become
+  separate dependencies rather than fixes inside the review task.
 
 ### Retired seam tasks
 

@@ -5,6 +5,10 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-089` — Root-hygiene strict mode rejects canonical and ignored state](BUG-089-root-hygiene-rejects-canonical-and-ignored-state.md):
+  strict mode currently rejects tracked `ara/` together with documented or
+  disposable local state (`imgui.ini`, `.ruff_cache/`); reconcile the explicit
+  repository policy and checker without allowing arbitrary root entries.
 - [`BUG-088` — Benchmark smoke hard timeout flakes under host contention](BUG-088-benchmark-smoke-hard-timeout-host-contention.md):
   the required default CPU gate timed out the monolithic 21-result smoke at its
   hard 30-second limit under concurrent load, while the same pair passed in
