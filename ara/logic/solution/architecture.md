@@ -95,3 +95,52 @@
   tasks/done/RUNTIME-176-parameterization-runtime-config-integration.md,
   N213, N215]
 - **From staging**: O32
+
+## A10: Slang Starts as One Offline Kernel Pilot
+- **Decision**: Any Slang adoption starts with a pinned offline compiler that
+  emits SPIR-V and reflection for one pure compute or material kernel, checked
+  against an independent analytic C++ oracle and finite-difference gradients.
+  It does not imply a shader-language migration, runtime compiler, or
+  differentiable-renderer architecture.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [N222,
+  tasks/backlog/rendering/GRAPHICS-123-slang-single-kernel-gradient-pilot.md]
+- **From staging**: O42
+
+## A11: meshoptimizer v1.2 Is an External Oracle Before an Engine Dependency
+- **Decision**: Evaluate meshoptimizer v1.2 through deterministic standalone
+  geometry and cluster-hierarchy evidence before changing the pinned dependency
+  or production paths. Topology-changing filters remain opt-in and must preserve
+  primitive-to-source-face provenance.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [N222,
+  tasks/backlog/geometry/GEOM-066-meshoptimizer-v1-2-geometry-oracle.md,
+  tasks/backlog/rendering/GRAPHICS-125-memory-priced-cluster-hierarchy-evidence.md]
+- **From staging**: O43
+
+## A12: Neural Render Proxy Work Begins With Deterministic Path Replay
+- **Decision**: Neural Render Proxy research begins with a non-neural,
+  deterministic path-record and GatherLight replay reference, correctness tests,
+  and benchmark evidence. Training or renderer integration remains optional and
+  blocked until operational path tracing, hardware RT, and differentiable
+  consumers exist and the reference evidence justifies expansion.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [N222,
+  tasks/backlog/methods/METHOD-030-neural-render-proxy-path-replay-reference.md]
+- **From staging**: O44
+
+## A13: Issue 445 Research Is Deferred Behind a Shared Stability Audit
+- **Decision**: Every Issue 445 candidate task depends first on REVIEW-003, a
+  one-shot, commit-scoped, report-only audit of architecture convergence and
+  right-sizing. Candidate tasks begin with bounded evidence and explicit
+  stop/kill criteria; they cannot introduce shared frameworks or production
+  integration before their local evidence gates pass.
+- **Provenance**: user-revised
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [N222,
+  tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md,
+  tasks/SESSION-BRIEF.md]
+- **From staging**: O47

@@ -406,3 +406,164 @@ observations:
     promoted_to: "logic/solution/constraints.md:K19"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O38
+    timestamp: "2026-07-15T19:13+02:00"
+    provenance: ai-suggested
+    content: >
+      Progressive Poisson's Vulkan/GPU implementation is Scaffolded rather than
+      Operational or ParityProven until a non-skipped gpu/vulkan run records the actual
+      backend, excludes fallback, completes dispatch/readback, and compares against the
+      CPU reference; current README wording about executable GPU parity is too strong.
+    context: "Bounded forward test of the repository-specific results-audit rubric against method.yaml and the method README."
+    potential_type: claim
+    bound_to: [N219]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O39
+    timestamp: "2026-07-15T20:39+02:00"
+    provenance: ai-suggested
+    content: >
+      A QEF-feature-point plus adaptive-Delaunay implicit meshing follow-up is a
+      strong fit for GEOM-013 and METHOD-007, but the broad combination is at
+      most N1/N2 under ADS, TetWeave, Subgrid Marching Tetrahedra, Manifold Dual
+      Contouring, and certified Delaunay-meshing prior art; a 2D adversarial
+      falsifier should precede any 3D implementation.
+    context: "Primary-source literature scan and repository mapping for Graphics Programming Weekly Issue 445."
+    potential_type: claim
+    bound_to: [N220]
+    promoted: true
+    promoted_to: "logic/claims.md:C03"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O40
+    timestamp: "2026-07-15T20:39+02:00"
+    provenance: ai-suggested
+    content: >
+      Confidence-driven spatial subdivision using contribution and direction
+      signatures may improve the variance-memory frontier of guided Walk on
+      Stars after METHOD-004 has a CPU reference, but existing guided-WoSt prior
+      art limits this transfer to a provisional N2-T contribution.
+    context: "Transfer analysis of illumination-aware path-guiding subdivision to IntrinsicEngine Monte Carlo PDE methods."
+    potential_type: claim
+    bound_to: [N220]
+    promoted: true
+    promoted_to: "logic/claims.md:C04"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O41
+    timestamp: "2026-07-15T20:39+02:00"
+    provenance: ai-suggested
+    content: >
+      A memory-SAH objective based on expected bytes or cache lines is directly
+      testable on engine-owned CPU BVH and meshlet/cluster-LOD layouts, whereas
+      custom merged-node layouts are not directly adoptable for opaque vendor
+      Vulkan acceleration structures; a trace-only or CPU packing study should
+      gate GPU implementation.
+    context: "Architecture and transfer analysis of the HPG 2026 merged-node BVH paper."
+    potential_type: heuristic
+    bound_to: [N220]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H05"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O42
+    timestamp: "2026-07-15T20:39+02:00"
+    provenance: ai-suggested
+    content: >
+      The smallest useful Slang lane is pinned offline compilation to SPIR-V
+      plus reflection for one pure compute or material kernel with an independent
+      analytic C++ oracle and finite-difference gradient checks; a wholesale
+      shader migration or claim of a differentiable renderer is premature.
+    context: "Repository-gated assessment of Slang modules and automatic differentiation."
+    potential_type: architecture
+    bound_to: [N220]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A10"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O43
+    timestamp: "2026-07-15T20:39+02:00"
+    provenance: ai-suggested
+    content: >
+      meshoptimizer v1.2 is an implementation-ready external baseline for
+      simplification, meshlet, tangent-frame, and cluster-hierarchy experiments,
+      but IntrinsicEngine's vcpkg port is still 1.1.1 and topology-changing
+      filtering must be opt-in to preserve primitive-to-face provenance.
+    context: "Release audit against current geometry, graphics, asset, and dependency contracts."
+    potential_type: architecture
+    bound_to: [N220]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A11"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O44
+    timestamp: "2026-07-15T20:39+02:00"
+    provenance: ai-suggested
+    content: >
+      Full Neural Render Proxy integration is a long-horizon fixed-scene,
+      fixed-view inverse-lighting method blocked by absent operational path
+      tracing, hardware RT, and AD consumers; a deterministic non-neural
+      path-record and GatherLight replay oracle is the appropriate first
+      evidence artifact.
+    context: "Prior-art and readiness audit of Neural Render Proxies against the current renderer roadmap."
+    potential_type: architecture
+    bound_to: [N220]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A12"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O45
+    timestamp: "2026-07-15T20:39+02:00"
+    provenance: ai-suggested
+    content: >
+      Decoder-aware mipmap optimization may transfer from neural material
+      rendering to scientific normal, label, and signed-scalar fields by
+      minimizing invariant and visualization loss rather than raw-channel
+      averaging; the idea remains provisional until a CPU fixture shows less
+      angular error, label bleed, or isoline drift at equal storage.
+    context: "Cross-domain extrapolation from Slang differentiable nonlinear mipmapping and neural appearance literature."
+    potential_type: claim
+    bound_to: [N220]
+    promoted: true
+    promoted_to: "logic/claims.md:C05"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O46
+    timestamp: "2026-07-15T21:06+02:00"
+    provenance: ai-executed
+    content: >
+      Face diagnostics computed on a compact algorithm mesh must preserve the
+      compact-face-to-source-face mapping and remap results into authoritative
+      GeometrySources face storage. Reusing diagnostics also requires an exact
+      fingerprint of canonical topology-to-face indices, vertex positions, and
+      UV payloads.
+    context: >
+      GRAPHICS-122 final review found deleted source-face slots shifting compact
+      solver indices and an incomplete diagnostics fingerprint; committed
+      mapping, remapping, and provenance regressions closed both defects.
+    potential_type: constraint
+    bound_to: [N221]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K20"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O47
+    timestamp: "2026-07-15T21:46+02:00"
+    provenance: user-revised
+    content: >
+      The Issue 445 portfolio must remain deferred behind one commit-scoped,
+      report-only architecture-stability and right-sizing audit. Candidate work
+      begins with bounded evidence, explicit stop or kill criteria, and no shared
+      framework or production integration until its local evidence gate passes.
+    context: >
+      The user requested durable tasks only for a future stable version after
+      architecture complexity and code-creep issues are resolved; REVIEW-003 and
+      fourteen candidate tasks encode that sequencing and scope boundary.
+    potential_type: architecture
+    bound_to: [N220, N222]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A13"
+    crystallized_via: artifact-commitment
+    stale: false

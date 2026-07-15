@@ -5129,3 +5129,92 @@ tree:
       layering, test-layout, clean-workshop, inventory, and PR-contract checks
       passed; BUG-085 and BUG-086 retired with UI-036.
     status: resolved
+  - id: N219
+    type: experiment
+    title: "Results-audit forward check of Progressive Poisson maturity"
+    provenance: ai-executed
+    timestamp: "2026-07-15T19:13+02:00"
+    evidence:
+      - "tools/agents/skills/intrinsicengine-results-audit/SKILL.md"
+      - "methods/geometry/progressive_poisson/README.md"
+      - "methods/geometry/progressive_poisson/method.yaml"
+    result: >
+      The bounded method audit found the CPU reference and public fallback honestly
+      represented, but the Vulkan/GPU seam remains Scaffolded: no non-skipped execution,
+      readback, or CPU-reference parity evidence was present. The method README's wording
+      about an executable backend and CPU/GPU parity therefore outruns the current
+      capability evidence. No test or GPU workload ran during this audit.
+    status: resolved
+  - id: N220
+    type: question
+    title: "Graphics Programming Weekly 445 opportunities for IntrinsicEngine"
+    provenance: user
+    timestamp: "2026-07-15T20:39+02:00"
+    description: >
+      Which techniques, applications, methods, and research ideas in Graphics
+      Programming Weekly Issue 445 and its linked literature are promising for
+      IntrinsicEngine, given the current architecture and task portfolio?
+    evidence:
+      - "https://www.jendrikillner.com/post/graphics-programming-weekly-issue-445/"
+      - "https://studios.disneyresearch.com/2026/07/01/neural-render-proxies-for-interactive-and-differentiable-lighting/"
+      - "https://spatial-subdiv.ewi.tudelft.nl/"
+      - "https://graphics.cs.utah.edu/research/projects/bvh-merged-nodes/"
+      - "https://www.mattkeeter.com/blog/2026-07-03-meshing/"
+      - "https://github.com/zeux/meshoptimizer/releases/tag/v1.2"
+      - "https://github.com/AlphaPixel/slughorn"
+      - "https://github.com/shader-slang/slang"
+      - "https://materialx.org/Specification.html"
+    status: resolved
+  - id: N221
+    type: experiment
+    title: "Operational GPU UV-view closure verification"
+    provenance: ai-executed
+    timestamp: "2026-07-15T21:06+02:00"
+    also_depends_on: [N218]
+    evidence:
+      - "tasks/done/GRAPHICS-122-uv-view-offscreen-render-target.md"
+      - "/tmp/graphics122-focused-final.log"
+      - "/tmp/graphics122-cpu-full-final-tree.log"
+      - "/tmp/graphics122-vulkan-uv-final-tree.log"
+      - "commit d0e173dd"
+      - "commit 6ac57482"
+    result: >
+      GRAPHICS-122 retired at Operational after the final focused CPU selection
+      passed 77/77, the full Clang-23 ASan/UBSan CPU-supported gate passed
+      3,780/3,780, and both promoted-Vulkan UV-view smokes passed without a
+      capability skip. The GPU tests directly sampled asymmetric UV islands,
+      backgrounds, texture density, a resident texture, and finite/non-finite
+      heatmap bands; the runtime smoke exercised AgentCli config, real
+      selection/residency, the UvView and ImGui recipe passes, and ImGui texture
+      presentation. Independent final review found no remaining actionable
+      defect.
+    status: resolved
+  - id: N222
+    type: decision
+    title: "Defer the Issue 445 idea portfolio behind an architecture-stability gate"
+    provenance: user
+    timestamp: "2026-07-15T21:46+02:00"
+    also_depends_on: [N220]
+    choice: >
+      Preserve the selected Issue 445 opportunities as right-sized, evidence-first
+      backlog tasks, but make REVIEW-003 their shared first dependency so none is
+      eligible for implementation until the known architecture-convergence,
+      complexity, code-creep, validator, and root-hygiene blockers retire and a
+      commit-scoped readiness audit passes. Each candidate keeps an explicit
+      falsifier, start/kill rule, or evidence gate before production integration.
+    alternatives:
+      - "Begin implementing the most promising candidates immediately."
+      - "Keep the literature scan as notes without durable implementation tasks."
+      - "Gate candidates only on their local subsystem dependencies without one shared readiness audit."
+    evidence:
+      - "O39"
+      - "O40"
+      - "O41"
+      - "O42"
+      - "O43"
+      - "O44"
+      - "O45"
+      - "tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md"
+      - "tasks/backlog/README.md"
+      - "tasks/SESSION-BRIEF.md"
+    status: resolved

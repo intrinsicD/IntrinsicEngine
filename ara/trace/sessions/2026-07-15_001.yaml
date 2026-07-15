@@ -2,9 +2,9 @@ session:
   id: "2026-07-15_001"
   date: "2026-07-15"
   started: "2026-07-15T00:44"
-  last_turn: "2026-07-15T13:27"
-  turn_count: 3
-  summary: "Retired the parameterization chain through Operational UI-036, including review-driven geometry/BFF/runtime closure and ImGui clipping/large-draw repairs."
+  last_turn: "2026-07-15T21:46+02:00"
+  turn_count: 7
+  summary: "Completed the parameterization chain through an Operational GPU UV view, then deferred fourteen Issue 445 research tasks behind a shared architecture-stability audit."
 
 events_logged:
   - turn: 1
@@ -127,6 +127,132 @@ events_logged:
     routing: crystallized
     provenance: ai-executed
     summary: "Crystallized end-to-end large-draw-list vertex-offset support as K19."
+  - turn: 4
+    type: experiment
+    id: "N219"
+    routing: direct
+    provenance: ai-executed
+    summary: "Forward-tested the new audit rubric and found Progressive Poisson's GPU seam Scaffolded without execution/readback/parity evidence."
+  - turn: 4
+    type: claim
+    id: "O38"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged the boundary between the CPU reference, Scaffolded Vulkan seam, and unsupported executable-parity wording."
+  - turn: 5
+    type: question
+    id: "N220"
+    routing: direct
+    provenance: user
+    summary: "Resolved which Issue 445 techniques and linked research are promising for IntrinsicEngine."
+  - turn: 5
+    type: claim
+    id: "O39"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged QEF-feature adaptive Delaunay meshing as a high-fit but prior-art-constrained research candidate."
+  - turn: 5
+    type: claim
+    id: "O40"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged confidence-driven subdivision for guided Walk on Stars as a provisional N2-T transfer."
+  - turn: 5
+    type: heuristic
+    id: "O41"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged memory-SAH packing for engine-owned BVH and cluster layouts behind a CPU traffic study."
+  - turn: 5
+    type: architecture
+    id: "O42"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged a one-kernel offline Slang and independent gradient-parity pilot."
+  - turn: 5
+    type: architecture
+    id: "O43"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged meshoptimizer v1.2 as an external baseline subject to vcpkg and provenance constraints."
+  - turn: 5
+    type: architecture
+    id: "O44"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged deterministic path-record replay before any full Neural Render Proxy integration."
+  - turn: 5
+    type: claim
+    id: "O45"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged invariant-aware mipmaps for scientific fields as a cross-domain research candidate."
+  - turn: 6
+    type: experiment
+    id: "N221"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired GRAPHICS-122 after 77 focused CPU tests, 3,780 full-gate CPU tests, and two non-skipped promoted-Vulkan UV-view smokes passed."
+  - turn: 6
+    type: constraint
+    id: "O46"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized compact-face diagnostics remapping and exact input provenance as K20."
+  - turn: 7
+    type: decision
+    id: "N222"
+    routing: direct
+    provenance: user
+    summary: "Deferred fourteen Issue 445 candidate tasks behind the shared REVIEW-003 architecture-stability and right-sizing audit."
+  - turn: 7
+    type: claim
+    id: "O39"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the adversarial-2D-first adaptive Delaunay/QEF hypothesis as C03 after task commitment."
+  - turn: 7
+    type: claim
+    id: "O40"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized confidence-driven Walk on Stars guiding as hypothesis C04 after task commitment."
+  - turn: 7
+    type: heuristic
+    id: "O41"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized memory-traffic pricing before hierarchy GPU adoption as H05."
+  - turn: 7
+    type: architecture
+    id: "O42"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the one-offline-kernel Slang pilot boundary as A10."
+  - turn: 7
+    type: architecture
+    id: "O43"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized meshoptimizer v1.2 external-oracle-first adoption as A11."
+  - turn: 7
+    type: architecture
+    id: "O44"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized deterministic path replay before Neural Render Proxy integration as A12."
+  - turn: 7
+    type: claim
+    id: "O45"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized invariant-aware scientific-field mipmaps as hypothesis C05 after task commitment."
+  - turn: 7
+    type: architecture
+    id: "O47"
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized the shared stability audit and evidence-first expansion boundary as A13."
 
 ai_actions:
   - turn: 1
@@ -203,7 +329,58 @@ ai_actions:
       - "tasks/done/RETIREMENT-LOG.md"
       - "tasks/backlog/rendering/GRAPHICS-122-uv-view-offscreen-render-target.md"
 
-claims_touched: [C02]
+  - turn: 4
+    action: "Adapted the latest results-audit pattern to IntrinsicEngine with method maturity, CPU-reference oracles, actual-backend/fallback checks, manifest/result binding, warmup/unit discipline, and Operational/ParityProven evidence thresholds; added native routing and inventory entries."
+    provenance: ai-executed
+    files_changed: ["tools/agents/skills/intrinsicengine-results-audit/SKILL.md", "tools/agents/skills/intrinsicengine-core/SKILL.md", "tools/agents/skills/README.md"]
+  - turn: 4
+    action: "Validated the skill schema, three-surface mirror map, relative documentation links, routing, and whitespace, then ran the bounded Progressive Poisson forward audit without executing tests or a GPU workload."
+    provenance: ai-executed
+    files_changed: []
+  - turn: 5
+    action: "Scanned Graphics Programming Weekly Issue 445 and linked primary papers, official project pages, specifications, repositories, and release notes; audited prior-art threats and mapped each candidate to current IntrinsicEngine architecture and task readiness."
+    provenance: ai-executed
+    files_changed: []
+  - turn: 6
+    action: "Implemented and retired GRAPHICS-122 with a retained GPU UV-view target, typed recipe pass/resource, runtime-selected residency and background texture wiring, config/UI/Agent parity, source-aligned face diagnostics, and direct semantic GPU readback coverage."
+    provenance: ai-executed
+    files_changed:
+      - "src/graphics/renderer/Graphics.UvView.cppm"
+      - "src/graphics/renderer/Graphics.UvView.cpp"
+      - "src/runtime/Runtime.SandboxParameterizationFacade.cpp"
+      - "tests/contract/graphics/Test.UvView.cpp"
+      - "tests/integration/graphics/Test.UvViewGpuSmoke.cpp"
+      - "tasks/done/GRAPHICS-122-uv-view-offscreen-render-target.md"
+  - turn: 6
+    action: "Passed the 77-test focused selection, 3,780-test default CPU gate, both non-skipped promoted-Vulkan UV-view smokes, strict structural checks, and independent final review; committed implementation d0e173dd and retirement 6ac57482."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/SESSION-BRIEF.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+
+  - turn: 7
+    action: "Created a report-only REVIEW-003 readiness gate, fourteen deferred evidence-first Issue 445 tasks, and BUG-089 for the strict root-hygiene mismatch; cross-reviewed their scope, dependencies, ownership, start/kill criteria, and benchmark commands, then regenerated the backlog indexes and session brief."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md"
+      - "tasks/backlog/bugs/BUG-089-root-hygiene-rejects-canonical-and-ignored-state.md"
+      - "tasks/backlog/assets/ASSETIO-009-loss-aware-materialx-subset-import.md"
+      - "tasks/backlog/geometry/GEOM-065-invariant-aware-scientific-field-mip-pyramids.md"
+      - "tasks/backlog/geometry/GEOM-066-meshoptimizer-v1-2-geometry-oracle.md"
+      - "tasks/backlog/geometry/GEOM-067-memory-aware-bvh-merged-node-evidence.md"
+      - "tasks/backlog/methods/METHOD-027-adaptive-delaunay-qef-implicit-meshing.md"
+      - "tasks/backlog/methods/METHOD-028-confidence-driven-walk-on-stars-guiding.md"
+      - "tasks/backlog/methods/METHOD-029-discontinuity-aware-material-derivatives-and-jacobian-portability.md"
+      - "tasks/backlog/methods/METHOD-030-neural-render-proxy-path-replay-reference.md"
+      - "tasks/backlog/methods/METHOD-031-jacobian-portability-predictive-study.md"
+      - "tasks/backlog/methods/HARDEN-084-localized-cpu-gpu-parity-signatures.md"
+      - "tasks/backlog/rendering/GRAPHICS-123-slang-single-kernel-gradient-pilot.md"
+      - "tasks/backlog/rendering/GRAPHICS-124-slughorn-world-space-vector-annotation-proof.md"
+      - "tasks/backlog/rendering/GRAPHICS-125-memory-priced-cluster-hierarchy-evidence.md"
+      - "tasks/backlog/rendering/GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md"
+      - "tasks/SESSION-BRIEF.md"
+
+claims_touched: [C02, C03, C04, C05]
 
 key_context:
   - turn: 1
@@ -212,13 +389,26 @@ key_context:
     excerpt: "User reiterated that the agentic workflow should execute all selected backlog work."
   - turn: 3
     excerpt: "User asked whether to leave the live engine viewer open; the agent retained it for the dense-mesh proof and then closed it cleanly."
+  - turn: 4
+    excerpt: "User requested adapting the two latest results-audit skills into IntrinsicEngine and three peer repositories."
+  - turn: 5
+    excerpt: "User requested a literature-backed scan of Graphics Programming Weekly Issue 445 for promising engine techniques, applications, methods, and ideas."
+  - turn: 6
+    excerpt: "User instructed the agent to continue the agentic workflow with the next task, which was GRAPHICS-122."
+  - turn: 7
+    excerpt: "User requested durable tasks for the ideas, explicitly deferred until the engine reaches a stable version and architecture complexity and code-creep issues are resolved."
 
 open_threads:
-  - "GRAPHICS-122 is now unblocked as the optional GPU-shaded dense-mesh UV-view upgrade; no next-task selection has been made."
+  - "Choose the next architecture-convergence task after GRAPHICS-122; BUG-087 and BUG-089 gate REVIEW-003, while BUG-088 separately tracks benchmark-timeout handling."
   - "BUG-081 still needs a comparable warm-configure population before recalibrating its exact-vcpkg-hit latency guard."
   - "Resolve whether model training means GEOM-058 or a new neural/LLM workflow."
   - "BUG-082 and BUG-083 still need evidence from the environments where their reported failures reproduce."
   - "The verified parameterization closure branch remains local because publication was not requested."
+  - "Adjudicate O38 by narrowing Progressive Poisson's README or collecting a non-skipped actual-Vulkan dispatch/readback and CPU-reference parity artifact."
+  - "Keep every Issue 445 candidate ineligible until REVIEW-003 passes; only then select among the tasks using their explicit start/kill evidence."
 
 ai_suggestions_pending:
   - "Treat GEOM-058 Gaussian-mixture fitting as the provisional repository-native model-training target unless the user specifies a neural or LLM model."
+  - "Keep Progressive Poisson at Scaffolded and avoid executable GPU-parity wording until the requested backend runs without fallback and produces readback parity evidence."
+  - "Run the 2D adversarial QEF/Delaunay killing test before opening a 3D meshing implementation task."
+  - "Keep Slang, MaterialX, and Neural Render Proxy work as separately gated pilots rather than combining them into a premature renderer migration."

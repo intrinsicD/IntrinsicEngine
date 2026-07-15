@@ -57,3 +57,16 @@
   tasks/done/RUNTIME-176-parameterization-runtime-config-integration.md,
   N214, N215]
 - **From staging**: O35
+
+## H05: Price hierarchy layouts by expected memory traffic before GPU adoption
+- **Rationale**: Compare engine-owned BVH and cluster-hierarchy layouts using
+  expected bytes or cache lines per query, not node count alone. A deterministic
+  CPU packing or trace study can reject unhelpful merged-node layouts before any
+  Vulkan integration, while opaque vendor acceleration structures remain out of
+  scope for custom physical layouts.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Sensitivity**: high
+- **Code ref**: [tasks/backlog/geometry/GEOM-067-memory-aware-bvh-merged-node-evidence.md,
+  tasks/backlog/rendering/GRAPHICS-125-memory-priced-cluster-hierarchy-evidence.md]
+- **From staging**: O41

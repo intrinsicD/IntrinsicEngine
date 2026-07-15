@@ -240,3 +240,19 @@
   tasks/done/BUG-086-imgui-adapter-omits-vtx-offset-capability.md,
   N218]
 - **From staging**: O37
+
+## K20: Compact Face Diagnostics Preserve Source Provenance
+- **Constraint**: Face diagnostics computed on a compact algorithm mesh must
+  carry the compact-face-to-source-face mapping and remap results into the
+  authoritative GeometrySources face-storage domain, preserving deleted slots
+  as tombstones. Cached diagnostics are reusable only when an exact fingerprint
+  matches canonical topology-to-face indices, vertex positions, and UV values.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [src/runtime/Runtime.SandboxEditorFacades.Internal.hpp,
+  src/runtime/Runtime.SandboxEditorFacades.cpp,
+  src/runtime/Runtime.SandboxParameterizationFacade.cpp,
+  tests/contract/runtime/Test.ParameterizationFacade.cpp,
+  tasks/done/GRAPHICS-122-uv-view-offscreen-render-target.md,
+  N221]
+- **From staging**: O46
