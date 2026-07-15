@@ -101,6 +101,29 @@ namespace Extrinsic::Core::Config
             TargetAngles,
         };
 
+        export enum class ParameterizationUvRenderMode : std::uint32_t
+        {
+            CpuLayout = 0,
+            GpuShaded,
+        };
+
+        export enum class ParameterizationUvBackgroundMode : std::uint32_t
+        {
+            Grid = 0,
+            Checker,
+            TexelDensity,
+            Texture,
+        };
+
+        export struct ParameterizationViewConfig
+        {
+            ParameterizationUvRenderMode RenderMode{
+                ParameterizationUvRenderMode::CpuLayout};
+            ParameterizationUvBackgroundMode BackgroundMode{
+                ParameterizationUvBackgroundMode::Grid};
+            bool ShowDistortionHeatmap{false};
+        };
+
         export struct ParameterizationUvConfig
         {
             double U{0.0};
@@ -143,6 +166,7 @@ namespace Extrinsic::Core::Config
             ParameterizationLscmConfig Lscm{};
             ParameterizationHarmonicConfig Harmonic{};
             ParameterizationBffConfig Bff{};
+            ParameterizationViewConfig View{};
         };
 
         export struct SandboxConfig

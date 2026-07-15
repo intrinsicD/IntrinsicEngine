@@ -89,6 +89,11 @@ TEST(CoreEngineConfigLoad, SerializesAndLoadsEveryBootField)
         1.0, 2.0, 3.2831853071795864769};
     config.Sandbox.Parameterization.Bff.AngleSumTolerance = 3.0e-8;
     config.Sandbox.Parameterization.Bff.DegeneracyTolerance = 4.0e-12;
+    config.Sandbox.Parameterization.View.RenderMode =
+        ParameterizationUvRenderMode::GpuShaded;
+    config.Sandbox.Parameterization.View.BackgroundMode =
+        ParameterizationUvBackgroundMode::Texture;
+    config.Sandbox.Parameterization.View.ShowDistortionHeatmap = true;
 
     const std::string document = SerializeEngineConfig(config);
     const EngineConfigLoadResult preview = PreviewEngineConfig(document, EngineConfig{});
@@ -96,7 +101,7 @@ TEST(CoreEngineConfigLoad, SerializesAndLoadsEveryBootField)
     ASSERT_EQ(preview.State, EngineConfigState::Valid);
     EXPECT_FALSE(HasErrors(preview));
     EXPECT_TRUE(preview.Preview.SideEffectFree);
-    EXPECT_EQ(preview.Preview.ParsedFieldCount, 52u);
+    EXPECT_EQ(preview.Preview.ParsedFieldCount, 55u);
     EXPECT_EQ(preview.Preview.Config.Window.Title, "Engine Config Test");
     EXPECT_EQ(preview.Preview.Config.Window.Width, 1280);
     EXPECT_EQ(preview.Preview.Config.Window.Height, 720);
@@ -189,6 +194,13 @@ TEST(CoreEngineConfigLoad, SerializesAndLoadsEveryBootField)
     EXPECT_DOUBLE_EQ(
         preview.Preview.Config.Sandbox.Parameterization.Bff.DegeneracyTolerance,
         4.0e-12);
+    EXPECT_EQ(preview.Preview.Config.Sandbox.Parameterization.View.RenderMode,
+              ParameterizationUvRenderMode::GpuShaded);
+    EXPECT_EQ(
+        preview.Preview.Config.Sandbox.Parameterization.View.BackgroundMode,
+        ParameterizationUvBackgroundMode::Texture);
+    EXPECT_TRUE(preview.Preview.Config.Sandbox.Parameterization.View
+                    .ShowDistortionHeatmap);
     EXPECT_EQ(SerializeEngineConfig(preview.Preview.Config), document);
 
     const std::filesystem::path path = TempConfigPath("intrinsic_engine_config_roundtrip");
@@ -216,6 +228,13 @@ TEST(CoreEngineConfigLoad, SerializesAndLoadsEveryBootField)
         (std::vector<std::uint32_t>{0u, 2u, 5u}));
     EXPECT_EQ(loaded.Preview.Config.Sandbox.Parameterization.Bff.Mode,
               ParameterizationBffBoundaryMode::TargetAngles);
+    EXPECT_EQ(loaded.Preview.Config.Sandbox.Parameterization.View.RenderMode,
+              ParameterizationUvRenderMode::GpuShaded);
+    EXPECT_EQ(
+        loaded.Preview.Config.Sandbox.Parameterization.View.BackgroundMode,
+        ParameterizationUvBackgroundMode::Texture);
+    EXPECT_TRUE(loaded.Preview.Config.Sandbox.Parameterization.View
+                    .ShowDistortionHeatmap);
 }
 
 TEST(CoreEngineConfigLoad, InvalidFieldsFallBackWithDiagnostics)
@@ -368,6 +387,61 @@ TEST(CoreEngineConfigLoad, ParameterizationEnumTokensRoundTripStably)
                   testCase.Value);
     }
 
+    struct RenderModeCase
+    {
+        ParameterizationUvRenderMode Value;
+        std::string Token;
+    };
+    for (const RenderModeCase& testCase : {
+             RenderModeCase{ParameterizationUvRenderMode::CpuLayout,
+                            "cpu_layout"},
+             RenderModeCase{ParameterizationUvRenderMode::GpuShaded,
+                            "gpu_shaded"},
+         })
+    {
+        EngineConfig config{};
+        config.Sandbox.Parameterization.View.RenderMode = testCase.Value;
+        const std::string document = SerializeEngineConfig(config);
+        EXPECT_NE(document.find(
+                      "\"render_mode\": \"" + testCase.Token + "\""),
+                  std::string::npos);
+        const EngineConfigLoadResult preview = PreviewEngineConfig(document);
+        ASSERT_EQ(preview.State, EngineConfigState::Valid);
+        EXPECT_EQ(
+            preview.Preview.Config.Sandbox.Parameterization.View.RenderMode,
+            testCase.Value);
+    }
+
+    struct BackgroundModeCase
+    {
+        ParameterizationUvBackgroundMode Value;
+        std::string Token;
+    };
+    for (const BackgroundModeCase& testCase : {
+             BackgroundModeCase{ParameterizationUvBackgroundMode::Grid,
+                                "grid"},
+             BackgroundModeCase{ParameterizationUvBackgroundMode::Checker,
+                                "checker"},
+             BackgroundModeCase{
+                 ParameterizationUvBackgroundMode::TexelDensity,
+                 "texel_density"},
+             BackgroundModeCase{ParameterizationUvBackgroundMode::Texture,
+                                "texture"},
+         })
+    {
+        EngineConfig config{};
+        config.Sandbox.Parameterization.View.BackgroundMode = testCase.Value;
+        const std::string document = SerializeEngineConfig(config);
+        EXPECT_NE(document.find(
+                      "\"background_mode\": \"" + testCase.Token + "\""),
+                  std::string::npos);
+        const EngineConfigLoadResult preview = PreviewEngineConfig(document);
+        ASSERT_EQ(preview.State, EngineConfigState::Valid);
+        EXPECT_EQ(
+            preview.Preview.Config.Sandbox.Parameterization.View.BackgroundMode,
+            testCase.Value);
+    }
+
     struct BoundaryCase
     {
         ParameterizationBoundaryPolicy Value;
@@ -423,6 +497,40 @@ TEST(CoreEngineConfigLoad, ParameterizationEnumTokensRoundTripStably)
         EXPECT_EQ(preview.Preview.Config.Sandbox.Parameterization.Bff.Mode,
                   testCase.Value);
     }
+}
+
+TEST(CoreEngineConfigLoad,
+     InvalidParameterizationViewFieldsRetainReferenceValues)
+{
+    EngineConfig defaults{};
+    defaults.Sandbox.Parameterization.View.RenderMode =
+        ParameterizationUvRenderMode::GpuShaded;
+    defaults.Sandbox.Parameterization.View.BackgroundMode =
+        ParameterizationUvBackgroundMode::Texture;
+    defaults.Sandbox.Parameterization.View.ShowDistortionHeatmap = true;
+
+    const EngineConfigLoadResult result = PreviewEngineConfig(
+        R"json({
+          "schema": "intrinsic.core.engine-config",
+          "version": 1,
+          "sandbox": {"parameterization": {"view": {
+            "render_mode": "path_traced",
+            "background_mode": "udim",
+            "show_distortion_heatmap": "yes",
+            "unused": true
+          }}}
+        })json",
+        defaults);
+
+    ASSERT_EQ(result.State, EngineConfigState::FallbackApplied);
+    EXPECT_FALSE(HasErrors(result));
+    EXPECT_TRUE(HasDiagnostic(result, EngineConfigDiagnosticCode::InvalidValue));
+    EXPECT_TRUE(HasDiagnostic(result, EngineConfigDiagnosticCode::UnknownField));
+    const ParameterizationViewConfig& view =
+        result.Preview.Config.Sandbox.Parameterization.View;
+    EXPECT_EQ(view.RenderMode, ParameterizationUvRenderMode::GpuShaded);
+    EXPECT_EQ(view.BackgroundMode, ParameterizationUvBackgroundMode::Texture);
+    EXPECT_TRUE(view.ShowDistortionHeatmap);
 }
 
 TEST(CoreEngineConfigLoad, InvalidParameterizationFieldsRetainReferenceValues)

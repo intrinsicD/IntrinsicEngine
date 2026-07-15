@@ -510,6 +510,25 @@ namespace Extrinsic::Core::Config
             return std::nullopt;
         }
 
+        [[nodiscard]] std::optional<ParameterizationUvRenderMode>
+        ParseParameterizationUvRenderMode(const std::string_view value) noexcept
+        {
+            if (value == "cpu_layout") return ParameterizationUvRenderMode::CpuLayout;
+            if (value == "gpu_shaded") return ParameterizationUvRenderMode::GpuShaded;
+            return std::nullopt;
+        }
+
+        [[nodiscard]] std::optional<ParameterizationUvBackgroundMode>
+        ParseParameterizationUvBackgroundMode(const std::string_view value) noexcept
+        {
+            if (value == "grid") return ParameterizationUvBackgroundMode::Grid;
+            if (value == "checker") return ParameterizationUvBackgroundMode::Checker;
+            if (value == "texel_density")
+                return ParameterizationUvBackgroundMode::TexelDensity;
+            if (value == "texture") return ParameterizationUvBackgroundMode::Texture;
+            return std::nullopt;
+        }
+
         [[nodiscard]] std::string_view ToConfigString(const GraphicsBackend value) noexcept
         {
             switch (value)
@@ -613,6 +632,31 @@ namespace Extrinsic::Core::Config
                 return "target_angles";
             }
             return "automatic_conformal";
+        }
+
+        [[nodiscard]] std::string_view ToConfigString(
+            const ParameterizationUvRenderMode value) noexcept
+        {
+            switch (value)
+            {
+            case ParameterizationUvRenderMode::CpuLayout: return "cpu_layout";
+            case ParameterizationUvRenderMode::GpuShaded: return "gpu_shaded";
+            }
+            return "cpu_layout";
+        }
+
+        [[nodiscard]] std::string_view ToConfigString(
+            const ParameterizationUvBackgroundMode value) noexcept
+        {
+            switch (value)
+            {
+            case ParameterizationUvBackgroundMode::Grid: return "grid";
+            case ParameterizationUvBackgroundMode::Checker: return "checker";
+            case ParameterizationUvBackgroundMode::TexelDensity:
+                return "texel_density";
+            case ParameterizationUvBackgroundMode::Texture: return "texture";
+            }
+            return "grid";
         }
 
         [[nodiscard]] json SerializeUv(const ParameterizationUvConfig& uv)
@@ -912,7 +956,7 @@ namespace Extrinsic::Core::Config
                 result,
                 *object,
                 "sandbox.parameterization",
-                {"strategy", "lscm", "harmonic", "bff"});
+                {"strategy", "lscm", "harmonic", "bff", "view"});
 
             ParameterizationConfig& config =
                 result.Preview.Config.Sandbox.Parameterization;
@@ -926,6 +970,58 @@ namespace Extrinsic::Core::Config
                          config.Strategy))
             {
                 ++result.Preview.ParsedFieldCount;
+            }
+
+            if (const json* view = FindMember(*object, "view"); view != nullptr)
+            {
+                constexpr std::string_view kPath =
+                    "sandbox.parameterization.view";
+                if (!view->is_object())
+                {
+                    AddWarning(result,
+                               EngineConfigDiagnosticCode::InvalidValue,
+                               std::string{kPath},
+                               "Expected an object; reference parameterization view config retained.");
+                }
+                else
+                {
+                    AddUnknownFieldDiagnostics(
+                        result,
+                        *view,
+                        kPath,
+                        {"render_mode",
+                         "background_mode",
+                         "show_distortion_heatmap"});
+                    if (ReadEnum(result,
+                                 *view,
+                                 "render_mode",
+                                 kPath,
+                                 ParseParameterizationUvRenderMode,
+                                 config.View.RenderMode))
+                    {
+                        ++result.Preview.ParsedFieldCount;
+                    }
+                    if (ReadEnum(result,
+                                 *view,
+                                 "background_mode",
+                                 kPath,
+                                 ParseParameterizationUvBackgroundMode,
+                                 config.View.BackgroundMode))
+                    {
+                        ++result.Preview.ParsedFieldCount;
+                    }
+                    if (const std::optional<bool> showDistortionHeatmap =
+                            ReadBool(result,
+                                     *view,
+                                     "show_distortion_heatmap",
+                                     kPath);
+                        showDistortionHeatmap.has_value())
+                    {
+                        config.View.ShowDistortionHeatmap =
+                            *showDistortionHeatmap;
+                        ++result.Preview.ParsedFieldCount;
+                    }
+                }
             }
 
             if (const json* lscm = FindMember(*object, "lscm"); lscm != nullptr)
@@ -1773,6 +1869,18 @@ namespace Extrinsic::Core::Config
              json::object({
                  {"strategy",
                   std::string{ToConfigString(config.Sandbox.Parameterization.Strategy)}},
+                 {"view",
+                  json::object({
+                      {"render_mode",
+                       std::string{ToConfigString(
+                           config.Sandbox.Parameterization.View.RenderMode)}},
+                      {"background_mode",
+                       std::string{ToConfigString(
+                           config.Sandbox.Parameterization.View.BackgroundMode)}},
+                      {"show_distortion_heatmap",
+                       config.Sandbox.Parameterization.View
+                           .ShowDistortionHeatmap},
+                  })},
                  {"lscm",
                   json::object({
                       {"auto_pins", config.Sandbox.Parameterization.Lscm.AutoPins},
