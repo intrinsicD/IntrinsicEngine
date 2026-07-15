@@ -2316,6 +2316,69 @@ export namespace Extrinsic::Runtime
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
+    enum class SandboxEditorParameterizationUvViewStatus : std::uint8_t
+    {
+        Disabled,
+        CpuLayout,
+        CpuFallbackNonOperational,
+        WaitingForGeometry,
+        WaitingForGpuFrame,
+        InvalidRequest,
+        ResourceCreationFailed,
+        Ready,
+    };
+
+    struct SandboxEditorParameterizationUvViewRequest
+    {
+        bool Enabled{false};
+        std::uint64_t RequestToken{0u};
+        std::uint32_t StableEntityId{0u};
+        std::uint32_t Width{0u};
+        std::uint32_t Height{0u};
+        glm::vec2 UvBoundsMin{0.0f};
+        glm::vec2 UvBoundsMax{1.0f};
+        Core::Config::ParameterizationViewConfig View{};
+        std::vector<std::uint32_t> LineIndices{};
+        std::vector<float> TriangleConformalDistortion{};
+    };
+
+    // Pointer-free presentation state copied across the runtime -> app
+    // boundary. The graphics target handle remains renderer-owned; ImGui only
+    // receives its stable bindless index after token/extent validation.
+    struct SandboxEditorParameterizationUvViewState
+    {
+        SandboxEditorParameterizationUvViewStatus Status{
+            SandboxEditorParameterizationUvViewStatus::Disabled};
+        Core::Config::ParameterizationUvRenderMode RequestedMode{
+            Core::Config::ParameterizationUvRenderMode::CpuLayout};
+        Core::Config::ParameterizationUvRenderMode ActiveMode{
+            Core::Config::ParameterizationUvRenderMode::CpuLayout};
+        Core::Config::ParameterizationUvBackgroundMode RequestedBackground{
+            Core::Config::ParameterizationUvBackgroundMode::Grid};
+        Core::Config::ParameterizationUvBackgroundMode ActiveBackground{
+            Core::Config::ParameterizationUvBackgroundMode::Grid};
+        bool HeatmapActive{false};
+        bool GpuReady{false};
+        std::uint64_t RequestToken{0u};
+        std::uint32_t BindlessIndex{0u};
+        std::uint32_t Width{0u};
+        std::uint32_t Height{0u};
+        std::uint64_t TargetGeneration{0u};
+        std::uint64_t RecordedPassCount{0u};
+        std::string Message{};
+    };
+
+    struct SandboxEditorParameterizationUvViewCommandSurface
+    {
+        std::function<SandboxEditorParameterizationUvViewState(
+            SandboxEditorParameterizationUvViewRequest)> Submit{};
+
+        [[nodiscard]] bool Available() const noexcept
+        {
+            return static_cast<bool>(Submit);
+        }
+    };
+
     struct SandboxEditorContext
     {
         ECS::Scene::Registry* Scene{nullptr};
@@ -2331,6 +2394,8 @@ export namespace Extrinsic::Runtime
         SandboxEditorAssetImportQueueCommandSurface AssetImportQueueCommands{};
         SandboxEditorSceneFileCommandSurface SceneFileCommands{};
         SandboxEditorPrimitiveViewCommandSurface PrimitiveViewCommands{};
+        SandboxEditorParameterizationUvViewCommandSurface
+            ParameterizationUvViewCommands{};
         SandboxEditorVisualizationAdapterBindingCommandSurface VisualizationAdapterBindings{};
         std::uint64_t VisualizationAdapterBindingRevision{0u};
         SandboxEditorKMeansCommandSurface KMeansCommands{};
@@ -2678,6 +2743,12 @@ export namespace Extrinsic::Runtime
                 Geometry::Parameterization::ParameterizationStatus::InvalidInput};
         Geometry::Parameterization::ParameterizationDiagnostics Diagnostics{};
         std::size_t VertexCount{0u};
+        // Identifies the exact canonical triangle topology and UV payload that
+        // produced Diagnostics. A missing value means the diagnostics must not
+        // be projected onto the current UV view.
+        // Exact provenance for face diagnostics: rendered topology-to-face
+        // mapping, vertex positions, and UV coordinates.
+        std::optional<std::uint64_t> DiagnosticInputFingerprint{};
         std::string Message{};
 
         [[nodiscard]] bool Succeeded() const noexcept
@@ -2727,10 +2798,16 @@ export namespace Extrinsic::Runtime
         bool HasFiniteUvBounds{false};
         bool HasLastResult{false};
         std::uint32_t SelectedStableEntityId{0u};
+        // Matches LastParameterizationResult only while every input consumed
+        // by the position- and UV-dependent face diagnostics is unchanged.
+        std::optional<std::uint64_t> DiagnosticInputFingerprint{};
         SandboxEditorParameterizationStrategy Strategy{
             SandboxEditorParameterizationStrategy::Lscm};
+        Core::Config::ParameterizationViewConfig View{};
         std::vector<glm::vec2> UVs{};
         std::vector<std::array<std::uint32_t, 3u>> Triangles{};
+        std::vector<std::uint32_t> LineIndices{};
+        std::vector<float> TriangleConformalDistortion{};
         glm::vec2 UvBoundsMin{0.0f};
         glm::vec2 UvBoundsMax{0.0f};
         std::optional<Geometry::Parameterization::ParameterizationStatus>
@@ -2850,6 +2927,20 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] SandboxEditorParameterizationViewModel
     BuildSandboxEditorParameterizationViewModel(
         const SandboxEditorContext& context);
+
+    [[nodiscard]] SandboxEditorParameterizationUvViewState
+    SubmitSandboxEditorParameterizationUvView(
+        const SandboxEditorContext& context,
+        const SandboxEditorParameterizationViewModel& model,
+        std::uint32_t width,
+        std::uint32_t height);
+
+    void DisableSandboxEditorParameterizationUvView(
+        const SandboxEditorContext& context);
+
+    [[nodiscard]] const char*
+    DebugNameForSandboxEditorParameterizationUvViewStatus(
+        SandboxEditorParameterizationUvViewStatus status) noexcept;
 
     SandboxEditorKMeansResult ApplySandboxEditorKMeansCommand(
         const SandboxEditorContext& context,

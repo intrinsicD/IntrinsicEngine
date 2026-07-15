@@ -60,12 +60,15 @@ tokens (`lscm`, `harmonic_cotangent`, `tutte_uniform`, or `bff`) and the typed
 LSCM, harmonic, and BFF values described in
 [engine config](engine-config.md). Harmonic boundary policy uses `circle`,
 `square`, or `custom`; BFF boundary mode uses `automatic_conformal`,
-`target_lengths`, or `target_angles`. Applying the block updates only the active
-value-type `EngineConfig` and sets
+`target_lengths`, or `target_angles`. Its nested `view` value also carries the
+`cpu_layout`/`gpu_shaded` presentation request, background choice, and
+distortion-heatmap toggle. Applying the block updates only the active value-type
+`EngineConfig` and sets
 `RuntimeEngineConfigApplyResult::SandboxParameterizationChanged` when its value
 changed. The configured sandbox parameterization command reads this same live
-state; there is no second UI-only parameter path and no optimized/GPU backend
-selector.
+state; the parameterization editor reads the same view state when it submits the
+optional renderer request. There is no second UI-only parameter path, and the
+GPU view selector is not a parameterization solver-backend selector.
 
 Every other engine-config difference is boot-only and is reported in
 `RuntimeEngineConfigApplyResult::RejectedBootOnlyFields`; the live config remains
@@ -88,10 +91,11 @@ activation handlers call the same facade callbacks carried by that context:
   `Engine::GetConfigControl().PreviewEngineConfigControlDocument` and
   `Engine::GetConfigControl().ApplyEngineConfigHotSubset` with
   `RuntimeConfigControlSource::Editor`.
-- The parameterization panel delivered by retired `UI-036` routes strategy and
-  value edits through those same engine-config preview/apply methods with
+- The parameterization panel delivered by retired `UI-036` routes strategy,
+  value, render-mode, background, and heatmap edits through those same
+  engine-config preview/apply methods with
   `RuntimeConfigControlSource::Editor`; the configured parameterization facade
-  consumes the resulting live config.
+  and UV-view request path consume the resulting live config.
 
 Agent/CLI callers use the same `EngineConfigControl` methods with
 `RuntimeConfigControlSource::AgentCli` or
@@ -119,8 +123,21 @@ parameterization diagnostics.
 
 The companion `SandboxEditorParameterizationViewModel` copies the selected
 mesh into UI-safe CPU data: per-vertex UVs, deterministic triangle index
-triples, finite UV bounds, and aggregate last-result diagnostics. It carries no
-raw mesh/property pointers, chart or seam records, or invented per-face
-distortion values. Retired `UI-036` turns this model into the visible split UV
-view and delivered the `Operational` proof; the retired runtime/config slice
-closed at `CPUContracted` under the Null/default runtime contracts.
+triples from the canonical runtime surface packer, finite UV bounds, and
+aggregate last-result diagnostics. When GPU shading is selected it also builds
+expanded line indices and a per-triangle projection of the canonical
+face-storage-aligned conformal-distortion payload; the default CPU path avoids
+that GPU-only dense work. It carries no raw
+mesh/property pointers and invents no chart or seam records. Retired `UI-036`
+turns this model into the visible split UV view. The optional GPU path uses a
+pointer-free runtime command surface to resolve the selected surface's existing
+`GpuGeometryHandle` and optional resident albedo binding, submit a copied
+renderer request, and return only presentation state plus a bindless texture
+index. The panel refreshes the request once per visible frame, so closing or
+globally hiding the window disables the optional pass on the next renderer
+prepare instead of retaining unseen GPU work. A non-operational device,
+missing residency, invalid request, resource
+failure, or target that has not completed for the current token/extent reports
+an explicit CPU-layout fallback; the app never receives the graphics texture
+handle. This preserves the derived-view decision in
+[ADR-0025](../adr/0025-parameterization-uv-view-and-split-view.md).

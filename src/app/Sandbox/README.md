@@ -84,16 +84,48 @@ path, with undo and redo controls in the same window. No panel-only solver or
 configuration path exists.
 
 The parameterization window stores its controls-to-UV split ratio in panel
-state and exposes a draggable divider. The UV pane fits the pointer-free
-runtime view model into the available rectangle, draws its triangles with
-`ImDrawList`, and provides unit-square grid/checker toggles, fit, cursor-centred
-wheel zoom, and middle-button pan. The controls pane reports the last run's
-strategy, command/solver outcome, evaluated/skipped/flipped face counts,
-boundary-edge count, and aggregate conformal, area, and stretch diagnostics;
-it does not synthesize per-face heatmaps, charts, or seams. `v:texcoord`
-writeback updates a 3D material that already samples the mesh UVs (including an
-already-bound UV-checker material), but this presentation panel does not create
-or bind such a material.
+state and exposes a draggable divider. Its config-backed view controls choose
+`CPU layout` or `GPU shaded`, a grid/checker/texel-density/selected-albedo
+background, and the optional conformal-distortion heatmap. These values use the
+same validated `EngineConfig.sandbox.parameterization.view` preview/apply lane
+as config-file and agent callers; they are not panel-only renderer switches.
+
+`CPU layout` is the default and the deterministic fallback. It fits the
+pointer-free runtime view model into the available rectangle, draws its
+triangles with `ImDrawList`, and provides fit, cursor-centred wheel zoom, and
+middle-button pan. Grid and checker render directly in this path;
+texel-density and texture requests fall back to checker when a GPU target is
+not ready. When `GPU shaded` is requested, runtime resolves the selected
+surface's existing GPU geometry and optional resident albedo texture, then
+submits copied UV-view data to the renderer-owned retained target. The panel
+uses its bindless index only after the matching request and pane extent have
+completed a successful `UvViewPass`; while geometry, device, resources, or a
+newly resized target are unavailable, the status line reports the reason and
+the CPU layout remains visible. A missing texture background falls back to
+checker, and a missing face-distortion payload falls back to the plain GPU
+fill rather than suppressing the view. Face distortion is submitted only when
+the last successful result's canonical topology-to-face, exact-position, and
+exact-UV fingerprint still matches the current mesh snapshot, so undo,
+regenerated positions/UVs, and topology replacement cannot color a new layout
+with stale diagnostics.
+
+GPU submission is refreshed once per visible panel frame. Closing the
+parameterization window or hiding the editor therefore disables the gated UV
+pass before renderer preparation; reopening it reuses the same retained target
+but waits for a newly completed matching frame before publishing its bindless
+index. Pane requests larger than 4096 pixels on either axis fail closed to the
+CPU layout.
+
+The controls pane reports the last run's strategy, command/solver outcome,
+evaluated/skipped/flipped face counts, boundary-edge count, and aggregate
+conformal, area, and stretch diagnostics. The optional GPU heatmap consumes
+the canonical face-storage-aligned conformal-distortion diagnostic; the panel
+still does not synthesize charts or seams. `v:texcoord` writeback updates a 3D
+material that already samples the mesh UVs (including an already-bound
+UV-checker material), but this presentation panel does not create or bind such
+a material. Both render modes remain derived views of the selected mesh, not
+new ECS entities or scene cameras; see
+[ADR-0025](../../../docs/adr/0025-parameterization-uv-view-and-split-view.md).
 
 With the standard reference configuration, runtime creates `ReferenceTriangle`
 through `Extrinsic.Runtime.ReferenceScene::TriangleProvider` as an ordinary

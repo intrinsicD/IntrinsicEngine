@@ -85,8 +85,9 @@ There are three current edit lanes over the same preview/apply contract:
   `ApplyRenderRecipeConfigPreview(...)` expose the same side-effect-free preview
   and fail-closed apply path to agents, CLI tools, tests, and application code.
 
-Runtime config control also exposes `render.default_recipe_config_path` and
-`sandbox.progressive_poisson`.
+Runtime config control also exposes `render.default_recipe_config_path`,
+`sandbox.progressive_poisson`, and `sandbox.parameterization` through the
+separate engine-config lane.
 `Engine::Initialize()` attempts the configured boot recipe after renderer
 initialization. Live hot-apply is deliberately limited to those fields:
 `ApplyEngineConfigHotSubset(...)` validates the referenced recipe before
@@ -123,6 +124,48 @@ reports per-frame compile attempt/cache-hit counters through
 `RenderGraphFrameStats::Compile`. The multi-KB compiler debug dump is lazy:
 default frames leave `RenderGraphFrameStats::DebugDump` empty, and explicit
 renderer debug-dump enablement builds it from the current compiled graph.
+
+## Retained UV View Pass
+
+`Extrinsic.Graphics.UvView` is the concrete, single-consumer offscreen path for
+the Sandbox parameterization pane. It owns its sampled `RGBA8` target,
+sampler/pipelines, and copied line/distortion upload buffers. It consumes an
+existing `GpuGeometryHandle` and resident texcoord/index data; it does not add a
+second `RenderWorld`, scene camera, viewport contract, or ECS entity.
+The UV-owned line and distortion payloads use persistently mapped host-visible
+buffers, so their writes require no transfer command or render-pass-local
+barrier. `UvViewPass` explicitly depends on `CullingPass`: the attachment-free
+culling route publishes any pending managed `GpuWorld` vertex/index upload
+barriers before either culling or the UV draw can consume that residency.
+
+After an operational device and a valid resident request are prepared, the
+renderer enables `FrameRecipeFeatures::EnableUvView`, imports the retained
+target as `FrameRecipeResourceKind::UvViewColor`, and declares the typed
+`FrameRecipePassKind::UvView` (`UvViewPass`) as its authorized writer. The pass
+is a side effect so the target remains an observable output even when ImGui is
+not recorded for that frame. When ImGui is active, its declared read of
+`UvViewColor` expresses the producer-before-sampler dependency. This is a
+fixed typed recipe branch, not a `RenderRecipeConfig` pass-injection surface.
+The `sandbox.parameterization.view` config controls influence this branch only
+through runtime's validated request submission; they do not directly edit the
+frame recipe. The request is a per-frame heartbeat: a visible GPU pane refreshes
+the same semantic token before renderer preparation, while a closed or globally
+hidden editor window submits nothing and the renderer disables `UvViewPass` for
+that frame. Same-token heartbeats do not replace or re-upload the retained
+topology buffers. Requests above the bounded 4096-by-4096 target limit fail
+closed to the CPU layout rather than silently rendering an extent that cannot
+match the panel.
+
+A newly allocated or resized target enters the graph in `Undefined` and exits
+in `ShaderRead`; a previously completed target imports in `ShaderRead`. The UV
+view marks contents sampleable only after graph execution succeeds and the
+matching pass was recorded. Runtime therefore publishes the bindless index to
+the panel only for the current request token and pane extent after a completed
+frame. Non-operational devices, missing geometry, invalid requests, resource
+creation failures, and not-yet-completed targets remain on the CPU layout with
+an explicit status. This realizes the optional offscreen path selected by
+[ADR-0025](../adr/0025-parameterization-uv-view-and-split-view.md) without
+generalizing the renderer into a multi-view system.
 
 ## Transient Placement
 

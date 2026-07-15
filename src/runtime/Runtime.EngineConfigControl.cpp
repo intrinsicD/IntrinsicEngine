@@ -109,7 +109,11 @@ namespace Extrinsic::Runtime
                    lhs.Bff.Mode == rhs.Bff.Mode &&
                    lhs.Bff.BoundaryData == rhs.Bff.BoundaryData &&
                    lhs.Bff.AngleSumTolerance == rhs.Bff.AngleSumTolerance &&
-                   lhs.Bff.DegeneracyTolerance == rhs.Bff.DegeneracyTolerance;
+                   lhs.Bff.DegeneracyTolerance == rhs.Bff.DegeneracyTolerance &&
+                   lhs.View.RenderMode == rhs.View.RenderMode &&
+                   lhs.View.BackgroundMode == rhs.View.BackgroundMode &&
+                   lhs.View.ShowDistortionHeatmap ==
+                       rhs.View.ShowDistortionHeatmap;
         }
 
         [[nodiscard]] std::vector<std::string> FindBootOnlyEngineConfigDifferences(

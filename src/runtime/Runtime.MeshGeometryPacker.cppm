@@ -137,4 +137,14 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] MeshPackStatus BuildSurfaceTriangleFaceMap(
         const ECS::Components::GeometrySources::ConstSourceView& view,
         std::vector<std::uint32_t>& outTriangleToFace);
+
+    // Reproduce the canonical surface triangle-list order together with its
+    // gl_PrimitiveID -> face-row inverse. This is the public read-only form of
+    // the same protected face-ring walk used by PackMesh, for runtime views
+    // that need topology-aligned auxiliary payloads without repacking vertex
+    // streams. Both outputs are cleared on entry and on failure.
+    [[nodiscard]] MeshPackStatus BuildSurfaceTriangleTopology(
+        const ECS::Components::GeometrySources::ConstSourceView& view,
+        std::vector<std::uint32_t>& outSurfaceIndices,
+        std::vector<std::uint32_t>& outTriangleToFace);
 }

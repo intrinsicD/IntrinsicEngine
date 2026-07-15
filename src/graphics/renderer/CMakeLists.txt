@@ -44,6 +44,7 @@ target_sources(${target_name}
         Graphics.HZB.cppm
         Graphics.LightClusters.cppm
         Graphics.TransformSyncSystem.cppm
+        Graphics.UvView.cppm
         Graphics.TransientDebugUploadHelper.cppm
         Graphics.VisualizationOverlayUploadHelper.cppm
         PRIVATE
@@ -84,6 +85,7 @@ target_sources(${target_name}
         Graphics.HZB.cpp
         Graphics.LightClusters.cpp
         Graphics.TransformSyncSystem.cpp
+        Graphics.UvView.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

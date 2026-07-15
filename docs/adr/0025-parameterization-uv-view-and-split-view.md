@@ -4,7 +4,7 @@
 - **Date:** 2026-07-13
 - **Owners:** Graphics/Runtime/UI
 - **Related tasks:** GEOM-063 (retired), RUNTIME-176 (retired), UI-036
-  (retired), GRAPHICS-122 (optional, unblocked)
+  (retired), GRAPHICS-122 (optional GPU upgrade)
 
 ## Context
 
@@ -86,19 +86,29 @@ resizable UV view that is a *different space* (UV) of the same entity.
   **no renderer change and no docking**, and matches the existing menu-first
   floating-window UX.
 - **Optional upgrade — GPU-shaded offscreen UV target (GRAPHICS-122).** For dense
-  meshes and texel-density/texture/heatmap shading, render the mesh's UV-space
-  residency to a small offscreen target with an orthographic UV camera and present it
-  through `ImGui::Image` (bindless). This reuses the mesh's existing `GeometrySources`
-  residency in UV space — still a *derived view of the one entity*, not a new entity —
-  and falls back to the CPU layout when no device is operational.
+  meshes and texel-density/texture/heatmap shading,
+  `Extrinsic.Graphics.UvView` renders the selected surface's existing resident
+  geometry with texcoords as positions into a retained offscreen target, and
+  the panel presents its bindless index with an ImGui image draw. The typed,
+  gated `UvViewPass` is a dedicated derived-view branch of the existing frame
+  recipe; it does not add a second scene camera or general viewport contract.
+  Runtime publishes the GPU target only after the current request and extent
+  complete successfully. Until then, and whenever the device or geometry is
+  unavailable, the CPU layout stays active with an explicit fallback status.
+  Per-face distortion is accepted only when the successful result's canonical
+  topology-to-face, exact-position, and exact-UV fingerprint matches the
+  current view snapshot, preventing undo or later geometry/UV edits from
+  projecting stale diagnostics.
 
 **Control** flows through the config lane delivered by retired RUNTIME-176:
 stable CPU strategy tokens and the typed LSCM pin/solver, harmonic boundary/pin,
-and BFF boundary-mode values are serializable config applied through the
-validated preview→apply path, with the retired UI-036 panel and agents/config
-files as co-equal drivers. The bounded BFF contract has no cone
-placement/cutting control, and the config has no optimized/GPU backend selector
-while no such implementation exists.
+and BFF boundary-mode values plus the UV-view render mode, background, and
+heatmap toggle are serializable config applied through the validated
+preview→apply path, with the retired UI-036 panel and agents/config files as
+co-equal drivers. The bounded BFF contract has no cone placement/cutting
+control. `gpu_shaded` selects presentation only; the config has no
+optimized/GPU parameterization-solver selector while no such implementation
+exists.
 
 ## Consequences
 
@@ -110,9 +120,9 @@ while no such implementation exists.
   typical meshes; the GRAPHICS-122 GPU path is the answer for very dense meshes); a
   *docked* splitter (versus the manual two-pane splitter) and a *true* second
   viewport remain future opt-ins, not part of this decision.
-- Delivered baseline: GEOM-063 (surface), RUNTIME-176 (facade + config + UV
-  view model), and UI-036 (panel + split view). GRAPHICS-122 is the optional,
-  now-unblocked GPU-shaded target.
+- Baseline: GEOM-063 (surface), RUNTIME-176 (facade + config + UV view model),
+  and UI-036 (panel + split view). GRAPHICS-122 supplies the optional
+  GPU-shaded retained target while preserving that CPU baseline.
 
 ## Alternatives Considered
 
@@ -149,6 +159,7 @@ while no such implementation exists.
   parameterized a mesh through the registered window, showed the UV layout,
   kept the checker/grid inside the UV pane, and preserved the updated 3D UV
   state.
-- GRAPHICS-122 is an optional, now-unblocked upgrade. Its closure still
-  requires an opt-in `gpu;vulkan` readback smoke proving a non-empty UV target
-  on a Vulkan-capable host and CPU-layout fallback on a non-operational device.
+- GRAPHICS-122 keeps CPU contracts for request validation, retained-target
+  readiness, resize generation, explicit background/heatmap degradation, and
+  non-operational CPU fallback. Its opt-in `gpu;vulkan` readback smoke is the
+  operational proof for non-empty UV-target output on a Vulkan-capable host.

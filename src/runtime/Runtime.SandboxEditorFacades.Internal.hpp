@@ -7,6 +7,10 @@ namespace Extrinsic::Runtime::Detail
         Geometry::HalfedgeMesh::Mesh Mesh{};
         std::vector<glm::vec3> BeforePositions{};
         std::vector<bool> DeletedVertices{};
+        // The mesh snapshot compacts deleted GeometrySources face slots.
+        // Preserve the source slot for each resulting mesh face so callers
+        // can project face diagnostics back onto the authoritative storage.
+        std::vector<std::uint32_t> SourceFaceForMeshFace{};
         SandboxEditorCommandStatus Status{
             SandboxEditorCommandStatus::NoChange};
         Core::ErrorCode Error{Core::ErrorCode::Success};

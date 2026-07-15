@@ -45,12 +45,14 @@ namespace
             RenderSubsystemStage::ShadowSystem,
             RenderSubsystemStage::DeferredSystem,
             RenderSubsystemStage::PostProcessSystem,
+            RenderSubsystemStage::UvView,
         };
     }
 
     [[nodiscard]] std::vector<RenderSubsystemStage> ExpectedShutdownOrder()
     {
         return {
+            RenderSubsystemStage::UvView,
             RenderSubsystemStage::SelectionSystem,
             RenderSubsystemStage::LightSystem,
             RenderSubsystemStage::ForwardSystem,

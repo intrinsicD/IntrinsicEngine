@@ -272,6 +272,64 @@ TEST(RuntimeConfigControlFacade, SandboxProgressivePoissonConfigIsHotApplied)
     engine.Shutdown();
 }
 
+TEST(RuntimeConfigControlFacade,
+     ParameterizationViewFieldsAreIndividuallyHotApplied)
+{
+    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+    Runtime::EngineConfigControl& configControl = engine.GetConfigControl();
+
+    const auto applyCandidate = [&configControl](
+                                    CoreConfig::EngineConfig candidate,
+                                    const std::string& sourceId)
+    {
+        const CoreConfig::EngineConfigLoadResult preview =
+            configControl.PreviewEngineConfigControlDocument(
+                CoreConfig::SerializeEngineConfig(candidate),
+                sourceId);
+        EXPECT_TRUE(CoreConfig::IsConfigUsable(preview));
+
+        const Runtime::RuntimeEngineConfigApplyResult result =
+            configControl.ApplyEngineConfigHotSubset(
+                preview,
+                Runtime::RuntimeConfigControlSource::AgentCli);
+        EXPECT_TRUE(result.Succeeded());
+        EXPECT_EQ(result.Status,
+                  Runtime::RuntimeEngineConfigApplyStatus::Applied);
+        EXPECT_TRUE(result.EngineConfigApplied);
+        EXPECT_TRUE(result.SandboxParameterizationChanged);
+        EXPECT_FALSE(result.SandboxProgressivePoissonChanged);
+        EXPECT_FALSE(result.DefaultRecipeConfigPathChanged);
+        EXPECT_EQ(result.Source,
+                  Runtime::RuntimeConfigControlSource::AgentCli);
+    };
+
+    CoreConfig::EngineConfig candidate = engine.GetEngineConfig();
+    candidate.Sandbox.Parameterization.View.RenderMode =
+        CoreConfig::ParameterizationUvRenderMode::GpuShaded;
+    applyCandidate(candidate, "agent-parameterization-view-render-mode.json");
+    EXPECT_EQ(engine.GetEngineConfig().Sandbox.Parameterization.View.RenderMode,
+              CoreConfig::ParameterizationUvRenderMode::GpuShaded);
+
+    candidate = engine.GetEngineConfig();
+    candidate.Sandbox.Parameterization.View.BackgroundMode =
+        CoreConfig::ParameterizationUvBackgroundMode::Checker;
+    applyCandidate(candidate, "agent-parameterization-view-background.json");
+    EXPECT_EQ(
+        engine.GetEngineConfig().Sandbox.Parameterization.View.BackgroundMode,
+        CoreConfig::ParameterizationUvBackgroundMode::Checker);
+
+    candidate = engine.GetEngineConfig();
+    candidate.Sandbox.Parameterization.View.ShowDistortionHeatmap = true;
+    applyCandidate(candidate, "agent-parameterization-view-heatmap.json");
+    EXPECT_TRUE(engine.GetEngineConfig()
+                    .Sandbox.Parameterization.View.ShowDistortionHeatmap);
+    EXPECT_EQ(configControl.GetEngineConfigControlState().LastApply.Source,
+              Runtime::RuntimeConfigControlSource::AgentCli);
+
+    engine.Shutdown();
+}
+
 TEST(RuntimeConfigControlFacade, InvalidHotRecipeConfigPreservesActiveOverride)
 {
     const std::filesystem::path invalidPath =

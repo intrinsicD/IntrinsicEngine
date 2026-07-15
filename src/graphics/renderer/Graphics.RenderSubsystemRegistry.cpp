@@ -30,6 +30,7 @@ namespace Extrinsic::Graphics
                 RenderSubsystemStage::ShadowSystem,
                 RenderSubsystemStage::DeferredSystem,
                 RenderSubsystemStage::PostProcessSystem,
+                RenderSubsystemStage::UvView,
             };
 
         constexpr std::uint8_t StageIndex(const RenderSubsystemStage stage) noexcept
@@ -128,10 +129,25 @@ namespace Extrinsic::Graphics
         m_PostProcessSystem.emplace();
         m_PostProcessSystem->Initialize(device, *m_TextureManager, *m_BufferManager);
         RecordInitialize(RenderSubsystemStage::PostProcessSystem);
+        if (shouldStop(RenderSubsystemStage::PostProcessSystem)) return;
+
+        m_UvView.emplace();
+        m_UvView->Initialize(device,
+                             *m_BufferManager,
+                             *m_TextureManager,
+                             *m_SamplerManager,
+                             *m_PipelineManager);
+        RecordInitialize(RenderSubsystemStage::UvView);
     }
 
     void RenderSubsystemRegistry::ShutdownSystems()
     {
+        if (m_UvView)
+        {
+            m_UvView->Shutdown();
+        }
+        RecordShutdownIfPresent(RenderSubsystemStage::UvView);
+
         if (m_SelectionSystem)
         {
             m_SelectionSystem->Shutdown();
@@ -207,6 +223,7 @@ namespace Extrinsic::Graphics
 
     void RenderSubsystemRegistry::ResetStorage()
     {
+        m_UvView.reset();
         m_SelectionSystem.reset();
         m_LightSystem.reset();
         m_ForwardSystem.reset();
@@ -268,6 +285,10 @@ namespace Extrinsic::Graphics
         if (m_PostProcessSystem && m_TextureManager)
         {
             m_PostProcessSystem->Initialize(device, *m_TextureManager, *m_BufferManager);
+        }
+        if (m_UvView)
+        {
+            (void)m_UvView->RebuildOperationalResources(device);
         }
 
         m_LastRebuildSucceeded = true;
@@ -462,6 +483,16 @@ namespace Extrinsic::Graphics
         return m_ShadowSystem;
     }
 
+    std::optional<UvView>& RenderSubsystemRegistry::UvViewSystem() noexcept
+    {
+        return m_UvView;
+    }
+
+    const std::optional<UvView>& RenderSubsystemRegistry::UvViewSystem() const noexcept
+    {
+        return m_UvView;
+    }
+
     bool RenderSubsystemRegistry::IsPresent(const RenderSubsystemStage stage) const noexcept
     {
         switch (stage)
@@ -483,6 +514,7 @@ namespace Extrinsic::Graphics
         case RenderSubsystemStage::ShadowSystem: return m_ShadowSystem.has_value();
         case RenderSubsystemStage::DeferredSystem: return m_DeferredSystem.has_value();
         case RenderSubsystemStage::PostProcessSystem: return m_PostProcessSystem.has_value();
+        case RenderSubsystemStage::UvView: return m_UvView.has_value();
         case RenderSubsystemStage::Count: return false;
         }
         return false;

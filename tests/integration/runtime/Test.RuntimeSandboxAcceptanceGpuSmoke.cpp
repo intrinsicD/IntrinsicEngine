@@ -49,6 +49,7 @@ import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
 import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Component.Culling.Local;
@@ -79,6 +80,7 @@ import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
+import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.ProgressivePresentationExtraction;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -86,6 +88,8 @@ import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Sandbox.Editor.MethodPanels;
+import Extrinsic.Sandbox.Editor.Shell;
 import Geometry.Properties;
 
 namespace
@@ -97,6 +101,7 @@ namespace gs = Extrinsic::ECS::Components::GeometrySources;
 namespace pn = Extrinsic::ECS::Components::GeometrySources::PropertyNames;
 namespace G = Extrinsic::Graphics::Components;
 namespace Assets = Extrinsic::Assets;
+namespace Config = Extrinsic::Core::Config;
 namespace RT = Extrinsic::Runtime;
 
 using Extrinsic::Backends::Vulkan::EvaluateVulkanDeviceOperationalStatus;
@@ -1306,6 +1311,133 @@ void SetEntityPosition(Registry& scene, const EntityHandle entity, const glm::ve
     out += std::to_string(view.FacesAlive());
     return out;
 }
+
+struct ParameterizationUvViewRuntimePathState
+{
+    bool ConfigPreviewUsable{false};
+    bool ConfigApplied{false};
+    bool ConfigAppliedFromAgentCli{false};
+    bool ParameterizationConfigChanged{false};
+    bool ActiveConfigMatchesRequest{false};
+    bool WindowOpened{false};
+    bool ReferenceTriangleSelected{false};
+    bool SawGpuReadyUvView{false};
+    bool SawImGuiUserTexture{false};
+    bool ExitedAfterOperationalPath{false};
+    std::uint32_t Frames{0u};
+    std::uint64_t ReadyRequestToken{0u};
+    std::uint64_t ReadyRecordedPassCount{0u};
+    std::string LastUvViewDiagnostic{};
+};
+
+// GRAPHICS-122 acceptance driver: reproduce the real app-owned presentation
+// composition instead of submitting renderer state from the test. The app
+// configures the engine through the agent/CLI config lane, selects the actual
+// reference-scene mesh, opens the contributed parameterization window, and
+// waits until that window consumes the renderer-owned UV target as an ImGui
+// user texture. Pixel content remains covered by Test.UvViewGpuSmoke.cpp.
+class ParameterizationUvViewRuntimePathApp final : public IApplication
+{
+public:
+    explicit ParameterizationUvViewRuntimePathApp(
+        std::shared_ptr<ParameterizationUvViewRuntimePathState> state) noexcept
+        : m_State(std::move(state))
+    {
+    }
+
+    void OnInitialize(Engine& engine) override
+    {
+        Config::EngineConfig candidate = engine.GetEngineConfig();
+        candidate.Sandbox.Parameterization.View.RenderMode =
+            Config::ParameterizationUvRenderMode::GpuShaded;
+        candidate.Sandbox.Parameterization.View.BackgroundMode =
+            Config::ParameterizationUvBackgroundMode::Checker;
+        candidate.Sandbox.Parameterization.View.ShowDistortionHeatmap = false;
+
+        RT::EngineConfigControl& configControl = engine.GetConfigControl();
+        const Config::EngineConfigLoadResult preview =
+            configControl.PreviewEngineConfigControlDocument(
+                Config::SerializeEngineConfig(candidate),
+                "graphics-122-runtime-path-gpu-smoke.json");
+        m_State->ConfigPreviewUsable = Config::IsConfigUsable(preview);
+        if (m_State->ConfigPreviewUsable)
+        {
+            const RT::RuntimeEngineConfigApplyResult apply =
+                configControl.ApplyEngineConfigHotSubset(
+                    preview,
+                    RT::RuntimeConfigControlSource::AgentCli);
+            m_State->ConfigApplied = apply.Succeeded();
+            m_State->ConfigAppliedFromAgentCli =
+                apply.Source == RT::RuntimeConfigControlSource::AgentCli;
+            m_State->ParameterizationConfigChanged =
+                apply.SandboxParameterizationChanged;
+            const Config::ParameterizationViewConfig& activeView =
+                configControl.GetEngineConfigControlState()
+                    .ActiveConfig.Sandbox.Parameterization.View;
+            m_State->ActiveConfigMatchesRequest =
+                activeView.RenderMode ==
+                    Config::ParameterizationUvRenderMode::GpuShaded &&
+                activeView.BackgroundMode ==
+                    Config::ParameterizationUvBackgroundMode::Checker &&
+                !activeView.ShowDistortionHeatmap;
+        }
+
+        const EntityHandle triangle =
+            FindEntityByName(engine.GetScene(), "ReferenceTriangle");
+        m_State->ReferenceTriangleSelected =
+            IsReferenceTriangleEntityValid(engine.GetScene(), triangle) &&
+            engine.GetSelectionController().SetSelectedEntity(
+                engine.GetScene(), triangle);
+
+        m_EditorShell.Attach(engine);
+        m_MethodPanels.Register(m_EditorShell);
+        m_State->WindowOpened = m_EditorShell.SetEditorWindowOpen(
+            "mesh.processing.parameterize_uv", true);
+    }
+
+    void OnSimTick(Engine&, double) override {}
+
+    void OnVariableTick(Engine& engine, double, double) override
+    {
+        ++m_State->Frames;
+
+        const Extrinsic::Graphics::UvViewOutput output =
+            engine.GetRenderer().GetUvViewOutput();
+        m_State->LastUvViewDiagnostic = output.Diagnostic;
+        if (output.IsGpuReady())
+        {
+            m_State->SawGpuReadyUvView = true;
+            m_State->ReadyRequestToken = output.RequestToken;
+            m_State->ReadyRecordedPassCount = output.RecordedPassCount;
+        }
+
+        m_State->SawImGuiUserTexture =
+            m_State->SawImGuiUserTexture ||
+            engine.GetImGuiAdapter().GetDiagnostics().LastFrameUsedUserTexture;
+
+        constexpr std::uint32_t kMaximumFrames = 12u;
+        if (m_State->SawGpuReadyUvView && m_State->SawImGuiUserTexture)
+        {
+            m_State->ExitedAfterOperationalPath = true;
+            engine.RequestExit();
+        }
+        else if (m_State->Frames >= kMaximumFrames)
+        {
+            engine.RequestExit();
+        }
+    }
+
+    void OnShutdown(Engine&) override
+    {
+        m_MethodPanels.Unregister();
+        m_EditorShell.Detach();
+    }
+
+private:
+    std::shared_ptr<ParameterizationUvViewRuntimePathState> m_State{};
+    Extrinsic::Sandbox::Editor::EditorShell m_EditorShell{};
+    Extrinsic::Sandbox::Editor::MethodPanels m_MethodPanels{};
+};
 } // namespace
 
 // The working-sandbox acceptance scene (one mesh, one graph, one point cloud)
@@ -1576,6 +1708,109 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigProducesVisi
 
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
     device.DestroyBuffer(readbackBuffer);
+    engine.Shutdown();
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke,
+     ParameterizationUvViewWindowUsesOperationalGpuTargetThroughRuntimePath)
+{
+    auto state = std::make_shared<ParameterizationUvViewRuntimePathState>();
+    auto bootstrap = BootstrapDefaultSandboxAppEngineWithApp(
+        std::make_unique<ParameterizationUvViewRuntimePathApp>(state));
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+
+    const AcceptanceRunCapture run = DriveAcceptanceAndCapture(engine);
+    const Extrinsic::Graphics::UvViewOutput output =
+        engine.GetRenderer().GetUvViewOutput();
+    const auto adapterDiagnostics = engine.GetImGuiAdapter().GetDiagnostics();
+
+    if (!run.DeviceOperational)
+    {
+        engine.Shutdown();
+        ADD_FAILURE()
+            << "Promoted Vulkan became non-operational while driving the real parameterization UV-view window: status="
+            << ToString(run.Status.Code)
+            << " reason=" << ToString(run.Status.Reason)
+            << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+        return;
+    }
+
+    EXPECT_TRUE(state->ConfigPreviewUsable)
+        << "Agent/CLI UV-view config preview was rejected.";
+    EXPECT_TRUE(state->ConfigApplied)
+        << "Agent/CLI UV-view config did not apply through EngineConfigControl.";
+    EXPECT_TRUE(state->ConfigAppliedFromAgentCli)
+        << "UV-view config apply lost its AgentCli provenance.";
+    EXPECT_TRUE(state->ParameterizationConfigChanged)
+        << "EngineConfigControl did not report the parameterization hot subset as changed.";
+    EXPECT_TRUE(state->ActiveConfigMatchesRequest)
+        << "The active config lane does not match the requested GPU/checker/no-heatmap view.";
+    EXPECT_TRUE(state->ReferenceTriangleSelected)
+        << "The real ReferenceTriangle was not selected through SelectionController.";
+    EXPECT_TRUE(state->WindowOpened)
+        << "The contributed mesh.processing.parameterize_uv window did not open.";
+    const RT::RuntimeEngineConfigControlState& configState =
+        engine.GetConfigControl().GetEngineConfigControlState();
+    EXPECT_EQ(configState.ActiveConfig.Sandbox.Parameterization.View.RenderMode,
+              Config::ParameterizationUvRenderMode::GpuShaded);
+    EXPECT_EQ(configState.ActiveConfig.Sandbox.Parameterization.View.BackgroundMode,
+              Config::ParameterizationUvBackgroundMode::Checker);
+    EXPECT_TRUE(configState.HasLastApply);
+    EXPECT_EQ(configState.LastApply.Source,
+              RT::RuntimeConfigControlSource::AgentCli);
+
+    EXPECT_TRUE(state->SawGpuReadyUvView)
+        << "The real runtime/editor path never observed a completed renderer-owned UV target after "
+        << state->Frames << " bounded frames. last diagnostic="
+        << state->LastUvViewDiagnostic;
+    EXPECT_TRUE(state->SawImGuiUserTexture)
+        << "The parameterization panel never emitted its ready UV target as an ImGui user texture.";
+    EXPECT_TRUE(state->ExitedAfterOperationalPath)
+        << "The bounded app timed out before both UV readiness and ImGui consumption were observed.";
+    EXPECT_GT(state->ReadyRequestToken, 0u);
+    EXPECT_GT(state->ReadyRecordedPassCount, 0u);
+
+    EXPECT_TRUE(output.IsGpuReady()) << output.Diagnostic;
+    EXPECT_EQ(output.ActiveBackground,
+              Extrinsic::Graphics::UvViewBackgroundMode::Checker);
+    EXPECT_TRUE(output.HasCompletedContents);
+    EXPECT_GT(output.RequestToken, 0u);
+    EXPECT_GT(output.RecordedPassCount, 0u);
+
+    EXPECT_EQ(run.Status.Code,
+              Extrinsic::Backends::Vulkan::VulkanOperationalStatusCode::Operational);
+    EXPECT_EQ(run.Status.Reason,
+              Extrinsic::Backends::Vulkan::VulkanOperationalReason::None);
+    EXPECT_TRUE(run.Stats.Compile.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_TRUE(run.Stats.Execute.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_TRUE(ContainsPass(run.Stats, "UvViewPass"))
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_EQ(FindPassStatus(run.Stats, "UvViewPass"),
+              RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_TRUE(ContainsPass(run.Stats, "ImGuiPass"))
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_EQ(FindPassStatus(run.Stats, "ImGuiPass"),
+              RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+
+    EXPECT_TRUE(adapterDiagnostics.LastFrameUsedUserTexture);
+    EXPECT_GT(adapterDiagnostics.LastVertexCount, 0u);
+    EXPECT_GT(adapterDiagnostics.LastIndexCount, 0u);
+    EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
+        << "Vulkan fallback counters incremented across the operational UV-view runtime path: "
+        << "fallbackToNull " << run.Before.FallbackToNull << " -> "
+        << run.After.FallbackToNull << ", initFailure "
+        << run.Before.InitFailure << " -> " << run.After.InitFailure
+        << ", validationError " << run.Before.ValidationError << " -> "
+        << run.After.ValidationError << ", gateFailure "
+        << run.Before.OperationalGateFailure << " -> "
+        << run.After.OperationalGateFailure;
+
     engine.Shutdown();
 }
 

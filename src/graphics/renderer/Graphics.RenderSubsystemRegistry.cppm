@@ -24,6 +24,7 @@ import Extrinsic.Graphics.DeferredSystem;
 import Extrinsic.Graphics.PostProcessSystem;
 import Extrinsic.Graphics.ShadowSystem;
 import Extrinsic.Graphics.TransformSyncSystem;
+import Extrinsic.Graphics.UvView;
 
 namespace Extrinsic::Graphics
 {
@@ -45,6 +46,7 @@ namespace Extrinsic::Graphics
         ShadowSystem,
         DeferredSystem,
         PostProcessSystem,
+        UvView,
         Count,
     };
 
@@ -120,6 +122,8 @@ namespace Extrinsic::Graphics
         [[nodiscard]] const std::optional<PostProcessSystem>& PostProcessSystemRegistry() const noexcept;
         [[nodiscard]] std::optional<ShadowSystem>& ShadowSystemRegistry() noexcept;
         [[nodiscard]] const std::optional<ShadowSystem>& ShadowSystemRegistry() const noexcept;
+        [[nodiscard]] std::optional<UvView>& UvViewSystem() noexcept;
+        [[nodiscard]] const std::optional<UvView>& UvViewSystem() const noexcept;
 
     private:
         [[nodiscard]] bool IsPresent(RenderSubsystemStage stage) const noexcept;
@@ -142,6 +146,7 @@ namespace Extrinsic::Graphics
         std::optional<DeferredSystem>       m_DeferredSystem{};
         std::optional<PostProcessSystem>    m_PostProcessSystem{};
         std::optional<ShadowSystem>         m_ShadowSystem{};
+        std::optional<UvView>               m_UvView{};
         bool m_LastRebuildSucceeded = false;
         bool m_LastRebuildFailedMissingRequiredSubsystem = false;
         std::vector<RenderSubsystemLifecycleEvent> m_LifecycleEvents{};

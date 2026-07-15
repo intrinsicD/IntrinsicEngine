@@ -431,6 +431,19 @@ TEST(FrameRecipeContract, UvViewWritesRetainedImportBeforeImGuiSamplesIt)
     EXPECT_TRUE(PassWritesTexture(*compiled, "UvViewPass", "UvViewColor"));
     EXPECT_TRUE(PassReadsTexture(*compiled, "ImGuiPass", "UvViewColor"));
     EXPECT_TRUE(HasCompiledRenderPassAttachment(*compiled, "UvViewPass"));
+    const std::uint32_t cullingIndex =
+        PassIndexByName(*compiled, "CullingPass");
+    const std::uint32_t uvViewIndex =
+        PassIndexByName(*compiled, "UvViewPass");
+    ASSERT_LT(cullingIndex, compiled->PassDeclarations.size());
+    ASSERT_LT(uvViewIndex, compiled->PassDeclarations.size());
+    EXPECT_NE(std::ranges::find(
+                  compiled->PassDeclarations[uvViewIndex]
+                      .ExplicitDependencyPasses,
+                  cullingIndex),
+              compiled->PassDeclarations[uvViewIndex]
+                  .ExplicitDependencyPasses.end());
+    ExpectPassBefore(*compiled, "CullingPass", "UvViewPass");
     ExpectPassBefore(*compiled, "UvViewPass", "ImGuiPass");
 
     const std::uint32_t uvTextureIndex = TextureIndexByName(*compiled, "UvViewColor");

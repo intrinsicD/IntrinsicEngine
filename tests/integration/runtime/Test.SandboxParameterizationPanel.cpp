@@ -247,6 +247,10 @@ TEST(SandboxParameterizationPanel, StrategiesAndTypedRequestAreExact)
     config.Bff.BoundaryData = {1.0, 2.0, 3.0};
     config.Bff.AngleSumTolerance = 3.0e-8;
     config.Bff.DegeneracyTolerance = 4.0e-11;
+    config.View.RenderMode = Config::ParameterizationUvRenderMode::GpuShaded;
+    config.View.BackgroundMode =
+        Config::ParameterizationUvBackgroundMode::Texture;
+    config.View.ShowDistortionHeatmap = true;
 
     const auto request =
         SandboxEditor::BuildSandboxParameterizationPanelApplyRequest(
@@ -284,6 +288,10 @@ TEST(SandboxParameterizationPanel, StrategiesAndTypedRequestAreExact)
                      config.Bff.AngleSumTolerance);
     EXPECT_DOUBLE_EQ(copied.Bff.DegeneracyTolerance,
                      config.Bff.DegeneracyTolerance);
+    EXPECT_EQ(copied.View.RenderMode, config.View.RenderMode);
+    EXPECT_EQ(copied.View.BackgroundMode, config.View.BackgroundMode);
+    EXPECT_EQ(copied.View.ShowDistortionHeatmap,
+              config.View.ShowDistortionHeatmap);
 
     EXPECT_FALSE(
         SandboxEditor::BuildSandboxParameterizationPanelApplyRequest(
@@ -494,7 +502,13 @@ TEST(SandboxParameterizationPanel, RealWindowAndTypedActionAreOperational)
         ImGui::FindWindowByName(
             "Mesh / Processing / Parameterize (UV)"),
         nullptr);
-    EXPECT_GE(engine.GetImGuiAdapter().GetDiagnostics().FramesProduced, 1u);
+    const auto& imguiDiagnostics =
+        engine.GetImGuiAdapter().GetDiagnostics();
+    EXPECT_GE(imguiDiagnostics.FramesProduced, 1u);
+    EXPECT_FALSE(imguiDiagnostics.LastFrameUsedUserTexture)
+        << "Configured CpuLayout must use the panel ImDrawList path without a user texture.";
+    EXPECT_GT(imguiDiagnostics.LastVertexCount, 0u);
+    EXPECT_GT(imguiDiagnostics.LastIndexCount, 0u);
     shell.Detach();
     engine.Shutdown();
 }

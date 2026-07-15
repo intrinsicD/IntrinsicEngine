@@ -46,6 +46,7 @@ import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.SamplerManager;
 import Extrinsic.Graphics.Material;
+import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
@@ -1350,6 +1351,29 @@ namespace Extrinsic::Runtime
         return m_RenderExtractionService.LastStats();
     }
 
+    std::optional<Graphics::GpuGeometryHandle>
+    Engine::FindSurfaceGpuGeometry(
+        const std::uint32_t stableEntityId) const noexcept
+    {
+        const auto availability =
+            m_RenderExtractionService.Cache().FindGpuRenderableAvailability(
+                stableEntityId);
+        if (!availability.has_value() ||
+            !availability->Surface.HasGeometry)
+        {
+            return std::nullopt;
+        }
+        return availability->Surface.Geometry;
+    }
+
+    std::optional<Graphics::MaterialTextureAssetBindings>
+    Engine::GetMaterialTextureAssetBindings(
+        const std::uint32_t stableEntityId) const noexcept
+    {
+        return m_RenderExtractionService.Cache()
+            .GetMaterialTextureAssetBindings(stableEntityId);
+    }
+
     const RuntimeFramePacingDiagnostics&
     Engine::GetLastFramePacingDiagnostics() const noexcept
     {
@@ -1360,8 +1384,7 @@ namespace Extrinsic::Runtime
     Engine::GetMaterialTextureAssetBindingsForTest(
         const std::uint32_t stableEntityId) const noexcept
     {
-        return m_RenderExtractionService.GetMaterialTextureAssetBindingsForTest(
-            stableEntityId);
+        return GetMaterialTextureAssetBindings(stableEntityId);
     }
 
     RuntimeInputActionHandle Engine::RegisterInputAction(

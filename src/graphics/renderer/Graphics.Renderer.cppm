@@ -22,6 +22,7 @@ import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.Graphics.GpuWorld;
+export import Extrinsic.Graphics.UvView;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.VisualizationPackets;
@@ -883,6 +884,13 @@ namespace Extrinsic::Graphics
         virtual void SetDebugViewRequestedResourceName(std::string name) = 0;
 
         [[nodiscard]] virtual std::string GetDebugViewRequestedResourceName() const = 0;
+
+        // GRAPHICS-122 — copied runtime/editor request for the single retained
+        // UV-space target. Appended to minimise polymorphic slot churn.
+        // Backends that do not implement the optional view retain the default
+        // honest CPU-layout fallback.
+        virtual void SubmitUvViewRequest(UvViewRequest request);
+        [[nodiscard]] virtual UvViewOutput GetUvViewOutput() const;
     };
 
     export std::unique_ptr<IRenderer> CreateRenderer();

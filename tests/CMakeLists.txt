@@ -625,6 +625,7 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
         Test.ImGuiSurfaceGpuSmoke.cpp
         Test.ObjectSpaceNormalTextureBakeGpuSmoke.cpp
         Test.TransientDebugSurfaceGpuSmoke.cpp
+        Test.UvViewGpuSmoke.cpp
         Test.VisualizationOverlaySurfaceGpuSmoke.cpp
         Test.VulkanBootstrapSmoke.cpp
     )
@@ -839,6 +840,7 @@ set(_graphics_contract_cpu_test_files
     Test.SurfacePassContracts.cpp
     Test.TransformSyncSystem.cpp
     Test.TransientDebugSurfacePass.cpp
+    Test.UvView.cpp
     Test.VisualizationOverlayPass.cpp
     Test.VisualizationPropertyBufferResidency.cpp
 )

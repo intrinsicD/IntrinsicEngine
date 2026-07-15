@@ -2,6 +2,7 @@ module;
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -27,6 +28,7 @@ import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.MeshGeometryPacker;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.HalfedgeMesh;
 import Geometry.Parameterization;
@@ -62,6 +64,99 @@ namespace Extrinsic::Runtime
             const std::span<const glm::vec2> values) noexcept
         {
             return std::ranges::all_of(values, IsFiniteUv);
+        }
+
+        [[nodiscard]] bool IsFinitePosition(const glm::vec3 position) noexcept
+        {
+            return std::isfinite(position.x) && std::isfinite(position.y) &&
+                   std::isfinite(position.z);
+        }
+
+        [[nodiscard]] bool AllFinitePositions(
+            const std::span<const glm::vec3> values) noexcept
+        {
+            return std::ranges::all_of(values, IsFinitePosition);
+        }
+
+        [[nodiscard]] std::uint64_t ComputeDiagnosticInputFingerprint(
+            const std::span<const std::uint32_t> surfaceIndices,
+            const std::span<const std::uint32_t> triangleFaces,
+            const std::span<const glm::vec3> positions,
+            const std::span<const glm::vec2> uvs) noexcept
+        {
+            constexpr std::uint64_t kOffsetBasis = 14695981039346656037ull;
+            constexpr std::uint64_t kPrime = 1099511628211ull;
+            std::uint64_t hash = kOffsetBasis;
+            const auto mix = [&hash](const std::uint32_t word) noexcept
+            {
+                hash ^= static_cast<std::uint64_t>(word);
+                hash *= kPrime;
+            };
+            const auto mixSize = [&mix](const std::size_t size) noexcept
+            {
+                const std::uint64_t value = static_cast<std::uint64_t>(size);
+                mix(static_cast<std::uint32_t>(value));
+                mix(static_cast<std::uint32_t>(value >> 32u));
+            };
+
+            mixSize(surfaceIndices.size());
+            for (const std::uint32_t index : surfaceIndices)
+                mix(index);
+            mixSize(triangleFaces.size());
+            for (const std::uint32_t face : triangleFaces)
+                mix(face);
+            mixSize(positions.size());
+            for (const glm::vec3 position : positions)
+            {
+                mix(std::bit_cast<std::uint32_t>(position.x));
+                mix(std::bit_cast<std::uint32_t>(position.y));
+                mix(std::bit_cast<std::uint32_t>(position.z));
+            }
+            mixSize(uvs.size());
+            for (const glm::vec2 uv : uvs)
+            {
+                mix(std::bit_cast<std::uint32_t>(uv.x));
+                mix(std::bit_cast<std::uint32_t>(uv.y));
+            }
+            return hash;
+        }
+
+        [[nodiscard]] bool AlignFaceDiagnosticsToSourceStorage(
+            Parameterization::ParameterizationDiagnostics& diagnostics,
+            const std::span<const std::uint32_t> sourceFaceForMeshFace,
+            const std::size_t sourceFaceStorageCount)
+        {
+            if (diagnostics.FaceStorageCount !=
+                    sourceFaceForMeshFace.size() ||
+                diagnostics.FaceConformalDistortion.size() !=
+                    sourceFaceForMeshFace.size())
+            {
+                return false;
+            }
+
+            std::vector<float> sourceDistortion(
+                sourceFaceStorageCount,
+                std::numeric_limits<float>::quiet_NaN());
+            std::vector<bool> mapped(sourceFaceStorageCount, false);
+            for (std::size_t meshFace = 0u;
+                 meshFace < sourceFaceForMeshFace.size();
+                 ++meshFace)
+            {
+                const std::uint32_t sourceFace =
+                    sourceFaceForMeshFace[meshFace];
+                if (sourceFace >= sourceFaceStorageCount || mapped[sourceFace])
+                    return false;
+                sourceDistortion[sourceFace] =
+                    diagnostics.FaceConformalDistortion[meshFace];
+                mapped[sourceFace] = true;
+            }
+
+            diagnostics.FaceStorageCount = sourceFaceStorageCount;
+            diagnostics.DeletedFaceCount = static_cast<std::size_t>(
+                std::ranges::count(mapped, false));
+            diagnostics.FaceConformalDistortion =
+                std::move(sourceDistortion);
+            return true;
         }
 
         [[nodiscard]] bool CanRepresentAsFloat(const double value) noexcept
@@ -254,6 +349,24 @@ namespace Extrinsic::Runtime
                 if (!ToGeometryStrategy(candidate).has_value())
                     return false;
             }
+            switch (config.View.RenderMode)
+            {
+            case Config::ParameterizationUvRenderMode::CpuLayout:
+            case Config::ParameterizationUvRenderMode::GpuShaded:
+                break;
+            default:
+                return false;
+            }
+            switch (config.View.BackgroundMode)
+            {
+            case Config::ParameterizationUvBackgroundMode::Grid:
+            case Config::ParameterizationUvBackgroundMode::Checker:
+            case Config::ParameterizationUvBackgroundMode::TexelDensity:
+            case Config::ParameterizationUvBackgroundMode::Texture:
+                break;
+            default:
+                return false;
+            }
             return true;
         }
 
@@ -358,6 +471,64 @@ namespace Extrinsic::Runtime
                 return false;
             }
             return true;
+        }
+
+        void HashUvViewTokenValue(
+            std::uint64_t& token,
+            const std::uint64_t value) noexcept
+        {
+            constexpr std::uint64_t prime = 1099511628211ull;
+            for (std::uint32_t shift = 0u; shift < 64u; shift += 8u)
+            {
+                token ^= (value >> shift) & 0xFFu;
+                token *= prime;
+            }
+        }
+
+        [[nodiscard]] std::uint64_t BuildUvViewRequestToken(
+            const SandboxEditorParameterizationViewModel& model,
+            const std::uint32_t width,
+            const std::uint32_t height) noexcept
+        {
+            std::uint64_t token = 1469598103934665603ull;
+            HashUvViewTokenValue(token, model.SelectedStableEntityId);
+            HashUvViewTokenValue(token, width);
+            HashUvViewTokenValue(token, height);
+            HashUvViewTokenValue(
+                token,
+                static_cast<std::uint32_t>(model.View.RenderMode));
+            HashUvViewTokenValue(
+                token,
+                static_cast<std::uint32_t>(model.View.BackgroundMode));
+            HashUvViewTokenValue(
+                token,
+                model.View.ShowDistortionHeatmap ? 1u : 0u);
+            for (const float bound : {
+                     model.UvBoundsMin.x,
+                     model.UvBoundsMin.y,
+                     model.UvBoundsMax.x,
+                     model.UvBoundsMax.y})
+            {
+                HashUvViewTokenValue(token, std::bit_cast<std::uint32_t>(bound));
+            }
+            for (const std::uint32_t index : model.LineIndices)
+                HashUvViewTokenValue(token, index);
+            for (const glm::vec2 uv : model.UVs)
+            {
+                HashUvViewTokenValue(
+                    token,
+                    std::bit_cast<std::uint32_t>(uv.x));
+                HashUvViewTokenValue(
+                    token,
+                    std::bit_cast<std::uint32_t>(uv.y));
+            }
+            for (const float value : model.TriangleConformalDistortion)
+            {
+                HashUvViewTokenValue(
+                    token,
+                    std::bit_cast<std::uint32_t>(value));
+            }
+            return token;
         }
 
         [[nodiscard]] std::optional<ParameterizationUvState> CaptureUvState(
@@ -644,6 +815,18 @@ namespace Extrinsic::Runtime
 
         Parameterization::ParameterizeResult parameterized =
             Parameterization::ParameterizeMesh(source.Mesh, *strategy);
+        if (parameterized.Succeeded() &&
+            !AlignFaceDiagnosticsToSourceStorage(
+                parameterized.Diagnostics,
+                source.SourceFaceForMeshFace,
+                view.FaceSource->Properties.Size()))
+        {
+            return finish(MakeResult(
+                command,
+                SandboxEditorCommandStatus::GeometryProcessingFailed,
+                Parameterization::ParameterizationStatus::SolverFailed,
+                "Parameterization could not align face diagnostics with source storage."));
+        }
         SandboxEditorParameterizationResult result = MakeResult(
             command,
             parameterized.Succeeded()
@@ -668,6 +851,29 @@ namespace Extrinsic::Runtime
             result.Message =
                 "Parameterization returned non-finite or count-mismatched UVs.";
             return finish(std::move(result));
+        }
+
+        std::vector<std::uint32_t> fingerprintSurfaceIndices{};
+        std::vector<std::uint32_t> fingerprintTriangleFaces{};
+        if (BuildSurfaceTriangleTopology(
+                view,
+                fingerprintSurfaceIndices,
+                fingerprintTriangleFaces) == MeshPackStatus::Success)
+        {
+            const auto positions = view.VertexSource->Properties.Get<glm::vec3>(
+                GS::PropertyNames::kPosition);
+            if (positions &&
+                positions.Vector().size() ==
+                    view.VertexSource->Properties.Size() &&
+                AllFinitePositions(positions.Vector()))
+            {
+                result.DiagnosticInputFingerprint =
+                    ComputeDiagnosticInputFingerprint(
+                        fingerprintSurfaceIndices,
+                        fingerprintTriangleFaces,
+                        positions.Vector(),
+                        parameterized.UVs);
+            }
         }
 
         const SandboxEditorCommandStatus commitStatus = CommitUvState(
@@ -791,6 +997,14 @@ namespace Extrinsic::Runtime
         const SandboxEditorContext& context)
     {
         SandboxEditorParameterizationViewModel model{};
+        if (context.EngineConfigControlState != nullptr)
+        {
+            const Config::ParameterizationConfig& active =
+                context.EngineConfigControlState->ActiveConfig.Sandbox
+                    .Parameterization;
+            model.Strategy = active.Strategy;
+            model.View = active.View;
+        }
         if (context.Scene == nullptr || context.Selection == nullptr)
         {
             model.Message =
@@ -828,12 +1042,43 @@ namespace Extrinsic::Runtime
         }
         model.SelectedEntityIsMesh = true;
 
-        std::string topologyDiagnostic{};
-        if (!CollectTriangleIndices(
-                view, model.Triangles, topologyDiagnostic))
+        std::vector<std::uint32_t> surfaceIndices{};
+        std::vector<std::uint32_t> triangleFaces{};
+        const MeshPackStatus topologyStatus = BuildSurfaceTriangleTopology(
+            view,
+            surfaceIndices,
+            triangleFaces);
+        if (topologyStatus != MeshPackStatus::Success)
         {
-            model.Message = std::move(topologyDiagnostic);
+            model.Message = "UV view topology is unavailable (";
+            model.Message += DebugNameForMeshPackStatus(topologyStatus);
+            model.Message += ").";
             return model;
+        }
+        model.Triangles.reserve(surfaceIndices.size() / 3u);
+        const bool gpuRequested =
+            model.View.RenderMode ==
+            Config::ParameterizationUvRenderMode::GpuShaded;
+        if (gpuRequested)
+            model.LineIndices.reserve(surfaceIndices.size() * 2u);
+        for (std::size_t index = 0u;
+             index + 2u < surfaceIndices.size();
+             index += 3u)
+        {
+            const std::array triangle{
+                surfaceIndices[index],
+                surfaceIndices[index + 1u],
+                surfaceIndices[index + 2u],
+            };
+            model.Triangles.push_back(triangle);
+            if (gpuRequested)
+            {
+                model.LineIndices.insert(
+                    model.LineIndices.end(),
+                    {triangle[0u], triangle[1u],
+                     triangle[1u], triangle[2u],
+                     triangle[2u], triangle[0u]});
+            }
         }
 
         const auto uvs = view.VertexSource->Properties.Get<glm::vec2>(
@@ -857,6 +1102,21 @@ namespace Extrinsic::Runtime
                     IsFiniteUv(model.UvBoundsMin) &&
                     IsFiniteUv(model.UvBoundsMax);
             }
+            const auto positions =
+                view.VertexSource->Properties.Get<glm::vec3>(
+                    GS::PropertyNames::kPosition);
+            if (positions &&
+                positions.Vector().size() ==
+                    view.VertexSource->Properties.Size() &&
+                AllFinitePositions(positions.Vector()))
+            {
+                model.DiagnosticInputFingerprint =
+                    ComputeDiagnosticInputFingerprint(
+                        surfaceIndices,
+                        triangleFaces,
+                        positions.Vector(),
+                        model.UVs);
+            }
         }
         else if (view.VertexSource->Properties.Exists(kTexcoordProperty))
         {
@@ -874,14 +1134,163 @@ namespace Extrinsic::Runtime
                 context.LastParameterizationResult->ParameterizationStatus;
             model.LastDiagnostics =
                 context.LastParameterizationResult->Diagnostics;
+            const std::vector<float>& faceDistortion =
+                model.LastDiagnostics->FaceConformalDistortion;
+            const bool diagnosticsMatchCurrentUv =
+                context.LastParameterizationResult->Succeeded() &&
+                context.LastParameterizationResult->DiagnosticInputFingerprint
+                    .has_value() &&
+                model.DiagnosticInputFingerprint.has_value() &&
+                context.LastParameterizationResult->DiagnosticInputFingerprint ==
+                    model.DiagnosticInputFingerprint;
+            if (gpuRequested && diagnosticsMatchCurrentUv &&
+                !faceDistortion.empty())
+            {
+                model.TriangleConformalDistortion.reserve(
+                    triangleFaces.size());
+                for (const std::uint32_t faceIndex : triangleFaces)
+                {
+                    model.TriangleConformalDistortion.push_back(
+                        faceIndex < faceDistortion.size()
+                            ? faceDistortion[faceIndex]
+                            : std::numeric_limits<float>::quiet_NaN());
+                }
+            }
             if (!context.LastParameterizationResult->Message.empty())
                 model.Message = context.LastParameterizationResult->Message;
         }
-        else if (context.EngineConfigControlState != nullptr)
-        {
-            model.Strategy = context.EngineConfigControlState->ActiveConfig
-                                 .Sandbox.Parameterization.Strategy;
-        }
         return model;
+    }
+
+    SandboxEditorParameterizationUvViewState
+    SubmitSandboxEditorParameterizationUvView(
+        const SandboxEditorContext& context,
+        const SandboxEditorParameterizationViewModel& model,
+        const std::uint32_t width,
+        const std::uint32_t height)
+    {
+        const bool gpuRequested =
+            model.View.RenderMode ==
+            Config::ParameterizationUvRenderMode::GpuShaded;
+        SandboxEditorParameterizationUvViewState fallback{
+            .Status = gpuRequested
+                ? SandboxEditorParameterizationUvViewStatus::WaitingForGpuFrame
+                : SandboxEditorParameterizationUvViewStatus::CpuLayout,
+            .RequestedMode = model.View.RenderMode,
+            .ActiveMode = Config::ParameterizationUvRenderMode::CpuLayout,
+            .RequestedBackground = model.View.BackgroundMode,
+            .ActiveBackground =
+                model.View.BackgroundMode ==
+                            Config::ParameterizationUvBackgroundMode::Grid ||
+                        model.View.BackgroundMode ==
+                            Config::ParameterizationUvBackgroundMode::Checker
+                    ? model.View.BackgroundMode
+                    : Config::ParameterizationUvBackgroundMode::Checker,
+            .Width = width,
+            .Height = height,
+            .Message = gpuRequested
+                ? "GPU UV view is waiting for a rendered target."
+                : "CPU UV layout is active.",
+        };
+
+        if (!gpuRequested)
+        {
+            if (context.ParameterizationUvViewCommands.Available())
+            {
+                (void)context.ParameterizationUvViewCommands.Submit(
+                    SandboxEditorParameterizationUvViewRequest{
+                        .Enabled = false,
+                        .StableEntityId = model.SelectedStableEntityId,
+                        .Width = width,
+                        .Height = height,
+                        .UvBoundsMin = model.UvBoundsMin,
+                        .UvBoundsMax = model.UvBoundsMax,
+                        .View = model.View,
+                    });
+            }
+            return fallback;
+        }
+
+        SandboxEditorParameterizationUvViewRequest request{
+            .Enabled = model.HasSelectedEntity &&
+                       model.SelectedEntityIsMesh && model.HasUvCoordinates &&
+                       model.HasFiniteUvBounds && width > 0u && height > 0u,
+            .RequestToken = BuildUvViewRequestToken(model, width, height),
+            .StableEntityId = model.SelectedStableEntityId,
+            .Width = width,
+            .Height = height,
+            .UvBoundsMin = model.UvBoundsMin,
+            .UvBoundsMax = model.UvBoundsMax,
+            .View = model.View,
+            .LineIndices = model.LineIndices,
+            .TriangleConformalDistortion =
+                model.TriangleConformalDistortion,
+        };
+        fallback.RequestToken = request.RequestToken;
+
+        if (!request.Enabled)
+        {
+            fallback.Status =
+                SandboxEditorParameterizationUvViewStatus::InvalidRequest;
+            fallback.Message = model.Message.empty()
+                ? "GPU UV view requires a selected mesh with finite UVs and a non-empty pane."
+                : model.Message;
+        }
+
+        if (!context.ParameterizationUvViewCommands.Available())
+        {
+            if (gpuRequested)
+            {
+                fallback.Status =
+                    SandboxEditorParameterizationUvViewStatus::CpuFallbackNonOperational;
+                fallback.Message =
+                    "GPU UV view command routing is unavailable; CPU layout is active.";
+            }
+            return fallback;
+        }
+
+        if (!request.Enabled)
+        {
+            (void)context.ParameterizationUvViewCommands.Submit(
+                std::move(request));
+            return fallback;
+        }
+
+        return context.ParameterizationUvViewCommands.Submit(
+            std::move(request));
+    }
+
+    void DisableSandboxEditorParameterizationUvView(
+        const SandboxEditorContext& context)
+    {
+        if (!context.ParameterizationUvViewCommands.Available())
+            return;
+        (void)context.ParameterizationUvViewCommands.Submit(
+            SandboxEditorParameterizationUvViewRequest{});
+    }
+
+    const char* DebugNameForSandboxEditorParameterizationUvViewStatus(
+        const SandboxEditorParameterizationUvViewStatus status) noexcept
+    {
+        switch (status)
+        {
+        case SandboxEditorParameterizationUvViewStatus::Disabled:
+            return "disabled";
+        case SandboxEditorParameterizationUvViewStatus::CpuLayout:
+            return "CPU layout";
+        case SandboxEditorParameterizationUvViewStatus::CpuFallbackNonOperational:
+            return "CPU fallback (GPU unavailable)";
+        case SandboxEditorParameterizationUvViewStatus::WaitingForGeometry:
+            return "CPU fallback (waiting for geometry)";
+        case SandboxEditorParameterizationUvViewStatus::WaitingForGpuFrame:
+            return "CPU fallback (waiting for GPU frame)";
+        case SandboxEditorParameterizationUvViewStatus::InvalidRequest:
+            return "CPU fallback (invalid request)";
+        case SandboxEditorParameterizationUvViewStatus::ResourceCreationFailed:
+            return "CPU fallback (GPU resource failure)";
+        case SandboxEditorParameterizationUvViewStatus::Ready:
+            return "GPU shaded";
+        }
+        return "unknown";
     }
 }

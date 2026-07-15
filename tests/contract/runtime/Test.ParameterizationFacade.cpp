@@ -603,3 +603,329 @@ TEST(ParameterizationFacade, ViewModelIsPointerFreeAndCarriesAggregateDiagnostic
     EXPECT_EQ(model.LastDiagnostics->VertexStorageCount, 9u);
     EXPECT_EQ(model.LastDiagnostics->LiveFaceCount, 8u);
 }
+
+TEST(ParameterizationFacade, ViewModelFansFaceDiagnosticsIntoRenderedTriangles)
+{
+    ParameterizationHarness harness{MakeQuadMesh()};
+    Runtime::RuntimeEngineConfigControlState state{};
+    state.ActiveConfig.Sandbox.Parameterization.View.RenderMode =
+        Config::ParameterizationUvRenderMode::GpuShaded;
+    harness.Context.EngineConfigControlState = &state;
+    harness.Vertices()
+        .Properties.GetOrAdd<glm::vec2>("v:texcoord", glm::vec2{0.0f})
+        .Vector() = {
+            {0.0f, 0.0f},
+            {1.0f, 0.0f},
+            {1.0f, 1.0f},
+            {0.0f, 1.0f},
+        };
+    Runtime::SandboxEditorParameterizationResult last{};
+    const Runtime::SandboxEditorParameterizationViewModel current =
+        Runtime::BuildSandboxEditorParameterizationViewModel(harness.Context);
+    ASSERT_TRUE(current.DiagnosticInputFingerprint.has_value());
+    last.Status = Runtime::SandboxEditorCommandStatus::Applied;
+    last.StableEntityId = harness.StableEntityId;
+    last.ParameterizationStatus =
+        Geometry::Parameterization::ParameterizationStatus::Success;
+    last.DiagnosticInputFingerprint = current.DiagnosticInputFingerprint;
+    last.Diagnostics.FaceStorageCount = 1u;
+    last.Diagnostics.FaceConformalDistortion = {2.5f};
+    harness.Context.LastParameterizationResult = &last;
+
+    const Runtime::SandboxEditorParameterizationViewModel model =
+        Runtime::BuildSandboxEditorParameterizationViewModel(harness.Context);
+    ASSERT_EQ(model.Triangles.size(), 2u);
+    EXPECT_EQ(model.Triangles[0],
+              (std::array<std::uint32_t, 3u>{0u, 1u, 2u}));
+    EXPECT_EQ(model.Triangles[1],
+              (std::array<std::uint32_t, 3u>{0u, 2u, 3u}));
+    EXPECT_EQ(
+        model.LineIndices,
+        (std::vector<std::uint32_t>{
+            0u, 1u, 1u, 2u, 2u, 0u,
+            0u, 2u, 2u, 3u, 3u, 0u,
+        }));
+    EXPECT_EQ(
+        model.TriangleConformalDistortion,
+        (std::vector<float>{2.5f, 2.5f}));
+}
+
+TEST(ParameterizationFacade,
+     FaceDiagnosticsRequireTheExactGeometryAndUvFingerprint)
+{
+    ParameterizationHarness harness{};
+    Runtime::RuntimeEngineConfigControlState state{};
+    state.ActiveConfig.Sandbox.Parameterization.View.RenderMode =
+        Config::ParameterizationUvRenderMode::GpuShaded;
+    harness.Context.EngineConfigControlState = &state;
+
+    Runtime::SandboxEditorParameterizationResult last = Apply(
+        harness, Config::ParameterizationStrategyKind::HarmonicCotangent);
+    ASSERT_TRUE(last.Succeeded()) << last.Message;
+    ASSERT_TRUE(last.DiagnosticInputFingerprint.has_value());
+    last.Diagnostics.FaceConformalDistortion.assign(8u, 2.0f);
+    harness.Context.LastParameterizationResult = &last;
+
+    Runtime::SandboxEditorParameterizationViewModel model =
+        Runtime::BuildSandboxEditorParameterizationViewModel(harness.Context);
+    EXPECT_EQ(model.TriangleConformalDistortion.size(), 8u);
+    EXPECT_EQ(model.DiagnosticInputFingerprint,
+              last.DiagnosticInputFingerprint);
+
+    ASSERT_TRUE(harness.History.Undo().Succeeded());
+    model = Runtime::BuildSandboxEditorParameterizationViewModel(
+        harness.Context);
+    EXPECT_FALSE(model.DiagnosticInputFingerprint.has_value());
+    EXPECT_TRUE(model.TriangleConformalDistortion.empty());
+
+    ASSERT_TRUE(harness.History.Redo().Succeeded());
+    model = Runtime::BuildSandboxEditorParameterizationViewModel(
+        harness.Context);
+    EXPECT_EQ(model.DiagnosticInputFingerprint,
+              last.DiagnosticInputFingerprint);
+    EXPECT_EQ(model.TriangleConformalDistortion.size(), 8u);
+
+    auto uvs = harness.Vertices().Properties.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(uvs);
+    const glm::vec2 originalUv = uvs.Vector().front();
+    uvs.Vector().front().x = originalUv.x + 0.125f;
+    model = Runtime::BuildSandboxEditorParameterizationViewModel(
+        harness.Context);
+    ASSERT_TRUE(model.DiagnosticInputFingerprint.has_value());
+    EXPECT_NE(model.DiagnosticInputFingerprint,
+              last.DiagnosticInputFingerprint);
+    EXPECT_TRUE(model.TriangleConformalDistortion.empty());
+
+    uvs.Vector().front() = originalUv;
+    model = Runtime::BuildSandboxEditorParameterizationViewModel(
+        harness.Context);
+    EXPECT_EQ(model.DiagnosticInputFingerprint,
+              last.DiagnosticInputFingerprint);
+    EXPECT_EQ(model.TriangleConformalDistortion.size(), 8u);
+
+    auto positions = harness.Vertices().Properties.Get<glm::vec3>(
+        GS::PropertyNames::kPosition);
+    ASSERT_TRUE(positions);
+    positions.Vector().front().x += 0.25f;
+    model = Runtime::BuildSandboxEditorParameterizationViewModel(
+        harness.Context);
+    ASSERT_TRUE(model.DiagnosticInputFingerprint.has_value());
+    EXPECT_NE(model.DiagnosticInputFingerprint,
+              last.DiagnosticInputFingerprint);
+    EXPECT_TRUE(model.TriangleConformalDistortion.empty());
+}
+
+TEST(ParameterizationFacade,
+     DeletedFaceTombstoneKeepsDiagnosticsAlignedWithSourceFaceStorage)
+{
+    Geometry::HalfedgeMesh::Mesh mesh = MakeGridMesh();
+    mesh.DeleteFace(Geometry::FaceHandle{0u});
+    ASSERT_EQ(mesh.FacesSize(), 8u);
+    ASSERT_EQ(mesh.DeletedFaceCount(), 1u);
+
+    ParameterizationHarness harness{mesh};
+    Runtime::RuntimeEngineConfigControlState state{};
+    state.ActiveConfig.Sandbox.Parameterization.View.RenderMode =
+        Config::ParameterizationUvRenderMode::GpuShaded;
+    harness.Context.EngineConfigControlState = &state;
+
+    Runtime::SandboxEditorParameterizationResult result = Apply(
+        harness, Config::ParameterizationStrategyKind::HarmonicCotangent);
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_EQ(result.Diagnostics.FaceStorageCount, 8u);
+    EXPECT_EQ(result.Diagnostics.LiveFaceCount, 7u);
+    EXPECT_EQ(result.Diagnostics.DeletedFaceCount, 1u);
+    ASSERT_EQ(result.Diagnostics.FaceConformalDistortion.size(), 8u);
+    EXPECT_TRUE(std::isnan(result.Diagnostics.FaceConformalDistortion[0u]));
+    for (std::size_t sourceFace = 1u; sourceFace < 8u; ++sourceFace)
+    {
+        EXPECT_TRUE(std::isfinite(
+            result.Diagnostics.FaceConformalDistortion[sourceFace]));
+    }
+
+    harness.Context.LastParameterizationResult = &result;
+    const Runtime::SandboxEditorParameterizationViewModel model =
+        Runtime::BuildSandboxEditorParameterizationViewModel(harness.Context);
+    ASSERT_EQ(model.TriangleConformalDistortion.size(), 7u);
+    for (std::size_t triangle = 0u;
+         triangle < model.TriangleConformalDistortion.size();
+         ++triangle)
+    {
+        EXPECT_EQ(
+            model.TriangleConformalDistortion[triangle],
+            result.Diagnostics.FaceConformalDistortion[triangle + 1u]);
+    }
+}
+
+TEST(ParameterizationFacade, CpuViewDisablesGpuWorkAndReportsBackgroundFallback)
+{
+    Runtime::SandboxEditorContext context{};
+    std::vector<Runtime::SandboxEditorParameterizationUvViewRequest> requests{};
+    context.ParameterizationUvViewCommands.Submit =
+        [&requests](Runtime::SandboxEditorParameterizationUvViewRequest request)
+        {
+            requests.push_back(request);
+            return Runtime::SandboxEditorParameterizationUvViewState{};
+        };
+
+    Runtime::SandboxEditorParameterizationViewModel model{};
+    model.View.RenderMode = Config::ParameterizationUvRenderMode::CpuLayout;
+    for (const Config::ParameterizationUvBackgroundMode background : {
+             Config::ParameterizationUvBackgroundMode::Texture,
+             Config::ParameterizationUvBackgroundMode::TexelDensity})
+    {
+        model.View.BackgroundMode = background;
+        const Runtime::SandboxEditorParameterizationUvViewState state =
+            Runtime::SubmitSandboxEditorParameterizationUvView(
+                context, model, 320u, 180u);
+        ASSERT_FALSE(requests.empty());
+        EXPECT_FALSE(requests.back().Enabled);
+        EXPECT_EQ(requests.back().Width, 320u);
+        EXPECT_EQ(requests.back().Height, 180u);
+        EXPECT_EQ(
+            state.Status,
+            Runtime::SandboxEditorParameterizationUvViewStatus::CpuLayout);
+        EXPECT_EQ(state.RequestedMode,
+                  Config::ParameterizationUvRenderMode::CpuLayout);
+        EXPECT_EQ(state.ActiveMode,
+                  Config::ParameterizationUvRenderMode::CpuLayout);
+        EXPECT_EQ(state.RequestedBackground, background);
+        EXPECT_EQ(
+            state.ActiveBackground,
+            Config::ParameterizationUvBackgroundMode::Checker);
+        EXPECT_FALSE(state.GpuReady);
+    }
+}
+
+TEST(ParameterizationFacade, GpuViewWithoutCommandSurfaceReportsCpuFallback)
+{
+    Runtime::SandboxEditorContext context{};
+    Runtime::SandboxEditorParameterizationViewModel model{};
+    model.HasSelectedEntity = true;
+    model.SelectedEntityIsMesh = true;
+    model.HasUvCoordinates = true;
+    model.HasFiniteUvBounds = true;
+    model.SelectedStableEntityId = 17u;
+    model.View.RenderMode = Config::ParameterizationUvRenderMode::GpuShaded;
+    model.View.BackgroundMode =
+        Config::ParameterizationUvBackgroundMode::Texture;
+    model.UVs = {{0.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 1.0f}};
+    model.UvBoundsMin = {0.0f, 0.0f};
+    model.UvBoundsMax = {1.0f, 1.0f};
+    model.Triangles = {{0u, 1u, 2u}};
+    model.LineIndices = {0u, 1u, 1u, 2u, 2u, 0u};
+
+    const Runtime::SandboxEditorParameterizationUvViewState state =
+        Runtime::SubmitSandboxEditorParameterizationUvView(
+            context, model, 400u, 240u);
+    EXPECT_EQ(
+        state.Status,
+        Runtime::SandboxEditorParameterizationUvViewStatus::CpuFallbackNonOperational);
+    EXPECT_EQ(state.RequestedMode,
+              Config::ParameterizationUvRenderMode::GpuShaded);
+    EXPECT_EQ(state.ActiveMode,
+              Config::ParameterizationUvRenderMode::CpuLayout);
+    EXPECT_EQ(
+        state.ActiveBackground,
+        Config::ParameterizationUvBackgroundMode::Checker);
+    EXPECT_FALSE(state.GpuReady);
+}
+
+TEST(ParameterizationFacade, GpuViewRequestTokenIsStableAndSemantic)
+{
+    Runtime::SandboxEditorContext context{};
+    std::vector<Runtime::SandboxEditorParameterizationUvViewRequest> requests{};
+    context.ParameterizationUvViewCommands.Submit =
+        [&requests](Runtime::SandboxEditorParameterizationUvViewRequest request)
+        {
+            requests.push_back(request);
+            return Runtime::SandboxEditorParameterizationUvViewState{
+                .Status =
+                    Runtime::SandboxEditorParameterizationUvViewStatus::Ready,
+                .RequestedMode = request.View.RenderMode,
+                .ActiveMode = Config::ParameterizationUvRenderMode::GpuShaded,
+                .RequestedBackground = request.View.BackgroundMode,
+                .ActiveBackground = request.View.BackgroundMode,
+                .HeatmapActive = request.View.ShowDistortionHeatmap,
+                .GpuReady = true,
+                .RequestToken = request.RequestToken,
+                .BindlessIndex = 41u,
+                .Width = request.Width,
+                .Height = request.Height,
+                .TargetGeneration = 7u,
+                .RecordedPassCount = 3u,
+                .Message = "ready",
+            };
+        };
+
+    Runtime::SandboxEditorParameterizationViewModel model{};
+    model.HasSelectedEntity = true;
+    model.SelectedEntityIsMesh = true;
+    model.HasUvCoordinates = true;
+    model.HasFiniteUvBounds = true;
+    model.SelectedStableEntityId = 29u;
+    model.View.RenderMode = Config::ParameterizationUvRenderMode::GpuShaded;
+    model.View.BackgroundMode = Config::ParameterizationUvBackgroundMode::Grid;
+    model.UVs = {{0.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 1.0f}};
+    model.UvBoundsMin = {0.0f, 0.0f};
+    model.UvBoundsMax = {1.0f, 1.0f};
+    model.Triangles = {{0u, 1u, 2u}};
+    model.LineIndices = {0u, 1u, 1u, 2u, 2u, 0u};
+    model.TriangleConformalDistortion = {1.25f};
+
+    const auto submit = [&context](
+                            const Runtime::SandboxEditorParameterizationViewModel& value)
+    {
+        return Runtime::SubmitSandboxEditorParameterizationUvView(
+            context, value, 640u, 360u);
+    };
+    const auto first = submit(model);
+    const auto repeated = submit(model);
+    ASSERT_EQ(requests.size(), 2u);
+    EXPECT_TRUE(requests[0].Enabled);
+    EXPECT_EQ(requests[0].StableEntityId, 29u);
+    EXPECT_EQ(requests[0].Width, 640u);
+    EXPECT_EQ(requests[0].Height, 360u);
+    EXPECT_EQ(requests[0].LineIndices, model.LineIndices);
+    EXPECT_EQ(requests[0].TriangleConformalDistortion,
+              model.TriangleConformalDistortion);
+    EXPECT_EQ(requests[0].RequestToken, requests[1].RequestToken);
+    EXPECT_EQ(first.RequestToken, repeated.RequestToken);
+    EXPECT_EQ(first.Status,
+              Runtime::SandboxEditorParameterizationUvViewStatus::Ready);
+    EXPECT_EQ(first.ActiveMode,
+              Config::ParameterizationUvRenderMode::GpuShaded);
+    EXPECT_TRUE(first.GpuReady);
+    EXPECT_EQ(first.BindlessIndex, 41u);
+    EXPECT_EQ(first.TargetGeneration, 7u);
+    EXPECT_EQ(first.RecordedPassCount, 3u);
+    EXPECT_EQ(first.Width, 640u);
+    EXPECT_EQ(first.Height, 360u);
+    EXPECT_EQ(first.Message, "ready");
+
+    const std::uint64_t referenceToken = requests.back().RequestToken;
+    model.View.BackgroundMode =
+        Config::ParameterizationUvBackgroundMode::Checker;
+    (void)submit(model);
+    EXPECT_NE(requests.back().RequestToken, referenceToken);
+    const std::uint64_t backgroundToken = requests.back().RequestToken;
+
+    model.View.ShowDistortionHeatmap = true;
+    (void)submit(model);
+    EXPECT_NE(requests.back().RequestToken, backgroundToken);
+    const std::uint64_t heatmapToken = requests.back().RequestToken;
+
+    model.LineIndices[0] = 2u;
+    (void)submit(model);
+    EXPECT_NE(requests.back().RequestToken, heatmapToken);
+    const std::uint64_t topologyToken = requests.back().RequestToken;
+
+    model.TriangleConformalDistortion[0] = 3.0f;
+    (void)submit(model);
+    EXPECT_NE(requests.back().RequestToken, topologyToken);
+    const std::uint64_t diagnosticToken = requests.back().RequestToken;
+
+    model.SelectedStableEntityId = 30u;
+    (void)submit(model);
+    EXPECT_NE(requests.back().RequestToken, diagnosticToken);
+}

@@ -69,6 +69,11 @@ fail-closed.
     },
     "parameterization": {
       "strategy": "lscm",
+      "view": {
+        "render_mode": "cpu_layout",
+        "background_mode": "grid",
+        "show_distortion_heatmap": false
+      },
       "lscm": {
         "auto_pins": true,
         "pin_vertex_0": 0,
@@ -130,6 +135,9 @@ fail-closed.
 | `sandbox.progressive_poisson` | `mesh_surface_min_triangle_area` | Positive finite number in `[1e-30, 1e30]` |
 | `sandbox.progressive_poisson` | `debounce_seconds` | Number in `[0.0, 10.0]` |
 | `sandbox.parameterization` | `strategy` | `lscm`, `harmonic_cotangent`, `tutte_uniform`, `bff` |
+| `sandbox.parameterization.view` | `render_mode` | `cpu_layout`, `gpu_shaded`; the GPU request falls back to the CPU layout until a matching completed target is ready |
+| `sandbox.parameterization.view` | `background_mode` | `grid`, `checker`, `texel_density`, `texture` |
+| `sandbox.parameterization.view` | `show_distortion_heatmap` | Boolean; requests the canonical per-face conformal-distortion shading on the GPU path |
 | `sandbox.parameterization.lscm` | `auto_pins` | Boolean; when true, the geometry solver chooses its deterministic pins |
 | `sandbox.parameterization.lscm` | `pin_vertex_0`, `pin_vertex_1` | Distinct unsigned 32-bit vertex indices used when `auto_pins` is false |
 | `sandbox.parameterization.lscm` | `pin_uv_0`, `pin_uv_1` | Arrays of exactly two finite, float-representable numbers |
@@ -145,11 +153,13 @@ fail-closed.
 
 The parameterization section is additive within schema version 1. A document
 may omit it and retain the caller-provided reference defaults. When it is
-present, all four strategy selections and the three typed parameter records
-round-trip so file/agent callers and the downstream UI can change the strategy
-without inventing an untyped parameter bag. The serializer persists
-the lowercase tokens above, never a `std::variant` alternative index. There is
-no optimized/GPU backend selector while every implemented strategy is CPU-only.
+present, all four strategy selections, the UV-view controls, and the three
+typed parameter records round-trip so file/agent callers and the downstream UI
+can change them without inventing an untyped parameter bag. The serializer
+persists the lowercase tokens above, never a `std::variant` alternative index.
+`view.render_mode = gpu_shaded` selects an optional presentation path; it does
+not change the parameterization solver backend. There is no optimized/GPU
+solver selector while every implemented strategy is CPU-only.
 
 ## Mutability
 
@@ -175,10 +185,12 @@ reject the hot apply without disturbing the currently active recipe override. An
 empty path clears the active override and returns to the derived default frame
 recipe. The sandbox progressive-Poisson block is value-only method/playground
 state consumed by the Sandbox Editor and agent/CLI callers. The parameterization
-block similarly holds the selected CPU strategy and its typed values; applying
-it sets `SandboxParameterizationChanged` when the live value changes. Neither
-sandbox block imports runtime from core or mutates renderer state by itself. See
-[runtime config control](runtime-config-control.md).
+block similarly holds the selected CPU strategy, its typed values, and the UV
+view render/background/heatmap choices; applying it sets
+`SandboxParameterizationChanged` when the live value changes. Runtime and the
+Sandbox panel consume the view choices and request the renderer path, while the
+core config value itself imports no runtime/graphics code and mutates no
+renderer state. See [runtime config control](runtime-config-control.md).
 
 ## Diagnostics
 

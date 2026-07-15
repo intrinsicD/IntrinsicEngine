@@ -35,6 +35,7 @@ import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Graphics.UvView;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.ColormapSystem;
@@ -205,7 +206,8 @@ namespace Extrinsic::Graphics
                             lhs.EnableAntiAliasing,
                             lhs.EnableImGui,
                             lhs.EnableTransientDebugSurface,
-                            lhs.EnableVisualizationOverlay) ==
+                            lhs.EnableVisualizationOverlay,
+                            lhs.EnableUvView) ==
                    std::tie(rhs.LightingPath,
                             rhs.EnableDepthPrepass,
                             rhs.EnableHZBBuild,
@@ -219,7 +221,8 @@ namespace Extrinsic::Graphics
                             rhs.EnableAntiAliasing,
                             rhs.EnableImGui,
                             rhs.EnableTransientDebugSurface,
-                            rhs.EnableVisualizationOverlay);
+                            rhs.EnableVisualizationOverlay,
+                            rhs.EnableUvView);
         }
 
         [[nodiscard]] bool FrameRecipeImportsEqual(const FrameRecipeImports& lhs,
@@ -249,7 +252,9 @@ namespace Extrinsic::Graphics
                                    lhs.ClusterGridAABBs.IsValid(),
                                    lhs.ClusterLightHeaders.IsValid(),
                                    lhs.ClusterLightIndices.IsValid(),
-                                   lhs.ClusterLightCounter.IsValid()) ==
+                                   lhs.ClusterLightCounter.IsValid(),
+                                   lhs.UvViewColor.IsValid(),
+                                   lhs.UvViewColorInitialized) ==
                    std::make_tuple(rhs.Backbuffer.IsValid(),
                                    rhs.SceneTable.IsValid(),
                                    rhs.InstanceStatic.IsValid(),
@@ -274,7 +279,9 @@ namespace Extrinsic::Graphics
                                    rhs.ClusterGridAABBs.IsValid(),
                                    rhs.ClusterLightHeaders.IsValid(),
                                    rhs.ClusterLightIndices.IsValid(),
-                                   rhs.ClusterLightCounter.IsValid());
+                                   rhs.ClusterLightCounter.IsValid(),
+                                   rhs.UvViewColor.IsValid(),
+                                   rhs.UvViewColorInitialized);
         }
 
         [[nodiscard]] bool FrameRecipeSizingEqual(const FrameRecipeSizing& lhs,
@@ -455,6 +462,7 @@ namespace Extrinsic::Graphics
                         aaOptions.ReconstructionHistoryPrevious);
             bindTexture(FrameRecipeResourceKind::ReconstructionHistoryCurrent,
                         aaOptions.ReconstructionHistoryCurrent);
+            bindTexture(FrameRecipeResourceKind::UvViewColor, imports.UvViewColor);
 
             bindBuffer(FrameRecipeResourceKind::SceneTable, imports.SceneTable);
             bindBuffer(FrameRecipeResourceKind::InstanceStatic, imports.InstanceStatic);
@@ -1552,6 +1560,20 @@ namespace Extrinsic::Graphics
         return projection;
     }
 
+    void IRenderer::SubmitUvViewRequest(UvViewRequest request)
+    {
+        (void)request;
+    }
+
+    UvViewOutput IRenderer::GetUvViewOutput() const
+    {
+        return UvViewOutput{
+            .Status = UvViewStatus::CpuFallbackNonOperational,
+            .ActiveMode = UvViewActiveMode::CpuLayout,
+            .Diagnostic = "Renderer backend does not provide the optional GPU UV view.",
+        };
+    }
+
     class NullRenderer final : public IRenderer
     {
     private:
@@ -2299,6 +2321,23 @@ namespace Extrinsic::Graphics
                 });
         }
 
+        void SubmitUvViewRequest(UvViewRequest request) override
+        {
+            if (m_Subsystems.UvViewSystem())
+            {
+                m_Subsystems.UvViewSystem()->Submit(std::move(request));
+            }
+        }
+
+        [[nodiscard]] UvViewOutput GetUvViewOutput() const override
+        {
+            if (m_Subsystems.UvViewSystem())
+            {
+                return m_Subsystems.UvViewSystem()->GetOutput();
+            }
+            return IRenderer::GetUvViewOutput();
+        }
+
         void SubmitRuntimeSnapshots(const RuntimeRenderSnapshotBatch& snapshots,
                                     const std::uint32_t storageSlot) override
         {
@@ -2984,6 +3023,13 @@ namespace Extrinsic::Graphics
                 selectedAAMode = FrameRecipeAAMode::NoAA;
                 temporalOptions = {};
             }
+            UvView* uvView = m_Subsystems.UvViewSystem()
+                ? &*m_Subsystems.UvViewSystem()
+                : nullptr;
+            if (uvView != nullptr)
+            {
+                uvView->Prepare(*m_Subsystems.GpuWorldSystem());
+            }
             const FrameRecipeImports imports{
                 .Backbuffer = m_Device->GetBackbufferHandle(frame),
                 .SceneTable = m_Subsystems.GpuWorldSystem()->GetSceneTableBuffer(),
@@ -3055,6 +3101,11 @@ namespace Extrinsic::Graphics
                     (m_ClusterLightCounterBuffer.has_value() && m_ClusterLightCounterBuffer->IsValid())
                         ? m_ClusterLightCounterBuffer->GetHandle()
                         : RHI::BufferHandle{},
+                .UvViewColor = uvView != nullptr && uvView->ShouldRecord()
+                    ? uvView->GetTarget()
+                    : RHI::TextureHandle{},
+                .UvViewColorInitialized =
+                    uvView != nullptr && uvView->TargetHasShaderReadContents(),
             };
             const FrameRecipeAAOptions aaOptions{
                 .Mode = selectedAAMode,
@@ -3117,6 +3168,8 @@ namespace Extrinsic::Graphics
                 defaultRecipeFeatures.EnableDepthPrepass && clusterResourcesReady;
             defaultRecipeFeatures.EnableClusterLightAssignment =
                 defaultRecipeFeatures.EnableClusterGridBuild && clusterResourcesReady;
+            defaultRecipeFeatures.EnableUvView =
+                uvView != nullptr && uvView->ShouldRecord();
             if (m_ActiveFrameRecipeOverride.has_value())
             {
                 m_LastRenderGraphStats.FrameRecipeOverrideActive = true;
@@ -3953,6 +4006,10 @@ namespace Extrinsic::Graphics
                     : (m_ParallelRenderGraphRecordingEnabled
                            ? executeParallelSingleQueueOrFallback()
                            : executeSingleQueue());
+            if (uvView != nullptr)
+            {
+                uvView->CompleteFrame(executeResult.has_value());
+            }
             const auto executeEnd = std::chrono::steady_clock::now();
             m_LastRenderGraphStats.Execute.TimeMicros = static_cast<std::uint64_t>(
                 std::chrono::duration_cast<std::chrono::microseconds>(executeEnd - executeBegin).count());
@@ -8242,14 +8299,25 @@ namespace Extrinsic::Graphics
             {
                 return RenderCommandPassStatus::SkippedNonOperational;
             }
+            std::optional<GpuWorld>& gpuWorld =
+                m_Subsystems.GpuWorldSystem();
+            if (!gpuWorld.has_value())
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+            // The culling pass has no render attachments and is the explicit
+            // predecessor of every managed-buffer consumer, including UvView.
+            // Record upload visibility before any availability soft-skip so a
+            // missing culling pipeline cannot strand freshly uploaded geometry.
+            gpuWorld->SubmitPendingUploadBarriers(cmd);
             if (!m_CullingOutputAvailable)
             {
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
 
-            m_Subsystems.GpuWorldSystem()->SubmitPendingUploadBarriers(cmd);
             m_Subsystems.CullingSystemRegistry()->ResetCounters(cmd);
-            m_Subsystems.CullingSystemRegistry()->DispatchCull(cmd, camera, *m_Subsystems.GpuWorldSystem());
+            m_Subsystems.CullingSystemRegistry()->DispatchCull(
+                cmd, camera, *gpuWorld);
             return RenderCommandPassStatus::Recorded;
         }
 
@@ -10394,6 +10462,27 @@ namespace Extrinsic::Graphics
                 RenderCommandRouteContext& context = RouteContextFrom(contextPointer);
                 const RenderCommandPassStatus status =
                     RecordVisualizationOverlayPass(cmd, *context.World);
+                AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
+            });
+
+        m_CommandRouter.Register(id(FrameRecipePassKind::UvView),
+            [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void*) {
+                if (!m_Subsystems.UvViewSystem())
+                {
+                    AccumulateCommandRecordStatus(
+                        route.DebugName,
+                        route.PassId,
+                        RenderCommandPassStatus::SkippedUnavailable);
+                    return;
+                }
+                UvView& uvView = *m_Subsystems.UvViewSystem();
+                const std::uint64_t before =
+                    uvView.GetOutput().RecordedPassCount;
+                uvView.Record(cmd);
+                const RenderCommandPassStatus status =
+                    uvView.GetOutput().RecordedPassCount > before
+                        ? RenderCommandPassStatus::Recorded
+                        : RenderCommandPassStatus::SkippedUnavailable;
                 AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
             });
 

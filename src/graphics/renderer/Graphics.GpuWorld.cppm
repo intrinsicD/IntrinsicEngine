@@ -301,6 +301,9 @@ export namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::BufferHandle GetManagedVertexBuffer() const noexcept;
         [[nodiscard]] RHI::BufferHandle GetManagedIndexBuffer() const noexcept;
+        [[nodiscard]] bool TryGetGeometryRecord(
+            GpuGeometryHandle geometry,
+            RHI::GpuGeometryRecord& outRecord) const noexcept;
 
         [[nodiscard]] std::uint32_t GetLiveInstanceCount() const noexcept;
         [[nodiscard]] std::uint32_t GetInstanceCapacity() const noexcept;

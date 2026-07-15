@@ -1868,24 +1868,25 @@ namespace Extrinsic::Graphics
             return addRecipePassWithId(ToFramePassId(kind), std::move(name), setup, sideEffect);
         };
 
-        addRecipePass(FrameRecipePassKind::Culling, "CullingPass", [=](RenderGraphBuilder& builder) {
-            builder.Read(sceneTable, BufferUsage::ShaderRead);
-            builder.Read(instanceStatic, BufferUsage::ShaderRead);
-            builder.Read(instanceDynamic, BufferUsage::ShaderRead);
-            builder.Read(entityConfig, BufferUsage::ShaderRead);
-            builder.Read(geometryRecords, BufferUsage::ShaderRead);
-            builder.Read(bounds, BufferUsage::ShaderRead);
-            builder.Read(materialBuffer, BufferUsage::ShaderRead);
-            builder.Read(lights, BufferUsage::ShaderRead);
-            builder.Write(drawIndirect, BufferUsage::ShaderWrite);
-            builder.Write(drawCount, BufferUsage::ShaderWrite);
-            builder.Write(lineDrawIndirect, BufferUsage::ShaderWrite);
-            builder.Write(lineDrawCount, BufferUsage::ShaderWrite);
-            builder.Write(lineQuadDrawIndirect, BufferUsage::ShaderWrite);
-            builder.Write(lineQuadDrawCount, BufferUsage::ShaderWrite);
-            builder.Write(pointDrawIndirect, BufferUsage::ShaderWrite);
-            builder.Write(pointDrawCount, BufferUsage::ShaderWrite);
-        });
+        const PassRef cullingPass =
+            addRecipePass(FrameRecipePassKind::Culling, "CullingPass", [=](RenderGraphBuilder& builder) {
+                builder.Read(sceneTable, BufferUsage::ShaderRead);
+                builder.Read(instanceStatic, BufferUsage::ShaderRead);
+                builder.Read(instanceDynamic, BufferUsage::ShaderRead);
+                builder.Read(entityConfig, BufferUsage::ShaderRead);
+                builder.Read(geometryRecords, BufferUsage::ShaderRead);
+                builder.Read(bounds, BufferUsage::ShaderRead);
+                builder.Read(materialBuffer, BufferUsage::ShaderRead);
+                builder.Read(lights, BufferUsage::ShaderRead);
+                builder.Write(drawIndirect, BufferUsage::ShaderWrite);
+                builder.Write(drawCount, BufferUsage::ShaderWrite);
+                builder.Write(lineDrawIndirect, BufferUsage::ShaderWrite);
+                builder.Write(lineDrawCount, BufferUsage::ShaderWrite);
+                builder.Write(lineQuadDrawIndirect, BufferUsage::ShaderWrite);
+                builder.Write(lineQuadDrawCount, BufferUsage::ShaderWrite);
+                builder.Write(pointDrawIndirect, BufferUsage::ShaderWrite);
+                builder.Write(pointDrawCount, BufferUsage::ShaderWrite);
+            });
 
         if (features.EnableDepthPrepass)
         {
@@ -2318,6 +2319,7 @@ namespace Extrinsic::Graphics
         if (features.EnableUvView)
         {
             addRecipePass(FrameRecipePassKind::UvView, "UvViewPass", [=](RenderGraphBuilder& builder) {
+                builder.DependsOn(cullingPass);
                 builder.Write(uvViewColor, TextureUsage::ColorAttachmentWrite);
                 builder.SetRenderPass(RHI::RenderPassDesc{
                     .ColorTargets = kMinimalRenderPassColorAttachments,

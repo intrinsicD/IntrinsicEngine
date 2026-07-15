@@ -15,7 +15,7 @@ Root scanned: `src`
 | `geometry` | 103 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 69 |
+| `graphics/renderer` | 70 |
 | `graphics/rhi` | 20 |
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
@@ -266,6 +266,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.SpatialDebugVisualizers` | `src/graphics/renderer/Graphics.SpatialDebugVisualizers.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.TransformSyncSystem` | `src/graphics/renderer/Graphics.TransformSyncSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.TransientDebugUploadHelper` | `src/graphics/renderer/Graphics.TransientDebugUploadHelper.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.UvView` | `src/graphics/renderer/Graphics.UvView.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.VisualizationOverlayUploadHelper` | `src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.VisualizationPackets` | `src/graphics/renderer/Graphics.VisualizationPackets.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.VisualizationPropertyBufferResidency` | `src/graphics/renderer/Graphics.VisualizationPropertyBufferResidency.cppm` | `graphics/renderer` |
@@ -418,4 +419,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugClosestFace` | `src/runtime/SpatialDebug/Runtime.SpatialDebugClosestFace.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **391**
+Total modules: **392**

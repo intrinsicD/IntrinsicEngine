@@ -24,6 +24,7 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.RHI.Device;
 import Extrinsic.Platform.Window;
 import Extrinsic.Graphics.CameraSnapshots;
+import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.Renderer;
@@ -290,6 +291,11 @@ namespace Extrinsic::Runtime
         // Zero-initialized until the first frame extracts.
         [[nodiscard]] const RuntimeRenderExtractionStats&
             GetLastRenderExtractionStats() const noexcept;
+        [[nodiscard]] std::optional<Graphics::GpuGeometryHandle>
+            FindSurfaceGpuGeometry(std::uint32_t stableEntityId) const noexcept;
+        [[nodiscard]] std::optional<Graphics::MaterialTextureAssetBindings>
+            GetMaterialTextureAssetBindings(
+                std::uint32_t stableEntityId) const noexcept;
         [[nodiscard]] std::optional<Graphics::MaterialTextureAssetBindings>
             GetMaterialTextureAssetBindingsForTest(std::uint32_t stableEntityId) const noexcept;
 

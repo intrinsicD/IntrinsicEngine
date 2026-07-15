@@ -128,6 +128,128 @@ namespace Extrinsic::Runtime
             }
             return FaceRingOutcome::Triangulate;
         }
+
+        [[nodiscard]] MeshPackStatus BuildSurfaceTriangleTopologyImpl(
+            const ECS::Components::GeometrySources::ConstSourceView& view,
+            std::vector<std::uint32_t>* outSurfaceIndices,
+            std::vector<std::uint32_t>* outTriangleToFace)
+        {
+            using namespace ECS::Components::GeometrySources;
+
+            if (outSurfaceIndices != nullptr)
+                outSurfaceIndices->clear();
+            if (outTriangleToFace != nullptr)
+                outTriangleToFace->clear();
+
+            const auto fail = [&](const MeshPackStatus status)
+            {
+                if (outSurfaceIndices != nullptr)
+                    outSurfaceIndices->clear();
+                if (outTriangleToFace != nullptr)
+                    outTriangleToFace->clear();
+                return status;
+            };
+
+            const SourceAvailability availability = BuildSourceAvailability(view);
+            if (availability.ProvenanceDomain != Domain::Mesh)
+                return fail(MeshPackStatus::WrongDomain);
+            if (view.VertexSource == nullptr)
+                return fail(MeshPackStatus::MissingPositions);
+            const auto positionProperty =
+                view.VertexSource->Properties.Get<glm::vec3>(
+                    PropertyNames::kPosition);
+            if (!positionProperty)
+                return fail(MeshPackStatus::MissingPositions);
+            const std::uint32_t vertexCount = static_cast<std::uint32_t>(
+                positionProperty.Vector().size());
+            if (vertexCount == 0u)
+                return fail(MeshPackStatus::EmptyMesh);
+
+            if (view.HalfedgeSource == nullptr)
+                return fail(MeshPackStatus::MissingHalfedgeTopology);
+            const auto toVertexProperty =
+                view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                    PropertyNames::kHalfedgeToVertex);
+            const auto nextProperty =
+                view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                    PropertyNames::kHalfedgeNext);
+            const auto faceProperty =
+                view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                    PropertyNames::kHalfedgeFace);
+            if (!toVertexProperty || !nextProperty || !faceProperty)
+                return fail(MeshPackStatus::MissingHalfedgeTopology);
+            const auto& toVertex = toVertexProperty.Vector();
+            const auto& nextHalfedge = nextProperty.Vector();
+            const auto& halfedgeFace = faceProperty.Vector();
+            const std::size_t halfedgeCount = toVertex.size();
+            if (halfedgeCount == 0u)
+                return fail(MeshPackStatus::EmptyMesh);
+            if (nextHalfedge.size() != halfedgeCount ||
+                halfedgeFace.size() != halfedgeCount)
+            {
+                return fail(MeshPackStatus::InvalidTopology);
+            }
+
+            if (view.FaceSource == nullptr)
+                return fail(MeshPackStatus::MissingFaceTopology);
+            const auto faceHalfedgeProperty =
+                view.FaceSource->Properties.Get<std::uint32_t>(
+                    PropertyNames::kFaceHalfedge);
+            if (!faceHalfedgeProperty)
+                return fail(MeshPackStatus::MissingFaceTopology);
+            const auto& faceHalfedge = faceHalfedgeProperty.Vector();
+            const std::size_t faceCount = faceHalfedge.size();
+            if (faceCount == 0u)
+                return fail(MeshPackStatus::EmptyMesh);
+
+            const std::uint32_t faceCountU32 =
+                static_cast<std::uint32_t>(faceCount);
+            std::vector<std::uint32_t> ringScratch;
+            ringScratch.reserve(8u);
+            std::size_t emittedTriangleCount = 0u;
+            for (std::size_t faceIndex = 0u;
+                 faceIndex < faceCount;
+                 ++faceIndex)
+            {
+                const FaceRingOutcome outcome = ProduceFaceRing(
+                    faceHalfedge,
+                    halfedgeFace,
+                    nextHalfedge,
+                    toVertex,
+                    faceCountU32,
+                    vertexCount,
+                    faceIndex,
+                    ringScratch);
+                if (outcome == FaceRingOutcome::Invalid)
+                    return fail(MeshPackStatus::InvalidTopology);
+                if (outcome == FaceRingOutcome::Skip)
+                    continue;
+
+                for (std::size_t ringIndex = 1u;
+                     ringIndex + 1u < ringScratch.size();
+                     ++ringIndex)
+                {
+                    if (outSurfaceIndices != nullptr)
+                    {
+                        outSurfaceIndices->insert(
+                            outSurfaceIndices->end(),
+                            {ringScratch[0u],
+                             ringScratch[ringIndex],
+                             ringScratch[ringIndex + 1u]});
+                    }
+                    if (outTriangleToFace != nullptr)
+                    {
+                        outTriangleToFace->push_back(
+                            static_cast<std::uint32_t>(faceIndex));
+                    }
+                    ++emittedTriangleCount;
+                }
+            }
+
+            if (emittedTriangleCount == 0u)
+                return fail(MeshPackStatus::DegenerateAllFaces);
+            return MeshPackStatus::Success;
+        }
     }
 
     const char* DebugNameForMeshPackStatus(MeshPackStatus status) noexcept
@@ -442,107 +564,20 @@ namespace Extrinsic::Runtime
         const ECS::Components::GeometrySources::ConstSourceView& view,
         std::vector<std::uint32_t>& outTriangleToFace)
     {
-        outTriangleToFace.clear();
+        return BuildSurfaceTriangleTopologyImpl(
+            view,
+            nullptr,
+            &outTriangleToFace);
+    }
 
-        using namespace ECS::Components::GeometrySources;
-
-        // Validation mirrors `PackMesh` so the two stay in lockstep; only the
-        // topology needed to reproduce the surface triangle order is read
-        // (positions are needed for the `targetV < vertexCount` ring check).
-        const SourceAvailability availability = BuildSourceAvailability(view);
-        if (availability.ProvenanceDomain != Domain::Mesh)
-        {
-            return MeshPackStatus::WrongDomain;
-        }
-        if (view.VertexSource == nullptr)
-        {
-            return MeshPackStatus::MissingPositions;
-        }
-        const auto posProp = view.VertexSource->Properties.Get<glm::vec3>(PropertyNames::kPosition);
-        if (!posProp)
-        {
-            return MeshPackStatus::MissingPositions;
-        }
-        const std::uint32_t vertexCount = static_cast<std::uint32_t>(posProp.Vector().size());
-        if (vertexCount == 0)
-        {
-            return MeshPackStatus::EmptyMesh;
-        }
-        if (view.HalfedgeSource == nullptr)
-        {
-            return MeshPackStatus::MissingHalfedgeTopology;
-        }
-        const auto toVertexProp = view.HalfedgeSource->Properties.Get<std::uint32_t>(
-            PropertyNames::kHalfedgeToVertex);
-        const auto nextProp = view.HalfedgeSource->Properties.Get<std::uint32_t>(
-            PropertyNames::kHalfedgeNext);
-        const auto faceProp = view.HalfedgeSource->Properties.Get<std::uint32_t>(
-            PropertyNames::kHalfedgeFace);
-        if (!toVertexProp || !nextProp || !faceProp)
-        {
-            return MeshPackStatus::MissingHalfedgeTopology;
-        }
-        const auto& toVertex = toVertexProp.Vector();
-        const auto& nextHe = nextProp.Vector();
-        const auto& halfedgeFace = faceProp.Vector();
-        const std::size_t halfedgeCount = toVertex.size();
-        if (halfedgeCount == 0)
-        {
-            return MeshPackStatus::EmptyMesh;
-        }
-        if (nextHe.size() != halfedgeCount || halfedgeFace.size() != halfedgeCount)
-        {
-            return MeshPackStatus::InvalidTopology;
-        }
-
-        if (view.FaceSource == nullptr)
-        {
-            return MeshPackStatus::MissingFaceTopology;
-        }
-        const auto faceHeProp = view.FaceSource->Properties.Get<std::uint32_t>(
-            PropertyNames::kFaceHalfedge);
-        if (!faceHeProp)
-        {
-            return MeshPackStatus::MissingFaceTopology;
-        }
-        const auto& faceHe = faceHeProp.Vector();
-        const std::size_t faceCount = faceHe.size();
-        if (faceCount == 0)
-        {
-            return MeshPackStatus::EmptyMesh;
-        }
-
-        const std::uint32_t faceCountU32 = static_cast<std::uint32_t>(faceCount);
-
-        std::vector<std::uint32_t> ringScratch;
-        ringScratch.reserve(8);
-
-        for (std::size_t f = 0; f < faceCount; ++f)
-        {
-            const FaceRingOutcome outcome = ProduceFaceRing(
-                faceHe, halfedgeFace, nextHe, toVertex, faceCountU32, vertexCount, f, ringScratch);
-            if (outcome == FaceRingOutcome::Invalid)
-            {
-                outTriangleToFace.clear();
-                return MeshPackStatus::InvalidTopology;
-            }
-            if (outcome == FaceRingOutcome::Skip)
-            {
-                continue;
-            }
-            // Fan triangulation emits (ringSize - 2) triangles for this face,
-            // all owned by face row `f` — matching PackMesh's emission count.
-            const std::size_t triangles = ringScratch.size() - 2u;
-            for (std::size_t t = 0; t < triangles; ++t)
-            {
-                outTriangleToFace.push_back(static_cast<std::uint32_t>(f));
-            }
-        }
-
-        if (outTriangleToFace.empty())
-        {
-            return MeshPackStatus::DegenerateAllFaces;
-        }
-        return MeshPackStatus::Success;
+    MeshPackStatus BuildSurfaceTriangleTopology(
+        const ECS::Components::GeometrySources::ConstSourceView& view,
+        std::vector<std::uint32_t>& outSurfaceIndices,
+        std::vector<std::uint32_t>& outTriangleToFace)
+    {
+        return BuildSurfaceTriangleTopologyImpl(
+            view,
+            &outSurfaceIndices,
+            &outTriangleToFace);
     }
 }

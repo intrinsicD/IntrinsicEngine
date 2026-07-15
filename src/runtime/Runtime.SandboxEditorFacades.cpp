@@ -48,10 +48,14 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.CurrentRendererContractAdapter;
+import Extrinsic.Graphics.GpuAssetCache;
+import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Graphics.UvView;
+import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetImportPipeline;
@@ -5186,6 +5190,7 @@ namespace Extrinsic::Runtime
             Geometry::HalfedgeMesh::Mesh Mesh{};
             std::vector<glm::vec3> BeforePositions{};
             std::vector<bool> DeletedVertices{};
+            std::vector<std::uint32_t> SourceFaceForMeshFace{};
             SandboxEditorCommandStatus Status{
                 SandboxEditorCommandStatus::NoChange};
             Core::ErrorCode Error{Core::ErrorCode::Success};
@@ -5279,8 +5284,20 @@ namespace Extrinsic::Runtime
                     "Mesh denoise conversion changed the vertex slot count.";
                 return result;
             }
+            if (converted.Mesh.FacesSize() !=
+                soup.SourceFaceForSoupFace.size())
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Diagnostic =
+                    "Mesh denoise conversion changed the face slot count.";
+                return result;
+            }
 
             result.Mesh = std::move(converted.Mesh);
+            result.SourceFaceForMeshFace =
+                std::move(soup.SourceFaceForSoupFace);
             result.Status = SandboxEditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             return result;
@@ -10305,6 +10322,245 @@ namespace Extrinsic::Runtime
             return model;
         }
 
+        [[nodiscard]] Graphics::UvViewBackgroundMode ToGraphicsUvViewBackground(
+            const Core::Config::ParameterizationUvBackgroundMode mode) noexcept
+        {
+            using ConfigMode =
+                Core::Config::ParameterizationUvBackgroundMode;
+            switch (mode)
+            {
+            case ConfigMode::Grid:
+                return Graphics::UvViewBackgroundMode::Grid;
+            case ConfigMode::Checker:
+                return Graphics::UvViewBackgroundMode::Checker;
+            case ConfigMode::TexelDensity:
+                return Graphics::UvViewBackgroundMode::TexelDensity;
+            case ConfigMode::Texture:
+                return Graphics::UvViewBackgroundMode::Texture;
+            }
+            return Graphics::UvViewBackgroundMode::Grid;
+        }
+
+        [[nodiscard]] Core::Config::ParameterizationUvBackgroundMode
+        ToConfigUvViewBackground(
+            const Graphics::UvViewBackgroundMode mode) noexcept
+        {
+            using ConfigMode =
+                Core::Config::ParameterizationUvBackgroundMode;
+            switch (mode)
+            {
+            case Graphics::UvViewBackgroundMode::Grid:
+                return ConfigMode::Grid;
+            case Graphics::UvViewBackgroundMode::Checker:
+                return ConfigMode::Checker;
+            case Graphics::UvViewBackgroundMode::TexelDensity:
+                return ConfigMode::TexelDensity;
+            case Graphics::UvViewBackgroundMode::Texture:
+                return ConfigMode::Texture;
+            }
+            return ConfigMode::Grid;
+        }
+
+        [[nodiscard]] SandboxEditorParameterizationUvViewStatus
+        ToSandboxUvViewStatus(const Graphics::UvViewStatus status) noexcept
+        {
+            using SandboxStatus =
+                SandboxEditorParameterizationUvViewStatus;
+            switch (status)
+            {
+            case Graphics::UvViewStatus::Disabled:
+                return SandboxStatus::Disabled;
+            case Graphics::UvViewStatus::CpuFallbackNonOperational:
+                return SandboxStatus::CpuFallbackNonOperational;
+            case Graphics::UvViewStatus::WaitingForGeometry:
+                return SandboxStatus::WaitingForGeometry;
+            case Graphics::UvViewStatus::InvalidRequest:
+                return SandboxStatus::InvalidRequest;
+            case Graphics::UvViewStatus::ResourceCreationFailed:
+                return SandboxStatus::ResourceCreationFailed;
+            case Graphics::UvViewStatus::Ready:
+                return SandboxStatus::Ready;
+            }
+            return SandboxStatus::InvalidRequest;
+        }
+
+        void MixSandboxUvViewToken(
+            std::uint64_t& token,
+            const std::uint64_t value) noexcept
+        {
+            token ^= value + 0x9E3779B97F4A7C15ull +
+                     (token << 6u) + (token >> 2u);
+        }
+
+        [[nodiscard]] SandboxEditorParameterizationUvViewState
+        SubmitEngineParameterizationUvView(
+            Engine& engine,
+            SandboxEditorParameterizationUvViewRequest request)
+        {
+            using ConfigBackground =
+                Core::Config::ParameterizationUvBackgroundMode;
+            using ConfigMode =
+                Core::Config::ParameterizationUvRenderMode;
+            using SandboxStatus =
+                SandboxEditorParameterizationUvViewStatus;
+
+            SandboxEditorParameterizationUvViewState state{
+                .Status = request.Enabled
+                    ? SandboxStatus::WaitingForGpuFrame
+                    : SandboxStatus::CpuLayout,
+                .RequestedMode = request.View.RenderMode,
+                .ActiveMode = ConfigMode::CpuLayout,
+                .RequestedBackground = request.View.BackgroundMode,
+                .ActiveBackground =
+                    request.View.BackgroundMode == ConfigBackground::Grid ||
+                            request.View.BackgroundMode == ConfigBackground::Checker
+                        ? request.View.BackgroundMode
+                        : ConfigBackground::Checker,
+                .RequestToken = request.RequestToken,
+                .Width = request.Width,
+                .Height = request.Height,
+                .Message = request.Enabled
+                    ? "GPU UV view is waiting for the next rendered frame."
+                    : "CPU UV layout is active.",
+            };
+
+            if (!request.Enabled)
+            {
+                Graphics::UvViewRequest disabledRequest{};
+                disabledRequest.RequestToken = request.RequestToken;
+                engine.GetRenderer().SubmitUvViewRequest(
+                    std::move(disabledRequest));
+                return state;
+            }
+
+            const std::optional<Graphics::GpuGeometryHandle> geometry =
+                engine.FindSurfaceGpuGeometry(request.StableEntityId);
+            if (geometry.has_value())
+            {
+                MixSandboxUvViewToken(state.RequestToken, geometry->Index);
+                MixSandboxUvViewToken(state.RequestToken, geometry->Generation);
+            }
+            else
+            {
+                MixSandboxUvViewToken(state.RequestToken, 0xFFFFFFFFFFFFFFFFull);
+            }
+
+            RHI::BindlessIndex backgroundTexture =
+                RHI::kInvalidBindlessIndex;
+            std::uint64_t backgroundTextureGeneration = 0u;
+            if (request.View.BackgroundMode == ConfigBackground::Texture)
+            {
+                const auto bindings = engine.GetMaterialTextureAssetBindings(
+                    request.StableEntityId);
+                if (bindings.has_value() && bindings->Albedo.IsValid())
+                {
+                    const auto view =
+                        engine.GetGpuAssetCache().GetView(bindings->Albedo);
+                    if (view.has_value() &&
+                        view->Kind == Graphics::GpuAssetKind::Texture &&
+                        view->BindlessIdx != RHI::kInvalidBindlessIndex)
+                    {
+                        backgroundTexture = view->BindlessIdx;
+                        backgroundTextureGeneration = view->Generation;
+                    }
+                }
+            }
+            MixSandboxUvViewToken(state.RequestToken, backgroundTexture);
+            MixSandboxUvViewToken(
+                state.RequestToken,
+                backgroundTextureGeneration);
+
+            Graphics::UvViewRequest graphicsRequest{
+                .Enabled = true,
+                .RequestToken = state.RequestToken,
+                .Geometry = geometry.value_or(Graphics::GpuGeometryHandle{}),
+                .Width = request.Width,
+                .Height = request.Height,
+                .Bounds = Graphics::UvViewBounds{
+                    .MinU = request.UvBoundsMin.x,
+                    .MinV = request.UvBoundsMin.y,
+                    .MaxU = request.UvBoundsMax.x,
+                    .MaxV = request.UvBoundsMax.y,
+                },
+                .Background =
+                    ToGraphicsUvViewBackground(request.View.BackgroundMode),
+                .BackgroundTexture = backgroundTexture,
+                .ShowDistortionHeatmap =
+                    request.View.ShowDistortionHeatmap,
+                .LineIndices = std::move(request.LineIndices),
+                .TriangleConformalDistortion =
+                    std::move(request.TriangleConformalDistortion),
+            };
+            engine.GetRenderer().SubmitUvViewRequest(
+                std::move(graphicsRequest));
+
+            if (!engine.GetDevice().IsOperational())
+            {
+                state.Status = SandboxStatus::CpuFallbackNonOperational;
+                state.Message =
+                    "GPU UV view is unavailable because the render device is not operational; CPU layout is active.";
+                return state;
+            }
+            if (!geometry.has_value())
+            {
+                state.Status = SandboxStatus::WaitingForGeometry;
+                state.Message =
+                    "Selected mesh GPU surface residency is not ready; CPU layout is active.";
+                return state;
+            }
+
+            const Graphics::UvViewOutput output =
+                engine.GetRenderer().GetUvViewOutput();
+            if (output.RequestToken != state.RequestToken)
+                return state;
+
+            state.Status = ToSandboxUvViewStatus(output.Status);
+            state.ActiveMode = output.ActiveMode ==
+                    Graphics::UvViewActiveMode::GpuShaded
+                ? ConfigMode::GpuShaded
+                : ConfigMode::CpuLayout;
+            state.RequestedBackground =
+                ToConfigUvViewBackground(output.RequestedBackground);
+            state.ActiveBackground =
+                ToConfigUvViewBackground(output.ActiveBackground);
+            state.HeatmapActive = output.HeatmapActive;
+            state.TargetGeneration = output.TargetGeneration;
+            state.RecordedPassCount = output.RecordedPassCount;
+            state.Message = output.Diagnostic;
+            if (state.ActiveMode == ConfigMode::CpuLayout &&
+                state.ActiveBackground != ConfigBackground::Grid &&
+                state.ActiveBackground != ConfigBackground::Checker)
+            {
+                state.ActiveBackground = ConfigBackground::Checker;
+            }
+
+            const bool extentMatches = output.Width == request.Width &&
+                                       output.Height == request.Height;
+            if (output.Status == Graphics::UvViewStatus::Ready &&
+                (!extentMatches || !output.IsGpuReady() ||
+                 output.RecordedPassCount == 0u))
+            {
+                state.Status = SandboxStatus::WaitingForGpuFrame;
+                state.ActiveMode = ConfigMode::CpuLayout;
+                if (state.ActiveBackground != ConfigBackground::Grid &&
+                    state.ActiveBackground != ConfigBackground::Checker)
+                {
+                    state.ActiveBackground = ConfigBackground::Checker;
+                }
+                state.Message =
+                    "GPU UV view target is not yet ready for this pane extent; CPU layout is active.";
+                return state;
+            }
+            if (output.Status == Graphics::UvViewStatus::Ready)
+            {
+                state.GpuReady = true;
+                state.BindlessIndex = output.BindlessIndex;
+                state.Width = output.Width;
+                state.Height = output.Height;
+            }
+            return state;
+        }
+
         [[nodiscard]] SandboxEditorContext BuildContextFromEngine(Engine& engine)
         {
             return SandboxEditorContext{
@@ -10514,6 +10770,17 @@ namespace Extrinsic::Runtime
                             return result;
                         },
                 },
+                .ParameterizationUvViewCommands =
+                    SandboxEditorParameterizationUvViewCommandSurface{
+                        .Submit =
+                            [&engine](
+                                SandboxEditorParameterizationUvViewRequest request)
+                            {
+                                return SubmitEngineParameterizationUvView(
+                                    engine,
+                                    std::move(request));
+                            },
+                    },
                 .VisualizationAdapterBindings = SandboxEditorVisualizationAdapterBindingCommandSurface{
                     .GetBinding =
                         [&engine](const std::uint32_t stableEntityId)
@@ -10688,6 +10955,38 @@ namespace Extrinsic::Runtime
                             "Scene close failed: editor session attachment expired.",
                     };
                 });
+            context.ParameterizationUvViewCommands.Submit =
+                GuardAttachmentCommand(
+                    std::move(
+                        context.ParameterizationUvViewCommands.Submit),
+                    epoch,
+                    [](SandboxEditorParameterizationUvViewRequest request)
+                    {
+                        return SandboxEditorParameterizationUvViewState{
+                            .Status =
+                                SandboxEditorParameterizationUvViewStatus::CpuFallbackNonOperational,
+                            .RequestedMode = request.View.RenderMode,
+                            .ActiveMode =
+                                Core::Config::ParameterizationUvRenderMode::CpuLayout,
+                            .RequestedBackground =
+                                request.View.BackgroundMode,
+                            .ActiveBackground =
+                                request.View.BackgroundMode ==
+                                            Core::Config::
+                                                ParameterizationUvBackgroundMode::Grid ||
+                                        request.View.BackgroundMode ==
+                                            Core::Config::
+                                                ParameterizationUvBackgroundMode::Checker
+                                    ? request.View.BackgroundMode
+                                    : Core::Config::
+                                          ParameterizationUvBackgroundMode::Checker,
+                            .RequestToken = request.RequestToken,
+                            .Width = request.Width,
+                            .Height = request.Height,
+                            .Message =
+                                "GPU UV view command failed because the editor session attachment expired.",
+                        };
+                    });
             context.VisualizationAdapterBindings.GetBinding =
                 GuardAttachmentCommand(
                     std::move(
@@ -10774,6 +11073,8 @@ namespace Extrinsic::Runtime
                 .Mesh = std::move(source.Mesh),
                 .BeforePositions = std::move(source.BeforePositions),
                 .DeletedVertices = std::move(source.DeletedVertices),
+                .SourceFaceForMeshFace =
+                    std::move(source.SourceFaceForMeshFace),
                 .Status = source.Status,
                 .Error = source.Error,
                 .Diagnostic = std::move(source.Diagnostic),

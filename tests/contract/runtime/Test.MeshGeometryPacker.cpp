@@ -29,6 +29,7 @@ using Extrinsic::Runtime::MeshPackResult;
 using Extrinsic::Runtime::MeshPackStatus;
 using Extrinsic::Runtime::MeshVertex;
 using Extrinsic::Runtime::PackMesh;
+using Extrinsic::Runtime::BuildSurfaceTriangleTopology;
 
 namespace pn = Extrinsic::ECS::Components::GeometrySources::PropertyNames;
 
@@ -534,6 +535,47 @@ TEST(MeshGeometryPackerTest, QuadFanTriangulatesIntoTwoTriangles)
     EXPECT_EQ(result.Upload->SurfaceIndices[3], 1u);
     EXPECT_EQ(result.Upload->SurfaceIndices[4], 3u);
     EXPECT_EQ(result.Upload->SurfaceIndices[5], 0u);
+}
+
+TEST(MeshGeometryPackerTest, SurfaceTopologyHelperMatchesCanonicalPackOrder)
+{
+    const MeshScratch mesh = BuildSingleQuad();
+    MeshPackBuffer scratch;
+    const MeshPackResult packed = PackMesh(mesh.View(), scratch);
+    ASSERT_EQ(packed.Status, MeshPackStatus::Success);
+    ASSERT_TRUE(packed.Upload.has_value());
+
+    std::vector<std::uint32_t> surfaceIndices{99u};
+    std::vector<std::uint32_t> triangleFaces{99u};
+    const MeshPackStatus status = BuildSurfaceTriangleTopology(
+        mesh.View(),
+        surfaceIndices,
+        triangleFaces);
+
+    ASSERT_EQ(status, MeshPackStatus::Success);
+    EXPECT_EQ(surfaceIndices,
+              std::vector<std::uint32_t>(
+                  packed.Upload->SurfaceIndices.begin(),
+                  packed.Upload->SurfaceIndices.end()));
+    EXPECT_EQ(triangleFaces,
+              (std::vector<std::uint32_t>{0u, 0u}));
+}
+
+TEST(MeshGeometryPackerTest, SurfaceTopologyHelperClearsBothOutputsOnFailure)
+{
+    MeshScratch mesh = BuildSingleTriangle();
+    auto next = mesh.HalfedgeSource.Properties.Get<std::uint32_t>(
+        pn::kHalfedgeNext);
+    ASSERT_TRUE(next);
+    next.Vector()[0] = kInvalidIndex;
+
+    std::vector<std::uint32_t> surfaceIndices{99u};
+    std::vector<std::uint32_t> triangleFaces{99u};
+    EXPECT_EQ(BuildSurfaceTriangleTopology(
+                  mesh.View(), surfaceIndices, triangleFaces),
+              MeshPackStatus::InvalidTopology);
+    EXPECT_TRUE(surfaceIndices.empty());
+    EXPECT_TRUE(triangleFaces.empty());
 }
 
 TEST(MeshGeometryPackerTest, PackIsDeterministicAcrossInvocations)

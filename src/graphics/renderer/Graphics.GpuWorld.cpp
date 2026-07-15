@@ -1863,6 +1863,19 @@ namespace Extrinsic::Graphics
 
     RHI::BufferHandle GpuWorld::GetManagedVertexBuffer() const noexcept { return m_Impl->ManagedVertexLease.GetHandle(); }
     RHI::BufferHandle GpuWorld::GetManagedIndexBuffer() const noexcept { return m_Impl->ManagedIndexLease.GetHandle(); }
+    bool GpuWorld::TryGetGeometryRecord(
+        const GpuGeometryHandle geometry,
+        RHI::GpuGeometryRecord& outRecord) const noexcept
+    {
+        outRecord = {};
+        if (!m_Impl->GeometrySlots.Resolve(geometry) ||
+            geometry.Index >= m_Impl->GeometryRecordsCpu.size())
+        {
+            return false;
+        }
+        outRecord = m_Impl->GeometryRecordsCpu[geometry.Index];
+        return true;
+    }
 
     std::uint32_t GpuWorld::GetLiveInstanceCount() const noexcept { return m_Impl->InstanceSlots.LiveCount; }
     std::uint32_t GpuWorld::GetInstanceCapacity() const noexcept { return m_Impl->Desc.MaxInstances; }

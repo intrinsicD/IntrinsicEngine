@@ -43,6 +43,10 @@ namespace Extrinsic::Sandbox::Editor
             decltype(ParameterizationPanelConfig{}.Harmonic.Boundary);
         using ParameterizationBffBoundaryMode =
             decltype(ParameterizationPanelConfig{}.Bff.Mode);
+        using ParameterizationUvRenderMode =
+            decltype(ParameterizationPanelConfig{}.View.RenderMode);
+        using ParameterizationUvBackgroundMode =
+            decltype(ParameterizationPanelConfig{}.View.BackgroundMode);
         using ParameterizationSolverStatus = decltype(
             Runtime::SandboxEditorParameterizationResult{}
                 .ParameterizationStatus);
@@ -537,8 +541,9 @@ namespace Extrinsic::Sandbox::Editor
             float SplitRatio{0.42f};
             float Zoom{1.0f};
             glm::vec2 Pan{0.0f};
-            bool ShowGrid{true};
-            bool ShowChecker{true};
+            std::optional<
+                Runtime::SandboxEditorParameterizationUvViewState>
+                LastUvViewState{};
         };
 
         EditorShell* Shell{nullptr};
@@ -1473,6 +1478,100 @@ namespace Extrinsic::Sandbox::Editor
             return "Unsupported";
         }
 
+        static const char* ParameterizationUvRenderModeLabel(
+            const ParameterizationUvRenderMode mode) noexcept
+        {
+            using Mode = ParameterizationUvRenderMode;
+            switch (mode)
+            {
+            case Mode::CpuLayout:
+                return "CPU layout";
+            case Mode::GpuShaded:
+                return "GPU shaded";
+            }
+            return "Unsupported";
+        }
+
+        static const char* ParameterizationUvBackgroundModeLabel(
+            const ParameterizationUvBackgroundMode mode) noexcept
+        {
+            using Mode = ParameterizationUvBackgroundMode;
+            switch (mode)
+            {
+            case Mode::Grid:
+                return "Grid";
+            case Mode::Checker:
+                return "Checker";
+            case Mode::TexelDensity:
+                return "Texel density";
+            case Mode::Texture:
+                return "Selected albedo texture";
+            }
+            return "Unsupported";
+        }
+
+        static bool DrawParameterizationUvViewControls(
+            decltype(ParameterizationPanelConfig{}.View)& config)
+        {
+            using RenderMode = ParameterizationUvRenderMode;
+            using BackgroundMode = ParameterizationUvBackgroundMode;
+            constexpr std::array<RenderMode, 2u> renderModes{
+                RenderMode::CpuLayout,
+                RenderMode::GpuShaded,
+            };
+            constexpr std::array<BackgroundMode, 4u> backgroundModes{
+                BackgroundMode::Grid,
+                BackgroundMode::Checker,
+                BackgroundMode::TexelDensity,
+                BackgroundMode::Texture,
+            };
+
+            bool changed = false;
+            if (ImGui::BeginCombo(
+                    "Render mode##ParameterizationUvView",
+                    ParameterizationUvRenderModeLabel(config.RenderMode)))
+            {
+                for (const RenderMode mode : renderModes)
+                {
+                    const bool selected = config.RenderMode == mode;
+                    if (ImGui::Selectable(
+                            ParameterizationUvRenderModeLabel(mode),
+                            selected))
+                    {
+                        config.RenderMode = mode;
+                        changed = true;
+                    }
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+            if (ImGui::BeginCombo(
+                    "Background##ParameterizationUvView",
+                    ParameterizationUvBackgroundModeLabel(
+                        config.BackgroundMode)))
+            {
+                for (const BackgroundMode mode : backgroundModes)
+                {
+                    const bool selected = config.BackgroundMode == mode;
+                    if (ImGui::Selectable(
+                            ParameterizationUvBackgroundModeLabel(mode),
+                            selected))
+                    {
+                        config.BackgroundMode = mode;
+                        changed = true;
+                    }
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+            changed |= ImGui::Checkbox(
+                "Distortion heatmap##ParameterizationUvView",
+                &config.ShowDistortionHeatmap);
+            return changed;
+        }
+
         static bool DrawParameterizationStrategy(
             SandboxParameterizationPanelConfig& config)
         {
@@ -1709,7 +1808,10 @@ namespace Extrinsic::Sandbox::Editor
         static bool DrawParameterizationConfigControls(
             SandboxParameterizationPanelConfig& config)
         {
-            bool changed = DrawParameterizationStrategy(config);
+            ImGui::SeparatorText("UV view");
+            bool changed = DrawParameterizationUvViewControls(config.View);
+            ImGui::SeparatorText("Parameterization method");
+            changed |= DrawParameterizationStrategy(config);
             ImGui::SeparatorText("Strategy parameters");
             using Strategy = Runtime::SandboxEditorParameterizationStrategy;
             switch (config.Strategy)
@@ -1892,6 +1994,7 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         void DrawParameterizationUvPane(
+            const Runtime::SandboxEditorContext& context,
             const Runtime::SandboxEditorParameterizationViewModel& model)
         {
             ImGui::TextUnformatted("UV layout");
@@ -1902,28 +2005,51 @@ namespace Extrinsic::Sandbox::Editor
                 Parameterization.Pan = glm::vec2{0.0f};
             }
             ImGui::SameLine();
-            ImGui::Checkbox("Grid##ParameterizationUv", &Parameterization.ShowGrid);
-            ImGui::SameLine();
-            ImGui::Checkbox(
-                "Checker##ParameterizationUv",
-                &Parameterization.ShowChecker);
-            ImGui::SameLine();
             ImGui::TextDisabled("%.0f%%", Parameterization.Zoom * 100.0f);
+            if (Parameterization.LastUvViewState.has_value())
+            {
+                ImGui::SameLine();
+                ImGui::TextDisabled(
+                    "%s / %s%s",
+                    Runtime::DebugNameForSandboxEditorParameterizationUvViewStatus(
+                        Parameterization.LastUvViewState->Status),
+                    ParameterizationUvBackgroundModeLabel(
+                        Parameterization.LastUvViewState->ActiveBackground),
+                    Parameterization.LastUvViewState->HeatmapActive
+                        ? " / heatmap"
+                        : "");
+                if (ImGui::IsItemHovered() &&
+                    !Parameterization.LastUvViewState->Message.empty())
+                {
+                    ImGui::SetTooltip(
+                        "%s",
+                        Parameterization.LastUvViewState->Message.c_str());
+                }
+            }
 
             const ImVec2 canvasMin = ImGui::GetCursorScreenPos();
             ImVec2 canvasSize = ImGui::GetContentRegionAvail();
             canvasSize.x = std::max(canvasSize.x, 80.0f);
             canvasSize.y = std::max(canvasSize.y, 80.0f);
+            Runtime::SandboxEditorParameterizationUvViewState uvView =
+                Runtime::SubmitSandboxEditorParameterizationUvView(
+                    context,
+                    model,
+                    static_cast<std::uint32_t>(canvasSize.x),
+                    static_cast<std::uint32_t>(canvasSize.y));
+            Parameterization.LastUvViewState = uvView;
             ImGui::InvisibleButton(
                 "##ParameterizationUvCanvas",
                 canvasSize);
             const bool hovered = ImGui::IsItemHovered();
-            if (hovered && ImGui::IsMouseDragging(ImGuiMouseButton_Middle))
+            if (!uvView.GpuReady && hovered &&
+                ImGui::IsMouseDragging(ImGuiMouseButton_Middle))
             {
                 const ImVec2 delta = ImGui::GetIO().MouseDelta;
                 Parameterization.Pan += glm::vec2{delta.x, delta.y};
             }
-            if (hovered && ImGui::GetIO().MouseWheel != 0.0f)
+            if (!uvView.GpuReady && hovered &&
+                ImGui::GetIO().MouseWheel != 0.0f)
             {
                 const float oldZoom = Parameterization.Zoom;
                 const float factor = std::pow(
@@ -1955,151 +2081,162 @@ namespace Extrinsic::Sandbox::Editor
                 canvasMin,
                 canvasMax,
                 IM_COL32(24, 27, 32, 255));
+            drawList->PushClipRect(canvasMin, canvasMax, true);
+            if (uvView.GpuReady)
+            {
+                drawList->AddImage(
+                    static_cast<ImTextureID>(uvView.BindlessIndex),
+                    canvasMin,
+                    canvasMax);
+            }
+            else
+            {
+                const bool showGrid =
+                    uvView.ActiveBackground ==
+                    ParameterizationUvBackgroundMode::Grid;
+                const bool showChecker = !showGrid;
+                const SandboxParameterizationUvProjection projection =
+                    BuildSandboxParameterizationUvProjection(
+                        model,
+                        SandboxParameterizationUvPane{
+                            .Min = {canvasMin.x, canvasMin.y},
+                            .Max = {canvasMax.x, canvasMax.y},
+                            .Padding = 24.0f,
+                            .Zoom = Parameterization.Zoom,
+                            .Pan = Parameterization.Pan,
+                            .IncludeUnitSquare = true,
+                        });
+                if (projection.Valid)
+                {
+                    if (showChecker)
+                    {
+                        constexpr std::uint32_t kCheckerCount = 10u;
+                        for (std::uint32_t y = 0u; y < kCheckerCount; ++y)
+                        {
+                            for (std::uint32_t x = 0u; x < kCheckerCount; ++x)
+                            {
+                                const glm::vec2 uv0{
+                                    static_cast<float>(x) /
+                                        static_cast<float>(kCheckerCount),
+                                    static_cast<float>(y) /
+                                        static_cast<float>(kCheckerCount),
+                                };
+                                const glm::vec2 uv1{
+                                    static_cast<float>(x + 1u) /
+                                        static_cast<float>(kCheckerCount),
+                                    static_cast<float>(y + 1u) /
+                                        static_cast<float>(kCheckerCount),
+                                };
+                                const glm::vec2 p0 =
+                                    ProjectSandboxParameterizationUvPoint(
+                                        projection,
+                                        uv0);
+                                const glm::vec2 p1 =
+                                    ProjectSandboxParameterizationUvPoint(
+                                        projection,
+                                        uv1);
+                                if (!IsFiniteVec2(p0) || !IsFiniteVec2(p1))
+                                    continue;
+                                drawList->AddRectFilled(
+                                    ImVec2{
+                                        std::min(p0.x, p1.x),
+                                        std::min(p0.y, p1.y),
+                                    },
+                                    ImVec2{
+                                        std::max(p0.x, p1.x),
+                                        std::max(p0.y, p1.y),
+                                    },
+                                    ((x + y) & 1u) == 0u
+                                        ? IM_COL32(53, 57, 66, 255)
+                                        : IM_COL32(36, 40, 47, 255));
+                            }
+                        }
+                    }
+                    if (showGrid)
+                    {
+                        for (std::uint32_t index = 0u; index <= 10u; ++index)
+                        {
+                            const float t = static_cast<float>(index) / 10.0f;
+                            const glm::vec2 vertical0 =
+                                ProjectSandboxParameterizationUvPoint(
+                                    projection,
+                                    {t, 0.0f});
+                            const glm::vec2 vertical1 =
+                                ProjectSandboxParameterizationUvPoint(
+                                    projection,
+                                    {t, 1.0f});
+                            const glm::vec2 horizontal0 =
+                                ProjectSandboxParameterizationUvPoint(
+                                    projection,
+                                    {0.0f, t});
+                            const glm::vec2 horizontal1 =
+                                ProjectSandboxParameterizationUvPoint(
+                                    projection,
+                                    {1.0f, t});
+                            if (!IsFiniteVec2(vertical0) ||
+                                !IsFiniteVec2(vertical1) ||
+                                !IsFiniteVec2(horizontal0) ||
+                                !IsFiniteVec2(horizontal1))
+                            {
+                                continue;
+                            }
+                            const ImU32 color = index == 0u || index == 10u
+                                ? IM_COL32(121, 129, 146, 190)
+                                : IM_COL32(91, 98, 112, 100);
+                            drawList->AddLine(
+                                ToImVec2(vertical0),
+                                ToImVec2(vertical1),
+                                color);
+                            drawList->AddLine(
+                                ToImVec2(horizontal0),
+                                ToImVec2(horizontal1),
+                                color);
+                        }
+                    }
+
+                    for (const auto& triangle : projection.Triangles)
+                    {
+                        const ImVec2 a =
+                            ToImVec2(projection.Vertices[triangle[0]]);
+                        const ImVec2 b =
+                            ToImVec2(projection.Vertices[triangle[1]]);
+                        const ImVec2 c =
+                            ToImVec2(projection.Vertices[triangle[2]]);
+                        drawList->AddTriangleFilled(
+                            a, b, c, IM_COL32(66, 145, 214, 52));
+                        drawList->AddTriangle(
+                            a,
+                            b,
+                            c,
+                            IM_COL32(113, 190, 255, 220),
+                            1.25f);
+                    }
+                    for (const glm::vec2 vertex : projection.Vertices)
+                    {
+                        drawList->AddCircleFilled(
+                            ToImVec2(vertex),
+                            2.0f,
+                            IM_COL32(225, 240, 255, 235));
+                    }
+                }
+                else
+                {
+                    const std::string& message = projection.Message.empty()
+                        ? model.Message
+                        : projection.Message;
+                    drawList->AddText(
+                        ImVec2{canvasMin.x + 12.0f, canvasMin.y + 12.0f},
+                        IM_COL32(170, 176, 188, 255),
+                        message.empty()
+                            ? "Parameterize the selected mesh to populate UVs."
+                            : message.c_str());
+                }
+            }
+            drawList->PopClipRect();
             drawList->AddRect(
                 canvasMin,
                 canvasMax,
                 IM_COL32(90, 96, 108, 255));
-
-            const SandboxParameterizationUvProjection projection =
-                BuildSandboxParameterizationUvProjection(
-                    model,
-                    SandboxParameterizationUvPane{
-                        .Min = {canvasMin.x, canvasMin.y},
-                        .Max = {canvasMax.x, canvasMax.y},
-                        .Padding = 24.0f,
-                        .Zoom = Parameterization.Zoom,
-                        .Pan = Parameterization.Pan,
-                        .IncludeUnitSquare =
-                            Parameterization.ShowChecker ||
-                            Parameterization.ShowGrid,
-                    });
-            drawList->PushClipRect(canvasMin, canvasMax, true);
-            if (projection.Valid)
-            {
-                if (Parameterization.ShowChecker)
-                {
-                    constexpr std::uint32_t kCheckerCount = 10u;
-                    for (std::uint32_t y = 0u; y < kCheckerCount; ++y)
-                    {
-                        for (std::uint32_t x = 0u; x < kCheckerCount; ++x)
-                        {
-                            const glm::vec2 uv0{
-                                static_cast<float>(x) /
-                                    static_cast<float>(kCheckerCount),
-                                static_cast<float>(y) /
-                                    static_cast<float>(kCheckerCount),
-                            };
-                            const glm::vec2 uv1{
-                                static_cast<float>(x + 1u) /
-                                    static_cast<float>(kCheckerCount),
-                                static_cast<float>(y + 1u) /
-                                    static_cast<float>(kCheckerCount),
-                            };
-                            const glm::vec2 p0 =
-                                ProjectSandboxParameterizationUvPoint(
-                                    projection,
-                                    uv0);
-                            const glm::vec2 p1 =
-                                ProjectSandboxParameterizationUvPoint(
-                                    projection,
-                                    uv1);
-                            if (!IsFiniteVec2(p0) || !IsFiniteVec2(p1))
-                                continue;
-                            drawList->AddRectFilled(
-                                ImVec2{
-                                    std::min(p0.x, p1.x),
-                                    std::min(p0.y, p1.y),
-                                },
-                                ImVec2{
-                                    std::max(p0.x, p1.x),
-                                    std::max(p0.y, p1.y),
-                                },
-                                ((x + y) & 1u) == 0u
-                                    ? IM_COL32(53, 57, 66, 255)
-                                    : IM_COL32(36, 40, 47, 255));
-                        }
-                    }
-                }
-                if (Parameterization.ShowGrid)
-                {
-                    for (std::uint32_t index = 0u; index <= 10u; ++index)
-                    {
-                        const float t = static_cast<float>(index) / 10.0f;
-                        const glm::vec2 vertical0 =
-                            ProjectSandboxParameterizationUvPoint(
-                                projection,
-                                {t, 0.0f});
-                        const glm::vec2 vertical1 =
-                            ProjectSandboxParameterizationUvPoint(
-                                projection,
-                                {t, 1.0f});
-                        const glm::vec2 horizontal0 =
-                            ProjectSandboxParameterizationUvPoint(
-                                projection,
-                                {0.0f, t});
-                        const glm::vec2 horizontal1 =
-                            ProjectSandboxParameterizationUvPoint(
-                                projection,
-                                {1.0f, t});
-                        if (!IsFiniteVec2(vertical0) ||
-                            !IsFiniteVec2(vertical1) ||
-                            !IsFiniteVec2(horizontal0) ||
-                            !IsFiniteVec2(horizontal1))
-                        {
-                            continue;
-                        }
-                        const ImU32 color = index == 0u || index == 10u
-                            ? IM_COL32(121, 129, 146, 190)
-                            : IM_COL32(91, 98, 112, 100);
-                        drawList->AddLine(
-                            ToImVec2(vertical0),
-                            ToImVec2(vertical1),
-                            color);
-                        drawList->AddLine(
-                            ToImVec2(horizontal0),
-                            ToImVec2(horizontal1),
-                            color);
-                    }
-                }
-
-                for (const auto& triangle : projection.Triangles)
-                {
-                    const ImVec2 a = ToImVec2(projection.Vertices[triangle[0]]);
-                    const ImVec2 b = ToImVec2(projection.Vertices[triangle[1]]);
-                    const ImVec2 c = ToImVec2(projection.Vertices[triangle[2]]);
-                    drawList->AddTriangleFilled(
-                        a,
-                        b,
-                        c,
-                        IM_COL32(66, 145, 214, 52));
-                    drawList->AddTriangle(
-                        a,
-                        b,
-                        c,
-                        IM_COL32(113, 190, 255, 220),
-                        1.25f);
-                }
-                for (const glm::vec2 vertex : projection.Vertices)
-                {
-                    drawList->AddCircleFilled(
-                        ToImVec2(vertex),
-                        2.0f,
-                        IM_COL32(225, 240, 255, 235));
-                }
-            }
-            else
-            {
-                const std::string& message = projection.Message.empty()
-                    ? model.Message
-                    : projection.Message;
-                drawList->AddText(
-                    ImVec2{canvasMin.x + 12.0f, canvasMin.y + 12.0f},
-                    IM_COL32(170, 176, 188, 255),
-                    message.empty()
-                        ? "Parameterize the selected mesh to populate UVs."
-                        : message.c_str());
-            }
-            drawList->PopClipRect();
         }
 
         void DrawParameterizationWindow(
@@ -2109,11 +2246,12 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::SetNextWindowSize(
                 ImVec2(920.0f, 600.0f),
                 ImGuiCond_FirstUseEver);
-            if (ImGui::Begin(
+            const bool contentsVisible = ImGui::Begin(
                     "Mesh / Processing / Parameterize (UV)",
-                    &open))
+                    &open);
+            if (contentsVisible)
             {
-                const Runtime::SandboxEditorParameterizationViewModel model =
+                Runtime::SandboxEditorParameterizationViewModel model =
                     Runtime::BuildSandboxEditorParameterizationViewModel(context);
                 if (model.HasSelectedEntity)
                 {
@@ -2146,6 +2284,12 @@ namespace Extrinsic::Sandbox::Editor
                     true);
                 DrawParameterizationControlPane(context, model);
                 ImGui::EndChild();
+                if (const auto active =
+                        Runtime::GetSandboxEditorParameterizationConfig(context);
+                    active.has_value())
+                {
+                    model.View = active->View;
+                }
                 ImGui::SameLine(0.0f, 0.0f);
 
                 ImGui::InvisibleButton(
@@ -2173,10 +2317,15 @@ namespace Extrinsic::Sandbox::Editor
                     "##ParameterizationUv",
                     ImVec2(0.0f, available.y),
                     true);
-                DrawParameterizationUvPane(model);
+                DrawParameterizationUvPane(context, model);
                 ImGui::EndChild();
             }
             ImGui::End();
+            if (!open || !contentsVisible)
+            {
+                Runtime::DisableSandboxEditorParameterizationUvView(context);
+                Parameterization.LastUvViewState.reset();
+            }
         }
 
         static void DrawProgressivePoissonResultStatus(
