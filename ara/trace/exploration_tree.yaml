@@ -5059,3 +5059,73 @@ tree:
       corrections removed the history lifetime hazard and preserved deleted
       vertex tombstones; UI-036 became unblocked.
     status: resolved
+  - id: N216
+    type: decision
+    title: "Implement UI-036 as the next parameterization slice"
+    provenance: ai-executed
+    timestamp: "2026-07-15T13:27"
+    also_depends_on: [N213, N215]
+    choice: >
+      Select the newly unblocked UI-036 as the next task, extend the existing
+      app-owned Sandbox method-panel module, and use a CPU ImDrawList derived
+      UV view over the RUNTIME-176 pointer-free model; keep the GPU-shaded
+      offscreen target as optional GRAPHICS-122 work.
+    alternatives:
+      - "Choose an unrelated unblocked backlog task after RUNTIME-176."
+      - "Add a dedicated panel module or new renderer target for the baseline UI."
+      - "Expose unimplemented parameterization strategies or a speculative backend selector."
+    evidence:
+      - "tasks/done/UI-036-sandbox-parameterization-editor-and-uv-split-view.md"
+      - "commit 6502de0b"
+      - "commit 8e88a48b"
+    status: resolved
+  - id: N217
+    type: dead_end
+    title: "Reject unmirrored ImGui scissors under the negative-height viewport"
+    provenance: ai-executed
+    timestamp: "2026-07-15T13:27"
+    also_depends_on: [N216]
+    hypothesis: >
+      A top-left framebuffer scissor converted from ImDrawCmd::ClipRect can be
+      passed unchanged to RHI SetScissor while the existing ImGui vertex and
+      present transforms preserve visible clipping.
+    failure_mode: >
+      The Vulkan command context uses a negative-height viewport, so ImGui
+      geometry is vertically mirrored in PresentSource before Present flips it
+      upright. An unchanged top-left scissor clips the opposite attachment
+      region: full backgrounds survive while menu labels and child content
+      disappear or escape.
+    lesson: >
+      Keep canonical top-left scissors in the pointer-free adapter records and
+      mirror Y only at Pass.ImGui with H - (Y + Height), where the attachment
+      viewport convention is known.
+    status: resolved
+  - id: N218
+    type: experiment
+    title: "Operational parameterization UI and ImGui blocker closure"
+    provenance: ai-executed
+    timestamp: "2026-07-15T13:27"
+    also_depends_on: [N215, N216, N217]
+    evidence:
+      - "tasks/done/UI-036-sandbox-parameterization-editor-and-uv-split-view.md"
+      - "tasks/done/BUG-085-imgui-overlay-drops-command-clip-rectangles.md"
+      - "tasks/done/BUG-086-imgui-adapter-omits-vtx-offset-capability.md"
+      - "ctest --test-dir build/ci --output-on-failure -R 'Parameterization|SandboxEditor|MethodPanel|ImGui' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "ctest --test-dir build/ci-vulkan --output-on-failure -R '^ImGuiSurfaceGpuSmoke\\.' -L gpu -L vulkan --timeout 120"
+      - "ctest --test-dir build/ci-vulkan --output-on-failure -R '^RuntimeSandboxAcceptanceGpuSmoke\\.ExtrinsicSandboxDefaultConfigProducesVisibleFrameWithValidation$' -L gpu -L vulkan --timeout 120"
+      - "/tmp/ui036-live/parameterize-ran-fixed4.png"
+      - "/tmp/ui036-live/dolphin-dense-selected.png"
+      - "commits 1766253c, 8e88a48b, and d99dd10d"
+    result: >
+      UI-036 retired at Operational with implemented-strategy config controls,
+      undoable UV writeback, a resizable clipped UV view, and aggregate
+      diagnostics. Live promoted Vulkan applied LSCM with the checker/grid
+      contained, then selected a dense dolphin mesh above the former 65,535
+      draw-list threshold without assertion and closed cleanly. The focused
+      suite passed 255/255, the CPU-supported gate passed 3,753/3,753 in
+      423.23 seconds, the ImGui Vulkan smokes passed 3/3, and the
+      validation-enabled runtime acceptance passed 1/1. Strict task, docs,
+      layering, test-layout, clean-workshop, inventory, and PR-contract checks
+      passed; BUG-085 and BUG-086 retired with UI-036.
+    status: resolved

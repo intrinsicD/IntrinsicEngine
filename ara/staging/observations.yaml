@@ -384,3 +384,25 @@ observations:
     promoted_to: "logic/solution/heuristics.md:H04"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O36
+    timestamp: "2026-07-15T13:27"
+    provenance: ai-executed
+    content: "With the renderer's negative-height Vulkan viewport and PresentSource finalization, canonical top-left ImGui command scissors must be mirrored at Pass.ImGui as nativeY = DisplayHeight - (Y + Height); mirroring earlier would contaminate backend-neutral overlay records."
+    context: "BUG-085 live UI failure, viewport/present diagnosis, asymmetric GPU pixel regression, source fix, and Operational retirement."
+    potential_type: constraint
+    bound_to: [N217, N218]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K18"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O37
+    timestamp: "2026-07-15T13:27"
+    provenance: ai-executed
+    content: "A Dear ImGui renderer using 16-bit indices must advertise RendererHasVtxOffset before NewFrame and preserve each command VtxOffset through adapter, upload, and draw submission, adding the base exactly once; otherwise draw lists above 65,535 vertices assert despite downstream offset support."
+    context: "BUG-086 68k-vertex CPU regression, dense-mesh promoted-Vulkan replay, source fix, and Operational retirement."
+    potential_type: constraint
+    bound_to: [N216, N218]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K19"
+    crystallized_via: artifact-commitment
+    stale: false

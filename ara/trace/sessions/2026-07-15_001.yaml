@@ -2,9 +2,9 @@ session:
   id: "2026-07-15_001"
   date: "2026-07-15"
   started: "2026-07-15T00:44"
-  last_turn: "2026-07-15T09:51"
-  turn_count: 2
-  summary: "Retired GEOM-019, GEOM-014, GEOM-063, METHOD-023, and RUNTIME-176 after review-driven parameterization, simplification, BFF, config/runtime, benchmark, and task-truth closure."
+  last_turn: "2026-07-15T13:27"
+  turn_count: 3
+  summary: "Retired the parameterization chain through Operational UI-036, including review-driven geometry/BFF/runtime closure and ImGui clipping/large-draw repairs."
 
 events_logged:
   - turn: 1
@@ -97,6 +97,36 @@ events_logged:
     routing: crystallized
     provenance: ai-executed
     summary: "Crystallized validation of every serialized strategy record as H04."
+  - turn: 3
+    type: decision
+    id: "N216"
+    routing: direct
+    provenance: ai-executed
+    summary: "Selected UI-036 as the next unblocked slice and kept its baseline app-owned, CPU-drawn, and right-sized."
+  - turn: 3
+    type: dead_end
+    id: "N217"
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected applying top-left ImGui scissors unchanged under the renderer's negative-height Vulkan viewport."
+  - turn: 3
+    type: experiment
+    id: "N218"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired UI-036 and BUG-085/086 after live dense-mesh Vulkan proof, 255 focused tests, 3,753 CPU tests, and four GPU acceptance smokes."
+  - turn: 3
+    type: constraint
+    id: "O36"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized attachment-boundary ImGui scissor Y mirroring as K18."
+  - turn: 3
+    type: constraint
+    id: "O37"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized end-to-end large-draw-list vertex-offset support as K19."
 
 ai_actions:
   - turn: 1
@@ -147,6 +177,31 @@ ai_actions:
       - "tasks/SESSION-BRIEF.md"
       - "tasks/done/RETIREMENT-LOG.md"
       - "tasks/backlog/ui/UI-036-parameterization-control-and-uv-inspection.md"
+  - turn: 3
+    action: "Implemented the app-owned UI-036 parameterization window with implemented-strategy config controls, explicit apply/undo, a resizable UV split view, projection helpers, checker/grid, zoom/pan, and aggregate diagnostics."
+    provenance: ai-executed
+    files_changed:
+      - "src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm"
+      - "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp"
+      - "tests/integration/runtime/Test.SandboxParameterizationPanel.cpp"
+      - "tasks/done/UI-036-sandbox-parameterization-editor-and-uv-split-view.md"
+  - turn: 3
+    action: "Diagnosed and repaired BUG-085/086 by preserving command scissors, converting native Y at Pass.ImGui, advertising RendererHasVtxOffset, preserving command base vertices, and adding CPU plus Vulkan regressions."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/ImGui/Runtime.ImGuiAdapter.cpp"
+      - "src/graphics/renderer/Graphics.ImGuiOverlaySystem.cppm"
+      - "src/graphics/renderer/Graphics.ImGuiUploadHelper.cppm"
+      - "src/graphics/renderer/Passes/Pass.ImGui.cpp"
+      - "tests/contract/runtime/Test.ImGuiAdapter.cpp"
+      - "tests/integration/graphics/Test.ImGuiSurfaceGpuSmoke.cpp"
+  - turn: 3
+    action: "Completed live promoted-Vulkan UI/dense-mesh replays, 255/255 focused tests, 3,753/3,753 CPU tests, 3/3 ImGui Vulkan smokes, 1/1 runtime acceptance, strict lifecycle/architecture checks, commits 1766253c and 8e88a48b, and retirement commit d99dd10d."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/SESSION-BRIEF.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+      - "tasks/backlog/rendering/GRAPHICS-122-uv-view-offscreen-render-target.md"
 
 claims_touched: [C02]
 
@@ -155,14 +210,15 @@ key_context:
     excerpt: "User instructed the agent to use the agentic workflow to execute the full proposed work order."
   - turn: 2
     excerpt: "User reiterated that the agentic workflow should execute all selected backlog work."
+  - turn: 3
+    excerpt: "User asked whether to leave the live engine viewer open; the agent retained it for the dense-mesh proof and then closed it cleanly."
 
 open_threads:
-  - "UI-036 is now unblocked and is the next visible Operational parameterization slice over the completed runtime facade."
+  - "GRAPHICS-122 is now unblocked as the optional GPU-shaded dense-mesh UV-view upgrade; no next-task selection has been made."
   - "BUG-081 still needs a comparable warm-configure population before recalibrating its exact-vcpkg-hit latency guard."
   - "Resolve whether model training means GEOM-058 or a new neural/LLM workflow."
   - "BUG-082 and BUG-083 still need evidence from the environments where their reported failures reproduce."
   - "The verified parameterization closure branch remains local because publication was not requested."
 
 ai_suggestions_pending:
-  - "Prefer UI-036 next so the app-owned editor can expose the completed parameterization config, command, UV, and aggregate-diagnostics model."
   - "Treat GEOM-058 Gaussian-mixture fitting as the provisional repository-native model-training target unless the user specifies a neural or LLM model."

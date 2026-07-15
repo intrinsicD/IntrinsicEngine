@@ -207,3 +207,36 @@
   tasks/done/RUNTIME-176-parameterization-runtime-config-integration.md,
   N214, N215]
 - **From staging**: O34
+
+## K18: ImGui Scissors Convert at the Attachment-Viewport Boundary
+- **Constraint**: Runtime preserves finite ImGui command scissors in canonical
+  top-left framebuffer coordinates. Because the promoted renderer uses a
+  negative-height Vulkan viewport before Present finalization, `Pass.ImGui`
+  converts each validated scissor to attachment coordinates with
+  `nativeY = DisplayHeight - (Y + Height)` immediately before the draw.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [src/runtime/ImGui/Runtime.ImGuiAdapter.cpp,
+  src/graphics/renderer/Passes/Pass.ImGui.cpp,
+  tests/contract/graphics/Test.ImGuiPass.cpp,
+  tests/integration/graphics/Test.ImGuiSurfaceGpuSmoke.cpp,
+  tasks/done/BUG-085-imgui-overlay-drops-command-clip-rectangles.md,
+  N217, N218]
+- **From staging**: O36
+
+## K19: Large ImGui Draw Lists Require End-to-End Vertex Offsets
+- **Constraint**: A Dear ImGui renderer configured with 16-bit indices must
+  advertise `ImGuiBackendFlags_RendererHasVtxOffset` before `NewFrame()` and
+  carry every command `VtxOffset` through the pointer-free adapter and upload
+  records. Draw submission adds the draw-list base plus command offset exactly
+  once; otherwise a draw list above 65,535 vertices aborts even when the pass
+  could consume split commands.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [src/runtime/ImGui/Runtime.ImGuiAdapter.cpp,
+  src/graphics/renderer/Graphics.ImGuiUploadHelper.cpp,
+  src/graphics/renderer/Passes/Pass.ImGui.cpp,
+  tests/contract/runtime/Test.ImGuiAdapter.cpp,
+  tasks/done/BUG-086-imgui-adapter-omits-vtx-offset-capability.md,
+  N218]
+- **From staging**: O37
