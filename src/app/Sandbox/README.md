@@ -17,9 +17,9 @@ ten core Sandbox windows, menu composition, ImGui state, and frame
 presentation while delegating generic callback/registry/visibility lifecycle
 to `Runtime.EditorUiHost`. Runtime exposes the presentation-free
 `Runtime.SandboxEditorFacades` models, commands, result sinks, and attached
-session. `Sandbox.Editor.MethodPanels` owns
-the K-Means and Progressive Poisson ImGui controls and registers five domain
-windows through the shell's context-aware contribution facade. The app
+session. `Sandbox.Editor.MethodPanels` owns the K-Means, Progressive Poisson,
+and parameterization ImGui controls and registers six domain windows through
+the shell's context-aware contribution facade. The app
 continues to import the same runtime module surface. `Sandbox.Editor.MeshProcessingPanels`
 owns the ICP registration window plus the mesh denoise, curvature, remesh,
 subdivide, simplify, and mesh/graph/point-cloud vertex-normal windows. It
@@ -72,6 +72,28 @@ the callback-scoped selected-mesh property view, and runtime-owned command
 surfaces, and the sandbox app
 still does not own selection, ECS mutation, method jobs, rendering, or asset
 state.
+
+`Mesh > Processing > Parameterize (UV)` exposes exactly the four CPU strategies
+implemented by the runtime facade: LSCM, harmonic cotangent, uniform Tutte, and
+Boundary First Flattening. Its controls keep an explicit panel-local draft for
+the selected strategy's typed values; edits remain marked as unapplied until
+the user applies or reloads the draft. Applying routes through the validated
+`EngineConfig.sandbox.parameterization` preview/apply lane, and running the
+configured strategy writes `v:texcoord` through the runtime command-history
+path, with undo and redo controls in the same window. No panel-only solver or
+configuration path exists.
+
+The parameterization window stores its controls-to-UV split ratio in panel
+state and exposes a draggable divider. The UV pane fits the pointer-free
+runtime view model into the available rectangle, draws its triangles with
+`ImDrawList`, and provides unit-square grid/checker toggles, fit, cursor-centred
+wheel zoom, and middle-button pan. The controls pane reports the last run's
+strategy, command/solver outcome, evaluated/skipped/flipped face counts,
+boundary-edge count, and aggregate conformal, area, and stretch diagnostics;
+it does not synthesize per-face heatmaps, charts, or seams. `v:texcoord`
+writeback updates a 3D material that already samples the mesh UVs (including an
+already-bound UV-checker material), but this presentation panel does not create
+or bind such a material.
 
 With the standard reference configuration, runtime creates `ReferenceTriangle`
 through `Extrinsic.Runtime.ReferenceScene::TriangleProvider` as an ordinary

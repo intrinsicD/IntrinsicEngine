@@ -3,21 +3,25 @@ module;
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <iterator>
 #include <limits>
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
+#include <glm/vec2.hpp>
 #include <imgui.h>
 
 module Extrinsic.Sandbox.Editor.MethodPanels;
 
 import Extrinsic.Sandbox.Editor.Shell;
 
+import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.SandboxEditorFacades;
 
@@ -25,6 +29,24 @@ namespace Extrinsic::Sandbox::Editor
 {
     namespace
     {
+        using ParameterizationPanelConfig =
+            SandboxParameterizationPanelConfig;
+        using ParameterizationUvConfig =
+            decltype(ParameterizationPanelConfig{}.Lscm.PinUv0);
+        using ParameterizationLscmConfig =
+            decltype(ParameterizationPanelConfig{}.Lscm);
+        using ParameterizationHarmonicConfig =
+            decltype(ParameterizationPanelConfig{}.Harmonic);
+        using ParameterizationBffConfig =
+            decltype(ParameterizationPanelConfig{}.Bff);
+        using ParameterizationBoundaryPolicy =
+            decltype(ParameterizationPanelConfig{}.Harmonic.Boundary);
+        using ParameterizationBffBoundaryMode =
+            decltype(ParameterizationPanelConfig{}.Bff.Mode);
+        using ParameterizationSolverStatus = decltype(
+            Runtime::SandboxEditorParameterizationResult{}
+                .ParameterizationStatus);
+
         constexpr std::array<Runtime::SandboxEditorKMeansBackend, 2>
             kKMeansBackends{
                 Runtime::SandboxEditorKMeansBackend::CpuReference,
@@ -179,6 +201,275 @@ namespace Extrinsic::Sandbox::Editor
             }
             return text;
         }
+
+        [[nodiscard]] bool IsFiniteVec2(const glm::vec2 value) noexcept
+        {
+            return std::isfinite(value.x) && std::isfinite(value.y);
+        }
+
+        [[nodiscard]] bool IsSupportedParameterizationStrategy(
+            const Runtime::SandboxEditorParameterizationStrategy strategy) noexcept
+        {
+            const auto options = SandboxParameterizationStrategyOptions();
+            return std::any_of(
+                options.begin(),
+                options.end(),
+                [strategy](const SandboxParameterizationStrategyOption& option)
+                {
+                    return option.Strategy == strategy &&
+                           !option.StableToken.empty();
+                });
+        }
+
+        [[nodiscard]] const char* ParameterizationSolverStatusLabel(
+            const ParameterizationSolverStatus status) noexcept
+        {
+            switch (status)
+            {
+            case ParameterizationSolverStatus::Success:
+                return "success";
+            case ParameterizationSolverStatus::InvalidInput:
+                return "invalid input";
+            case ParameterizationSolverStatus::SolverFailed:
+                return "solver failed";
+            }
+            return "unsupported";
+        }
+    }
+
+    std::array<SandboxParameterizationStrategyOption, 4u>
+    SandboxParameterizationStrategyOptions() noexcept
+    {
+        using Strategy = Runtime::SandboxEditorParameterizationStrategy;
+        return {
+            SandboxParameterizationStrategyOption{
+                .Strategy = Strategy::Lscm,
+                .Label = "LSCM",
+                .StableToken = "lscm",
+            },
+            SandboxParameterizationStrategyOption{
+                .Strategy = Strategy::HarmonicCotangent,
+                .Label = "Harmonic (cotangent)",
+                .StableToken = "harmonic_cotangent",
+            },
+            SandboxParameterizationStrategyOption{
+                .Strategy = Strategy::TutteUniform,
+                .Label = "Tutte (uniform)",
+                .StableToken = "tutte_uniform",
+            },
+            SandboxParameterizationStrategyOption{
+                .Strategy = Strategy::Bff,
+                .Label = "Boundary First Flattening",
+                .StableToken = "bff",
+            },
+        };
+    }
+
+    std::optional<SandboxParameterizationPanelApplyRequest>
+    BuildSandboxParameterizationPanelApplyRequest(
+        const std::uint32_t stableEntityId,
+        const SandboxParameterizationPanelConfig& config)
+    {
+        if (stableEntityId == 0u ||
+            !IsSupportedParameterizationStrategy(config.Strategy) ||
+            Runtime::StableTokenForSandboxEditorParameterizationStrategy(
+                config.Strategy).empty())
+        {
+            return std::nullopt;
+        }
+        return SandboxParameterizationPanelApplyRequest{
+            .Config =
+                Runtime::SandboxEditorParameterizationConfigCommand{
+                    .Config = config,
+                    .SourceId = "sandbox.parameterization.panel",
+                },
+            .Execute =
+                Runtime::SandboxEditorConfiguredParameterizationCommand{
+                    .StableEntityId = stableEntityId,
+                },
+        };
+    }
+
+    SandboxParameterizationPanelActionResult
+    ApplySandboxParameterizationPanelAction(
+        const Runtime::SandboxEditorContext& context,
+        const std::uint32_t stableEntityId,
+        const SandboxParameterizationPanelConfig& config)
+    {
+        const auto request = BuildSandboxParameterizationPanelApplyRequest(
+            stableEntityId,
+            config);
+        if (!request.has_value())
+        {
+            SandboxParameterizationPanelActionResult rejected{};
+            rejected.Config.Status =
+                Runtime::SandboxEditorParameterizationConfigStatus::PreviewRejected;
+            rejected.Config.Message =
+                "Parameterization panel request is invalid or unsupported.";
+            return rejected;
+        }
+
+        SandboxParameterizationPanelActionResult result{};
+        result.Config = Runtime::ApplySandboxEditorParameterizationConfigCommand(
+            context,
+            request->Config);
+        if (result.Config.Succeeded())
+        {
+            result.Execution =
+                Runtime::ApplySandboxEditorConfiguredParameterizationCommand(
+                    context,
+                    request->Execute);
+        }
+        return result;
+    }
+
+    glm::vec2 ProjectSandboxParameterizationUvPoint(
+        const SandboxParameterizationUvProjection& projection,
+        const glm::vec2 uv) noexcept
+    {
+        const glm::vec2 centered = uv - projection.UvCenter;
+        return projection.PaneCenter + projection.Pan +
+               glm::vec2{
+                   centered.x * projection.Scale * projection.Zoom,
+                   -centered.y * projection.Scale * projection.Zoom,
+               };
+    }
+
+    SandboxParameterizationUvProjection
+    BuildSandboxParameterizationUvProjection(
+        const Runtime::SandboxEditorParameterizationViewModel& model,
+        const SandboxParameterizationUvPane& pane)
+    {
+        SandboxParameterizationUvProjection projection{};
+        projection.Zoom = pane.Zoom;
+        projection.Pan = pane.Pan;
+
+        if (!model.HasUvCoordinates || !model.HasFiniteUvBounds ||
+            model.UVs.empty())
+        {
+            projection.Message = "Selected mesh has no finite UV coordinates.";
+            return projection;
+        }
+        if (!IsFiniteVec2(pane.Min) || !IsFiniteVec2(pane.Max) ||
+            !IsFiniteVec2(pane.Pan) || !std::isfinite(pane.Padding) ||
+            !std::isfinite(pane.Zoom) || pane.Zoom <= 0.0f)
+        {
+            projection.Message = "UV pane transform is invalid.";
+            return projection;
+        }
+
+        const glm::vec2 paneSize = pane.Max - pane.Min;
+        const float padding = std::max(0.0f, pane.Padding);
+        const glm::vec2 available = paneSize - glm::vec2{padding * 2.0f};
+        if (!IsFiniteVec2(available) || available.x <= 0.0f ||
+            available.y <= 0.0f)
+        {
+            projection.Message = "UV pane is too small to draw.";
+            return projection;
+        }
+
+        glm::vec2 uvMin = model.UVs.front();
+        glm::vec2 uvMax = model.UVs.front();
+        for (const glm::vec2 uv : model.UVs)
+        {
+            if (!IsFiniteVec2(uv))
+            {
+                projection.Message = "UV coordinates contain non-finite values.";
+                return projection;
+            }
+            uvMin.x = std::min(uvMin.x, uv.x);
+            uvMin.y = std::min(uvMin.y, uv.y);
+            uvMax.x = std::max(uvMax.x, uv.x);
+            uvMax.y = std::max(uvMax.y, uv.y);
+        }
+
+        for (const auto& triangle : model.Triangles)
+        {
+            if (triangle[0] >= model.UVs.size() ||
+                triangle[1] >= model.UVs.size() ||
+                triangle[2] >= model.UVs.size())
+            {
+                projection.Message = "UV topology references an invalid vertex.";
+                return projection;
+            }
+        }
+
+        constexpr float kSpanEpsilon = 1.0e-8f;
+        const glm::vec2 span = uvMax - uvMin;
+        float scaleX = std::numeric_limits<float>::max();
+        float scaleY = std::numeric_limits<float>::max();
+        if (span.x > kSpanEpsilon)
+            scaleX = available.x / span.x;
+        if (span.y > kSpanEpsilon)
+            scaleY = available.y / span.y;
+        float scale = std::min(scaleX, scaleY);
+        if (scale == std::numeric_limits<float>::max())
+            scale = std::min(available.x, available.y);
+        if (!std::isfinite(scale) || scale <= 0.0f)
+        {
+            projection.Message = "UV bounds cannot be fitted to the pane.";
+            return projection;
+        }
+
+        projection.PaneCenter = pane.Min + paneSize * 0.5f;
+        projection.UvCenter = uvMin + span * 0.5f;
+        if (!IsFiniteVec2(projection.PaneCenter) ||
+            !IsFiniteVec2(projection.UvCenter))
+        {
+            projection.Message = "UV projection center is non-finite.";
+            return projection;
+        }
+        projection.Scale = scale;
+        projection.Triangles = model.Triangles;
+        projection.Vertices.reserve(model.UVs.size());
+        projection.FitsPane = true;
+        const glm::vec2 fitMin = pane.Min + glm::vec2{padding - 0.5f};
+        const glm::vec2 fitMax = pane.Max - glm::vec2{padding - 0.5f};
+        for (const glm::vec2 uv : model.UVs)
+        {
+            const glm::vec2 point =
+                ProjectSandboxParameterizationUvPoint(projection, uv);
+            if (!IsFiniteVec2(point))
+            {
+                projection.Vertices.clear();
+                projection.Message =
+                    "UV projection produced a non-finite pane coordinate.";
+                return projection;
+            }
+            projection.Vertices.push_back(point);
+            projection.FitsPane = projection.FitsPane &&
+                                  point.x >= fitMin.x && point.x <= fitMax.x &&
+                                  point.y >= fitMin.y && point.y <= fitMax.y;
+        }
+        projection.Valid = true;
+        return projection;
+    }
+
+    SandboxParameterizationResultSummary
+    BuildSandboxParameterizationResultSummary(
+        const Runtime::SandboxEditorParameterizationResult& result)
+    {
+        const auto& diagnostics = result.Diagnostics;
+        return SandboxParameterizationResultSummary{
+            .Succeeded = result.Succeeded(),
+            .HasDiagnostics = diagnostics.VertexStorageCount > 0u ||
+                              diagnostics.LiveFaceCount > 0u ||
+                              diagnostics.EvaluatedFaceCount > 0u ||
+                              diagnostics.SkippedFaceCount > 0u,
+            .StrategyToken = result.StrategyToken,
+            .CommandStatus =
+                Runtime::DebugNameForSandboxEditorCommandStatus(result.Status),
+            .SolverStatus = ParameterizationSolverStatusLabel(
+                result.ParameterizationStatus),
+            .Message = result.Message,
+            .EvaluatedFaceCount = diagnostics.EvaluatedFaceCount,
+            .SkippedFaceCount = diagnostics.SkippedFaceCount,
+            .FlippedElementCount = diagnostics.FlippedElementCount,
+            .BoundaryEdgeCount = diagnostics.BoundaryEdgeCount,
+            .MeanConformalDistortion = diagnostics.MeanConformalDistortion,
+            .MeanAreaDistortion = diagnostics.MeanAreaDistortion,
+            .MeanStretch = diagnostics.MeanStretch,
+        };
     }
 
     struct MethodPanels::Impl
@@ -224,6 +515,22 @@ namespace Extrinsic::Sandbox::Editor
             std::uint32_t PendingStableEntityId{0u};
         };
 
+        struct ParameterizationState
+        {
+            SandboxParameterizationPanelConfig Draft{};
+            bool Initialized{false};
+            bool Dirty{false};
+            std::optional<Runtime::SandboxEditorParameterizationConfigResult>
+                LastConfigResult{};
+            std::optional<Runtime::SandboxEditorParameterizationResult>
+                LastResult{};
+            float SplitRatio{0.42f};
+            float Zoom{1.0f};
+            glm::vec2 Pan{0.0f};
+            bool ShowGrid{true};
+            bool ShowChecker{true};
+        };
+
         EditorShell* Shell{nullptr};
         std::vector<Runtime::EditorWindowHandle> Handles{};
         int CachedModelFrame{-1};
@@ -233,6 +540,7 @@ namespace Extrinsic::Sandbox::Editor
             CachedDomainModels{};
         KMeansState KMeans{};
         ProgressivePoissonState ProgressivePoisson{};
+        ParameterizationState Parameterization{};
 
         void Register(EditorShell& editorShell)
         {
@@ -264,6 +572,7 @@ namespace Extrinsic::Sandbox::Editor
                 "mesh.processing.progressive_poisson",
                 {"Mesh", "Processing"},
                 "Mesh / Processing / Progressive Poisson");
+            RegisterParameterizationWindow();
         }
 
         void Unregister()
@@ -284,6 +593,7 @@ namespace Extrinsic::Sandbox::Editor
             ProgressivePoisson.AutoRunPending = false;
             ProgressivePoisson.LastEditTime = 0.0;
             ProgressivePoisson.PendingStableEntityId = 0u;
+            Parameterization = ParameterizationState{};
         }
 
         [[nodiscard]] const Runtime::SandboxEditorDomainWindowModel&
@@ -359,6 +669,24 @@ namespace Extrinsic::Sandbox::Editor
                                 context,
                                 kind,
                                 windowTitle);
+                        },
+                }));
+        }
+
+        void RegisterParameterizationWindow()
+        {
+            Handles.push_back(Shell->RegisterEditorWindow(
+                EditorWindowDescriptor{
+                    .Id = "mesh.processing.parameterize_uv",
+                    .MenuPath = {"Mesh", "Processing"},
+                    .Title = "Parameterize (UV)",
+                    .OpenByDefault = false,
+                    .Draw =
+                        [this](
+                            bool& open,
+                            const Runtime::SandboxEditorContext& context)
+                        {
+                            DrawParameterizationWindow(open, context);
                         },
                 }));
         }
@@ -1081,6 +1409,761 @@ namespace Extrinsic::Sandbox::Editor
                     ? ProgressivePoisson.LastResult
                     : processing.LastProgressivePoissonResult;
             DrawProgressivePoissonResultStatus(result);
+        }
+
+        static bool DrawParameterizationU32(
+            const char* label,
+            std::uint32_t& value)
+        {
+            return ImGui::InputScalar(
+                label,
+                ImGuiDataType_U32,
+                &value);
+        }
+
+        static bool DrawParameterizationUvValue(
+            ParameterizationUvConfig& uv)
+        {
+            bool changed = false;
+            changed |= ImGui::InputDouble("U", &uv.U, 0.0, 0.0, "%.8g");
+            ImGui::SameLine();
+            changed |= ImGui::InputDouble("V", &uv.V, 0.0, 0.0, "%.8g");
+            return changed;
+        }
+
+        static const char* ParameterizationBoundaryLabel(
+            const ParameterizationBoundaryPolicy boundary) noexcept
+        {
+            using Boundary = ParameterizationBoundaryPolicy;
+            switch (boundary)
+            {
+            case Boundary::Circle:
+                return "Circle";
+            case Boundary::Square:
+                return "Square";
+            case Boundary::Custom:
+                return "Custom pins";
+            }
+            return "Unsupported";
+        }
+
+        static const char* ParameterizationBffModeLabel(
+            const ParameterizationBffBoundaryMode mode) noexcept
+        {
+            using Mode = ParameterizationBffBoundaryMode;
+            switch (mode)
+            {
+            case Mode::AutomaticConformal:
+                return "Automatic conformal";
+            case Mode::TargetLengths:
+                return "Target boundary lengths";
+            case Mode::TargetAngles:
+                return "Target boundary angles";
+            }
+            return "Unsupported";
+        }
+
+        static bool DrawParameterizationStrategy(
+            SandboxParameterizationPanelConfig& config)
+        {
+            const auto options = SandboxParameterizationStrategyOptions();
+            const auto selected = std::find_if(
+                options.begin(),
+                options.end(),
+                [&config](const SandboxParameterizationStrategyOption& option)
+                {
+                    return option.Strategy == config.Strategy;
+                });
+            const char* preview = selected == options.end()
+                ? "Unsupported"
+                : selected->Label.data();
+            bool changed = false;
+            if (ImGui::BeginCombo("Strategy##Parameterization", preview))
+            {
+                for (const SandboxParameterizationStrategyOption& option :
+                     options)
+                {
+                    const bool isSelected = option.Strategy == config.Strategy;
+                    if (ImGui::Selectable(option.Label.data(), isSelected))
+                    {
+                        config.Strategy = option.Strategy;
+                        changed = true;
+                    }
+                    if (isSelected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+            return changed;
+        }
+
+        static bool DrawParameterizationLscmControls(
+            ParameterizationLscmConfig& config)
+        {
+            bool changed = false;
+            changed |= ImGui::Checkbox(
+                "Choose pins automatically##Parameterization",
+                &config.AutoPins);
+            if (!config.AutoPins)
+            {
+                changed |= DrawParameterizationU32(
+                    "First pin vertex##Parameterization",
+                    config.PinVertex0);
+                changed |= DrawParameterizationU32(
+                    "Second pin vertex##Parameterization",
+                    config.PinVertex1);
+            }
+            ImGui::TextUnformatted("First pin UV");
+            ImGui::PushID("FirstPinUv");
+            changed |= DrawParameterizationUvValue(config.PinUv0);
+            ImGui::PopID();
+            ImGui::TextUnformatted("Second pin UV");
+            ImGui::PushID("SecondPinUv");
+            changed |= DrawParameterizationUvValue(config.PinUv1);
+            ImGui::PopID();
+            changed |= ImGui::InputDouble(
+                "Solver tolerance##Parameterization",
+                &config.SolverTolerance,
+                0.0,
+                0.0,
+                "%.3e");
+            changed |= DrawParameterizationU32(
+                "Maximum iterations##Parameterization",
+                config.MaxSolverIterations);
+            return changed;
+        }
+
+        static bool DrawParameterizationHarmonicControls(
+            ParameterizationHarmonicConfig& config)
+        {
+            using Boundary = ParameterizationBoundaryPolicy;
+            constexpr std::array<Boundary, 3u> boundaries{
+                Boundary::Circle,
+                Boundary::Square,
+                Boundary::Custom,
+            };
+
+            bool changed = false;
+            if (ImGui::BeginCombo(
+                    "Boundary##Parameterization",
+                    ParameterizationBoundaryLabel(config.Boundary)))
+            {
+                for (const Boundary boundary : boundaries)
+                {
+                    const bool selected = config.Boundary == boundary;
+                    if (ImGui::Selectable(
+                            ParameterizationBoundaryLabel(boundary),
+                            selected))
+                    {
+                        config.Boundary = boundary;
+                        changed = true;
+                    }
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+            changed |= ImGui::Checkbox(
+                "Arc-length boundary spacing##Parameterization",
+                &config.ArcLengthSpacing);
+            changed |= ImGui::Checkbox(
+                "Clamp non-convex weights##Parameterization",
+                &config.ClampNonConvexWeights);
+
+            ImGui::SeparatorText("Pinned boundary vertices");
+            if (config.PinnedVertices.size() != config.PinnedUvs.size())
+            {
+                ImGui::TextDisabled(
+                    "Pin vertex and UV counts must match before Apply.");
+            }
+            const std::size_t pairCount = std::min(
+                config.PinnedVertices.size(),
+                config.PinnedUvs.size());
+            std::optional<std::size_t> removeIndex{};
+            for (std::size_t index = 0u; index < pairCount; ++index)
+            {
+                ImGui::PushID(static_cast<int>(index));
+                ImGui::Text("Pin %zu", index + 1u);
+                changed |= DrawParameterizationU32(
+                    "Vertex##ParameterizationPin",
+                    config.PinnedVertices[index]);
+                changed |= DrawParameterizationUvValue(
+                    config.PinnedUvs[index]);
+                if (ImGui::Button("Remove##ParameterizationPin"))
+                    removeIndex = index;
+                ImGui::PopID();
+            }
+            if (removeIndex.has_value())
+            {
+                config.PinnedVertices.erase(
+                    config.PinnedVertices.begin() +
+                    static_cast<std::ptrdiff_t>(*removeIndex));
+                config.PinnedUvs.erase(
+                    config.PinnedUvs.begin() +
+                    static_cast<std::ptrdiff_t>(*removeIndex));
+                changed = true;
+            }
+            if (ImGui::Button("Add pin##Parameterization"))
+            {
+                config.PinnedVertices.push_back(0u);
+                config.PinnedUvs.emplace_back();
+                changed = true;
+            }
+            return changed;
+        }
+
+        static bool DrawParameterizationBffControls(
+            ParameterizationBffConfig& config)
+        {
+            using Mode = ParameterizationBffBoundaryMode;
+            constexpr std::array<Mode, 3u> modes{
+                Mode::AutomaticConformal,
+                Mode::TargetLengths,
+                Mode::TargetAngles,
+            };
+            bool changed = false;
+            if (ImGui::BeginCombo(
+                    "Boundary mode##Parameterization",
+                    ParameterizationBffModeLabel(config.Mode)))
+            {
+                for (const Mode mode : modes)
+                {
+                    const bool selected = config.Mode == mode;
+                    if (ImGui::Selectable(
+                            ParameterizationBffModeLabel(mode),
+                            selected))
+                    {
+                        config.Mode = mode;
+                        if (mode == Mode::AutomaticConformal)
+                            config.BoundaryData.clear();
+                        changed = true;
+                    }
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+
+            if (config.Mode != Mode::AutomaticConformal)
+            {
+                ImGui::SeparatorText(
+                    config.Mode == Mode::TargetLengths
+                        ? "Boundary target lengths"
+                        : "Boundary target angles");
+                std::optional<std::size_t> removeIndex{};
+                for (std::size_t index = 0u;
+                     index < config.BoundaryData.size();
+                     ++index)
+                {
+                    ImGui::PushID(static_cast<int>(index));
+                    changed |= ImGui::InputDouble(
+                        "Value##ParameterizationBffBoundary",
+                        &config.BoundaryData[index],
+                        0.0,
+                        0.0,
+                        "%.8g");
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Remove##ParameterizationBffBoundary"))
+                        removeIndex = index;
+                    ImGui::PopID();
+                }
+                if (removeIndex.has_value())
+                {
+                    config.BoundaryData.erase(
+                        config.BoundaryData.begin() +
+                        static_cast<std::ptrdiff_t>(*removeIndex));
+                    changed = true;
+                }
+                if (ImGui::Button("Add boundary value##Parameterization"))
+                {
+                    config.BoundaryData.push_back(
+                        config.Mode == Mode::TargetLengths ? 1.0 : 0.0);
+                    changed = true;
+                }
+            }
+            changed |= ImGui::InputDouble(
+                "Angle-sum tolerance##Parameterization",
+                &config.AngleSumTolerance,
+                0.0,
+                0.0,
+                "%.3e");
+            changed |= ImGui::InputDouble(
+                "Degeneracy tolerance##Parameterization",
+                &config.DegeneracyTolerance,
+                0.0,
+                0.0,
+                "%.3e");
+            return changed;
+        }
+
+        static bool DrawParameterizationConfigControls(
+            SandboxParameterizationPanelConfig& config)
+        {
+            bool changed = DrawParameterizationStrategy(config);
+            ImGui::SeparatorText("Strategy parameters");
+            using Strategy = Runtime::SandboxEditorParameterizationStrategy;
+            switch (config.Strategy)
+            {
+            case Strategy::Lscm:
+                changed |= DrawParameterizationLscmControls(config.Lscm);
+                break;
+            case Strategy::HarmonicCotangent:
+            case Strategy::TutteUniform:
+                changed |= DrawParameterizationHarmonicControls(
+                    config.Harmonic);
+                break;
+            case Strategy::Bff:
+                changed |= DrawParameterizationBffControls(config.Bff);
+                break;
+            }
+            return changed;
+        }
+
+        static void DrawParameterizationResult(
+            const std::optional<Runtime::SandboxEditorParameterizationResult>&
+                result)
+        {
+            ImGui::SeparatorText("Last run diagnostics");
+            if (!result.has_value())
+            {
+                ImGui::TextDisabled("No parameterization has run this session.");
+                return;
+            }
+            const SandboxParameterizationResultSummary summary =
+                BuildSandboxParameterizationResultSummary(*result);
+            ImGui::Text(
+                "Status: %s (%s)",
+                summary.CommandStatus.c_str(),
+                summary.SolverStatus.c_str());
+            ImGui::Text("Strategy token: %s", summary.StrategyToken.c_str());
+            if (summary.HasDiagnostics)
+            {
+                ImGui::Text(
+                    "Faces: %zu evaluated, %zu skipped, %zu flipped",
+                    summary.EvaluatedFaceCount,
+                    summary.SkippedFaceCount,
+                    summary.FlippedElementCount);
+                ImGui::Text(
+                    "Boundary edges: %zu",
+                    summary.BoundaryEdgeCount);
+                ImGui::Text(
+                    "Mean conformal %.6g  area %.6g  stretch %.6g",
+                    summary.MeanConformalDistortion,
+                    summary.MeanAreaDistortion,
+                    summary.MeanStretch);
+            }
+            if (!summary.Message.empty())
+                ImGui::TextWrapped("%s", summary.Message.c_str());
+        }
+
+        void DrawParameterizationControlPane(
+            const Runtime::SandboxEditorContext& context,
+            const Runtime::SandboxEditorParameterizationViewModel& model)
+        {
+            if (!Parameterization.Initialized || !Parameterization.Dirty)
+            {
+                const auto active =
+                    Runtime::GetSandboxEditorParameterizationConfig(context);
+                if (active.has_value())
+                {
+                    Parameterization.Draft = *active;
+                    Parameterization.Initialized = true;
+                }
+            }
+
+            if (context.LastParameterizationResult != nullptr)
+                Parameterization.LastResult = *context.LastParameterizationResult;
+
+            Parameterization.Dirty |=
+                DrawParameterizationConfigControls(Parameterization.Draft);
+            if (Parameterization.Dirty)
+                ImGui::TextDisabled("Draft has unapplied changes.");
+
+            const bool configAvailable =
+                context.EngineConfigControlState != nullptr &&
+                context.EngineConfigCommandsAvailable;
+            if (!configAvailable)
+                ImGui::BeginDisabled();
+            if (ImGui::Button("Apply configuration##Parameterization"))
+            {
+                Parameterization.LastConfigResult =
+                    Runtime::ApplySandboxEditorParameterizationConfigCommand(
+                        context,
+                        Runtime::SandboxEditorParameterizationConfigCommand{
+                            .Config = Parameterization.Draft,
+                            .SourceId = "sandbox.parameterization.panel",
+                        });
+                if (Parameterization.LastConfigResult->Succeeded())
+                    Parameterization.Dirty = false;
+            }
+            if (!configAvailable)
+                ImGui::EndDisabled();
+            ImGui::SameLine();
+            if (ImGui::Button("Reload active##Parameterization"))
+            {
+                const auto active =
+                    Runtime::GetSandboxEditorParameterizationConfig(context);
+                if (active.has_value())
+                {
+                    Parameterization.Draft = *active;
+                    Parameterization.Initialized = true;
+                    Parameterization.Dirty = false;
+                }
+            }
+
+            const bool canRun = configAvailable && model.HasSelectedEntity &&
+                                model.SelectedEntityIsMesh;
+            if (!canRun)
+                ImGui::BeginDisabled();
+            if (ImGui::Button("Parameterize selected mesh##Parameterization"))
+            {
+                SandboxParameterizationPanelActionResult action =
+                    ApplySandboxParameterizationPanelAction(
+                        context,
+                        model.SelectedStableEntityId,
+                        Parameterization.Draft);
+                Parameterization.LastConfigResult = std::move(action.Config);
+                if (action.Execution.has_value())
+                    Parameterization.LastResult = std::move(action.Execution);
+                if (Parameterization.LastConfigResult->Succeeded())
+                    Parameterization.Dirty = false;
+            }
+            if (!canRun)
+                ImGui::EndDisabled();
+
+            const bool historyAvailable = context.CommandHistory != nullptr;
+            const Runtime::EditorCommandHistorySnapshot history =
+                historyAvailable
+                    ? context.CommandHistory->Snapshot()
+                    : Runtime::EditorCommandHistorySnapshot{};
+            const bool canUndoUv =
+                history.CanUndo && history.UndoLabel == "Parameterize mesh UVs";
+            const bool canRedoUv =
+                history.CanRedo && history.RedoLabel == "Parameterize mesh UVs";
+            if (!canUndoUv)
+                ImGui::BeginDisabled();
+            if (ImGui::Button("Undo UV writeback##Parameterization") &&
+                historyAvailable)
+            {
+                (void)context.CommandHistory->Undo();
+            }
+            if (!canUndoUv)
+                ImGui::EndDisabled();
+            ImGui::SameLine();
+            if (!canRedoUv)
+                ImGui::BeginDisabled();
+            if (ImGui::Button("Redo UV writeback##Parameterization") &&
+                historyAvailable)
+            {
+                (void)context.CommandHistory->Redo();
+            }
+            if (!canRedoUv)
+                ImGui::EndDisabled();
+            if (history.CanUndo && !canUndoUv)
+            {
+                ImGui::TextDisabled(
+                    "Next global undo is '%s'; use File / Scene.",
+                    history.UndoLabel.c_str());
+            }
+
+            if (Parameterization.LastConfigResult.has_value() &&
+                !Parameterization.LastConfigResult->Message.empty())
+            {
+                ImGui::TextWrapped(
+                    "%s",
+                    Parameterization.LastConfigResult->Message.c_str());
+            }
+            DrawParameterizationResult(Parameterization.LastResult);
+        }
+
+        static ImVec2 ToImVec2(const glm::vec2 value) noexcept
+        {
+            return ImVec2{value.x, value.y};
+        }
+
+        void DrawParameterizationUvPane(
+            const Runtime::SandboxEditorParameterizationViewModel& model)
+        {
+            ImGui::TextUnformatted("UV layout");
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Fit##ParameterizationUv"))
+            {
+                Parameterization.Zoom = 1.0f;
+                Parameterization.Pan = glm::vec2{0.0f};
+            }
+            ImGui::SameLine();
+            ImGui::Checkbox("Grid##ParameterizationUv", &Parameterization.ShowGrid);
+            ImGui::SameLine();
+            ImGui::Checkbox(
+                "Checker##ParameterizationUv",
+                &Parameterization.ShowChecker);
+            ImGui::SameLine();
+            ImGui::TextDisabled("%.0f%%", Parameterization.Zoom * 100.0f);
+
+            const ImVec2 canvasMin = ImGui::GetCursorScreenPos();
+            ImVec2 canvasSize = ImGui::GetContentRegionAvail();
+            canvasSize.x = std::max(canvasSize.x, 80.0f);
+            canvasSize.y = std::max(canvasSize.y, 80.0f);
+            ImGui::InvisibleButton(
+                "##ParameterizationUvCanvas",
+                canvasSize);
+            const bool hovered = ImGui::IsItemHovered();
+            if (hovered && ImGui::IsMouseDragging(ImGuiMouseButton_Middle))
+            {
+                const ImVec2 delta = ImGui::GetIO().MouseDelta;
+                Parameterization.Pan += glm::vec2{delta.x, delta.y};
+            }
+            if (hovered && ImGui::GetIO().MouseWheel != 0.0f)
+            {
+                const float oldZoom = Parameterization.Zoom;
+                const float factor = std::pow(
+                    1.15f,
+                    ImGui::GetIO().MouseWheel);
+                Parameterization.Zoom = std::clamp(
+                    oldZoom * factor,
+                    0.1f,
+                    20.0f);
+                const ImVec2 mouse = ImGui::GetIO().MousePos;
+                const glm::vec2 paneCenter{
+                    canvasMin.x + canvasSize.x * 0.5f,
+                    canvasMin.y + canvasSize.y * 0.5f,
+                };
+                const glm::vec2 cursorOffset =
+                    glm::vec2{mouse.x, mouse.y} - paneCenter -
+                    Parameterization.Pan;
+                Parameterization.Pan +=
+                    cursorOffset *
+                    (1.0f - Parameterization.Zoom / oldZoom);
+            }
+
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            const ImVec2 canvasMax{
+                canvasMin.x + canvasSize.x,
+                canvasMin.y + canvasSize.y,
+            };
+            drawList->AddRectFilled(
+                canvasMin,
+                canvasMax,
+                IM_COL32(24, 27, 32, 255));
+            drawList->AddRect(
+                canvasMin,
+                canvasMax,
+                IM_COL32(90, 96, 108, 255));
+
+            const SandboxParameterizationUvProjection projection =
+                BuildSandboxParameterizationUvProjection(
+                    model,
+                    SandboxParameterizationUvPane{
+                        .Min = {canvasMin.x, canvasMin.y},
+                        .Max = {canvasMax.x, canvasMax.y},
+                        .Padding = 24.0f,
+                        .Zoom = Parameterization.Zoom,
+                        .Pan = Parameterization.Pan,
+                    });
+            drawList->PushClipRect(canvasMin, canvasMax, true);
+            if (projection.Valid)
+            {
+                if (Parameterization.ShowChecker)
+                {
+                    constexpr std::uint32_t kCheckerCount = 10u;
+                    for (std::uint32_t y = 0u; y < kCheckerCount; ++y)
+                    {
+                        for (std::uint32_t x = 0u; x < kCheckerCount; ++x)
+                        {
+                            const glm::vec2 uv0{
+                                static_cast<float>(x) /
+                                    static_cast<float>(kCheckerCount),
+                                static_cast<float>(y) /
+                                    static_cast<float>(kCheckerCount),
+                            };
+                            const glm::vec2 uv1{
+                                static_cast<float>(x + 1u) /
+                                    static_cast<float>(kCheckerCount),
+                                static_cast<float>(y + 1u) /
+                                    static_cast<float>(kCheckerCount),
+                            };
+                            const glm::vec2 p0 =
+                                ProjectSandboxParameterizationUvPoint(
+                                    projection,
+                                    uv0);
+                            const glm::vec2 p1 =
+                                ProjectSandboxParameterizationUvPoint(
+                                    projection,
+                                    uv1);
+                            if (!IsFiniteVec2(p0) || !IsFiniteVec2(p1))
+                                continue;
+                            drawList->AddRectFilled(
+                                ImVec2{
+                                    std::min(p0.x, p1.x),
+                                    std::min(p0.y, p1.y),
+                                },
+                                ImVec2{
+                                    std::max(p0.x, p1.x),
+                                    std::max(p0.y, p1.y),
+                                },
+                                ((x + y) & 1u) == 0u
+                                    ? IM_COL32(53, 57, 66, 255)
+                                    : IM_COL32(36, 40, 47, 255));
+                        }
+                    }
+                }
+                if (Parameterization.ShowGrid)
+                {
+                    for (std::uint32_t index = 0u; index <= 10u; ++index)
+                    {
+                        const float t = static_cast<float>(index) / 10.0f;
+                        const glm::vec2 vertical0 =
+                            ProjectSandboxParameterizationUvPoint(
+                                projection,
+                                {t, 0.0f});
+                        const glm::vec2 vertical1 =
+                            ProjectSandboxParameterizationUvPoint(
+                                projection,
+                                {t, 1.0f});
+                        const glm::vec2 horizontal0 =
+                            ProjectSandboxParameterizationUvPoint(
+                                projection,
+                                {0.0f, t});
+                        const glm::vec2 horizontal1 =
+                            ProjectSandboxParameterizationUvPoint(
+                                projection,
+                                {1.0f, t});
+                        if (!IsFiniteVec2(vertical0) ||
+                            !IsFiniteVec2(vertical1) ||
+                            !IsFiniteVec2(horizontal0) ||
+                            !IsFiniteVec2(horizontal1))
+                        {
+                            continue;
+                        }
+                        const ImU32 color = index == 0u || index == 10u
+                            ? IM_COL32(121, 129, 146, 190)
+                            : IM_COL32(91, 98, 112, 100);
+                        drawList->AddLine(
+                            ToImVec2(vertical0),
+                            ToImVec2(vertical1),
+                            color);
+                        drawList->AddLine(
+                            ToImVec2(horizontal0),
+                            ToImVec2(horizontal1),
+                            color);
+                    }
+                }
+
+                for (const auto& triangle : projection.Triangles)
+                {
+                    const ImVec2 a = ToImVec2(projection.Vertices[triangle[0]]);
+                    const ImVec2 b = ToImVec2(projection.Vertices[triangle[1]]);
+                    const ImVec2 c = ToImVec2(projection.Vertices[triangle[2]]);
+                    drawList->AddTriangleFilled(
+                        a,
+                        b,
+                        c,
+                        IM_COL32(66, 145, 214, 52));
+                    drawList->AddTriangle(
+                        a,
+                        b,
+                        c,
+                        IM_COL32(113, 190, 255, 220),
+                        1.25f);
+                }
+                for (const glm::vec2 vertex : projection.Vertices)
+                {
+                    drawList->AddCircleFilled(
+                        ToImVec2(vertex),
+                        2.0f,
+                        IM_COL32(225, 240, 255, 235));
+                }
+            }
+            else
+            {
+                const std::string& message = projection.Message.empty()
+                    ? model.Message
+                    : projection.Message;
+                drawList->AddText(
+                    ImVec2{canvasMin.x + 12.0f, canvasMin.y + 12.0f},
+                    IM_COL32(170, 176, 188, 255),
+                    message.empty()
+                        ? "Parameterize the selected mesh to populate UVs."
+                        : message.c_str());
+            }
+            drawList->PopClipRect();
+        }
+
+        void DrawParameterizationWindow(
+            bool& open,
+            const Runtime::SandboxEditorContext& context)
+        {
+            ImGui::SetNextWindowSize(
+                ImVec2(920.0f, 600.0f),
+                ImGuiCond_FirstUseEver);
+            if (ImGui::Begin(
+                    "Mesh / Processing / Parameterize (UV)",
+                    &open))
+            {
+                const Runtime::SandboxEditorParameterizationViewModel model =
+                    Runtime::BuildSandboxEditorParameterizationViewModel(context);
+                if (model.HasSelectedEntity)
+                {
+                    ImGui::Text(
+                        "Selected entity: %u%s",
+                        model.SelectedStableEntityId,
+                        model.SelectedEntityIsMesh ? " (mesh)" : "");
+                }
+                else
+                {
+                    ImGui::TextDisabled("Selected entity: none");
+                }
+                if (!model.Message.empty())
+                    ImGui::TextWrapped("%s", model.Message.c_str());
+
+                constexpr float splitterWidth = 6.0f;
+                const ImVec2 available = ImGui::GetContentRegionAvail();
+                const float usableWidth =
+                    std::max(available.x - splitterWidth, 2.0f);
+                Parameterization.SplitRatio = std::clamp(
+                    Parameterization.SplitRatio,
+                    0.28f,
+                    0.72f);
+                const float controlWidth =
+                    usableWidth * Parameterization.SplitRatio;
+
+                ImGui::BeginChild(
+                    "##ParameterizationControls",
+                    ImVec2(controlWidth, available.y),
+                    true);
+                DrawParameterizationControlPane(context, model);
+                ImGui::EndChild();
+                ImGui::SameLine(0.0f, 0.0f);
+
+                ImGui::InvisibleButton(
+                    "##ParameterizationSplitter",
+                    ImVec2(splitterWidth, available.y));
+                if (ImGui::IsItemActive())
+                {
+                    Parameterization.SplitRatio = std::clamp(
+                        Parameterization.SplitRatio +
+                            ImGui::GetIO().MouseDelta.x / usableWidth,
+                        0.28f,
+                        0.72f);
+                }
+                const ImVec2 splitterMin = ImGui::GetItemRectMin();
+                const ImVec2 splitterMax = ImGui::GetItemRectMax();
+                ImGui::GetWindowDrawList()->AddRectFilled(
+                    splitterMin,
+                    splitterMax,
+                    ImGui::IsItemHovered() || ImGui::IsItemActive()
+                        ? IM_COL32(94, 155, 214, 210)
+                        : IM_COL32(69, 75, 86, 180));
+                ImGui::SameLine(0.0f, 0.0f);
+
+                ImGui::BeginChild(
+                    "##ParameterizationUv",
+                    ImVec2(0.0f, available.y),
+                    true);
+                DrawParameterizationUvPane(model);
+                ImGui::EndChild();
+            }
+            ImGui::End();
         }
 
         static void DrawProgressivePoissonResultStatus(

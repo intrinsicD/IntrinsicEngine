@@ -47,3 +47,14 @@ attach/detach interface. `EditorShell` owns the ten core Sandbox windows,
 menus, ImGui state, and frame presentation; runtime exposes only generic editor
 hosting plus data/model/command facades. The Sandbox executable no longer
 composes those panel families individually.
+
+`Sandbox.Editor.MethodPanels` also owns the registered
+`Mesh > Processing > Parameterize (UV)` window. The window offers only LSCM,
+harmonic cotangent, uniform Tutte, and Boundary First Flattening; maintains an
+explicit typed draft; and applies that draft through the runtime-owned
+`EngineConfig.sandbox.parameterization` validation lane before executing the
+undoable `v:texcoord` command. Its draggable controls/UV split renders the
+pointer-free runtime UV model with fit, grid/checker, zoom, pan, and aggregate
+last-run diagnostics. The app does not bind a UV/checker material: UV writeback
+is visible on the 3D mesh when its existing material already samples those
+coordinates.

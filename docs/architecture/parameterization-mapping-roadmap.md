@@ -297,7 +297,18 @@ Scope:
   programmatic callers. RUNTIME-176 retired at `CPUContracted`; it does not
   invent chart/seam records, per-face distortion, fallback telemetry, or an
   optimized/GPU selector.
-- Sandbox editor panel + resizable UV split view (`UI-036`): a two-pane controls/UV-layout split (manual splitter, no docking dependency), the 2D UV layout drawn with `ImDrawList` from the view model, and interactive pin/BFF-boundary control routed through the config lane. Cones are not part of the bounded BFF contract.
+- Sandbox editor panel + resizable UV split view (`UI-036`): the registered
+  `Mesh > Processing > Parameterize (UV)` window offers exactly LSCM, harmonic
+  cotangent, uniform Tutte, and BFF. A persistent explicit draft holds the
+  selected strategy's typed values until Apply routes them through the same
+  validated config lane used by files and agents; configured execution writes
+  undoable `v:texcoord` values. A stored-ratio manual splitter separates the
+  controls from an `ImDrawList` UV pane with fit, unit-square grid/checker,
+  cursor-centred zoom, and pan. The controls report aggregate last-run status,
+  face/boundary counts, and conformal/area/stretch diagnostics without
+  inventing per-face heatmaps, charts, or seams. The writeback updates an
+  already-bound 3D material that samples UVs, but the panel does not create or
+  bind a UV/checker material. Cones remain outside the bounded BFF contract.
 - Optional GPU-shaded UV target (`GRAPHICS-122`): an offscreen UV render presented via `ImGui::Image` for texel-density/texture/heatmap shading and dense meshes, with a CPU-layout fallback.
 
 Rendering-model decision (ADR-0025): the UV layout is a **derived second view of the mesh entity** (shared topology/`StableId`/`v:texcoord`), not a separate ECS entity, matching how Blender/Houdini/Maya/RizomUV present a UV editor as a second view of the same mesh in UV space. A separate UV entity and a true second viewport are considered and deferred/rejected there.

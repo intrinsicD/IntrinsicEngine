@@ -323,6 +323,7 @@ if(TARGET ExtrinsicSandboxEditor)
         FILES
             Test.SandboxDomainPanels.cpp
             Test.SandboxEditorPresentation.cpp
+            Test.SandboxParameterizationPanel.cpp
     )
     intrinsic_test_object_lib(SandboxEditorIntegrationTestObjs
         SOURCES

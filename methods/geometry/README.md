@@ -14,6 +14,15 @@ Implemented CPU parameterization strategies enter the sandbox through
 `EngineConfig.sandbox.parameterization` and the existing runtime editor facade.
 The stable config tokens are `lscm`, `harmonic_cotangent`, `tutte_uniform`, and
 `bff`; the configured command writes undoable `v:texcoord` values and produces
-the pointer-free UV model consumed by the downstream editor. See
+the pointer-free UV model consumed by the Sandbox editor. The active
+[`UI-036`](../../tasks/active/UI-036-sandbox-parameterization-editor-and-uv-split-view.md)
+window at `Mesh > Processing > Parameterize (UV)` exposes exactly those four
+strategies, keeps typed edits in an explicit draft, and uses the same validated
+config lane before execution. Its resizable controls/UV split supplies fit,
+unit-square grid/checker, zoom, pan, and aggregate last-run diagnostics. The
+panel does not bind a 3D UV/checker material; an already-bound material that
+samples `v:texcoord` observes the undoable writeback. See
 [engine config](../../docs/architecture/engine-config.md) and
-[runtime config control](../../docs/architecture/runtime-config-control.md).
+[runtime config control](../../docs/architecture/runtime-config-control.md),
+and [ADR-0025](../../docs/adr/0025-parameterization-uv-view-and-split-view.md)
+for the derived UV-view decision.
