@@ -383,6 +383,16 @@ namespace Extrinsic::Sandbox::Editor
             uvMax.y = std::max(uvMax.y, uv.y);
         }
 
+        if (pane.IncludeUnitSquare)
+        {
+            // Fit the visible checker/grid together with the mesh so its unit
+            // square stays a useful reference for compact UV islands.
+            uvMin.x = std::min(uvMin.x, 0.0f);
+            uvMin.y = std::min(uvMin.y, 0.0f);
+            uvMax.x = std::max(uvMax.x, 1.0f);
+            uvMax.y = std::max(uvMax.y, 1.0f);
+        }
+
         for (const auto& triangle : model.Triangles)
         {
             if (triangle[0] >= model.UVs.size() ||
@@ -1959,6 +1969,9 @@ namespace Extrinsic::Sandbox::Editor
                         .Padding = 24.0f,
                         .Zoom = Parameterization.Zoom,
                         .Pan = Parameterization.Pan,
+                        .IncludeUnitSquare =
+                            Parameterization.ShowChecker ||
+                            Parameterization.ShowGrid,
                     });
             drawList->PushClipRect(canvasMin, canvasMax, true);
             if (projection.Valid)

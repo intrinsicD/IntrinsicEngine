@@ -68,6 +68,7 @@ export namespace Extrinsic::Sandbox::Editor
         float Padding{20.0f};
         float Zoom{1.0f};
         glm::vec2 Pan{0.0f};
+        bool IncludeUnitSquare{false};
     };
 
     struct SandboxParameterizationUvProjection

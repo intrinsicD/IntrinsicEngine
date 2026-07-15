@@ -330,6 +330,42 @@ TEST(SandboxParameterizationPanel, ProjectionFitsAndFailsClosed)
     EXPECT_NEAR(horizontalScale, verticalScale, 1.0e-5f);
     EXPECT_GT(projection.Vertices[0].y, projection.Vertices[3].y);
 
+    auto compactIsland = model;
+    compactIsland.UVs = {
+        {0.45f, 0.45f},
+        {0.55f, 0.45f},
+        {0.55f, 0.55f},
+        {0.45f, 0.55f},
+    };
+    compactIsland.UvBoundsMin = {0.45f, 0.45f};
+    compactIsland.UvBoundsMax = {0.55f, 0.55f};
+    const auto compactProjection =
+        SandboxEditor::BuildSandboxParameterizationUvProjection(
+            compactIsland,
+            SandboxEditor::SandboxParameterizationUvPane{
+                .Min = pane.Min,
+                .Max = pane.Max,
+                .Padding = pane.Padding,
+                .IncludeUnitSquare = true,
+            });
+    ASSERT_TRUE(compactProjection.Valid) << compactProjection.Message;
+    const glm::vec2 unitMin =
+        SandboxEditor::ProjectSandboxParameterizationUvPoint(
+            compactProjection,
+            {0.0f, 0.0f});
+    const glm::vec2 unitMax =
+        SandboxEditor::ProjectSandboxParameterizationUvPoint(
+            compactProjection,
+            {1.0f, 1.0f});
+    EXPECT_GE(unitMin.x, pane.Min.x + pane.Padding - 0.5f);
+    EXPECT_LE(unitMin.x, pane.Max.x - pane.Padding + 0.5f);
+    EXPECT_GE(unitMin.y, pane.Min.y + pane.Padding - 0.5f);
+    EXPECT_LE(unitMin.y, pane.Max.y - pane.Padding + 0.5f);
+    EXPECT_GE(unitMax.x, pane.Min.x + pane.Padding - 0.5f);
+    EXPECT_LE(unitMax.x, pane.Max.x - pane.Padding + 0.5f);
+    EXPECT_GE(unitMax.y, pane.Min.y + pane.Padding - 0.5f);
+    EXPECT_LE(unitMax.y, pane.Max.y - pane.Padding + 0.5f);
+
     auto transformedPane = pane;
     transformedPane.Zoom = 2.0f;
     transformedPane.Pan = {17.0f, -9.0f};
