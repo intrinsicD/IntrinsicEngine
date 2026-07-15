@@ -21,6 +21,7 @@ endif()
 # promoted geometry/core module libraries.
 add_executable(IntrinsicBenchmarkSmoke
     runners/BenchmarkSmokeRunner.cpp
+    geometry/Bench_BoundaryFirstFlatteningReferenceSmoke.cpp
     geometry/Bench_ExampleSmoke.cpp
     geometry/Bench_PointCloudFilteringSmoke.cpp
     geometry/Bench_ProgressivePoissonReferenceSmoke.cpp

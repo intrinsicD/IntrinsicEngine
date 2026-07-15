@@ -1,0 +1,24 @@
+# METHOD-023 — CPU-reference Boundary First Flattening correctness smoke.
+#
+# This is a deterministic health measurement, not a performance claim.
+# quality_error_l2 is the worst measured RMS conformal error reported by the
+# shared parameterization diagnostics on the built-in curved disk fixture.
+
+benchmark_id: geometry.boundary_first_flattening.smoke
+method: geometry.boundary_first_flattening
+dataset: builtin.curved_grid_disk_n3
+params:
+  intent: correctness
+  fixture: curved_grid_disk_n3
+  boundary_mode: automatic_conformal
+  angle_sum_tolerance: 1.0e-8
+  degeneracy_tolerance: 1.0e-12
+  warmup_iterations: 1
+  measured_iterations: 3
+  performance_claim: false
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 250
+  quality_error_l2_max: 0.5

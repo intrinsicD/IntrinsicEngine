@@ -14,6 +14,7 @@
 // with the previous scaffold's CMake/CI wiring.
 
 #include "../geometry/Bench.GeometrySmoke.hpp"
+#include "../geometry/Bench.BoundaryFirstFlatteningReferenceSmoke.hpp"
 #include "../geometry/Bench.PointCloudFilteringSmoke.hpp"
 #include "../geometry/Bench.ProgressivePoissonReferenceSmoke.hpp"
 #include "../geometry/Bench.QualityMetricsSmoke.hpp"
@@ -550,6 +551,71 @@ auto EmitSimplificationQualitySmoke(const std::string &commit)
 
   return EmittedBenchmark{kSimplificationQualitySmokeBenchmarkId, out.str(),
                           metrics.Succeeded};
+}
+
+auto EmitBoundaryFirstFlatteningReferenceSmoke(const std::string &commit)
+    -> EmittedBenchmark {
+  using namespace Intrinsic::Bench::Geometry;
+
+  const auto metrics = RunBoundaryFirstFlatteningReferenceSmoke();
+
+  std::ostringstream out;
+  out.setf(std::ios::fixed);
+  out.precision(9);
+  out << "{\n"
+      << "  \"benchmark_id\": \""
+      << EscapeJson(kBoundaryFirstFlatteningReferenceSmokeBenchmarkId)
+      << "\",\n"
+      << "  \"method\": \""
+      << EscapeJson(kBoundaryFirstFlatteningReferenceSmokeMethod) << "\",\n"
+      << "  \"backend\": \"cpu_reference\",\n"
+      << "  \"dataset\": \""
+      << EscapeJson(kBoundaryFirstFlatteningReferenceSmokeDataset) << "\",\n"
+      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
+      << "  \"metrics\": {\n"
+      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
+      << "  },\n"
+      << "  \"diagnostics\": {\n"
+      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+      << "    \"mode\": \"correctness_smoke\",\n"
+      << "    \"warmup_iterations\": "
+      << kBoundaryFirstFlatteningReferenceSmokeWarmupIterations << ",\n"
+      << "    \"measured_iterations\": "
+      << kBoundaryFirstFlatteningReferenceSmokeMeasuredIterations << ",\n"
+      << "    \"failed_measured_iteration_count\": "
+      << metrics.FailedMeasuredIterationCount << ",\n"
+      << "    \"smoke_runtime_ms_max\": "
+      << kBoundaryFirstFlatteningReferenceSmokeRuntimeMillisecondsMax << ",\n"
+      << "    \"quality_error_l2_max\": "
+      << kBoundaryFirstFlatteningReferenceSmokeQualityErrorL2Max << ",\n"
+      << "    \"performance_claim\": false,\n"
+      << "    \"boundary_mode\": \"automatic_conformal\",\n"
+      << "    \"mean_conformal_distortion\": "
+      << metrics.MeanConformalDistortion << ",\n"
+      << "    \"max_conformal_distortion\": "
+      << metrics.MaxConformalDistortion << ",\n"
+      << "    \"closure_adjustment_rms_relative\": "
+      << metrics.ClosureAdjustmentRmsRelative << ",\n"
+      << "    \"closure_adjustment_max_relative\": "
+      << metrics.ClosureAdjustmentMaxRelative << ",\n"
+      << "    \"failure_reason\": \""
+      << EscapeJson(std::string(metrics.FailureReason)) << "\",\n"
+      << "    \"vertex_count\": " << metrics.VertexCount << ",\n"
+      << "    \"face_count\": " << metrics.FaceCount << ",\n"
+      << "    \"evaluated_face_count\": "
+      << metrics.EvaluatedFaceCount << ",\n"
+      << "    \"flipped_element_count\": "
+      << metrics.FlippedElementCount << "\n"
+      << "  },\n"
+      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
+      << "\"\n"
+      << "}\n";
+
+  return EmittedBenchmark{
+      kBoundaryFirstFlatteningReferenceSmokeBenchmarkId,
+      out.str(),
+      metrics.Succeeded};
 }
 
 auto EmitQualityMetricsSmoke(const std::string &commit) -> EmittedBenchmark {
@@ -1162,6 +1228,7 @@ auto main(int argc, char **argv) -> int {
   emitted.push_back(EmitUvAtlasPromotionSmoke(commit));
   emitted.push_back(EmitProgressivePoissonReferenceSmoke(commit));
   emitted.push_back(EmitSignedHeatReferenceSmoke(commit));
+  emitted.push_back(EmitBoundaryFirstFlatteningReferenceSmoke(commit));
   emitted.push_back(EmitSimplificationQualitySmoke(commit));
   emitted.push_back(EmitSurfaceSamplingSmoke(commit));
   emitted.push_back(EmitQualityMetricsSmoke(commit));

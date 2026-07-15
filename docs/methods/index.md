@@ -41,6 +41,17 @@ This index is the canonical entry point for method/paper implementation document
 
 ## Geometry Methods
 
+- [`geometry.boundary_first_flattening`](../../methods/geometry/boundary_first_flattening/)
+  is the CPU-reference method contract for Sawhney and Crane's Boundary
+  First Flattening (ACM TOG 37(1), Article 5, 2017; DOI
+  [`10.1145/3132705`](https://doi.org/10.1145/3132705)). Its bounded
+  `METHOD-023` scope accepts an already-cut triangle disk and defines
+  `AutomaticConformal`, approximate `TargetLengths`, and `TargetAngles` modes.
+  Cones, cutting, optimized/GPU backends, and performance claims are excluded.
+  The executable CPU reference is exposed through
+  `Geometry.Parameterization.Bff`, with analytic correctness tests and a
+  manifest-backed smoke benchmark; `RUNTIME-176` owns later config
+  serialization and selected-mesh UV writeback.
 - [`geometry.signed_heat`](../../methods/geometry/signed_heat/) is the
   deterministic CPU reference backend for Feng & Crane's Signed Heat Method on
   triangle-mesh surfaces. Given an oriented halfedge curve, it writes

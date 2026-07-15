@@ -41,6 +41,7 @@ TEST(ParameterizationDiagnostics, IdentityTriangleHasZeroNormalizedError)
     EXPECT_EQ(diagnostics.FlippedElementCount, 0u);
     EXPECT_NEAR(diagnostics.MeanConformalDistortion, 1.0, kTolerance);
     EXPECT_NEAR(diagnostics.MeanConformalError, 0.0, kTolerance);
+    EXPECT_NEAR(diagnostics.RootMeanSquareConformalError, 0.0, kTolerance);
     EXPECT_NEAR(diagnostics.MeanAreaRatio, 1.0, kTolerance);
     EXPECT_NEAR(diagnostics.MeanAreaError, 0.0, kTolerance);
     EXPECT_NEAR(diagnostics.MeanSymmetricDirichletExcess, 0.0, kTolerance);
@@ -81,6 +82,7 @@ TEST(ParameterizationDiagnostics, StretchedRectangleHasPredictableDistortion)
     EXPECT_EQ(diagnostics.EvaluatedFaceCount, 2u);
     EXPECT_NEAR(diagnostics.MeanConformalDistortion, 2.0, kTolerance);
     EXPECT_NEAR(diagnostics.MaxConformalDistortion, 2.0, kTolerance);
+    EXPECT_NEAR(diagnostics.RootMeanSquareConformalError, 1.0, kTolerance);
     EXPECT_NEAR(diagnostics.MeanAreaRatio, 2.0, kTolerance);
     EXPECT_NEAR(diagnostics.MeanAreaDistortion, 2.0, kTolerance);
     EXPECT_NEAR(diagnostics.MeanSymmetricDirichletEnergy, 3.125, kTolerance);

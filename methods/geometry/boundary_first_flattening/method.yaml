@@ -1,0 +1,36 @@
+id: geometry.boundary_first_flattening
+name: Boundary First Flattening
+domain: geometry
+status: reference
+paper:
+  title: "Boundary First Flattening"
+  authors: "Rohan Sawhney and Keenan Crane"
+  year: 2017
+  doi: "10.1145/3132705"
+  url: "https://doi.org/10.1145/3132705"
+inputs:
+  - "Connected manifold triangle mesh with finite positions, exactly one boundary loop, and Euler characteristic one"
+  - "BFF mode: AutomaticConformal, approximate TargetLengths, or TargetAngles"
+  - "TargetLengths: one positive finite UV-space length per boundary edge"
+  - "TargetAngles: one finite exterior turning angle in radians per boundary vertex, with total equal to 2*pi within tolerance"
+outputs:
+  - "Per-vertex finite UV coordinates on success; no UV payload on failure"
+  - "Shared ParameterizationDiagnostics plus boundary-target residuals and solver status"
+backends:
+  - cpu_reference
+metrics:
+  - "mean_conformal_distortion"
+  - "max_conformal_distortion"
+  - "boundary_length_error"
+  - "boundary_angle_error"
+  - "runtime_ms"
+correctness_tests:
+  - "../../../tests/unit/geometry/Test.BoundaryFirstFlattening.cpp"
+benchmarks:
+  - "../../../benchmarks/geometry/manifests/boundary_first_flattening_reference_smoke.yaml"
+known_limitations:
+  - "Input must already have disk topology; the method does not cut closed or multiply connected surfaces."
+  - "Cone singularities and automatic cone placement are excluded from the bounded repository contract."
+  - "Target boundary lengths are approximate constraints; the result reports closure and length residuals rather than claiming exact realization."
+  - "The objective is conformal and does not guarantee area preservation."
+  - "Only a CPU reference backend is planned; no optimized or GPU performance claim is made."

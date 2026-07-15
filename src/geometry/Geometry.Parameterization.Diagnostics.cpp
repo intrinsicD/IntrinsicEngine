@@ -152,6 +152,7 @@ namespace Geometry::Parameterization
 
         double conformalSum = 0.0;
         double conformalErrorSum = 0.0;
+        double conformalErrorSquaredSum = 0.0;
         double areaRatioSum = 0.0;
         double areaDistortionSum = 0.0;
         double areaErrorSum = 0.0;
@@ -235,7 +236,8 @@ namespace Geometry::Parameterization
             const double s2 = static_cast<double>(glm::dot(e2, sAxis));
             const double t2 = static_cast<double>(glm::dot(e2, tAxis));
             const double detLocal = s1 * t2 - s2 * t1;
-            if (std::abs(detLocal) <= options.SingularValueEpsilon)
+            if (std::abs(detLocal)
+                <= 2.0 * options.DegeneratePositionAreaEpsilon)
             {
                 ++diagnostics.DegeneratePositionFaceCount;
                 ++diagnostics.SkippedFaceCount;
@@ -264,6 +266,7 @@ namespace Geometry::Parameterization
 
             conformalSum += conformal;
             conformalErrorSum += conformalError;
+            conformalErrorSquaredSum += conformalError * conformalError;
             diagnostics.MaxConformalDistortion = std::max(diagnostics.MaxConformalDistortion, conformal);
             diagnostics.MaxConformalError = std::max(diagnostics.MaxConformalError, conformalError);
 
@@ -293,6 +296,8 @@ namespace Geometry::Parameterization
             const double invCount = 1.0 / static_cast<double>(diagnostics.EvaluatedFaceCount);
             diagnostics.MeanConformalDistortion = conformalSum * invCount;
             diagnostics.MeanConformalError = conformalErrorSum * invCount;
+            diagnostics.RootMeanSquareConformalError =
+                std::sqrt(conformalErrorSquaredSum * invCount);
             diagnostics.MeanAreaRatio = areaRatioSum * invCount;
             diagnostics.MeanAreaDistortion = areaDistortionSum * invCount;
             diagnostics.MeanAreaError = areaErrorSum * invCount;
@@ -337,7 +342,8 @@ namespace Geometry::Parameterization
 
                 const double length3d = static_cast<double>(glm::distance(mesh.Position(v0), mesh.Position(v1)));
                 const double lengthUv = static_cast<double>(glm::distance(uvs[v0.Index], uvs[v1.Index]));
-                if (length3d <= options.BoundaryLengthEpsilon || lengthUv <= options.BoundaryLengthEpsilon)
+                if (length3d <= options.BoundaryPositionLengthEpsilon
+                    || lengthUv <= options.BoundaryUvLengthEpsilon)
                 {
                     ++diagnostics.SkippedBoundaryEdgeCount;
                     continue;

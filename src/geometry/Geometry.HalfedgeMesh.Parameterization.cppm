@@ -14,6 +14,7 @@ export module Geometry.Parameterization;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 export import Geometry.Parameterization.Diagnostics;
+export import Geometry.Parameterization.Bff;
 export import Geometry.Parameterization.Harmonic;
 
 export namespace Geometry::Parameterization
@@ -116,7 +117,7 @@ export namespace Geometry::Parameterization
         SolverFailed,
     };
 
-    using ParameterizationStrategy = std::variant<ParameterizationParams, HarmonicParams>;
+    using ParameterizationStrategy = std::variant<ParameterizationParams, HarmonicParams, BffParams>;
 
     struct ParameterizeResult
     {

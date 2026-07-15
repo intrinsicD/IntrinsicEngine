@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 12 |
 | `core` | 41 |
 | `ecs` | 28 |
-| `geometry` | 102 |
+| `geometry` | 103 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 69 |
@@ -177,6 +177,7 @@ Root scanned: `src`
 | `Geometry.Octree` | `src/geometry/Geometry.Octree.cppm` | `geometry` |
 | `Geometry.Overlap` | `src/geometry/Geometry.Overlap.cppm` | `geometry` |
 | `Geometry.PCA` | `src/geometry/Geometry.PCA.cppm` | `geometry` |
+| `Geometry.Parameterization.Bff` | `src/geometry/Geometry.Parameterization.Bff.cppm` | `geometry` |
 | `Geometry.Parameterization.Diagnostics` | `src/geometry/Geometry.Parameterization.Diagnostics.cppm` | `geometry` |
 | `Geometry.Parameterization.Harmonic` | `src/geometry/Geometry.Parameterization.Harmonic.cppm` | `geometry` |
 | `Geometry.Plane` | `src/geometry/Geometry.Plane.cppm` | `geometry` |
@@ -417,4 +418,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugClosestFace` | `src/runtime/SpatialDebug/Runtime.SpatialDebugClosestFace.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **390**
+Total modules: **391**

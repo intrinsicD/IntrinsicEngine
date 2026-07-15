@@ -26,7 +26,8 @@ export namespace Geometry::Parameterization
         double DegeneratePositionAreaEpsilon{1.0e-12};
         double DegenerateUvAreaEpsilon{1.0e-12};
         double SingularValueEpsilon{1.0e-12};
-        double BoundaryLengthEpsilon{1.0e-12};
+        double BoundaryPositionLengthEpsilon{1.0e-12};
+        double BoundaryUvLengthEpsilon{1.0e-12};
     };
 
     struct ParameterizationDiagnostics
@@ -49,6 +50,7 @@ export namespace Geometry::Parameterization
         double MeanConformalDistortion{0.0};
         double MaxConformalDistortion{0.0};
         double MeanConformalError{0.0};
+        double RootMeanSquareConformalError{0.0};
         double MaxConformalError{0.0};
 
         double MeanAreaRatio{0.0};

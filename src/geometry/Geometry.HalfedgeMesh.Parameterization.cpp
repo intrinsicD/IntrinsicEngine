@@ -589,6 +589,34 @@ namespace Geometry::Parameterization
                 return result;
             }
         }
+
+        [[nodiscard]] ParameterizeResult DispatchParameterization(
+            const HalfedgeMesh::Mesh& mesh,
+            const BffParams& params)
+        {
+            ParameterizeResult result;
+            BffResult bff = ComputeBFF(mesh, params);
+
+            switch (bff.Status)
+            {
+            case BffStatus::Success:
+                result.Diagnostics = bff.Diagnostics.Quality;
+                if (result.Diagnostics.Status
+                    != ParameterizationDiagnosticsStatus::Success)
+                {
+                    return result;
+                }
+                result.Status = ParameterizationStatus::Success;
+                result.UVs = std::move(bff.UVs);
+                return result;
+            case BffStatus::SingularSystem:
+            case BffStatus::SolverFailed:
+                result.Status = ParameterizationStatus::SolverFailed;
+                return result;
+            default:
+                return result;
+            }
+        }
     } // namespace
 
     ParameterizeResult ParameterizeMesh(

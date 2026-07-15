@@ -16,7 +16,7 @@ This document splits parameterization, atlas, distortion, and surface-map work i
 The current promoted geometry layer already provides useful parameterization and mapping foundations:
 
 - `Geometry.Parameterization` provides LSCM for disk-topology triangle meshes, including pinned-vertex selection, UV output, conformal distortion summaries, flipped-triangle counts, and optional mesh-backed `v:texcoord` / `v:lscm_pinned` properties.
-- `Geometry.Parameterization.Diagnostics` provides the reusable diagnostics record for mesh positions plus per-vertex UVs, including evaluated/skipped counts, invalid-input classification, flipped elements, conformal/area/symmetric-Dirichlet/stretch metrics, deterministic boundary length distortion, and seam-discontinuity placeholders.
+- `Geometry.Parameterization.Diagnostics` provides the reusable diagnostics record for mesh positions plus per-vertex UVs, including evaluated/skipped counts, invalid-input classification, flipped elements, mean/RMS/max conformal error, area/symmetric-Dirichlet/stretch metrics, deterministic boundary length distortion, and seam-discontinuity placeholders.
 - `Geometry.UvAtlas` provides the backend-neutral UV atlas seam with authored-UV preservation, source xrefs for seam splits, chart/seam-cut records, GEOM-018 quality diagnostics, a method selector for `FastStaged` versus `XAtlas`, and `FastStaged` as the default concrete CPU backend. `FastStaged` grows connected planar multi-face charts, attempts existing LSCM then harmonic/Tutte parameterization per chart where topology allows, records per-chart quality diagnostics, and shelf-packs finite non-overlapping UVs; the repository-pinned `jpcy/xatlas` overlay remains available through explicit `XAtlas` requests and as compatibility fallback when enabled.
 - `Extrinsic.Runtime.AssetMeshNormals` consumes `Geometry.UvAtlas` from the runtime layer for imported renderable meshes, preserving valid authored UVs or generating atlas UVs before generated texture bakes. Geometry stays independent of assets, ECS, graphics, runtime, platform, and app layers.
 - `Geometry.DEC` and the reusable `Geometry.Sparse` seam provide sparse matrix and conjugate-gradient infrastructure that future parameterization solvers can share.
@@ -190,20 +190,36 @@ Dependencies:
 
 - The `GEOM-063` surface; the [`GEOM-024`](../../tasks/backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md) generalized symmetric eigensolver seam (shared with `METHOD-006`); the DEC cotangent/area operators; boundary-loop helpers.
 
-## Pack 4c — Boundary First Flattening (BFF) and interactive control
+## Pack 4c — Boundary First Flattening (BFF) boundary control
 
 Active task: [`METHOD-023`](../../tasks/active/METHOD-023-boundary-first-flattening-reference-backend.md) (adds the controllable-conformal `Bff` strategy).
 
 Scope:
 
-- Add an interactive conformal flattening that lets the caller prescribe boundary data — target boundary lengths or target exterior angles (curvature) — with optional interior cone singularities, via the Dirichlet-to-Neumann boundary reduction. This is the state-of-the-art *controllable* conformal method and the basis for the interactive UV editing in the engine-integration pack.
-- Paper: Sawhney & Crane, "Boundary First Flattening" (TOG 2018).
+- The package intake now lives at
+  [`methods/geometry/boundary_first_flattening`](../../methods/geometry/boundary_first_flattening/);
+  the executable strategy is owned by `METHOD-023` and exposed through
+  `Geometry.Parameterization.Bff` plus the shared typed dispatch.
+- Add a CPU reference conformal flattening for an already-cut triangle disk,
+  using the Dirichlet-to-Neumann boundary reduction. The bounded strategy
+  supports `AutomaticConformal` free-boundary data, approximate positive
+  `TargetLengths` (one per boundary edge), and `TargetAngles` in radians (one
+  per boundary vertex with a total of `2*pi` within the documented tolerance).
+- Cone singularities, cone placement, seam generation, cutting, optimized/GPU
+  backends, area-preservation guarantees, and performance claims are outside
+  this pack. Target-length mode reports closure and fitting residuals rather
+  than promising exact lengths.
+- Paper: Rohan Sawhney and Keenan Crane, "Boundary First Flattening," *ACM
+  Transactions on Graphics* 37(1), Article 5, 2017. DOI:
+  [`10.1145/3132705`](https://doi.org/10.1145/3132705).
 
 Primary home: the `Bff` strategy on the family surface, with paper claim capture under `methods/geometry/boundary_first_flattening`.
 
 Dependencies:
 
-- The `GEOM-063` surface; the DEC cotangent Laplacian; `Geometry.Sparse` LDLT for the interior solves; boundary-loop helpers. No eigensolver (that is Pack 4b).
+- The `GEOM-063` surface; the DEC cotangent Laplacian; `Geometry.Sparse` LDLT
+  for the boundary/interior solves; boundary-loop helpers. No eigensolver (that
+  is Pack 4b), atlas cutting, or runtime dependency.
 
 ## Pack 5 — Atlas segmentation, seam generation, and chart packing
 
@@ -269,8 +285,13 @@ This pack is outside `src/geometry` — it wires the geometry family surface int
 
 Scope:
 
-- Runtime facade + config lane (`RUNTIME-176`): an `EngineConfig.sandbox.parameterization` section applied through `EngineConfigControl`, an editor command that writes UVs back as `v:texcoord` via `GeometrySources`, a `Runtime.ParameterizationBackend` RHI fallback adapter, and a pointer-free UV view model.
-- Sandbox editor panel + resizable UV split view (`UI-036`): a two-pane controls/UV-layout split (manual splitter, no docking dependency), the 2D UV layout drawn with `ImDrawList` from the view model, a distortion-heatmap overlay, and interactive pin/BFF-boundary/cone control routed through the config lane.
+- Runtime facade + config lane (`RUNTIME-176`): an
+  `EngineConfig.sandbox.parameterization` section applied through
+  `EngineConfigControl`, stable tokens for implemented CPU strategies, an
+  editor command that writes UVs back as `v:texcoord` via `GeometrySources`,
+  and a pointer-free UV view model. No backend selector is reserved while only
+  CPU implementations exist.
+- Sandbox editor panel + resizable UV split view (`UI-036`): a two-pane controls/UV-layout split (manual splitter, no docking dependency), the 2D UV layout drawn with `ImDrawList` from the view model, and interactive pin/BFF-boundary control routed through the config lane. Cones are not part of the bounded BFF contract.
 - Optional GPU-shaded UV target (`GRAPHICS-122`): an offscreen UV render presented via `ImGui::Image` for texel-density/texture/heatmap shading and dense meshes, with a CPU-layout fallback.
 
 Rendering-model decision (ADR-0025): the UV layout is a **derived second view of the mesh entity** (shared topology/`StableId`/`v:texcoord`), not a separate ECS entity, matching how Blender/Houdini/Maya/RizomUV present a UV editor as a second view of the same mesh in UV space. A separate UV entity and a true second viewport are considered and deferred/rejected there.

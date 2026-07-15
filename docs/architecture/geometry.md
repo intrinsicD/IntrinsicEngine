@@ -419,7 +419,7 @@ UV parameterizations and surface-map quality checks. It evaluates a
 storage and reports explicit status/count fields for missing UV coordinates,
 non-triangle faces, non-finite positions or UVs, degenerate 3D triangles,
 degenerate UV triangles, skipped faces, and flipped UV elements. The metric
-record includes conformal distortion, identity-normalized conformal error,
+record includes conformal distortion, mean/RMS/max identity-normalized conformal error,
 area ratio and authalic area distortion, symmetric Dirichlet energy/excess,
 stretch, deterministic boundary length distortion, and seam-discontinuity
 placeholders for future chart/map records.
@@ -457,13 +457,14 @@ of scope.
 
 `Geometry.Parameterization::ParameterizeMesh` is the typed family entry point
 for the CPU solvers that exist today. `ParameterizationStrategy` is a
-`std::variant<ParameterizationParams, HarmonicParams>`: the first alternative
-selects LSCM, while the second selects cotangent Harmonic or uniform-weight
-Tutte through its own payload. Successful dispatch returns UVs plus the shared
+`std::variant<ParameterizationParams, HarmonicParams, BffParams>`: the first
+alternative selects LSCM, the second selects cotangent Harmonic or uniform-
+weight Tutte, and the third selects Boundary First Flattening. Successful
+dispatch returns UVs plus the shared
 `ParameterizationDiagnostics`; legacy invalid-input and solver-convergence
 conventions are normalized to `ParameterizationStatus::{Success, InvalidInput,
-SolverFailed}` and failures carry no UV payload. The direct `ComputeLSCM` and
-`ComputeHarmonic` APIs remain reachable and numerically unchanged.
+SolverFailed}` and failures carry no UV payload. The direct `ComputeLSCM`,
+`ComputeHarmonic`, and `ComputeBFF` APIs remain reachable.
 
 The geometry surface reserves no future strategy or backend token. Each method
 task adds its concrete params alternative when its implementation lands.
@@ -478,6 +479,34 @@ connected manifold vertex topology, one boundary loop, and Euler characteristic
 one. Invalid numeric LSCM parameters fail before the solve, and dispatch only
 reports `Success` when the shared diagnostics report usable evaluated faces.
 The solver equations and successful-solve numerics are unchanged.
+
+### Boundary First Flattening method contract
+
+The reference
+[`geometry.boundary_first_flattening`](../../methods/geometry/boundary_first_flattening/)
+package and `Geometry.Parameterization.Bff` module implement the bounded
+`METHOD-023` CPU reference for Sawhney and Crane's *Boundary First
+Flattening* (ACM TOG 37(1), Article 5, 2017; DOI
+[`10.1145/3132705`](https://doi.org/10.1145/3132705)). `BffParams` is a concrete
+alternative on the shared `ParameterizationStrategy` variant.
+
+The bounded geometry contract is CPU-only and accepts an already-cut,
+connected manifold triangle disk with finite positions, one boundary loop, and
+Euler characteristic one. It defines three boundary modes:
+`AutomaticConformal` free-boundary data, approximate positive `TargetLengths`
+in UV units (one per boundary edge), and finite `TargetAngles` in radians (one
+per boundary vertex, with a total of `2*pi` within the documented tolerance).
+Length fitting reports closure and target residuals rather than promising exact
+realization. Cone singularities, cone placement, seam generation, and cutting
+are excluded;
+unsupported topology and inconsistent data fail closed without UV output.
+
+`METHOD-023` owns the `cpu_reference` payload and dispatch branch in
+`Geometry.Parameterization`. `RUNTIME-176` owns stable config tokens, typed
+payload conversion, selected-mesh `v:texcoord` writeback, dirty marking, undo,
+and the pointer-free UV view model. Geometry retains no config, ECS, runtime,
+graphics, platform, or app dependency, and this package makes no performance
+claim. The objective is conformal and does not guarantee area preservation.
 
 ### Halfedge Vertex Normal Recompute
 
