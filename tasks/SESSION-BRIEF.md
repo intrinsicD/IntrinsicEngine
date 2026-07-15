@@ -54,7 +54,6 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-082` — GLFW X11 input-method initialization leaks under LeakSanitizer (tasks/backlog/bugs/BUG-082-glfw-x11-input-method-lsan-leak.md)
 - unblocked: `BUG-083` — Vulkan Sandbox shutdown reports driver and DBus leaks under LeakSanitizer (tasks/backlog/bugs/BUG-083-vulkan-sandbox-shutdown-lsan-leaks.md)
 - unblocked: `BUG-088` — Benchmark smoke hard timeout flakes under host contention (tasks/backlog/bugs/BUG-088-benchmark-smoke-hard-timeout-host-contention.md)
-- unblocked: `BUG-089` — Root-hygiene strict mode rejects canonical and ignored state (tasks/backlog/bugs/BUG-089-root-hygiene-rejects-canonical-and-ignored-state.md)
 
 ## Theme H — Agentic workflow hardening
 

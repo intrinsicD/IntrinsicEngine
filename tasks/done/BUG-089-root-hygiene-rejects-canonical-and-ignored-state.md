@@ -5,6 +5,12 @@ depends_on: []
 ---
 # BUG-089 — Root-hygiene strict mode rejects canonical and ignored state
 
+## Status
+
+- Completed on 2026-07-16 at `CPUContracted` maturity. Implementation commit:
+  `7671576b`. One repository-owned policy now distinguishes exact tracked
+  roots from bounded named local state, and both checker entrypoints use it.
+
 ## Goal
 
 - Restore a meaningful strict root-hygiene gate that accepts the repository's
@@ -52,44 +58,44 @@ depends_on: []
 
 ## Required changes
 
-- [ ] Decide and document the canonical status of tracked `ara/`; if it remains
+- [x] Decide and document the canonical status of tracked `ara/`; if it remains
       a repository root, add it explicitly to the allowlist rather than using a
       broad pattern.
-- [ ] Make the checker ignore only named disposable local roots and/or entries
+- [x] Make the checker ignore only named disposable local roots and/or entries
       proven ignored by repository policy, without allowing an untracked source
       directory merely because a developer's global Git configuration ignores
       it.
-- [ ] Reconcile `imgui.ini` and `.ruff_cache/` handling with the canonical
+- [x] Reconcile `imgui.ini` and `.ruff_cache/` handling with the canonical
       allowlist/ignore policy so the documented notes and executable check agree.
-- [ ] Keep diagnostics distinguishing allowed tracked roots, ignored local
+- [x] Keep diagnostics distinguishing allowed tracked roots, ignored local
       state, unexpected entries, and missing required entries.
 
 ## Tests
 
-- [ ] Add isolated filesystem fixtures proving strict mode accepts the canonical
+- [x] Add isolated filesystem fixtures proving strict mode accepts the canonical
       root set, tracked `ara/`, ignored `imgui.ini`, and disposable
       `.ruff_cache/`.
-- [ ] Prove strict mode still rejects an unowned root Markdown file, an unknown
+- [x] Prove strict mode still rejects an unowned root Markdown file, an unknown
       source directory, and a missing required root.
-- [ ] Prove a global/user ignore rule alone cannot hide an unexpected source
+- [x] Prove a global/user ignore rule alone cannot hide an unexpected source
       root from the repository check.
 
 ## Docs
 
-- [ ] Update `tools/repo/root_allowlist.yaml` notes and the owning repository-
+- [x] Update `tools/repo/root_allowlist.yaml` notes and the owning repository-
       hygiene documentation with the exact tracked/local-state policy.
-- [ ] Update this bug index and retirement log after the strict command passes
+- [x] Update this bug index and retirement log after the strict command passes
       in both a clean checkout and a representative developer worktree.
 
 ## Acceptance criteria
 
-- [ ] `python3 tools/repo/check_root_hygiene.py --root . --strict` passes with
+- [x] `python3 tools/repo/check_root_hygiene.py --root . --strict` passes with
       the intentional tracked roots and named ignored local state present.
-- [ ] The same command fails closed for genuinely unexpected top-level source
+- [x] The same command fails closed for genuinely unexpected top-level source
       or Markdown entries.
-- [ ] The allowlist and executable ignore behavior express the same policy; no
+- [x] The allowlist and executable ignore behavior express the same policy; no
       blanket wildcard or warning-only escape is introduced.
-- [ ] Task, docs-link, and repository structural checks remain green.
+- [x] Task, docs-link, and repository structural checks remain green.
 
 ## Verification
 

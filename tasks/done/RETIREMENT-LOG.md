@@ -8,6 +8,18 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-089`](BUG-089-root-hygiene-rejects-canonical-and-ignored-state.md) —
+strict root ownership retired on 2026-07-16 at `CPUContracted`. Implementation
+commit `7671576b` makes `root_allowlist.yaml` the single policy for exact
+tracked roots and bounded named local state, with the legacy top-level checker
+preserved as a compatibility entrypoint. Tracked `ara/` and named
+`imgui.ini`/`.ruff_cache/` state now pass; missing, malformed, duplicate,
+overlapping, unknown-section, and broad-wildcard policy fails closed, as do
+unknown source/Markdown roots even when a global Git ignore hides them. The
+12-test regression, strict real-root check, task policy/state links, docs
+links, workflow naming, and test layout passed; independent final review found
+no blockers.
+
 [`BUG-087`](BUG-087-task-validator-documented-root-silent-noop.md) — the
 task-validator root contract retired on 2026-07-16 at `CPUContracted`.
 Implementation commit `998f0e77` standardizes live agent documentation on
