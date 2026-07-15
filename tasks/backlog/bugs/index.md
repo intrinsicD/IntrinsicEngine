@@ -5,6 +5,16 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-088` — Benchmark smoke hard timeout flakes under host contention](BUG-088-benchmark-smoke-hard-timeout-host-contention.md):
+  the required default CPU gate timed out the monolithic 21-result smoke at its
+  hard 30-second limit under concurrent load, while the same pair passed in
+  14.71 seconds in isolation; collect a timing population and choose an
+  evidence-backed PR-fast split or slow-lane classification without weakening
+  strict result validation.
+- [`BUG-087` — Documented task-validator root silently validates zero tasks](BUG-087-task-validator-documented-root-silent-noop.md):
+  the canonical `--root .` invocation exits zero after discovering no tasks,
+  while `--root tasks --strict` validates the real tree; correct the root
+  contract and make strict zero-file discovery fail closed.
 - [`BUG-082` — GLFW X11 input-method initialization leaks under LeakSanitizer](BUG-082-glfw-x11-input-method-lsan-leak.md):
   a GLFW-backed runtime contract passes its assertions but the process exits
   nonzero for a 408-byte `_XimOpenIM` allocation after engine shutdown; isolate
