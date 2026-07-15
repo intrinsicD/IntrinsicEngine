@@ -6,6 +6,7 @@ namespace Extrinsic::Runtime::Detail
     {
         Geometry::HalfedgeMesh::Mesh Mesh{};
         std::vector<glm::vec3> BeforePositions{};
+        std::vector<bool> DeletedVertices{};
         SandboxEditorCommandStatus Status{
             SandboxEditorCommandStatus::NoChange};
         Core::ErrorCode Error{Core::ErrorCode::Success};

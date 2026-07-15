@@ -73,6 +73,45 @@ namespace Extrinsic::Runtime
                    lhs.DebounceSeconds == rhs.DebounceSeconds;
         }
 
+        [[nodiscard]] bool ParameterizationUvConfigEquals(
+            const Core::Config::ParameterizationUvConfig& lhs,
+            const Core::Config::ParameterizationUvConfig& rhs) noexcept
+        {
+            return lhs.U == rhs.U && lhs.V == rhs.V;
+        }
+
+        [[nodiscard]] bool ParameterizationConfigEquals(
+            const Core::Config::ParameterizationConfig& lhs,
+            const Core::Config::ParameterizationConfig& rhs) noexcept
+        {
+            const bool pinnedUvsEqual =
+                lhs.Harmonic.PinnedUvs.size() == rhs.Harmonic.PinnedUvs.size() &&
+                std::equal(lhs.Harmonic.PinnedUvs.begin(),
+                           lhs.Harmonic.PinnedUvs.end(),
+                           rhs.Harmonic.PinnedUvs.begin(),
+                           ParameterizationUvConfigEquals);
+            return lhs.Strategy == rhs.Strategy &&
+                   lhs.Lscm.AutoPins == rhs.Lscm.AutoPins &&
+                   lhs.Lscm.PinVertex0 == rhs.Lscm.PinVertex0 &&
+                   lhs.Lscm.PinVertex1 == rhs.Lscm.PinVertex1 &&
+                   ParameterizationUvConfigEquals(lhs.Lscm.PinUv0,
+                                                  rhs.Lscm.PinUv0) &&
+                   ParameterizationUvConfigEquals(lhs.Lscm.PinUv1,
+                                                  rhs.Lscm.PinUv1) &&
+                   lhs.Lscm.SolverTolerance == rhs.Lscm.SolverTolerance &&
+                   lhs.Lscm.MaxSolverIterations == rhs.Lscm.MaxSolverIterations &&
+                   lhs.Harmonic.Boundary == rhs.Harmonic.Boundary &&
+                   lhs.Harmonic.ArcLengthSpacing == rhs.Harmonic.ArcLengthSpacing &&
+                   lhs.Harmonic.ClampNonConvexWeights ==
+                       rhs.Harmonic.ClampNonConvexWeights &&
+                   lhs.Harmonic.PinnedVertices == rhs.Harmonic.PinnedVertices &&
+                   pinnedUvsEqual &&
+                   lhs.Bff.Mode == rhs.Bff.Mode &&
+                   lhs.Bff.BoundaryData == rhs.Bff.BoundaryData &&
+                   lhs.Bff.AngleSumTolerance == rhs.Bff.AngleSumTolerance &&
+                   lhs.Bff.DegeneracyTolerance == rhs.Bff.DegeneracyTolerance;
+        }
+
         [[nodiscard]] std::vector<std::string> FindBootOnlyEngineConfigDifferences(
             const Core::Config::EngineConfig& current,
             const Core::Config::EngineConfig& candidate)
@@ -389,9 +428,14 @@ namespace Extrinsic::Runtime
             !ProgressivePoissonPlaygroundConfigEquals(
                 config->Sandbox.ProgressivePoisson,
                 candidate.Sandbox.ProgressivePoisson);
+        const bool parameterizationChanged = !ParameterizationConfigEquals(
+            config->Sandbox.Parameterization,
+            candidate.Sandbox.Parameterization);
         result.DefaultRecipeConfigPathChanged = recipePathChanged;
         result.SandboxProgressivePoissonChanged = progressivePoissonChanged;
-        if (!recipePathChanged && !progressivePoissonChanged)
+        result.SandboxParameterizationChanged = parameterizationChanged;
+        if (!recipePathChanged && !progressivePoissonChanged &&
+            !parameterizationChanged)
         {
             result.Status = RuntimeEngineConfigApplyStatus::NoChange;
             m_ConfigControlState.ActiveConfig = *config;
@@ -441,6 +485,10 @@ namespace Extrinsic::Runtime
         {
             config->Sandbox.ProgressivePoisson =
                 candidate.Sandbox.ProgressivePoisson;
+        }
+        if (parameterizationChanged)
+        {
+            config->Sandbox.Parameterization = candidate.Sandbox.Parameterization;
         }
         m_ConfigControlState.ActiveConfig = *config;
         result.Status = RuntimeEngineConfigApplyStatus::Applied;

@@ -1,19 +1,20 @@
 # ADR 0025: Parameterization UV view — derived second view, not a separate entity
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-07-13
 - **Owners:** Graphics/Runtime/UI
 - **Related tasks:** GEOM-063, RUNTIME-176, UI-036, GRAPHICS-122
 
 ## Context
 
-The end-to-end parameterization family (GEOM-063 dispatch surface; ARAP/SLIM/BFF/SCP
-strategies; runtime facade RUNTIME-176; editor panel UI-036) produces a per-vertex
-UV map (`v:texcoord`) for a selected mesh. Unlike point-cloud consolidation, which
-mutates positions in place and needs no new view, a parameterization result is only
-meaningful when the user can **see the 2D UV layout** — chart placement, seams,
-flips, and distortion — alongside the 3D mesh, and **control** the map interactively
-(pins, BFF boundary targets, cones). This forces two coupled questions:
+The end-to-end parameterization family (GEOM-063 dispatch surface; implemented
+LSCM, harmonic/Tutte, and BFF strategies; runtime facade RUNTIME-176; editor
+panel UI-036) produces a per-vertex UV map (`v:texcoord`) for a selected mesh.
+Unlike point-cloud consolidation, which mutates positions in place and needs no
+new view, a parameterization result is only meaningful when the user can **see
+the 2D UV layout** alongside the 3D mesh, inspect its aggregate diagnostics,
+and **control** the map interactively (pins and supported boundary values). This
+forces two coupled questions:
 
 1. Should the UV layout be rendered as **its own ECS entity**?
 2. How is the **resizable split view** (3D mesh ↔ 2D UV layout) delivered?
@@ -40,8 +41,10 @@ Verified current-state constraints (2026-07-13 rendering/UI architecture survey)
   `VisualizationConfig`) under the **single scene camera**. Derived geometry (gizmos,
   debug primitives, visualization overlays) is submitted as **render packets**, not
   entities, and is also drawn under that one camera.
-- UV data already exists CPU-side: `v:texcoord`, `Geometry.UvAtlas` chart/seam
-  records, and `Geometry.Parameterization.Diagnostics` per-face distortion.
+- UV data already exists CPU-side as `v:texcoord`. The parameterization family
+  returns aggregate `Geometry.Parameterization.Diagnostics`; atlas chart/seam
+  records belong to `Geometry.UvAtlas` and are not synthesized by the runtime
+  parameterization view model.
 
 ### How modern DCC tools do this
 
@@ -75,10 +78,11 @@ resizable UV view that is a *different space* (UV) of the same entity.
   A single registered editor window is split by a **manual draggable two-pane
   splitter** (ImGui child regions / a resizable table column with a stored ratio) into
   a controls pane and a UV-layout pane. The UV pane maps a runtime-built,
-  pointer-free `SandboxEditorParameterizationViewModel` (per-vertex UVs, face triples,
-  chart/seam records, per-face distortion) into pane-local space and draws it with
-  `ImGui::GetWindowDrawList()`. This needs **no renderer change and no docking**, and
-  matches the existing menu-first floating-window UX.
+  pointer-free `SandboxEditorParameterizationViewModel` (per-vertex UVs,
+  triangle index triples, finite bounds, and aggregate diagnostics) into
+  pane-local space and draws it with `ImGui::GetWindowDrawList()`. This needs
+  **no renderer change and no docking**, and matches the existing menu-first
+  floating-window UX.
 - **Optional upgrade — GPU-shaded offscreen UV target (GRAPHICS-122).** For dense
   meshes and texel-density/texture/heatmap shading, render the mesh's UV-space
   residency to a small offscreen target with an orthographic UV camera and present it
@@ -86,10 +90,12 @@ resizable UV view that is a *different space* (UV) of the same entity.
   residency in UV space — still a *derived view of the one entity*, not a new entity —
   and falls back to the CPU layout when no device is operational.
 
-**Control** flows through the config lane (RUNTIME-176): strategy/backend/params, BFF
-boundary-target mode and cones, and pins are serializable config applied through the
-validated preview→apply path, with the UI-036 panel and agents/config files as
-co-equal drivers.
+**Control** flows through the config lane (RUNTIME-176): stable CPU strategy
+tokens and the typed LSCM pin/solver, harmonic boundary/pin, and BFF boundary-
+mode values are serializable config applied through the validated preview→apply
+path, with the UI-036 panel and agents/config files as co-equal drivers. The
+bounded BFF contract has no cone placement/cutting control, and the config has
+no optimized/GPU backend selector while no such implementation exists.
 
 ## Consequences
 
@@ -127,12 +133,15 @@ co-equal drivers.
 
 ## Validation
 
-- UI-036: default CPU gate covers window registration, the view-model→pane-space
-  projection, and result/fallback rendering (model-level, no ImGui frame); the
-  interactive proof (parameterize a disk mesh, see the UV layout beside the updated
-  3D checker) is cited from a Vulkan-capable host run.
-- RUNTIME-176: contract tests assert the config round-trip, the pointer-free UV view
-  model, `Editor`/`AgentCli`/`Programmatic` apply-source parity, and honest backend
-  fallback telemetry on the Null device.
+- RUNTIME-176 closes at `CPUContracted`: contract tests assert the additive
+  schema-v1 config round-trip, pointer-free UV view model, undoable
+  `v:texcoord` writeback, deterministic configured execution, and
+  `Editor`/`AgentCli`/`Programmatic` apply-source parity under the Null/default
+  runtime path. No backend fallback telemetry is expected for this CPU-only
+  family.
+- UI-036 owns `Operational`: the default CPU gate covers window registration,
+  the view-model→pane-space projection, and result rendering (model-level, no
+  ImGui frame); its interactive proof parameterizes a disk mesh and shows the
+  UV layout beside the updated 3D checker on a Vulkan-capable host.
 - GRAPHICS-122: opt-in `gpu;vulkan` readback smoke asserts a non-empty UV target on a
   Vulkan-capable host and CPU-layout fallback on a non-operational device.

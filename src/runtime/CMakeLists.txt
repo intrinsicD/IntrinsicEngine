@@ -151,6 +151,7 @@ target_sources(${target_name}
         Cameras/Runtime.CameraControllers.cpp
         Cameras/Runtime.CameraFocusCommand.cpp
         Runtime.SandboxMethodFacade.cpp
+        Runtime.SandboxParameterizationFacade.cpp
         Runtime.SandboxEditorRenderRecipeFacade.cpp
         Runtime.SandboxEditorFacades.cpp
         Gizmos/Runtime.GizmoFrameService.cpp

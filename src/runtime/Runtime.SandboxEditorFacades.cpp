@@ -10773,6 +10773,7 @@ namespace Extrinsic::Runtime
             return SandboxEditorMeshSourceSnapshot{
                 .Mesh = std::move(source.Mesh),
                 .BeforePositions = std::move(source.BeforePositions),
+                .DeletedVertices = std::move(source.DeletedVertices),
                 .Status = source.Status,
                 .Error = source.Error,
                 .Diagnostic = std::move(source.Diagnostic),
@@ -15463,6 +15464,13 @@ namespace Extrinsic::Runtime
                 if (AttachmentEpochIsActive(epoch))
                     m_LastUvRegenerationResult = std::move(result);
             };
+        context.MethodResultSinks.Parameterization =
+            [epoch = m_AttachmentEpoch, this](
+                SandboxEditorParameterizationResult result)
+            {
+                if (AttachmentEpochIsActive(epoch))
+                    m_LastParameterizationResult = std::move(result);
+            };
         context.MethodResultSinks.MeshCurvature =
             [epoch = m_AttachmentEpoch, this](
                 SandboxEditorMeshCurvatureResult result)
@@ -15579,6 +15587,9 @@ namespace Extrinsic::Runtime
         if (m_LastUvRegenerationResult.has_value())
             context.LastUvRegenerationResult =
                 &*m_LastUvRegenerationResult;
+        if (m_LastParameterizationResult.has_value())
+            context.LastParameterizationResult =
+                &*m_LastParameterizationResult;
         if (m_LastProgressivePoissonResult.has_value())
             context.LastProgressivePoissonResult =
                 &*m_LastProgressivePoissonResult;
@@ -15709,6 +15720,7 @@ namespace Extrinsic::Runtime
         m_LastPointCloudOutlierRemovalResult.reset();
         m_LastProgressivePoissonResult.reset();
         m_LastUvRegenerationResult.reset();
+        m_LastParameterizationResult.reset();
         m_LastRegistrationResult.reset();
         m_DerivedJobSnapshot = {};
         m_RenderRecipeContext = {};

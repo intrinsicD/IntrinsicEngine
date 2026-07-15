@@ -6,10 +6,12 @@ module;
 #include <cmath>
 #include <initializer_list>
 #include <limits>
+#include <numbers>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
@@ -240,6 +242,191 @@ namespace Extrinsic::Core::Config
             return number;
         }
 
+        [[nodiscard]] std::optional<ParameterizationUvConfig> ReadUv(
+            EngineConfigLoadResult& result,
+            const json& object,
+            const std::string_view key,
+            const std::string_view path)
+        {
+            const json* value = FindMember(object, key);
+            if (value == nullptr)
+            {
+                return std::nullopt;
+            }
+            if (!value->is_array() || value->size() != 2u ||
+                !(*value)[0].is_number() || !(*value)[1].is_number())
+            {
+                AddWarning(result,
+                           EngineConfigDiagnosticCode::InvalidValue,
+                           FieldSubject(path, key),
+                           "Expected an array of two numeric UV coordinates; reference default retained.");
+                return std::nullopt;
+            }
+
+            const double u = (*value)[0].get<double>();
+            const double v = (*value)[1].get<double>();
+            constexpr double kMaxFloat =
+                static_cast<double>(std::numeric_limits<float>::max());
+            if (!std::isfinite(u) || !std::isfinite(v) ||
+                std::abs(u) > kMaxFloat || std::abs(v) > kMaxFloat)
+            {
+                AddWarning(result,
+                           EngineConfigDiagnosticCode::InvalidValue,
+                           FieldSubject(path, key),
+                           "UV coordinates must be finite and representable as floats; reference default retained.");
+                return std::nullopt;
+            }
+            return ParameterizationUvConfig{.U = u, .V = v};
+        }
+
+        [[nodiscard]] std::optional<std::vector<std::uint32_t>> ReadIndexArray(
+            EngineConfigLoadResult& result,
+            const json& object,
+            const std::string_view key,
+            const std::string_view path)
+        {
+            const json* value = FindMember(object, key);
+            if (value == nullptr)
+            {
+                return std::nullopt;
+            }
+            if (!value->is_array())
+            {
+                AddWarning(result,
+                           EngineConfigDiagnosticCode::InvalidValue,
+                           FieldSubject(path, key),
+                           "Expected an array of vertex indices; reference default retained.");
+                return std::nullopt;
+            }
+
+            std::vector<std::uint32_t> indices{};
+            indices.reserve(value->size());
+            for (std::size_t index = 0; index < value->size(); ++index)
+            {
+                const json& element = (*value)[index];
+                if (!element.is_number_integer())
+                {
+                    AddWarning(result,
+                               EngineConfigDiagnosticCode::InvalidValue,
+                               FieldSubject(path, key) + "[" + std::to_string(index) + "]",
+                               "Expected a non-negative 32-bit vertex index; reference array retained.");
+                    return std::nullopt;
+                }
+                const std::int64_t parsed = element.get<std::int64_t>();
+                if (parsed < 0 ||
+                    parsed > static_cast<std::int64_t>(
+                                 std::numeric_limits<std::uint32_t>::max()))
+                {
+                    AddWarning(result,
+                               EngineConfigDiagnosticCode::InvalidValue,
+                               FieldSubject(path, key) + "[" + std::to_string(index) + "]",
+                               "Vertex index is outside the supported range; reference array retained.");
+                    return std::nullopt;
+                }
+                indices.push_back(static_cast<std::uint32_t>(parsed));
+            }
+            return indices;
+        }
+
+        [[nodiscard]] std::optional<std::vector<ParameterizationUvConfig>> ReadUvArray(
+            EngineConfigLoadResult& result,
+            const json& object,
+            const std::string_view key,
+            const std::string_view path)
+        {
+            const json* value = FindMember(object, key);
+            if (value == nullptr)
+            {
+                return std::nullopt;
+            }
+            if (!value->is_array())
+            {
+                AddWarning(result,
+                           EngineConfigDiagnosticCode::InvalidValue,
+                           FieldSubject(path, key),
+                           "Expected an array of UV coordinate pairs; reference array retained.");
+                return std::nullopt;
+            }
+
+            std::vector<ParameterizationUvConfig> uvs{};
+            uvs.reserve(value->size());
+            for (std::size_t index = 0; index < value->size(); ++index)
+            {
+                const json& element = (*value)[index];
+                if (!element.is_array() || element.size() != 2u ||
+                    !element[0].is_number() || !element[1].is_number())
+                {
+                    AddWarning(result,
+                               EngineConfigDiagnosticCode::InvalidValue,
+                               FieldSubject(path, key) + "[" + std::to_string(index) + "]",
+                               "Expected an array of two numeric UV coordinates; reference array retained.");
+                    return std::nullopt;
+                }
+                const double u = element[0].get<double>();
+                const double v = element[1].get<double>();
+                constexpr double kMaxFloat =
+                    static_cast<double>(std::numeric_limits<float>::max());
+                if (!std::isfinite(u) || !std::isfinite(v) ||
+                    std::abs(u) > kMaxFloat || std::abs(v) > kMaxFloat)
+                {
+                    AddWarning(result,
+                               EngineConfigDiagnosticCode::InvalidValue,
+                               FieldSubject(path, key) + "[" + std::to_string(index) + "]",
+                               "UV coordinates must be finite and representable as floats; reference array retained.");
+                    return std::nullopt;
+                }
+                uvs.push_back(ParameterizationUvConfig{.U = u, .V = v});
+            }
+            return uvs;
+        }
+
+        [[nodiscard]] std::optional<std::vector<double>> ReadNumberArray(
+            EngineConfigLoadResult& result,
+            const json& object,
+            const std::string_view key,
+            const std::string_view path)
+        {
+            const json* value = FindMember(object, key);
+            if (value == nullptr)
+            {
+                return std::nullopt;
+            }
+            if (!value->is_array())
+            {
+                AddWarning(result,
+                           EngineConfigDiagnosticCode::InvalidValue,
+                           FieldSubject(path, key),
+                           "Expected a numeric array; reference default retained.");
+                return std::nullopt;
+            }
+
+            std::vector<double> numbers{};
+            numbers.reserve(value->size());
+            for (std::size_t index = 0; index < value->size(); ++index)
+            {
+                const json& element = (*value)[index];
+                if (!element.is_number())
+                {
+                    AddWarning(result,
+                               EngineConfigDiagnosticCode::InvalidValue,
+                               FieldSubject(path, key) + "[" + std::to_string(index) + "]",
+                               "Expected a finite numeric value; reference array retained.");
+                    return std::nullopt;
+                }
+                const double number = element.get<double>();
+                if (!std::isfinite(number))
+                {
+                    AddWarning(result,
+                               EngineConfigDiagnosticCode::InvalidValue,
+                               FieldSubject(path, key) + "[" + std::to_string(index) + "]",
+                               "Expected a finite numeric value; reference array retained.");
+                    return std::nullopt;
+                }
+                numbers.push_back(number);
+            }
+            return numbers;
+        }
+
         [[nodiscard]] std::optional<GraphicsBackend> ParseGraphicsBackend(
             const std::string_view value) noexcept
         {
@@ -287,6 +474,39 @@ namespace Extrinsic::Core::Config
         {
             if (value == "CpuReference") return ProgressivePoissonPlaygroundBackend::CpuReference;
             if (value == "VulkanCompute") return ProgressivePoissonPlaygroundBackend::VulkanCompute;
+            return std::nullopt;
+        }
+
+        [[nodiscard]] std::optional<ParameterizationStrategyKind>
+        ParseParameterizationStrategy(const std::string_view value) noexcept
+        {
+            if (value == "lscm") return ParameterizationStrategyKind::Lscm;
+            if (value == "harmonic_cotangent")
+                return ParameterizationStrategyKind::HarmonicCotangent;
+            if (value == "tutte_uniform")
+                return ParameterizationStrategyKind::TutteUniform;
+            if (value == "bff") return ParameterizationStrategyKind::Bff;
+            return std::nullopt;
+        }
+
+        [[nodiscard]] std::optional<ParameterizationBoundaryPolicy>
+        ParseParameterizationBoundaryPolicy(const std::string_view value) noexcept
+        {
+            if (value == "circle") return ParameterizationBoundaryPolicy::Circle;
+            if (value == "square") return ParameterizationBoundaryPolicy::Square;
+            if (value == "custom") return ParameterizationBoundaryPolicy::Custom;
+            return std::nullopt;
+        }
+
+        [[nodiscard]] std::optional<ParameterizationBffBoundaryMode>
+        ParseParameterizationBffBoundaryMode(const std::string_view value) noexcept
+        {
+            if (value == "automatic_conformal")
+                return ParameterizationBffBoundaryMode::AutomaticConformal;
+            if (value == "target_lengths")
+                return ParameterizationBffBoundaryMode::TargetLengths;
+            if (value == "target_angles")
+                return ParameterizationBffBoundaryMode::TargetAngles;
             return std::nullopt;
         }
 
@@ -352,6 +572,63 @@ namespace Extrinsic::Core::Config
             case ProgressivePoissonPlaygroundBackend::VulkanCompute: return "VulkanCompute";
             }
             return "CpuReference";
+        }
+
+        [[nodiscard]] std::string_view ToConfigString(
+            const ParameterizationStrategyKind value) noexcept
+        {
+            switch (value)
+            {
+            case ParameterizationStrategyKind::Lscm: return "lscm";
+            case ParameterizationStrategyKind::HarmonicCotangent:
+                return "harmonic_cotangent";
+            case ParameterizationStrategyKind::TutteUniform: return "tutte_uniform";
+            case ParameterizationStrategyKind::Bff: return "bff";
+            }
+            return "lscm";
+        }
+
+        [[nodiscard]] std::string_view ToConfigString(
+            const ParameterizationBoundaryPolicy value) noexcept
+        {
+            switch (value)
+            {
+            case ParameterizationBoundaryPolicy::Circle: return "circle";
+            case ParameterizationBoundaryPolicy::Square: return "square";
+            case ParameterizationBoundaryPolicy::Custom: return "custom";
+            }
+            return "circle";
+        }
+
+        [[nodiscard]] std::string_view ToConfigString(
+            const ParameterizationBffBoundaryMode value) noexcept
+        {
+            switch (value)
+            {
+            case ParameterizationBffBoundaryMode::AutomaticConformal:
+                return "automatic_conformal";
+            case ParameterizationBffBoundaryMode::TargetLengths:
+                return "target_lengths";
+            case ParameterizationBffBoundaryMode::TargetAngles:
+                return "target_angles";
+            }
+            return "automatic_conformal";
+        }
+
+        [[nodiscard]] json SerializeUv(const ParameterizationUvConfig& uv)
+        {
+            return json::array({uv.U, uv.V});
+        }
+
+        [[nodiscard]] json SerializeUvs(
+            const std::vector<ParameterizationUvConfig>& uvs)
+        {
+            json values = json::array();
+            for (const ParameterizationUvConfig& uv : uvs)
+            {
+                values.push_back(SerializeUv(uv));
+            }
+            return values;
         }
 
         template <typename Enum, typename Parser>
@@ -614,6 +891,364 @@ namespace Extrinsic::Core::Config
             }
         }
 
+        void ParseParameterizationConfig(EngineConfigLoadResult& result,
+                                         const json& sandbox)
+        {
+            const json* object = FindMember(sandbox, "parameterization");
+            if (object == nullptr)
+            {
+                return;
+            }
+            if (!object->is_object())
+            {
+                AddWarning(result,
+                           EngineConfigDiagnosticCode::InvalidValue,
+                           "sandbox.parameterization",
+                           "Expected an object; reference parameterization config retained.");
+                return;
+            }
+
+            AddUnknownFieldDiagnostics(
+                result,
+                *object,
+                "sandbox.parameterization",
+                {"strategy", "lscm", "harmonic", "bff"});
+
+            ParameterizationConfig& config =
+                result.Preview.Config.Sandbox.Parameterization;
+            const ParameterizationLscmConfig referenceLscm = config.Lscm;
+            const ParameterizationBffConfig referenceBff = config.Bff;
+            if (ReadEnum(result,
+                         *object,
+                         "strategy",
+                         "sandbox.parameterization",
+                         ParseParameterizationStrategy,
+                         config.Strategy))
+            {
+                ++result.Preview.ParsedFieldCount;
+            }
+
+            if (const json* lscm = FindMember(*object, "lscm"); lscm != nullptr)
+            {
+                constexpr std::string_view kPath = "sandbox.parameterization.lscm";
+                if (!lscm->is_object())
+                {
+                    AddWarning(result,
+                               EngineConfigDiagnosticCode::InvalidValue,
+                               std::string{kPath},
+                               "Expected an object; reference LSCM config retained.");
+                }
+                else
+                {
+                    AddUnknownFieldDiagnostics(
+                        result,
+                        *lscm,
+                        kPath,
+                        {"auto_pins",
+                         "pin_vertex_0",
+                         "pin_vertex_1",
+                         "pin_uv_0",
+                         "pin_uv_1",
+                         "solver_tolerance",
+                         "max_solver_iterations"});
+
+                    if (const std::optional<bool> autoPins =
+                            ReadBool(result, *lscm, "auto_pins", kPath);
+                        autoPins.has_value())
+                    {
+                        config.Lscm.AutoPins = *autoPins;
+                        ++result.Preview.ParsedFieldCount;
+                    }
+                    if (const std::optional<std::int64_t> pin = ReadInteger(
+                            result,
+                            *lscm,
+                            "pin_vertex_0",
+                            kPath,
+                            0,
+                            std::numeric_limits<std::uint32_t>::max());
+                        pin.has_value())
+                    {
+                        config.Lscm.PinVertex0 = static_cast<std::uint32_t>(*pin);
+                        ++result.Preview.ParsedFieldCount;
+                    }
+                    if (const std::optional<std::int64_t> pin = ReadInteger(
+                            result,
+                            *lscm,
+                            "pin_vertex_1",
+                            kPath,
+                            0,
+                            std::numeric_limits<std::uint32_t>::max());
+                        pin.has_value())
+                    {
+                        config.Lscm.PinVertex1 = static_cast<std::uint32_t>(*pin);
+                        ++result.Preview.ParsedFieldCount;
+                    }
+                    if (const std::optional<ParameterizationUvConfig> uv =
+                            ReadUv(result, *lscm, "pin_uv_0", kPath);
+                        uv.has_value())
+                    {
+                        config.Lscm.PinUv0 = *uv;
+                        ++result.Preview.ParsedFieldCount;
+                    }
+                    if (const std::optional<ParameterizationUvConfig> uv =
+                            ReadUv(result, *lscm, "pin_uv_1", kPath);
+                        uv.has_value())
+                    {
+                        config.Lscm.PinUv1 = *uv;
+                        ++result.Preview.ParsedFieldCount;
+                    }
+                    if (const std::optional<double> tolerance = ReadNumber(
+                            result,
+                            *lscm,
+                            "solver_tolerance",
+                            kPath,
+                            std::numeric_limits<double>::min(),
+                            1.0e30);
+                        tolerance.has_value())
+                    {
+                        config.Lscm.SolverTolerance = *tolerance;
+                        ++result.Preview.ParsedFieldCount;
+                    }
+                    if (const std::optional<std::int64_t> iterations = ReadInteger(
+                            result,
+                            *lscm,
+                            "max_solver_iterations",
+                            kPath,
+                            1,
+                            std::numeric_limits<std::uint32_t>::max());
+                        iterations.has_value())
+                    {
+                        config.Lscm.MaxSolverIterations =
+                            static_cast<std::uint32_t>(*iterations);
+                        ++result.Preview.ParsedFieldCount;
+                    }
+                }
+            }
+
+            if (const json* harmonic = FindMember(*object, "harmonic");
+                harmonic != nullptr)
+            {
+                constexpr std::string_view kPath =
+                    "sandbox.parameterization.harmonic";
+                if (!harmonic->is_object())
+                {
+                    AddWarning(result,
+                               EngineConfigDiagnosticCode::InvalidValue,
+                               std::string{kPath},
+                               "Expected an object; reference harmonic config retained.");
+                }
+                else
+                {
+                    AddUnknownFieldDiagnostics(
+                        result,
+                        *harmonic,
+                        kPath,
+                        {"boundary",
+                         "arc_length_spacing",
+                         "clamp_non_convex_weights",
+                         "pinned_vertices",
+                         "pinned_uvs"});
+
+                    if (ReadEnum(result,
+                                 *harmonic,
+                                 "boundary",
+                                 kPath,
+                                 ParseParameterizationBoundaryPolicy,
+                                 config.Harmonic.Boundary))
+                    {
+                        ++result.Preview.ParsedFieldCount;
+                    }
+                    if (const std::optional<bool> spacing = ReadBool(
+                            result, *harmonic, "arc_length_spacing", kPath);
+                        spacing.has_value())
+                    {
+                        config.Harmonic.ArcLengthSpacing = *spacing;
+                        ++result.Preview.ParsedFieldCount;
+                    }
+                    if (const std::optional<bool> clamp = ReadBool(
+                            result,
+                            *harmonic,
+                            "clamp_non_convex_weights",
+                            kPath);
+                        clamp.has_value())
+                    {
+                        config.Harmonic.ClampNonConvexWeights = *clamp;
+                        ++result.Preview.ParsedFieldCount;
+                    }
+
+                    const bool hasVertices =
+                        FindMember(*harmonic, "pinned_vertices") != nullptr;
+                    const bool hasUvs = FindMember(*harmonic, "pinned_uvs") != nullptr;
+                    const std::optional<std::vector<std::uint32_t>> vertices =
+                        ReadIndexArray(result, *harmonic, "pinned_vertices", kPath);
+                    const std::optional<std::vector<ParameterizationUvConfig>> uvs =
+                        ReadUvArray(result, *harmonic, "pinned_uvs", kPath);
+                    if (hasVertices != hasUvs)
+                    {
+                        AddWarning(
+                            result,
+                            EngineConfigDiagnosticCode::InvalidValue,
+                            std::string{kPath},
+                            "Pinned vertex and UV arrays must be provided together; reference arrays retained.");
+                    }
+                    else if (hasVertices && vertices.has_value() && uvs.has_value())
+                    {
+                        if (vertices->size() != uvs->size())
+                        {
+                            AddWarning(
+                                result,
+                                EngineConfigDiagnosticCode::InvalidValue,
+                                std::string{kPath},
+                                "Pinned vertex and UV arrays must have equal length; reference arrays retained.");
+                        }
+                        else
+                        {
+                            config.Harmonic.PinnedVertices = *vertices;
+                            config.Harmonic.PinnedUvs = *uvs;
+                            result.Preview.ParsedFieldCount += 2u;
+                        }
+                    }
+                }
+            }
+
+            if (const json* bff = FindMember(*object, "bff"); bff != nullptr)
+            {
+                constexpr std::string_view kPath = "sandbox.parameterization.bff";
+                if (!bff->is_object())
+                {
+                    AddWarning(result,
+                               EngineConfigDiagnosticCode::InvalidValue,
+                               std::string{kPath},
+                               "Expected an object; reference BFF config retained.");
+                }
+                else
+                {
+                    AddUnknownFieldDiagnostics(
+                        result,
+                        *bff,
+                        kPath,
+                        {"mode",
+                         "boundary_data",
+                         "angle_sum_tolerance",
+                         "degeneracy_tolerance"});
+
+                    if (ReadEnum(result,
+                                 *bff,
+                                 "mode",
+                                 kPath,
+                                 ParseParameterizationBffBoundaryMode,
+                                 config.Bff.Mode))
+                    {
+                        ++result.Preview.ParsedFieldCount;
+                    }
+                    if (const std::optional<std::vector<double>> boundaryData =
+                            ReadNumberArray(result, *bff, "boundary_data", kPath);
+                        boundaryData.has_value())
+                    {
+                        config.Bff.BoundaryData = *boundaryData;
+                        ++result.Preview.ParsedFieldCount;
+                    }
+                    if (const std::optional<double> tolerance = ReadNumber(
+                            result,
+                            *bff,
+                            "angle_sum_tolerance",
+                            kPath,
+                            std::numeric_limits<double>::min(),
+                            1.0e30);
+                        tolerance.has_value())
+                    {
+                        config.Bff.AngleSumTolerance = *tolerance;
+                        ++result.Preview.ParsedFieldCount;
+                    }
+                    if (const std::optional<double> tolerance = ReadNumber(
+                            result,
+                            *bff,
+                            "degeneracy_tolerance",
+                            kPath,
+                            std::numeric_limits<double>::min(),
+                            1.0e30);
+                        tolerance.has_value())
+                    {
+                        config.Bff.DegeneracyTolerance = *tolerance;
+                        ++result.Preview.ParsedFieldCount;
+                    }
+                }
+            }
+
+            if (!config.Lscm.AutoPins &&
+                config.Lscm.PinVertex0 == config.Lscm.PinVertex1)
+            {
+                AddWarning(
+                    result,
+                    EngineConfigDiagnosticCode::InvalidValue,
+                    "sandbox.parameterization.lscm",
+                    "Manual LSCM pins must select distinct vertices; reference LSCM config retained.");
+                config.Lscm = referenceLscm;
+            }
+
+            bool bffValid = true;
+            std::string_view bffMessage{};
+            switch (config.Bff.Mode)
+            {
+            case ParameterizationBffBoundaryMode::AutomaticConformal:
+                if (!config.Bff.BoundaryData.empty())
+                {
+                    bffValid = false;
+                    bffMessage =
+                        "Automatic BFF mode requires empty boundary data; reference BFF config retained.";
+                }
+                break;
+            case ParameterizationBffBoundaryMode::TargetLengths:
+                if (config.Bff.BoundaryData.empty())
+                {
+                    bffValid = false;
+                    bffMessage =
+                        "Target-length BFF mode requires boundary data; reference BFF config retained.";
+                }
+                else if (!std::all_of(config.Bff.BoundaryData.begin(),
+                                      config.Bff.BoundaryData.end(),
+                                      [](const double value) { return value > 0.0; }))
+                {
+                    bffValid = false;
+                    bffMessage =
+                        "Target BFF boundary lengths must be positive; reference BFF config retained.";
+                }
+                break;
+            case ParameterizationBffBoundaryMode::TargetAngles:
+                if (config.Bff.BoundaryData.empty())
+                {
+                    bffValid = false;
+                    bffMessage =
+                        "Target-angle BFF mode requires boundary data; reference BFF config retained.";
+                }
+                else
+                {
+                    double angleSum = 0.0;
+                    for (const double angle : config.Bff.BoundaryData)
+                    {
+                        angleSum += angle;
+                    }
+                    if (!std::isfinite(angleSum) ||
+                        std::abs(angleSum - 2.0 * std::numbers::pi_v<double>) >
+                            config.Bff.AngleSumTolerance)
+                    {
+                        bffValid = false;
+                        bffMessage =
+                            "Target BFF boundary angles must sum to 2*pi within the configured tolerance; reference BFF config retained.";
+                    }
+                }
+                break;
+            }
+            if (!bffValid)
+            {
+                AddWarning(result,
+                           EngineConfigDiagnosticCode::InvalidValue,
+                           "sandbox.parameterization.bff",
+                           std::string{bffMessage});
+                config.Bff = referenceBff;
+            }
+        }
+
         void ParseSandboxConfig(EngineConfigLoadResult& result, const json& root)
         {
             const json* object = FindMember(root, "sandbox");
@@ -630,20 +1265,25 @@ namespace Extrinsic::Core::Config
                 return;
             }
 
-            AddUnknownFieldDiagnostics(result, *object, "sandbox", {"progressive_poisson"});
+            AddUnknownFieldDiagnostics(
+                result,
+                *object,
+                "sandbox",
+                {"progressive_poisson", "parameterization"});
 
+            const json emptyPoisson = json::object();
             const json* poisson = FindMember(*object, "progressive_poisson");
             if (poisson == nullptr)
             {
-                return;
+                poisson = &emptyPoisson;
             }
-            if (!poisson->is_object())
+            else if (!poisson->is_object())
             {
                 AddWarning(result,
                            EngineConfigDiagnosticCode::InvalidValue,
                            "sandbox.progressive_poisson",
                            "Expected an object; reference progressive Poisson config retained.");
-                return;
+                poisson = &emptyPoisson;
             }
 
             AddUnknownFieldDiagnostics(
@@ -801,6 +1441,8 @@ namespace Extrinsic::Core::Config
                 config.DebounceSeconds = *debounce;
                 ++result.Preview.ParsedFieldCount;
             }
+
+            ParseParameterizationConfig(result, *object);
         }
 
         [[nodiscard]] bool HasFallbackDiagnostics(const EngineConfigLoadResult& result) noexcept
@@ -1126,6 +1768,55 @@ namespace Extrinsic::Core::Config
                   config.Sandbox.ProgressivePoisson.MeshSurfaceInterpolateNormals},
                  {"auto_run_on_edit", config.Sandbox.ProgressivePoisson.AutoRunOnEdit},
                  {"debounce_seconds", config.Sandbox.ProgressivePoisson.DebounceSeconds},
+             })},
+            {"parameterization",
+             json::object({
+                 {"strategy",
+                  std::string{ToConfigString(config.Sandbox.Parameterization.Strategy)}},
+                 {"lscm",
+                  json::object({
+                      {"auto_pins", config.Sandbox.Parameterization.Lscm.AutoPins},
+                      {"pin_vertex_0",
+                       config.Sandbox.Parameterization.Lscm.PinVertex0},
+                      {"pin_vertex_1",
+                       config.Sandbox.Parameterization.Lscm.PinVertex1},
+                      {"pin_uv_0",
+                       SerializeUv(config.Sandbox.Parameterization.Lscm.PinUv0)},
+                      {"pin_uv_1",
+                       SerializeUv(config.Sandbox.Parameterization.Lscm.PinUv1)},
+                      {"solver_tolerance",
+                       config.Sandbox.Parameterization.Lscm.SolverTolerance},
+                      {"max_solver_iterations",
+                       config.Sandbox.Parameterization.Lscm.MaxSolverIterations},
+                  })},
+                 {"harmonic",
+                  json::object({
+                      {"boundary",
+                       std::string{ToConfigString(
+                           config.Sandbox.Parameterization.Harmonic.Boundary)}},
+                      {"arc_length_spacing",
+                       config.Sandbox.Parameterization.Harmonic.ArcLengthSpacing},
+                      {"clamp_non_convex_weights",
+                       config.Sandbox.Parameterization.Harmonic
+                           .ClampNonConvexWeights},
+                      {"pinned_vertices",
+                       config.Sandbox.Parameterization.Harmonic.PinnedVertices},
+                      {"pinned_uvs",
+                       SerializeUvs(
+                           config.Sandbox.Parameterization.Harmonic.PinnedUvs)},
+                  })},
+                 {"bff",
+                  json::object({
+                      {"mode",
+                       std::string{ToConfigString(
+                           config.Sandbox.Parameterization.Bff.Mode)}},
+                      {"boundary_data",
+                       config.Sandbox.Parameterization.Bff.BoundaryData},
+                      {"angle_sum_tolerance",
+                       config.Sandbox.Parameterization.Bff.AngleSumTolerance},
+                      {"degeneracy_tolerance",
+                       config.Sandbox.Parameterization.Bff.DegeneracyTolerance},
+                  })},
              })},
         });
         return root.dump(2);

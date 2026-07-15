@@ -29,7 +29,8 @@ The gaps below come from the [`src/geometry` gap analysis](../reviews/2026-05-12
 
 ## Family surface and shared optimization seam
 
-The direct solver entry points (`ComputeLSCM`, `ComputeHarmonic`) remain
+The direct solver entry points (`ComputeLSCM`, `ComputeHarmonic`, `ComputeBFF`)
+remain
 available with their per-method params structs. Retired GEOM-063 now also
 consolidates the implemented CPU solvers behind one typed dispatch surface.
 Each later method extends that variant with its concrete params type when it
@@ -37,7 +38,7 @@ lands; runtime config uses explicit stable tokens and converts them to those
 typed payloads. Backend selection stays at the runtime/method boundary until a
 second implementation exists.
 
-- Family surface: retired [`GEOM-063`](../../tasks/done/GEOM-063-unified-cpu-parameterization-strategy-dispatch.md) — `Geometry.Parameterization::ParameterizeMesh(mesh, strategy)` with `ParameterizationStrategy = std::variant<ParameterizationParams, HarmonicParams>`, normalized status, and the GEOM-018 diagnostics in every successful result. Tutte is selected through `HarmonicParams::Weights = Uniform`. No unimplemented strategy or backend token is reserved; each method/backend owner extends the surface when its implementation lands.
+- Family surface: retired [`GEOM-063`](../../tasks/done/GEOM-063-unified-cpu-parameterization-strategy-dispatch.md) — `Geometry.Parameterization::ParameterizeMesh(mesh, strategy)` with `ParameterizationStrategy = std::variant<ParameterizationParams, HarmonicParams, BffParams>`, normalized status, and the GEOM-018 diagnostics in every successful result. Tutte is selected through `HarmonicParams::Weights = Uniform`. No unimplemented strategy or backend token is reserved; each method/backend owner extends the surface when its implementation lands.
 - Shared optimization seam: [`GEOM-064`](../../tasks/backlog/geometry/GEOM-064-parameterization-optimization-kernels.md) — `Geometry.Parameterization.Optimize` with the per-triangle local rotation fit, the symmetric-Dirichlet energy/gradient plus PSD proxy, and the injectivity-preserving line search that ARAP (Pack 3), SLIM (Pack 4), and the optimized backend (Pack 7) share, so no variant re-derives the nonlinear-solve core privately.
 
 The rendering/interaction decision for the interactive UV view is recorded in [ADR-0025](../adr/0025-parameterization-uv-view-and-split-view.md): the UV layout is a derived second view of the mesh entity (shared topology/`StableId`/`v:texcoord`), not a separate ECS entity.
@@ -287,16 +288,24 @@ Scope:
 
 - Runtime facade + config lane (`RUNTIME-176`): an
   `EngineConfig.sandbox.parameterization` section applied through
-  `EngineConfigControl`, stable tokens for implemented CPU strategies, an
-  editor command that writes UVs back as `v:texcoord` via `GeometrySources`,
-  and a pointer-free UV view model. No backend selector is reserved while only
-  CPU implementations exist.
+  `EngineConfigControl`; stable `lscm`, `harmonic_cotangent`,
+  `tutte_uniform`, and `bff` tokens; nested typed LSCM, harmonic, and BFF
+  values; an undoable editor command that writes UVs back as `v:texcoord` via
+  `GeometrySources`; and a pointer-free UV view model containing UVs, triangle
+  index triples, finite bounds, and aggregate diagnostics. The configured
+  command consumes the same hot-applied state used by file, agent/CLI, and
+  programmatic callers. RUNTIME-176 closes at `CPUContracted`; it does not
+  invent chart/seam records, per-face distortion, fallback telemetry, or an
+  optimized/GPU selector.
 - Sandbox editor panel + resizable UV split view (`UI-036`): a two-pane controls/UV-layout split (manual splitter, no docking dependency), the 2D UV layout drawn with `ImDrawList` from the view model, and interactive pin/BFF-boundary control routed through the config lane. Cones are not part of the bounded BFF contract.
 - Optional GPU-shaded UV target (`GRAPHICS-122`): an offscreen UV render presented via `ImGui::Image` for texel-density/texture/heatmap shading and dense meshes, with a CPU-layout fallback.
 
 Rendering-model decision (ADR-0025): the UV layout is a **derived second view of the mesh entity** (shared topology/`StableId`/`v:texcoord`), not a separate ECS entity, matching how Blender/Houdini/Maya/RizomUV present a UV editor as a second view of the same mesh in UV space. A separate UV entity and a true second viewport are considered and deferred/rejected there.
 
-Layer boundary: geometry stays free of renderer/runtime/assets; `RUNTIME-176` owns composition; `UI-036` is `app -> runtime` only; `GRAPHICS-122` keeps the UV pass in graphics wired by runtime.
+Layer boundary: geometry stays free of renderer/runtime/assets; `RUNTIME-176`
+owns composition and the Null/default CPU contract; `UI-036` is `app ->
+runtime` only and owns the visible `Operational` proof; `GRAPHICS-122` keeps the
+optional UV pass in graphics wired by runtime.
 
 ## Cross-pack correctness policy
 

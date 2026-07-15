@@ -51,69 +51,85 @@ maturity_target: CPUContracted
   config and result model when real optimized/GPU implementations exist.
 
 ## Status
-- In progress on branch `codex/arch-006-completion`; owner: Codex.
-- Dependencies `GEOM-063` and `METHOD-023` are retired. Promotion right-sized
-  the task to the existing config-control and sandbox-editor seams.
-- Slice 1: land the core value schema, stable JSON tokens, parser/serializer,
-  validation, hot-subset equality/copy, and config tests.
-- Slice 2: land the same-module runtime facade, undoable UV writeback,
-  configured command path, pointer-free view model, and contract tests.
-- Slice 3: synchronize architecture/method docs and inventories, run the
-  default CPU and architecture-review gates, and retire at `CPUContracted`.
-- Next verification: strict task/state validation after promotion, then the
-  focused core config test build for slice 1.
+- Implementation complete locally on branch `codex/arch-006-completion`;
+  owner: Codex. Dependencies `GEOM-063` and `METHOD-023` are retired.
+- Core config now round-trips stable LSCM, harmonic/Tutte, and BFF values and
+  hot-applies the block with `SandboxParameterizationChanged`. The runtime
+  facade converts the active config to the typed geometry variant, writes
+  storage-aligned `v:texcoord` values with undo/redo, preserves deleted vertex
+  tombstones, and exposes the pointer-free UV/triangle/diagnostics view model.
+- Static token, range, pairing, narrowing, and BFF closure errors fail closed.
+  Mesh-dependent custom harmonic pin coverage/validity remains geometry-owned
+  and returns a normalized failure without mutating UV state.
+- Focused verification: `IntrinsicRuntimeContractTests` built with ASan/UBSan;
+  `ParameterizationFacade.*` passed 13/13, and the combined
+  `Parameterization|EngineConfig` selection passed 56/56.
+- Merge-quality verification: `IntrinsicTests` built through the `ci` preset;
+  the default CPU gate passed 3,743/3,743 tests in 380.43 seconds. Strict
+  layering, allowlist quality, test layout, task policy/state/maturity, docs
+  links (2,677), and `git diff --check` are clean. The module inventory was
+  regenerated (391 modules) and produced no content change.
+- Independent architecture/right-sizing review found no blockers after two
+  fixes: persistent history closures no longer retain the session-owned model
+  cache, and reconstructed solver meshes restore deleted vertex slots. The
+  clean-workshop scorecard records rows 1-3 and 7 `pass`, rows 4-6 and 8
+  `n/a`, and no findings.
+- One early Clang 23/ccache module-frontend bus error was ruled out via the
+  stale-build triage: a ccache-disabled rebuild succeeded, and subsequent
+  normal cached focused and full builds passed. Next step is the technical
+  commit, followed by separate task retirement at `CPUContracted`.
 
 ## Required changes
-- [ ] Add a `ParameterizationConfig` value struct nested in `SandboxConfig`:
+- [x] Add a `ParameterizationConfig` value struct nested in `SandboxConfig`:
       explicit strategy/mode enums whose JSON tokens are stable, typed records
       for LSCM pins/solver values, harmonic boundary/pins, and BFF boundary
       controls; deterministic defaults and no variant-index serialization.
-- [ ] Extend `Core.Config.EngineLoad.cpp` parser/serializer and the schema table (and `docs/architecture/engine-config.md`) to round-trip the section with diagnostics; add it to the `EngineConfigControl` hot-apply subset.
-- [ ] Add `ApplySandboxEditorParameterizationCommand` (+ config-routed variant):
+- [x] Extend `Core.Config.EngineLoad.cpp` parser/serializer and the schema table (and `docs/architecture/engine-config.md`) to round-trip the section with diagnostics; add it to the `EngineConfigControl` hot-apply subset.
+- [x] Add `ApplySandboxEditorParameterizationCommand` (+ config-routed variant):
       read the selected mesh, convert its stable strategy token to the typed
       geometry payload, run `ParameterizeMesh`, write `v:texcoord`, mark it
       dirty, and record an undoable history entry.
-- [ ] Export a `SandboxEditorParameterizationResult` with chosen stable strategy
+- [x] Export a `SandboxEditorParameterizationResult` with chosen stable strategy
       token, status, and diagnostics summary — no raw geometry pointers.
-- [ ] Export a `SandboxEditorParameterizationViewModel` (per-vertex UVs,
+- [x] Export a `SandboxEditorParameterizationViewModel` (per-vertex UVs,
       triangle index triples, UV bounds, and aggregate last-result diagnostics)
       built from the selected mesh + last result for `UI-036`; pointer-free and
       copyable.
-- [ ] Add the implementation as a private source of the existing
+- [x] Add the implementation as a private source of the existing
       `Extrinsic.Runtime.SandboxEditorFacades` module and expose free functions
       through the existing engine/session context. Do not add a service,
       registry, policy object, or new module for one implementation.
 
 ## Tests
-- [ ] Extend `tests/unit/core/Test.Core.EngineConfigLoad.cpp` (`unit;core`): the
+- [x] Extend `tests/unit/core/Test.Core.EngineConfigLoad.cpp` (`unit;core`): the
       config section round-trips through `Core.Config.EngineLoad` (parse →
       serialize → parse is stable), preserves vectors/pairs, and rejects
       invalid tokens, ranges, and paired-array mismatches with diagnostics.
-- [ ] `tests/contract/runtime/Test.ParameterizationFacade.cpp` (`contract;runtime`,
+- [x] `tests/contract/runtime/Test.ParameterizationFacade.cpp` (`contract;runtime`,
       Null device): each implemented strategy writes finite `v:texcoord`, marks
       texcoords dirty, and is undoable; unsupported config tokens fail closed.
-- [ ] View-model build: given a parameterized mesh,
+- [x] View-model build: given a parameterized mesh,
       `SandboxEditorParameterizationViewModel` has UV count == vertex storage
       count, deterministic triangle triples, finite UV bounds, and aggregate
       diagnostics populated — with no raw pointers.
-- [ ] Apply-source parity: applying the same validated config via `Editor`,
+- [x] Apply-source parity: applying the same validated config via `Editor`,
       `AgentCli`, and `Programmatic` sources produces identical config state;
       the configured facade then produces identical UVs.
-- [ ] Determinism: identical config + input produce identical UVs.
+- [x] Determinism: identical config + input produce identical UVs.
 
 ## Docs
-- [ ] Update `docs/architecture/engine-config.md` and `docs/architecture/runtime-config-control.md` with the new section and hot-apply entry.
-- [ ] Add a short runtime-integration note to the parameterization method-package READMEs pointing at the runtime facade and config path.
-- [ ] Refresh `docs/api/generated/module_inventory.md` if the exported import
+- [x] Update `docs/architecture/engine-config.md` and `docs/architecture/runtime-config-control.md` with the new section and hot-apply entry.
+- [x] Add a short runtime-integration note to the parameterization method-package READMEs pointing at the runtime facade and config path.
+- [x] Refresh `docs/api/generated/module_inventory.md` if the exported import
       surface changes; this task adds no new module.
 
 ## Acceptance criteria
-- [ ] A selected mesh is parameterized and its `v:texcoord` property is updated
+- [x] A selected mesh is parameterized and its `v:texcoord` property is updated
       through the runtime facade under Null/default runtime paths.
-- [ ] Every implemented strategy is choosable from config, agent/programmatic
+- [x] Every implemented strategy is choosable from config, agent/programmatic
       apply, and UI through one validated path with source tagging.
-- [ ] The UV view model is produced for `UI-036` and is pointer-free.
-- [ ] Contract tests pass in the default CPU gate; layering holds (`runtime -> lower`, `core -> nothing`).
+- [x] The UV view model is produced for `UI-036` and is pointer-free.
+- [x] Contract tests pass in the default CPU gate; layering holds (`runtime -> lower`, `core -> nothing`).
 
 ## Verification
 ```bash

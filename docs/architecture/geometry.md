@@ -419,10 +419,10 @@ UV parameterizations and surface-map quality checks. It evaluates a
 storage and reports explicit status/count fields for missing UV coordinates,
 non-triangle faces, non-finite positions or UVs, degenerate 3D triangles,
 degenerate UV triangles, skipped faces, and flipped UV elements. The metric
-record includes conformal distortion, mean/RMS/max identity-normalized conformal error,
-area ratio and authalic area distortion, symmetric Dirichlet energy/excess,
-stretch, deterministic boundary length distortion, and seam-discontinuity
-placeholders for future chart/map records.
+record includes conformal distortion, mean/RMS/max identity-normalized
+conformal error, area ratio and authalic area distortion, symmetric Dirichlet
+energy/excess, stretch, deterministic boundary length distortion, and seam-
+discontinuity placeholders for future chart/map records.
 
 Existing LSCM quality fields and its full diagnostics record are populated from
 this evaluator, as are Harmonic/Tutte results, so the unified dispatch and
@@ -473,6 +473,20 @@ payloads; it never persists `std::variant::index()`. Optimized/GPU policy and
 requested-versus-actual telemetry enter only with the tasks that own a real
 second implementation, at the applicable strategy or RHI-visible runtime
 boundary.
+
+The runtime config boundary is
+`EngineConfig.sandbox.parameterization`. It serializes `lscm`,
+`harmonic_cotangent`, `tutte_uniform`, and `bff`, with nested typed LSCM,
+harmonic, and BFF values. `EngineConfigControl` treats that block as an
+additive schema-v1 hot subset, and the configured sandbox facade consumes the
+same validated state used by config-file, agent/CLI, editor, and programmatic
+callers. The facade writes successful UVs to the selected mesh's `v:texcoord`
+property with undo/redo support and exposes a pointer-free CPU view model of
+UVs, triangle index triples, finite bounds, and aggregate diagnostics. It does
+not synthesize atlas chart/seam records or per-face distortion, and it exposes
+no backend selector while these strategies have only CPU implementations.
+RUNTIME-176 owns this `CPUContracted` boundary; UI-036 owns the visible
+`Operational` split-view proof.
 
 The LSCM preflight now uses the same disk-topology definition as Harmonic/Tutte:
 connected manifold vertex topology, one boundary loop, and Euler characteristic

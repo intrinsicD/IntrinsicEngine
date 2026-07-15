@@ -1,6 +1,8 @@
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -66,6 +68,27 @@ TEST(CoreEngineConfigLoad, SerializesAndLoadsEveryBootField)
     config.Sandbox.ProgressivePoisson.MeshSurfaceInterpolateNormals = false;
     config.Sandbox.ProgressivePoisson.AutoRunOnEdit = false;
     config.Sandbox.ProgressivePoisson.DebounceSeconds = 0.5;
+    config.Sandbox.Parameterization.Strategy = ParameterizationStrategyKind::Bff;
+    config.Sandbox.Parameterization.Lscm.AutoPins = false;
+    config.Sandbox.Parameterization.Lscm.PinVertex0 = 3u;
+    config.Sandbox.Parameterization.Lscm.PinVertex1 = 17u;
+    config.Sandbox.Parameterization.Lscm.PinUv0 = {-0.25, 0.5};
+    config.Sandbox.Parameterization.Lscm.PinUv1 = {1.25, 0.75};
+    config.Sandbox.Parameterization.Lscm.SolverTolerance = 2.0e-9;
+    config.Sandbox.Parameterization.Lscm.MaxSolverIterations = 9000u;
+    config.Sandbox.Parameterization.Harmonic.Boundary =
+        ParameterizationBoundaryPolicy::Custom;
+    config.Sandbox.Parameterization.Harmonic.ArcLengthSpacing = false;
+    config.Sandbox.Parameterization.Harmonic.ClampNonConvexWeights = false;
+    config.Sandbox.Parameterization.Harmonic.PinnedVertices = {0u, 2u, 5u};
+    config.Sandbox.Parameterization.Harmonic.PinnedUvs = {
+        {0.0, 0.0}, {1.0, 0.0}, {0.25, 1.0}};
+    config.Sandbox.Parameterization.Bff.Mode =
+        ParameterizationBffBoundaryMode::TargetAngles;
+    config.Sandbox.Parameterization.Bff.BoundaryData = {
+        1.0, 2.0, 3.2831853071795864769};
+    config.Sandbox.Parameterization.Bff.AngleSumTolerance = 3.0e-8;
+    config.Sandbox.Parameterization.Bff.DegeneracyTolerance = 4.0e-12;
 
     const std::string document = SerializeEngineConfig(config);
     const EngineConfigLoadResult preview = PreviewEngineConfig(document, EngineConfig{});
@@ -73,7 +96,7 @@ TEST(CoreEngineConfigLoad, SerializesAndLoadsEveryBootField)
     ASSERT_EQ(preview.State, EngineConfigState::Valid);
     EXPECT_FALSE(HasErrors(preview));
     EXPECT_TRUE(preview.Preview.SideEffectFree);
-    EXPECT_EQ(preview.Preview.ParsedFieldCount, 35u);
+    EXPECT_EQ(preview.Preview.ParsedFieldCount, 52u);
     EXPECT_EQ(preview.Preview.Config.Window.Title, "Engine Config Test");
     EXPECT_EQ(preview.Preview.Config.Window.Width, 1280);
     EXPECT_EQ(preview.Preview.Config.Window.Height, 720);
@@ -120,6 +143,53 @@ TEST(CoreEngineConfigLoad, SerializesAndLoadsEveryBootField)
     EXPECT_FALSE(preview.Preview.Config.Sandbox.ProgressivePoisson.AutoRunOnEdit);
     EXPECT_DOUBLE_EQ(preview.Preview.Config.Sandbox.ProgressivePoisson.DebounceSeconds,
                      0.5);
+    EXPECT_EQ(preview.Preview.Config.Sandbox.Parameterization.Strategy,
+              ParameterizationStrategyKind::Bff);
+    EXPECT_FALSE(preview.Preview.Config.Sandbox.Parameterization.Lscm.AutoPins);
+    EXPECT_EQ(preview.Preview.Config.Sandbox.Parameterization.Lscm.PinVertex0, 3u);
+    EXPECT_EQ(preview.Preview.Config.Sandbox.Parameterization.Lscm.PinVertex1, 17u);
+    EXPECT_DOUBLE_EQ(preview.Preview.Config.Sandbox.Parameterization.Lscm.PinUv0.U,
+                     -0.25);
+    EXPECT_DOUBLE_EQ(preview.Preview.Config.Sandbox.Parameterization.Lscm.PinUv0.V,
+                     0.5);
+    EXPECT_DOUBLE_EQ(preview.Preview.Config.Sandbox.Parameterization.Lscm.PinUv1.U,
+                     1.25);
+    EXPECT_DOUBLE_EQ(preview.Preview.Config.Sandbox.Parameterization.Lscm.PinUv1.V,
+                     0.75);
+    EXPECT_DOUBLE_EQ(
+        preview.Preview.Config.Sandbox.Parameterization.Lscm.SolverTolerance,
+        2.0e-9);
+    EXPECT_EQ(
+        preview.Preview.Config.Sandbox.Parameterization.Lscm.MaxSolverIterations,
+        9000u);
+    EXPECT_EQ(preview.Preview.Config.Sandbox.Parameterization.Harmonic.Boundary,
+              ParameterizationBoundaryPolicy::Custom);
+    EXPECT_FALSE(
+        preview.Preview.Config.Sandbox.Parameterization.Harmonic.ArcLengthSpacing);
+    EXPECT_FALSE(preview.Preview.Config.Sandbox.Parameterization.Harmonic
+                     .ClampNonConvexWeights);
+    EXPECT_EQ(
+        preview.Preview.Config.Sandbox.Parameterization.Harmonic.PinnedVertices,
+        (std::vector<std::uint32_t>{0u, 2u, 5u}));
+    ASSERT_EQ(preview.Preview.Config.Sandbox.Parameterization.Harmonic.PinnedUvs.size(),
+              3u);
+    EXPECT_DOUBLE_EQ(
+        preview.Preview.Config.Sandbox.Parameterization.Harmonic.PinnedUvs[2].U,
+        0.25);
+    EXPECT_DOUBLE_EQ(
+        preview.Preview.Config.Sandbox.Parameterization.Harmonic.PinnedUvs[2].V,
+        1.0);
+    EXPECT_EQ(preview.Preview.Config.Sandbox.Parameterization.Bff.Mode,
+              ParameterizationBffBoundaryMode::TargetAngles);
+    EXPECT_EQ(preview.Preview.Config.Sandbox.Parameterization.Bff.BoundaryData,
+              (std::vector<double>{1.0, 2.0, 3.2831853071795864769}));
+    EXPECT_DOUBLE_EQ(
+        preview.Preview.Config.Sandbox.Parameterization.Bff.AngleSumTolerance,
+        3.0e-8);
+    EXPECT_DOUBLE_EQ(
+        preview.Preview.Config.Sandbox.Parameterization.Bff.DegeneracyTolerance,
+        4.0e-12);
+    EXPECT_EQ(SerializeEngineConfig(preview.Preview.Config), document);
 
     const std::filesystem::path path = TempConfigPath("intrinsic_engine_config_roundtrip");
     WriteTextFile(path, document);
@@ -139,6 +209,13 @@ TEST(CoreEngineConfigLoad, SerializesAndLoadsEveryBootField)
               ProgressivePoissonPlaygroundBackend::VulkanCompute);
     EXPECT_EQ(loaded.Preview.Config.Sandbox.ProgressivePoisson.MeshSurfaceSampleCount,
               2048u);
+    EXPECT_EQ(loaded.Preview.Config.Sandbox.Parameterization.Strategy,
+              ParameterizationStrategyKind::Bff);
+    EXPECT_EQ(
+        loaded.Preview.Config.Sandbox.Parameterization.Harmonic.PinnedVertices,
+        (std::vector<std::uint32_t>{0u, 2u, 5u}));
+    EXPECT_EQ(loaded.Preview.Config.Sandbox.Parameterization.Bff.Mode,
+              ParameterizationBffBoundaryMode::TargetAngles);
 }
 
 TEST(CoreEngineConfigLoad, InvalidFieldsFallBackWithDiagnostics)
@@ -262,4 +339,336 @@ TEST(CoreEngineConfigLoad, InvalidFieldsFallBackWithDiagnostics)
     EXPECT_FALSE(result.Preview.Config.Sandbox.ProgressivePoisson.AutoRunOnEdit);
     EXPECT_DOUBLE_EQ(result.Preview.Config.Sandbox.ProgressivePoisson.DebounceSeconds,
                      0.75);
+}
+
+TEST(CoreEngineConfigLoad, ParameterizationEnumTokensRoundTripStably)
+{
+    struct StrategyCase
+    {
+        ParameterizationStrategyKind Value;
+        std::string Token;
+    };
+    for (const StrategyCase& testCase : {
+             StrategyCase{ParameterizationStrategyKind::Lscm, "lscm"},
+             StrategyCase{ParameterizationStrategyKind::HarmonicCotangent,
+                          "harmonic_cotangent"},
+             StrategyCase{ParameterizationStrategyKind::TutteUniform,
+                          "tutte_uniform"},
+             StrategyCase{ParameterizationStrategyKind::Bff, "bff"},
+         })
+    {
+        EngineConfig config{};
+        config.Sandbox.Parameterization.Strategy = testCase.Value;
+        const std::string document = SerializeEngineConfig(config);
+        EXPECT_NE(document.find("\"strategy\": \"" + testCase.Token + "\""),
+                  std::string::npos);
+        const EngineConfigLoadResult preview = PreviewEngineConfig(document);
+        ASSERT_EQ(preview.State, EngineConfigState::Valid);
+        EXPECT_EQ(preview.Preview.Config.Sandbox.Parameterization.Strategy,
+                  testCase.Value);
+    }
+
+    struct BoundaryCase
+    {
+        ParameterizationBoundaryPolicy Value;
+        std::string Token;
+    };
+    for (const BoundaryCase& testCase : {
+             BoundaryCase{ParameterizationBoundaryPolicy::Circle, "circle"},
+             BoundaryCase{ParameterizationBoundaryPolicy::Square, "square"},
+             BoundaryCase{ParameterizationBoundaryPolicy::Custom, "custom"},
+         })
+    {
+        EngineConfig config{};
+        config.Sandbox.Parameterization.Harmonic.Boundary = testCase.Value;
+        const std::string document = SerializeEngineConfig(config);
+        EXPECT_NE(document.find("\"boundary\": \"" + testCase.Token + "\""),
+                  std::string::npos);
+        const EngineConfigLoadResult preview = PreviewEngineConfig(document);
+        ASSERT_EQ(preview.State, EngineConfigState::Valid);
+        EXPECT_EQ(preview.Preview.Config.Sandbox.Parameterization.Harmonic.Boundary,
+                  testCase.Value);
+    }
+
+    struct BffModeCase
+    {
+        ParameterizationBffBoundaryMode Value;
+        std::string Token;
+    };
+    for (const BffModeCase& testCase : {
+             BffModeCase{ParameterizationBffBoundaryMode::AutomaticConformal,
+                         "automatic_conformal"},
+             BffModeCase{ParameterizationBffBoundaryMode::TargetLengths,
+                         "target_lengths"},
+             BffModeCase{ParameterizationBffBoundaryMode::TargetAngles,
+                         "target_angles"},
+         })
+    {
+        EngineConfig config{};
+        config.Sandbox.Parameterization.Bff.Mode = testCase.Value;
+        if (testCase.Value == ParameterizationBffBoundaryMode::TargetLengths)
+        {
+            config.Sandbox.Parameterization.Bff.BoundaryData = {1.0};
+        }
+        else if (testCase.Value == ParameterizationBffBoundaryMode::TargetAngles)
+        {
+            config.Sandbox.Parameterization.Bff.BoundaryData = {
+                6.2831853071795864769};
+        }
+        const std::string document = SerializeEngineConfig(config);
+        EXPECT_NE(document.find("\"mode\": \"" + testCase.Token + "\""),
+                  std::string::npos);
+        const EngineConfigLoadResult preview = PreviewEngineConfig(document);
+        ASSERT_EQ(preview.State, EngineConfigState::Valid);
+        EXPECT_EQ(preview.Preview.Config.Sandbox.Parameterization.Bff.Mode,
+                  testCase.Value);
+    }
+}
+
+TEST(CoreEngineConfigLoad, InvalidParameterizationFieldsRetainReferenceValues)
+{
+    EngineConfig defaults{};
+    ParameterizationConfig& reference = defaults.Sandbox.Parameterization;
+    reference.Strategy = ParameterizationStrategyKind::TutteUniform;
+    reference.Lscm.PinVertex0 = 7u;
+    reference.Lscm.PinVertex1 = 9u;
+    reference.Lscm.PinUv0 = {0.25, 0.5};
+    reference.Lscm.PinUv1 = {0.75, 0.5};
+    reference.Lscm.SolverTolerance = 5.0e-7;
+    reference.Lscm.MaxSolverIterations = 44u;
+    reference.Harmonic.Boundary = ParameterizationBoundaryPolicy::Square;
+    reference.Harmonic.PinnedVertices = {4u, 8u};
+    reference.Harmonic.PinnedUvs = {{0.0, 0.0}, {1.0, 1.0}};
+    reference.Bff.Mode = ParameterizationBffBoundaryMode::TargetLengths;
+    reference.Bff.BoundaryData = {2.0, 3.0};
+    reference.Bff.AngleSumTolerance = 6.0e-7;
+    reference.Bff.DegeneracyTolerance = 7.0e-9;
+
+    const std::string document = R"json(
+{
+  "schema": "intrinsic.core.engine-config",
+  "version": 1,
+  "sandbox": {
+    "parameterization": {
+      "strategy": "arap",
+      "lscm": {
+        "auto_pins": false,
+        "pin_vertex_0": -1,
+        "pin_vertex_1": 4294967296,
+        "pin_uv_0": [0.0],
+        "pin_uv_1": ["east", 0.0],
+        "solver_tolerance": 0.0,
+        "max_solver_iterations": 0
+      },
+      "harmonic": {
+        "boundary": "polygon",
+        "arc_length_spacing": false,
+        "clamp_non_convex_weights": false,
+        "pinned_vertices": [0, 1],
+        "pinned_uvs": [[0.0, 0.0]]
+      },
+      "bff": {
+        "mode": "target_lengths",
+        "boundary_data": [1.0, -2.0],
+        "angle_sum_tolerance": 0.0,
+        "degeneracy_tolerance": -1.0
+      }
+    }
+  }
+}
+)json";
+
+    const EngineConfigLoadResult result = PreviewEngineConfig(document, defaults);
+
+    ASSERT_EQ(result.State, EngineConfigState::FallbackApplied);
+    EXPECT_FALSE(HasErrors(result));
+    EXPECT_TRUE(HasDiagnostic(result, EngineConfigDiagnosticCode::InvalidValue));
+    const ParameterizationConfig& parsed =
+        result.Preview.Config.Sandbox.Parameterization;
+    EXPECT_EQ(parsed.Strategy, ParameterizationStrategyKind::TutteUniform);
+    EXPECT_FALSE(parsed.Lscm.AutoPins);
+    EXPECT_EQ(parsed.Lscm.PinVertex0, 7u);
+    EXPECT_EQ(parsed.Lscm.PinVertex1, 9u);
+    EXPECT_DOUBLE_EQ(parsed.Lscm.PinUv0.U, 0.25);
+    EXPECT_DOUBLE_EQ(parsed.Lscm.PinUv0.V, 0.5);
+    EXPECT_DOUBLE_EQ(parsed.Lscm.PinUv1.U, 0.75);
+    EXPECT_DOUBLE_EQ(parsed.Lscm.PinUv1.V, 0.5);
+    EXPECT_DOUBLE_EQ(parsed.Lscm.SolverTolerance, 5.0e-7);
+    EXPECT_EQ(parsed.Lscm.MaxSolverIterations, 44u);
+    EXPECT_EQ(parsed.Harmonic.Boundary, ParameterizationBoundaryPolicy::Square);
+    EXPECT_FALSE(parsed.Harmonic.ArcLengthSpacing);
+    EXPECT_FALSE(parsed.Harmonic.ClampNonConvexWeights);
+    EXPECT_EQ(parsed.Harmonic.PinnedVertices,
+              (std::vector<std::uint32_t>{4u, 8u}));
+    ASSERT_EQ(parsed.Harmonic.PinnedUvs.size(), 2u);
+    EXPECT_DOUBLE_EQ(parsed.Harmonic.PinnedUvs[1].U, 1.0);
+    EXPECT_DOUBLE_EQ(parsed.Harmonic.PinnedUvs[1].V, 1.0);
+    EXPECT_EQ(parsed.Bff.Mode, ParameterizationBffBoundaryMode::TargetLengths);
+    EXPECT_EQ(parsed.Bff.BoundaryData, (std::vector<double>{2.0, 3.0}));
+    EXPECT_DOUBLE_EQ(parsed.Bff.AngleSumTolerance, 6.0e-7);
+    EXPECT_DOUBLE_EQ(parsed.Bff.DegeneracyTolerance, 7.0e-9);
+}
+
+TEST(CoreEngineConfigLoad, InvalidParameterizationCrossFieldsRestoreExecutableRecords)
+{
+    EngineConfig defaults{};
+    defaults.Sandbox.Parameterization.Lscm.PinVertex0 = 2u;
+    defaults.Sandbox.Parameterization.Lscm.PinVertex1 = 6u;
+    defaults.Sandbox.Parameterization.Bff.Mode =
+        ParameterizationBffBoundaryMode::TargetLengths;
+    defaults.Sandbox.Parameterization.Bff.BoundaryData = {4.0, 5.0};
+
+    const EngineConfigLoadResult invalidManualPins = PreviewEngineConfig(
+        R"json({
+          "schema": "intrinsic.core.engine-config",
+          "version": 1,
+          "sandbox": {"parameterization": {
+            "lscm": {
+              "auto_pins": false,
+              "pin_vertex_0": 12,
+              "pin_vertex_1": 12,
+              "pin_uv_0": [1.0e39, 0.0]
+            },
+            "bff": {
+              "mode": "target_angles",
+              "boundary_data": [1.0, 2.0, 3.0]
+            }
+          }}
+        })json",
+        defaults);
+    ASSERT_EQ(invalidManualPins.State, EngineConfigState::FallbackApplied);
+    const ParameterizationConfig& restored =
+        invalidManualPins.Preview.Config.Sandbox.Parameterization;
+    EXPECT_TRUE(restored.Lscm.AutoPins);
+    EXPECT_EQ(restored.Lscm.PinVertex0, 2u);
+    EXPECT_EQ(restored.Lscm.PinVertex1, 6u);
+    EXPECT_EQ(restored.Bff.Mode, ParameterizationBffBoundaryMode::TargetLengths);
+    EXPECT_EQ(restored.Bff.BoundaryData, (std::vector<double>{4.0, 5.0}));
+
+    const EngineConfigLoadResult automaticWithData = PreviewEngineConfig(
+        R"json({
+          "schema": "intrinsic.core.engine-config",
+          "version": 1,
+          "sandbox": {"parameterization": {"bff": {
+            "mode": "automatic_conformal",
+            "boundary_data": [1.0]
+          }}}
+        })json",
+        defaults);
+    ASSERT_EQ(automaticWithData.State, EngineConfigState::FallbackApplied);
+    EXPECT_EQ(automaticWithData.Preview.Config.Sandbox.Parameterization.Bff.Mode,
+              ParameterizationBffBoundaryMode::TargetLengths);
+    EXPECT_EQ(automaticWithData.Preview.Config.Sandbox.Parameterization.Bff
+                  .BoundaryData,
+              (std::vector<double>{4.0, 5.0}));
+
+    const EngineConfigLoadResult targetLengthsWithoutData = PreviewEngineConfig(
+        R"json({
+          "schema": "intrinsic.core.engine-config",
+          "version": 1,
+          "sandbox": {"parameterization": {"bff": {
+            "mode": "target_lengths",
+            "boundary_data": []
+          }}}
+        })json",
+        defaults);
+    ASSERT_EQ(targetLengthsWithoutData.State, EngineConfigState::FallbackApplied);
+    EXPECT_EQ(targetLengthsWithoutData.Preview.Config.Sandbox.Parameterization.Bff
+                  .BoundaryData,
+              (std::vector<double>{4.0, 5.0}));
+
+    const EngineConfigLoadResult targetAnglesWithoutData = PreviewEngineConfig(
+        R"json({
+          "schema": "intrinsic.core.engine-config",
+          "version": 1,
+          "sandbox": {"parameterization": {"bff": {
+            "mode": "target_angles",
+            "boundary_data": []
+          }}}
+        })json",
+        defaults);
+    ASSERT_EQ(targetAnglesWithoutData.State, EngineConfigState::FallbackApplied);
+    EXPECT_EQ(targetAnglesWithoutData.Preview.Config.Sandbox.Parameterization.Bff
+                  .BoundaryData,
+              (std::vector<double>{4.0, 5.0}));
+}
+
+TEST(CoreEngineConfigLoad, MalformedParameterizationArraysFailClosedAsPairs)
+{
+    EngineConfig defaults{};
+    defaults.Sandbox.Parameterization.Lscm.PinUv0 = {0.25, 0.75};
+    defaults.Sandbox.Parameterization.Harmonic.PinnedVertices = {3u};
+    defaults.Sandbox.Parameterization.Harmonic.PinnedUvs = {{0.5, 0.5}};
+    defaults.Sandbox.Parameterization.Bff.BoundaryData = {4.0};
+
+    const EngineConfigLoadResult malformedUvs = PreviewEngineConfig(
+        R"json({
+          "schema": "intrinsic.core.engine-config",
+          "version": 1,
+          "sandbox": {"parameterization": {
+            "harmonic": {
+              "pinned_vertices": [0],
+              "pinned_uvs": [[0.0, 1.0, 2.0]]
+            },
+            "bff": {"boundary_data": [1.0, "invalid"]}
+          }}
+        })json",
+        defaults);
+
+    ASSERT_EQ(malformedUvs.State, EngineConfigState::FallbackApplied);
+    EXPECT_EQ(malformedUvs.Preview.Config.Sandbox.Parameterization.Harmonic
+                  .PinnedVertices,
+              (std::vector<std::uint32_t>{3u}));
+    ASSERT_EQ(malformedUvs.Preview.Config.Sandbox.Parameterization.Harmonic
+                  .PinnedUvs.size(),
+              1u);
+    EXPECT_DOUBLE_EQ(malformedUvs.Preview.Config.Sandbox.Parameterization.Harmonic
+                         .PinnedUvs[0].U,
+                     0.5);
+    EXPECT_EQ(malformedUvs.Preview.Config.Sandbox.Parameterization.Bff.BoundaryData,
+              (std::vector<double>{4.0}));
+
+    const EngineConfigLoadResult missingPair = PreviewEngineConfig(
+        R"json({
+          "schema": "intrinsic.core.engine-config",
+          "version": 1,
+          "sandbox": {"parameterization": {
+            "harmonic": {"pinned_vertices": [0, 1]}
+          }}
+        })json",
+        defaults);
+    ASSERT_EQ(missingPair.State, EngineConfigState::FallbackApplied);
+    EXPECT_EQ(missingPair.Preview.Config.Sandbox.Parameterization.Harmonic
+                  .PinnedVertices,
+              (std::vector<std::uint32_t>{3u}));
+    EXPECT_EQ(missingPair.Preview.Config.Sandbox.Parameterization.Harmonic
+                  .PinnedUvs.size(),
+              1u);
+
+    const EngineConfigLoadResult oversizedUvs = PreviewEngineConfig(
+        R"json({
+          "schema": "intrinsic.core.engine-config",
+          "version": 1,
+          "sandbox": {"parameterization": {
+            "lscm": {"pin_uv_0": [1.0e39, 0.0]},
+            "harmonic": {
+              "pinned_vertices": [0],
+              "pinned_uvs": [[0.0, -1.0e39]]
+            }
+          }}
+        })json",
+        defaults);
+    ASSERT_EQ(oversizedUvs.State, EngineConfigState::FallbackApplied);
+    EXPECT_DOUBLE_EQ(
+        oversizedUvs.Preview.Config.Sandbox.Parameterization.Lscm.PinUv0.U,
+        0.25);
+    EXPECT_DOUBLE_EQ(
+        oversizedUvs.Preview.Config.Sandbox.Parameterization.Lscm.PinUv0.V,
+        0.75);
+    EXPECT_EQ(oversizedUvs.Preview.Config.Sandbox.Parameterization.Harmonic
+                  .PinnedVertices,
+              (std::vector<std::uint32_t>{3u}));
+    EXPECT_DOUBLE_EQ(oversizedUvs.Preview.Config.Sandbox.Parameterization.Harmonic
+                         .PinnedUvs[0].U,
+                     0.5);
 }

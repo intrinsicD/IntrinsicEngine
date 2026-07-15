@@ -261,6 +261,7 @@ if(TARGET ExtrinsicRuntime)
         Test.GeometryAvailability.cpp
         Test.PointCloudGeometryExtraction.cpp
         Test.PointCloudGeometryPacker.cpp
+        Test.ParameterizationFacade.cpp
         Test.PrimitiveSelectionRefinement.cpp
         Test.PrimitiveSelectionRefinementWiring.cpp
         Test.ProceduralGeometryCache.cpp

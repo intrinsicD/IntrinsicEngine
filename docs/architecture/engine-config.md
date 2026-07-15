@@ -66,6 +66,31 @@ fail-closed.
       "mesh_surface_interpolate_normals": true,
       "auto_run_on_edit": true,
       "debounce_seconds": 0.25
+    },
+    "parameterization": {
+      "strategy": "lscm",
+      "lscm": {
+        "auto_pins": true,
+        "pin_vertex_0": 0,
+        "pin_vertex_1": 1,
+        "pin_uv_0": [0.0, 0.0],
+        "pin_uv_1": [1.0, 0.0],
+        "solver_tolerance": 1e-8,
+        "max_solver_iterations": 5000
+      },
+      "harmonic": {
+        "boundary": "circle",
+        "arc_length_spacing": true,
+        "clamp_non_convex_weights": true,
+        "pinned_vertices": [],
+        "pinned_uvs": []
+      },
+      "bff": {
+        "mode": "automatic_conformal",
+        "boundary_data": [],
+        "angle_sum_tolerance": 1e-8,
+        "degeneracy_tolerance": 1e-12
+      }
     }
   }
 }
@@ -104,6 +129,27 @@ fail-closed.
 | `sandbox.progressive_poisson` | `mesh_surface_sample_count` | Integer in `[1, 10000000]` |
 | `sandbox.progressive_poisson` | `mesh_surface_min_triangle_area` | Positive finite number in `[1e-30, 1e30]` |
 | `sandbox.progressive_poisson` | `debounce_seconds` | Number in `[0.0, 10.0]` |
+| `sandbox.parameterization` | `strategy` | `lscm`, `harmonic_cotangent`, `tutte_uniform`, `bff` |
+| `sandbox.parameterization.lscm` | `auto_pins` | Boolean; when true, the geometry solver chooses its deterministic pins |
+| `sandbox.parameterization.lscm` | `pin_vertex_0`, `pin_vertex_1` | Distinct unsigned 32-bit vertex indices used when `auto_pins` is false |
+| `sandbox.parameterization.lscm` | `pin_uv_0`, `pin_uv_1` | Arrays of exactly two finite, float-representable numbers |
+| `sandbox.parameterization.lscm` | `solver_tolerance` | Positive finite number no greater than `1e30` |
+| `sandbox.parameterization.lscm` | `max_solver_iterations` | Integer in `[1, 4294967295]` |
+| `sandbox.parameterization.harmonic` | `boundary` | `circle`, `square`, `custom` |
+| `sandbox.parameterization.harmonic` | `arc_length_spacing`, `clamp_non_convex_weights` | Boolean |
+| `sandbox.parameterization.harmonic` | `pinned_vertices` | Array of unsigned 32-bit vertex indices; must be provided together with `pinned_uvs` |
+| `sandbox.parameterization.harmonic` | `pinned_uvs` | Array of two-number finite, float-representable UV arrays; must be provided together with and match the cardinality of `pinned_vertices` |
+| `sandbox.parameterization.bff` | `mode` | `automatic_conformal`, `target_lengths`, `target_angles` |
+| `sandbox.parameterization.bff` | `boundary_data` | Finite number array interpreted as positive per-boundary-edge lengths or per-boundary-vertex exterior angles by `mode`; empty for `automatic_conformal`, non-empty for target modes, and target angles must sum to `2*pi` within `angle_sum_tolerance` |
+| `sandbox.parameterization.bff` | `angle_sum_tolerance`, `degeneracy_tolerance` | Positive finite numbers no greater than `1e30` |
+
+The parameterization section is additive within schema version 1. A document
+may omit it and retain the caller-provided reference defaults. When it is
+present, all four strategy selections and the three typed parameter records
+round-trip so file/agent callers and the downstream UI can change the strategy
+without inventing an untyped parameter bag. The serializer persists
+the lowercase tokens above, never a `std::variant` alternative index. There is
+no optimized/GPU backend selector while every implemented strategy is CPU-only.
 
 ## Mutability
 
@@ -119,7 +165,7 @@ The schema is primarily a boot config. Runtime reads it before constructing
 
 The current live hot-apply subset is deliberately narrow:
 `render.default_recipe_config_path` and
-`sandbox.progressive_poisson`.
+the `sandbox.progressive_poisson` and `sandbox.parameterization` value blocks.
 `Runtime::Engine::GetConfigControl().ApplyEngineConfigHotSubset` previews a
 candidate document against the live Engine-owned config, rejects any difference
 in the boot-only fields above, and then applies only those live fields. A
@@ -128,8 +174,10 @@ non-empty recipe path is loaded and activated through the same validated
 reject the hot apply without disturbing the currently active recipe override. An
 empty path clears the active override and returns to the derived default frame
 recipe. The sandbox progressive-Poisson block is value-only method/playground
-state consumed by the Sandbox Editor and agent/CLI callers; it does not import
-runtime from core or mutate renderer state by itself. See
+state consumed by the Sandbox Editor and agent/CLI callers. The parameterization
+block similarly holds the selected CPU strategy and its typed values; applying
+it sets `SandboxParameterizationChanged` when the live value changes. Neither
+sandbox block imports runtime from core or mutates renderer state by itself. See
 [runtime config control](runtime-config-control.md).
 
 ## Diagnostics

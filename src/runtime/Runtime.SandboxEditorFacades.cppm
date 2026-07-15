@@ -68,6 +68,7 @@ import Geometry.PointCloud.Utils;
 import Geometry.Properties;
 import Geometry.Smoothing;
 import Geometry.UvAtlas;
+export import Geometry.Parameterization;
 
 export namespace Extrinsic::Runtime
 {
@@ -1956,6 +1957,7 @@ export namespace Extrinsic::Runtime
     };
 
     struct SandboxEditorUvRegenerationCommandResult;
+    struct SandboxEditorParameterizationResult;
 
     struct SandboxEditorMethodResultSinks
     {
@@ -1964,6 +1966,8 @@ export namespace Extrinsic::Runtime
             ProgressivePoisson{};
         std::function<void(SandboxEditorUvRegenerationCommandResult)>
             UvRegeneration{};
+        std::function<void(SandboxEditorParameterizationResult)>
+            Parameterization{};
         std::function<void(SandboxEditorMeshCurvatureResult)> MeshCurvature{};
         std::function<void(SandboxEditorMeshDenoiseResult)> MeshDenoise{};
         std::function<void(SandboxEditorMeshRemeshResult)> MeshRemesh{};
@@ -2362,6 +2366,8 @@ export namespace Extrinsic::Runtime
             LastPointCloudOutlierRemovalResult{nullptr};
         const SandboxEditorUvRegenerationCommandResult*
             LastUvRegenerationResult{nullptr};
+        const SandboxEditorParameterizationResult*
+            LastParameterizationResult{nullptr};
         const SandboxEditorProgressivePoissonResult*
             LastProgressivePoissonResult{nullptr};
         const SandboxEditorRegistrationResult*
@@ -2642,6 +2648,98 @@ export namespace Extrinsic::Runtime
         }
     };
 
+    using SandboxEditorParameterizationStrategy =
+        Core::Config::ParameterizationStrategyKind;
+
+    [[nodiscard]] std::string_view
+    StableTokenForSandboxEditorParameterizationStrategy(
+        SandboxEditorParameterizationStrategy strategy) noexcept;
+
+    struct SandboxEditorParameterizationCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        Core::Config::ParameterizationConfig Config{};
+    };
+
+    struct SandboxEditorConfiguredParameterizationCommand
+    {
+        std::uint32_t StableEntityId{0u};
+    };
+
+    struct SandboxEditorParameterizationResult
+    {
+        SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
+        std::uint32_t StableEntityId{0u};
+        SandboxEditorParameterizationStrategy Strategy{
+            SandboxEditorParameterizationStrategy::Lscm};
+        std::string StrategyToken{"lscm"};
+        Geometry::Parameterization::ParameterizationStatus
+            ParameterizationStatus{
+                Geometry::Parameterization::ParameterizationStatus::InvalidInput};
+        Geometry::Parameterization::ParameterizationDiagnostics Diagnostics{};
+        std::size_t VertexCount{0u};
+        std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SandboxEditorCommandStatus::Applied &&
+                   ParameterizationStatus ==
+                       Geometry::Parameterization::ParameterizationStatus::Success;
+        }
+    };
+
+    enum class SandboxEditorParameterizationConfigStatus : std::uint8_t
+    {
+        None = 0,
+        Applied,
+        NoChange,
+        MissingConfigFacade,
+        PreviewRejected,
+        ApplyRejected,
+    };
+
+    struct SandboxEditorParameterizationConfigCommand
+    {
+        Core::Config::ParameterizationConfig Config{};
+        std::string SourceId{"sandbox.parameterization"};
+    };
+
+    struct SandboxEditorParameterizationConfigResult
+    {
+        SandboxEditorParameterizationConfigStatus Status{
+            SandboxEditorParameterizationConfigStatus::None};
+        Core::Config::EngineConfigLoadResult Preview{};
+        RuntimeEngineConfigApplyResult Apply{};
+        std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SandboxEditorParameterizationConfigStatus::Applied ||
+                   Status == SandboxEditorParameterizationConfigStatus::NoChange;
+        }
+    };
+
+    struct SandboxEditorParameterizationViewModel
+    {
+        bool HasSelectedEntity{false};
+        bool SelectedEntityIsMesh{false};
+        bool HasUvCoordinates{false};
+        bool HasFiniteUvBounds{false};
+        bool HasLastResult{false};
+        std::uint32_t SelectedStableEntityId{0u};
+        SandboxEditorParameterizationStrategy Strategy{
+            SandboxEditorParameterizationStrategy::Lscm};
+        std::vector<glm::vec2> UVs{};
+        std::vector<std::array<std::uint32_t, 3u>> Triangles{};
+        glm::vec2 UvBoundsMin{0.0f};
+        glm::vec2 UvBoundsMax{0.0f};
+        std::optional<Geometry::Parameterization::ParameterizationStatus>
+            LastStatus{};
+        std::optional<Geometry::Parameterization::ParameterizationDiagnostics>
+            LastDiagnostics{};
+        std::string Message{};
+    };
+
     [[nodiscard]] const char* DebugNameForSandboxEditorUvAtlasStatus(
         Geometry::UvAtlas::UvAtlasStatus status) noexcept;
     [[nodiscard]] const char* DebugNameForSandboxEditorUvAtlasProvenance(
@@ -2729,6 +2827,29 @@ export namespace Extrinsic::Runtime
     SandboxEditorUvRegenerationCommandResult ApplySandboxEditorUvRegenerationCommand(
         const SandboxEditorContext& context,
         const SandboxEditorUvRegenerationCommand& command);
+
+    SandboxEditorParameterizationResult
+    ApplySandboxEditorParameterizationCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorParameterizationCommand& command);
+
+    SandboxEditorParameterizationResult
+    ApplySandboxEditorConfiguredParameterizationCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorConfiguredParameterizationCommand& command);
+
+    [[nodiscard]] SandboxEditorParameterizationConfigResult
+    ApplySandboxEditorParameterizationConfigCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorParameterizationConfigCommand& command);
+
+    [[nodiscard]] std::optional<Core::Config::ParameterizationConfig>
+    GetSandboxEditorParameterizationConfig(
+        const SandboxEditorContext& context) noexcept;
+
+    [[nodiscard]] SandboxEditorParameterizationViewModel
+    BuildSandboxEditorParameterizationViewModel(
+        const SandboxEditorContext& context);
 
     SandboxEditorKMeansResult ApplySandboxEditorKMeansCommand(
         const SandboxEditorContext& context,
@@ -2891,6 +3012,8 @@ export namespace Extrinsic::Runtime
             m_LastProgressivePoissonResult{};
         std::optional<SandboxEditorUvRegenerationCommandResult>
             m_LastUvRegenerationResult{};
+        std::optional<SandboxEditorParameterizationResult>
+            m_LastParameterizationResult{};
         std::optional<SandboxEditorRegistrationResult>
             m_LastRegistrationResult{};
         DerivedJobQueueSnapshot m_DerivedJobSnapshot{};

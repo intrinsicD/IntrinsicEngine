@@ -1,6 +1,7 @@
 module;
 
 #include <cstdint>
+#include <vector>
 
 export module Extrinsic.Core.Config.Engine;
 
@@ -78,9 +79,76 @@ namespace Extrinsic::Core::Config
             double DebounceSeconds{0.25};
         };
 
+        export enum class ParameterizationStrategyKind : std::uint32_t
+        {
+            Lscm = 0,
+            HarmonicCotangent,
+            TutteUniform,
+            Bff,
+        };
+
+        export enum class ParameterizationBoundaryPolicy : std::uint32_t
+        {
+            Circle = 0,
+            Square,
+            Custom,
+        };
+
+        export enum class ParameterizationBffBoundaryMode : std::uint32_t
+        {
+            AutomaticConformal = 0,
+            TargetLengths,
+            TargetAngles,
+        };
+
+        export struct ParameterizationUvConfig
+        {
+            double U{0.0};
+            double V{0.0};
+        };
+
+        export struct ParameterizationLscmConfig
+        {
+            bool AutoPins{true};
+            std::uint32_t PinVertex0{0u};
+            std::uint32_t PinVertex1{1u};
+            ParameterizationUvConfig PinUv0{};
+            ParameterizationUvConfig PinUv1{1.0, 0.0};
+            double SolverTolerance{1.0e-8};
+            std::uint32_t MaxSolverIterations{5000u};
+        };
+
+        export struct ParameterizationHarmonicConfig
+        {
+            ParameterizationBoundaryPolicy Boundary{
+                ParameterizationBoundaryPolicy::Circle};
+            bool ArcLengthSpacing{true};
+            bool ClampNonConvexWeights{true};
+            std::vector<std::uint32_t> PinnedVertices{};
+            std::vector<ParameterizationUvConfig> PinnedUvs{};
+        };
+
+        export struct ParameterizationBffConfig
+        {
+            ParameterizationBffBoundaryMode Mode{
+                ParameterizationBffBoundaryMode::AutomaticConformal};
+            std::vector<double> BoundaryData{};
+            double AngleSumTolerance{1.0e-8};
+            double DegeneracyTolerance{1.0e-12};
+        };
+
+        export struct ParameterizationConfig
+        {
+            ParameterizationStrategyKind Strategy{ParameterizationStrategyKind::Lscm};
+            ParameterizationLscmConfig Lscm{};
+            ParameterizationHarmonicConfig Harmonic{};
+            ParameterizationBffConfig Bff{};
+        };
+
         export struct SandboxConfig
         {
             ProgressivePoissonPlaygroundConfig ProgressivePoisson{};
+            ParameterizationConfig Parameterization{};
         };
 
         export struct EngineConfig

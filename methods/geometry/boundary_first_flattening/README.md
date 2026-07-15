@@ -38,10 +38,16 @@ record plus BFF-specific boundary and closure residuals.
 ## Runtime ownership
 
 The geometry method remains CPU-only and owns no config, ECS, runtime, or UI
-state. `RUNTIME-176` owns stable strategy-token serialization, conversion to
-the typed BFF payload, selected-mesh `v:texcoord` writeback, dirty marking,
-undo, and the pointer-free UV view model. UI presentation remains downstream
-of that runtime facade.
+state. `RUNTIME-176` exposes it through
+`EngineConfig.sandbox.parameterization` with strategy token `bff`, mode tokens
+`automatic_conformal`, `target_lengths`, and `target_angles`, plus the typed
+`boundary_data`, `angle_sum_tolerance`, and `degeneracy_tolerance` values. The
+configured runtime command converts that validated state to `BffParams`, writes
+selected-mesh `v:texcoord`, marks the mesh dirty, and records undo/redo. Its
+pointer-free UV view model carries UVs, triangle index triples, finite bounds,
+and aggregate diagnostics; it does not invent cones, chart/seam records, or
+per-face distortion. UI-036 remains downstream of the runtime facade and owns
+the visible `Operational` proof.
 
 ## Evidence policy
 
