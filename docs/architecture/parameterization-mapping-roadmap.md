@@ -280,7 +280,7 @@ Correctness and benchmarks:
 
 ## Pack 7 — Engine integration and interactive UV view
 
-Implementation tasks: retired [`RUNTIME-176`](../../tasks/done/RUNTIME-176-parameterization-runtime-config-integration.md), [`UI-036`](../../tasks/backlog/ui/UI-036-sandbox-parameterization-editor-and-uv-split-view.md), optional [`GRAPHICS-122`](../../tasks/backlog/rendering/GRAPHICS-122-uv-view-offscreen-render-target.md); decision record [ADR-0025](../adr/0025-parameterization-uv-view-and-split-view.md).
+Implementation tasks: retired [`RUNTIME-176`](../../tasks/done/RUNTIME-176-parameterization-runtime-config-integration.md), active [`UI-036`](../../tasks/active/UI-036-sandbox-parameterization-editor-and-uv-split-view.md), optional [`GRAPHICS-122`](../../tasks/backlog/rendering/GRAPHICS-122-uv-view-offscreen-render-target.md); decision record [ADR-0025](../adr/0025-parameterization-uv-view-and-split-view.md).
 
 This pack is outside `src/geometry` — it wires the geometry family surface into the engine so the parameterization is choosable and controllable from a config file, an agent/CLI, and the UI as co-equal surfaces, and adds the interactive UV view. It follows the LOP-family (`RUNTIME-175`/`UI-035`) and progressive-Poisson (`RUNTIME-134`) integration precedents.
 

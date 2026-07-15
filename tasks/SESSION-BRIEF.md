@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `UI-036` — Sandbox parameterization editor panel and resizable UV split view (tasks/active/UI-036-sandbox-parameterization-editor-and-uv-split-view.md)
 
 ## Theme B — Rendering modernization
 
@@ -86,7 +86,6 @@ the authoritative open/unblocked view.
 - blocked by `METHOD-025`: `METHOD-026` — Parameterization family GPU (Vulkan compute) backend and parity (tasks/backlog/methods/METHOD-026-parameterization-family-gpu-vulkan-compute-backend.md)
 - blocked by `METHOD-016`: `RUNTIME-175` — Point-cloud consolidation runtime facade, config lane, and backend adapter (tasks/backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
 - blocked by `RUNTIME-175`: `UI-035` — Sandbox point-cloud consolidation editor panel (tasks/backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md)
-- unblocked: `UI-036` — Sandbox parameterization editor panel and resizable UV split view (tasks/backlog/ui/UI-036-sandbox-parameterization-editor-and-uv-split-view.md)
 
 ## Unthemed
 

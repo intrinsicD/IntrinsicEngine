@@ -6,6 +6,18 @@ maturity_target: Operational
 ---
 # UI-036 — Sandbox parameterization editor panel and resizable UV split view
 
+## Status
+- In progress on branch `codex/arch-006-completion`; owner: Codex.
+- `RUNTIME-176` is retired at `CPUContracted`; its config, command, history,
+  result, and pointer-free UV view-model seams are the only engine surfaces
+  consumed here.
+- One technical slice extends the existing app-owned
+  `Sandbox.Editor.MethodPanels` module, adds pure presentation/action helpers
+  for headless integration tests, synchronizes app/method docs, and then runs
+  the default CPU plus live Vulkan Sandbox gates before retirement.
+- Next verification: strict task/state validation after promotion, followed by
+  the focused Sandbox editor integration target.
+
 ## Goal
 - Add the Sandbox editor window that lists only parameterization strategies
   implemented at landing, edits their typed parameters through the validated
@@ -17,6 +29,14 @@ maturity_target: Operational
 - No new control path that bypasses the config lane — the panel drives the same validated apply path an agent/config file uses.
 - No second camera/viewport or renderer change — the UV layout is drawn as a 2D overlay with `ImGui`'s `ImDrawList` from the runtime view model (per `ADR-0025`, Option A); the GPU-rendered UV target is the optional follow-up `GRAPHICS-122`.
 - No ImGui docking dependency — the split is a manual two-pane splitter inside one registered window, so no `ImGuiConfigFlags_DockingEnable`/`imgui.ini` persistence change is required.
+- No direct UV-canvas pin picking, cut/weld, seam editing, or 3D gizmo. Current
+  LSCM pin, harmonic custom-boundary, and BFF boundary arrays are edited as
+  typed config values in the controls pane; later method tasks own any new
+  payloads.
+- No checker material creation or assignment. Parameterization writes
+  `v:texcoord` and the existing runtime command marks it dirty, so an
+  already-bound UV/checker material observes the update; material workflow is
+  outside this presentation-only task.
 
 ## Context
 - Owner/layer: `src/app/Sandbox/Editor/` (ImGui panels). `app -> runtime` only; panels import runtime seams, not lower layers.
@@ -28,15 +48,44 @@ maturity_target: Operational
 - Interactive controls are generated only for real config alternatives. Current
   pin/boundary edits use the RUNTIME-176 validated apply path; future method
   tasks add ARAP/SLIM/SCP controls with their concrete payloads.
-- The applied UVs are written back to the selected mesh by the `RUNTIME-176` facade (`v:texcoord` + dirty tag, undoable), so the 3D mesh's checker material and the UV pane update together — this is the `Operational`, visible-in-sandbox proof.
+- The applied UVs are written back to the selected mesh by the `RUNTIME-176`
+  facade (`v:texcoord` + dirty tag, undoable), so the UV pane and any
+  already-bound UV/checker material observe the same source data.
+- The app surface keeps a persistent draft and applies it explicitly through
+  the validated config command. Per-widget hot apply is deliberately rejected:
+  paired pin arrays and BFF target-angle data pass through temporarily invalid
+  states while a user is editing them.
+
+## Right-sizing
+- **Element:** a new `ParameterizationPanel` module/class would be a one-window,
+  one-caller surface beside the existing method-panel owner and is flagged by
+  the single-consumer/pure-registration heuristics.
+- **Simpler alternative:** register `mesh.processing.parameterize_uv` in the
+  existing `Sandbox.Editor.MethodPanels` module. Keep ImGui and draft state in
+  its current private implementation; add only plain app-owned value records
+  and free functions for strategy inventory, projection, result summary, and
+  the config-then-command action because those are shared by the window and
+  integration tests.
+- **Blast radius:** one existing app module interface/implementation, its
+  existing integration-test target, app/method documentation, and generated
+  module inventory. No new CMake target, runtime interface, renderer member,
+  service, registry, queue, or backend edge.
+- **Reintroduction trigger:** split a dedicated UV-view module only when a
+  second independent app consumer or the optional `GRAPHICS-122` GPU view
+  requires a reusable presentation interface.
 
 ## Control surfaces
 - UI: `Mesh > Processing > Parameterize (UV)` window with the controls/UV split view.
 - Config/Agent: unchanged from `RUNTIME-176` — the panel edits the same `EngineConfig.sandbox.parameterization` section and applies through the tagged `Editor` source, so config files and agents remain co-equal drivers.
 
 ## Required changes
-- [ ] Add a registered parameterization window in `src/app/Sandbox/Editor/` (mirroring `Sandbox.MethodPanels.cpp`), receiving `SandboxEditorContext`, not `Engine&`, with a draggable two-pane splitter (controls | UV layout) and a persisted-in-panel split ratio.
-- [ ] Strategy selector reflecting the strategies `Geometry.Parameterization` implements; disable/annotate strategies not yet available so the UI never offers an unimplemented variant.
+- [ ] Register `mesh.processing.parameterize_uv` in the existing
+      `Sandbox.Editor.MethodPanels` module, receiving `SandboxEditorContext`,
+      not `Engine&`, with a draggable two-pane splitter (controls | UV layout)
+      and a session-persistent panel split ratio.
+- [ ] Strategy selector lists exactly the currently implemented
+      LSCM/Harmonic-Cotangent/Tutte-Uniform/BFF tokens; do not add disabled
+      future ARAP/SLIM/SCP or backend entries.
 - [ ] Parameter widgets for each implemented strategy's actual config payload,
       edited through the RUNTIME-176 preview/apply path; no future-only knobs.
 - [ ] UV layout pane: draw the `SandboxEditorParameterizationViewModel` as 2D
@@ -48,9 +97,15 @@ maturity_target: Operational
 - [ ] Render chosen strategy, status, and the `ParameterizationDiagnostics`
       summary from `SandboxEditorParameterizationResult`.
 - [ ] Apply/undo affordances routed through the runtime command so edits are undoable via `EditorCommandHistory`.
+- [ ] Keep the config draft local until explicit apply; failed preview/apply
+      preserves the draft and surfaces its diagnostic instead of mutating the
+      active config or silently coercing a token.
 
 ## Tests
-- [ ] Extend the app/editor panel registration coverage (or a headless panel-model test where one exists) to assert the parameterization window registers through the `UI-034` registry and produces a valid apply request from a param set without ImGui frame state.
+- [ ] Extend app/editor integration coverage to assert the parameterization
+      window registers through the `UI-034` registry and the plain app action
+      applies a typed config then invokes the configured runtime command without
+      requiring ImGui frame state.
 - [ ] Strategy gating: the panel cannot emit an unimplemented strategy token.
 - [ ] View-model mapping: given a `SandboxEditorParameterizationViewModel`, the pane-space projection helper maps every UV inside the pane rect and preserves face count (pure model-level assertion, no ImGui frame).
 - [ ] Result rendering surfaces status and diagnostics (model-level assertion).
@@ -61,7 +116,8 @@ maturity_target: Operational
 
 ## Acceptance criteria
 - [ ] Selecting a mesh, choosing an implemented strategy, tuning params, and
-      applying updates both the 3D checker view and UV layout pane, undoably.
+      applying updates `v:texcoord`, the UV layout pane, and any already-bound
+      3D UV/checker material, undoably; this task does not assign a material.
 - [ ] The controls/UV split is resizable via the draggable splitter; the
       grid/checker background toggles correctly and aggregate distortion
       diagnostics are visible.
@@ -73,19 +129,35 @@ maturity_target: Operational
 ## Verification
 ```bash
 cmake --preset ci
-cmake --build --preset ci --target IntrinsicTests
-ctest --test-dir build/ci --output-on-failure -R 'Parameterization|SandboxEditor|MethodPanel' -LE 'gpu|vulkan' --timeout 120
+cmake --build --preset ci --target IntrinsicSandboxEditorIntegrationTests IntrinsicRuntimeContractTests
+ctest --test-dir build/ci --output-on-failure -R 'Parameterization|SandboxEditor|MethodPanel' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests ExtrinsicSandbox
+ctest --test-dir build/ci-vulkan --output-on-failure -R '^RuntimeSandboxAcceptanceGpuSmoke\\.ExtrinsicSandboxDefaultConfigProducesVisibleFrameWithValidation$' -L gpu -L vulkan --timeout 120
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
-Interactive proof (Vulkan-capable host): launch `ExtrinsicSandbox`, select a disk mesh, and parameterize via `Mesh > Processing > Parameterize (UV)` — the UV split view shows the layout and the mesh checker updates; cite the run in the retirement note.
+Operational proof: the app integration test opens the registered window inside
+`Engine::Run()`, drives the same plain config-then-command action on a selected
+disk mesh, and verifies the produced ImGui layout plus UV/history state. On a
+Vulkan-capable host, launch `ExtrinsicSandbox`, select a disk mesh, and
+parameterize via `Mesh > Processing > Parameterize (UV)`; cite that run and the
+existing operational Sandbox GPU acceptance smoke in the retirement note.
 
 ## Forbidden changes
 - No `Engine&` in panel callbacks; no UI ownership of geometry/runtime/asset state.
 - No private apply path that the config file/agent lane cannot reproduce.
 - No offering an unimplemented strategy or placeholder backend selector.
 - No enabling ImGui docking or writing `imgui.ini` in this task (the split is a manual splitter; docking is a separate opt-in if ever wanted).
+- No new app panel-family/module or controller member for this single window;
+  extend the existing method-panel owner.
 
 ## Maturity
-- Target: `Operational` — the window drives the real runtime apply path in `ExtrinsicSandbox` and renders the UV layout. The default CPU gate covers registration/model/projection behavior; the interactive viewport proof is cited from a Vulkan-capable host run.
+- Target: `Operational` — the window drives the real runtime apply path in
+  `Engine::Run()` and renders the UV layout. The integration-labeled app test
+  covers registration, config-then-command execution, projection, result
+  presentation, and a produced ImGui frame; the live Vulkan Sandbox run is
+  cited separately. `GRAPHICS-122` remains only the optional dense-mesh GPU UV
+  target, not a missing maturity gate for this CPU `ImDrawList` view.

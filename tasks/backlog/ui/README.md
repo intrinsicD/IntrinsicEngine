@@ -14,10 +14,11 @@ map.
   (LOP/WLOP/CLOP/EAR strategy + CPU/GPU backend picker driving the
   `RUNTIME-175` config-lane apply path; gated on `runtime/RUNTIME-175`;
   coordinate with active `ARCH-006` Slice 4).
-- [UI-036 — Sandbox parameterization editor panel and resizable UV split view](UI-036-sandbox-parameterization-editor-and-uv-split-view.md)
+- [UI-036 — Sandbox parameterization editor panel and resizable UV split view](../../active/UI-036-sandbox-parameterization-editor-and-uv-split-view.md)
   (implemented LSCM/Harmonic/Tutte/BFF controls and a resizable two-pane
   controls/UV-layout split view drawn with `ImDrawList` from the retired
-  `RUNTIME-176` CPU view model; now unblocked;
+  `RUNTIME-176` CPU view model; active on
+  `codex/arch-006-completion`;
   derived-view rationale in
   [ADR-0025](../../../docs/adr/0025-parameterization-uv-view-and-split-view.md);
   use the app-owned editor structure retired by `ARCH-006`).

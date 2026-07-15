@@ -11,7 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-None.
+- [UI-036 — Sandbox parameterization editor panel and resizable UV split view](UI-036-sandbox-parameterization-editor-and-uv-split-view.md)
+  (`in-progress`; owner: Codex; branch: `codex/arch-006-completion`). The task
+  is right-sized to one window in the existing app-owned MethodPanels module;
+  next gate is the focused Sandbox editor integration target.
 
 ## History
 
