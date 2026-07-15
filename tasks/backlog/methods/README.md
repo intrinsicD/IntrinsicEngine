@@ -126,8 +126,8 @@ map.
   Sandbox editor panel with a resizable UV split view — was delivered by
   retired `RUNTIME-176` and `UI-036`. Later strategies/backends extend those
   delivered surfaces rather than assigning future work to either retired
-  task. The optional `rendering/GRAPHICS-122` upgrade is unblocked and
-  selectable, with the derived-view rendering decision recorded in
+  task. The optional `GRAPHICS-122` upgrade is active, with the derived-view
+  rendering decision recorded in
   [ADR-0025](../../../docs/adr/0025-parameterization-uv-view-and-split-view.md).
   This mirrors the LOP consolidation family and the retired `RUNTIME-134`
   progressive-Poisson playground. Realizes Packs 3–4 of the

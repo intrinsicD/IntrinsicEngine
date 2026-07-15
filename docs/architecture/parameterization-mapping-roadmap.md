@@ -284,8 +284,8 @@ Implementation baseline: retired
 [`RUNTIME-176`](../../tasks/done/RUNTIME-176-parameterization-runtime-config-integration.md)
 and retired
 [`UI-036`](../../tasks/done/UI-036-sandbox-parameterization-editor-and-uv-split-view.md).
-The optional, now-unblocked
-[`GRAPHICS-122`](../../tasks/backlog/rendering/GRAPHICS-122-uv-view-offscreen-render-target.md)
+The optional, now-active
+[`GRAPHICS-122`](../../tasks/active/GRAPHICS-122-uv-view-offscreen-render-target.md)
 owns the GPU-shaded upgrade; the derived-view decision is recorded in
 [ADR-0025](../adr/0025-parameterization-uv-view-and-split-view.md).
 

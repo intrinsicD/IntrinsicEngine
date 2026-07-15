@@ -160,8 +160,8 @@ split; narratives live in the retirement log.
   (done, 2026-07-15, `Operational`): delivered implemented-strategy controls,
   validated config-lane apply/undo, aggregate diagnostics, and a resizable
   CPU `ImDrawList` UV view over the pointer-free model delivered by retired
-  `RUNTIME-176`. The optional dense-mesh GPU-shaded upgrade remains selectable
-  as [`GRAPHICS-122`](../rendering/GRAPHICS-122-uv-view-offscreen-render-target.md).
+  `RUNTIME-176`. The optional dense-mesh GPU-shaded upgrade is active as
+  [`GRAPHICS-122`](../../active/GRAPHICS-122-uv-view-offscreen-render-target.md).
 - [RORG-031F — UI integration backlog seed](../../archive/RORG-031F-ui-integration.md)
   (done, 2026-07-05, `Scaffolded`): planning-only umbrella retired after
   current UI children through `UI-031` were indexed, the remaining deferred

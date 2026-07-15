@@ -251,7 +251,7 @@ ported algorithms are retired `UI-024`/`UI-025`/`UI-026` under the UI backlog.
   resizable CPU UV split view on 2026-07-15. Future strategies/backends extend
   that delivered panel and this delivered runtime model rather than assigning
   new ownership to either retired task. The optional GPU-shaded UV target
-  `rendering/GRAPHICS-122` is now unblocked and selectable; the derived-view rendering decision is
+  `GRAPHICS-122` is now active; the derived-view rendering decision is
   [ADR-0025](../../../docs/adr/0025-parameterization-uv-view-and-split-view.md).
   Build on the app-owned editor structure retired by `ARCH-006`.
 

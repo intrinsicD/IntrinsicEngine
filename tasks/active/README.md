@@ -11,7 +11,11 @@ Each active task should include:
 
 ## Currently active
 
-None.
+- [GRAPHICS-122 — GPU-shaded UV view offscreen render target](GRAPHICS-122-uv-view-offscreen-render-target.md)
+  (`in-progress`; owner: Codex; branch: `codex/arch-006-completion`). The task
+  is right-sized to one concrete graphics UV-view module and one typed recipe
+  pass/resource wired through the delivered parameterization panel; next gate
+  is the focused CPU config/diagnostic/recipe contract.
 
 ## History
 

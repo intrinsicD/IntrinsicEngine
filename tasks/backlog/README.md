@@ -357,8 +357,8 @@ family on the retired `GEOM-063` shared surface — `METHOD-021` ARAP (blocked b
 `METHOD-025`; the retired `RUNTIME-176` dependency is satisfied; iterative
 strategies only), and its delivered engine-integration leaves `RUNTIME-176`
 and `UI-036` (both retired 2026-07-15). The optional `GRAPHICS-122` dependency
-is therefore satisfied and that GPU-shaded UV-view upgrade is unblocked and
-selectable. The method-readiness seams are `GEOM-013`,
+is therefore satisfied and that GPU-shaded UV-view upgrade is active on
+`codex/arch-006-completion`. The method-readiness seams are `GEOM-013`,
 `GEOM-024`, `GEOM-058`, `GEOM-059`, `GEOM-060`, `GEOM-061`, `GEOM-062`,
 `GEOM-064`.
 
