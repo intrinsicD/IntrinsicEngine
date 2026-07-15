@@ -11,11 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [RUNTIME-170 — Privatize the object-space normal GPU queue surface](RUNTIME-170-privatize-object-space-normal-gpu-queue-surface.md)
-  (`in-progress`; owner: Codex; branch: `codex/arch-006-completion`). The
-  single-consumer queue module is being folded into service-owned private
-  state without changing bake behavior; next gate is the focused
-  queue/service contract build and test.
+- No tasks are currently active.
 
 ## History
 

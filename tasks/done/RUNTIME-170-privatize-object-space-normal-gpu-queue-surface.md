@@ -10,12 +10,11 @@ maturity_target: CPUContracted
 
 ## Status
 
-- Implementation verified on 2026-07-16; owner: Codex; branch:
-  `codex/arch-006-completion`.
-- Closure target `CPUContracted` is met: the focused selection passed 164/164,
-  the full CPU-supported gate passed 3,780/3,780 in 398.27 seconds, and the
-  strict structural/review bundle is green.
-- Next gate: commit the implementation, then perform retirement bookkeeping.
+- Completed on 2026-07-16 at `CPUContracted`.
+- Implementation commit: `ca17b9b9`.
+- Verification: the focused selection passed 164/164, the full CPU-supported
+  gate passed 3,780/3,780 in 398.27 seconds, and the strict
+  structural/review bundle is green.
 
 ## Goal
 - Keep object-space normal bake GPU queue ownership inside

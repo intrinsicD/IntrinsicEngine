@@ -8,6 +8,22 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-170`](RUNTIME-170-privatize-object-space-normal-gpu-queue-surface.md) —
+the object-space normal bake GPU queue surface retired on 2026-07-16 at
+`CPUContracted`. Implementation commit `ca17b9b9` folds the one-consumer GPU
+participant, plan-provider adaptation, retained submissions, and diagnostics
+into `ObjectSpaceNormalBakeService` opaque state while keeping the CPU request
+queue public. The aggregate public interface shrank from 175 to 96 lines and
+from 15 to 5 direct imports, and the inventory dropped from 392 to 391 modules;
+the single-host timing sample is recorded without a speedup claim. Six queue
+scenarios now drive record/drain behavior only through the service and
+`JobService`, including stale discard, content-key reuse, and generation-safe
+record/ready-publication failure cleanup. The focused selection passed 164/164,
+the full CPU-supported gate passed 3,780/3,780 in 398.27 seconds, strict
+structural and clean-workshop checks passed, and three independent reviews
+found no blockers. `RUNTIME-129` retains production Vulkan plan-provider and
+opt-in runtime smoke ownership.
+
 [`BUG-089`](BUG-089-root-hygiene-rejects-canonical-and-ignored-state.md) —
 strict root ownership retired on 2026-07-16 at `CPUContracted`. Implementation
 commit `7671576b` makes `root_allowlist.yaml` the single policy for exact

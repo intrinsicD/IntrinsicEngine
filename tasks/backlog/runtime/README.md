@@ -194,10 +194,6 @@ main `Runtime.RenderExtraction` module slimming.
 - [`RUNTIME-169`](RUNTIME-169-privatize-render-extraction-service-surface.md) —
   keep `RenderExtractionService` Engine-owned but remove its standalone module
   surface after `RUNTIME-163`.
-- [`RUNTIME-170`](../../active/RUNTIME-170-privatize-object-space-normal-gpu-queue-surface.md) —
-  make the object-space normal bake GPU queue a service-private seam after
-  `RUNTIME-161`; active on `codex/arch-006-completion`. Production Vulkan
-  wiring remains `RUNTIME-129`.
 - [`RUNTIME-171`](RUNTIME-171-privatize-asset-residency-service-surface.md) —
   privatize the Engine-owned asset residency service after `RUNTIME-164`.
 - [`RUNTIME-172`](RUNTIME-172-privatize-scene-document-surface.md) —
@@ -208,6 +204,13 @@ main `Runtime.RenderExtraction` module slimming.
   `RUNTIME-137`.
 - [`RUNTIME-174`](RUNTIME-174-privatize-imgui-editor-bridge-surface.md) —
   privatize the Engine-owned ImGui editor bridge after `RUNTIME-159`.
+
+### Retired module-surface diet work
+
+- [`RUNTIME-170`](../../done/RUNTIME-170-privatize-object-space-normal-gpu-queue-surface.md)
+  retired the one-consumer object-space normal bake GPU queue module into
+  service-owned private state at `CPUContracted`; production Vulkan wiring
+  remains owned by `RUNTIME-129`.
 
 ### bcg geometry-processing port integration (seeded 2026-06-26)
 

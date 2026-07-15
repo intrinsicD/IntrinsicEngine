@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `RUNTIME-170` — Privatize the object-space normal GPU queue surface (tasks/active/RUNTIME-170-privatize-object-space-normal-gpu-queue-surface.md)
+- none
 
 ## Theme B — Rendering modernization
 
