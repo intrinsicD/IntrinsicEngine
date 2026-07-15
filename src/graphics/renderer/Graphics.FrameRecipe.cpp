@@ -352,6 +352,7 @@ namespace Extrinsic::Graphics
         case FrameRecipePassKind::ClusterGridBuild: return "ClusterGridBuildPass";
         case FrameRecipePassKind::LightClusterAssignment: return "LightClusterAssignmentPass";
         case FrameRecipePassKind::Reconstruction: return "ReconstructionPass";
+        case FrameRecipePassKind::UvView: return "UvViewPass";
         }
         return "UnknownPass";
     }
@@ -404,6 +405,7 @@ namespace Extrinsic::Graphics
         case FrameRecipeResourceKind::ReconstructionHistoryPrevious: return "Reconstruction.HistoryPrevious";
         case FrameRecipeResourceKind::ReconstructionHistoryCurrent: return "Reconstruction.HistoryCurrent";
         case FrameRecipeResourceKind::ReconstructionResolvedHDR: return "Reconstruction.ResolvedHDR";
+        case FrameRecipeResourceKind::UvViewColor: return "UvViewColor";
         }
         return "UnknownResource";
     }
@@ -707,6 +709,16 @@ namespace Extrinsic::Graphics
                            false,
                            aaResolveReads,
                            {"PostProcess.AATemp.Resolved"});
+        if (features.EnableUvView)
+        {
+            AddPass(out,
+                    FrameRecipePassKind::UvView,
+                    "UvViewPass",
+                    true,
+                    false,
+                    {},
+                    {"UvViewColor"});
+        }
         AddPass(out, FrameRecipePassKind::Present, "Present", true, true, {"FrameRecipe.PresentSource"}, {"Backbuffer"});
 
         AddResource(out, FrameRecipeResourceKind::Backbuffer, "Backbuffer", true, true, true);
@@ -787,6 +799,17 @@ namespace Extrinsic::Graphics
         // dispatch). Gated on `EnablePostProcess` to match the other
         // postprocess transients above.
         AddResource(out, FrameRecipeResourceKind::HistogramReadback, "Histogram.Readback", features.EnablePostProcess, true, false, true, true);
+        if (features.EnableUvView)
+        {
+            AddResource(out,
+                        FrameRecipeResourceKind::UvViewColor,
+                        "UvViewColor",
+                        true,
+                        true,
+                        false,
+                        false,
+                        true);
+        }
         return out;
     }
 
@@ -1011,6 +1034,13 @@ namespace Extrinsic::Graphics
         const bool selectionOutlineActive =
             features.EnableDepthPrepass && features.EnableSelectionOutline;
         const FramePassId presentPassId = ToFramePassId(FrameRecipePassKind::Present);
+        std::vector<FrameResourceId> imguiReads{
+            FrameRecipePresentSourceResourceId(),
+        };
+        if (features.EnableUvView)
+        {
+            imguiReads.push_back(ToFrameResourceId(FrameRecipeResourceKind::UvViewColor));
+        }
 
         RegisterFrameRecipePassContribution(
             registry,
@@ -1086,9 +1116,7 @@ namespace Extrinsic::Graphics
                     .PassId = presentPassId,
                     .Placement = FrameRecipeContributionAnchorPlacement::Before,
                 },
-                .Reads = {
-                    FrameRecipePresentSourceResourceId(),
-                },
+                .Reads = std::move(imguiReads),
                 .Writes = {
                     FrameRecipePresentSourceResourceId(),
                 },
@@ -1399,6 +1427,14 @@ namespace Extrinsic::Graphics
                 .Diagnostic = "FrameRecipe requires a valid imported Backbuffer handle.",
             };
         }
+        if (features.EnableUvView && !imports.UvViewColor.IsValid())
+        {
+            return FrameRecipeBuildResult{
+                .Succeeded = false,
+                .MissingPrerequisiteCount = 1u,
+                .Diagnostic = "FrameRecipe UV view requires a valid UvViewColor texture import.",
+            };
+        }
 
         const bool usesDeferred = UsesDeferredResources(features);
         // GRAPHICS-113 — split host picking readback and PrimitiveId from the
@@ -1467,8 +1503,10 @@ namespace Extrinsic::Graphics
                                       const RHI::TextureHandle handle,
                                       const TextureState initial,
                                       const TextureState finalState,
-                                      const FrameRecipeResourceKind kind) {
-            const TextureRef ref = graph.ImportTexture(std::move(name), handle, initial, finalState);
+                                      const FrameRecipeResourceKind kind,
+                                      const bool allowImportedWrites = false) {
+            const TextureRef ref = graph.ImportTexture(
+                std::move(name), handle, initial, finalState, allowImportedWrites);
             (void)graph.SetTextureResourceId(ref, ToFrameResourceId(kind));
             return ref;
         };
@@ -1541,6 +1579,7 @@ namespace Extrinsic::Graphics
         TextureRef reconstructionHistoryCurrent{};
         TextureRef reconstructionResolvedHDR{};
         TextureRef debugView{};
+        TextureRef uvViewColor{};
         BufferRef postProcessHistogram{};
         BufferRef pickingReadback{};
         BufferRef histogramReadback{};
@@ -1561,6 +1600,17 @@ namespace Extrinsic::Graphics
                                        TextureState::Undefined,
                                        TextureState::ShaderWrite,
                                        FrameRecipeResourceKind::HZBCurrent);
+        }
+        if (features.EnableUvView)
+        {
+            uvViewColor = importTexture("UvViewColor",
+                                        imports.UvViewColor,
+                                        imports.UvViewColorInitialized
+                                            ? TextureState::ShaderRead
+                                            : TextureState::Undefined,
+                                        TextureState::ShaderRead,
+                                        FrameRecipeResourceKind::UvViewColor,
+                                        true);
         }
         if (clusterGridBuildActive)
         {
@@ -2265,6 +2315,19 @@ namespace Extrinsic::Graphics
                 (features.EnableAntiAliasing && spatialAAActive) ? postProcessAATempResolved : ldr;
         }
 
+        if (features.EnableUvView)
+        {
+            addRecipePass(FrameRecipePassKind::UvView, "UvViewPass", [=](RenderGraphBuilder& builder) {
+                builder.Write(uvViewColor, TextureUsage::ColorAttachmentWrite);
+                builder.SetRenderPass(RHI::RenderPassDesc{
+                    .ColorTargets = kMinimalRenderPassColorAttachments,
+                });
+                // The imported retained target is an observable recipe output
+                // even when the ImGui overlay is disabled for a frame.
+                builder.SideEffect();
+            });
+        }
+
         auto textureForFrameResourceId = [&](const FrameResourceId id) -> TextureRef
         {
             if (!id.IsValid())
@@ -2298,6 +2361,7 @@ namespace Extrinsic::Graphics
             case FrameRecipeResourceKind::ReconstructionHistoryPrevious: return reconstructionHistoryPrevious;
             case FrameRecipeResourceKind::ReconstructionHistoryCurrent: return reconstructionHistoryCurrent;
             case FrameRecipeResourceKind::ReconstructionResolvedHDR: return reconstructionResolvedHDR;
+            case FrameRecipeResourceKind::UvViewColor: return uvViewColor;
             case FrameRecipeResourceKind::SelectionOutline:
             case FrameRecipeResourceKind::SceneTable:
             case FrameRecipeResourceKind::InstanceStatic:
@@ -2381,6 +2445,10 @@ namespace Extrinsic::Graphics
                 const TextureRef input = presentSource;
                 addRecipePassWithId(contribution.Id, std::string{contribution.Name}, [=](RenderGraphBuilder& builder) {
                     builder.Read(input, TextureUsage::ShaderRead);
+                    if (uvViewColor.IsValid())
+                    {
+                        builder.Read(uvViewColor, TextureUsage::ShaderRead);
+                    }
                     builder.Write(input, TextureUsage::ColorAttachmentWrite);
                     builder.SetRenderPass(RHI::RenderPassDesc{
                         .ColorTargets = kDefaultLoadColorAttachments,

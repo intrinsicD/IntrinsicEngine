@@ -45,6 +45,7 @@ namespace
         compiled.TextureInitialStates.resize(textureCount, TextureState::Undefined);
         compiled.TextureFinalStates.resize(textureCount, TextureState::Undefined);
         compiled.TextureImported.resize(textureCount, false);
+        compiled.TextureImportedWriteAllowed.resize(textureCount, false);
         compiled.TextureIsBackbuffer.resize(textureCount, false);
 
         compiled.BufferNames.resize(bufferCount);
@@ -392,6 +393,78 @@ TEST(RenderGraphValidation, ImportedTextureAuthorizationListControlsWriters)
     EXPECT_EQ(finding.PassName, "DeniedPass");
     EXPECT_EQ(finding.ResourceIndex, 0u);
     EXPECT_EQ(finding.ResourceName, "History");
+}
+
+TEST(RenderGraphValidation, ShaderReadBoundaryImportRejectsWriteWithoutAuthorization)
+{
+    RenderGraph graph;
+    const TextureRef imported = graph.ImportTexture(
+        "ReadOnlyHistory",
+        RHI::TextureHandle{3u, 1u},
+        TextureState::ShaderRead,
+        TextureState::ShaderRead);
+    const TextureResourceDesc* desc = graph.GetTextureDesc(imported);
+    ASSERT_NE(desc, nullptr);
+    EXPECT_FALSE(desc->ImportedWriteAllowed);
+
+    (void)graph.AddPass("WriteImported", [imported](RenderGraphBuilder& builder) {
+        EXPECT_FALSE(builder.Write(imported, TextureUsage::ColorAttachmentWrite).IsValid());
+    });
+
+    EXPECT_FALSE(graph.Compile().has_value());
+}
+
+TEST(RenderGraphValidation, AuthorizedImportedWritePreservesShaderReadBoundaryStates)
+{
+    RenderGraph graph;
+    const TextureRef imported = graph.ImportTexture(
+        "RetainedTarget",
+        RHI::TextureHandle{4u, 1u},
+        TextureState::ShaderRead,
+        TextureState::ShaderRead,
+        true);
+    const TextureResourceDesc* desc = graph.GetTextureDesc(imported);
+    ASSERT_NE(desc, nullptr);
+    EXPECT_TRUE(desc->ImportedWriteAllowed);
+
+    (void)graph.AddPass("WriteRetainedTarget", [imported](RenderGraphBuilder& builder) {
+        EXPECT_TRUE(builder.Write(imported, TextureUsage::ColorAttachmentWrite).IsValid());
+    });
+    (void)graph.AddPass("SampleRetainedTarget", [imported](RenderGraphBuilder& builder) {
+        EXPECT_TRUE(builder.Read(imported, TextureUsage::ShaderRead).IsValid());
+        builder.SideEffect();
+    });
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    EXPECT_TRUE(compiled->ValidationFindings.empty());
+    ASSERT_LT(imported.Index, compiled->TextureImportedWriteAllowed.size());
+    EXPECT_TRUE(compiled->TextureImportedWriteAllowed[imported.Index]);
+    ASSERT_LT(imported.Index, compiled->TextureInitialStates.size());
+    ASSERT_LT(imported.Index, compiled->TextureFinalStates.size());
+    EXPECT_EQ(compiled->TextureInitialStates[imported.Index], TextureState::ShaderRead);
+    EXPECT_EQ(compiled->TextureFinalStates[imported.Index], TextureState::ShaderRead);
+
+    bool sawWriteTransition = false;
+    bool sawReadTransition = false;
+    for (const BarrierPacket& packet : compiled->BarrierPackets)
+    {
+        for (const TextureBarrierPacket& barrier : packet.TextureBarriers)
+        {
+            if (barrier.TextureIndex != imported.Index)
+            {
+                continue;
+            }
+            sawWriteTransition = sawWriteTransition ||
+                (barrier.Before == TextureBarrierState::ShaderRead &&
+                 barrier.After == TextureBarrierState::ColorAttachmentWrite);
+            sawReadTransition = sawReadTransition ||
+                (barrier.Before == TextureBarrierState::ColorAttachmentWrite &&
+                 barrier.After == TextureBarrierState::ShaderRead);
+        }
+    }
+    EXPECT_TRUE(sawWriteTransition);
+    EXPECT_TRUE(sawReadTransition);
 }
 
 TEST(RenderGraphValidation, ImportedBufferAuthorizationListControlsWriters)

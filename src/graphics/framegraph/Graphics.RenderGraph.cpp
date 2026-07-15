@@ -466,7 +466,8 @@ namespace Extrinsic::Graphics
 
                 if (desc->Imported && write)
                 {
-                    const bool writableContract = TextureStateAllowsWrite(desc->InitialState) ||
+                    const bool writableContract = desc->ImportedWriteAllowed ||
+                                                  TextureStateAllowsWrite(desc->InitialState) ||
                                                   TextureStateAllowsWrite(desc->FinalState);
                     if (!writableContract)
                     {
@@ -523,7 +524,8 @@ namespace Extrinsic::Graphics
     TextureRef RenderGraph::ImportTexture(std::string name,
                                           const RHI::TextureHandle handle,
                                           const TextureState initial,
-                                          const TextureState finalState)
+                                          const TextureState finalState,
+                                          const bool allowImportedWrites)
     {
         if (!m_Impl)
         {
@@ -534,6 +536,7 @@ namespace Extrinsic::Graphics
         TextureResourceDesc& texture = m_Impl->Textures.emplace_back();
         texture.Name = std::move(name);
         texture.Imported = true;
+        texture.ImportedWriteAllowed = allowImportedWrites;
         texture.IsBackbuffer = false;
         texture.AliasEligible = false;
         texture.InitialState = initial;

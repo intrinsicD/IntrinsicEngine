@@ -112,6 +112,9 @@ namespace Extrinsic::Graphics
         // TAA/external reconstruction can read jittered HDR/depth/motion plus
         // retained history and publish a reconstructed HDR input for tonemap.
         Reconstruction,
+        // GRAPHICS-122 — dedicated UV-space render pass. Appended to preserve
+        // every existing typed pass id.
+        UvView,
     };
 
     export [[nodiscard]] constexpr FramePassId ToFramePassId(const FrameRecipePassKind kind) noexcept
@@ -193,6 +196,9 @@ namespace Extrinsic::Graphics
         ReconstructionHistoryPrevious,
         ReconstructionHistoryCurrent,
         ReconstructionResolvedHDR,
+        // GRAPHICS-122 — retained sampled color target owned by the UV-view
+        // graphics module. Appended to preserve every existing resource id.
+        UvViewColor,
     };
 
     export [[nodiscard]] constexpr FrameResourceId ToFrameResourceId(const FrameRecipeResourceKind kind) noexcept
@@ -265,6 +271,9 @@ namespace Extrinsic::Graphics
         // has no pipelines and no helper; Slices B/C wire the per-kind
         // pipelines + upload + recording paths.
         bool EnableVisualizationOverlay{false};
+        // GRAPHICS-122 — opt into the dedicated retained UV-view target and
+        // pass. Defaults off so existing default-recipe contracts are unchanged.
+        bool EnableUvView{false};
     };
 
     export struct FrameRecipeTemporalOptions
@@ -360,6 +369,15 @@ namespace Extrinsic::Graphics
         RHI::BufferHandle ClusterLightHeaders{};
         RHI::BufferHandle ClusterLightIndices{};
         RHI::BufferHandle ClusterLightCounter{};
+        // GRAPHICS-122 — retained sampled UV-view target. When the feature is
+        // enabled the recipe writes it as a color attachment and returns it to
+        // ShaderRead at the frame boundary for ImGui sampling.
+        RHI::TextureHandle UvViewColor{};
+        // Newly created Vulkan textures begin Undefined. The target owner sets
+        // this only after the first UV pass records successfully, allowing
+        // subsequent frames to enter from ShaderRead without lying about the
+        // first generation's actual layout.
+        bool UvViewColorInitialized{false};
     };
 
     // GRAPHICS-073 Slice B — typed sizing seam for the shadow atlas. When

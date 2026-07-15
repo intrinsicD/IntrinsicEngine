@@ -1206,6 +1206,7 @@ namespace Extrinsic::Graphics
         TextureTransientPlacements = other.TextureTransientPlacements;
         BufferTransientPlacements = other.BufferTransientPlacements;
         TextureImported = other.TextureImported;
+        TextureImportedWriteAllowed = other.TextureImportedWriteAllowed;
         TextureIsBackbuffer = other.TextureIsBackbuffer;
         BufferImported = other.BufferImported;
         TextureQueueSharingModes = other.TextureQueueSharingModes;
@@ -1260,6 +1261,7 @@ namespace Extrinsic::Graphics
         TextureTransientPlacements = std::move(other.TextureTransientPlacements);
         BufferTransientPlacements = std::move(other.BufferTransientPlacements);
         TextureImported = std::move(other.TextureImported);
+        TextureImportedWriteAllowed = std::move(other.TextureImportedWriteAllowed);
         TextureIsBackbuffer = std::move(other.TextureIsBackbuffer);
         BufferImported = std::move(other.BufferImported);
         TextureQueueSharingModes = std::move(other.TextureQueueSharingModes);
@@ -1607,6 +1609,7 @@ namespace Extrinsic::Graphics
             compiled.TextureHandles.resize(textures.size());
             compiled.BufferHandles.resize(buffers.size());
             compiled.TextureImported.resize(textures.size(), false);
+            compiled.TextureImportedWriteAllowed.resize(textures.size(), false);
             compiled.TextureIsBackbuffer.resize(textures.size(), false);
             compiled.BufferImported.resize(buffers.size(), false);
             compiled.TextureQueueSharingModes.resize(textures.size(), QueueSharingMode::Exclusive);
@@ -1619,6 +1622,8 @@ namespace Extrinsic::Graphics
                 compiled.TextureInitialStates[textureIndex] = textures[textureIndex].InitialState;
                 compiled.TextureFinalStates[textureIndex] = textures[textureIndex].FinalState;
                 compiled.TextureImported[textureIndex] = textures[textureIndex].Imported;
+                compiled.TextureImportedWriteAllowed[textureIndex] =
+                    textures[textureIndex].ImportedWriteAllowed;
                 compiled.TextureIsBackbuffer[textureIndex] = textures[textureIndex].IsBackbuffer;
                 if (textures[textureIndex].Imported)
                 {
@@ -1648,6 +1653,7 @@ namespace Extrinsic::Graphics
         std::vector<RHI::TextureHandle> textureHandles(textures.size());
         std::vector<RHI::BufferHandle> bufferHandles(buffers.size());
         std::vector<bool> textureImported(textures.size(), false);
+        std::vector<bool> textureImportedWriteAllowed(textures.size(), false);
         std::vector<bool> textureIsBackbuffer(textures.size(), false);
         std::vector<bool> bufferImported(buffers.size(), false);
         std::vector<std::string> textureNames(textures.size());
@@ -1681,6 +1687,7 @@ namespace Extrinsic::Graphics
             textureResourceIds[textureIndex] = textures[textureIndex].Id;
             textureInitialStates[textureIndex] = textures[textureIndex].InitialState;
             textureFinalStates[textureIndex] = textures[textureIndex].FinalState;
+            textureImportedWriteAllowed[textureIndex] = textures[textureIndex].ImportedWriteAllowed;
             textureIsBackbuffer[textureIndex] = textures[textureIndex].IsBackbuffer;
             if (textures[textureIndex].Imported)
             {
@@ -2383,6 +2390,7 @@ namespace Extrinsic::Graphics
         compiled.TextureHandles = std::move(textureHandles);
         compiled.BufferHandles = std::move(bufferHandles);
         compiled.TextureImported = std::move(textureImported);
+        compiled.TextureImportedWriteAllowed = std::move(textureImportedWriteAllowed);
         compiled.TextureIsBackbuffer = std::move(textureIsBackbuffer);
         compiled.BufferImported = std::move(bufferImported);
         compiled.TextureQueueSharingModes = std::move(textureQueueSharingModes);
@@ -3008,7 +3016,11 @@ namespace Extrinsic::Graphics
                 }
                 else
                 {
-                    allowed = BoolAt(compiled.PassSideEffects, writerPass) && (!isBackbuffer || writerPass == finalizerPass);
+                    const bool resourceAllowsImportedTextureWrites =
+                        isTexture && BoolAt(compiled.TextureImportedWriteAllowed, resourceIndex);
+                    allowed = resourceAllowsImportedTextureWrites ||
+                              (BoolAt(compiled.PassSideEffects, writerPass) &&
+                               (!isBackbuffer || writerPass == finalizerPass));
                 }
 
                 if (allowed)

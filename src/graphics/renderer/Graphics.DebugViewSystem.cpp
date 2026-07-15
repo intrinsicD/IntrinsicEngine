@@ -68,6 +68,7 @@ namespace Extrinsic::Graphics
             case FrameRecipeResourceKind::ReconstructionHistoryPrevious:
             case FrameRecipeResourceKind::ReconstructionHistoryCurrent:
             case FrameRecipeResourceKind::ReconstructionResolvedHDR:
+            case FrameRecipeResourceKind::UvViewColor:
                 return DebugViewResourceClass::Texture;
             }
             return DebugViewResourceClass::Unknown;

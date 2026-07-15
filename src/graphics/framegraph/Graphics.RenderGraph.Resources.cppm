@@ -84,6 +84,12 @@ namespace Extrinsic::Graphics
         std::string Name{};
         FrameResourceId Id{};
         bool Imported = false;
+        // Imported textures are read-only by default. Retained render targets
+        // may opt into graph-authored writes while still declaring read-only
+        // frame-boundary states (for example ShaderRead -> ColorAttachment ->
+        // ShaderRead). Recipe-aware validation remains responsible for
+        // restricting the authorized writer pass.
+        bool ImportedWriteAllowed = false;
         bool IsBackbuffer = false;
         bool AliasEligible = true;
         TextureState InitialState = TextureState::Undefined;

@@ -221,6 +221,7 @@ namespace Extrinsic::Graphics
         std::vector<TransientResourcePlacement> TextureTransientPlacements{};
         std::vector<TransientResourcePlacement> BufferTransientPlacements{};
         std::vector<bool> TextureImported{};
+        std::vector<bool> TextureImportedWriteAllowed{};
         std::vector<bool> TextureIsBackbuffer{};
         std::vector<bool> BufferImported{};
         std::vector<QueueSharingMode> TextureQueueSharingModes{};

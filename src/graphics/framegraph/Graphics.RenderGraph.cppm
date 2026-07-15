@@ -43,7 +43,8 @@ namespace Extrinsic::Graphics
         [[nodiscard]] TextureRef ImportTexture(std::string name,
                                                RHI::TextureHandle handle,
                                                TextureState initial,
-                                               TextureState finalState = TextureState::Present);
+                                               TextureState finalState = TextureState::Present,
+                                               bool allowImportedWrites = false);
         [[nodiscard]] BufferRef ImportBuffer(std::string name,
                                              RHI::BufferHandle handle,
                                              BufferState initial,

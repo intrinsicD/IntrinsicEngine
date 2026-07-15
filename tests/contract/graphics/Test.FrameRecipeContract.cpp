@@ -65,6 +65,7 @@ namespace
             .ClusterLightHeaders = Extrinsic::RHI::BufferHandle{20u, 1u},
             .ClusterLightIndices = Extrinsic::RHI::BufferHandle{21u, 1u},
             .ClusterLightCounter = Extrinsic::RHI::BufferHandle{22u, 1u},
+            .UvViewColor = Extrinsic::RHI::TextureHandle{23u, 1u},
         };
     }
 
@@ -357,6 +358,182 @@ TEST(FrameRecipeContract, DefaultRecipeBuildsCanonicalPassOrder)
     };
     EXPECT_EQ(OrderedPassNames(*compiled), expected);
     EXPECT_EQ(build.DeclaredPassCount, expected.size());
+}
+
+TEST(FrameRecipeContract, UvViewIsAbsentFromTheDisabledDefaultRecipe)
+{
+    const FrameRecipeIntrospection recipe = DescribeDefaultFrameRecipe(FrameRecipeFeatures{});
+    EXPECT_EQ(FindPass(recipe, FrameRecipePassKind::UvView), nullptr);
+    EXPECT_EQ(FindResource(recipe, FrameRecipeResourceKind::UvViewColor), nullptr);
+
+    const auto* imgui = FindPass(recipe, FrameRecipePassKind::ImGui);
+    ASSERT_NE(imgui, nullptr);
+    EXPECT_FALSE(Contains(imgui->Reads, "UvViewColor"));
+
+    RenderGraph graph;
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        FrameRecipeFeatures{},
+        MakeImports(),
+        FrameRecipeSizing{.Width = 640u, .Height = 480u});
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    EXPECT_FALSE(HasPassName(*compiled, "UvViewPass"));
+    EXPECT_EQ(std::ranges::find(compiled->TextureNames, "UvViewColor"), compiled->TextureNames.end());
+}
+
+TEST(FrameRecipeContract, UvViewWritesRetainedImportBeforeImGuiSamplesIt)
+{
+    FrameRecipeFeatures features{};
+    features.EnableUvView = true;
+
+    const FrameRecipeIntrospection recipe = DescribeDefaultFrameRecipe(features);
+    EXPECT_EQ(FrameRecipePassKindName(FrameRecipePassKind::UvView), std::string_view{"UvViewPass"});
+    EXPECT_EQ(FrameRecipeResourceKindName(FrameRecipeResourceKind::UvViewColor), std::string_view{"UvViewColor"});
+    EXPECT_EQ(FrameRecipePassIdName(ToFramePassId(FrameRecipePassKind::UvView)), std::string_view{"UvViewPass"});
+    EXPECT_EQ(FrameRecipeResourceIdName(ToFrameResourceId(FrameRecipeResourceKind::UvViewColor)),
+              std::string_view{"UvViewColor"});
+
+    const auto* uvPass = FindPass(recipe, FrameRecipePassKind::UvView);
+    ASSERT_NE(uvPass, nullptr);
+    EXPECT_TRUE(uvPass->Enabled);
+    EXPECT_TRUE(Contains(uvPass->Writes, "UvViewColor"));
+
+    const auto* uvResource = FindResource(recipe, FrameRecipeResourceKind::UvViewColor);
+    ASSERT_NE(uvResource, nullptr);
+    EXPECT_TRUE(uvResource->Enabled);
+    EXPECT_TRUE(uvResource->Imported);
+    EXPECT_FALSE(uvResource->Optional);
+    EXPECT_TRUE(uvResource->ImportedWriteAllowed);
+
+    const auto* imgui = FindPass(recipe, FrameRecipePassKind::ImGui);
+    ASSERT_NE(imgui, nullptr);
+    EXPECT_TRUE(imgui->Enabled);
+    EXPECT_TRUE(Contains(imgui->Reads, "UvViewColor"));
+
+    FrameRecipeImports imports = MakeImports();
+    imports.UvViewColorInitialized = true;
+    RenderGraph graph;
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        imports,
+        FrameRecipeSizing{.Width = 640u, .Height = 480u});
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    {
+        const auto& compileResult = graph.GetLastCompileValidationResult();
+        ASSERT_TRUE(compiled.has_value())
+            << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+    }
+    EXPECT_TRUE(PassWritesTexture(*compiled, "UvViewPass", "UvViewColor"));
+    EXPECT_TRUE(PassReadsTexture(*compiled, "ImGuiPass", "UvViewColor"));
+    EXPECT_TRUE(HasCompiledRenderPassAttachment(*compiled, "UvViewPass"));
+    ExpectPassBefore(*compiled, "UvViewPass", "ImGuiPass");
+
+    const std::uint32_t uvTextureIndex = TextureIndexByName(*compiled, "UvViewColor");
+    ASSERT_LT(uvTextureIndex, compiled->TextureNames.size());
+    ASSERT_LT(uvTextureIndex, compiled->TextureImported.size());
+    ASSERT_LT(uvTextureIndex, compiled->TextureImportedWriteAllowed.size());
+    ASSERT_LT(uvTextureIndex, compiled->TextureInitialStates.size());
+    ASSERT_LT(uvTextureIndex, compiled->TextureFinalStates.size());
+    EXPECT_TRUE(compiled->TextureImported[uvTextureIndex]);
+    EXPECT_TRUE(compiled->TextureImportedWriteAllowed[uvTextureIndex]);
+    EXPECT_EQ(compiled->TextureInitialStates[uvTextureIndex], TextureState::ShaderRead);
+    EXPECT_EQ(compiled->TextureFinalStates[uvTextureIndex], TextureState::ShaderRead);
+
+    bool sawColorWriteTransition = false;
+    bool sawShaderReadTransition = false;
+    for (const BarrierPacket& packet : compiled->BarrierPackets)
+    {
+        for (const TextureBarrierPacket& barrier : packet.TextureBarriers)
+        {
+            if (barrier.TextureIndex != uvTextureIndex)
+            {
+                continue;
+            }
+            sawColorWriteTransition = sawColorWriteTransition ||
+                (barrier.Before == TextureBarrierState::ShaderRead &&
+                 barrier.After == TextureBarrierState::ColorAttachmentWrite);
+            sawShaderReadTransition = sawShaderReadTransition ||
+                (barrier.Before == TextureBarrierState::ColorAttachmentWrite &&
+                 barrier.After == TextureBarrierState::ShaderRead);
+        }
+    }
+    EXPECT_TRUE(sawColorWriteTransition);
+    EXPECT_TRUE(sawShaderReadTransition);
+
+    const RenderGraphValidationResult validation = ValidateRecipeCompiledGraph(recipe, *compiled);
+    EXPECT_FALSE(validation.HasErrors());
+}
+
+TEST(FrameRecipeContract, FirstGenerationUvViewTransitionsFromUndefinedToShaderRead)
+{
+    FrameRecipeFeatures features{};
+    features.EnableUvView = true;
+    FrameRecipeImports imports = MakeImports();
+    ASSERT_FALSE(imports.UvViewColorInitialized);
+
+    const FrameRecipeIntrospection recipe = DescribeDefaultFrameRecipe(features);
+    RenderGraph graph;
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        imports,
+        FrameRecipeSizing{.Width = 640u, .Height = 480u});
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    const std::uint32_t uvTextureIndex = TextureIndexByName(*compiled, "UvViewColor");
+    ASSERT_LT(uvTextureIndex, compiled->TextureInitialStates.size());
+    ASSERT_LT(uvTextureIndex, compiled->TextureFinalStates.size());
+    EXPECT_EQ(compiled->TextureInitialStates[uvTextureIndex], TextureState::Undefined);
+    EXPECT_EQ(compiled->TextureFinalStates[uvTextureIndex], TextureState::ShaderRead);
+
+    bool sawInitialWriteTransition = false;
+    bool sawFinalReadTransition = false;
+    for (const BarrierPacket& packet : compiled->BarrierPackets)
+    {
+        for (const TextureBarrierPacket& barrier : packet.TextureBarriers)
+        {
+            if (barrier.TextureIndex != uvTextureIndex)
+            {
+                continue;
+            }
+            sawInitialWriteTransition = sawInitialWriteTransition ||
+                (barrier.Before == TextureBarrierState::Undefined &&
+                 barrier.After == TextureBarrierState::ColorAttachmentWrite);
+            sawFinalReadTransition = sawFinalReadTransition ||
+                (barrier.Before == TextureBarrierState::ColorAttachmentWrite &&
+                 barrier.After == TextureBarrierState::ShaderRead);
+        }
+    }
+    EXPECT_TRUE(sawInitialWriteTransition);
+    EXPECT_TRUE(sawFinalReadTransition);
+
+    const RenderGraphValidationResult validation = ValidateRecipeCompiledGraph(recipe, *compiled);
+    EXPECT_FALSE(validation.HasErrors());
+}
+
+TEST(FrameRecipeContract, UvViewRequiresRetainedTextureImport)
+{
+    FrameRecipeFeatures features{};
+    features.EnableUvView = true;
+    FrameRecipeImports imports = MakeImports();
+    imports.UvViewColor = {};
+
+    RenderGraph graph;
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        imports,
+        FrameRecipeSizing{.Width = 640u, .Height = 480u});
+    EXPECT_FALSE(build.Succeeded);
+    EXPECT_EQ(build.MissingPrerequisiteCount, 1u);
+    EXPECT_NE(build.Diagnostic.find("UvViewColor"), std::string::npos);
 }
 
 TEST(FrameRecipeContract, DefaultRecipePropagatesTypedPassAndResourceIds)
