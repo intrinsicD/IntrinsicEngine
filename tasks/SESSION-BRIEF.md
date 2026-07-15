@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `GRAPHICS-122` — GPU-shaded UV view offscreen render target (optional upgrade) (tasks/active/GRAPHICS-122-uv-view-offscreen-render-target.md)
+- none
 
 ## Theme B — Rendering modernization
 

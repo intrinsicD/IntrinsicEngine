@@ -284,9 +284,9 @@ Implementation baseline: retired
 [`RUNTIME-176`](../../tasks/done/RUNTIME-176-parameterization-runtime-config-integration.md)
 and retired
 [`UI-036`](../../tasks/done/UI-036-sandbox-parameterization-editor-and-uv-split-view.md).
-The optional, now-active
-[`GRAPHICS-122`](../../tasks/active/GRAPHICS-122-uv-view-offscreen-render-target.md)
-owns the GPU-shaded upgrade; the derived-view decision is recorded in
+The optional GPU-shaded upgrade retired at `Operational` under
+[`GRAPHICS-122`](../../tasks/done/GRAPHICS-122-uv-view-offscreen-render-target.md);
+the derived-view decision is recorded in
 [ADR-0025](../adr/0025-parameterization-uv-view-and-split-view.md).
 
 This pack is outside `src/geometry` — it wires the geometry family surface into the engine so the parameterization is choosable and controllable from a config file, an agent/CLI, and the UI as co-equal surfaces, and adds the interactive UV view. It follows the LOP-family (`RUNTIME-175`/`UI-035`) and progressive-Poisson (`RUNTIME-134`) integration precedents.
@@ -316,17 +316,17 @@ Scope:
   inventing per-face heatmaps, charts, or seams. The writeback updates an
   already-bound 3D material that samples UVs, but the panel does not create or
   bind a UV/checker material. Cones remain outside the bounded BFF contract.
-- Optional, now-unblocked GPU-shaded UV target (`GRAPHICS-122`): an offscreen UV
+- Retired optional GPU-shaded UV target (`GRAPHICS-122`): an offscreen UV
   render presented via `ImGui::Image` for texel-density/texture/heatmap shading
-  and dense meshes, with a CPU-layout fallback.
+  and dense meshes, with a CPU-layout fallback; retired at `Operational`.
 
 Rendering-model decision (ADR-0025): the UV layout is a **derived second view of the mesh entity** (shared topology/`StableId`/`v:texcoord`), not a separate ECS entity, matching how Blender/Houdini/Maya/RizomUV present a UV editor as a second view of the same mesh in UV space. A separate UV entity and a true second viewport are considered and deferred/rejected there.
 
 Layer boundary: geometry stays free of renderer/runtime/assets. Retired
 `RUNTIME-176` delivered composition and the Null/default CPU contract; retired
-`UI-036` preserved `app -> runtime` only and delivered the visible
-`Operational` proof. `GRAPHICS-122` keeps the optional UV pass in graphics
-wired by runtime.
+`UI-036` preserved `app -> runtime` only and delivered the visible CPU
+`Operational` proof. Retired `GRAPHICS-122` keeps the optional UV pass in
+graphics wired by runtime.
 
 ## Cross-pack correctness policy
 
@@ -346,7 +346,8 @@ The diagnostics ([`GEOM-018`](../../tasks/archive/GEOM-018-parameterization-dist
 2. [`GEOM-064`](../../tasks/backlog/geometry/GEOM-064-parameterization-optimization-kernels.md) — the shared optimization-kernel seam ARAP and SLIM consume.
 3. The SOTA reference variants on the surface: ARAP (`METHOD-021`, Pack 3), SLIM (`METHOD-022`, Pack 4), SCP (`METHOD-024`, Pack 4b), BFF (`METHOD-023`, Pack 4c) — CPU-reference-first, in each task's `depends_on` order.
 4. The optimized CPU (`METHOD-025`) and GPU (`METHOD-026`) backends for the iterative strategies after reference parity; the linear one-shot strategies (LSCM/SCP/BFF) record no optimized/GPU follow-up in their tasks. `METHOD-026` also wires the runtime GPU job-queue leg, so it is additionally gated on `RUNTIME-176`.
-5. The engine-integration and interactive-UV baseline is retired under Pack 7
-   (`RUNTIME-176` + `UI-036`); optional `GRAPHICS-122` is now unblocked.
+5. The entire engine-integration and interactive-UV Pack 7 is retired,
+   including the baseline (`RUNTIME-176` + `UI-036`) and optional
+   `GRAPHICS-122` GPU-shaded target.
 
 Later packs should not begin until their prerequisites are retired to `tasks/done/` or recorded as explicit out-of-scope assumptions in the candidate task file.

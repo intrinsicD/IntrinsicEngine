@@ -8,6 +8,24 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`GRAPHICS-122`](GRAPHICS-122-uv-view-offscreen-render-target.md) — the
+optional GPU-shaded parameterization UV view retired on 2026-07-15 at
+`Operational`. Commits `c5655359`, `871d09eb`, `86d0d1d4`, and `d0e173dd`
+delivered config/UI/agent parity, face-storage-aligned conformal diagnostics,
+the typed `UvViewPass`/`UvViewColor` recipe declaration, and a concrete
+graphics-owned retained target under the existing `RenderSubsystemRegistry`.
+Runtime reuses selected `GpuWorld` residency, accepts distortion only when the
+exact topology-to-face/position/UV fingerprint still matches, and presents a
+completed bindless target through the existing EditorShell window; CPU/null
+paths retain an explicit `CpuLayout` fallback. The focused ASan/UBSan selection
+passed 77/77 and the full CPU-supported gate passed 3,780/3,780 in 407.98
+seconds. The final-tree `gpu;vulkan` selection passed 2/2 without skips in 9.09
+seconds: direct semantic checker/texel-density/texture/heatmap readback plus the
+real Agent/CLI → `ReferenceTriangle` → EditorShell → ImGui path. Strict
+layering/task/docs/generated-artifact checks and independent final review were
+clean. The upgrade remains a derived view of one mesh entity, not a second ECS
+entity, camera, or general viewport contract.
+
 [`UI-036`](UI-036-sandbox-parameterization-editor-and-uv-split-view.md) — the
 Sandbox parameterization editor and resizable UV split view retired on
 2026-07-15 at `Operational`. Implementation commit `6502de0b` registered the

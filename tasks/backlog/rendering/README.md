@@ -27,15 +27,15 @@ without requiring them to read every file.
 - No open Theme B modernization leaves. The 2026-07-03 review R13 follow-up
   `GRAPHICS-119` retired parallel render-pass command recording via the task
   scheduler on 2026-07-07.
-- [`GRAPHICS-122`](../../active/GRAPHICS-122-uv-view-offscreen-render-target.md) — GPU-shaded
-  UV view offscreen render target. **Theme I** (parameterization family) optional
-  upgrade, not a Theme B modernization leaf: renders the selected mesh's UV-space
-  residency to an offscreen target for `ImGui::Image` in the UV split view
-  delivered by retired `UI-036`, with its CPU `ImDrawList` baseline as the
-  fallback. The `UI-036` dependency is satisfied as of 2026-07-15, so
-  `GRAPHICS-122` is active on `codex/arch-006-completion`; derived-view rationale in
+
+## Retired cross-domain rendering leaves
+
+- [`GRAPHICS-122`](../../done/GRAPHICS-122-uv-view-offscreen-render-target.md) —
+  retired 2026-07-15 at `Operational`; delivered the optional retained
+  GPU-shaded UV target, typed recipe pass, runtime/editor presentation, and
+  honest CPU-layout fallback without a second ECS entity, camera, or viewport.
+  The derived-view rationale remains in
   [ADR-0025](../../../docs/adr/0025-parameterization-uv-view-and-split-view.md).
-  Not required for the parameterization family to be engine-integrated.
 
 ## Legacy Parity Follow-Ups
 

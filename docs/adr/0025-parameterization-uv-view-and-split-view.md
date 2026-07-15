@@ -4,7 +4,7 @@
 - **Date:** 2026-07-13
 - **Owners:** Graphics/Runtime/UI
 - **Related tasks:** GEOM-063 (retired), RUNTIME-176 (retired), UI-036
-  (retired), GRAPHICS-122 (optional GPU upgrade)
+  (retired), GRAPHICS-122 (retired optional GPU upgrade)
 
 ## Context
 
@@ -85,7 +85,8 @@ resizable UV view that is a *different space* (UV) of the same entity.
   pane-local space and draws it with `ImGui::GetWindowDrawList()`. This needs
   **no renderer change and no docking**, and matches the existing menu-first
   floating-window UX.
-- **Optional upgrade — GPU-shaded offscreen UV target (GRAPHICS-122).** For dense
+- **Delivered optional upgrade — GPU-shaded offscreen UV target (retired
+  GRAPHICS-122).** For dense
   meshes and texel-density/texture/heatmap shading,
   `Extrinsic.Graphics.UvView` renders the selected surface's existing resident
   geometry with texcoords as positions into a retained offscreen target, and
@@ -117,7 +118,7 @@ exists.
   first delivery ships with zero renderer/graphics changes and no docking dependency;
   the GPU upgrade is isolated and optional; the design matches every mainstream DCC.
 - Trade-offs / risks: the CPU `ImDrawList` layout emits lines on the CPU (fine for
-  typical meshes; the GRAPHICS-122 GPU path is the answer for very dense meshes); a
+  typical meshes; the GRAPHICS-122 GPU path is intended for very dense meshes); a
   *docked* splitter (versus the manual two-pane splitter) and a *true* second
   viewport remain future opt-ins, not part of this decision.
 - Baseline: GEOM-063 (surface), RUNTIME-176 (facade + config + UV view model),
@@ -159,7 +160,10 @@ exists.
   parameterized a mesh through the registered window, showed the UV layout,
   kept the checker/grid inside the UV pane, and preserved the updated 3D UV
   state.
-- GRAPHICS-122 keeps CPU contracts for request validation, retained-target
-  readiness, resize generation, explicit background/heatmap degradation, and
-  non-operational CPU fallback. Its opt-in `gpu;vulkan` readback smoke is the
-  operational proof for non-empty UV-target output on a Vulkan-capable host.
+- GRAPHICS-122 retired at `Operational` with CPU contracts for request
+  validation, retained-target readiness, resize generation, explicit
+  background/heatmap degradation, and non-operational CPU fallback. Its final
+  `gpu;vulkan` selection passed both the direct semantic readback of asymmetric
+  islands across checker, texel-density, real bindless-texture, and
+  low/mid/high/invalid heatmap probes, and the real Agent/CLI →
+  `ReferenceTriangle` → EditorShell → ImGui runtime path.
