@@ -153,3 +153,18 @@
   tests/integration/runtime/Test.SandboxEditorPresentation.cpp,
   tasks/done/ARCH-006-sandbox-editor-content-out-of-runtime.md]
 - **From staging**: O26
+
+## K14: Unified Disk Parameterization Fails Closed
+- **Constraint**: Unified CPU disk-parameterization dispatch may report
+  `Success` only when topology is connected and manifold with exactly one
+  boundary loop and Euler characteristic one, numeric inputs are finite and
+  valid, and shared diagnostics report usable evaluated faces. Any failed
+  precondition or unusable diagnostic state returns no UV payload.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [src/geometry/Geometry.HalfedgeMesh.Parameterization.cpp,
+  tests/unit/geometry/Test.ParameterizationDispatch.cpp,
+  tests/unit/geometry/Test.HarmonicParameterization.cpp,
+  tasks/done/GEOM-063-unified-cpu-parameterization-strategy-dispatch.md,
+  N211, N212]
+- **From staging**: O28

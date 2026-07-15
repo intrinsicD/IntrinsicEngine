@@ -65,3 +65,17 @@
   tasks/done/ARCH-006-sandbox-editor-content-out-of-runtime.md,
   tests/integration/runtime/Test.SandboxEditorPresentation.cpp]
 - **From staging**: O25
+
+## A08: Close False-Open Foundations Before New Backlog Code
+- **Decision**: Backlog selection first retires already-implemented false-open
+  foundations with current verification, then promotes the smallest
+  right-sized foundation that opens the intended downstream chain. In this
+  geometry loop, GEOM-019 and GEOM-014 closed before GEOM-063 unified the
+  implemented CPU parameterizers.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N209, N210, N212,
+  tasks/done/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md,
+  tasks/done/GEOM-014-feature-aware-quadric-error-simplification.md,
+  tasks/done/GEOM-063-unified-cpu-parameterization-strategy-dispatch.md]
+- **From staging**: O27

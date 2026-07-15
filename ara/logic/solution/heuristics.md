@@ -26,3 +26,19 @@
   docs/benchmarking/ci-policy.md,
   benchmarks/baselines/ci_gate_latency_github_ubuntu_24_04_v1.json]
 - **From staging**: O12
+
+## H03: Aggregate Every Measured Comparative-Smoke Iteration
+- **Rationale**: A repeated comparative correctness smoke should AND status
+  across every measured iteration, report failed-iteration count and worst
+  quality/error, enforce its declared runtime budget, and name diagnostics by
+  the invariant actually counted. A final successful sample must not conceal
+  an earlier failure or an exceeded smoke budget.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Sensitivity**: medium
+- **Code ref**: [benchmarks/geometry/Bench.SimplificationQualitySmoke.hpp,
+  benchmarks/geometry/Bench_SimplificationQualitySmoke.cpp,
+  benchmarks/geometry/manifests/geometry_simplification_fa_qem_quality_smoke.yaml,
+  tasks/done/GEOM-014-feature-aware-quadric-error-simplification.md,
+  N211, N212]
+- **From staging**: O29

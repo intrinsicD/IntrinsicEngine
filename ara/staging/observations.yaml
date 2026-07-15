@@ -287,12 +287,34 @@ observations:
     stale: false
   - id: O27
     timestamp: "2026-07-14T23:09"
-    provenance: ai-suggested
+    provenance: user-revised
     content: "Recommended work order: retire the already-implemented false-open GEOM-019 before starting new code, then promote GEOM-063 as the next substantive slice because it consolidates the existing Tutte/Harmonic/LSCM solvers and opens the parameterization family integration chain."
-    context: "Portfolio audit requested after ARCH-006 retirement; the current host supplied the verification that GEOM-019 previously lacked, while the open sanitizer bugs did not reproduce locally."
+    context: "Portfolio audit requested after ARCH-006 retirement; the user then adopted the proposed agentic work order and the loop retired GEOM-019, GEOM-014, and GEOM-063."
     potential_type: architecture
-    bound_to: [N209]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    bound_to: [N209, N210, N212]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A08"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O28
+    timestamp: "2026-07-15T02:18"
+    provenance: ai-executed
+    content: "Unified CPU disk-parameterization dispatch may report Success only when topology is connected-manifold with exactly one boundary loop and Euler characteristic one, numeric inputs are finite and valid, and shared diagnostics report usable evaluated faces; every failed precondition returns no UV payload."
+    context: "GEOM-063 independent review, fail-closed corrections, regression tests, retirement, and aggregate verification."
+    potential_type: constraint
+    bound_to: [N211, N212]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K14"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O29
+    timestamp: "2026-07-15T02:18"
+    provenance: ai-executed
+    content: "A repeated comparative correctness smoke must aggregate status across every measured iteration, report failed-iteration count and worst quality/error, enforce its runtime budget, and name diagnostics by the invariant actually counted."
+    context: "GEOM-014 independent benchmark review, aggregate-status and diagnostic corrections, manifest-backed rerun, and retirement verification."
+    potential_type: heuristic
+    bound_to: [N211, N212]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H03"
+    crystallized_via: artifact-commitment
     stale: false

@@ -4918,3 +4918,79 @@ tree:
       BUG-081 remains hosted-population constrained. Strict task-policy and
       task-schema validation passed, and no production files changed.
     status: resolved
+  - id: N210
+    type: decision
+    title: "Execute the proposed three-task geometry closure loop"
+    provenance: user
+    timestamp: "2026-07-15T02:18"
+    also_depends_on: [N209]
+    choice: >
+      Adopt the audited work order through the agentic workflow: retire the
+      already-implemented GEOM-019 foundation, close and retire the false-open
+      GEOM-014 feature-aware simplification task, then right-size, promote,
+      implement, review, and retire GEOM-063 as the unified CPU
+      parameterization dispatch foundation.
+    alternatives:
+      - "Stop after the backlog recommendation without changing task state."
+      - "Retire only the false-open tasks and leave GEOM-063 unstarted."
+      - "Choose a different unblocked backlog task before opening the parameterization chain."
+    evidence:
+      - "User instruction on 2026-07-15: use the agentic workflow to do all of this"
+      - "commit 9adcb7e6"
+      - "commit 0f6da84f"
+      - "commit 667364f4"
+      - "commit 7ebd681f"
+      - "commit 922ce877"
+    status: resolved
+  - id: N211
+    type: dead_end
+    title: "Reject shallow retirement evidence for geometry contracts"
+    provenance: ai-executed
+    timestamp: "2026-07-15T02:18"
+    also_depends_on: [N209, N210]
+    hypothesis: >
+      Existing solver status, a one-boundary-loop check, broad sharp-feature
+      counts, and a final benchmark iteration are sufficient evidence for
+      GEOM-014 and GEOM-063 retirement.
+    failure_mode: >
+      Independent review found that LSCM admitted a punctured genus-one mesh
+      and non-finite pin input, unified dispatch could report success when
+      diagnostics had no evaluated faces, simplification diagnostics counted
+      crease-line vertices as pinned corners, and the comparative smoke ignored
+      earlier measured failures and did not enforce its declared runtime cap.
+    lesson: >
+      Retirement evidence must gate the actual topology, numeric, and shared
+      diagnostic contracts; comparative smokes must aggregate every measured
+      iteration and name diagnostics by the invariant actually counted.
+    status: resolved
+  - id: N212
+    type: experiment
+    title: "Three-task geometry closure and aggregate verification"
+    provenance: ai-executed
+    timestamp: "2026-07-15T02:18"
+    also_depends_on: [N209, N210, N211]
+    evidence:
+      - "tasks/done/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md"
+      - "tasks/done/GEOM-014-feature-aware-quadric-error-simplification.md"
+      - "tasks/done/GEOM-063-unified-cpu-parameterization-strategy-dispatch.md"
+      - "build/ci/bin/IntrinsicGeometryTests --gtest_filter='ParameterizationDispatch.*'"
+      - "build/ci/bin/IntrinsicGeometryTests --gtest_filter='*Parameterization*:*Harmonic*:*Lscm*'"
+      - "build/ci/bin/IntrinsicGeometryTests --gtest_filter='Simplification*'"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -R '^IntrinsicBenchmarkSmoke\\.(Run|Validate)$' --timeout 60"
+      - "python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict"
+      - "python3 tools/benchmark/validate_benchmark_results.py --root build/ci/benchmark-ctest/IntrinsicBenchmarkSmokeTest --strict"
+      - "commit 922ce877"
+    result: >
+      GEOM-019, GEOM-014, and GEOM-063 retired at CPUContracted after three
+      independent review passes and their follow-up corrections. Dispatch
+      passed 6/6 tests, the full parameterization family passed 31/31,
+      simplification passed 29/29 directly and all 93 registered matches in
+      the aggregate gate, and the Clang-23 ASan/UBSan CPU-supported gate passed
+      9250/9250 in 977.67 seconds. The manifest-backed simplification smoke
+      passed both CTest stages with zero failed measured iterations, eight
+      immutable corners, a 24-face target, and a 1255.539 ms mean below its
+      5000 ms budget. Strict task, docs, layering, test-layout, method,
+      benchmark, skill-mirror, PR-contract, and generated-inventory checks
+      passed; METHOD-023 and RUNTIME-176 became unblocked.
+    status: resolved
