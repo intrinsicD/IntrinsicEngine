@@ -5,6 +5,11 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-086` — ImGui adapter omits the vertex-offset renderer capability](../../active/BUG-086-imgui-adapter-omits-vtx-offset-capability.md):
+  the overlay dataflow already preserves `ImDrawCmd::VtxOffset`, but the
+  runtime adapter does not advertise `RendererHasVtxOffset`; a dense selected
+  UV mesh therefore aborts at ImGui's 65,535-vertex draw-list limit instead of
+  splitting into offset commands.
 - [`BUG-085` — ImGui overlay drops draw-command clip rectangles](../../active/BUG-085-imgui-overlay-drops-command-clip-rectangles.md):
   the runtime adapter omits `ImDrawCmd::ClipRect` from pointer-free overlay
   commands and `Pass.ImGui` records no per-command scissor, so custom content

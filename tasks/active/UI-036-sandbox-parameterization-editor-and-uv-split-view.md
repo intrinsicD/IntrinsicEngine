@@ -1,13 +1,14 @@
 ---
 id: UI-036
 theme: I
-depends_on: [RUNTIME-176, BUG-085]
+depends_on: [RUNTIME-176, BUG-085, BUG-086]
 maturity_target: Operational
 ---
 # UI-036 — Sandbox parameterization editor panel and resizable UV split view
 
 ## Status
-- Blocked on branch `codex/arch-006-completion`; owner: Codex.
+- Blocked on `BUG-085` and `BUG-086` on branch
+  `codex/arch-006-completion`; owner: Codex.
 - `RUNTIME-176` is retired at `CPUContracted`; its config, command, history,
   result, and pointer-free UV view-model seams are the only engine surfaces
   consumed here.
@@ -19,6 +20,10 @@ maturity_target: Operational
   ImGui overlay drops draw-command clip rectangles, allowing the UV checker to
   escape its child pane. Resume retirement after that blocking seam is fixed
   and the live interaction is replayed.
+- The same replay selected a large dropped mesh and exposed `BUG-086`: the
+  adapter preserves command vertex offsets but does not advertise the ImGui
+  renderer capability, so a draw list above 65,535 vertices asserts instead
+  of splitting safely.
 
 ## Goal
 - Add the Sandbox editor window that lists only parameterization strategies
