@@ -1,7 +1,7 @@
 module;
 
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -24,6 +24,19 @@ export namespace Extrinsic::Graphics
         std::uint32_t Color{0xffffffffu};
     };
 
+    struct ImGuiOverlayScissor
+    {
+        std::int32_t X{0};
+        std::int32_t Y{0};
+        std::uint32_t Width{0u};
+        std::uint32_t Height{0u};
+
+        [[nodiscard]] bool IsEmpty() const noexcept
+        {
+            return Width == 0u || Height == 0u;
+        }
+    };
+
     struct ImGuiOverlayDrawCommand
     {
         std::uint32_t IndexOffset{0u};
@@ -31,6 +44,7 @@ export namespace Extrinsic::Graphics
         std::uint32_t IndexCount{0u};
         RHI::BindlessIndex TextureBindlessIndex{RHI::kInvalidBindlessIndex};
         bool UsesUserTexture{false};
+        ImGuiOverlayScissor Scissor{};
     };
 
     struct ImGuiOverlayFontAtlas

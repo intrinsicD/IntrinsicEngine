@@ -110,7 +110,10 @@ namespace Extrinsic::Graphics
                    lhs.SampleCount == rhs.SampleCount;
         }
 
-        [[nodiscard]] bool DrawCommandsValid(const ImGuiOverlayDrawList& drawList) noexcept
+        [[nodiscard]] bool DrawCommandsValid(
+            const ImGuiOverlayDrawList& drawList,
+            const std::uint32_t displayWidth,
+            const std::uint32_t displayHeight) noexcept
         {
             if (drawList.Commands.empty())
             {
@@ -122,7 +125,15 @@ namespace Extrinsic::Graphics
                 if (command.IndexCount == 0u ||
                     command.IndexOffset > drawList.IndexCount ||
                     command.IndexCount > drawList.IndexCount - command.IndexOffset ||
-                    command.VertexOffset >= drawList.VertexCount)
+                    command.VertexOffset >= drawList.VertexCount ||
+                    command.Scissor.IsEmpty() ||
+                    command.Scissor.X < 0 || command.Scissor.Y < 0 ||
+                    static_cast<std::uint64_t>(command.Scissor.X) +
+                            command.Scissor.Width >
+                        displayWidth ||
+                    static_cast<std::uint64_t>(command.Scissor.Y) +
+                            command.Scissor.Height >
+                        displayHeight)
                 {
                     return false;
                 }
@@ -353,7 +364,10 @@ namespace Extrinsic::Graphics
         for (ImGuiOverlayDrawList& drawList : frame.DrawLists)
         {
             if (drawList.VertexCount == 0u || drawList.IndexCount == 0u ||
-                !DrawCommandsValid(drawList))
+                !DrawCommandsValid(
+                    drawList,
+                    frame.DisplayWidth,
+                    frame.DisplayHeight))
             {
                 ++m_Impl->Diagnostics.RejectedDrawListCount;
                 continue;

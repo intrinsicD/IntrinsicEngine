@@ -1400,17 +1400,22 @@ Concretely:
   submitted POD vertices/indices into renderer-owned host-visible vertex/index
   upload storage partitioned by the current frame-in-flight slot;
   `ImGuiPass::Execute(...)` records deterministic
-  `BindIndexBuffer + PushConstants + DrawIndexed` blocks and increments
+  `BindIndexBuffer + SetScissor + PushConstants + DrawIndexed` blocks and increments
   `ImGuiOverlayDiagnostics::DrawCalls`. Slice D.1 promotes the frame recipe's
   `"ImGuiPass"` node from side-effect-only to a load/store render-pass-scope
   pass that reads and writes the current `FrameRecipe.PresentSource` color
   attachment, so an operational device with an attached uploadable overlay
   frame records under the CPU/null gate. Slice D.2 adds
   `ImGuiOverlayDrawCommand` command metadata, carries direct `ImTextureID`
-  values as `RHI::BindlessIndex` slots, pushes the selected texture index per
-  command, and samples the retained font atlas or user texture in
+  values as `RHI::BindlessIndex` slots, preserves per-command vertex offsets
+  and framebuffer scissors, pushes the selected texture index per command, and
+  samples the retained font atlas or user texture in
   `assets/shaders/imgui.frag` without adding a graphics-visible descriptor
-  surface. `RecordImGuiPass()` flushes queued bindless descriptor updates after
+  surface. The upload helper fails closed on empty or out-of-frame scissors,
+  and the pass mirrors the top-left ImGui Y extent into the renderer's
+  negative-height viewport convention before applying the validated scissor
+  immediately before its indexed draw. `RecordImGuiPass()` flushes queued
+  bindless descriptor updates after
   `UploadPendingFontAtlas()` and before `ImGuiPass::Execute(...)`, so a
   freshly allocated atlas slot is visible to the shader in the same frame. The
   promoted Vulkan backend reserves framegraph sampled-texture descriptor slots

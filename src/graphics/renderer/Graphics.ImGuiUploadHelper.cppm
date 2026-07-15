@@ -20,7 +20,7 @@ import Extrinsic.RHI.Handles;
 // upload storage per frame-in-flight slot, copies submitted
 // `ImGuiOverlayFrame` payloads through `IDevice::WriteBuffer(...)`, and
 // returns per-draw-list offsets so `Pass.ImGui` can record deterministic
-// `BindIndexBuffer + PushConstants + DrawIndexed` blocks.
+// `BindIndexBuffer + SetScissor + PushConstants + DrawIndexed` blocks.
 
 export namespace Extrinsic::Graphics
 {
@@ -31,6 +31,7 @@ export namespace Extrinsic::Graphics
         std::uint32_t IndexCount{0u};
         RHI::BindlessIndex TextureBindlessIndex{RHI::kInvalidBindlessIndex};
         bool UsesUserTexture{false};
+        ImGuiOverlayScissor Scissor{};
     };
 
     struct ImGuiDrawListUploadResult
@@ -50,6 +51,8 @@ export namespace Extrinsic::Graphics
     struct ImGuiUploadResult
     {
         std::vector<ImGuiDrawListUploadResult> DrawLists{};
+        std::uint32_t DisplayWidth{0u};
+        std::uint32_t DisplayHeight{0u};
         std::uint32_t DrawListCount{0u};
         std::uint32_t DrawCommandCount{0u};
         std::uint32_t CommandUploadListBuilds{0u};

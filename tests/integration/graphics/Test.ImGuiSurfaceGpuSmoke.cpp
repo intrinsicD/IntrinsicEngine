@@ -39,6 +39,7 @@ inline constexpr std::uint32_t kReadbackWidth = 256u;
 inline constexpr std::uint32_t kReadbackHeight = 256u;
 inline constexpr std::uint32_t kImGuiProbeX = 64u;
 inline constexpr std::uint32_t kImGuiProbeY = 40u;
+inline constexpr std::uint32_t kImGuiClippedProbeY = 80u;
 
 struct CpuFontAtlasProbe
 {
@@ -428,10 +429,15 @@ TEST(ImGuiSurfaceGpuSmoke, DrawListPixelsReachBackbufferOnOperationalVulkan)
 
             ImDrawList* foreground = ImGui::GetForegroundDrawList();
             const int firstNewVertex = foreground->VtxBuffer.Size;
+            foreground->PushClipRect(
+                ImVec2(32.0f, 32.0f),
+                ImVec2(96.0f, 64.0f),
+                true);
             foreground->AddRectFilled(
                 ImVec2(32.0f, 32.0f),
                 ImVec2(96.0f, 96.0f),
                 IM_COL32(255, 0, 0, 255));
+            foreground->PopClipRect();
             if (firstNewVertex >= 0 && firstNewVertex < foreground->VtxBuffer.Size)
             {
                 const ImDrawVert& vertex = foreground->VtxBuffer[firstNewVertex];
@@ -551,6 +557,25 @@ TEST(ImGuiSurfaceGpuSmoke, DrawListPixelsReachBackbufferOnOperationalVulkan)
         << std::hex << g_LastCpuFontAtlasProbe.DrawVertexColor << std::dec;
     EXPECT_LT(actual.G, 96u);
     EXPECT_LT(actual.B, 96u);
+
+    const std::uint64_t clippedPixelOffset =
+        static_cast<std::uint64_t>(kImGuiClippedProbeY) * rowStride +
+        static_cast<std::uint64_t>(kImGuiProbeX) *
+            static_cast<std::uint64_t>(bytesPerPixel);
+    ASSERT_LE(clippedPixelOffset + 4u, readbackSize);
+    const Rgba8Pixel clipped = ReorderToRgba(
+        backbufferFormat,
+        readbackBytes[static_cast<std::size_t>(clippedPixelOffset + 0u)],
+        readbackBytes[static_cast<std::size_t>(clippedPixelOffset + 1u)],
+        readbackBytes[static_cast<std::size_t>(clippedPixelOffset + 2u)],
+        readbackBytes[static_cast<std::size_t>(clippedPixelOffset + 3u)]);
+    EXPECT_FALSE(clipped.R > 200u && clipped.G < 96u && clipped.B < 96u)
+        << "Expected the ImGui command scissor to reject the red rectangle at "
+        << kImGuiProbeX << "," << kImGuiClippedProbeY << "; actual RGBA=("
+        << static_cast<int>(clipped.R) << ","
+        << static_cast<int>(clipped.G) << ","
+        << static_cast<int>(clipped.B) << ","
+        << static_cast<int>(clipped.A) << ")";
 
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
     device.DestroyBuffer(readbackBuffer);

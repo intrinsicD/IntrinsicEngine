@@ -174,6 +174,7 @@ namespace Extrinsic::Tests
             End,
             FillBuffer,
             BindPipeline,
+            SetScissor,
             PushConstants,
             Dispatch,
             DispatchIndirect,
@@ -202,6 +203,14 @@ namespace Extrinsic::Tests
             std::uint32_t FirstIndex = 0;
             std::int32_t VertexOffset = 0;
             std::uint32_t FirstInstance = 0;
+        };
+
+        struct ScissorRecord
+        {
+            std::int32_t X = 0;
+            std::int32_t Y = 0;
+            std::uint32_t Width = 0u;
+            std::uint32_t Height = 0u;
         };
 
         struct TextureBarrierRecord
@@ -259,7 +268,21 @@ namespace Extrinsic::Tests
         void BeginRenderPass(const RHI::RenderPassDesc&) override {}
         void EndRenderPass() override {}
         void SetViewport(float, float, float, float, float, float) override {}
-        void SetScissor(std::int32_t, std::int32_t, std::uint32_t, std::uint32_t) override {}
+        void SetScissor(const std::int32_t x,
+                        const std::int32_t y,
+                        const std::uint32_t width,
+                        const std::uint32_t height) override
+        {
+            ++SetScissorCalls;
+            LastScissor = ScissorRecord{
+                .X = x,
+                .Y = y,
+                .Width = width,
+                .Height = height,
+            };
+            ScissorRecords.push_back(LastScissor);
+            Events.push_back(EventKind::SetScissor);
+        }
         void BindPipeline(RHI::PipelineHandle handle) override
         {
             ++BindPipelineCalls;
@@ -432,6 +455,7 @@ namespace Extrinsic::Tests
         std::vector<MemoryBarrierRecord>  MemoryBarrierCalls{};
         std::vector<DispatchRecord> DispatchRecords{};
         std::vector<DispatchIndirectRecord> DispatchIndirectRecords{};
+        std::vector<ScissorRecord> ScissorRecords{};
         std::vector<CopyBufferRecord> CopyBufferRecords{};
         std::vector<EventKind> Events{};
         std::vector<std::uint32_t> PushConstantSizes{};
@@ -445,6 +469,7 @@ namespace Extrinsic::Tests
         int FillBufferCalls = 0;
         int BindPipelineCalls = 0;
         int BindIndexBufferCalls = 0;
+        int SetScissorCalls = 0;
         int PushConstantsCalls = 0;
         int DispatchCalls = 0;
         int DispatchIndirectCalls = 0;
@@ -455,6 +480,7 @@ namespace Extrinsic::Tests
         int DrawIndirectCountCalls = 0;
         DrawRecord LastDraw{};
         DrawIndexedRecord LastDrawIndexed{};
+        ScissorRecord LastScissor{};
         std::uint32_t LastPushConstantSize = 0;
         std::uint32_t LastPushConstantOffset = 0;
         DispatchRecord LastDispatch{};

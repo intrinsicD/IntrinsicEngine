@@ -6,8 +6,11 @@
 // Vulkan dependency. `imgui.h` is included directly only to synthesize a real
 // panel draw in the draw-list test.
 
+#include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -140,6 +143,7 @@ TEST(ImGuiAdapter, InitializeLoadsBundledRobotoAndBuildsLegacyFontAtlas)
 
     ImGuiIO& io = ImGui::GetIO();
     EXPECT_EQ(io.BackendFlags & ImGuiBackendFlags_RendererHasTextures, 0);
+    EXPECT_NE(io.BackendFlags & ImGuiBackendFlags_RendererHasVtxOffset, 0);
     ASSERT_GT(io.Fonts->Fonts.Size, 0);
     const ImFont* font = io.Fonts->Fonts[0];
     ASSERT_NE(font, nullptr);
@@ -170,6 +174,24 @@ TEST(ImGuiAdapter, InitializeLoadsBundledRobotoAndBuildsLegacyFontAtlas)
     EXPECT_EQ(frame->FontAtlas.Height, static_cast<std::uint32_t>(fontHeight));
     EXPECT_EQ(frame->FontAtlas.BytesPerPixel, 1u);
     EXPECT_FALSE(frame->FontAtlas.Pixels.empty());
+}
+
+TEST(ImGuiAdapter, HiDpiFontKeepsLogicalMetricsAndUsesRasterizerDensity)
+{
+    FakeWindow window(640, 480);
+    window.SetExtents(
+        Plat::Extent2D{640, 480},
+        Plat::Extent2D{1280, 960});
+    ImGuiOverlaySystem overlay;
+    ImGuiAdapter       adapter(window, overlay);
+
+    ASSERT_TRUE(adapter.Initialize());
+    const ImGuiIO& io = ImGui::GetIO();
+    ASSERT_GT(io.Fonts->Fonts.Size, 0);
+    const ImFont* font = io.Fonts->Fonts[0];
+    ASSERT_NE(font, nullptr);
+    EXPECT_FLOAT_EQ(font->LegacySize, 16.0f);
+    EXPECT_FLOAT_EQ(font->CurrentRasterizerDensity, 2.0f);
 }
 
 TEST(ImGuiAdapter, FontAtlasPayloadIsCopiedOnlyWhenDirty)
@@ -309,6 +331,337 @@ TEST(ImGuiAdapter, ImageDrawPreservesUserTextureBindlessCommand)
         }
     }
     EXPECT_TRUE(foundUserTextureCommand);
+}
+
+TEST(ImGuiAdapter, LargeDrawListPreservesNonZeroVertexOffset)
+{
+    FakeWindow         window(320, 240);
+    ImGuiOverlaySystem overlay;
+    ImGuiAdapter       adapter(window, overlay);
+
+    ASSERT_TRUE(adapter.Initialize());
+    ASSERT_NE(
+        ImGui::GetIO().BackendFlags &
+            ImGuiBackendFlags_RendererHasVtxOffset,
+        0);
+    adapter.SetEditorCallback(
+        []
+        {
+            ImDrawList* drawList = ImGui::GetForegroundDrawList();
+            constexpr std::size_t kRectangleCount = 17'000u;
+            for (std::size_t i = 0u; i < kRectangleCount; ++i)
+            {
+                const float x = static_cast<float>(i % 200u);
+                const float y = static_cast<float>((i / 200u) % 150u);
+                drawList->AddRectFilled(
+                    ImVec2(x, y),
+                    ImVec2(x + 1.0f, y + 1.0f),
+                    IM_COL32_WHITE);
+            }
+        });
+
+    adapter.BeginFrame(kFrameDelta);
+    adapter.EndFrame();
+
+    const ImDrawData* drawData = ImGui::GetDrawData();
+    ASSERT_NE(drawData, nullptr);
+    bool rawNonZeroVertexOffset = false;
+    std::uint32_t expectedVertexOffset = 0u;
+    for (int listIndex = 0; listIndex < drawData->CmdListsCount; ++listIndex)
+    {
+        const ImDrawList* drawList = drawData->CmdLists[listIndex];
+        ASSERT_NE(drawList, nullptr);
+        for (const ImDrawCmd& command : drawList->CmdBuffer)
+        {
+            if (command.UserCallback == nullptr && command.ElemCount > 0u &&
+                command.VtxOffset > 0u)
+            {
+                rawNonZeroVertexOffset = true;
+                expectedVertexOffset = command.VtxOffset;
+                break;
+            }
+        }
+    }
+    ASSERT_TRUE(rawNonZeroVertexOffset);
+
+    const auto* frame = overlay.GetCurrentFrame();
+    ASSERT_NE(frame, nullptr);
+    EXPECT_GT(adapter.GetDiagnostics().LastVertexCount, 65'535u);
+    bool overlayPreservedVertexOffset = false;
+    for (const Extrinsic::Graphics::ImGuiOverlayDrawList& drawList :
+         frame->DrawLists)
+    {
+        for (const Extrinsic::Graphics::ImGuiOverlayDrawCommand& command :
+             drawList.Commands)
+        {
+            if (command.VertexOffset == expectedVertexOffset)
+            {
+                overlayPreservedVertexOffset = true;
+                break;
+            }
+        }
+    }
+    EXPECT_TRUE(overlayPreservedVertexOffset);
+}
+
+TEST(ImGuiAdapter, NestedChildDrawPreservesFramebufferScissor)
+{
+    FakeWindow         window(320, 240);
+    ImGuiOverlaySystem overlay;
+    ImGuiAdapter       adapter(window, overlay);
+    ImVec4             childClip{};
+    bool               capturedChildClip = false;
+
+    ASSERT_TRUE(adapter.Initialize());
+    adapter.SetEditorCallback(
+        [&childClip, &capturedChildClip]
+        {
+            ImGui::SetNextWindowPos(ImVec2(20.0f, 15.0f), ImGuiCond_Always);
+            ImGui::SetNextWindowSize(ImVec2(220.0f, 180.0f), ImGuiCond_Always);
+            ImGui::Begin(
+                "BUG-085 Nested Clip Panel",
+                nullptr,
+                ImGuiWindowFlags_NoSavedSettings);
+            ImGui::TextUnformatted("outer content");
+            const bool childVisible = ImGui::BeginChild(
+                "Nested Clip Child",
+                ImVec2(130.0f, 90.0f),
+                ImGuiChildFlags_Borders);
+            if (childVisible)
+            {
+                ImDrawList* drawList = ImGui::GetWindowDrawList();
+                const ImVec2 clipMin = drawList->GetClipRectMin();
+                const ImVec2 clipMax = drawList->GetClipRectMax();
+                childClip =
+                    ImVec4(clipMin.x, clipMin.y, clipMax.x, clipMax.y);
+                capturedChildClip = true;
+
+                const ImVec2 origin = ImGui::GetCursorScreenPos();
+                drawList->AddRectFilled(
+                    origin,
+                    ImVec2(origin.x + 60.0f, origin.y + 40.0f),
+                    IM_COL32(80, 160, 240, 255));
+            }
+            ImGui::EndChild();
+            ImGui::End();
+        });
+
+    adapter.BeginFrame(kFrameDelta);
+    adapter.EndFrame();
+    adapter.BeginFrame(kFrameDelta);
+    adapter.EndFrame();
+
+    ASSERT_TRUE(capturedChildClip);
+    const auto* frame = overlay.GetCurrentFrame();
+    ASSERT_NE(frame, nullptr);
+    const ImDrawData* drawData = ImGui::GetDrawData();
+    ASSERT_NE(drawData, nullptr);
+
+    const double minX = std::clamp(
+        static_cast<double>(
+            (childClip.x - drawData->DisplayPos.x) *
+            drawData->FramebufferScale.x),
+        0.0,
+        static_cast<double>(frame->DisplayWidth));
+    const double minY = std::clamp(
+        static_cast<double>(
+            (childClip.y - drawData->DisplayPos.y) *
+            drawData->FramebufferScale.y),
+        0.0,
+        static_cast<double>(frame->DisplayHeight));
+    const double maxX = std::clamp(
+        static_cast<double>(
+            (childClip.z - drawData->DisplayPos.x) *
+            drawData->FramebufferScale.x),
+        0.0,
+        static_cast<double>(frame->DisplayWidth));
+    const double maxY = std::clamp(
+        static_cast<double>(
+            (childClip.w - drawData->DisplayPos.y) *
+            drawData->FramebufferScale.y),
+        0.0,
+        static_cast<double>(frame->DisplayHeight));
+    const std::int32_t expectedX = static_cast<std::int32_t>(minX);
+    const std::int32_t expectedY = static_cast<std::int32_t>(minY);
+    const std::uint32_t expectedWidth =
+        static_cast<std::uint32_t>(maxX - minX);
+    const std::uint32_t expectedHeight =
+        static_cast<std::uint32_t>(maxY - minY);
+    ASSERT_GT(expectedWidth, 0u);
+    ASSERT_GT(expectedHeight, 0u);
+
+    bool foundChildScissor = false;
+    for (const Extrinsic::Graphics::ImGuiOverlayDrawList& drawList :
+         frame->DrawLists)
+    {
+        for (const Extrinsic::Graphics::ImGuiOverlayDrawCommand& command :
+             drawList.Commands)
+        {
+            if (command.Scissor.X == expectedX &&
+                command.Scissor.Y == expectedY &&
+                command.Scissor.Width == expectedWidth &&
+                command.Scissor.Height == expectedHeight)
+            {
+                foundChildScissor = true;
+            }
+        }
+    }
+    EXPECT_TRUE(foundChildScissor);
+}
+
+TEST(ImGuiAdapter, ScalesClampsAndRejectsInvalidFramebufferClipRects)
+{
+    FakeWindow window(100, 80);
+    window.SetExtents(
+        Plat::Extent2D{100, 80}, Plat::Extent2D{200, 240});
+    ImGuiOverlaySystem overlay;
+    ImGuiAdapter       adapter(window, overlay);
+
+    ASSERT_TRUE(adapter.Initialize());
+    adapter.SetEditorCallback(
+        []
+        {
+            ImGuiViewport* viewport = ImGui::GetMainViewport();
+            viewport->Pos = ImVec2(10.0f, 20.0f);
+            viewport->WorkPos = viewport->Pos;
+            ImDrawList* drawList = ImGui::GetForegroundDrawList();
+
+            drawList->PushClipRect(
+                ImVec2(std::numeric_limits<float>::quiet_NaN(), 10.0f),
+                ImVec2(20.0f, 30.0f),
+                false);
+            drawList->AddRectFilled(
+                ImVec2(2.0f, 2.0f),
+                ImVec2(8.0f, 8.0f),
+                IM_COL32_WHITE);
+            drawList->PopClipRect();
+
+            drawList->PushClipRect(
+                ImVec2(60.0f, 40.0f), ImVec2(60.0f, 50.0f), false);
+            drawList->AddRectFilled(
+                ImVec2(10.0f, 10.0f),
+                ImVec2(16.0f, 16.0f),
+                IM_COL32_WHITE);
+            drawList->PopClipRect();
+
+            drawList->PushClipRect(
+                ImVec2(-25.0f, -15.0f), ImVec2(150.0f, 100.0f), false);
+            drawList->AddRectFilled(
+                ImVec2(30.0f, 40.0f),
+                ImVec2(38.0f, 48.0f),
+                IM_COL32_WHITE);
+            drawList->PopClipRect();
+        });
+
+    adapter.BeginFrame(kFrameDelta);
+    adapter.EndFrame();
+
+    const auto* frame = overlay.GetCurrentFrame();
+    ASSERT_NE(frame, nullptr);
+    EXPECT_EQ(frame->DisplayWidth, 200u);
+    EXPECT_EQ(frame->DisplayHeight, 240u);
+
+    const ImDrawData* drawData = ImGui::GetDrawData();
+    ASSERT_NE(drawData, nullptr);
+    EXPECT_FLOAT_EQ(drawData->DisplayPos.x, 10.0f);
+    EXPECT_FLOAT_EQ(drawData->DisplayPos.y, 20.0f);
+    ASSERT_FLOAT_EQ(drawData->FramebufferScale.x, 2.0f);
+    ASSERT_FLOAT_EQ(drawData->FramebufferScale.y, 3.0f);
+
+    std::size_t rawDrawableCount = 0u;
+    std::size_t rawRejectedCount = 0u;
+    std::size_t rawNonFiniteCount = 0u;
+    std::size_t rawEmptyCount = 0u;
+    for (int listIndex = 0; listIndex < drawData->CmdListsCount; ++listIndex)
+    {
+        const ImDrawList* drawList = drawData->CmdLists[listIndex];
+        ASSERT_NE(drawList, nullptr);
+        for (const ImDrawCmd& command : drawList->CmdBuffer)
+        {
+            if (command.UserCallback != nullptr || command.ElemCount == 0u)
+                continue;
+            ++rawDrawableCount;
+
+            const bool finite =
+                std::isfinite(command.ClipRect.x) &&
+                std::isfinite(command.ClipRect.y) &&
+                std::isfinite(command.ClipRect.z) &&
+                std::isfinite(command.ClipRect.w);
+            if (!finite)
+            {
+                ++rawNonFiniteCount;
+                ++rawRejectedCount;
+                continue;
+            }
+
+            const double minX = std::clamp(
+                static_cast<double>(
+                    (command.ClipRect.x - drawData->DisplayPos.x) *
+                    drawData->FramebufferScale.x),
+                0.0,
+                static_cast<double>(frame->DisplayWidth));
+            const double minY = std::clamp(
+                static_cast<double>(
+                    (command.ClipRect.y - drawData->DisplayPos.y) *
+                    drawData->FramebufferScale.y),
+                0.0,
+                static_cast<double>(frame->DisplayHeight));
+            const double maxX = std::clamp(
+                static_cast<double>(
+                    (command.ClipRect.z - drawData->DisplayPos.x) *
+                    drawData->FramebufferScale.x),
+                0.0,
+                static_cast<double>(frame->DisplayWidth));
+            const double maxY = std::clamp(
+                static_cast<double>(
+                    (command.ClipRect.w - drawData->DisplayPos.y) *
+                    drawData->FramebufferScale.y),
+                0.0,
+                static_cast<double>(frame->DisplayHeight));
+            if (maxX <= minX || maxY <= minY ||
+                static_cast<std::uint32_t>(maxX - minX) == 0u ||
+                static_cast<std::uint32_t>(maxY - minY) == 0u)
+            {
+                ++rawEmptyCount;
+                ++rawRejectedCount;
+            }
+        }
+    }
+    EXPECT_GE(rawNonFiniteCount, 1u);
+    EXPECT_GE(rawEmptyCount, 1u);
+
+    std::size_t overlayCommandCount = 0u;
+    bool foundClampedFullFramebufferScissor = false;
+    bool foundScaledKnownVertex = false;
+    for (const Extrinsic::Graphics::ImGuiOverlayDrawList& drawList :
+         frame->DrawLists)
+    {
+        for (const Extrinsic::Graphics::ImGuiOverlayVertex& vertex :
+             drawList.Vertices)
+        {
+            if (vertex.Position[0] == 40.0f &&
+                vertex.Position[1] == 60.0f)
+            {
+                foundScaledKnownVertex = true;
+            }
+        }
+        for (const Extrinsic::Graphics::ImGuiOverlayDrawCommand& command :
+             drawList.Commands)
+        {
+            ++overlayCommandCount;
+            EXPECT_GT(command.Scissor.Width, 0u);
+            EXPECT_GT(command.Scissor.Height, 0u);
+            if (command.Scissor.X == 0 && command.Scissor.Y == 0 &&
+                command.Scissor.Width == frame->DisplayWidth &&
+                command.Scissor.Height == frame->DisplayHeight)
+            {
+                foundClampedFullFramebufferScissor = true;
+            }
+        }
+    }
+    EXPECT_EQ(overlayCommandCount + rawRejectedCount, rawDrawableCount);
+    EXPECT_TRUE(foundClampedFullFramebufferScissor);
+    EXPECT_TRUE(foundScaledKnownVertex);
 }
 
 // --- editor hook cadence ------------------------------------------------------

@@ -28,6 +28,7 @@ namespace
     {
         BindPipeline,
         BindIndexBuffer,
+        SetScissor,
         PushConstants,
         Draw,
         DrawIndexed,
@@ -48,6 +49,10 @@ namespace
         RHI::IndexType LastIndexType{RHI::IndexType::Uint32};
         std::uint32_t LastDrawVertexCount{0u};
         std::uint32_t LastDrawIndexedIndexCount{0u};
+        std::int32_t LastScissorX{0};
+        std::int32_t LastScissorY{0};
+        std::uint32_t LastScissorWidth{0u};
+        std::uint32_t LastScissorHeight{0u};
         std::vector<std::byte> LastPushConstants{};
 
         void Begin() override {}
@@ -55,7 +60,17 @@ namespace
         void BeginRenderPass(const RHI::RenderPassDesc&) override {}
         void EndRenderPass() override {}
         void SetViewport(float, float, float, float, float, float) override {}
-        void SetScissor(std::int32_t, std::int32_t, std::uint32_t, std::uint32_t) override {}
+        void SetScissor(const std::int32_t x,
+                        const std::int32_t y,
+                        const std::uint32_t width,
+                        const std::uint32_t height) override
+        {
+            Events.push_back({.Kind = EventKind::SetScissor});
+            LastScissorX = x;
+            LastScissorY = y;
+            LastScissorWidth = width;
+            LastScissorHeight = height;
+        }
         void BindPipeline(RHI::PipelineHandle pipeline) override
         {
             Events.push_back({.Kind = EventKind::BindPipeline});
@@ -235,21 +250,28 @@ TEST(GraphicsImGuiPresentContract, ImGuiPassRecordsOverlayDrawDataOnlyWhenReady)
                 .Uploaded = true,
             },
         },
+        .DisplayWidth = 128u,
+        .DisplayHeight = 64u,
         .DrawListCount = 1u,
         .Uploaded = true,
     };
     pass.Execute(cmd, upload);
 
-    ASSERT_EQ(cmd.Events.size(), 4u);
+    ASSERT_EQ(cmd.Events.size(), 5u);
     EXPECT_EQ(cmd.Events[0].Kind, EventKind::BindPipeline);
     EXPECT_EQ(cmd.Events[1].Kind, EventKind::BindIndexBuffer);
-    EXPECT_EQ(cmd.Events[2].Kind, EventKind::PushConstants);
-    EXPECT_EQ(cmd.Events[3].Kind, EventKind::DrawIndexed);
+    EXPECT_EQ(cmd.Events[2].Kind, EventKind::SetScissor);
+    EXPECT_EQ(cmd.Events[3].Kind, EventKind::PushConstants);
+    EXPECT_EQ(cmd.Events[4].Kind, EventKind::DrawIndexed);
     EXPECT_EQ(cmd.LastPipeline, pipeline);
     EXPECT_EQ(cmd.LastIndexBuffer, indexBuffer);
     EXPECT_EQ(cmd.LastIndexBufferOffset, 64u);
     EXPECT_EQ(cmd.LastIndexType, RHI::IndexType::Uint32);
     EXPECT_EQ(cmd.LastDrawIndexedIndexCount, 18u);
+    EXPECT_EQ(cmd.LastScissorX, 0);
+    EXPECT_EQ(cmd.LastScissorY, 0);
+    EXPECT_EQ(cmd.LastScissorWidth, 128u);
+    EXPECT_EQ(cmd.LastScissorHeight, 64u);
     EXPECT_EQ(overlay.GetDiagnostics().DrawCalls, 1u);
 
     ASSERT_EQ(cmd.LastPushConstants.size(), sizeof(Graphics::ImGuiOverlayPushConstants));

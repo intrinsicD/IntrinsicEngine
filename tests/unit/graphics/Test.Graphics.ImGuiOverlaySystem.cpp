@@ -32,18 +32,72 @@ TEST(GraphicsImGuiOverlaySystem, SubmitFrameAggregatesValidDrawData)
                         .IndexCount = 12u,
                         .TextureBindlessIndex = 42u,
                         .UsesUserTexture = true,
+                        .Scissor = {
+                            .X = 0,
+                            .Y = 0,
+                            .Width = 1280u,
+                            .Height = 720u,
+                        },
                     },
                 },
             },
             Graphics::ImGuiOverlayDrawList{.CommandCount = 0u, .VertexCount = 8u, .IndexCount = 12u},
+            Graphics::ImGuiOverlayDrawList{
+                .CommandCount = 1u,
+                .VertexCount = 3u,
+                .IndexCount = 3u,
+                .Commands = {
+                    Graphics::ImGuiOverlayDrawCommand{
+                        .IndexOffset = 0u,
+                        .VertexOffset = 0u,
+                        .IndexCount = 3u,
+                    },
+                },
+            },
+            Graphics::ImGuiOverlayDrawList{
+                .CommandCount = 1u,
+                .VertexCount = 3u,
+                .IndexCount = 3u,
+                .Commands = {
+                    Graphics::ImGuiOverlayDrawCommand{
+                        .IndexOffset = 0u,
+                        .VertexOffset = 0u,
+                        .IndexCount = 3u,
+                        .Scissor = {
+                            .X = 1279,
+                            .Y = 0,
+                            .Width = 2u,
+                            .Height = 1u,
+                        },
+                    },
+                },
+            },
+            Graphics::ImGuiOverlayDrawList{
+                .CommandCount = 1u,
+                .VertexCount = 3u,
+                .IndexCount = 3u,
+                .Commands = {
+                    Graphics::ImGuiOverlayDrawCommand{
+                        .IndexOffset = 0u,
+                        .VertexOffset = 0u,
+                        .IndexCount = 3u,
+                        .Scissor = {
+                            .X = -1,
+                            .Y = 0,
+                            .Width = 1u,
+                            .Height = 1u,
+                        },
+                    },
+                },
+            },
         },
     });
 
     EXPECT_TRUE(overlay.HasOverlayWork());
     const Graphics::ImGuiOverlayDiagnostics diagnostics = overlay.GetDiagnostics();
-    EXPECT_EQ(diagnostics.SubmittedDrawListCount, 3u);
+    EXPECT_EQ(diagnostics.SubmittedDrawListCount, 6u);
     EXPECT_EQ(diagnostics.AcceptedDrawListCount, 2u);
-    EXPECT_EQ(diagnostics.RejectedDrawListCount, 1u);
+    EXPECT_EQ(diagnostics.RejectedDrawListCount, 4u);
     EXPECT_EQ(diagnostics.DrawCommandCount, 3u);
     EXPECT_EQ(diagnostics.VertexCount, 28u);
     EXPECT_EQ(diagnostics.IndexCount, 42u);

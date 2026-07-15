@@ -1,13 +1,15 @@
 module;
 
+#include <algorithm>
+#include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <algorithm>
-#include <chrono>
 #include <filesystem>
 #include <functional>
 #include <limits>
+#include <optional>
 #include <string>
 #include <system_error>
 #include <type_traits>
@@ -77,18 +79,23 @@ namespace Extrinsic::Runtime
 
         void ConfigureFonts(ImGuiIO& io)
         {
-            const float dpiScale = std::max(io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
-            const float fontSize = kBaseFontSizePixels * (dpiScale > 0.0f ? dpiScale : 1.0f);
+            const float dpiScale =
+                std::max(io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
+            const float rasterizerDensity = dpiScale > 0.0f ? dpiScale : 1.0f;
             const std::string fontPath = ResolveBundledFontPath();
             ImFontConfig fontConfig{};
             fontConfig.Flags |= ImFontFlags_NoLoadError;
+            fontConfig.RasterizerDensity = rasterizerDensity;
             if (!fontPath.empty() &&
-                io.Fonts->AddFontFromFileTTF(fontPath.c_str(), fontSize, &fontConfig) != nullptr)
+                io.Fonts->AddFontFromFileTTF(
+                    fontPath.c_str(),
+                    kBaseFontSizePixels,
+                    &fontConfig) != nullptr)
             {
                 return;
             }
 
-            fontConfig.SizePixels = fontSize;
+            fontConfig.SizePixels = kBaseFontSizePixels;
             io.Fonts->AddFontDefault(&fontConfig);
         }
 
@@ -107,17 +114,106 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] std::uint32_t ToPixelDimension(const float value)
         {
-            return value > 0.0f ? static_cast<std::uint32_t>(value + 0.5f) : 0u;
+            if (!std::isfinite(value) || value <= 0.0f)
+                return 0u;
+            constexpr float kMaxDimension =
+                static_cast<float>(std::numeric_limits<std::uint32_t>::max());
+            if (value >= kMaxDimension)
+                return std::numeric_limits<std::uint32_t>::max();
+            return static_cast<std::uint32_t>(value + 0.5f);
         }
 
-        [[nodiscard]] Graphics::ImGuiOverlayDrawCommand BuildOverlayDrawCommand(
+        [[nodiscard]] std::optional<Graphics::ImGuiOverlayScissor>
+        BuildOverlayScissor(
+            const ImVec4 clipRect,
+            const ImVec2 displayPos,
+            const ImVec2 framebufferScale,
+            const std::uint32_t pixelWidth,
+            const std::uint32_t pixelHeight) noexcept
+        {
+            if (pixelWidth == 0u || pixelHeight == 0u ||
+                !std::isfinite(clipRect.x) ||
+                !std::isfinite(clipRect.y) ||
+                !std::isfinite(clipRect.z) ||
+                !std::isfinite(clipRect.w) ||
+                !std::isfinite(displayPos.x) ||
+                !std::isfinite(displayPos.y) ||
+                !std::isfinite(framebufferScale.x) ||
+                !std::isfinite(framebufferScale.y) ||
+                framebufferScale.x <= 0.0f || framebufferScale.y <= 0.0f)
+            {
+                return std::nullopt;
+            }
+
+            double clipMinX =
+                (static_cast<double>(clipRect.x) - displayPos.x) *
+                framebufferScale.x;
+            double clipMinY =
+                (static_cast<double>(clipRect.y) - displayPos.y) *
+                framebufferScale.y;
+            double clipMaxX =
+                (static_cast<double>(clipRect.z) - displayPos.x) *
+                framebufferScale.x;
+            double clipMaxY =
+                (static_cast<double>(clipRect.w) - displayPos.y) *
+                framebufferScale.y;
+            if (!std::isfinite(clipMinX) || !std::isfinite(clipMinY) ||
+                !std::isfinite(clipMaxX) || !std::isfinite(clipMaxY))
+            {
+                return std::nullopt;
+            }
+
+            clipMinX = std::clamp(
+                clipMinX, 0.0, static_cast<double>(pixelWidth));
+            clipMinY = std::clamp(
+                clipMinY, 0.0, static_cast<double>(pixelHeight));
+            clipMaxX = std::clamp(
+                clipMaxX, 0.0, static_cast<double>(pixelWidth));
+            clipMaxY = std::clamp(
+                clipMaxY, 0.0, static_cast<double>(pixelHeight));
+            if (clipMaxX <= clipMinX || clipMaxY <= clipMinY ||
+                clipMinX >
+                    static_cast<double>(std::numeric_limits<std::int32_t>::max()) ||
+                clipMinY >
+                    static_cast<double>(std::numeric_limits<std::int32_t>::max()))
+            {
+                return std::nullopt;
+            }
+
+            Graphics::ImGuiOverlayScissor scissor{
+                .X = static_cast<std::int32_t>(clipMinX),
+                .Y = static_cast<std::int32_t>(clipMinY),
+                .Width = static_cast<std::uint32_t>(clipMaxX - clipMinX),
+                .Height = static_cast<std::uint32_t>(clipMaxY - clipMinY),
+            };
+            if (scissor.IsEmpty())
+                return std::nullopt;
+            return scissor;
+        }
+
+        [[nodiscard]] std::optional<Graphics::ImGuiOverlayDrawCommand>
+        BuildOverlayDrawCommand(
             const ImDrawCmd& command,
+            const ImDrawData& drawData,
+            const std::uint32_t pixelWidth,
+            const std::uint32_t pixelHeight,
             const ImTextureData* atlasTexData) noexcept
         {
+            const std::optional<Graphics::ImGuiOverlayScissor> scissor =
+                BuildOverlayScissor(
+                    command.ClipRect,
+                    drawData.DisplayPos,
+                    drawData.FramebufferScale,
+                    pixelWidth,
+                    pixelHeight);
+            if (!scissor.has_value())
+                return std::nullopt;
+
             Graphics::ImGuiOverlayDrawCommand out{};
             out.IndexOffset = command.IdxOffset;
             out.VertexOffset = command.VtxOffset;
             out.IndexCount = command.ElemCount;
+            out.Scissor = *scissor;
             ImTextureRef atlasTexRef = ImGui::GetIO().Fonts->TexRef;
             if (atlasTexData != nullptr)
             {
@@ -210,6 +306,7 @@ namespace Extrinsic::Runtime
         // ImDrawData::Textures[] and acknowledges ImTextureData requests.
         io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors;
         io.BackendFlags |= ImGuiBackendFlags_HasSetMousePos;
+        io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;
 
         ImGuiPlatformIO& platformIo = ImGui::GetPlatformIO();
         platformIo.Platform_ClipboardUserData = this;
@@ -446,7 +543,12 @@ namespace Extrinsic::Runtime
                 {
                     const ImDrawVert& src = cmdList->VtxBuffer[v];
                     overlayList.Vertices.push_back(Graphics::ImGuiOverlayVertex{
-                        .Position = {src.pos.x, src.pos.y},
+                        .Position = {
+                            (src.pos.x - drawData->DisplayPos.x) *
+                                drawData->FramebufferScale.x,
+                            (src.pos.y - drawData->DisplayPos.y) *
+                                drawData->FramebufferScale.y,
+                        },
                         .UV = {src.uv.x, src.uv.y},
                         .Color = src.col,
                     });
@@ -470,10 +572,16 @@ namespace Extrinsic::Runtime
                     // is a user texture (e.g. ImGui::Image). Preserve the
                     // command's bindless slot so graphics can push it directly
                     // without importing ImGui types or adding descriptor APIs.
-                    const Graphics::ImGuiOverlayDrawCommand overlayCommand =
-                        BuildOverlayDrawCommand(drawCommand, atlasTexData);
-                    overlayList.Commands.push_back(overlayCommand);
-                    if (overlayCommand.UsesUserTexture)
+                    const auto overlayCommand = BuildOverlayDrawCommand(
+                        drawCommand,
+                        *drawData,
+                        pixelWidth,
+                        pixelHeight,
+                        atlasTexData);
+                    if (!overlayCommand.has_value())
+                        continue;
+                    overlayList.Commands.push_back(*overlayCommand);
+                    if (overlayCommand->UsesUserTexture)
                     {
                         overlayList.UsesUserTexture = true;
                         usesUserTexture = true;

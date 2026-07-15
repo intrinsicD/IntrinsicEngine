@@ -30,26 +30,49 @@ namespace Extrinsic::Graphics
         };
 
         [[nodiscard]] bool DrawCommandRangeValid(const ImGuiOverlayDrawList& drawList,
-                                                 const ImGuiOverlayDrawCommand& command) noexcept
+                                                 const ImGuiOverlayDrawCommand& command,
+                                                 const std::uint32_t displayWidth,
+                                                 const std::uint32_t displayHeight) noexcept
         {
             return command.IndexCount > 0u &&
                    command.IndexOffset <= drawList.IndexCount &&
                    command.IndexCount <= drawList.IndexCount - command.IndexOffset &&
-                   command.VertexOffset < drawList.VertexCount;
+                   command.VertexOffset < drawList.VertexCount &&
+                   !command.Scissor.IsEmpty() &&
+                   command.Scissor.X >= 0 && command.Scissor.Y >= 0 &&
+                   static_cast<std::uint64_t>(command.Scissor.X) +
+                           command.Scissor.Width <=
+                       displayWidth &&
+                   static_cast<std::uint64_t>(command.Scissor.Y) +
+                           command.Scissor.Height <=
+                       displayHeight;
         }
 
         [[nodiscard]] std::vector<ImGuiDrawCommandUploadResult> BuildCommandUploads(
-            const ImGuiOverlayDrawList& drawList)
+            const ImGuiOverlayDrawList& drawList,
+            const std::uint32_t displayWidth,
+            const std::uint32_t displayHeight)
         {
             std::vector<ImGuiDrawCommandUploadResult> commands;
             if (drawList.Commands.empty())
             {
+                if (drawList.CommandCount == 0u ||
+                    displayWidth == 0u || displayHeight == 0u)
+                {
+                    return commands;
+                }
                 commands.push_back(ImGuiDrawCommandUploadResult{
                     .IndexOffset = 0u,
                     .VertexOffset = 0u,
                     .IndexCount = drawList.IndexCount,
                     .TextureBindlessIndex = RHI::kInvalidBindlessIndex,
                     .UsesUserTexture = drawList.UsesUserTexture,
+                    .Scissor = ImGuiOverlayScissor{
+                        .X = 0,
+                        .Y = 0,
+                        .Width = displayWidth,
+                        .Height = displayHeight,
+                    },
                 });
                 return commands;
             }
@@ -57,7 +80,11 @@ namespace Extrinsic::Graphics
             commands.reserve(drawList.Commands.size());
             for (const ImGuiOverlayDrawCommand& command : drawList.Commands)
             {
-                if (!DrawCommandRangeValid(drawList, command))
+                if (!DrawCommandRangeValid(
+                        drawList,
+                        command,
+                        displayWidth,
+                        displayHeight))
                 {
                     return {};
                 }
@@ -67,6 +94,7 @@ namespace Extrinsic::Graphics
                     .IndexCount = command.IndexCount,
                     .TextureBindlessIndex = command.TextureBindlessIndex,
                     .UsesUserTexture = command.UsesUserTexture,
+                    .Scissor = command.Scissor,
                 });
             }
             return commands;
@@ -176,6 +204,8 @@ namespace Extrinsic::Graphics
     ImGuiUploadResult ImGuiUploadHelper::UploadFrame(const ImGuiOverlayFrame& frame)
     {
         ImGuiUploadResult result{};
+        result.DisplayWidth = frame.DisplayWidth;
+        result.DisplayHeight = frame.DisplayHeight;
         result.DrawListCount = static_cast<std::uint32_t>(frame.DrawLists.size());
 
         if (!frame.Enabled || frame.DrawLists.empty() || m_Device == nullptr ||
@@ -191,7 +221,10 @@ namespace Extrinsic::Graphics
         for (const ImGuiOverlayDrawList& drawList : frame.DrawLists)
         {
             std::vector<ImGuiDrawCommandUploadResult> commands =
-                BuildCommandUploads(drawList);
+                BuildCommandUploads(
+                    drawList,
+                    frame.DisplayWidth,
+                    frame.DisplayHeight);
             if (drawList.Vertices.size() != drawList.VertexCount ||
                 drawList.Indices.size() != drawList.IndexCount ||
                 commands.empty())

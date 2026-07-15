@@ -265,6 +265,12 @@ font-atlas cache and revision. `EndFrame()` copies atlas bytes into
 `ImGuiOverlayFrame` only when the atlas payload changes; unchanged frames submit
 metadata-only atlas records for the graphics overlay system to retain. Adapter
 diagnostics report atlas copy/reuse counts and the last copied byte count.
+The adapter converts each `ImDrawCmd::ClipRect` from Dear ImGui display space
+into a finite framebuffer-relative scissor, transforms copied vertex positions
+into the same framebuffer space, and omits empty or non-finite commands. It also
+advertises `ImGuiBackendFlags_RendererHasVtxOffset`; large 16-bit-index draw
+lists can therefore split into commands whose base vertex is preserved through
+the pointer-free overlay records instead of aborting at 65,535 vertices.
 
 ### Render Artifact Publication
 

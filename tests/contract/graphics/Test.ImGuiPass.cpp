@@ -138,7 +138,7 @@ namespace
         frame.DisplayWidth = 320u;
         frame.DisplayHeight = 180u;
         Graphics::ImGuiOverlayDrawList drawList =
-            MakeOverlayDrawList(2u, 4u, {0u, 1u, 2u, 1u, 2u, 3u});
+            MakeOverlayDrawList(2u, 4u, {0u, 1u, 2u, 0u, 1u, 2u});
         drawList.UsesUserTexture = true;
         drawList.Commands = {
             Graphics::ImGuiOverlayDrawCommand{
@@ -147,6 +147,12 @@ namespace
                 .IndexCount = 3u,
                 .TextureBindlessIndex = 77u,
                 .UsesUserTexture = true,
+                .Scissor = {
+                    .X = 5,
+                    .Y = 7,
+                    .Width = 100u,
+                    .Height = 80u,
+                },
             },
             Graphics::ImGuiOverlayDrawCommand{
                 .IndexOffset = 3u,
@@ -154,6 +160,12 @@ namespace
                 .IndexCount = 3u,
                 .TextureBindlessIndex = RHI::kInvalidBindlessIndex,
                 .UsesUserTexture = false,
+                .Scissor = {
+                    .X = 120,
+                    .Y = 40,
+                    .Width = 190u,
+                    .Height = 100u,
+                },
             },
         };
         frame.DrawLists.push_back(std::move(drawList));
@@ -223,6 +235,8 @@ TEST(ImGuiPassContract, UploadHelperPacksTwoDrawListsAndPassRecordsPerList)
 
         ASSERT_TRUE(upload.Uploaded);
         ASSERT_FALSE(upload.Overflow);
+        EXPECT_EQ(upload.DisplayWidth, 256u);
+        EXPECT_EQ(upload.DisplayHeight, 144u);
         ASSERT_EQ(upload.DrawListCount, 2u);
         ASSERT_EQ(upload.DrawLists.size(), 2u);
         EXPECT_EQ(upload.CommandUploadListBuilds, 2u);
@@ -239,6 +253,14 @@ TEST(ImGuiPassContract, UploadHelperPacksTwoDrawListsAndPassRecordsPerList)
         EXPECT_EQ(upload.DrawLists[1].FirstVertex, 3u);
         EXPECT_EQ(upload.DrawLists[1].IndexOffsetBytes, 3u * sizeof(std::uint32_t));
         EXPECT_EQ(upload.DrawLists[1].IndexCount, 6u);
+        ASSERT_EQ(upload.DrawLists[0].Commands.size(), 1u);
+        EXPECT_EQ(upload.DrawLists[0].Commands[0].Scissor.X, 0);
+        EXPECT_EQ(upload.DrawLists[0].Commands[0].Scissor.Y, 0);
+        EXPECT_EQ(upload.DrawLists[0].Commands[0].Scissor.Width, 256u);
+        EXPECT_EQ(upload.DrawLists[0].Commands[0].Scissor.Height, 144u);
+        ASSERT_EQ(upload.DrawLists[1].Commands.size(), 1u);
+        EXPECT_EQ(upload.DrawLists[1].Commands[0].Scissor.Width, 256u);
+        EXPECT_EQ(upload.DrawLists[1].Commands[0].Scissor.Height, 144u);
         EXPECT_EQ(helper.GetBufferAllocationCount(), 2u);
 
         ASSERT_EQ(device.BufferWrites.size(), 2u);
@@ -254,6 +276,15 @@ TEST(ImGuiPassContract, UploadHelperPacksTwoDrawListsAndPassRecordsPerList)
     EXPECT_EQ(device.CommandContext.BindIndexBufferCalls, 2);
     EXPECT_EQ(device.CommandContext.PushConstantsCalls, 2);
     EXPECT_EQ(device.CommandContext.DrawIndexedCalls, 2);
+    EXPECT_EQ(device.CommandContext.SetScissorCalls, 2);
+    ASSERT_EQ(device.CommandContext.ScissorRecords.size(), 2u);
+    for (const auto& scissor : device.CommandContext.ScissorRecords)
+    {
+        EXPECT_EQ(scissor.X, 0);
+        EXPECT_EQ(scissor.Y, 0);
+        EXPECT_EQ(scissor.Width, 256u);
+        EXPECT_EQ(scissor.Height, 144u);
+    }
     EXPECT_EQ(device.CommandContext.LastBoundPipeline, pipeline);
     EXPECT_EQ(device.CommandContext.LastIndexType, RHI::IndexType::Uint32);
     EXPECT_EQ(device.CommandContext.LastDrawIndexed.IndexCount, 6u);
@@ -309,10 +340,18 @@ TEST(ImGuiPassContract, UploadHelperPreservesPerCommandTextureBindlessIndices)
     EXPECT_EQ(upload.DrawLists[0].Commands[0].IndexCount, 3u);
     EXPECT_EQ(upload.DrawLists[0].Commands[0].TextureBindlessIndex, 77u);
     EXPECT_TRUE(upload.DrawLists[0].Commands[0].UsesUserTexture);
+    EXPECT_EQ(upload.DrawLists[0].Commands[0].Scissor.X, 5);
+    EXPECT_EQ(upload.DrawLists[0].Commands[0].Scissor.Y, 7);
+    EXPECT_EQ(upload.DrawLists[0].Commands[0].Scissor.Width, 100u);
+    EXPECT_EQ(upload.DrawLists[0].Commands[0].Scissor.Height, 80u);
     EXPECT_EQ(upload.DrawLists[0].Commands[1].IndexOffset, 3u);
     EXPECT_EQ(upload.DrawLists[0].Commands[1].VertexOffset, 1u);
     EXPECT_EQ(upload.DrawLists[0].Commands[1].TextureBindlessIndex, RHI::kInvalidBindlessIndex);
     EXPECT_FALSE(upload.DrawLists[0].Commands[1].UsesUserTexture);
+    EXPECT_EQ(upload.DrawLists[0].Commands[1].Scissor.X, 120);
+    EXPECT_EQ(upload.DrawLists[0].Commands[1].Scissor.Y, 40);
+    EXPECT_EQ(upload.DrawLists[0].Commands[1].Scissor.Width, 190u);
+    EXPECT_EQ(upload.DrawLists[0].Commands[1].Scissor.Height, 100u);
 
     Graphics::ImGuiPass pass{overlay};
     pass.SetPipeline(RHI::PipelineHandle{601u, 1u});
@@ -322,7 +361,30 @@ TEST(ImGuiPassContract, UploadHelperPreservesPerCommandTextureBindlessIndices)
     EXPECT_EQ(device.CommandContext.BindIndexBufferCalls, 1);
     EXPECT_EQ(device.CommandContext.PushConstantsCalls, 2);
     EXPECT_EQ(device.CommandContext.DrawIndexedCalls, 2);
+    EXPECT_EQ(device.CommandContext.SetScissorCalls, 2);
     EXPECT_EQ(overlay.GetDiagnostics().DrawCalls, 2u);
+
+    ASSERT_EQ(device.CommandContext.ScissorRecords.size(), 2u);
+    EXPECT_EQ(device.CommandContext.ScissorRecords[0].X, 5);
+    EXPECT_EQ(device.CommandContext.ScissorRecords[0].Y, 93);
+    EXPECT_EQ(device.CommandContext.ScissorRecords[0].Width, 100u);
+    EXPECT_EQ(device.CommandContext.ScissorRecords[0].Height, 80u);
+    EXPECT_EQ(device.CommandContext.ScissorRecords[1].X, 120);
+    EXPECT_EQ(device.CommandContext.ScissorRecords[1].Y, 40);
+    EXPECT_EQ(device.CommandContext.ScissorRecords[1].Width, 190u);
+    EXPECT_EQ(device.CommandContext.ScissorRecords[1].Height, 100u);
+
+    const std::vector expectedEvents{
+        Tests::MockCommandContext::EventKind::BindPipeline,
+        Tests::MockCommandContext::EventKind::BindIndexBuffer,
+        Tests::MockCommandContext::EventKind::SetScissor,
+        Tests::MockCommandContext::EventKind::PushConstants,
+        Tests::MockCommandContext::EventKind::DrawIndexed,
+        Tests::MockCommandContext::EventKind::SetScissor,
+        Tests::MockCommandContext::EventKind::PushConstants,
+        Tests::MockCommandContext::EventKind::DrawIndexed,
+    };
+    EXPECT_EQ(device.CommandContext.Events, expectedEvents);
 
     ASSERT_EQ(device.CommandContext.PushConstantPayloads.size(), 2u);
     Graphics::ImGuiOverlayPushConstants firstPush{};
@@ -343,6 +405,55 @@ TEST(ImGuiPassContract, UploadHelperPreservesPerCommandTextureBindlessIndices)
     EXPECT_EQ(secondPush.IndexCount, 3u);
     EXPECT_EQ(secondPush.TextureBindlessIndex, RHI::kInvalidBindlessIndex);
     EXPECT_EQ(secondPush.Flags & Graphics::kImGuiOverlayPushFlagUserTexture, 0u);
+}
+
+TEST(ImGuiPassContract, InvalidCommandScissorsFailClosedAtUploadAndRecord)
+{
+    Tests::MockDevice device;
+    RHI::BufferManager bufferManager{device};
+    Graphics::ImGuiUploadHelper helper{device, bufferManager};
+
+    Graphics::ImGuiOverlayFrame invalidFrame = MakeUserTextureCommandFrame();
+    invalidFrame.DrawLists[0].Commands[0].Scissor = {
+        .X = 319,
+        .Y = 0,
+        .Width = 2u,
+        .Height = 1u,
+    };
+    const Graphics::ImGuiUploadResult rejected = helper.UploadFrame(invalidFrame);
+    EXPECT_FALSE(rejected.Uploaded);
+    EXPECT_TRUE(rejected.DrawLists.empty());
+
+    Graphics::ImGuiOverlaySystem overlay;
+    overlay.Initialize();
+    overlay.SubmitFrame(MakeUserTextureCommandFrame());
+    ASSERT_TRUE(overlay.HasOverlayWork());
+    const Graphics::ImGuiOverlayFrame* frame = overlay.GetCurrentFrame();
+    ASSERT_NE(frame, nullptr);
+
+    Graphics::ImGuiUploadResult upload = helper.UploadFrame(*frame);
+    ASSERT_TRUE(upload.Uploaded);
+    ASSERT_EQ(upload.DrawLists.size(), 1u);
+    ASSERT_EQ(upload.DrawLists[0].Commands.size(), 2u);
+    upload.DrawLists[0].Commands[0].Scissor = {
+        .X = 319,
+        .Y = 0,
+        .Width = 2u,
+        .Height = 1u,
+    };
+
+    Graphics::ImGuiPass pass{overlay};
+    pass.SetPipeline(RHI::PipelineHandle{602u, 1u});
+    pass.Execute(device.CommandContext, upload);
+
+    EXPECT_EQ(device.CommandContext.SetScissorCalls, 1);
+    EXPECT_EQ(device.CommandContext.PushConstantsCalls, 1);
+    EXPECT_EQ(device.CommandContext.DrawIndexedCalls, 1);
+    ASSERT_EQ(device.CommandContext.ScissorRecords.size(), 1u);
+    EXPECT_EQ(device.CommandContext.ScissorRecords[0].X, 120);
+    EXPECT_EQ(device.CommandContext.ScissorRecords[0].Y, 40);
+    EXPECT_EQ(device.CommandContext.ScissorRecords[0].Width, 190u);
+    EXPECT_EQ(device.CommandContext.ScissorRecords[0].Height, 100u);
 }
 
 TEST(ImGuiPassContract, UploadHelperPartitionsStorageByFrameSlot)
