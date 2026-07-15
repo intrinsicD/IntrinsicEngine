@@ -187,8 +187,9 @@ compile cost. They preserve behavior and ownership; they are not feature tasks.
 `ARCH-006` owns the top Sandbox editor/app hot path, and `RUNTIME-166` owns the
 main `Runtime.RenderExtraction` module slimming.
 
-- [`RUNTIME-167`](RUNTIME-167-privatize-engine-frameloop-surface.md) —
-  privatize the `Runtime.Engine:FrameLoop` partition after `RUNTIME-150`.
+- [`RUNTIME-167`](../../active/RUNTIME-167-privatize-engine-frameloop-surface.md) —
+  privatize the `Runtime.Engine:FrameLoop` partition after `RUNTIME-150`;
+  active on `codex/arch-006-completion`.
 - [`RUNTIME-168`](RUNTIME-168-privatize-sandbox-default-policies-surface.md) —
   privatize the Sandbox default policy module after `RUNTIME-144`.
 - [`RUNTIME-169`](RUNTIME-169-privatize-render-extraction-service-surface.md) —

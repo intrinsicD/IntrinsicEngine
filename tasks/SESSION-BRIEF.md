@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `RUNTIME-167` — Privatize the Engine frame-loop surface (tasks/active/RUNTIME-167-privatize-engine-frameloop-surface.md)
 
 ## Theme B — Rendering modernization
 
@@ -39,7 +39,6 @@ the authoritative open/unblocked view.
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
 - unblocked: `RUNTIME-166` — Slim and partition the RenderExtraction module (tasks/backlog/runtime/RUNTIME-166-slim-render-extraction-module.md)
-- unblocked: `RUNTIME-167` — Privatize the Engine frame-loop surface (tasks/backlog/runtime/RUNTIME-167-privatize-engine-frameloop-surface.md)
 - unblocked: `RUNTIME-168` — Privatize the Sandbox default policies surface (tasks/backlog/runtime/RUNTIME-168-privatize-sandbox-default-policies-surface.md)
 - unblocked: `RUNTIME-169` — Privatize the RenderExtractionService surface (tasks/backlog/runtime/RUNTIME-169-privatize-render-extraction-service-surface.md)
 - unblocked: `RUNTIME-171` — Privatize the AssetResidencyService surface (tasks/backlog/runtime/RUNTIME-171-privatize-asset-residency-service-surface.md)

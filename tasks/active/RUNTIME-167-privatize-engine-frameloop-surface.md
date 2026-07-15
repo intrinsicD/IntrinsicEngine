@@ -8,6 +8,13 @@ maturity_target: Operational
 ---
 # RUNTIME-167 — Privatize the Engine frame-loop surface
 
+## Status
+
+- In progress on 2026-07-16; owner: Codex; branch:
+  `codex/arch-006-completion`.
+- Next gate: replace the one-consumer module partition with textual private
+  header glue, then build the focused runtime contract/integration targets.
+
 ## Goal
 - Remove the exported `Extrinsic.Runtime.Engine:FrameLoop` module partition as a
   public build-graph surface by moving its frame-loop helper declarations and
@@ -23,13 +30,31 @@ maturity_target: Operational
 - Owner/layer: `runtime`; this is implementation locality inside the runtime
   composition root.
 - `src/runtime/Runtime.Engine.FrameLoop.cppm` is a low-fanout compile hotspot:
-  local 2026-07-10 triage measured up to 138.098s for a 445-line interface with
-  31 imports and only `Runtime.Engine.cpp` as a production importer.
+  local 2026-07-10 triage measured up to 138.098s for an interface now at 452
+  lines and 31 imports with only `Runtime.Engine.cpp` as a production importer.
 - The original extraction is retired in `RUNTIME-150`; this task narrows the
   outcome from "module partition" to "private implementation seam".
 - The repository rule is to keep `.cppm` surfaces to exported types and small
   declarations; frame-loop hook adapters and control-flow bodies are private
   implementation detail.
+
+## Right-sizing
+
+- Measured current surface: 452 interface lines, 31 imports, one production
+  importer (`Runtime.Engine.cpp`), no C++ test importers, and nine source-reading
+  references in one layering test file. A recent contention-sensitive
+  `.ninja_log` sample was 142.139 s; the task retains the earlier 138.098 s
+  observation as baseline evidence rather than a performance claim.
+- Simpler alternative: one include-only private header consumed exactly once by
+  `Runtime.Engine.cpp`. Keep the helper bodies together because the abbreviated
+  fixed-step template must be visible in its consuming translation unit; do not
+  add a replacement module, object library, interface, registry, or factory.
+- Blast radius: the partition/source owner, runtime CMake/README and architecture
+  wording, source-reading layering contracts, the runtime backlog index, and the
+  generated module inventory.
+- Reintroduction trigger: reconsider a private partition only when a present
+  second `Runtime.Engine` implementation unit needs these helpers and comparative
+  measurements justify a shared BMI.
 
 ## Required changes
 - [ ] Inventory every declaration in `Runtime.Engine.FrameLoop.cppm` as either
