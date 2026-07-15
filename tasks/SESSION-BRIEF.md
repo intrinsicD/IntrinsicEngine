@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `RUNTIME-176` — Parameterization runtime facade, config lane, and UV view model (tasks/active/RUNTIME-176-parameterization-runtime-config-integration.md)
 
 ## Theme B — Rendering modernization
 
@@ -85,7 +85,6 @@ the authoritative open/unblocked view.
 - blocked by `METHOD-021`: `METHOD-025` — Parameterization family optimized CPU backend and comparison benchmark (tasks/backlog/methods/METHOD-025-parameterization-family-optimized-cpu-backend.md)
 - blocked by `METHOD-025`: `METHOD-026` — Parameterization family GPU (Vulkan compute) backend and parity (tasks/backlog/methods/METHOD-026-parameterization-family-gpu-vulkan-compute-backend.md)
 - blocked by `METHOD-016`: `RUNTIME-175` — Point-cloud consolidation runtime facade, config lane, and backend adapter (tasks/backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
-- unblocked: `RUNTIME-176` — Parameterization runtime facade, config lane, and UV view model (tasks/backlog/runtime/RUNTIME-176-parameterization-runtime-config-integration.md)
 - blocked by `RUNTIME-175`: `UI-035` — Sandbox point-cloud consolidation editor panel (tasks/backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md)
 - blocked by `RUNTIME-176`: `UI-036` — Sandbox parameterization editor panel and resizable UV split view (tasks/backlog/ui/UI-036-sandbox-parameterization-editor-and-uv-split-view.md)
 

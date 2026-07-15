@@ -234,7 +234,8 @@ ported algorithms are retired `UI-024`/`UI-025`/`UI-026` under the UI backlog.
 
 ### Parameterization family integration (Theme I, seeded 2026-07-13)
 
-- [`RUNTIME-176 — Parameterization runtime facade, config lane, and UV view model`](RUNTIME-176-parameterization-runtime-config-integration.md)
+- [`RUNTIME-176 — Parameterization runtime facade, config lane, and UV view model`](../../active/RUNTIME-176-parameterization-runtime-config-integration.md)
+  is active on branch `codex/arch-006-completion`.
   is the engine-integration leaf for the parameterization method family
   (`methods/METHOD-021..026` on the retired `geometry/GEOM-063` typed CPU
   strategy surface): a
