@@ -22,6 +22,9 @@ depends_on: []
 
 ## Context
 
+- Claimed on 2026-07-16 by Codex on branch
+  `codex/arch-006-completion`.
+
 - Reproduction on 2026-07-15:
   `python3 tools/repo/check_root_hygiene.py --root . --strict` exits 1 and
   reports `.ruff_cache/`, tracked `ara/`, and ignored `imgui.ini` as unexpected.
@@ -33,6 +36,19 @@ depends_on: []
   fail strict hygiene without any source-layout violation.
 - This blocks the commit-scoped readiness audit in `REVIEW-003`; the audit must
   not weaken or skip strict root hygiene to proceed.
+
+## Right-sizing
+
+- Element: root-entry policy is duplicated between two CLI checkers, while
+  one documented YAML file is already named as their shared authority.
+- Simpler alternative: one canonical checker with a plain policy record and
+  parsing/matching free functions; the older top-level checker path becomes a
+  thin compatibility entrypoint and is no longer run redundantly. No registry,
+  service, plugin, or Git integration.
+- Blast radius: the two checker CLIs, one YAML policy, focused Python
+  regressions, and repository-hygiene documentation only.
+- Reintroduction trigger: none; a second policy backend would require a
+  separately reviewed repository-policy task.
 
 ## Required changes
 

@@ -12,7 +12,9 @@ CI helper scripts and workflow validation tools.
 - `ccache_ci.py`: validates the retained CI ccache policy (configured launcher/mode/digest identity) and exports ccache statistics. Part of the CI-007 `pr-fast.yml` policy.
 - `ccache_module_invalidation_probe.py`: exercises ccache reuse across a hermetic C++23 module-interface change to prove exported-interface edits invalidate importers. Part of the retained CI-007 `pr-fast.yml` policy.
 - `touched_scope.py`: plans (or runs) conservative build/test/structural verification commands for the touched repository scope. Local iteration aid; not yet a workflow gate (CI-005 tracks promoting it).
-- `run_repo_hygiene_checks.sh`: warning-mode wrapper running `check_root_hygiene.py`, `check_expected_top_level.py`, and `check_doc_links.py`. Local convenience; not wired into a workflow.
+- `run_repo_hygiene_checks.sh`: warning-mode wrapper running the canonical
+  `check_root_hygiene.py` policy check once, followed by `check_doc_links.py`.
+  Local convenience; not wired into a workflow.
 - `run_clean_workshop_review.sh`: clean-workshop architecture review bundle (WORKSHOP-009) running the layering, allowlist-quality, task-policy, and doc-link validators. Local convenience; not wired into a workflow.
 
 ## Notes

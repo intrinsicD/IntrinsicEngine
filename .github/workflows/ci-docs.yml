@@ -31,6 +31,11 @@ jobs:
       - name: Validate task validator regressions
         run: python3 tests/regression/tooling/Test.ValidateTasks.py
 
+      - name: Validate root hygiene policy regressions
+        run: |
+          python3 tools/repo/check_root_hygiene.py --root . --strict
+          python3 tests/regression/tooling/Test.RootHygiene.py
+
       - name: Validate task state links (strict mode)
         run: python3 tools/agents/check_task_state_links.py --root . --strict
 

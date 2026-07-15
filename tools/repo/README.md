@@ -4,8 +4,12 @@ Repository structure and policy scripts.
 
 ## Current scripts
 
-- `check_root_hygiene.py`: reports root-level markdown and allowed/blocked status; local build/vendor/IDE artifact directories are ignored when comparing the root allowlist.
-- `check_expected_top_level.py`: compares current top-level source tree entries to configured expectations; local build/vendor/IDE artifact directories are ignored.
+- `check_root_hygiene.py`: enforces root-level Markdown policy and the shared
+  repository-owned root policy, reporting allowed roots, named ignored local
+  state, unexpected entries, and missing required entries separately.
+- `check_expected_top_level.py`: compatibility entrypoint for
+  `check_root_hygiene.py`; the hygiene wrapper invokes only the canonical
+  checker so the root is not scanned twice.
 - `check_layering.py`: validates layer dependency boundaries in warning
   mode by default, with `--strict` for CI enforcement. Covers
   ``#include`` directives, C++23 module imports (including promoted
@@ -59,7 +63,10 @@ the method adapter already consumes.
 ## Config files
 
 - `layering_allowlist.yaml`: temporary path-scoped exceptions for `check_layering.py`; each entry must include task and expiry notes, avoid broad wildcards, and point at an open removal owner. The allowlist is currently empty.
-- `root_allowlist.yaml`: the expected repository-root entries consumed by `check_root_hygiene.py` and `check_expected_top_level.py`; build/vendor/IDE artifact directories are ignored rather than listed here.
+- `root_allowlist.yaml`: the exact expected repository roots and bounded named
+  patterns for disposable local build/dependency/editor/tool state consumed by
+  both root checkers. The scripts do not consult developer-global Git ignore
+  configuration, so it cannot hide an unowned source root.
 
 ## Compatibility entrypoints
 

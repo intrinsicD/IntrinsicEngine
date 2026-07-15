@@ -9,6 +9,7 @@ allowed_root_entries:
   - README.md
   - CMakeLists.txt
   - CMakePresets.json
+  - ara/
   - assets/
   - benchmarks/
   - cmake/
@@ -22,5 +23,20 @@ allowed_root_entries:
   - tools/
   - vcpkg-configuration.json
   - vcpkg.json
+ignored_local_entries:
+  - .idea/
+  - .ruff_cache/
+  - Testing/
+  - __pycache__/
+  - build/
+  - build-*/
+  - cmake-build-*/
+  - external/
+  - experimental/
+  - imgui.ini
+  - third_party/
+  - vcpkg_installed/
 notes:
-  - "imgui.ini is local runtime/editor state and is intentionally excluded from source control."
+  - "Allowed entries are exact tracked repository roots; broad patterns are forbidden."
+  - "Ignored local entries are repository-owned names/patterns for disposable build, dependency, editor, and tool state."
+  - "Git's global/user ignore configuration is never consulted for root ownership."
