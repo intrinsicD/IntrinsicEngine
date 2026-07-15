@@ -11,7 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-No tasks are currently active.
+- [METHOD-023 — Boundary First Flattening (BFF) reference backend](METHOD-023-boundary-first-flattening-reference-backend.md)
+  (`in-progress`; owner: Codex; branch: `codex/arch-006-completion`). Paper
+  intake and scope correction are complete; next gate is the focused geometry
+  reference implementation/test slice.
 
 ## History
 

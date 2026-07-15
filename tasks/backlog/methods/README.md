@@ -53,9 +53,6 @@ map.
 - [METHOD-022 — SLIM locally-injective parameterization reference backend](METHOD-022-slim-injective-parameterization-reference-backend.md)
   (adds its concrete flip-free SLIM params alternative; gated on `GEOM-064`
   and `METHOD-021`; roadmap Pack 4).
-- [METHOD-023 — Boundary First Flattening (BFF) reference backend](METHOD-023-boundary-first-flattening-reference-backend.md)
-  (unblocked; adds its concrete controllable-conformal BFF params alternative
-  with boundary length/angle targets and cones; new SOTA pack).
 - [METHOD-024 — Spectral Conformal Parameterization (SCP) reference backend](METHOD-024-spectral-conformal-parameterization-reference-backend.md)
   (adds its concrete pin-free conformal SCP params alternative; gated on the
   `geometry/GEOM-024` generalized eigensolver seam; new SOTA pack).
@@ -69,6 +66,13 @@ map.
   (LSCM/SCP/BFF) record no GPU follow-up in their own tasks).
 
 ## Convergence
+
+- `METHOD-023` is active in
+  [`tasks/active/`](../../active/METHOD-023-boundary-first-flattening-reference-backend.md).
+  Its paper audit bounded the reference to disk BFF with automatic, approximate
+  target-length, and exterior-angle modes; cone BFF requires a future
+  seam-aware cut/result contract and is not approximated on the current
+  one-UV-per-vertex surface.
 
 - METHOD-001 contributes to **Theme C — Physics readiness** and is retired at
   `CPUContracted`. Runtime/ECS integration and any performance backend remain

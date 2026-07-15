@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `METHOD-023` — Boundary First Flattening (BFF) reference backend (tasks/active/METHOD-023-boundary-first-flattening-reference-backend.md)
 
 ## Theme B — Rendering modernization
 
@@ -81,7 +81,6 @@ the authoritative open/unblocked view.
 - blocked by `METHOD-019`: `METHOD-020` — LOP-family GPU (Vulkan compute) backend and parity (tasks/backlog/methods/METHOD-020-lop-family-gpu-vulkan-compute-backend.md)
 - blocked by `GEOM-064`: `METHOD-021` — ARAP (local/global) parameterization reference backend (tasks/backlog/methods/METHOD-021-arap-parameterization-reference-backend.md)
 - blocked by `GEOM-064`: `METHOD-022` — SLIM locally-injective parameterization reference backend (tasks/backlog/methods/METHOD-022-slim-injective-parameterization-reference-backend.md)
-- unblocked: `METHOD-023` — Boundary First Flattening (BFF) reference backend (tasks/backlog/methods/METHOD-023-boundary-first-flattening-reference-backend.md)
 - blocked by `GEOM-024`: `METHOD-024` — Spectral Conformal Parameterization (SCP) reference backend (tasks/backlog/methods/METHOD-024-spectral-conformal-parameterization-reference-backend.md)
 - blocked by `METHOD-021`: `METHOD-025` — Parameterization family optimized CPU backend and comparison benchmark (tasks/backlog/methods/METHOD-025-parameterization-family-optimized-cpu-backend.md)
 - blocked by `METHOD-025`: `METHOD-026` — Parameterization family GPU (Vulkan compute) backend and parity (tasks/backlog/methods/METHOD-026-parameterization-family-gpu-vulkan-compute-backend.md)
