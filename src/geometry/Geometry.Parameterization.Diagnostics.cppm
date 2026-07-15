@@ -3,6 +3,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <vector>
 
 #include <glm/fwd.hpp>
 
@@ -52,6 +53,13 @@ export namespace Geometry::Parameterization
         double MeanConformalError{0.0};
         double RootMeanSquareConformalError{0.0};
         double MaxConformalError{0.0};
+
+        /// Face-storage-aligned conformal distortion values. The vector size
+        /// equals FaceStorageCount and each entry is indexed by
+        /// FaceHandle::Index. Evaluated triangle entries contain the
+        /// dimensionless singular-value ratio sigma_max / sigma_min (>= 1);
+        /// deleted, skipped, and invalid faces contain quiet NaN.
+        std::vector<float> FaceConformalDistortion{};
 
         double MeanAreaRatio{0.0};
         double MinAreaRatio{0.0};

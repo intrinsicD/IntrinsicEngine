@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <limits>
 #include <vector>
 
@@ -39,6 +40,9 @@ TEST(ParameterizationDiagnostics, IdentityTriangleHasZeroNormalizedError)
     EXPECT_EQ(diagnostics.EvaluatedFaceCount, 1u);
     EXPECT_EQ(diagnostics.SkippedFaceCount, 0u);
     EXPECT_EQ(diagnostics.FlippedElementCount, 0u);
+    ASSERT_EQ(diagnostics.FaceConformalDistortion.size(), diagnostics.FaceStorageCount);
+    ASSERT_EQ(diagnostics.FaceConformalDistortion.size(), 1u);
+    EXPECT_NEAR(diagnostics.FaceConformalDistortion[0], 1.0f, static_cast<float>(kTolerance));
     EXPECT_NEAR(diagnostics.MeanConformalDistortion, 1.0, kTolerance);
     EXPECT_NEAR(diagnostics.MeanConformalError, 0.0, kTolerance);
     EXPECT_NEAR(diagnostics.RootMeanSquareConformalError, 0.0, kTolerance);
@@ -57,6 +61,9 @@ TEST(ParameterizationDiagnostics, IdentitySquareReportsBoundaryMetrics)
 
     EXPECT_EQ(diagnostics.Status, Geometry::Parameterization::ParameterizationDiagnosticsStatus::Success);
     EXPECT_EQ(diagnostics.EvaluatedFaceCount, 2u);
+    ASSERT_EQ(diagnostics.FaceConformalDistortion.size(), 2u);
+    EXPECT_NEAR(diagnostics.FaceConformalDistortion[0], 1.0f, static_cast<float>(kTolerance));
+    EXPECT_NEAR(diagnostics.FaceConformalDistortion[1], 1.0f, static_cast<float>(kTolerance));
     EXPECT_EQ(diagnostics.BoundaryLoopCount, 1u);
     EXPECT_EQ(diagnostics.BoundaryEdgeCount, 4u);
     EXPECT_EQ(diagnostics.SkippedBoundaryEdgeCount, 0u);
@@ -80,6 +87,9 @@ TEST(ParameterizationDiagnostics, StretchedRectangleHasPredictableDistortion)
 
     EXPECT_EQ(diagnostics.Status, Geometry::Parameterization::ParameterizationDiagnosticsStatus::Success);
     EXPECT_EQ(diagnostics.EvaluatedFaceCount, 2u);
+    ASSERT_EQ(diagnostics.FaceConformalDistortion.size(), 2u);
+    EXPECT_NEAR(diagnostics.FaceConformalDistortion[0], 2.0f, static_cast<float>(kTolerance));
+    EXPECT_NEAR(diagnostics.FaceConformalDistortion[1], 2.0f, static_cast<float>(kTolerance));
     EXPECT_NEAR(diagnostics.MeanConformalDistortion, 2.0, kTolerance);
     EXPECT_NEAR(diagnostics.MaxConformalDistortion, 2.0, kTolerance);
     EXPECT_NEAR(diagnostics.RootMeanSquareConformalError, 1.0, kTolerance);
@@ -127,6 +137,8 @@ TEST(ParameterizationDiagnostics, DegeneratePositionTriangleIsSkipped)
     EXPECT_EQ(diagnostics.EvaluatedFaceCount, 0u);
     EXPECT_EQ(diagnostics.SkippedFaceCount, 1u);
     EXPECT_EQ(diagnostics.DegeneratePositionFaceCount, 1u);
+    ASSERT_EQ(diagnostics.FaceConformalDistortion.size(), 1u);
+    EXPECT_TRUE(std::isnan(diagnostics.FaceConformalDistortion[0]));
 }
 
 TEST(ParameterizationDiagnostics, DegenerateUvTriangleIsSkipped)
@@ -144,6 +156,25 @@ TEST(ParameterizationDiagnostics, DegenerateUvTriangleIsSkipped)
     EXPECT_EQ(diagnostics.EvaluatedFaceCount, 0u);
     EXPECT_EQ(diagnostics.SkippedFaceCount, 1u);
     EXPECT_EQ(diagnostics.DegenerateUvFaceCount, 1u);
+    ASSERT_EQ(diagnostics.FaceConformalDistortion.size(), 1u);
+    EXPECT_TRUE(std::isnan(diagnostics.FaceConformalDistortion[0]));
+}
+
+TEST(ParameterizationDiagnostics, DeletedFaceKeepsStorageAlignedNanSentinel)
+{
+    auto mesh = MakeTwoTriangleSquare();
+    mesh.DeleteFace(Geometry::FaceHandle{0u});
+    const auto uvs = IdentitySquareUvs();
+
+    const auto diagnostics = Geometry::Parameterization::EvaluateParameterizationDiagnostics(mesh, uvs);
+
+    EXPECT_EQ(diagnostics.Status, Geometry::Parameterization::ParameterizationDiagnosticsStatus::Success);
+    EXPECT_EQ(diagnostics.FaceStorageCount, 2u);
+    EXPECT_EQ(diagnostics.DeletedFaceCount, 1u);
+    EXPECT_EQ(diagnostics.EvaluatedFaceCount, 1u);
+    ASSERT_EQ(diagnostics.FaceConformalDistortion.size(), diagnostics.FaceStorageCount);
+    EXPECT_TRUE(std::isnan(diagnostics.FaceConformalDistortion[0]));
+    EXPECT_NEAR(diagnostics.FaceConformalDistortion[1], 1.0f, static_cast<float>(kTolerance));
 }
 
 TEST(ParameterizationDiagnostics, NonTriangleFaceIsReported)

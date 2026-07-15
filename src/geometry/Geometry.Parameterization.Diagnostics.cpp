@@ -136,6 +136,9 @@ namespace Geometry::Parameterization
         ParameterizationDiagnostics diagnostics{};
         diagnostics.VertexStorageCount = mesh.VerticesSize();
         diagnostics.FaceStorageCount = mesh.FacesSize();
+        diagnostics.FaceConformalDistortion.assign(
+            diagnostics.FaceStorageCount,
+            std::numeric_limits<float>::quiet_NaN());
 
         if (mesh.VertexCount() == 0u || mesh.FaceCount() == 0u)
         {
@@ -253,6 +256,7 @@ namespace Geometry::Parameterization
             }
 
             const double conformal = sv.Max / sv.Min;
+            diagnostics.FaceConformalDistortion[fi] = static_cast<float>(conformal);
             const double conformalError = std::abs(conformal - 1.0);
             const double areaRatio = uvArea / area3d;
             const double areaDistortion = ReciprocalSymmetricDistortion(areaRatio);
