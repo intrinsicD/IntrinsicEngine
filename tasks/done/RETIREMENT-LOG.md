@@ -8,6 +8,21 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`METHOD-023`](METHOD-023-boundary-first-flattening-reference-backend.md) —
+Boundary First Flattening retired on 2026-07-15 at `CPUContracted`.
+Implementation commit `4bf4f67b` added a typed disk-BFF strategy with
+automatic conformal, approximate target-length, and prescribed exterior-angle
+modes, paper-weighted best-fit boundary closure, separate Dirichlet and
+grounded-Neumann solves, and harmonic or holomorphic interior extension. The
+surface deliberately excludes cone/cut output that one UV per original vertex
+cannot represent, reports rather than hides length/closure residuals, and
+fails closed on invalid topology, geometry, boundary data, factorization, and
+diagnostic outcomes. Analytic, scale, closed-form closure, deterministic, and
+failure regressions plus the manifest-backed correctness smoke passed; the
+post-review focused selection passed 43/43 and the default CPU-supported gate
+passed 3,726/3,726 in 374.73 seconds. Runtime/config integration remains owned
+by `RUNTIME-176`; visible editor operation remains owned by `UI-036`.
+
 [`GEOM-063`](GEOM-063-unified-cpu-parameterization-strategy-dispatch.md) — the
 unified CPU parameterization strategy dispatch retired on 2026-07-15 at
 `CPUContracted`. Right-sizing removed the speculative global backend axis,

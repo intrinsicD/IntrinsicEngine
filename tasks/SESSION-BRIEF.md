@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `METHOD-023` — Boundary First Flattening (BFF) reference backend (tasks/active/METHOD-023-boundary-first-flattening-reference-backend.md)
+- none
 
 ## Theme B — Rendering modernization
 

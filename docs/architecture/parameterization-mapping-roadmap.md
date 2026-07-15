@@ -192,7 +192,7 @@ Dependencies:
 
 ## Pack 4c — Boundary First Flattening (BFF) boundary control
 
-Active task: [`METHOD-023`](../../tasks/active/METHOD-023-boundary-first-flattening-reference-backend.md) (adds the controllable-conformal `Bff` strategy).
+Retired task: [`METHOD-023`](../../tasks/done/METHOD-023-boundary-first-flattening-reference-backend.md) (adds the controllable-conformal `Bff` strategy).
 
 Scope:
 

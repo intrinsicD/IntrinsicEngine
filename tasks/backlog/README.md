@@ -351,7 +351,7 @@ EAR/anisotropic (blocked by `METHOD-016`/`GEOM-062`), `METHOD-019` optimized CPU
 `METHOD-016`) and `UI-035` (blocked by `RUNTIME-175`); the parameterization
 family on the retired `GEOM-063` shared surface — `METHOD-021` ARAP (blocked by
 `GEOM-064`), `METHOD-022` SLIM (blocked by `GEOM-064`/`METHOD-021`),
-`METHOD-023` BFF (unblocked),
+`METHOD-023` BFF (retired),
 `METHOD-024` SCP (blocked by `GEOM-024`), `METHOD-025` optimized CPU
 (blocked by `METHOD-021`/`022`), `METHOD-026` GPU (blocked by
 `METHOD-025`/`RUNTIME-176`; iterative strategies only), and

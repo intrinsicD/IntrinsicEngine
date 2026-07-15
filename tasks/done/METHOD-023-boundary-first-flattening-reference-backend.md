@@ -3,6 +3,7 @@ id: METHOD-023
 theme: I
 depends_on: [GEOM-063]
 maturity_target: CPUContracted
+completed_on: 2026-07-15
 ---
 # METHOD-023 — Boundary First Flattening (BFF) reference backend
 
@@ -60,9 +61,8 @@ maturity_target: CPUContracted
 - Backend axis: `cpu_reference` only. No `gpu_vulkan_compute` backend is planned — `METHOD-026` covers only the iterative strategies. The interior solves are linear and already fast, so no `cpu_optimized` is planned either unless a benchmark justifies it.
 
 ## Status
-- Implementation and evidence complete on branch
-  `codex/arch-006-completion`; owner: Codex. Ready to retire at
-  `CPUContracted`.
+- Completed on 2026-07-15 at `CPUContracted` on branch
+  `codex/arch-006-completion`; implementation commit: `4bf4f67b`.
 - Dependency `GEOM-063` is retired. Paper intake and repository-seam audit are
   complete; cone and exact-length overclaims were removed before code landed.
 - Slices 1-3 are complete: paper-derived contract, CPU reference, analytic and

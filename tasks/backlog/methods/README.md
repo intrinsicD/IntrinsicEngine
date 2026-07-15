@@ -67,8 +67,8 @@ map.
 
 ## Convergence
 
-- `METHOD-023` is active in
-  [`tasks/active/`](../../active/METHOD-023-boundary-first-flattening-reference-backend.md).
+- `METHOD-023` is retired; its authoritative task record is under
+  `tasks/done/METHOD-023-boundary-first-flattening-reference-backend.md`.
   Its paper audit bounded the reference to disk BFF with automatic, approximate
   target-length, and exterior-angle modes; cone BFF requires a future
   seam-aware cut/result contract and is not approximated on the current

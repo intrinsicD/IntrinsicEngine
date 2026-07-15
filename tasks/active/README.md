@@ -11,10 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [METHOD-023 — Boundary First Flattening (BFF) reference backend](METHOD-023-boundary-first-flattening-reference-backend.md)
-  (`in-progress`; owner: Codex; branch: `codex/arch-006-completion`). The CPU
-  reference, correctness tests, benchmark, docs, and full default CPU gate are
-  complete; the task is ready to retire at `CPUContracted`.
+None.
 
 ## History
 
