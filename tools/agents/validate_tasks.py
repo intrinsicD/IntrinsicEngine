@@ -458,7 +458,14 @@ def main() -> int:
 
     files = find_markdown_files(root)
     if not files:
-        print(f"No task markdown files found under {root}.")
+        searched = ", ".join(
+            str(root / lifecycle) for lifecycle in ("active", "backlog", "done")
+        )
+        message = f"No task markdown files found; searched: {searched}."
+        if args.strict:
+            print(f"ERROR: {message}", file=sys.stderr)
+            return 1
+        print(f"WARNING: {message}")
         return 0
 
     mode = "strict" if args.strict else "warning"

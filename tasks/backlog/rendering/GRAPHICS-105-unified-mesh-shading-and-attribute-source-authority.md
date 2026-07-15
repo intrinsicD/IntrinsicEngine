@@ -74,7 +74,7 @@ maturity_target: Operational
 ## Verification
 ```bash
 python3 tools/agents/check_task_policy.py --root . --strict
-python3 tools/agents/validate_tasks.py --root .
+python3 tools/agents/validate_tasks.py --root tasks --strict
 python3 tools/docs/check_doc_links.py --root .
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict

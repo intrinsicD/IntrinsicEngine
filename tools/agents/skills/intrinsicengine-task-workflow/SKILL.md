@@ -215,7 +215,7 @@ Every task execution should follow:
 python3 tools/agents/check_task_policy.py --root . --strict
 
 # Full task validator
-python3 tools/agents/validate_tasks.py --root .
+python3 tools/agents/validate_tasks.py --root tasks --strict
 ```
 
 The validator enforces the nine required sections; the optional `## Maturity`

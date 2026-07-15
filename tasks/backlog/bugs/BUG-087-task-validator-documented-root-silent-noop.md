@@ -16,6 +16,8 @@ depends_on: []
 - No hand-editing generated skill reference mirrors.
 
 ## Context
+- Claimed on 2026-07-16 by Codex on branch
+  `codex/arch-006-completion`.
 - Symptom: `docs/agent/task-format.md` and its generated task-workflow skill
   instruct agents to run `python3 tools/agents/validate_tasks.py --root .`.
   On 2026-07-15 that command exited zero with `No task markdown files found`

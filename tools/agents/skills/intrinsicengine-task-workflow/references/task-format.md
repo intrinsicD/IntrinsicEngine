@@ -173,7 +173,7 @@ they are not precedent).
 
 When **batch-seeding** several tasks (e.g. converting review findings into a
 task series), allocate the whole contiguous range up front and run
-`python3 tools/agents/validate_tasks.py --root .` locally before committing —
+`python3 tools/agents/validate_tasks.py --root tasks --strict` locally before committing —
 CI enforces uniqueness, but a concurrent session may claim the same numbers
 in flight (`GEOM-027` collided this way and had to be renumbered by
 `PROC-012`). If two branches race, the first one merged keeps the numbers and
