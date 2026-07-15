@@ -318,3 +318,69 @@ observations:
     promoted_to: "logic/solution/heuristics.md:H03"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O30
+    timestamp: "2026-07-15T09:51"
+    provenance: ai-executed
+    content: "The bounded disk BFF CPU reference deterministically produces finite automatic-conformal, approximate target-boundary-length, and prescribed exterior-angle UVs while reporting residual diagnostics and failing closed on unsupported or invalid input; it makes no cone-support claim."
+    context: "METHOD-023 implementation, correctness review, method/benchmark validation, and CPUContracted retirement."
+    potential_type: claim
+    bound_to: [N213, N215]
+    promoted: true
+    promoted_to: "logic/claims.md:C02"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O31
+    timestamp: "2026-07-15T09:51"
+    provenance: ai-executed
+    content: "A one-UV-per-original-vertex result cannot represent BFF cone cuts that duplicate seam and corner degrees of freedom, so cone support remains excluded until a seam-aware chart/cut result contract exists."
+    context: "METHOD-023 paper intake, result-shape audit, right-sizing decision, and task retirement."
+    potential_type: constraint
+    bound_to: [N213, N215]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K15"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O32
+    timestamp: "2026-07-15T09:51"
+    provenance: ai-executed
+    content: "Runtime parameterization control uses stable schema tokens and typed LSCM, harmonic, and BFF records through one validated preview/apply path for Editor, AgentCli, and Programmatic sources; it exposes only implemented CPU strategies and no backend selector."
+    context: "RUNTIME-176 config, facade, parity tests, right-sizing review, and CPUContracted retirement."
+    potential_type: architecture
+    bound_to: [N213, N215]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A09"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O33
+    timestamp: "2026-07-15T09:51"
+    provenance: ai-executed
+    content: "Persistent parameterization undo/redo closures must not capture a session-owned view-model cache; they capture only engine-lived scene identity and copied mutation state, while the active cache is invalidated synchronously."
+    context: "RUNTIME-176 independent lifetime review and ASan regression that destroys the session cache before undo/redo."
+    potential_type: constraint
+    bound_to: [N214, N215]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K16"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O34
+    timestamp: "2026-07-15T09:51"
+    provenance: ai-executed
+    content: "Reconstructing a geometry source for an algorithm must preserve deleted vertex tombstones and storage indexing; converting deleted slots into live isolated vertices changes topology and can invalidate a valid disk."
+    context: "RUNTIME-176 independent topology review and ten-slot disk-with-tombstone regression."
+    potential_type: constraint
+    bound_to: [N214, N215]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K17"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O35
+    timestamp: "2026-07-15T09:51"
+    provenance: ai-executed
+    content: "When a config serializer persists all strategy parameter records, edit-time validation must validate inactive records too; otherwise invalid inactive enum values can silently serialize as fallback tokens."
+    context: "RUNTIME-176 config round-trip and preview/validate-then-apply review."
+    potential_type: heuristic
+    bound_to: [N214, N215]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H04"
+    crystallized_via: artifact-commitment
+    stale: false

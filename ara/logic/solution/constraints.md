@@ -168,3 +168,42 @@
   tasks/done/GEOM-063-unified-cpu-parameterization-strategy-dispatch.md,
   N211, N212]
 - **From staging**: O28
+
+## K15: BFF Cone Support Requires a Seam-Aware Result
+- **Constraint**: A one-UV-per-original-vertex result cannot represent BFF
+  cone cuts that duplicate seam and corner degrees of freedom. Cone support
+  remains excluded until a seam-aware chart/cut result contract exists; it
+  must not be approximated behind the current result shape.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [src/geometry/Geometry.Parameterization.Bff.cppm,
+  methods/geometry/boundary_first_flattening/README.md,
+  tasks/done/METHOD-023-boundary-first-flattening-reference-backend.md,
+  N213, N215]
+- **From staging**: O31
+
+## K16: Persistent History Cannot Own Session Cache Lifetimes
+- **Constraint**: Parameterization undo/redo closures may capture only
+  engine-lived scene identity and copied mutation state, never a session-owned
+  view-model cache that can be destroyed before the history entry. The active
+  cache is invalidated synchronously when the command is applied.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [src/runtime/Runtime.SandboxParameterizationFacade.cpp,
+  tests/contract/runtime/Test.ParameterizationFacade.cpp,
+  tasks/done/RUNTIME-176-parameterization-runtime-config-integration.md,
+  N214, N215]
+- **From staging**: O33
+
+## K17: Algorithm Reconstruction Preserves Deleted Storage Slots
+- **Constraint**: Reconstructing geometry-source data for an algorithm must
+  preserve deleted vertex tombstones and storage-aligned indexing. Converting
+  deleted slots into live isolated vertices changes topology and can reject a
+  disk that is valid in the source representation.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [src/runtime/Runtime.SandboxParameterizationFacade.cpp,
+  tests/contract/runtime/Test.ParameterizationFacade.cpp,
+  tasks/done/RUNTIME-176-parameterization-runtime-config-integration.md,
+  N214, N215]
+- **From staging**: O34

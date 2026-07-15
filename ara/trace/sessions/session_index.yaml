@@ -106,8 +106,8 @@ sessions:
     open_threads: 5
   - id: "2026-07-15_001"
     date: "2026-07-15"
-    summary: "Retired GEOM-019, GEOM-014, and GEOM-063 after review-driven parameterization, simplification, benchmark, and task-truth closure."
-    turn_count: 1
-    events_count: 6
-    claims_touched: []
+    summary: "Retired GEOM-019, GEOM-014, GEOM-063, METHOD-023, and RUNTIME-176 after review-driven parameterization, simplification, BFF, config/runtime, benchmark, and task-truth closure."
+    turn_count: 2
+    events_count: 15
+    claims_touched: [C02]
     open_threads: 5

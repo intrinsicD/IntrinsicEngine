@@ -4994,3 +4994,68 @@ tree:
       benchmark, skill-mirror, PR-contract, and generated-inventory checks
       passed; METHOD-023 and RUNTIME-176 became unblocked.
     status: resolved
+  - id: N213
+    type: decision
+    title: "Sequence BFF reference before runtime parameterization integration"
+    provenance: ai-executed
+    timestamp: "2026-07-15T09:51"
+    also_depends_on: [N210, N212]
+    choice: >
+      Implement and retire METHOD-023 first, then promote, implement, and
+      retire RUNTIME-176 so the runtime config and command surface names only
+      concrete implemented CPU strategies and payloads.
+    alternatives:
+      - "Integrate only the three pre-existing strategies and leave BFF outside the runtime contract."
+      - "Add a speculative generic backend selector before a second implementation exists."
+      - "Choose an unrelated unblocked backlog task after the geometry closure."
+    evidence:
+      - "tasks/done/METHOD-023-boundary-first-flattening-reference-backend.md"
+      - "tasks/done/RUNTIME-176-parameterization-runtime-config-integration.md"
+      - "commit 4bf4f67b"
+      - "commit e8c3f73e"
+    status: resolved
+  - id: N214
+    type: dead_end
+    title: "Reject unsafe parameterization history and topology reconstruction"
+    provenance: ai-executed
+    timestamp: "2026-07-15T09:51"
+    also_depends_on: [N213]
+    hypothesis: >
+      The first runtime facade was complete once it applied UVs, recorded
+      undo/redo closures, and reconstructed a solver mesh from the geometry
+      source's vertex positions and faces.
+    failure_mode: >
+      Independent review found that persistent history closures captured the
+      session-owned model cache and could outlive it, while reconstruction
+      converted deleted vertex tombstones into live isolated vertices and
+      rejected otherwise valid storage-aligned disk meshes.
+    lesson: >
+      Persistent history may capture only engine-lived or copied mutation
+      state, and algorithm-side reconstruction must preserve deletion and
+      storage-index semantics rather than rebuilding only apparent topology.
+    status: resolved
+  - id: N215
+    type: experiment
+    title: "BFF and runtime parameterization closure verification"
+    provenance: ai-executed
+    timestamp: "2026-07-15T09:51"
+    also_depends_on: [N212, N213, N214]
+    evidence:
+      - "tasks/done/METHOD-023-boundary-first-flattening-reference-backend.md"
+      - "tasks/done/RUNTIME-176-parameterization-runtime-config-integration.md"
+      - "ctest --test-dir build/ci --output-on-failure -R 'Parameterization|EngineConfig' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "commit 93313a37"
+      - "commit f2094490"
+    result: >
+      METHOD-023 and RUNTIME-176 retired at CPUContracted after independent
+      code, benchmark, and task-retirement review. The runtime facade passed
+      13/13 ASan/UBSan tests, the combined Parameterization/EngineConfig set
+      passed 56/56, and the full Clang-23 CPU-supported gate passed 3,743/3,743
+      in 380.43 seconds. Strict layering, task, test-layout, docs-link,
+      generated-session, inventory, and clean-workshop checks passed. Review
+      corrections removed the history lifetime hazard and preserved deleted
+      vertex tombstones; UI-036 became unblocked.
+    status: resolved

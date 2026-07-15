@@ -2,9 +2,9 @@ session:
   id: "2026-07-15_001"
   date: "2026-07-15"
   started: "2026-07-15T00:44"
-  last_turn: "2026-07-15T02:18"
-  turn_count: 1
-  summary: "Retired GEOM-019, GEOM-014, and GEOM-063 after review-driven parameterization, simplification, benchmark, and task-truth closure."
+  last_turn: "2026-07-15T09:51"
+  turn_count: 2
+  summary: "Retired GEOM-019, GEOM-014, GEOM-063, METHOD-023, and RUNTIME-176 after review-driven parameterization, simplification, BFF, config/runtime, benchmark, and task-truth closure."
 
 events_logged:
   - turn: 1
@@ -43,6 +43,60 @@ events_logged:
     routing: crystallized
     provenance: ai-executed
     summary: "Crystallized aggregate repeated-smoke correctness accounting as H03."
+  - turn: 2
+    type: decision
+    id: "N213"
+    routing: direct
+    provenance: ai-executed
+    summary: "Sequenced the concrete BFF CPU reference before its runtime/config integration and rejected a speculative backend axis."
+  - turn: 2
+    type: dead_end
+    id: "N214"
+    routing: direct
+    provenance: ai-executed
+    summary: "Independent review rejected history closures with session-cache lifetime coupling and topology reconstruction that revived deleted vertices."
+  - turn: 2
+    type: experiment
+    id: "N215"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired METHOD-023 and RUNTIME-176 after focused, combined, 3,743-test CPU, and strict structural verification."
+  - turn: 2
+    type: claim
+    id: "O30"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized bounded deterministic three-control BFF reference support as C02."
+  - turn: 2
+    type: constraint
+    id: "O31"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the seam-aware result prerequisite for BFF cone support as K15."
+  - turn: 2
+    type: architecture
+    id: "O32"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the typed current-strategy-only parameterization config/apply lane as A09."
+  - turn: 2
+    type: constraint
+    id: "O33"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the persistent-history/session-cache lifetime boundary as K16."
+  - turn: 2
+    type: constraint
+    id: "O34"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized deleted-slot-preserving algorithm reconstruction as K17."
+  - turn: 2
+    type: heuristic
+    id: "O35"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized validation of every serialized strategy record as H04."
 
 ai_actions:
   - turn: 1
@@ -67,20 +121,48 @@ ai_actions:
     action: "Passed focused parameterization and simplification binaries, the manifest-backed benchmark pair and strict result validation, the 9,250-test CPU-supported gate, and strict task/docs/layering/test-layout/method/benchmark/inventory/PR-contract checks; committed the technical result through 922ce877."
     provenance: ai-executed
     files_changed: []
+  - turn: 2
+    action: "Right-sized and implemented METHOD-023 as a bounded CPU reference for automatic conformal, approximate target-length, and prescribed exterior-angle BFF controls, with deterministic correctness tests, residual diagnostics, method/benchmark manifests, and explicit cone/result-shape limits."
+    provenance: ai-executed
+    files_changed:
+      - "src/geometry/Geometry.Parameterization.Bff.cppm"
+      - "src/geometry/Geometry.Parameterization.Bff.cpp"
+      - "tests/unit/geometry/Test.BoundaryFirstFlattening.cpp"
+      - "methods/geometry/boundary_first_flattening/method.yaml"
+      - "tasks/done/METHOD-023-boundary-first-flattening-reference-backend.md"
+  - turn: 2
+    action: "Implemented RUNTIME-176 with schema-v1 parameterization config, shared Editor/AgentCli/Programmatic validation/apply, undoable UV writeback, and a pointer-free UV/triangle/diagnostics model; independent review then removed session-cache capture from persistent history and restored deleted tombstones during solver reconstruction."
+    provenance: ai-executed
+    files_changed:
+      - "src/core/Core.Config.Engine.cppm"
+      - "src/core/Core.Config.EngineLoad.cpp"
+      - "src/runtime/Runtime.SandboxEditorFacades.cppm"
+      - "src/runtime/Runtime.SandboxParameterizationFacade.cpp"
+      - "tests/contract/runtime/Test.ParameterizationFacade.cpp"
+      - "tasks/done/RUNTIME-176-parameterization-runtime-config-integration.md"
+  - turn: 2
+    action: "Passed 13/13 focused runtime facade tests, 56/56 combined Parameterization/EngineConfig tests, the 3,743-test default CPU gate, strict structural checks, and retirement reviews; committed both technical slices and task retirements through f2094490."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/SESSION-BRIEF.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+      - "tasks/backlog/ui/UI-036-parameterization-control-and-uv-inspection.md"
 
-claims_touched: []
+claims_touched: [C02]
 
 key_context:
   - turn: 1
     excerpt: "User instructed the agent to use the agentic workflow to execute the full proposed work order."
+  - turn: 2
+    excerpt: "User reiterated that the agentic workflow should execute all selected backlog work."
 
 open_threads:
-  - "Choose the next parameterization-chain slice: RUNTIME-176 CPU engine integration or METHOD-023's new concrete strategy now that GEOM-063 is retired."
+  - "UI-036 is now unblocked and is the next visible Operational parameterization slice over the completed runtime facade."
   - "BUG-081 still needs a comparable warm-configure population before recalibrating its exact-vcpkg-hit latency guard."
   - "Resolve whether model training means GEOM-058 or a new neural/LLM workflow."
   - "BUG-082 and BUG-083 still need evidence from the environments where their reported failures reproduce."
-  - "The verified geometry closure branch remains local because publication was not requested."
+  - "The verified parameterization closure branch remains local because publication was not requested."
 
 ai_suggestions_pending:
-  - "Prefer RUNTIME-176 next to make the completed CPU strategy family operational before adding another solver."
+  - "Prefer UI-036 next so the app-owned editor can expose the completed parameterization config, command, UV, and aggregate-diagnostics model."
   - "Treat GEOM-058 Gaussian-mixture fitting as the provisional repository-native model-training target unless the user specifies a neural or LLM model."

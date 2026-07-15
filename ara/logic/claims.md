@@ -17,3 +17,22 @@
 - **Dependencies**: []
 - **Tags**: CI, ccache, C++23 modules, gate latency
 - **From staging**: O15
+
+## C02: Bounded disk BFF supports three deterministic CPU reference controls
+- **Statement**: On supported triangle disks, the METHOD-023 CPU reference
+  deterministically produces finite UVs for automatic conformal, approximate
+  target-boundary-length, and prescribed exterior-angle controls, reports
+  residual diagnostics, and fails closed for unsupported or invalid input.
+- **Status**: supported
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: A supported deterministic fixture produces
+  non-finite or nondeterministic UVs, a declared control fails its residual or
+  orientation contract, or unsupported topology/input returns a UV payload.
+- **Proof**: [tasks/done/METHOD-023-boundary-first-flattening-reference-backend.md,
+  tests/unit/geometry/Test.BoundaryFirstFlattening.cpp,
+  src/geometry/Geometry.Parameterization.Bff.cpp,
+  commit 4bf4f67b]
+- **Dependencies**: [K14, K15]
+- **Tags**: geometry, parameterization, BFF, CPU reference
+- **From staging**: O30

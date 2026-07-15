@@ -42,3 +42,18 @@
   tasks/done/GEOM-014-feature-aware-quadric-error-simplification.md,
   N211, N212]
 - **From staging**: O29
+
+## H04: Validate Every Persisted Strategy Record
+- **Rationale**: When serialization persists all strategy parameter records,
+  edit-time validation should validate inactive records as well as the selected
+  one; otherwise an invalid inactive enum can silently become a fallback token
+  during serialization and break faithful round trips.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Sensitivity**: medium
+- **Code ref**: [src/core/Core.Config.EngineLoad.cpp,
+  src/runtime/Runtime.EngineConfigControl.cpp,
+  tests/contract/runtime/Test.ParameterizationFacade.cpp,
+  tasks/done/RUNTIME-176-parameterization-runtime-config-integration.md,
+  N214, N215]
+- **From staging**: O35

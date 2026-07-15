@@ -79,3 +79,19 @@
   tasks/done/GEOM-014-feature-aware-quadric-error-simplification.md,
   tasks/done/GEOM-063-unified-cpu-parameterization-strategy-dispatch.md]
 - **From staging**: O27
+
+## A09: Parameterization Uses One Typed Config and Apply Lane
+- **Decision**: Runtime parameterization control uses stable schema tokens and
+  typed LSCM, harmonic, and BFF parameter records through the same validated
+  preview/apply path for `Editor`, `AgentCli`, and `Programmatic` sources. The
+  surface exposes only the implemented LSCM, harmonic-cotangent,
+  Tutte-uniform, and BFF CPU strategies and has no speculative backend picker.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [src/core/Core.Config.Engine.cppm,
+  src/core/Core.Config.EngineLoad.cpp,
+  src/runtime/Runtime.SandboxParameterizationFacade.cpp,
+  tests/contract/runtime/Test.ParameterizationFacade.cpp,
+  tasks/done/RUNTIME-176-parameterization-runtime-config-integration.md,
+  N213, N215]
+- **From staging**: O32
