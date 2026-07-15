@@ -204,6 +204,9 @@ TEST(RuntimeEngineLayering, ObjectSpaceNormalBakeServiceKeepsGpuQueueComposition
         ReadFile(RepoRoot() / "src/runtime/Runtime.ObjectSpaceNormalBakeService.cppm");
     const auto serviceImpl =
         ReadFile(RepoRoot() / "src/runtime/Runtime.ObjectSpaceNormalBakeService.cpp");
+    const auto runtimeCMake = ReadFile(RepoRoot() / "src/runtime/CMakeLists.txt");
+    const auto moduleInventory =
+        ReadFile(RepoRoot() / "docs/api/generated/module_inventory.md");
 
     EXPECT_NE(engineInterface.find("import Extrinsic.Runtime.ObjectSpaceNormalBakeService"),
               std::string::npos);
@@ -239,11 +242,18 @@ TEST(RuntimeEngineLayering, ObjectSpaceNormalBakeServiceKeepsGpuQueueComposition
 
     EXPECT_NE(serviceInterface.find("export module Extrinsic.Runtime.ObjectSpaceNormalBakeService"),
               std::string::npos);
-    EXPECT_NE(serviceInterface.find("RuntimeObjectSpaceNormalBakeGpuQueue m_GpuQueue"),
-              std::string::npos);
     EXPECT_NE(serviceInterface.find("export import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue"),
               std::string::npos);
-    EXPECT_NE(serviceImpl.find("RuntimeObjectSpaceNormalBakeGpuQueueDependencies"),
+    EXPECT_EQ(serviceInterface.find("import Extrinsic.Runtime.ObjectSpaceNormalBakeGpuQueue"),
+              std::string::npos);
+    EXPECT_EQ(serviceInterface.find("RuntimeObjectSpaceNormalBakeGpuQueue"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("struct Impl;"), std::string::npos);
+    EXPECT_NE(serviceInterface.find("std::unique_ptr<Impl> m_Impl"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("struct ObjectSpaceNormalBakeService::Impl"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("MakeGpuQueueParticipantDesc()"),
               std::string::npos);
     const auto readyFrameDefinition =
         serviceImpl.find("ObjectSpaceNormalBakeReadyFrame(");
@@ -253,7 +263,15 @@ TEST(RuntimeEngineLayering, ObjectSpaceNormalBakeServiceKeepsGpuQueueComposition
               std::string::npos);
     EXPECT_EQ(serviceImpl.find("device->GetGlobalFrameNumber() + 1u"),
               std::string::npos);
-    EXPECT_NE(serviceImpl.find("jobs.RegisterGpuQueueParticipant(m_GpuQueue.MakeGpuQueueParticipantDesc())"),
+    EXPECT_NE(serviceImpl.find("jobs.RegisterGpuQueueParticipant("),
+              std::string::npos);
+    EXPECT_FALSE(std::filesystem::exists(
+        RepoRoot() / "src/runtime/Runtime.ObjectSpaceNormalBakeGpuQueue.cppm"));
+    EXPECT_FALSE(std::filesystem::exists(
+        RepoRoot() / "src/runtime/Runtime.ObjectSpaceNormalBakeGpuQueue.cpp"));
+    EXPECT_EQ(runtimeCMake.find("Runtime.ObjectSpaceNormalBakeGpuQueue"),
+              std::string::npos);
+    EXPECT_EQ(moduleInventory.find("Extrinsic.Runtime.ObjectSpaceNormalBakeGpuQueue"),
               std::string::npos);
 }
 

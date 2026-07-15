@@ -28,7 +28,6 @@ target_sources(${target_name}
         Runtime.MeshPrimitiveViewControls.cppm
         Runtime.MethodFigureExport.cppm
         Runtime.ObjectSpaceNormalBakeBinding.cppm
-        Runtime.ObjectSpaceNormalBakeGpuQueue.cppm
         Runtime.ObjectSpaceNormalBakeQueue.cppm
         Runtime.ObjectSpaceNormalBakeService.cppm
         Runtime.ObjectSpaceNormalBakeSubmission.cppm
@@ -114,7 +113,6 @@ target_sources(${target_name}
         Runtime.MeshPrimitiveViewControls.cpp
         Runtime.MethodFigureExport.cpp
         Runtime.ObjectSpaceNormalBakeBinding.cpp
-        Runtime.ObjectSpaceNormalBakeGpuQueue.cpp
         Runtime.ObjectSpaceNormalBakeQueue.cpp
         Runtime.ObjectSpaceNormalBakeService.cpp
         Runtime.ObjectSpaceNormalBakeSubmission.cpp

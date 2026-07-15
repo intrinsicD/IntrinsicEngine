@@ -10,16 +10,18 @@ maturity_target: CPUContracted
 
 ## Status
 
-- In progress on 2026-07-16; owner: Codex; branch:
+- Implementation verified on 2026-07-16; owner: Codex; branch:
   `codex/arch-006-completion`.
-- Next gate: replace the standalone exported queue module with service-owned
-  implementation state, then build and run the focused queue/service contract.
+- Closure target `CPUContracted` is met: the focused selection passed 164/164,
+  the full CPU-supported gate passed 3,780/3,780 in 398.27 seconds, and the
+  strict structural/review bundle is green.
+- Next gate: commit the implementation, then perform retirement bookkeeping.
 
 ## Goal
 - Keep object-space normal bake GPU queue ownership inside
   `ObjectSpaceNormalBakeService` by replacing
-  `Extrinsic.Runtime.ObjectSpaceNormalBakeGpuQueue` with a private
-  implementation/header seam.
+  `Extrinsic.Runtime.ObjectSpaceNormalBakeGpuQueue` with service-owned private
+  implementation state.
 
 ## Non-goals
 - No production Vulkan bake plan-provider wiring; that remains owned by
@@ -52,30 +54,53 @@ maturity_target: CPUContracted
 - Reintroduction trigger: only a present second production owner requiring an
   independently composed queue lifetime would justify a standalone surface.
 
+## Implementation evidence
+
+- The former service-plus-queue public surface measured 175 lines and 15
+  direct import declarations (57/6 for the service and 118/9 for the queue).
+  The resulting single service interface is 96 lines with 5 direct imports;
+  the generated inventory therefore drops from 392 to 391 modules.
+- The implementation keeps the request queue public but moves the GPU
+  participant, plan-provider adaptation, retained submissions, and full
+  diagnostics into one service-owned `Impl`. The focused contracts reach
+  record/drain behavior only through `ObjectSpaceNormalBakeService` and
+  `JobService`; two explicitly test-named free functions configure deterministic
+  failure cases and copy the counters those contracts assert.
+- The participant debug label intentionally remains
+  `Runtime.ObjectSpaceNormalBakeGpuQueue` to preserve diagnostic continuity;
+  it is not a module name, import, CMake entry, or exported type.
+- A post-change no-ccache exact interface-object command completed in 36.73 s
+  on this host, versus the 32.88 s sum of the separately measured pre-change
+  queue and service targets. The post-change command also regenerated CMake and
+  rescanned the module graph after the file-set change, so this is recorded as
+  a single-host diagnostic and not a compile-time improvement claim. The
+  demonstrated result is the structural reduction of one module, 79 interface
+  lines, and 10 direct import declarations.
+
 ## Required changes
-- [ ] Inventory declarations in `Runtime.ObjectSpaceNormalBakeGpuQueue.cppm`
+- [x] Inventory declarations in `Runtime.ObjectSpaceNormalBakeGpuQueue.cppm`
       into public service API needs and private queue implementation details.
-- [ ] Move queue class, plan-provider, and diagnostics internals behind
+- [x] Move queue class, plan-provider, and diagnostics internals behind
       `ObjectSpaceNormalBakeService` private source/header glue where possible.
-- [ ] Preserve test access through service-level APIs or a narrow explicit test
+- [x] Preserve test access through service-level APIs or a narrow explicit test
       seam; do not keep a public module only for tests.
-- [ ] Remove the `.cppm` from module file sets if the public surface is retired.
-- [ ] Record before/after interface/import/timing metrics.
+- [x] Remove the `.cppm` from module file sets if the public surface is retired.
+- [x] Record before/after interface/import/timing metrics.
 
 ## Tests
-- [ ] Run object-space normal bake queue/service tests, runtime job-service
+- [x] Run object-space normal bake queue/service tests, runtime job-service
       tests, and relevant sandbox/editor tests.
-- [ ] Run strict layering and the default CPU-supported CTest gate.
+- [x] Run strict layering and the default CPU-supported CTest gate.
 
 ## Docs
-- [ ] Update runtime/rendering docs and READMEs if they name the GPU queue module.
-- [ ] Regenerate `docs/api/generated/module_inventory.md`.
+- [x] Update runtime/rendering docs and READMEs if they name the GPU queue module.
+- [x] Regenerate `docs/api/generated/module_inventory.md`.
 
 ## Acceptance criteria
-- [ ] `ObjectSpaceNormalBakeService` remains the public runtime owner of the GPU
+- [x] `ObjectSpaceNormalBakeService` remains the public runtime owner of the GPU
       queue participant.
-- [ ] Queue diagnostics and fail-closed behavior remain covered by tests.
-- [ ] The standalone GPU queue module is removed or explicitly justified with
+- [x] Queue diagnostics and fail-closed behavior remain covered by tests.
+- [x] The standalone GPU queue module is removed or explicitly justified with
       before/after metrics.
 
 ## Verification

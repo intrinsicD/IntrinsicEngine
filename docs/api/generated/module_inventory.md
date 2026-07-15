@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 85 |
+| `runtime` | 84 |
 
 ## Modules
 
@@ -381,7 +381,6 @@ Root scanned: `src`
 | `Extrinsic.Runtime.Module` | `src/runtime/Runtime.Module.cppm` | `runtime` |
 | `Extrinsic.Runtime.ModuleSchedule` | `src/runtime/Runtime.ModuleSchedule.cppm` | `runtime` |
 | `Extrinsic.Runtime.ObjectSpaceNormalBakeBinding` | `src/runtime/Runtime.ObjectSpaceNormalBakeBinding.cppm` | `runtime` |
-| `Extrinsic.Runtime.ObjectSpaceNormalBakeGpuQueue` | `src/runtime/Runtime.ObjectSpaceNormalBakeGpuQueue.cppm` | `runtime` |
 | `Extrinsic.Runtime.ObjectSpaceNormalBakeQueue` | `src/runtime/Runtime.ObjectSpaceNormalBakeQueue.cppm` | `runtime` |
 | `Extrinsic.Runtime.ObjectSpaceNormalBakeService` | `src/runtime/Runtime.ObjectSpaceNormalBakeService.cppm` | `runtime` |
 | `Extrinsic.Runtime.ObjectSpaceNormalBakeSubmission` | `src/runtime/Runtime.ObjectSpaceNormalBakeSubmission.cppm` | `runtime` |
@@ -419,4 +418,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugClosestFace` | `src/runtime/SpatialDebug/Runtime.SpatialDebugClosestFace.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **392**
+Total modules: **391**
