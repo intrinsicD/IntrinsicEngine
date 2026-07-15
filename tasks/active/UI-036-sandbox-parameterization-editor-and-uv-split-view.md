@@ -1,13 +1,13 @@
 ---
 id: UI-036
 theme: I
-depends_on: [RUNTIME-176]
+depends_on: [RUNTIME-176, BUG-085]
 maturity_target: Operational
 ---
 # UI-036 — Sandbox parameterization editor panel and resizable UV split view
 
 ## Status
-- In progress on branch `codex/arch-006-completion`; owner: Codex.
+- Blocked on branch `codex/arch-006-completion`; owner: Codex.
 - `RUNTIME-176` is retired at `CPUContracted`; its config, command, history,
   result, and pointer-free UV view-model seams are the only engine surfaces
   consumed here.
@@ -15,8 +15,10 @@ maturity_target: Operational
   `Sandbox.Editor.MethodPanels` module, adds pure presentation/action helpers
   for headless integration tests, synchronizes app/method docs, and then runs
   the default CPU plus live Vulkan Sandbox gates before retirement.
-- Next verification: strict task/state validation after promotion, followed by
-  the focused Sandbox editor integration target.
+- Live Vulkan selection and LSCM execution exposed `BUG-085`: the promoted
+  ImGui overlay drops draw-command clip rectangles, allowing the UV checker to
+  escape its child pane. Resume retirement after that blocking seam is fixed
+  and the live interaction is replayed.
 
 ## Goal
 - Add the Sandbox editor window that lists only parameterization strategies

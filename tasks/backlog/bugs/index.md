@@ -5,6 +5,11 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-085` — ImGui overlay drops draw-command clip rectangles](../../active/BUG-085-imgui-overlay-drops-command-clip-rectangles.md):
+  the runtime adapter omits `ImDrawCmd::ClipRect` from pointer-free overlay
+  commands and `Pass.ImGui` records no per-command scissor, so custom content
+  can escape nested child/window bounds on promoted Vulkan; discovered by the
+  live `UI-036` LSCM/checker interaction.
 - [`BUG-082` — GLFW X11 input-method initialization leaks under LeakSanitizer](BUG-082-glfw-x11-input-method-lsan-leak.md):
   a GLFW-backed runtime contract passes its assertions but the process exits
   nonzero for a 408-byte `_XimOpenIM` allocation after engine shutdown; isolate

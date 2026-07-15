@@ -8,6 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
+- `BUG-085` — ImGui overlay drops draw-command clip rectangles (tasks/active/BUG-085-imgui-overlay-drops-command-clip-rectangles.md)
 - `UI-036` — Sandbox parameterization editor panel and resizable UV split view (tasks/active/UI-036-sandbox-parameterization-editor-and-uv-split-view.md)
 
 ## Theme B — Rendering modernization
