@@ -868,3 +868,11 @@ entries:
       - "Did not duplicate N230/N231 for the repeated merge request and no-op push; the new journey fact is the provenance-based exclusion, not another integration event."
       - "Did not stage a new generalized dataset claim because existing repository policy and ASSETIO-004 already govern small deterministic fixtures versus large external corpora."
       - "Kept O08, O09, O13, and O38 non-stale and unpromoted; this same-day release audit supplied no closure or contradiction signal for their topics."
+  - turn: "2026-07-16_001#4"
+    notes:
+      - "Routed the user's explicit commit/merge/push instruction for the new model-workflow audit as decision N233 rather than duplicating the earlier completion-series decision N230."
+      - "Routed the real Sandbox preflight, live fail-late import reproductions, and bounded code diagnoses as experiment N234 because they produced observable results and durable repair tasks."
+      - "Routed the reviewed build/test/structural proof and remote fast-forward receipt as experiment N235; the task batch changes future work selection but does not claim that the defects are fixed."
+      - "Did not stage generalized claims from the bug diagnoses: they are repository-bounded journey facts with exact task/code evidence, and the committed task files preserve their falsifiable scope."
+      - "Kept O08, O09, O13, and O38 non-stale and unpromoted; no module-posture, model-training, or Progressive Poisson GPU-parity closure or contradiction occurred."
+      - "Preserved M16.xyz and child.obj as untracked local audit inputs under N232; neither the task batch nor the research epilogue changes their publication status."

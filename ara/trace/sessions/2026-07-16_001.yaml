@@ -2,9 +2,9 @@ session:
   id: "2026-07-16_001"
   date: "2026-07-16"
   started: "2026-07-16T00:42+02:00"
-  last_turn: "2026-07-16T10:57+02:00"
-  turn_count: 3
-  summary: "Completed Runtime.Engine convergence and six reproducible workflow/runtime/platform/Vulkan bug closures, published and fast-forwarded the verified series into remote main, then kept two unprovenanced local model datasets out of Git history."
+  last_turn: "2026-07-16T11:49+02:00"
+  turn_count: 4
+  summary: "Completed Runtime.Engine convergence and six prior bug closures, audited Sandbox model workflows into eight scoped tasks, published both verified series to remote main, and kept two unprovenanced local model datasets out of Git history."
 
 events_logged:
   - turn: 1
@@ -67,6 +67,24 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Excluded two large unprovenanced local model datasets and confirmed the requested main merge/push was already complete."
+  - turn: 4
+    type: decision
+    id: "N233"
+    routing: direct
+    provenance: user
+    summary: "Directed the reviewed Sandbox model-workflow task batch to be committed, merged into main, and pushed after verification."
+  - turn: 4
+    type: experiment
+    id: "N234"
+    routing: direct
+    provenance: ai-executed
+    summary: "Reproduced two fail-late File / Import states and converted four additional code-confirmed workflow defects into an eight-task repair portfolio."
+  - turn: 4
+    type: experiment
+    id: "N235"
+    routing: direct
+    provenance: ai-executed
+    summary: "Passed the 3,788-test CPU gate and strict landing review, then fast-forwarded and pushed the task batch to origin/main."
 
 ai_actions:
   - turn: 1
@@ -125,6 +143,23 @@ ai_actions:
     action: "Audited the complete working tree, dataset provenance, task ownership, repository corpus policy, and live remote graph; left the two local model inputs untouched and confirmed main/origin/main at f4885ca0."
     provenance: ai-executed
     files_changed: []
+  - turn: 4
+    action: "Ran real-GPU and live nested Sandbox workflow checks, audited runtime/asset prerequisite contracts, and authored eight reviewed backlog tasks with synchronized indexes and session brief."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/backlog/bugs/BUG-093-file-import-prerequisite-gating-tooltips.md"
+      - "tasks/backlog/bugs/BUG-094-model-scene-node-semantics-selection.md"
+      - "tasks/backlog/bugs/BUG-095-direct-mesh-postprocess-stale-overwrite.md"
+      - "tasks/backlog/bugs/BUG-096-icp-point-to-plane-target-normals.md"
+      - "tasks/backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md"
+      - "tasks/backlog/assets/ASSETIO-010-async-model-companion-preflight.md"
+      - "tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md"
+      - "tasks/backlog/ui/UI-038-progressive-poisson-destructive-conversion-safety.md"
+      - "tasks/SESSION-BRIEF.md"
+  - turn: 4
+    action: "Applied independent task-review corrections, passed Clang 23 build plus 3,788 CPU-supported tests and strict structural gates, committed 5aa0aa91, fast-forwarded main, and pushed origin/main."
+    provenance: ai-executed
+    files_changed: []
 
 claims_touched: []
 
@@ -135,6 +170,8 @@ key_context:
     excerpt: "User requested that all remaining changes be committed appropriately, merged into main, and pushed to the remote."
   - turn: 3
     excerpt: "Appropriate publication excluded pre-existing local datasets whose attribution and redistribution rights could not be established."
+  - turn: 4
+    excerpt: "User requested that all intended audit changes be committed appropriately, merged into main, and pushed to the remote."
 
 open_threads:
   - "Select the next bounded architecture/runtime slice; RUNTIME-168 is the smallest reviewed private-surface candidate, while ARCH-014 remains the umbrella that gates REVIEW-003."
@@ -143,9 +180,12 @@ open_threads:
   - "Adjudicate O38 by narrowing Progressive Poisson's README or collecting a non-skipped actual-Vulkan dispatch/readback and CPU-reference parity artifact."
   - "Keep every Issue 445 candidate ineligible until REVIEW-003 passes; only then select among the tasks using their explicit start/kill evidence."
   - "Recover provenance and redistribution rights before proposing M16.xyz or the bimba100K-derived child.obj for publication; otherwise retain them only as local audit inputs and use small generated fixtures for durable coverage."
+  - "Implement BUG-093 first; it unblocks ASSETIO-010 companion preview and supplies the one disabled-tooltip convention consumed by UI-037."
+  - "Resolve BUG-094 through BUG-097 and UI-038 with their regression-first slice plans before claiming the audited model workflows are linear, truthful, and recoverable."
 
 ai_suggestions_pending:
   - "Use RUNTIME-168 as the next small convergence slice before larger RUNTIME-166 or ARCH-015 work."
   - "Collect BUG-091/088/081 timing populations in their reported cold or contended hosted environments rather than relaxing local timeouts."
   - "Treat GEOM-058 Gaussian-mixture fitting as the provisional repository-native model-training target unless the user specifies a neural or LLM model."
   - "Keep Progressive Poisson at Scaffolded until actual-backend dispatch, readback, and CPU-reference parity evidence exists."
+  - "Prioritize BUG-093 as the first bounded model-workflow implementation because it directly fixes the live fail-late import states and unlocks two dependent tasks."

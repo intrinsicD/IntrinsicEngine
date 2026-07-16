@@ -5429,3 +5429,81 @@ tree:
       - "git push origin main:main: Everything up-to-date"
       - "origin/main at f4885ca0"
     status: resolved
+  - id: N233
+    type: decision
+    title: "Land the model-workflow audit as a reviewed task batch"
+    provenance: user
+    timestamp: "2026-07-16T11:49+02:00"
+    also_depends_on: [N232]
+    choice: >
+      Commit every intended Sandbox model-workflow audit record, merge the
+      reviewed batch into main, and push main to the remote after verification.
+    alternatives:
+      - "Leave the audit records uncommitted on the feature branch."
+      - "Publish only the feature branch without advancing main."
+      - "Land the records without the required build, test, task, and documentation gates."
+    evidence:
+      - "User instruction in session 2026-07-16_001 turn 4"
+      - "tasks/backlog/bugs/BUG-093-file-import-prerequisite-gating-tooltips.md"
+      - "tasks/backlog/assets/ASSETIO-010-async-model-companion-preflight.md"
+      - "tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md"
+    status: resolved
+  - id: N234
+    type: experiment
+    title: "Audit Sandbox model import and domain-workflow prerequisites"
+    provenance: ai-executed
+    timestamp: "2026-07-16T11:49+02:00"
+    also_depends_on: [N233]
+    evidence:
+      - "/tmp/intrinsic-sandbox-model-audit/sandbox-xephyr.log"
+      - "/tmp/intrinsic-sandbox-model-audit/12-file-import-empty.png"
+      - "/tmp/intrinsic-sandbox-model-audit/24-duck0-bin-failed.png"
+      - "/tmp/model-workflow-vulkan-preflight.log"
+      - "tasks/backlog/bugs/BUG-093-file-import-prerequisite-gating-tooltips.md"
+      - "tasks/backlog/bugs/BUG-094-model-scene-node-semantics-selection.md"
+      - "tasks/backlog/bugs/BUG-095-direct-mesh-postprocess-stale-overwrite.md"
+      - "tasks/backlog/bugs/BUG-096-icp-point-to-plane-target-normals.md"
+      - "tasks/backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md"
+      - "tasks/backlog/assets/ASSETIO-010-async-model-companion-preflight.md"
+      - "tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md"
+      - "tasks/backlog/ui/UI-038-progressive-poisson-destructive-conversion-safety.md"
+    result: >
+      A real-GPU Sandbox preflight passed 2/2 on the RTX 3050. A live nested
+      Sandbox run then proved that empty paths and the checked-in companion-only
+      Duck0.bin remained actionable without disabled-reason tooltips and failed
+      only after submission. Read-only runtime/asset audits confirmed four
+      additional bounded correctness defects: glTF node semantics and standard
+      selection are dropped, deferred direct-mesh enrichment can overwrite
+      newer edits, point-to-plane ICP passes no target normals, and the
+      default-off progressive model-scene UV job publishes an all-zero atlas.
+      Eight scoped backlog tasks now separate those fixes from broader linear
+      domain-readiness and destructive-conversion safety work.
+    status: resolved
+  - id: N235
+    type: experiment
+    title: "Verify and publish the Sandbox model-workflow task batch"
+    provenance: ai-executed
+    timestamp: "2026-07-16T11:49+02:00"
+    also_depends_on: [N233, N234]
+    evidence:
+      - "commit 5aa0aa91"
+      - "/tmp/model-workflow-landing-ci-configure.log"
+      - "/tmp/model-workflow-landing-ci-build.log"
+      - "/tmp/model-workflow-landing-ci-ctest.log"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main --strict"
+      - "Independent task_batch_landing_audit review"
+      - "git merge --ff-only agent/sandbox-model-workflow-linear-ui"
+      - "git push origin main"
+    result: >
+      Clang 23 configuration and the IntrinsicTests build completed, and the
+      CPU-supported gate passed 3,788/3,788 in 409.65 seconds. Strict task,
+      maturity, state-link, documentation-link/sync, layering, test-layout,
+      root-hygiene, diff, and PR-contract checks passed. Independent review
+      corrected build ordering, nonblocking readiness dependencies, slice
+      boundaries, single-owner URI resolution, one disabled-tooltip convention,
+      and config-versus-confirmation wording before commit. Main fast-forwarded
+      from 86ddb7f5 to 5aa0aa91, origin/main accepted the same non-force update,
+      and the two unprovenanced local model datasets remained untouched.
+    status: resolved
