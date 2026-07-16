@@ -11,7 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-- No tasks are currently active.
+- [BUG-090 — Async-work layering test asserts stale shutdown call spelling](BUG-090-async-work-layering-test-stale-shutdown-owner.md)
+  (`in-progress`; owner: Codex; branch: `codex/arch-006-completion`). The
+  opt-in runtime layering binary has one stale Engine shutdown spelling; next
+  gate is the exact pre-fix reproduction and two-assertion correction.
 
 ## History
 

@@ -7,6 +7,13 @@ maturity_target: CPUContracted
 ---
 # BUG-090 — Async-work layering test asserts stale shutdown call spelling
 
+## Status
+
+- In progress on 2026-07-16; owner: Codex; branch:
+  `codex/arch-006-completion`.
+- Next gate: reproduce the exact stale assertion, update only its two shutdown
+  spellings, and run the complete source-layering selection.
+
 ## Goal
 - Restore the `RuntimeEngineLayering` source contract by asserting the current
   Engine shutdown-hook delegation to `AsyncWorkService`.
@@ -25,7 +32,7 @@ maturity_target: CPUContracted
   `ShutdownHooks::AsyncWork` delegation, which calls
   `AsyncWork.ShutdownAndDrain()` and `AsyncWork.Reset()` after Engine passes
   `m_AsyncWorkService` into the hook.
-- Impact: one of 25 source-layering tests is red when its containing opt-in
+- Impact: one of 24 source-layering tests is red when its containing opt-in
   integration binary is selected directly. The default CPU gate excludes that
   binary by label, so the stale assertion can remain hidden.
 - Evidence: both stale strings are absent from pre-`RUNTIME-167` `HEAD`, while
