@@ -2,9 +2,9 @@ session:
   id: "2026-07-16_001"
   date: "2026-07-16"
   started: "2026-07-16T00:42+02:00"
-  last_turn: "2026-07-16T10:04+02:00"
-  turn_count: 2
-  summary: "Completed Runtime.Engine convergence and six reproducible workflow/runtime/platform/Vulkan bug closures, published the verified branch, then fast-forwarded the fully tested series into remote main."
+  last_turn: "2026-07-16T10:57+02:00"
+  turn_count: 3
+  summary: "Completed Runtime.Engine convergence and six reproducible workflow/runtime/platform/Vulkan bug closures, published and fast-forwarded the verified series into remote main, then kept two unprovenanced local model datasets out of Git history."
 
 events_logged:
   - turn: 1
@@ -61,6 +61,12 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Passed a fresh 3,788-test merge gate, fast-forwarded main by 84 commits, and advanced origin/main without rewriting history."
+  - turn: 3
+    type: decision
+    id: "N232"
+    routing: direct
+    provenance: ai-executed
+    summary: "Excluded two large unprovenanced local model datasets and confirmed the requested main merge/push was already complete."
 
 ai_actions:
   - turn: 1
@@ -115,6 +121,10 @@ ai_actions:
     action: "Fast-forwarded local main from b199ee15 to 94e76ec0 and pushed the same linear history to origin/main with a normal non-force update."
     provenance: ai-executed
     files_changed: []
+  - turn: 3
+    action: "Audited the complete working tree, dataset provenance, task ownership, repository corpus policy, and live remote graph; left the two local model inputs untouched and confirmed main/origin/main at f4885ca0."
+    provenance: ai-executed
+    files_changed: []
 
 claims_touched: []
 
@@ -123,6 +133,8 @@ key_context:
     excerpt: "User authorized unattended work until morning, prioritized architecture/runtime/graphics/bugs, required appropriate commits, and requested a final tested push."
   - turn: 2
     excerpt: "User requested that all remaining changes be committed appropriately, merged into main, and pushed to the remote."
+  - turn: 3
+    excerpt: "Appropriate publication excluded pre-existing local datasets whose attribution and redistribution rights could not be established."
 
 open_threads:
   - "Select the next bounded architecture/runtime slice; RUNTIME-168 is the smallest reviewed private-surface candidate, while ARCH-014 remains the umbrella that gates REVIEW-003."
@@ -130,6 +142,7 @@ open_threads:
   - "Resolve whether model training means GEOM-058 or a new neural/LLM workflow."
   - "Adjudicate O38 by narrowing Progressive Poisson's README or collecting a non-skipped actual-Vulkan dispatch/readback and CPU-reference parity artifact."
   - "Keep every Issue 445 candidate ineligible until REVIEW-003 passes; only then select among the tasks using their explicit start/kill evidence."
+  - "Recover provenance and redistribution rights before proposing M16.xyz or the bimba100K-derived child.obj for publication; otherwise retain them only as local audit inputs and use small generated fixtures for durable coverage."
 
 ai_suggestions_pending:
   - "Use RUNTIME-168 as the next small convergence slice before larger RUNTIME-166 or ARCH-015 work."

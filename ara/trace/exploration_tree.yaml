@@ -5404,3 +5404,28 @@ tree:
       fast-forwarded from b199ee15 to 94e76ec0 without conflicts, and the normal
       non-force push advanced origin/main to the same verified tip.
     status: resolved
+  - id: N232
+    type: decision
+    title: "Exclude unprovenanced local model datasets from publication"
+    provenance: ai-executed
+    timestamp: "2026-07-16T10:57+02:00"
+    also_depends_on: [N231]
+    choice: >
+      Left assets/models/M16.xyz and assets/models/child.obj untouched and
+      untracked after release review found no owning task, source attribution,
+      redistribution license, or approval under repository large-dataset policy.
+      Repeated the requested fast-forward/push sequence as a no-op because the
+      audited branch, local main, and origin/main already named the same commit.
+    alternatives:
+      - "Commit both raw datasets as ordinary Git blobs without provenance metadata."
+      - "Delete or rename the user's local audit inputs."
+      - "Create an empty commit or merge commit despite identical branch tips."
+    evidence:
+      - "assets/models/M16.xyz: 14,972,536 untracked bytes"
+      - "assets/models/child.obj: 3,448,822 untracked bytes; header identifies bimba100K.obj"
+      - "docs/methods/dataset-policy.md"
+      - "docs/benchmarking/dataset-policy.md"
+      - "Retired ASSETIO-004 generated-fixture precedent"
+      - "git push origin main:main: Everything up-to-date"
+      - "origin/main at f4885ca0"
+    status: resolved

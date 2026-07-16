@@ -113,8 +113,8 @@ sessions:
     open_threads: 7
   - id: "2026-07-16_001"
     date: "2026-07-16"
-    summary: "Completed Runtime.Engine convergence and six reproducible workflow/runtime/platform/Vulkan bug closures, published the verified branch, then fast-forwarded the fully tested series into remote main."
-    turn_count: 2
-    events_count: 9
+    summary: "Completed Runtime.Engine convergence and six reproducible workflow/runtime/platform/Vulkan bug closures, published and fast-forwarded the verified series into remote main, then kept two unprovenanced local model datasets out of Git history."
+    turn_count: 3
+    events_count: 10
     claims_touched: []
-    open_threads: 5
+    open_threads: 6
