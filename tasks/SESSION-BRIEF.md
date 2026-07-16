@@ -48,6 +48,8 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-082` — GLFW X11 input-method initialization leaks under LeakSanitizer (tasks/backlog/bugs/BUG-082-glfw-x11-input-method-lsan-leak.md)
 - unblocked: `BUG-083` — Vulkan Sandbox shutdown reports driver and DBus leaks under LeakSanitizer (tasks/backlog/bugs/BUG-083-vulkan-sandbox-shutdown-lsan-leaks.md)
 - unblocked: `BUG-088` — Benchmark smoke hard timeout flakes under host contention (tasks/backlog/bugs/BUG-088-benchmark-smoke-hard-timeout-host-contention.md)
+- unblocked: `BUG-091` — GoogleTest PRE_TEST discovery times out on a cold start (tasks/backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md)
+- unblocked: `BUG-092` — Scene lifecycle async wait exhausts its frame budget under delayed I/O (tasks/backlog/bugs/BUG-092-scene-lifecycle-async-wait-frame-budget.md)
 
 ## Theme H — Agentic workflow hardening
 
