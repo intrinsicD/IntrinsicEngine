@@ -8,6 +8,23 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-093`](BUG-093-file-import-prerequisite-gating-tooltips.md) — the Sandbox
+File / Import prerequisite defect retired on 2026-07-16 at `Operational`.
+Implementation commit `d97cd893` centralizes route, promoted-importer, and
+payload-hint readiness in one runtime evaluator shared by presentation-model
+construction and dispatch-time validation. The editable path, six ordered
+payload choices, single-payload `Unknown` resolution, ambiguous PLY handling,
+incompatible-hint rejection, and recognized-but-unavailable KTX/KTX2 paths now
+fail closed without app-owned format policy. The app consumes runtime-owned
+disabled reasons through one `AllowWhenDisabled` tooltip convention for the
+payload chooser, payload rows, import button, and existing queue controls.
+Focused coverage passed 6/6; the integration case ran the real File / Import
+window inside Null-window `Engine::Run()`, hovered its disabled import control,
+and observed an active tooltip. The aggregate build passed and the default
+CPU-supported gate passed 3,792/3,792 in 468.28 seconds; strict structural
+checks passed. `ASSETIO-010` retains asynchronous primary/companion-file
+preflight, while `UI-037` retains the broader domain-action rollout.
+
 [`BUG-083`](BUG-083-vulkan-sandbox-shutdown-lsan-leaks.md) — the Vulkan
 Sandbox shutdown LeakSanitizer defect retired on 2026-07-16 at `Operational`.
 Implementation commit `3cb91b98` maps the exact NVIDIA RTX 3050 / driver

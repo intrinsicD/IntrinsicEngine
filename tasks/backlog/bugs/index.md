@@ -21,10 +21,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   glTF decode flattens meshes without active-scene traversal, hierarchy,
   transforms, or instancing, and model primitives bypass standard selectable,
   completion, selection, and focus authoring.
-- [`BUG-093` — File / Import prerequisite gating and disabled-reason tooltips](../../active/BUG-093-file-import-prerequisite-gating-tooltips.md):
-  the editor enables `Import asset` from command-surface availability alone,
-  allowing empty, unsupported, ambiguous, or incompatible path/hint requests
-  to fail late without a disabled-control explanation.
 - [`BUG-091` — GoogleTest PRE_TEST discovery times out on a cold start](BUG-091-gtest-pretest-discovery-cold-timeout.md):
   CMake's implicit five-second PRE_TEST discovery limit can abort CTest while
   an unrelated cold sanitizer binary enumerates tests, before the selected
@@ -43,6 +39,12 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   headroom while preserving fail-closed semantics.
 
 ## Verified / Closed
+
+- Closed 2026-07-16: [`BUG-093` — File / Import prerequisite gating and disabled-reason tooltips](../../done/BUG-093-file-import-prerequisite-gating-tooltips.md).
+  One runtime evaluator now owns route, promoted-importer, and payload-hint
+  readiness for both presentation and dispatch. The real Null-window File /
+  Import workflow exposes runtime-owned disabled reasons on hover and prevents
+  invalid requests from reaching the import callback.
 
 - Closed 2026-07-16: [`BUG-083` — Vulkan Sandbox shutdown reports driver and DBus leaks under LeakSanitizer](../../done/BUG-083-vulkan-sandbox-shutdown-lsan-leaks.md).
   The exact NVIDIA report is partitioned across three diagnosed external

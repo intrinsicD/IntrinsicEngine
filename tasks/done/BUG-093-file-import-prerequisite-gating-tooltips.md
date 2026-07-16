@@ -8,11 +8,13 @@ maturity_target: Operational
 
 ## Status
 
-- In progress on 2026-07-16; owner: Codex; branch:
-  `agent/bug-093-file-import-prerequisites`.
-- Live Sandbox evidence already pins empty-path and companion-only fail-late
-  behavior. The next verification step is the focused runtime model/dispatch
-  regression before app presentation changes.
+- Completed on 2026-07-16 at maturity `Operational`; owner: Codex; branch:
+  `agent/bug-093-file-import-prerequisites`; implementation commit:
+  `d97cd893`.
+- Runtime and app presentation now share fail-closed route, promoted-importer,
+  and payload-hint readiness. Focused coverage passed 6/6, including the real
+  File / Import window and disabled-hover tooltip path inside Null-window
+  `Engine::Run()`.
 
 ## Goal
 
@@ -75,31 +77,31 @@ maturity_target: Operational
 
 ## Required changes
 
-- [ ] Extend `SandboxEditorFileImportModel` with `CanChoosePayloadHint`,
+- [x] Extend `SandboxEditorFileImportModel` with `CanChoosePayloadHint`,
       `CanImport`, `ResolvedPayloadKind`, deterministic payload-option records
       (`Kind`, `Enabled`, `DisabledReason`),
       `PayloadHintDisabledReason`, and `ImportDisabledReason`; preserve
       `Enabled` as command-surface availability rather than overloading it with
       form validity.
-- [ ] Add one private runtime prerequisite evaluator shared by
+- [x] Add one private runtime prerequisite evaluator shared by
       `BuildFileImportModel(...)` and
       `ApplySandboxEditorFileImportCommand(...)`. It must use
       `DiagnoseAssetImportRoute(...)` plus the promoted model/texture capability
       predicates and must not read or parse the source file.
-- [ ] Make the evaluator return reasons in a stable priority order: unavailable
+- [x] Make the evaluator return reasons in a stable priority order: unavailable
       command surface, empty path, missing/unsupported extension, unavailable
       promoted importer, ambiguous hint, then incompatible explicit hint.
-- [ ] Populate the six payload options in stable enum order. Allow `Unknown`
+- [x] Populate the six payload options in stable enum order. Allow `Unknown`
       auto-resolution for single-payload formats; disable it for ambiguous PLY;
       enable only `Mesh` and `PointCloud` for PLY; disable every incompatible
       explicit kind with a format-specific reason.
-- [ ] Revalidate route, importer capability, and hint immediately before
+- [x] Revalidate route, importer capability, and hint immediately before
       dispatch so a direct caller cannot bypass the presentation gate and an
       invalid command never invokes the runtime import callback.
-- [ ] Keep the path field independently editable, and split the app's current
+- [x] Keep the path field independently editable, and split the app's current
       all-controls disabled scope into separate hint and `Import asset` scopes
       driven by the runtime model.
-- [ ] Add one app-internal free-function convention in the existing editor-shell
+- [x] Add one app-internal free-function convention in the existing editor-shell
       module using
       `ImGuiHoveredFlags_ForTooltip | ImGuiHoveredFlags_AllowWhenDisabled`, and
       apply it to the payload combo, disabled payload rows, `Import asset`, and
@@ -107,54 +109,54 @@ maturity_target: Operational
       carry runtime-owned disabled reasons. Keep it reusable by the existing
       app panel implementation units for `UI-037`; do not add a widget module,
       service, class, or validation policy.
-- [ ] Keep expected incomplete form state out of persistent diagnostics;
+- [x] Keep expected incomplete form state out of persistent diagnostics;
       diagnostics remain for unavailable subsystems and submitted-command
       failures, while form guidance lives in status text and tooltips.
 
 ## Tests
 
-- [ ] Extend runtime facade contracts for missing command surface, empty path,
+- [x] Extend runtime facade contracts for missing command surface, empty path,
       missing/unsupported extension, unavailable KTX importer, OBJ + `Graph`,
       PLY + `Unknown`, both valid PLY hints, XYZ + `Unknown`, and GLB +
       `Unknown`; assert resolved payload, per-option availability, and exact
       disabled-reason priority.
-- [ ] Turn the checked-in `assets/models/Duck.gltf` + `Graph` case into a
+- [x] Turn the checked-in `assets/models/Duck.gltf` + `Graph` case into a
       regression: `Enabled` remains true, `CanImport` is false, the reason names
       the `ModelScene` requirement, and dispatch does not call the fake import
       surface until a compatible hint is supplied.
-- [ ] Add app-linked presentation coverage proving the real `File / Import`
+- [x] Add app-linked presentation coverage proving the real `File / Import`
       window renders its independently disabled controls and that hovering a
       disabled import control produces the runtime-owned reason through the
       `AllowWhenDisabled` path.
-- [ ] Cover queue `Clear completed` and row `Cancel` disabled reasons through
+- [x] Cover queue `Clear completed` and row `Cancel` disabled reasons through
       the same tooltip helper without changing their command behavior.
-- [ ] Preserve the existing source/link contract proving every Sandbox editor
+- [x] Preserve the existing source/link contract proving every Sandbox editor
       implementation imports runtime only.
 
 ## Docs
 
-- [ ] Update `src/app/Sandbox/README.md` with the linear path -> hint -> import
+- [x] Update `src/app/Sandbox/README.md` with the linear path -> hint -> import
       interaction and disabled-reason behavior.
-- [ ] Update `src/runtime/README.md` with the runtime-owned prerequisite model,
+- [x] Update `src/runtime/README.md` with the runtime-owned prerequisite model,
       dispatch-time fail-closed validation, and the explicit deferral of file
       and companion reads to `ASSETIO-010`.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` if the exported
+- [x] Regenerate `docs/api/generated/module_inventory.md` if the exported
       facade model surface changes, and refresh `tasks/SESSION-BRIEF.md` when
       the task changes lifecycle state.
 
 ## Acceptance criteria
 
-- [ ] An incompatible or ambiguous path/hint pair cannot dispatch an import,
+- [x] An incompatible or ambiguous path/hint pair cannot dispatch an import,
       and its exact next action is visible from the disabled control.
-- [ ] A valid single-payload or explicitly disambiguated PLY route enables
+- [x] A valid single-payload or explicitly disambiguated PLY route enables
       import without app-owned format knowledge.
-- [ ] KTX/KTX2 remain deterministically unavailable despite router
+- [x] KTX/KTX2 remain deterministically unavailable despite router
       recognition; no unsupported decoder is advertised.
-- [ ] Direct command calls and the app panel share the same runtime validation
+- [x] Direct command calls and the app panel share the same runtime validation
       result, and no invalid command reaches the import callback.
-- [ ] The canonical app-linked Null-window `Engine::Run()` integration test
+- [x] The canonical app-linked Null-window `Engine::Run()` integration test
       exercises the real `File / Import` window and disabled-tooltip path.
-- [ ] Layering remains `app -> runtime`, with no file IO/decode in ImGui panel
+- [x] Layering remains `app -> runtime`, with no file IO/decode in ImGui panel
       construction and no new service/registry/widget framework.
 
 ## Verification
@@ -172,6 +174,19 @@ ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi\.FileImport|Sa
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```
+
+Verification completed on 2026-07-16:
+
+- The focused runtime and app-linked presentation selection passed 6/6. The
+  integration case opened the real File / Import window inside Null-window
+  `Engine::Run()`, hovered the disabled import button, and observed an active
+  tooltip window. Runtime string contracts and source-linked helper assertions
+  pin the reason propagation; queue clear/cancel reuse is source-contracted.
+- The aggregate `IntrinsicTests` target built successfully and the default
+  CPU-supported gate passed 3,792/3,792 in 468.28 seconds.
+- Strict task policy, task schema, layering, test-layout, documentation-link,
+  root-hygiene, PR-contract, and diff checks passed. Regenerating the public
+  module inventory produced no diff and retained 386 modules.
 
 ## Forbidden changes
 
@@ -195,3 +210,6 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
   canonical editor callback inside Null-window `Engine::Run()` and exercises
   the real disabled-tooltip presentation path; route and dispatch behavior are
   also pinned by the default CPU contract gate.
+- Achieved: the canonical app-linked Null-window test exercises the real
+  disabled-hover path, while the runtime facade and dispatch contracts pin
+  exact route, capability, resolution, reason-priority, and callback behavior.

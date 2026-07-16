@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `BUG-093` — File / Import prerequisite gating and disabled-reason tooltips (tasks/active/BUG-093-file-import-prerequisite-gating-tooltips.md)
+- none
 
 ## Theme B — Rendering modernization
 
@@ -28,7 +28,7 @@ the authoritative open/unblocked view.
 
 - unblocked: `ARCH-014` — Kernel convergence tracking (umbrella north-star) (tasks/backlog/architecture/ARCH-014-kernel-convergence-tracking.md)
 - unblocked: `ARCH-015` — Runtime module scope: cluster methods by result-consumer contract (grilling + ADR) (tasks/backlog/architecture/ARCH-015-runtime-module-scope-by-result-consumer-contract.md)
-- blocked by `BUG-093`: `ASSETIO-010` — Async model companion preflight (tasks/backlog/assets/ASSETIO-010-async-model-companion-preflight.md)
+- unblocked: `ASSETIO-010` — Async model companion preflight (tasks/backlog/assets/ASSETIO-010-async-model-companion-preflight.md)
 - unblocked: `CORE-005` — Non-blocking TaskGraph submission and completion API (tasks/backlog/architecture/CORE-005-nonblocking-taskgraph-submit-api.md)
 - unblocked: `CORE-006` — Domain-free core task/DAG vocabulary (tasks/backlog/architecture/CORE-006-domain-free-core-task-vocabulary.md)
 - unblocked: `CORE-007` — Scheduler priority, wait, and wake hardening (tasks/backlog/architecture/CORE-007-scheduler-priority-wait-wake-hardening.md)
@@ -42,7 +42,7 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-166` — Slim and partition the RenderExtraction module (tasks/backlog/runtime/RUNTIME-166-slim-render-extraction-module.md)
 - unblocked: `RUNTIME-168` — Privatize the Sandbox default policies surface (tasks/backlog/runtime/RUNTIME-168-privatize-sandbox-default-policies-surface.md)
 - unblocked: `RUNTIME-172` — Privatize the SceneDocument surface (tasks/backlog/runtime/RUNTIME-172-privatize-scene-document-surface.md)
-- blocked by `BUG-093`: `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md)
+- blocked by `BUG-096`: `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md)
 - unblocked: `UI-038` — Progressive Poisson destructive-conversion safety (tasks/backlog/ui/UI-038-progressive-poisson-destructive-conversion-safety.md)
 
 ## Theme G — Active bugs
