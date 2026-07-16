@@ -126,14 +126,49 @@ void InstallSandboxDefaultRuntimePolicies(Runtime::Engine& engine)
 [[nodiscard]] bool HasDiagnostic(
         const std::vector<Runtime::SandboxEditorDiagnostic>& diagnostics,
         const Runtime::SandboxEditorDiagnosticCode code)
+{
+    for (const Runtime::SandboxEditorDiagnostic& diagnostic : diagnostics)
     {
-        for (const Runtime::SandboxEditorDiagnostic& diagnostic : diagnostics)
-        {
-            if (diagnostic.Code == code)
-                return true;
-        }
-        return false;
+        if (diagnostic.Code == code)
+            return true;
     }
+    return false;
+}
+
+[[nodiscard]] const Runtime::SandboxEditorFileImportPayloadOption*
+    FindFileImportPayloadOption(
+        const Runtime::SandboxEditorFileImportModel& model,
+        const Assets::AssetPayloadKind kind)
+{
+    const auto option = std::find_if(
+        model.PayloadOptions.begin(),
+        model.PayloadOptions.end(),
+        [kind](const Runtime::SandboxEditorFileImportPayloadOption& candidate)
+        {
+            return candidate.Kind == kind;
+        });
+    return option == model.PayloadOptions.end() ? nullptr : &*option;
+}
+
+template <std::size_t N>
+void ExpectEnabledFileImportPayloadOptions(
+        const Runtime::SandboxEditorFileImportModel& model,
+        const std::array<Assets::AssetPayloadKind, N>& expected)
+{
+    for (const Runtime::SandboxEditorFileImportPayloadOption& option :
+         model.PayloadOptions)
+    {
+        const bool shouldBeEnabled =
+            std::find(expected.begin(), expected.end(), option.Kind) !=
+            expected.end();
+        EXPECT_EQ(option.Enabled, shouldBeEnabled)
+            << Assets::DebugNameForAssetPayloadKind(option.Kind);
+        if (shouldBeEnabled)
+            EXPECT_TRUE(option.DisabledReason.empty());
+        else
+            EXPECT_FALSE(option.DisabledReason.empty());
+    }
+}
 
 [[nodiscard]] bool LogSnapshotContains(
         const Core::Log::LogSnapshot& snapshot,
@@ -520,6 +555,325 @@ struct TmpFile
         return count;
     }
 }
+TEST(SandboxEditorUi, FileImportPrerequisitesAreDeterministic)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    const auto buildModel =
+        [&](const std::string_view path,
+            const Assets::AssetPayloadKind payloadKind,
+            const bool commandSurfaceAvailable = true)
+        {
+            Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+            if (commandSurfaceAvailable)
+            {
+                context.AssetImportCommands.Import =
+                    [](const Runtime::SandboxEditorFileImportCommand& command)
+                    {
+                        return Runtime::SandboxEditorFileImportResult{
+                            .Status =
+                                Runtime::SandboxEditorCommandStatus::Applied,
+                            .PayloadKind = command.PayloadKind,
+                        };
+                    };
+            }
+            context.PendingAssetImportPath = path;
+            context.PendingAssetImportPayloadKind = payloadKind;
+            return Runtime::BuildSandboxEditorPanelFrame(context).FileImport;
+        };
+
+    constexpr std::array allPayloadKinds{
+        Assets::AssetPayloadKind::Unknown,
+        Assets::AssetPayloadKind::Mesh,
+        Assets::AssetPayloadKind::PointCloud,
+        Assets::AssetPayloadKind::Graph,
+        Assets::AssetPayloadKind::ModelScene,
+        Assets::AssetPayloadKind::Texture2D,
+    };
+
+    Runtime::SandboxEditorFileImportModel model = buildModel(
+        "assets/models/model.obj",
+        Assets::AssetPayloadKind::Mesh,
+        false);
+    EXPECT_FALSE(model.Enabled);
+    EXPECT_FALSE(model.CanChoosePayloadHint);
+    EXPECT_FALSE(model.CanImport);
+    EXPECT_EQ(model.ResolvedPayloadKind, Assets::AssetPayloadKind::Unknown);
+    EXPECT_EQ(
+        model.PayloadHintDisabledReason,
+        "Asset import requires an available runtime import command surface.");
+    EXPECT_EQ(model.ImportDisabledReason, model.PayloadHintDisabledReason);
+    ExpectEnabledFileImportPayloadOptions(
+        model,
+        std::array<Assets::AssetPayloadKind, 0>{});
+    for (std::size_t i = 0u; i < model.PayloadOptions.size(); ++i)
+    {
+        EXPECT_EQ(model.PayloadOptions[i].Kind, allPayloadKinds[i]);
+        EXPECT_EQ(model.PayloadOptions[i].DisabledReason,
+                  model.ImportDisabledReason);
+    }
+
+    Runtime::SandboxEditorContext flagOnlyContext =
+        MakeContext(registry, selection);
+    flagOnlyContext.AssetImportCommandsAvailable = true;
+    flagOnlyContext.PendingAssetImportPath = "assets/models/model.obj";
+    flagOnlyContext.PendingAssetImportPayloadKind =
+        Assets::AssetPayloadKind::Mesh;
+    model = Runtime::BuildSandboxEditorPanelFrame(flagOnlyContext).FileImport;
+    EXPECT_TRUE(model.Enabled);
+    EXPECT_FALSE(model.CanChoosePayloadHint);
+    EXPECT_FALSE(model.CanImport);
+    EXPECT_EQ(
+        model.ImportDisabledReason,
+        "Asset import requires an available runtime import command surface.");
+    EXPECT_TRUE(HasDiagnostic(
+        model.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::AssetImportUnavailable));
+
+    model = buildModel({}, Assets::AssetPayloadKind::Graph, false);
+    EXPECT_FALSE(model.Enabled);
+    EXPECT_EQ(
+        model.ImportDisabledReason,
+        "Asset import requires an available runtime import command surface.");
+
+    model = buildModel({}, Assets::AssetPayloadKind::Unknown);
+    EXPECT_TRUE(model.Enabled);
+    EXPECT_FALSE(model.CanChoosePayloadHint);
+    EXPECT_FALSE(model.CanImport);
+    EXPECT_EQ(
+        model.ImportDisabledReason,
+        "Enter an asset path before choosing a payload or importing.");
+    EXPECT_EQ(model.StatusText, model.ImportDisabledReason);
+
+    model = buildModel("assets/models/model",
+                       Assets::AssetPayloadKind::Unknown);
+    EXPECT_FALSE(model.CanChoosePayloadHint);
+    EXPECT_FALSE(model.CanImport);
+    EXPECT_EQ(
+        model.ImportDisabledReason,
+        "Add a supported file extension to the asset path before importing.");
+
+    model = buildModel("assets/models/model",
+                       Assets::AssetPayloadKind::Graph);
+    EXPECT_EQ(
+        model.ImportDisabledReason,
+        "Add a supported file extension to the asset path before importing.");
+
+    model = buildModel("assets/models/Duck0.bin",
+                       Assets::AssetPayloadKind::Unknown);
+    EXPECT_FALSE(model.CanChoosePayloadHint);
+    EXPECT_FALSE(model.CanImport);
+    EXPECT_EQ(
+        model.ImportDisabledReason,
+        "Asset extension '.bin' is unsupported; choose a path with a supported asset file extension.");
+
+    model = buildModel("assets/textures/albedo.ktx",
+                       Assets::AssetPayloadKind::Unknown);
+    EXPECT_FALSE(model.CanChoosePayloadHint);
+    EXPECT_FALSE(model.CanImport);
+    EXPECT_EQ(model.ResolvedPayloadKind, Assets::AssetPayloadKind::Texture2D);
+    EXPECT_EQ(
+        model.ImportDisabledReason,
+        "KTX import is unavailable because no promoted Texture2D importer supports this format; choose a supported asset format.");
+    ExpectEnabledFileImportPayloadOptions(
+        model,
+        std::array<Assets::AssetPayloadKind, 0>{});
+
+    model = buildModel("assets/textures/albedo.ktx2",
+                       Assets::AssetPayloadKind::Graph);
+    EXPECT_FALSE(model.CanChoosePayloadHint);
+    EXPECT_FALSE(model.CanImport);
+    EXPECT_EQ(model.ResolvedPayloadKind, Assets::AssetPayloadKind::Unknown);
+    EXPECT_EQ(
+        model.ImportDisabledReason,
+        "KTX import is unavailable because no promoted Texture2D importer supports this format; choose a supported asset format.");
+    ExpectEnabledFileImportPayloadOptions(
+        model,
+        std::array<Assets::AssetPayloadKind, 0>{});
+
+    model = buildModel("assets/models/model.obj",
+                       Assets::AssetPayloadKind::Graph);
+    EXPECT_TRUE(model.CanChoosePayloadHint);
+    EXPECT_FALSE(model.CanImport);
+    EXPECT_EQ(model.ResolvedPayloadKind, Assets::AssetPayloadKind::Unknown);
+    EXPECT_TRUE(model.PayloadHintDisabledReason.empty());
+    EXPECT_EQ(
+        model.ImportDisabledReason,
+        "OBJ import requires the Mesh payload; Graph is incompatible.");
+    ExpectEnabledFileImportPayloadOptions(
+        model,
+        std::array{
+            Assets::AssetPayloadKind::Unknown,
+            Assets::AssetPayloadKind::Mesh,
+        });
+
+    model = buildModel("assets/models/model.ply",
+                       Assets::AssetPayloadKind::Unknown);
+    EXPECT_TRUE(model.CanChoosePayloadHint);
+    EXPECT_FALSE(model.CanImport);
+    EXPECT_EQ(model.ResolvedPayloadKind, Assets::AssetPayloadKind::Unknown);
+    EXPECT_EQ(
+        model.ImportDisabledReason,
+        "PLY import requires an explicit Mesh or PointCloud payload.");
+    ExpectEnabledFileImportPayloadOptions(
+        model,
+        std::array{
+            Assets::AssetPayloadKind::Mesh,
+            Assets::AssetPayloadKind::PointCloud,
+        });
+
+    const Runtime::SandboxEditorFileImportPayloadOption* unknownOption =
+        FindFileImportPayloadOption(
+            model,
+            Assets::AssetPayloadKind::Unknown);
+    ASSERT_NE(unknownOption, nullptr);
+    EXPECT_EQ(unknownOption->DisabledReason, model.ImportDisabledReason);
+
+    for (const Assets::AssetPayloadKind explicitPlyKind :
+         {Assets::AssetPayloadKind::Mesh,
+          Assets::AssetPayloadKind::PointCloud})
+    {
+        model = buildModel("assets/models/model.ply", explicitPlyKind);
+        EXPECT_TRUE(model.CanChoosePayloadHint);
+        EXPECT_TRUE(model.CanImport);
+        EXPECT_EQ(model.ResolvedPayloadKind, explicitPlyKind);
+        EXPECT_TRUE(model.ImportDisabledReason.empty());
+        ExpectEnabledFileImportPayloadOptions(
+            model,
+            std::array{
+                Assets::AssetPayloadKind::Mesh,
+                Assets::AssetPayloadKind::PointCloud,
+            });
+    }
+
+    model = buildModel("assets/models/cloud.xyz",
+                       Assets::AssetPayloadKind::Unknown);
+    EXPECT_TRUE(model.CanChoosePayloadHint);
+    EXPECT_TRUE(model.CanImport);
+    EXPECT_EQ(model.ResolvedPayloadKind, Assets::AssetPayloadKind::PointCloud);
+    ExpectEnabledFileImportPayloadOptions(
+        model,
+        std::array{
+            Assets::AssetPayloadKind::Unknown,
+            Assets::AssetPayloadKind::PointCloud,
+        });
+
+    model = buildModel("assets/models/Duck.glb",
+                       Assets::AssetPayloadKind::Unknown);
+    EXPECT_TRUE(model.CanChoosePayloadHint);
+    EXPECT_TRUE(model.CanImport);
+    EXPECT_EQ(model.ResolvedPayloadKind, Assets::AssetPayloadKind::ModelScene);
+    ExpectEnabledFileImportPayloadOptions(
+        model,
+        std::array{
+            Assets::AssetPayloadKind::Unknown,
+            Assets::AssetPayloadKind::ModelScene,
+        });
+}
+TEST(SandboxEditorUi, FileImportDispatchRejectsInvalidPrerequisitesBeforeCallback)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    std::size_t callbackCalls = 0u;
+    Runtime::SandboxEditorFileImportCommand observedCommand{};
+    context.AssetImportCommands.Import =
+        [&](const Runtime::SandboxEditorFileImportCommand& command)
+        {
+            ++callbackCalls;
+            observedCommand = command;
+            return Runtime::SandboxEditorFileImportResult{
+                .Status = Runtime::SandboxEditorCommandStatus::Applied,
+                .PayloadKind = command.PayloadKind,
+            };
+        };
+
+    struct InvalidCase
+    {
+        std::string_view Path{};
+        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        std::string_view Reason{};
+    };
+    constexpr std::array invalidCases{
+        InvalidCase{
+            .Path = {},
+            .Error = Core::ErrorCode::InvalidPath,
+            .Reason =
+                "Enter an asset path before choosing a payload or importing.",
+        },
+        InvalidCase{
+            .Path = "assets/models/model",
+            .Error = Core::ErrorCode::InvalidPath,
+            .Reason =
+                "Add a supported file extension to the asset path before importing.",
+        },
+        InvalidCase{
+            .Path = "assets/models/Duck0.bin",
+            .Error = Core::ErrorCode::AssetUnsupportedFormat,
+            .Reason =
+                "Asset extension '.bin' is unsupported; choose a path with a supported asset file extension.",
+        },
+        InvalidCase{
+            .Path = "assets/textures/albedo.ktx",
+            .Error = Core::ErrorCode::AssetUnsupportedFormat,
+            .Reason =
+                "KTX import is unavailable because no promoted Texture2D importer supports this format; choose a supported asset format.",
+        },
+        InvalidCase{
+            .Path = "assets/textures/albedo.ktx2",
+            .PayloadKind = Assets::AssetPayloadKind::Graph,
+            .Error = Core::ErrorCode::AssetUnsupportedFormat,
+            .Reason =
+                "KTX import is unavailable because no promoted Texture2D importer supports this format; choose a supported asset format.",
+        },
+        InvalidCase{
+            .Path = "assets/models/model.ply",
+            .Error = Core::ErrorCode::InvalidArgument,
+            .Reason =
+                "PLY import requires an explicit Mesh or PointCloud payload.",
+        },
+        InvalidCase{
+            .Path = "assets/models/model.obj",
+            .PayloadKind = Assets::AssetPayloadKind::Graph,
+            .Error = Core::ErrorCode::InvalidArgument,
+            .Reason =
+                "OBJ import requires the Mesh payload; Graph is incompatible.",
+        },
+    };
+
+    for (const InvalidCase& invalid : invalidCases)
+    {
+        SCOPED_TRACE(invalid.Path);
+        const Runtime::SandboxEditorFileImportResult result =
+            Runtime::ApplySandboxEditorFileImportCommand(
+                context,
+                Runtime::SandboxEditorFileImportCommand{
+                    .Path = std::string{invalid.Path},
+                    .PayloadKind = invalid.PayloadKind,
+                });
+        EXPECT_EQ(result.Status,
+                  Runtime::SandboxEditorCommandStatus::AssetImportFailed);
+        EXPECT_EQ(result.Error, invalid.Error);
+        EXPECT_EQ(result.Message, invalid.Reason);
+        EXPECT_EQ(callbackCalls, 0u);
+    }
+
+    const Runtime::SandboxEditorFileImportResult valid =
+        Runtime::ApplySandboxEditorFileImportCommand(
+            context,
+            Runtime::SandboxEditorFileImportCommand{
+                .Path = "assets/models/cloud.xyz",
+                .PayloadKind = Assets::AssetPayloadKind::Unknown,
+            });
+    EXPECT_TRUE(valid.Succeeded());
+    EXPECT_EQ(callbackCalls, 1u);
+    EXPECT_EQ(observedCommand.Path, "assets/models/cloud.xyz");
+    EXPECT_EQ(observedCommand.PayloadKind,
+              Assets::AssetPayloadKind::PointCloud);
+}
 TEST(SandboxEditorUi, FileImportCommandRoutesThroughRuntimeOwnedSurface)
 {
     ECS::Scene::Registry registry;
@@ -553,11 +907,36 @@ TEST(SandboxEditorUi, FileImportCommandRoutesThroughRuntimeOwnedSurface)
     Runtime::SandboxEditorPanelFrame frame =
         Runtime::BuildSandboxEditorPanelFrame(context);
     EXPECT_TRUE(frame.FileImport.Enabled);
+    EXPECT_TRUE(frame.FileImport.CanChoosePayloadHint);
+    EXPECT_FALSE(frame.FileImport.CanImport);
     EXPECT_EQ(frame.FileImport.PendingPath, "assets/models/Duck.gltf");
     EXPECT_EQ(frame.FileImport.PayloadKind, Assets::AssetPayloadKind::Graph);
+    EXPECT_EQ(frame.FileImport.ResolvedPayloadKind,
+              Assets::AssetPayloadKind::Unknown);
+    EXPECT_EQ(frame.FileImport.ImportDisabledReason,
+              "GLTF import requires the ModelScene payload; Graph is incompatible.");
+    ExpectEnabledFileImportPayloadOptions(
+        frame.FileImport,
+        std::array{
+            Assets::AssetPayloadKind::Unknown,
+            Assets::AssetPayloadKind::ModelScene,
+        });
     EXPECT_FALSE(HasDiagnostic(
         frame.FileImport.Diagnostics,
         Runtime::SandboxEditorDiagnosticCode::AssetImportUnavailable));
+
+    const Runtime::SandboxEditorFileImportResult incompatible =
+        Runtime::ApplySandboxEditorFileImportCommand(
+            context,
+            Runtime::SandboxEditorFileImportCommand{
+                .Path = "assets/models/Duck.gltf",
+                .PayloadKind = Assets::AssetPayloadKind::Graph,
+            });
+    EXPECT_FALSE(commandObserved);
+    EXPECT_EQ(incompatible.Status,
+              Runtime::SandboxEditorCommandStatus::AssetImportFailed);
+    EXPECT_EQ(incompatible.Error, Core::ErrorCode::InvalidArgument);
+    EXPECT_EQ(incompatible.Message, frame.FileImport.ImportDisabledReason);
 
     const Runtime::SandboxEditorFileImportResult result =
         Runtime::ApplySandboxEditorFileImportCommand(
@@ -569,7 +948,7 @@ TEST(SandboxEditorUi, FileImportCommandRoutesThroughRuntimeOwnedSurface)
 
     EXPECT_TRUE(commandObserved);
     EXPECT_EQ(observedCommand.Path, "assets/models/Duck.gltf");
-    EXPECT_EQ(observedCommand.PayloadKind, Assets::AssetPayloadKind::Unknown);
+    EXPECT_EQ(observedCommand.PayloadKind, Assets::AssetPayloadKind::ModelScene);
     EXPECT_TRUE(result.Succeeded());
     EXPECT_EQ(result.Asset, (Assets::AssetId{7u, 2u}));
     EXPECT_EQ(result.PayloadKind, Assets::AssetPayloadKind::ModelScene);
@@ -580,6 +959,7 @@ TEST(SandboxEditorUi, FileImportCommandRoutesThroughRuntimeOwnedSurface)
     EXPECT_STREQ(Runtime::DebugNameForSandboxEditorCommandStatus(result.Status),
                  "Applied");
 
+    context.PendingAssetImportPayloadKind = Assets::AssetPayloadKind::Unknown;
     context.LastAssetImportResult = &result;
     frame = Runtime::BuildSandboxEditorPanelFrame(context);
     ASSERT_TRUE(frame.FileImport.LastResult.has_value());
@@ -599,6 +979,9 @@ TEST(SandboxEditorUi, FileImportCommandRoutesThroughRuntimeOwnedSurface)
     EXPECT_EQ(missing.Status,
               Runtime::SandboxEditorCommandStatus::MissingAssetImportCommands);
     EXPECT_EQ(missing.Error, Core::ErrorCode::InvalidState);
+    EXPECT_EQ(
+        missing.Message,
+        "Asset import requires an available runtime import command surface.");
     EXPECT_STREQ(Runtime::DebugNameForSandboxEditorCommandStatus(
                      missing.Status),
                  "MissingAssetImportCommands");
@@ -610,6 +993,9 @@ TEST(SandboxEditorUi, FileImportCommandRoutesThroughRuntimeOwnedSurface)
     EXPECT_EQ(empty.Status,
               Runtime::SandboxEditorCommandStatus::AssetImportFailed);
     EXPECT_EQ(empty.Error, Core::ErrorCode::InvalidPath);
+    EXPECT_EQ(
+        empty.Message,
+        "Enter an asset path before choosing a payload or importing.");
     EXPECT_STREQ(Runtime::DebugNameForSandboxEditorDiagnosticCode(
                      Runtime::SandboxEditorDiagnosticCode::AssetImportFailed),
                  "AssetImportFailed");
@@ -655,6 +1041,8 @@ TEST(SandboxEditorUi, FileImportCommandTreatsAsyncPendingAsNonFailure)
     EXPECT_EQ(result.PayloadKind, Assets::AssetPayloadKind::Texture2D);
     EXPECT_NE(result.Message.find("Queued"), std::string::npos);
 
+    context.PendingAssetImportPath = "assets/textures/albedo.png";
+    context.PendingAssetImportPayloadKind = Assets::AssetPayloadKind::Unknown;
     context.LastAssetImportResult = &result;
     Runtime::SandboxEditorPanelFrame frame =
         Runtime::BuildSandboxEditorPanelFrame(context);

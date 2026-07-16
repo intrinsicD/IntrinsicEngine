@@ -1640,11 +1640,25 @@ export namespace Extrinsic::Runtime
         }
     };
 
+    struct SandboxEditorFileImportPayloadOption
+    {
+        Assets::AssetPayloadKind Kind{Assets::AssetPayloadKind::Unknown};
+        bool Enabled{false};
+        std::string DisabledReason{};
+    };
+
     struct SandboxEditorFileImportModel
     {
         bool        Enabled{false};
+        bool        CanChoosePayloadHint{false};
+        bool        CanImport{false};
         std::string PendingPath{};
         Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
+        Assets::AssetPayloadKind ResolvedPayloadKind{
+            Assets::AssetPayloadKind::Unknown};
+        std::array<SandboxEditorFileImportPayloadOption, 6> PayloadOptions{};
+        std::string PayloadHintDisabledReason{};
+        std::string ImportDisabledReason{};
         std::optional<SandboxEditorFileImportResult> LastResult{};
         std::string StatusText{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};

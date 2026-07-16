@@ -28,6 +28,7 @@ module;
 module Extrinsic.Runtime.SandboxEditorFacades;
 
 import Extrinsic.Asset.ImportRouter;
+import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
@@ -217,8 +218,273 @@ namespace Extrinsic::Runtime
                    payloadKind == A::AssetPayloadKind::Texture2D;
         }
 
-        // Validation tables belong to the non-ImGui command facade. The app
-        // owns the matching combo-box presentation tables.
+        inline constexpr std::array<A::AssetPayloadKind, 6>
+            kFileImportPayloadKinds{{
+                A::AssetPayloadKind::Unknown,
+                A::AssetPayloadKind::Mesh,
+                A::AssetPayloadKind::PointCloud,
+                A::AssetPayloadKind::Graph,
+                A::AssetPayloadKind::ModelScene,
+                A::AssetPayloadKind::Texture2D,
+            }};
+
+        inline constexpr std::string_view kImportSurfaceUnavailableReason =
+            "Asset import requires an available runtime import command surface.";
+        inline constexpr std::string_view kImportPathEmptyReason =
+            "Enter an asset path before choosing a payload or importing.";
+        inline constexpr std::string_view kImportExtensionMissingReason =
+            "Add a supported file extension to the asset path before importing.";
+
+        struct FileImportPrerequisiteEvaluation
+        {
+            bool CanChoosePayloadHint{false};
+            bool CanImport{false};
+            A::AssetPayloadKind ResolvedPayloadKind{
+                A::AssetPayloadKind::Unknown};
+            std::array<SandboxEditorFileImportPayloadOption, 6> PayloadOptions{};
+            std::string PayloadHintDisabledReason{};
+            std::string ImportDisabledReason{};
+            Core::ErrorCode Error{Core::ErrorCode::Success};
+        };
+
+        [[nodiscard]] bool HasPromotedFileImporter(
+            const A::AssetFileFormat format,
+            const A::AssetPayloadKind payloadKind) noexcept
+        {
+            if (payloadKind == A::AssetPayloadKind::ModelScene)
+                return A::IsSupportedModelSceneImportFormat(format);
+            if (payloadKind == A::AssetPayloadKind::Texture2D)
+                return A::IsSupportedTextureImportFormat(format);
+            return true;
+        }
+
+        [[nodiscard]] std::string PayloadChoicesText(
+            const std::span<const A::AssetPayloadKind> payloads)
+        {
+            std::string text{};
+            for (std::size_t i = 0u; i < payloads.size(); ++i)
+            {
+                if (i > 0u)
+                    text += i + 1u == payloads.size() ? " or " : ", ";
+                text += A::DebugNameForAssetPayloadKind(payloads[i]);
+            }
+            return text;
+        }
+
+        [[nodiscard]] std::string BuildUnsupportedExtensionReason(
+            const A::AssetRouteDiagnostic& diagnostic)
+        {
+            std::string reason = "Asset extension";
+            if (!diagnostic.Extension.empty())
+            {
+                reason += " '.";
+                reason += diagnostic.Extension;
+                reason += "'";
+            }
+            reason +=
+                " is unsupported; choose a path with a supported asset file extension.";
+            return reason;
+        }
+
+        [[nodiscard]] std::string BuildIncompatiblePayloadReason(
+            const A::AssetFileFormatInfo& format,
+            const A::AssetPayloadKind payloadKind)
+        {
+            std::string reason = A::DebugNameForAssetFileFormat(format.Format);
+            reason += " import ";
+            const std::string choices = PayloadChoicesText(format.ImportPayloads);
+            if (payloadKind == A::AssetPayloadKind::Unknown)
+            {
+                reason += "requires an explicit ";
+                reason += choices;
+                reason += " payload.";
+                return reason;
+            }
+
+            if (format.ImportPayloads.size() == 1u)
+            {
+                reason += "requires the ";
+                reason += choices;
+                reason += " payload; ";
+            }
+            else
+            {
+                reason += "supports only ";
+                reason += choices;
+                reason += " payloads; ";
+            }
+            reason += A::DebugNameForAssetPayloadKind(payloadKind);
+            reason += " is incompatible.";
+            return reason;
+        }
+
+        [[nodiscard]] std::string BuildUnavailableImporterReason(
+            const A::AssetFileFormatInfo& format)
+        {
+            std::string reason = A::DebugNameForAssetFileFormat(format.Format);
+            reason += " import is unavailable because no promoted ";
+            reason += PayloadChoicesText(format.ImportPayloads);
+            reason +=
+                " importer supports this format; choose a supported asset format.";
+            return reason;
+        }
+
+        [[nodiscard]] FileImportPrerequisiteEvaluation
+        EvaluateFileImportPrerequisites(
+            const bool commandSurfaceAvailable,
+            const std::string_view path,
+            const A::AssetPayloadKind selectedPayloadKind)
+        {
+            FileImportPrerequisiteEvaluation evaluation{};
+            for (std::size_t i = 0u; i < kFileImportPayloadKinds.size(); ++i)
+                evaluation.PayloadOptions[i].Kind = kFileImportPayloadKinds[i];
+
+            const auto disableAll = [&evaluation](const std::string_view reason,
+                                                  const Core::ErrorCode error)
+            {
+                evaluation.PayloadHintDisabledReason = reason;
+                evaluation.ImportDisabledReason = reason;
+                evaluation.Error = error;
+                for (SandboxEditorFileImportPayloadOption& option :
+                     evaluation.PayloadOptions)
+                {
+                    option.DisabledReason = reason;
+                }
+            };
+
+            if (!commandSurfaceAvailable)
+            {
+                disableAll(kImportSurfaceUnavailableReason,
+                           Core::ErrorCode::InvalidState);
+                return evaluation;
+            }
+            if (path.empty())
+            {
+                disableAll(kImportPathEmptyReason, Core::ErrorCode::InvalidPath);
+                return evaluation;
+            }
+
+            const A::AssetRouteDiagnostic automaticDiagnostic =
+                A::DiagnoseAssetImportRoute(
+                    path,
+                    A::AssetRouteOperation::Import,
+                    A::AssetImportHint{
+                        .PayloadKind = A::AssetPayloadKind::Unknown,
+                    });
+            if (automaticDiagnostic.Status == A::AssetRouteStatus::MissingExtension)
+            {
+                disableAll(kImportExtensionMissingReason,
+                           automaticDiagnostic.Error);
+                return evaluation;
+            }
+            if (automaticDiagnostic.Status ==
+                A::AssetRouteStatus::UnsupportedExtension)
+            {
+                const std::string reason =
+                    BuildUnsupportedExtensionReason(automaticDiagnostic);
+                disableAll(reason, automaticDiagnostic.Error);
+                return evaluation;
+            }
+
+            const A::AssetFileFormatInfo* format = A::FindAssetFileFormat(path);
+            if (format == nullptr || format->ImportPayloads.empty())
+            {
+                const std::string reason = automaticDiagnostic.Message.empty()
+                    ? std::string{
+                          "The selected asset format has no supported import payload."}
+                    : automaticDiagnostic.Message;
+                disableAll(reason, automaticDiagnostic.Error);
+                return evaluation;
+            }
+
+            const A::AssetRouteDiagnostic selectedDiagnostic =
+                A::DiagnoseAssetImportRoute(
+                    path,
+                    A::AssetRouteOperation::Import,
+                    A::AssetImportHint{.PayloadKind = selectedPayloadKind});
+            if (selectedDiagnostic.Status == A::AssetRouteStatus::Ready)
+            {
+                const auto selectedRoute = A::ResolveAssetImportRoute(
+                    path,
+                    A::AssetRouteOperation::Import,
+                    A::AssetImportHint{.PayloadKind = selectedPayloadKind});
+                if (selectedRoute.has_value())
+                    evaluation.ResolvedPayloadKind = selectedRoute->PayloadKind;
+            }
+
+            const bool promotedImporterAvailable =
+                std::ranges::any_of(
+                    format->ImportPayloads,
+                    [format](const A::AssetPayloadKind payloadKind)
+                    {
+                        return HasPromotedFileImporter(format->Format,
+                                                       payloadKind);
+                    });
+            if (!promotedImporterAvailable)
+            {
+                const std::string reason = BuildUnavailableImporterReason(*format);
+                disableAll(reason, Core::ErrorCode::AssetUnsupportedFormat);
+                return evaluation;
+            }
+
+            evaluation.CanChoosePayloadHint = true;
+            for (SandboxEditorFileImportPayloadOption& option :
+                 evaluation.PayloadOptions)
+            {
+                const A::AssetRouteDiagnostic optionDiagnostic =
+                    A::DiagnoseAssetImportRoute(
+                        path,
+                        A::AssetRouteOperation::Import,
+                        A::AssetImportHint{.PayloadKind = option.Kind});
+                if (optionDiagnostic.Status != A::AssetRouteStatus::Ready)
+                {
+                    option.DisabledReason =
+                        BuildIncompatiblePayloadReason(*format, option.Kind);
+                    continue;
+                }
+
+                const auto optionRoute = A::ResolveAssetImportRoute(
+                    path,
+                    A::AssetRouteOperation::Import,
+                    A::AssetImportHint{.PayloadKind = option.Kind});
+                if (!optionRoute.has_value() ||
+                    !HasPromotedFileImporter(optionRoute->Format,
+                                             optionRoute->PayloadKind))
+                {
+                    option.DisabledReason = BuildUnavailableImporterReason(*format);
+                    continue;
+                }
+                option.Enabled = true;
+            }
+
+            const auto selectedOption = std::ranges::find(
+                evaluation.PayloadOptions,
+                selectedPayloadKind,
+                &SandboxEditorFileImportPayloadOption::Kind);
+            if (selectedOption == evaluation.PayloadOptions.end())
+            {
+                evaluation.ImportDisabledReason =
+                    "Select a supported payload hint before importing.";
+                evaluation.Error = Core::ErrorCode::InvalidArgument;
+                return evaluation;
+            }
+            if (!selectedOption->Enabled)
+            {
+                evaluation.ImportDisabledReason = selectedOption->DisabledReason;
+                evaluation.Error = selectedDiagnostic.Error == Core::ErrorCode::Success
+                    ? Core::ErrorCode::AssetUnsupportedFormat
+                    : selectedDiagnostic.Error;
+                return evaluation;
+            }
+
+            evaluation.CanImport = true;
+            evaluation.Error = Core::ErrorCode::Success;
+            return evaluation;
+        }
+
+        // Validation tables belong to the non-ImGui command facade. App
+        // presentation consumes the exported option records instead of
+        // duplicating runtime-owned availability policy.
         inline constexpr std::array<SandboxEditorMeshDenoiseStage, 1>
             kMeshDenoiseStages{{
                 SandboxEditorMeshDenoiseStage::FullBilateral,
@@ -9936,22 +10202,41 @@ namespace Extrinsic::Runtime
                 context.AssetImportCommands.Available();
             model.PendingPath = context.PendingAssetImportPath;
             model.PayloadKind = context.PendingAssetImportPayloadKind;
-            if (model.Enabled)
+            const FileImportPrerequisiteEvaluation prerequisites =
+                EvaluateFileImportPrerequisites(
+                    context.AssetImportCommands.Available(),
+                    model.PendingPath,
+                    model.PayloadKind);
+            model.CanChoosePayloadHint = prerequisites.CanChoosePayloadHint;
+            model.CanImport = prerequisites.CanImport;
+            model.ResolvedPayloadKind = prerequisites.ResolvedPayloadKind;
+            model.PayloadOptions = prerequisites.PayloadOptions;
+            model.PayloadHintDisabledReason =
+                prerequisites.PayloadHintDisabledReason;
+            model.ImportDisabledReason = prerequisites.ImportDisabledReason;
+            if (model.CanImport)
             {
-                model.StatusText = "Import commands available.";
+                model.StatusText = "Ready to import ";
+                model.StatusText += A::DebugNameForAssetPayloadKind(
+                    model.ResolvedPayloadKind);
+                model.StatusText += " asset.";
             }
             else
             {
-                model.StatusText =
-                    "Asset import is disabled: runtime import commands are unavailable.";
-                AddDiagnostic(model.Diagnostics,
-                              SandboxEditorDiagnosticCode::AssetImportUnavailable,
-                              model.StatusText);
+                model.StatusText = model.ImportDisabledReason;
+                if (!context.AssetImportCommands.Available())
+                {
+                    AddDiagnostic(
+                        model.Diagnostics,
+                        SandboxEditorDiagnosticCode::AssetImportUnavailable,
+                        model.StatusText);
+                }
             }
             if (context.LastAssetImportResult != nullptr)
             {
                 model.LastResult = *context.LastAssetImportResult;
-                if (!context.LastAssetImportResult->Message.empty())
+                if (model.CanImport &&
+                    !context.LastAssetImportResult->Message.empty())
                 {
                     model.StatusText = context.LastAssetImportResult->Message;
                 }
@@ -9961,7 +10246,9 @@ namespace Extrinsic::Runtime
                 {
                     AddDiagnostic(model.Diagnostics,
                                   SandboxEditorDiagnosticCode::AssetImportFailed,
-                                  model.StatusText);
+                                  context.LastAssetImportResult->Message.empty()
+                                      ? model.StatusText
+                                      : context.LastAssetImportResult->Message);
                 }
             }
             return model;
@@ -12283,38 +12570,43 @@ namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorFileImportCommand& command)
     {
-        if (!context.AssetImportCommands.Available())
+        const FileImportPrerequisiteEvaluation prerequisites =
+            EvaluateFileImportPrerequisites(
+                context.AssetImportCommands.Available(),
+                command.Path,
+                command.PayloadKind);
+        if (!prerequisites.CanImport)
         {
             return SandboxEditorFileImportResult{
-                .Status = SandboxEditorCommandStatus::MissingAssetImportCommands,
-                .PayloadKind = command.PayloadKind,
-                .Error = Core::ErrorCode::InvalidState,
-                .Message = "Asset import command surface is unavailable.",
-            };
-        }
-        if (command.Path.empty())
-        {
-            return SandboxEditorFileImportResult{
-                .Status = SandboxEditorCommandStatus::AssetImportFailed,
-                .PayloadKind = command.PayloadKind,
-                .Error = Core::ErrorCode::InvalidPath,
-                .Message = BuildImportFailureMessage(Core::ErrorCode::InvalidPath),
+                .Status = context.AssetImportCommands.Available()
+                    ? SandboxEditorCommandStatus::AssetImportFailed
+                    : SandboxEditorCommandStatus::MissingAssetImportCommands,
+                .PayloadKind = prerequisites.ResolvedPayloadKind ==
+                        A::AssetPayloadKind::Unknown
+                    ? command.PayloadKind
+                    : prerequisites.ResolvedPayloadKind,
+                .Error = prerequisites.Error,
+                .Message = prerequisites.ImportDisabledReason,
             };
         }
 
+        SandboxEditorFileImportCommand resolvedCommand = command;
+        resolvedCommand.PayloadKind = prerequisites.ResolvedPayloadKind;
         SandboxEditorFileImportResult result =
-            context.AssetImportCommands.Import(command);
+            context.AssetImportCommands.Import(resolvedCommand);
         if (result.Status == SandboxEditorCommandStatus::Applied)
         {
             if (result.Message.empty())
-                result.Message = BuildImportSuccessMessage(command, result);
+                result.Message = BuildImportSuccessMessage(resolvedCommand, result);
             result.Error = Core::ErrorCode::Success;
             InvalidateSelectedModelCache(context);
         }
         else if (result.Status == SandboxEditorCommandStatus::Pending)
         {
             if (result.Message.empty())
-                result.Message = BuildImportPendingMessage(command, result.PayloadKind);
+                result.Message = BuildImportPendingMessage(
+                    resolvedCommand,
+                    result.PayloadKind);
             result.Error = Core::ErrorCode::Success;
         }
         else if (result.Message.empty())

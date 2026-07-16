@@ -14,6 +14,8 @@ import Extrinsic.Runtime.SandboxEditorFacades;
 
 export namespace Extrinsic::Sandbox::Editor
 {
+    void DrawDisabledReasonTooltip(std::string_view disabledReason);
+
     struct EditorWindowDescriptor
     {
         std::string Id{};

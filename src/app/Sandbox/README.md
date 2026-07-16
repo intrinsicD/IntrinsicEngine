@@ -51,6 +51,16 @@ requests, and default import/input policy implementation remain runtime/asset
 owned; the sandbox app implementation only composes the runtime-provided
 defaults.
 
+`File / Import` is a linear path -> payload-hint -> import workflow. The path
+field remains editable whenever the window is bound, while the runtime facade
+independently reports whether the payload chooser and import command are ready.
+Single-payload formats may keep the `Unknown` hint as automatic resolution;
+ambiguous PLY input requires an explicit mesh or point-cloud hint. Disabled
+chooser rows and commands expose the runtime-owned prerequisite reason on hover,
+including through ImGui's disabled-item hover path, so app code does not carry a
+second extension or importer-capability table. The same disabled-tooltip
+convention is used by the AssetIO queue's clear and cancel commands.
+
 The `File / Import` editor window also polls
 `Engine::GetAssetImportPipeline().GetAssetImportQueueSnapshot()` for the
 runtime-owned AssetIO queue. Rows show queued/running/apply/upload/terminal

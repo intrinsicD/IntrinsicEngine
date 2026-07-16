@@ -31,6 +31,21 @@ import Extrinsic.Runtime.SandboxEditorFacades;
 
 namespace Extrinsic::Sandbox::Editor
 {
+    void DrawDisabledReasonTooltip(const std::string_view disabledReason)
+    {
+        constexpr ImGuiHoveredFlags hoverFlags =
+            ImGuiHoveredFlags_ForTooltip |
+            ImGuiHoveredFlags_AllowWhenDisabled;
+        if (disabledReason.empty() || !ImGui::IsItemHovered(hoverFlags))
+            return;
+
+        ImGui::BeginTooltip();
+        ImGui::TextUnformatted(
+            disabledReason.data(),
+            disabledReason.data() + disabledReason.size());
+        ImGui::EndTooltip();
+    }
+
     namespace
     {
         using namespace Extrinsic::Runtime;
@@ -43,16 +58,6 @@ namespace Extrinsic::Sandbox::Editor
             static_cast<VisualizationColorSource>(1);
         inline constexpr VisualizationColorSource kScalarFieldSource =
             static_cast<VisualizationColorSource>(2);
-
-        inline constexpr std::array<SandboxEditorAssetPayloadKind, 6>
-            kImportPayloadKinds{{
-                SandboxEditorAssetPayloadKind::Unknown,
-                SandboxEditorAssetPayloadKind::Mesh,
-                SandboxEditorAssetPayloadKind::PointCloud,
-                SandboxEditorAssetPayloadKind::Graph,
-                SandboxEditorAssetPayloadKind::ModelScene,
-                SandboxEditorAssetPayloadKind::Texture2D,
-            }};
 
         inline constexpr std::array<ProgressiveSlotSemantic, 6>
             kTextureBakeTargetSemantics{{
@@ -260,6 +265,8 @@ namespace Extrinsic::Sandbox::Editor
             if (!clearAvailable)
             {
                 ImGui::EndDisabled();
+                DrawDisabledReasonTooltip(
+                    model.ClearCompletedDisabledReason);
                 if (!model.ClearCompletedDisabledReason.empty())
                 {
                     ImGui::TextDisabled(
@@ -347,6 +354,8 @@ namespace Extrinsic::Sandbox::Editor
                     if (!cancelAvailable)
                     {
                         ImGui::EndDisabled();
+                        DrawDisabledReasonTooltip(
+                            row.CancelDisabledReason);
                         if (!row.CancelDisabledReason.empty())
                         {
                             ImGui::TextDisabled("%s",
@@ -2101,14 +2110,6 @@ namespace Extrinsic::Sandbox::Editor
             if (windowId == "file.import" &&
                 BeginFixedWindow("File / Import", open, ImVec2(0.0f, 0.0f)))
             {
-                const bool importControlsAvailable =
-                    frame.FileImport.Enabled &&
-                    context != nullptr &&
-                    importPathBuffer != nullptr &&
-                    importPayloadKind != nullptr &&
-                    lastImportResult != nullptr;
-                if (!importControlsAvailable)
-                    ImGui::BeginDisabled();
                 if (importPathBuffer != nullptr)
                 {
                     ImGui::InputText("Path",
@@ -2121,30 +2122,60 @@ namespace Extrinsic::Sandbox::Editor
                 }
                 if (importPayloadKind != nullptr)
                 {
+                    const bool payloadHintAvailable =
+                        frame.FileImport.CanChoosePayloadHint;
+                    if (!payloadHintAvailable)
+                        ImGui::BeginDisabled();
                     if (ImGui::BeginCombo(
                             "Payload hint",
                             DebugNameForSandboxEditorAssetPayloadKind(*importPayloadKind)))
                     {
-                        for (const SandboxEditorAssetPayloadKind kind : kImportPayloadKinds)
+                        for (const SandboxEditorFileImportPayloadOption& option :
+                             frame.FileImport.PayloadOptions)
                         {
-                            const bool selected = *importPayloadKind == kind;
+                            const bool selected =
+                                *importPayloadKind == option.Kind;
+                            if (!option.Enabled)
+                                ImGui::BeginDisabled();
                             if (ImGui::Selectable(
-                                    DebugNameForSandboxEditorAssetPayloadKind(kind),
+                                    DebugNameForSandboxEditorAssetPayloadKind(
+                                        option.Kind),
                                     selected))
                             {
-                                *importPayloadKind = kind;
+                                *importPayloadKind = option.Kind;
                             }
                             if (selected)
                                 ImGui::SetItemDefaultFocus();
+                            if (!option.Enabled)
+                            {
+                                ImGui::EndDisabled();
+                                DrawDisabledReasonTooltip(
+                                    option.DisabledReason);
+                            }
                         }
                         ImGui::EndCombo();
+                    }
+                    if (!payloadHintAvailable)
+                    {
+                        ImGui::EndDisabled();
+                        DrawDisabledReasonTooltip(
+                            frame.FileImport.PayloadHintDisabledReason);
                     }
                 }
                 else
                 {
                     ImGui::TextDisabled("Payload hint is not bound.");
                 }
-                if (ImGui::Button("Import asset") && importControlsAvailable)
+
+                const bool importAvailable =
+                    frame.FileImport.CanImport &&
+                    context != nullptr &&
+                    importPathBuffer != nullptr &&
+                    importPayloadKind != nullptr &&
+                    lastImportResult != nullptr;
+                if (!importAvailable)
+                    ImGui::BeginDisabled();
+                if (ImGui::Button("Import asset") && importAvailable)
                 {
                     *lastImportResult = ApplySandboxEditorFileImportCommand(
                         *context,
@@ -2153,8 +2184,12 @@ namespace Extrinsic::Sandbox::Editor
                             .PayloadKind = *importPayloadKind,
                         });
                 }
-                if (!importControlsAvailable)
+                if (!importAvailable)
+                {
                     ImGui::EndDisabled();
+                    DrawDisabledReasonTooltip(
+                        frame.FileImport.ImportDisabledReason);
+                }
                 ImGui::TextWrapped("%s", frame.FileImport.StatusText.c_str());
                 const SandboxEditorFileImportResult* result =
                     lastImportResult != nullptr && lastImportResult->has_value()

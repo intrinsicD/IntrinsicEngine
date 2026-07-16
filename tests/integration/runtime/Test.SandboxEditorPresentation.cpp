@@ -1,6 +1,7 @@
 // ARCH-006 Slice 5 app-owned editor presentation and composition coverage.
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -18,6 +19,7 @@
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
+import Extrinsic.Platform.Backend.Null;
 import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.AssetImportPipeline;
@@ -48,6 +50,23 @@ namespace
             engine.RequestExit();
         }
         void OnShutdown(Runtime::Engine&) override {}
+    };
+
+    class ThreeFrameApplication final : public Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            ++m_Frames;
+            if (m_Frames == 3u)
+                engine.RequestExit();
+        }
+        void OnShutdown(Runtime::Engine&) override {}
+
+    private:
+        std::uint32_t m_Frames{0u};
     };
 
     class WaitForAssetImportEventApplication final : public Runtime::IApplication
@@ -142,6 +161,35 @@ namespace
                 return true;
         }
         return false;
+    }
+
+    [[nodiscard]] bool ActiveImGuiTooltipExists()
+    {
+        const ImGuiContext* context = ImGui::GetCurrentContext();
+        if (context == nullptr)
+            return false;
+
+        return std::ranges::any_of(
+            context->Windows,
+            [](const ImGuiWindow* window)
+            {
+                return window != nullptr &&
+                       window->Active &&
+                       (window->Flags & ImGuiWindowFlags_Tooltip) != 0;
+            });
+    }
+
+    [[nodiscard]] std::string WithoutAsciiWhitespace(
+        const std::string_view text)
+    {
+        std::string compact{};
+        compact.reserve(text.size());
+        for (const char character : text)
+        {
+            if (!std::isspace(static_cast<unsigned char>(character)))
+                compact.push_back(character);
+        }
+        return compact;
     }
 
     [[nodiscard]] bool HasDiagnostic(
@@ -496,6 +544,146 @@ TEST(SandboxEditorPresentation, AdapterCallbackDrawsDeterministicMenuOnlyFrame)
 
     shell.Detach();
     engine.Shutdown();
+}
+
+TEST(SandboxEditorPresentation,
+     FileImportDisabledReasonRendersThroughRealHoveredControl)
+{
+    Runtime::Engine engine(
+        HeadlessConfig(), std::make_unique<ThreeFrameApplication>());
+    engine.Initialize();
+
+    SandboxEditor::EditorShell shell;
+    ASSERT_TRUE(shell.SetEditorWindowOpen("file.import", true));
+
+    std::uint32_t observerFrames = 0u;
+    bool importButtonHovered = false;
+    bool tooltipVisible = false;
+    ImVec2 queuedMousePosition{};
+    ImVec2 observedMousePosition{};
+    std::string hoveredWindowName{};
+    const Runtime::EditorWindowHandle observer = shell.RegisterEditorWindow(
+        SandboxEditor::EditorWindowDescriptor{
+            .Id = "test.file_import_hover_observer",
+            .MenuPath = {"View"},
+            .Title = "File import hover observer",
+            .OpenByDefault = true,
+            .Draw =
+                [&](bool&, const Runtime::SandboxEditorContext&)
+                {
+                    ++observerFrames;
+                    ImGuiWindow* importWindow =
+                        ImGui::FindWindowByName("File / Import");
+                    if (importWindow == nullptr)
+                        return;
+
+                    if (observerFrames == 1u)
+                    {
+                        // Keep the observer window from occluding the real
+                        // built-in window on the hover frame.
+                        ImGui::SetWindowPos(
+                            ImVec2(8.0f, 500.0f),
+                            ImGuiCond_Always);
+                        const ImGuiStyle& style = ImGui::GetStyle();
+                        const float frameHeight = ImGui::GetFrameHeight();
+                        const ImVec2 labelSize =
+                            ImGui::CalcTextSize("Import asset");
+                        const ImVec2 importButtonCenter{
+                            importWindow->DC.CursorStartPos.x +
+                                (labelSize.x + 2.0f * style.FramePadding.x) /
+                                    2.0f,
+                            importWindow->DC.CursorStartPos.y +
+                                2.0f * (frameHeight + style.ItemSpacing.y) +
+                                frameHeight / 2.0f,
+                        };
+                        queuedMousePosition = importButtonCenter;
+                        static_cast<
+                            Plat::Backends::Null::NullWindow&>(
+                                engine.GetWindow())
+                            .QueueCursor(
+                                importButtonCenter.x,
+                                importButtonCenter.y);
+                        return;
+                    }
+
+                    if (observerFrames == 2u)
+                        return;
+
+                    const ImGuiID importButtonId =
+                        importWindow->GetID("Import asset");
+                    observedMousePosition = ImGui::GetIO().MousePos;
+                    if (ImGui::GetCurrentContext()->HoveredWindow != nullptr)
+                    {
+                        hoveredWindowName =
+                            ImGui::GetCurrentContext()->HoveredWindow->Name;
+                    }
+                    importButtonHovered =
+                        ImGui::GetCurrentContext()->HoveredId == importButtonId ||
+                        (ImGui::GetCurrentContext()->HoveredId == 0u &&
+                         ImGui::GetCurrentContext()->HoveredIdIsDisabled);
+                    tooltipVisible = ActiveImGuiTooltipExists();
+                },
+        });
+    ASSERT_TRUE(observer.IsValid());
+
+    ImGuiStyle& style = ImGui::GetStyle();
+    const ImGuiHoveredFlags savedTooltipHoverFlags =
+        style.HoverFlagsForTooltipMouse;
+    style.HoverFlagsForTooltipMouse = ImGuiHoveredFlags_DelayNone;
+    shell.Attach(engine);
+    engine.Run();
+    style.HoverFlagsForTooltipMouse = savedTooltipHoverFlags;
+
+    ASSERT_EQ(observerFrames, 3u);
+    ASSERT_FALSE(shell.GetLastFrame().FileImport.CanImport);
+    ASSERT_FALSE(shell.GetLastFrame().FileImport.ImportDisabledReason.empty());
+    EXPECT_TRUE(importButtonHovered)
+        << "queued=(" << queuedMousePosition.x << ", "
+        << queuedMousePosition.y << ") observed=("
+        << observedMousePosition.x << ", " << observedMousePosition.y
+        << ") hoveredWindow=" << hoveredWindowName;
+    EXPECT_TRUE(tooltipVisible)
+        << "queued=(" << queuedMousePosition.x << ", "
+        << queuedMousePosition.y << ") observed=("
+        << observedMousePosition.x << ", " << observedMousePosition.y
+        << ") hoveredWindow=" << hoveredWindowName;
+
+    EXPECT_TRUE(shell.UnregisterEditorWindow(observer));
+    shell.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorPresentation,
+     DisabledReasonTooltipConventionIsSharedByImportAndQueueControls)
+{
+    const std::string shell = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp");
+    ASSERT_FALSE(shell.empty());
+    const std::string compactShell = WithoutAsciiWhitespace(shell);
+    EXPECT_NE(
+        compactShell.find(
+            "DrawDisabledReasonTooltip(model.ClearCompletedDisabledReason);"),
+        std::string::npos);
+    EXPECT_NE(
+        compactShell.find(
+            "DrawDisabledReasonTooltip(row.CancelDisabledReason);"),
+        std::string::npos);
+    EXPECT_NE(
+        compactShell.find(
+            "DrawDisabledReasonTooltip(frame.FileImport.ImportDisabledReason);"),
+        std::string::npos);
+
+    for (const std::string_view required :
+         {"ImGuiHoveredFlags_ForTooltip |",
+          "ImGuiHoveredFlags_AllowWhenDisabled",
+          "option.DisabledReason",
+          "frame.FileImport.PayloadHintDisabledReason",
+          "frame.FileImport.ImportDisabledReason",
+          "frame.FileImport.CanChoosePayloadHint",
+          "frame.FileImport.CanImport"})
+    {
+        EXPECT_NE(shell.find(required), std::string::npos) << required;
+    }
 }
 
 TEST(SandboxEditorPresentation, RuntimeImportEventIsReflectedByAppFilePanel)
