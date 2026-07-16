@@ -68,7 +68,6 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.KMeansBackend;
 import Extrinsic.Runtime.KMeansGpuBackend;
-import Extrinsic.Runtime.KMeansGpuJobQueue;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressivePoissonGpuBackend;

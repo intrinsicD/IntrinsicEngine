@@ -36,7 +36,12 @@ maturity_target: ParityProven
 - Backend axis: adds `gpu_vulkan_compute` with `gpu;vulkan` parity; CPU reference/optimized remain the oracles and the fallback.
 
 ## Required changes
-- [ ] Add the runtime GPU backend adapter (mirroring `Runtime.KMeansGpuBackend`/`KMeansGpuJobQueue`) that records the local-step and global-solve compute passes for ARAP/SLIM, uploads mesh topology/positions once, iterates on the GPU, and drains UVs through `AsyncBufferReadback`.
+- [ ] Add the runtime GPU backend adapter (mirroring
+      `Runtime.KMeansGpuBackend` plus the Sandbox-editor-private K-Means queue
+      attached to `Extrinsic.Runtime.SandboxEditorFacades`, whose queue DTOs
+      remain on that public facade) that records the local-step and global-solve
+      compute passes for ARAP/SLIM, uploads mesh topology/positions once,
+      iterates on the GPU, and drains UVs through `AsyncBufferReadback`.
 - [ ] Add and wire a runtime parameterization GPU job queue (JobService
       `GpuQueue` participant) so work records inside the renderer frame context
       with no extra present.

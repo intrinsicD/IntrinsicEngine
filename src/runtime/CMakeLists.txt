@@ -56,7 +56,6 @@ target_sources(${target_name}
         Runtime.GpuReadbackJob.cppm
         Runtime.KMeansBackend.cppm
         Runtime.KMeansGpuBackend.cppm
-        Runtime.KMeansGpuJobQueue.cppm
         Runtime.RegistrationAlignment.cppm
         Runtime.PhysicsBridge.cppm
         Runtime.SceneDocument.cppm

@@ -71,8 +71,11 @@ copies active-world geometry into a `JobService` CPU snapshot, publishes a
 completion event at the main-thread job gate, commits labels during event pump B,
 and emits `ClusterLabelsChanged` as the standing visualization refresh reaction.
 `Runtime.Engine.cppm` and `Runtime.Engine.cpp` do not import or name the K-Means
-modules; direct Vulkan K-Means queue ownership remains with the existing Sandbox
-editor GPU participant path until the `RUNTIME-137` GPU-job target follow-up.
+modules. The public `Extrinsic.Runtime.SandboxEditorFacades` surface retains the
+K-Means GPU request, submission, result, and status DTOs used for command
+injection, while the queue class is private implementation glue attached to that
+module. Its Sandbox-owned `JobService` `GpuQueue` participant still records and
+drains Vulkan K-Means work inside the normal renderer frame context.
 
 The frame order is:
 
@@ -172,9 +175,12 @@ immediate/asynchronous result publication. Runtime retains the exported domain
 models, callback-scoped borrowed property view, command/job execution,
 UV/outlier result state, and result sinks; the app module imports runtime only.
 K-Means and Progressive Poisson facade bodies compile in the private
-`Runtime.SandboxMethodFacade.cpp` implementation unit, while render-recipe and
-artifact facades compile in their own private implementation unit. The
-app-to-runtime dependency direction is unchanged.
+`Runtime.SandboxMethodFacade.cpp` implementation unit. The K-Means GPU queue
+declaration is likewise private implementation glue, with its implementation
+unit attached to `Extrinsic.Runtime.SandboxEditorFacades`; only its command DTOs
+remain on that public facade. Render-recipe and artifact facades compile in
+their own private implementation unit. The app-to-runtime dependency direction
+is unchanged.
 
 The internal `RuntimeFrameContext` record carries the data that must survive
 between those phases: frame delta, fixed-step interpolation alpha, render frame

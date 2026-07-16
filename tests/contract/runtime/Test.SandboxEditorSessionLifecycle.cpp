@@ -71,7 +71,6 @@ import Extrinsic.Runtime.EditorPropertyWidgets;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigControl;
-import Extrinsic.Runtime.KMeansGpuJobQueue;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressiveRenderData;
@@ -271,14 +270,17 @@ TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
     std::function<Runtime::SandboxEditorFileImportResult(
         const Runtime::SandboxEditorFileImportCommand&)>
         staleImportCommand{};
+    Runtime::SandboxEditorKMeansGpuCommandSurface staleGpuCommands{};
     ASSERT_TRUE(session.VisitPreparedFrame(
         [&](Runtime::SandboxEditorPreparedFrameView frame)
         {
             staleResultSink = frame.Context.MethodResultSinks.KMeans;
             staleImportCommand = frame.Context.AssetImportCommands.Import;
+            staleGpuCommands = frame.Context.KMeansGpuCommands;
         }));
     ASSERT_TRUE(staleResultSink);
     ASSERT_TRUE(staleImportCommand);
+    ASSERT_TRUE(staleGpuCommands.Available());
     const Runtime::SandboxEditorFileImportResult activeImport =
         staleImportCommand(Runtime::SandboxEditorFileImportCommand{
             .Path = "/tmp/intrinsic-session-active-command.obj",
@@ -293,12 +295,15 @@ TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
     ASSERT_TRUE(session.PrepareFrame(MakeNoSandboxEditorModelBuildRequest()));
 
     std::function<void(Runtime::SandboxEditorKMeansResult)> currentResultSink{};
+    Runtime::SandboxEditorKMeansGpuCommandSurface currentGpuCommands{};
     ASSERT_TRUE(session.VisitPreparedFrame(
         [&](Runtime::SandboxEditorPreparedFrameView frame)
         {
             currentResultSink = frame.Context.MethodResultSinks.KMeans;
+            currentGpuCommands = frame.Context.KMeansGpuCommands;
         }));
     ASSERT_TRUE(currentResultSink);
+    ASSERT_TRUE(currentGpuCommands.Available());
 
     currentResultSink(Runtime::SandboxEditorKMeansResult{
         .Message = "current attachment result",
@@ -314,6 +319,11 @@ TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
     EXPECT_EQ(staleImport.Status,
               Runtime::SandboxEditorCommandStatus::AssetImportFailed);
     EXPECT_EQ(staleImport.Error, Core::ErrorCode::InvalidState);
+    const Runtime::RuntimeKMeansGpuJobSubmission staleGpuSubmission =
+        staleGpuCommands.Submit({});
+    EXPECT_EQ(staleGpuSubmission.Status,
+              Runtime::RuntimeKMeansGpuJobStatus::GpuUnavailable);
+    EXPECT_FALSE(staleGpuCommands.ConsumeCompleted().has_value());
 
     ASSERT_TRUE(session.PrepareFrame(MakeNoSandboxEditorModelBuildRequest()));
     ASSERT_TRUE(session.VisitPreparedFrame(

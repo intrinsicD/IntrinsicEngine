@@ -34,7 +34,10 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.RHI.BufferManager;
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Device;
+import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
@@ -45,7 +48,7 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.JobService;
-import Extrinsic.Runtime.KMeansGpuJobQueue;
+import Extrinsic.Runtime.KMeansGpuBackend;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
@@ -61,6 +64,7 @@ import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
+import Geometry.KMeans;
 import Geometry.Graph.Vertex.Normals;
 import Geometry.HalfedgeMesh.Vertices.Normals;
 import Geometry.PointCloud.Normals;
@@ -69,6 +73,64 @@ import Geometry.Properties;
 import Geometry.Smoothing;
 import Geometry.UvAtlas;
 export import Geometry.Parameterization;
+
+export namespace Extrinsic::Runtime
+{
+    enum class RuntimeKMeansGpuJobStatus : std::uint8_t
+    {
+        Idle,
+        Accepted,
+        Busy,
+        InvalidInput,
+        GpuUnavailable,
+        PipelineUnavailable,
+        RecordFailed,
+        ReadbackPending,
+        ReadbackFailed,
+        Completed,
+    };
+
+    struct RuntimeKMeansGpuJobRequest
+    {
+        std::uint64_t Sequence{0u}; // 0 means "assign a sequence on submit".
+        std::uint32_t StableEntityId{0u};
+        std::uint32_t DomainTag{0u};
+        std::vector<glm::vec3> Points{};
+        std::vector<glm::vec3> InitialCentroids{};
+        Geometry::KMeans::KMeansParams Params{};
+    };
+
+    struct RuntimeKMeansGpuJobSubmission
+    {
+        RuntimeKMeansGpuJobStatus Status{RuntimeKMeansGpuJobStatus::Idle};
+        std::uint64_t Sequence{0u};
+        KMeansGpuStatus GpuStatus{KMeansGpuStatus::Success};
+        std::string Diagnostic{};
+
+        [[nodiscard]] bool Accepted() const noexcept
+        {
+            return Status == RuntimeKMeansGpuJobStatus::Accepted;
+        }
+    };
+
+    struct RuntimeKMeansGpuJobResult
+    {
+        RuntimeKMeansGpuJobStatus Status{RuntimeKMeansGpuJobStatus::Idle};
+        std::uint64_t Sequence{0u};
+        std::uint32_t StableEntityId{0u};
+        std::uint32_t DomainTag{0u};
+        KMeansGpuStatus GpuStatus{KMeansGpuStatus::Success};
+        Geometry::KMeans::KMeansResult Result{};
+        std::string Diagnostic{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == RuntimeKMeansGpuJobStatus::Completed;
+        }
+    };
+}
+
+#include "Runtime.KMeansGpuJobQueue.Internal.hpp"
 
 export namespace Extrinsic::Runtime
 {

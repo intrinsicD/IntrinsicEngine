@@ -174,10 +174,12 @@ The RHI-visible integration hooks live in runtime:
 `Extrinsic::RHI::IDevice&`, evaluates `IDevice::IsOperational()` for GPU
 requests, and remains a nonblocking synchronous fallback seam. Real Vulkan
 KMeans execution is owned by `Extrinsic.Runtime.KMeansGpuBackend` and the
-`JobService` `GpuQueue`-driven `Extrinsic.Runtime.KMeansGpuJobQueue`, which
-provide command recording, persistent GPU resources, and asynchronous readback
+Sandbox editor's `JobService` `GpuQueue` participant, which together provide
+command recording, persistent GPU resources, and asynchronous readback
 ownership without importing RHI into geometry or creating an extra swapchain
-present.
+present. The queue class is private implementation glue attached to the public
+`Extrinsic.Runtime.SandboxEditorFacades` module; its request, submission,
+result, and status DTOs remain on that facade for command injection.
 
 ### Geometry IO coverage
 

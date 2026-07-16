@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 80 |
+| `runtime` | 79 |
 
 ## Modules
 
@@ -368,7 +368,6 @@ Root scanned: `src`
 | `Extrinsic.Runtime.JobServiceGpuQueueBridge` | `src/runtime/Runtime.JobServiceGpuQueueBridge.cppm` | `runtime` |
 | `Extrinsic.Runtime.KMeansBackend` | `src/runtime/Runtime.KMeansBackend.cppm` | `runtime` |
 | `Extrinsic.Runtime.KMeansGpuBackend` | `src/runtime/Runtime.KMeansGpuBackend.cppm` | `runtime` |
-| `Extrinsic.Runtime.KMeansGpuJobQueue` | `src/runtime/Runtime.KMeansGpuJobQueue.cppm` | `runtime` |
 | `Extrinsic.Runtime.KernelEvents` | `src/runtime/Runtime.KernelEvents.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshAttributeTextureBake` | `src/runtime/Runtime.MeshAttributeTextureBake.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshGeometryPacker` | `src/runtime/Runtime.MeshGeometryPacker.cppm` | `runtime` |
@@ -414,4 +413,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugClosestFace` | `src/runtime/SpatialDebug/Runtime.SpatialDebugClosestFace.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **387**
+Total modules: **386**

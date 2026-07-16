@@ -19,7 +19,12 @@ maturity_target: Operational
 - Template to mirror: `RUNTIME-134` (progressive-Poisson interactive playground) — the only method wired through the full P3 config lane. It added a `SandboxConfig` value struct, an `EngineConfigControl` hot-subset apply, a runtime command DTO, ECS-property writeback, and a `CpuReference`/`VulkanCompute` backend toggle.
 - Config lane (`AGENTS.md` §5 P3): reference model `Extrinsic.Graphics.RenderRecipeConfig` (schema-id + version + diagnostics, side-effect-free preview→validate→apply). The engine tree is `EngineConfig { …, SandboxConfig }` in `Core.Config.Engine.cppm`; the file lane is `Core.Config.EngineLoad` (schema `intrinsic.core.engine-config`); the runtime facade is `Extrinsic.Runtime.EngineConfigControl` via `Engine::GetConfigControl()`, whose `RuntimeConfigControlSource { Editor, AgentCli, Programmatic }` tag is the co-equal-surfaces mechanism.
 - Editor facade pattern: `ApplySandboxEditor<X>Command` in `Runtime.SandboxEditorFacades.cpp` / `Runtime.SandboxMethodFacade.cpp`, reading geometry via `GS::BuildConstView(raw, entity)` (require `Domain::PointCloud`), writing back via `PopulateFromCloud` + `Dirty::MarkVertexPositionsDirty`, wrapped in `EditorCommandHistory` for undo — mirror `ApplySandboxEditorPointCloudOutlierRemovalCommand`.
-- Backend adapter pattern: `Runtime.KMeansBackend` (RHI convenience overload, `IsOperational()` gate, honest fallback) + `Runtime.KMeansGpuJobQueue` (JobService `GpuQueue` registration). The consolidation adapter mirrors these.
+- Backend adapter pattern: `Runtime.KMeansBackend` (RHI convenience overload,
+  `IsOperational()` gate, honest fallback) plus the Sandbox editor's private
+  K-Means queue implementation (`JobService` `GpuQueue` registration), attached
+  to `Extrinsic.Runtime.SandboxEditorFacades` while its request, submission,
+  result, and status DTOs remain on that public facade. The consolidation
+  adapter mirrors this ownership shape.
 - `ARCH-006` retired the point-cloud presentation into `src/app/Sandbox`; land the runtime seams so the app-owned panel (`UI-035`) consumes them without owning engine state.
 
 ## Control surfaces

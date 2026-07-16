@@ -493,3 +493,161 @@ TEST(RuntimeEnginePrivateGlue, AssetResidencyServiceIsEnginePrivateImplementatio
                   "Extrinsic.Runtime.ObjectSpaceNormalBakeQueue`"),
               std::string::npos);
 }
+
+TEST(RuntimeEnginePrivateGlue, KMeansGpuJobQueueIsSandboxFacadePrivateImplementation)
+{
+    const auto root = RepoRoot();
+    const auto facadeInterface = ReadFile(
+        root / "src/runtime/Runtime.SandboxEditorFacades.cppm");
+    const auto methodImpl = ReadFile(
+        root / "src/runtime/Runtime.SandboxMethodFacade.cpp");
+    const auto privateHeader = ReadFile(
+        root / "src/runtime/Runtime.KMeansGpuJobQueue.Internal.hpp");
+    const auto queueImpl = ReadFile(
+        root / "src/runtime/Runtime.KMeansGpuJobQueue.cpp");
+    const auto engineInterface = ReadFile(root / "src/runtime/Runtime.Engine.cppm");
+    const auto engineImpl = ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+    const auto runtimeCMake = ReadFile(root / "src/runtime/CMakeLists.txt");
+    const auto moduleInventory = ReadFile(
+        root / "docs/api/generated/module_inventory.md");
+    constexpr std::string_view includeDirective =
+        "#include \"Runtime.KMeansGpuJobQueue.Internal.hpp\"";
+
+    std::vector<std::filesystem::path> includeOwners;
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(
+             root / "src/runtime"))
+    {
+        if (!entry.is_regular_file())
+            continue;
+        const auto extension = entry.path().extension();
+        if (extension != ".cpp" && extension != ".cppm" &&
+            extension != ".hpp" && extension != ".h")
+            continue;
+        if (ReadFile(entry.path()).find(includeDirective) != std::string::npos)
+            includeOwners.push_back(entry.path());
+    }
+
+    const std::string oldImport =
+        std::string{"import Extrinsic.Runtime."} + "KMeansGpuJobQueue;";
+    std::vector<std::filesystem::path> oldImportOwners;
+    for (const auto& sourceRoot : {root / "src", root / "tests"})
+    {
+        for (const auto& entry :
+             std::filesystem::recursive_directory_iterator(sourceRoot))
+        {
+            if (!entry.is_regular_file())
+                continue;
+            const auto extension = entry.path().extension();
+            if (extension != ".cpp" && extension != ".cppm" &&
+                extension != ".hpp" && extension != ".h")
+                continue;
+            if (ReadFile(entry.path()).find(oldImport) != std::string::npos)
+                oldImportOwners.push_back(entry.path());
+        }
+    }
+
+    EXPECT_FALSE(std::filesystem::exists(
+        root / "src/runtime/Runtime.KMeansGpuJobQueue.cppm"));
+    ASSERT_EQ(includeOwners.size(), 1u);
+    EXPECT_EQ(includeOwners.front().filename(),
+              "Runtime.SandboxEditorFacades.cppm");
+    EXPECT_NE(facadeInterface.find(includeDirective), std::string::npos);
+    EXPECT_FALSE(ContainsModuleDirective(privateHeader));
+    EXPECT_EQ(privateHeader.find("export "), std::string::npos);
+    EXPECT_NE(privateHeader.find("class RuntimeKMeansGpuJobQueue"),
+              std::string::npos);
+    EXPECT_EQ(privateHeader.find("enum class RuntimeKMeansGpuJobStatus"),
+              std::string::npos);
+    EXPECT_EQ(privateHeader.find("struct RuntimeKMeansGpuJobRequest"),
+              std::string::npos);
+    EXPECT_EQ(privateHeader.find("struct RuntimeKMeansGpuJobSubmission"),
+              std::string::npos);
+    EXPECT_EQ(privateHeader.find("struct RuntimeKMeansGpuJobResult"),
+              std::string::npos);
+    EXPECT_TRUE(oldImportOwners.empty());
+
+    const auto publicStatus = facadeInterface.find(
+        "enum class RuntimeKMeansGpuJobStatus");
+    const auto publicRequest = facadeInterface.find(
+        "struct RuntimeKMeansGpuJobRequest");
+    const auto publicSubmission = facadeInterface.find(
+        "struct RuntimeKMeansGpuJobSubmission");
+    const auto publicResult = facadeInterface.find(
+        "struct RuntimeKMeansGpuJobResult");
+    const auto privateInclude = facadeInterface.find(includeDirective);
+    const auto publicSession = facadeInterface.find(
+        "class SandboxEditorSession");
+    ASSERT_NE(publicStatus, std::string::npos);
+    ASSERT_NE(publicRequest, std::string::npos);
+    ASSERT_NE(publicSubmission, std::string::npos);
+    ASSERT_NE(publicResult, std::string::npos);
+    ASSERT_NE(privateInclude, std::string::npos);
+    ASSERT_NE(publicSession, std::string::npos);
+    EXPECT_LT(publicStatus, publicRequest);
+    EXPECT_LT(publicRequest, publicSubmission);
+    EXPECT_LT(publicSubmission, publicResult);
+    EXPECT_LT(publicResult, privateInclude);
+    EXPECT_LT(privateInclude, publicSession);
+    EXPECT_NE(facadeInterface.find(
+                  "return Status == RuntimeKMeansGpuJobStatus::Accepted;"),
+              std::string::npos);
+    EXPECT_NE(facadeInterface.find(
+                  "return Status == RuntimeKMeansGpuJobStatus::Completed;"),
+              std::string::npos);
+    constexpr std::string_view directImports[] = {
+        "import Extrinsic.RHI.BufferManager;",
+        "import Extrinsic.RHI.CommandContext;",
+        "import Extrinsic.RHI.TransferQueue;",
+        "import Extrinsic.Runtime.KMeansGpuBackend;",
+        "import Geometry.KMeans;",
+    };
+    for (const auto directImport : directImports)
+    {
+        EXPECT_NE(facadeInterface.find(directImport), std::string::npos);
+        EXPECT_EQ(facadeInterface.find(std::string{"export "} +
+                                       std::string{directImport}),
+                  std::string::npos);
+    }
+
+    EXPECT_NE(queueImpl.find("module Extrinsic.Runtime.SandboxEditorFacades;"),
+              std::string::npos);
+    EXPECT_EQ(queueImpl.find(
+                  "module Extrinsic.Runtime.KMeansGpuJobQueue;"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("KMeansGpuJobQueue"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("KMeansGpuJobQueue"), std::string::npos);
+    EXPECT_EQ(runtimeCMake.find("Runtime.KMeansGpuJobQueue.cppm"),
+              std::string::npos);
+    EXPECT_NE(runtimeCMake.find("Runtime.KMeansGpuJobQueue.cpp"),
+              std::string::npos);
+    EXPECT_EQ(moduleInventory.find(
+                  "Extrinsic.Runtime.KMeansGpuJobQueue`"),
+              std::string::npos);
+
+    const auto queueMember = facadeInterface.find(
+        "std::unique_ptr<RuntimeKMeansGpuJobQueue> m_KMeansGpuJobs");
+    const auto participantMember = facadeInterface.find(
+        "GpuQueueParticipantHandle m_KMeansGpuParticipant");
+    ASSERT_NE(queueMember, std::string::npos);
+    ASSERT_NE(participantMember, std::string::npos);
+    EXPECT_LT(queueMember, participantMember);
+
+    const auto detach = methodImpl.find(
+        "void SandboxEditorSession::DetachKMeansGpuQueue(");
+    const auto unregister = methodImpl.find(
+        "UnregisterGpuQueueParticipant(", detach);
+    const auto waitIdle = methodImpl.find(
+        "engine->GetDevice().WaitIdle();", unregister);
+    const auto clearParticipant = methodImpl.find(
+        "m_KMeansGpuParticipant = {};", waitIdle);
+    const auto destroyQueue = methodImpl.find(
+        "m_KMeansGpuJobs.reset();", clearParticipant);
+    ASSERT_NE(detach, std::string::npos);
+    ASSERT_NE(unregister, std::string::npos);
+    ASSERT_NE(waitIdle, std::string::npos);
+    ASSERT_NE(clearParticipant, std::string::npos);
+    ASSERT_NE(destroyQueue, std::string::npos);
+    EXPECT_LT(unregister, waitIdle);
+    EXPECT_LT(waitIdle, clearParticipant);
+    EXPECT_LT(clearParticipant, destroyQueue);
+}

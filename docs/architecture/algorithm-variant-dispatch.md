@@ -325,11 +325,13 @@ loop, and returns cache-owned result resources. Callers enqueue
 `KMeansGpuAsyncReadbacks` after the producing command submission has retired;
 the helper then drains labels/distances/centroids through
 `AsyncBufferReadback` without a device-wide readback stall. The Sandbox editor
-uses `Extrinsic.Runtime.KMeansGpuJobQueue`, a runtime queue registered with the
-`JobService` `GpuQueue` participant registry so those command/readback
-dependencies record inside the normal renderer frame context and never create an
-extra swapchain present. The queue publishes completed GPU labels and colors
-back through the same ECS property path as CPU K-Means. GEOM-056 proves
+uses a queue registered with the `JobService` `GpuQueue` participant registry so
+those command/readback dependencies record inside the normal renderer frame
+context and never create an extra swapchain present. That queue is private
+implementation glue attached to `Extrinsic.Runtime.SandboxEditorFacades`; the
+request, submission, result, and status DTOs remain on the public facade. The
+queue publishes completed GPU labels and colors back through the same ECS
+property path as CPU K-Means. GEOM-056 proves
 the explicit GPU path with an opt-in `gpu;vulkan` parity smoke and
 `IntrinsicKMeansGpuBenchmarkSmoke`, which emits GPU timing, CPU-reference
 baseline timing, and parity diagnostics without making a speedup claim.

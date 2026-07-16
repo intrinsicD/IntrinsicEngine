@@ -12,7 +12,7 @@ module;
 
 #include <glm/glm.hpp>
 
-module Extrinsic.Runtime.KMeansGpuJobQueue;
+module Extrinsic.Runtime.SandboxEditorFacades;
 
 import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.Graphics.GpuTransfer;
