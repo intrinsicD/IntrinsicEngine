@@ -6,8 +6,8 @@ depends_on: [BUG-082]
 # BUG-083 — Vulkan Sandbox shutdown reports driver and DBus leaks under LeakSanitizer
 
 ## Status
-- In progress on 2026-07-16; owner: Codex; branch:
-  `codex/arch-006-completion`.
+- Completed on 2026-07-16 at maturity `Operational`; owner: Codex; branch:
+  `codex/arch-006-completion`; implementation commit: `3cb91b98`.
 - A fresh sanitizer-enabled `ci-vulkan` rebuild reproduced the issue on the
   exact current head: the NVIDIA process wrote five renderer-completed samples
   and ended with an operational device, then exited 86 for 116,425 leaked bytes
@@ -92,7 +92,7 @@ depends_on: [BUG-082]
 ## Docs
 - [x] Record allocation ownership and the narrow sanitizer policy in the
       Vulkan/platform testing notes.
-- [ ] Update the retirement log and task indexes when verified.
+- [x] Update the retirement log and task indexes when verified.
 
 ## Acceptance criteria
 - [x] The exact five-frame `ExtrinsicSandbox` command exits zero after writing
@@ -131,5 +131,6 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Folding the fix into `UI-034`, `ARCH-006`, or unrelated renderer work.
 
 ## Maturity
-- Target: Operational on a Vulkan-capable sanitizer host. CPU/null behavior is
-  already covered elsewhere and is not a substitute for this shutdown gate.
+- Achieved: `Operational` on the NVIDIA RTX 3050 / driver `590.48.01` sanitizer
+  path and the Mesa lavapipe CI path. CPU/null behavior remains independently
+  covered and was not used as a substitute for the shutdown gate.

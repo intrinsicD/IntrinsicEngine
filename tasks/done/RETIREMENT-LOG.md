@@ -8,6 +8,30 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-083`](BUG-083-vulkan-sandbox-shutdown-lsan-leaks.md) — the Vulkan
+Sandbox shutdown LeakSanitizer defect retired on 2026-07-16 at `Operational`.
+Implementation commit `3cb91b98` maps the exact NVIDIA RTX 3050 / driver
+`590.48.01` report's 116,425 bytes / 35 allocations without overlap:
+113,760 bytes / 18 allocations enter unloaded driver frames through the
+push-constant call path, 784 bytes / 14 allocations share the VMA buffer-bind
+path, and 1,881 bytes / 3 allocations share
+`dbus_connection_send_with_reply_and_block`. The replacement policy contains
+only those three function/call-path entries and is applied only by the explicit
+Vulkan process runner; broad loader, ICD, unknown-module, pthread, GLFW/X11,
+and general GoogleTest suppressions are absent. The runner first requires the
+unrelated named 4,096-byte engine leak to produce a direct-leak report and exit
+86, then requires a clean Sandbox exit, five renderer-completed samples, and
+an operational final device. It executed without skips and passed 1/1 on
+NVIDIA in 14.81 seconds and 1/1 on lavapipe in 4.06 seconds. The exact-head
+aggregate build and default CPU-supported gate passed 3,788/3,788 in 402.61
+seconds, and the original GLFW close path passed 10/10 with empty compiled
+defaults and no suppression file. Strict convergence, layering, test-layout,
+task, state-link, documentation, root, PR-contract, workflow, skill-sync,
+inventory, and diff checks passed. Independent evidence and final reviews
+found no unmatched leak family, fail-closed gap, CI-registration defect, or
+remaining overclaim. No production source, Vulkan lifetime, runtime behavior,
+or backend-selection policy changed.
+
 [`BUG-082`](BUG-082-glfw-x11-input-method-lsan-leak.md) — the GLFW/X11
 input-method LeakSanitizer investigation retired on 2026-07-16 at
 `Operational`. Implementation commit `fb549c96` preserves the unchanged

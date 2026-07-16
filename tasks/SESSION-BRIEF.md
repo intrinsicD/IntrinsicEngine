@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `BUG-083` — Vulkan Sandbox shutdown reports driver and DBus leaks under LeakSanitizer (tasks/active/BUG-083-vulkan-sandbox-shutdown-lsan-leaks.md)
+- none
 
 ## Theme B — Rendering modernization
 
