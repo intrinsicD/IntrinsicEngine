@@ -1,18 +1,18 @@
 ---
 id: LEGACY-043
 theme: F
-depends_on: []
+depends_on:
+  - GRAPHICS-105
 maturity_target: Retired
 ---
 # LEGACY-043 — Retire stale multi-descriptor-set shader sources
 
 ## Goal
-- Delete the pre-bindless GLSL shader sources under `assets/shaders/` that
-  use the retired multi-descriptor-set binding model (`set = 0..3` camera/
-  texture/instance/material tiers), which no renderer pass references and
-  which are physically incompatible with the promoted Vulkan device's
-  single-set global pipeline layout — and stop compiling them on every
-  build.
+- Delete the pre-bindless GLSL shader families under `assets/shaders/` that
+  use retired multi-descriptor-set or non-heap fixed-`set = 0` layouts (plus
+  their paired fragments), which no renderer pass references and which cannot
+  form promoted pipelines against the Vulkan device's single-set global
+  layout — and stop compiling them on every build.
 
 ## Non-goals
 - No changes to the active binding model (single bindless heap at
@@ -36,43 +36,69 @@ maturity_target: Retired
 - The active `assets/shaders/deferred/lighting.frag` header comment
   already names `assets/shaders/deferred_lighting.frag` as the legacy
   model that "cannot be honored" by the promoted layout.
-- Confirmed-stale sources (multi-set model, not referenced by any
-  `PipelineDesc` shader path in `src/graphics/renderer/`):
-  `assets/shaders/surface.vert`, `surface.frag`, `surface_gbuffer.vert`,
+- The 2026-07-16 execution-time audit corrected the original inventory:
+  `assets/shaders/surface_gbuffer.vert` does not exist;
+  `assets/shaders/deferred/gbuffer.frag` is read by
+  `RendererFrameLifecycle` and is one of `GRAPHICS-105`'s two promoted
+  `ResolveSurfaceNormal` contract paths even though the production descriptor
+  currently loads `deferred/default_debug_gbuffer.frag.spv`; and root
+  `assets/shaders/line.frag` is named by the `RHI.PipelineRegistry` fixture.
+  Those files are not currently unreferenced deletion candidates.
+- Current deletion candidates are root `surface.vert`, `surface.frag`,
   `surface_gbuffer.frag`, `deferred_lighting.frag`,
-  `deferred/gbuffer.vert`, `deferred/gbuffer.frag`, root-level
-  `triangle.vert`, `triangle.frag`, `point.vert`, `point.frag`,
-  `line.vert`, `line.frag` (root level only — the referenced replacements
-  live under `forward/` and `deferred/`).
+  `deferred/gbuffer.vert`, root `triangle.vert`, `triangle.frag`,
+  `point.vert`, `point.frag`, and `line.vert`. Root `line.frag` becomes a
+  candidate only after its test fixture is redirected to a surviving shader.
+  `deferred/gbuffer.frag` becomes eligible only if `GRAPHICS-105` explicitly
+  consolidates its contract into the surviving default deferred path; if
+  `GRAPHICS-105` retains it, this task must retain it too.
 - `cmake/CompileShaders.cmake` uses `file(GLOB_RECURSE)` over
   `assets/shaders/`, so every stale source is compiled to `.spv` and
-  copied into the runtime shader directory on every build.
+  emitted into the runtime shader directory on every build.
 - The implementer must re-verify the stale list at execution time
   (`grep -r <name> src/`) before deleting — shader path references are
   string-built via `Core::Filesystem::GetShaderPath`, and substring
   collisions (e.g. `default_debug_surface.frag` contains `surface.frag`)
   make a naive grep read as "referenced". Match full path strings.
+- The original whole-tree descriptor assertion was also too broad: other
+  shader families legitimately use fixed `set = 0` bindings. This task audits
+  only the retirement candidates; it does not redefine every surviving shader
+  as a bindless graphics pipeline.
 
 ## Required changes
-- [ ] Re-verify each file in the Context list is not loaded by any
+- [ ] Re-verify each current deletion candidate in the Context list is not
+      loaded by any
       `PipelineDesc` shader path (full-path match, not substring) in
-      `src/`, `tests/`, or recipe/config documents under `config/` and
-      `assets/`.
+      `src/`, `tests/`, or recipe/config documents under `assets/`.
+- [ ] Record the candidate-scoped descriptor audit with a whitespace-tolerant
+      pattern such as `layout\s*\([^)]*\bset\s*=\s*[1-9]`; do not turn it
+      into a whole-tree ban on fixed-binding shader families.
+- [ ] Apply the completed `GRAPHICS-105` decision: retain
+      `deferred/gbuffer.frag` if it remains a promoted contract path, or add it
+      to the deletion inventory only if its contract has been consolidated
+      into a surviving shader.
+- [ ] Redirect the `RHI.PipelineRegistry` root `line.frag` fixture to a
+      surviving shader path before treating root `line.frag` as stale.
 - [ ] Delete the confirmed-stale shader sources.
 - [ ] Remove or update stale mentions of the deleted files in
-      `src/graphics/renderer/README.md`, `src/runtime/README.md`, and any
-      other docs that name them (`grep -rn` for each deleted filename).
+      renderer/FrameRecipe/pass source comments, renderer contract tests,
+      `src/graphics/renderer/README.md`, architecture/ADR docs, and agent
+      review guidance that still treats them as available (`rg` each resolved
+      filename across `src/`, `tests/`, `assets/`, and `docs/`). Explanatory
+      retirement history may continue to name deleted paths explicitly.
 - [ ] Update the legacy-model reference in
       `assets/shaders/deferred/lighting.frag`'s header comment so it does
       not point at a deleted file (describe the retired model inline
       instead).
+- [ ] If canonical `docs/agent/*` guidance changes, regenerate its skill
+      mirror with `python3 tools/agents/sync_skills.py --write`.
 
 ## Tests
-- [ ] Clean configure + build compiles the shader set with no references
-      to deleted files (`CONFIGURE_DEPENDS` glob re-scan picks up the
-      deletions).
+- [ ] Configure and build in a new, dedicated build directory so the shader
+      set is compiled with no orphaned outputs from earlier glob contents.
 - [ ] Default CPU gate stays green:
-      `ctest --test-dir build/ci -LE 'gpu|vulkan|slow|flaky-quarantine'`.
+      `ctest --test-dir build/legacy-043-ci
+      -LE 'gpu|vulkan|slow|flaky-quarantine'`.
 - [ ] If a Vulkan-capable host is available, one opt-in smoke run
       (`ctest --test-dir build/ci -L 'gpu' ...`) confirming the default
       recipe still builds all pipelines; otherwise record that the change
@@ -84,27 +110,38 @@ maturity_target: Retired
 - [ ] Update `tasks/backlog/rendering/README.md` status line on retirement.
 
 ## Acceptance criteria
-- [ ] No shader source under `assets/shaders/` declares a descriptor set
-      other than the bindless heap at `set = 0, binding = 0`
-      (`grep -rE "set = [1-9]" assets/shaders/` returns nothing, and every
-      remaining `set = 0` binding is the heap).
+- [ ] Every deleted candidate is proven unreferenced and incompatible with the
+      promoted path it was claimed to duplicate; no whole-tree assertion is
+      made about legitimate fixed-binding shader families outside this task.
 - [ ] The build output `shaders/` directory no longer contains `.spv`
-      artifacts for the deleted sources after a clean build.
-- [ ] No doc or comment references a deleted shader path.
+      artifacts for the deleted sources after the dedicated fresh build.
+- [ ] `deferred/gbuffer.frag` follows the recorded `GRAPHICS-105` outcome, and
+      no referenced shader or test fixture is deleted.
+- [ ] No live pipeline, recipe, config, or test reference treats a deleted
+      shader path as available; explicit compatibility explanation and retired
+      history may still name it as deleted.
 - [ ] CPU gate passes.
 
 ## Verification
 ```bash
-cmake --preset ci
-cmake --build --preset ci --target IntrinsicTests
-ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
-grep -rEn "set = [1-9]" assets/shaders/ || echo "no multi-set shaders remain"
-for f in surface.vert surface.frag surface_gbuffer.vert surface_gbuffer.frag deferred_lighting.frag; do grep -rn --include='*.cpp' --include='*.cppm' "shaders/$f" src/ && echo "STALE REF: $f"; done; true
+test ! -e build/legacy-043-ci
+cmake --preset ci -B build/legacy-043-ci
+cmake --build build/legacy-043-ci --target IntrinsicTests
+ctest --test-dir build/legacy-043-ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+deleted=(surface.vert surface.frag surface_gbuffer.frag deferred_lighting.frag deferred/gbuffer.vert triangle.vert triangle.frag point.vert point.frag line.vert line.frag)
+# If GRAPHICS-105 consolidated deferred/gbuffer.frag, append it to deleted.
+for f in "${deleted[@]}"; do
+  test ! -e "assets/shaders/$f"
+  test ! -e "build/legacy-043-ci/bin/shaders/$f.spv"
+  ! rg -n --fixed-strings "shaders/$f.spv" src tests assets
+done
 ```
 
 ## Forbidden changes
 - Deleting or editing any shader referenced by a renderer pass, recipe
-  document, or test.
+  document, or test, except deleting `deferred/gbuffer.frag` after an explicit
+  `GRAPHICS-105` consolidation decision or redirecting the test-only root
+  `line.frag` fixture before deletion.
 - Redesigning the binding model or `CompileShaders.cmake` beyond stale
   removal.
 - Mixing in unrelated shader or renderer work.

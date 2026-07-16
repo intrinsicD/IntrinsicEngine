@@ -33,7 +33,7 @@ the authoritative open/unblocked view.
 - unblocked: `CORE-007` — Scheduler priority, wait, and wake hardening (tasks/backlog/architecture/CORE-007-scheduler-priority-wait-wake-hardening.md)
 - unblocked: `CORE-008` — Compiled task-graph plan reuse across executions (tasks/backlog/architecture/CORE-008-compiled-taskgraph-plan-reuse.md)
 - unblocked: `CORE-009` — App-owned config sections out of core EngineConfig (tasks/backlog/architecture/CORE-009-app-owned-config-sections.md)
-- unblocked: `LEGACY-043` — Retire stale multi-descriptor-set shader sources (tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md)
+- blocked by `GRAPHICS-105`: `LEGACY-043` — Retire stale multi-descriptor-set shader sources (tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - blocked by `ARCH-014`: `REVIEW-003` — Architecture stability and right-sizing readiness audit (tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
