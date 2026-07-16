@@ -8,10 +8,11 @@ maturity_target: CPUContracted
 
 ## Status
 
-- Implementation and verification completed on 2026-07-16; owner: Codex; branch:
-  `codex/arch-006-completion`.
-- Next gate: commit the verified implementation, then retire the task at
-  `CPUContracted`.
+- Completed on 2026-07-16 at `CPUContracted`.
+- Implementation commit: `ea3b403e`.
+- Verification: checker regressions passed `19/19`, touched-scope regressions
+  `10/10`, workflow regressions `5/5`, and ccache workflow regressions `15/15`.
+  The live exact policy and strict structural gates passed.
 
 ## Goal
 

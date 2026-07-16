@@ -8,6 +8,21 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`HARDEN-085`](HARDEN-085-enforce-runtime-engine-kernel-convergence-ratchet.md)
+— the `Runtime.Engine` convergence ratchet retired on 2026-07-16 at
+`CPUContracted`. Implementation commit `ea3b403e` adds a stdlib-only exact
+allowlist-complement checker and JSON policy, guards public `GetX` names and
+re-exports, requires policy updates on improvements, and validates temporary
+debt arithmetic plus a unique open owner. The fixed 43 / 23 legacy-interim
+reference remains explicit; the checked 49 / 28 / 33-getter snapshot is green
+only with `RUNTIME-178` owning the `+6 / +5 / +1` budget debt. `pr-fast` and
+touched-scope run both the live guard and synthetic failures, with independent
+workflow-policy coverage. Checker regressions passed 19/19, touched-scope
+10/10, workflow 5/5, and ccache workflow 15/15; strict task, documentation,
+layering, root, test-layout, state-link, PR-contract, skill-sync, JSON, Python,
+and diff gates passed. Independent architecture review found no remaining
+parser, policy-lifecycle, CI-wiring, or right-sizing blocker.
+
 [`RUNTIME-173`](RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md) — the
 Sandbox-session-only K-Means GPU job queue surface retired on 2026-07-16 at
 `CPUContracted`. Implementation commit `e8033e11` moves the unchanged queue

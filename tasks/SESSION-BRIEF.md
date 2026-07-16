@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `HARDEN-085` — Enforce the Runtime.Engine kernel-convergence ratchet (tasks/active/HARDEN-085-enforce-runtime-engine-kernel-convergence-ratchet.md)
+- none
 
 ## Theme B — Rendering modernization
 
@@ -41,7 +41,7 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-166` — Slim and partition the RenderExtraction module (tasks/backlog/runtime/RUNTIME-166-slim-render-extraction-module.md)
 - unblocked: `RUNTIME-168` — Privatize the Sandbox default policies surface (tasks/backlog/runtime/RUNTIME-168-privatize-sandbox-default-policies-surface.md)
 - unblocked: `RUNTIME-172` — Privatize the SceneDocument surface (tasks/backlog/runtime/RUNTIME-172-privatize-scene-document-surface.md)
-- blocked by `HARDEN-085`: `RUNTIME-178` — Restore the pre-ratchet Runtime.Engine convergence budget (tasks/backlog/runtime/RUNTIME-178-restore-engine-convergence-budget.md)
+- unblocked: `RUNTIME-178` — Restore the pre-ratchet Runtime.Engine convergence budget (tasks/backlog/runtime/RUNTIME-178-restore-engine-convergence-budget.md)
 
 ## Theme G — Active bugs
 

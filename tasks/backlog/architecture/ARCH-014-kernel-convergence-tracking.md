@@ -15,7 +15,7 @@ depends_on: []
 ## Non-goals
 - No implementation of the seams or extractions here — child tasks own that
   work. Retired children remain convergence evidence; open children such as
-  `HARDEN-085`, `RUNTIME-129`, and `RUNTIME-178` own their implementation. This task
+  `RUNTIME-129` and `RUNTIME-178` own their implementation. This task
   tracks and enforces; it does not do their work.
 - No re-litigation of ADR-0024 decisions (that is an ADR amendment, not this
   task).
@@ -39,7 +39,7 @@ depends_on: []
   the `RenderExtraction` prefix). The checked exact-v1 2026-07-16 snapshot is 49 / 28
   with 33 distinct public getter names and two re-exports; the `+6 / +5 / +1`
   delta is explicit temporary debt owned by `RUNTIME-178`, not a rewritten
-  reference. `HARDEN-085` owns the authoritative exact-policy ratchet.
+  reference. Retired `HARDEN-085` delivered the authoritative exact-policy ratchet.
   `ARCH-012`
   retired on 2026-07-08 at `Operational`: Sandbox composes
   `Runtime::ClusteringModule`, and `Runtime.Engine.cppm` / `.cpp` contain no

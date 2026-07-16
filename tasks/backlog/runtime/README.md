@@ -197,8 +197,9 @@ main `Runtime.RenderExtraction` module slimming.
 ### Kernel convergence remediation
 
 - [`RUNTIME-178`](RUNTIME-178-restore-engine-convergence-budget.md) — after
-  `HARDEN-085`, restore the fixed 43 / 23 Engine import snapshot and remove the
-  `GRAPHICS-122` getter debt without resurrecting retired service BMIs.
+  retired `HARDEN-085`, restore the fixed 43 / 23 Engine import snapshot and
+  remove the `GRAPHICS-122` getter debt without resurrecting retired service
+  BMIs; now unblocked.
 
 ### Retired module-surface diet work
 

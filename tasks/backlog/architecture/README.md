@@ -36,8 +36,8 @@ are retired to `tasks/done/`; `ARCH-014` remains the open umbrella:
 - [`ARCH-014`](ARCH-014-kernel-convergence-tracking.md) — umbrella
   north-star: owns the [kernel target-state](../../../docs/architecture/kernel-target-state.md)
   convergence scorecard and the review/ratchet guardrail; stays open
-  until the whole ADR-0024 migration is reached. Its active `HARDEN-085` child
-  is implementing the monotone checker and `pr-fast` gate.
+  until the whole ADR-0024 migration is reached. Retired child `HARDEN-085`
+  delivered the monotone checker and `pr-fast` gate.
 - [`ARCH-015`](ARCH-015-runtime-module-scope-by-result-consumer-contract.md) —
   grilling + ADR to decide the `IRuntimeModule` scoping rule (cluster methods by
   shared result-consumer contract, e.g. DBSCAN inside `ClusteringModule`, not a
@@ -51,6 +51,10 @@ are retired to `tasks/done/`; `ARCH-014` remains the open umbrella:
 
 ### Retired seam tasks
 
+- [`HARDEN-085`](../../done/HARDEN-085-enforce-runtime-engine-kernel-convergence-ratchet.md)
+  delivered the exact allowlist-complement Engine ratchet, getter/re-export
+  guards, temporary-debt lifecycle, synthetic regressions, touched-scope
+  selection, and `pr-fast` enforcement at `CPUContracted`.
 - [`ARCH-006`](../../done/ARCH-006-sandbox-editor-content-out-of-runtime.md) —
   moved Sandbox presentation into app-owned editor shell/panel modules,
   retired `Extrinsic.Runtime.SandboxEditorUi`, retained presentation-free
