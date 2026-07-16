@@ -64,8 +64,10 @@ Core owns reusable graph/scheduling primitives, not domain-specific GPU policy.
     running on scheduler workers.
 - **`Extrinsic.Core.FrameGraph`**: ECS-oriented facade over `TaskGraph` with
   typed read/write access declarations plus structural and commit tokens.
-- **`Extrinsic.Core.FrameClock`**: reusable steady-clock frame delta helper with
-  clamped delta sampling and explicit resampling after deliberate sleeps.
+- **`Extrinsic.Core.FrameClock`**: reusable steady-clock helper that exposes the
+  prior completed-frame duration as a non-negative clamped delta, records the
+  current frame at `EndFrame()`, and supports explicit resampling after
+  deliberate sleeps.
 
 ### Graph stats and diagnostics
 

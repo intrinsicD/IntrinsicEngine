@@ -202,6 +202,9 @@ namespace Extrinsic::ECS::Systems::BoundsPropagation
         graph.AddPass(PassName,
             [](Extrinsic::Core::FrameGraphBuilder& builder)
             {
+                // World bounds are materialized on demand for newly bounded
+                // entities, which may create or grow component storage.
+                builder.StructuralWrite();
                 builder.WaitFor(Extrinsic::Core::Hash::StringID{TransformHierarchy::PassName});
                 builder.Read<Components::Culling::Local::Bounds>();
                 builder.Read<Components::Transform::WorldMatrix>();

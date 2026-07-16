@@ -2,13 +2,20 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
+WORKFLOW_ROOT = REPO_ROOT / ".github" / "workflows"
+BENCHMARK_CMAKE = REPO_ROOT / "benchmarks" / "CMakeLists.txt"
+BENCHMARK_WORKFLOW = WORKFLOW_ROOT / "ci-bench-smoke.yml"
+DOCS_WORKFLOW = WORKFLOW_ROOT / "ci-docs.yml"
 TIME_COMMAND = REPO_ROOT / "tools" / "ci" / "time_command.py"
 AGGREGATOR = REPO_ROOT / "tools" / "ci" / "aggregate_gate_timing.py"
 MANIFEST_VALIDATOR = (
@@ -23,6 +30,15 @@ CI_BASELINE = (
     / "baselines"
     / "ci_gate_latency_github_ubuntu_24_04_v1.json"
 )
+WARM_CONFIGURE_BUDGET_SECONDS = 40.0
+WARM_CONFIGURE_CALL_COUNTS = {
+    "pr-fast.yml": 1,
+    "ci-linux-clang.yml": 1,
+    "ci-sanitizers.yml": 1,
+    "ci-vulkan.yml": 1,
+    "ci-bench-smoke.yml": 1,
+    "nightly-deep.yml": 2,
+}
 
 
 def _write_phase(path: Path, elapsed_seconds: float, returncode: int = 0) -> None:
@@ -194,6 +210,150 @@ class CiTimingTests(unittest.TestCase):
             failure_payload = json.loads(failure_path.read_text(encoding="utf-8"))
             self.assertEqual(failure_payload["returncode"], 7)
             self.assertEqual(failure_payload["command_returncode"], 7)
+
+            over_budget_path = tmp_path / "over-budget.json"
+            over_budget = subprocess.run(
+                [
+                    sys.executable,
+                    str(TIME_COMMAND),
+                    "--label",
+                    "over-budget",
+                    "--warm-cache-hit",
+                    "true",
+                    "--max-warm-seconds",
+                    "0",
+                    "--json-out",
+                    str(over_budget_path),
+                    "--",
+                    sys.executable,
+                    "-c",
+                    "import time; time.sleep(0.01)",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            self.assertEqual(over_budget.returncode, 1)
+            self.assertIn("exact vcpkg cache hit", over_budget.stderr)
+            over_budget_payload = json.loads(
+                over_budget_path.read_text(encoding="utf-8")
+            )
+            self.assertTrue(over_budget_payload["warm_cache_hit"])
+            self.assertEqual(over_budget_payload["command_returncode"], 0)
+            self.assertEqual(over_budget_payload["returncode"], 1)
+
+    def test_workflow_warm_configure_budgets_match_hosted_evidence(self) -> None:
+        observed: dict[str, list[float]] = {}
+        for path in sorted(WORKFLOW_ROOT.glob("*.yml")):
+            budgets = [
+                float(value)
+                for value in re.findall(
+                    r"--max-warm-seconds\s+([0-9]+(?:\.[0-9]+)?)",
+                    path.read_text(encoding="utf-8"),
+                )
+            ]
+            if budgets:
+                observed[path.name] = budgets
+
+        expected = {
+            name: [WARM_CONFIGURE_BUDGET_SECONDS] * count
+            for name, count in WARM_CONFIGURE_CALL_COUNTS.items()
+        }
+        self.assertEqual(observed, expected)
+
+    def test_benchmark_smoke_registration_matches_dedicated_lane(self) -> None:
+        cmake = "\n".join(
+            line.split("#", 1)[0]
+            for line in BENCHMARK_CMAKE.read_text(encoding="utf-8").splitlines()
+        )
+
+        registration = re.search(
+            r"intrinsic_register_test_executable\(\s*"
+            r"TARGET\s+IntrinsicBenchmarkSmoke\s+"
+            r"LABELS\s+(?P<labels>[^\n\)]+)\s*\)",
+            cmake,
+        )
+        self.assertIsNotNone(registration, "missing benchmark smoke registration")
+        self.assertEqual(
+            set(registration.group("labels").split()),
+            {"benchmark", "geometry", "graphics", "physics", "slow"},
+        )
+
+        def properties(test_name: str) -> str:
+            match = re.search(
+                rf"set_tests_properties\(\s*{re.escape(test_name)}\s+"
+                r"PROPERTIES(?P<body>.*?)\n\s*\)",
+                cmake,
+                flags=re.DOTALL,
+            )
+            self.assertIsNotNone(match, f"missing properties for {test_name}")
+            return match.group("body")
+
+        def property_value(block: str, name: str) -> str:
+            match = re.search(
+                rf"\b{re.escape(name)}\s+(?:\"(?P<quoted>[^\"]+)\"|(?P<bare>\S+))",
+                block,
+            )
+            self.assertIsNotNone(match, f"missing {name} property")
+            return match.group("quoted") or match.group("bare")
+
+        run = properties("IntrinsicBenchmarkSmoke.Run")
+        validate = properties("IntrinsicBenchmarkSmoke.Validate")
+        expected_labels = {"benchmark", "geometry", "graphics", "physics", "slow"}
+        self.assertEqual(set(property_value(run, "LABELS").split(";")), expected_labels)
+        self.assertEqual(
+            set(property_value(validate, "LABELS").split(";")), expected_labels
+        )
+        self.assertEqual(property_value(run, "TIMEOUT"), "120")
+        self.assertEqual(property_value(validate, "TIMEOUT"), "30")
+        self.assertEqual(
+            property_value(run, "FIXTURES_SETUP"), "IntrinsicBenchmarkSmoke"
+        )
+        self.assertEqual(
+            property_value(validate, "FIXTURES_REQUIRED"),
+            "IntrinsicBenchmarkSmoke",
+        )
+
+        workflow = yaml.safe_load(BENCHMARK_WORKFLOW.read_text(encoding="utf-8"))
+        triggers = workflow.get("on", workflow.get(True, {}))
+        self.assertIn("pull_request", triggers)
+        job = workflow["jobs"]["benchmark-smoke"]
+        self.assertEqual(job["timeout-minutes"], 15)
+        steps = job["steps"]
+        named_steps = {step.get("name"): step for step in steps}
+        runner_step = named_steps["Run benchmark smoke runner"]
+        validator_step = named_steps["Validate benchmark result JSON"]
+        artifact_step = named_steps["Upload benchmark smoke artifact"]
+        self.assertEqual(runner_step["timeout-minutes"], 2)
+        self.assertFalse(runner_step.get("continue-on-error", False))
+        self.assertIn("--target IntrinsicBenchmarks", runner_step["run"])
+        self.assertFalse(validator_step.get("continue-on-error", False))
+        self.assertIn(
+            "validate_benchmark_results.py --root build/ci/benchmark --strict",
+            validator_step["run"],
+        )
+        self.assertLess(steps.index(runner_step), steps.index(validator_step))
+        self.assertLess(steps.index(validator_step), steps.index(artifact_step))
+        self.assertEqual(artifact_step["uses"], "actions/upload-artifact@v4")
+        self.assertEqual(
+            artifact_step["with"]["path"],
+            "build/ci/benchmark/IntrinsicBenchmarkSmoke/",
+        )
+        self.assertEqual(artifact_step["with"]["if-no-files-found"], "error")
+
+        docs_workflow = yaml.safe_load(DOCS_WORKFLOW.read_text(encoding="utf-8"))
+        docs_steps = docs_workflow["jobs"]["docs-validation"]["steps"]
+        validator_regression_steps = [
+            step
+            for step in docs_steps
+            if "Test_BenchmarkResultValidator.py" in step.get("run", "")
+        ]
+        self.assertEqual(len(validator_regression_steps), 1)
+        self.assertFalse(
+            validator_regression_steps[0].get("continue-on-error", False)
+        )
 
     def test_aggregator_converts_units_and_emits_valid_result(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

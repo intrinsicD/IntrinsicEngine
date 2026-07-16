@@ -911,6 +911,9 @@ namespace Extrinsic::Runtime
         // commands must not replay into the next session's fresh scene.
         m_CommandBus.DiscardPending();
 
+        if (m_AssetImportPipeline)
+            m_AssetImportPipeline->CancelActiveAssetImportsForShutdown();
+
         if (m_Window)
             m_Window->Listen({});
 

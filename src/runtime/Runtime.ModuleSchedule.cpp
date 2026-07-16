@@ -226,6 +226,14 @@ namespace Extrinsic::Runtime
                  waitForSignals = record.Desc.WaitForSignals](
                     Core::FrameGraphBuilder& builder)
                 {
+                    // BUG-105: SimSystemContext always exposes ActiveWorld, so
+                    // every module callback is conservatively a registry-
+                    // structure reader. Baseline/component systems that add
+                    // or remove components declare StructuralWrite(); this
+                    // token prevents EnTT's storage map from being mutated on
+                    // a worker while a module callback queries another pool.
+                    builder.StructuralRead();
+
                     // BUG-072: translate the declarative wait/signal labels into
                     // real per-tick FrameGraph edges. Without this the labels
                     // affected only FinalizeForBoot's boot-time insertion order,

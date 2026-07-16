@@ -208,9 +208,12 @@ ctest --test-dir build/ci-no-ccache --output-on-failure -LE 'gpu|vulkan|slow|fla
 Initial cache-backed configure steps in CI run through
 `tools/ci/time_command.py`, which records the wall-clock configure duration in
 the GitHub step summary. When `actions/cache` reports an exact vcpkg
-binary-cache hit, the wrapper enforces the current 20-second warm-cache budget.
-`BUG-081` owns population-based recalibration after a 22.002-second hosted
-runner outlier exceeded that guard before compilation.
+binary-cache hit, the wrapper enforces the current 40-second warm-cache budget.
+`BUG-081` recalibrated that guard from contemporary exact-hit populations after
+22.002-second and 30.368-second hosted-runner outliers stopped unrelated jobs
+before compilation. The population, p95-plus-headroom rule, and workflow
+coverage are recorded in the canonical
+[benchmark CI policy](benchmarking/ci-policy.md#warm-configure-failure-guard).
 
 Version bumps flow through the manifest:
 

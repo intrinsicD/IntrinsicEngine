@@ -28,6 +28,7 @@ module;
 module Extrinsic.Runtime.SandboxEditorFacades;
 
 import Extrinsic.Asset.ImportRouter;
+import Extrinsic.Asset.GeometryIOBridge;
 import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Config.Engine;
@@ -10888,13 +10889,19 @@ namespace Extrinsic::Runtime
                                     .PayloadKind = command.PayloadKind,
                                 });
                             if (route.has_value() &&
-                                IsModelTextureImportPayload(route->PayloadKind))
+                                (IsModelTextureImportPayload(route->PayloadKind) ||
+                                 Assets::IsGeometryPayloadKind(route->PayloadKind)))
                             {
-                                auto queued = engine.GetAssetImportPipeline().QueueModelTextureImport(
-                                    RuntimeAssetImportRequest{
-                                        .Path = command.Path,
-                                        .PayloadKind = route->PayloadKind,
-                                    });
+                                const RuntimeAssetImportRequest request{
+                                    .Path = command.Path,
+                                    .PayloadKind = route->PayloadKind,
+                                };
+                                auto queued = Assets::IsGeometryPayloadKind(
+                                                  route->PayloadKind)
+                                    ? engine.GetAssetImportPipeline().QueueGeometryImport(
+                                          request)
+                                    : engine.GetAssetImportPipeline().QueueModelTextureImport(
+                                          request);
                                 if (!queued.has_value())
                                 {
                                     return SandboxEditorFileImportResult{

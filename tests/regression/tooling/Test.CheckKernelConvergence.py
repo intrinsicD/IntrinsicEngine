@@ -113,8 +113,12 @@ class KernelConvergenceTests(unittest.TestCase):
     def test_current_repository_snapshot_passes(self) -> None:
         result = run_checker(REPO_ROOT)
         self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("plain_imports=49 domain_imports=28", result.stdout)
-        self.assertIn("owner=RUNTIME-178", result.stdout)
+        self.assertIn(
+            "plain_imports=42 domain_imports=21 export_imports=2 "
+            "public_getter_names=31",
+            result.stdout,
+        )
+        self.assertIn("Temporary debt: none", result.stdout)
 
     def test_clean_synthetic_snapshot_ignores_comments_strings_private_and_inline_calls(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

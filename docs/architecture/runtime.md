@@ -52,7 +52,12 @@ Runtime modules compose through `Engine::AddModule(...)` before
 kernel command, event, job, world, service, sim-system, and frame-hook seams; it
 does not expose `Engine&`. Module sim systems join the fixed-step `FrameGraph`
 with declared wait/signal labels so registration order does not decide pass
-order. Before any per-tick passes can be appended, schedule finalization rejects
+order. Because every `SimSystemContext` exposes the live active world, runtime
+also declares `StructuralRead()` for every module sim system. Baseline or
+module pass setup that adds/removes components declares `StructuralWrite()`;
+component-specific hazards alone do not serialize EnTT's registry-wide
+storage-map mutation. Before any per-tick passes can be appended, schedule
+finalization rejects
 duplicate `(module, system)` identities with `InvalidArgument` and rejects
 cyclic or unprovided signal dependencies with `InvalidState`. The schedule seam
 remains open through all `OnResolve` callbacks: sim systems and frame hooks may

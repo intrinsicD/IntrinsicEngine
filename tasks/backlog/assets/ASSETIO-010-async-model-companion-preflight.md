@@ -49,6 +49,19 @@ maturity_target: Operational
   so this fixture must preview as required-buffer-ready with an optional-image
   warning, not search unrelated asset directories. The checked-in
   `assets/models/Duck.glb` is the embedded/self-contained comparison case.
+- Live baseline on 2026-07-16 exercised the current Sandbox File / Import
+  controls with absolute paths. `Duck0.bin` correctly kept payload/import
+  disabled as a standalone unsupported extension. `Duck.glb` and `Duck.gltf`
+  both auto-resolved to ModelScene, queued, completed, selected, and focused
+  one visible primitive; GLB reported one embedded texture and two texture
+  upload requests, while GLTF reported no embedded texture and one upload
+  request. The GLTF UI exposed neither a Pending dependency preview nor the
+  missing optional adjacent `DuckCM.png` warning, and the absolute-path run
+  does not close the repository-relative exactly-once resolver regression.
+- Temporary screenshots/videos under
+  `/tmp/intrinsic-live-ui-completion/` record that manual audit; durable
+  acceptance remains the deterministic tests in this task, never those local
+  artifacts.
 - TinyGLTF treats an external `buffers[].uri` as required and validates its
   declared byte length. An external `images[].uri` load is non-critical to
   overall GLTF loading; `data:` URIs and images backed by `bufferView` require

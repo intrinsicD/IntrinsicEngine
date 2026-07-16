@@ -29,6 +29,7 @@ the authoritative open/unblocked view.
 - unblocked: `ARCH-014` — Kernel convergence tracking (umbrella north-star) (tasks/backlog/architecture/ARCH-014-kernel-convergence-tracking.md)
 - unblocked: `ARCH-015` — Runtime module scope: cluster methods by result-consumer contract (grilling + ADR) (tasks/backlog/architecture/ARCH-015-runtime-module-scope-by-result-consumer-contract.md)
 - unblocked: `ASSETIO-010` — Async model companion preflight (tasks/backlog/assets/ASSETIO-010-async-model-companion-preflight.md)
+- blocked by `ASSETIO-010`: `ASSETIO-011` — Semantic Sandbox File / Import workflow matrix (tasks/backlog/assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md)
 - unblocked: `CORE-005` — Non-blocking TaskGraph submission and completion API (tasks/backlog/architecture/CORE-005-nonblocking-taskgraph-submit-api.md)
 - unblocked: `CORE-006` — Domain-free core task/DAG vocabulary (tasks/backlog/architecture/CORE-006-domain-free-core-task-vocabulary.md)
 - unblocked: `CORE-007` — Scheduler priority, wait, and wake hardening (tasks/backlog/architecture/CORE-007-scheduler-priority-wait-wake-hardening.md)
@@ -47,8 +48,6 @@ the authoritative open/unblocked view.
 
 ## Theme G — Active bugs
 
-- unblocked: `BUG-081` — Warm-configure CI budget still flakes on hosted-runner variance (tasks/backlog/bugs/BUG-081-warm-configure-budget-runner-variance.md)
-- unblocked: `BUG-088` — Benchmark smoke hard timeout flakes under host contention (tasks/backlog/bugs/BUG-088-benchmark-smoke-hard-timeout-host-contention.md)
 - unblocked: `BUG-091` — GoogleTest PRE_TEST discovery times out on a cold start (tasks/backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md)
 - unblocked: `BUG-095` — Direct-mesh postprocess can overwrite newer editor geometry (tasks/backlog/bugs/BUG-095-direct-mesh-postprocess-stale-overwrite.md)
 - unblocked: `BUG-096` — ICP point-to-plane ignores target normals (tasks/backlog/bugs/BUG-096-icp-point-to-plane-target-normals.md)

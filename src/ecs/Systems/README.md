@@ -25,7 +25,8 @@ those entities. The promoted CPU traversal does **not** stamp
 render-sync responsibility.
 
 `RegisterSystem(FrameGraph&, registry&)` adds the traversal as a FrameGraph
-pass named `"TransformUpdate"` declaring `Read<Transform::Component>`,
+pass named `"TransformUpdate"` declaring `StructuralWrite()`,
+`Read<Transform::Component>`,
 `Read<Hierarchy::Component>`, `Write<Transform::WorldMatrix>`,
 `Write<Transform::IsDirtyTag>`, `Write<Transform::WorldUpdatedTag>`, and
 `Signal("TransformUpdate")`. The runtime activates this pass every fixed-step
@@ -63,6 +64,7 @@ counted and the entity's existing world bounds are left untouched.
 
 `RegisterSystem(FrameGraph&, registry&)` registers the pass named
 `"WorldBoundsUpdate"`, with `WaitFor("TransformUpdate")`,
+`StructuralWrite()`,
 `Read<Culling::Local::Bounds>`, `Read<Transform::WorldMatrix>`,
 `Read<Transform::WorldUpdatedTag>`, `Write<Culling::World::Bounds>`, and
 `Signal("WorldBoundsUpdate")`. The runtime activates this pass alongside
@@ -93,10 +95,14 @@ without logging or throwing.
 
 `RegisterSystem(FrameGraph&, registry&)` registers the pass named
 `"RenderSync"` with `WaitFor("TransformUpdate")`,
-`WaitFor("WorldBoundsUpdate")`, `Write<Transform::WorldUpdatedTag>`,
+`WaitFor("WorldBoundsUpdate")`, `StructuralWrite()`,
+`Write<Transform::WorldUpdatedTag>`,
 `Write<DirtyTags::DirtyTransform>`, and `Signal("RenderSync")`. The two
 `WaitFor` edges guarantee `BoundsPropagation` reads `WorldUpdatedTag`
-before this pass clears it. The runtime activates this pass alongside
+before this pass clears it. Each promoted pass declares a structural write
+because it may add or remove components; this serializes EnTT registry-map
+mutation against runtime module systems' implicit structural reads. The
+runtime activates this pass alongside
 `TransformHierarchy` and `BoundsPropagation` through
 `Extrinsic.Runtime.EcsSystemBundle::RegisterPromotedEcsSystemBundle`
 (`RUNTIME-091`) so the `DirtyTransform` hand-off lands every fixed-step

@@ -49,6 +49,10 @@ namespace Extrinsic::ECS::Systems::RenderSync
         graph.AddPass(PassName,
             [](Extrinsic::Core::FrameGraphBuilder& builder)
             {
+                // DirtyTransform is materialized on demand and
+                // WorldUpdatedTag is cleared, so this pass mutates registry
+                // structure in addition to its component-specific writes.
+                builder.StructuralWrite();
                 builder.WaitFor(Extrinsic::Core::Hash::StringID{TransformHierarchy::PassName});
                 builder.WaitFor(Extrinsic::Core::Hash::StringID{BoundsPropagation::PassName});
                 builder.Write<Components::Transform::WorldUpdatedTag>();
