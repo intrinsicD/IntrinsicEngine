@@ -8,6 +8,14 @@ maturity_target: Operational
 ---
 # RUNTIME-171 — Privatize the AssetResidencyService surface
 
+## Status
+
+- In progress on 2026-07-16; owner: Codex; branch:
+  `codex/arch-006-completion`.
+- Next gate: replace the standalone module with an Engine-private declaration
+  attached to `Extrinsic.Runtime.Engine`, then build the focused asset
+  residency, handoff, and runtime contract targets.
+
 ## Goal
 - Keep `AssetResidencyService` as an Engine-owned implementation service while
   removing its low-fanout exported module surface and preserving GPU asset cache
@@ -22,9 +30,22 @@ maturity_target: Operational
 ## Context
 - Owner/layer: `runtime`; runtime owns cross-layer asset-to-graphics wiring.
 - Local 2026-07-10 triage measured `Runtime.AssetResidencyService.cppm` at up
-  to 23.732s, with three production consumers and nine imports.
+  to 23.732s, with nine imports.
 - `RUNTIME-164` extracted this service from `Engine`; this task preserves that
   ownership split but removes unnecessary public module exposure if feasible.
+- Current consumer inventory: only `Runtime.Engine.cppm` and
+  `Runtime.Engine.cpp` import the named module. The apparent third production
+  consumer, `Runtime.Engine.FrameLoop.Internal.hpp`, is include-only Engine
+  implementation glue that borrows the service type; no app or test imports or
+  instantiates the service directly.
+- Right-sized shape: keep the service as a by-value Engine member in the same
+  position, keep its separate implementation unit and direct implementation
+  imports, and attach its declaration/implementation to `Runtime.Engine`.
+  Import the owning asset, graphics, handoff, and queue contracts directly
+  without re-exporting them. Do not add a pimpl allocation, replacement
+  partition, or compatibility module.
+- Reintroduce a standalone service module only when a tracked non-Engine
+  production consumer lands.
 
 ## Required changes
 - [ ] Inventory current consumers and decide whether all production uses can be
@@ -55,8 +76,9 @@ maturity_target: Operational
 ## Verification
 ```bash
 cmake --preset ci
-cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicRuntimeIntegrationTests
-ctest --test-dir build/ci --output-on-failure -R 'AssetResidency|AssetModel|GpuAssetCache|RuntimeEngineLayering|RuntimeSandboxAcceptance' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+cmake --build --preset ci --target IntrinsicGraphicsAssetsUnitTests IntrinsicRuntimeContractTests IntrinsicRuntimeGraphicsCpuTests IntrinsicRuntimeIntegrationTests
+ctest --test-dir build/ci --output-on-failure -R 'AssetResidency|AssetModel|GpuAssetCache|RuntimeEnginePrivateGlue|RuntimeSandboxAcceptance' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+build/ci/bin/IntrinsicRuntimeIntegrationTests --gtest_filter='RuntimeEngineLayering.*'
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/repo/check_layering.py --root src --strict

@@ -11,7 +11,12 @@ Each active task should include:
 
 ## Currently active
 
-- No tasks are currently active.
+- [RUNTIME-171 — Privatize the AssetResidencyService surface](RUNTIME-171-privatize-asset-residency-service-surface.md)
+  (`in-progress`; owner: Codex; branch: `codex/arch-006-completion`). The
+  Engine-only asset residency service is moving from a standalone exported
+  module to private Engine module glue without changing cache, listener, model
+  handoff, maintenance, or teardown behavior; next gate is the focused runtime
+  and graphics-assets build.
 
 ## History
 
