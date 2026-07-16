@@ -16,7 +16,7 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   14.71 seconds in isolation; collect a timing population and choose an
   evidence-backed PR-fast split or slow-lane classification without weakening
   strict result validation.
-- [`BUG-082` — GLFW X11 input-method initialization leaks under LeakSanitizer](BUG-082-glfw-x11-input-method-lsan-leak.md):
+- [`BUG-082` — GLFW X11 input-method initialization leaks under LeakSanitizer](../../active/BUG-082-glfw-x11-input-method-lsan-leak.md):
   a GLFW-backed runtime contract passes its assertions but the process exits
   nonzero for a 408-byte `_XimOpenIM` allocation after engine shutdown; isolate
   terminate ordering versus an upstream retained global without weakening

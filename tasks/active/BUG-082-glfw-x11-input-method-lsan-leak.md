@@ -5,6 +5,14 @@ depends_on: []
 ---
 # BUG-082 — GLFW X11 input-method initialization leaks under LeakSanitizer
 
+## Status
+
+- In progress on 2026-07-16; owner: Codex; branch:
+  `codex/arch-006-completion`.
+- A prior completed implementation was audited against this head. Only its
+  four-file technical slice will be integrated; task/index history and all
+  verification evidence will be regenerated locally.
+
 ## Goal
 - Make a process that initializes and shuts down the GLFW/X11 platform backend
   exit cleanly under the sanitizer-enabled `ci` preset, or establish a precise

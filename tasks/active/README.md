@@ -11,7 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-No tasks are currently active.
+- [BUG-082 — GLFW X11 input-method initialization leaks under LeakSanitizer](BUG-082-glfw-x11-input-method-lsan-leak.md)
+  (`in-progress`; owner: Codex; branch: `codex/arch-006-completion`). The
+  source-only regression patch is audited against current head; next gate is
+  live X11 sanitizer execution plus the unsuppressed synthetic-leak control.
 
 ## History
 
