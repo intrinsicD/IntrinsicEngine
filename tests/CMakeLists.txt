@@ -1036,6 +1036,48 @@ if(TARGET PlatformGlfwSmokeTestObjs)
     )
 endif()
 
+# BUG-082: an intentionally standalone sanitizer process. It must not link
+# TestSupportObjs because their default sanitizer options/suppressions would
+# invalidate the leak-on negative control.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux"
+   AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
+    add_executable(IntrinsicGlfwLifecycleLsanProcess
+        regression/platform/Test.GlfwLifecycleLsanProcess.cpp
+    )
+    set_target_properties(IntrinsicGlfwLifecycleLsanProcess PROPERTIES
+        CXX_SCAN_FOR_MODULES ON
+    )
+    target_compile_options(IntrinsicGlfwLifecycleLsanProcess PRIVATE
+        ${INTRINSIC_COMPILE_FLAGS}
+    )
+    target_link_options(IntrinsicGlfwLifecycleLsanProcess PRIVATE
+        ${INTRINSIC_LINK_FLAGS}
+        "LINKER:--wrap=glfwTerminate"
+    )
+    target_link_libraries(IntrinsicGlfwLifecycleLsanProcess PRIVATE
+        IntrinsicConfig
+        ExtrinsicPlatform
+        ExtrinsicCore
+    )
+    intrinsic_register_test_executable(
+        TARGET IntrinsicGlfwLifecycleLsanProcess
+        LABELS regression platform glfw
+    )
+
+    add_test(NAME GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
+        COMMAND ${CMAKE_COMMAND}
+            -DPROBE_EXE=$<TARGET_FILE:IntrinsicGlfwLifecycleLsanProcess>
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/regression/platform/Run.GlfwLifecycleLsanContract.cmake
+    )
+    set_tests_properties(
+        GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
+        PROPERTIES
+            LABELS "regression;platform;glfw"
+            SKIP_REGULAR_EXPRESSION "BUG082_SKIP:"
+            TIMEOUT ${_intrinsic_default_test_timeout_seconds}
+    )
+endif()
+
 if(TARGET GraphicsVulkanSmokeTestObjs)
     intrinsic_test_executable(IntrinsicGraphicsVulkanSmokeTests
         OBJECTS GraphicsVulkanSmokeTestObjs

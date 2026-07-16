@@ -12,6 +12,10 @@ depends_on: []
 - A prior completed implementation was audited against this head. Only its
   four-file technical slice will be integrated; task/index history and all
   verification evidence will be regenerated locally.
+- Current-head verification on 2026-07-16 is green: the dedicated live X11
+  sanitizer contract passed `1/1` without a capability skip, the GLFW platform
+  intersection passed `2/2`, and the default CPU-supported gate passed
+  `3,788/3,788` in 398.51 seconds.
 
 ## Goal
 - Make a process that initializes and shuts down the GLFW/X11 platform backend
@@ -43,42 +47,71 @@ depends_on: []
   `GLFWLifetime`; its destructor calls `glfwTerminate()`. The remaining work is
   to determine whether shutdown ordering prevents cleanup or Xlib/GLFW retains
   this allocation despite a completed terminate path.
+- A controlled clean rebuild changed no GLFW source but removed the report.
+  Historical debugger evidence on the unchanged GLFW 3.4 / libX11 1.8.7 path
+  observed `GLFWLifetime::~GLFWLifetime()` -> `glfwTerminate()` ->
+  `XUnregisterIMInstantiateCallback()` -> `XCloseIM()` before normal exit, the
+  complete owner teardown for the synchronously registered input-method
+  handle. Current-head leak-on verification reproduced the clean result. The
+  explicitly Null-backed UI-capture process passed once. The GLFW-backed
+  close-before-first-frame process passed 10/10 with `detect_leaks=1` and no
+  environment-provided suppression file. Because
+  `IntrinsicRuntimeContractTests` links `TestSupportObjs` and its compiled-in
+  LeakSanitizer defaults, the standalone helper below is the strictly
+  unsuppressed control. No production lifetime change or XIM suppression is
+  therefore justified.
+- The dedicated standalone process does not link shared GTest/TestSupport
+  sanitizer defaults. On the live X11 display it executed without a skip,
+  proved the process-static lifetime calls wrapped `glfwTerminate()` exactly
+  once before LeakSanitizer's sweep, and first required the unsuppressed named
+  4,096-byte synthetic leak to exit 86 with a direct-leak report.
 
 ## Required changes
-- [ ] Reduce the failure to a focused GLFW initialize/terminate sanitizer
+- [x] Reduce the failure to a focused GLFW initialize/terminate sanitizer
       contract and record whether `GLFWLifetime::~GLFWLifetime` and
       `glfwTerminate()` execute before LeakSanitizer's sweep.
-- [ ] Determine allocation ownership against the pinned GLFW 3.4/Xlib path and
+- [x] Determine allocation ownership against the pinned GLFW 3.4/Xlib path and
       distinguish an engine lifetime defect from an upstream retained global.
-- [ ] Fix engine shutdown ordering when owned here; if upstream-owned, use only
-      a symbol-specific, documented suppression that leaves engine leak
-      detection enabled and is covered by a regression.
+- [x] Preserve the proven-clean engine ordering and add no suppression: the
+      exact path reaches unregister/close and exits cleanly. Pair it with an
+      unsuppressed synthetic-leak control so later regressions fail closed.
 
 ## Tests
-- [ ] Add a deterministic sanitizer regression that initializes and terminates
+- [x] Add a deterministic sanitizer regression that initializes and terminates
       the GLFW backend in one process and exits zero without hiding unrelated
       leaks.
-- [ ] Keep the default CPU-supported gate and GLFW platform contracts green.
+- [x] Keep the default CPU-supported gate and GLFW platform contracts green.
 
 ## Docs
-- [ ] Record the ownership diagnosis and any sanitizer suppression rationale in
+- [x] Record the ownership diagnosis and no-suppression decision in
       the platform testing notes.
 - [ ] Update this index and the retirement log when verified.
 
 ## Acceptance criteria
-- [ ] The exact focused process exits zero under the sanitizer-enabled `ci`
+- [x] The exact focused process exits zero under the sanitizer-enabled `ci`
       preset after exercising GLFW/X11 initialization.
-- [ ] A synthetic engine-owned leak is still detected by the same sanitizer
+- [x] A synthetic engine-owned leak is still detected by the same sanitizer
       configuration.
-- [ ] No backend-selection or production runtime semantics change unless the
+- [x] No backend-selection or production runtime semantics change unless the
       diagnosis proves the current lifetime is incorrect.
 
 ## Verification
 ```bash
 cmake --preset ci
-cmake --build --preset ci --target IntrinsicRuntimeContractTests
-build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='ImGuiAdapterEngineWiring.UiCaptureSuppressesRuntimeInputConsumers'
-build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='ImGuiAdapterEngineWiring.RunNormalizesNativeCloseBeforeFirstFrame'
+cmake --build --preset ci --target IntrinsicGlfwLifecycleLsanProcess IntrinsicRuntimeContractTests
+ctest --test-dir build/ci -V \
+  -R '^GlfwLifecycleLsan\.EngineStaticTeardownAndLeakControl$' --timeout 60
+env ASAN_OPTIONS='detect_leaks=1:symbolize=0:fast_unwind_on_malloc=0:halt_on_error=1' \
+  LSAN_OPTIONS='detect_leaks=1:fast_unwind_on_malloc=0:exitcode=86' \
+  build/ci/bin/IntrinsicRuntimeContractTests \
+  --gtest_filter='ImGuiAdapterEngineWiring.UiCaptureSuppressesRuntimeInputConsumers'
+for iteration in $(seq 1 10); do
+  env ASAN_OPTIONS='detect_leaks=1:symbolize=0:fast_unwind_on_malloc=0:halt_on_error=1' \
+    LSAN_OPTIONS='detect_leaks=1:fast_unwind_on_malloc=0:exitcode=86' \
+    build/ci/bin/IntrinsicRuntimeContractTests \
+    --gtest_filter='ImGuiAdapterEngineWiring.RunNormalizesNativeCloseBeforeFirstFrame'
+done
+ctest --test-dir build/ci --output-on-failure -L platform -L glfw --timeout 60
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
