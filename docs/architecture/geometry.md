@@ -195,7 +195,12 @@ by point rows and normal rows; CSV and 3D inputs may carry normals through their
 six-column layouts; PTS and TXT validate their count/intensity/color/reflectance
 columns and store supported color channels. The additional ASCII readers share
 one strict scanner and fail closed on empty, malformed, wrong-column, or
-non-finite inputs.
+non-finite inputs. Binary point-cloud PLY import retains only the declared
+vertex scalars, but consumes every non-vertex scalar and list property in file
+order so mesh faces and application-specific elements do not desynchronize the
+stream. List counts must be integral, non-negative, endian-correct, and bounded
+against the remaining payload; list properties on the vertex element remain
+invalid.
 
 This is module-level geometry coverage. Asset/runtime routing remains a
 separate layer concern and should not be inferred from the existence of a
