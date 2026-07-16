@@ -121,8 +121,20 @@ is unavailable, and its CPU/null contracts are covered in the default gate by
 the Slice 1/2 `RuntimeSandboxAcceptance.*` cases in
 `IntrinsicRuntimeGraphicsCpuTests`.
 
+`ExtrinsicSandbox.VulkanShutdownLsanContract` is the BUG-083 process-level
+regression (`gpu;vulkan;regression;runtime;graphics`). It is intentionally run
+under Xvfb/lavapipe in `ci-vulkan`, enables LeakSanitizer for an exact five-frame
+Sandbox process, requires five renderer-completed samples and an operational
+final device, then requires a clean process exit. Its first subprocess reuses
+the BUG-082 standalone helper and must still report the named 4096-byte
+synthetic engine leak under the same three-entry suppression file. GoogleTest
+binaries embed no default suppressions; the three entries are scoped to this
+runner.
+
 ```bash
-ctest --test-dir build/ci --output-on-failure -L 'gpu' -L 'vulkan' --timeout 120
+ctest --test-dir build/ci-vulkan --output-on-failure \
+  -R '^ExtrinsicSandbox\.VulkanShutdownLsanContract$' \
+  -L 'gpu' -L 'vulkan' --no-tests=error --timeout 180
 ```
 
 For fast local iteration on changed paths, use the touched-scope helper to plan

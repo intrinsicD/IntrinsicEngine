@@ -1,14 +1,3 @@
-leak:/lib/x86_64-linux-gnu/libdbus-1.so.3
-leak:libdbus
-leak:libvulkan
-leak:libGLX_nvidia
-leak:libnvidia-glcore
-leak:Unknown Module
-leak:libvulkan_virtio
-
-# Some Vulkan ICD / loader paths show up as <unknown module> allocations.
-# Suppress by common allocator frames as a last resort to keep CI green.
-leak:__pthread_once_slow
-leak:pthread_once
-leak:VmaAllocator_T::BindVulkanBuffer
 leak:VulkanCommandContext@Extrinsic.Backends.Vulkan::PushConstants
+leak:VmaAllocator_T::BindVulkanBuffer
+leak:dbus_connection_send_with_reply_and_block

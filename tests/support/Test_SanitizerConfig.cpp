@@ -21,16 +21,6 @@ extern "C" const char* __lsan_default_options()
 
 extern "C" const char* __lsan_default_suppressions()
 {
-    return
-        "leak:/lib/x86_64-linux-gnu/libdbus-1.so.3\n"
-        "leak:libdbus\n"
-        "leak:libvulkan\n"
-        "leak:libGLX_nvidia\n"
-        "leak:libnvidia-glcore\n"
-        "leak:Unknown Module\n"
-        "leak:libvulkan_virtio\n"
-        "leak:__pthread_once_slow\n"
-        "leak:pthread_once\n";
+    return "";
 }
 #endif
-

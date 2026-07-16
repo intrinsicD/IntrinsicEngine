@@ -12,8 +12,15 @@ find_program(INTRINSIC_LLVM_SYMBOLIZER
         NAMES llvm-symbolizer llvm-symbolizer-18 llvm-symbolizer-19 llvm-symbolizer-20 llvm-symbolizer-21 llvm-symbolizer-22
 )
 
+# BUG-083: prefer the diagnosed stable symbolizer for the full Vulkan process.
+# The generic host symbolizer may point at a newer LLVM than the configured
+# compiler and has hung while resolving unloaded proprietary-driver frames.
+find_program(INTRINSIC_LSAN_SYMBOLIZER
+        NAMES llvm-symbolizer-18 llvm-symbolizer-20 llvm-symbolizer-19 llvm-symbolizer-21 llvm-symbolizer-22 llvm-symbolizer
+)
+
 set(_intrinsic_test_env
-        "LSAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/lsan.supp:fast_unwind_on_malloc=0:detect_leaks=0"
+        "LSAN_OPTIONS=fast_unwind_on_malloc=0:detect_leaks=0"
         "ASAN_OPTIONS=symbolize=1:detect_leaks=0:fast_unwind_on_malloc=0"
 )
 
@@ -1126,6 +1133,33 @@ if(TARGET ExtrinsicSandbox
         LABELS "gpu;vulkan;integration;runtime;graphics"
         TIMEOUT 180
     )
+
+    # BUG-083: unlike the general fixture environment above, this subprocess
+    # contract explicitly enables leak detection. The standalone BUG-082 helper
+    # supplies an unsuppressed engine-owned negative control before the exact
+    # five-frame Vulkan shutdown run.
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux"
+       AND INTRINSIC_ENABLE_SANITIZERS
+       AND TARGET IntrinsicGlfwLifecycleLsanProcess)
+        if(NOT INTRINSIC_LSAN_SYMBOLIZER)
+            message(FATAL_ERROR
+                "BUG-083 requires llvm-symbolizer for narrow Vulkan leak suppressions"
+            )
+        endif()
+        add_test(NAME ExtrinsicSandbox.VulkanShutdownLsanContract
+            COMMAND ${CMAKE_COMMAND}
+                -DSANDBOX_EXE=$<TARGET_FILE:ExtrinsicSandbox>
+                -DLEAK_CONTROL_EXE=$<TARGET_FILE:IntrinsicGlfwLifecycleLsanProcess>
+                -DREPORT_PATH=${CMAKE_BINARY_DIR}/Testing/Temporary/extrinsic_sandbox_vulkan_shutdown_lsan.json
+                -DSUPPRESSIONS_PATH=${CMAKE_SOURCE_DIR}/lsan.supp
+                -DSYMBOLIZER_PATH=${INTRINSIC_LSAN_SYMBOLIZER}
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/regression/graphics/Run.VulkanShutdownLsanContract.cmake
+        )
+        set_tests_properties(ExtrinsicSandbox.VulkanShutdownLsanContract PROPERTIES
+            LABELS "gpu;vulkan;regression;runtime;graphics"
+            TIMEOUT 180
+        )
+    endif()
 endif()
 
 intrinsic_test_executable(IntrinsicGraphicsUnitTests

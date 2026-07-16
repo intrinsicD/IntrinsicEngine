@@ -398,6 +398,18 @@ available through the Vulkan 1.2/1.3 feature chain.
   destroys per-frame command/sync resources, then tears down VMA/device/surface/
   instance state so partial bring-up slices do not leak backend resources when
   callers omit explicit per-resource destroys.
+  `ExtrinsicSandbox.VulkanShutdownLsanContract` preserves the process-level
+  shutdown proof: under `ci-vulkan` it records exactly five
+  renderer-completed samples, requires an operational final device, and
+  requires a clean LeakSanitizer process exit. The only accepted
+  external-retention suppressions are the diagnosed push-constant driver,
+  `VmaAllocator_T::BindVulkanBuffer`, and
+  `dbus_connection_send_with_reply_and_block` call paths. Before
+  launching the Sandbox, the runner reuses the standalone BUG-082 helper to
+  prove that a named 4096-byte engine allocation still fails under that exact
+  suppression file; broad loader, ICD, unknown-module, pthread, and GLFW/X11
+  suppressions are forbidden. The general GoogleTest binaries embed no default
+  suppression; these three exceptions are scoped to this process runner.
 - Runtime resource-slot reclamation is separate from deferred Vulkan-object
   destruction. `DestroyBuffer`/`DestroyTexture`/`DestroySampler`/
   `DestroyPipeline` move the live Vulkan handles into the per-frame deletion

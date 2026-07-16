@@ -70,7 +70,7 @@ jobs:
           python3 tools/ci/time_command.py \
             --label "Build promoted Vulkan targets" \
             --json-out build/ci-vulkan/ci-timing/phases/build.json \
-            -- cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicGpuVulkanTests
+            -- cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicGpuVulkanTests IntrinsicGlfwLifecycleLsanProcess
 
       # GRAPHICS-080: `ctest -L 'gpu' -L 'vulkan'` is the documented intersection
       # form across labels (each `-L` regex must match at least one label). The
@@ -84,10 +84,11 @@ jobs:
       # without a Vulkan device the remaining smoke fixtures self-skip via
       # `GTEST_SKIP` and the runtime fallback breadcrumb fires — the gate passes
       # as long as no fixture fails. BUG-064 runs the sandbox frame-pacing
-      # capture separately under Xvfb and Mesa's lavapipe software Vulkan
-      # implementation because that process must execute operational renderer
-      # frames before it can emit a diagnostic report. The software driver is
-      # scoped to that capture; the remaining smoke fixtures retain their
+      # capture and BUG-083 leak-on shutdown contract separately under Xvfb and
+      # Mesa's lavapipe software Vulkan implementation because both processes
+      # must execute renderer frames and finish with an operational device. The
+      # software driver is scoped to those Sandbox processes; the remaining
+      # smoke fixtures retain their
       # capability-skip behavior. `--no-tests=ignore` keeps this batch green if
       # a future host build trims the fixture set to empty.
       - name: Run gpu;vulkan opt-in fixtures
@@ -97,42 +98,50 @@ jobs:
             --inventory build/ci-vulkan/test-inventories/IntrinsicGpuVulkanTests.txt
           python3 tools/ci/check_prerequisites.py test-binaries \
             --build-dir build/ci-vulkan \
-            --targets ExtrinsicSandbox
+            --targets ExtrinsicSandbox IntrinsicGlfwLifecycleLsanProcess
           python3 tools/ci/time_command.py \
             --label "Run gpu;vulkan opt-in fixtures" \
             --json-out build/ci-vulkan/ci-timing/phases/test.json \
-            -- ctest --test-dir build/ci-vulkan --output-on-failure -L "gpu" -L "vulkan" -LE "slow|flaky-quarantine" -E "^ExtrinsicSandbox\\.FramePacingDiagnosticCapture$" --no-tests=ignore --timeout 120 -j$(nproc)
+            -- ctest --test-dir build/ci-vulkan --output-on-failure -L "gpu" -L "vulkan" -LE "slow|flaky-quarantine" -E "^ExtrinsicSandbox\\.(FramePacingDiagnosticCapture|VulkanShutdownLsanContract)$" --no-tests=ignore --timeout 120 -j$(nproc)
 
-      - name: Run frame-pacing capture under virtual display
+      - name: Run Sandbox Vulkan process contracts under virtual display
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
           VK_DRIVER_FILES: /usr/share/vulkan/icd.d/lvp_icd.json
         run: |
           test -r "$VK_DRIVER_FILES"
+          sandbox_process_count="$(ctest --test-dir build/ci-vulkan --show-only=json-v1 \
+            -R "^ExtrinsicSandbox\\.(FramePacingDiagnosticCapture|VulkanShutdownLsanContract)$" \
+            -L "gpu" -L "vulkan" \
+            | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')"
+          if [[ "$sandbox_process_count" -ne 2 ]]; then
+            echo "Expected both Sandbox Vulkan process contracts, found $sandbox_process_count" >&2
+            exit 1
+          fi
           python3 tools/ci/time_command.py \
-            --label "Run frame-pacing capture under virtual display" \
-            --json-out build/ci-vulkan/ci-timing/phases/test_frame_pacing.json \
+            --label "Run Sandbox Vulkan process contracts under virtual display" \
+            --json-out build/ci-vulkan/ci-timing/phases/test_sandbox_processes.json \
             -- xvfb-run -a --server-args="-screen 0 1280x720x24" \
               ctest --test-dir build/ci-vulkan --output-on-failure \
-                -R "^ExtrinsicSandbox\\.FramePacingDiagnosticCapture$" \
+                -R "^ExtrinsicSandbox\\.(FramePacingDiagnosticCapture|VulkanShutdownLsanContract)$" \
                 -L "gpu" -L "vulkan" --no-tests=error --timeout 180
 
       - name: Aggregate gate timing result
         if: always()
         run: |
           context_args=()
-          if gpu_tests="$(ctest --test-dir build/ci-vulkan --show-only=json-v1 -L "gpu" -L "vulkan" -LE "slow|flaky-quarantine" -E "^ExtrinsicSandbox\\.FramePacingDiagnosticCapture$" | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')" &&
-             frame_pacing_tests="$(ctest --test-dir build/ci-vulkan --show-only=json-v1 -R "^ExtrinsicSandbox\\.FramePacingDiagnosticCapture$" -L "gpu" -L "vulkan" | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')"; then
-            context_args+=(--selected-test-count "$((gpu_tests + frame_pacing_tests))")
+          if gpu_tests="$(ctest --test-dir build/ci-vulkan --show-only=json-v1 -L "gpu" -L "vulkan" -LE "slow|flaky-quarantine" -E "^ExtrinsicSandbox\\.(FramePacingDiagnosticCapture|VulkanShutdownLsanContract)$" | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')" &&
+             sandbox_process_tests="$(ctest --test-dir build/ci-vulkan --show-only=json-v1 -R "^ExtrinsicSandbox\\.(FramePacingDiagnosticCapture|VulkanShutdownLsanContract)$" -L "gpu" -L "vulkan" | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')"; then
+            context_args+=(--selected-test-count "$((gpu_tests + sandbox_process_tests))")
           fi
-          if ninja_edges="$(ninja -C build/ci-vulkan -t commands ExtrinsicSandbox IntrinsicGpuVulkanTests | sed '/^[[:space:]]*$/d' | wc -l)"; then
+          if ninja_edges="$(ninja -C build/ci-vulkan -t commands ExtrinsicSandbox IntrinsicGpuVulkanTests IntrinsicGlfwLifecycleLsanProcess | sed '/^[[:space:]]*$/d' | wc -l)"; then
             context_args+=(--ninja-edge-count "$ninja_edges")
           fi
           python3 tools/ci/aggregate_gate_timing.py \
             --configure-json build/ci-vulkan/ci-timing/phases/configure.json \
             --build-json build/ci-vulkan/ci-timing/phases/build.json \
             --test-json build/ci-vulkan/ci-timing/phases/test.json \
-            --test-json build/ci-vulkan/ci-timing/phases/test_frame_pacing.json \
+            --test-json build/ci-vulkan/ci-timing/phases/test_sandbox_processes.json \
             --gate ci-vulkan \
             --preset ci-vulkan \
             --compiler clang-20 \
