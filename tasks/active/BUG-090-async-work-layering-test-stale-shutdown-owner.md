@@ -11,8 +11,10 @@ maturity_target: CPUContracted
 
 - In progress on 2026-07-16; owner: Codex; branch:
   `codex/arch-006-completion`.
-- Next gate: reproduce the exact stale assertion, update only its two shutdown
-  spellings, and run the complete source-layering selection.
+- Fix and verification complete: the exact test was reproduced with only the
+  two documented missing spellings, then passed 1/1 after the correction; the
+  complete source-layering selection passed 24/24. Next gate: self-review and
+  technical commit.
 
 ## Goal
 - Restore the `RuntimeEngineLayering` source contract by asserting the current
@@ -41,22 +43,22 @@ maturity_target: CPUContracted
   privatization regression.
 
 ## Required changes
-- [ ] Replace only the two stale member-qualified assertions with the current
+- [x] Replace only the two stale member-qualified assertions with the current
       shutdown-hook delegation spellings.
-- [ ] Preserve the positive Engine ownership/delegation checks and the negative
+- [x] Preserve the positive Engine ownership/delegation checks and the negative
       raw streaming/derived-job ownership checks.
 
 ## Tests
-- [ ] Reproduce the exact failing test before the fix and pass it afterward.
-- [ ] Run the complete `RuntimeEngineLayering` selection.
+- [x] Reproduce the exact failing test before the fix and pass it afterward.
+- [x] Run the complete `RuntimeEngineLayering` selection.
 
 ## Docs
-- [ ] Keep the bug index, task lifecycle record, and session brief synchronized.
+- [x] Keep the bug index, task lifecycle record, and session brief synchronized.
 
 ## Acceptance criteria
-- [ ] The direct source-layering selection passes without changing production
+- [x] The direct source-layering selection passes without changing production
       code or weakening an ownership assertion.
-- [ ] Strict task, state-link, documentation-link, and diff checks pass.
+- [x] Strict task, state-link, documentation-link, and diff checks pass.
 
 ## Verification
 ```bash

@@ -633,9 +633,9 @@ TEST(RuntimeEngineLayering, AsyncWorkServiceKeepsStreamingAndDerivedJobOwnership
               std::string::npos);
     EXPECT_NE(engineImpl.find("m_AsyncWorkService.Streaming()"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("m_AsyncWorkService.ShutdownAndDrain()"),
+    EXPECT_NE(engineImpl.find("AsyncWork.ShutdownAndDrain()"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("m_AsyncWorkService.Reset()"),
+    EXPECT_NE(engineImpl.find("AsyncWork.Reset()"),
               std::string::npos);
     EXPECT_NE(engineImpl.find("m_AsyncWorkService.SubmitDerivedJob("),
               std::string::npos);
