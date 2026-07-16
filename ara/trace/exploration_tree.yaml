@@ -5344,3 +5344,19 @@ tree:
       workflow, root-hygiene, and PR-contract checks passed without production
       runtime or Vulkan lifetime changes.
     status: resolved
+  - id: N229
+    type: experiment
+    title: "Publish the verified overnight task series"
+    provenance: ai-executed
+    timestamp: "2026-07-16T08:02+02:00"
+    also_depends_on: [N223, N224, N225, N226, N228]
+    evidence:
+      - "commit bf22644d"
+      - "refs/heads/codex/arch-006-completion on origin"
+      - "git push --set-upstream origin codex/arch-006-completion"
+    result: >
+      The non-force push created origin/codex/arch-006-completion, the remote
+      accepted bf22644d, and the local branch began tracking the matching remote
+      ref after the final code, GPU, CPU, task, documentation, root-hygiene, and
+      PR-contract gates passed.
+    status: resolved

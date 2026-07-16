@@ -113,8 +113,8 @@ sessions:
     open_threads: 7
   - id: "2026-07-16_001"
     date: "2026-07-16"
-    summary: "Completed Runtime.Engine convergence and six reproducible workflow/runtime/platform/Vulkan bug closures, with full CPU and live GPU evidence, and prepared the verified branch for publication."
+    summary: "Completed Runtime.Engine convergence and six reproducible workflow/runtime/platform/Vulkan bug closures, with full CPU and live GPU evidence, and published the verified branch."
     turn_count: 1
-    events_count: 6
+    events_count: 7
     claims_touched: []
     open_threads: 5

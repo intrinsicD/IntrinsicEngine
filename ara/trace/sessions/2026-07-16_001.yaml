@@ -2,9 +2,9 @@ session:
   id: "2026-07-16_001"
   date: "2026-07-16"
   started: "2026-07-16T00:42+02:00"
-  last_turn: "2026-07-16T07:56+02:00"
+  last_turn: "2026-07-16T08:02+02:00"
   turn_count: 1
-  summary: "Completed Runtime.Engine convergence and six reproducible workflow/runtime/platform/Vulkan bug closures, with full CPU and live GPU evidence, and prepared the verified branch for publication."
+  summary: "Completed Runtime.Engine convergence and six reproducible workflow/runtime/platform/Vulkan bug closures, with full CPU and live GPU evidence, and published the verified branch."
 
 events_logged:
   - turn: 1
@@ -43,6 +43,12 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Retired BUG-083 with exact native-driver accounting, runner-local suppressions, a leak negative control, and non-skipped NVIDIA/lavapipe proof."
+  - turn: 1
+    type: experiment
+    id: "N229"
+    routing: direct
+    provenance: ai-executed
+    summary: "Published the verified task series as a new non-force remote branch and established upstream tracking."
 
 ai_actions:
   - turn: 1
@@ -85,6 +91,10 @@ ai_actions:
     files_changed:
       - "tasks/SESSION-BRIEF.md"
       - "tasks/done/RETIREMENT-LOG.md"
+  - turn: 1
+    action: "Created origin/codex/arch-006-completion with a non-force push after confirming the remote branch did not already exist."
+    provenance: ai-executed
+    files_changed: []
 
 claims_touched: []
 
