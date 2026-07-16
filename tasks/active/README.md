@@ -11,7 +11,11 @@ Each active task should include:
 
 ## Currently active
 
-No tasks are currently active.
+- [RUNTIME-178 — Restore the pre-ratchet Runtime.Engine convergence budget](RUNTIME-178-restore-engine-convergence-budget.md)
+  (`in-progress`; owner: Codex; branch: `codex/arch-006-completion`). The
+  right-sized slice makes two Engine-private services opaque and routes UV
+  queries through the existing registered extraction cache; next gate is the
+  focused runtime build and exact convergence ratchet.
 
 ## History
 
