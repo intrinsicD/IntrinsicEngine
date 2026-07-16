@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 81 |
+| `runtime` | 80 |
 
 ## Modules
 
@@ -349,7 +349,6 @@ Root scanned: `src`
 | `Extrinsic.Runtime.AssetModelSceneHandoff` | `src/runtime/Runtime.AssetModelSceneHandoff.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetModelTextureHandoff` | `src/runtime/Runtime.AssetModelTextureHandoff.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetModelTextureIO` | `src/runtime/Runtime.AssetModelTextureIO.cppm` | `runtime` |
-| `Extrinsic.Runtime.AssetResidencyService` | `src/runtime/Runtime.AssetResidencyService.cppm` | `runtime` |
 | `Extrinsic.Runtime.AsyncBufferReadback` | `src/runtime/Runtime.AsyncBufferReadback.cppm` | `runtime` |
 | `Extrinsic.Runtime.AsyncWorkService` | `src/runtime/Runtime.AsyncWorkService.cppm` | `runtime` |
 | `Extrinsic.Runtime.CommandBus` | `src/runtime/Runtime.CommandBus.cppm` | `runtime` |
@@ -415,4 +414,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugClosestFace` | `src/runtime/SpatialDebug/Runtime.SpatialDebugClosestFace.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **388**
+Total modules: **387**

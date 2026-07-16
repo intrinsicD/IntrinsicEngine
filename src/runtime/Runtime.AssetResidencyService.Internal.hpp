@@ -1,29 +1,17 @@
-module;
+#pragma once
 
-#include <cstdint>
-#include <memory>
-
-export module Extrinsic.Runtime.AssetResidencyService;
-
-import Extrinsic.Asset.EventBus;
-import Extrinsic.Asset.Service;
-import Extrinsic.ECS.Scene.Registry;
-export import Extrinsic.Graphics.GpuAssetCache;
-import Extrinsic.Graphics.Renderer;
-import Extrinsic.RHI.Device;
-export import Extrinsic.Runtime.AssetModelSceneHandoff;
-export import Extrinsic.Runtime.AssetModelTextureHandoff;
-export import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
+// Include-only Engine module glue. Include after the required asset, graphics,
+// RHI, ECS, and runtime module imports in Runtime.Engine.cppm.
 
 namespace Extrinsic::Runtime
 {
-    export struct AssetResidencySceneHandoffOptions
+    struct AssetResidencySceneHandoffOptions
     {
         RuntimeObjectSpaceNormalBakeQueue* ObjectSpaceNormalBakeQueue{};
         bool ObjectSpaceNormalBakeGraphicsBackendOperational{false};
     };
 
-    export class AssetResidencyService
+    class AssetResidencyService
     {
     public:
         AssetResidencyService() = default;

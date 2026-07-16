@@ -136,7 +136,7 @@ now live in an Engine-private `RenderExtractionService`.
 `AssetEventBus` listener token, `AssetModelTextureHandoff`,
 `AssetModelSceneHandoff`, fallback bootstrap delegation, pending material
 binding re-resolution, and asset-residency teardown ordering now live behind
-`Extrinsic.Runtime.AssetResidencyService`.
+an Engine-private `AssetResidencyService`.
 `RUNTIME-165` is retired; persistent `StreamingExecutor` /
 `DerivedJobRegistry` ownership, maintenance drains, shutdown reset, and
 derived-job facade delegation now live behind
@@ -155,8 +155,8 @@ derived-job facade delegation now live behind
   (done, 2026-07-09, `Operational`): GPU asset cache ownership, cache
   asset-event listener wiring, model texture/model scene handoff ownership,
   fallback bootstrap delegation, pending material-binding re-resolution, and
-  asset-residency teardown ordering now live in
-  `Extrinsic.Runtime.AssetResidencyService`. `Engine` keeps lifecycle/frame
+  asset-residency teardown ordering now live in an Engine-private
+  `AssetResidencyService`. `Engine` keeps lifecycle/frame
   ordering plus public `GetAssetService()` / `GetGpuAssetCache()`
   compatibility facades.
 - [RUNTIME-163 — Extract render extraction service out of Engine](../../archive/RUNTIME-163-extract-render-extraction-service.md)

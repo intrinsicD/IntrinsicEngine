@@ -10,7 +10,6 @@ target_sources(${target_name}
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Runtime.AsyncWorkService.cppm
         Runtime.AsyncBufferReadback.cppm
-        Runtime.AssetResidencyService.cppm
         Runtime.AssetImportPipeline.cppm
         Runtime.AssetGeometryIO.cppm
         Runtime.AssetIngestStateMachine.cppm

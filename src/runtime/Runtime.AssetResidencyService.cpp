@@ -4,7 +4,7 @@ module;
 #include <memory>
 #include <utility>
 
-module Extrinsic.Runtime.AssetResidencyService;
+module Extrinsic.Runtime.Engine;
 
 import Extrinsic.Asset.EventBus;
 import Extrinsic.Asset.Registry;

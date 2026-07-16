@@ -58,7 +58,6 @@ import Extrinsic.Runtime.AssetGeometryIO;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetMeshNormals;
 import Extrinsic.Runtime.AssetModelTextureIO;
-import Extrinsic.Runtime.AssetResidencyService;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.DeviceBootstrap;

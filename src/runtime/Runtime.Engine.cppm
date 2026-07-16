@@ -20,17 +20,20 @@ import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameClock;
 import Extrinsic.Core.FrameGraph;
 import Extrinsic.Core.Geometry2D;
+import Extrinsic.Asset.EventBus;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.RHI.Device;
 import Extrinsic.Platform.Window;
 import Extrinsic.Graphics.CameraSnapshots;
+import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.AsyncWorkService;
-import Extrinsic.Runtime.AssetResidencyService;
+import Extrinsic.Runtime.AssetModelSceneHandoff;
+import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.AssetImportPipeline;
@@ -44,6 +47,7 @@ import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.ModuleSchedule;
+import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeService;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.ReferenceScene;
@@ -62,6 +66,7 @@ import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Scene.Registry;
 
 #include "Runtime.ImGuiEditorBridge.Internal.hpp"
+#include "Runtime.AssetResidencyService.Internal.hpp"
 #include "Runtime.RenderExtractionService.Internal.hpp"
 
 namespace Extrinsic::Runtime

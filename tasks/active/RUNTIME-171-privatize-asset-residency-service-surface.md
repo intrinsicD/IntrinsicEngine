@@ -10,11 +10,10 @@ maturity_target: Operational
 
 ## Status
 
-- In progress on 2026-07-16; owner: Codex; branch:
-  `codex/arch-006-completion`.
-- Next gate: replace the standalone module with an Engine-private declaration
-  attached to `Extrinsic.Runtime.Engine`, then build the focused asset
-  residency, handoff, and runtime contract targets.
+- Implementation and verification completed on 2026-07-16; owner: Codex;
+  branch: `codex/arch-006-completion`.
+- Next gate: commit the verified technical slice, then retire this task at
+  `Operational` with the implementation commit recorded.
 
 ## Goal
 - Keep `AssetResidencyService` as an Engine-owned implementation service while
@@ -33,7 +32,7 @@ maturity_target: Operational
   to 23.732s, with nine imports.
 - `RUNTIME-164` extracted this service from `Engine`; this task preserves that
   ownership split but removes unnecessary public module exposure if feasible.
-- Current consumer inventory: only `Runtime.Engine.cppm` and
+- Pre-change consumer inventory: only `Runtime.Engine.cppm` and
   `Runtime.Engine.cpp` import the named module. The apparent third production
   consumer, `Runtime.Engine.FrameLoop.Internal.hpp`, is include-only Engine
   implementation glue that borrows the service type; no app or test imports or
@@ -48,35 +47,70 @@ maturity_target: Operational
   production consumer lands.
 
 ## Required changes
-- [ ] Inventory current consumers and decide whether all production uses can be
+- [x] Inventory current consumers and decide whether all production uses can be
       narrowed to Engine-private source/header glue.
-- [ ] Move service declarations to private runtime headers or reduce the module
+- [x] Move service declarations to private runtime headers or reduce the module
       to a minimal facade if external runtime code still needs it.
-- [ ] Avoid re-exporting `GpuAssetCache`, model texture handoff, model scene
+- [x] Avoid re-exporting `GpuAssetCache`, model texture handoff, model scene
       handoff, or object-space normal queue modules through the service seam.
-- [ ] Update source-scan tests and CMake file sets.
-- [ ] Record before/after compile timing, interface lines, and import count.
+- [x] Update source-scan tests and CMake file sets.
+- [x] Record before/after compile timing, interface lines, and import count.
 
 ## Tests
-- [ ] Run asset residency, model scene/texture handoff, runtime engine layering,
+- [x] Run asset residency, model scene/texture handoff, runtime engine layering,
       and sandbox acceptance coverage.
-- [ ] Run strict layering and default CPU-supported CTest.
+- [x] Run strict layering and default CPU-supported CTest.
 
 ## Docs
-- [ ] Update runtime/assets architecture docs if the service stops being a
+- [x] Update runtime/assets architecture docs if the service stops being a
       named module.
-- [ ] Regenerate `docs/api/generated/module_inventory.md`.
+- [x] Regenerate `docs/api/generated/module_inventory.md`.
 
 ## Acceptance criteria
-- [ ] Runtime still owns asset-to-GPU residency and teardown ordering.
-- [ ] `AssetResidencyService` no longer broadens the public module graph unless
+- [x] Runtime still owns asset-to-GPU residency and teardown ordering.
+- [x] `AssetResidencyService` no longer broadens the public module graph unless
       an explicit consumer inventory justifies it.
-- [ ] No lower layer gains live runtime or asset-service ownership.
+- [x] No lower layer gains live runtime or asset-service ownership.
+
+## Evidence
+
+- Consumer inventory: the two pre-change named-module importers were
+  `Runtime.Engine.cppm` and `Runtime.Engine.cpp`; no app or test imported or
+  instantiated the service. The directive-free private declaration now has
+  exactly one include owner, `Runtime.Engine.cppm`.
+- Surface metrics: runtime modules `81 -> 80`, repository modules `388 -> 387`,
+  named-module importers `2 -> 0`, and the combined named interface surface
+  fell from 557 lines / 56 imports (Engine plus service) to 491 lines / 51
+  imports (Engine). The retired 71-line exported service interface became a
+  59-line private header with no imports; across the affected Engine/service
+  units, imports fell `159 -> 153` and export-imports fell `6 -> 2`.
+- Compile diagnostics: the task baseline records the standalone BMI at up to
+  23.732 seconds; this fresh build recorded the removed BMI edge at 27.362
+  seconds, the post-change service implementation edge at 6.559 seconds, and
+  the post-change Engine BMI at 72.681 seconds. These single-host timings are
+  structural diagnostics only; there is no matched aggregate build-speed
+  claim.
+- Declaration and implementation review: after removing module directives and
+  exports, the service declaration is text-equivalent; after reattaching the
+  implementation to `Extrinsic.Runtime.Engine`, all 165 implementation lines
+  and direct implementation imports are unchanged. The by-value member
+  position and cache/listener/handoff lifetimes are unchanged.
+- Focused residency/model/cache/private-glue/acceptance coverage passed
+  `79/79`; direct `RuntimeEngineLayering.*` coverage passed `21/21`; a full
+  `IntrinsicTests` build completed, and the final default CPU-supported gate
+  passed `3784/3784` in 398.08 seconds.
+- Strict layering, allowlist quality, task policy/maturity, doc links, test
+  layout, root hygiene, PR contract, skill-mirror sync, module-inventory
+  freshness, diff checks, and the clean-workshop automated bundle passed.
+  Manual clean-workshop rows found no public API leak, renderer/pass/recipe
+  growth, scaffold debt, or temporary exception. Three independent reviews
+  found no remaining architecture, lifetime, scope, test, docs, or metrics
+  blocker.
 
 ## Verification
 ```bash
 cmake --preset ci
-cmake --build --preset ci --target IntrinsicGraphicsAssetsUnitTests IntrinsicRuntimeContractTests IntrinsicRuntimeGraphicsCpuTests IntrinsicRuntimeIntegrationTests
+cmake --build --preset ci --target IntrinsicAssetUnitTests IntrinsicGraphicsAssetsUnitTests IntrinsicRuntimeContractTests IntrinsicRuntimeGraphicsCpuTests IntrinsicRuntimeIntegrationTests
 ctest --test-dir build/ci --output-on-failure -R 'AssetResidency|AssetModel|GpuAssetCache|RuntimeEnginePrivateGlue|RuntimeSandboxAcceptance' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
 build/ci/bin/IntrinsicRuntimeIntegrationTests --gtest_filter='RuntimeEngineLayering.*'
 cmake --build --preset ci --target IntrinsicTests
