@@ -5,6 +5,26 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-097` — Progressive model-scene UV job publishes a zero atlas](BUG-097-progressive-model-scene-zero-uv-atlas.md):
+  the default-off progressive enrichment path labels an all-zero authoritative
+  `v:texcoord` property as an atlas and can publish it after newer UV/topology
+  edits; replace it with real atlas output plus generation-safe stale discard.
+- [`BUG-096` — ICP point-to-plane ignores target normals](BUG-096-icp-point-to-plane-target-normals.md):
+  synchronous and queued runtime registration pass an empty target-normal span,
+  so geometry silently executes point-to-point while the editor reports the
+  requested point-to-plane variant.
+- [`BUG-095` — Direct-mesh postprocess can overwrite newer editor geometry](BUG-095-direct-mesh-postprocess-stale-overwrite.md):
+  deferred import enrichment validates only entity liveness before replacing
+  live geometry, allowing newer position, topology, UV, or property edits to be
+  lost; apply must be generation-keyed and stale-safe.
+- [`BUG-094` — Model-scene import drops node semantics and standard selection behavior](BUG-094-model-scene-node-semantics-selection.md):
+  glTF decode flattens meshes without active-scene traversal, hierarchy,
+  transforms, or instancing, and model primitives bypass standard selectable,
+  completion, selection, and focus authoring.
+- [`BUG-093` — File / Import prerequisite gating and disabled-reason tooltips](BUG-093-file-import-prerequisite-gating-tooltips.md):
+  the editor enables `Import asset` from command-surface availability alone,
+  allowing empty, unsupported, ambiguous, or incompatible path/hint requests
+  to fail late without a disabled-control explanation.
 - [`BUG-091` — GoogleTest PRE_TEST discovery times out on a cold start](BUG-091-gtest-pretest-discovery-cold-timeout.md):
   CMake's implicit five-second PRE_TEST discovery limit can abort CTest while
   an unrelated cold sanitizer binary enumerates tests, before the selected

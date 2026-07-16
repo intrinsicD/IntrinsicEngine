@@ -158,6 +158,13 @@ still open. `UI-031` is retired and consumes the visibility-gated model-build
 slice for the domain-window information-architecture cleanup; the broader async
 cache/job pipeline remains owned by `RUNTIME-138`.
 
+The 2026-07-16 Sandbox model-workflow audit opened three Theme F leaves:
+`ASSETIO-010` owns asynchronous primary/companion-file preview after
+`BUG-093`; `UI-037` owns runtime-authoritative linear action readiness and
+disabled-reason tooltips after `BUG-093`, `BUG-096`, and `RUNTIME-138`; and `UI-038` owns explicit,
+undoable safety for destructive Progressive Poisson mesh conversion. The
+reproducible correctness defects themselves remain Theme G bugs.
+
 `RUNTIME-131` is retired to `tasks/done`: runtime exposes the agent/CLI
 config-control facade for render-recipe preview/activation and the current
 engine-config hot subset (`render.default_recipe_config_path`), with the
@@ -268,6 +275,9 @@ Open members (kernel-seam priority set first):
 - [`architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md`](architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) (one-shot post-convergence admission gate; blocked until known architecture/right-sizing/tool-rent work retires).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md`](runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md).
+- [`assets/ASSETIO-010-async-model-companion-preflight.md`](assets/ASSETIO-010-async-model-companion-preflight.md) (blocked by `BUG-093`).
+- [`ui/UI-037-linear-domain-action-readiness-tooltips.md`](ui/UI-037-linear-domain-action-readiness-tooltips.md) (blocked by `BUG-093`, `BUG-096`, and `RUNTIME-138`).
+- [`ui/UI-038-progressive-poisson-destructive-conversion-safety.md`](ui/UI-038-progressive-poisson-destructive-conversion-safety.md).
 - [`architecture/CORE-005-nonblocking-taskgraph-submit-api.md`](architecture/CORE-005-nonblocking-taskgraph-submit-api.md).
 - [`architecture/CORE-006-domain-free-core-task-vocabulary.md`](architecture/CORE-006-domain-free-core-task-vocabulary.md).
 - [`architecture/CORE-007-scheduler-priority-wait-wake-hardening.md`](architecture/CORE-007-scheduler-priority-wait-wake-hardening.md).

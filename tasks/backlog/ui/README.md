@@ -10,13 +10,23 @@ map.
 
 ## Tasks
 
+- [UI-038 — Progressive Poisson destructive-conversion safety](UI-038-progressive-poisson-destructive-conversion-safety.md)
+  (runtime-owned preview/confirmation plus exact undo/redo for the existing
+  mesh-to-point-cloud replacement; auto-run and agent/backend paths cannot
+  bypass confirmation).
+- [UI-037 — Linear domain-action readiness and disabled-reason tooltips](UI-037-linear-domain-action-readiness-tooltips.md)
+  (one runtime-owned readiness/reason contract for mesh, UV, bake,
+  point-cloud, registration, and parameterization actions, consumed by both
+  app and agent/controller callers; gated on truthful point-to-plane semantics
+  from `BUG-096`, the shared tooltip convention from `BUG-093`, and
+  generation-keyed nonblocking selected analysis from `RUNTIME-138`).
 - [UI-035 — Sandbox point-cloud consolidation editor panel](UI-035-sandbox-pointcloud-consolidation-editor-panel.md)
   (LOP/WLOP/CLOP/EAR strategy + CPU/GPU backend picker driving the
   `RUNTIME-175` config-lane apply path; gated on `runtime/RUNTIME-175`;
   coordinate with active `ARCH-006` Slice 4).
 
 Further UI children open from the deferred triggers recorded by the retired
-RORG-031F seed.
+RORG-031F seed and from reproducible workflow audits.
 
 The runtime SpatialDebug closest-face picking consumer for `GEOM-039` is
 retired under the runtime backlog as `RUNTIME-135`.
