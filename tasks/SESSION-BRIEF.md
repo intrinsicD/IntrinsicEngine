@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `BUG-094` — Model-scene import drops node semantics and standard selection behavior (tasks/active/BUG-094-model-scene-node-semantics-selection.md)
+- none
 
 ## Theme B — Rendering modernization
 

@@ -8,6 +8,23 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-094`](BUG-094-model-scene-node-semantics-selection.md) — the model-scene
+node-semantics and selection defect retired on 2026-07-16 at `Operational`.
+Commit `16c30545` retains the selected glTF scene's deterministic hierarchy,
+finite local transforms, and shared primitive prototypes in the CPU asset;
+`f16cf7b1` transactionally materializes explicit node and primitive-leaf ECS
+entities, preserves repeated instances, and routes every leaf through the
+canonical render/select authoring and one aggregate-focus completion;
+`353a2fc8` adds the checked-in transformed/instanced fixture and real Vulkan
+visibility/readback/picking proof; and `1663bab7` preserves tight orthogonal
+TRS spheres while conservatively enclosing affine shear and makes the world
+replacement regression count live entities rather than EnTT tombstones. The
+complete affected CPU suites passed 44/44, the final promoted-Vulkan import and
+existing click-pick pair passed 2/2 without skips on an NVIDIA GeForce RTX 3050
+with driver 590.48.01, and the exact-head default CPU-supported gate passed
+3,810/3,810 in 615.10 seconds. Assets remains CPU-only, runtime owns ECS
+composition, and graphics continues to consume snapshots/views.
+
 [`BUG-093`](BUG-093-file-import-prerequisite-gating-tooltips.md) — the Sandbox
 File / Import prerequisite defect retired on 2026-07-16 at `Operational`.
 Implementation commit `d97cd893` centralizes route, promoted-importer, and

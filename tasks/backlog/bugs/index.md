@@ -17,10 +17,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   deferred import enrichment validates only entity liveness before replacing
   live geometry, allowing newer position, topology, UV, or property edits to be
   lost; apply must be generation-keyed and stale-safe.
-- [`BUG-094` — Model-scene import drops node semantics and standard selection behavior](../../active/BUG-094-model-scene-node-semantics-selection.md):
-  glTF decode flattens meshes without active-scene traversal, hierarchy,
-  transforms, or instancing, and model primitives bypass standard selectable,
-  completion, selection, and focus authoring.
 - [`BUG-091` — GoogleTest PRE_TEST discovery times out on a cold start](BUG-091-gtest-pretest-discovery-cold-timeout.md):
   CMake's implicit five-second PRE_TEST discovery limit can abort CTest while
   an unrelated cold sanitizer binary enumerates tests, before the selected
@@ -39,6 +35,12 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   headroom while preserving fail-closed semantics.
 
 ## Verified / Closed
+
+- Closed 2026-07-16: [`BUG-094` — Model-scene import drops node semantics and standard selection behavior](../../done/BUG-094-model-scene-node-semantics-selection.md).
+  CPU decode now retains active-scene hierarchy, transforms, and shared
+  primitive instances; runtime materializes node and selectable primitive-leaf
+  entities through the canonical authoring/completion path. A no-skip promoted
+  Vulkan smoke proves transformed imported geometry visible and click-pickable.
 
 - Closed 2026-07-16: [`BUG-093` — File / Import prerequisite gating and disabled-reason tooltips](../../done/BUG-093-file-import-prerequisite-gating-tooltips.md).
   One runtime evaluator now owns route, promoted-importer, and payload-hint

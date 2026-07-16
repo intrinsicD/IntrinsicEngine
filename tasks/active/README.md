@@ -11,10 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [BUG-094 — Model-scene import drops node semantics and standard selection behavior](BUG-094-model-scene-node-semantics-selection.md)
-  (`in-progress`; owner: Codex; branch:
-  `agent/bug-094-model-scene-semantics`). The next gate is the regression-first
-  CPU scene payload and active-scene traversal contract.
+No tasks are currently active.
 
 ## History
 

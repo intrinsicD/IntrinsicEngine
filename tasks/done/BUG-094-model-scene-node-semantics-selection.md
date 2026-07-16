@@ -8,16 +8,20 @@ maturity_target: Operational
 
 ## Status
 
-- In progress on 2026-07-16; owner: Codex; branch:
+- Completed on 2026-07-16 at `Operational`; owner: Codex; branch:
   `agent/bug-094-model-scene-semantics`.
+- Commit references: `16c30545` (CPU scene semantics), `f16cf7b1`
+  (runtime hierarchy/materialization), `353a2fc8` (promoted Vulkan visibility
+  and picking), and `1663bab7` (conservative transformed bounds and live-world
+  regression correction).
 - Slices A, B, and C are implemented and verified. The CPU
   payload retains active-scene roots, pre-order hierarchy, local transforms,
   and shared primitive prototypes for GLTF and GLB; runtime materializes that
   hierarchy, applies the standard mesh authoring policy, and completes once
   with aggregate focus for synchronous and queued imports. A capable-host
   Vulkan smoke proves a transformed imported instance visible and click-pickable
-  through real readback. The task has reached `Operational`; the default CPU
-  aggregate merge gate remains before retirement.
+  through real readback. The final default CPU-supported aggregate gate passed
+  3,810/3,810 and the task is retired at its target maturity.
 
 ## Goal
 - Make a successful glTF model-scene import preserve active-scene membership,
@@ -240,6 +244,18 @@ Slice C verification on 2026-07-16:
 - The new smoke plus the existing
   `ClickPickReadbackSelectsReferenceTriangleAndBackgroundClears` regression
   passed 2/2. Fixture JSON, test labels, and the diff checks passed.
+
+Final exact-head verification on 2026-07-16:
+
+- The aggregate `IntrinsicTests` target built successfully after the bounds
+  correction. The default CPU-supported gate passed 3,810/3,810 in 615.10
+  seconds.
+- The final `ci-vulkan` incremental build succeeded and the imported-model
+  smoke plus the existing click-pick regression passed 2/2 without skips in
+  9.64 seconds.
+- Strict task/schema/state-link/session-brief, docs-sync/link, layering,
+  test-layout, root-hygiene, PR-contract, skill-mirror, clean-workshop, module
+  inventory, and diff checks passed on the retirement state.
 
 ## Forbidden changes
 - Treating all `model.meshes` entries as scene instances or silently applying
