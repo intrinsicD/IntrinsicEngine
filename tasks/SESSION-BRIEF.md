@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `RUNTIME-173` — Privatize the K-Means GPU job queue surface (tasks/active/RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md)
 
 ## Theme B — Rendering modernization
 
@@ -41,7 +41,6 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-166` — Slim and partition the RenderExtraction module (tasks/backlog/runtime/RUNTIME-166-slim-render-extraction-module.md)
 - unblocked: `RUNTIME-168` — Privatize the Sandbox default policies surface (tasks/backlog/runtime/RUNTIME-168-privatize-sandbox-default-policies-surface.md)
 - unblocked: `RUNTIME-172` — Privatize the SceneDocument surface (tasks/backlog/runtime/RUNTIME-172-privatize-scene-document-surface.md)
-- unblocked: `RUNTIME-173` — Privatize the K-Means GPU job queue surface (tasks/backlog/runtime/RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md)
 
 ## Theme G — Active bugs
 

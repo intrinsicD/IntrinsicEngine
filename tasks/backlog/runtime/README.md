@@ -193,9 +193,9 @@ main `Runtime.RenderExtraction` module slimming.
 - [`RUNTIME-172`](RUNTIME-172-privatize-scene-document-surface.md) —
   reduce or retire the exported scene document orchestration surface after
   `RUNTIME-148`.
-- [`RUNTIME-173`](RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md) —
+- [`RUNTIME-173`](../../active/RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md) —
   move the K-Means GPU job queue behind the editor/module integration seam after
-  `RUNTIME-137`.
+  `RUNTIME-137`; active on `codex/arch-006-completion`.
 
 ### Retired module-surface diet work
 

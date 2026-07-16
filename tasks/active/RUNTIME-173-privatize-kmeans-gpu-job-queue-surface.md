@@ -8,6 +8,14 @@ maturity_target: CPUContracted
 ---
 # RUNTIME-173 — Privatize the K-Means GPU job queue surface
 
+## Status
+
+- In progress on 2026-07-16; owner: Codex; branch:
+  `codex/arch-006-completion`.
+- Next gate: move the public queue DTO contract into
+  `Extrinsic.Runtime.SandboxEditorFacades`, make the queue class private to
+  that module, and build the focused Sandbox/JobService coverage.
+
 ## Goal
 - Remove `Extrinsic.Runtime.KMeansGpuJobQueue` as a broadly importable runtime
   module by moving the queue behind the Sandbox editor/module integration seam
@@ -26,6 +34,24 @@ maturity_target: CPUContracted
   21.473s with mostly editor/test consumers.
 - `RUNTIME-137` moved the queue path onto the `JobService` `GpuQueue` registry;
   this task narrows the compile surface after that ownership split.
+- Pre-change inventory: nine sources import the named module: the Sandbox
+  facade interface plus two facade implementation units and six split Sandbox
+  contract sources. Queue-class use is entirely private to
+  `SandboxEditorSession`; only the request/submission/result/status DTOs form a
+  genuine public command injection contract, used directly by one clustering
+  test. The other five test imports are unused, and the exported debug-name
+  function has no callers.
+- Right-sized shape: preserve the four DTO/status definitions and inline
+  predicates under their existing names in the public Sandbox facade; move the
+  unchanged queue declaration to one directive-free private header included by
+  that facade; and attach the unchanged implementation unit to
+  `Extrinsic.Runtime.SandboxEditorFacades`. Do not add a replacement module,
+  partition, wrapper, compatibility facade, or queue test API.
+- Lifetime constraints: retain the session-owned `unique_ptr`, borrowed device/
+  buffer-manager/transfer-queue references, queue-before-participant member
+  order, JobService registration/unregistration, device-idle shutdown callback,
+  attachment-epoch guards, frame-command recording, maintenance drain, and
+  completion-consumption ordering exactly.
 
 ## Required changes
 - [ ] Inventory queue consumers and decide whether the queue belongs behind the
