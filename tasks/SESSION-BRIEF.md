@@ -8,10 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `BUG-098` — Frame clock samples an incomplete frame delta (tasks/active/BUG-098-frame-clock-samples-incomplete-frame-delta.md)
-- `BUG-099` — Binary PLY point-cloud import rejects face-list elements (tasks/active/BUG-099-binary-ply-pointcloud-skips-face-lists.md)
-- `BUG-100` — Manual geometry import blocks the Sandbox frame loop (tasks/active/BUG-100-manual-geometry-import-blocks-frame-loop.md)
-- `BUG-101` — Fast-staged UV edge grouping is quadratic (tasks/active/BUG-101-fast-staged-uv-edge-grouping-quadratic.md)
+- none
 
 ## Theme B — Rendering modernization
 

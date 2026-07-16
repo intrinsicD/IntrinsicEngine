@@ -8,10 +8,14 @@ maturity_target: Operational
 
 ## Status
 
-- In progress on 2026-07-16; owner: Codex geometry worker; branch:
-  `agent/sandbox-model-workflow-completion`.
-- Next gate: deterministic near-linear edge grouping, reuse in seam recording,
-  and declared scaling evidence against a comparable baseline.
+- Completed on 2026-07-16 at `Operational`; owner: Codex; branch:
+  `agent/sandbox-model-workflow-completion`; implementation commit:
+  `25d27068`.
+- Deterministic geometry and real-runtime close coverage passed 3/3. The
+  declared runner emitted 22 strictly valid results; the comparable local
+  sanitized baseline/candidate evidence records exact output parity and a
+  46.175% lower large-fixture median without turning local timing into a gate.
+  The default CPU-supported gate passed 3,830/3,830.
 
 ## Goal
 
@@ -49,58 +53,58 @@ maturity_target: Operational
 
 ## Required changes
 
-- [ ] Replace the vector-wide edge search with a reserved edge-key-to-index
+- [x] Replace the vector-wide edge search with a reserved edge-key-to-index
       lookup that preserves first-seen group order and per-group face order.
-- [ ] Use a deterministic normalized undirected edge key with collision-safe
+- [x] Use a deterministic normalized undirected edge key with collision-safe
       equality; do not derive output order from hash-table iteration.
-- [ ] Reuse the already-computed source edge groups when recording fast-staged
+- [x] Reuse the already-computed source edge groups when recording fast-staged
       seams instead of rebuilding them.
-- [ ] Preserve boundary/nonmanifold classification, chart membership, seam
+- [x] Preserve boundary/nonmanifold classification, chart membership, seam
       records, diagnostics, UV finiteness, and authored-UV behavior.
 
 ## Tests
 
-- [ ] Add generated high-cardinality manifold/grid coverage asserting
+- [x] Add generated high-cardinality manifold/grid coverage asserting
       fast-staged success, face preservation, finite UVs, and deterministic
       chart/seam output across repeated runs.
-- [ ] Pin boundary and nonmanifold edge grouping so the faster lookup cannot
+- [x] Pin boundary and nonmanifold edge grouping so the faster lookup cannot
       merge unequal keys or reorder first-seen records.
-- [ ] Extend the declared UV-atlas benchmark with a scaling fixture large
+- [x] Extend the declared UV-atlas benchmark with a scaling fixture large
       enough to detect quadratic grouping and compare the candidate result to
       a recorded baseline before making a performance claim.
-- [ ] Add a bounded real-engine direct-mesh enrichment/close regression using
+- [x] Add a bounded real-engine direct-mesh enrichment/close regression using
       a generated fixture if the existing runtime seam can prove operational
       shutdown without a brittle wall-clock assertion.
 
 ## Docs
 
-- [ ] Update the geometry UV-atlas notes and benchmark manifest/README for the
+- [x] Update the geometry UV-atlas notes and benchmark manifest/README for the
       new scaling evidence.
-- [ ] Update runtime docs only if shutdown/cancellation semantics change.
-- [ ] Refresh task indexes/session brief and retirement records on closure.
+- [x] Update runtime docs only if shutdown/cancellation semantics change.
+- [x] Refresh task indexes/session brief and retirement records on closure.
 
 ## Acceptance criteria
 
-- [ ] Edge grouping performs expected constant-time key lookup per incidence
+- [x] Edge grouping performs expected constant-time key lookup per incidence
       and is constructed once per fast-staged generation.
-- [ ] Deterministic chart/seam/UV results match the pre-fix semantics on
+- [x] Deterministic chart/seam/UV results match the pre-fix semantics on
       representative boundary, manifold, and nonmanifold inputs.
-- [ ] A declared benchmark result demonstrates the dense-fixture scaling
+- [x] A declared benchmark result demonstrates the dense-fixture scaling
       change against an explicit baseline; no unsupported speedup claim is
       recorded.
-- [ ] Generated operational coverage no longer leaves close waiting on the
+- [x] Generated operational coverage no longer leaves close waiting on the
       former avoidable quadratic worker, and focused/default gates pass.
 
 ## Verification
 
 ```bash
 cmake --preset ci
-cmake --build --preset ci --target IntrinsicGeometryUnitTests IntrinsicGeometryBenchmarks IntrinsicRuntimeContractTests
+cmake --build --preset ci --target IntrinsicGeometryTests IntrinsicRuntimeContractTests IntrinsicBenchmarks
 ctest --test-dir build/ci --output-on-failure \
-  -R '^UvAtlas\.|^RuntimeAssetImportFormatCoverage\.DirectMeshEnrichmentClose' \
+  -R '^(UvAtlas\.(FastStagedHighCardinalityGridIsFiniteAndDeterministic|FastStagedKeepsFirstSeenBoundaryAndNonmanifoldSeamOrder)|RuntimeAssetImportFormatCoverage\.DirectMeshEnrichmentCloseDrainsGeneratedGridAndCompletesDeterministically)$' \
   -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
-python3 tools/benchmark/validate_benchmark_manifests.py
-python3 tools/benchmark/validate_benchmark_results.py
+python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
+python3 tools/benchmark/validate_benchmark_results.py --root build/ci/benchmark --strict
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure \
   -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
@@ -109,6 +113,17 @@ python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+Verification completed on 2026-07-16. Clean detached baseline
+`8ca524387a92ea444b63fb28cac723ca4c9feebb` and candidate measurements used
+the same `ci-vulkan` Clang 23 Debug ASan/UBSan configuration, serialized idle
+host, and byte-identical harness. The large-fixture median changed from
+1,031.895895 ms to 555.416594 ms (46.175% lower), normalized scaling changed
+from 1.726739 to 1.195250, quality L2 remained zero, and the output signature
+matched exactly (`5684639256857304174`). These are scoped local sanitized
+measurements, not a broad performance claim or timing gate. All 22 emitted
+benchmark results validated strictly; the default CPU-supported gate passed
+3,830/3,830.
 
 ## Forbidden changes
 
@@ -120,7 +135,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 ## Maturity
 
-- Target: `Operational`: geometry correctness and declared scaling evidence
+- Achieved: `Operational`: geometry correctness and declared scaling evidence
   establish `CPUContracted`; a generated real runtime enrichment/close path
   proves the fix reaches the workload that exposed it. No Vulkan proof is
   required because the hot work is CPU-only.

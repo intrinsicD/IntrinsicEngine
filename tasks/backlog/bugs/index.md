@@ -5,22 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-101` — Fast-staged UV edge grouping is quadratic](../../active/BUG-101-fast-staged-uv-edge-grouping-quadratic.md):
-  fast-staged atlas generation linearly scans all prior edge groups for every
-  triangle incidence and rebuilds the same groups for seam recording, leaving
-  dense direct-mesh enrichment CPU-hot and shutdown waiting for minutes.
-- [`BUG-100` — Manual geometry import blocks the Sandbox frame loop](../../active/BUG-100-manual-geometry-import-blocks-frame-loop.md):
-  File / Import queues model/texture payloads but calls the synchronous API for
-  Mesh/Graph/PointCloud, freezing ImGui during large reads/decodes despite an
-  existing deferred dropped-geometry path.
-- [`BUG-099` — Binary PLY point-cloud import rejects face-list elements](../../active/BUG-099-binary-ply-pointcloud-skips-face-lists.md):
-  both checked-in endian fixtures succeed as Mesh but fail as PointCloud
-  because the binary point-cloud reader rejects list properties on unrelated
-  non-vertex elements instead of consuming them safely.
-- [`BUG-098` — Frame clock samples an incomplete frame delta](../../active/BUG-098-frame-clock-samples-incomplete-frame-delta.md):
-  runtime samples `now - BeginFrame` before meaningful frame work, starving
-  simulation/UI time and preventing production-delay disabled tooltips from
-  appearing even under a stable multi-second hover.
 - [`BUG-097` — Progressive model-scene UV job publishes a zero atlas](BUG-097-progressive-model-scene-zero-uv-atlas.md):
   the default-off progressive enrichment path labels an all-zero authoritative
   `v:texcoord` property as an atlas and can publish it after newer UV/topology
@@ -51,6 +35,27 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   headroom while preserving fail-closed semantics.
 
 ## Verified / Closed
+
+- Closed 2026-07-16: [`BUG-101` — Fast-staged UV edge grouping is quadratic](../../done/BUG-101-fast-staged-uv-edge-grouping-quadratic.md).
+  Normalized edge-key lookup now preserves deterministic first-seen ordering
+  and reuses source groups for seam recording. Declared baseline comparison
+  records exact output parity and scoped local sanitized scaling evidence;
+  generated runtime coverage proves bounded enrichment and close.
+
+- Closed 2026-07-16: [`BUG-100` — Manual geometry import blocks the Sandbox frame loop](../../done/BUG-100-manual-geometry-import-blocks-frame-loop.md).
+  Every frame-driven payload now uses the existing queued import lane, with
+  worker-only decode, bounded main-thread apply, fail-closed cancellation, and
+  shutdown cancellation before policy teardown.
+
+- Closed 2026-07-16: [`BUG-099` — Binary PLY point-cloud import rejects face-list elements](../../done/BUG-099-binary-ply-pointcloud-skips-face-lists.md).
+  The binary point-cloud reader now safely consumes unrelated scalar/list rows
+  in either endian order while retaining strict vertex-list rejection and
+  truncation/overflow checks.
+
+- Closed 2026-07-16: [`BUG-098` — Frame clock samples an incomplete frame delta](../../done/BUG-098-frame-clock-samples-incomplete-frame-delta.md).
+  Runtime consumers now receive the bounded previous completed-frame duration,
+  restoring real production-delay ImGui hover timing without changing the
+  minimized-window sleep contract.
 
 - Closed 2026-07-16: [`BUG-094` — Model-scene import drops node semantics and standard selection behavior](../../done/BUG-094-model-scene-node-semantics-selection.md).
   CPU decode now retains active-scene hierarchy, transforms, and shared

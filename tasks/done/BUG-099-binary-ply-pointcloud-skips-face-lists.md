@@ -8,10 +8,13 @@ maturity_target: CPUContracted
 
 ## Status
 
-- In progress on 2026-07-16; owner: Codex geometry worker; branch:
-  `agent/sandbox-model-workflow-completion`.
-- Next gate: endian-safe non-vertex list consumption plus malformed binary
-  PLY regression coverage.
+- Completed on 2026-07-16 at `CPUContracted`; implementation commit:
+  `bb985f61`.
+- `IntrinsicGeometryTests` built; all 78 point-cloud IO cases and the focused
+  17-test binary PLY selection passed. The aggregate build and default
+  CPU-supported gate passed 3,830/3,830; strict structural and documentation
+  checks passed.
+- `ASSETIO-011` retains the real Sandbox `Operational` matrix follow-up.
 
 ## Goal
 
@@ -50,51 +53,51 @@ maturity_target: CPUContracted
 
 ## Required changes
 
-- [ ] Add one bounds-checked binary property consumer for non-vertex PLY rows:
+- [x] Add one bounds-checked binary property consumer for non-vertex PLY rows:
       fixed scalars advance by their declared width; list properties decode an
       integral count in the file's endian order and advance by
       `count * elementWidth` with overflow/truncation checks.
-- [ ] Reject negative, floating, overflowing, or truncated list counts and
+- [x] Reject negative, floating, overflowing, or truncated list counts and
       retain strict rejection of vertex-list properties.
-- [ ] Preserve element order and cursor alignment when scalar and list
+- [x] Preserve element order and cursor alignment when scalar and list
       properties are interleaved or when multiple non-vertex elements exist.
-- [ ] Keep the public point-cloud IO module surface unchanged.
+- [x] Keep the public point-cloud IO module surface unchanged.
 
 ## Tests
 
-- [ ] Add generated little- and big-endian point-cloud PLY fixtures whose
+- [x] Add generated little- and big-endian point-cloud PLY fixtures whose
       vertex element is followed by a valid face index list; assert exact
       positions and successful decode.
-- [ ] Add mixed scalar/list non-vertex coverage and malformed cases for
+- [x] Add mixed scalar/list non-vertex coverage and malformed cases for
       truncated count, truncated payload, negative signed count, floating
       count type, and multiplication overflow where representable.
-- [ ] Preserve the existing regression that rejects a list property inside
+- [x] Preserve the existing regression that rejects a list property inside
       the vertex element.
-- [ ] Exercise the two checked-in endian fixtures through focused geometry IO
+- [x] Exercise the two checked-in endian fixtures through focused geometry IO
       coverage without making screenshot evidence the durable test oracle.
 
 ## Docs
 
-- [ ] Update the geometry IO support notes to state that point-cloud PLY reads
+- [x] Update the geometry IO support notes to state that point-cloud PLY reads
       ignore but strictly consume non-vertex elements, including lists.
-- [ ] Refresh task indexes/session brief and retirement records on closure.
+- [x] Refresh task indexes/session brief and retirement records on closure.
 
 ## Acceptance criteria
 
-- [ ] Both endian variants decode valid vertex-plus-face-list PLY as a point
+- [x] Both endian variants decode valid vertex-plus-face-list PLY as a point
       cloud with the exact declared vertices.
-- [ ] Malformed list counts or payloads fail closed without out-of-bounds reads
+- [x] Malformed list counts or payloads fail closed without out-of-bounds reads
       or cursor desynchronization.
-- [ ] Mesh PLY behavior and vertex-list rejection remain unchanged.
-- [ ] The focused geometry unit suite and default CPU-supported gate pass.
+- [x] Mesh PLY behavior and vertex-list rejection remain unchanged.
+- [x] The focused geometry unit suite and default CPU-supported gate pass.
 
 ## Verification
 
 ```bash
 cmake --preset ci
-cmake --build --preset ci --target IntrinsicGeometryUnitTests
+cmake --build --preset ci --target IntrinsicGeometryTests
 ctest --test-dir build/ci --output-on-failure \
-  -R '^GeometryIO_PointCloudIO\..*Binary.*PLY' \
+  -R '^GeometryIO_PointCloudIO\.(LoadsBinary.*PLY.*|LoadsCheckedInBinaryPLY.*|LoadPLYPointCloudRejectsTruncatedBinaryBody|BinaryPLYPointCloudRejects.*|LoadPLYPointCloudRejectsListPropertyInVertex)$' \
   -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure \
@@ -115,6 +118,6 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 ## Maturity
 
-- Target: `CPUContracted` for the geometry-owned format contract;
+- Achieved: `CPUContracted` for the geometry-owned format contract;
   `Operational` owned by `ASSETIO-011` through the real Sandbox control
   matrix.

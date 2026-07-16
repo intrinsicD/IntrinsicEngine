@@ -8,10 +8,13 @@ maturity_target: Operational
 
 ## Status
 
-- In progress on 2026-07-16; owner: Codex; branch:
-  `agent/sandbox-model-workflow-completion`.
-- Next gate: completed-frame clock regression plus the production-delay real
-  File / Import hover integration.
+- Completed on 2026-07-16 at `Operational`; implementation commit:
+  `c9f7067a`.
+- The actual `IntrinsicCoreWrapperUnitTests` and
+  `IntrinsicSandboxEditorIntegrationTests` targets built, and the focused six
+  clock cases plus production-delay File / Import hover integration passed
+  7/7. The aggregate build and default CPU-supported gate passed 3,830/3,830;
+  strict structural and documentation checks passed.
 
 ## Goal
 
@@ -51,51 +54,51 @@ maturity_target: Operational
 
 ## Required changes
 
-- [ ] Make the clamped frame-delta query use the stored previous completed
+- [x] Make the clamped frame-delta query use the stored previous completed
       duration and keep its result in the documented non-negative bounded
       range.
-- [ ] Update FrameClock API comments and runtime documentation so
+- [x] Update FrameClock API comments and runtime documentation so
       `LastRawDelta()` is no longer described as telemetry-only while the
       simulation/UI delta is sampled from the same completed-frame record.
-- [ ] Preserve `BeginFrame()`/`Resample()`/`EndFrame()` ownership and the
+- [x] Preserve `BeginFrame()`/`Resample()`/`EndFrame()` ownership and the
       minimized-window sleep exclusion contract.
-- [ ] Keep Dear ImGui's production `Stationary | DelayShort` tooltip policy;
+- [x] Keep Dear ImGui's production `Stationary | DelayShort` tooltip policy;
       do not hide the runtime defect with `DelayNone`.
 
 ## Tests
 
-- [ ] Add a core unit regression proving the clamped delta remains exactly the
+- [x] Add a core unit regression proving the clamped delta remains exactly the
       stored completed-frame duration after `EndFrame()` instead of continuing
       to accumulate current wall time.
-- [ ] Extend the real Null-window `File / Import` presentation test to retain
+- [x] Extend the real Null-window `File / Import` presentation test to retain
       production tooltip flags, advance completed frame time deterministically,
       and observe the disabled control's tooltip after the configured delay.
-- [ ] Preserve zero-limit, non-negative, resample, and first-frame behavior.
+- [x] Preserve zero-limit, non-negative, resample, and first-frame behavior.
 
 ## Docs
 
-- [ ] Update `src/core/README.md` and `src/runtime/README.md` with the
+- [x] Update `src/core/README.md` and `src/runtime/README.md` with the
       completed-frame delta contract.
-- [ ] Regenerate the module inventory only if the exported module surface
+- [x] Regenerate the module inventory only if the exported module surface
       changes structurally rather than semantically.
-- [ ] Refresh task indexes/session brief and retirement records on closure.
+- [x] Refresh task indexes/session brief and retirement records on closure.
 
 ## Acceptance criteria
 
-- [ ] Every engine time consumer receives a non-negative delta derived from
+- [x] Every engine time consumer receives a non-negative delta derived from
       the previous completed frame and bounded by `m_MaxFrameDelta`.
-- [ ] A default-delay disabled-control tooltip appears through the real
+- [x] A default-delay disabled-control tooltip appears through the real
       `Engine::Run()`/ImGui adapter path without changing production hover
       flags.
-- [ ] Deliberate idle/minimized sleep does not inject a catch-up timestep, and
+- [x] Deliberate idle/minimized sleep does not inject a catch-up timestep, and
       the first frame remains deterministic.
-- [ ] Focused core/runtime tests and the default CPU-supported gate pass.
+- [x] Focused core/runtime tests and the default CPU-supported gate pass.
 
 ## Verification
 
 ```bash
 cmake --preset ci
-cmake --build --preset ci --target IntrinsicCoreUnitTests IntrinsicSandboxEditorIntegrationTests
+cmake --build --preset ci --target IntrinsicCoreWrapperUnitTests IntrinsicSandboxEditorIntegrationTests
 ctest --test-dir build/ci --output-on-failure \
   -R '^CoreFrameClock\.|^SandboxEditorPresentation\.FileImportDisabledReasonRendersThroughRealHoveredControl$' \
   -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
@@ -119,6 +122,6 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 ## Maturity
 
-- Target: `Operational` through the real Null-window `Engine::Run()` and
+- Achieved: `Operational` through the real Null-window `Engine::Run()` and
   ImGui-adapter tooltip path, with the dependency-free clock semantics pinned
   at `CPUContracted` by core unit tests. No Vulkan-specific follow-up is owed.

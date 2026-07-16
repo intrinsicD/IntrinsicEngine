@@ -8,10 +8,14 @@ maturity_target: Operational
 
 ## Status
 
-- In progress on 2026-07-16; owner: Codex runtime worker; branch:
+- Completed on 2026-07-16 at `Operational`; owner: Codex; branch:
   `agent/sandbox-model-workflow-completion`.
-- Next gate: a real Null-window manual geometry command returns `Pending`,
-  advances frames while decode is blocked, then applies exactly once.
+- Commit references: `56352aa7` queues every frame-driven import route and
+  cancels outstanding imports before shutdown tears down application policy;
+  `694b8b3f` aligns stale-session coverage with the queued result contract.
+  Focused runtime coverage passed 5/5, focused
+  presentation coverage passed 3/3, and the default CPU-supported gate passed
+  3,830/3,830.
 
 ## Right-sizing note
 
@@ -60,59 +64,59 @@ maturity_target: Operational
 - Owner: runtime import composition and facade command wiring. `app` renders
   the existing pending/queue model and remains `app -> runtime` only.
 - The separately observed multi-minute OBJ UV enrichment worker and close-time
-  drain are owned by `BUG-101`; stale postprocess overwrite/readiness is owned
-  by `BUG-095`.
+  quadratic drain were fixed by `BUG-101`; stale postprocess
+  overwrite/readiness remains owned by `BUG-095`.
 
 ## Required changes
 
-- [ ] Generalize the existing dropped-geometry streaming helper into one
+- [x] Generalize the existing dropped-geometry streaming helper into one
       source-aware queued geometry import path returning
       `RuntimeQueuedAssetImport`; preserve dropped-file multi-candidate
       fallback and manual explicit-hint behavior.
-- [ ] Make the Sandbox import command queue every supported payload and return
+- [x] Make the Sandbox import command queue every supported payload and return
       `Pending` plus the ingest handle immediately; remove its geometry-only
       synchronous branch.
-- [ ] Keep route/ingest state creation on the frame thread, decode on the
+- [x] Keep route/ingest state creation on the frame thread, decode on the
       worker, and `AssetService`/ECS/post-import/selection/focus/history apply
       on the bounded main-thread completion lane.
-- [ ] Preserve cancellation, terminal queue diagnostics, duplicate-active
+- [x] Preserve cancellation, terminal queue diagnostics, duplicate-active
       request handling, completed-handler behavior, and exactly-once dirty
       marking for manual and dropped sources.
-- [ ] Keep the direct synchronous API available and clearly documented as
+- [x] Keep the direct synchronous API available and clearly documented as
       inappropriate for frame-driven UI callbacks.
 
 ## Tests
 
-- [ ] Add a deterministic fake/blocking geometry decoder contract proving a
+- [x] Add a deterministic fake/blocking geometry decoder contract proving a
       real Sandbox import command returns `Pending` before the worker is
       released and the engine continues producing ImGui frames.
-- [ ] Assert queued manual Mesh, Graph, and PointCloud results materialize,
+- [x] Assert queued manual Mesh, Graph, and PointCloud results materialize,
       select, focus, mark dirty, and publish one terminal ingest event after
       the worker/apply barrier is released.
-- [ ] Add cancellation and failure coverage proving no partial asset/entity
+- [x] Add cancellation and failure coverage proving no partial asset/entity
       apply and no history mutation.
-- [ ] Preserve dropped-file candidate routing and synchronous direct-API
+- [x] Preserve dropped-file candidate routing and synchronous direct-API
       contracts.
 
 ## Docs
 
-- [ ] Update `src/runtime/README.md` and `src/app/Sandbox/README.md` so all
+- [x] Update `src/runtime/README.md` and `src/app/Sandbox/README.md` so all
       frame-driven File / Import routes are documented as queued while the
       direct API remains synchronous for explicit non-frame callers.
-- [ ] Regenerate the module inventory if the public queued import surface
+- [x] Regenerate the module inventory if the public queued import surface
       changes.
-- [ ] Refresh task indexes/session brief and retirement records on closure.
+- [x] Refresh task indexes/session brief and retirement records on closure.
 
 ## Acceptance criteria
 
-- [ ] No Sandbox File / Import geometry read/decode runs inside the ImGui
+- [x] No Sandbox File / Import geometry read/decode runs inside the ImGui
       callback; the command promptly returns `Pending` with an operation.
-- [ ] While a deterministic worker is blocked, the frame counter and UI
+- [x] While a deterministic worker is blocked, the frame counter and UI
       continue advancing and no ECS/asset/history mutation is visible.
-- [ ] Successful completion applies once on the main thread with the same
+- [x] Successful completion applies once on the main thread with the same
       entity authoring, visibility, selection, focus, and queue diagnostics as
       the former synchronous path.
-- [ ] Cancellation/failure remains fail-closed and all focused/default CPU
+- [x] Cancellation/failure remains fail-closed and all focused/default CPU
       gates pass.
 
 ## Verification
@@ -121,7 +125,10 @@ maturity_target: Operational
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests
 ctest --test-dir build/ci --output-on-failure \
-  -R '^RuntimeAssetImportFormatCoverage\.QueuedManualGeometry|^SandboxEditorUi\.FileImportGeometryRemainsResponsive' \
+  -R '^SandboxEditorUi\.(QueuedManualGeometryImportsRemainResponsiveAndApplyOnce|QueuedManualGeometryCancellationPreventsApply|QueuedManualGeometryDecodeFailureIsFailClosed|ShutdownCancelsBlockedManualGeometryBeforePolicyUnregister|DroppedFileImportFailureLogsDiagnostics)$' \
+  -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+ctest --test-dir build/ci --output-on-failure \
+  -R '^SandboxEditorSession\.StaleCopiedSurfacesFailAfterDetachAndReattach$' \
   -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure \
@@ -134,6 +141,12 @@ python3 tools/docs/check_doc_links.py --root .
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
 
+Verification completed on 2026-07-16. The blocked decoder contract proved
+that ImGui frames continue before release, completion applies once on the main
+thread, cancellation and decode failure remain fail-closed, and shutdown
+cancels blocked or apply-ready work before unregistering policy state. The
+aggregate build and default CPU-supported gate passed 3,830/3,830.
+
 ## Forbidden changes
 
 - Calling the synchronous import API from the Sandbox ImGui command path.
@@ -144,6 +157,6 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 ## Maturity
 
-- Target: `Operational` through a real Null-window Sandbox import command that
+- Achieved: `Operational` through a real Null-window Sandbox import command that
   remains responsive while decode is deterministically blocked and then
   observes queued completion. No Vulkan-specific follow-up is owed.

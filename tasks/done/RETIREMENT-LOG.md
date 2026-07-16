@@ -8,6 +8,50 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-101`](BUG-101-fast-staged-uv-edge-grouping-quadratic.md) — fast-staged UV
+edge grouping retired on 2026-07-16 at `Operational`. Commit `25d27068`
+replaces the per-incidence vector-wide search with reserved normalized edge-key
+lookup while preserving first-seen group and face order, then reuses those
+groups for seam recording. Two deterministic geometry regressions plus a real
+generated-grid runtime enrichment/close contract passed 3/3. The declared
+runner emitted 22 strictly valid results; on one controlled local Clang 23
+Debug ASan/UBSan host, the large-grid median changed from 1,031.895895 ms to
+555.416594 ms (46.175% lower), normalized scaling changed from 1.726739 to
+1.195250, quality L2 remained zero, and the exact output signature matched.
+The evidence is explicitly local and is neither a broad claim nor a timing
+gate. The aggregate build and default CPU-supported gate passed 3,830/3,830.
+
+[`BUG-100`](BUG-100-manual-geometry-import-blocks-frame-loop.md) — manual
+Sandbox geometry import retired on 2026-07-16 at `Operational`. Commit
+`56352aa7` routes Mesh, Graph, PointCloud, ModelScene, and Texture2D commands
+through the existing queued import lane: route state stays on the frame thread,
+decode runs on the worker, and assets/ECS/selection/focus/history apply once on
+the bounded main-thread drain. Shutdown now cancels blocked or apply-ready
+imports before unregistering application policy. Commit `694b8b3f` updates the
+stale-session regression for the queued `Pending` contract while retaining its
+detach/reattach rejection proof. Focused runtime/diagnostic coverage passed
+5/5, app presentation coverage passed 3/3, the repaired lifecycle test passed
+1/1, and the aggregate default CPU-supported gate passed 3,830/3,830.
+
+[`BUG-099`](BUG-099-binary-ply-pointcloud-skips-face-lists.md) — binary PLY
+point-cloud list consumption retired on 2026-07-16 at `CPUContracted`. Commit
+`bb985f61` adds endian-aware, bounds-checked consumption of non-vertex scalar
+and list properties while rejecting negative, floating, overflowing, or
+truncated counts and retaining strict vertex-list rejection. Both checked-in
+endian fixtures and generated interleaving/malformed cases passed; the focused
+binary selection passed 17/17 and the aggregate default CPU-supported gate
+passed 3,830/3,830. `ASSETIO-011` retains the real Sandbox `Operational`
+workflow matrix.
+
+[`BUG-098`](BUG-098-frame-clock-samples-incomplete-frame-delta.md) — incomplete
+frame-delta sampling retired on 2026-07-16 at `Operational`. Commit `c9f7067a`
+makes `FrameDeltaClamped()` return the bounded previous completed-frame
+duration instead of the few microseconds elapsed immediately after
+`BeginFrame()`, while preserving first-frame zero and minimized-window sleep
+exclusion. Six clock cases and the real Null-window `Engine::Run()` production-
+delay File / Import tooltip path passed 7/7. The aggregate build and default
+CPU-supported gate passed 3,830/3,830, with no Vulkan-specific follow-up owed.
+
 [`BUG-094`](BUG-094-model-scene-node-semantics-selection.md) — the model-scene
 node-semantics and selection defect retired on 2026-07-16 at `Operational`.
 Commit `16c30545` retains the selected glTF scene's deterministic hierarchy,
