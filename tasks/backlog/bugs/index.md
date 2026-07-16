@@ -17,7 +17,7 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   deferred import enrichment validates only entity liveness before replacing
   live geometry, allowing newer position, topology, UV, or property edits to be
   lost; apply must be generation-keyed and stale-safe.
-- [`BUG-094` — Model-scene import drops node semantics and standard selection behavior](BUG-094-model-scene-node-semantics-selection.md):
+- [`BUG-094` — Model-scene import drops node semantics and standard selection behavior](../../active/BUG-094-model-scene-node-semantics-selection.md):
   glTF decode flattens meshes without active-scene traversal, hierarchy,
   transforms, or instancing, and model primitives bypass standard selectable,
   completion, selection, and focus authoring.

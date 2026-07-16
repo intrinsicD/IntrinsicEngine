@@ -6,6 +6,14 @@ maturity_target: Operational
 ---
 # BUG-094 — Model-scene import drops node semantics and standard selection behavior
 
+## Status
+
+- In progress on 2026-07-16; owner: Codex; branch:
+  `agent/bug-094-model-scene-semantics`.
+- Slice A starts regression-first with the CPU scene payload and active-scene
+  traversal contract. Runtime hierarchy/completion and capable-host Vulkan
+  proof remain required before retirement at `Operational`.
+
 ## Goal
 - Make a successful glTF model-scene import preserve active-scene membership,
   node hierarchy and local transforms, and repeated mesh instances, then pass
