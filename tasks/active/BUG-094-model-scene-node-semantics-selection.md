@@ -10,13 +10,14 @@ maturity_target: Operational
 
 - In progress on 2026-07-16; owner: Codex; branch:
   `agent/bug-094-model-scene-semantics`.
-- Slices A and B are implemented and focused verification is green. The CPU
+- Slices A, B, and C are implemented and verified. The CPU
   payload retains active-scene roots, pre-order hierarchy, local transforms,
   and shared primitive prototypes for GLTF and GLB; runtime materializes that
   hierarchy, applies the standard mesh authoring policy, and completes once
-  with aggregate focus for synchronous and queued imports. The task is
-  `CPUContracted`; capable-host Vulkan proof (Slice C) remains required before
-  it can become `Operational`.
+  with aggregate focus for synchronous and queued imports. A capable-host
+  Vulkan smoke proves a transformed imported instance visible and click-pickable
+  through real readback. The task has reached `Operational`; the default CPU
+  aggregate merge gate remains before retirement.
 
 ## Goal
 - Make a successful glTF model-scene import preserve active-scene membership,
@@ -76,7 +77,7 @@ maturity_target: Operational
   fixture and a handoff assertion for geometry/material upload. The new GLTF,
   GLB, payload-topology, malformed-scene, hierarchy, authoring-component,
   reload, completion, selection, and focus contracts pin the CPU behavior;
-  Slice C still needs visible-pixel and mouse-pick coverage.
+  Slice C adds the capable-host visible-pixel and mouse-pick proof.
 
 ## Slice plan
 - **Slice A — CPU scene contract.** Extend the assets payload and decoder with
@@ -134,14 +135,15 @@ maturity_target: Operational
       Exercise both synchronous and queued routes and assert one completion,
       deterministic selected entity, and a focus target enclosing the
       world-space primitive bounds.
-- [ ] Add opt-in Vulkan acceptance coverage in
+- [x] Add opt-in Vulkan acceptance coverage in
       `tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp`
       named
       `RuntimeSandboxAcceptanceGpuSmoke.ImportedModelSceneIsVisibleAndClickPickable`.
-      Import a checked-in transformed, instanced fixture, prove non-black
-      readback at a projected primitive, and prove mouse readback selects that
-      primitive. Capability absence may skip; a capable operational device must
-      fail on wrong pixels or selection.
+      Import a checked-in transformed, instanced fixture, prove a foreground
+      readback distinct from the light-blue clear at a projected primitive,
+      and prove mouse readback selects that primitive. Capability
+      absence may skip; a capable operational device must fail on wrong pixels
+      or selection.
 
 ## Docs
 - [x] Document the model payload's scene/node/instance semantics and the
@@ -166,7 +168,7 @@ maturity_target: Operational
 - [x] Both synchronous and queued model-scene imports run completion exactly
       once, select the deterministic first primitive, and frame aggregate
       world-space bounds.
-- [ ] The CPU contracts pass under the Null backend and the opt-in Vulkan smoke
+- [x] The CPU contracts pass under the Null backend and the opt-in Vulkan smoke
       proves the promoted path visible and click-pickable on a capable host.
 - [x] Layering remains compliant: assets holds CPU data, runtime owns ECS
       composition, and graphics sees only snapshots/views and asset IDs.
@@ -222,8 +224,22 @@ Slice B verification on 2026-07-16:
   documentation-link, root-hygiene, skill-sync, clean-workshop automated, and
   diff checks passed. Regenerating the public module inventory produced no diff
   and retained 386 modules.
-- The default CPU-supported aggregate gate and Slice C capable-host Vulkan
-  smoke are still pending in this checkpoint.
+- The default CPU-supported aggregate gate remained pending at this checkpoint;
+  Slice C evidence is recorded below.
+
+Slice C verification on 2026-07-16:
+
+- `IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests` built successfully from the
+  `ci-vulkan` preset.
+- `RuntimeSandboxAcceptanceGpuSmoke.ImportedModelSceneIsVisibleAndClickPickable`
+  passed 1/1 in 4.52 seconds on an NVIDIA GeForce RTX 3050 with driver
+  590.48.01. The smoke imported the checked-in transformed/instanced glTF,
+  proved a distinct surface pixel at the focused-camera projection, and proved
+  refined Mesh/Face selection of the second instance through real Vulkan
+  readback.
+- The new smoke plus the existing
+  `ClickPickReadbackSelectsReferenceTriangleAndBackgroundClears` regression
+  passed 2/2. Fixture JSON, test labels, and the diff checks passed.
 
 ## Forbidden changes
 - Treating all `model.meshes` entries as scene instances or silently applying
@@ -237,6 +253,8 @@ Slice B verification on 2026-07-16:
 
 ## Maturity
 - Target: `Operational`.
+- Achieved on 2026-07-16 by the capable-host Slice C visible-and-click-pickable
+  smoke above.
 - `CPUContracted` requires deterministic decoder, malformed-input, hierarchy,
   transform, authoring-component, selection, and focus contracts through the
   real runtime import routes.

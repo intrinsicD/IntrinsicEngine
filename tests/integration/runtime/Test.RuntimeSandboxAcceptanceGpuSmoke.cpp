@@ -78,6 +78,7 @@ import Extrinsic.RHI.Types;
 import Extrinsic.Sandbox.Editor.Controller;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
+import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
@@ -2303,6 +2304,59 @@ constexpr std::uint32_t kBug024TotalFrames = 8u;
             toPixel(ndcY, static_cast<std::uint32_t>(extent.Height))};
 }
 
+// Model-scene completion focuses the runtime-owned camera on aggregate import
+// bounds, so the fixed reference-camera projection above is no longer valid.
+// Project through the active controller's actual post-focus view instead.
+[[nodiscard]] std::optional<std::pair<std::uint32_t, std::uint32_t>>
+ProjectMainCameraPixel(
+    Engine& engine,
+    const glm::vec3 world,
+    const Extrinsic::Core::Extent2D extent) noexcept
+{
+    if (extent.Width == 0u || extent.Height == 0u)
+    {
+        return std::nullopt;
+    }
+
+    const Extrinsic::Runtime::ICameraController* controller =
+        engine.GetCameraControllerRegistry().ResolveOrNull(
+            Extrinsic::Runtime::CameraControllerSlot::Main);
+    if (controller == nullptr)
+    {
+        return std::nullopt;
+    }
+
+    const auto camera = controller->GetView(extent);
+    const glm::vec4 clip =
+        camera.Projection * camera.View * glm::vec4{world, 1.0f};
+    if (!camera.Valid || !std::isfinite(clip.x) || !std::isfinite(clip.y) ||
+        !std::isfinite(clip.w) || clip.w <= 0.000001f)
+    {
+        return std::nullopt;
+    }
+
+    const glm::vec2 ndc{clip.x / clip.w, clip.y / clip.w};
+    if (!std::isfinite(ndc.x) || !std::isfinite(ndc.y) ||
+        ndc.x < -1.0f || ndc.x > 1.0f ||
+        ndc.y < -1.0f || ndc.y > 1.0f)
+    {
+        return std::nullopt;
+    }
+
+    const auto toPixel = [](const float value, const std::uint32_t size) noexcept
+    {
+        const float lastPixel = static_cast<float>(size - 1u);
+        return static_cast<std::uint32_t>(
+            std::clamp((value + 1.0f) * 0.5f * lastPixel,
+                       0.0f,
+                       lastPixel));
+    };
+    return std::pair{
+        toPixel(ndc.x, static_cast<std::uint32_t>(extent.Width)),
+        toPixel(ndc.y, static_cast<std::uint32_t>(extent.Height)),
+    };
+}
+
 inline constexpr float kReferenceTriangleLineWidthSmokePx = 12.0f;
 inline constexpr std::uint32_t kReferenceTriangleLineWidthSampleRadius = 7u;
 inline constexpr std::uint32_t kReferenceTriangleLineWidthMinDarkPixels = 12u;
@@ -3763,10 +3817,26 @@ constexpr float kBug026PlaneTolerance = 0.05f;
 class ClickPickRoundTripApp final : public IApplication
 {
 public:
+    void SetTarget(
+        const EntityHandle entity,
+        const glm::vec3 worldPoint,
+        std::string targetName,
+        const std::uint32_t postBackgroundSettleFrames = 0u)
+    {
+        m_Triangle = entity;
+        m_TargetWorldPoint = worldPoint;
+        m_TargetName = std::move(targetName);
+        m_UseFocusedCameraProjection = true;
+        m_PostBackgroundSettleFrames = postBackgroundSettleFrames;
+    }
+
     void OnInitialize(Engine& engine) override
     {
         m_EditorUi.Attach(engine);
-        m_Triangle = FindEntityByName(engine.GetScene(), "ReferenceTriangle");
+        if (m_Triangle == Extrinsic::ECS::InvalidEntityHandle)
+        {
+            m_Triangle = FindEntityByName(engine.GetScene(), "ReferenceTriangle");
+        }
     }
 
     void OnSimTick(Engine&, double) override {}
@@ -3777,7 +3847,8 @@ public:
         if (m_Triangle == Extrinsic::ECS::InvalidEntityHandle ||
             !engine.GetScene().IsValid(m_Triangle))
         {
-            FailureReason = "ReferenceTriangle was not present while driving the click-pick smoke.";
+            FailureReason = m_TargetName +
+                " was not present while driving the click-pick smoke.";
             engine.RequestExit();
             return;
         }
@@ -3798,7 +3869,24 @@ public:
             {
                 break;
             }
-            TrianglePixel = ProjectReferenceCameraPixel(glm::vec3{0.0f, 0.0f, 0.0f}, extent);
+            if (m_UseFocusedCameraProjection)
+            {
+                const auto projected =
+                    ProjectMainCameraPixel(engine, m_TargetWorldPoint, extent);
+                if (!projected.has_value())
+                {
+                    FailureReason = "Could not project " + m_TargetName +
+                        " through the focused main camera.";
+                    engine.RequestExit();
+                    return;
+                }
+                TrianglePixel = *projected;
+            }
+            else
+            {
+                TrianglePixel = ProjectReferenceCameraPixel(
+                    glm::vec3{0.0f, 0.0f, 0.0f}, extent);
+            }
             engine.GetSelectionController().RequestClickPick(TrianglePixel.first, TrianglePixel.second);
             TriangleClickSubmitted = true;
             m_Phase = Phase::AwaitTriangleHit;
@@ -3819,6 +3907,21 @@ public:
             if (ObserveBackgroundNoHit(engine))
             {
                 BackgroundNoHitObserved = true;
+                if (m_PostBackgroundSettleFrames == 0u)
+                {
+                    m_Phase = Phase::Done;
+                    engine.RequestExit();
+                }
+                else
+                {
+                    m_Phase = Phase::SettleAfterBackground;
+                }
+            }
+            break;
+        case Phase::SettleAfterBackground:
+            ++m_BackgroundSettleFrames;
+            if (m_BackgroundSettleFrames >= m_PostBackgroundSettleFrames)
+            {
                 m_Phase = Phase::Done;
                 engine.RequestExit();
             }
@@ -3855,6 +3958,7 @@ private:
         SubmitTriangleClick,
         AwaitTriangleHit,
         AwaitBackgroundNoHit,
+        SettleAfterBackground,
         Done,
     };
 
@@ -3924,9 +4028,14 @@ private:
 
     Extrinsic::Sandbox::Editor::SandboxEditorController m_EditorUi{};
     EntityHandle m_Triangle{Extrinsic::ECS::InvalidEntityHandle};
+    glm::vec3 m_TargetWorldPoint{0.0f};
+    std::string m_TargetName{"ReferenceTriangle"};
     Phase m_Phase{Phase::SubmitTriangleClick};
     std::uint32_t m_Frames{0u};
     std::uint32_t m_NoHitsBeforeBackground{0u};
+    std::uint32_t m_PostBackgroundSettleFrames{0u};
+    std::uint32_t m_BackgroundSettleFrames{0u};
+    bool m_UseFocusedCameraProjection{false};
 };
 } // namespace
 
@@ -4003,6 +4112,272 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ClickPickReadbackSelectsReferenceTriangle
     EXPECT_EQ(FindPassStatus(run.Stats, "Present"), RenderCommandPassStatus::Recorded)
         << BuildPassStatusSummary(run.Stats);
 
+    engine.Shutdown();
+}
+
+// BUG-094 Slice C — operational proof that the model-scene route preserves
+// transformed mesh instances all the way through sandbox authoring, surface
+// rendering, and Vulkan selection readback. The target is the second instance:
+// import completion initially selects the first, so observing the second as the
+// sole selected entity proves the click readback changed authoritative state.
+TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedModelSceneIsVisibleAndClickPickable)
+{
+    auto app = std::make_unique<ClickPickRoundTripApp>();
+    auto* appPtr = app.get();
+    auto bootstrap = BootstrapDefaultSandboxAppEngineWithApp(std::move(app));
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+
+    const std::filesystem::path fixturePath =
+        std::filesystem::path{__FILE__}
+            .parent_path()
+            .parent_path()
+            .parent_path()
+            .parent_path() /
+        "assets/models/__test_bug094_instanced_triangle.gltf";
+    ASSERT_TRUE(std::filesystem::exists(fixturePath))
+        << "Missing checked-in BUG-094 model-scene fixture: "
+        << fixturePath.string();
+
+    auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(
+        Extrinsic::Runtime::RuntimeAssetImportRequest{
+            .Path = fixturePath.string(),
+            .PayloadKind = Assets::AssetPayloadKind::ModelScene,
+        });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+    EXPECT_EQ(imported->PayloadKind, Assets::AssetPayloadKind::ModelScene);
+    EXPECT_TRUE(imported->MaterializedModelScene);
+    EXPECT_EQ(imported->PrimitiveEntitiesCreated, 2u);
+
+    auto& raw = engine.GetScene().Raw();
+    std::vector<EntityHandle> instances{};
+    raw.view<ECSC::MetaData>().each(
+        [&](const EntityHandle entity, const ECSC::MetaData& metadata)
+        {
+            if (metadata.EntityName != "BUG094SharedTriangle")
+            {
+                return;
+            }
+            const gs::ConstSourceView source = gs::BuildConstView(raw, entity);
+            if (source.Valid() && source.ActiveDomain == gs::Domain::Mesh)
+            {
+                instances.push_back(entity);
+            }
+        });
+    ASSERT_EQ(instances.size(), 2u);
+    std::sort(
+        instances.begin(),
+        instances.end(),
+        [&](const EntityHandle lhs, const EntityHandle rhs)
+        {
+            return raw.get<ECSC::Culling::World::Bounds>(lhs)
+                       .WorldBoundingSphere.Center.x <
+                   raw.get<ECSC::Culling::World::Bounds>(rhs)
+                       .WorldBoundingSphere.Center.x;
+        });
+
+    for (const EntityHandle instance : instances)
+    {
+        ASSERT_TRUE(engine.GetScene().IsValid(instance));
+        ASSERT_TRUE((raw.all_of<
+            ECSC::Transform::Component,
+            ECSC::Transform::WorldMatrix,
+            ECSC::Culling::Local::Bounds,
+            ECSC::Culling::World::Bounds,
+            ECSC::Selection::SelectableTag,
+            G::RenderSurface,
+            G::VisualizationConfig,
+            gs::Vertices,
+            gs::Edges,
+            gs::Halfedges,
+            gs::Faces>(instance)));
+        const gs::ConstSourceView source = gs::BuildConstView(raw, instance);
+        ASSERT_TRUE(source.Valid());
+        EXPECT_EQ(source.ActiveDomain, gs::Domain::Mesh);
+        EXPECT_EQ(source.VerticesAlive(), 3u);
+        EXPECT_EQ(source.FacesAlive(), 1u);
+        EXPECT_EQ(raw.get<G::VisualizationConfig>(instance).Source,
+                  G::VisualizationConfig::ColorSource::Material);
+    }
+
+    const EntityHandle firstInstance = instances[0];
+    const EntityHandle targetInstance = instances[1];
+    const auto& firstWorld =
+        raw.get<ECSC::Transform::WorldMatrix>(firstInstance).Matrix;
+    const auto& targetWorld =
+        raw.get<ECSC::Transform::WorldMatrix>(targetInstance).Matrix;
+    EXPECT_NEAR(firstWorld[3].x, -1.0f, 0.0001f);
+    EXPECT_NEAR(targetWorld[3].x, 1.0f, 0.0001f);
+    EXPECT_NE(firstWorld[3].x, targetWorld[3].x);
+    EXPECT_TRUE(engine.GetSelectionController().IsSelected(firstInstance));
+    EXPECT_FALSE(engine.GetSelectionController().IsSelected(targetInstance));
+
+    const glm::vec4 targetWorldPoint4 =
+        targetWorld * glm::vec4{0.0f, 0.0f, 0.0f, 1.0f};
+    ASSERT_TRUE(std::isfinite(targetWorldPoint4.x));
+    ASSERT_TRUE(std::isfinite(targetWorldPoint4.y));
+    ASSERT_TRUE(std::isfinite(targetWorldPoint4.z));
+    ASSERT_GT(std::abs(targetWorldPoint4.w), 0.000001f);
+    const glm::vec3 targetWorldPoint =
+        glm::vec3{targetWorldPoint4} / targetWorldPoint4.w;
+    // Two clear frames after the background no-hit keep the final color
+    // readback free of the target's selection outline.
+    appPtr->SetTarget(
+        targetInstance,
+        targetWorldPoint,
+        "BUG094RightInstance primitive",
+        2u);
+
+    auto& renderer = engine.GetRenderer();
+    auto& device = engine.GetDevice();
+    const Extrinsic::RHI::Format backbufferFormat =
+        device.GetBackbufferFormat();
+    const std::uint32_t bytesPerPixel =
+        Extrinsic::RHI::BytesPerBlock(backbufferFormat);
+    const Extrinsic::Core::Extent2D extent = device.GetBackbufferExtent();
+    if (bytesPerPixel < 4u || extent.Width == 0u || extent.Height == 0u)
+    {
+        engine.Shutdown();
+        GTEST_SKIP()
+            << "Backbuffer format or extent cannot support the BUG-094 readback.";
+    }
+
+    const std::uint64_t readbackSize =
+        static_cast<std::uint64_t>(bytesPerPixel) *
+        static_cast<std::uint64_t>(extent.Width) *
+        static_cast<std::uint64_t>(extent.Height);
+    const Extrinsic::RHI::BufferHandle readbackBuffer =
+        device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+            .SizeBytes = readbackSize,
+            .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+            .HostVisible = true,
+            .DebugName = "Sandbox.Bug094ModelScene.Readback",
+        });
+    if (!readbackBuffer.IsValid())
+    {
+        engine.Shutdown();
+        GTEST_SKIP()
+            << "Readback buffer allocation failed; gpu;vulkan smoke is opt-in.";
+    }
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbackBuffer);
+
+    const auto run = DriveAcceptanceAndCapture(engine);
+    if (!run.DeviceOperational)
+    {
+        renderer.SetDefaultRecipeBackbufferReadbackBuffer(
+            Extrinsic::RHI::BufferHandle{});
+        device.DestroyBuffer(readbackBuffer);
+        engine.Shutdown();
+        ADD_FAILURE()
+            << "BUG-094 model-scene smoke did not reach operational Vulkan: status="
+            << ToString(run.Status.Code)
+            << " reason=" << ToString(run.Status.Reason)
+            << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+        return;
+    }
+
+    ASSERT_TRUE(appPtr->FailureReason.empty()) << appPtr->FailureReason;
+    ASSERT_TRUE(appPtr->TriangleClickSubmitted)
+        << "The model-scene smoke never submitted its projected primitive click.";
+    ASSERT_TRUE(appPtr->TriangleHitObserved)
+        << "The Vulkan pick readback did not select the second model instance. "
+        << "target pixel=(" << appPtr->TrianglePixel.first << ","
+        << appPtr->TrianglePixel.second << ") background pixel=("
+        << appPtr->BackgroundPixel.first << ","
+        << appPtr->BackgroundPixel.second << ")";
+    ASSERT_TRUE(appPtr->TriangleHitResult.has_value());
+    ASSERT_TRUE(appPtr->BackgroundClickSubmitted);
+    ASSERT_TRUE(appPtr->BackgroundNoHitObserved);
+
+    const Extrinsic::Runtime::PrimitiveSelectionResult& hit =
+        *appPtr->TriangleHitResult;
+    EXPECT_EQ(hit.Status,
+              Extrinsic::Runtime::PrimitiveRefineStatus::Success);
+    EXPECT_EQ(
+        hit.EntityId,
+        Extrinsic::Runtime::SelectionController::ToStableEntityId(
+            targetInstance));
+    EXPECT_EQ(hit.Domain, gs::Domain::Mesh);
+    EXPECT_EQ(hit.Kind, Extrinsic::Runtime::RefinedPrimitiveKind::Face);
+    EXPECT_EQ(hit.FaceId, 0u);
+    EXPECT_TRUE(hit.CursorFromDepth);
+    EXPECT_GT(hit.Depth, 0.0f);
+    EXPECT_LT(hit.Depth, 0.999f);
+
+    const auto selectionDiagnostics =
+        engine.GetSelectionController().GetDiagnostics();
+    EXPECT_EQ(selectionDiagnostics.ClickRequestsSubmitted, 2u);
+    EXPECT_EQ(selectionDiagnostics.PicksDrained, 2u);
+    EXPECT_EQ(selectionDiagnostics.Hits, 1u);
+    EXPECT_EQ(selectionDiagnostics.NoHits, 1u);
+    EXPECT_EQ(selectionDiagnostics.NonSelectableHitsRejected, 0u);
+    EXPECT_EQ(engine.GetSelectionController().SelectedCount(), 0u);
+    EXPECT_FALSE(raw.all_of<ECSC::Selection::SelectedTag>(targetInstance));
+
+    const auto& extraction = engine.GetLastRenderExtractionStats();
+    EXPECT_GE(extraction.CandidateRenderableCount, 2u);
+    EXPECT_GE(extraction.MeshGeometryUploads + extraction.MeshGeometryReuseHits,
+              2u);
+    EXPECT_EQ(extraction.MeshGeometryFailedPack, 0u);
+    EXPECT_EQ(extraction.MeshGeometryInvalidTopology, 0u);
+    EXPECT_TRUE(run.Stats.Compile.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_TRUE(run.Stats.Execute.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_EQ(FindPassStatus(run.Stats, "DepthPrepass"),
+              RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_EQ(FindPassStatus(run.Stats, "SurfacePass"),
+              RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_EQ(FindPassStatus(run.Stats, "Present"),
+              RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u);
+
+    const GpuInstanceConfigReadback targetGpu =
+        ReadVisibleInstanceConfigByEntityId(
+            device,
+            renderer,
+            Extrinsic::Runtime::SelectionController::ToStableEntityId(
+                targetInstance),
+            Extrinsic::RHI::GpuRender_Surface);
+    EXPECT_TRUE(targetGpu.Found)
+        << "The imported target instance did not reach the visible GPU surface lane.";
+
+    std::vector<std::uint8_t> bytes(
+        static_cast<std::size_t>(readbackSize),
+        0u);
+    device.ReadBuffer(readbackBuffer, bytes.data(), readbackSize, 0u);
+    const RgbaPixel background = ReadPixel(
+        bytes,
+        backbufferFormat,
+        bytesPerPixel,
+        extent,
+        static_cast<std::uint32_t>((extent.Width * 15u) / 16u),
+        static_cast<std::uint32_t>((extent.Height * 15u) / 16u));
+    const ForegroundSample targetPixel = FindMostForegroundPixel(
+        bytes,
+        backbufferFormat,
+        bytesPerPixel,
+        extent,
+        appPtr->TrianglePixel.first,
+        appPtr->TrianglePixel.second,
+        8u,
+        background);
+    EXPECT_GT(targetPixel.BackgroundDistance, 48)
+        << "The transformed model instance did not contribute a visible pixel at "
+        << "its focused-camera projection. target=" << PixelText(targetPixel.Pixel)
+        << " background=" << PixelText(background)
+        << " projected=(" << appPtr->TrianglePixel.first << ","
+        << appPtr->TrianglePixel.second << ") extent="
+        << extent.Width << "x" << extent.Height
+        << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(
+        Extrinsic::RHI::BufferHandle{});
+    device.DestroyBuffer(readbackBuffer);
     engine.Shutdown();
 }
 
