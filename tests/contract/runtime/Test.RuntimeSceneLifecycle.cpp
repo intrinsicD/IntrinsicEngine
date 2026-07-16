@@ -1,9 +1,11 @@
-#include <cstdint>
 #include <atomic>
+#include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <functional>
 #include <memory>
+#include <thread>
 #include <utility>
 #include <variant>
 
@@ -105,12 +107,17 @@ namespace
     class WaitForConditionApplication final : public Runtime::IApplication
     {
     public:
+        using Clock = std::chrono::steady_clock;
         using Predicate = std::function<bool(Runtime::Engine&)>;
 
         explicit WaitForConditionApplication(Predicate predicate,
-                                             std::uint32_t maxFrames = 256u)
+                                             std::chrono::milliseconds timeout =
+                                                 std::chrono::seconds(10),
+                                             std::chrono::milliseconds pollDelay =
+                                                 std::chrono::milliseconds(1))
             : m_Predicate(std::move(predicate))
-            , m_MaxFrames(maxFrames)
+            , m_Timeout(timeout)
+            , m_PollDelay(pollDelay)
         {
         }
 
@@ -118,18 +125,53 @@ namespace
         void OnSimTick(Runtime::Engine&, double) override {}
         void OnVariableTick(Runtime::Engine& engine, double, double) override
         {
+            const Clock::time_point now = Clock::now();
+            if (!m_Started)
+            {
+                m_Started = true;
+                m_StartedAt = now;
+                m_Deadline = now + m_Timeout;
+            }
+
             ++m_Frames;
-            if ((m_Predicate && m_Predicate(engine)) || m_Frames >= m_MaxFrames)
+            if (m_Predicate && m_Predicate(engine))
+            {
+                m_Satisfied = true;
+                m_Elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    now - m_StartedAt);
                 engine.RequestExit();
+                return;
+            }
+
+            if (now >= m_Deadline)
+            {
+                m_TimedOut = true;
+                m_Elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    now - m_StartedAt);
+                engine.RequestExit();
+                return;
+            }
+
+            std::this_thread::sleep_for(m_PollDelay);
         }
         void OnShutdown(Runtime::Engine&) override {}
 
         std::uint32_t Frames() const noexcept { return m_Frames; }
+        bool ConditionSatisfied() const noexcept { return m_Satisfied; }
+        bool TimedOut() const noexcept { return m_TimedOut; }
+        std::chrono::milliseconds Elapsed() const noexcept { return m_Elapsed; }
 
     private:
         Predicate m_Predicate{};
-        std::uint32_t m_MaxFrames{0u};
+        std::chrono::milliseconds m_Timeout{};
+        std::chrono::milliseconds m_PollDelay{};
+        Clock::time_point m_StartedAt{};
+        Clock::time_point m_Deadline{};
+        std::chrono::milliseconds m_Elapsed{};
         std::uint32_t m_Frames{0u};
+        bool m_Started{false};
+        bool m_Satisfied{false};
+        bool m_TimedOut{false};
     };
 
     class TempSceneFile final
@@ -237,6 +279,48 @@ TEST(RuntimeRenderExtraction, VisualizationAdapterBindingRevisionTracksMutations
     EXPECT_EQ(cache.GetVisualizationAdapterBindingRevision(), 3u);
 }
 
+TEST(RuntimeSceneLifecycle, AsyncWaitAllowsCompletionBeyondLegacyFrameBudget)
+{
+    std::uint32_t predicateCalls = 0u;
+    auto application = std::make_unique<WaitForConditionApplication>(
+        [&predicateCalls](Runtime::Engine&)
+        {
+            ++predicateCalls;
+            return predicateCalls > 256u;
+        },
+        std::chrono::seconds(10));
+    WaitForConditionApplication* app = application.get();
+    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
+    engine.Initialize();
+    engine.Run();
+
+    EXPECT_TRUE(app->ConditionSatisfied());
+    EXPECT_FALSE(app->TimedOut());
+    EXPECT_GE(app->Elapsed(), std::chrono::milliseconds(200));
+    EXPECT_GT(app->Frames(), 256u);
+    EXPECT_EQ(app->Frames(), predicateCalls);
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeSceneLifecycle, AsyncWaitReportsElapsedTimeout)
+{
+    auto application = std::make_unique<WaitForConditionApplication>(
+        [](Runtime::Engine&) { return false; },
+        std::chrono::milliseconds(5));
+    WaitForConditionApplication* app = application.get();
+    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
+    engine.Initialize();
+    engine.Run();
+
+    EXPECT_FALSE(app->ConditionSatisfied());
+    EXPECT_TRUE(app->TimedOut());
+    EXPECT_GE(app->Elapsed(), std::chrono::milliseconds(5));
+    EXPECT_GT(app->Frames(), 1u);
+
+    engine.Shutdown();
+}
+
 TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSidecars)
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
@@ -340,7 +424,10 @@ TEST(RuntimeSceneLifecycle, QueuedSceneSaveWritesSnapshotAndMarksHistoryOnComple
         << "explicit Null window backend must keep Engine::Run() drivable";
     engine.Run();
 
-    EXPECT_LT(app->Frames(), 256u);
+    ASSERT_TRUE(app->ConditionSatisfied())
+        << "scene save timed out after " << app->Elapsed().count()
+        << " ms and " << app->Frames() << " frames";
+    EXPECT_FALSE(app->TimedOut());
     const std::optional<Runtime::RuntimeSceneFileEvent>& event =
         engine.GetSceneDocument().GetLastSceneFileEvent();
     ASSERT_TRUE(event.has_value());
@@ -403,7 +490,10 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadInvalidDocumentFailsClosed)
         << "explicit Null window backend must keep Engine::Run() drivable";
     engine.Run();
 
-    EXPECT_LT(app->Frames(), 256u);
+    ASSERT_TRUE(app->ConditionSatisfied())
+        << "invalid scene load timed out after " << app->Elapsed().count()
+        << " ms and " << app->Frames() << " frames";
+    EXPECT_FALSE(app->TimedOut());
     const std::optional<Runtime::RuntimeSceneFileEvent>& event =
         engine.GetSceneDocument().GetLastSceneFileEvent();
     ASSERT_TRUE(event.has_value());
@@ -430,7 +520,8 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadAppliesParsedSceneOnMainThread)
         {
             const std::optional<Runtime::RuntimeSceneFileEvent>& event =
                 runningEngine.GetSceneDocument().GetLastSceneFileEvent();
-            return event.has_value() && event->Succeeded();
+            return event.has_value() &&
+                   event->Operation == Runtime::RuntimeSceneFileOperation::Load;
         });
     WaitForConditionApplication* app = application.get();
     Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
@@ -455,7 +546,10 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadAppliesParsedSceneOnMainThread)
         << "explicit Null window backend must keep Engine::Run() drivable";
     engine.Run();
 
-    EXPECT_LT(app->Frames(), 256u);
+    ASSERT_TRUE(app->ConditionSatisfied())
+        << "scene load timed out after " << app->Elapsed().count()
+        << " ms and " << app->Frames() << " frames";
+    EXPECT_FALSE(app->TimedOut());
     const std::optional<Runtime::RuntimeSceneFileEvent>& event =
         engine.GetSceneDocument().GetLastSceneFileEvent();
     ASSERT_TRUE(event.has_value());

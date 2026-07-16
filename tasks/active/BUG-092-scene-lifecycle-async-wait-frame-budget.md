@@ -7,7 +7,7 @@ depends_on: []
 
 ## Status
 
-- In progress on 2026-07-16; owner: Codex; branch:
+- Completed on 2026-07-16 at maturity `CPUContracted`; owner: Codex; branch:
   `codex/arch-006-completion`.
 - Root cause and controlled-delay reproduction are complete. The selected
   repair is test-only: a ten-second steady-clock deadline, a one-millisecond
@@ -38,8 +38,10 @@ depends_on: []
   teardown drained the worker. The failed case took 3.78 s.
 - Expected behavior: a bounded, valid queued save may complete slowly under
   ordinary host contention, and the contract should keep driving maintenance
-  until its elapsed-time budget expires. A genuinely hung task must still fail
-  closed with an actionable timeout assertion.
+  until its elapsed-time budget expires. An absent observed completion must
+  stop the main loop with actionable helper state; the existing 30-second
+  per-test CTest property remains the outer guard if a non-returning worker
+  also prevents `ShutdownAndDrain()` from returning.
 - Impact: unrelated runtime/architecture work can lose the required CPU gate
   even though scene serialization and shutdown draining behave correctly.
 - Root cause: this file's `WaitForConditionApplication` bounds asynchronous
@@ -65,6 +67,26 @@ depends_on: []
   `Runtime.StreamingExecutor`; its `Engine::RunFrame()` diff preserves the
   maintenance order and only changes private helper ownership from values to
   pointers. The failure is therefore not caused by `RUNTIME-178`.
+- Selected repair and evidence: the test-local helper now uses a ten-second
+  `steady_clock` budget and sleeps one millisecond after each unsuccessful
+  predicate check. A checked-in regression succeeds only on predicate call
+  257 and requires at least 200 ms elapsed, so restoring either the old frame
+  ceiling or the no-yield loop fails deterministically. A second regression
+  exercises an explicit five-millisecond timeout. All five focused contracts
+  passed 20 consecutive repetitions each (100 executions in 62.15 seconds),
+  and the three real scene-file paths passed 100 consecutive repetitions each
+  (300 executions in 66.65 seconds). Re-running the Linux `strace` injection
+  at the real save seam delayed the 624-byte worker write by five seconds and
+  the fixed test passed in 5.151 seconds; the same injection failed the old
+  helper at 5.14 seconds. `SceneDocument` constructs its file backend inside
+  the worker, so adding a production injection hook solely for this test was
+  rejected as disproportionate; the checked-in helper regression plus the
+  repeatable syscall-delay command split portable contract coverage from
+  real-I/O operational evidence.
+- The aggregate `IntrinsicTests` build and default CPU-supported gate passed;
+  the latter completed 3,787/3,787 tests in 402.05 seconds. Independent review
+  found no remaining determinism, lifetime, timeout-semantics, right-sizing, or
+  documentation blocker.
 - Ranked hypotheses and disposition:
   1. Frame-count-only waiting expires before a delayed worker completion:
      confirmed by the five-second syscall-delay repro.
@@ -77,46 +99,49 @@ depends_on: []
      diff and provenance audit.
 
 ## Required changes
-- [ ] Replace the helper's frame-count-only stop condition with an explicit
+- [x] Replace the helper's frame-count-only stop condition with an explicit
       `std::chrono::steady_clock` deadline and a small bounded yield/sleep after
       each unsuccessful predicate check; retain a diagnostic frame count but
       make elapsed time the failure budget.
-- [ ] Expose whether the helper stopped because its predicate succeeded or its
+- [x] Expose whether the helper stopped because its predicate succeeded or its
       deadline expired so assertions report the actual asynchronous timeout
       rather than cascading from a missing optional event.
-- [ ] Apply the corrected helper contract to queued save, invalid queued load,
+- [x] Apply the corrected helper contract to queued save, invalid queued load,
       and successful queued load without changing production I/O behavior.
-- [ ] Calibrate the deadline below the test's 60-second CTest limit using clean
+- [x] Calibrate the deadline below the effective 30-second per-test CTest
+      property using clean
       and controlled-delay evidence; normal successful runs must not pay the
       full deadline.
 
 ## Tests
-- [ ] Turn the controlled delayed-worker scenario into repeatable regression
-      evidence at the real runtime/scene-file seam, using the existing test
-      helper or a narrowly scoped test hook rather than a production sleep.
-- [ ] Prove the queued-save contract passes when completion arrives within the
-      declared elapsed-time budget and fails with an explicit timeout when it
-      does not.
-- [ ] Run all three queued scene-file lifecycle contracts repeatedly in
+- [x] Pin the old 256-frame failure in a portable checked-in helper regression
+      and retain the repeatable five-second syscall-delay command as real
+      runtime/scene-file-seam evidence without adding a production sleep or
+      injection API.
+- [x] Prove delayed helper success within the declared elapsed-time budget and
+      direct timeout state when no completion is observed; retain the CTest
+      process timeout as the outer guard for a non-drainable worker.
+- [x] Run all three queued scene-file lifecycle contracts repeatedly in
       isolation and together; retain snapshot, event, history, and fail-closed
       load assertions.
-- [ ] Run the default CPU-supported gate after the focused repair.
+- [x] Run the default CPU-supported gate after the focused repair.
 
 ## Docs
-- [ ] Record the selected elapsed-time budget, controlled-delay distribution,
+- [x] Record the selected elapsed-time budget, controlled-delay distribution,
       and final diagnosis in this task; update the bug index and retirement log
       when the repair is verified.
-- [ ] Update runtime/testing guidance only if the fix establishes a reusable
-      asynchronous contract-test wait policy.
+- [x] Keep the policy local to this one helper; no broader runtime/testing
+      guidance is warranted by a one-file test-harness repair.
 
 ## Acceptance criteria
-- [ ] The real queued scene-save test remains end-to-end through
+- [x] The real queued scene-save test remains end-to-end through
       `Engine::RunFrame()` maintenance and main-thread completion application.
-- [ ] A completion delayed within the declared budget cannot be mistaken for a
+- [x] A completion delayed within the declared budget cannot be mistaken for a
       missing event solely because the Null backend advanced 256 frames.
-- [ ] A genuinely absent completion remains bounded and reports a direct,
-      actionable timeout reason.
-- [ ] No production runtime behavior, module surface, or layering edge changes
+- [x] An absent observed completion bounds `Engine::Run()` and reports direct
+      satisfied/timed-out state plus elapsed time and frame count; CTest's
+      30-second property still bounds a worker that cannot drain.
+- [x] No production runtime behavior, module surface, or layering edge changes
       unless new evidence demonstrates that the test-only correction is
       insufficient.
 
@@ -124,13 +149,15 @@ depends_on: []
 ```bash
 cmake --build --preset ci --target IntrinsicRuntimeContractTests
 ctest --test-dir build/ci --output-on-failure \
+  -R '^RuntimeSceneLifecycle\.(AsyncWaitAllowsCompletionBeyondLegacyFrameBudget|AsyncWaitReportsElapsedTimeout|QueuedSceneSaveWritesSnapshotAndMarksHistoryOnCompletion|QueuedSceneLoadInvalidDocumentFailsClosed|QueuedSceneLoadAppliesParsedSceneOnMainThread)$' \
+  --repeat until-fail:20 --timeout 60
+ctest --test-dir build/ci --output-on-failure \
   -R '^RuntimeSceneLifecycle\.(QueuedSceneSaveWritesSnapshotAndMarksHistoryOnCompletion|QueuedSceneLoadInvalidDocumentFailsClosed|QueuedSceneLoadAppliesParsedSceneOnMainThread)$' \
   --repeat until-fail:100 --timeout 60
 
-# Diagnostic reproduction of the original bug: the pre-fix test reaches 256
-# frames before the worker's first scene-file write returns, then applies the
-# successful completion only during shutdown. Keep this as diagnostic evidence
-# unless a portable controlled-delay seam replaces it.
+# Real-seam controlled-delay evidence: the pre-fix test reaches 256 frames and
+# fails before the worker write returns; the fixed test observes and applies
+# the same five-second-delayed completion before its ten-second deadline.
 cd build/ci/tests
 LSAN_OPTIONS='suppressions=/home/alex/Documents/IntrinsicEngine/lsan.supp:fast_unwind_on_malloc=0:detect_leaks=0' \
   strace -f -qq -e trace=write \
