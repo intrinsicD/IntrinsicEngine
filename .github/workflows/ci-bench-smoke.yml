@@ -48,7 +48,7 @@ jobs:
           python3 tools/ci/time_command.py \
             --label "Configure (ci preset)" \
             --warm-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
-            --max-warm-seconds 20 \
+            --max-warm-seconds 40 \
             --json-out build/ci/ci-timing/phases/configure.json \
             -- cmake --preset ci
 

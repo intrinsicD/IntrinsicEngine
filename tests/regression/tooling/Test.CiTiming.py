@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -9,6 +10,7 @@ import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+WORKFLOW_ROOT = REPO_ROOT / ".github" / "workflows"
 TIME_COMMAND = REPO_ROOT / "tools" / "ci" / "time_command.py"
 AGGREGATOR = REPO_ROOT / "tools" / "ci" / "aggregate_gate_timing.py"
 MANIFEST_VALIDATOR = (
@@ -23,6 +25,15 @@ CI_BASELINE = (
     / "baselines"
     / "ci_gate_latency_github_ubuntu_24_04_v1.json"
 )
+WARM_CONFIGURE_BUDGET_SECONDS = 40.0
+WARM_CONFIGURE_CALL_COUNTS = {
+    "pr-fast.yml": 1,
+    "ci-linux-clang.yml": 1,
+    "ci-sanitizers.yml": 1,
+    "ci-vulkan.yml": 1,
+    "ci-bench-smoke.yml": 1,
+    "nightly-deep.yml": 2,
+}
 
 
 def _write_phase(path: Path, elapsed_seconds: float, returncode: int = 0) -> None:
@@ -194,6 +205,58 @@ class CiTimingTests(unittest.TestCase):
             failure_payload = json.loads(failure_path.read_text(encoding="utf-8"))
             self.assertEqual(failure_payload["returncode"], 7)
             self.assertEqual(failure_payload["command_returncode"], 7)
+
+            over_budget_path = tmp_path / "over-budget.json"
+            over_budget = subprocess.run(
+                [
+                    sys.executable,
+                    str(TIME_COMMAND),
+                    "--label",
+                    "over-budget",
+                    "--warm-cache-hit",
+                    "true",
+                    "--max-warm-seconds",
+                    "0",
+                    "--json-out",
+                    str(over_budget_path),
+                    "--",
+                    sys.executable,
+                    "-c",
+                    "import time; time.sleep(0.01)",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            self.assertEqual(over_budget.returncode, 1)
+            self.assertIn("exact vcpkg cache hit", over_budget.stderr)
+            over_budget_payload = json.loads(
+                over_budget_path.read_text(encoding="utf-8")
+            )
+            self.assertTrue(over_budget_payload["warm_cache_hit"])
+            self.assertEqual(over_budget_payload["command_returncode"], 0)
+            self.assertEqual(over_budget_payload["returncode"], 1)
+
+    def test_workflow_warm_configure_budgets_match_hosted_evidence(self) -> None:
+        observed: dict[str, list[float]] = {}
+        for path in sorted(WORKFLOW_ROOT.glob("*.yml")):
+            budgets = [
+                float(value)
+                for value in re.findall(
+                    r"--max-warm-seconds\s+([0-9]+(?:\.[0-9]+)?)",
+                    path.read_text(encoding="utf-8"),
+                )
+            ]
+            if budgets:
+                observed[path.name] = budgets
+
+        expected = {
+            name: [WARM_CONFIGURE_BUDGET_SECONDS] * count
+            for name, count in WARM_CONFIGURE_CALL_COUNTS.items()
+        }
+        self.assertEqual(observed, expected)
 
     def test_aggregator_converts_units_and_emits_valid_result(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -33,6 +33,63 @@ Cold and warm-cache samples are reported separately. Performance claims require
 at least five comparable samples and cite median and p95 plus the exact commit,
 runner image, preset, sanitizer, and gate selector.
 
+### Warm-configure failure guard
+
+`time_command.py --max-warm-seconds` is a hard failure only when
+`actions/cache` reports an exact vcpkg binary-cache hit. `BUG-081` calibrated
+the guard from contemporary exact-hit GitHub Actions runs collected on
+2026-07-09 through 2026-07-16. Every population used `ubuntu-24.04`, Clang 20,
+the workflow's declared preset, and an exact cache identity; samples span image
+versions `20260705.232.1` and `20260714.240.1`. Median uses the conventional
+midpoint rule and p95 uses nearest rank, so p95 is the observed maximum for
+these small populations.
+
+| Guarded context | Exact-hit samples (run: seconds) | Median | p95 |
+| --- | --- | ---: | ---: |
+| `pr-fast` | [29326012528](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29326012528): 6.882; [29310409627](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29310409627): 7.749; [29306897219](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29306897219): 6.082; [29290382724](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29290382724): 15.464; [29211278659](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29211278659): 6.515; [29211167225](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29211167225): 22.002 | 7.316 s | 22.002 s |
+| `ci-linux-clang` | [29505287087](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29505287087): 9.959; [29501697671](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29501697671): 12.952; [29491998461](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29491998461): 9.509; [29488777640](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29488777640): 10.741; [29488509696](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29488509696): 5.922; [29485440146](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29485440146): 18.261; [29482204431](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29482204431): 11.490; [29482105867](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29482105867): 9.426; [29333921619](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29333921619): 6.504; [29326805774](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29326805774): 8.656; [29326012533](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29326012533): 8.775; [29311863286](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29311863286): 11.253; [29310409591](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29310409591): 16.558; [29306897210](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29306897210): 10.784; [29290396424](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29290396424): 6.117; [29290382868](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29290382868): 10.894 | 10.350 s | 18.261 s |
+| `ci-sanitizers` ASan | [29519782498](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29519782498): 30.368; [29326012509](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29326012509): 15.137; [29310409592](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29310409592): 13.916; [29306897170](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29306897170): 11.365; [29290382723](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29290382723): 12.115; [29204545802](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29204545802): 10.013 | 13.016 s | 30.368 s |
+| `ci-sanitizers` UBSan | [29326012509](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29326012509): 10.598; [29310409592](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29310409592): 11.399; [29306897170](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29306897170): 10.077; [29290382723](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29290382723): 8.710; [29204545802](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29204545802): 8.758 | 10.077 s | 11.399 s |
+| `ci-vulkan` | [29326012577](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29326012577): 5.208; [29310409655](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29310409655): 6.198; [29306897280](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29306897280): 14.553; [29290382751](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29290382751): 9.333; [29280699135](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29280699135): 10.406; [29278614647](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29278614647): 5.943; [29277091536](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29277091536): 15.074; [29275795415](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29275795415): 10.871; [29204545763](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29204545763): 10.656 | 10.406 s | 15.074 s |
+| `ci-bench-smoke` | [29519782520](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29519782520): 11.251; [29326012574](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29326012574): 10.211; [29325473494](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29325473494): 12.525; [29310409612](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29310409612): 13.450; [29306897190](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29306897190): 7.508; [29290382853](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29290382853): 10.294; [29204545807](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29204545807): 11.795; [29082107982](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29082107982): 14.019; [29079330843](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29079330843): 9.363 | 11.251 s | 14.019 s |
+| `nightly-deep` CPU | [29475153703](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29475153703): 7.492; [29392444882](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29392444882): 14.153; [29309516631](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29309516631): 8.492; [29227934714](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29227934714): 11.781; [29182066778](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29182066778): 19.032; [29141930320](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29141930320): 10.315; [28998474622](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/28998474622): 24.265 | 11.781 s | 24.265 s |
+
+Direct job-log comparison retained the exact configured/restored primary cache
+identity. Three keys appear in the table:
+
+- `Linux-vcpkg-5473e109440db896a38daaa7aa8eefd0d12331c980f6c350c190cb108ad20c1b`
+  covers every sample except the runs enumerated below.
+- `Linux-vcpkg-51c6cfee9c817d807dcfa0537b51e86c806aa8f10aaa7d35037f0d43dd873785`
+  covers `pr-fast` runs `29211278659` and `29211167225`, both sanitizer
+  contexts in run `29204545802`, `ci-vulkan` run `29204545763`,
+  `ci-bench-smoke` runs `29204545807`, `29082107982`, and `29079330843`,
+  and nightly runs `29141930320`, `29182066778`, and `29227934714`.
+- `Linux-vcpkg-018e2147eaa8a1e2b807e186151e000be7ed0ad931c1822a99e99b9a6813cfa9`
+  covers nightly run `28998474622`.
+
+There are no restore-key-only samples in the retained population. Runner agent
+version was `2.335.1` throughout. Image `20260714.240.1` covers ASan run
+`29519782498`, benchmark-smoke run `29519782520`, and Linux runs `29505287087`,
+`29501697671`, `29488777640`, `29488509696`, `29485440146`, and `29482204431`;
+all remaining samples use image `20260705.232.1`.
+
+The fleet-wide rule is `ceil-to-5-seconds(1.25 × max context p95)`. The maximum
+observed p95 is ASan's `30.368 s`; adding a 25% margin yields `37.960 s`, which
+rounds to a `40 s` hard limit. All seven workflow call sites use that one value.
+The optional self-hosted nightly GPU job has not produced a comparable five-sample
+population, so its otherwise identical call site conservatively inherits the
+fleet maximum instead of an unevidenced lower threshold.
+
+The newer hosted image weakly correlated with higher `ci-linux-clang` timing
+(new-image median `11.116 s`, old-image median `9.468 s`), but ranges overlap
+and the new image also produced a `5.922 s` sample. The evidence does not
+distinguish shared-runner variance, image/context interaction, or source/config
+interaction as the cause of the `30.368 s` ASan tail sample. The calibration
+retains that observed tail without making a causal claim.
+`tests/regression/tooling/Test.CiTiming.py` pins all seven call sites to the
+calibrated finite value and separately proves that an exact cache hit above the
+configured limit still exits non-zero.
+
 The CI-003 pre-optimization baseline is
 [`benchmarks/baselines/ci_gate_latency_github_ubuntu_24_04_v1.json`](../../benchmarks/baselines/ci_gate_latency_github_ubuntu_24_04_v1.json).
 It contains five GitHub Actions API samples for each required gate and both
