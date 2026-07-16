@@ -2,9 +2,9 @@ session:
   id: "2026-07-16_001"
   date: "2026-07-16"
   started: "2026-07-16T00:42+02:00"
-  last_turn: "2026-07-16T23:05+02:00"
-  turn_count: 8
-  summary: "Completed Runtime.Engine convergence and six prior bug closures, audited and repaired the first Sandbox model-workflow defects, published the verified series to remote main, excluded unprovenanced datasets plus incomplete stale task refs, materialized the CI/test audit as a validated dependency-ordered backlog, and compared nine historical repositories into a selective IntrinsicEngine adaptation roadmap."
+  last_turn: "2026-07-16T23:31+02:00"
+  turn_count: 9
+  summary: "Completed Runtime.Engine convergence and six prior bug closures, audited and repaired the first Sandbox model-workflow defects, published the verified series to remote main, excluded unprovenanced datasets plus incomplete stale task refs, materialized and locally integrated the CI/test audit as a validated dependency-ordered backlog, and compared nine historical repositories into a selective IntrinsicEngine adaptation roadmap."
 
 events_logged:
   - turn: 1
@@ -115,6 +115,18 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Updated and audited nine historical repositories, rejected wholesale ports, found two target correctness defects, and ranked the narrow capabilities worth adapting."
+  - turn: 9
+    type: decision
+    id: "N241"
+    routing: direct
+    provenance: user
+    summary: "Directed the committed CI/testing backlog task batch to be merged into main."
+  - turn: 9
+    type: experiment
+    id: "N242"
+    routing: direct
+    provenance: ai-executed
+    summary: "Isolated the two intended commits from 23 unrelated branch commits, passed the full 3,810-test integration gate, and fast-forwarded local main without pushing."
 
 ai_actions:
   - turn: 1
@@ -236,6 +248,20 @@ ai_actions:
       - "ara/trace/pm_reasoning_log.yaml"
       - "ara/trace/sessions/2026-07-16_001.yaml"
       - "ara/trace/sessions/session_index.yaml"
+  - turn: 9
+    action: "Committed the CI/testing backlog and its research record, reconstructed the batch on a clean branch rooted at main, and fast-forwarded only those two commits into local main."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/backlog/bugs/BUG-106-test-gate-capability-routing-drift.md"
+      - "tasks/backlog/bugs/BUG-107-backend-target-graph-configure-history.md"
+      - "tasks/backlog/process/CI-010-cpu-source-coverage-refactor-parity.md"
+      - "tasks/backlog/process/CI-011-measured-slow-test-cohort.md"
+      - "tasks/backlog/process/BUILD-004-source-complete-compile-hotspot-evidence.md"
+      - "tasks/SESSION-BRIEF.md"
+  - turn: 9
+    action: "Passed clean Clang 23 configure/build, all 3,810 CPU-supported tests, and strict task/docs/layering/layout/root/PR structural checks; fetched origin/main and confirmed the local-only two-commit delta."
+    provenance: ai-executed
+    files_changed: []
 
 claims_touched: []
 
@@ -256,6 +282,8 @@ key_context:
     excerpt: "User requested that the audited tasks be created and added to the backlog."
   - turn: 8
     excerpt: "User requested current pulls and a cross-repository audit for architecture, feature, geometry-method, data-structure, and research ideas worth adapting into IntrinsicEngine."
+  - turn: 9
+    excerpt: "User requested that the newly authored CI/testing backlog tasks be committed and merged into main."
 
 open_threads:
   - "Select the next bounded architecture/runtime slice; RUNTIME-168 is the smallest reviewed private-surface candidate, while ARCH-014 remains the umbrella that gates REVIEW-003."

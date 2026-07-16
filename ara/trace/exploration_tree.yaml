@@ -5656,3 +5656,49 @@ tree:
       GEOM-058..062 and METHOD-015..020 already own the useful framework-family
       research gaps, so no duplicate backlog artifacts were created.
     status: resolved
+  - id: N241
+    type: decision
+    title: "Commit the CI/testing backlog and integrate only that batch into main"
+    provenance: user
+    timestamp: "2026-07-16T23:31+02:00"
+    also_depends_on: [N238, N239]
+    choice: >
+      Commit the concrete CI/testing task portfolio and merge it into main.
+      Preserve unrelated branch history and local model inputs outside the
+      integration scope.
+    alternatives:
+      - "Leave the validated task batch uncommitted"
+      - "Fast-forward the original working branch and implicitly include its unrelated prior commits"
+    evidence:
+      - "User instruction: bitte committe diese tasks und merge die in main ein"
+      - "N238"
+      - "N239"
+    status: resolved
+  - id: N242
+    type: experiment
+    title: "Isolate, verify, and fast-forward the CI/testing backlog onto local main"
+    provenance: ai-executed
+    timestamp: "2026-07-16T23:31+02:00"
+    also_depends_on: [N239, N241]
+    evidence:
+      - "7ec39e02 tasks(ci): add coverage-first optimization backlog"
+      - "8126756d research: record CI backlog materialization"
+      - "cmake --preset ci"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+      - "python3 tools/repo/check_root_hygiene.py --root ."
+      - "python3 tools/repo/check_pr_contract.py"
+    result: >
+      Detected that the original work branch was already 23 commits ahead of
+      main, so created a clean integration branch from main and cherry-picked
+      only the task and research commits without conflict. Clang 23 configure
+      and the 1,561-step IntrinsicTests build passed; all 3,810 CPU-supported
+      tests passed in 438.75 seconds. Strict task, task-policy, state-link,
+      documentation, layering, test-layout, root-hygiene, PR-contract, and
+      session-brief checks also passed. Local main was fast-forwarded to
+      8126756d and is two commits ahead of origin/main; no push was requested
+      or performed, and M16.xyz plus child.obj remain untouched and untracked.
+    status: resolved

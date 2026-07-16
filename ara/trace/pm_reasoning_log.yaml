@@ -903,3 +903,10 @@ entries:
       - "Recorded the Fibonacci and voxel findings as correctness gates rather than port requests; both defects are in current IntrinsicEngine code and the legacy sources are only behavioral evidence."
       - "Kept the existing GEOM-058..062 and METHOD-015..020 ownership graph intact and opened no duplicate task records."
       - "Preserved dirty Engine25, Test, Geometry, Engine24 vendor, and IntrinsicEngine worktree state; Engine25 was audited at fetched origin/main because a pull would overwrite local edits."
+  - turn: "2026-07-16_001#9"
+    notes:
+      - "Routed the user's explicit task-batch commit and main-integration instruction as decision N241 and the scope-isolated landing plus verification as experiment N242."
+      - "Rejected a direct fast-forward from the original working branch because it would have carried 23 unrelated prior commits; cherry-picked only the two intended commits onto a branch rooted at main."
+      - "Recorded the full Clang 23 configure/build and 3,810-test CPU-supported gate because this turn upgraded the prior documentation-only validation to integration-grade evidence."
+      - "Did not push origin/main because the user requested commit and merge only; local main remains ahead and ready for an explicit later publication request."
+      - "Preserved M16.xyz and child.obj under N232 and did not stage a new generalized performance claim from a single correctness-gate run."
