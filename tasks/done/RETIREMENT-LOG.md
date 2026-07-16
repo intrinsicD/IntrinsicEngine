@@ -8,6 +8,23 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-174`](RUNTIME-174-privatize-imgui-editor-bridge-surface.md) — the
+Engine-only ImGui editor bridge module surface retired on 2026-07-16 at
+`Operational`. Implementation commit `724a7489` replaces the standalone
+`Extrinsic.Runtime.ImGuiEditorBridge` BMI with an include-only declaration
+attached to `Extrinsic.Runtime.Engine`; the existing implementation unit is
+reattached to Engine with its method bodies unchanged. The bridge remains a
+by-value member in the same position, preserving renderer overlay attach/detach,
+Begin/End bracketing, callback, capture, diagnostics, and teardown order.
+Runtime modules drop from 83 to 82 and repository modules from 390 to 389; the
+dedicated `contract;runtime` guard proves the old module/CMake/inventory entries
+remain absent and the private declaration has exactly one owner. Focused CPU
+coverage passed 52/52, runtime layering passed 23/23, and the default
+CPU-supported gate passed 4,178/4,178 in 452.48 seconds after a successful full
+build. Strict structural and clean-workshop checks passed, and three independent
+reviews found no blockers. Compile timings are retained as diagnostics only; no
+overall speedup is claimed.
+
 [`BUG-090`](BUG-090-async-work-layering-test-stale-shutdown-owner.md) — the
 stale async-work shutdown source assertion retired on 2026-07-16 at
 `CPUContracted`. Implementation commit `406b44d0` updates only the two expected

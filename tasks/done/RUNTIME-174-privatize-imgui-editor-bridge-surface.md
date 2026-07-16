@@ -10,10 +10,11 @@ maturity_target: Operational
 
 ## Status
 
-- Implementation complete on 2026-07-16; owner: Codex; branch:
-  `codex/arch-006-completion`.
-- Next gate: commit the reviewed technical slice, then retire this task at its
-  `Operational` target.
+- Completed on 2026-07-16 at `Operational`.
+- Implementation commit: `724a7489`.
+- Verification: focused CPU coverage passed `52/52`, runtime layering passed
+  `23/23`, and the final default CPU-supported gate passed `4178/4178` after a
+  successful `IntrinsicTests` build. Strict structural/review gates passed.
 
 ## Goal
 - Keep `ImGuiEditorBridge` as an Engine-owned implementation service while

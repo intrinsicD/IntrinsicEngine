@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `RUNTIME-174` — Privatize the ImGuiEditorBridge surface (tasks/active/RUNTIME-174-privatize-imgui-editor-bridge-surface.md)
+- none
 
 ## Theme B — Rendering modernization
 
